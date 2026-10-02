@@ -65,7 +65,7 @@ class ToolPermission:
 
 def offered_tools(projection: RunProjection, department: str, *, guidance_only: bool = False) -> list[str]:
     # 请求中提供给模型的工具：部门的工具，只能回应指导时限于回应指导的范围，再去掉当前工作不允许的提交
-    available = tools_for(department)
+    available = tools_for(department, projection.kind)
     if guidance_only:
         available = [name for name in available if usable_when_guidance_only(name)]
     return [name for name in available if tool_error(projection, department, name, {}) is None]
@@ -95,7 +95,7 @@ def tool_permission(
     if projection.phase in TERMINAL_PHASES or aborted or basis.changed(projection, department):
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
-    if not has_tool(department, name):
+    if not has_tool(department, name, projection.kind):
         return ToolPermission(reason=f"{department} cannot use {name}")
     if guidance_only and not usable_when_guidance_only(name):
         return ToolPermission(reason="This guidance activation cannot change files or submit normal department work.")

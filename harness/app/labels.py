@@ -13,12 +13,21 @@ def event_label(event_type: str, payload: dict[str, Any]) -> str:
     template = _LABELS.get(event_type)
     if template is None:
         raise KeyError(f"no event label is defined for {event_type}")
+    if event_type == EventType.RUN_DONE:
+        # 结束说明按停止原因写成中文，不直接显示英文的停止原因
+        return template.format_map({"stop_reason": _done_text(payload)})
     return template.format_map(_Missing(payload))
 
 class _Missing(dict):
     # 模板里出现载荷没有的字段时填入空串：说明仍然生成，不因此失败
     def __missing__(self, key: str) -> str:
         return ""
+
+def _done_text(payload: dict[str, Any]) -> str:
+    # 以完成结束的两种停止原因（普通事项的放行、建档事项的基线核验）
+    return {"released": "已完成并放行", "baseline_verified": "已完成基线核验"}.get(str(payload.get("stop_reason") or ""),
+                                                                       _stop_text(payload))
+
 
 def _stop_text(payload: dict[str, Any]) -> str:
     return str(payload.get("stop_reason") or "")
@@ -27,7 +36,6 @@ _LABELS: dict[str, str] = {
     EventType.RUN_CREATED: "建立了事项：{task}",
     EventType.USER_INPUT_RECEIVED: "收到用户输入（第 {input_version} 版）：{content}",
     EventType.PRODUCT_INPUT_ASSIGNED: "把用户输入分配给产品部门（第 {input_version} 版）",
-    EventType.DEPARTMENT_PROMPT_UPDATED: "更新了{department}部门的提示词（第 {version} 版）：{reason}",
     EventType.DEPARTMENT_GUIDANCE_RECEIVED: "收到定向指导：{text}",
     EventType.DEPARTMENT_GUIDANCE_APPLIED: "定向指导已被采用：{guidance_ids}",
     EventType.DEPARTMENT_GUIDANCE_RESPONDED: "对定向指导作出回应：{status}",
@@ -59,9 +67,11 @@ _LABELS: dict[str, str] = {
     EventType.PRODUCT_DECISION_ACCEPTED: "采纳了产品决策（{kind}）",
     EventType.DELIVERY_ACCEPTED: "采纳了交付（第 {version} 版）",
     EventType.QA_SUBMITTED: "质检提交了结论：{verdict}",
+    EventType.STRUCTURE_ACCEPTED: "采纳了现有结构说明（第 {revision} 版）",
+    EventType.BASELINE_REVIEW_ACCEPTED: "质检提交了基线核验：{verdict}",
     EventType.LESSON_CANDIDATE_RECORDED: "记下了一条经验候选：{summary}",
     EventType.TRANSITION: "运行状态从 {from_phase} 变为 {to_phase}",
-    EventType.RUN_DONE: "运行结束：已完成并放行",
+    EventType.RUN_DONE: "运行结束：{stop_reason}",
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
     EventType.RUN_CONTINUED: "运行从暂停位置继续：{resumed_at_phase}",
     EventType.RUN_FAILED: "运行失败：{stop_reason}",
@@ -70,6 +80,7 @@ _LABELS: dict[str, str] = {
     EventType.DECISION_WITHDRAWN: "撤回了一个决定（{kind}）",
     ProjectEventType.PROJECT_REGISTERED: "建立了项目：{name}",
     ProjectEventType.PROJECT_RENAMED: "项目改名为：{name}",
+    ProjectEventType.PROJECT_GOAL_CHANGED: "修改了项目的长期目标",
     ProjectEventType.PROJECT_PINNED: "把项目固定到列表顶部",
     ProjectEventType.PROJECT_ARCHIVED: "归档了项目",
     ProjectEventType.PROJECT_RESTORED: "恢复了项目",
@@ -77,7 +88,7 @@ _LABELS: dict[str, str] = {
     ProjectEventType.WORK_ITEM_START_FAILED: "事项未能开始：{reason}",
     ProjectEventType.DELIVERABLE_ADOPTED: "采纳了交付物（第 {version} 版）",
     ProjectEventType.ADOPTION_HELD: "暂缓采纳：{reason}",
-    ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED: "配置了{department}部门的提示词（第 {version} 版）",
+    ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED: "配置了{department}部门的设置（第 {version} 版）",
     ProjectEventType.COMMAND_CONFIGURED: "配置了登记命令 {name}",
     ProjectEventType.MATERIAL_RECORDED: "登记了材料：{summary}",
     ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: "登记了源目录：{path}",
@@ -85,4 +96,5 @@ _LABELS: dict[str, str] = {
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: "收集了模型候选：{count} 个",
     CatalogEventType.CATALOG_TEST_FINISHED: "模型测试结束：{status}",
     CatalogEventType.CREDENTIAL_CHANGED: "凭据发生变化：{operation}",
+    CatalogEventType.HOME_SEEN: "记下用户查看的位置：{position}",
 }

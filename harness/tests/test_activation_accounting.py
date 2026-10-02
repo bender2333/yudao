@@ -10,6 +10,12 @@ from harness.proposals import product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 
+# 本文件里等待一次激活收尾或等待对方线程到达会合点的墙钟界限只用来防止测试一直等待，按 #107 的裁定
+# （架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常用时的值，与 #112 实施方案的
+# 120 秒同一口径。收尾包含 Git 版本库写入一次版本，正常用时数秒；这些界限不判定被测行为，
+# 被等待的动作是否发生由收尾之后的断言核对。
+_WAIT_LIMIT = 120
+
 
 def _message(identity, usage):
     return ModelStreamEvent(
@@ -25,7 +31,7 @@ def test_cancel_does_not_wait_for_provider_or_accept_its_late_error(tmp_path):
 
     def turn(request):
         entered.set()
-        assert release.wait(5)
+        assert release.wait(_WAIT_LIMIT)
         raise ProviderError("late provider failure")
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([turn]))
@@ -33,12 +39,12 @@ def test_cancel_does_not_wait_for_provider_or_accept_its_late_error(tmp_path):
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         try:
-            assert entered.wait(5)
+            assert entered.wait(_WAIT_LIMIT)
             assert system.cancel(run_id).stop_reason == "cancelled"
             assert not future.done()
         finally:
             release.set()
-        result = future.result(timeout=5)
+        result = future.result(timeout=_WAIT_LIMIT)
     assert result.phase == "FAILED" and result.stop_reason == "cancelled"
     assert "late provider failure" not in (result.error or "")
     assert sum(event.type == EventType.RUN_FAILED for event in system.store.list_events(run_id)) == 1
@@ -57,7 +63,7 @@ def test_completed_observations_are_live_and_survive_later_stop(tmp_path, finish
     def turn(call):
         yield _message("second", usage)
         observed.set()
-        assert release.wait(5)
+        assert release.wait(_WAIT_LIMIT)
         if finish == "timeout":
             raise ProviderError("controlled timeout")
         if finish == "cancelled":
@@ -73,7 +79,7 @@ def test_completed_observations_are_live_and_survive_later_stop(tmp_path, finish
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         try:
-            assert observed.wait(5)
+            assert observed.wait(_WAIT_LIMIT)
             live = system.project(run_id)
             events = system.store.list_events(run_id)
             assert not future.done()
@@ -86,7 +92,7 @@ def test_completed_observations_are_live_and_survive_later_stop(tmp_path, finish
                 assert system.cancel(run_id).stop_reason == "cancelled"
         finally:
             release.set()
-        result = future.result(timeout=5)
+        result = future.result(timeout=_WAIT_LIMIT)
     messages = [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_MESSAGE]
     assert result.tool_count == (2 if finish == "success" else 1)
     if finish == "success":
@@ -108,7 +114,7 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
     def turn(call):
         yield _message("first", CallUsage(total_tokens=3000, reported=True))
         observed.set()
-        assert release.wait(5)
+        assert release.wait(_WAIT_LIMIT)
         if call.attempt_id not in adapter.cancelled:
             continued.append("next model round")
         return product_spec()
@@ -119,7 +125,7 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         try:
-            assert observed.wait(5)
+            assert observed.wait(_WAIT_LIMIT)
             current = system.project(run_id)
             assert current.phase == "PRODUCT_SPEC" and current.stop_reason is None
             assert current.token_used == 3000
@@ -127,7 +133,7 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
             assert not adapter.cancelled
         finally:
             release.set()
-        result = future.result(timeout=5)
+        result = future.result(timeout=_WAIT_LIMIT)
     assert continued
     assert result.phase == "ENGINEERING" and result.stop_reason is None
     assert result.product_spec is not None
@@ -149,7 +155,7 @@ def test_cancel_of_another_run_does_not_abort_current_invocation(tmp_path):
 
     def turn(call):
         observed.set()
-        assert release.wait(5)
+        assert release.wait(_WAIT_LIMIT)
         assert call.attempt_id not in adapter.cancelled
         return product_spec()
 
@@ -160,12 +166,12 @@ def test_cancel_of_another_run_does_not_abort_current_invocation(tmp_path):
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, active)
         try:
-            assert observed.wait(5)
+            assert observed.wait(_WAIT_LIMIT)
             assert system.cancel(abandoned).stop_reason == "cancelled"
             assert not adapter.cancelled
         finally:
             release.set()
-        assert future.result(timeout=5).phase == "ENGINEERING"
+        assert future.result(timeout=_WAIT_LIMIT).phase == "ENGINEERING"
 
 
 @pytest.mark.parametrize("reason", ["provider_error", "max_cycles"])

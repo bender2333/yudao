@@ -1,6 +1,18 @@
 {
   "added_defaults": {
+    "department_prompt_configured": {
+      "department_prompt": "旧事件用 text 写部门 Prompt 原文；没有 text 与 department_prompt 时该部门没有写入 Prompt，读取时用内置默认 Prompt（版本 0）",
+      "department_prompt_ref": "旧事件用 prompt_ref 写部门 Prompt 的工件引用；没有它时从 department_prompt（或 text）的原文计算内容哈希，没有原文时该部门没有写入 Prompt",
+      "model_id": "旧事件只做部门 Prompt 设置，没有模型选择；没有这个字段时按「跟随部门默认」处理",
+      "provider_id": "旧事件只做部门 Prompt 设置，没有模型选择；没有这个字段时按「跟随部门默认」处理",
+      "requested_tier": "旧事件只做部门 Prompt 设置，没有请求档位；没有这个字段时按「跟随」处理"
+    },
+    "project_goal_changed": {
+      "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
+      "goal_ref": "这个事件种类是新增的，旧版本的项目流中没有它：目标原文的引用取自 project_registered（或此前最后一条 project_goal_changed）"
+    },
     "work_item_created": {
+      "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
       "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的"
     }
   },
@@ -127,8 +139,11 @@
     "department_prompt_configured": {
       "base_version": "integer",
       "department": "enum string",
-      "prompt_ref": "object",
-      "text": "string",
+      "department_prompt": "string?",
+      "department_prompt_ref": "object?",
+      "model_id": "string?",
+      "provider_id": "string?",
+      "requested_tier": "string?",
       "version": "integer"
     },
     "material_recorded": {
@@ -138,6 +153,10 @@
       "text": "string"
     },
     "project_archived": {},
+    "project_goal_changed": {
+      "goal": "string",
+      "goal_ref": "object"
+    },
     "project_pinned": {
       "pinned": "boolean"
     },
@@ -145,7 +164,7 @@
       "goal": "string",
       "goal_ref": "object",
       "name": "string",
-      "source": "const string"
+      "source": "enum string"
     },
     "project_renamed": {
       "name": "string"
@@ -162,6 +181,7 @@
       "command_versions": "object",
       "context_window": "integer",
       "definitions_version": "string",
+      "kind": "string",
       "max_cycles": "integer",
       "priority": "string",
       "project_context_ref": "object",

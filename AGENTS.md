@@ -38,8 +38,9 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
   - 本次改动或新增的集成层测试文件：`uv run python -m pytest harness/tests/<文件>`
   - 前端测试：`node --test --test-reporter=dot harness/tests/test_web_ui.js`
   - 登记表建立之前（#158 合并之前）：运行与本次改动相关的测试文件与前端测试。
-  - 每次都运行 `uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`：两项检查整个仓库的模块导入关系与接口合同，任何改动都可能影响它们。
+  - 每次都运行 `uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`：两项检查整个仓库的模块导入关系与接口合同，任何改动都可能影响它们。`test_openapi_snapshot.py` 里的两项检查分别核对运行中的服务与 `harness/tests/openapi/openapi.json` 相同、按快照重新生成的客户端类型与提交的 `client/src/renderer/src/api/generated/` 逐文件相同；它需要 `harness/tests/openapi` 与 `client` 各安装一次依赖（各自的 `npm install`），未安装时报错写明缺少哪个文件。改动接口合同的工单在用 `--write-openapi-snapshot` 重写快照以后，在 `client` 中运行 `npm run generate:api` 重新生成客户端类型并提交，两项检查才会都通过。
   - 只用单进程运行，不加 `-n`。集成层全部由架构师按批运行，执行者与审查者不运行全量测试。
+  - 这台机器上同时运行着多个执行者、审查者与集成层测试。只能结束自己启动、并且记下了进程号的进程（`kill <进程号>`），不允许按进程名结束进程（例如 `taskkill /IM python.exe`），也不允许结束不是自己启动的进程。
   - 先看结尾的计数与失败清单；需要细节时，只对失败的那一项加 `--tb=short` 重新运行，或者用 `--lf` 重新运行上次失败的测试。
   - 新增测试文件时在登记表中加一行，放在第一个能到达其结论的层；越界使用子进程、网络或临时目录的测试会被该层的检查判为失败。
 - 真实模型 smoke：`uv run python -m harness smoke --provider-config .yudao/providers.json`，需要环境变量 `YUDAO_OPENCODE_GO_KEY`。凭据不写入代码、事件、日志与提交；`provider.md` 与 `.yudao/` 已被 git 忽略，不提交。
@@ -59,7 +60,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 - 修改 `docs/` 下的文档时，在 `docs/CHANGELOG.md` 追加记录，格式：`模型 ID / 时间（到分钟） / 具体的改动 / 原因`。
 
 # 规则
-1. 不保留向后兼容。过时的直接删，别加兼容层、别写migration、别留fallback。事件日志中的项目流与机器流是唯一的例外：跨 Yudao 版本保存，只增加字段或事件种类，已有字段的含义不变（[ADR-0019](docs/adr/0019-project-stream-across-versions.md)）。
+1. 不保留向后兼容。过时的直接删，别加兼容层、别写migration、别留fallback。事件日志中的项目流与机器流是唯一的例外：跨 Yudao 版本保存，只增加字段、事件种类或已有字段的取值，已有字段的含义不变（[ADR-0019](docs/adr/0019-project-stream-across-versions.md)）。
 2. 选能满足当前需求的最简单实现。不要预防性抽象，不要多此一举的配置层。
 3. 系统分层长。先跑通一个最小的端到端版本，再往上加东西。绝不为了未完成的复杂度拆掉能跑的东西。
 4. 组件保持模块化，关注点分离。

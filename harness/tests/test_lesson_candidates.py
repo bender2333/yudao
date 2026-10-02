@@ -5,7 +5,7 @@ import pytest
 from harness.adapters.base import ProviderError
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
-from harness.models import DEPARTMENTS, EventType, json_dumps
+from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, json_dumps
 from harness.projection import project_events
 from harness.proposals import delivery_turn, plan_turn, product_spec, review, review_turn
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
@@ -87,7 +87,10 @@ def test_candidate_is_never_injected_into_department_context(tmp_path):
     candidate = result.lesson_candidates[0]
     for department in DEPARTMENTS:
         assembler = ContextAssembler()
-        args = {"department": department, "session_id": "test-session", "activation_id": "test-activation"}
+        prompt = DepartmentPrompt(department, 0, DEFINITIONS.role(department).prompt,
+                                  ArtifactRef(kind="department_prompt", content_hash="", path=""), "")
+        args = {"department": department, "session_id": "test-session", "activation_id": "test-activation",
+                "prompt": prompt}
         with_candidate = assembler.assemble(result, **args)
         without_candidate = assembler.assemble(replace(result, lesson_candidates=[]), **args)
         assert with_candidate == without_candidate

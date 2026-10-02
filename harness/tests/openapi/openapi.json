@@ -56,6 +56,108 @@
         }
       }
     },
+    "/api/commands/project.onboard": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "project.onboard",
+        "operationId": "command_project_onboard",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOnboard"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_OnboardRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commands/onboarding.restart": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "onboarding.restart",
+        "operationId": "command_onboarding_restart",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingRestart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_OnboardRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, project_archived, not_allowed, source_invalid, busy, provider_unavailable, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/project.rename": {
       "post": {
         "tags": [
@@ -68,6 +170,57 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ProjectRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, stale_base, project_archived, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commands/project.set_goal": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "project.set_goal",
+        "operationId": "command_project_set_goal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectSetGoal"
               }
             }
           },
@@ -340,7 +493,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：not_found, project_archived, busy, provider_unavailable, command_id_reused",
+            "description": "命令被拒绝，可能的原因：not_found, project_archived, busy, provider_unavailable, work_item_in_progress, not_allowed, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -1382,6 +1535,57 @@
         }
       }
     },
+    "/api/commands/home.mark_seen": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "home.mark_seen",
+        "operationId": "command_home_mark_seen",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkSeen"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/system.status": {
       "get": {
         "tags": [
@@ -1389,6 +1593,24 @@
         ],
         "summary": "system.status",
         "operationId": "query_system_status",
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1396,6 +1618,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Snapshot_SystemStatus_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1453,6 +1685,22 @@
         "summary": "decisions.list",
         "operationId": "query_decisions_list",
         "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
           {
             "name": "project_id",
             "in": "query",
@@ -1551,6 +1799,22 @@
         "summary": "projects.list",
         "operationId": "query_projects_list",
         "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
           {
             "name": "include_archived",
             "in": "query",
@@ -1652,6 +1916,22 @@
         "summary": "project.loop",
         "operationId": "query_project_loop",
         "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
           {
             "name": "project_id",
             "in": "query",
@@ -2628,6 +2908,48 @@
         }
       }
     },
+    "/api/queries/run.recovery": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "run.recovery",
+        "operationId": "query_run_recovery",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_RunRecoveryResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/catalog": {
       "get": {
         "tags": [
@@ -2670,6 +2992,70 @@
         }
       }
     },
+    "/api/queries/home.away_report": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "home.away_report",
+        "operationId": "query_home_away_report",
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "since_seen",
+                "24h",
+                "7d"
+              ],
+              "type": "string",
+              "default": "since_seen",
+              "title": "Range"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_AwayReport_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/capabilities": {
       "get": {
         "tags": [
@@ -2684,6 +3070,84 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/stop": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Stop",
+        "operationId": "system_stop",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-update/latest.yml": {
+      "get": {
+        "tags": [
+          "client-update"
+        ],
+        "summary": "Latest Manifest",
+        "operationId": "client_update_manifest",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-update/{filename}": {
+      "get": {
+        "tags": [
+          "client-update"
+        ],
+        "summary": "Installer",
+        "operationId": "client_update_file",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2993,6 +3457,35 @@
         ],
         "title": "Accepted[NoRefs]"
       },
+      "Accepted_OnboardRefs_": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "refs": {
+            "$ref": "#/components/schemas/OnboardRefs"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "position",
+          "refs",
+          "duplicate"
+        ],
+        "title": "Accepted[OnboardRefs]"
+      },
       "Accepted_ProjectRefs_": {
         "properties": {
           "command_id": {
@@ -3159,7 +3652,8 @@
             "enum": [
               "running",
               "completed",
-              "failed"
+              "failed",
+              "unknown"
             ],
             "title": "Status"
           },
@@ -3220,6 +3714,30 @@
                 "type": "null"
               }
             ]
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Snapshot Ref"
+          },
+          "after_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Snapshot Ref"
           }
         },
         "additionalProperties": false,
@@ -3492,6 +4010,96 @@
         ],
         "title": "AttemptView"
       },
+      "AwayRange": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "since_seen",
+              "24h",
+              "7d"
+            ],
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "from_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From At"
+          },
+          "from_position": {
+            "type": "integer",
+            "title": "From Position"
+          },
+          "to_position": {
+            "type": "integer",
+            "title": "To Position"
+          },
+          "to_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "from_at",
+          "from_position",
+          "to_position",
+          "to_at"
+        ],
+        "title": "AwayRange"
+      },
+      "AwayReport": {
+        "properties": {
+          "last_seen": {
+            "$ref": "#/components/schemas/LastSeen"
+          },
+          "range": {
+            "$ref": "#/components/schemas/AwayRange"
+          },
+          "ranges": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Ranges"
+          },
+          "summary": {
+            "items": {
+              "$ref": "#/components/schemas/ReportItem"
+            },
+            "type": "array",
+            "title": "Summary"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/ReportFact"
+            },
+            "type": "array",
+            "title": "Facts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "last_seen",
+          "range",
+          "ranges",
+          "summary",
+          "facts"
+        ],
+        "title": "AwayReport"
+      },
       "BindingInput": {
         "properties": {
           "provider_id": {
@@ -3503,6 +4111,17 @@
             "type": "string",
             "minLength": 1,
             "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
           }
         },
         "additionalProperties": false,
@@ -3512,6 +4131,32 @@
           "model_id"
         ],
         "title": "BindingInput"
+      },
+      "BlockedObjects": {
+        "properties": {
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "queued_after": {
+            "type": "integer",
+            "title": "Queued After"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "work_item_id",
+          "queued_after"
+        ],
+        "title": "BlockedObjects"
       },
       "CallTarget": {
         "properties": {
@@ -3655,6 +4300,35 @@
               }
             ],
             "title": "Sent Tier"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
           }
         },
         "additionalProperties": false,
@@ -3675,7 +4349,10 @@
           "accepts_required_tool_call",
           "selection_source",
           "requested_tier",
-          "sent_tier"
+          "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode"
         ],
         "title": "CallTarget"
       },
@@ -3913,6 +4590,17 @@
           "model_id": {
             "type": "string",
             "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
           }
         },
         "additionalProperties": false,
@@ -4266,6 +4954,28 @@
           "accepts_required_tool_call": {
             "type": "boolean",
             "title": "Accepts Required Tool Call"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode"
           }
         },
         "additionalProperties": false,
@@ -4277,7 +4987,10 @@
           "context_window",
           "max_output_tokens",
           "capability_source",
-          "accepts_required_tool_call"
+          "accepts_required_tool_call",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode"
         ],
         "title": "CatalogModel"
       },
@@ -4476,7 +5189,8 @@
                 "decision_closed",
                 "option_invalid",
                 "not_allowed",
-                "command_id_reused"
+                "command_id_reused",
+                "source_invalid"
               ]
             },
             "type": "array",
@@ -4922,10 +5636,23 @@
             "format": "date-time",
             "title": "Requested At"
           },
+          "blocked": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BlockedObjects"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "request": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/UnknownActionRequested"
               },
               {
                 "$ref": "#/components/schemas/PauseRequested"
@@ -4956,6 +5683,7 @@
           "version",
           "status",
           "requested_at",
+          "blocked",
           "request",
           "answer"
         ],
@@ -5043,6 +5771,11 @@
               }
             ],
             "title": "Used Event Id"
+          },
+          "prompt_configured": {
+            "type": "boolean",
+            "title": "Prompt Configured",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -5074,6 +5807,44 @@
           "source": {
             "type": "string",
             "title": "Source"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "prompt_configured": {
+            "type": "boolean",
+            "title": "Prompt Configured",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -5105,10 +5876,50 @@
             "type": "string",
             "title": "Department"
           },
-          "text": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Text"
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "department_prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Prompt"
           }
         },
         "additionalProperties": false,
@@ -5117,8 +5928,7 @@
           "command_id",
           "base_version",
           "project_id",
-          "department",
-          "text"
+          "department"
         ],
         "title": "DepartmentSettingsSave"
       },
@@ -5171,6 +5981,9 @@
           },
           "prompt": {
             "$ref": "#/components/schemas/DepartmentPromptState"
+          },
+          "setting": {
+            "$ref": "#/components/schemas/DepartmentSetting"
           },
           "guidance": {
             "items": {
@@ -5234,6 +6047,7 @@
           "phase",
           "active",
           "prompt",
+          "setting",
           "guidance",
           "messages",
           "context",
@@ -5257,6 +6071,11 @@
             "type": "string",
             "title": "Version"
           },
+          "api_version": {
+            "type": "integer",
+            "title": "Api Version",
+            "example": 1
+          },
           "contract_digest": {
             "type": "string",
             "title": "Contract Digest"
@@ -5276,6 +6095,7 @@
           "log_id",
           "boot_id",
           "version",
+          "api_version",
           "contract_digest",
           "access"
         ],
@@ -5323,6 +6143,30 @@
             "type": "boolean",
             "title": "Accepts Required Tool Call",
             "default": true
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels",
+            "default": []
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode",
+            "default": ""
           },
           "provider_id": {
             "type": "string",
@@ -5617,6 +6461,32 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HomeStatus": {
+        "properties": {
+          "waiting_decisions": {
+            "type": "integer",
+            "title": "Waiting Decisions"
+          },
+          "disk_free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Free Bytes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "waiting_decisions",
+          "disk_free_bytes"
+        ],
+        "title": "HomeStatus"
+      },
       "InputView": {
         "properties": {
           "input_id": {
@@ -5673,6 +6543,64 @@
         ],
         "title": "InputView"
       },
+      "LastSeen": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "at",
+          "position"
+        ],
+        "title": "LastSeen"
+      },
+      "LateResult": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "at",
+          "text",
+          "event_id"
+        ],
+        "title": "LateResult"
+      },
       "LiveAttempt": {
         "properties": {
           "attempt_id": {
@@ -5699,6 +6627,38 @@
           "channels"
         ],
         "title": "LiveAttempt"
+      },
+      "MarkSeen": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Position"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "position"
+        ],
+        "title": "MarkSeen"
       },
       "MaterialRecord": {
         "properties": {
@@ -5783,6 +6743,30 @@
             "type": "boolean",
             "title": "Accepts Required Tool Call",
             "default": true
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Levels",
+            "default": []
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "title": "Reasoning Mode",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -5872,6 +6856,60 @@
         "additionalProperties": false,
         "type": "object",
         "title": "NoRefs"
+      },
+      "OnboardRefs": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "work_item_id",
+          "run_id"
+        ],
+        "title": "OnboardRefs"
+      },
+      "OnboardingRestart": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "null",
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "source_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "project_id",
+          "source_name"
+        ],
+        "title": "OnboardingRestart"
       },
       "OverlayCapability": {
         "properties": {
@@ -6166,6 +7204,49 @@
         ],
         "title": "ProjectMaterial"
       },
+      "ProjectOnboard": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "null",
+            "title": "Base Version"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Goal"
+          },
+          "source_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Name"
+          },
+          "source_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "name",
+          "goal",
+          "source_name",
+          "source_path"
+        ],
+        "title": "ProjectOnboard"
+      },
       "ProjectOverviewResult": {
         "properties": {
           "project_id": {
@@ -6385,6 +7466,29 @@
               }
             ],
             "title": "Current Adoption"
+          },
+          "onboarding_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onboarding Status"
+          },
+          "interrupted_count": {
+            "type": "integer",
+            "title": "Interrupted Count"
+          },
+          "pending_verification_count": {
+            "type": "integer",
+            "title": "Pending Verification Count"
+          },
+          "waiting_resume_count": {
+            "type": "integer",
+            "title": "Waiting Resume Count"
           }
         },
         "additionalProperties": false,
@@ -6402,9 +7506,44 @@
           "work_item_count",
           "in_progress_count",
           "active_work_item_id",
-          "current_adoption"
+          "current_adoption",
+          "onboarding_status",
+          "interrupted_count",
+          "pending_verification_count",
+          "waiting_resume_count"
         ],
         "title": "ProjectRow"
+      },
+      "ProjectSetGoal": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Goal"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "project_id",
+          "goal"
+        ],
+        "title": "ProjectSetGoal"
       },
       "ProjectSettingsResult": {
         "properties": {
@@ -6562,6 +7701,11 @@
             },
             "type": "array",
             "title": "Changed By"
+          },
+          "replayable": {
+            "type": "boolean",
+            "title": "Replayable",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -6571,6 +7715,88 @@
           "changed_by"
         ],
         "title": "QueryCapability"
+      },
+      "RecoveryLimits": {
+        "properties": {
+          "activations": {
+            "type": "integer",
+            "title": "Activations"
+          },
+          "model_steps": {
+            "type": "integer",
+            "title": "Model Steps"
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries"
+          },
+          "cycle_count": {
+            "type": "integer",
+            "title": "Cycle Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "activations",
+          "model_steps",
+          "retries",
+          "cycle_count"
+        ],
+        "title": "RecoveryLimits"
+      },
+      "RecoveryOwner": {
+        "properties": {
+          "epoch": {
+            "type": "integer",
+            "title": "Epoch"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "holds_slot": {
+            "type": "boolean",
+            "title": "Holds Slot"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "epoch",
+          "since",
+          "holds_slot"
+        ],
+        "title": "RecoveryOwner"
+      },
+      "RecoveryStatus": {
+        "properties": {
+          "auto_resumed": {
+            "type": "integer",
+            "title": "Auto Resumed"
+          },
+          "pending_verification": {
+            "type": "integer",
+            "title": "Pending Verification"
+          },
+          "waiting_resume": {
+            "type": "integer",
+            "title": "Waiting Resume"
+          },
+          "unknown_actions": {
+            "type": "integer",
+            "title": "Unknown Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "auto_resumed",
+          "pending_verification",
+          "waiting_resume",
+          "unknown_actions"
+        ],
+        "title": "RecoveryStatus"
       },
       "Rejected": {
         "properties": {
@@ -6595,7 +7821,8 @@
               "decision_closed",
               "option_invalid",
               "not_allowed",
-              "command_id_reused"
+              "command_id_reused",
+              "source_invalid"
             ],
             "title": "Reason"
           },
@@ -6654,6 +7881,108 @@
           "differences"
         ],
         "title": "ReplayCheckResult"
+      },
+      "ReportFact": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "at",
+          "type",
+          "label",
+          "project_id",
+          "work_item_id"
+        ],
+        "title": "ReportFact"
+      },
+      "ReportItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "integer",
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "refs": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Refs"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "value",
+          "unit",
+          "refs"
+        ],
+        "title": "ReportItem"
       },
       "ReviewEntry": {
         "properties": {
@@ -6831,6 +8160,155 @@
         ],
         "title": "RunExportResult"
       },
+      "RunRecoveryResult": {
+        "properties": {
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "interrupted",
+              "pending_verification",
+              "waiting_resume",
+              "terminated"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "executable": {
+            "type": "boolean",
+            "title": "Executable"
+          },
+          "last_confirmed_position": {
+            "type": "integer",
+            "title": "Last Confirmed Position"
+          },
+          "last_confirmed_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Confirmed Event Id"
+          },
+          "unfinished_actions": {
+            "items": {
+              "$ref": "#/components/schemas/UnfinishedAction"
+            },
+            "type": "array",
+            "title": "Unfinished Actions"
+          },
+          "verifications": {
+            "items": {
+              "$ref": "#/components/schemas/VerificationRecord"
+            },
+            "type": "array",
+            "title": "Verifications"
+          },
+          "next_legal_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Legal Action"
+          },
+          "can_continue": {
+            "type": "boolean",
+            "title": "Can Continue"
+          },
+          "cannot_continue_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cannot Continue Reason"
+          },
+          "unusable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnusableTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limits": {
+            "$ref": "#/components/schemas/RecoveryLimits"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecoveryOwner"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "late_results": {
+            "items": {
+              "$ref": "#/components/schemas/LateResult"
+            },
+            "type": "array",
+            "title": "Late Results"
+          },
+          "has_unknown_actions": {
+            "type": "boolean",
+            "title": "Has Unknown Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "work_item_id",
+          "run_id",
+          "state",
+          "reason",
+          "executable",
+          "last_confirmed_position",
+          "last_confirmed_event_id",
+          "unfinished_actions",
+          "verifications",
+          "next_legal_action",
+          "can_continue",
+          "cannot_continue_reason",
+          "unusable",
+          "limits",
+          "owner",
+          "late_results",
+          "has_unknown_actions"
+        ],
+        "title": "RunRecoveryResult"
+      },
       "RuntimeForceUpgrade": {
         "properties": {
           "command_id": {
@@ -6882,6 +8360,24 @@
           "command_id"
         ],
         "title": "RuntimeStartDrain"
+      },
+      "Snapshot_AwayReport_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AwayReport"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[AwayReport]"
       },
       "Snapshot_CatalogDocument_": {
         "properties": {
@@ -7189,6 +8685,24 @@
         ],
         "title": "Snapshot[RunExportResult]"
       },
+      "Snapshot_RunRecoveryResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunRecoveryResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[RunRecoveryResult]"
+      },
       "Snapshot_SystemStatus_": {
         "properties": {
           "position": {
@@ -7359,6 +8873,14 @@
             "format": "date-time",
             "title": "Started At"
           },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "running_runs": {
+            "type": "integer",
+            "title": "Running Runs"
+          },
           "provider": {
             "$ref": "#/components/schemas/ProviderReadiness"
           },
@@ -7367,6 +8889,12 @@
           },
           "drain": {
             "$ref": "#/components/schemas/DrainStatus"
+          },
+          "recovery": {
+            "$ref": "#/components/schemas/RecoveryStatus"
+          },
+          "home": {
+            "$ref": "#/components/schemas/HomeStatus"
           }
         },
         "additionalProperties": false,
@@ -7375,11 +8903,234 @@
           "log_id",
           "boot_id",
           "started_at",
+          "version",
+          "running_runs",
           "provider",
           "catalog",
-          "drain"
+          "drain",
+          "recovery",
+          "home"
         ],
         "title": "SystemStatus"
+      },
+      "UnfinishedAction": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_sent",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "activation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Id"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id"
+          },
+          "input_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Version"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable"
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Snapshot Ref"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "started_event_id": {
+            "type": "string",
+            "title": "Started Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action_id",
+          "tool",
+          "department",
+          "status",
+          "activation_id",
+          "step_id",
+          "input_version",
+          "purpose",
+          "repeatable",
+          "before_snapshot_ref",
+          "created_at",
+          "started_event_id"
+        ],
+        "title": "UnfinishedAction"
+      },
+      "UnknownActionRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "unknown_action",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "action",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "action_kind": {
+            "type": "string",
+            "title": "Action Kind"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "action_id",
+          "tool",
+          "action_kind",
+          "repeatable"
+        ],
+        "title": "UnknownActionRequested"
+      },
+      "UnusableTarget": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "problem": {
+            "type": "string",
+            "title": "Problem"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department",
+          "model",
+          "problem"
+        ],
+        "title": "UnusableTarget"
       },
       "UsageGroup": {
         "properties": {
@@ -7652,6 +9403,74 @@
         ],
         "title": "ValidationError"
       },
+      "VerificationRecord": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "result": {
+            "type": "string",
+            "title": "Result"
+          },
+          "decided_by": {
+            "type": "string",
+            "title": "Decided By"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action_id",
+          "tool",
+          "basis",
+          "result",
+          "decided_by",
+          "note",
+          "decision_id",
+          "at",
+          "event_id"
+        ],
+        "title": "VerificationRecord"
+      },
       "VersionEntry": {
         "properties": {
           "event_id": {
@@ -7794,6 +9613,10 @@
             "type": "string",
             "title": "Work Item Id"
           },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -7904,6 +9727,7 @@
         "type": "object",
         "required": [
           "work_item_id",
+          "kind",
           "title",
           "text",
           "run_id",
@@ -8006,6 +9830,10 @@
             "type": "string",
             "title": "Work Item Id"
           },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
           "sign": {
             "type": "string",
             "title": "Sign"
@@ -8096,6 +9924,17 @@
             ],
             "title": "Adoption Id"
           },
+          "recovery_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery State"
+          },
           "version": {
             "type": "integer",
             "title": "Version"
@@ -8105,6 +9944,7 @@
         "type": "object",
         "required": [
           "work_item_id",
+          "kind",
           "sign",
           "color_index",
           "status",
@@ -8117,6 +9957,7 @@
           "pending_question",
           "run_id",
           "adoption_id",
+          "recovery_state",
           "version"
         ],
         "title": "WorkItemLoop"
@@ -8250,6 +10091,520 @@
           "not_started"
         ],
         "title": "WorkItemStats"
+      },
+      "ActionVerifiedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "action_verified",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ActionVerifiedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ActionVerifiedEvent",
+        "type": "object"
+      },
+      "ActionVerifiedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "provider_config_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Config Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "requested_provider": {
+            "title": "Requested Provider",
+            "type": "string"
+          },
+          "requested_protocol": {
+            "title": "Requested Protocol",
+            "type": "string"
+          },
+          "requested_model": {
+            "title": "Requested Model",
+            "type": "string"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "credential_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Version"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "configured_max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured Max Output Tokens"
+          },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
+          },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
+          "input_version": {
+            "title": "Input Version",
+            "type": "integer"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "integer"
+          },
+          "prompt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Hash"
+          },
+          "guidance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guidance Ids",
+            "type": "array"
+          },
+          "guidance_only": {
+            "title": "Guidance Only",
+            "type": "boolean"
+          },
+          "effective_contract_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Contract Hash"
+          },
+          "engineering_plan_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engineering Plan Hash"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "attempt_id": {
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "logical_call_id": {
+            "title": "Logical Call Id",
+            "type": "string"
+          },
+          "collaboration_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collaboration Request Id"
+          },
+          "context_event_id": {
+            "title": "Context Event Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "integer"
+          },
+          "input_item": {
+            "$ref": "#/components/schemas/FunctionCallOutput"
+          },
+          "activation_id": {
+            "title": "Activation Id",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "work",
+              "compaction"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "resolution": {
+            "const": "continue",
+            "title": "Resolution",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Decision Id"
+          }
+        },
+        "required": [
+          "provider_config_id",
+          "model_id",
+          "provider_name",
+          "protocol",
+          "base_url",
+          "requested_provider",
+          "requested_protocol",
+          "requested_model",
+          "credential_ref",
+          "credential_version",
+          "context_window",
+          "configured_max_output_tokens",
+          "accepts_required_tool_call",
+          "selection_source",
+          "requested_tier",
+          "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
+          "input_version",
+          "prompt_version",
+          "prompt_hash",
+          "guidance_ids",
+          "guidance_only",
+          "effective_contract_hash",
+          "engineering_plan_hash",
+          "request_id",
+          "attempt_id",
+          "logical_call_id",
+          "collaboration_request_id",
+          "context_event_id",
+          "id",
+          "name",
+          "step_id",
+          "input_item",
+          "activation_id",
+          "purpose",
+          "ok",
+          "resolution"
+        ],
+        "title": "ActionVerifiedPayload",
+        "type": "object"
       },
       "ActivationFinishedEvent": {
         "additionalProperties": false,
@@ -8719,6 +11074,338 @@
           "code_tree_digest"
         ],
         "title": "Baseline",
+        "type": "object"
+      },
+      "BaselineConclusion": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement": {
+            "title": "Requirement",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "verified",
+              "read_only",
+              "existing_defect",
+              "unsupported"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requirement",
+          "status",
+          "evidence"
+        ],
+        "title": "BaselineConclusion",
+        "type": "object"
+      },
+      "BaselineOmission": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "location"
+        ],
+        "title": "BaselineOmission",
+        "type": "object"
+      },
+      "BaselineOtherFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check",
+          "reason"
+        ],
+        "title": "BaselineOtherFailure",
+        "type": "object"
+      },
+      "BaselineReviewAcceptedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "baseline_review_accepted",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/BaselineReviewAcceptedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "BaselineReviewAcceptedEvent",
+        "type": "object"
+      },
+      "BaselineReviewAcceptedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "verdict": {
+            "enum": [
+              "consistent",
+              "rework_product"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          },
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineConclusion"
+            },
+            "title": "Conclusions",
+            "type": "array"
+          },
+          "omissions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOmission"
+            },
+            "title": "Omissions",
+            "type": "array"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckReceipt"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "other_failures": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOtherFailure"
+            },
+            "title": "Other Failures",
+            "type": "array"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "structure_hash": {
+            "title": "Structure Hash",
+            "type": "string"
+          },
+          "code_snapshot_hash": {
+            "title": "Code Snapshot Hash",
+            "type": "string"
+          },
+          "kind": {
+            "const": "baseline_review",
+            "title": "Kind",
+            "type": "string"
+          },
+          "issuer": {
+            "const": "quality",
+            "title": "Issuer",
+            "type": "string"
+          },
+          "parent_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Hash"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "const": "active",
+            "title": "Status",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "git_version": {
+            "$ref": "#/components/schemas/GitVersion"
+          }
+        },
+        "required": [
+          "verdict",
+          "conclusions",
+          "omissions",
+          "checks",
+          "other_failures",
+          "product_spec_hash",
+          "structure_hash",
+          "code_snapshot_hash",
+          "kind",
+          "issuer",
+          "parent_hash",
+          "revision",
+          "status",
+          "content_hash",
+          "id",
+          "request_id",
+          "git_version"
+        ],
+        "title": "BaselineReviewAcceptedPayload",
         "type": "object"
       },
       "CatalogCandidatesCollectedEvent": {
@@ -9505,6 +12192,19 @@
           },
           "tree_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provenance"
           }
         },
         "required": [
@@ -10792,6 +13492,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -10934,6 +13663,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -11299,6 +14031,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -11544,6 +14305,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "effective_contract_hash",
           "engineering_plan_hash",
           "request_id",
@@ -12341,6 +15105,9 @@
                 "$ref": "#/components/schemas/ModelUnavailableRequested"
               },
               {
+                "$ref": "#/components/schemas/UnknownActionRequested"
+              },
+              {
                 "$ref": "#/components/schemas/PauseRequested"
               }
             ],
@@ -12516,6 +15283,7 @@
           "reason": {
             "enum": [
               "released",
+              "baseline_verified",
               "max_cycles",
               "model_steps_exhausted",
               "no_tool_call",
@@ -14236,7 +17004,7 @@
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/DepartmentPromptConfiguredPayload"
+            "$ref": "#/components/schemas/DepartmentSettingsConfiguredPayload"
           }
         },
         "required": [
@@ -14260,7 +17028,7 @@
         "title": "DepartmentPromptConfiguredEvent",
         "type": "object"
       },
-      "DepartmentPromptConfiguredPayload": {
+      "DepartmentSettingsConfiguredPayload": {
         "additionalProperties": false,
         "properties": {
           "department": {
@@ -14275,198 +17043,77 @@
           "version": {
             "title": "Version",
             "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "prompt_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
           },
           "base_version": {
             "title": "Base Version",
             "type": "integer"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Id"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Requested Tier"
+          },
+          "department_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Department Prompt"
+          },
+          "department_prompt_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
           "department",
           "version",
-          "text",
-          "prompt_ref",
           "base_version"
         ],
-        "title": "DepartmentPromptConfiguredPayload",
-        "type": "object"
-      },
-      "DepartmentPromptUpdatedEvent": {
-        "additionalProperties": false,
-        "properties": {
-          "position": {
-            "title": "Position",
-            "type": "integer"
-          },
-          "previous": {
-            "title": "Previous",
-            "type": "integer"
-          },
-          "event_id": {
-            "title": "Event Id",
-            "type": "string"
-          },
-          "at": {
-            "format": "date-time",
-            "title": "At",
-            "type": "string"
-          },
-          "stream": {
-            "title": "Stream",
-            "type": "string"
-          },
-          "stream_version": {
-            "title": "Stream Version",
-            "type": "integer"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
-          "work_item_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Work Item Id"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Run Id"
-          },
-          "department": {
-            "anyOf": [
-              {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department"
-          },
-          "role": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Role"
-          },
-          "actor": {
-            "title": "Actor",
-            "type": "string"
-          },
-          "command_id": {
-            "anyOf": [
-              {
-                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Command Id"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "type": {
-            "const": "department_prompt_updated",
-            "title": "Type",
-            "type": "string"
-          },
-          "payload": {
-            "$ref": "#/components/schemas/DepartmentPromptUpdatedPayload"
-          }
-        },
-        "required": [
-          "position",
-          "previous",
-          "event_id",
-          "at",
-          "stream",
-          "stream_version",
-          "project_id",
-          "work_item_id",
-          "run_id",
-          "department",
-          "role",
-          "actor",
-          "command_id",
-          "label",
-          "type",
-          "payload"
-        ],
-        "title": "DepartmentPromptUpdatedEvent",
-        "type": "object"
-      },
-      "DepartmentPromptUpdatedPayload": {
-        "additionalProperties": false,
-        "properties": {
-          "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
-            "title": "Department",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "prompt_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
-          }
-        },
-        "required": [
-          "department",
-          "version",
-          "text",
-          "prompt_ref"
-        ],
-        "title": "DepartmentPromptUpdatedPayload",
+        "title": "DepartmentSettingsConfiguredPayload",
         "type": "object"
       },
       "FailureObservation": {
@@ -14610,6 +17257,158 @@
           "tree"
         ],
         "title": "GitVersion",
+        "type": "object"
+      },
+      "HomeSeenEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "home_seen",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/HomeSeenPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "HomeSeenEvent",
+        "type": "object"
+      },
+      "HomeSeenPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "position"
+        ],
+        "title": "HomeSeenPayload",
         "type": "object"
       },
       "InputRecord": {
@@ -15431,6 +18230,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -15706,6 +18534,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -16029,6 +18860,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -16277,6 +19137,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -16595,6 +19458,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -16748,6 +19640,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -17054,6 +19949,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -17205,6 +20129,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -17512,6 +20439,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -17690,6 +20646,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -18001,6 +20960,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -18164,6 +21152,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -19302,6 +22293,162 @@
         "title": "ProjectArchivedPayload",
         "type": "object"
       },
+      "ProjectGoalChangedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "project_goal_changed",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProjectGoalChangedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ProjectGoalChangedEvent",
+        "type": "object"
+      },
+      "ProjectGoalChangedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "goal": {
+            "title": "Goal",
+            "type": "string"
+          },
+          "goal_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          }
+        },
+        "required": [
+          "goal",
+          "goal_ref"
+        ],
+        "title": "ProjectGoalChangedPayload",
+        "type": "object"
+      },
       "ProjectPinnedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -19607,7 +22754,10 @@
             "$ref": "#/components/schemas/ArtifactRef"
           },
           "source": {
-            "const": "idea",
+            "enum": [
+              "idea",
+              "existing"
+            ],
             "title": "Source",
             "type": "string"
           }
@@ -19915,39 +23065,6 @@
         "additionalProperties": false,
         "properties": {},
         "title": "ProjectRestoredPayload",
-        "type": "object"
-      },
-      "PromptRecord": {
-        "additionalProperties": false,
-        "properties": {
-          "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
-            "title": "Department",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "prompt_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
-          }
-        },
-        "required": [
-          "department",
-          "version",
-          "text",
-          "prompt_ref"
-        ],
-        "title": "PromptRecord",
         "type": "object"
       },
       "ProposalRejectedEvent": {
@@ -20948,22 +24065,13 @@
             "title": "Task",
             "type": "string"
           },
+          "kind": {
+            "default": "change",
+            "title": "Kind",
+            "type": "string"
+          },
           "initial_input": {
             "$ref": "#/components/schemas/InputRecord"
-          },
-          "department_prompts": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/PromptRecord"
-            },
-            "propertyNames": {
-              "enum": [
-                "product",
-                "engineering",
-                "quality"
-              ]
-            },
-            "title": "Department Prompts",
-            "type": "object"
           },
           "intend_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
@@ -21051,6 +24159,17 @@
               }
             ]
           },
+          "overview_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "workspace_digest": {
             "title": "Workspace Digest",
             "type": "string"
@@ -21105,7 +24224,6 @@
         "required": [
           "task",
           "initial_input",
-          "department_prompts",
           "intend_ref",
           "git_version",
           "intend_path",
@@ -21272,7 +24390,10 @@
         "additionalProperties": false,
         "properties": {
           "stop_reason": {
-            "const": "released",
+            "enum": [
+              "released",
+              "baseline_verified"
+            ],
             "title": "Stop Reason",
             "type": "string"
           }
@@ -22799,6 +25920,374 @@
         "title": "SpecSupersededPayload",
         "type": "object"
       },
+      "StructureAcceptedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "structure_accepted",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/StructureAcceptedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "StructureAcceptedEvent",
+        "type": "object"
+      },
+      "StructureAcceptedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "overall": {
+            "title": "Overall",
+            "type": "string"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/StructureModule"
+            },
+            "title": "Modules",
+            "type": "array"
+          },
+          "entry_points": {
+            "items": {
+              "$ref": "#/components/schemas/StructureEntryPoint"
+            },
+            "title": "Entry Points",
+            "type": "array"
+          },
+          "build_and_test": {
+            "items": {
+              "$ref": "#/components/schemas/StructureBuildItem"
+            },
+            "title": "Build And Test",
+            "type": "array"
+          },
+          "requirement_locations": {
+            "items": {
+              "$ref": "#/components/schemas/StructureRequirementLocation"
+            },
+            "title": "Requirement Locations",
+            "type": "array"
+          },
+          "conventions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conventions",
+            "type": "array"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "code_tree_digest": {
+            "title": "Code Tree Digest",
+            "type": "string"
+          },
+          "kind": {
+            "const": "structure",
+            "title": "Kind",
+            "type": "string"
+          },
+          "issuer": {
+            "const": "engineering",
+            "title": "Issuer",
+            "type": "string"
+          },
+          "parent_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Hash"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "status": {
+            "const": "active",
+            "title": "Status",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "structure_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "git_version": {
+            "$ref": "#/components/schemas/GitVersion"
+          }
+        },
+        "required": [
+          "overall",
+          "modules",
+          "entry_points",
+          "build_and_test",
+          "requirement_locations",
+          "conventions",
+          "product_spec_hash",
+          "code_tree_digest",
+          "kind",
+          "issuer",
+          "parent_hash",
+          "revision",
+          "status",
+          "content_hash",
+          "id",
+          "structure_ref",
+          "request_id",
+          "git_version"
+        ],
+        "title": "StructureAcceptedPayload",
+        "type": "object"
+      },
+      "StructureBuildItem": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "argv": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Argv",
+            "type": "array"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/CheckReceipt"
+          }
+        },
+        "required": [
+          "name",
+          "argv",
+          "purpose",
+          "receipt"
+        ],
+        "title": "StructureBuildItem",
+        "type": "object"
+      },
+      "StructureEntryPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "program",
+              "command_line",
+              "service"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "how_to_run": {
+            "title": "How To Run",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "how_to_run"
+        ],
+        "title": "StructureEntryPoint",
+        "type": "object"
+      },
+      "StructureModule": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "responsibility": {
+            "title": "Responsibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "responsibility"
+        ],
+        "title": "StructureModule",
+        "type": "object"
+      },
+      "StructureRequirementLocation": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement": {
+            "title": "Requirement",
+            "type": "string"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Locations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requirement",
+          "locations"
+        ],
+        "title": "StructureRequirementLocation",
+        "type": "object"
+      },
       "ToolCallRequiredEvent": {
         "additionalProperties": false,
         "properties": {
@@ -23204,6 +26693,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -23347,6 +26865,17 @@
               }
             ],
             "default": null
+          },
+          "after_snapshot_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -23366,6 +26895,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -23819,6 +27351,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -23959,6 +27520,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -24273,6 +27837,17 @@
             ],
             "default": null,
             "title": "Snapshot Hash"
+          },
+          "before_snapshot_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [
@@ -24738,6 +28313,35 @@
             ],
             "title": "Sent Tier"
           },
+          "reasoning_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Levels",
+            "type": "array"
+          },
+          "default_reasoning_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Reasoning Level"
+          },
+          "reasoning_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Mode"
+          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -24880,6 +28484,9 @@
           "selection_source",
           "requested_tier",
           "sent_tier",
+          "reasoning_levels",
+          "default_reasoning_level",
+          "reasoning_mode",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -25334,6 +28941,11 @@
             "default": "user",
             "title": "Priority",
             "type": "string"
+          },
+          "kind": {
+            "default": "change",
+            "title": "Kind",
+            "type": "string"
           }
         },
         "required": [
@@ -25581,8 +29193,10 @@
       "EventObject": {
         "discriminator": {
           "mapping": {
+            "action_verified": "#/components/schemas/ActionVerifiedEvent",
             "activation_finished": "#/components/schemas/ActivationFinishedEvent",
             "adoption_held": "#/components/schemas/AdoptionHeldEvent",
+            "baseline_review_accepted": "#/components/schemas/BaselineReviewAcceptedEvent",
             "catalog_candidates_collected": "#/components/schemas/CatalogCandidatesCollectedEvent",
             "catalog_revised": "#/components/schemas/CatalogRevisedEvent",
             "catalog_test_finished": "#/components/schemas/CatalogTestFinishedEvent",
@@ -25605,7 +29219,7 @@
             "department_guidance_responded": "#/components/schemas/DepartmentGuidanceRespondedEvent",
             "department_input": "#/components/schemas/DepartmentInputEvent",
             "department_prompt_configured": "#/components/schemas/DepartmentPromptConfiguredEvent",
-            "department_prompt_updated": "#/components/schemas/DepartmentPromptUpdatedEvent",
+            "home_seen": "#/components/schemas/HomeSeenEvent",
             "lesson_candidate_recorded": "#/components/schemas/LessonCandidateRecordedEvent",
             "material_recorded": "#/components/schemas/MaterialRecordedEvent",
             "model_attempt_failed": "#/components/schemas/ModelAttemptFailedEvent",
@@ -25619,6 +29233,7 @@
             "product_decision_accepted": "#/components/schemas/ProductDecisionAcceptedEvent",
             "product_input_assigned": "#/components/schemas/ProductInputAssignedEvent",
             "project_archived": "#/components/schemas/ProjectArchivedEvent",
+            "project_goal_changed": "#/components/schemas/ProjectGoalChangedEvent",
             "project_pinned": "#/components/schemas/ProjectPinnedEvent",
             "project_registered": "#/components/schemas/ProjectRegisteredEvent",
             "project_renamed": "#/components/schemas/ProjectRenamedEvent",
@@ -25637,6 +29252,7 @@
             "source_directory_configured": "#/components/schemas/SourceDirectoryConfiguredEvent",
             "spec_accepted": "#/components/schemas/SpecAcceptedEvent",
             "spec_superseded": "#/components/schemas/SpecSupersededEvent",
+            "structure_accepted": "#/components/schemas/StructureAcceptedEvent",
             "tool_call_required": "#/components/schemas/ToolCallRequiredEvent",
             "tool_called": "#/components/schemas/ToolCalledEvent",
             "tool_skipped": "#/components/schemas/ToolSkippedEvent",
@@ -25657,9 +29273,6 @@
           },
           {
             "$ref": "#/components/schemas/ProductInputAssignedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/DepartmentPromptUpdatedEvent"
           },
           {
             "$ref": "#/components/schemas/DepartmentGuidanceReceivedEvent"
@@ -25719,6 +29332,9 @@
             "$ref": "#/components/schemas/ToolSkippedEvent"
           },
           {
+            "$ref": "#/components/schemas/ActionVerifiedEvent"
+          },
+          {
             "$ref": "#/components/schemas/ProposalSubmittedEvent"
           },
           {
@@ -25755,6 +29371,12 @@
             "$ref": "#/components/schemas/QaSubmittedEvent"
           },
           {
+            "$ref": "#/components/schemas/StructureAcceptedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/BaselineReviewAcceptedEvent"
+          },
+          {
             "$ref": "#/components/schemas/LessonCandidateRecordedEvent"
           },
           {
@@ -25789,6 +29411,9 @@
           },
           {
             "$ref": "#/components/schemas/ProjectRenamedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectGoalChangedEvent"
           },
           {
             "$ref": "#/components/schemas/ProjectPinnedEvent"
@@ -25840,6 +29465,9 @@
           },
           {
             "$ref": "#/components/schemas/RuntimeForceUpgradeRequestedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/HomeSeenEvent"
           }
         ]
       },

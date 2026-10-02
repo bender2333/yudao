@@ -1,8 +1,8 @@
 # 浏览器与 computer use 设计说明
 
-更新：2026-09-30。状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定，第 3 项 2026-09-30 按 ADR-0022 修改）；computer use 的屏幕从哪里来、怎样实现待专题 2（第 5.1 节）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2D，父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单见第 17 节。
+更新：2026-10-01。状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定，第 3 项 2026-09-30 按 ADR-0022 修改；2026-10-01 按 3.2B 的设计，#69 是 MCP 客户端模块，见第 4.1 节）；computer use 的屏幕从哪里来、怎样实现待专题 2（第 5.1 节）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2D，父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单见第 17 节。
 
-依据：需求 [D34](../requirements/browser-and-computer-use.md)；[ADR-0022](../adr/0022-run-directly-without-containers.md)（代码在执行位置上直接运行）；[执行环境服务设计说明](execution-environment.md)（3.2C：执行环境服务、执行代理、执行位置、执行位置上的程序、动作回执）；[模型管理设计说明](model-management.md)第 4.3、5.6、6 节（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)第 6.3、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4.3 节；[本地通用工具设计说明](local-tools.md)第 2 节；[语义系统设计说明](semantic-system.md)第 5.5、13 节；[评测场景](evaluation-scenarios.md)场景 1；[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 7.1、7.3、8.3、9.4 节）。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)、[computer use 实现调研](../research/computer-use-implementations.md)。工单：[#122](https://github.com/bender2333/yudao/issues/122)（3.2B）、[#69](https://github.com/bender2333/yudao/issues/69)（MCP 工具）、[#146](https://github.com/bender2333/yudao/issues/146)（输入方式与建议能力）、[#128](https://github.com/bender2333/yudao/issues/128)（执行环境的合同）。用词以 `CONTEXT.md` 为准。
+依据：需求 [D34](../requirements/browser-and-computer-use.md)；[ADR-0022](../adr/0022-run-directly-without-containers.md)（代码在执行位置上直接运行）；[执行环境服务设计说明](execution-environment.md)（3.2C：执行环境服务、执行代理、执行位置、执行位置上的程序、动作回执）；[模型管理设计说明](model-management.md)第 4.3、5.6、6 节（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)第 6.3、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4.3 节；[本地通用工具设计说明](local-tools.md)第 2 节；[语义系统设计说明](semantic-system.md)第 5.5、13 节；[评测场景](evaluation-scenarios.md)场景 1；[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 7.1、7.3、8.3、9.4 节）。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)、[computer use 实现调研](../research/computer-use-implementations.md)。工单：[#122](https://github.com/bender2333/yudao/issues/122)（3.2B）、[#69](https://github.com/bender2333/yudao/issues/69)（MCP 客户端模块）、[#146](https://github.com/bender2333/yudao/issues/146)（输入方式与建议能力）、[#128](https://github.com/bender2333/yudao/issues/128)（执行环境的合同）。用词以 `CONTEXT.md` 为准。
 
 参照实现的提交号：Playwright MCP `microsoft/playwright-mcp` v0.0.83（2026-09-28，`main` 提交 `f183dad`，依赖 Playwright `1.64.0-alpha-1790635538000`）；Anthropic `claude-quickstarts` 提交 `dee7116`；OMP `C:\project\codes\oh-my-pi` 提交 `fdfeef1f78`；OpenCode `C:\project\codes\opencode` 提交 `0027387`。
 
@@ -169,7 +169,7 @@ U 接纳交付说明时核对：名称不重复；种类是两者之一；`comma
 
 ### 4.1 运行方式
 
-Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，程序由用户安装，第 3.2 节），由试用会话在执行位置上以 stdio 方式启动，每个网页种类的会话一个进程。MCP 客户端使用 3.2B（#69）的实现，客户端会话放在执行代码中，由执行代码所在的进程持有：本机进程时是控制核心的进程，远程时是执行代理。控制核心经执行环境的动作合同调用它，与其他动作一样有动作记录与按尝试身份去重，远程时有心跳（3.2C 第 4.4、6 节）。内置服务的工具许可按角色的定义，不经过 #69 的项目登记与一次性批准（总体架构第 7.3 节：按普通浏览器 MCP 的默认做法运行，不另加限制）。
+Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，程序由用户安装，第 3.2 节），由试用会话在执行位置上以 stdio 方式启动，每个网页种类的会话一个进程。MCP 客户端使用 3.2B（#69）的 MCP 客户端模块（官方 SDK 的会话、进程管理与取消，放在执行代码包中，不导入 Yudao 的其他模块；登记的 MCP 服务器在控制主机上使用同一个模块，[网络取回与 MCP 工具设计说明](network-and-mcp.md)第 7.1 节），客户端会话放在执行代码中，由执行代码所在的进程持有：本机进程时是控制核心的进程，远程时是执行代理。控制核心经执行环境的动作合同调用它，与其他动作一样有动作记录与按尝试身份去重，远程时有心跳（3.2C 第 4.4、6 节）。内置服务的工具许可按角色的定义，不经过 3.2B 的项目登记与一次性批准（总体架构第 7.3 节：按普通浏览器 MCP 的默认做法运行，不另加限制）。
 
 启动参数：
 

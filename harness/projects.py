@@ -18,13 +18,13 @@ from .models import (
     Adoption,
     ArtifactRef,
     DEPARTMENTS,
+    DepartmentSetting,
     Event,
     EventType,
     HeldCandidate,
     ProjectEvent,
     ProjectEventType,
     ProjectProjection,
-    PromptConfig,
     RegisteredCommand,
     RunProjection,
     SourceDirectory,
@@ -33,7 +33,8 @@ from .models import (
     department_for_phase,
     new_id,
 )
-from .projection import RunNotFoundError, project_run, saved_project
+from .projection import RunNotFoundError, project_run, replay_project, replay_run, saved_project
+from .providers.selection import ModelSelection
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
@@ -57,11 +58,16 @@ class ProjectArchivedError(ValueError):
 class WorkItemInProgressError(ValueError):
     """有进行中事项时不能归档或记录材料。"""
 
+class OnboardingNotAllowedError(ValueError):
+    """重新开始建档不满足条件：项目不是接入已有项目建立的、已有基线或已有进行中的建档事项。"""
 
-class PromptConfigConflict(Exception):
-    """所编辑的配置版本已过期；`current` 是项目当前配置的读取体。"""
+class SourceDirectoryNotFoundError(KeyError):
+    """登记名对应的源目录不存在。"""
+
+class DepartmentSettingConflict(Exception):
+    """所编辑的项目部门设置版本已过期；`current` 是项目当前设置的读取体。"""
     def __init__(self, current: dict[str, Any]) -> None:
-        super().__init__("department prompt configuration changed since base_version")
+        super().__init__("department setting changed since base_version")
         self.current = current
 
 
@@ -80,40 +86,44 @@ class SourceDirectoryConflict(Exception):
 
 
 def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str, *,
-                       include_history: bool = True) -> ProjectProjection:
+                       include_history: bool = True, through: int | None = None) -> ProjectProjection:
     # 项目的读取模型：保存的项目投影，加上没有配置过的部门的默认 Prompt，以及由所属 run 的投影派生的事项状态。
-    # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们
-    state = saved_project(store, project_id)
+    # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们。
+    # through 给出全局位置的上界时按位置读取：项目与所属 run 的投影都从事件重放到该位置（工单 #127）
+    state = saved_project(store, project_id) if through is None else replay_project(store, project_id, through=through)
     if state is None:
         raise ProjectNotFoundError(project_id)
-    return _compose(store, state, include_history=include_history)
+    return _compose(store, state, include_history=include_history, through=through)
 
 
-def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True) -> ProjectProjection:
+def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True,
+             through: int | None = None) -> ProjectProjection:
     # 在给出的项目投影上补齐默认 Prompt 与事项状态
     project_id = state.project_id
-    _default_prompts(state)
+    _default_settings(state)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
     for item in state.work_items:
-        _derive_work_item(store, item, adopted, held, project_id, include_history=include_history)
+        _derive_work_item(store, item, adopted, held, project_id, include_history=include_history,
+                          through=through)
     state.active_work_item_id = next((item.work_item_id for item in state.work_items if item.status == "in_progress"), None)
     return state
 
 
-def _default_prompts(state: ProjectProjection) -> ProjectProjection:
-    # 没有配置过的部门使用默认 Prompt
+def _default_settings(state: ProjectProjection) -> ProjectProjection:
+    # 没有配置过的部门使用内置默认 Prompt（版本 0），模型与请求档位都跟随部门默认
     for department in DEPARTMENTS:
-        state.prompt_configs.setdefault(department, PromptConfig(
+        state.department_settings.setdefault(department, DepartmentSetting(
             department=department, version=0, text=DEFINITIONS.role(department).prompt, source="default",
         ))
     return state
 
 
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
-                      held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True) -> None:
+                      held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True,
+                      through: int | None = None) -> None:
     try:
-        run = project_run(store, item.run_id)
+        run = project_run(store, item.run_id) if through is None else replay_run(store, item.run_id, through=through)
     except RunNotFoundError:
         item.status = "not_started"
         return
@@ -137,7 +147,7 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     else:
         item.status = "in_progress"
     if include_history:
-        events = store.list_events(item.run_id)
+        events = store.list_events(item.run_id, through_position=through)
         handoffs = work_item_handoffs(events)
         item.last_handoff = handoffs[-1] if handoffs else None
         item.rework = [
@@ -211,7 +221,7 @@ def _project_event_summary(event: ProjectEvent) -> str:
     payload = event.payload
     return str(
         payload.get("title") or payload.get("summary") or payload.get("name") or payload.get("reason")
-        or payload.get("error") or (payload.get("department") if event.type == ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED else None)
+        or payload.get("error") or (payload.get("department") if event.type == ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED else None)
         or event.type
     )
 
@@ -318,10 +328,21 @@ class ProjectService:
         projects.sort(key=lambda item: not item.pinned)
         return projects
 
-    def read_prompt(self, project_id: str, department: str) -> dict[str, Any]:
+    def read_department_setting(self, project_id: str, department: str) -> dict[str, Any]:
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
-        return _prompt_view(self.projection(project_id).prompt_configs[department])
+        return _setting_view(self.projection(project_id).department_settings[department])
+
+    def read_projection_setting(self, project_id: str, department: str) -> DepartmentSetting | None:
+        # 运行层每次请求读取的当前设置：直接取保存的项目投影，不拼接事项状态（避免每次请求重算全部事项）。
+        # 没有这个项目或部门不存在时为空，由调用方按内置默认 Prompt 处理
+        if department not in DEPARTMENTS:
+            return None
+        state = saved_project(self.store, project_id)
+        if state is None:
+            return None
+        _default_settings(state)
+        return state.department_settings.get(department)
 
     def read_commands(self, project_id: str) -> list[dict[str, Any]]:
         return [_command_view(config) for _, config in sorted(self.projection(project_id).commands.items())]
@@ -334,9 +355,10 @@ class ProjectService:
 
     # 项目登记与状态
 
-    def register(self, name: str, goal: str, *, command: Command | None = None) -> str:
+    def register(self, name: str, goal: str, *, source: str = "idea",
+                 command: Command | None = None) -> str:
         # command 是引起登记的命令：同一命令身份已经登记时写入口在判断之前拒绝（DuplicateCommand、CommandIdReused），
-        # 不保存目标原文，也不新建项目
+        # 不保存目标原文，也不新建项目。source 为 idea（想法新建）或 existing（接入已有项目）
         _require_text("name", name)
         _require_text("goal", goal)
         project_id = new_id("proj")
@@ -344,11 +366,104 @@ class ProjectService:
         def register(transaction: Transaction) -> None:
             goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
-                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "idea",
+                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": source,
             }, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
         return project_id
+
+    def onboard(self, name: str, goal: str, source_name: str, source_path: str, *,
+                max_cycles: int = DEFINITIONS.limits.max_cycles,
+                run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
+                context_window: int = 32_000,
+                command: Command | None = None) -> tuple[str, str, str]:
+        # 接入已有项目（3.8 第 3.1 节）：同一个项目流事务中登记项目（source 为 existing）、登记源目录、
+        # 登记建档事项（kind 为 onboarding，带快照记录），随后创建建档 run。
+        # 快照在事务之前采集：采集失败时命令被拒绝，不建立项目，不写入任何事件。
+        # 调用方（应用层）先采集快照并把错误转成 source_invalid
+        _require_text("name", name)
+        _require_text("goal", goal)
+        _require_text("source_name", source_name)
+        _require_text("source_path", source_path)
+        project_id = new_id("proj")
+        work_item_id, run_id = new_id("wi"), new_id("run")
+        tree, snapshot = ingest_snapshot(source_path, self.artifacts, run_id)
+
+        def onboard(transaction: Transaction) -> _NewWorkItem | None:
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
+                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "existing",
+            }, actor="user:local"))
+            transaction.append(NewProjectEvent(ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, {
+                "name": source_name, "path": source_path, "version": 1, "base_version": 0,
+            }, actor="user:local"))
+            project = _default_settings(deepcopy(transaction.projection))
+            return self._work_item_created(
+                transaction, project, goal, title=name, max_cycles=max_cycles,
+                run_time_limit_sec=run_time_limit_sec, context_window=context_window,
+                baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
+                work_item_id=work_item_id, run_id=run_id, kind="onboarding",
+            )
+
+        item = self._start_in(project_id, onboard, command=command)
+        return project_id, item.work_item_id, item.run_id
+
+    def restart_onboarding(self, project_id: str, source_name: str, *,
+                           max_cycles: int = DEFINITIONS.limits.max_cycles,
+                           run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
+                           context_window: int = 32_000,
+                           command: Command | None = None) -> tuple[str, str]:
+        # 重新开始建档（3.8 第 3.1 节）：从登记的源目录重新采集快照，开始新的建档事项。
+        # 只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用
+        _require_text("source_name", source_name)
+        project = self._writable(project_id)
+        if project.source != "existing":
+            raise OnboardingNotAllowedError("项目不是接入已有项目建立的")
+        if project.current_adoption is not None:
+            raise OnboardingNotAllowedError("项目已经有基线采纳")
+        if any(item.status == "in_progress" for item in _compose(self.store, deepcopy(project)).work_items):
+            raise WorkItemInProgressError(f"work item in progress: {project_id}")
+        directory = project.source_directories.get(source_name)
+        if directory is None:
+            raise SourceDirectoryNotFoundError(f"unknown source directory: {source_name}")
+        work_item_id, run_id = new_id("wi"), new_id("run")
+        tree, snapshot = ingest_snapshot(directory.path, self.artifacts, run_id)
+
+        def restart(transaction: Transaction) -> _NewWorkItem | None:
+            state = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
+            return self._work_item_created(
+                transaction, state, state.goal, title=state.name, max_cycles=max_cycles,
+                run_time_limit_sec=run_time_limit_sec, context_window=context_window,
+                baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
+                work_item_id=work_item_id, run_id=run_id, kind="onboarding",
+            )
+
+        item = self._start_in(project_id, restart, command=command)
+        return item.work_item_id, item.run_id
+
+    def _start_in(self, project_id: str, create: Callable[[Transaction], _NewWorkItem | None], *,
+                  command: Command | None = None) -> _NewWorkItem:
+        # 在已有的项目流事务结果上创建 run；创建失败时在项目流记下失败的原因。
+        # 从登记之前到 run 创建完成，这个项目算作有事项正在开始
+        token = object()
+        self._starting.setdefault(project_id, set()).add(token)
+        try:
+            item = self.writes.transact(project_stream(project_id), create, command=command)
+            if item is None:
+                raise ValueError("the work item transaction produced no work item")
+            try:
+                self.orchestrator.create_run(item.text, run_id=item.run_id, **item.run_options)
+            except Exception as exc:
+                self.writes.append(project_stream(project_id), NewProjectEvent(
+                    ProjectEventType.WORK_ITEM_START_FAILED,
+                    {"work_item_id": item.work_item_id, "run_id": item.run_id,
+                     "error": str(exc) or type(exc).__name__},
+                    actor="system",
+                ))
+                raise
+        finally:
+            self._starting[project_id].discard(token)
+        return item
 
     def rename(self, project_id: str, name: str, *, command: Command | None = None) -> None:
         _require_text("name", name)
@@ -358,6 +473,19 @@ class ProjectService:
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_RENAMED, {"name": name}, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), rename, command=command)
+
+    def set_goal(self, project_id: str, goal: str, *, command: Command | None = None) -> None:
+        # 修改长期目标：写成项目流事件，之后开始的事项使用新目标，进行中的事项按 run_created 记下的开始时的目标做完
+        _require_text("goal", goal)
+
+        def set_goal(transaction: Transaction) -> None:
+            self._writable_in(transaction, project_id)
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_GOAL_CHANGED, {
+                "goal": goal, "goal_ref": asdict(goal_ref),
+            }, actor="user:local"))
+
+        self.writes.transact(project_stream(project_id), set_goal, command=command)
 
     def pin(self, project_id: str, pinned: bool, *, command: Command | None = None) -> None:
         if not isinstance(pinned, bool):
@@ -400,7 +528,7 @@ class ProjectService:
 
         def create(transaction: Transaction) -> _NewWorkItem:
             # 事项的基线、Prompt 与登记命令取自事务中的项目投影
-            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
+            project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
             baseline = None
             initial_tree = None
             source_run = None
@@ -426,41 +554,17 @@ class ProjectService:
 
         return self._start(project_id, create, command=command)
 
-    def start_work_item_from_snapshot(self, project_id: str, source_dir: str, text: str, *,
-                                      title: str | None = None,
-                                      max_cycles: int = DEFINITIONS.limits.max_cycles,
-                                      run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
-                                      context_window: int = 32_000) -> tuple[str, str]:
-        # 可信代码快照接入：源目录只读采集，事项在独立工作区开始，源目录不被改写
-        _require_text("text", text)
-        _require_title(title)
-        if not isinstance(source_dir, str) or not source_dir.strip():
-            raise ValueError("source_dir must be a non-empty string")
-        self._writable(project_id)
-        self.settle_pending(project_id)
-        work_item_id, run_id = new_id("wi"), new_id("run")
-        tree, snapshot = ingest_snapshot(source_dir, self.artifacts, run_id)
-
-        def create(transaction: Transaction) -> _NewWorkItem:
-            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
-            return self._work_item_created(
-                transaction, project, text, title=title, max_cycles=max_cycles,
-                run_time_limit_sec=run_time_limit_sec, context_window=context_window,
-                baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
-                work_item_id=work_item_id, run_id=run_id,
-            )
-
-        return self._start(project_id, create)
 
     def _work_item_created(self, transaction: Transaction, project: ProjectProjection, text: str, *,
                            title: str | None, max_cycles: int, run_time_limit_sec: int, context_window: int,
                            baseline: dict[str, Any] | None, initial_tree: Any, snapshot: dict[str, Any] | None,
                            source_run: Any, work_item_id: str, run_id: str,
-                           priority: str = PRIORITY_USER) -> _NewWorkItem:
+                           priority: str = PRIORITY_USER, kind: str = "change") -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
-        department_prompts = {department: project.prompt_configs[department].text for department in DEPARTMENTS}
-        prompt_config_versions = {department: project.prompt_configs[department].version for department in DEPARTMENTS}
+        # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
+        prompt_config_versions = {department: project.department_settings[department].version
+                                  for department in DEPARTMENTS}
         # 登记命令在事项创建时冻结：之后项目再改注册表，不影响已创建事项的执行依据
         frozen_commands = {name: config.frozen() for name, config in project.commands.items()}
         command_versions = {name: config.version for name, config in project.commands.items()}
@@ -476,6 +580,7 @@ class ProjectService:
             "definitions_version": DEFINITIONS.version,
             # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
             "priority": priority,
+            "kind": kind,
         }, actor="user:local"))
         return _NewWorkItem(
             work_item_id=work_item_id, run_id=run_id, text=text,
@@ -483,8 +588,8 @@ class ProjectService:
                 max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 project_id=project.project_id, work_item_id=work_item_id, baseline=baseline,
                 initial_tree=initial_tree, code_snapshot=snapshot, project_context=context_text,
-                department_prompts=department_prompts, prompt_config_versions=prompt_config_versions,
-                registered_commands=frozen_commands, command_versions=command_versions,
+                prompt_config_versions=prompt_config_versions,
+                registered_commands=frozen_commands, command_versions=command_versions, kind=kind,
             ),
         )
 
@@ -492,21 +597,7 @@ class ProjectService:
                command: Command | None = None) -> tuple[str, str]:
         # 在项目流登记事项，再创建它的 run；创建失败时在项目流记下失败的原因。
         # 从登记之前到 run 创建完成，这个项目算作有事项正在开始
-        token = object()
-        self._starting.setdefault(project_id, set()).add(token)
-        try:
-            item = self.writes.transact(project_stream(project_id), create, command=command)
-            try:
-                self.orchestrator.create_run(item.text, run_id=item.run_id, **item.run_options)
-            except Exception as exc:
-                self.writes.append(project_stream(project_id), NewProjectEvent(
-                    ProjectEventType.WORK_ITEM_START_FAILED,
-                    {"work_item_id": item.work_item_id, "run_id": item.run_id, "error": str(exc) or type(exc).__name__},
-                    actor="system",
-                ))
-                raise
-        finally:
-            self._starting[project_id].discard(token)
+        item = self._start_in(project_id, create, command=command)
         return item.work_item_id, item.run_id
 
     def restart_work_item_for_upgrade(self, run_id: str, *, command: Command | None = None) -> tuple[str, str] | None:
@@ -521,7 +612,7 @@ class ProjectService:
             return None
 
         def restart(transaction: Transaction) -> _NewWorkItem | None:
-            project = _default_prompts(deepcopy(self._writable_in(transaction, run.project_id)))
+            project = _default_settings(deepcopy(self._writable_in(transaction, run.project_id)))
             item = project.work_item_for_run(run_id)
             if item is None:
                 return None
@@ -571,7 +662,7 @@ class ProjectService:
         work_item_id, run_id = new_id("wi"), new_id("run")
 
         def queue(transaction: Transaction) -> str:
-            project = _default_prompts(deepcopy(self._writable_in(transaction, project_id)))
+            project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
             source_run = None
             baseline, initial_tree = None, None
             adoption = project.current_adoption
@@ -661,30 +752,41 @@ class ProjectService:
 
     # 部门 Prompt 项目配置
 
-    def configure_prompt(self, project_id: str, department: str, text: str, base_version: int, *,
-                         command: Command | None = None) -> dict[str, Any]:
+    def configure_department_settings(self, project_id: str, department: str, selection: ModelSelection,
+                                      base_version: int, *, command: Command | None = None) -> dict[str, Any]:
+        # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；三项一起保存、一个版本。
+        # 并发修改时按版本拒绝后提交的修改（设计说明第 5.2 节）。选择「跟随部门默认」清除本项目的模型选择，
+        # 档位选择「跟随」清除请求档位；部门 Prompt 为空表示没有写入，使用内置默认 Prompt
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
-        if not isinstance(text, str) or not text.strip():
-            raise ValueError("prompt text must be a non-empty string")
         if type(base_version) is not int or base_version < 0:
             raise ValueError("base_version must be a non-negative integer")
+        if selection.department_prompt is not None and not selection.department_prompt.strip():
+            raise ValueError("department prompt must be a non-empty string when given")
 
         def configure(transaction: Transaction) -> dict[str, Any] | None:
-            current = _default_prompts(deepcopy(self._writable_in(transaction, project_id))).prompt_configs[department]
+            current = _default_settings(
+                deepcopy(self._writable_in(transaction, project_id))).department_settings[department]
             if base_version != current.version:
-                raise PromptConfigConflict(_prompt_view(current))
-            if text == current.text:
-                return {**_prompt_view(current), "unchanged": True}
-            ref = save_department_prompt(self.artifacts, project_id, department, text)
-            transaction.append(NewProjectEvent(ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED, {
-                "department": department, "version": current.version + 1, "text": text,
-                "prompt_ref": asdict(ref), "base_version": base_version,
-            }, actor="user:local"))
+                raise DepartmentSettingConflict(_setting_view(current))
+            unchanged = (current.provider_id == selection.provider_id
+                         and current.model_id == selection.model_id
+                         and current.requested_tier == selection.requested_tier
+                         and _current_prompt(current) == selection.department_prompt)
+            if unchanged:
+                return {**_setting_view(current), "unchanged": True}
+            payload = selection.event_payload()
+            if selection.department_prompt is not None:
+                ref = save_department_prompt(self.artifacts, project_id, department, selection.department_prompt)
+                payload["department_prompt_ref"] = asdict(ref)
+            payload.update({"department": department, "version": current.version + 1,
+                            "base_version": base_version})
+            transaction.append(NewProjectEvent(ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, payload,
+                                              actor="user:local"))
             return None
 
         unchanged = self.writes.transact(project_stream(project_id), configure, command=command)
-        return unchanged or {**self.read_prompt(project_id, department), "unchanged": False}
+        return unchanged or {**self.read_department_setting(project_id, department), "unchanged": False}
 
     # 项目登记命令（3.2A 本地命令：只有登记的命令与参数范围可以执行）
 
@@ -804,14 +906,22 @@ def _require_title(title: str | None) -> None:
         raise ValueError("title must be a non-empty string when given")
 
 
-def _prompt_view(config: PromptConfig) -> dict[str, Any]:
+def _current_prompt(setting: DepartmentSetting) -> str | None:
+    # 项目部门设置中写入的部门 Prompt；没有写入时为 None，读取模型补成内置默认 Prompt
+    return setting.text if setting.configured_prompt else None
+
+def _setting_view(setting: DepartmentSetting) -> dict[str, Any]:
     return {
-        "department": config.department,
-        "text": config.text,
-        "default_text": DEFINITIONS.role(config.department).prompt,
-        "version": config.version,
-        "updated_at": config.updated_at,
-        "source": config.source,
+        "department": setting.department,
+        "text": setting.text,
+        "default_text": DEFINITIONS.role(setting.department).prompt,
+        "prompt_configured": setting.configured_prompt,
+        "provider_id": setting.provider_id,
+        "model_id": setting.model_id,
+        "requested_tier": setting.requested_tier,
+        "version": setting.version,
+        "updated_at": setting.updated_at,
+        "source": setting.source,
     }
 
 

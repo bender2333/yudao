@@ -14,7 +14,7 @@ from .event_store import EventStore, catalog_stream
 from .models import CatalogEventType, ProjectEventType
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .write_path import NewCatalogEvent, WritePath
-from .projection import RunNotFoundError, RunProjection, project_run
+from .projection import RunNotFoundError, RunProjection, load_projection, project_run
 from .projects import ProjectService
 from .providers import ProviderFacade
 from .streams import (
@@ -143,10 +143,15 @@ class LoopSystem:
     # 排空与强制升级（应用层与接口层设计说明第 3.2 节「升级」，ADR-0019）
 
     @property
+    def running_runs(self) -> int:
+        # 还没有结束的 run 数：客户端在停止之前用它显示确认，也用于排空状态（设计说明第 4.4 节）
+        unfinished = classify_startup_runs(self.store)
+        return len(unfinished.same_version) + len(unfinished.other_version)
+
+    @property
     def drain(self) -> DrainState:
         # 排空状态：未排空、排空中（还有 run 在进行）、已排空可以升级；正在进行的 run 数与期间排队的事项数
-        unfinished = classify_startup_runs(self.store)
-        running = len(unfinished.same_version) + len(unfinished.other_version)
+        running = self.running_runs
         version = self._drain_version()
         if version is None:
             return DrainState(state=DRAIN_IDLE, version=0, running_runs=running)
@@ -221,6 +226,31 @@ class LoopSystem:
 
         return self.writes.transact(catalog_stream(), decide)
 
+    def mark_seen(self, position: int, *, command: Command | None = None) -> int:
+        # 把用户查看过的全局位置更新为 position（工单 #127），写入目录流。控制主机上只有一个位置，
+        # 上一次的查看位置由这次写入取代；位置必须在日志范围内（0 到日志末尾）
+        end = self.store.end_position()
+        if position < 0 or position > end:
+            raise ValueError(f"seen position {position} is outside the log (end {end})")
+
+        def decide(transaction):
+            transaction.append(NewCatalogEvent(CatalogEventType.HOME_SEEN, {"position": position},
+                                               actor="user:local"))
+
+        self.writes.transact(catalog_stream(), decide, command=command)
+        return position
+
+    @property
+    def home_seen(self) -> tuple[int, str] | None:
+        # 用户查看过的全局位置与它的写入时间；从未查看过时为空
+        saved = self.store.projection(catalog_stream())
+        if saved is None:
+            return None
+        state = load_projection(saved, catalog_stream())
+        if state.last_seen_position is None:
+            return None
+        return state.last_seen_position, state.last_seen_at
+
     @property
     def provider_config_path(self) -> Path | None:
         return self.facade.config_path
@@ -280,9 +310,6 @@ class LoopSystem:
 
     def add_input(self, run_id: str, text: str) -> RunProjection:
         return self.orchestrator.add_input(run_id, text)
-
-    def update_prompt(self, run_id: str, department: str, text: str) -> RunProjection:
-        return self.orchestrator.update_prompt(run_id, department, text)
 
     def add_guidance(self, run_id: str, department: str, text: str) -> RunProjection:
         return self.orchestrator.add_guidance(run_id, department, text)

@@ -85,6 +85,8 @@ class CodeSnapshot(Payload):
     files: list[str]
     directories: list[str]
     tree_ref: ArtifactRef
+    # 快照的 git 来源：提交、分支与是否有未提交的修改；源目录不是 git 仓库或旧事件没有这个字段时为空
+    provenance: dict[str, Any] | None = None
 
 
 class InputRecord(Payload):
@@ -100,13 +102,6 @@ class InputRecord(Payload):
     byte_end: int
     git_version: GitVersion
     base_version: int | None = None
-
-
-class PromptRecord(Payload):
-    department: Department
-    version: int
-    text: str
-    prompt_ref: ArtifactRef
 
 
 class FrozenCommand(Payload):
@@ -184,6 +179,10 @@ class CallTarget(Payload):
     selection_source: str | None
     requested_tier: str | None
     sent_tier: str | None
+    # 模型访问定义声明的推理档位（#87）：支持档位、默认档位与推理参数方式，未声明时为空
+    reasoning_levels: list[str]
+    default_reasoning_level: str | None
+    reasoning_mode: str | None
 
 
 class AttemptIdentity(Payload):
@@ -236,8 +235,9 @@ class ToolRecord(AttemptIdentity, WorkBasis, Versions, CallTarget):
 
 class RunCreatedPayload(Payload):
     task: str
+    # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
+    kind: str = "change"
     initial_input: InputRecord
-    department_prompts: dict[Department, PromptRecord]
     intend_ref: ArtifactRef
     git_version: GitVersion
     intend_path: str
@@ -251,6 +251,8 @@ class RunCreatedPayload(Payload):
     work_item_id: str | None
     baseline: Baseline | None
     snapshot: CodeSnapshot | None
+    # 建档事项的仓库概况工件引用；普通事项没有概况
+    overview_ref: ArtifactRef | None = None
     workspace_digest: str
     project_context_ref: ArtifactRef | None
     prompt_config_versions: dict[Department, int]
@@ -268,10 +270,6 @@ class UserInputReceivedPayload(InputRecord):
 
 class ProductInputAssignedPayload(Payload):
     through_version: int
-
-
-class DepartmentPromptUpdatedPayload(PromptRecord):
-    pass
 
 
 class DepartmentGuidanceReceivedPayload(Payload):
@@ -509,6 +507,8 @@ class ToolCallResult(ToolRecord):
     ok: bool
     error: str | None
     output_ref: ArtifactRef | None = None
+    # 动作后的公开树快照（工单 #17）：与事件 tool_started 上的动作前快照、动作参数一起构成核实依据
+    after_snapshot_ref: ArtifactRef | None = None
 
 
 class UsageCharge(Versions, CallTarget):
@@ -545,11 +545,23 @@ class ToolStartedPayload(AttemptIdentity, Versions, WorkBasis):
     registered_name: str | None = None
     registered_argv: list[str] | None = None
     snapshot_hash: str | None = None
+    # 动作前的公开树快照（工单 #17）：许可以后、执行之前写入，中断后按它与动作参数核对实际效果
+    before_snapshot_ref: ArtifactRef | None = None
 
 
 class ToolSkippedPayload(ToolRecord):
     ok: Literal[False]
     error: str
+
+class ActionVerifiedPayload(ToolRecord):
+    # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
+    # resolution 为 continue 表示用户选择按当前实际状态继续；选择重新执行时不写核实记录，由步骤驱动补执行。
+    # input_item 让这条结果进入部门历史，模型据此继续
+    ok: bool
+    error: str | None = None
+    resolution: Literal["continue"]
+    note: str | None = None
+    decision_id: str | None = None
 
 
 class ProposalSubmittedPayload(Payload):
@@ -761,6 +773,89 @@ class QaSubmittedPayload(Payload):
     git_version: GitVersion
 
 
+class StructureModule(Payload):
+    # 现有结构说明中的一个模块
+    path: str
+    responsibility: str
+
+
+class StructureEntryPoint(Payload):
+    kind: Literal["program", "command_line", "service"]
+    path: str
+    how_to_run: str
+
+
+class StructureBuildItem(Payload):
+    # 构建与测试的一条命令，带本次激活中绑定当前快照的执行回执
+    name: str
+    argv: list[str]
+    purpose: str
+    receipt: CheckReceipt
+
+
+class StructureRequirementLocation(Payload):
+    requirement: str
+    locations: list[str]
+
+
+class StructureAcceptedPayload(Payload):
+    overall: str
+    modules: list[StructureModule]
+    entry_points: list[StructureEntryPoint]
+    build_and_test: list[StructureBuildItem]
+    requirement_locations: list[StructureRequirementLocation]
+    conventions: list[str]
+    product_spec_hash: str
+    code_tree_digest: str
+    kind: Literal["structure"]
+    issuer: Literal["engineering"]
+    parent_hash: str | None
+    revision: int
+    status: Literal["active"]
+    content_hash: str
+    id: str
+    structure_ref: ArtifactRef
+    request_id: str | None
+    git_version: GitVersion
+
+
+class BaselineConclusion(Payload):
+    # 基线核验中对一条初始 PRD 要求的结论
+    requirement: str
+    status: Literal["verified", "read_only", "existing_defect", "unsupported"]
+    evidence: str
+
+
+class BaselineOmission(Payload):
+    capability: str
+    location: str
+
+
+class BaselineOtherFailure(Payload):
+    check: str
+    reason: str
+
+
+class BaselineReviewAcceptedPayload(Payload):
+    verdict: Literal["consistent", "rework_product"]
+    conclusions: list[BaselineConclusion]
+    omissions: list[BaselineOmission]
+    checks: list[CheckReceipt]
+    other_failures: list[BaselineOtherFailure]
+    product_spec_hash: str
+    structure_hash: str
+    code_snapshot_hash: str
+    kind: Literal["baseline_review"]
+    issuer: Literal["quality"]
+    parent_hash: str | None
+    revision: int
+    status: Literal["active"]
+    content_hash: str
+    id: str
+    request_id: str | None
+    git_version: GitVersion
+
+
 class ReviewObservation(Payload):
     # 教训候选来自质检退回
     verdict: str
@@ -851,7 +946,7 @@ class ModelUnavailableRequested(Payload):
 
 
 class PauseRequested(Payload):
-    # 暂停以后继续（D09，工单 #204）：模型连续多次没有调用工具，或者工作区出现公开树无法表示的条目，
+    # 暂停以后继续（D09，工单 #204）：模型连续多次没有调用工具，或者工作区出现无法表示的条目，
     # run 暂停并发出这个请求，回答之前这个 run 不推进。description 写明停止原因与人工处理说明；
     # workspace_unrepresentable 的 facts 是条目在工作区内的相对路径；department 是暂停时正在工作的部门；
     # resumed_at_phase 是暂停时所在的阶段，回答继续时恢复到它
@@ -864,8 +959,25 @@ class PauseRequested(Payload):
     stop_reason: Literal["no_tool_call", "workspace_unrepresentable"]
     resumed_at_phase: Phase
 
+
+class UnknownActionRequested(Payload):
+    # 工单 #17：动作核实与一致边界。恢复时发现未确认的动作，请求用户决定如何处理。
+    # 只阻塞该动作（blocks="action"），不阻塞整个 run。
+    # facts 列出涉及的事件编号（tool_started/tool_called 对）；options 按工具是否可重复决定是否包含 reexecute
+    kind: Literal["unknown_action"]
+    blocks: Literal["action"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    action_id: str
+    tool: str
+    action_kind: str
+    repeatable: bool
+
+
 # 决定请求的载荷：以 kind 区分的各种决定请求
-DecisionRequestedPayload = ModelUnavailableRequested | PauseRequested
+DecisionRequestedPayload = ModelUnavailableRequested | UnknownActionRequested | PauseRequested
 
 
 class DecisionAnsweredPayload(Payload):
@@ -904,11 +1016,18 @@ class ProjectRegisteredPayload(Payload):
     name: str
     goal: str
     goal_ref: ArtifactRef
-    source: Literal["idea"]
+    # 项目来源：想法新建为 idea，接入已有项目为 existing
+    source: Literal["idea", "existing"]
 
 
 class ProjectRenamedPayload(Payload):
     name: str
+
+
+class ProjectGoalChangedPayload(Payload):
+    # 长期目标改为 goal；goal_ref 是目标原文的工件引用
+    goal: str
+    goal_ref: ArtifactRef
 
 
 class ProjectPinnedPayload(Payload):
@@ -939,6 +1058,8 @@ class WorkItemCreatedPayload(Payload):
     definitions_version: str
     # 事项在队列中的优先级：因升级重新开始的事项排在最前面；旧事件没有这个字段时按用户新要求处理（ADR-0019）
     priority: str = PRIORITY_USER
+    # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
+    kind: str = "change"
 
 
 class WorkItemStartFailedPayload(Payload):
@@ -972,8 +1093,16 @@ class AdoptionHeldPayload(Payload):
     current_adoption_id: str | None
 
 
-class DepartmentPromptConfiguredPayload(PromptRecord):
+class DepartmentSettingsConfiguredPayload(Payload):
+    # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；三项一起保存、一个版本
+    department: Department
+    version: int
     base_version: int
+    provider_id: str | None = None
+    model_id: str | None = None
+    requested_tier: str | None = None
+    department_prompt: str | None = None
+    department_prompt_ref: ArtifactRef | None = None
 
 
 class CommandConfiguredPayload(Payload):
@@ -1062,12 +1191,17 @@ class RuntimeForceUpgradeRequestedPayload(Payload):
     restarted_work_items: list[str]
 
 
+class HomeSeenPayload(Payload):
+    # 用户查看过的全局位置（工单 #127）：上一次查看的位置被这次的位置取代，控制主机上只有一个。
+    # 位置的写入时间由事件的 created_at 给出
+    position: int
+
+
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
     EventType.RUN_CREATED: RunCreatedPayload,
     EventType.USER_INPUT_RECEIVED: UserInputReceivedPayload,
     EventType.PRODUCT_INPUT_ASSIGNED: ProductInputAssignedPayload,
-    EventType.DEPARTMENT_PROMPT_UPDATED: DepartmentPromptUpdatedPayload,
     EventType.DEPARTMENT_GUIDANCE_RECEIVED: DepartmentGuidanceReceivedPayload,
     EventType.DEPARTMENT_GUIDANCE_APPLIED: DepartmentGuidanceAppliedPayload,
     EventType.DEPARTMENT_GUIDANCE_RESPONDED: DepartmentGuidanceRespondedPayload,
@@ -1087,6 +1221,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.TOOL_CALLED: ToolCallResult | UsageCharge,
     EventType.TOOL_STARTED: ToolStartedPayload,
     EventType.TOOL_SKIPPED: ToolSkippedPayload,
+    EventType.ACTION_VERIFIED: ActionVerifiedPayload,
     EventType.PROPOSAL_SUBMITTED: ProposalSubmittedPayload,
     EventType.PROPOSAL_REJECTED: ProposalRejectedPayload,
     EventType.SPEC_ACCEPTED: SpecAcceptedPayload,
@@ -1099,6 +1234,8 @@ PAYLOADS: dict[str, Any] = {
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,
     EventType.DELIVERY_ACCEPTED: DeliveryAcceptedPayload,
     EventType.QA_SUBMITTED: QaSubmittedPayload,
+    EventType.STRUCTURE_ACCEPTED: StructureAcceptedPayload,
+    EventType.BASELINE_REVIEW_ACCEPTED: BaselineReviewAcceptedPayload,
     EventType.LESSON_CANDIDATE_RECORDED: LessonCandidateRecordedPayload,
     EventType.TRANSITION: TransitionPayload,
     EventType.RUN_DONE: RunDonePayload,
@@ -1111,6 +1248,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.DECISION_WITHDRAWN: DecisionWithdrawnPayload,
     ProjectEventType.PROJECT_REGISTERED: ProjectRegisteredPayload,
     ProjectEventType.PROJECT_RENAMED: ProjectRenamedPayload,
+    ProjectEventType.PROJECT_GOAL_CHANGED: ProjectGoalChangedPayload,
     ProjectEventType.PROJECT_PINNED: ProjectPinnedPayload,
     ProjectEventType.PROJECT_ARCHIVED: ProjectArchivedPayload,
     ProjectEventType.PROJECT_RESTORED: ProjectRestoredPayload,
@@ -1118,7 +1256,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.WORK_ITEM_START_FAILED: WorkItemStartFailedPayload,
     ProjectEventType.DELIVERABLE_ADOPTED: DeliverableAdoptedPayload,
     ProjectEventType.ADOPTION_HELD: AdoptionHeldPayload,
-    ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED: DepartmentPromptConfiguredPayload,
+    ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED: DepartmentSettingsConfiguredPayload,
     ProjectEventType.COMMAND_CONFIGURED: CommandConfiguredPayload,
     ProjectEventType.MATERIAL_RECORDED: MaterialRecordedPayload,
     ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: SourceDirectoryConfiguredPayload,
@@ -1128,4 +1266,5 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.CREDENTIAL_CHANGED: CredentialChangedPayload,
     CatalogEventType.RUNTIME_DRAIN_STARTED: RuntimeDrainStartedPayload,
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: RuntimeForceUpgradeRequestedPayload,
+    CatalogEventType.HOME_SEEN: HomeSeenPayload,
 }

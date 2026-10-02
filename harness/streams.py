@@ -20,7 +20,6 @@ RUN_EVENT_TYPES = frozenset({
     "run_created",
     "user_input_received",
     "product_input_assigned",
-    "department_prompt_updated",
     "department_guidance_received",
     "department_guidance_applied",
     "department_guidance_responded",
@@ -40,6 +39,7 @@ RUN_EVENT_TYPES = frozenset({
     "tool_called",
     "tool_started",
     "tool_skipped",
+    "action_verified",
     "proposal_submitted",
     "proposal_rejected",
     "spec_accepted",
@@ -53,6 +53,8 @@ RUN_EVENT_TYPES = frozenset({
     "delivery_accepted",
     "qa_submitted",
     "lesson_candidate_recorded",
+    "structure_accepted",
+    "baseline_review_accepted",
     "transition",
     "run_resumed",
     "run_continued",
@@ -68,6 +70,7 @@ RUN_EVENT_TYPES = frozenset({
 PROJECT_EVENT_TYPES = frozenset({
     "project_registered",
     "project_renamed",
+    "project_goal_changed",
     "project_pinned",
     "project_archived",
     "project_restored",
@@ -81,7 +84,8 @@ PROJECT_EVENT_TYPES = frozenset({
     "source_directory_configured",
 })
 
-# 目录流：模型目录与凭据的修订记录，以及排空与强制升级。与项目流一样是跨版本保存的长期事实
+# 目录流：模型目录与凭据的修订记录，以及排空与强制升级、用户查看过的位置。
+# 与项目流一样是跨版本保存的长期事实
 CATALOG_EVENT_TYPES = frozenset({
     "catalog_revised",
     "catalog_candidates_collected",
@@ -89,6 +93,7 @@ CATALOG_EVENT_TYPES = frozenset({
     "credential_changed",
     "runtime_drain_started",
     "runtime_force_upgrade_requested",
+    "home_seen",
 })
 
 # 全部声明过分类的事件种类

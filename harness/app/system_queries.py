@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import shutil
 from typing import TYPE_CHECKING, Literal
+
 from pydantic import AwareDatetime
+
+from ..models import CatalogEventType, EventType
+from ..projection import saved_decisions
 from .contracts import Contract, Snapshot
+from .project_queries import RecoveryStatus, recovery_status
 from .registry import QueryDefinition
+from .replay import ReplayRequest, catalog_through, check_position, decisions_through
 
 if TYPE_CHECKING:
     from .application import Application
-
 
 class ProviderReadiness(Contract):
     # 能否新建事项：三个部门都能解析调用目标时可用；不可用时给出原因与说明
@@ -17,12 +23,10 @@ class ProviderReadiness(Contract):
     reason: str
     message: str
 
-
 class CatalogState(Contract):
     # 模型目录当前生效的修订号与最近一次重新读取的错误
     revision: int
     reload_error: str | None
-
 
 class DrainStatus(Contract):
     # 排空状态（ADR-0019）：未排空、排空中或已排空可以升级；排空中的剩余 run 数与期间排队的事项数。
@@ -32,36 +36,89 @@ class DrainStatus(Contract):
     running_runs: int
     queued_work_items: int
 
+class HomeStatus(Contract):
+    # 首页顶部的状态项（设计说明第 4.3 节「系统首页」，工单 #127）：待你决定的数量与磁盘可用空间。
+    # 结果未知的动作数（3.1）、离线的机器数（3.2C）、等待模型服务的 run 数与正在修复的故障数（Stage 4）
+    # 由所属工作包在这里加入字段；没有来源的项不返回，不写成零
+    waiting_decisions: int
+    disk_free_bytes: int | None
+
 class SystemStatus(Contract):
-    # 部署身份（日志身份）、本次启动的身份与启动时间、Provider 就绪摘要、目录修订号与重读错误
+    # 部署身份（日志身份）、本次启动的身份与启动时间、Provider 就绪摘要、目录修订号与重读错误。
+    # version 是服务的发布版本号，running_runs 是还没有结束的 run 数，客户端在停止之前用它显示确认
     log_id: str
     boot_id: str
     started_at: AwareDatetime
+    version: str
+    running_runs: int
     provider: ProviderReadiness
     catalog: CatalogState
     # 排空状态（ADR-0019，3.1）：未排空、排空中与剩余的 run 数、已排空可以升级
     drain: DrainStatus
+    # 恢复观察汇总（3.1，工单 #18）
+    recovery: RecoveryStatus
+    # 首页状态项（工单 #127）
+    home: HomeStatus
 
 # 这个文件用了 from __future__ import annotations，SystemStatus 引用 DrainStatus 时需要重建模型
 SystemStatus.model_rebuild()
 
-def _system_status(application: Application, _request: None) -> Snapshot[SystemStatus]:
+class SystemStatusRequest(ReplayRequest):
+    # 可回放（设计说明第 4.1 节）：at 是全局位置，省略时读取现在的快照
+    pass
+
+def _system_status(application: Application, request: SystemStatusRequest) -> Snapshot[SystemStatus]:
     system = application.system
-    position = system.store.end_position()
+    store = system.store
+    through = check_position(application, request.at)
+    # 首页状态项里与时间有关的项按位置读取：待你决定的数量取到 at 为止的决定请求；磁盘可用空间是本机的实时值
+    if through is None:
+        _, decisions = saved_decisions(store)
+        catalog = system.facade.config_status()
+        position = store.end_position()
+    else:
+        decisions = decisions_through(store, through)
+        catalog = _catalog_state(catalog_through(store, through))
+        position = through
     readiness = system.provider_status()
-    catalog = system.facade.config_status()
     drain = system.drain
+    recovery = recovery_status(application)
     return Snapshot[SystemStatus](position=position, data=SystemStatus(
-        log_id=system.store.log_id, boot_id=application.boot_id, started_at=application.started_at,
+        log_id=store.log_id, boot_id=application.boot_id, started_at=application.started_at,
+        version=application.version, running_runs=system.running_runs,
         provider=ProviderReadiness(available=readiness["available"], reason=readiness["reason"],
                                    message=readiness["message"]),
         catalog=CatalogState(revision=catalog["revision"], reload_error=catalog["reload_error"]),
         drain=DrainStatus(state=drain.state, version=drain.version, running_runs=drain.running_runs,
                           queued_work_items=drain.queued_work_items),
+        recovery=recovery,
+        home=HomeStatus(
+            waiting_decisions=sum(1 for item in decisions if item.status == "open"),
+            disk_free_bytes=_disk_free_bytes(system.data_dir),
+        ),
     ))
 
+def _catalog_state(state) -> dict:
+    # 从重放到 at 的目录投影取出查询需要的修订号与重读错误；重读错误只存在于当前生效的配置，按位置读取时为空
+    return {"revision": state.revision, "reload_error": None}
 
-SYSTEM_STATUS = QueryDefinition(name="system.status", request=None, result=SystemStatus, handle=_system_status)
+def _disk_free_bytes(data_dir) -> int | None:
+    # 控制主机上数据目录所在卷的可用空间；读取失败时为空（没有来源的项不返回，不写成零）
+    try:
+        return shutil.disk_usage(str(data_dir)).free
+    except OSError:
+        return None
+
+SYSTEM_STATUS = QueryDefinition(
+    name="system.status", request=SystemStatusRequest, result=SystemStatus, handle=_system_status,
+    changed_by=(EventType.RUN_RESUMED, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
+                EventType.RUN_PAUSED, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED,
+                EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
+                EventType.DECISION_WITHDRAWN, CatalogEventType.CATALOG_REVISED,
+                CatalogEventType.RUNTIME_DRAIN_STARTED),
+    replayable=True,
+)
 
 class LiveAttempt(Contract):
     # 进行中的调用尝试（设计说明第 5.6 节）：是否在进行中，以及各通道已收到的文字。

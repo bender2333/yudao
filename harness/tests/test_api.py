@@ -141,7 +141,14 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         document = client.get("/openapi.json").json()
     assert capabilities["commands"] == [
         {"name": "project.create", "reasons": ["command_id_reused"]},
+        {"name": "project.onboard",
+         "reasons": ["source_invalid", "busy", "provider_unavailable", "command_id_reused"]},
+        {"name": "onboarding.restart",
+         "reasons": ["not_found", "project_archived", "not_allowed", "source_invalid", "busy",
+                     "provider_unavailable", "command_id_reused"]},
         {"name": "project.rename",
+         "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
+        {"name": "project.set_goal",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "project.pin",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
@@ -152,7 +159,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
          "reasons": ["not_found", "project_archived", "work_item_in_progress", "not_allowed",
                      "command_id_reused"]},
         {"name": "work_item.create",
-         "reasons": ["not_found", "project_archived", "busy", "provider_unavailable", "command_id_reused"]},
+         "reasons": ["not_found", "project_archived", "busy", "provider_unavailable",
+                     "work_item_in_progress", "not_allowed", "command_id_reused"]},
         {"name": "work_item.append_input", "reasons": ["not_found", "run_terminal", "command_id_reused"]},
         {"name": "work_item.cancel", "reasons": ["not_found", "run_terminal", "command_id_reused"]},
         {"name": "guidance.send",
@@ -179,33 +187,51 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "credential.remove_persisted", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
         {"name": "runtime.start_drain", "reasons": ["not_allowed", "command_id_reused"]},
         {"name": "runtime.force_upgrade", "reasons": ["not_allowed", "command_id_reused"]},
+        {"name": "home.mark_seen", "reasons": ["not_allowed", "command_id_reused"]},
     ]
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]
-    assert capabilities["queries"][-2:] == [
-        {"name": "catalog", "changed_by": catalog_changed_by},
-        {"name": "catalog.document", "changed_by": catalog_changed_by},
+    assert [{"name": item["name"], "changed_by": item["changed_by"], "replayable": item["replayable"]}
+            for item in capabilities["queries"][-3:-1]] == [
+        {"name": "catalog", "changed_by": catalog_changed_by, "replayable": False},
+        {"name": "catalog.document", "changed_by": catalog_changed_by, "replayable": False},
     ]
+    assert capabilities["queries"][-1] == {
+        "name": "home.away_report", "replayable": False,
+        "changed_by": sorted([
+            "transition", "collaboration_requested", "collaboration_responded", "collaboration_closed",
+            "qa_submitted", "run_done", "run_paused", "run_failed", "decision_requested", "decision_answered",
+            "deliverable_adopted", "work_item_created",
+        ]) + ["model_attempt_finished"],
+    }
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
         "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions",
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
-        "project.settings", "run.export", "replay.check", "catalog", "catalog.document",
+        "project.settings", "run.export", "replay.check", "run.recovery", "catalog", "catalog.document",
+        "home.away_report",
     }
-    # 覆盖层只列出依赖的查询都已登记的：flow 与 waiting 的依赖已登记，其余依赖的查询尚未加入
+    # 可回放的查询：接受第 4.1 节的 at（按位置读取）
+    assert {item["name"] for item in queries if item["replayable"]} == {
+        "system.status", "projects.list", "decisions.list", "project.loop",
+    }
+    # 覆盖层只列出依赖的查询都已登记的：flow、waiting 与 recovery 的依赖已登记，其余依赖的查询尚未加入
     assert capabilities["overlays"] == [
         {"name": "flow", "queries": ["project.flow"]},
         {"name": "waiting", "queries": ["project.loop", "decisions.list"]},
+        {"name": "recovery", "queries": ["run.recovery"]},
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
-    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed", "no_tool_call",
-                                         "workspace_unrepresentable"]
+    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed", "unknown_action",
+                                         "no_tool_call", "workspace_unrepresentable"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id
     assert deployment["version"] == document["info"]["version"]
+    assert deployment["api_version"] == 1
+    assert deployment["access"] == "local"
     # 事件种类：现有全部 run 事件、项目事件与目录事件，与 OpenAPI 中事件对象的联合一致
     known = {value for owner in (EventType, ProjectEventType, CatalogEventType)
              for key, value in vars(owner).items() if not key.startswith("_")}
@@ -263,7 +289,7 @@ def test_registered_commands_and_queries_get_routes_and_capabilities_and_a_base_
         capabilities = client.get("/api/capabilities").json()
         document = client.get("/openapi.json").json()
         assert {"name": "sample.rename", "reasons": ["stale_base", "command_id_reused"]} in capabilities["commands"]
-        assert {"name": "sample.name", "changed_by": ["project_renamed"]} in capabilities["queries"]
+        assert {"name": "sample.name", "changed_by": ["project_renamed"], "replayable": False} in capabilities["queries"]
         assert _registered_paths(document, "/api/commands/") == {"project.create", "sample.rename"}
         assert _registered_paths(document, "/api/queries/") == {"system.status", "sample.name"}
         parameters = document["paths"]["/api/queries/sample.name"]["get"]["parameters"]

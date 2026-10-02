@@ -13,6 +13,11 @@ from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import after_event
 
+# 等待一次激活收尾或等待对方线程到达会合点的墙钟界限只用来防止测试一直等待，按 #107 的裁定
+# （架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常用时的值，与 #112 实施方案的
+# 120 秒同一口径。收尾含一次版本存储写入，正常用时数秒。
+_WAIT_LIMIT = 120
+
 
 def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_path):
     run_id_holder = []
@@ -49,9 +54,9 @@ def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path):
     after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
-        assert scheduled.wait(5)
+        assert scheduled.wait(_WAIT_LIMIT)
         system.add_input(run_id, "NEW USER ORIGINAL\nwith exact spacing")
-        first_result = future.result(timeout=5)
+        first_result = future.result(timeout=_WAIT_LIMIT)
 
     assert first_result.phase == "PRODUCT_SPEC"
     assert len(adapter.invocations) == 1
@@ -75,15 +80,18 @@ def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_pa
     after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
-        assert scheduled.wait(5)
+        assert scheduled.wait(_WAIT_LIMIT)
         started = time.monotonic()
         if action == "input":
             system.add_input(run_id, "NEW USER ORIGINAL")
         else:
             system.add_guidance(run_id, "product", "Keep the output short")
-        result = future.result(timeout=10)
+        result = future.result(timeout=20)
 
-    assert time.monotonic() - started < 5
+    # 界限 20 秒明显小于配置的 30 秒等待：要证明的是等待没有被走满，结束以后由阶段与停止原因核对；
+    # 20 秒同时远大于正常用时（唤醒到激活结束含一次版本存储写入，并发负载下数秒），
+    # 按 #107 的裁定（docs/architecture-issues.md，架构师 2026-09-27 16:55）取这一数量级
+    assert time.monotonic() - started < 20
     assert result.phase == "PRODUCT_SPEC" and result.stop_reason is None
     assert len(adapter.invocations) == 1
 
@@ -104,13 +112,16 @@ def test_cancel_wakes_a_long_retry_wait_even_when_cancelling_the_attempt_fails(t
     after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
-        assert scheduled.wait(5)
+        assert scheduled.wait(_WAIT_LIMIT)
         started = time.monotonic()
         with pytest.raises(RuntimeError, match="could not cancel"):
             system.cancel(run_id)
-        future.result(timeout=10)
+        future.result(timeout=20)
 
-    assert time.monotonic() - started < 5
+    # 界限 20 秒明显小于配置的 30 秒等待：要证明的是等待没有被走满，结束以后由阶段与停止原因核对；
+    # 20 秒同时远大于正常用时（唤醒到激活结束含一次版本存储写入，并发负载下数秒），
+    # 按 #107 的裁定（docs/architecture-issues.md，架构师 2026-09-27 16:55）取这一数量级
+    assert time.monotonic() - started < 20
     assert len(adapter.invocations) == 1
 
 

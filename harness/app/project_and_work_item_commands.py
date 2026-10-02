@@ -12,8 +12,10 @@ from ..event_store import Command
 from ..models import DEPARTMENTS, TERMINAL_PHASES, Event, ProjectEvent
 from ..interactions import RunTerminalError
 from ..projection import RunNotFoundError
+from ..providers.errors import CatalogValidationError
+from ..providers.selection import ModelSelection
 from ..projects import (
-    CommandConfigConflict, ProjectArchivedError, ProjectNotFoundError, PromptConfigConflict,
+    CommandConfigConflict, DepartmentSettingConflict, ProjectArchivedError, ProjectNotFoundError,
     SourceDirectoryConflict, WorkItemInProgressError,
 )
 from .commands import Rejection
@@ -50,6 +52,22 @@ async def _rename_project(application: "Application", command: Command, request:
     _require_current(application, request.project_id, request.base_version)
     try:
         application.system.projects.rename(request.project_id, request.name, command=command)
+    except ProjectNotFoundError as missing:
+        raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
+    except ProjectArchivedError as archived:
+        raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
+
+
+class ProjectSetGoal(CommandRequest):
+    base_version: int
+    project_id: str
+    goal: Text
+
+
+async def _set_project_goal(application: "Application", command: Command, request: ProjectSetGoal) -> None:
+    _require_current(application, request.project_id, request.base_version)
+    try:
+        application.system.projects.set_goal(request.project_id, request.goal, command=command)
     except ProjectNotFoundError as missing:
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     except ProjectArchivedError as archived:
@@ -157,6 +175,12 @@ async def _create_work_item(application: "Application", command: Command, reques
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     if project.archived:
         raise Rejection("project_archived", "项目已归档，恢复以后才能新建事项")
+    # 建档之前的事项（3.8 第 2 节）：接入已有项目还没有基线时，普通事项不能开始
+    onboarding = [item for item in project.work_items if item.kind == "onboarding"]
+    if project.source == "existing" and project.current_adoption is None and onboarding:
+        if any(item.status == "in_progress" for item in onboarding):
+            raise Rejection("work_item_in_progress", "项目正在建档，结束以后才能新建事项")
+        raise Rejection("not_allowed", "项目还没有完成建档，请重新开始建档")
     # 排空期间（3.1，ADR-0019）：Yudao 停止开始新事项，新建的事项排队不开始
     if system.drain.state != "idle":
         system.projects.queue_work_item(request.project_id, request.text, title=request.title, command=command)
@@ -167,6 +191,11 @@ async def _create_work_item(application: "Application", command: Command, reques
     status = system.provider_status()
     if not status.get("available", False):
         raise Rejection("provider_unavailable", status.get("message") or "模型调用目标不可用")
+    # 新建事项前按该项目的设置对三个部门解析：任何一个无法解析时拒绝，说明部门与具体项（设计说明第 5.5 节）
+    failure = _unresolved_department(application, request.project_id)
+    if failure is not None:
+        department, item, message = failure
+        raise Rejection("provider_unavailable", f"部门 {department} 的{item}无法解析：{message}")
     try:
         work_item_id, run_id = system.projects.start_work_item(
             request.project_id, request.text, title=request.title, command=command)
@@ -179,6 +208,25 @@ async def _create_work_item(application: "Application", command: Command, reques
     # 事项已经登记、run 已经创建；由流程编排在接口进程的事件循环中作为任务运行
     system.orchestrator.start_work_item(run_id)
 
+
+def _unresolved_department(application: "Application", project_id: str) -> tuple[str, str, str] | None:
+    # 按该项目的设置解析三个部门（模型访问定义与请求档位分别继承），返回第一个无法解析的部门与具体项。
+    # 没有写入任何项目部门设置的项目按部门默认检查（设计说明第 5.5 节最后一段）
+    system = application.system
+    if system.orchestrator.test_adapter_factory is not None:
+        # 确定性测试与演示的适配器在激活时按 fake 协议登记目标，这里不重复解析目录（#45 答复第 6 条）
+        return None
+    for department in DEPARTMENTS:
+        setting = system.projects.read_projection_setting(project_id, department)
+        project_selection = ModelSelection(
+            provider_id=None if setting is None else setting.provider_id,
+            model_id=None if setting is None else setting.model_id,
+            requested_tier=None if setting is None else setting.requested_tier,
+        )
+        resolution = system.facade.resolve_department_default(department, project=project_selection)
+        if not resolution.available:
+            return department, "模型访问定义", resolution.message
+    return None
 
 class WorkItemAppendInput(CommandRequest):
     # 追加需求：基准版本是事项的输入版本，写入事件作为依据，不要求相等
@@ -253,26 +301,40 @@ async def _send_guidance(application: "Application", command: Command, request: 
 # 项目设置（修改类：基准版本是各设置自身的版本，要求相等）
 
 class DepartmentSettingsSave(CommandRequest):
-    # 部门 Prompt 部分（模型与档位由 D24 确定）
+    # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入。
+    # 模型选择「跟随部门默认」时 provider_id 与 model_id 都不给；档位选择「跟随」时 requested_tier 不给
     base_version: int
     project_id: str
     department: str
-    text: Text
+    provider_id: str | None = None
+    model_id: str | None = None
+    requested_tier: str | None = None
+    department_prompt: Text | None = None
 
 
 async def _save_department_settings(application: "Application", command: Command,
                                     request: DepartmentSettingsSave) -> None:
     if request.department not in DEPARTMENTS:
         raise Rejection("not_allowed", "部门不存在")
+    if (request.provider_id is None) != (request.model_id is None):
+        raise Rejection("not_allowed", "模型访问定义引用必须同时给出所属连接与定义")
+    project_selection = ModelSelection(
+        provider_id=request.provider_id, model_id=request.model_id,
+        requested_tier=request.requested_tier, department_prompt=request.department_prompt,
+    )
     try:
-        application.system.projects.configure_prompt(
-            request.project_id, request.department, request.text,
+        # 保存时校验所选定义已准入、请求档位属于保存时生效模型的支持档位（Provider 模块的检查）
+        application.system.facade.validate_department_setting(request.department, project_selection)
+        application.system.projects.configure_department_settings(
+            request.project_id, request.department, project_selection,
             base_version=request.base_version, command=command)
     except ProjectNotFoundError as missing:
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     except ProjectArchivedError as archived:
         raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
-    except PromptConfigConflict as conflict:
+    except CatalogValidationError as invalid:
+        raise Rejection("not_allowed", str(invalid)) from invalid
+    except DepartmentSettingConflict as conflict:
         current = conflict.current or {}
         raise Rejection("stale_base", "部门设置已经被修改，请重新读取以后提交",
                         current_version=current.get("version", 0)) from conflict
@@ -346,6 +408,9 @@ async def _save_source_directory(application: "Application", command: Command,
 PROJECT_RENAME = CommandDefinition(
     name="project.rename", request=ProjectRename, refs=NoRefs, handle=_rename_project, derive_refs=_no_refs,
     reasons=("not_found", "stale_base", "project_archived"))
+PROJECT_SET_GOAL = CommandDefinition(
+    name="project.set_goal", request=ProjectSetGoal, refs=NoRefs, handle=_set_project_goal, derive_refs=_no_refs,
+    reasons=("not_found", "stale_base", "project_archived"))
 PROJECT_PIN = CommandDefinition(
     name="project.pin", request=ProjectPin, refs=NoRefs, handle=_pin_project, derive_refs=_no_refs,
     reasons=("not_found", "stale_base", "project_archived"))
@@ -361,7 +426,8 @@ MATERIAL_RECORD = CommandDefinition(
 WORK_ITEM_CREATE = CommandDefinition(
     name="work_item.create", request=WorkItemCreate, refs=WorkItemRefs, handle=_create_work_item,
     derive_refs=_work_item_refs,
-    reasons=("not_found", "project_archived", "busy", "provider_unavailable"))
+    reasons=("not_found", "project_archived", "busy", "provider_unavailable",
+             "work_item_in_progress", "not_allowed"))
 WORK_ITEM_APPEND_INPUT = CommandDefinition(
     name="work_item.append_input", request=WorkItemAppendInput, refs=NoRefs, handle=_append_input,
     derive_refs=_no_refs, reasons=("not_found", "run_terminal"))

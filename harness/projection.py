@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
+from .definitions import DEFINITIONS
 from .event_store import (
     EventStore, SavedDecision, SavedProjection, is_catalog_stream, is_run_stream, project_stream, run_stream,
 )
@@ -22,7 +23,7 @@ from .models import (
     CollaborationResponse,
     DecisionRequest,
     DepartmentGuidance,
-    DepartmentPrompt,
+    DepartmentSetting,
     ArtifactRef,
     ContextExclusion,
     ContextManifest,
@@ -42,7 +43,6 @@ from .models import (
     ProjectEvent,
     ProjectEventType,
     ProjectProjection,
-    PromptConfig,
     QAReview,
     RegisteredCommand,
     RunProjection,
@@ -84,17 +84,17 @@ def saved_project(store: EventStore, project_id: str) -> ProjectProjection | Non
     return None if saved is None else _PROJECT_STATE.validate_json(saved.state)
 
 
-def replay_run(store: EventStore, run_id: str) -> RunProjection:
-    # 从 run 流的第一条事件重放运行状态投影：只用于重建与核对
-    events = store.list_events(run_id)
+def replay_run(store: EventStore, run_id: str, *, through: int | None = None) -> RunProjection:
+    # 从 run 流的第一条事件重放运行状态投影：只用于重建、核对与按位置读取（through 给出全局位置的上界）
+    events = store.list_events(run_id, through_position=through)
     if not events:
         raise RunNotFoundError(run_id)
     return project_events(events)
 
 
-def replay_project(store: EventStore, project_id: str) -> ProjectProjection | None:
-    # 从项目流的第一条事件重放项目投影：只用于重建与核对
-    events = store.list_project_events(project_id)
+def replay_project(store: EventStore, project_id: str, *, through: int | None = None) -> ProjectProjection | None:
+    # 从项目流的第一条事件重放项目投影：只用于重建、核对与按位置读取（through 给出全局位置的上界）
+    events = store.list_project_events(project_id, through_position=through)
     return replay(project_stream(project_id), events) if events else None
 
 
@@ -138,12 +138,16 @@ def fold(state: Projection, event: Event | ProjectEvent | CatalogEvent) -> None:
 
 
 def apply_catalog_event(state: CatalogProjection, event: CatalogEvent) -> None:
-    # 目录投影只记最后一条事件与最后一条 catalog_revised 的修订号；目录内容仍由 Provider 模块保存
+    # 目录投影只记最后一条事件与最后一条 catalog_revised 的修订号；目录内容仍由 Provider 模块保存。
+    # home_seen 另记用户查看过的全局位置与时间（工单 #127），控制主机上只有一个
     state.last_event_id = event.event_id
     state.stream_version = event.stream_version
     state.updated_at = event.created_at
     if event.type == CatalogEventType.CATALOG_REVISED:
         state.revision = int(event.payload["revision"])
+    elif event.type == CatalogEventType.HOME_SEEN:
+        state.last_seen_position = int(event.payload["position"])
+        state.last_seen_at = event.created_at
 
 
 def replay(stream: str, events: list[Event] | list[ProjectEvent] | list[CatalogEvent]) -> Projection:
@@ -282,10 +286,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.inputs.append(initial)
         state.input_version = initial.version
         state.product_work_input_version = initial.version
-        for value in payload["department_prompts"].values():
-            prompt = _prompt_from_payload(value, event)
-            state.department_prompts[prompt.department] = prompt
-            state.prompt_versions.append(prompt)
         state.phase = event.state_after
         state.max_cycles = int(payload["max_cycles"])
         state.run_time_limit_sec = int(payload["run_time_limit_sec"])
@@ -309,6 +309,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.run_event_version = int(payload.get("run_event_version", 0))
         # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（ADR-0014）
         state.definitions_version = str(payload.get("definitions_version", ""))
+        # 事项种类与仓库概况：旧 run 的创建事件没有这两个字段，种类按普通事项理解（工单 #134）
+        state.kind = str(payload.get("kind", "change"))
+        state.overview_ref = payload.get("overview_ref")
         return
 
     if etype == EventType.USER_INPUT_RECEIVED:
@@ -323,12 +326,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.product_work_input_version = payload["through_version"]
         state.phase = "PRODUCT_SPEC"
         state.active_department = "product"
-        return
-
-    if etype == EventType.DEPARTMENT_PROMPT_UPDATED:
-        prompt = _prompt_from_payload(payload, event)
-        state.department_prompts[prompt.department] = prompt
-        state.prompt_versions.append(prompt)
         return
 
     if etype == EventType.DEPARTMENT_GUIDANCE_RECEIVED:
@@ -416,6 +413,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
                             "requested_provider", "requested_protocol", "requested_model",
                             "credential_ref", "credential_version", "context_window",
                             "configured_max_output_tokens", "accepts_required_tool_call", "selection_source",
+                            "reasoning_levels", "default_reasoning_level", "reasoning_mode",
                             "requested_tier", "sent_tier")
             }
         state.model_requests.append({
@@ -439,6 +437,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "credential_ref": payload.get("credential_ref"),
             "credential_version": payload.get("credential_version"),
             "selection_source": payload.get("selection_source"),
+            "prompt_version": payload.get("prompt_version"),
             "requested_tier": payload.get("requested_tier"),
             "sent_tier": payload.get("sent_tier"),
             "provider": requested_provider,
@@ -638,6 +637,31 @@ def apply_event(state: RunProjection, event: Event) -> None:
         )
         return
 
+    if etype == EventType.STRUCTURE_ACCEPTED:
+        _clear_feedback(state, event.department)
+        record = {key: value for key, value in payload.items() if key != "git_version"}
+        state.structures.append(record)
+        state.structure = record
+        state.evidence.append({"kind": "structure", "content_hash": payload["content_hash"],
+                               "structure_ref": payload["structure_ref"],
+                               "code_tree_digest": payload["code_tree_digest"],
+                               "product_spec_hash": payload["product_spec_hash"]})
+        return
+
+    if etype == EventType.BASELINE_REVIEW_ACCEPTED:
+        _clear_feedback(state, event.department)
+        record = {key: value for key, value in payload.items() if key != "git_version"}
+        state.baseline_reviews.append(record)
+        state.baseline_review = record
+        if record["verdict"] == "rework_product":
+            state.rework_count += 1
+            _supersede_active_deliveries(state, "baseline_rework_product")
+        state.evidence.append({"kind": "baseline_review", "verdict": record["verdict"],
+                               "content_hash": record["content_hash"], "checks": record["checks"],
+                               "product_spec_hash": record["product_spec_hash"],
+                               "code_snapshot_hash": record["code_snapshot_hash"]})
+        return
+
     if etype == EventType.QA_SUBMITTED:
         _clear_feedback(state, event.department)
         review = _review_from_payload(payload, event)
@@ -714,12 +738,6 @@ def _input_from_payload(payload: dict[str, Any], event: Event) -> UserInput:
         byte_end=payload["byte_end"], created_event_id=event.event_id,
     )
 
-
-def _prompt_from_payload(payload: dict[str, Any], event: Event) -> DepartmentPrompt:
-    return DepartmentPrompt(
-        department=payload["department"], version=payload["version"], text=payload["text"],
-        prompt_ref=ArtifactRef(**payload["prompt_ref"]), created_event_id=event.event_id,
-    )
 
 
 def _guidance_from_payload(payload: dict[str, Any], event: Event) -> DepartmentGuidance:
@@ -912,6 +930,10 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
     if etype == ProjectEventType.PROJECT_RENAMED:
         state.name = payload["name"]
         return
+    if etype == ProjectEventType.PROJECT_GOAL_CHANGED:
+        state.goal = payload["goal"]
+        state.goal_ref = payload["goal_ref"]
+        return
     if etype == ProjectEventType.PROJECT_PINNED:
         state.pinned = bool(payload["pinned"])
         return
@@ -931,6 +953,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             run_time_limit_sec=int(payload["run_time_limit_sec"]),
             context_window=int(payload["context_window"]), created_at=event.created_at,
             stream_version=event.stream_version, event_id=event.event_id, snapshot=payload.get("snapshot"),
+            kind=payload.get("kind", "change"),
         ))
         return
     if etype == ProjectEventType.WORK_ITEM_START_FAILED:
@@ -959,14 +982,25 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             stream_version=event.stream_version, event_id=event.event_id,
         ))
         return
-    if etype == ProjectEventType.DEPARTMENT_PROMPT_CONFIGURED:
-        config = PromptConfig(
-            department=payload["department"], version=int(payload["version"]), text=payload["text"],
-            source="configured", prompt_ref=payload["prompt_ref"], base_version=payload["base_version"],
+    if etype == ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED:
+        department = payload["department"]
+        # 旧版本的事件只带 text（部门 Prompt），新版本带 department_prompt 与模型、请求档位（ADR-0019）
+        if "department_prompt" in payload:
+            configured_prompt = payload["department_prompt"]
+            prompt_ref = payload.get("department_prompt_ref")
+        else:
+            configured_prompt = payload.get("text")
+            prompt_ref = payload.get("prompt_ref")
+        text = configured_prompt if configured_prompt is not None else DEFINITIONS.role(department).prompt
+        setting = DepartmentSetting(
+            department=department, version=int(payload["version"]), text=text, source="configured",
+            provider_id=payload.get("provider_id"), model_id=payload.get("model_id"),
+            requested_tier=payload.get("requested_tier"), configured_prompt=configured_prompt is not None,
+            prompt_ref=prompt_ref, base_version=payload.get("base_version"),
             updated_at=event.created_at, event_id=event.event_id,
         )
-        state.prompt_configs[config.department] = config
-        state.prompt_config_history.append(config)
+        state.department_settings[department] = setting
+        state.department_setting_history.append(setting)
         return
     if etype == ProjectEventType.COMMAND_CONFIGURED:
         command = RegisteredCommand(

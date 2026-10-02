@@ -12,6 +12,7 @@ from harness.__main__ import main
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
+from harness.app.home import AwayReportRequest
 from harness.app.project_queries import (
     DeliveryFile,
     DepartmentWorkspace,
@@ -32,10 +33,11 @@ from harness.app.project_queries import (
     WorkItemMaterials,
 )
 from harness.app.registry import Registry
-from harness.app.system_queries import SYSTEM_STATUS
+from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import product_spec, plan_turn, delivery_turn, review_turn
+from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tests.saved_rewrite import rewrite_saved_event
@@ -73,7 +75,7 @@ def test_overlays_list_only_when_every_dependent_query_is_registered(data_dir):
     overlays = {item.name: item.queries for item in capabilities.overlays}
     assert overlays["flow"] == ["project.flow"]
     assert overlays["waiting"] == ["project.loop", "decisions.list"]
-    assert "recovery" not in overlays
+    assert overlays["recovery"] == ["run.recovery"]
     assert "context_usage" not in overlays
     assert "semantic_records" not in overlays
 
@@ -123,9 +125,10 @@ def _all_requests(system, project_id, work_item_id, run_id):
                     if event.type == EventType.CONTEXT_ASSEMBLED)
     delivery_event_id = system.project(run_id).delivery_spec.created_event_id
     return [
-        ("system.status", None),
+        ("system.status", SystemStatusRequest()),
         ("decisions.list", DecisionsList()),
         ("projects.list", ProjectsList()),
+        ("home.away_report", AwayReportRequest()),
         ("project.overview", ProjectOverview(project_id=project_id)),
         ("project.loop", ProjectLoop(project_id=project_id)),
         ("project.flow", ProjectFlow(project_id=project_id)),
@@ -275,7 +278,8 @@ def test_query_time_does_not_grow_with_unrelated_history(data_dir):
 def test_current_queries_cover_the_old_read_scenarios(data_dir):
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("对照", GOAL)
-    system.projects.configure_prompt(project_id, "product", "产品提示", 0)
+    system.projects.configure_department_settings(
+        project_id, "product", ModelSelection(department_prompt="产品提示"), 0)
     work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
     projection = system.run_until_stop(run_id)
     application = _application(system)
@@ -316,7 +320,10 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
         project_id=project_id, department="product", work_item=work_item_id,
     ))
     assert workspace.data.prompt.configured_version == 1
-    assert workspace.data.prompt.used_version == projection.department_prompts["product"].version
+    assert workspace.data.prompt.prompt_configured is True
+    # 实际采用的版本来自该部门最近一次模型请求事件（run 内没有 Prompt 副本）
+    assert workspace.data.prompt.used_version == 1
+    assert workspace.data.setting.model_id is None and workspace.data.setting.requested_tier is None
 
     actions = application.query("run.actions", RunActions(run_id=run_id))
     assert any(action.tool == "write_file" and action.receipt.ok for action in actions.data.actions)

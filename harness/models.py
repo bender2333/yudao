@@ -34,6 +34,8 @@ ENGINEERING_ACTIVE = frozenset({"ENGINEERING", "REWORK_ENGINEERING"})
 QUALITY_ACTIVE = frozenset({"QUALITY", "DELIVERY"})
 
 QA_VERDICTS = ("rework_product", "rework_engineering", "release")
+# 基线核验逐条结论的状态（工单 #134，docs/design/existing-project-onboarding.md 第 4.5 节）
+BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
 # 提案种类：定义中提交类工具提交的种类
 PROPOSAL_KINDS = tuple(tool.proposal for tool in DEFINITIONS.tools.values() if tool.proposal is not None)
 
@@ -42,7 +44,6 @@ class EventType:
     RUN_CREATED = "run_created"
     USER_INPUT_RECEIVED = "user_input_received"
     PRODUCT_INPUT_ASSIGNED = "product_input_assigned"
-    DEPARTMENT_PROMPT_UPDATED = "department_prompt_updated"
     DEPARTMENT_GUIDANCE_RECEIVED = "department_guidance_received"
     DEPARTMENT_GUIDANCE_APPLIED = "department_guidance_applied"
     DEPARTMENT_GUIDANCE_RESPONDED = "department_guidance_responded"
@@ -62,6 +63,7 @@ class EventType:
     TOOL_CALLED = "tool_called"
     TOOL_STARTED = "tool_started"
     TOOL_SKIPPED = "tool_skipped"
+    ACTION_VERIFIED = "action_verified"
     PROPOSAL_SUBMITTED = "proposal_submitted"
     PROPOSAL_REJECTED = "proposal_rejected"
     SPEC_ACCEPTED = "spec_accepted"
@@ -74,6 +76,8 @@ class EventType:
     PRODUCT_DECISION_ACCEPTED = "product_decision_accepted"
     DELIVERY_ACCEPTED = "delivery_accepted"
     QA_SUBMITTED = "qa_submitted"
+    STRUCTURE_ACCEPTED = "structure_accepted"
+    BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
     TRANSITION = "transition"
     RUN_DONE = "run_done"
@@ -89,6 +93,7 @@ class EventType:
 class ProjectEventType:
     PROJECT_REGISTERED = "project_registered"
     PROJECT_RENAMED = "project_renamed"
+    PROJECT_GOAL_CHANGED = "project_goal_changed"
     PROJECT_PINNED = "project_pinned"
     PROJECT_ARCHIVED = "project_archived"
     PROJECT_RESTORED = "project_restored"
@@ -96,7 +101,9 @@ class ProjectEventType:
     WORK_ITEM_START_FAILED = "work_item_start_failed"
     DELIVERABLE_ADOPTED = "deliverable_adopted"
     ADOPTION_HELD = "adoption_held"
-    DEPARTMENT_PROMPT_CONFIGURED = "department_prompt_configured"
+    # 项目部门设置的三项写成同一种事件；事件种类字符串跨版本保持 department_prompt_configured（ADR-0019），
+    # 只增加字段（provider_id、model_id、requested_tier）
+    DEPARTMENT_SETTINGS_CONFIGURED = "department_prompt_configured"
     COMMAND_CONFIGURED = "command_configured"
     MATERIAL_RECORDED = "material_recorded"
     SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
@@ -112,12 +119,15 @@ class CatalogEventType:
     # 排空与强制升级（3.1）：与目录事件同在一份流中，是控制主机这一份部署的长期事实（ADR-0019）
     RUNTIME_DRAIN_STARTED = "runtime_drain_started"
     RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
+    # 用户查看过的全局位置（界面工作线，工单 #127）：控制主机上只有一个，随部署长期保存
+    HOME_SEEN = "home_seen"
 
 
 GIT_VERSION_EVENTS = frozenset({
     EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.SPEC_ACCEPTED,
     EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED, EventType.PLAN_ACCEPTED,
-    EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+    EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED, EventType.STRUCTURE_ACCEPTED,
+    EventType.BASELINE_REVIEW_ACCEPTED,
 })
 
 
@@ -526,11 +536,14 @@ class CatalogEvent:
 @dataclass
 class CatalogProjection:
     # 目录流的投影：只记最后一条事件与最后一条 catalog_revised 的修订号。
-    # 目录内容与凭据仍由 Provider 模块保存，这里不复制
+    # 目录内容与凭据仍由 Provider 模块保存，这里不复制。
+    # last_seen_position 是用户查看过的全局位置（工单 #127），控制主机上只有一个
     last_event_id: str | None = None
     stream_version: int = 0
     updated_at: str | None = None
     revision: int = 0
+    last_seen_position: int | None = None
+    last_seen_at: str | None = None
 
 
 @dataclass
@@ -604,8 +617,6 @@ class RunProjection:
     product_work_input_version: int = 0
     processed_input_version: int = 0
     inputs: list[UserInput] = field(default_factory=list)
-    department_prompts: dict[str, DepartmentPrompt] = field(default_factory=dict)
-    prompt_versions: list[DepartmentPrompt] = field(default_factory=list)
     department_guidance: list[DepartmentGuidance] = field(default_factory=list)
     yielded_work: dict[str, Any] | None = None
     phase: str = "CREATED"
@@ -641,6 +652,12 @@ class RunProjection:
     delivery_spec: DeliverySpec | None = None
     pending_request: CollaborationRequest | None = None
     last_review: QAReview | None = None
+    # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧 run 的事件没有这个字段时为 change
+    kind: str = "change"
+    # 建档事项的产出：仓库概况与现有结构的工件引用（设计第 4.1、4.2 节）
+    overview_ref: dict[str, Any] | None = None
+    structure: dict[str, Any] | None = None
+    baseline_review: dict[str, Any] | None = None
     sessions: dict[str, SessionRecord] = field(default_factory=dict)
     product_specs: list[ProductSpec] = field(default_factory=list)
     effective_contracts: list[EffectiveContract] = field(default_factory=list)
@@ -651,6 +668,8 @@ class RunProjection:
     request_results: list[dict[str, Any]] = field(default_factory=list)
     product_decisions: list[ProductDecision] = field(default_factory=list)
     reviews: list[QAReview] = field(default_factory=list)
+    structures: list[dict[str, Any]] = field(default_factory=list)
+    baseline_reviews: list[dict[str, Any]] = field(default_factory=list)
     lesson_candidates: list[LessonCandidate] = field(default_factory=list)
     effective_decisions: list[ProductDecision] = field(default_factory=list)
     manifests: list[ContextManifest] = field(default_factory=list)
@@ -735,11 +754,17 @@ class HeldCandidate:
 
 
 @dataclass
-class PromptConfig:
+class DepartmentSetting:
+    # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；
+    # 三项一起保存、一个版本（设计说明第 5.2 节）。没有写入的项使用部门默认，部门 Prompt 没有写入时使用内置默认 Prompt。
     department: str
     version: int
     text: str
     source: str
+    provider_id: str | None = None
+    model_id: str | None = None
+    requested_tier: str | None = None
+    configured_prompt: bool = False
     prompt_ref: dict[str, Any] | None = None
     base_version: int | None = None
     updated_at: str | None = None
@@ -816,6 +841,8 @@ class WorkItem:
     event_id: str
     snapshot: dict[str, Any] | None = None
     start_error: str | None = None
+    # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
+    kind: str = "change"
     command_versions: dict[str, int] = field(default_factory=dict)
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
@@ -847,8 +874,8 @@ class ProjectProjection:
     current_adoption: Adoption | None = None
     adoptions: list[Adoption] = field(default_factory=list)
     held: list[HeldCandidate] = field(default_factory=list)
-    prompt_configs: dict[str, PromptConfig] = field(default_factory=dict)
-    prompt_config_history: list[PromptConfig] = field(default_factory=list)
+    department_settings: dict[str, DepartmentSetting] = field(default_factory=dict)
+    department_setting_history: list[DepartmentSetting] = field(default_factory=list)
     commands: dict[str, RegisteredCommand] = field(default_factory=dict)
     command_history: list[RegisteredCommand] = field(default_factory=list)
     materials: list[Material] = field(default_factory=list)

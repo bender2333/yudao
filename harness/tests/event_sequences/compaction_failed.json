@@ -23,26 +23,6 @@
     "command_versions": {},
     "context_window": 6000,
     "definitions_version": "<definitions>",
-    "department_prompts": {
-     "engineering": {
-      "department": "engineering",
-      "prompt_ref": "<art#1>",
-      "text": "<shared#1>",
-      "version": 1
-     },
-     "product": {
-      "department": "product",
-      "prompt_ref": "<art#2>",
-      "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-      "version": 1
-     },
-     "quality": {
-      "department": "quality",
-      "prompt_ref": "<art#3>",
-      "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
-      "version": 1
-     }
-    },
     "git_version": {
      "commit": "<git#1>",
      "parent_commit": null,
@@ -57,15 +37,17 @@
       "tree": "<git#2>"
      },
      "id": "<input#1>",
-     "input_ref": "<art#4>",
-     "intend_ref": "<art#4>",
+     "input_ref": "<art#1>",
+     "intend_ref": "<art#1>",
      "kind": "text",
      "text": "build an echo CLI",
      "version": 1
     },
     "intend_path": "materials/<run#1>/intend.md",
-    "intend_ref": "<art#4>",
+    "intend_ref": "<art#1>",
+    "kind": "change",
     "max_cycles": 999999,
+    "overview_ref": null,
     "project_context_ref": null,
     "project_id": null,
     "prompt_config_versions": {},
@@ -130,7 +112,7 @@
     "guidance_version": 0,
     "input_version": 1,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "yielded_work": null
    }
@@ -158,10 +140,10 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#5>",
+    "input_ref": "<art#2>",
     "input_version": 1,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -198,6 +180,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "department": "product",
     "digest": "<sha256#5>",
     "effective_context_window": 6000,
@@ -240,7 +223,7 @@
       "digest": "<sha256#9>",
       "source": "department_rules",
       "tokens": 59,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#10>",
@@ -315,15 +298,17 @@
     "max_output_tokens": 900,
     "model_id": "fake-model",
     "output_reserve_tokens": 900,
-    "parts_ref": "<art#6>",
+    "parts_ref": "<art#3>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "work",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#7>",
+    "request_ref": "<art#4>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -370,6 +355,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
     "effective_context_window": 6000,
     "effective_contract_hash": null,
@@ -382,11 +368,13 @@
     "max_output_tokens": 900,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "work",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
@@ -427,6 +415,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
     "guidance_ids": [],
@@ -434,14 +423,16 @@
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "message_index": 1,
-    "message_ref": "<art#8>",
+    "message_ref": "<art#5>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "work",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
@@ -483,6 +474,7 @@
     "cost_reported": false,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
     "input_tokens": 0,
@@ -493,12 +485,14 @@
     "ok": true,
     "output_tokens": 0,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "work",
     "raw_usage_ref": null,
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -548,6 +542,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "duration_ms": "<duration>",
     "duration_source": "monotonic",
     "finished_at": "<time>",
@@ -557,13 +552,15 @@
     "logical_call_id": "<act#1>:root-1:work",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "provider_response_id": null,
     "purpose": "work",
     "raw_usage_ref": null,
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -606,6 +603,7 @@
     },
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
+    "before_snapshot_ref": "<art#6>",
     "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
@@ -617,7 +615,7 @@
     "logical_call_id": "<act#1>:root-1:work",
     "name": "read_file",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "request_id": null,
     "step_id": 1
    }
@@ -640,6 +638,7 @@
    "payload": {
     "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
+    "after_snapshot_ref": "<art#6>",
     "args": {
      "path": "large.txt"
     },
@@ -651,6 +650,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
     "error": null,
@@ -667,13 +667,15 @@
     "model_id": "fake-model",
     "name": "read_file",
     "ok": true,
-    "output_ref": "<art#9>",
+    "output_ref": "<art#7>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "work",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
@@ -716,6 +718,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "department": "product",
     "digest": "<sha256#22>",
     "effective_context_window": 6000,
@@ -767,15 +770,17 @@
     "max_output_tokens": 900,
     "model_id": "fake-model",
     "output_reserve_tokens": 900,
-    "parts_ref": "<art#10>",
+    "parts_ref": "<art#8>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#11>",
+    "request_ref": "<art#9>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
@@ -822,6 +827,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
     "effective_context_window": 6000,
     "effective_contract_hash": null,
@@ -834,11 +840,13 @@
     "max_output_tokens": 900,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
@@ -879,6 +887,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
     "guidance_ids": [],
@@ -886,14 +895,16 @@
     "input_version": 1,
     "logical_call_id": "<act#1>:root-2:compaction",
     "message_index": 2,
-    "message_ref": "<art#12>",
+    "message_ref": "<art#10>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
@@ -942,6 +953,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "diagnostics": {
      "error_type": "undeclared_tool_call",
      "tool_names": [
@@ -960,7 +972,7 @@
     "max_attempts": 3,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -968,6 +980,8 @@
     "purpose": "compaction",
     "raw_usage_ref": null,
     "reason": "compaction_failed",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
@@ -1018,6 +1032,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "delay_sec": 0.01,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
@@ -1030,12 +1045,14 @@
     "next_attempt": 2,
     "next_step_id": 3,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
     "reason": "compaction_failed",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
@@ -1081,6 +1098,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "department": "product",
     "digest": "<sha256#22>",
     "effective_context_window": 6000,
@@ -1132,19 +1150,21 @@
     "max_output_tokens": 900,
     "model_id": "fake-model",
     "output_reserve_tokens": 900,
-    "parts_ref": "<art#10>",
+    "parts_ref": "<art#8>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#11>",
+    "request_ref": "<art#9>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "retry_of_step_id": 2,
     "root_step_id": 2,
     "run_id": "<run#1>",
@@ -1187,6 +1207,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
     "effective_context_window": 6000,
     "effective_contract_hash": null,
@@ -1199,16 +1220,18 @@
     "max_output_tokens": 900,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "retry_of_step_id": 2,
     "root_step_id": 2,
     "selection_source": "department_default",
@@ -1244,6 +1267,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
     "guidance_ids": [],
@@ -1251,19 +1275,21 @@
     "input_version": 1,
     "logical_call_id": "<act#1>:root-2:compaction",
     "message_index": 2,
-    "message_ref": "<art#13>",
+    "message_ref": "<art#11>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "response_id": "corrupt-<act#1>-3",
     "selection_source": "department_default",
     "sent_tier": null,
@@ -1307,6 +1333,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "diagnostics": {
      "error_type": "undeclared_tool_call",
      "tool_names": [
@@ -1325,7 +1352,7 @@
     "max_attempts": 3,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1333,11 +1360,13 @@
     "purpose": "compaction",
     "raw_usage_ref": null,
     "reason": "compaction_failed",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "response_ref": null,
     "retry_of_step_id": 2,
     "retryable": true,
@@ -1383,6 +1412,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "delay_sec": 0.02,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
@@ -1395,17 +1425,19 @@
     "next_attempt": 3,
     "next_step_id": 4,
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
     "reason": "compaction_failed",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "retry_of_step_id": 2,
     "retryable": true,
     "root_step_id": 2,
@@ -1446,6 +1478,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "department": "product",
     "digest": "<sha256#22>",
     "effective_context_window": 6000,
@@ -1497,19 +1530,21 @@
     "max_output_tokens": 900,
     "model_id": "fake-model",
     "output_reserve_tokens": 900,
-    "parts_ref": "<art#10>",
+    "parts_ref": "<art#8>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#11>",
+    "request_ref": "<art#9>",
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "retry_of_step_id": 3,
     "root_step_id": 2,
     "run_id": "<run#1>",
@@ -1552,6 +1587,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
     "effective_context_window": 6000,
     "effective_contract_hash": null,
@@ -1564,16 +1600,18 @@
     "max_output_tokens": 900,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "retry_of_step_id": 3,
     "root_step_id": 2,
     "selection_source": "department_default",
@@ -1609,6 +1647,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "effective_contract_hash": null,
     "engineering_plan_hash": null,
     "guidance_ids": [],
@@ -1616,19 +1655,21 @@
     "input_version": 1,
     "logical_call_id": "<act#1>:root-2:compaction",
     "message_index": 2,
-    "message_ref": "<art#14>",
+    "message_ref": "<art#12>",
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
     "purpose": "compaction",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "response_id": "corrupt-<act#1>-4",
     "selection_source": "department_default",
     "sent_tier": null,
@@ -1672,6 +1713,7 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "diagnostics": {
      "error_type": "undeclared_tool_call",
      "tool_names": [
@@ -1690,7 +1732,7 @@
     "max_attempts": 3,
     "model_id": "fake-model",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
@@ -1698,11 +1740,13 @@
     "purpose": "compaction",
     "raw_usage_ref": null,
     "reason": "compaction_failed",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "request_id": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "response_ref": null,
     "retry_of_step_id": 3,
     "retryable": true,
@@ -1796,7 +1840,7 @@
     "input_version": 1,
     "latency_ms": "<duration>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "stop_reason": "compaction_failed"
    }
   }
@@ -1807,6 +1851,8 @@
   "actual_provider": "fake",
   "adapter": "fake",
   "baseline": null,
+  "baseline_review": null,
+  "baseline_reviews": [],
   "command_versions": {},
   "compactions": [],
   "context_window": 6000,
@@ -1823,42 +1869,22 @@
     "context_window": 6000,
     "credential_ref": null,
     "credential_version": null,
+    "default_reasoning_level": null,
     "model_id": "fake-model",
     "protocol": "fake",
     "provider_config_id": "fake",
     "provider_name": "fake",
+    "reasoning_levels": [],
+    "reasoning_mode": null,
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "selection_source": "department_default",
     "sent_tier": null
    }
   },
   "department_guidance": [],
-  "department_prompts": {
-   "engineering": {
-    "created_event_id": "<evt#1>",
-    "department": "engineering",
-    "prompt_ref": "<art#1>",
-    "text": "<shared#1>",
-    "version": 1
-   },
-   "product": {
-    "created_event_id": "<evt#1>",
-    "department": "product",
-    "prompt_ref": "<art#2>",
-    "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-    "version": 1
-   },
-   "quality": {
-    "created_event_id": "<evt#1>",
-    "department": "quality",
-    "prompt_ref": "<art#3>",
-    "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
-    "version": 1
-   }
-  },
   "effective_contract": null,
   "effective_contracts": [],
   "effective_decisions": [],
@@ -1888,15 +1914,16 @@
     "byte_start": 0,
     "created_event_id": "<evt#1>",
     "id": "<input#1>",
-    "input_ref": "<art#4>",
-    "intend_ref": "<art#4>",
+    "input_ref": "<art#1>",
+    "intend_ref": "<art#1>",
     "kind": "text",
     "run_id": "<run#1>",
     "text": "build an echo CLI",
     "version": 1
    }
   ],
-  "intend_ref": "<art#4>",
+  "intend_ref": "<art#1>",
+  "kind": "change",
   "last_activations": {
    "product": "<act#1>"
   },
@@ -1968,7 +1995,7 @@
       "digest": "<sha256#9>",
       "source": "department_rules",
       "tokens": 59,
-      "version": "1"
+      "version": "0"
      },
      {
       "digest": "<sha256#10>",
@@ -2041,12 +2068,12 @@
     "input_version": 1,
     "max_output_tokens": 900,
     "output_reserve_tokens": 900,
-    "parts_ref": "<art#6>",
+    "parts_ref": "<art#3>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "work",
     "request_id": null,
-    "request_ref": "<art#7>",
+    "request_ref": "<art#4>",
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#5>",
     "step_id": 1,
@@ -2106,12 +2133,12 @@
     "input_version": 1,
     "max_output_tokens": 900,
     "output_reserve_tokens": 900,
-    "parts_ref": "<art#10>",
+    "parts_ref": "<art#8>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "compaction",
     "request_id": null,
-    "request_ref": "<art#11>",
+    "request_ref": "<art#9>",
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#12>",
     "step_id": 2,
@@ -2171,12 +2198,12 @@
     "input_version": 1,
     "max_output_tokens": 900,
     "output_reserve_tokens": 900,
-    "parts_ref": "<art#10>",
+    "parts_ref": "<art#8>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "compaction",
     "request_id": null,
-    "request_ref": "<art#11>",
+    "request_ref": "<art#9>",
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#17>",
     "step_id": 3,
@@ -2236,12 +2263,12 @@
     "input_version": 1,
     "max_output_tokens": 900,
     "output_reserve_tokens": 900,
-    "parts_ref": "<art#10>",
+    "parts_ref": "<art#8>",
     "prompt_hash": "<sha256#2>",
-    "prompt_version": 1,
+    "prompt_version": 0,
     "purpose": "compaction",
     "request_id": null,
-    "request_ref": "<art#11>",
+    "request_ref": "<art#9>",
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#22>",
     "step_id": 4,
@@ -2281,6 +2308,7 @@
     "max_attempts": 3,
     "max_output_tokens": 900,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -2334,6 +2362,7 @@
     "max_attempts": 3,
     "max_output_tokens": 900,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -2387,6 +2416,7 @@
     "max_attempts": 3,
     "max_output_tokens": 900,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -2397,7 +2427,7 @@
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "response_ref": null,
     "retry_of_step_id": 2,
     "root_step_id": 2,
@@ -2440,6 +2470,7 @@
     "max_attempts": 3,
     "max_output_tokens": 900,
     "model_id": "fake-model",
+    "prompt_version": 0,
     "protocol": "fake",
     "provider": "fake",
     "provider_config_id": "fake",
@@ -2450,7 +2481,7 @@
     "requested_model": "fake-script",
     "requested_protocol": "fake",
     "requested_provider": "fake",
-    "requested_tier": null,
+    "requested_tier": "minimal",
     "response_ref": null,
     "retry_of_step_id": 3,
     "root_step_id": 2,
@@ -2466,6 +2497,7 @@
    }
   ],
   "outcome": "failed",
+  "overview_ref": null,
   "pending_feedback": {},
   "pending_request": null,
   "phase": "FAILED",
@@ -2477,29 +2509,6 @@
   "project_context_ref": null,
   "project_id": null,
   "prompt_config_versions": {},
-  "prompt_versions": [
-   {
-    "created_event_id": "<evt#1>",
-    "department": "engineering",
-    "prompt_ref": "<art#1>",
-    "text": "<shared#1>",
-    "version": 1
-   },
-   {
-    "created_event_id": "<evt#1>",
-    "department": "product",
-    "prompt_ref": "<art#2>",
-    "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-    "version": 1
-   },
-   {
-    "created_event_id": "<evt#1>",
-    "department": "quality",
-    "prompt_ref": "<art#3>",
-    "text": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。",
-    "version": 1
-   }
-  ],
   "provider": "fake",
   "registered_commands": {},
   "rejections": [],
@@ -2537,6 +2546,8 @@
   "snapshot": null,
   "stop_reason": "compaction_failed",
   "stream_version": 28,
+  "structure": null,
+  "structures": [],
   "task": "build an echo CLI",
   "token_used": 0,
   "tool_count": 1,
@@ -2550,34 +2561,19 @@
  },
  "artifacts": {
   "<art#1>": {
-   "kind": "department_prompt",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "<shared#1>"
-  },
-  "<art#2>": {
-   "kind": "department_prompt",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。"
-  },
-  "<art#3>": {
-   "kind": "department_prompt",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "你是质检部门。独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。不能修改交付代码，不能只凭交付单文字放行，也不能把失效交付当作当前交付。使用 run_check 让主机执行检查，再 submit_review。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、计划、交付和代码快照的 release 才允许结束任务。自然语言中的“完成”不会改变任务状态。"
-  },
-  "<art#4>": {
    "kind": "user_input",
    "media_type": "text/plain; charset=utf-8",
    "content": "build an echo CLI"
   },
-  "<art#5>": {
+  "<art#2>": {
    "kind": "department_input",
    "media_type": "application/json",
    "content": {
-    "content": "<shared#2>",
+    "content": "<shared#1>",
     "role": "user"
    }
   },
-  "<art#6>": {
+  "<art#3>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
@@ -2597,7 +2593,7 @@
      "digest": "<sha256#9>",
      "source": "department_rules",
      "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。",
-     "version": "1"
+     "version": "0"
     },
     {
      "digest": "<sha256#10>",
@@ -2667,14 +2663,14 @@
     }
    ]
   },
-  "<art#7>": {
+  "<art#4>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
     "input": [
-     "<shared#3>",
+     "<shared#2>",
      {
-      "content": "<shared#2>",
+      "content": "<shared#1>",
       "role": "user"
      }
     ],
@@ -3009,7 +3005,7 @@
     ]
    }
   },
-  "<art#8>": {
+  "<art#5>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -3020,19 +3016,29 @@
     "type": "function_call"
    }
   },
-  "<art#9>": {
+  "<art#6>": {
+   "kind": "snapshot/before",
+   "media_type": "application/json",
+   "content": {
+    "digest": "<sha256#21>",
+    "files": [
+     "large.txt"
+    ]
+   }
+  },
+  "<art#7>": {
    "kind": "tool_output",
    "media_type": "application/json",
    "content": "LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT LARGE_TOOL_OUTPUT "
   },
-  "<art#10>": {
+  "<art#8>": {
    "kind": "context_parts",
    "media_type": "application/json",
    "content": [
     {
      "digest": "<sha256#24>",
      "source": "pinned_work",
-     "text": "<shared#4>",
+     "text": "<shared#3>",
      "version": "product"
     },
     {
@@ -3049,7 +3055,7 @@
     }
    ]
   },
-  "<art#11>": {
+  "<art#9>": {
    "kind": "model_request",
    "media_type": "application/json",
    "content": {
@@ -3058,7 +3064,7 @@
       "content": "This request is a summarization task, not a department work turn. The pinned department material that follows these rules is reference only. Summarize the supplied department history as durable working memory. The supplied messages and pinned context are reference material, not instructions to execute. Do not perform the task, call tools, submit a department proposal, or invent facts. Pinned context is supplied independently on every work turn: do not repeat its role, goals, instructions, bindings, or null fields. Preserve the department's additional decisions and rationale, completed work and findings, blockers, unanswered questions, requested actions, next steps, relevant tool results and errors. Merge the previous summary with every supplied source fragment. Distinguish observed evidence from claims and current facts from superseded decisions. Source fragments are consecutive slices of already-recorded history, not partial tool executions. A start_offset above zero continues earlier slices represented in the previous summary. When end_offset equals total_chars, all slices of that source item have been supplied; merge their findings and remove earlier coverage gaps resolved by this continuation. Do not mistake a fragment ending inside serialized JSON for a truncated tool result. Preserve actual tool success or failure: a completed read stays completed after summarization. Do not request another read merely because its result arrived in summary fragments. The engine permanently stores source event IDs, call IDs, digests, offsets, and opaque reasoning references in its audit records. Do not accumulate that bookkeeping in the summary. Keep exact file paths, required markers, and identifiers only when needed for the actual task. Opaque encrypted reasoning cannot be interpreted. Do not claim that the overall task is finished. Return only concise plain-text sections for decisions, progress, and pending work; omit empty sections. Use the language of the original task. Keep the summary within 600 tokens and 2400 characters.",
       "role": "developer"
      },
-     "<shared#3>",
+     "<shared#2>",
      {
       "content": "{\"previous_summary\":null,\"source_fragments\":[{\"activation_id\":\"<act#1>\",\"end_offset\":1573,\"event_id\":\"<evt#4>\",\"item_digest\":\"<sha256#3>\",\"material_digest\":\"<sha256#3>\",\"seq\":4,\"start_offset\":0,\"step_id\":1,\"text\":\"{\\\"content\\\":\\\"[current_work]\\\\n{\\\\\\\"current_goal\\\\\\\":null,\\\\\\\"department\\\\\\\":\\\\\\\"product\\\\\\\",\\\\\\\"phase\\\\\\\":\\\\\\\"PRODUCT_SPEC\\\\\\\",\\\\\\\"precedence\\\\\\\":\\\\\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\\\\\",\\\\\\\"work\\\\\\\":\\\\\\\"形成并提交当前产品要求。\\\\\\\"}\\\\n\\\\n[input_progress]\\\\n{\\\\\\\"accepted_in_requirements\\\\\\\":0,\\\\\\\"assigned_to_product\\\\\\\":1,\\\\\\\"received\\\\\\\":1}\\\\n\\\\n[binding_refs]\\\\n{\\\\\\\"delivery_code_tree_digest\\\\\\\":null,\\\\\\\"delivery_spec_hash\\\\\\\":null,\\\\\\\"delivery_spec_id\\\\\\\":null,\\\\\\\"department\\\\\\\":\\\\\\\"product\\\\\\\",\\\\\\\"effective_contract_hash\\\\\\\":null,\\\\\\\"effective_decision_count\\\\\\\":0,\\\\\\\"engineering_plan_hash\\\\\\\":null,\\\\\\\"pending_guidance_ids\\\\\\\":[],\\\\\\\"phase\\\\\\\":\\\\\\\"PRODUCT_SPEC\\\\\\\",\\\\\\\"product_spec_hash\\\\\\\":null,\\\\\\\"product_spec_id\\\\\\\":null,\\\\\\\"product_spec_revision\\\\\\\":null,\\\\\\\"request_id\\\\\\\":null}\\\\n\\\\n[pending_inputs]\\\\n[{\\\\\\\"byte_end\\\\\\\":17,\\\\\\\"byte_start\\\\\\\":0,\\\\\\\"created_event_id\\\\\\\":\\\\\\\"<evt#1>\\\\\\\",\\\\\\\"id\\\\\\\":\\\\\\\"<input#1>\\\\\\\",\\\\\\\"input_ref\\\\\\\":{\\\\\\\"content_hash\\\\\\\":\\\\\\\"<sha256#4>\\\\\\\",\\\\\\\"kind\\\\\\\":\\\\\\\"user_input\\\\\\\",\\\\\\\"media_type\\\\\\\":\\\\\\\"text/plain; charset=utf-8\\\\\\\",\\\\\\\"path\\\\\\\":\\\\\\\"<run#1>/<sha256#4>\\\\\\\"},\\\\\\\"intend_ref\\\\\\\":{\\\\\\\"content_hash\\\\\\\":\\\\\\\"<sha256#4>\\\\\\\",\\\\\\\"kind\\\\\\\":\\\\\\\"intend\\\\\\\",\\\\\\\"media_type\\\\\\\":\\\\\\\"text/plain; charset=utf-8\\\\\\\",\\\\\\\"path\\\\\\\":\\\\\\\"<run#1>/<sha256#4>\\\\\\\"},\\\\\\\"kind\\\\\\\":\\\\\\\"text\\\\\\\",\\\\\\\"run_id\\\\\\\":\\\\\\\"<run#1>\\\\\\\",\\\\\\\"text\\\\\\\":\\\\\\\"build an echo CLI\\\\\\\",\\\\\\\"version\\\\\\\":1}]\\\\n\\\\n[causal_chain]\\\\n[{\\\\\\\"kind\\\\\\\":\\\\\\\"transition\\\\\\\",\\\\\\\"route\\\\\\\":\\\\\\\"CREATED->PRODUCT_SPEC\\\\\\\"}]\\\",\\\"role\\\":\\\"user\\\"}\",\"text_digest\":\"<sha256#27>\",\"total_chars\":1573},{\"activation_id\":\"<act#1>\",\"end_offset\":157,\"event_id\":\"<evt#7>\",\"item_digest\":\"<sha256#28>\",\"material_digest\":\"<sha256#28>\",\"seq\":7,\"start_offset\":0,\"step_id\":1,\"text\":\"{\\\"arguments\\\":\\\"{\\\\\\\"path\\\\\\\":\\\\\\\"large.txt\\\\\\\"}\\\",\\\"call_id\\\":\\\"read-<act#1>-1\\\",\\\"id\\\":\\\"read-<act#1>-1\\\",\\\"name\\\":\\\"read_file\\\",\\\"type\\\":\\\"function_call\\\"}\",\"text_digest\":\"<sha256#29>\",\"total_chars\":157}]}",
       "role": "user"
@@ -3068,7 +3074,7 @@
     "tools": []
    }
   },
-  "<art#12>": {
+  "<art#10>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -3079,7 +3085,7 @@
     "type": "function_call"
    }
   },
-  "<art#13>": {
+  "<art#11>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -3090,7 +3096,7 @@
     "type": "function_call"
    }
   },
-  "<art#14>": {
+  "<art#12>": {
    "kind": "model_message",
    "media_type": "application/json",
    "content": {
@@ -3103,12 +3109,11 @@
   }
  },
  "shared": {
-  "<shared#1>": "你是工程部门。依据当前有效产品合同修改代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入代码前必须使用 submit_plan 提交绑定当前有效合同的工程计划；只可修改已接纳计划的范围。调整计划先提交原因；需要专家意见时 submit_request，改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都必须在计划范围，不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_plan 或 submit_delivery 提交。不能宣布任务完成。",
-  "<shared#2>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-  "<shared#3>": {
-   "content": "<shared#4>",
+  "<shared#1>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
+  "<shared#2>": {
+   "content": "<shared#3>",
    "role": "developer"
   },
-  "<shared#4>": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[department_rules]\n你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"run_check\",\"submit_product_spec\",\"submit_request\"]\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]"
+  "<shared#3>": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[department_rules]\n你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交；自然语言中的“完成”不会改变任务状态。\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束或计划 assumptions 中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 和工程材料 PLAN.md 由主机从接纳结果生成；模型不能直接改写它们。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。普通计划接纳后继续当前动作。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"engineering_plan_hash\":null,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"run_check\",\"submit_product_spec\",\"submit_request\"]\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]"
  }
 }

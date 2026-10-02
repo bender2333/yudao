@@ -418,9 +418,10 @@ def test_assembler_records_budget_and_digest(tmp_path):
         phase="ENGINEERING",
         context_window=8000,
         sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
-        department_prompts={"engineering": DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")},
     )
-    assembled = ContextAssembler().assemble(projection, department="engineering", session_id="ses_e", activation_id="act_1")
+    prompt = DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")
+    assembled = ContextAssembler().assemble(
+        projection, department="engineering", session_id="ses_e", activation_id="act_1", prompt=prompt)
     assert assembled.manifest.budget == 8000
     assert assembled.manifest.digest.startswith("sha256:")
     assert assembled.manifest.token_estimate > 0
@@ -436,11 +437,11 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
     projection = RunProjection(
         run_id="run_x", task="task", phase="ENGINEERING", context_window=8000,
         sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
-        department_prompts={"engineering": DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")},
     )
+    prompt = DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")
     assembler = ContextAssembler()
     pinned = assembler.assemble(projection, department="engineering", session_id="ses_e", activation_id="act_1",
-                                context_window=8000, max_output_tokens=1200)
+                                prompt=prompt, context_window=8000, max_output_tokens=1200)
     records = []
     for index in range(1, 9):
         item = {"id": f"msg-{index}", "type": "message", "role": "assistant",
