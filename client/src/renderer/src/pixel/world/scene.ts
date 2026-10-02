@@ -6,7 +6,7 @@
 // GSAP 的补间与 PixiJS 的渲染读同一个时钟（clock.ts），全场景的时间都由 scene.stepped 累加。
 
 import { createActor } from "xstate";
-import { animDuration as animTotal } from "../anims.ts";
+import { animDuration as animTotal, hash } from "../anims.ts";
 import { characterMachine, pipeMachine } from "./state.ts";
 import type {
   Actor, ActorInit, Character, Geo, HeadIconKind, PackageVisual, ParticleModel, Pipe, SceneLike, SceneOptions, Seat, Step, World,
@@ -47,7 +47,8 @@ export function createScene(opts: SceneOptions): SceneLike {
         anim: o.anim ?? "idle",
         animStart: 0,
         clock: 0,
-        seed: Math.floor(opts.random() * 3000),
+        // 小人的随机相位取声明序号的哈希（原型 engine.js 第 843 行）；不消耗场景的随机数序列
+        seed: Math.floor(hash(scene.actors.length + 7) * 3000),
         hold: o.hold ?? null,
         face: null,
         alpha: 1,
