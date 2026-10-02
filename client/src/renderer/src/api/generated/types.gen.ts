@@ -5031,7 +5031,7 @@ export type CatalogRevisedPayload = {
     /**
      * Operation
      */
-    operation: 'save_connection' | 'delete_connection' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
+    operation: 'save_connection' | 'delete_connection' | 'remove_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
     /**
      * Provider Id
      */

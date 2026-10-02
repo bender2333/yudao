@@ -215,12 +215,12 @@ class ProviderFacade:
 
     def replace_catalog_document(self, raw: Mapping[str, Any]) -> int:
         # 导入整份文档：以当前修订号加一发布，文档里的旧修订号不会让修订号回退。
-        # 导入移除被部门默认引用的定义按移除单条定义的规则拒绝（模型管理设计说明第 4.5、4.6 节），
+        # 导入移除被引用的定义、或移除被引用定义所属的连接时由应用层按移除单条定义的同一规则拒绝
+        # （模型管理设计说明第 4.5、4.6 节），引用方包含各部门默认与项目部门设置；
         # 启动读取目录文件仍然容忍陈旧引用，两者走出不同的入口
         with self._lock:
             document = dict(raw)
             document["revision"] = self._store.revision + 1
-            self._require_bound_definitions_present(document)
             self.store_document(document)
             return self._store.revision
 
@@ -280,30 +280,6 @@ class ProviderFacade:
             return [_definition_identity(model_id, key)
                     for model_id in sorted(self._store.models)
                     if self._store.models[model_id].provider_id == key]
-
-    def _require_bound_definitions_present(self, document: Mapping[str, Any]) -> None:
-        # 导入整份文档时，文档缺少当前被部门默认引用的定义、或缺少被引用定义所属的连接，
-        # 整份拒绝并列出引用方（模型管理设计说明第 4.5、4.6 节）。比较用文档里的原始身份，
-        # 文档自身的结构与准入校验由 store_document 完成；拟议文档自己的 bindings 不在这里检查
-        if not isinstance(document, Mapping):
-            return
-        raw_providers = document.get("providers")
-        raw_models = document.get("models")
-        if not isinstance(raw_providers, list) or not isinstance(raw_models, list):
-            return
-        provider_ids = {str(item.get("id")) for item in raw_providers if isinstance(item, Mapping)}
-        model_ids = {str(item.get("id")) for item in raw_models if isinstance(item, Mapping)}
-        issues: list[ValidationIssue] = []
-        for department in sorted(self._bindings):
-            binding = self._bindings[department]
-            model_id = str(binding.get("model_id") or "")
-            if not model_id:
-                continue
-            if model_id not in model_ids or str(binding.get("provider_id") or "") not in provider_ids:
-                issues.append(ValidationIssue(f"bindings.{department}",
-                                              "仍被引用，无法移除：模型访问定义或其所属连接不在文档中"))
-        if issues:
-            raise CatalogValidationError(tuple(issues))
 
     def persist_catalog(self, previous: Mapping[str, Any]) -> str | None:
         # 保存以后落盘；失败时恢复上一份文档并返回错误说明；没有配置路径时不做任何事

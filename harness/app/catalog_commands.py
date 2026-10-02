@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import PositiveInt
@@ -215,6 +216,37 @@ def _project_provider_referrers(application: Application, provider_id: str) -> l
                 referrers.append(f"projects.{project.project_id}.department_settings.{department}")
     return referrers
 
+def _document_removed_referrers(application: Application, document: Mapping[str, Any]) -> list[str]:
+    # 导入整份目录文档时，文档缺少仍被引用的模型访问定义（或缺少引用方指向的连接）时的引用方（设计说明第 4.6 节）。
+    # 与移除单条定义同一套规则：部门默认与项目部门设置都算引用方，按移除单条定义的同一个顺序列出，
+    # 比对用文档里的原始身份，文档自身的结构与准入校验由 Provider 模块完成
+    if not isinstance(document, Mapping):
+        return []
+    raw_providers = document.get("providers")
+    raw_models = document.get("models")
+    if not isinstance(raw_providers, list) or not isinstance(raw_models, list):
+        return []
+    provider_ids = {str(item.get("id")) for item in raw_providers if isinstance(item, Mapping)}
+    model_ids = {str(item.get("id")) for item in raw_models if isinstance(item, Mapping)}
+    referrers: list[str] = []
+    bindings = application.system.facade.get_bindings()
+    for department in sorted(bindings):
+        binding = bindings[department]
+        model_id = str(binding.get("model_id") or "")
+        if not model_id:
+            continue
+        if model_id not in model_ids or str(binding.get("provider_id") or "") not in provider_ids:
+            referrers.append(f"bindings.{department}")
+    for project in application.system.projects.list_projects(include_archived=True):
+        for department in sorted(project.department_settings):
+            setting = project.department_settings[department]
+            model_id = str(setting.model_id or "")
+            if not model_id:
+                continue
+            if model_id not in model_ids or str(setting.provider_id or "") not in provider_ids:
+                referrers.append(f"projects.{project.project_id}.department_settings.{department}")
+    return referrers
+
 def _binding_reminders(application: Application) -> list[str]:
     # 部门默认保存以后，各部门当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）。
     # 没有绑定模型的不检查；提醒随事件保存，接受结果按事件重新得出同样的值
@@ -312,11 +344,11 @@ async def _save_document(application: Application, command: Command, request: Ca
         "bindings": {key: item.model_dump() for key, item in request.document.bindings.items()},
     }
     try:
+        referrers = _document_removed_referrers(application, document)
+        if referrers:
+            raise Rejection("in_use", "仍被引用，无法移除：" + "、".join(sorted(set(referrers))))
         facade.replace_catalog_document(document)
     except CatalogValidationError as exc:
-        if any("仍被引用" in issue.message for issue in exc.issues):
-            referrers = [issue.location for issue in exc.issues]
-            raise Rejection("in_use", "仍被引用，无法移除：" + "、".join(referrers))
         raise Rejection("catalog_invalid", str(exc))
     after = facade.catalog_revision()
     problem = facade.persist_catalog(previous)

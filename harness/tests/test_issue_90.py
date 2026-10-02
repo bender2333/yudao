@@ -5,7 +5,8 @@
 #      两个项目的部门与进行中事项；保存以后这些定义回到候选；
 #   2) 移除被项目部门设置引用的定义返回 in_use 与引用方；没有引用时成功；
 #   3) 删除其下有定义但都没有被引用的 Provider 配置，定义一并删除；有引用时返回 in_use 与引用方；
-#   4) 导入移除了被引用定义的目录文档被整份拒绝，错误写出引用方。
+#   4) 导入移除了被引用定义的目录文档被整份拒绝，错误写出引用方（部门默认与项目部门设置两类引用方都写出）；
+#   5) 移除定义写入的 catalog_revised 事件载荷通过合同类型校验，operation 记为 remove_model。
 
 from __future__ import annotations
 
@@ -14,7 +15,9 @@ import uuid
 from typing import Any
 
 from harness.app.application import Application
-from harness.models import DEPARTMENTS
+from harness.app.payloads import CatalogRevisedPayload
+from harness.event_store import catalog_stream
+from harness.models import DEPARTMENTS, CatalogEventType
 from harness.tests.api_helpers import running_api
 from harness.tests.protocol_helpers import serve, sse
 
@@ -342,6 +345,74 @@ def test_import_removing_referenced_definition_is_rejected_as_a_whole(tmp_path):
         assert "bindings.engineering" in body["message"]
         # 目录没有变化
         assert any(item["id"] == "model-a" for item in _document(client)["models"])
+
+def test_import_removing_definition_referenced_only_by_a_project_is_rejected(tmp_path):
+    # 定义只被项目部门设置引用（部门默认都指向 model-a2，不含 model-a）：导入移除 model-a 的文档
+    # 仍被整份拒绝并写出该项目部门；目录没有变化
+    opened = _Opened(tmp_path)
+    with running_api(opened) as client:
+        opened.admit(("provider-a", "model-a"), ("provider-a", "model-a2"))
+        # 部门默认改指 model-a2：model-a 不再被部门默认引用，只有项目部门设置引用它
+        saved = _post(client, "catalog.department_defaults.save",
+                      base_version=_catalog(client)["revision"],
+                      bindings={department: {"provider_id": "provider-a", "model_id": "model-a2"}
+                                for department in DEPARTMENTS})
+        assert saved.status_code == 200, saved.text
+        project_id = _create_project(client, "P")
+        _set_model(client, project_id, "engineering", provider_id="provider-a", model_id="model-a")
+
+        document = _document(client)
+        trimmed = {
+            "providers": [item for item in document["providers"]],
+            "models": [item for item in document["models"] if item["id"] != "model-a"],
+            "bindings": {key: value for key, value in document["bindings"].items()},
+        }
+        rejected = _post(client, "catalog.document.save", base_version=_catalog(client)["revision"],
+                         document=trimmed)
+        assert rejected.status_code == 409, rejected.text
+        body = rejected.json()
+        assert body["reason"] == "in_use"
+        assert f"projects.{project_id}.department_settings.engineering" in body["message"]
+        # 目录没有变化
+        assert any(item["id"] == "model-a" for item in _document(client)["models"])
+
+def test_import_removing_definition_referenced_by_defaults_and_projects_lists_both(tmp_path):
+    # 定义同时被部门默认与项目部门设置引用：拒绝信息里两类引用方都出现
+    opened = _Opened(tmp_path)
+    with running_api(opened) as client:
+        opened.admit(("provider-a", "model-a"))
+        project_id = _create_project(client, "P")
+        _set_model(client, project_id, "engineering", provider_id="provider-a", model_id="model-a")
+
+        document = _document(client)
+        trimmed = {
+            "providers": [item for item in document["providers"]],
+            "models": [item for item in document["models"] if item["id"] != "model-a"],
+            "bindings": {key: value for key, value in document["bindings"].items()},
+        }
+        rejected = _post(client, "catalog.document.save", base_version=_catalog(client)["revision"],
+                         document=trimmed)
+        assert rejected.status_code == 409, rejected.text
+        message = rejected.json()["message"]
+        assert "bindings.engineering" in message
+        assert f"projects.{project_id}.department_settings.engineering" in message
+
+def test_remove_model_writes_a_revised_event_that_validates(tmp_path):
+    # 移除一条没有被引用的定义以后，事件日志里的 catalog_revised 事件载荷通过 CatalogRevisedPayload 校验，
+    # operation 记为 remove_model（ADR-0019：目录流的字段取值只增加）
+    opened = _Opened(tmp_path)
+    with running_api(opened) as client:
+        opened.admit(("provider-a", "model-a2"))
+        removed = _post(client, "catalog.model.remove", base_version=_catalog(client)["revision"],
+                        provider_id="provider-a", model_id="model-a2")
+        assert removed.status_code == 200, removed.text
+        events = [event for event in opened.system.store.stream_events(catalog_stream())
+                  if event.type == CatalogEventType.CATALOG_REVISED]
+
+    assert events, "移除定义以后没有写入 catalog_revised 事件"
+    payload = CatalogRevisedPayload.model_validate(events[-1].payload)
+    assert payload.operation == "remove_model"
+    assert payload.provider_id == "provider-a"
 
 def test_import_removing_unreferenced_definition_succeeds(tmp_path):
     # 导入移除了没有被引用定义的目录文档：整份接受（对照上一条）
