@@ -36,7 +36,7 @@ from harness.app.registry import Registry
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
-from harness.proposals import product_spec, plan_turn, delivery_turn, review_turn
+from harness.proposals import product_spec, plan_turn, delivery_turn, review_turn, collaboration_request
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
@@ -324,6 +324,18 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
     # 实际采用的版本来自该部门最近一次模型请求事件（run 内没有 Prompt 副本）
     assert workspace.data.prompt.used_version == 1
     assert workspace.data.setting.model_id is None and workspace.data.setting.requested_tier is None
+    # 部门房间的画面数据：这个 run 走完以后产品房间为已完成，卷轴数是它写出的 PRD 版本数
+    room = workspace.data.room
+    assert room.department == "product"
+    assert room.status == "done"
+    assert room.crt.target == "做一件事"
+    assert room.crt.status == "已完成"
+    assert room.crt.cycle == projection.cycle_count
+    assert room.roles[0].id == "product-agent" and room.roles[0].kind == "agent"
+    assert room.scrolls == len(projection.product_specs)
+    assert room.pipes.out == "idle"
+    # 门口立牌只在暂停、中断与因升级停止时出现
+    assert room.door is None
 
     actions = application.query("run.actions", RunActions(run_id=run_id))
     assert any(action.tool == "write_file" and action.receipt.ok for action in actions.data.actions)
@@ -361,6 +373,42 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
 
     exported = application.query("run.export", RunExport(run_id=run_id))
     assert any(event["type"] == EventType.RUN_CREATED for event in exported.data.events)
+
+
+def test_department_workspace_room_reflects_the_run_state(data_dir):
+    # 部门房间的画面数据随 run 的状态变化（原型 roomStatus 与房间数据）：
+    # 工程向产品发出询问时，产品房间为等待回答（asking）、工程房间为工作中（working），
+    # 询问的未回答数记在传信管口
+    system = _system(data_dir, [
+        product_spec(), collaboration_request("product"),
+    ])
+    project_id = system.projects.register("房间", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "看看房间")
+    assert system.activate_once(run_id).product_spec is not None
+    pending = system.activate_once(run_id)
+    assert pending.pending_request is not None
+    application = _application(system)
+
+    product_room = application.query("department.workspace", DepartmentWorkspace(
+        project_id=project_id, department="product", work_item=work_item_id)).data.room
+    assert product_room.status == "asking"
+    assert product_room.crt.target == "看看房间"
+    assert product_room.crt.status == "等待回答"
+    assert product_room.pipes.letters_waiting == 1
+    assert product_room.pipes.out == "idle"
+
+    engineering_room = application.query("department.workspace", DepartmentWorkspace(
+        project_id=project_id, department="engineering", work_item=work_item_id)).data.room
+    # 工程发出询问以后在等产品的回答：它已经交出了当前步骤，房间回到未工作的持续状态
+    assert engineering_room.status == "idle"
+    assert engineering_room.pipes.letters_waiting == 0
+    # 问询不影响质检房间：它没有参与这次 run
+    quality_room = application.query("department.workspace", DepartmentWorkspace(
+        project_id=project_id, department="quality", work_item=work_item_id)).data.room
+    assert quality_room.status == "idle"
+    assert quality_room.roles[0].id == "quality-agent"
+    assert quality_room.crt.target == "看看房间"
+
     checked = application.query("replay.check", ReplayCheck(run_id=run_id))
     assert checked.data.consistent is True
     assert checked.data.differences == []
