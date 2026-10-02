@@ -9,7 +9,7 @@ import { createActor } from "xstate";
 import { animDuration as animTotal } from "../anims.ts";
 import { characterMachine, pipeMachine } from "./state.ts";
 import type {
-  Actor, ActorInit, Character, Geo, PackageVisual, ParticleModel, Pipe, SceneLike, SceneOptions, Seat, Step, World,
+  Actor, ActorInit, Character, Geo, HeadIconKind, PackageVisual, ParticleModel, Pipe, SceneLike, SceneOptions, Seat, Step, World,
 } from "./types.ts";
 
 /** 角色实体对应的 actor 的 id 前缀。 */
@@ -353,7 +353,7 @@ function startStep(scene: SceneLike, actor: Actor, st: Step): void {
       actor.hold = st.item ?? null;
       break;
     case "icon":
-      actor.icon = st.icon ? { ...st.icon, t0: scene.realT } : null;
+      actor.icon = st.icon ? { kind: st.icon.kind as HeadIconKind, text: st.icon.text ?? undefined, t0: scene.realT } : null;
       break;
     case "call":
       break;

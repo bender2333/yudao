@@ -6,7 +6,7 @@
 // 放在渲染层 render-decl.ts 里，与这里的声明一一对应。
 
 import decl from "../generated/floor-decl.json" with { type: "json" };
-import type { Catalog, DeclContext, IdleDef, LinkDef, RestFn, RestState, RoleRestFn, RoomDef, TaskDef } from "./types.ts";
+import type { Catalog, DeclContext, IdleDef, LinkDef, RestFn, RestState, RoleRestFn, RoomDef, RoomVisual, TaskDef } from "./types.ts";
 
 /** 任务目录（数据来自原型 floor-decl.js 的 TASKS）。 */
 export const TASKS = decl.tasks as unknown as Record<string, TaskDef>;
@@ -138,17 +138,20 @@ export function keyOf(ev: { type: string; tool?: string | null; department?: str
 }
 
 /** 项目楼层的任务目录（世界与系统共用）。 */
-export const catalog: Catalog = {
-  tasks: TASKS,
-  idle: IDLE,
-  keyOf,
-  roomDefs: ROOMS,
-  linkDefs: LINKS,
-  flags: decl.flags,
-  deptRest,
-  roleRest,
-  geo: decl.geo,
-};
+export function buildCatalog(visuals: Record<string, RoomVisual>): Catalog {
+  const rooms = ROOMS.map((room) => (visuals[room.id] ? { ...room, ...visuals[room.id] } : room));
+  return {
+    tasks: TASKS,
+    idle: IDLE,
+    keyOf,
+    roomDefs: rooms,
+    linkDefs: LINKS,
+    flags: decl.flags,
+    deptRest,
+    roleRest,
+    geo: decl.geo,
+  };
+}
 
 /** 原型声明的说话目录登记的事件类型（测试核对齐全）。 */
 export const sayCatalogTypes: string[] = decl.sayCatalog;

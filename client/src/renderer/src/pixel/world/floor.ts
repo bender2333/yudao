@@ -10,7 +10,7 @@ import { actorOf, charFor, primaryOf, syncCharacters, mountMachines } from "./sc
 import { say, sayMs } from "./say.ts";
 import { signal, signalOn } from "./signals.ts";
 import type {
-  Catalog, Character, DecisionView, FloorModel, LoopItem, PackageVisual, PixelFloorEvent, SceneLike, Task, World,
+  Catalog, Character, DecisionView, DeclContext, FloorModel, LoopItem, PackageVisual, PixelFloorEvent, SceneLike, Task, World,
 } from "./types.ts";
 import { createWorld } from "./declare.ts";
 
@@ -102,6 +102,8 @@ export interface FloorDriver {
   decisionHidden: (id: string, now: number) => boolean;
   /** 每个角色此刻头顶说的话（画面按 until 读取）。 */
   saidOf: (id: string, now: number) => { text: string; until: number } | null;
+  /** 房间声明的 props、lit、tint 读取画面数据的窗口。 */
+  declCtx: () => DeclContext;
 }
 
 /** 建立一个楼层驱动：世界、角色与画面状态都在这里维护。 */
@@ -502,6 +504,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
       const s = state.said[id];
       return s && s.until > now ? s : null;
     },
+    declCtx: () => ctx as DeclContext,
   };
 }
 

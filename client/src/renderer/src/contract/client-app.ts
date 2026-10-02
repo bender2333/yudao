@@ -34,11 +34,29 @@ export class ClientApp {
   private views: ViewSync | null = null;
   private boot: string | null = null;
   private capabilities: Capabilities | null = null;
+  /** 项目楼层这类按事件播放动作的画面：订阅本项目的事件与重新同步。 */
+  private readonly eventSubscribers = new Set<(event: EventObject) => void>();
+  private readonly resyncSubscribers = new Set<() => void>();
 
   constructor(
     private readonly runQuery: QueryRunner,
     private readonly listeners: ClientListeners,
   ) {}
+
+  /**
+   * 订阅本项目的事件：画面用它把事件变成动作。返回值是取消订阅的函数。
+   * 状态以查询为准，事件只决定动作的起点；重新同步（缺口、断线重连、resync）时不补播已经播放过的动作。
+   */
+  subscribeEvents(fn: (event: EventObject) => void): () => void {
+    this.eventSubscribers.add(fn);
+    return () => this.eventSubscribers.delete(fn);
+  }
+
+  /** 订阅重新同步：收到时画面回到查询给出的状态，不补播已经播放过的动作。 */
+  subscribeResync(fn: () => void): () => void {
+    this.resyncSubscribers.add(fn);
+    return () => this.resyncSubscribers.delete(fn);
+  }
 
   get viewSync(): ViewSync | null {
     return this.views;
@@ -121,6 +139,7 @@ export class ClientApp {
   private onEvent(event: EventObject): void {
     this.views?.applyEvent(event.type, event.position);
     this.listeners.onEvent(event);
+    for (const fn of [...this.eventSubscribers]) fn(event);
     if (event.type === "decision_requested" || event.type === "decision_answered" || event.type === "decision_withdrawn") {
       void this.refreshPendingDecisions();
     }
@@ -144,6 +163,8 @@ export class ClientApp {
     const position = await this.views!.refreshAll();
     this.closeStream();
     this.startStream(position);
+    // 画面回到查询给出的状态，不补播已经播放过的动作
+    for (const fn of [...this.resyncSubscribers]) fn();
   }
 
   async refreshPendingDecisions(): Promise<void> {

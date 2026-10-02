@@ -5,7 +5,7 @@
 import { roomOf } from "./declare.ts";
 import { actorOf, charsOf, charFor } from "./scene.ts";
 import { polyLength, pointAt } from "./declare.ts";
-import type { Character, IdleDef, RestState, Seat, SpotKind, Step, Task, TaskDef, World } from "./types.ts";
+import type { Character, HeadIconKind, IdleDef, RestState, Seat, SpotKind, Step, Task, TaskDef, World } from "./types.ts";
 import type { SceneLike } from "./types.ts";
 
 /** 队列里最多留几个可以被挤掉的任务（must 的任务不受限制）。 */
@@ -239,9 +239,10 @@ function stepOne(world: World, scene: SceneLike, ch: Character): void {
     actor.hold = goal?.hold ?? null;
   }
   if (goal && goal.icon) {
-    const text = goal.iconText || (goal.icon === "text" ? goal.label ?? null : null);
-    if (!actor.icon || actor.icon.kind !== goal.icon || actor.icon.text !== text) {
-      actor.icon = { kind: goal.icon, text: text, t0: scene.realT, fromTask: true };
+    const kind = goal.icon as HeadIconKind;
+    const text = goal.iconText || (kind === "text" ? goal.label : undefined) || undefined;
+    if (!actor.icon || actor.icon.kind !== kind || actor.icon.text !== text) {
+      actor.icon = { kind, text, t0: scene.realT, fromTask: true };
     }
   } else if (actor.icon && actor.icon.fromTask) {
     actor.icon = null;

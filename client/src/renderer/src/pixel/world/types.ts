@@ -196,8 +196,15 @@ export interface LinkHop {
   link: Pipe;
 }
 
+/** 房间的陈设画法与条件（需要画布原语，由渲染层按房间 id 提供）。 */
+export interface RoomVisual {
+  props?: (c: CanvasRenderingContext2D, room: Room, t: number, ctx: DeclContext) => void;
+  lit?: (ctx: DeclContext) => boolean;
+  tint?: (c: CanvasRenderingContext2D, room: Room, t: number, ctx: DeclContext) => void;
+}
+
 /** 房间声明：w、when、agentKind、ports、spots 等（原型 floor-decl.js 的字段）。 */
-export interface RoomDef {
+export interface RoomDef extends RoomVisual {
   id: string;
   label: string;
   roomKind: string;
@@ -400,10 +407,12 @@ export interface TimeText {
 // ---------------------------------------------------------------------------
 // 场景与 actor：小人与陈设在画面上的当前状态（渲染层只读；走位与姿势由系统推进）
 
-/** 头顶的状态图标。 */
+/** 头顶的状态图标（kind 的取值与 shapes.ts 的 drawIcon 一致）。 */
+export type HeadIconKind = "think" | "stream" | "bulb" | "hourglass" | "question" | "exclaim" | "check" | "cross" | "heart" | "zzz" | "text";
+
 export interface HeadIcon {
-  kind: string;
-  text?: string | null;
+  kind: HeadIconKind;
+  text?: string;
   t0: number;
   fromTask?: boolean;
 }

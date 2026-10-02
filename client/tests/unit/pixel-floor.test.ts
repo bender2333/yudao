@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { catalog, eventActionTypes, sayCatalogTypes } from "../../src/renderer/src/pixel/world/floor-decl.ts";
+import { buildCatalog, eventActionTypes, sayCatalogTypes } from "../../src/renderer/src/pixel/world/floor-decl.ts";
 import { declareLinks, declareRooms, createWorld, polyLength, pointAt, route } from "../../src/renderer/src/pixel/world/declare.ts";
 import { dispatch, enqueue, stepCharacters, stepPackages, stepPipes, bubbleFor } from "../../src/renderer/src/pixel/world/characters.ts";
 import { say, sayMs } from "../../src/renderer/src/pixel/world/say.ts";
@@ -17,6 +17,7 @@ import { mountMachines, syncCharacters } from "../../src/renderer/src/pixel/worl
 import { createFloorState } from "../../src/renderer/src/pixel/world/floor.ts";
 import { createScene } from "../../src/renderer/src/pixel/world/scene.ts";
 import { createFloorDriver } from "../../src/renderer/src/pixel/world/floor.ts";
+import type { FloorModel, LoopItem, PixelFloorEvent, RoleInfo } from "../../src/renderer/src/pixel/world/types.ts";
 
 // ---------------------------------------------------------------------------
 // 确定时钟与手写数据
@@ -28,6 +29,9 @@ function seeded(): () => number {
     return seed / 4294967296;
   };
 }
+
+// 世界与系统不需要画布，因此目录不带房间的陈设画法（渲染层在 floor-view 里合成）
+const catalog = buildCatalog({});
 
 const TIME = { clock: (iso: string | null) => iso ?? "", duration: (sec: number) => String(sec) };
 

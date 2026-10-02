@@ -16,6 +16,7 @@ import type {
 import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, SubmitButton, Table, TextArea,
   TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
+import { FloorScreen } from "./floor-screen";
 import { PHASE_LABELS, WORK_ITEM_STATUS, departmentName, formatTime, label } from "./labels";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 
@@ -42,8 +43,8 @@ export function OverviewPage(props: { app: ClientApp; route: Route }) {
       {data ? (
         <>
           <Summary data={data} />
-          <Section title="循环画面" note="像素楼层与管道由工单 #82 填入，这里留出位置">
-            <Empty text="循环画面的位置（第 5.2 至 5.5 节）" />
+          <Section title="循环画面" note="项目楼层与管道（像素画面，工单 #82）">
+            <FloorScreen app={props.app} projectId={projectId} workItemId={workItem} />
           </Section>
           <CurrentItem app={props.app} projectId={projectId} item={current} command={command} />
           <Board items={items} />
