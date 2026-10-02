@@ -65,10 +65,13 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   );
 }
 
-// 当前生效模型的来源：取自调用目标的 selection_source；后端目前只登记部门默认这一种
+// 当前生效模型的来源：取自生效模型的 selection_source
 function selectionSourceLabel(value: string | null): string {
   if (value === "department_default") {
     return "部门默认";
+  }
+  if (value === "project_department_setting") {
+    return "项目设置";
   }
   return show(value, "未上报");
 }
@@ -85,7 +88,7 @@ function departmentStatus(data: DepartmentWorkspaceResult): string {
 
 function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; onOpenSettings: () => void }) {
   const data = props.data;
-  const provider = data.provider === null ? null : dict(data.provider);
+  const effective = data.effective;
   const lastCall = data.last_call === null ? null : dict(data.last_call);
   const info = DEPARTMENTS[data.department];
 
@@ -94,16 +97,16 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
       <KeyValue
         items={[
           ["部门状态", departmentStatus(data)],
-          ["当前生效的模型及来源", provider === null
-            ? "还没有请求，未上报"
-            : `${show(optionalText(provider.requested_model))}（来源 ${selectionSourceLabel(optionalText(provider.selection_source))}）`],
+          ["当前生效的模型及来源", effective.state === "unset"
+            ? "未设置"
+            : effective.state === "unusable"
+              ? `无法使用：${show(effective.message)}`
+              : `${show(optionalText(effective.model))}（来源 ${selectionSourceLabel(optionalText(effective.selection_source))}）`],
           ["最近一次请求实际使用的模型", lastCall === null ? "未上报" : show(optionalText(lastCall.actual_model))],
-          ["协议", lastCall === null && provider === null
+          ["协议", lastCall === null ? "未上报" : show(optionalText(lastCall.requested_protocol))],
+          ["发送的档位", lastCall === null
             ? "未上报"
-            : show(optionalText(lastCall?.requested_protocol) ?? optionalText(provider?.protocol))],
-          ["发送的档位", provider === null
-            ? "未上报"
-            : `请求 ${show(optionalText(provider.requested_tier))}，实际发送 ${show(optionalText(provider.sent_tier))}`],
+            : `请求 ${show(optionalText(lastCall.requested_tier))}，实际发送 ${show(optionalText(lastCall.sent_tier))}`],
           ["提醒", data.reminders.length === 0 ? "没有" : data.reminders.join("；")],
         ]}
       />

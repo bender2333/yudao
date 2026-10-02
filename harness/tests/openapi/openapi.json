@@ -6356,6 +6356,9 @@
           "setting": {
             "$ref": "#/components/schemas/DepartmentSetting"
           },
+          "effective": {
+            "$ref": "#/components/schemas/EffectiveModel"
+          },
           "guidance": {
             "items": {
               "$ref": "#/components/schemas/GuidanceRecord"
@@ -6388,18 +6391,6 @@
             ],
             "title": "Last Call"
           },
-          "provider": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider"
-          },
           "reminders": {
             "items": {
               "type": "string"
@@ -6419,11 +6410,11 @@
           "active",
           "prompt",
           "setting",
+          "effective",
           "guidance",
           "messages",
           "context",
           "last_call",
-          "provider",
           "reminders"
         ],
         "title": "DepartmentWorkspaceResult"
@@ -6602,6 +6593,135 @@
           "queued_work_items"
         ],
         "title": "DrainStatus"
+      },
+      "EffectiveModel": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "effective",
+              "unusable",
+              "unset"
+            ],
+            "title": "State"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Name"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          },
+          "requested_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Tier"
+          },
+          "sent_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Tier"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "EffectiveModel"
       },
       "EventDetailResult": {
         "properties": {
