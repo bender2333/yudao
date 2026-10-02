@@ -31,7 +31,9 @@ from harness.adapters.base import ProviderError  # noqa: E402
 from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
 from harness.app.application import Application  # noqa: E402
-from harness.app.catalog_commands import CatalogConnectionSave, ModelInput, ProviderInput  # noqa: E402
+from harness.app.catalog_commands import (  # noqa: E402
+    BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, ModelInput, ProviderInput,
+)
 from harness.app.contracts import Accepted, Rejected  # noqa: E402
 from harness.app.project_commands import ProjectCreate  # noqa: E402
 from harness.app.project_and_work_item_commands import (  # noqa: E402
@@ -151,7 +153,8 @@ class ModelsServer:
         self.server.shutdown()
         self.server.server_close()
 
-async def seed_catalog(application: Application, upstream_base: str, models_url: str) -> None:
+async def seed_catalog(application: Application, upstream_base: str, models_url: str,
+                       *, admit_and_bind: bool = False) -> None:
     # 界面上的候选、连接测试与模型测试都发真实请求，不使用测试替身
     revision = application.system.facade.catalog_revision()
     saved = await application.command("catalog.connection.save", CatalogConnectionSave(
@@ -171,6 +174,15 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
     ), actor="user:local")
     if isinstance(saved, Rejected):
         raise RuntimeError(f"catalog seed rejected: {saved.reason} {saved.message}")
+    if not admit_and_bind:
+        return
+    # 给这条定义写准入记录并让三个部门默认都绑定它：作废准入与删除引用方两类用例需要真实的引用方
+    facade = application.system.facade
+    facade.record_admission("opencode-go", "glm-4.6", admitted_model="glm-4.6")
+    await accept(application, "catalog.department_defaults.save", CatalogDepartmentDefaultsSave(
+        command_id=str(uuid.uuid4()), base_version=facade.catalog_revision(),
+        bindings={department: BindingInput(provider_id="opencode-go", model_id="glm-4.6", requested_tier=None)
+                  for department in ("product", "engineering", "quality")}))
 
 
 class VersionedApplication(Application):
@@ -201,6 +213,8 @@ def main() -> int:
     # 因此这里接到的子命令与真正的 yudao 命令一致；端口固定为客户端连接的本机端口，
     # 接受本机停止请求并在收到以后退出，与 harness.api.server 的行为一致
     parser.add_argument("mode", nargs="?", default="fixture", choices=("fixture", "api"))
+    # 预置时给定义写准入并让三个部门默认绑定它：作废准入与删除引用方的用例需要真实的引用方（工单 #94）
+    parser.add_argument("--admit-and-bind", action="store_true")
     args = parser.parse_args()
 
     import tempfile
@@ -246,7 +260,8 @@ def main() -> int:
     already_seeded = bool(application.query("projects.list", ProjectsList(include_archived=True)).data.projects)
     if not already_seeded:
         asyncio.run(seed(application, system))
-    asyncio.run(seed_catalog(application, upstream_base, models_server.base))
+    asyncio.run(seed_catalog(application, upstream_base, models_server.base,
+                             admit_and_bind=args.admit_and_bind))
 
     port = server.servers[0].sockets[0].getsockname()[1]
     print(json.dumps({"port": port, "data_dir": str(data_dir)}), flush=True)

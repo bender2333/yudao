@@ -11,8 +11,11 @@ const KEY = "sk-e2e-opencode-go-8f3a1c";
 // 每条用例各自启动一份后端与客户端：用例会修改目录（保存连接、部门默认、凭据），
 // 共用一份后端会让用例之间互相影响。后端启动用时由 git 子进程与目录种子决定（#107 裁定，
 // 见 docs/architecture-issues.md），这里单独放宽每条用例的时限
-async function openModels(size: { width: number; height: number }): Promise<{ backend: Backend; client: ClientApp }> {
-  const backend = await startBackend();
+async function openModels(
+  size: { width: number; height: number },
+  options: { admitAndBind?: boolean } = {},
+): Promise<{ backend: Backend; client: ClientApp }> {
+  const backend = await startBackend(options.admitAndBind === true ? { admitAndBind: true } : {});
   const client = await startClient(backend, size);
   await expect(client.page.locator(".brand")).toHaveText("Yudao");
   // 宽度 390 时左侧栏收为抽屉，先打开抽屉再点入口（原型 v8 设计说明第 3.3 节）
@@ -203,7 +206,7 @@ for (const size of [
       await form.getByTestId("default-level-vision-model").selectOption("high");
       await form.getByTestId("reasoning-mode-vision-model").selectOption("effort");
 
-      // 保存：容量已确认，保存以后表单收起，模型表里出现这条定义
+      // 保存：这条连接的准入未作废（没有引用方），保存以后表单收起，模型表里出现这条定义
       await form.getByTestId("submit-provider").click();
       await expect(form).toHaveCount(0);
       await expect(client.page.getByTestId("model-vision-model")).toBeVisible();
@@ -300,6 +303,159 @@ for (const size of [
       await expect(dialog.getByRole("status")).toHaveCount(0);
       await dialog.getByRole("button", { name: "关闭" }).click();
       await expect(dialog).toHaveCount(0);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  test(`${label}：编辑 JSON 带准入字段或引用候选时保存被拒绝，页面指出字段位置`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size, { admitAndBind: true });
+    const errors = watchErrors(client);
+    try {
+      await client.page.getByTestId("edit-json").click();
+      const dialog = client.page.locator(".modal");
+      const editor = dialog.getByLabel("目录文档 JSON");
+      const document = JSON.parse(await editor.inputValue()) as {
+        providers: Record<string, unknown>[]; models: Record<string, unknown>[]; bindings: Record<string, Record<string, unknown>>;
+      };
+
+      // 带准入字段：合同层拒绝，页面指出字段位置（models.0.admitted_at）
+      const withAdmission = JSON.parse(JSON.stringify(document)) as typeof document;
+      withAdmission.models[0].admitted_at = "2026-10-02T00:00:00Z";
+      await editor.fill(JSON.stringify(withAdmission, null, 2));
+      await dialog.getByRole("button", { name: "保存" }).click();
+      await expect(dialog.getByRole("status")).toContainText("models.0.admitted_at");
+      // 拒绝以后整份不写入：重新打开仍是原文档
+      await dialog.getByRole("button", { name: "重置" }).click();
+      await expect(editor).not.toHaveValue(/admitted_at/);
+
+      // 部门默认引用候选（未准入的定义）：领域校验拒绝并指出 bindings.<部门> 位置
+      const referencingCandidate = JSON.parse(JSON.stringify(document)) as typeof document;
+      referencingCandidate.bindings = {
+        product: { provider_id: "opencode-go", model_id: "not-admitted" },
+      };
+      await editor.fill(JSON.stringify(referencingCandidate, null, 2));
+      await dialog.getByRole("button", { name: "保存" }).click();
+      await expect(dialog.getByRole("status")).toContainText("bindings.product");
+      // 关闭以后目录不变：部门默认仍绑定 glm-4.6
+      await dialog.getByRole("button", { name: "关闭" }).click();
+      await expect(client.page.getByTestId("default-model-product")).toHaveValue("glm-4.6");
+      // 两次保存都被拒绝：浏览器会记录这两条被拒绝的响应，页面本身没有脚本错误
+      expect(errors).toEqual([
+        "Failed to load resource: the server responded with a status of 422 (Unprocessable Content)",
+        "Failed to load resource: the server responded with a status of 409 (Conflict)",
+      ]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  test(`${label}：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size, { admitAndBind: true });
+    const errors = watchErrors(client);
+    try {
+      // 三个部门默认都绑定了 glm-4.6，准入有效
+      await expect(client.page.getByTestId("provider-opencode-go").locator(".mm-summary")).toContainText("已准入 1 · 候选 0");
+
+      // 编辑连接，改地址：影响列表由 catalog.change_impact 算出，保存前弹确认框
+      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
+      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
+      const form = client.page.locator(".mm-form");
+      await expect(form.getByTestId("impact-notice")).toHaveCount(0);
+      await form.getByTestId("provider-base-url").fill("https://changed.example/v1");
+      await expect(form.getByTestId("impact-notice")).toContainText("准入作废");
+      await expect(form.getByTestId("impact-notice")).toContainText("产品");
+
+      // 取消：目录不变，连接地址仍是种子地址，准入仍然有效
+      await form.getByTestId("submit-provider").click();
+      const confirm = client.page.getByTestId("confirm-save");
+      await expect(confirm).toBeVisible();
+      await expect(confirm.getByTestId("confirm-save-list")).toContainText("glm-4.6");
+      await confirm.getByTestId("confirm-save-no").click();
+      await expect(confirm).toHaveCount(0);
+      await expect(form.getByTestId("impact-notice")).toContainText("准入作废");
+      await form.getByRole("button", { name: "取消" }).click();
+      const summary = client.page.getByTestId("provider-opencode-go").locator(".mm-summary");
+      await expect(summary).toContainText(/127\.0\.0\.1/);
+      await expect(summary).toContainText("已准入 1 · 候选 0");
+
+      // 再次改地址并确认：保存成功，准入作废
+      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
+      await client.page.locator(".mm-form").getByTestId("provider-base-url").fill("https://changed.example/v1");
+      await client.page.locator(".mm-form").getByTestId("submit-provider").click();
+      await client.page.getByTestId("confirm-save").getByTestId("confirm-save-yes").click();
+      await expect(client.page.locator(".mm-form")).toHaveCount(0);
+      await expect(client.page.getByTestId("provider-opencode-go").locator(".mm-summary")).toContainText("已准入 0 · 候选 1");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  test(`${label}：删除被引用的连接时显示引用方并拒绝，删除没有引用的连接时确认框列出将一并删除的定义`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size, { admitAndBind: true });
+    const errors = watchErrors(client);
+    try {
+      // 被三个部门默认引用：确认框列出引用方，确认按钮不可用
+      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
+      await client.page.getByTestId("delete-opencode-go").click();
+      const confirm = client.page.getByTestId("confirm-delete");
+      await expect(confirm.getByTestId("confirm-delete-list")).toContainText("仍被引用，不能删除");
+      await expect(confirm.getByTestId("confirm-delete-list")).toContainText("部门默认：产品");
+      await expect(confirm.getByTestId("confirm-delete-yes")).toBeDisabled();
+      await confirm.getByTestId("confirm-delete-no").click();
+      await expect(confirm).toHaveCount(0);
+      // 取消以后连接还在
+      await expect(client.page.getByTestId("provider-opencode-go")).toBeVisible();
+
+      // 清空部门默认：通过界面把三个部门都设为「未设置」并保存，连接不再被引用
+      for (const department of ["product", "engineering", "quality"]) {
+        await client.page.getByTestId(`default-model-${department}`).selectOption("");
+      }
+      await client.page.getByTestId("save-defaults").click();
+      await expect(client.page.getByTestId("defaults-status")).toContainText("已保存部门默认");
+
+      // 删除：确认框列出将一并删除的定义，确认以后连接消失（卡片已展开，直接点删除）
+      await client.page.getByTestId("delete-opencode-go").click();
+      await expect(confirm.getByTestId("confirm-delete-list")).toContainText("一并删除");
+      await expect(confirm.getByTestId("confirm-delete-list")).toContainText("glm-4.6");
+      await confirm.getByTestId("confirm-delete-yes").click();
+      await expect(client.page.getByTestId("page-notice")).toContainText("已删除");
+      await expect(client.page.getByTestId("provider-opencode-go")).toHaveCount(0);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  test(`${label}：引用作废的定义时下拉框显示「无法使用：准入已作废」，所选模型未声明档位时禁用档位`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size, { admitAndBind: true });
+    const errors = watchErrors(client);
+    try {
+      // 经界面改地址并确认：准入作废，三个部门默认的引用保留
+      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
+      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
+      await client.page.locator(".mm-form").getByTestId("provider-base-url").fill("https://changed.example/v1");
+      await client.page.locator(".mm-form").getByTestId("submit-provider").click();
+      await client.page.getByTestId("confirm-save").getByTestId("confirm-save-yes").click();
+      await expect(client.page.locator(".mm-form")).toHaveCount(0);
+
+      // 引用保留并显示「无法使用：准入已作废」
+      await expect(client.page.getByTestId("unavailable-product")).toContainText("无法使用：准入已作废");
+      await expect(client.page.getByTestId("unavailable-quality")).toContainText("无法使用：准入已作废");
+      // 准入作废的定义不在下拉框的已准入选项里，但已保存的引用作为一项保留并选中
+      await expect(client.page.getByTestId("default-model-product")).toHaveValue("glm-4.6");
+      const options = await client.page.getByTestId("default-model-product").locator("option").allTextContents();
+      expect(options).toEqual(["未设置", "glm-4.6"]);
       expect(errors).toEqual([]);
     } finally {
       await client.close();
