@@ -12,7 +12,8 @@ import { defaultSettings, DEFAULT_LOCAL_ADDRESS } from "./contract/settings";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { parseRoute, paths, type Route } from "./shell/routing";
-import { ConnectPage, UpdatePage } from "./views/connect";
+import { ConnectPage } from "./views/connect";
+import { UpdatePage } from "./views/update";
 import { HomePage } from "./views/home/page";
 import { SettingsPage as ClientSettingsPage } from "./views/settings";
 import { ModelManagementPage } from "./views/models/page";
@@ -309,7 +310,8 @@ export function App() {
   }
   if (state.kind === "outdated") {
     return (
-      <UpdatePage address={state.address} clientVersion={state.clientVersion} serverVersion={state.serverVersion} />
+      <UpdatePage address={state.address} clientVersion={state.clientVersion}
+                  serverVersion={state.serverVersion} serverRelease={state.serverRelease} />
     );
   }
   if (state.kind === "failed") {

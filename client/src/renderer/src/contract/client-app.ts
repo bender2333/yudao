@@ -13,7 +13,7 @@ import { ViewSync } from "./view-sync";
 
 export type ClientState =
   | { kind: "connecting" }
-  | { kind: "outdated"; address: string; clientVersion: number; serverVersion: number }
+  | { kind: "outdated"; address: string; clientVersion: number; serverVersion: number; serverRelease: string }
   | { kind: "failed"; address: string; message: string }
   | { kind: "connected"; address: string; capabilities: Capabilities; streamConnected: boolean };
 
@@ -81,7 +81,8 @@ export class ClientApp {
     const result = await connect(settings);
     if (result.state === "outdated") {
       this.listeners.onState({
-        kind: "outdated", address: result.address, clientVersion: result.clientVersion, serverVersion: result.serverVersion,
+        kind: "outdated", address: result.address, clientVersion: result.clientVersion,
+        serverVersion: result.serverVersion, serverRelease: result.serverRelease,
       });
       return;
     }

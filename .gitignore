@@ -12,6 +12,11 @@ third_party/
 node_modules/
 build/
 dist/
+# 客户端安装包的构建输出（工单 #208 的测试与发布脚本生成安装程序、blockmap 与 latest.yml）
+client/dist/
+client/dist-*/
+# 端到端测试构建的安装包缓存（两个测试版本，工单 #208；按需构建，构建一次后复用）
+client/tests/e2e/.update-build/
 harness/tests/openapi/generated/
 client/out/
 client/playwright-report/
