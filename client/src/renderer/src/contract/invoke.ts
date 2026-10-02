@@ -3,15 +3,27 @@
 // 查询与命令函数由 @hey-api/openapi-ts 生成；这里按名称查找它们，避免为每个页面各写一遍调用。
 // 生成函数的返回类型由合同给出，因此这里的返回保留原始类型；只有按名称查找这一步是运行时的。
 
+import type { Rejected } from "../api/generated/types.gen";
 import type { Client } from "../api/generated/client";
 import * as sdk from "../api/generated/sdk.gen";
 
 type QueryFunction = (options: { client: Client; query?: Record<string, unknown> }) => Promise<{ data: unknown }>;
-type CommandFunction = (options: { client: Client; body: unknown }) => Promise<{ data: unknown }>;
+type CommandFunction = (options: { client: Client; body: unknown }) => Promise<{ data: unknown; error?: unknown }>;
 
-// 生成的函数名：querySystemStatus、commandProjectCreate 等；名称中的点换成下划线并首字母大写
+// 一条命令的结果：接受返回应用层的受理回执（command_id、position、refs），拒绝返回 Rejected
+export type CommandOutcome =
+  | { ok: true; accepted: Record<string, unknown> }
+  | { ok: false; rejection: Rejected };
+
+// 生成的函数名：querySystemStatus、commandProjectCreate、queryWorkItemMaterials 等。
+// 名称里的点与下划线都是分词：每一段的首字母大写以后直接拼起来（work_item.materials -> WorkItemMaterials）
 function functionName(prefix: "query" | "command", name: string): string {
-  return prefix + name.split(".").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("");
+  const pascal = name
+    .split(".")
+    .flatMap((part) => part.split("_"))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+  return prefix + pascal;
 }
 
 const functions = sdk as unknown as Record<string, QueryFunction | CommandFunction>;
@@ -30,10 +42,20 @@ export async function callQuery<T>(
   return response.data as { position: number; data: T };
 }
 
-export async function callCommand(client: Client, name: string, body: unknown): Promise<unknown> {
+// 提交一条命令：200 返回受理回执；409 的响应体是 Rejected，生成的客户端把它放在 error 字段。
+// 网络错误与其他非预期状态码直接抛出，由调用处的界面显示（fast-fail，不静默吞掉）
+export async function callCommand(
+  client: Client,
+  name: string,
+  body: Record<string, unknown>,
+): Promise<CommandOutcome> {
   const fn = functions[functionName("command", name)];
   if (typeof fn !== "function") {
     throw new Error(`能力清单中的命令 ${name} 没有生成的调用函数`);
   }
-  return (await (fn as CommandFunction)({ client, body })).data;
+  const response = await (fn as CommandFunction)({ client, body });
+  if (response.error !== undefined && response.error !== null) {
+    return { ok: false, rejection: response.error as Rejected };
+  }
+  return { ok: true, accepted: (response.data ?? {}) as Record<string, unknown> };
 }

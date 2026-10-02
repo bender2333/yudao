@@ -16,11 +16,14 @@ class ProviderError(Exception):
         reason: str = "provider_error",
         retryable: bool = False,
         diagnostics: dict[str, Any] | None = None,
+        facts: list[str] | None = None,
     ) -> None:
         super().__init__(message)
         self.reason = reason
         self.retryable = retryable
         self.diagnostics = diagnostics
+        # facts 是停止原因要带给决定请求的事实引用（workspace_unrepresentable 的条目相对路径）
+        self.facts = list(facts or [])
 
 
 @dataclass(frozen=True)

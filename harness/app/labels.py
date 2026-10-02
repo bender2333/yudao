@@ -73,6 +73,7 @@ _LABELS: dict[str, str] = {
     EventType.TRANSITION: "运行状态从 {from_phase} 变为 {to_phase}",
     EventType.RUN_DONE: "运行结束：{stop_reason}",
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
+    EventType.RUN_CONTINUED: "运行从暂停位置继续：{resumed_at_phase}",
     EventType.RUN_FAILED: "运行失败：{stop_reason}",
     EventType.DECISION_REQUESTED: "提出等待回答的决定（{kind}）：{question}",
     EventType.DECISION_ANSWERED: "回答了一个决定（{kind}）",

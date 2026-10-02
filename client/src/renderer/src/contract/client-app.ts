@@ -6,8 +6,9 @@
 
 import type { Capabilities, DecisionList, EventObject } from "../api/generated/types.gen";
 import { connect, interfaceFor, type Interface } from "./connection";
-import { EventStreamClient } from "./event-stream";
 import type { ConnectionSettings } from "./settings";
+import { EventStreamClient } from "./event-stream";
+import { callCommand, type CommandOutcome } from "./invoke";
 import { ViewSync } from "./view-sync";
 
 export type ClientState =
@@ -49,6 +50,15 @@ export class ClientApp {
 
   get currentAddress(): string {
     return this.iface?.baseUrl ?? "";
+  }
+
+  // 提交一条命令：接受时返回受理回执，409 拒绝时返回 Rejected 供界面显示原因；
+  // 网络错误与非预期状态码直接抛出，不静默吞掉（fast-fail）
+  async command(name: string, body: Record<string, unknown>): Promise<CommandOutcome> {
+    if (!this.iface) {
+      throw new Error("尚未连接控制主机");
+    }
+    return callCommand(this.iface.client, name, body);
   }
 
   // 连接一个部署：读取能力清单并核对接口版本

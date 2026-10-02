@@ -73,8 +73,13 @@ async function stopProcess(child: ChildProcessWithoutNullStreams): Promise<void>
   await exited;
 }
 
-// 启动 Electron 客户端：主进程读取测试环境变量（用户数据目录、后端地址与窗口尺寸），预置连接设置后启动
-export async function startClient(backend: Backend, size: { width: number; height: number }): Promise<ClientApp> {
+// 启动 Electron 客户端：主进程读取测试环境变量（用户数据目录、后端地址与窗口尺寸），预置连接设置后启动。
+// scheme 切换页面的配色（浅色与深色），在窗口内用 emulateMedia 生效
+export async function startClient(
+  backend: Backend,
+  size: { width: number; height: number },
+  options: { colorScheme?: "light" | "dark" } = {},
+): Promise<ClientApp> {
   const userData = mkdtempSync(join(tmpdir(), "yudao-client-"));
   const app = await electron.launch({
     args: [join(repoRoot, "client", "out", "main", "index.js")],
@@ -89,6 +94,9 @@ export async function startClient(backend: Backend, size: { width: number; heigh
   });
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
+  if (options.colorScheme) {
+    await page.emulateMedia({ colorScheme: options.colorScheme });
+  }
   return {
     app,
     page,

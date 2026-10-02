@@ -23,7 +23,7 @@
   - 状态：设计已确认（2026-09-29 用户确认第 11 节的决定：机器流、本机进程在进程内调用），2026-09-30 按 ADR-0022 改为代码在执行位置上直接运行；远程机器的真实验收在 Orange Pi AIpro 开发板上进行，开发板已经到位，执行代理的安装包由控制主机提供（2026-09-30，第 1.1、5.3.2 节）；#110 已完成，其余未实施。工单：父工单 #120（#110、#128 至 #130、#140 至 #145，界面 #117），属于里程碑 M3。
   - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)、[0022](../adr/0022-run-directly-without-containers.md)。调研：[执行环境服务调研](../research/execution-environment.md)。
 - [浏览器与 computer use](browser-and-computer-use.md)
-  - 内容：试用会话与执行位置上的程序；交付说明中的启动方式；Playwright MCP 浏览器工具；computer use（屏幕从哪里来待专题 2 讨论）；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
+  - 内容：试用会话与执行位置上的程序；交付说明中的启动方式；Playwright MCP 浏览器工具；computer use（控制主机的交互桌面、真实输入、用户同意与独占，ADR-0026）；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
   - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。工单：父工单 #123（#147 至 #155），属于里程碑 M4。
   - 需求：[D34](../requirements/browser-and-computer-use.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
 - [网络取回与 MCP 工具](network-and-mcp.md)
