@@ -213,6 +213,8 @@ button.primary:disabled {
 .note {
   color: var(--muted);
   font-size: 12px;
+  /* 说明里会出现很长的标识与路径（事项、运行、请求标识、页面路径），窄屏上按字符换行 */
+  overflow-wrap: anywhere;
 }
 
 .gate {
@@ -247,12 +249,378 @@ button.primary:disabled {
     transform: translateX(0);
   }
 
-  .app.drawer-open::after {
-    content: "";
+  /* 抽屉打开时的遮罩：点它关闭抽屉（顶栏与左侧栏都在遮罩之上，点得到） */
+  .drawer-scrim {
     position: fixed;
     inset: 0;
-    background: rgb(0 0 0 / 35%);
     z-index: 5;
+    border: 0;
+    padding: 0;
+    background: rgb(0 0 0 / 35%);
+  }
+}
+
+/* 项目页面（原型 v8 设计说明第 3.1 至 3.3、5.1、7 节，工单 #80）：概览、部门工作间、资料、观测与设置。
+   宽表在窄屏时由 .table-scroll 自己横向滚动，页面本身不出现横向滚动条。 */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 960px;
+}
+
+.page .card {
+  max-width: none;
+}
+
+.section-head h2 {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.section-head .note {
+  margin: 0 0 12px;
+}
+
+.line {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.line .term {
+  flex: 0 0 160px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.line .value {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.kv {
+  margin-bottom: 12px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tag.ok { color: var(--ok); border-color: currentColor; }
+.tag.warn { color: var(--warn); border-color: currentColor; }
+.tag.danger { color: var(--danger); border-color: currentColor; }
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.tabs button[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* 宽表：容器自己横向滚动，窄屏时页面不随之变宽 */
+.table-scroll {
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.table-scroll table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 480px;
+  font-size: 13px;
+}
+
+.table-scroll caption {
+  text-align: left;
+  color: var(--muted);
+  font-size: 12px;
+  padding-bottom: 4px;
+}
+
+.table-scroll th,
+.table-scroll td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table-scroll th {
+  background: color-mix(in srgb, var(--border) 35%, transparent);
+  font-weight: 600;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.sub-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.sub-card h3 {
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.form button {
+  align-self: flex-start;
+}
+
+.field textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.field span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.field.picker {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.raw {
+  background: color-mix(in srgb, var(--border) 30%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: min(50vh, 24rem);
+  overflow: auto;
+}
+
+.prompt-text {
+  max-height: 16rem;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+button.link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  font: inherit;
+}
+
+/* 事项看板：宽屏多列，窄屏单列 */
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.board-col h3 {
+  font-size: 13px;
+  margin: 0 0 6px;
+  color: var(--muted);
+}
+
+.board-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+.board-card .card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+.board-card .card-note {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.filters .field {
+  margin-bottom: 0;
+  min-width: 140px;
+}
+
+.message-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.message-list > li {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+  overflow-wrap: anywhere;
+}
+
+.input-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 弹窗：详情与表单 */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.modal-body {
+  padding: 16px;
+  overflow: auto;
+}
+
+/* 顶栏的事项选择框与项目菜单 */
+.project-menu-wrap {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.dropdown button {
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font: inherit;
+}
+
+.dropdown button:hover {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+@media (max-width: 700px) {
+  .line {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .line .term {
+    flex: none;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
   }
 }
 

@@ -61,7 +61,11 @@ async function startDevClient(
 function watchErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(m.text());
+    // 开发构建的客户端连不上后端时，浏览器自己对失败的请求记一条控制台消息（跨源策略、ERR_FAILED）；
+    // 那不是图鉴或像素画面自己的错误，这里只记录应用自身的错误与未捕获的异常
+    const text = m.text();
+    const connectionNoise = text.includes("blocked by CORS policy") || text.includes("net::ERR_FAILED");
+    if (m.type() === "error" && !connectionNoise) errors.push(text);
   });
   page.on("pageerror", (e) => errors.push(e.message));
   return errors;

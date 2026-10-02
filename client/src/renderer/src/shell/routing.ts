@@ -7,6 +7,8 @@ export type Route = {
   workItemId: string | null;
   department: string | null;
   systemPage: string | null;
+  attemptId: string | null;
+  runId: string | null;
 };
 
 const SYSTEM_PAGES: Record<string, string> = {
@@ -21,7 +23,7 @@ export function parseRoute(hash: string): Route {
   const [pathPart, queryPart] = text.split("?", 2);
   const query = new URLSearchParams(queryPart ?? "");
   const segments = pathPart.split("/").filter(Boolean);
-  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, systemPage: null };
+  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, systemPage: null, attemptId: null, runId: null };
   if (segments.length === 0 || segments[0] === "home") {
     route.name = "home";
     return route;
@@ -54,7 +56,10 @@ export function parseRoute(hash: string): Route {
       return route;
     }
     if (segments[2] === "observe" && segments[3]) {
+      // 观测详情：#/p/{项目}/observe/{请求标识}；run 标识写在参数 r 中，刷新与后退以后仍能直接读取
       route.name = "observe-detail";
+      route.attemptId = segments[3];
+      route.runId = query.get("r");
       return route;
     }
     route.name = segments[2] ?? "overview";
@@ -73,6 +78,18 @@ export const paths = {
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
   materials: (projectId: string) => `#/p/${projectId}/materials`,
   observe: (projectId: string) => `#/p/${projectId}/observe`,
+  // 请求详情：事项范围（w）与 run 标识（r）都写在参数里，刷新、后退与直接输入路径都能读回
+  observeDetail: (projectId: string, attemptId: string, options: { workItem?: string | null; runId?: string | null } = {}) => {
+    const query = new URLSearchParams();
+    if (options.workItem) {
+      query.set("w", options.workItem);
+    }
+    if (options.runId) {
+      query.set("r", options.runId);
+    }
+    const suffix = query.toString();
+    return `#/p/${projectId}/observe/${attemptId}${suffix ? `?${suffix}` : ""}`;
+  },
   settings: (projectId: string) => `#/p/${projectId}/settings`,
   sys: (page: string) => `#/sys/${page}`,
 };

@@ -6,9 +6,9 @@
 
 import type { Capabilities, DecisionList, EventObject } from "../api/generated/types.gen";
 import { connect, interfaceFor, type Interface } from "./connection";
-import { EventStreamClient } from "./event-stream";
-import type { CommandOutcome } from "./invoke";
 import type { ConnectionSettings } from "./settings";
+import { EventStreamClient } from "./event-stream";
+import { callCommand, type CommandOutcome } from "./invoke";
 import { ViewSync } from "./view-sync";
 
 export type ClientState =
@@ -26,7 +26,6 @@ export type ClientListeners = {
 
 // 把查询与命令交给生成的应用层接口；外壳提供它们，以便单元测试注入替身
 export type QueryRunner = <T>(client: Interface["client"], name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
-export type CommandRunner = (client: Interface["client"], name: string, body: unknown) => Promise<CommandOutcome>;
 
 export class ClientApp {
   private iface: Interface | null = null;
@@ -40,7 +39,6 @@ export class ClientApp {
 
   constructor(
     private readonly runQuery: QueryRunner,
-    private readonly submitCommand: CommandRunner,
     private readonly listeners: ClientListeners,
   ) {}
 
@@ -54,6 +52,15 @@ export class ClientApp {
 
   get currentAddress(): string {
     return this.iface?.baseUrl ?? "";
+  }
+
+  // 提交一条命令：接受时返回受理回执，409 拒绝时返回 Rejected 供界面显示原因；
+  // 网络错误与非预期状态码直接抛出，不静默吞掉（fast-fail）
+  async command(name: string, body: Record<string, unknown>): Promise<CommandOutcome> {
+    if (!this.iface) {
+      throw new Error("尚未连接控制主机");
+    }
+    return callCommand(this.iface.client, name, body);
   }
 
   // 连接一个部署：读取能力清单并核对接口版本
@@ -88,14 +95,6 @@ export class ClientApp {
       return Promise.reject(new Error("尚未连接"));
     }
     return this.runQuery<T>(this.iface.client, name, params);
-  }
-
-  // 提交一个命令：Accepted 与 Rejected 都原样交回，由页面显示结果；未连接时直接失败
-  async command(name: string, body: unknown): Promise<CommandOutcome> {
-    if (!this.iface) {
-      throw new Error("尚未连接");
-    }
-    return this.submitCommand(this.iface.client, name, body);
   }
 
   // 不按项目筛选的事件流：窗口关闭时也保持（设计说明第 5.7 节）

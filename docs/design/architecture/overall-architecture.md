@@ -212,7 +212,7 @@ sequenceDiagram
 | 登记的本地命令 | 本机或执行代理 | 登记表 | 3.2A |
 | 检查 | 检查副本 | 质检角色 | 已有 |
 | 网络取回、登记的 MCP 工具 | 控制主机，与 run 的执行位置无关（[ADR-0025](../../adr/0025-network-and-mcp-run-on-control-host.md)） | 项目登记的来源与工具；登记之外经一次性批准（用户决定） | 3.2B |
-| 浏览器（Playwright MCP）与 computer use | run 的执行位置（computer use 的屏幕待专题 2 讨论，见[阶段需求概览](../../requirements/stage-requirements-overview.md)第 6 节） | 角色的工具许可；按普通浏览器 MCP 的默认做法运行，不另加限制；computer use 只提供给模型能看图的部门；质检只按交付说明中的启动方式启动交付的软件（[D34](../../requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](../browser-and-computer-use.md)） | 3.2D |
+| 浏览器（Playwright MCP）与 computer use | run 的执行位置；computer use 只在控制主机的交互桌面上（[ADR-0026](../../adr/0026-desktop-trials-on-control-host-desktop.md)） | 角色的工具许可；按普通浏览器 MCP 的默认做法运行，不另加限制；computer use 只提供给模型能看图的部门；质检只按交付说明中的启动方式启动交付的软件（[D34](../../requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](../browser-and-computer-use.md)） | 3.2D |
 | 外部动作（部署、回滚、重启、读取运行数据） | 登记的运行环境上的执行代理 | 常设授权清单以内由运维直接执行；清单以外由用户决定 | Stage 4 |
 | 外包 agent 的文件与命令请求 | 外包 agent 的进程 | 与自有角色相同 | D31 |
 
@@ -260,7 +260,7 @@ sequenceDiagram
 | 3.2C 执行环境服务 | 3、4、6 | 远程执行代理这种新实现，经过 HTTP 加 JSON 的合同，本机进程在进程内调用；机器流；项目的执行位置；远程动作按心跳判断存活 |
 | 3.4A 并行 | 1、2 | 流程编排调度执行槽位；同一项目的事项按优先级排队，因升级重新开始的事项排在最前面 |
 | 3.2B 网络与 MCP | 6、8 | 新的动作类别，固定在控制主机；登记就是常设授权，登记之外经一次性批准（用户决定）；MCP 客户端模块放在执行代码包中，3.2D 共用 |
-| 3.2D 浏览器与 computer use | 6 | 使用 3.2B 的 MCP 客户端模块接入 Playwright MCP，不经项目登记；computer use 的屏幕待专题 2 讨论；质检部门的建议能力是图像输入，不满足时只提醒（模型管理设计说明第 5.6 节） |
+| 3.2D 浏览器与 computer use | 6 | 使用 3.2B 的 MCP 客户端模块接入 Playwright MCP，不经项目登记；computer use 在控制主机的交互桌面上用真实输入进行，开始前经用户同意（ADR-0026）；质检部门的建议能力是图像输入，不满足时只提醒（模型管理设计说明第 5.6 节） |
 | D24 模型管理（#83） | 5、7 | Provider 的目录与解析；推理档位；部门的建议能力只用于提醒；角色层设置 |
 | D25 语义系统（#22） | 1、9、10 | 知识层投影；P 与 U；证据核对判定点；只读观察者（#98）就是应用层的查询与事件流加提案 |
 | JEV 接入 | 4 | 判定点合同；Provider 的 systemone 协议 |

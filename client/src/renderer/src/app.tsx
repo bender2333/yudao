@@ -1,11 +1,12 @@
-// 渲染进程的应用：连接状态、路由、外壳与页面（原型 v8 设计说明第 3 节，工单 #79）。
-// 本工单建立外壳、连接设置、接口版本核对、事件流同步与视图同步；首页页面（#175）、
-// 项目页面（#80）与像素画面（#176 至 #180）由各自的工单实现，这里只留出它们的位置。
+// 渲染进程的应用：连接状态、路由、外壳与页面（原型 v8 设计说明第 3 节，工单 #79 与 #80）。
+// #79 建立外壳、连接设置、接口版本核对、事件流同步与视图同步；#80 实现项目页面
+// （左侧栏、顶栏与项目标签、概览、部门工作间、资料、观测、设置）与页面分派。
+// 首页页面（#175）与像素画面（#176 至 #180）由各自的工单实现，这里只留出它们的位置。
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, ProjectList, ProjectRow, SystemStatus } from "./api/generated/types.gen";
 import { ClientApp, type ClientState } from "./contract/client-app";
-import { callCommand, callQuery } from "./contract/invoke";
+import { callQuery } from "./contract/invoke";
 import type { ConnectionSettings } from "./contract/settings";
 import { defaultSettings } from "./contract/settings";
 import { Sidebar } from "./shell/sidebar";
@@ -14,6 +15,11 @@ import { parseRoute, paths, type Route } from "./shell/routing";
 import { ConnectPage, UpdatePage } from "./views/connect";
 import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
+import { DepartmentPage } from "./views/project/department";
+import { MaterialsPage } from "./views/project/materials";
+import { ObserveDetailPage, ObservePage } from "./views/project/observe";
+import { OverviewPage } from "./views/project/overview";
+import { SettingsPage } from "./views/project/settings";
 
 // 图鉴页只在开发时用到；用动态导入把它挡在正式包之外
 const LazyGallery = lazy(async () => {
@@ -35,7 +41,7 @@ export function App() {
 
   // 客户端应用：查询经生成的调用发出，事件到达时更新状态与待决定数量
   const app = useMemo(() => {
-    const instance = new ClientApp(callQuery, callCommand, {
+    const instance = new ClientApp(callQuery, {
       onState: (next) => setState(next),
       onPendingDecisions: (count) => {
         setPending(count);
@@ -52,8 +58,15 @@ export function App() {
     return instance;
   }, []);
 
+  // 图鉴只在开发时可用（第 133 行那条分支）：直接开 #/gallery 看画法，不必先连上后端，
+  // 也不在控制台留下一次注定失败的连接
+  const galleryOnly = import.meta.env.DEV && route.name === "gallery";
+
   // 启动：读取保存的连接设置并连接
   useEffect(() => {
+    if (galleryOnly) {
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const stored = (await window.yudao?.getSettings()) ?? defaultSettings();
@@ -67,7 +80,7 @@ export function App() {
       cancelled = true;
       app.close();
     };
-  }, [app]);
+  }, [app, galleryOnly]);
 
   // 路由：监听 hash 变化
   useEffect(() => {
@@ -167,9 +180,11 @@ export function App() {
 
   const capabilities = state.capabilities;
   const tabs = buildTabs(route, capabilities);
+  const project = projects.find((item) => item.project_id === route.projectId) ?? null;
   return (
     <div className={`app${drawerOpen ? " drawer-open" : ""}`}>
       <Sidebar
+        app={app}
         capabilities={capabilities}
         projects={projects}
         activeProjectId={route.projectId}
@@ -177,13 +192,21 @@ export function App() {
         pendingByProject={pendingByProject}
         onNavigate={navigate}
       />
+      {drawerOpen ? (
+        <button type="button" className="drawer-scrim" aria-label="关闭左侧栏" onClick={() => setDrawerOpen(false)} />
+      ) : null}
       <div className="main">
         <Topbar
+          app={app}
+          projectId={route.projectId}
+          workItemId={route.workItemId}
+          project={project}
           path={pathLabel(route, projects)}
           pending={pending}
           streamConnected={state.streamConnected}
           onPendingClick={() => navigate(paths.home())}
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
+          onNavigate={navigate}
         />
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="content">
@@ -195,12 +218,38 @@ export function App() {
               onBack={() => navigate(paths.home())}
             />
           ) : (
-            <PlaceholderPage route={route} systemStatus={systemStatus} />
+            <ProjectRouter app={app} route={route} systemStatus={systemStatus} />
           )}
         </main>
       </div>
     </div>
   );
+}
+
+// 项目页面（原型 v8 设计说明第 3.3 节的路径，工单 #80）：按路径分派到具体页面。
+// 概览、部门工作间、资料、观测与设置由本工单实现；恢复页（3.1）与系统页由所属工单实现，
+// 未实现时显示占位，写明由哪个工单填入。
+function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null }) {
+  const { route } = props;
+  if (route.projectId === null) {
+    return <PlaceholderPage route={route} systemStatus={props.systemStatus} />;
+  }
+  switch (route.name) {
+    case "overview":
+      return <OverviewPage app={props.app} route={route} />;
+    case "dept":
+      return <DepartmentPage app={props.app} route={route} />;
+    case "materials":
+      return <MaterialsPage app={props.app} route={route} />;
+    case "observe":
+      return <ObservePage app={props.app} route={route} />;
+    case "observe-detail":
+      return <ObserveDetailPage app={props.app} route={route} />;
+    case "settings":
+      return <SettingsPage app={props.app} route={route} />;
+    default:
+      return <PlaceholderPage route={route} systemStatus={props.systemStatus} />;
+  }
 }
 
 // 项目标签（原型 v8 设计说明第 3.2 节）：按能力清单显示，缺少查询的标签不出现

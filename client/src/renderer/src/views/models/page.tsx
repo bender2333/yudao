@@ -42,7 +42,7 @@ import {
 
 export type ModelManagementPageProps = {
   views: ViewSync | null;
-  command: (name: string, body: unknown) => Promise<CommandOutcome>;
+  command: (name: string, body: Record<string, unknown>) => Promise<CommandOutcome>;
   subscribeEvents: (listener: (event: EventObject) => void) => () => void;
   onBack: () => void;
 };
@@ -627,21 +627,17 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   );
 }
 
-// 一条命令的结果：200 是 Accepted，409 是 Rejected；拒绝时把原因与当前版本一起显示
+// 一条命令的结果：接受时 ok，拒绝时按 Rejected 的原因与当前版本显示
 function interpret(outcome: CommandOutcome): SubmitResult {
-  const error = outcome.error;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = error.message;
-    const current = "current_version" in error ? error.current_version : null;
-    return {
-      ok: false,
-      message: typeof current === "number" ? `${String(message)}（当前版本 ${current}）` : String(message),
-    };
+  if (outcome.ok) {
+    return { ok: true, message: "" };
   }
-  if (error) {
-    return { ok: false, message: String(error) };
-  }
-  return { ok: true, message: "" };
+  const rejection = outcome.rejection;
+  const current = rejection.current_version;
+  return {
+    ok: false,
+    message: current === null || current === undefined ? rejection.message : `${rejection.message}（当前版本 ${current}）`,
+  };
 }
 
 function testKeyOf(payload: CatalogTestFinishedPayload): string {
