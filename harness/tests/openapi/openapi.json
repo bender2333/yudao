@@ -8075,6 +8075,18 @@
             "type": "integer",
             "title": "In Progress Count"
           },
+          "waiting_count": {
+            "type": "integer",
+            "title": "Waiting Count"
+          },
+          "decisions_waiting": {
+            "type": "integer",
+            "title": "Decisions Waiting"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "title": "Last Activity At"
+          },
           "active_work_item_id": {
             "anyOf": [
               {
@@ -8135,6 +8147,9 @@
           "version",
           "work_item_count",
           "in_progress_count",
+          "waiting_count",
+          "decisions_waiting",
+          "last_activity_at",
           "active_work_item_id",
           "current_adoption",
           "onboarding_status",

@@ -4,7 +4,7 @@
 // 首页页面（#175）与像素画面（#176 至 #180）由各自的工单实现，这里只留出它们的位置。
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Capabilities, DecisionList, ProjectList, ProjectRow, SystemStatus } from "./api/generated/types.gen";
+import type { Capabilities, DecisionList, DecisionView, ProjectList, ProjectRow, SystemStatus } from "./api/generated/types.gen";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
 import type { ConnectionSettings } from "./contract/settings";
@@ -13,6 +13,7 @@ import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { parseRoute, paths, type Route } from "./shell/routing";
 import { ConnectPage, UpdatePage } from "./views/connect";
+import { HomePage } from "./views/home/page";
 import { SettingsPage as ClientSettingsPage } from "./views/settings";
 import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
@@ -157,6 +158,26 @@ export function App() {
       views.close("shell.status");
     };
   }, [app, connected]);
+
+  // 项目标签栏右侧的「待你决定」（原型 v8 设计说明第 3.2 节）：本项目的等待回答的决定请求；
+  // 与首页共用一份数据来源（decisions.list），只是筛选到当前项目
+  const [projectDecisions, setProjectDecisions] = useState<DecisionView[]>([]);
+  useEffect(() => {
+    const views = app.viewSync;
+    if (!connected || !views || route.projectId === null) {
+      setProjectDecisions([]);
+      return;
+    }
+    const viewId = "shell.project.decisions";
+    void views.open<DecisionList>(
+      viewId,
+      { query: "decisions.list", params: { project_id: route.projectId, status: ["open"] } },
+      (data) => setProjectDecisions(data.decisions),
+    );
+    return () => {
+      views.close(viewId);
+    };
+  }, [app, connected, route.projectId]);
 
   const navigate = useCallback((hash: string) => {
     window.location.hash = hash;
@@ -339,6 +360,7 @@ export function App() {
           project={project}
           path={pathLabel(route, projects)}
           pending={pending}
+          projectDecisions={projectDecisions}
           streamConnected={state.streamConnected}
           onPendingClick={() => navigate(paths.home())}
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
@@ -346,7 +368,9 @@ export function App() {
         />
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="content">
-          {route.name === "client-settings" ? (
+          {route.name === "home" ? (
+            <HomePage app={app} onNavigate={navigate} />
+          ) : route.name === "client-settings" ? (
             <ClientSettingsPage
               settings={settings ?? defaultSettings()}
               loginAtStartup={loginAtStartup}
