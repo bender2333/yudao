@@ -41,11 +41,14 @@ from .selection import (
     SelectionResolution,
     merge_selection,
 )
+from . import capabilities, suggested
 from .store import ModelDefinition, ProviderDefinition, ProviderStore, SUPPORTED_PROTOCOLS
 from .tls import ssl_context
 
 __all__ = [
     "ssl_context",
+    "capabilities",
+    "suggested",
     "ProviderFacade",
     "ProviderStore",
     "ProviderDefinition",

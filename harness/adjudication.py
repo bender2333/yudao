@@ -10,7 +10,7 @@ from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .collaboration import request_basis, tool_error
 from .contracts import current_contract_hash, current_plan_hash, path_in_scope
 from .models import TERMINAL_PHASES, Event, RunProjection
-from .tools import has_tool, tool_action, tools_for, usable_when_guidance_only
+from .tools import has_tool, offers_with_input, tool_action, tools_for, usable_when_guidance_only
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 
 _STALE_BASIS = ("The input, contract, plan, or current work changed after this activation began; "
@@ -63,12 +63,15 @@ class ToolPermission:
         return not self.stopped and self.reason is None
 
 
-def offered_tools(projection: RunProjection, department: str, *, guidance_only: bool = False) -> list[str]:
-    # 请求中提供给模型的工具：部门的工具，只能回应指导时限于回应指导的范围，再去掉当前工作不允许的提交
+def offered_tools(projection: RunProjection, department: str, *, guidance_only: bool = False,
+                  input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
+    # 请求中提供给模型的工具：部门的工具，只能回应指导时限于回应指导的范围，再去掉当前工作不允许的提交，
+    # 最后按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具（设计说明第 5.6 节）
     available = tools_for(department, projection.kind)
     if guidance_only:
         available = [name for name in available if usable_when_guidance_only(name)]
-    return [name for name in available if tool_error(projection, department, name, {}) is None]
+    return [name for name in offers_with_input(available, input_modalities)
+            if tool_error(projection, department, name, {}) is None]
 
 
 def facts_query(call: dict[str, Any]) -> FactsQuery:

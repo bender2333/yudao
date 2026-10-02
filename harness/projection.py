@@ -412,7 +412,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
                 for key in ("provider_config_id", "model_id", "provider_name", "protocol", "base_url",
                             "requested_provider", "requested_protocol", "requested_model",
                             "credential_ref", "credential_version", "context_window",
-                            "configured_max_output_tokens", "accepts_required_tool_call", "selection_source",
+                            "configured_max_output_tokens", "accepts_required_tool_call", "input_modalities",
+                            "selection_source",
                             "reasoning_levels", "default_reasoning_level", "reasoning_mode",
                             "requested_tier", "sent_tier")
             }
@@ -450,6 +451,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "max_output_tokens": payload.get("max_output_tokens"),
             "configured_max_output_tokens": payload.get("configured_max_output_tokens"),
             "accepts_required_tool_call": payload.get("accepts_required_tool_call"),
+            "input_modalities": payload.get("input_modalities"),
             "actual_provider": None,
             "actual_model": None,
             "context_digest": event.context_digest,

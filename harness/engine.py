@@ -611,7 +611,8 @@ class StepDriver:
                 limits = model_limits(target["context_window"], target["configured_max_output_tokens"])
                 snapshot_hash = self._environment.query(FactsQuery(tree=True)).tree.digest
                 pinned = self._assembly.pin(projection, self._frame, limits, step_id=step_id,
-                                            events=transaction.events(), snapshot_hash=snapshot_hash)
+                                            events=transaction.events(), snapshot_hash=snapshot_hash,
+                                            input_modalities=tuple(target.get("input_modalities") or ()))
             except UnrepresentableWorkspace as exc:
                 # 请求装配时发现工作区有公开树无法表示的条目：以 workspace_unrepresentable 暂停
                 return _Unassembled("workspace_unrepresentable", exc)

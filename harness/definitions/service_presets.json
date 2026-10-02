@@ -1,5 +1,5 @@
 {
-  "revision": "2026-09-26.1",
+  "revision": "2026-10-02.1",
   "source": "https://opencode.ai/docs/go/ 与 https://opencode.ai/zen/go/v1/models（2026-09-19 采集）",
   "presets": [
     {
@@ -15,6 +15,7 @@
       "docs_url": "https://opencode.ai/docs/go/",
       "header_profile": "opencode-go",
       "source": "https://opencode.ai/docs/go/#endpoints（2026-09-19）",
+      "models_dev_id": "opencode-go",
       "notes": "订阅套餐使用 API Key；请求需带真实客户端 User-Agent 与 x-opencode-session。三种协议的请求基址都是同一个。"
     }
   ]

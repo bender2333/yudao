@@ -311,6 +311,10 @@ class DepartmentSettingsSave(CommandRequest):
     requested_tier: str | None = None
     department_prompt: Text | None = None
 
+class DepartmentSettingsSaveRefs(Contract):
+    # 保存以后该部门模型不具备建议能力时的提醒（设计说明第 5.6 节「保存时」）；具备或没有写入模型时为空
+    reminders: list[str] = []
+
 
 async def _save_department_settings(application: "Application", command: Command,
                                     request: DepartmentSettingsSave) -> None:
@@ -322,12 +326,15 @@ async def _save_department_settings(application: "Application", command: Command
         provider_id=request.provider_id, model_id=request.model_id,
         requested_tier=request.requested_tier, department_prompt=request.department_prompt,
     )
+    # 写入的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）：照常保存，提醒随接受结果返回
+    notes = (application.system.facade.department_setting_reminders(request.department, project_selection)
+             if project_selection.writes_model() else [])
     try:
         # 保存时校验所选定义已准入、请求档位属于保存时生效模型的支持档位（Provider 模块的检查）
         application.system.facade.validate_department_setting(request.department, project_selection)
         application.system.projects.configure_department_settings(
             request.project_id, request.department, project_selection,
-            base_version=request.base_version, command=command)
+            base_version=request.base_version, command=command, reminders=notes)
     except ProjectNotFoundError as missing:
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     except ProjectArchivedError as archived:
@@ -438,8 +445,11 @@ GUIDANCE_SEND = CommandDefinition(
     name="guidance.send", request=GuidanceSend, refs=NoRefs, handle=_send_guidance, derive_refs=_no_refs,
     reasons=("not_found", "run_terminal", "not_allowed"))
 DEPARTMENT_SETTINGS_SAVE = CommandDefinition(
-    name="department_settings.save", request=DepartmentSettingsSave, refs=NoRefs, handle=_save_department_settings,
-    derive_refs=_no_refs, reasons=("not_found", "stale_base", "project_archived", "not_allowed"))
+    name="department_settings.save", request=DepartmentSettingsSave, refs=DepartmentSettingsSaveRefs,
+    handle=_save_department_settings,
+    derive_refs=lambda events: DepartmentSettingsSaveRefs(
+        reminders=list(events[-1].payload.get("reminders") or ())),
+    reasons=("not_found", "stale_base", "project_archived", "not_allowed"))
 COMMAND_REGISTRATION_SAVE = CommandDefinition(
     name="command_registration.save", request=CommandRegistrationSave, refs=NoRefs,
     handle=_save_command_registration, derive_refs=_no_refs,

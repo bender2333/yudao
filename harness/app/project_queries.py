@@ -570,6 +570,15 @@ class DepartmentWorkspaceResult(Contract):
     reminders: list[str]
 
 
+def _effective_model_id(application: Application, state: Any, department: str) -> str | None:
+    # 本项目某部门的生效模型（设计说明第 5.3 节）：项目部门设置写入了模型时用它，否则用部门默认
+    project_model = state.department_settings[department].model_id
+    if project_model:
+        return project_model
+    binding = application.system.facade.providers_view()["bindings"].get(department) or {}
+    return binding.get("model_id")
+
+
 def _department_workspace(application: Application, request: DepartmentWorkspace
                           ) -> Snapshot[DepartmentWorkspaceResult]:
     store = application.system.store
@@ -614,7 +623,9 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             guidance=guidance, messages=messages, context=context,
             last_call=_last_call(run, request.department),
             provider=None if run is None else run.provider_bindings.get(request.department),
-            reminders=[],
+            # 当前生效模型不具备本部门建议能力时的提醒（设计说明第 5.6 节「部门工作间」）
+            reminders=application.system.facade.model_reminders(
+                _effective_model_id(application, state, request.department), request.department),
         ),
     )
 
@@ -1215,27 +1226,31 @@ class ProjectSettingsResult(Contract):
     departments: dict[str, DepartmentSetting]
     commands: dict[str, CommandSetting]
     source_directories: dict[str, SourceDirectorySetting]
+    # 各部门生效模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）；
+    # 生效模型按第 5.3 节解析，包括跟随部门默认的情况
+    department_reminders: dict[str, list[str]]
 
 
 def _project_settings(application: Application, request: ProjectSettings) -> Snapshot[ProjectSettingsResult]:
     store = application.system.store
     state = _project(application, request.project_id, include_history=False)
+    settings = {
+        department: DepartmentSetting(
+            department=department, version=state.department_settings[department].version,
+            text=state.department_settings[department].text,
+            source=state.department_settings[department].source,
+            provider_id=state.department_settings[department].provider_id,
+            model_id=state.department_settings[department].model_id,
+            requested_tier=state.department_settings[department].requested_tier,
+            prompt_configured=state.department_settings[department].configured_prompt)
+        for department in DEPARTMENTS
+    }
     return Snapshot[ProjectSettingsResult](
         position=store.end_position(),
         data=ProjectSettingsResult(
             project_id=state.project_id, name=state.name, goal=state.goal, version=state.stream_version,
             pinned=state.pinned, archived=state.archived,
-            departments={
-                department: DepartmentSetting(
-                    department=department, version=state.department_settings[department].version,
-                    text=state.department_settings[department].text,
-                    source=state.department_settings[department].source,
-                    provider_id=state.department_settings[department].provider_id,
-                    model_id=state.department_settings[department].model_id,
-                    requested_tier=state.department_settings[department].requested_tier,
-                    prompt_configured=state.department_settings[department].configured_prompt)
-                for department in DEPARTMENTS
-            },
+            departments=settings,
             commands={
                 name: CommandSetting(name=value.name, version=value.version, argv=list(value.argv),
                                      args=list(value.args), timeout_sec=value.timeout_sec,
@@ -1246,6 +1261,9 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
                 name: SourceDirectorySetting(name=value.name, path=value.path, version=value.version)
                 for name, value in state.source_directories.items()
             },
+            # 各部门生效模型（跟随部门默认时取部门默认）的建议能力提醒（设计说明第 5.6 节）
+            department_reminders=application.system.facade.project_department_reminders(
+                {department: {"model_id": setting.model_id} for department, setting in settings.items()}),
         ),
     )
 

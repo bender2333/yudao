@@ -176,6 +176,8 @@ class CallTarget(Payload):
     configured_max_output_tokens: int | None
     # 模型访问定义声明的是否接受要求调用工具；模型尚未解析时为空
     accepts_required_tool_call: bool | None
+    # 模型访问定义声明的输入方式（设计说明第 4.3 节）；模型尚未解析时为空列表
+    input_modalities: list[str]
     selection_source: str | None
     requested_tier: str | None
     sent_tier: str | None
@@ -1103,6 +1105,9 @@ class DepartmentSettingsConfiguredPayload(Payload):
     requested_tier: str | None = None
     department_prompt: str | None = None
     department_prompt_ref: ArtifactRef | None = None
+    # 这次保存写入的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）；
+    # 没有写入模型或模型具备建议能力时为空
+    reminders: list[str] = []
 
 
 class CommandConfiguredPayload(Payload):
@@ -1141,6 +1146,8 @@ class CatalogRevisedPayload(Payload):
     operation: Literal["save_connection", "delete_connection", "save_document", "department_defaults",
                        "reload", "startup"]
     provider_id: str | None
+    # 部门默认保存以后各部门的建议能力提醒（设计说明第 5.6 节）；其他操作为空
+    reminders: list[str] = []
 
 
 class CatalogCandidatesCollectedPayload(Payload):
@@ -1150,7 +1157,8 @@ class CatalogCandidatesCollectedPayload(Payload):
     status: Literal["ok", "unknown"]
     source_url: str
     fetched_at: str
-    # 候选逐条带上游模型 ID；上游列表返回窗口与输出上限时带这两项，其余候选只有上游模型 ID
+    # 候选逐条带上游模型 ID，以及预填值与来源（设计说明第 4.3 节）：窗口与输出上限先取上游模型列表、
+    # 其次取模型能力表；输入方式取能力表；每个预填值带来源（models_url、capability_table 或 default）
     candidates: list[dict[str, Any]]
     candidate_ids: list[str]
     error: str | None
