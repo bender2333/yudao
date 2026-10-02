@@ -100,10 +100,10 @@ def test_no_config_start(tmp_path):
     assert status["available"] is False
     assert status["reason"] == "provider_config_missing"
 
-    # config_status: 路径已记录，reload 后 config_state 为 missing，reload_error 为空
+    # config_status: 路径已记录，reload 报告目录文件不存在，reload_error 为空
     cfg = facade.config_status()
     assert cfg["config_path"] == str(missing_config)
-    assert cfg["config_state"] in ("empty", "missing")
+    assert cfg["config_state"] in ("empty", "missing", "deleted")
     assert cfg["reload_error"] is None
 
 
@@ -338,7 +338,7 @@ def test_corrupt_external_edit(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_clear_withdraw(tmp_path):
-    """删除 providers.json -> reload config_state=missing，readiness 不可用；
+    """删除 providers.json -> reload config_state=deleted，目录与部门默认一起清空，readiness 不可用；
     重建有效空文档 -> reload 发布。"""
     config_path = tmp_path / "providers.json"
     facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
@@ -349,11 +349,12 @@ def test_clear_withdraw(tmp_path):
     facade.load_document(config_path)
     saved_rev = facade.revision
 
-    # 删除文件
+    # 删除文件：目录与部门默认一起清空，config_state 记为 deleted（设计说明第 4.7 节）
     config_path.unlink()
     result = facade.reload()
     assert result["ok"] is True  # 删除不是损坏，reload_error 为 None
-    assert facade.config_status()["config_state"] == "missing"
+    assert facade.config_status()["config_state"] == "deleted"
+    assert facade.get_bindings() == {} and facade.to_document()["models"] == []
     readiness = facade.describe_readiness()
     assert readiness["available"] is False
     assert readiness["reason"] == "provider_config_missing"
