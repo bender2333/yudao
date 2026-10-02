@@ -454,3 +454,4 @@ claude-opus-5-5 / 2026-10-02 11:06 / 专题 2：浏览器与 computer use 设计
 claude-opus-5-5 / 2026-10-02 11:06 / 模型管理设计说明第 5.3 节增加事项种类的工作说明，接入已有项目设计说明第 4.2 节相应修改，CONTEXT.md 新增术语，architecture-issues.md 为 #89 的一条写处理结论；decision.md 记两条 / 处理 #89 登记的部门 Prompt 与种类说明的冲突，用户采纳建议
 
 9router/ag/gemini-3.8-flash-high / 2026-10-02 13:50 / docs/architecture-issues.md 追加一条：#207 记录 `harness/tests/test_api.py` 的命令清单期望缺少 `catalog.model.remove`，该失败在 origin/main（e15b5d23）上就存在，与本工单改动无关 / 执行 #207 的模块层自测时发现并登记，交由 #90 或接口合同维护工单修
+claude-sonnet-5-5 / 2026-10-02 16:34 / docs/architecture-issues.md 追加 #207 登记的 test_api 命令清单失败的处理结论 / 该失败已由 #252 修复，按登记规则写处理行
