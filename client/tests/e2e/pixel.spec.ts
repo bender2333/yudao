@@ -169,3 +169,159 @@ test("正式的页面入口里没有图鉴：页签与侧栏都取不到它", as
     await server.close();
   }
 });
+
+// 决定板与世界里的决定卡片（工单 #179 验收标准 1）：把原型 checks/behaviors.js 第 217 至 283 行关于卡片与
+// 回答的检查改写过来，在真实浏览器里用给定的数据挂载楼层画面，直接驱动卡片与点击。板与飞行的检查由 #82
+// 的客户端测试覆盖，这里只覆盖卡片的点开、翻页、回答、说明必填、被拒显示与盖章收起。
+// 两种窗口尺寸各跑一遍，控制台错误为零（验收标准 4）。
+for (const size of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`世界里的决定卡片在 ${size.width}×${size.height} 下：点板子打开、点选项回答、需要说明不提交、被拒显示原因、盖章与翻页关闭`, async () => {
+    const server = await startRendererServer();
+    try {
+      const { app, page } = await startDevClient(server, size);
+      const errors = watchErrors(page);
+      try {
+        await page.goto(`${server.resolvedUrls?.local[0]}index.html#/gallery`);
+        await expect(page.locator(".gallery-page")).toBeVisible();
+
+      const result = await page.evaluate(async () => {
+        const { mount } = (window as unknown as {
+          __pixelFloorTest: { mount: (model: unknown, opts?: { answer?: (p: unknown) => unknown }) => Promise<{
+            view: { card(): { isOpen(): boolean; openId(): string | null }; destroy(): void };
+            hooks: {
+              decisions(): { board: { x: number; y: number; w: number; h: number }; card: { openId: string | null; message: string | null; stamp: { id: string; text: string } | null } };
+              openCard(id: string): void;
+              answer(option: string): Promise<void>;
+            };
+            setModel(model: unknown): void;
+            step(ms: number): void;
+            click(x: number, y: number): void;
+            answers: { decision_id: string; option: string; base_version: number; note: string }[];
+            destroy(): void;
+          }> };
+        }).__pixelFloorTest;
+        const out: Record<string, unknown> = {};
+        const role = (id: string, kind: string, name: string) => ({ id, kind, name, status: "idle", task: null });
+        const roles = {
+          product: [role("p-mgr", "manager", "产品部门经理")],
+          engineering: [role("e-mgr", "manager", "工程经理")],
+          quality: [role("q-mgr", "manager", "质检经理")],
+        };
+        const item = { work_item_id: "w1", kind: "request", sign: "测试事项", color_index: 0, status: "running", department: "engineering", round: 1, elapsed_sec: 100, time_limit_sec: 7200, version: 1, phase: null, started_at: null, pending_question: null, run_id: "r1", adoption_id: null, recovery_state: null };
+        const face = (id: string, over: Record<string, unknown> = {}) => Object.assign({
+          id, kind: "model_unavailable", version: 3, title: "模型引用无法使用", work_item_id: "w1", where: "项目 · 测试事项", waited: "已等待 1 分", blocks: "不挡住事项",
+          rows: [{ term: "部门", value: "工程" }], links: [],
+          options: [{ id: "go", label: "继续执行", kind: "primary" }, { id: "stop", label: "停止事项", kind: "danger" }],
+        }, over);
+        const model = (over: Record<string, unknown> = {}) => Object.assign({
+          items: [item], open_requests: [], shelves: { adopted: [] }, slots: { total: 3, used: 1 }, waiting_provider: [],
+          machines: null, ops: null, interrupted: false, roles, decisions: [],
+        }, over);
+        const tick = async () => {
+          const { promise, resolve } = Promise.withResolvers<void>();
+          setTimeout(resolve, 0);
+          await promise;
+        };
+
+        // 点板子打开卡片，点选项调用回答命令（带决定的版本）
+        let m = await mount(model({ decisions: [face("d1")] }));
+        m.step(200);
+        out.closedBefore = !m.view.card().isOpen();
+        const b = m.hooks.decisions().board;
+        m.click(b.x + b.w / 2, b.y + b.h / 2);
+        out.openedByBoard = m.view.card().isOpen() && m.view.card().openId() === "d1";
+        // 卡片打开以后画一帧，章的可点击区域才被收集
+        m.step(0);
+        m.click(110, 270);
+        await tick();
+        out.answerCalled = m.answers.length === 1 && m.answers[0].decision_id === "d1" && m.answers[0].option === "go" && m.answers[0].base_version === 3;
+        out.stamped = m.hooks.decisions().card.stamp;
+        m.step(1500);
+        out.closedAfterStamp = !m.view.card().isOpen();
+        m.destroy();
+
+        // 需要说明的选项：没写说明不提交，纸上给出提示
+        m = await mount(model({ decisions: [face("d2", { options: [{ id: "revise", label: "提出修改", note_required: true }] })] }));
+        m.step(200);
+        m.hooks.openCard("d2");
+        m.hooks.answer("revise");
+        await tick();
+        out.needNoteBlocked = m.answers.length === 0 && m.view.card().isOpen() && (m.hooks.decisions().card.message ?? "").includes("说明");
+        m.destroy();
+
+        // 命令被拒绝时纸上显示原因
+        m = await mount(model({ decisions: [face("d4")] }), { answer: () => ({ accepted: false, message: "这个决定请求已经回答，不能再次回答" }) });
+        m.step(200);
+        m.hooks.openCard("d4");
+        m.hooks.answer("go");
+        await tick();
+        out.rejectedReason = m.hooks.decisions().card.message;
+        m.destroy();
+
+        // 回答以后事件流带来的新列表里已经没有这个决定：纸留到盖章结束，说明栏的文字也留着
+        m = await mount(model({ decisions: [face("d5")] }));
+        m.step(200);
+        m.hooks.openCard("d5");
+        m.step(0);
+        const noteBox = document.querySelector('textarea[aria-label="决定的说明"]') as HTMLTextAreaElement | null;
+        if (!noteBox) throw new Error("卡片打开以后没有出现说明的输入框");
+        noteBox.value = "照旧继续";
+        noteBox.dispatchEvent(new Event("input", { bubbles: true }));
+        m.hooks.answer("go");
+        await tick();
+        m.setModel(model({ decisions: [] }));
+        m.step(300);
+        out.ghostKeptPaper = m.view.card().isOpen();
+        out.ghostKeptNote = noteBox.value === "照旧继续";
+        m.step(1500);
+        out.closedAfterGhost = !m.view.card().isOpen();
+        m.destroy();
+
+        // 翻页与关闭：点翻页翻到下一张；别处文本框里的方向键不翻页；方向键翻页；点关闭关上
+        m = await mount(model({ decisions: [face("d6"), face("d7")] }));
+        m.step(200);
+        m.hooks.openCard("d6");
+        m.step(0);
+        m.click(506, 38);
+        out.flipNext = m.view.card().openId() === "d7";
+        const other = document.createElement("input");
+        document.body.appendChild(other);
+        other.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+        out.otherInputNoFlip = m.view.card().openId() === "d7";
+        other.remove();
+        document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+        out.keyFlip = m.view.card().openId() === "d6";
+        m.step(0);
+        m.click(536, 38);
+        out.closeButton = !m.view.card().isOpen();
+        m.destroy();
+
+        return out;
+      });
+
+      expect(result.closedBefore).toBe(true);
+      expect(result.openedByBoard).toBe(true);
+      expect(result.answerCalled).toBe(true);
+      expect(result.closedAfterStamp).toBe(true);
+      expect(result.needNoteBlocked).toBe(true);
+      expect(result.rejectedReason).toBe("这个决定请求已经回答，不能再次回答");
+      expect(result.ghostKeptPaper).toBe(true);
+      expect(result.ghostKeptNote).toBe(true);
+      expect(result.closedAfterGhost).toBe(true);
+      expect(result.flipNext).toBe(true);
+      expect(result.otherInputNoFlip).toBe(true);
+      expect(result.keyFlip).toBe(true);
+      expect(result.closeButton).toBe(true);
+      expect(errors).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  } finally {
+    await server.close();
+  }
+  });
+}
+
