@@ -53,6 +53,7 @@ class EventType:
     ACTIVATION_FINISHED = "activation_finished"
     CONTEXT_ASSEMBLED = "context_assembled"
     MODEL_REQUEST_SERIALIZED = "model_request_serialized"
+    MODEL_REASONING = "model_reasoning"
     MODEL_MESSAGE = "model_message"
     MODEL_REQUESTED = "model_requested"
     MODEL_STREAM_PROGRESS = "model_stream_progress"

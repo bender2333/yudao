@@ -23,7 +23,7 @@ from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
-from .reasoning import messages_reasoning_params
+from .reasoning import ReasoningOutput, messages_reasoning_params
 from .resolve import FrozenTarget
 from .responses import (
     _ProviderClock,
@@ -253,6 +253,7 @@ class _MessagesInvoker:
         ), trace)
         text_parts: list[str] = []
         tool_blocks: dict[int, dict[str, Any]] = {}
+        thinking_blocks: dict[int, dict[str, Any]] = {}
         usage_raw: dict[str, Any] = {}
         response_id: str | None = None
         actual_model: str | None = None
@@ -280,10 +281,27 @@ class _MessagesInvoker:
                             "name": str(block.get("name") or ""),
                             "arguments": "",
                         }
+                    elif block.get("type") == "thinking":
+                        # 推理内容（设计说明第 7.6 节）：thinking 块与它的 signature 一起保存
+                        thinking_blocks[int(payload.get("index", 0))] = {
+                            "type": "thinking",
+                            "thinking": str(block.get("thinking") or ""),
+                        }
+                    elif block.get("type") == "redacted_thinking":
+                        thinking_blocks[int(payload.get("index", 0))] = {
+                            "type": "redacted_thinking",
+                            "data": str(block.get("data") or ""),
+                        }
                 elif event_type == "content_block_delta":
                     delta = payload.get("delta") or {}
                     if delta.get("type") == "text_delta":
                         text_parts.append(str(delta.get("text") or ""))
+                    elif delta.get("type") == "thinking_delta":
+                        entry = thinking_blocks.setdefault(int(payload.get("index", 0)), {"type": "thinking", "thinking": ""})
+                        entry["thinking"] += str(delta.get("thinking") or "")
+                    elif delta.get("type") == "signature_delta":
+                        entry = thinking_blocks.setdefault(int(payload.get("index", 0)), {"type": "thinking", "thinking": ""})
+                        entry["signature"] = str(delta.get("signature") or "")
                     elif delta.get("type") == "input_json_delta":
                         entry = tool_blocks.setdefault(int(payload.get("index", 0)),
                                                        {"id": "", "name": "", "arguments": ""})
@@ -312,6 +330,7 @@ class _MessagesInvoker:
         text = "".join(text_parts)
         output = _messages_output(text, tool_blocks)
         usage = _messages_usage(usage_raw, started)
+        reasoning = _messages_reasoning(thinking_blocks, tool_blocks)
         await invocation.emit({
             "kind": "usage",
             "id": response_id or _observation_id(invocation),
@@ -328,10 +347,21 @@ class _MessagesInvoker:
             provider=invocation.frozen_target.provider_id,
             model=actual_model or invocation.frozen_target.model,
             response_id=response_id, protocol="messages",
-            actual_model=actual_model,
+            actual_model=actual_model, reasoning=reasoning,
             wire_evidence={"request": params, "response_id": response_id, "stop_reason": stop_reason},
         )
 
+
+def _messages_reasoning(blocks: dict[int, dict[str, Any]],
+                        tool_blocks: dict[int, dict[str, Any]]) -> ReasoningOutput | None:
+    # Messages 的推理内容是 assistant 消息上的 thinking 块与它的 signature。thinking 块整体属于它后面第一个
+    # 工具调用（Anthropic 的思考块先于工具调用出现），回放时与该工具调用合成同一条 assistant 消息
+    thinking = [blocks[index] for index in sorted(blocks)]
+    if not thinking:
+        return None
+    tools = [(index, block) for index, block in sorted(tool_blocks.items())]
+    call_id = str(tools[0][1].get("id") or "") if tools else ""
+    return ReasoningOutput(items=[{"type": "reasoning", "call_id": call_id, "blocks": thinking}])
 
 def _messages_request_params(invocation: _MessagesInvocation, target: FrozenTarget) -> dict[str, Any]:
     system, messages = _messages_input(invocation.provider_input)
@@ -354,6 +384,15 @@ def _messages_request_params(invocation: _MessagesInvocation, target: FrozenTarg
     return params
 
 
+def _thinking_blocks(item: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    # 一条保存的推理内容：属于哪个工具调用（该协议的条目 ID）与它原样取回的块
+    call_id = item.get("call_id")
+    blocks = item.get("blocks")
+    if not isinstance(call_id, str) or not isinstance(blocks, list):
+        return {}
+    kept = [part for part in blocks if isinstance(part, dict)]
+    return {call_id: kept} if kept else {}
+
 def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, Any]]]:
     # 系统指令独立传参，不把用户材料提升为系统指令；工具配对保持 tool_use/tool_result
     raw = provider_input.raw_request or {}
@@ -361,20 +400,25 @@ def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, 
     system_parts: list[str] = []
     messages: list[dict[str, Any]] = []
     if isinstance(items, list) and items:
+        reasonings: dict[str, list[dict[str, Any]]] = {}
         for item in items:
             if not isinstance(item, dict):
                 continue
             item_type = item.get("type")
+            if item_type == "reasoning":
+                # 推理内容按协议保存的字段原样取回，工具调用的配对 id 保留
+                reasonings.update(_thinking_blocks(item))
+                continue
             if item_type == "function_call":
-                messages.append({
-                    "role": "assistant",
-                    "content": [{
-                        "type": "tool_use",
-                        "id": str(item.get("call_id") or item.get("id") or ""),
-                        "name": str(item.get("name") or ""),
-                        "input": _parse_arguments(item.get("arguments")),
-                    }],
+                call_id = str(item.get("call_id") or item.get("id") or "")
+                block: list[dict[str, Any]] = [*reasonings.pop(call_id, [])]
+                block.append({
+                    "type": "tool_use",
+                    "id": call_id,
+                    "name": str(item.get("name") or ""),
+                    "input": _parse_arguments(item.get("arguments")),
                 })
+                messages.append({"role": "assistant", "content": block})
                 continue
             if item_type == "function_call_output":
                 messages.append({

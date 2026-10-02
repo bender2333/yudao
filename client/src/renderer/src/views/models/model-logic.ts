@@ -3,6 +3,7 @@
 
 import type {
   CatalogAdmission,
+  CatalogBinding,
   CatalogCapabilityTable,
   CatalogCredential,
   CatalogModel,
@@ -579,3 +580,76 @@ export function admittedModels(
 ): ModelOption[] {
   return admittedOptions(models, providers, admissions);
 }
+
+// 选择的取值与显示（模型管理设计说明第 9.2 节）：
+// 模型下拉第一项为「跟随部门默认（当前：…）」，其后是按连接分组的已准入定义；
+// 选择第一项即清除项目的模型选择。这里把选项文本与「当前」说明集中在一处，
+// 部门设置弹窗与设置页的部门设置共用同一份计算。
+export type AdmissionGroup = { provider_id: string; provider_name: string; options: ModelOption[] };
+
+// 已准入定义按连接分组：组名取连接名称，组内按上游模型 ID 排序
+export function groupAdmittedModels(models: ModelOption[], providers: CatalogProvider[]): AdmissionGroup[] {
+  const groups: AdmissionGroup[] = [];
+  for (const provider of providers) {
+    const options = models
+      .filter((model) => model.provider_id === provider.id)
+      .sort((left, right) => left.model.localeCompare(right.model));
+    if (options.length > 0) {
+      groups.push({ provider_id: provider.id, provider_name: provider.name, options });
+    }
+  }
+  return groups;
+}
+
+// 跟随部门的选项文本：待保存的选择为空时写明当前生效的模型（来源与模型名）
+export function followDepartmentLabel(current: string): string {
+  return current === "" ? "跟随部门默认" : `跟随部门默认（当前：${current}）`;
+}
+
+// 当前生效模型的说明：取出生效状态与来源，供跟随选项展示。
+// 生效模型由 department.workspace 的 effective 给出，来源文案与选择来源一致
+export function currentEffectiveLabel(effective: { state: string; model?: string | null; message?: string | null;
+  selection_source?: string | null } | null): string {
+  if (effective === null) {
+    return "";
+  }
+  if (effective.state === "unset") {
+    return "未设置";
+  }
+  if (effective.state === "unusable") {
+    return `无法使用：${effective.message ?? ""}`;
+  }
+  return effective.model || "";
+}
+
+// 设置的模型取值（连接/定义）：写入项目的模型用它的引用，未写入时为空（跟随部门默认）
+export function selectionValue(providerId: string | null | undefined, modelId: string | null | undefined): string {
+  return providerId && modelId ? `${providerId}/${modelId}` : "";
+}
+
+// 把取值拆回连接与定义：空值表示「跟随部门默认」（清除项目的模型选择）
+export function selectionPair(value: string): { provider_id: string | null; model_id: string | null } {
+  if (value === "") {
+    return { provider_id: null, model_id: null };
+  }
+  const [provider_id, ...rest] = value.split("/");
+  return { provider_id, model_id: rest.join("/") };
+}
+
+// 一组设置按第 5.3 节取得的模型访问定义：项目设置写入了就用它，否则用部门默认（catalog 的 bindings）
+export function mergedModelId(projectModelId: string | null | undefined, department: string,
+  bindings: Record<string, CatalogBinding> | undefined): string {
+  if (projectModelId) {
+    return projectModelId;
+  }
+  return bindings?.[department]?.model_id ?? "";
+}
+
+// 从目录读出模型的上游名称与推理档位声明：供设置页的跟随说明与档位选项使用。
+// 模型不在目录里时返回空
+export function modelById(models: CatalogModel[], modelId: string): CatalogModel | null {
+  return models.find((item) => item.id === modelId) ?? null;
+}
+
+// 一次保存以后要提示的生效说明（设计说明第 9.2 节）
+export const DEPARTMENT_SAVE_NOTICE = "从本部门下一次模型请求起生效";

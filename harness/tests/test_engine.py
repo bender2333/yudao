@@ -24,6 +24,10 @@ def _submit(identity="submit"):
     proposal.pop("kind")
     return _call(identity, "submit_product_spec", **proposal)
 
+def change_product_model(system: LoopSystem, upstream_model: str) -> None:
+    # 运行中更换模型：确定性测试适配器登记的上游模型名取自编排器，在下一次解析时生效（#45 架构答复第 6 条）
+    system.orchestrator.test_model = upstream_model
+
 
 def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
@@ -49,7 +53,8 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     reasoning = {"id": "reason-1", "type": "reasoning", "summary": [], "encrypted_content": "PRIVATE_CHAIN"}
     lookup = _call("read-1", "read_file", path="proof.txt")
     adapter = FakeAdapter([
-        ModelResponse(output=[reasoning, lookup]),
+        ModelResponse(output=[lookup], reasoning={"provider_id": "fake", "protocol": "fake",
+                                                  "model": "fake-script", "items": [reasoning]}),
         ModelResponse(output=[_submit(), _call("after-submit", "read_file", path="must-not-read.txt")]),
         plan_turn(), delivery_turn(), review_turn("release", "valid host evidence"),
     ])
@@ -59,7 +64,10 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
     assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1, 1]
-    assert adapter.invocations[1].input_items[2:4] == [reasoning, lookup]
+    # 同一连接、同一协议、同一上游模型时推理内容原样回放，紧接它产生的那次输出（工单 #88）
+    replayed = adapter.invocations[1].input_items[2]
+    assert replayed["id"] == "reason-1" and replayed["encrypted_content"] == "PRIVATE_CHAIN"
+    assert adapter.invocations[1].input_items[3] == lookup
     tool_input = adapter.invocations[1].input_items[4]
     assert tool_input["call_id"] == "read-1"
     assert json.loads(tool_input["output"])["output"] == "CAUSAL_TOOL_OUTPUT"
@@ -71,6 +79,8 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     assert any(item.get("name") == "submit_plan" for item in adapter.invocations[3].input_items)
     events = system.store.list_events(run_id)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "after-submit" for event in events)
+    assert any(event.type == EventType.MODEL_REASONING and event.model == "fake-script"
+               for event in events)
     contexts = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED]
     assert len(contexts) == len(adapter.invocations)
     for event, request in zip(contexts, adapter.invocations):
@@ -247,6 +257,8 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     run_id = system.create_run("Original intent")
     system.activate_once(run_id)
     system.activate_once(run_id)
+    # 运行中更换模型：再次激活前换一个上游模型，来源不同，推理内容不再回放（工单 #88）
+    change_product_model(system, "other-model")
     # A fresh controller restores history from persisted events, not in-memory provider state.
     reloaded = LoopSystem.for_testing(tmp_path, adapter, resume_on_startup=False)
     result = reloaded.run_until_stop(run_id)
@@ -255,7 +267,8 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     history = resumed_product.input_items[1:]
     assert history[0]["role"] == "user"
     assert "current_work" in history[0]["content"]
-    assert private in history
+    assert private not in history
+    assert "PRODUCT_PRIVATE" not in json_dumps(history)
     assert "ENGINEERING_PRIVATE" not in json_dumps(history)
     assert history[-1]["role"] == "user"
     assert "[pending_request]" in history[-1]["content"]
