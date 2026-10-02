@@ -171,6 +171,17 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
     ), actor="user:local")
     if isinstance(saved, Rejected):
         raise RuntimeError(f"catalog seed rejected: {saved.reason} {saved.message}")
+    # 预置这个模型为已准入：部门设置弹窗的模型下拉只列出已准入定义，
+    # 因此要有一条真实通过模型测试的候选（工单 #95 的验收）。测试的真实请求走同一条凭据与上游路径，
+    # 这里在服务开始服务之前直接调用 Provider 模块的入口，等同于界面上的一次模型测试。
+    # 准入记录与凭据来源分开保存：测试完成以后清除内存里的 Key，让界面从「凭据缺失」开始，
+    # 需要凭据的用例自己按界面或命令设置（模型管理页的用例核对缺失状态）
+    facade = application.system.facade
+    facade.set_credential("OPENCODE_GO_KEY", "seed-only-key", persist=False)
+    result = await asyncio.to_thread(facade.model_test, "opencode-go", "glm-4.6")
+    if not result.get("ok"):
+        raise RuntimeError(f"catalog model test rejected: {result.get('error')} {result.get('message')}")
+    facade.clear_credential_override("OPENCODE_GO_KEY")
 
 
 class VersionedApplication(Application):
