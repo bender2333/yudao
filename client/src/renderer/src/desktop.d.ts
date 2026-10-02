@@ -37,8 +37,11 @@ export type DesktopApi = {
   setLoginItem: (openAtLogin: boolean) => Promise<LoginItemSettings>;
 };
 
+import type { FloorTestHooks } from "./pixel/floor/view";
+
 declare global {
   interface Window {
     yudao: DesktopApi;
+    __floorViewForTest?: FloorTestHooks;
   }
 }
