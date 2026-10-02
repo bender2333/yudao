@@ -100,6 +100,12 @@ class ProjectRow(Contract):
     version: int
     work_item_count: int
     in_progress_count: int
+    # 排队中的事项数：状态为未开始或排队中（设计说明第 4.3 节 projects.list 的项目列表字段）
+    waiting_count: int
+    # 待回答的决定数：本项目等待回答的决定请求数（首页与左侧栏按它显示数量）
+    decisions_waiting: int
+    # 最近活动时间：项目流与它各 run 的最后一条事件时间中最晚的一个
+    last_activity_at: str
     active_work_item_id: str | None
     current_adoption: str | None
     # 建档状态标记：项目由接入已有项目建立且还没有基线时，建档中为 onboarding，等待建档为 awaiting_onboarding；其余为空
@@ -129,6 +135,9 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             pinned=state.pinned, archived=state.archived, created_at=state.created_at,
             updated_at=state.updated_at, version=state.stream_version, work_item_count=len(state.work_items),
             in_progress_count=sum(item.status == "in_progress" for item in state.work_items),
+            waiting_count=sum(item.status in {"not_started", "held"} for item in state.work_items),
+            decisions_waiting=sum(1 for item in store.decisions(projects=(project_id,), statuses=("open",))[1]),
+            last_activity_at=_last_activity(store, state, through=through),
             active_work_item_id=state.active_work_item_id,
             current_adoption=None if state.current_adoption is None else state.current_adoption.adoption_id,
             onboarding_status=_onboarding_status(state),
@@ -137,6 +146,16 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             waiting_resume_count=observations.count(OBSERVATION_WAITING_RESUME),
         ))
     return Snapshot[ProjectList](position=_snapshot_position(store, through), data=ProjectList(projects=rows))
+
+def _last_activity(store: Any, state: Any, *, through: int | None) -> str:
+    # 最近活动时间：项目流最后一条事件的时间，与这个项目各 run 最后一条事件的时间取最晚的一个。
+    # 项目流没有事件时回落到创建时间；比较用 ISO 字符串（带时区，字典序与时间序一致）
+    times = [state.updated_at or state.created_at]
+    for item in state.work_items:
+        bounds = store.run_time_bounds(item.run_id, through=through)
+        if bounds is not None:
+            times.append(bounds[1])
+    return max(times)
 
 def _onboarding_status(state: Any) -> str | None:
     # 建档中的项目还没有基线采纳：有进行中的建档事项时为 onboarding，否则为 awaiting_onboarding

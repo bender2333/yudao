@@ -2650,6 +2650,18 @@ export type ProjectRow = {
      */
     in_progress_count: number;
     /**
+     * Waiting Count
+     */
+    waiting_count: number;
+    /**
+     * Decisions Waiting
+     */
+    decisions_waiting: number;
+    /**
+     * Last Activity At
+     */
+    last_activity_at: string;
+    /**
      * Active Work Item Id
      */
     active_work_item_id: string | null;
