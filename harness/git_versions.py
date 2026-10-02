@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import stat
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -32,12 +31,10 @@ class GitVersionStore:
     def __init__(self, root: str | Path, *, read_only: bool = False) -> None:
         self.root = Path(root).absolute()
         self.read_only = read_only
-        self._hooks = self.root / "empty-hooks"
         if read_only:
             # 只读使用不建立目录：需要 Git 历史的操作在目录缺失时给出同样的错误
             return
         self._directory(self.root, create=True)
-        self._directory(self._hooks, create=True)
 
     def prepare(
         self,
@@ -292,7 +289,6 @@ class GitVersionStore:
     def _repository(self, run_id: str, *, create: bool = False) -> pygit2.Repository:
         self._run_id(run_id)
         self._directory(self.root)
-        self._directory(self._hooks)
         path = self.root / (run_id + ".git")
         if not os.path.lexists(path):
             if not create:
