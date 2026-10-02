@@ -48,6 +48,49 @@ export interface FloorView {
   boardRect(): { x: number; y: number; w: number; h: number };
 }
 
+/** 端到端测试的入口：按需要给出世界、角色、包裹、管道与信号的当前状态（含类型，测试不猜形状）。 */
+export interface FloorTestHooks {
+  state: () => {
+    characters: { id: string; department: string | null; task: string | null; queued: string[]; bubble: string | null; pose: string | null }[];
+    packages: { id: string; link: string | null }[];
+    pipes: [string, string | null][];
+    signals: string[];
+    items: { id: string; status: string; department: string | null }[];
+    reduced: boolean;
+    canvasWidth: number;
+  };
+  resync: () => void;
+}
+
+/** 建立给端到端测试用的读取入口：读的是画面里世界的当前状态。 */
+export function floorTestHooks(view: FloorView, onResync: () => void): FloorTestHooks {
+  return {
+    state: () => {
+      const { driver, scene } = view.inspect();
+      const world = driver.world;
+      const canvas = view.inspect().renderer;
+      void canvas;
+      return {
+        characters: Object.values(world.characters).map((c) => ({
+          id: c.id,
+          department: c.department,
+          task: c.current ? c.current.taskKey : null,
+          queued: c.queue.map((t) => t.taskKey),
+          bubble: c.bubble ? c.bubble.text : null,
+          pose: scene.actors.find((a) => a.id === "ch-" + c.id)?.anim ?? null,
+        })),
+        packages: Object.values(world.packages).map((pk) => ({ id: pk.id, link: pk.transit ? pk.transit.linkKey : null })),
+        pipes: Object.entries(world.links).map(([key, p]) => [key, p.flow ? p.flow.state : null] as [string, string | null]),
+        signals: Object.keys(world.signals).filter((name) => world.signals[name].until > scene.realT),
+        items: driver.model.items.map((it) => ({ id: it.work_item_id, status: it.status, department: it.department })),
+        reduced: scene.reduced,
+        canvasWidth: 0,
+      };
+    },
+    resync: () => onResync(),
+  };
+}
+
 export interface FloorViewOptions {
   host: HTMLElement;
   clock: Clock;
@@ -109,6 +152,8 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
     ctx.clearRect(0, 0, W, H);
     renderer.draw(ctx);
     texture.source.update();
+    // 画面自己渲染：PixiJS 的共享 ticker 被时钟停掉了（时间全部由共用时钟给出），这里主动画一帧
+    app.renderer.render(app.stage);
   }
 
   applyLayout();

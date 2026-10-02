@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, WorkItemLoop } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { createRafClock } from "../../pixel/clock";
-import { createFloorView, type FloorView } from "../../pixel/floor/view";
+import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
 import type { FloorModel, LoopItem, PixelFloorEvent } from "../../pixel/world/types";
 import { useSnapshot } from "./use-snapshot";
 
@@ -93,6 +93,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<FloorView | null>(null);
   const clockRef = useRef<ReturnType<typeof createRafClock> | null>(null);
+  const resyncRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<string | null>(null);
   const capabilities = props.app.currentCapabilities;
@@ -116,6 +117,10 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
           return;
         }
         viewRef.current = view;
+        // 端到端测试经这个入口读取画面的当前状态；只在开发构建里暴露
+        if (import.meta.env.DEV) {
+          (window as unknown as { __floorViewForTest?: FloorTestHooks }).__floorViewForTest = floorTestHooks(view, () => resyncRef.current?.());
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -161,6 +166,10 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     const off = props.app.subscribeResync(() => {
       viewRef.current?.setModel(model);
     });
+    // 端到端测试触发一次重新同步（只在开发构建里暴露）
+    if (import.meta.env.DEV) {
+      resyncRef.current = () => viewRef.current?.setModel(model);
+    }
     return off;
   }, [props.app, model]);
 

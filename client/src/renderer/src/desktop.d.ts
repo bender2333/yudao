@@ -13,8 +13,11 @@ export type DesktopApi = {
   setTrayCount: (count: number) => Promise<boolean>;
 };
 
+import type { FloorTestHooks } from "./pixel/floor/view";
+
 declare global {
   interface Window {
     yudao: DesktopApi;
+    __floorViewForTest?: FloorTestHooks;
   }
 }
