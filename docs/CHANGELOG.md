@@ -461,3 +461,4 @@ qwen3.8 / 2026-10-02 16:45 / docs/architecture-issues.md 为 #82 登记两条：
 claude-sonnet-5-5 / 2026-10-02 16:34 / docs/architecture-issues.md 追加 #207 登记的 test_api 命令清单失败的处理结论 / 该失败已由 #252 修复，按登记规则写处理行
 claude-sonnet-5-5 / 2026-10-02 17:07 / docs/architecture-issues.md 为 #82 登记的两条问题（录制场景数与固定时刻、决定板与卡片的归属）写处理结论 / 按登记规则写处理行；结论同时写入 #178、#179 的任务评论
 claude-sonnet-5-5 / 2026-10-02 20:19 / docs/architecture-issues.md 为 #94 登记的 catalog.change_impact 对结构非法文档返回 500 的问题写处理结论（422，沿用查询错误形状，#261 实施），并把与 #82 的条目挤在一起的位置补一个空行 / 按登记规则写处理行
+claude-fable-5-1 / 2026-10-03 00:13 / docs/research/game-world-as-projection.md 增加第 5.5 节「怎样做映射：七种元件与一张工作表」：地点、物、连接、流、规则、操作、仪表七种元件的判别法，八列工作表与示例行，六步做法 / 用户追问映射到底怎样做，只有「组件像水管、信息像水」的片段
