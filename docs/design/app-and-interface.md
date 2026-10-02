@@ -180,7 +180,7 @@ sequenceDiagram
 
 接受表示事件已经追加。客户端在事件流到达位置 P 之前显示「已提交」，到达以后按事件显示最终状态（可观测性设计第 5 节）。
 
-拒绝原因是一份封闭清单，每个命令在合同中声明自己可能返回的原因：`stale_base`（基准版本过期）、`not_found`、`already_exists`、`project_archived`、`work_item_in_progress`、`run_terminal`、`busy`（没有空闲的执行槽位；3.4A 加入排队以后由排队代替）、`provider_unavailable`（新建事项时项目的三个部门无法解析调用目标）、`catalog_invalid`（目录校验失败，附字段位置）、`in_use`（仍被引用，附引用方）、`decision_closed`（决定请求已回答或已撤销）、`option_invalid`、`not_allowed`（对象状态不允许，附说明）、`command_id_reused`、`source_invalid`（接入已有项目时源目录不存在或不可读、含有宿主私有路径、公开树中有无法表示的条目，附工作区内的相对路径与处理方法；3.8）。
+拒绝原因是一份封闭清单，每个命令在合同中声明自己可能返回的原因：`stale_base`（基准版本过期）、`not_found`、`already_exists`、`project_archived`、`work_item_in_progress`、`run_terminal`、`busy`（没有空闲的执行槽位；3.4A 加入排队以后由排队代替）、`provider_unavailable`（新建事项时项目的三个部门无法解析调用目标）、`catalog_invalid`（目录校验失败，附字段位置）、`in_use`（仍被引用，附引用方）、`decision_closed`（决定请求已回答或已撤销）、`option_invalid`、`not_allowed`（对象状态不允许，附说明）、`command_id_reused`、`source_invalid`（接入已有项目时源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据不算）、公开树中有无法表示的条目，附工作区内的相对路径与处理方法；3.8）。
 
 ### 3.2 命令清单
 
