@@ -299,24 +299,37 @@ export function removePackage(world: World, id: string): void {
   delete world.packages[id];
 }
 
-export function sendPackage(world: World, id: string, linkKey: string | null, pts: [number, number][], ms?: number, onDone?: (pk: World["packages"][string]) => void): void {
+export function sendPackage(world: World, scene: SceneLike, id: string, linkKey: string | null, pts: [number, number][], ms?: number, onDone?: (pk: World["packages"][string]) => void): void {
   const pk = world.packages[id];
   if (!pk) return;
   pk.atRest = null;
-  pk.transit = { linkKey, pts, t0: null, k: 0, ms: ms ?? Math.max(700, polyLength(pts) * 9), onDone: onDone ?? null };
+  const duration = (ms ?? Math.max(700, polyLength(pts) * 9)) / 1000;
+  pk.transit = { linkKey, pts, t0: null, k: 0, ms: duration * 1000, pos: pts[0], onDone: onDone ?? null };
+  // 包裹沿管道折线移动：由 GSAP 的补间推进一步，位置只由共用时钟决定
+  const transit = pk.transit;
+  if (scene?.hasTween) {
+    const proxy = { k: 0 };
+    transit.tweenKill = () => proxy.k;
+    transit.tweenStart = (s) => {
+      s.tween(proxy, { k: 1, duration, ease: "none", onUpdate: () => { transit.k = proxy.k; } });
+    };
+  }
 }
 
 export function stepPackages(world: World, scene: SceneLike): void {
   for (const pk of Object.values(world.packages)) {
     if (!pk.transit) continue;
-    if (pk.transit.t0 === null) pk.transit.t0 = scene.realT;
-    const k = Math.min(1, (scene.realT - pk.transit.t0) / pk.transit.ms);
+    if (pk.transit.t0 === null) {
+      pk.transit.t0 = scene.realT;
+      pk.transit.tweenStart?.(scene);
+    }
+    const k = pk.transit.tweenKill ? pk.transit.k : Math.min(1, (scene.realT - pk.transit.t0) / pk.transit.ms);
     pk.transit.k = k;
     pk.transit.pos = pointAt(pk.transit.pts, polyLength(pk.transit.pts) * scene.easeInOut(k));
     if (k >= 1) {
       const done = pk.transit.onDone;
-      pk.atRest = { roomId: null, spotKind: "port_out" };
       pk.transit = null;
+      pk.atRest = { roomId: null, spotKind: "port_out" };
       done?.(pk);
     }
   }

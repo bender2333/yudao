@@ -77,6 +77,7 @@ export function createScene(opts: SceneOptions): SceneLike {
     },
     cancel(a) {
       a.script?.finalize?.();
+      a.step?.tween?.kill();
       a.script = null;
       a.step = null;
     },
@@ -160,6 +161,8 @@ export function createScene(opts: SceneOptions): SceneLike {
       for (const timer of scene.afterCallbacks.filter((x) => x.at <= scene.realT)) timer.fn();
       scene.afterCallbacks = scene.afterCallbacks.filter((x) => x.at > scene.realT);
     },
+    hasTween: opts.tween !== undefined,
+    tween: opts.tween ?? (() => ({ kill: () => {} })),
     makeCharacterMachine: opts.makeCharacterMachine ?? ((input) => characterMachine(input)),
     makePipeMachine: opts.makePipeMachine ?? ((input) => pipeMachine(input)),
   };
@@ -322,7 +325,7 @@ export function syncCharacters(
 }
 
 function startStep(scene: SceneLike, actor: Actor, st: Step): void {
-  const step = { st, t0: scene.realT, fromX: actor.x, fromY: actor.y, dur: 0 };
+  const step: NonNullable<Actor["step"]> = { st, t0: scene.realT, fromX: actor.x, fromY: actor.y, dur: 0, done: false };
   actor.step = step;
   switch (st.t) {
     case "go": {
@@ -330,9 +333,23 @@ function startStep(scene: SceneLike, actor: Actor, st: Step): void {
       const dy = (st.y ?? actor.y) - actor.y;
       const dist = Math.hypot(dx, dy);
       if (Math.abs(dx) > 0.5) actor.facing = dx > 0 ? 1 : -1;
-      step.dur = scene.reduced || dist < 0.5 ? 0 : (dist / (st.speed ?? actor.speed)) * 1000;
+      const seconds = scene.reduced || dist < 0.5 ? 0 : dist / (st.speed ?? actor.speed);
+      step.dur = seconds * 1000;
       scene.play(actor, st.gait ?? "walk");
       actor.seat = null;
+      // 走动由 GSAP 的补间推进：补间的位置由共用的时钟推进到第几毫秒决定
+      step.tween?.kill();
+      if (scene.hasTween) {
+        // 补间由共用的时钟推进；它在下一帧的时钟位置里把小人移到目标
+        step.tween = scene.tween(actor as unknown as Record<string, unknown>, {
+          x: st.x ?? actor.x, y: st.y ?? actor.y, duration: seconds, ease: "none",
+          onComplete: () => {
+            actor.x = st.x ?? actor.x;
+            actor.y = st.y ?? actor.y;
+            step.done = true;
+          },
+        });
+      }
       break;
     }
     case "anim":
@@ -414,11 +431,15 @@ function advanceActor(scene: SceneLike, actor: Actor, dt: number): void {
     const step = actor.step!;
     const elapsed = scene.realT - step.t0;
     const k = step.dur > 0 ? Math.min(1, elapsed / step.dur) : 1;
-    if (step.st.t === "go") {
+    // 没有接 GSAP 的补间时（纯逻辑测试）自己按经过时间插值
+    if (step.st.t === "go" && !scene.hasTween) {
       actor.x = step.fromX + ((step.st.x ?? step.fromX) - step.fromX) * k;
       actor.y = step.fromY + ((step.st.y ?? step.fromY) - step.fromY) * k;
     }
-    if (k >= 1) {
+    // 接了补间时，走动的完成由补间自己报告；其余步骤按经过时间完成
+    const finished = step.st.t === "go" && scene.hasTween ? step.done === true : k >= 1;
+    if (finished) {
+      step.tween?.kill();
       actor.step = null;
       actor.script.i++;
       continue;

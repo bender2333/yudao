@@ -133,8 +133,24 @@ export interface Package {
   color?: string | null;
   small?: boolean;
   atRest: { roomId: string | null; spotKind: string } | null;
-  /** 沿管道移动的状态；t0 为本次移动的起始时刻（毫秒）。 */
-  transit: { linkKey: string | null; pts: [number, number][]; t0: number | null; k: number; ms: number; pos?: [number, number]; onDone?: ((pk: Package) => void) | null } | null;
+  /**
+   * 沿管道移动的状态；t0 为本次移动的起始时刻（毫秒）。
+   * k 是移动进度：由 GSAP 的补间推进（tweenStart 在第一次推进时建立补间），
+   * 没有补间时（纯逻辑测试）按经过时间算。
+   */
+  transit: {
+    linkKey: string | null;
+    pts: [number, number][];
+    t0: number | null;
+    k: number;
+    ms: number;
+    pos?: [number, number];
+    /** 建立这次移动的补间（由场景提供）。 */
+    tweenStart?: (scene: SceneLike) => void;
+    /** 这次移动有补间（读 k 而不是按时间算）。 */
+    tweenKill?: () => number;
+    onDone?: ((pk: Package) => void) | null;
+  } | null;
 }
 
 /** 房间实体（机房里的设备是 roomKind 为 'device' 的节点）。 */
@@ -435,7 +451,7 @@ export interface Actor {
   visible: boolean;
   seat: Seat | null;
   script: Script | null;
-  step: { st: Step; t0: number; fromX: number; fromY: number; dur: number } | null;
+  step: { st: Step; t0: number; fromX: number; fromY: number; dur: number; tween?: { kill: () => void }; done?: boolean } | null;
   icon: HeadIcon | null;
   sign: string | null;
   bubble: string | null;
@@ -513,8 +529,12 @@ export interface SceneLike {
   setPipeState: (pipe: Pipe, state: string, at?: number) => void;
   pipeState: (id: string) => StateRecord | null;
   disposeCharacter: (id: string) => void;
-  /** 推进一帧：时间、走路与到点回调。 */
+  /** 推进一帧：时间、补间位置、走路与到点回调。 */
   stepScene: (deltaMs: number) => void;
+  /** 新建一段受共用时钟驱动的补间（GSAP）。 */
+  tween: (target: Record<string, unknown>, vars: Record<string, unknown>) => { kill: () => void };
+  /** 是否接了真实的补间实现（没有时为纯逻辑测试，按经过时间推进）。 */
+  hasTween: boolean;
   /** 飞行物：纸飞机、信件、决定单沿弧线飞行（原型 scene.fly）。 */
   fly: (o: { bmp: string; from: [number, number]; to: [number, number]; ms: number; arc?: number; onDone?: () => void }) => void;
   /** 粒子：灰尘、彩带、火花、烟雾（原型 scene.emit）。 */
@@ -599,6 +619,11 @@ export interface SceneOptions {
   random: () => number;
   /** 减少动画（系统设置）。 */
   reduced: boolean;
+  /**
+   * 建立受共用时钟驱动的补间（GSAP）。小人的走动与包裹沿管道的移动都用它：
+   * 起点钉在时钟零点上，位置只由「推进到第几毫秒」决定，测试与回放可重复。
+   */
+  tween?: (target: Record<string, unknown>, vars: Record<string, unknown>) => { kill: () => void };
   /** 建立角色与管道的状态机；测试与回放可以注入。 */
   makeCharacterMachine?: (input: CharacterMachineInput) => unknown;
   makePipeMachine?: (input: PipeMachineInput) => unknown;

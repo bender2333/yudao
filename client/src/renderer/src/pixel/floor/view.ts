@@ -82,6 +82,8 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
     H,
     random: () => Math.random(),
     reduced: reducedMotion(),
+    // 走动与包裹的移动由 GSAP 的补间推进，共用同一个时钟
+    tween: (target, vars) => opts.clock.tween(target, vars),
   });
   const emptyModel: FloorModel = {
     items: [], open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [],
@@ -111,7 +113,8 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   applyLayout();
   draw();
   const offTick = opts.clock.onTick((elapsed) => {
-    const delta = Math.max(0, Math.min(200, elapsed - last));
+    // 缓动与行走由 GSAP 的补间按共用时钟的位置计算，这里只把时钟的经过时间交给场景
+    const delta = Math.max(0, elapsed - last);
     last = elapsed;
     scene.stepScene(delta);
     driver.step();

@@ -222,7 +222,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     pk.bmp = bmp;
     pk.color = opt.color ?? null;
     pk.small = opt.small;
-    sendPackage(world, id, opt.linkKey ?? null, pts, opt.ms, () => {
+    sendPackage(world, scene, id, opt.linkKey ?? null, pts, opt.ms, () => {
       delete world.packages[id];
       opt.onDone?.();
     });
