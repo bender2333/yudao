@@ -15,6 +15,7 @@ import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
+import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 
 export function DepartmentPage(props: { app: ClientApp; route: Route }) {
@@ -44,6 +45,9 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
     <div className="page">
       <Loading state={picked} />
       <Loading state={workspace} />
+      <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
+        <RoomScreen app={props.app} data={data} />
+      </Section>
       {data ? (
         <>
           <TitleArea
@@ -53,9 +57,6 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
               : workItem !== null ? "（未选中事项，取当前事项）" : "（项目还没有事项）"}
             onOpenSettings={() => setSettingsOpen(true)}
           />
-          <Section title="部门房间" note="房间画面与小人由工单 #177 填入，这里留出位置">
-            <Empty text="部门房间的位置（第 8 节）" />
-          </Section>
           <InspectArea app={props.app} data={data} />
           <MessagesAndGuidance app={props.app} data={data} command={command} />
           {settingsOpen ? <SettingsDialog app={props.app} data={data} onClose={() => setSettingsOpen(false)} /> : null}

@@ -729,9 +729,10 @@ export function drawSpeeches(
   c: CanvasRenderingContext2D,
   scene: SceneLike,
   list: { a: NonNullable<ReturnType<typeof actorOf>>; text: string; kind: "say" | "think"; tail: boolean; until: number }[],
+  opts: { size?: number; maxW?: number } = {},
 ): void {
-  const size = 6;
-  const maxW = 84;
+  const size = opts.size ?? 6;
+  const maxW = opts.maxW ?? 84;
   const lh = size + 2;
   const rects: { x: number; y: number; w: number; h: number }[] = [];
   for (const it of list.slice().sort((p, q) => p.a.x - q.a.x)) {

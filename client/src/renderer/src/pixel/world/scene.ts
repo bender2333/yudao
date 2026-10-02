@@ -6,7 +6,7 @@
 // GSAP 的补间与 PixiJS 的渲染读同一个时钟（clock.ts），全场景的时间都由 scene.stepped 累加。
 
 import { createActor } from "xstate";
-import { animDuration as animTotal } from "../anims.ts";
+import { animDuration as animTotal, hash } from "../anims.ts";
 import { characterMachine, pipeMachine } from "./state.ts";
 import type {
   Actor, ActorInit, Character, Geo, HeadIconKind, PackageVisual, ParticleModel, Pipe, SceneLike, SceneOptions, Seat, Step, World,
@@ -47,7 +47,8 @@ export function createScene(opts: SceneOptions): SceneLike {
         anim: o.anim ?? "idle",
         animStart: 0,
         clock: 0,
-        seed: Math.floor(opts.random() * 3000),
+        // 与原型 engine.js 的 addActor 一致：seed 由当前演员数量决定（待机眨眼与陈设噪点靠它）
+        seed: Math.floor(hash(scene.actors.length + 7) * 3000),
         hold: o.hold ?? null,
         face: null,
         alpha: 1,
@@ -83,8 +84,14 @@ export function createScene(opts: SceneOptions): SceneLike {
     },
     run(a, steps, o) {
       a.script?.finalize?.();
-      a.script = { steps: steps.slice(), i: 0, finalize: o?.finalize, onDone: o?.onDone };
+      const explicit = o?.tail !== undefined && o.tail !== null ? o.tail : steps.length;
+      const key = steps.findIndex((s) => s.key);
+      const tail = Math.min(explicit, key >= 0 ? key + 1 : steps.length);
+      a.script = { steps: steps.slice(), i: 0, tail, finalize: o?.finalize, onDone: o?.onDone };
       a.step = null;
+    },
+    inTail(a) {
+      return !a.script || a.script.i >= a.script.tail;
     },
     after(ms, fn) {
       scene.afterCallbacks.push({ at: scene.realT + ms, fn });
@@ -351,11 +358,16 @@ function startStep(scene: SceneLike, actor: Actor, st: Step): void {
     case "anim":
       scene.play(actor, st.name!, true);
       if (st.facing) actor.facing = st.facing;
-      step.dur = scene.reduced ? 0 : st.ms !== undefined ? st.ms : animTotal(st.name!);
+      step.dur = scene.reduced ? (st.key ? Math.max(st.ms ?? 0, 1600) : 0) : st.ms !== undefined ? st.ms : animTotal(st.name!);
       break;
     case "wait":
+      step.dur = scene.reduced ? (st.key ? Math.max(st.ms ?? 0, 1600) : 0) : (st.ms ?? 0);
+      break;
+    case "fade": {
+      step.fromAlpha = actor.alpha;
       step.dur = scene.reduced ? 0 : (st.ms ?? 0);
       break;
+    }
     case "turn":
       actor.facing = st.facing ?? actor.facing;
       break;
@@ -432,6 +444,10 @@ function advanceActor(scene: SceneLike, actor: Actor, dt: number): void {
       actor.x = step.fromX + ((step.st.x ?? step.fromX) - step.fromX) * k;
       actor.y = step.fromY + ((step.st.y ?? step.fromY) - step.fromY) * k;
     }
+    if (step.st.t === "fade") {
+      const from = step.fromAlpha ?? actor.alpha;
+      actor.alpha = from + ((step.st.to ?? 1) - from) * k;
+    }
     if (k >= 1) {
       step.tween?.kill();
       // 走到目标位置时就地落到目标坐标（补间的终点与它一致）
@@ -439,6 +455,7 @@ function advanceActor(scene: SceneLike, actor: Actor, dt: number): void {
         actor.x = step.st.x ?? actor.x;
         actor.y = step.st.y ?? actor.y;
       }
+      if (step.st.t === "fade") actor.alpha = step.st.to ?? 1;
       actor.step = null;
       actor.script.i++;
       // 到达与下一个动作在同一帧里接上，中间不留空档

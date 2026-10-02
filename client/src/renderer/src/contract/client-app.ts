@@ -4,7 +4,7 @@
 // 发现缺口或收到 resync 时重新查询已打开的视图，再按快照位置中最小的一个重新订阅；
 // 本次启动的身份改变（服务重启）时重新读取能力清单并重新同步。
 
-import type { Capabilities, DecisionList, EventObject } from "../api/generated/types.gen";
+import type { Capabilities, DecisionList, EventObject, OutputDelta } from "../api/generated/types.gen";
 import { connect, interfaceFor, type Interface } from "./connection";
 import type { ConnectionSettings } from "./settings";
 import { EventStreamClient } from "./event-stream";
@@ -39,6 +39,8 @@ export class ClientApp {
   private readonly pageListeners = new Set<(event: EventObject) => void>();
   // 项目楼层的重新同步订阅：缺口、断线重连、resync 时画面回到查询给出的状态
   private readonly resyncSubscribers = new Set<() => void>();
+  // 输出片段订阅：部门房间的思考气泡按 offset 拼接模型输出（工单 #177）。片段不写入事件日志，只经流送达
+  private readonly deltaListeners = new Set<(delta: OutputDelta) => void>();
 
   constructor(
     private readonly runQuery: QueryRunner,
@@ -106,15 +108,20 @@ export class ClientApp {
     return this.runQuery<T>(this.iface.client, name, params);
   }
 
-  // 不按项目筛选的事件流：窗口关闭时也保持（设计说明第 5.7 节）
+  // 不按项目筛选的事件流：窗口关闭时也保持（设计说明第 5.7 节）。
+  // live=1：连接接收模型输出片段（delta 帧），部门房间的思考气泡据此逐字显示（工单 #177）
   private startStream(after: number): void {
-    this.stream = new EventStreamClient(this.iface!.baseUrl, {}, {
+    this.stream = new EventStreamClient(this.iface!.baseUrl, { live: true }, {
       onConnected: () => this.setStreamConnected(true),
       onInterrupted: () => this.setStreamConnected(false),
       onResync: () => void this.resync(),
       onMessage: (message) => {
         if (message.kind === "event") {
           this.onEvent(message.event);
+        } else if (message.kind === "delta") {
+          for (const listener of [...this.deltaListeners]) {
+            listener(message.delta);
+          }
         }
       },
     }, this.settings?.token ?? "");
@@ -145,6 +152,15 @@ export class ClientApp {
     this.pageListeners.add(listener);
     return () => {
       this.pageListeners.delete(listener);
+    };
+  }
+
+  // 订阅模型输出片段：部门房间的思考气泡按 offset 把片段接在 attempt.live 之后（工单 #177）。
+  // 片段不写入事件日志，只经事件流的 delta 帧送达
+  subscribeDeltas(listener: (delta: OutputDelta) => void): () => void {
+    this.deltaListeners.add(listener);
+    return () => {
+      this.deltaListeners.delete(listener);
     };
   }
 
