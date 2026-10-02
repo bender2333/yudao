@@ -753,10 +753,12 @@ class ProjectService:
     # 部门 Prompt 项目配置
 
     def configure_department_settings(self, project_id: str, department: str, selection: ModelSelection,
-                                      base_version: int, *, command: Command | None = None) -> dict[str, Any]:
+                                      base_version: int, *, command: Command | None = None,
+                                      reminders: list[str] | None = None) -> dict[str, Any]:
         # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；三项一起保存、一个版本。
         # 并发修改时按版本拒绝后提交的修改（设计说明第 5.2 节）。选择「跟随部门默认」清除本项目的模型选择，
-        # 档位选择「跟随」清除请求档位；部门 Prompt 为空表示没有写入，使用内置默认 Prompt
+        # 档位选择「跟随」清除请求档位；部门 Prompt 为空表示没有写入，使用内置默认 Prompt。
+        # reminders 是这次保存算出的建议能力提醒（设计说明第 5.6 节），随事件保存
         if department not in DEPARTMENTS:
             raise ValueError("unknown department")
         if type(base_version) is not int or base_version < 0:
@@ -780,7 +782,7 @@ class ProjectService:
                 ref = save_department_prompt(self.artifacts, project_id, department, selection.department_prompt)
                 payload["department_prompt_ref"] = asdict(ref)
             payload.update({"department": department, "version": current.version + 1,
-                            "base_version": base_version})
+                            "base_version": base_version, "reminders": list(reminders or ())})
             transaction.append(NewProjectEvent(ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, payload,
                                               actor="user:local"))
             return None

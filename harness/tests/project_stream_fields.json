@@ -5,7 +5,8 @@
       "department_prompt_ref": "旧事件用 prompt_ref 写部门 Prompt 的工件引用；没有它时从 department_prompt（或 text）的原文计算内容哈希，没有原文时该部门没有写入 Prompt",
       "model_id": "旧事件只做部门 Prompt 设置，没有模型选择；没有这个字段时按「跟随部门默认」处理",
       "provider_id": "旧事件只做部门 Prompt 设置，没有模型选择；没有这个字段时按「跟随部门默认」处理",
-      "requested_tier": "旧事件只做部门 Prompt 设置，没有请求档位；没有这个字段时按「跟随」处理"
+      "requested_tier": "旧事件只做部门 Prompt 设置，没有请求档位；没有这个字段时按「跟随」处理",
+      "reminders": "旧事件没有建议能力提醒（#146）；没有这个字段时接受结果不带提醒，一直显示的提醒由查询按当前目录重新计算"
     },
     "project_goal_changed": {
       "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
@@ -143,6 +144,7 @@
       "department_prompt_ref": "object?",
       "model_id": "string?",
       "provider_id": "string?",
+      "reminders": "array[string]",
       "requested_tier": "string?",
       "version": "integer"
     },

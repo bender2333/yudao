@@ -709,6 +709,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             if "context_window" in payload:
                 target_window = payload["context_window"]
                 configured_output_limit = payload.get("configured_max_output_tokens")
+                target_modalities = payload.get("input_modalities")
             else:
                 recorded = next(
                     (item for item in events
@@ -721,6 +722,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     raise ValueError("event has no recorded model request to take the call target from")
                 target_window = recorded.payload["context_window"]
                 configured_output_limit = recorded.payload.get("configured_max_output_tokens")
+                target_modalities = recorded.payload.get("input_modalities")
             limits = model_limits(target_window, configured_output_limit)
             frame = StepFrame(
                 department=event.department, session_id=event.session_id, activation_id=activation,
@@ -730,7 +732,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             )
             before = events[:index]
             pinned = assembly.pin(current_work, frame, limits, step_id=payload.get("step_id", 1), events=before,
-                                  snapshot_hash=_assembly_snapshot_hash(events, index))
+                                  snapshot_hash=_assembly_snapshot_hash(events, index),
+                                  input_modalities=tuple(target_modalities or ()))
             if event.type == EventType.DEPARTMENT_INPUT:
                 if payload.get("step_id") != 1:
                     raise ValueError("department input does not belong to its activation start")
@@ -828,7 +831,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if items[1:] != expected.payload["input"][1:]:
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
-                    offered = set(offered_tools(current_work, event.department, guidance_only=frame.guidance_only))
+                    offered = set(offered_tools(current_work, event.department, guidance_only=frame.guidance_only,
+                                               input_modalities=tuple(target_modalities or ())))
                     if len(names) != len(set(names)) or set(names) != offered:
                         raise ValueError("actual tool schemas do not match the department's tools")
                     if schemas != expected.context.tools:
