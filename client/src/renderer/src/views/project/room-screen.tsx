@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { EventObject } from "../../api/generated/types.gen";
 import type { DepartmentWorkspaceResult } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
-import { createRafClock } from "../../pixel/clock";
+import { createRafClock, type Clock } from "../../pixel/clock";
 import { createRoomView, type RoomModel, type RoomView } from "../../pixel/room/view";
 import { collaborationSides, handoffOf } from "../../pixel/room/decl";
 import { StreamBubble } from "../../pixel/room/stream";
@@ -106,20 +106,24 @@ export function roomTestHooks(view: RoomView): RoomTestHooks {
 }
 
 /** 部门房间：画布与事件订阅；状态来自 department.workspace 的 room 数据。
- *  重新查询期间数据短暂为空时画面保持挂载（换事项不重建画面），用最近一次的部门与查询结果继续显示。 */
-export function RoomScreen(props: { app: ClientApp; data: DepartmentWorkspaceResult | null }): React.JSX.Element {
+ *  部门由页面按路由给出：查询结果到达之前也要按同一个部门订阅事件。
+ *  重新查询期间数据短暂为空时画面保持挂载（换事项不重建画面），用最近一次的查询结果继续显示。 */
+export function RoomScreen(props: { app: ClientApp; department: string; data: DepartmentWorkspaceResult | null }): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<RoomView | null>(null);
-  const clockRef = useRef<ReturnType<typeof createRafClock> | null>(null);
+  const clockRef = useRef<Clock | null>(null);
   const resyncRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // 最近一次的部门与查询结果：数据为空时沿用，避免重新查询期间重建画面
-  const lastDataRef = useRef<{ data: DepartmentWorkspaceResult; model: RoomModel } | null>(null);
-  if (props.data !== null) {
-    lastDataRef.current = { data: props.data, model: roomModelOf(props.data) };
+  // 最近一次的查询结果：数据为空时沿用，避免重新查询期间重建画面；换部门时清空
+  const lastDataRef = useRef<{ department: string; data: DepartmentWorkspaceResult; model: RoomModel } | null>(null);
+  if (lastDataRef.current !== null && lastDataRef.current.department !== props.department) {
+    lastDataRef.current = null;
+  }
+  if (props.data !== null && props.data.department === props.department) {
+    lastDataRef.current = { department: props.department, data: props.data, model: roomModelOf(props.data) };
   }
   const last = lastDataRef.current;
-  const department = last?.data.department ?? "product";
+  const department = props.department;
   const model: RoomModel | null = last?.model ?? null;
   // 思考气泡：查询 attempt.live 与按偏移接上片段的规则，跨效果重建保持同一份状态
   const bubbleRef = useRef(new StreamBubble());

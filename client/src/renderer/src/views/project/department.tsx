@@ -46,7 +46,7 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
       <Loading state={picked} />
       <Loading state={workspace} />
       <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
-        <RoomScreen app={props.app} data={data} />
+        <RoomScreen app={props.app} department={department} data={data} />
       </Section>
       {data ? (
         <>
