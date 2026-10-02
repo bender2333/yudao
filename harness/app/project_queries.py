@@ -19,6 +19,7 @@ from ..models import (
     ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, EventType, GIT_VERSION_EVENTS, ProjectEventType, hash_bytes,
 )
 from ..observability import ObservabilityQuery
+from ..providers.selection import ModelSelection
 from ..projection import (
     RunNotFoundError, project_run, replay_decisions, replay_project, replay_run, load_decisions, saved_project,
 )
@@ -553,6 +554,22 @@ class GuidanceRecord(Contract):
     created_event_id: str
 
 
+class EffectiveModel(Contract):
+    # 本部门当前生效的模型及来源（设计说明第 9.3 节）：按第 5.3 节的选择规则与当前目录计算，不发送请求。
+    # state 为 effective 时给出模型与来源；为 unusable 时给出 reason 与 message；
+    # 为 unset 时都没有设置。unusable 与 unset 时不返回其他连接或模型
+    state: Literal["effective", "unusable", "unset"]
+    provider_id: str | None = None
+    model_id: str | None = None
+    provider_name: str | None = None
+    protocol: str | None = None
+    model: str | None = None
+    selection_source: str | None = None
+    requested_tier: str | None = None
+    sent_tier: str | None = None
+    reason: str | None = None
+    message: str | None = None
+
 class DepartmentWorkspaceResult(Contract):
     project_id: str
     department: str
@@ -562,21 +579,43 @@ class DepartmentWorkspaceResult(Contract):
     active: bool
     prompt: DepartmentPromptState
     setting: DepartmentSetting
+    effective: EffectiveModel
     guidance: list[GuidanceRecord]
     messages: list[dict[str, Any]]
     context: dict[str, Any]
     last_call: dict[str, Any] | None
-    provider: dict[str, Any] | None
     reminders: list[str]
 
 
-def _effective_model_id(application: Application, state: Any, department: str) -> str | None:
-    # 本项目某部门的生效模型（设计说明第 5.3 节）：项目部门设置写入了模型时用它，否则用部门默认
-    project_model = state.department_settings[department].model_id
-    if project_model:
-        return project_model
-    binding = application.system.facade.providers_view()["bindings"].get(department) or {}
-    return binding.get("model_id")
+def _project_selection(setting: Any) -> ModelSelection | None:
+    # 项目部门设置中的模型选择：模型两项与请求档位分别写入，没有写入模型时为空（跟随部门默认）
+    if not setting.model_id:
+        return None
+    return ModelSelection(provider_id=setting.provider_id, model_id=setting.model_id,
+                          requested_tier=setting.requested_tier)
+
+def _effective_model(application: Application, setting: Any, department: str) -> EffectiveModel:
+    # 本部门当前生效的模型及来源（设计说明第 9.3 节）：按第 5.3 节的顺序解析，不发送请求。
+    # 没有任何一层写入模型时为「未设置」，引用无法使用时为「无法使用」并带回原因；
+    # 这两种情况都不返回其他连接或模型
+    resolution = application.system.facade.resolve_effective_model(department, _project_selection(setting))
+    if resolution.resolution is None:
+        return EffectiveModel(state="unset")
+    target = resolution.resolution
+    if not target.available:
+        return EffectiveModel(state="unusable", reason=target.reason, message=target.message)
+    public = target.public
+    return EffectiveModel(
+        state="effective",
+        provider_id=public.get("provider_config_id"),
+        model_id=public.get("model_id"),
+        provider_name=public.get("provider_name"),
+        protocol=public.get("protocol"),
+        model=public.get("requested_model"),
+        selection_source=target.selection_source,
+        requested_tier=public.get("requested_tier"),
+        sent_tier=public.get("sent_tier"),
+    )
 
 
 def _department_workspace(application: Application, request: DepartmentWorkspace
@@ -587,6 +626,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
     run = None if item is None else _optional_run(application, item.run_id)
     configured = state.department_settings[request.department]
     used_version = _last_used_prompt_version(run, request.department)
+    effective = _effective_model(application, configured, request.department)
     guidance = [
         GuidanceRecord(
             guidance_id=value.id, version=value.version, text=value.text, status=value.status,
@@ -620,12 +660,11 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
                 source=configured.source, provider_id=configured.provider_id,
                 model_id=configured.model_id, requested_tier=configured.requested_tier,
                 prompt_configured=configured.configured_prompt),
+            effective=effective,
             guidance=guidance, messages=messages, context=context,
             last_call=_last_call(run, request.department),
-            provider=None if run is None else run.provider_bindings.get(request.department),
             # 当前生效模型不具备本部门建议能力时的提醒（设计说明第 5.6 节「部门工作间」）
-            reminders=application.system.facade.model_reminders(
-                _effective_model_id(application, state, request.department), request.department),
+            reminders=application.system.facade.model_reminders(effective.model_id, request.department),
         ),
     )
 
