@@ -215,13 +215,18 @@ class ProviderFacade:
 
     def replace_catalog_document(self, raw: Mapping[str, Any]) -> int:
         # 导入整份文档：以当前修订号加一发布，文档里的旧修订号不会让修订号回退。
+        # 部门默认与角色默认只能引用已准入、并且属于所填连接的定义（设计说明第 4.6 节），导入时在此核对；
         # 导入移除被引用的定义、或移除被引用定义所属的连接时由应用层按移除单条定义的同一规则拒绝
-        # （模型管理设计说明第 4.5、4.6 节），引用方包含各部门默认与项目部门设置；
-        # 启动读取目录文件仍然容忍陈旧引用，两者走出不同的入口
+        # （第 4.5、4.6 节），引用方包含各部门默认与项目部门设置；
+        # 启动读取目录文件容错陈旧引用与未准入的默认，两者走出不同的入口
         with self._lock:
             document = dict(raw)
             document["revision"] = self._store.revision + 1
-            self.store_document(document)
+            store, bindings = _parse_document(document, self._startup_mode)
+            _require_bound_admissions(bindings, store, self._admissions)
+            self._store = store
+            self._bindings = bindings
+            self._publish()
             return self._store.revision
 
     def remove_model(self, provider_id: str, model_id: str,
@@ -924,7 +929,8 @@ class ProviderFacade:
                 issues = [{"location": issue.location, "message": issue.message}
                           for issue in exc.issues]
                 if not self._store.providers and not self._store.models and not self._bindings:
-                    reason = "provider_config_missing" if self._config_state in {"empty", "missing"} else "provider_invalid"
+                    reason = ("provider_config_missing"
+                              if self._config_state in {"empty", "missing", "deleted"} else "provider_invalid")
                     message = "尚未配置 Provider：请在控制台完成服务接入后再创建事项" if reason == "provider_config_missing" else "; ".join(
                         f"{item['location']}: {item['message']}" for item in issues)
                 else:
@@ -1173,12 +1179,13 @@ class ProviderFacade:
         except OSError:
             if self._disk_config_seen and self._disk_config_hash is None:
                 return False
-            # 明确删除目录文件表示撤销默认配置：新任务停止创建，旧任务不变；修订号继续前进
+            # 明确删除目录文件表示撤销默认配置：目录、部门默认与角色默认一起清空，部门默认变为「未设置」；
+            # 新任务停止创建，进行中事项的下一次模型请求进入待恢复；修订号继续前进（设计说明第 4.7 节）
             previous_revision = self._store.revision
             self._store = ProviderStore.empty()
             self._store.revision = previous_revision + 1
             self._bindings = {}
-            self._config_state = "missing"
+            self._config_state = "deleted"
             self._reload_error = None
             self._disk_config_hash = None
             self._disk_config_seen = True
@@ -1395,6 +1402,9 @@ def _optional_text(value: Any) -> str | None:
         return value
     return None
 
+# 部门默认在目录文档中的字段：模型两项与请求档位（设计说明第 5.1 节）
+_BINDING_FIELDS = frozenset({"provider_id", "model_id", "requested_tier"})
+
 def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]:
     if raw is None:
         return {}
@@ -1406,6 +1416,12 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
         location = f"bindings.{department}"
         if not isinstance(item, Mapping):
             issues.append(ValidationIssue(location, "应为对象"))
+            continue
+        # 部门默认只写入三项（设计说明第 4.6、5.1 节）：模型两项与请求档位；
+        # 未知字段整份拒绝并指出字段位置，界面表单与编辑 JSON 走同一套校验
+        unknown = sorted(set(item) - _BINDING_FIELDS, key=str)
+        if unknown:
+            issues.extend(ValidationIssue(f"{location}.{key}", "未知字段") for key in unknown)
             continue
         provider_id = item.get("provider_id")
         model_id = item.get("model_id")

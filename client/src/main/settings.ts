@@ -12,12 +12,15 @@ export type ConnectionSettings = {
   address: string;
   // 访问令牌：保留位置，当前不发送（TODO：令牌与 TLS，设计说明第 6.3 节）
   token: string;
+  // 「允许局域网访问」（设计说明第 4.3 节）：只对「本机」一项有意义，默认关闭，
+  // 保存在客户端的设置中；打开时启动服务带 --access lan --host 0.0.0.0
+  allowLan: boolean;
 };
 
 export const DEFAULT_LOCAL_ADDRESS = "http://127.0.0.1:8765";
 
 export function defaultSettings(): ConnectionSettings {
-  return { kind: "local", address: DEFAULT_LOCAL_ADDRESS, token: "" };
+  return { kind: "local", address: DEFAULT_LOCAL_ADDRESS, token: "", allowLan: false };
 }
 
 function settingsPath(): string {
@@ -33,7 +36,8 @@ export function e2eBackendAddress(): string | null {
 export function loadSettings(): ConnectionSettings {
   const override = e2eBackendAddress();
   if (override !== null) {
-    return { kind: "lan", address: override, token: "" };
+    // 端到端测试连接的是另一台部署：不是「本机」，局域网开关不适用
+    return { kind: "lan", address: override, token: "", allowLan: false };
   }
   try {
     const parsed = JSON.parse(readFileSync(settingsPath(), "utf8")) as Partial<ConnectionSettings>;
@@ -41,6 +45,7 @@ export function loadSettings(): ConnectionSettings {
       kind: parsed.kind === "lan" ? "lan" : "local",
       address: typeof parsed.address === "string" ? parsed.address : DEFAULT_LOCAL_ADDRESS,
       token: typeof parsed.token === "string" ? parsed.token : "",
+      allowLan: parsed.allowLan === true,
     };
   } catch {
     // 文件不存在或内容损坏：回到默认设置（本机）

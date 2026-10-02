@@ -235,7 +235,7 @@ async function settingsVersion(page: Page, id: string): Promise<number> {
 // 结束时核对控制台错误为零。改变服务端状态的用例排在后面（决定解答与实时事项放最后）。
 
 test.describe("项目页面（1440×900）", () => {
-  test("概览：摘要、循环画面占位、看板与流转记录都来自查询", async () => {
+  test("概览：摘要、循环画面、看板与流转记录都来自查询", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
     const page = client.page;
@@ -250,7 +250,9 @@ test.describe("项目页面（1440×900）", () => {
       await expect(summary).toContainText("当前成果");
       await expect(summary).toContainText(ADOPTED_SUMMARY);
       await expect(summary).toContainText("共 1");
-      await expect(await section(page, "循环画面")).toContainText("循环画面的位置");
+      // 循环画面由工单 #82 填入：像素楼层画在画布上，画布之外还有文字列表
+      const floor = await section(page, "循环画面");
+      await expect(floor.locator(".floor-screen canvas")).toHaveCount(1);
       const board = await section(page, "事项看板");
       await expect(board.locator(".board-col")).toHaveCount(6);
       await expect(board.locator("h3").filter({ hasText: "已采纳" })).toContainText("（1）");

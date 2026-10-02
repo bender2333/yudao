@@ -24,7 +24,7 @@ export type ClientListeners = {
   onEvent: (event: EventObject) => void;
 };
 
-// 把查询与命令交给生成的应用层接口；外壳提供它，以便单元测试注入替身
+// 把查询与命令交给生成的应用层接口；外壳提供它们，以便单元测试注入替身
 export type QueryRunner = <T>(client: Interface["client"], name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
 
 export class ClientApp {
@@ -34,11 +34,22 @@ export class ClientApp {
   private views: ViewSync | null = null;
   private boot: string | null = null;
   private capabilities: Capabilities | null = null;
+  // 页面级的事件订阅：视图同步之外，页面还需要测试与候选等事件的结果内容（工单 #93），
+  // 项目楼层这类按事件播放动作的画面也用它（工单 #82）
+  private readonly pageListeners = new Set<(event: EventObject) => void>();
+  // 项目楼层的重新同步订阅：缺口、断线重连、resync 时画面回到查询给出的状态
+  private readonly resyncSubscribers = new Set<() => void>();
 
   constructor(
     private readonly runQuery: QueryRunner,
     private readonly listeners: ClientListeners,
   ) {}
+
+  /** 订阅重新同步：收到时画面回到查询给出的状态，不补播已经播放过的动作。 */
+  subscribeResync(fn: () => void): () => void {
+    this.resyncSubscribers.add(fn);
+    return () => this.resyncSubscribers.delete(fn);
+  }
 
   get viewSync(): ViewSync | null {
     return this.views;
@@ -121,9 +132,20 @@ export class ClientApp {
   private onEvent(event: EventObject): void {
     this.views?.applyEvent(event.type, event.position);
     this.listeners.onEvent(event);
+    for (const listener of [...this.pageListeners]) {
+      listener(event);
+    }
     if (event.type === "decision_requested" || event.type === "decision_answered" || event.type === "decision_withdrawn") {
       void this.refreshPendingDecisions();
     }
+  }
+
+  // 订阅每一条到达的事件，返回取消订阅的函数；页面用它接收测试结果与候选采集的结果内容
+  subscribeEvents(listener: (event: EventObject) => void): () => void {
+    this.pageListeners.add(listener);
+    return () => {
+      this.pageListeners.delete(listener);
+    };
   }
 
   // 缺口或 resync：把视图标为「数据可能过时」，重新查询它们的快照，再从快照位置中最小的一个重新订阅
@@ -144,6 +166,8 @@ export class ClientApp {
     const position = await this.views!.refreshAll();
     this.closeStream();
     this.startStream(position);
+    // 画面回到查询给出的状态，不补播已经播放过的动作
+    for (const fn of [...this.resyncSubscribers]) fn();
   }
 
   async refreshPendingDecisions(): Promise<void> {
