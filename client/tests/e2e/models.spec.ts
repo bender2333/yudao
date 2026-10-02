@@ -310,6 +310,50 @@ for (const size of [
     }
   });
 
+  test(`${label}：编辑 JSON 带准入字段或引用候选时保存被拒绝，页面指出字段位置`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size, { admitAndBind: true });
+    const errors = watchErrors(client);
+    try {
+      await client.page.getByTestId("edit-json").click();
+      const dialog = client.page.locator(".modal");
+      const editor = dialog.getByLabel("目录文档 JSON");
+      const document = JSON.parse(await editor.inputValue()) as {
+        providers: Record<string, unknown>[]; models: Record<string, unknown>[]; bindings: Record<string, Record<string, unknown>>;
+      };
+
+      // 带准入字段：合同层拒绝，页面指出字段位置（models.0.admitted_at）
+      const withAdmission = JSON.parse(JSON.stringify(document)) as typeof document;
+      withAdmission.models[0].admitted_at = "2026-10-02T00:00:00Z";
+      await editor.fill(JSON.stringify(withAdmission, null, 2));
+      await dialog.getByRole("button", { name: "保存" }).click();
+      await expect(dialog.getByRole("status")).toContainText("models.0.admitted_at");
+      // 拒绝以后整份不写入：重新打开仍是原文档
+      await dialog.getByRole("button", { name: "重置" }).click();
+      await expect(editor).not.toHaveValue(/admitted_at/);
+
+      // 部门默认引用候选（未准入的定义）：领域校验拒绝并指出 bindings.<部门> 位置
+      const referencingCandidate = JSON.parse(JSON.stringify(document)) as typeof document;
+      referencingCandidate.bindings = {
+        product: { provider_id: "opencode-go", model_id: "not-admitted" },
+      };
+      await editor.fill(JSON.stringify(referencingCandidate, null, 2));
+      await dialog.getByRole("button", { name: "保存" }).click();
+      await expect(dialog.getByRole("status")).toContainText("bindings.product");
+      // 关闭以后目录不变：部门默认仍绑定 glm-4.6
+      await dialog.getByRole("button", { name: "关闭" }).click();
+      await expect(client.page.getByTestId("default-model-product")).toHaveValue("glm-4.6");
+      // 两次保存都被拒绝：浏览器会记录这两条被拒绝的响应，页面本身没有脚本错误
+      expect(errors).toEqual([
+        "Failed to load resource: the server responded with a status of 422 (Unprocessable Content)",
+        "Failed to load resource: the server responded with a status of 409 (Conflict)",
+      ]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
   test(`${label}：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废`, async () => {
     test.setTimeout(300_000);
     const { backend, client } = await openModels(size, { admitAndBind: true });

@@ -267,17 +267,12 @@ export function testKey(kind: "connection" | "model", providerId: string, modelI
 // 保存会作废准入的影响列表与删除的引用方（设计说明第 4.4、4.5 节，工单 #94）。
 // 数据来自应用层查询 catalog.change_impact（工单 #90），界面按它的结果弹确认框与列出引用方。
 // 后端按第 4.4、4.5 节的规则算出受影响与将被删除的定义，并汇总部门默认与各项目的项目部门设置两层引用方。
-
-// catalog.change_impact 的一项引用方（按后端合同 ChangeImpact 的字段读回）
-export type ImpactReference = {
-  kind: "department_default" | "project_setting" | "work_item";
-  text: string;
-};
-
 export type ModelImpact = {
+  // 保存会作废准入的模型访问定义，与删除 Provider 配置时将一并删除的定义
   impacted: string[];
   deletions: string[];
-  references: ImpactReference[];
+  // 引用方清单的显示文字：部门默认、各项目的项目部门设置与进行中事项（第 4.4、4.5 节）
+  references: string[];
 };
 
 // 后端各引用方清单的一项：位置串与它的显示文字
@@ -293,17 +288,17 @@ export function collectImpact(impact: {
   project_settings?: ImpactProjectSetting[];
   work_items?: ImpactWorkItem[];
 }): ModelImpact {
-  const references: ImpactReference[] = [];
+  const references: string[] = [];
   for (const item of impact.department_defaults ?? []) {
-    references.push({ kind: "department_default", text: `部门默认：${DEPARTMENT_LABELS[item.department] ?? item.department}` });
+    references.push(`部门默认：${DEPARTMENT_LABELS[item.department] ?? item.department}`);
   }
   for (const item of impact.project_settings ?? []) {
     const department = DEPARTMENT_LABELS[item.department] ?? item.department;
-    references.push({ kind: "project_setting", text: `项目部门设置：${item.project_name}（${department}）` });
+    references.push(`项目部门设置：${item.project_name}（${department}）`);
   }
   for (const item of impact.work_items ?? []) {
     const department = DEPARTMENT_LABELS[item.department] ?? item.department;
-    references.push({ kind: "work_item", text: `进行中事项：${item.project_name} · ${item.title}（${department}）` });
+    references.push(`进行中事项：${item.project_name} · ${item.title}（${department}）`);
   }
   return {
     impacted: (impact.impacted ?? []).map((item) => item.model_id),
@@ -320,7 +315,7 @@ export function confirmImpactText(impact: ModelImpact | null): string {
     return "";
   }
   const definitions = impact.impacted.length > 0 ? impact.impacted.join("、") : impact.deletions.join("、");
-  const references = impact.references.map((item) => item.text).join("；");
+  const references = impact.references.join("；");
   return `这次保存会让这些模型访问定义的准入作废，回到候选：${definitions}。`
     + `受影响的引用方：${references}。引用保留，相关角色的下一次模型请求不发送，事项进入待恢复。确认以后保存？`;
 }
@@ -332,7 +327,7 @@ export function providerDeleteConfirmation(impact: ModelImpact | null): string {
     return "";
   }
   if (impact.references.length > 0) {
-    return `这份 Provider 配置仍被引用，不能删除：${impact.references.map((item) => item.text).join("；")}。`;
+    return `这份 Provider 配置仍被引用，不能删除：${impact.references.join("；")}。`;
   }
   const deletions = impact.deletions.length === 0 ? "没有模型访问定义" : impact.deletions.join("、");
   return `删除这份 Provider 配置会一并删除它下面的模型访问定义：${deletions}。确认删除？`;
@@ -343,7 +338,7 @@ export function modelRemoveReferrers(impact: ModelImpact | null): string {
   if (impact === null || impact.references.length === 0) {
     return "";
   }
-  return `这条模型访问定义仍被引用，不能移除：${impact.references.map((item) => item.text).join("；")}。`;
+  return `这条模型访问定义仍被引用，不能移除：${impact.references.join("；")}。`;
 }
 
 // 引用准入已作废的定义时下拉框里保留它的显示（设计说明第 4.4 节表格：保留，显示「无法使用：准入已作废」）

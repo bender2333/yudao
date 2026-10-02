@@ -213,9 +213,9 @@ test("影响列表按第 4.4 节读回：受影响定义、引用方与进行中
   assert.deepEqual(impact.impacted, ["m1"]);
   assert.deepEqual(impact.deletions, []);
   assert.equal(impact.references.length, 3);
-  assert.match(impact.references[0].text, /部门默认：产品/);
-  assert.match(impact.references[1].text, /项目部门设置：示例项目（质检）/);
-  assert.match(impact.references[2].text, /进行中事项：示例项目 · 实现回声工具（产品）/);
+  assert.match(impact.references[0], /部门默认：产品/);
+  assert.match(impact.references[1], /项目部门设置：示例项目（质检）/);
+  assert.match(impact.references[2], /进行中事项：示例项目 · 实现回声工具（产品）/);
 
   // 确认文字：没有引用方、没有受影响定义时为空（界面据此决定不弹确认框）
   assert.equal(confirmImpactText(null), "");

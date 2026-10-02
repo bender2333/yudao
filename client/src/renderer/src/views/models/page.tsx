@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CommandOutcome } from "../../contract/invoke";
+import type { Rejected } from "../../api/generated/types.gen";
 import type { ViewSync } from "../../contract/view-sync";
 import type {
   Catalog,
@@ -78,7 +79,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   // 由应用层查询 catalog.change_impact 算出，界面按它弹确认框与列出引用方
   const [saveImpact, setSaveImpact] = useState<ModelImpact | null>(null);
   const [deleteImpact, setDeleteImpact] = useState<ModelImpact | null>(null);
-  const [pendingSave, setPendingSave] = useState<{ name: string; body: Record<string, unknown> } | null>(null);
+  const [pendingSave, setPendingSave] = useState<Record<string, unknown> | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const views = props.views;
@@ -187,27 +188,6 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setForm({ mode: "add", state: emptyFormState() });
   }, []);
 
-  const submitForm = useCallback(async () => {
-    if (!form) {
-      return;
-    }
-    const rows = form.state.rows;
-    if (!rowsSavable(rows)) {
-      setFormStatus({ kind: "error", message: "窗口与输出上限没有「接受」或修改的行不能保存。" });
-      return;
-    }
-    // 保存会作废准入时先弹确认框：影响列表由 catalog.change_impact 算出（设计说明第 4.4 节）
-    const confirmation = confirmImpactText(saveImpact);
-    if (confirmation !== "") {
-      setPendingSave({
-        name: "catalog.connection.save",
-        body: { provider: providerInputFromForm(form.state), models: rows.map(rowToModelInput) },
-      });
-      return;
-    }
-    await runSave({ provider: providerInputFromForm(form.state), models: rows.map(rowToModelInput) });
-  }, [form, submit, saveImpact]);
-
   const runSave = useCallback(async (body: Record<string, unknown>) => {
     setBusy(true);
     const result = await submit("catalog.connection.save", body);
@@ -218,6 +198,24 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       setForm(null);
     }
   }, [submit]);
+
+  const submitForm = useCallback(async () => {
+    if (!form) {
+      return;
+    }
+    const rows = form.state.rows;
+    if (!rowsSavable(rows)) {
+      setFormStatus({ kind: "error", message: "窗口与输出上限没有「接受」或修改的行不能保存。" });
+      return;
+    }
+    // 保存会作废准入时先弹确认框：影响列表由 catalog.change_impact 算出（设计说明第 4.4 节）
+    const body = { provider: providerInputFromForm(form.state), models: rows.map(rowToModelInput) };
+    if (confirmImpactText(saveImpact) !== "") {
+      setPendingSave(body);
+      return;
+    }
+    await runSave(body);
+  }, [form, runSave, saveImpact]);
 
   const deleteProvider = useCallback(async (providerId: string) => {
     // 删除之前按第 4.5 节取回引用方与将一并删除的定义；被引用时确认框列出引用方，拒绝删除
@@ -690,7 +688,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             <p className="mm-warn" data-testid="confirm-save-list">{confirmImpactText(saveImpact)}</p>
             <div className="mm-actions">
               <button type="button" className="primary" data-testid="confirm-save-yes" disabled={busy}
-                      onClick={() => void runSave(pendingSave.body)}>确认保存</button>
+                      onClick={() => void runSave(pendingSave)}>确认保存</button>
               <button type="button" data-testid="confirm-save-no" onClick={() => setPendingSave(null)}>取消</button>
             </div>
           </div>
@@ -734,7 +732,15 @@ function interpret(outcome: CommandOutcome): SubmitResult {
   if (outcome.ok) {
     return { ok: true, message: "" };
   }
-  const rejection = outcome.rejection;
+  const rejection = outcome.rejection as Rejected & { detail?: { loc?: unknown[]; msg?: string }[] };
+  // 合同校验失败（422）返回错误明细，逐条指出字段位置（第 4.6 节）；命令被拒绝（409）返回原因与当前版本
+  if (Array.isArray(rejection.detail)) {
+    const parts = rejection.detail.map((item) => {
+      const location = Array.isArray(item.loc) ? item.loc.filter((part) => part !== "body").join(".") : "";
+      return location === "" ? String(item.msg ?? "") : `${location}：${item.msg ?? ""}`;
+    });
+    return { ok: false, message: parts.join("；") };
+  }
   const current = rejection.current_version;
   return {
     ok: false,
