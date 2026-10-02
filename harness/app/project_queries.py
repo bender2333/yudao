@@ -16,7 +16,8 @@ from ..git_audit import git_version_detail
 from ..definitions import DEFINITIONS
 from ..event_store import run_stream
 from ..models import (
-    ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, EventType, GIT_VERSION_EVENTS, ProjectEventType, hash_bytes,
+    ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
+    ProjectEventType, hash_bytes,
 )
 from ..observability import ObservabilityQuery
 from ..providers.selection import ModelSelection
@@ -1559,7 +1560,10 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 EventType.DEPARTMENT_GUIDANCE_APPLIED, EventType.DEPARTMENT_GUIDANCE_RESPONDED,
                 EventType.DEPARTMENT_ACTIVATED, EventType.MODEL_REQUESTED, EventType.MODEL_MESSAGE,
                 EventType.CONTEXT_ASSEMBLED, EventType.COMPACTION_RECORDED, EventType.USER_INPUT_RECEIVED,
-                EventType.DEPARTMENT_INPUT),
+                EventType.DEPARTMENT_INPUT,
+                # 本项目的部门设置修改以后生效模型与来源随之更新（工单 #95 的验收）；
+                # 目录修订（准入作废、连接修改）以后引用可用性随之更新
+                ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, CatalogEventType.CATALOG_REVISED),
 )
 
 RUN_ACTIONS = QueryDefinition(
@@ -1603,7 +1607,9 @@ PROJECT_SETTINGS = QueryDefinition(
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
                 ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED,
-                ProjectEventType.SOURCE_DIRECTORY_CONFIGURED),
+                ProjectEventType.SOURCE_DIRECTORY_CONFIGURED,
+                # 目录修订（准入作废、模型变更）以后生效模型的建议能力提醒随之更新（工单 #95）
+                CatalogEventType.CATALOG_REVISED),
 )
 
 RUN_EXPORT = QueryDefinition(
