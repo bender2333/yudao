@@ -2332,6 +2332,9 @@
    "kind": "sdk_request",
    "media_type": "application/json",
    "content": {
+    "include": [
+     "reasoning.encrypted_content"
+    ],
     "input": "<shared#2>",
     "max_output_tokens": 2048,
     "model": "scenario-model",
