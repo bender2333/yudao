@@ -1,0 +1,99 @@
+{
+  "proxy": "http://127.0.0.1:51517",
+  "run_id": "run_0b172ad991f04509",
+  "phase_after_two": "ENGINEERING",
+  "requests": [
+    {
+      "path": "/v1/responses",
+      "model": "ag/claude-opus-4-6-thinking",
+      "reasoning_params": {},
+      "replayed_reasoning_items": 0
+    },
+    {
+      "path": "/v1/responses",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "reasoning_params": {},
+      "replayed_reasoning_items": 0
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "ag/claude-opus-4-6-thinking",
+      "reasoning_params": {
+        "reasoning_effort": "medium"
+      },
+      "replayed_reasoning_messages": 0,
+      "sample": null
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "reasoning_params": {
+        "reasoning_effort": "medium"
+      },
+      "replayed_reasoning_messages": 0,
+      "sample": null
+    },
+    {
+      "path": "/v1/messages",
+      "model": "ag/claude-opus-4-6-thinking",
+      "reasoning_params": {
+        "thinking": {
+          "type": "adaptive"
+        },
+        "output_config": {
+          "effort": "medium"
+        }
+      },
+      "replayed_thinking_blocks": 0
+    },
+    {
+      "path": "/v1/messages",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "reasoning_params": {
+        "thinking": {
+          "type": "adaptive"
+        },
+        "output_config": {
+          "effort": "medium"
+        }
+      },
+      "replayed_thinking_blocks": 0
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "reasoning_params": {
+        "reasoning_effort": "medium"
+      },
+      "replayed_reasoning_messages": 0,
+      "sample": null
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "reasoning_params": {
+        "reasoning_effort": "medium"
+      },
+      "replayed_reasoning_messages": 1,
+      "sample": "Let me look at the workspace first.\n\nThe task: create product spec. Let me check"
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "reasoning_params": {
+        "reasoning_effort": "medium"
+      },
+      "replayed_reasoning_messages": 0,
+      "sample": null
+    },
+    {
+      "path": "/v1/chat/completions",
+      "model": "cbcn/deepseek-v4.1-flash",
+      "reasoning_params": {
+        "reasoning_effort": "medium"
+      },
+      "replayed_reasoning_messages": 1,
+      "sample": "The task: submit a plan bound to current contract hash, then write src/echo.py, "
+    }
+  ]
+}
