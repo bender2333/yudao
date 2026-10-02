@@ -31,6 +31,7 @@ from harness.adapters.base import ProviderError  # noqa: E402
 from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
 from harness.app.application import Application  # noqa: E402
+from harness.app.client_update import ReleaseAssets  # noqa: E402
 from harness.app.catalog_commands import (  # noqa: E402
     BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, ModelInput, ProviderInput,
 )
@@ -249,6 +250,10 @@ def main() -> int:
     # 端到端测试核对「接口版本不同时只显示更新页」：让服务报告一个不同的接口版本，
     # 就像一个已经升级或尚未升级的部署那样（真实 HTTP 响应，不改动被测代码）
     parser.add_argument("--api-version", type=int, default=None)
+    # 更新源（设计说明第 5.1 节，工单 #208）：把发布资源目录指到这里，服务从它提供
+    # /client-update/latest.yml 与安装程序。不给出时用 wheel 内的 harness/release_assets，
+    # 从源码运行没有这个目录，请求返回 404（更新页的「控制主机没有提供客户端安装包」）
+    parser.add_argument("--release-assets", default=None)
     # api：以 `yudao api` 命令的方式运行（工单 #207）。命令行的替身把收到的参数原样交给本脚本，
     # 因此这里接到的子命令与真正的 yudao 命令一致；端口固定为客户端连接的本机端口，
     # 接受本机停止请求并在收到以后退出，与 harness.api.server 的行为一致
@@ -282,9 +287,11 @@ def main() -> int:
         application.reported_api_version = args.api_version
 
     # 本机停止请求：请求到达时让 uvicorn 优雅退出（harness/api/server.py 的 _request_stop）
+    assets = ReleaseAssets(Path(args.release_assets)) if args.release_assets else ReleaseAssets()
     server = uvicorn.Server(uvicorn.Config(
         lambda: create_app(lambda: application, access=args.access,
-                            on_stop=lambda: setattr(server, "should_exit", True)),
+                            on_stop=lambda: setattr(server, "should_exit", True),
+                            release_assets=assets),
         host=args.host, port=port,
         log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0))
 

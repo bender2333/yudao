@@ -19,17 +19,26 @@ export type Backend = {
 export type ClientApp = {
   app: ElectronApplication;
   page: Page;
+  // 客户端进程结束的 Promise：更新时客户端退出并静默安装，测试用它等旧进程结束
+  exited: Promise<void>;
   close: () => Promise<void>;
 };
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 // 启动真实后端：脚本在 client/tests/e2e/backend.py 中，用仓库项目的 Python 环境运行。
-// apiVersion 让服务报告一个不同的接口版本，用于核对更新页
-export async function startBackend(options: { apiVersion?: number; admitAndBind?: boolean } = {}): Promise<Backend> {
-  const script = ["client/tests/e2e/backend.py", "--port", "0"];
+// apiVersion 让服务报告一个不同的接口版本，用于核对更新页；releaseAssets 给出更新源目录
+// （工单 #208：服务从它提供 /client-update/latest.yml 与安装程序）；port 固定端口，
+// 更新地址里的端口要与它一致，客户端才会从同一个服务下载安装程序
+export async function startBackend(
+  options: { apiVersion?: number; admitAndBind?: boolean; releaseAssets?: string; port?: number } = {},
+): Promise<Backend> {
+  const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {
     script.push("--api-version", String(options.apiVersion));
+  }
+  if (options.releaseAssets !== undefined) {
+    script.push("--release-assets", options.releaseAssets);
   }
   if (options.admitAndBind === true) {
     script.push("--admit-and-bind");
@@ -156,6 +165,7 @@ async function launchClient(options: {
   return {
     app,
     page,
+    exited,
     // 本机模式的收尾走生产的退出入口：托盘「退出客户端」（设计说明第 4.5 节）。
     // 退出以后客户端进程结束而服务仍在运行（ADR-0023），所以只能等进程退出事件：
     // Playwright 的 app.close() 还要等它的启动管道关闭，而本机服务是客户端拉起的独立
@@ -202,4 +212,48 @@ export function collectConsoleErrors(page: Page): string[] {
   });
   page.on("pageerror", (error) => errors.push(error.message));
   return errors;
+}
+
+// 启动已经安装的客户端（工单 #208）：安装目录里的可执行文件是真实的打包版本，app.isPackaged
+// 为真，更新时读取安装目录中的 app-update.yml，检查、下载与安装都按生产路径运行。
+// 与开发目录启动的 launchClient 分开：这里启动的是安装出来的 exe，可执行文件与用户那一份同名不同目录
+export async function launchInstalledClient(options: {
+  executablePath: string;
+  userData: string;
+  backendAddress: string;
+  env?: Record<string, string>;
+}): Promise<ClientApp> {
+  const app = await electron.launch({
+    executablePath: options.executablePath,
+    env: {
+      ...process.env,
+      YUDAO_E2E_USER_DATA: options.userData,
+      YUDAO_E2E_BACKEND: options.backendAddress,
+      ...options.env,
+    },
+  });
+  const child = app.process();
+  const exited = new Promise<void>((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+    } else {
+      child.on("exit", () => resolve());
+    }
+  });
+  const page = await app.firstWindow();
+  await page.waitForLoadState("domcontentloaded");
+  let closed = false;
+  return {
+    app,
+    page,
+    exited,
+    close: async () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      await app.close().catch(() => undefined);
+      await exited;
+    },
+  };
 }
