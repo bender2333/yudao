@@ -8,11 +8,12 @@ import type { Capabilities, DecisionList, ProjectList, ProjectRow, SystemStatus 
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
 import type { ConnectionSettings } from "./contract/settings";
-import { defaultSettings } from "./contract/settings";
+import { defaultSettings, DEFAULT_LOCAL_ADDRESS } from "./contract/settings";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { parseRoute, paths, type Route } from "./shell/routing";
 import { ConnectPage, UpdatePage } from "./views/connect";
+import { SettingsPage as ClientSettingsPage } from "./views/settings";
 import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
 import { DepartmentPage } from "./views/project/department";
@@ -38,6 +39,8 @@ export function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [loginAtStartup, setLoginAtStartup] = useState(false);
+  const [localServiceMessage, setLocalServiceMessage] = useState<string | null>(null);
 
   // 客户端应用：查询经生成的调用发出，事件到达时更新状态与待决定数量
   const app = useMemo(() => {
@@ -62,7 +65,8 @@ export function App() {
   // 也不在控制台留下一次注定失败的连接
   const galleryOnly = import.meta.env.DEV && route.name === "gallery";
 
-  // 启动：读取保存的连接设置并连接
+  // 启动：读取保存的连接设置并连接。连接设置是「本机」时先让主进程启动本机服务
+  // （设计说明第 4.3 节：服务已经运行就直接连接，没有运行就启动它，最多等待 30 秒）
   useEffect(() => {
     if (galleryOnly) {
       return;
@@ -74,6 +78,24 @@ export function App() {
         return;
       }
       setSettings(stored);
+      if (stored.kind === "local") {
+        const started = await window.yudao?.startLocalService(stored.allowLan);
+        if (cancelled) {
+          return;
+        }
+        if (started && !started.started) {
+          // 找不到 yudao 命令：显示安装命令与「重新检测」，不尝试连接（设计说明第 4.3 节第 3 步）。
+          // 只在还停在默认首页时切到设置页；用户或测试已经打开了别的页面（例如开发时的动作图鉴）
+          // 就不抢走他们的导航
+          setLocalServiceMessage(started.message);
+          setConnectError("本机没有运行 Yudao 服务，也没有找到 yudao 命令。");
+          if (parseRoute(window.location.hash).name === "home") {
+            window.location.hash = paths.clientSettings();
+          }
+          return;
+        }
+        setLocalServiceMessage(null);
+      }
       await app.open(stored);
     })();
     return () => {
@@ -81,6 +103,21 @@ export function App() {
       app.close();
     };
   }, [app, galleryOnly]);
+
+  // 登录时启动客户端（设计说明第 4.5 节）：以注册表里的实际值为准
+  useEffect(() => {
+    void (async () => {
+      const item = await window.yudao?.getLoginItem();
+      if (item) {
+        setLoginAtStartup(item.openAtLogin);
+      }
+    })();
+  }, []);
+
+  // 托盘菜单的「停止 Yudao」只在连接本机时出现（设计说明第 4.5 节）
+  useEffect(() => {
+    void window.yudao?.setConnectedLocal(state.kind === "connected" && state.address === DEFAULT_LOCAL_ADDRESS);
+  }, [state]);
 
   // 路由：监听 hash 变化
   useEffect(() => {
@@ -133,9 +170,79 @@ export function App() {
     await app.open(settings);
   }, [app, settings]);
 
+  // 连接「本机」时（设计说明第 4.3 节）：先请求服务，没有运行就启动它，最多等待 30 秒。
+  // 找到不到 yudao 命令时把安装命令提示显示在设置页，用户可以「重新检测」
+  const connectTo = useCallback(
+    async (next: ConnectionSettings) => {
+      if (next.kind === "local") {
+        const started = await window.yudao?.startLocalService(next.allowLan);
+        if (started && !started.started) {
+          setLocalServiceMessage(started.message);
+          setSettings(next);
+          await window.yudao?.saveSettings(next);
+          setConnectError("本机没有安装 Yudao 服务，用设置页里的命令安装以后再连接。");
+          return;
+        }
+        setLocalServiceMessage(null);
+      }
+      setSettings(next);
+      await window.yudao?.saveSettings(next);
+      await app.open(next);
+    },
+    [app],
+  );
+
   const onSaveSettings = useCallback(async (next: ConnectionSettings) => {
     setSettings(next);
     await window.yudao?.saveSettings(next);
+  }, []);
+
+  // 「允许局域网访问」开关（设计说明第 4.3 节）：保存在客户端设置；改动不影响正在运行的服务，
+  // 访问方式与开关不同时设置页显示「重新启动服务后生效」
+  const onAllowLan = useCallback(
+    async (allowLan: boolean) => {
+      const next = { ...(settings ?? defaultSettings()), allowLan };
+      setSettings(next);
+      await window.yudao?.saveSettings(next);
+    },
+    [settings],
+  );
+
+  // 「重新启动」：访问方式与开关不同时使用；读运行中的事项数（大于 0 时主进程先确认），
+  // 用本机停止请求停止服务，再按开关启动（设计说明第 4.3 节）
+  const onRestartLocal = useCallback(async () => {
+    const allowLan = settings?.allowLan ?? false;
+    const result = await window.yudao?.restartLocalService(allowLan);
+    if (!result) {
+      return;
+    }
+    if (result.stopped) {
+      setConnectError(null);
+      await reconnect();
+    } else {
+      setConnectError(result.message);
+    }
+  }, [settings, reconnect]);
+
+  const stopLocalService = useCallback(async () => {
+    const result = await window.yudao?.stopLocalService();
+    if (!result) {
+      return;
+    }
+    if (result.stopped) {
+      setLocalServiceMessage(result.message);
+      setConnectError("Yudao 服务已经停止。连接它时客户端会重新启动。");
+    } else {
+      setConnectError(result.message);
+    }
+  }, []);
+
+  // 登录时启动客户端（设计说明第 4.5 节）：写入当前用户的启动项；写成功以后再显示为打开
+  const onLoginAtStartup = useCallback(async (enabled: boolean) => {
+    const result = await window.yudao?.setLoginItem(enabled);
+    if (result) {
+      setLoginAtStartup(result.openAtLogin);
+    }
   }, []);
 
   // 动作图鉴只在开发时可用：直接开 #/gallery 就能看画法，不必先连上后端。
@@ -145,6 +252,35 @@ export function App() {
       <Suspense fallback={<div className="gate"><div className="card"><h1>正在载入图鉴…</h1></div></div>}>
         <LazyGallery />
       </Suspense>
+    );
+  }
+  // 设置页在连接与否都显示：连接「本机」而找不到 yudao 命令时客户端没有连上，
+  // 这时安装命令与「重新检测」正是要给用户看的内容（设计说明第 4.3 节）
+  // 服务正在运行且访问方式与「允许局域网访问」开关不同（从能力清单的 deployment.access 读出）
+  // 时显示「重新启动服务后生效」（设计说明第 4.3 节）
+  const localConnected = state.kind === "connected" && state.address === DEFAULT_LOCAL_ADDRESS;
+  const wantAccess = (settings ?? defaultSettings()).allowLan ? "lan" : "local";
+  const lanRestartNeeded = localConnected && state.capabilities.deployment.access !== wantAccess;
+  // 没有连接时，设置页单独显示：连接「本机」而找不到 yudao 命令时客户端没有连上，
+  // 这时安装命令与「重新检测」正是要给用户看的内容（设计说明第 4.3 节）。
+  // 已经连接时设置页显示在外壳里（下面），顶栏的连接状态与托盘入口保持可见
+  if (route.name === "client-settings" && state.kind !== "connected") {
+    return (
+      <ClientSettingsPage
+        settings={settings ?? defaultSettings()}
+        loginAtStartup={loginAtStartup}
+        localConnected={localConnected}
+        localMessage={localServiceMessage}
+        lanRestartNeeded={lanRestartNeeded}
+        onChange={(next) => void onSaveSettings(next)}
+        onConnect={(next) => void connectTo(next)}
+        onStopLocal={() => void stopLocalService()}
+        onRestartLocal={() => void onRestartLocal()}
+        onAllowLan={(allowLan) => void onAllowLan(allowLan)}
+        onLoginAtStartup={(enabled) => void onLoginAtStartup(enabled)}
+        connecting={state.kind === "connecting"}
+        error={connectError}
+      />
     );
   }
   if (state.kind === "connecting") {
@@ -210,7 +346,23 @@ export function App() {
         />
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="content">
-          {route.name === "sys-models" ? (
+          {route.name === "client-settings" ? (
+            <ClientSettingsPage
+              settings={settings ?? defaultSettings()}
+              loginAtStartup={loginAtStartup}
+              localConnected={localConnected}
+              localMessage={localServiceMessage}
+              lanRestartNeeded={lanRestartNeeded}
+              onChange={(next) => void onSaveSettings(next)}
+              onConnect={(next) => void connectTo(next)}
+              onStopLocal={() => void stopLocalService()}
+              onRestartLocal={() => void onRestartLocal()}
+              onAllowLan={(allowLan) => void onAllowLan(allowLan)}
+              onLoginAtStartup={(enabled) => void onLoginAtStartup(enabled)}
+              connecting={false}
+              error={connectError}
+            />
+          ) : route.name === "sys-models" ? (
             <ModelManagementPage
               views={app.viewSync}
               command={(name, body) => app.command(name, body)}

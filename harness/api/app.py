@@ -63,26 +63,29 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
     api.add_api_route("/api/capabilities", capabilities, methods=["GET"], response_model=Capabilities,
                       operation_id="capabilities", tags=["capabilities"])
     # 本机停止请求（设计说明第 4.4 节）：不是命令，不产生领域事件，不经过命令注册表
-    _add_stop(api, access=access, on_stop=on_stop)
+    _add_stop(api, on_stop=on_stop)
     # 更新源（设计说明第 5.1 节）：不是查询与命令，从 wheel 内的发布资源目录读取
     _add_client_update(api, assets=release_assets)
-    # CORS 只允许客户端页面的来源（第 6.2 节）。中间件最后添加的最先执行：认证在 CORS 之前
+    # CORS 只允许客户端页面的来源（第 6.2 节）。中间件最后添加的最先执行：认证在 CORS 之前。
+    # 事件流续传时浏览器带 Last-Event-ID（第 5.5 节的续传位置），它不在 CORS 的默认允许头里，
+    # 预检会被拒；Accept 也一并在允许之列
     api.add_middleware(CORSMiddleware, allow_origins=list(CLIENT_ORIGINS), allow_methods=["GET", "POST"],
-                       allow_headers=["Content-Type"])
+                       allow_headers=["Content-Type", "Accept", "Last-Event-ID"])
     api.add_middleware(AccessMiddleware, access=access)
     api.openapi = lambda: _openapi(api)
     _add_events(api, keepalive_sec=keepalive_sec)
     return api
 
-def _add_stop(api: FastAPI, *, access: AccessMode, on_stop: Callable[[], None] | None) -> None:
-    # POST /api/system/stop：只在本机访问方式下接受，并且请求来自回环地址；局域网访问方式下拒绝。
+def _add_stop(api: FastAPI, *, on_stop: Callable[[], None] | None) -> None:
+    # POST /api/system/stop：两种访问方式下都接受来自回环地址的请求（带 Origin 时只接受客户端页面的
+    # 来源，由 AccessMiddleware 拒绝其他来源），来自其他地址的请求拒绝。设计说明第 4.4 节。
     # 服务收到以后停止接受新请求、关闭事件流连接、等待进行中的写入完成、释放进程锁并退出；
     # 进行中的 run 不等待结束，下次启动时按 3.1 自动继续
     async def stop(request: Request) -> Response:
         peer = request.client.host if request.client is not None else ""
-        if access != "local" or not _is_loopback(peer):
+        if not _is_loopback(peer):
             return JSONResponse(status_code=403, content={"error": "the stop request is only accepted "
-                                                                    "from a loopback address in local access mode"})
+                                                                    "from a loopback address"})
         if on_stop is None:
             return JSONResponse(status_code=503, content={"error": "this service does not accept a stop request"})
         on_stop()

@@ -9,12 +9,15 @@ export type ConnectionSettings = {
   address: string;
   // 访问令牌：保留位置，当前不发送（TODO：令牌与 TLS）
   token: string;
+  // 「允许局域网访问」（设计说明第 4.3 节）：只对「本机」一项有意义，默认关闭；打开时
+  // 客户端启动服务带上 --access lan --host 0.0.0.0
+  allowLan: boolean;
 };
 
 export const DEFAULT_LOCAL_ADDRESS = "http://127.0.0.1:8765";
 
 export function defaultSettings(): ConnectionSettings {
-  return { kind: "local", address: DEFAULT_LOCAL_ADDRESS, token: "" };
+  return { kind: "local", address: DEFAULT_LOCAL_ADDRESS, token: "", allowLan: false };
 }
 
 // 地址规范化：去掉末尾的斜杠，留下协议、主机与端口。地址不合法时就地抛出，由调用方显示原因

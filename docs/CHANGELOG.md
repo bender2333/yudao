@@ -452,3 +452,5 @@ claude-opus-5-5 / 2026-10-02 09:36 / 修改桌面客户端的安装、更新与�
 claude-opus-5-5 / 2026-10-02 09:53 / ADR-0024 后果加入「忽略规则以 libgit2 为准」与取回规则的差异；docs/design/local-tools.md、docs/design/existing-project-onboarding.md 的忽略规则判断口径改为进程内用 pygit2；docs/architecture-issues.md 为 #235 的条目写处理结论 / 用户确认按 libgit2 处理
 claude-opus-5-5 / 2026-10-02 11:06 / 专题 2：浏览器与 computer use 设计说明第 1、2、3、5、6.1、7.3、9、11.2、12、13、14、15、16、17 节改为控制主机交互桌面上的真实输入、用户同意与独占、等待解锁与让出、截图缩放与坐标换算、启动命令按系统给出；新增 ADR-0026；执行环境服务第 7.2 节记录执行位置的系统；应用层与接口层增加 trial.stop_desktop、决定种类「使用本机桌面」与两个待恢复原因；客户端设计说明第 4.5 节增加托盘项与提示框；测试分层增加 desktop 标记；恢复契约第 4 节试用一行；总体架构、设计索引、D34、需求概览第 6 节第 2 项、Stage 3 计划去掉待专题 2 / 用户 2026-10-02 决定 computer use 现阶段只考虑 Windows 并采纳各轮建议
 claude-opus-5-5 / 2026-10-02 11:06 / 模型管理设计说明第 5.3 节增加事项种类的工作说明，接入已有项目设计说明第 4.2 节相应修改，CONTEXT.md 新增术语，architecture-issues.md 为 #89 的一条写处理结论；decision.md 记两条 / 处理 #89 登记的部门 Prompt 与种类说明的冲突，用户采纳建议
+
+9router/ag/gemini-3.8-flash-high / 2026-10-02 13:50 / docs/architecture-issues.md 追加一条：#207 记录 `harness/tests/test_api.py` 的命令清单期望缺少 `catalog.model.remove`，该失败在 origin/main（e15b5d23）上就存在，与本工单改动无关 / 执行 #207 的模块层自测时发现并登记，交由 #90 或接口合同维护工单修
