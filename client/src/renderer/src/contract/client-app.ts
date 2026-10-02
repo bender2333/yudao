@@ -7,6 +7,7 @@
 import type { Capabilities, DecisionList, EventObject } from "../api/generated/types.gen";
 import { connect, interfaceFor, type Interface } from "./connection";
 import { EventStreamClient } from "./event-stream";
+import type { CommandOutcome } from "./invoke";
 import type { ConnectionSettings } from "./settings";
 import { ViewSync } from "./view-sync";
 
@@ -23,8 +24,9 @@ export type ClientListeners = {
   onEvent: (event: EventObject) => void;
 };
 
-// 把查询与命令交给生成的应用层接口；外壳提供它，以便单元测试注入替身
+// 把查询与命令交给生成的应用层接口；外壳提供它们，以便单元测试注入替身
 export type QueryRunner = <T>(client: Interface["client"], name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
+export type CommandRunner = (client: Interface["client"], name: string, body: unknown) => Promise<CommandOutcome>;
 
 export class ClientApp {
   private iface: Interface | null = null;
@@ -33,9 +35,12 @@ export class ClientApp {
   private views: ViewSync | null = null;
   private boot: string | null = null;
   private capabilities: Capabilities | null = null;
+  // 页面级的事件订阅：视图同步之外，页面还需要测试与候选等事件的结果内容（工单 #93）
+  private readonly pageListeners = new Set<(event: EventObject) => void>();
 
   constructor(
     private readonly runQuery: QueryRunner,
+    private readonly submitCommand: CommandRunner,
     private readonly listeners: ClientListeners,
   ) {}
 
@@ -85,6 +90,14 @@ export class ClientApp {
     return this.runQuery<T>(this.iface.client, name, params);
   }
 
+  // 提交一个命令：Accepted 与 Rejected 都原样交回，由页面显示结果；未连接时直接失败
+  async command(name: string, body: unknown): Promise<CommandOutcome> {
+    if (!this.iface) {
+      throw new Error("尚未连接");
+    }
+    return this.submitCommand(this.iface.client, name, body);
+  }
+
   // 不按项目筛选的事件流：窗口关闭时也保持（设计说明第 5.7 节）
   private startStream(after: number): void {
     this.stream = new EventStreamClient(this.iface!.baseUrl, {}, {
@@ -111,9 +124,20 @@ export class ClientApp {
   private onEvent(event: EventObject): void {
     this.views?.applyEvent(event.type, event.position);
     this.listeners.onEvent(event);
+    for (const listener of this.pageListeners) {
+      listener(event);
+    }
     if (event.type === "decision_requested" || event.type === "decision_answered" || event.type === "decision_withdrawn") {
       void this.refreshPendingDecisions();
     }
+  }
+
+  // 订阅每一条到达的事件，返回取消订阅的函数；页面用它接收测试结果与候选采集的结果内容
+  subscribeEvents(listener: (event: EventObject) => void): () => void {
+    this.pageListeners.add(listener);
+    return () => {
+      this.pageListeners.delete(listener);
+    };
   }
 
   // 缺口或 resync：把视图标为「数据可能过时」，重新查询它们的快照，再从快照位置中最小的一个重新订阅

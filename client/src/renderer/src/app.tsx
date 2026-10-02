@@ -5,13 +5,14 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, ProjectList, ProjectRow, SystemStatus } from "./api/generated/types.gen";
 import { ClientApp, type ClientState } from "./contract/client-app";
-import { callQuery } from "./contract/invoke";
+import { callCommand, callQuery } from "./contract/invoke";
 import type { ConnectionSettings } from "./contract/settings";
 import { defaultSettings } from "./contract/settings";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { parseRoute, paths, type Route } from "./shell/routing";
 import { ConnectPage, UpdatePage } from "./views/connect";
+import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
 
 // 图鉴页只在开发时用到；用动态导入把它挡在正式包之外
@@ -34,7 +35,7 @@ export function App() {
 
   // 客户端应用：查询经生成的调用发出，事件到达时更新状态与待决定数量
   const app = useMemo(() => {
-    const instance = new ClientApp(callQuery, {
+    const instance = new ClientApp(callQuery, callCommand, {
       onState: (next) => setState(next),
       onPendingDecisions: (count) => {
         setPending(count);
@@ -186,7 +187,16 @@ export function App() {
         />
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="content">
-          <PlaceholderPage route={route} systemStatus={systemStatus} />
+          {route.name === "sys-models" ? (
+            <ModelManagementPage
+              views={app.viewSync}
+              command={(name, body) => app.command(name, body)}
+              subscribeEvents={(listener) => app.subscribeEvents(listener)}
+              onBack={() => navigate(paths.home())}
+            />
+          ) : (
+            <PlaceholderPage route={route} systemStatus={systemStatus} />
+          )}
         </main>
       </div>
     </div>
@@ -217,7 +227,8 @@ function pathLabel(route: Route, projects: ProjectRow[]): string {
     return "首页";
   }
   if (route.name.startsWith("sys-")) {
-    return route.systemPage ?? "系统";
+    // 模型管理页的路径只显示「模型管理」，不显示在项目名之后（设计说明第 9.1 节）
+    return route.name === "sys-models" ? "模型管理" : route.systemPage ?? "系统";
   }
   const project = projects.find((item) => item.project_id === route.projectId);
   const name = project?.name ?? route.projectId ?? "";
