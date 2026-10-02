@@ -459,3 +459,4 @@ qwen3.8 / 2026-10-02 16:45 / docs/architecture-issues.md 为 #82 登记两条：
 claude-sonnet-5-5 / 2026-10-02 16:34 / docs/architecture-issues.md 追加 #207 登记的 test_api 命令清单失败的处理结论 / 该失败已由 #252 修复，按登记规则写处理行
 claude-sonnet-5-5 / 2026-10-02 17:07 / docs/architecture-issues.md 为 #82 登记的两条问题（录制场景数与固定时刻、决定板与卡片的归属）写处理结论 / 按登记规则写处理行；结论同时写入 #178、#179 的任务评论
 claude-sonnet-5-5 / 2026-10-02 20:19 / docs/architecture-issues.md 为 #94 登记的 catalog.change_impact 对结构非法文档返回 500 的问题写处理结论（422，沿用查询错误形状，#261 实施），并把与 #82 的条目挤在一起的位置补一个空行 / 按登记规则写处理行
+claude-sonnet-5-5 / 2026-10-02 21:24 / docs/architecture-issues.md 为 #95 登记的测试适配器整份重写目录的问题写处理结论（测试与演示启动方式的 fake 目录按合并方式安装） / 按登记规则写处理行
