@@ -10,7 +10,7 @@ import { actorOf, charFor, primaryOf, syncCharacters, mountMachines } from "./sc
 import { say, sayMs } from "./say.ts";
 import { signal, signalOn } from "./signals.ts";
 import type {
-  Catalog, Character, DecisionView, DeclContext, FloorModel, LoopItem, PackageVisual, PixelFloorEvent, SceneLike, Task, TaskDef, TaskFx, World,
+  Catalog, Character, DecisionFace, DeclContext, FloorModel, LoopItem, PackageVisual, PixelFloorEvent, SceneLike, Task, TaskDef, TaskFx, World,
 } from "./types.ts";
 import { createWorld } from "./declare.ts";
 
@@ -372,13 +372,13 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
         }
         return;
       }
-      case "x_decision_issued":
-      case "project_decision_requested": {
-        // 提出决定的部门的小人走到门口送出决定单，决定单飞到大厅的板上；决定单在路上的时候板上还看不到它
-        const department = (ev.department ?? item?.department ?? null) as string | null;
+      case "decision_requested": {
+        // 提出决定的部门的小人走到门口送出决定单，决定单飞到大厅的板上；决定单在路上的时候板上还看不到它。
+        // 决定的身份是事件的 event_id（投影按它登记决定请求）；没有部门的决定请求（初始 PRD）从大厅上方飞进来
+        const department = (ev.department ?? null) as string | null;
         const room = department && world.rooms[department] && world.rooms[department].roomKind === "dept" ? world.rooms[department] : null;
         const board = boardRectOf(lay);
-        const decisionId = pl.decision_id as string | undefined;
+        const decisionId = (ev.event_id ?? (pl.decision_id as string | undefined)) ?? null;
         if (decisionId) state.hidden[decisionId] = scene.realT + 12000;
         let posted = false;
         const post = (): void => {
@@ -395,15 +395,25 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
             },
           });
         };
-        if (room && !scene.reduced && dispatch(world, { ...ev, department } as PixelFloorEvent, () => ({ done: post }))) scene.after(8000, post);
-        else post();
+        // 送单由经理做：任务键用原型声明里的 x_decision_issued，说完话（送单动作收尾）以后放单
+        const postEvent = { ...ev, type: "x_decision_issued", department } as PixelFloorEvent;
+        const postMake = (def: TaskDef, event: PixelFloorEvent, ch: Character): Partial<Task> => ({
+          ...extrasOf(def, event, ch, "from"),
+          done: post,
+        });
+        if (room && !scene.reduced && dispatch(world, postEvent, postMake)) {
+          scene.after(8000, post);
+        } else post();
         return;
       }
-      case "x_decision_answered":
-      case "project_decision_answered": {
-        const department = (ev.department ?? item?.department ?? null) as string | null;
+      case "decision_answered": {
+        // 回答过的决定单从板上飞回提出决定的部门的门口，经理在门口收下；正在展开的那张纸盖上章
+        const department = (ev.department ?? null) as string | null;
         const room = department && world.rooms[department] && world.rooms[department].roomKind === "dept" ? world.rooms[department] : null;
         const board = boardRectOf(lay);
+        const decisionId = pl.decision_id as string | undefined;
+        if (decisionId && scene.cardStamped) scene.cardStamped(decisionId, "已回答");
+        const answerEvent = { ...ev, type: "x_decision_answered", department } as PixelFloorEvent;
         if (room) {
           scene.fly({
             bmp: "decision",
@@ -411,10 +421,15 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
             to: [room.door, ROOM_B + 4],
             ms: 1000, arc: 26,
             onDone: () => {
-              if (!scene.reduced) dispatch(world, { ...ev, department } as PixelFloorEvent);
+              if (!scene.reduced) dispatch(world, answerEvent, (def, event, ch) => extrasOf(def, event, ch, "to"));
             },
           });
         }
+        return;
+      }
+      case "decision_withdrawn": {
+        // 决定请求被撤销：板上不再有它（快照刷新以后由查询结果决定），画面上只把板子闪一下
+        signal(world, scene, "board", 900);
         return;
       }
       case "x_provider_wait_entered":
@@ -508,7 +523,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
 }
 
 /** 大厅的决定板上的决定请求：还在路上的不算；最多画 6 张。 */
-export function visibleDecisions(decisions: DecisionView[], hidden: HiddenMap, now: number): DecisionView[] {
+export function visibleDecisions(decisions: DecisionFace[], hidden: HiddenMap, now: number): DecisionFace[] {
   return decisions.filter((d) => !((hidden[d.id] ?? 0) > now));
 }
 
