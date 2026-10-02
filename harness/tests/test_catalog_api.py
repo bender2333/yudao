@@ -199,6 +199,12 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
                            base_version=after_defaults["revision"], bindings={})
         assert cleared.status_code == 200, cleared.text
         current = _catalog(client)["revision"]
+        # 部门默认只能引用已准入的定义（设计说明第 4.6 节）：导入前先保存新连接并记录它的准入
+        added = _command(client, "catalog.connection.save", base_version=current,
+                         provider=_provider("p3"), models=[_model("m3")])
+        assert added.status_code == 200, added.text
+        opened.application.system.facade.record_admission("p3", "m3", admitted_model="model-x")
+        current = _catalog(client)["revision"]
         imported = _command(client, "catalog.document.save", base_version=current,
                             document={"providers": [_provider("p3")], "models": [_document_model("p3", "m3")],
                                       "bindings": {department: {"provider_id": "p3", "model_id": "m3"}
