@@ -1600,6 +1600,7 @@ export type DepartmentWorkspaceResult = {
     active: boolean;
     prompt: DepartmentPromptState;
     setting: DepartmentSetting;
+    effective: EffectiveModel;
     /**
      * Guidance
      */
@@ -1620,12 +1621,6 @@ export type DepartmentWorkspaceResult = {
      * Last Call
      */
     last_call: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Provider
-     */
-    provider: {
         [key: string]: unknown;
     } | null;
     /**
@@ -1738,6 +1733,56 @@ export type DrainStatus = {
      * Queued Work Items
      */
     queued_work_items: number;
+};
+
+/**
+ * EffectiveModel
+ */
+export type EffectiveModel = {
+    /**
+     * State
+     */
+    state: 'effective' | 'unusable' | 'unset';
+    /**
+     * Provider Id
+     */
+    provider_id?: string | null;
+    /**
+     * Model Id
+     */
+    model_id?: string | null;
+    /**
+     * Provider Name
+     */
+    provider_name?: string | null;
+    /**
+     * Protocol
+     */
+    protocol?: string | null;
+    /**
+     * Model
+     */
+    model?: string | null;
+    /**
+     * Selection Source
+     */
+    selection_source?: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier?: string | null;
+    /**
+     * Sent Tier
+     */
+    sent_tier?: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Message
+     */
+    message?: string | null;
 };
 
 /**
@@ -2604,6 +2649,18 @@ export type ProjectRow = {
      * In Progress Count
      */
     in_progress_count: number;
+    /**
+     * Waiting Count
+     */
+    waiting_count: number;
+    /**
+     * Decisions Waiting
+     */
+    decisions_waiting: number;
+    /**
+     * Last Activity At
+     */
+    last_activity_at: string;
     /**
      * Active Work Item Id
      */

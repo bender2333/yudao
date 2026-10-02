@@ -45,10 +45,29 @@ def loopback_status(client: httpx.Client) -> dict:
     assert response.status_code == 200
     return response.json()
 
-def test_stop_request_is_rejected_in_lan_access_mode(tmp_path):
-    # 局域网访问方式下拒绝停止请求
-    data_dir = tmp_path / "lan"
+def _lan_address() -> str:
+    # 本机的局域网地址：从另一台机器访问控制主机时用的就是它；没有时用回环
+    for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+        address = info[4][0]
+        if not address.startswith("127."):
+            return address
+    return "127.0.0.1"
+
+def test_stop_request_makes_a_lan_service_exit(tmp_path):
+    # 局域网访问方式下，来自回环地址的停止请求同样被接受并使服务退出（设计说明第 4.4 节：
+    # 两种访问方式下都接受来自回环地址的停止请求）
+    data_dir = tmp_path / "lan-loopback"
     with running_server(lambda: _open(data_dir), access="lan") as handle:
+        response = handle.client.post("/api/system/stop")
+        assert response.status_code == 202
+        assert response.json() == {"stopping": True}
+        assert handle.wait_stopped()
+
+def test_stop_request_from_another_address_is_rejected_in_lan_access_mode(tmp_path):
+    # 局域网访问方式下，来自非回环地址的停止请求被拒绝：服务继续运行
+    data_dir = tmp_path / "lan-other"
+    with running_server(lambda: _open(data_dir), access="lan",
+                        host="0.0.0.0", connect=_lan_address()) as handle:
         response = handle.client.post("/api/system/stop")
         assert response.status_code == 403
         assert handle.thread.is_alive()

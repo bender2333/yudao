@@ -5,10 +5,12 @@
 
 import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
-import type { ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
+import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
 import { useCommand, useSnapshot } from "../views/project/use-snapshot";
 import { WORK_ITEM_STATUS, label } from "../views/project/labels";
 import { list, text } from "../views/project/common";
+import { DecisionCardList } from "../views/decisions/card";
+import { sortByRequested } from "../views/decisions/card-logic";
 
 export type TopbarProps = {
   app: ClientApp | null;
@@ -17,6 +19,8 @@ export type TopbarProps = {
   project: ProjectRow | null;
   path: string;
   pending: number;
+  // 本项目的等待回答的决定请求（标签栏右侧的「待你决定」，v8 第 3.2 节）
+  projectDecisions: DecisionView[];
   streamConnected: boolean;
   onPendingClick: () => void;
   onToggleDrawer: () => void;
@@ -24,6 +28,9 @@ export type TopbarProps = {
 };
 
 export function Topbar(props: TopbarProps) {
+  const [decisionsOpen, setDecisionsOpen] = useState(false);
+  const waiting = sortByRequested(props.projectDecisions);
+  const now = Date.now();
   return (
     <header className="topbar">
       <button className="nav-item drawer-toggle" onClick={props.onToggleDrawer} aria-label="打开左侧栏">
@@ -37,6 +44,17 @@ export function Topbar(props: TopbarProps) {
       {props.projectId && props.project && props.app ? (
         <ProjectMenu app={props.app} projectId={props.projectId} workItemId={props.workItemId} project={props.project} onNavigate={props.onNavigate} />
       ) : null}
+      {/* 标签栏右侧的「待你决定」：只列出本项目的请求，点击展开决定卡片（第 3.2 节） */}
+      {props.projectId !== null && waiting.length > 0 ? (
+        <button
+          className="status-item lit"
+          aria-expanded={decisionsOpen}
+          onClick={() => setDecisionsOpen(!decisionsOpen)}
+          title="本项目等待回答的决定请求"
+        >
+          待你决定 · {waiting.length}
+        </button>
+      ) : null}
       <button
         className={`status-item${props.pending > 0 ? " lit" : ""}`}
         onClick={props.onPendingClick}
@@ -47,6 +65,21 @@ export function Topbar(props: TopbarProps) {
       <span className={`connection${props.streamConnected ? "" : " interrupted"}`} role="status">
         {props.streamConnected ? "已连接" : "连接中断，数据可能过时"}
       </span>
+      {decisionsOpen ? (
+        <div className="dropdown decisions-dropdown">
+          <DecisionCardList
+            app={props.app}
+            decisions={waiting}
+            now={now}
+            names={(decision) => ({
+              projectName: props.project?.name ?? decision.project_id ?? "",
+              workItemTitle: decision.work_item_id ?? "",
+            })}
+            onNavigate={props.onNavigate}
+            emptyText="本项目没有等待回答的决定"
+          />
+        </div>
+      ) : null}
     </header>
   );
 }

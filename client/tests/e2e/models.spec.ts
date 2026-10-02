@@ -22,7 +22,7 @@ async function openModels(
   if (size.width <= 700) {
     await client.page.locator(".drawer-toggle").click();
   }
-  await client.page.getByRole("button", { name: "模型管理" }).click();
+  await client.page.getByRole("button", { name: "模型管理", exact: true }).click();
   await expect(client.page.locator(".path")).toHaveText("模型管理");
   return { backend, client };
 }
