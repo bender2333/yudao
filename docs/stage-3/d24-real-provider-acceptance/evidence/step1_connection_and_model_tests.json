@@ -1,0 +1,328 @@
+{
+  "protocols": {
+    "responses": {
+      "protocol": "responses",
+      "connection_test": {
+        "ok": true,
+        "kind": "connection",
+        "target_key": "claude-responses",
+        "revision": 1,
+        "protocol": "responses",
+        "reason": "",
+        "message": ""
+      },
+      "admission_before_model_test": [],
+      "claude_model_test": {
+        "ok": true,
+        "error": null,
+        "model": "ag/claude-opus-4-6-thinking",
+        "admitted": true,
+        "protocol": "responses",
+        "revision": 2,
+        "elapsed_ms": 3578,
+        "usage_reported": true,
+        "persisted": false
+      },
+      "deepseek_model_test": {
+        "ok": true,
+        "error": null,
+        "model": "cbcn/deepseek-v4.1-flash",
+        "admitted": true,
+        "protocol": "responses",
+        "revision": 3,
+        "elapsed_ms": 3268,
+        "usage_reported": true,
+        "persisted": false
+      },
+      "admissions_after": [
+        {
+          "model_id": "claude-responses",
+          "provider_id": "eval-responses",
+          "protocol": "responses",
+          "admitted": true,
+          "stale": false,
+          "admitted_at": "2026-10-02T18:03:28.835989+00:00",
+          "admitted_model": "ag/claude-opus-4-6-thinking",
+          "base_url": "https://9router.huiju.asia/v1",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "model": "ag/claude-opus-4-6-thinking"
+        },
+        {
+          "model_id": "deepseek-responses",
+          "provider_id": "eval-responses",
+          "protocol": "responses",
+          "admitted": true,
+          "stale": false,
+          "admitted_at": "2026-10-02T18:03:32.104194+00:00",
+          "admitted_model": "cbcn/deepseek-v4.1-flash",
+          "base_url": "https://9router.huiju.asia/v1",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "model": "cbcn/deepseek-v4.1-flash"
+        }
+      ],
+      "readiness": {
+        "available": false,
+        "reason": "provider_unavailable",
+        "message": "bindings.product: 部门 product 未绑定 Provider 与模型；bindings.engineering: 部门 engineering 未绑定 Provider 与模型；bindings.quality: 部门 quality 未绑定 Provider 与模型",
+        "departments": {},
+        "issues": [
+          {
+            "location": "bindings.product",
+            "message": "部门 product 未绑定 Provider 与模型"
+          },
+          {
+            "location": "bindings.engineering",
+            "message": "部门 engineering 未绑定 Provider 与模型"
+          },
+          {
+            "location": "bindings.quality",
+            "message": "部门 quality 未绑定 Provider 与模型"
+          }
+        ],
+        "revision": 3,
+        "model_admissions": [
+          {
+            "model_id": "claude-responses",
+            "provider_id": "eval-responses",
+            "protocol": "responses",
+            "admitted": true,
+            "stale": false,
+            "admitted_at": "2026-10-02T18:03:28.835989+00:00",
+            "admitted_model": "ag/claude-opus-4-6-thinking",
+            "base_url": "https://9router.huiju.asia/v1",
+            "credential_ref": "YUDAO_EVAL_API_KEY",
+            "model": "ag/claude-opus-4-6-thinking"
+          },
+          {
+            "model_id": "deepseek-responses",
+            "provider_id": "eval-responses",
+            "protocol": "responses",
+            "admitted": true,
+            "stale": false,
+            "admitted_at": "2026-10-02T18:03:32.104194+00:00",
+            "admitted_model": "cbcn/deepseek-v4.1-flash",
+            "base_url": "https://9router.huiju.asia/v1",
+            "credential_ref": "YUDAO_EVAL_API_KEY",
+            "model": "cbcn/deepseek-v4.1-flash"
+          }
+        ]
+      }
+    },
+    "chat_completions": {
+      "protocol": "chat_completions",
+      "connection_test": {
+        "ok": true,
+        "kind": "connection",
+        "target_key": "claude-chat_completions",
+        "revision": 1,
+        "protocol": "chat_completions",
+        "reason": "",
+        "message": ""
+      },
+      "admission_before_model_test": [],
+      "claude_model_test": {
+        "ok": true,
+        "error": null,
+        "model": "claude-opus-4-6-thinking",
+        "admitted": true,
+        "protocol": "chat_completions",
+        "revision": 2,
+        "elapsed_ms": 4067,
+        "usage_reported": true,
+        "persisted": false
+      },
+      "deepseek_model_test": {
+        "ok": true,
+        "error": null,
+        "model": "deepseek-v4.1-flash",
+        "admitted": true,
+        "protocol": "chat_completions",
+        "revision": 3,
+        "elapsed_ms": 2604,
+        "usage_reported": true,
+        "persisted": false
+      },
+      "admissions_after": [
+        {
+          "model_id": "claude-chat_completions",
+          "provider_id": "eval-chat_completions",
+          "protocol": "chat_completions",
+          "admitted": true,
+          "stale": false,
+          "admitted_at": "2026-10-02T18:03:38.264653+00:00",
+          "admitted_model": "claude-opus-4-6-thinking",
+          "base_url": "https://9router.huiju.asia/v1",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "model": "ag/claude-opus-4-6-thinking"
+        },
+        {
+          "model_id": "deepseek-chat_completions",
+          "provider_id": "eval-chat_completions",
+          "protocol": "chat_completions",
+          "admitted": true,
+          "stale": false,
+          "admitted_at": "2026-10-02T18:03:40.868429+00:00",
+          "admitted_model": "deepseek-v4.1-flash",
+          "base_url": "https://9router.huiju.asia/v1",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "model": "cbcn/deepseek-v4.1-flash"
+        }
+      ],
+      "readiness": {
+        "available": false,
+        "reason": "provider_unavailable",
+        "message": "bindings.product: 部门 product 未绑定 Provider 与模型；bindings.engineering: 部门 engineering 未绑定 Provider 与模型；bindings.quality: 部门 quality 未绑定 Provider 与模型",
+        "departments": {},
+        "issues": [
+          {
+            "location": "bindings.product",
+            "message": "部门 product 未绑定 Provider 与模型"
+          },
+          {
+            "location": "bindings.engineering",
+            "message": "部门 engineering 未绑定 Provider 与模型"
+          },
+          {
+            "location": "bindings.quality",
+            "message": "部门 quality 未绑定 Provider 与模型"
+          }
+        ],
+        "revision": 3,
+        "model_admissions": [
+          {
+            "model_id": "claude-chat_completions",
+            "provider_id": "eval-chat_completions",
+            "protocol": "chat_completions",
+            "admitted": true,
+            "stale": false,
+            "admitted_at": "2026-10-02T18:03:38.264653+00:00",
+            "admitted_model": "claude-opus-4-6-thinking",
+            "base_url": "https://9router.huiju.asia/v1",
+            "credential_ref": "YUDAO_EVAL_API_KEY",
+            "model": "ag/claude-opus-4-6-thinking"
+          },
+          {
+            "model_id": "deepseek-chat_completions",
+            "provider_id": "eval-chat_completions",
+            "protocol": "chat_completions",
+            "admitted": true,
+            "stale": false,
+            "admitted_at": "2026-10-02T18:03:40.868429+00:00",
+            "admitted_model": "deepseek-v4.1-flash",
+            "base_url": "https://9router.huiju.asia/v1",
+            "credential_ref": "YUDAO_EVAL_API_KEY",
+            "model": "cbcn/deepseek-v4.1-flash"
+          }
+        ]
+      }
+    },
+    "messages": {
+      "protocol": "messages",
+      "connection_test": {
+        "ok": true,
+        "kind": "connection",
+        "target_key": "claude-messages",
+        "revision": 1,
+        "protocol": "messages",
+        "reason": "",
+        "message": ""
+      },
+      "admission_before_model_test": [],
+      "claude_model_test": {
+        "ok": true,
+        "error": null,
+        "model": "claude-opus-4-6-thinking",
+        "admitted": true,
+        "protocol": "messages",
+        "revision": 2,
+        "elapsed_ms": 5341,
+        "usage_reported": true,
+        "persisted": false
+      },
+      "deepseek_model_test": {
+        "ok": true,
+        "error": null,
+        "model": "deepseek-v4.1-flash",
+        "admitted": true,
+        "protocol": "messages",
+        "revision": 3,
+        "elapsed_ms": 3184,
+        "usage_reported": true,
+        "persisted": false
+      },
+      "admissions_after": [
+        {
+          "model_id": "claude-messages",
+          "provider_id": "eval-messages",
+          "protocol": "messages",
+          "admitted": true,
+          "stale": false,
+          "admitted_at": "2026-10-02T18:03:49.139231+00:00",
+          "admitted_model": "claude-opus-4-6-thinking",
+          "base_url": "https://9router.huiju.asia/v1",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "model": "ag/claude-opus-4-6-thinking"
+        },
+        {
+          "model_id": "deepseek-messages",
+          "provider_id": "eval-messages",
+          "protocol": "messages",
+          "admitted": true,
+          "stale": false,
+          "admitted_at": "2026-10-02T18:03:52.323401+00:00",
+          "admitted_model": "deepseek-v4.1-flash",
+          "base_url": "https://9router.huiju.asia/v1",
+          "credential_ref": "YUDAO_EVAL_API_KEY",
+          "model": "cbcn/deepseek-v4.1-flash"
+        }
+      ],
+      "readiness": {
+        "available": false,
+        "reason": "provider_unavailable",
+        "message": "bindings.product: 部门 product 未绑定 Provider 与模型；bindings.engineering: 部门 engineering 未绑定 Provider 与模型；bindings.quality: 部门 quality 未绑定 Provider 与模型",
+        "departments": {},
+        "issues": [
+          {
+            "location": "bindings.product",
+            "message": "部门 product 未绑定 Provider 与模型"
+          },
+          {
+            "location": "bindings.engineering",
+            "message": "部门 engineering 未绑定 Provider 与模型"
+          },
+          {
+            "location": "bindings.quality",
+            "message": "部门 quality 未绑定 Provider 与模型"
+          }
+        ],
+        "revision": 3,
+        "model_admissions": [
+          {
+            "model_id": "claude-messages",
+            "provider_id": "eval-messages",
+            "protocol": "messages",
+            "admitted": true,
+            "stale": false,
+            "admitted_at": "2026-10-02T18:03:49.139231+00:00",
+            "admitted_model": "claude-opus-4-6-thinking",
+            "base_url": "https://9router.huiju.asia/v1",
+            "credential_ref": "YUDAO_EVAL_API_KEY",
+            "model": "ag/claude-opus-4-6-thinking"
+          },
+          {
+            "model_id": "deepseek-messages",
+            "provider_id": "eval-messages",
+            "protocol": "messages",
+            "admitted": true,
+            "stale": false,
+            "admitted_at": "2026-10-02T18:03:52.323401+00:00",
+            "admitted_model": "deepseek-v4.1-flash",
+            "base_url": "https://9router.huiju.asia/v1",
+            "credential_ref": "YUDAO_EVAL_API_KEY",
+            "model": "cbcn/deepseek-v4.1-flash"
+          }
+        ]
+      }
+    }
+  }
+}

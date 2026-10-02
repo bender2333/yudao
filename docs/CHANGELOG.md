@@ -462,3 +462,5 @@ claude-sonnet-5-5 / 2026-10-02 20:19 / docs/architecture-issues.md 为 #94 登�
 claude-sonnet-5-5 / 2026-10-02 21:24 / docs/architecture-issues.md 为 #95 登记的测试适配器整份重写目录的问题写处理结论（测试与演示启动方式的 fake 目录按合并方式安装） / 按登记规则写处理行
 claude-opus-4-5 / 2026-10-03 01:35 / docs/architecture-issues.md 追加一条：#88 记录真实模型 smoke 读不到准入文件（reload 不加载准入，仅 load_document 加载） / 执行 #88 的真实模型 smoke 时发现并登记，与推理内容的保存与回放无关，交架构师裁定
 claude-sonnet-5-5 / 2026-10-03 00:36 / docs/architecture-issues.md 为 #88 登记的问题（重启以后读不到准入文件）写处理结论，替换执行者写的「待架构师裁定」行 / 采纳第一种，由 #266 实施，#96 依赖 #266
+
+claude-opus-4-6 / 2026-10-03 04:05 / 新增 docs/stage-3/d24-real-provider-acceptance/report.md 与 evidence/ 下九份原始证据；更新 docs/current-baseline.md 的模型管理（D24）一行、docs/architecture-issues.md 追加 Messages 历史翻译缺陷一条 / 工单 #96（D24 真实 Provider 验收）交付验收报告，逐条对照模型管理设计说明第 4 至 7 节记录真实请求与响应、调用目标、待恢复与继续、导出与重放；当前验收基线随之更新
