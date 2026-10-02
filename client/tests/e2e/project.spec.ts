@@ -608,7 +608,7 @@ test.describe("项目页面（1440×900）", () => {
       const id = await projectId(page, SAMPLE);
       await expect(page.locator(".connection")).toHaveText("已连接");
       const waiting = (await openDecisions(page)).length;
-      await expect(page.locator(".status-item").filter({ hasText: "待你决定" })).toHaveText(`待你决定：${waiting}`);
+      await expect(page.locator(".topbar .status-item").filter({ hasText: "待你决定：" })).toHaveText(`待你决定：${waiting}`);
       await expect(page.locator(".drawer-toggle")).toBeHidden();
       // 侧栏点项目条目 -> 概览
       await page.locator(".sidebar .project-entry").filter({ hasText: SAMPLE }).locator("button.nav-item").first().click();
@@ -632,7 +632,7 @@ test.describe("项目页面（1440×900）", () => {
       await page.evaluate((hash) => { window.location.hash = hash; }, `${navHash(id, "dept/product")}?w=${selected.work_items[0].work_item_id}`);
       await expect(await section(page, "产品工作间")).toContainText("（顶栏选中）");
       // 状态项点击 -> 首页（没有 #/decisions 这个页面）
-      await page.locator(".status-item").filter({ hasText: "待你决定" }).click();
+      await page.locator(".topbar .status-item").filter({ hasText: "待你决定：" }).click();
       await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe("#/home");
       expect(errors).toEqual([]);
     } finally {

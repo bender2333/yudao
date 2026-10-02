@@ -5,11 +5,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CommandOutcome } from "../../contract/invoke";
+import type { Rejected } from "../../api/generated/types.gen";
 import type { ViewSync } from "../../contract/view-sync";
 import type {
   Catalog,
   CatalogDocument,
   CatalogTestFinishedPayload,
+  ChangeImpact,
   EventObject,
 } from "../../api/generated/types.gen";
 import { JsonDialog } from "./json-dialog";
@@ -17,16 +19,20 @@ import { ProviderForm } from "./form";
 import {
   DEPARTMENT_LABELS,
   PROTOCOL_LABELS,
+  STALE_ADMISSION_LABEL,
   admissionLabel,
   admissionOf,
   admissionSummary,
   admittedModels,
-  affectedReferences,
+  collectImpact,
+  confirmImpactText,
   credentialStatusLabel,
   emptyFormState,
+  formDocumentValid,
   formStateFromProvider,
-  impactNotice,
+  modelRemoveReferrers,
   presetById,
+  providerDeleteConfirmation,
   providerInputFromForm,
   rowFromCandidate,
   rowFromManual,
@@ -35,6 +41,7 @@ import {
   tierOptions,
   type CandidateState,
   type FormState,
+  type ModelImpact,
   type ModelOption,
   type ServicePreset,
   type UpstreamCandidate,
@@ -42,6 +49,7 @@ import {
 
 export type ModelManagementPageProps = {
   views: ViewSync | null;
+  query: <T>(name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
   command: (name: string, body: Record<string, unknown>) => Promise<CommandOutcome>;
   subscribeEvents: (listener: (event: EventObject) => void) => () => void;
   onBack: () => void;
@@ -67,6 +75,12 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const [defaultsStatus, setDefaultsStatus] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  // 保存会作废准入的修改之前的影响列表，与删除时的一并删除清单（设计说明第 4.4、4.5 节，工单 #94）：
+  // 由应用层查询 catalog.change_impact 算出，界面按它弹确认框与列出引用方
+  const [saveImpact, setSaveImpact] = useState<ModelImpact | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<ModelImpact | null>(null);
+  const [pendingSave, setPendingSave] = useState<Record<string, unknown> | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const views = props.views;
   const catalogRef = useRef<Catalog | null>(null);
@@ -143,6 +157,11 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       base_version: current.revision,
       ...body,
     });
+    if (outcome.ok) {
+      // 命令被接受以后等目录视图刷新：下一条命令的基准版本用刷新后的修订号，
+      // 连续操作（例如清空部门默认以后删除连接）不会提交过期的版本（设计说明第 5.7 节）
+      await props.views?.refresh("models.catalog");
+    }
     return interpret(outcome);
   }, [props]);
 
@@ -169,6 +188,17 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setForm({ mode: "add", state: emptyFormState() });
   }, []);
 
+  const runSave = useCallback(async (body: Record<string, unknown>) => {
+    setBusy(true);
+    const result = await submit("catalog.connection.save", body);
+    setBusy(false);
+    setPendingSave(null);
+    setFormStatus({ kind: result.ok ? "ok" : "error", message: result.ok ? "已保存 Provider 配置。" : result.message });
+    if (result.ok) {
+      setForm(null);
+    }
+  }, [submit]);
+
   const submitForm = useCallback(async () => {
     if (!form) {
       return;
@@ -178,27 +208,58 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       setFormStatus({ kind: "error", message: "窗口与输出上限没有「接受」或修改的行不能保存。" });
       return;
     }
-    setBusy(true);
-    const result = await submit("catalog.connection.save", {
-      provider: providerInputFromForm(form.state),
-      models: rows.map(rowToModelInput),
-    });
-    setBusy(false);
-    setFormStatus({ kind: result.ok ? "ok" : "error", message: result.ok ? "已保存 Provider 配置。" : result.message });
-    if (result.ok) {
-      setForm(null);
+    // 保存会作废准入时先弹确认框：影响列表由 catalog.change_impact 算出（设计说明第 4.4 节）
+    const body = { provider: providerInputFromForm(form.state), models: rows.map(rowToModelInput) };
+    if (confirmImpactText(saveImpact) !== "") {
+      setPendingSave(body);
+      return;
     }
-  }, [form, submit]);
+    await runSave(body);
+  }, [form, runSave, saveImpact]);
 
   const deleteProvider = useCallback(async (providerId: string) => {
+    // 删除之前按第 4.5 节取回引用方与将一并删除的定义；被引用时确认框列出引用方，拒绝删除
+    setBusy(true);
+    const snapshot = await props.query<ChangeImpact>("catalog.change_impact", { kind: "provider", provider_id: providerId });
+    setBusy(false);
+    setDeleteImpact(collectImpact(snapshot.data));
+    setPendingDelete(providerId);
+  }, [props]);
+
+  const runDelete = useCallback(async (providerId: string) => {
     setBusy(true);
     const result = await submit("catalog.connection.delete", { provider_id: providerId });
     setBusy(false);
+    setPendingDelete(null);
     setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? "已删除 Provider 配置。" : result.message });
     if (result.ok) {
       setForm(null);
     }
   }, [submit]);
+
+  const removeModel = useCallback(async (providerId: string, modelId: string) => {
+    // 移除单条定义（设计说明第 4.5 节）：被引用时显示引用方并拒绝。
+    // 先取回拟议终态（这条定义被移除）的影响，引用方存在时显示引用方，不再提交命令
+    const catalogNow = catalogRef.current;
+    const provider = catalogNow?.providers.find((item) => item.id === providerId);
+    if (catalogNow === null || provider === undefined) {
+      return;
+    }
+    const remaining = provider.models
+      .filter((item) => item.id !== modelId)
+      .map((item) => modelDocumentFromDefinition(item));
+    const snapshot = await props.query<ChangeImpact>("catalog.change_impact", {
+      kind: "connection",
+      document: JSON.stringify({ provider: providerInputOf(provider), models: remaining }),
+    });
+    const referrers = modelRemoveReferrers(collectImpact(snapshot.data));
+    if (referrers !== "") {
+      setNotice({ kind: "error", message: referrers });
+      return;
+    }
+    const result = await submit("catalog.model.remove", { provider_id: providerId, model_id: modelId });
+    setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? "已移除访问定义。" : result.message });
+  }, [props, submit]);
 
   const testConnection = useCallback(async (providerId: string) => {
     setTesting((current) => ({ ...current, [`connection:${providerId}`]: true }));
@@ -297,31 +358,44 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     }
     return catalog.providers.find((item) => item.id === form.state.id)?.credential ?? null;
   }, [form, catalog]);
-  const impact = useMemo(() => {
-    if (!form || form.mode !== "edit" || !catalog) {
-      return "";
+
+  // 编辑表单的拟议修改：打开 catalog.change_impact 视图取回影响（设计说明第 4.4 节）。
+  // 参数用编辑中的表单内容序列化，表单内容变化时重开视图；查询只读，不写入任何内容。
+  // 查询的文档形状与目录文档一致（不含 capacity_confirmed 这类只属于保存命令的字段）
+  const formImpactParams = useMemo(() => {
+    if (!form || form.mode !== "edit") {
+      return null;
     }
-    const before = catalog.providers.find((item) => item.id === form.state.id);
-    if (!before) {
-      return "";
+    // 只有能构成合法目录文档的表单才发问影响：编辑中的表单会短暂地不合法（必填项为空、
+    // 协议与推理参数方式暂时不相符等），这时查询会被拒绝并把失败写进控制台（第 4.6 节的必填项与容量关系）
+    if (!formDocumentValid(form.state, form.state.rows)) {
+      return null;
     }
-    const rowsBefore = before.models.map((model) => ({
-      id: model.id, model: model.model, reasoning_mode: model.reasoning_mode,
-    }));
-    const rowsNow = form.state.rows.map((row) => ({
-      id: row.id, model: row.model, reasoning_mode: row.reasoning_mode,
-    }));
-    const departments = affectedReferences(
-      { ...before, base_url: form.state.base_url, credential_ref: form.state.credential_ref, protocol: form.state.protocol },
-      before,
-      rowsNow,
-      rowsBefore,
-      Object.fromEntries(Object.entries(catalog.bindings).map(([key, value]) => [
-        key, { provider_id: value.provider_id, model_id: value.model_id },
-      ])),
-    );
-    return impactNotice(departments);
-  }, [form, catalog]);
+    const models = form.state.rows.map((row) => {
+      const input = rowToModelInput(row);
+      delete input.capacity_confirmed;
+      return input;
+    });
+    return JSON.stringify({
+      kind: "connection",
+      provider: providerInputFromForm(form.state),
+      models,
+    });
+  }, [form]);
+
+  useEffect(() => {
+    if (views === null || formImpactParams === null) {
+      return;
+    }
+    // 编辑中的表单可以短暂地不合法（例如协议与推理参数方式暂时不相符），这时影响查询被拒绝。
+    // 这份拟议修改不会保存：保存命令按字段校验并给出位置，所以回退到「没有影响」，
+    // 让保存路径负责拒绝（catalog.change_impact 对不合法拟议文档的错误映射见 docs/architecture-issues.md）
+    views.open<ChangeImpact>("models.impact", {
+      query: "catalog.change_impact",
+      params: { kind: "connection", document: formImpactParams },
+    }, (data) => setSaveImpact(collectImpact(data))).catch(() => setSaveImpact(null));
+    return () => views.close("models.impact");
+  }, [views, formImpactParams]);
 
   if (catalog === null) {
     return <div className="card"><h1>模型管理</h1><p className="note">正在读取目录…</p></div>;
@@ -460,20 +534,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                               {testing[`model:${model.id}`] ? "测试中…" : "模型测试"}
                             </button>
                             <button type="button" data-testid={`row-remove-${model.id}`}
-                                    onClick={() => {
-                                      const rows = provider.models
-                                        .filter((item) => item.id !== model.id)
-                                        .map((item) => ({
-                                          ...item,
-                                        }));
-                                      void submit("catalog.connection.save", {
-                                        provider: providerInputOf(provider),
-                                        models: rows.map(rowInputOf),
-                                      }).then((result) => setNotice({
-                                        kind: result.ok ? "ok" : "error",
-                                        message: result.ok ? "已移除访问定义。" : result.message,
-                                      }));
-                                    }}>
+                                    onClick={() => void removeModel(provider.id, model.id)}>
                               移除
                             </button>
                           </td>
@@ -524,7 +585,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           candidate={candidates[form.state.id] ?? null}
           collecting={collecting === form.state.id}
           admissions={catalog.admissions}
-          impact={impact}
+          impact={confirmImpactText(saveImpact)}
           busy={busy}
           testing={testing}
           status={formStatus}
@@ -550,11 +611,12 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         <div className="mm-defaults-grid">
           {DEPARTMENTS.map((department) => {
             const choice = editingDefaults[department] ?? { modelId: "", tier: "" };
-            const option = choices.find((item) => item.id === choice.modelId);
+            // 所选模型的声明取自目录中的定义，档位选项与「未声明」提示都按它判断（设计说明第 9.1 节）
             const model = catalog.models.find((item) => item.id === choice.modelId);
-            const saved = catalog.bindings[department];
-            const tiers = tierOptions(model?.reasoning_levels ?? [], saved?.model_id === choice.modelId ? saved.requested_tier ?? "" : "");
+            const savedTier = savedAdmissionTier(catalog, choice.modelId);
+            const tiers = tierOptions(model?.reasoning_levels ?? [], savedTier);
             const reminders = catalog.department_reminders[department] ?? [];
+            const unavailable = unavailableBindingLabel(catalog, choice.modelId);
             return (
               <div className="mm-default" key={department} data-testid={`default-${department}`}>
                 <h3>{DEPARTMENT_LABELS[department]}</h3>
@@ -574,6 +636,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                         ))}
                       </optgroup>
                     ))}
+                    {/* 引用已作废或不在已准入选项里的定义时保留这一项（设计说明第 4.4 节表格） */}
+                    {unavailable !== "" && (
+                      <option value={choice.modelId}>{model?.model ?? choice.modelId}</option>
+                    )}
                   </select>
                 </label>
                 <label className="mm-field">
@@ -589,10 +655,12 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                   </select>
                 </label>
                 {(model?.reasoning_levels ?? []).length === 0 && !choice.tier && (
-                  <p className="mm-hint">该模型未声明推理档位，请求不带推理参数。</p>
+                  <p className="mm-hint" data-testid={`tier-hint-${department}`}>
+                    该模型未声明推理档位，请求不带推理参数。
+                  </p>
                 )}
-                {choice.modelId !== "" && !option && (
-                  <p className="mm-warn">该模型不在已准入的定义中，请先做模型测试。</p>
+                {unavailable !== "" && (
+                  <p className="mm-warn" data-testid={`unavailable-${department}`}>{unavailable}</p>
                 )}
                 {reminders.map((text) => <p className="mm-warn" key={text} data-testid={`reminder-${department}`}>{text}</p>)}
               </div>
@@ -611,6 +679,38 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           </p>
         )}
       </section>
+
+      {pendingSave && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingSave(null)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="确认保存" data-testid="confirm-save"
+               onClick={(event) => event.stopPropagation()}>
+            <h2>确认保存</h2>
+            <p className="mm-warn" data-testid="confirm-save-list">{confirmImpactText(saveImpact)}</p>
+            <div className="mm-actions">
+              <button type="button" className="primary" data-testid="confirm-save-yes" disabled={busy}
+                      onClick={() => void runSave(pendingSave)}>确认保存</button>
+              <button type="button" data-testid="confirm-save-no" onClick={() => setPendingSave(null)}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDelete !== null && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingDelete(null)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="确认删除" data-testid="confirm-delete"
+               onClick={(event) => event.stopPropagation()}>
+            <h2>确认删除</h2>
+            <p className={deleteImpact !== null && deleteImpact.references.length > 0 ? "mm-warn" : "mm-hint"}
+               data-testid="confirm-delete-list">{providerDeleteConfirmation(deleteImpact)}</p>
+            <div className="mm-actions">
+              <button type="button" className="primary" data-testid="confirm-delete-yes"
+                      disabled={busy || (deleteImpact !== null && deleteImpact.references.length > 0)}
+                      onClick={() => void runDelete(pendingDelete)}>确认删除</button>
+              <button type="button" data-testid="confirm-delete-no" onClick={() => setPendingDelete(null)}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {jsonOpen && (
         <JsonDialog
@@ -632,7 +732,15 @@ function interpret(outcome: CommandOutcome): SubmitResult {
   if (outcome.ok) {
     return { ok: true, message: "" };
   }
-  const rejection = outcome.rejection;
+  const rejection = outcome.rejection as Rejected & { detail?: { loc?: unknown[]; msg?: string }[] };
+  // 合同校验失败（422）返回错误明细，逐条指出字段位置（第 4.6 节）；命令被拒绝（409）返回原因与当前版本
+  if (Array.isArray(rejection.detail)) {
+    const parts = rejection.detail.map((item) => {
+      const location = Array.isArray(item.loc) ? item.loc.filter((part) => part !== "body").join(".") : "";
+      return location === "" ? String(item.msg ?? "") : `${location}：${item.msg ?? ""}`;
+    });
+    return { ok: false, message: parts.join("；") };
+  }
   const current = rejection.current_version;
   return {
     ok: false,
@@ -653,6 +761,32 @@ function testText(payload: CatalogTestFinishedPayload): string {
   return payload.kind === "model" ? `模型测试未通过：${payload.error ?? ""}` : `连接测试未通过：${payload.error ?? ""}`;
 }
 
+// 某部门当前绑定到所选模型的已保存请求档位（设计说明第 9.1 节）：绑定指向别的模型时没有已保存档位
+function savedAdmissionTier(catalog: Catalog, modelId: string): string {
+  for (const binding of Object.values(catalog.bindings)) {
+    if (binding.model_id === modelId) {
+      return binding.requested_tier ?? "";
+    }
+  }
+  return "";
+}
+
+// 引用不可用时下拉框的说明（设计说明第 4.4 节）：绑定的定义已不在已准入的定义里，
+// 且准入记录显示作废时显示「无法使用：准入已作废」，否则提示先做模型测试
+function unavailableBindingLabel(catalog: Catalog, modelId: string): string {
+  if (modelId === "") {
+    return "";
+  }
+  if (catalog.models.some((item) => item.id === modelId)) {
+    const admission = catalog.admissions.find((item) => item.model_id === modelId);
+    if (admission && admission.stale) {
+      return STALE_ADMISSION_LABEL;
+    }
+    return "";
+  }
+  return "该模型不在已准入的定义中，请先做模型测试。";
+}
+
 function groupByProvider(choices: ModelOption[]): { provider: string; label: string; options: ModelOption[] }[] {
   const groups: Record<string, { provider: string; label: string; options: ModelOption[] }> = {};
   for (const choice of choices) {
@@ -665,7 +799,7 @@ function groupByProvider(choices: ModelOption[]): { provider: string; label: str
   return Object.values(groups);
 }
 
-// 卡片里「移除」与表单保存用的是同一份连接内容，取值口径一致
+// 一份连接内容：卡片里「移除」与表单保存用的是同一份取值口径（设计说明第 4.4 节的拟议修改）
 function providerInputOf(provider: Catalog["providers"][number]): Record<string, unknown> {
   return {
     id: provider.id, name: provider.name, protocol: provider.protocol, base_url: provider.base_url,
@@ -674,7 +808,8 @@ function providerInputOf(provider: Catalog["providers"][number]): Record<string,
   };
 }
 
-function rowInputOf(model: Catalog["models"][number]): Record<string, unknown> {
+// 一条模型访问定义按目录文档形状提交：catalog.change_impact 的拟议修改用它（不含 capacity_confirmed）
+function modelDocumentFromDefinition(model: Catalog["models"][number]): Record<string, unknown> {
   return {
     id: model.id, model: model.model, context_window: model.context_window,
     max_output_tokens: model.max_output_tokens, capability_source: model.capability_source,
