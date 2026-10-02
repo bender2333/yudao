@@ -467,3 +467,4 @@ claude-opus-4-6 / 2026-10-03 03:35 / client/README.md 的目录、常用命令�
 claude-opus-4-6 / 2026-10-03 04:05 / 新增 docs/stage-3/d24-real-provider-acceptance/report.md 与 evidence/ 下九份原始证据；更新 docs/current-baseline.md 的模型管理（D24）一行、docs/architecture-issues.md 追加 Messages 历史翻译缺陷一条 / 工单 #96（D24 真实 Provider 验收）交付验收报告，逐条对照模型管理设计说明第 4 至 7 节记录真实请求与响应、调用目标、待恢复与继续、导出与重放；当前验收基线随之更新
 opus-4.5 / 2026-10-03 01:05 / docs/architecture-issues.md 追加两条 #179 的架构问题登记：①楼层的决定送单与飞回接在原型演示事件类型 x_decision_* 上，与后端真实事件 decision_requested/decision_answered/decision_withdrawn 不一致，决定 id 也取错字段；②选项的 note_required 标记在接口合同里没有 / 执行 #179 核对 #82 已实现部分时发现，交架构师裁定
 claude-sonnet-5-5 / 2026-10-03 03:26 / docs/architecture-issues.md 为 #179 登记的两条问题写处理结论（楼层的决定分支改接真实事件，已随 #179 合并；决定选项增加 note_required，由 #136 实施） / 按登记规则写处理行
+执行者 / 2026-10-03 05:40 / docs/architecture-issues.md 追加一条 #180 的架构问题登记并写处理结论：关键事实的种类无法只由事件种类得出（qa_submitted 分放行与返工），ReportFact 增加 kind 字段 / 执行 #180 实现时间轴刻度着色时发现，按登记规则一并写处理行

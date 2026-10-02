@@ -22,6 +22,8 @@ export interface FloorScreenProps {
   app: ClientApp;
   projectId: string;
   workItemId: string | null;
+  /** 回放位置（全局位置）：不为 null 时 project.loop 按位置带 at 读取；回放期间按一个部门一个角色画，不显示决定请求。 */
+  at?: number | null;
 }
 
 /** 覆盖层的名称与中文标签（按能力清单显示）。 */
@@ -92,13 +94,17 @@ export function floorEventOf(event: EventObject, projectId: string): PixelFloorE
 
 /** 循环画面：画布、覆盖层切换、窄屏文字列表与决定卡片。 */
 export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
+  const at = props.at ?? null;
+  const replaying = at !== null;
   const loop = useSnapshot<ProjectLoopResult>(props.app, "page.loop", "project.loop", {
     project_id: props.projectId,
     work_item: props.workItemId,
+    ...(at === null ? {} : { at }),
   });
+  // 回放到过去的时间点时不显示决定请求（设计说明第 5.5 节、原型 v9 第 8 节）
   const decisions = useSnapshot<DecisionList>(props.app, "page.decisions", "decisions.list", {
     project_id: props.projectId, status: ["open"],
-  });
+  }, replaying);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<FloorView | null>(null);
   const modelRef = useRef<FloorModel | null>(null);
@@ -177,13 +183,14 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     () => floorModelOf({
       loop: loop.data,
       workspaces: {},
-      decisions: decisions.data?.decisions ?? null,
+      // 回放期间不显示决定请求，部门按一个部门一个角色画（设计说明第 5.5 节）
+      decisions: replaying ? null : decisions.data?.decisions ?? null,
       slots: null,
       ops: null,
       machines: null,
       interrupted: false,
     }),
-    [loop.data, decisions.data],
+    [loop.data, decisions.data, replaying],
   );
 
   // 每次查询结果到达：状态以查询为准
@@ -192,14 +199,15 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     viewRef.current?.setModel(model);
   }, [model]);
 
-  // 事件只决定动作的起点
+  // 事件只决定动作的起点；回放期间不按事件流更新画面（设计说明第 4.1 节）
   useEffect(() => {
+    if (replaying) return;
     const off = props.app.subscribeEvents((event) => {
       const floorEvent = floorEventOf(event, props.projectId);
       if (floorEvent) viewRef.current?.playEvent(floorEvent);
     });
     return off;
-  }, [props.app, props.projectId]);
+  }, [props.app, props.projectId, replaying]);
 
   // 重新同步：画面回到查询给出的状态，不补播
   useEffect(() => {
