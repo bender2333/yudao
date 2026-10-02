@@ -723,3 +723,204 @@ button.link {
   .mm-defaults-grid { grid-template-columns: 1fr; }
 }
 
+
+/* 系统首页与决定卡片（原型 v8 设计说明第 4、6 节，工单 #175）：状态项一排、待你决定、
+   离开期间的报告与项目列表；决定卡片由首页与项目页面共用。窄屏时各区块单列，不出现横向滚动。 */
+
+.home {
+  max-width: 960px;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-row .status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 6px 10px;
+  cursor: default;
+}
+
+.status-row .status-item:not(:disabled) {
+  cursor: pointer;
+}
+
+.status-row .status-item.lit {
+  color: var(--danger);
+  border-color: currentColor;
+}
+
+.status-row .status-label {
+  font-size: 13px;
+}
+
+.status-row .status-value {
+  font-weight: 600;
+}
+
+.report-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.report-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.report-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.report-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.report-value small {
+  color: var(--muted);
+  font-size: 11px;
+  margin-left: 2px;
+}
+
+.report-detail {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.source-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+
+.source-list code {
+  font-size: 12px;
+}
+
+.decision-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.decision-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-wrap: anywhere;
+}
+
+.decision-card.answered {
+  opacity: 0.85;
+}
+
+.decision-head {
+  margin-bottom: 8px;
+}
+
+.decision-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.decision-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.decision-meta .muted {
+  color: var(--muted);
+}
+
+.decision-body {
+  margin: 8px 0;
+}
+
+.decision-body summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.decision-body .kv {
+  margin-top: 8px;
+}
+
+.decision-answer {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.decision-result {
+  color: var(--ok);
+  font-size: 13px;
+}
+
+.decision-foot {
+  margin-top: 8px;
+}
+
+.decisions-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 16px;
+  z-index: 15;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  width: min(560px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow: auto;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+}
+
+.topbar {
+  position: relative;
+}
+
+@media (max-width: 700px) {
+  .report-items {
+    grid-template-columns: 1fr;
+  }
+
+  .decisions-dropdown {
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+}
