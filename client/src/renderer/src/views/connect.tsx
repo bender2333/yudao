@@ -1,5 +1,5 @@
-// 连接设置与更新页（原型 v8 设计说明第 3.4 节，工单验收：接口版本不同时只显示更新页，
-// 不打开页面、不执行命令）。连接「本机」时服务已经运行就直接连接；服务没有运行时的启动由 #207 实现。
+// 连接设置页（原型 v8 设计说明第 3.4 节）。连接「本机」时服务已经运行就直接连接；
+// 服务没有运行时的启动由 #207 实现。更新页在 views/update.tsx（工单 #208）。
 
 import { useEffect, useState } from "react";
 import type { ConnectionSettings } from "../contract/settings";
@@ -80,29 +80,6 @@ export function ConnectPage(props: ConnectPageProps) {
           {props.connecting ? "连接中…" : "连接"}
         </button>
       </form>
-    </div>
-  );
-}
-
-export type UpdatePageProps = {
-  address: string;
-  clientVersion: number;
-  serverVersion: number;
-};
-
-export function UpdatePage(props: UpdatePageProps) {
-  return (
-    <div className="gate">
-      <div className="card">
-        <h1>请更新客户端</h1>
-        <p>客户端与控制主机的接口版本不同，不能打开页面，也不执行命令。</p>
-        <ul>
-          <li>控制主机地址：{props.address}</li>
-          <li>客户端接口版本：{props.clientVersion}</li>
-          <li>Yudao 服务接口版本：{props.serverVersion}</li>
-        </ul>
-        <p className="note">更新按钮与更新过程由 #208（客户端的安装包与更新页）实现。</p>
-      </div>
     </div>
   );
 }
