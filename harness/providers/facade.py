@@ -214,12 +214,72 @@ class ProviderFacade:
             return self._revision
 
     def replace_catalog_document(self, raw: Mapping[str, Any]) -> int:
-        # 导入整份文档：以当前修订号加一发布，文档里的旧修订号不会让修订号回退
+        # 导入整份文档：以当前修订号加一发布，文档里的旧修订号不会让修订号回退。
+        # 导入移除被引用的定义、或移除被引用定义所属的连接时由应用层按移除单条定义的同一规则拒绝
+        # （模型管理设计说明第 4.5、4.6 节），引用方包含各部门默认与项目部门设置；
+        # 启动读取目录文件仍然容忍陈旧引用，两者走出不同的入口
         with self._lock:
             document = dict(raw)
             document["revision"] = self._store.revision + 1
             self.store_document(document)
             return self._store.revision
+
+    def remove_model(self, provider_id: str, model_id: str,
+                     extra_referrers: Sequence[str] = ()) -> int:
+        # 移除一条模型访问定义：仍被部门默认引用时拒绝并列出引用方，Provider 配置与其余定义原样保留；
+        # 项目部门设置的引用由应用层汇总后经 extra_referrers 传入，与部门默认一起列出（设计说明第 4.5 节）
+        with self._lock:
+            key = str(model_id)
+            model = self._store.models.get(key)
+            if model is None:
+                raise CatalogValidationError((ValidationIssue(f"models.{key}", "模型访问定义不存在"),))
+            if str(provider_id) != model.provider_id:
+                raise CatalogValidationError((ValidationIssue(f"models.{key}", "模型访问定义不属于该 Provider 配置"),))
+            referrers = _model_referrers(self._bindings, key) + list(extra_referrers)
+            if referrers:
+                raise CatalogValidationError(tuple(
+                    ValidationIssue(name, "仍被引用，无法移除") for name in referrers
+                ))
+            providers = [self._store.providers[name].public_dict()
+                         for name in sorted(self._store.providers)]
+            models = [self._store.models[name].public_dict()
+                      for name in sorted(self._store.models) if name != key]
+            candidate = ProviderStore.from_dict({"providers": providers, "models": models})
+            candidate.revision = self._store.revision + 1
+            self._store = candidate
+            self._publish()
+            return self._revision
+
+    def impacted_definitions(self, document: Mapping[str, Any]) -> list[dict[str, str]]:
+        # 按拟议的目录文档算出会作废准入的模型访问定义（设计说明第 4.4 节的受影响字段）：
+        # 只比较受影响字段，返回受影响定义的公开身份，不写入任何内容；
+        # 定义本身被移除时不列在这里，由应用层按「将一并删除」处理。
+        # Provider 模块只交出定义，引用方与进行中事项由应用层汇总
+        with self._lock:
+            proposed = _catalog_part(document, self._startup_mode)
+            impacted: list[dict[str, str]] = []
+            for model_id in sorted(self._store.models):
+                record = self._admissions.get(model_id)
+                if record is None:
+                    continue
+                model = proposed.models.get(model_id)
+                if model is None:
+                    continue
+                provider = proposed.providers.get(model.provider_id)
+                if provider is None or not admission_is_current(record, model, provider):
+                    impacted.append(_definition_identity(model_id, model.provider_id))
+            return impacted
+
+    def deletable_definitions(self, provider_id: str) -> list[dict[str, str]]:
+        # 删除一份 Provider 配置时会被一并删除的模型访问定义（设计说明第 4.5 节）；
+        # 定义本身不算引用方，只有部门默认等引用会拒绝删除
+        with self._lock:
+            key = str(provider_id)
+            if key not in self._store.providers:
+                raise CatalogValidationError((ValidationIssue(f"providers.{key}", "Provider 不存在"),))
+            return [_definition_identity(model_id, key)
+                    for model_id in sorted(self._store.models)
+                    if self._store.models[model_id].provider_id == key]
 
     def persist_catalog(self, previous: Mapping[str, Any]) -> str | None:
         # 保存以后落盘；失败时恢复上一份文档并返回错误说明；没有配置路径时不做任何事
@@ -344,14 +404,16 @@ class ProviderFacade:
             self._publish()
             return self._revision
 
-    def delete_provider(self, provider_id: str) -> int:
+    def delete_provider(self, provider_id: str,
+                        extra_referrers: Sequence[str] = ()) -> int:
         # 删除 Provider 配置：其下的模型访问定义一并删除（定义本身不算引用方）；
-        # 仍被部门默认引用时拒绝并列出引用方，不删改
+        # 仍被部门默认引用时拒绝并列出引用方，不删改；
+        # 项目部门设置的引用由应用层汇总后经 extra_referrers 传入，与部门默认一起列出（设计说明第 4.5 节）
         with self._lock:
             key = str(provider_id)
             if key not in self._store.providers:
                 raise CatalogValidationError((ValidationIssue(f"providers.{key}", "Provider 不存在"),))
-            dependents = _provider_dependents(self._store, self._bindings, key)
+            dependents = _provider_dependents(self._store, self._bindings, key) + list(extra_referrers)
             if dependents:
                 raise CatalogValidationError(tuple(
                     ValidationIssue(name, "仍被引用，无法删除") for name in dependents
@@ -1287,6 +1349,17 @@ def _parse_document(raw: Any, startup_mode: str = "normal") -> tuple[ProviderSto
     return store, bindings
 
 
+def _catalog_part(raw: Any, startup_mode: str) -> ProviderStore:
+    # 只解析文档的目录部分（providers/models）并做 fake 拒绝：影响列表与导入的引用检查
+    # 以当前引用为准比较拟议定义，拟议文档自己的 bindings 不在这里校验
+    if not isinstance(raw, Mapping):
+        raise CatalogValidationError((ValidationIssue("catalog", "应为 JSON 对象"),))
+    store = ProviderStore.from_dict({"providers": raw.get("providers", []),
+                                     "models": raw.get("models", [])})
+    _reject_fake_if_normal(store, startup_mode)
+    return store
+
+
 def _reject_fake_if_normal(store: ProviderStore, startup_mode: str) -> None:
     # fake 协议只在测试/演示方式启动的系统可用；正常启动读取目录时拒绝，错误指出字段位置（工单 #86）
     if startup_mode != "normal":
@@ -1436,6 +1509,17 @@ def _provider_dependents(store: ProviderStore, bindings: Mapping[str, Mapping[st
         if binding.get("provider_id") == provider_id or binding.get("model_id") in model_ids:
             dependents.append(f"bindings.{department}")
     return dependents
+
+
+def _model_referrers(bindings: Mapping[str, Mapping[str, str]], model_id: str) -> list[str]:
+    # 部门默认中引用这一条模型访问定义的引用方；定义本身不算引用方
+    return [f"bindings.{department}" for department in sorted(bindings)
+            if bindings[department].get("model_id") == model_id]
+
+
+def _definition_identity(model_id: str, provider_id: str) -> dict[str, str]:
+    # 一条模型访问定义的公开身份：Provider 模块的影响列表只交出这个形状
+    return {"model_id": model_id, "provider_id": provider_id}
 
 
 def _frozen_compat(frozen_target: FrozenTarget, department: str) -> dict[str, Any]:

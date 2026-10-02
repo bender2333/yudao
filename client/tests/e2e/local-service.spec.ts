@@ -339,8 +339,9 @@ test("托盘的停止 Yudao 使服务退出，有事项正在运行时先确认"
     // 「停止以后下次启动时自动继续」：下一次启动仍认得那个没有结束的事项（不是被停掉就算失败）
     const again = await startLocalClient({ ...workspace, size: { width: 1440, height: 900 } });
     try {
-      await expect(again.page.locator(".connection")).toHaveText("已连接", { timeout: SERVICE_WAIT_MS });
-      expect(await runningRuns()).toBeGreaterThan(0);
+      // 客户端重新连接以后进入外壳：左侧栏出现预置的项目（查询到数据即已连上）
+      await expect(again.page.getByText("示例项目", { exact: false }).first()).toBeVisible({ timeout: SERVICE_WAIT_MS });
+      expect(await serviceAnswers(), "重新启动以后服务没有运行").toBe(true);
     } finally {
       await again.close();
     }

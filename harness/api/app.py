@@ -66,9 +66,11 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
     _add_stop(api, on_stop=on_stop)
     # 更新源（设计说明第 5.1 节）：不是查询与命令，从 wheel 内的发布资源目录读取
     _add_client_update(api, assets=release_assets)
-    # CORS 只允许客户端页面的来源（第 6.2 节）。中间件最后添加的最先执行：认证在 CORS 之前
+    # CORS 只允许客户端页面的来源（第 6.2 节）。中间件最后添加的最先执行：认证在 CORS 之前。
+    # 事件流续传时浏览器带 Last-Event-ID（第 5.5 节的续传位置），它不在 CORS 的默认允许头里，
+    # 预检会被拒；Accept 也一并在允许之列
     api.add_middleware(CORSMiddleware, allow_origins=list(CLIENT_ORIGINS), allow_methods=["GET", "POST"],
-                       allow_headers=["Content-Type"])
+                       allow_headers=["Content-Type", "Accept", "Last-Event-ID"])
     api.add_middleware(AccessMiddleware, access=access)
     api.openapi = lambda: _openapi(api)
     _add_events(api, keepalive_sec=keepalive_sec)
