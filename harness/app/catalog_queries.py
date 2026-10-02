@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ..models import CatalogEventType
+from ..models import DEPARTMENTS, CatalogEventType
+from ..providers import capabilities
 from .contracts import Contract, Snapshot
 from .registry import QueryDefinition
 
@@ -31,6 +32,8 @@ class CatalogModel(Contract):
     max_output_tokens: int
     capability_source: str
     accepts_required_tool_call: bool
+    # 输入方式（设计说明第 4.3 节）：模型访问定义中的值，文本总是包含
+    input_modalities: list[str]
     reasoning_levels: list[str]
     default_reasoning_level: str | None
     reasoning_mode: str
@@ -77,16 +80,27 @@ class CatalogPresets(Contract):
     presets: list[dict[str, Any]]
 
 
+class CatalogCapabilityTable(Contract):
+    # 模型能力表：整张表的 revision、快照日期与来源，以及预置服务方案在表中的条目
+    # （设计说明第 4.1 节；手动添加模型访问定义时客户端据此预填，运行时不从远端刷新）
+    revision: str
+    snapshot_date: str
+    source: str
+    presets: dict[str, list[dict[str, Any]]]
+
 class Catalog(Contract):
     # 查询 catalog：目录内容、凭据状态、预置表、准入记录与目录修订号（准入与目录分开返回，工单 #86）
     revision: int
     config_state: str
     reload_error: str | None
     presets: CatalogPresets
+    capability_table: CatalogCapabilityTable
     providers: list[CatalogProvider]
     models: list[CatalogModel]
     admissions: list[CatalogAdmission]
     bindings: dict[str, CatalogBinding]
+    # 部门默认当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）
+    department_reminders: dict[str, list[str]]
 
 
 class CatalogDocument(Contract):
@@ -118,16 +132,25 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
             "models": [_model(model) for model in item["models"]],
         }))
     presets = facade.presets_public_view()
+    table = capabilities.table_public()
+    bindings = {key: CatalogBinding.model_validate(value) for key, value in view["bindings"].items()}
     data = Catalog(
         revision=revision,
         config_state=status["config_state"],
         reload_error=status["reload_error"],
         presets=CatalogPresets(revision=presets["revision"], source=presets["source"],
                                presets=list(presets["presets"])),
+        capability_table=CatalogCapabilityTable(
+            revision=table["revision"], snapshot_date=table["snapshot_date"],
+            source=table["source"], presets=table["presets"]),
         providers=providers,
         models=[_model(item) for item in view["models"]],
         admissions=[CatalogAdmission.model_validate(item) for item in view["admissions"]],
-        bindings={key: CatalogBinding.model_validate(value) for key, value in view["bindings"].items()},
+        bindings=bindings,
+        # 部门默认各自当前绑定的模型的建议能力提醒（设计说明第 5.6 节）
+        department_reminders={department: facade.model_reminders(
+            None if bindings.get(department) is None else bindings[department].model_id, department)
+            for department in DEPARTMENTS},
     )
     return Snapshot[Catalog](position=position, data=data)
 

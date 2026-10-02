@@ -3,7 +3,7 @@
 桌面客户端按 [ADR-0015](0015-desktop-client-and-http-contracts.md) 是 Electron 程序，连接一个 Yudao 服务；控制主机是一台常开的机器，客户端通常运行在用户日常使用的电脑上（[ADR-0018](0018-single-control-host-remote-execution.md)）。M1 要交给用户试用，需要确定两者怎样安装、升级与发布。开发阶段后端在代码目录里用 `uv run python -m harness api` 启动，版本随执行者的合并随时变化。2026-10-01 用户逐轮采纳推荐，决定（[设计说明](../design/client-packaging-and-release.md)）：
 
 - Yudao 服务与桌面客户端分开安装：Yudao 服务用 `uv tool install` 安装成 `yudao` 命令，客户端用 Windows 安装程序（NSIS，按用户安装，不需要管理员权限）。两者出自同一个发布，版本号相同。
-- 退出客户端不停止 Yudao 服务：客户端只在本机的服务没有运行时启动它，启动为独立的后台进程；托盘菜单有「停止 Yudao」，用本机访问方式下的专用请求停止。
+- 退出客户端不停止 Yudao 服务：客户端只在本机的服务没有运行时启动它，启动为独立的后台进程；托盘菜单有「停止 Yudao」，用来自本机（回环地址）的专用请求停止。
 - 一次发布就是一个 wheel：Yudao 服务的 wheel 内包含客户端安装程序、更新清单（`latest.yml`）、blockmap 与执行代理的安装包（约 130 MB），Yudao 服务从自己的安装目录提供它们。
 - 客户端的版本跟随它连接的 Yudao 服务：接口版本不同时显示更新页，从已连接的 Yudao 服务下载同版本的安装程序更新，客户端比服务更新时降到服务的版本。使用 electron-builder 26 系列与 electron-updater 的 generic 提供方，开启 `allowDowngrade`。
 - 不签名。更新配置不写 `publisherName`，列为 TODO，离开局域网或分发给他人之前加入。

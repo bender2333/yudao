@@ -217,7 +217,11 @@ def test_projects_list_and_loop_show_onboarding_status_and_kind(data_dir, tmp_pa
 def test_time_limit_stops_the_onboarding_item_and_restart_is_available(data_dir, tmp_path):
     # 验收：建档 run 运行时间用完以后事项停止，没有发出确认请求，onboarding.restart 可用
     source = _source(tmp_path / "source")
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(_onboarding_script()))
+    def slow_spec(request):
+        # 运行时间在产品部门的模型调用期间用完：调用本身等待到限制之后，收尾在调用边界发现
+        time.sleep(1.5)
+        return FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"]))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([slow_spec, *_onboarding_script()[1:]]))
     project_id, work_item_id, run_id = system.projects.onboard(
         "已有项目", GOAL, "src", str(source), run_time_limit_sec=1)
     result = system.run_until_stop(run_id)

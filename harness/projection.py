@@ -412,7 +412,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
                 for key in ("provider_config_id", "model_id", "provider_name", "protocol", "base_url",
                             "requested_provider", "requested_protocol", "requested_model",
                             "credential_ref", "credential_version", "context_window",
-                            "configured_max_output_tokens", "accepts_required_tool_call", "selection_source",
+                            "configured_max_output_tokens", "accepts_required_tool_call", "input_modalities",
+                            "selection_source",
                             "reasoning_levels", "default_reasoning_level", "reasoning_mode",
                             "requested_tier", "sent_tier")
             }
@@ -450,6 +451,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "max_output_tokens": payload.get("max_output_tokens"),
             "configured_max_output_tokens": payload.get("configured_max_output_tokens"),
             "accepts_required_tool_call": payload.get("accepts_required_tool_call"),
+            "input_modalities": payload.get("input_modalities"),
             "actual_provider": None,
             "actual_model": None,
             "context_digest": event.context_digest,
@@ -707,6 +709,17 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.human_action = payload.get("human_action")
         state.error = event.error
         state.active_department = None
+        return
+
+    if etype == EventType.RUN_CONTINUED:
+        # 用户在暂停以后回答「处理以后继续执行」（工单 #204）：从暂停位置恢复阶段，清除暂停留下的字段；
+        # 已用的激活次数、模型步数与运行时间保持在暂停时的值，不在这里重置
+        state.phase = payload["resumed_at_phase"]
+        state.outcome = "running"
+        state.stop_reason = None
+        state.human_action = None
+        state.error = None
+        state.active_department = department_for_phase(state.phase)
         return
 
     if etype == EventType.RUN_FAILED:

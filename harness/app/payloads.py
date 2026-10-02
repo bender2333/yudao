@@ -176,6 +176,8 @@ class CallTarget(Payload):
     configured_max_output_tokens: int | None
     # 模型访问定义声明的是否接受要求调用工具；模型尚未解析时为空
     accepts_required_tool_call: bool | None
+    # 模型访问定义声明的输入方式（设计说明第 4.3 节）；模型尚未解析时为空列表
+    input_modalities: list[str]
     selection_source: str | None
     requested_tier: str | None
     sent_tier: str | None
@@ -945,6 +947,21 @@ class ModelUnavailableRequested(Payload):
     message: str
 
 
+class PauseRequested(Payload):
+    # 暂停以后继续（D09，工单 #204）：模型连续多次没有调用工具，或者工作区出现无法表示的条目，
+    # run 暂停并发出这个请求，回答之前这个 run 不推进。description 写明停止原因与人工处理说明；
+    # workspace_unrepresentable 的 facts 是条目在工作区内的相对路径；department 是暂停时正在工作的部门；
+    # resumed_at_phase 是暂停时所在的阶段，回答继续时恢复到它
+    kind: Literal["no_tool_call", "workspace_unrepresentable"]
+    blocks: Literal["run"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    stop_reason: Literal["no_tool_call", "workspace_unrepresentable"]
+    resumed_at_phase: Phase
+
+
 class UnknownActionRequested(Payload):
     # 工单 #17：动作核实与一致边界。恢复时发现未确认的动作，请求用户决定如何处理。
     # 只阻塞该动作（blocks="action"），不阻塞整个 run。
@@ -962,7 +979,7 @@ class UnknownActionRequested(Payload):
 
 
 # 决定请求的载荷：以 kind 区分的各种决定请求
-DecisionRequestedPayload = ModelUnavailableRequested | UnknownActionRequested
+DecisionRequestedPayload = ModelUnavailableRequested | UnknownActionRequested | PauseRequested
 
 
 class DecisionAnsweredPayload(Payload):
@@ -984,6 +1001,13 @@ class RunResumedPayload(Payload):
     basis: dict[str, Any]
     acquired_epoch: int
     previous_epoch: int | None
+
+class RunContinuedPayload(Payload):
+    # 暂停的 run 在用户回答「处理以后继续执行」以后继续（D09，工单 #204）：decision_id 是被回答的决定请求，
+    # stop_reason 是暂停时的停止原因，resumed_at_phase 是恢复到的阶段（暂停时记录在 run_paused 的 paused_at_phase）
+    decision_id: str
+    stop_reason: Literal["no_tool_call", "workspace_unrepresentable"]
+    resumed_at_phase: Phase
 
 
 # ---------------------------------------------------------------------------
@@ -1081,6 +1105,9 @@ class DepartmentSettingsConfiguredPayload(Payload):
     requested_tier: str | None = None
     department_prompt: str | None = None
     department_prompt_ref: ArtifactRef | None = None
+    # 这次保存写入的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）；
+    # 没有写入模型或模型具备建议能力时为空
+    reminders: list[str] = []
 
 
 class CommandConfiguredPayload(Payload):
@@ -1119,6 +1146,8 @@ class CatalogRevisedPayload(Payload):
     operation: Literal["save_connection", "delete_connection", "save_document", "department_defaults",
                        "reload", "startup"]
     provider_id: str | None
+    # 部门默认保存以后各部门的建议能力提醒（设计说明第 5.6 节）；其他操作为空
+    reminders: list[str] = []
 
 
 class CatalogCandidatesCollectedPayload(Payload):
@@ -1128,7 +1157,8 @@ class CatalogCandidatesCollectedPayload(Payload):
     status: Literal["ok", "unknown"]
     source_url: str
     fetched_at: str
-    # 候选逐条带上游模型 ID；上游列表返回窗口与输出上限时带这两项，其余候选只有上游模型 ID
+    # 候选逐条带上游模型 ID，以及预填值与来源（设计说明第 4.3 节）：窗口与输出上限先取上游模型列表、
+    # 其次取模型能力表；输入方式取能力表；每个预填值带来源（models_url、capability_table 或 default）
     candidates: list[dict[str, Any]]
     candidate_ids: list[str]
     error: str | None
@@ -1220,6 +1250,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,
     EventType.RUN_RESUMED: RunResumedPayload,
+    EventType.RUN_CONTINUED: RunContinuedPayload,
     EventType.DECISION_REQUESTED: DecisionRequestedPayload,
     EventType.DECISION_ANSWERED: DecisionAnsweredPayload,
     EventType.DECISION_WITHDRAWN: DecisionWithdrawnPayload,

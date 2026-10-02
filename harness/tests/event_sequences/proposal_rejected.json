@@ -292,6 +292,9 @@
       "version": "product"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 3026,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
@@ -362,6 +365,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
@@ -420,6 +426,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "message_index": 1,
@@ -477,6 +486,9 @@
     "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_tokens": 0,
     "input_total_tokens": 0,
     "input_version": 1,
@@ -548,6 +560,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "model_id": "fake-model",
@@ -672,6 +687,9 @@
      "output": "{\"error\":null,\"ok\":true,\"output\":{\"acceptance_criteria\":[\"prints it\"],\"goal\":\"\",\"kind\":\"product_spec\",\"requirements\":[\"print the argument\"]}}",
      "type": "function_call_output"
     },
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "model_id": "fake-model",
@@ -993,6 +1011,9 @@
       "version": "product"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 3644,
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
@@ -1063,6 +1084,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "max_attempts": 3,
@@ -1121,6 +1145,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "message_index": 1,
@@ -1178,6 +1205,9 @@
     "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_tokens": 0,
     "input_total_tokens": 0,
     "input_version": 1,
@@ -1249,6 +1279,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "model_id": "fake-model",
@@ -1401,6 +1434,9 @@
      "output": "{\"error\":null,\"ok\":true,\"output\":{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"kind\":\"product_spec\",\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"]}}",
      "type": "function_call_output"
     },
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "model_id": "fake-model",
@@ -1805,6 +1841,9 @@
       "version": "engineering"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 4685,
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1875,6 +1914,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "max_attempts": 3,
@@ -1933,6 +1975,9 @@
     "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "message_index": 1,
@@ -1990,6 +2035,9 @@
     "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_tokens": 0,
     "input_total_tokens": 0,
     "input_version": 1,
@@ -2061,6 +2109,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "model_id": "fake-model",
@@ -2203,6 +2254,9 @@
      "output": "<shared#1>",
      "type": "function_call_output"
     },
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "model_id": "fake-model",
@@ -2553,6 +2607,9 @@
       "version": "engineering"
      }
     ],
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 6052,
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -2623,6 +2680,9 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "max_attempts": 3,
@@ -2681,6 +2741,9 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 1,
@@ -2738,6 +2801,9 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 2,
@@ -2795,6 +2861,9 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "message_index": 3,
@@ -2852,6 +2921,9 @@
     "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_tokens": 0,
     "input_total_tokens": 0,
     "input_version": 1,
@@ -2923,6 +2995,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "model_id": "fake-model",
@@ -3039,6 +3114,9 @@
      "output": "{\"error\":null,\"ok\":true,\"output\":\"src/echo.py\"}",
      "type": "function_call_output"
     },
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "model_id": "fake-model",
@@ -3156,6 +3234,9 @@
      "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#4>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#27>\",\"engineering_plan_hash\":\"<sha256#44>\",\"executor\":\"host\",\"exit_code\":0,\"name\":\"smoke\",\"product_spec_hash\":\"<sha256#26>\",\"snapshot_hash\":\"<sha256#53>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"-c\\\",\\\"print('smoke ok')\\\"] exit=0\\nsmoke ok\",\"tree_changed\":false}}",
      "type": "function_call_output"
     },
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "model_id": "fake-model",
@@ -3273,6 +3354,9 @@
      "output": "{\"error\":null,\"ok\":true,\"output\":{\"check_names\":[\"smoke\"],\"files\":[\"src/echo.py\"],\"kind\":\"delivery_spec\",\"known_risks\":[],\"summary\":\"implemented echo CLI\"}}",
      "type": "function_call_output"
     },
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "model_id": "fake-model",
@@ -3574,6 +3658,9 @@
     "guidance_ids": [],
     "guidance_only": false,
     "injected": "<shared#2>",
+    "input_modalities": [
+     "text"
+    ],
     "input_token_estimate": 4657,
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
@@ -3644,6 +3731,9 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "max_attempts": 3,
@@ -3702,6 +3792,9 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "message_index": 1,
@@ -3759,6 +3852,9 @@
     "engineering_plan_hash": "<sha256#44>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "message_index": 2,
@@ -3816,6 +3912,9 @@
     "default_reasoning_level": null,
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_tokens": 0,
     "input_total_tokens": 0,
     "input_version": 1,
@@ -3887,6 +3986,9 @@
     "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "model_id": "fake-model",
@@ -4013,6 +4115,9 @@
      "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#5>\",\"delivery_spec_hash\":\"<sha256#54>\",\"effective_contract_hash\":\"<sha256#27>\",\"engineering_plan_hash\":\"<sha256#44>\",\"executor\":\"host\",\"exit_code\":0,\"name\":\"smoke\",\"product_spec_hash\":\"<sha256#26>\",\"snapshot_hash\":\"<sha256#53>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"-c\\\",\\\"print('smoke ok')\\\"] exit=0\\nsmoke ok\",\"tree_changed\":false}}",
      "type": "function_call_output"
     },
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "model_id": "fake-model",
@@ -4126,6 +4231,9 @@
      "output": "{\"error\":null,\"ok\":true,\"output\":{\"checks\":[\"smoke\"],\"defects\":[],\"kind\":\"qa_review\",\"rationale\":\"checks passed on the current snapshot\",\"verdict\":\"release\"}}",
      "type": "function_call_output"
     },
+    "input_modalities": [
+     "text"
+    ],
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "model_id": "fake-model",
@@ -4403,6 +4511,9 @@
     "credential_ref": null,
     "credential_version": null,
     "default_reasoning_level": null,
+    "input_modalities": [
+     "text"
+    ],
     "model_id": "fake-model",
     "protocol": "fake",
     "provider_config_id": "fake",
@@ -4424,6 +4535,9 @@
     "credential_ref": null,
     "credential_version": null,
     "default_reasoning_level": null,
+    "input_modalities": [
+     "text"
+    ],
     "model_id": "fake-model",
     "protocol": "fake",
     "provider_config_id": "fake",
@@ -4445,6 +4559,9 @@
     "credential_ref": null,
     "credential_version": null,
     "default_reasoning_level": null,
+    "input_modalities": [
+     "text"
+    ],
     "model_id": "fake-model",
     "protocol": "fake",
     "provider_config_id": "fake",
@@ -5307,6 +5424,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#6>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
@@ -5361,6 +5481,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#18>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#2>:root-1:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
@@ -5415,6 +5538,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#32>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#3>:root-1:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
@@ -5469,6 +5595,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#44>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#4>:root-1:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
@@ -5523,6 +5652,9 @@
     "effective_context_window": 32000,
     "event_id": "<evt#64>",
     "finished_at": "<time>",
+    "input_modalities": [
+     "text"
+    ],
     "logical_call_id": "<act#5>:root-1:work",
     "max_attempts": 3,
     "max_output_tokens": 4800,
