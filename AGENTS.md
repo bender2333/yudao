@@ -21,7 +21,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 
 ## 代码位置
 Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-architecture.md)的职责分层；控制核心各模块与文件的对应见总体架构第 6.1 节。
-- 接口层：`api/`（FastAPI 应用、访问方式、服务启动）、`__main__.py`（命令行入口、数据目录的进程锁）；`web/` 是旧 Web 控制台。
+- 接口层：`api/`（FastAPI 应用、访问方式、服务启动）、`__main__.py`（命令行入口、数据目录的进程锁）。
 - 应用层：`app/`（命令、查询、读取模型与合同）。
 - 控制核心：`orchestrator.py`（流程编排）、`engine.py` 与 `recording.py`（步骤驱动与记录）、`assembly.py`、`context.py`、`compaction.py`（上下文装配）、`adjudication.py` 与 `validation.py`（裁决规则）、`write_path.py`、`event_store.py`、`projection.py`（写入口、事件日志与投影）、`decisions.py`（用户决定）、`runtime.py`（`LoopSystem`，组装整个系统）。
 - 定义：`definitions/`（限额、停止原因、组织、角色、工具、提案合同、服务方案预置表）。
@@ -32,11 +32,11 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 
 ## 常用命令
 - 安装依赖（Python 3.11 或更新版本）：`uv sync --frozen`，按锁文件在仓库内建立项目环境 `.venv`，包含测试依赖。
-- 启动控制台：`uv run python -m harness`（默认端口 8765）；无需凭据的演示：`uv run python -m harness demo --serve --port 8765`
+- 启动服务：`uv run python -m harness api`（无参 `uv run python -m harness` 相同，默认端口 8765）；无需凭据的演示：`uv run python -m harness demo`
 - 测试分为单元、功能与模块、集成三层，每个测试文件属于哪一层写在登记表 `harness/tests/layers.toml` 中，每层的定义与边界见 `docs/design/test-pyramid.md`：
   - 单元层与模块层：`uv run python -m pytest -m "unit or module"`
   - 本次改动或新增的集成层测试文件：`uv run python -m pytest harness/tests/<文件>`
-  - 前端测试：`node --test --test-reporter=dot harness/tests/test_web_ui.js`
+  - 前端测试：`cd client && npm test`（客户端单元）；端到端为 `cd client && npm run test:e2e`
   - 登记表建立之前（#158 合并之前）：运行与本次改动相关的测试文件与前端测试。
   - 每次都运行 `uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`：两项检查整个仓库的模块导入关系与接口合同，任何改动都可能影响它们。`test_openapi_snapshot.py` 里的两项检查分别核对运行中的服务与 `harness/tests/openapi/openapi.json` 相同、按快照重新生成的客户端类型与提交的 `client/src/renderer/src/api/generated/` 逐文件相同；它需要 `harness/tests/openapi` 与 `client` 各安装一次依赖（各自的 `npm install`），未安装时报错写明缺少哪个文件。改动接口合同的工单在用 `--write-openapi-snapshot` 重写快照以后，在 `client` 中运行 `npm run generate:api` 重新生成客户端类型并提交，两项检查才会都通过。
   - 只用单进程运行，不加 `-n`。集成层全部由架构师按批运行，执行者与审查者不运行全量测试。

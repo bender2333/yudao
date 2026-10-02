@@ -3,13 +3,14 @@ from dataclasses import asdict, replace
 import pytest
 
 from harness.adapters.base import ProviderError
+from harness.app.application import Application
+from harness.app.project_queries import EventDetail, ReplayCheck, RunExport
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, json_dumps
 from harness.projection import project_events
 from harness.proposals import delivery_turn, plan_turn, product_spec, review, review_turn
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
-from harness.tests.test_web import get_json, request, running_server
 
 
 def rework_script(verdict="rework_engineering"):
@@ -161,25 +162,24 @@ def test_release_with_defect_keeps_existing_rejection_and_does_not_create_candid
     assert_candidate_does_not_change_execution(system, result)
 
 
-def test_web_evidence_source_export_and_replay_keep_the_same_candidate(tmp_path):
+def test_evidence_source_export_and_replay_keep_the_same_candidate(tmp_path):
     system, result = run_scripted(tmp_path, rework_script())
     candidate = result.lesson_candidates[0]
-    path = f"/api/runs/{result.run_id}"
+    application = Application(system)
     before = result.stream_version
-    with running_server(system) as (_server, host, port):
-        payload = get_json(host, port, path)
-        assert payload["evidence"]["lesson_candidates"] == result.to_dict()["lesson_candidates"]
-        assert candidate.created_event_id not in [item["event_id"] for item in payload["events"][-12:]]
-        detail = get_json(host, port, f"{path}/events/{candidate.created_event_id}")
-        source = get_json(host, port, f"{path}/events/{candidate.source_event_id}")
-        assert detail["payload"]["source_event_id"] == source["event_id"]
-        assert source["payload"]["rationale"] == candidate.observation["rationale"]
-        exported = get_json(host, port, f"{path}/export")
-        assert exported["projection"]["lesson_candidates"] == payload["evidence"]["lesson_candidates"]
-        source_event = dict(source)
-        git_detail = source_event.pop("git_version_detail")
-        assert git_detail["commit"] == source_event["payload"]["git_version"]["commit"]
-        assert detail in exported["events"] and source_event in exported["events"]
-        assert json_dumps(exported["projection"]["lesson_candidates"]) == json_dumps(system.replay(result.run_id).lesson_candidates)
-        assert request(host, port, "POST", f"{path}/replay")[0] == 200
+
+    exported = application.query("run.export", RunExport(run_id=result.run_id))
+    assert exported.data.projection["lesson_candidates"] == result.to_dict()["lesson_candidates"]
+    detail = application.query("event.detail", EventDetail(event_id=candidate.created_event_id))
+    source = application.query("event.detail", EventDetail(event_id=candidate.source_event_id))
+    assert detail.data.event["payload"]["source_event_id"] == source.data.event["event_id"]
+    assert source.data.event["payload"]["rationale"] == candidate.observation["rationale"]
+    assert (detail.data.event["payload"]["source_event_id"]
+            in [item["event_id"] for item in exported.data.events])
+    assert source.data.event["event_id"] in [item["event_id"] for item in exported.data.events]
+    assert source.data.artifacts["git_version"]["commit"] == source.data.event["payload"]["git_version"]["commit"]
+    assert json_dumps(exported.data.projection["lesson_candidates"]) == json_dumps(
+        system.replay(result.run_id).lesson_candidates)
+    checked = application.query("replay.check", ReplayCheck(run_id=result.run_id))
+    assert checked.data.consistent is True
     assert system.project(result.run_id).stream_version == before

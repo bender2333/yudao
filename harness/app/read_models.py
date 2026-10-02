@@ -285,7 +285,7 @@ def _attempt_clauses(*, project_id: str | None, run_id: str | None, work_item_id
                      department: str | None, status: AttemptStatus | None, provider: str | None,
                      requested_model: str | None, actual_model: str | None,
                      q: str | None) -> tuple[list[str], list[Any]]:
-    # 调用尝试表的筛选条件；与旧控制台的筛选规则相同（状态按公开状态，实际模型缺失时回退到请求的模型）
+    # 调用尝试表的筛选条件（状态按公开状态，实际模型缺失时回退到请求的模型）
     clauses: list[str] = []
     params: list[Any] = []
     for column, value in (("project_id", project_id), ("run_id", run_id), ("work_item_id", work_item_id),

@@ -2,11 +2,13 @@ import asyncio
 import json
 import re
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from harness.adapters.fake import FakeAdapter, prompt_part
+from harness.app.application import Application
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.projects import CommandConfigConflict
 from harness.proposals import delivery_turn, engineering_plan, plan_turn, product_spec, review_turn
@@ -14,9 +16,9 @@ from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.actions import Preconditions
 from harness.environment import LocalEnvironment
+from harness.tests.api_helpers import running_api
 from harness.tests.helpers import (LONG_RUNNING_TREE, action, happy_script, perform, recorded_context,
                                    wait_for_file, wait_until_stopped)
-from harness.tests.test_web import get_json, request, running_server
 from harness.definitions import DEFINITIONS
 from harness.workspace import Workspace
 
@@ -337,21 +339,23 @@ def test_registry_freezes_at_work_item_creation(data_dir):
     assert system.project(run_2).command_versions == {"itest": 2}
 
 
-def test_command_http_routes(data_dir):
+def test_command_registration_commands_and_stale_base(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
-    with running_server(system) as (_server, host, port):
-        status, raw, _ = request(host, port, "POST", "/api/projects", {"name": "Cmd", "goal": GOAL})
-        assert status == 201, raw
-        project_id = json.loads(raw)["project_id"]
-        status, raw, _ = request(host, port, "PUT", f"/api/projects/{project_id}/commands/itest",
-                                 {"argv": ["python", "-c", "print(1)"], "base_version": 0})
-        assert status == 200, raw
-        assert json.loads(raw)["version"] == 1
-        listed = get_json(host, port, f"/api/projects/{project_id}/commands")
-        assert [item["name"] for item in listed["commands"]] == ["itest"]
-        detail = get_json(host, port, f"/api/projects/{project_id}/commands/itest")
-        assert detail["argv"] == ["python", "-c", "print(1)"]
-        status, raw, _ = request(host, port, "PUT", f"/api/projects/{project_id}/commands/itest",
-                                 {"argv": ["python", "-c", "print(2)"], "base_version": 0})
-        assert status == 409, raw
-        assert json.loads(raw)["reason"] == "command_config_conflict"
+    application = Application(system)
+    with running_api(lambda: application) as client:
+        created = client.post("/api/commands/project.create",
+                              json={"command_id": str(uuid.uuid4()), "name": "Cmd", "goal": GOAL})
+        assert created.status_code == 200, created.text
+        project_id = created.json()["refs"]["project_id"]
+        saved = client.post("/api/commands/command_registration.save", json={
+            "command_id": str(uuid.uuid4()), "project_id": project_id, "name": "itest",
+            "argv": ["python", "-c", "print(1)"], "base_version": 0})
+        assert saved.status_code == 200, saved.text
+        settings = client.get("/api/queries/project.settings", params={"project_id": project_id}).json()["data"]
+        assert list(settings["commands"]) == ["itest"]
+        assert settings["commands"]["itest"]["argv"] == ["python", "-c", "print(1)"]
+        stale = client.post("/api/commands/command_registration.save", json={
+            "command_id": str(uuid.uuid4()), "project_id": project_id, "name": "itest",
+            "argv": ["python", "-c", "print(2)"], "base_version": 0})
+        assert stale.status_code == 409, stale.text
+        assert stale.json()["reason"] == "stale_base"

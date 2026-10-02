@@ -458,3 +458,5 @@ qwen3.8 / 2026-10-02 16:45 / docs/architecture-issues.md 为 #82 登记两条：
 9router/ag/gemini-3.8-flash-high / 2026-10-02 13:50 / docs/architecture-issues.md 追加一条：#207 记录 `harness/tests/test_api.py` 的命令清单期望缺少 `catalog.model.remove`，该失败在 origin/main（e15b5d23）上就存在，与本工单改动无关 / 执行 #207 的模块层自测时发现并登记，交由 #90 或接口合同维护工单修
 claude-sonnet-5-5 / 2026-10-02 16:34 / docs/architecture-issues.md 追加 #207 登记的 test_api 命令清单失败的处理结论 / 该失败已由 #252 修复，按登记规则写处理行
 claude-sonnet-5-5 / 2026-10-02 17:07 / docs/architecture-issues.md 为 #82 登记的两条问题（录制场景数与固定时刻、决定板与卡片的归属）写处理结论 / 按登记规则写处理行；结论同时写入 #178、#179 的任务评论
+
+opus-4.6 / 2026-10-02 21:31 / README 启动方式与示例改为应用接口（无参启动即 `api`）、删除旧 Web 接口表；`docs/design/department-guidance.md` 状态行、`docs/design/README.md` 索引状态、`docs/requirements/department-guidance.md` D20 状态改为命令 `guidance.send` 与查询 `department.workspace`；`docs/research/web-frontend-technology.md` 第 6 节现状改为 FastAPI 接口层与桌面客户端；`docs/design/app-and-interface.md` 第 2.5、7.3、7.4、7.5、10 节改为删除已完成的口径；`docs/design/test-pyramid.md` 第 7 节记录旧控制台界面测试已删除；`docs/current-baseline.md` 与 `docs/requirements/department-providers.md` 同步；`AGENTS.md` 去掉 `web/` 与旧启动命令 / 工单 #78 删除旧 Web 控制台，文档跟随更新
