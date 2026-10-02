@@ -38,10 +38,15 @@ export type DesktopApi = {
 };
 
 import type { FloorTestHooks } from "./pixel/floor/view";
+import type { PixelFloorTestMount } from "./pixel/floor/dev-mount";
+import type { DecisionAnswer, DecisionResult } from "./pixel/floor/card";
+import type { FloorModel } from "./pixel/world/types";
 
 declare global {
   interface Window {
     yudao: DesktopApi;
     __floorViewForTest?: FloorTestHooks;
+    /** 开发构建里的像素画面测试入口（只在 import.meta.env.DEV 下安装）。 */
+    __pixelFloorTest?: { mount: (model: FloorModel, opts?: { answer?: (payload: DecisionAnswer) => DecisionResult }) => Promise<PixelFloorTestMount> };
   }
 }

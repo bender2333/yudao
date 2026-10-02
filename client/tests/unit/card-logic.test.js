@@ -122,3 +122,20 @@ test("给像素画面用的纯文字版本与页面卡片共用同一份材料",
   assert.deepEqual(card.rows, materialRows(decision()));
   assert.deepEqual(card.options.map((option) => option.id), ["continue", "stop"]);
 });
+
+test("给画面用的卡片内容带上决定版本、项目与事项、链接与选项的说明标记", () => {
+  const now = new Date("2026-10-02T10:01:00Z").getTime();
+  const card = face(decision({ request: { ...decision().request, options: [{ id: "revise", label: "提出修改", note_required: true }] } }), now, {
+    projectName: "文本工具",
+    workItemTitle: "实现逐行处理",
+  });
+  assert.equal(card.version, 3);
+  assert.equal(card.work_item_id, "w1");
+  assert.equal(card.where, "文本工具 · 实现逐行处理");
+  assert.equal(card.waited, "已等待 60 秒");
+  assert.deepEqual(card.links.map((link) => link.href), ["#/sys/models", "#/p/p1/settings"]);
+  assert.equal(card.options[0].note_required, true);
+  // 没有给出名称时回落到标识
+  const bare = face(decision(), now);
+  assert.equal(bare.where, "p1 · w1");
+});

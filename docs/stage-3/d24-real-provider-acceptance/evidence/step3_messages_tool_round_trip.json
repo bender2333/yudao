@@ -1,0 +1,145 @@
+{
+  "first": {
+    "request": {
+      "model": "ag/claude-opus-4-6-thinking",
+      "max_tokens": 1024,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use get_weather to look up Paris, then report the result."
+        }
+      ],
+      "stream": true,
+      "tools": [
+        {
+          "name": "get_weather",
+          "description": "Look up the weather for a city",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ]
+          }
+        }
+      ],
+      "tool_choice": {
+        "type": "any"
+      },
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "medium"
+      }
+    },
+    "model": "claude-opus-4-6-thinking",
+    "finish_reason": "completed",
+    "output": [
+      {
+        "id": "messages-text-0",
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "\n\nI'll look up the weather for Paris right away."
+          }
+        ]
+      },
+      {
+        "id": "toolu_vrtx_016mT2A9MbTWKPppR2Cg8zSV",
+        "type": "function_call",
+        "call_id": "toolu_vrtx_016mT2A9MbTWKPppR2Cg8zSV",
+        "name": "get_weather",
+        "arguments": "{\"city\":\"Paris\"}"
+      }
+    ]
+  },
+  "tool_call": {
+    "id": "toolu_vrtx_016mT2A9MbTWKPppR2Cg8zSV",
+    "name": "get_weather",
+    "input": {
+      "city": "Paris"
+    }
+  },
+  "second": {
+    "request": {
+      "model": "ag/claude-opus-4-6-thinking",
+      "max_tokens": 1024,
+      "messages": [
+        {
+          "role": "assistant",
+          "content": "I will look up Paris."
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_vrtx_016mT2A9MbTWKPppR2Cg8zSV",
+              "name": "get_weather",
+              "input": {
+                "city": "Paris"
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_vrtx_016mT2A9MbTWKPppR2Cg8zSV",
+              "content": "{\"city\": \"Paris\", \"temp_c\": 21, \"sky\": \"clear\"}"
+            }
+          ]
+        }
+      ],
+      "stream": true,
+      "tools": [
+        {
+          "name": "get_weather",
+          "description": "Look up the weather for a city",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ]
+          }
+        }
+      ],
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "medium"
+      }
+    },
+    "model": "claude-opus-4-6-thinking",
+    "finish_reason": "completed",
+    "text": "I apologize — it looks like I jumped ahead there! You hadn't actually asked me anything yet. 😅\n\nHow can I help you? I have access to a weather lookup tool if you'd like to check the weather for any city.",
+    "output": [
+      {
+        "id": "messages-text-0",
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I apologize — it looks like I jumped ahead there! You hadn't actually asked me anything yet. 😅\n\nHow can I help you? I have access to a weather lookup tool if you'd like to check the weather for any city."
+          }
+        ]
+      }
+    ]
+  }
+}
