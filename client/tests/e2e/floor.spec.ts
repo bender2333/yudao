@@ -210,3 +210,88 @@ test("两种窗口尺寸下楼层画面都可用，控制台错误为零", async
     }
   }
 });
+
+// 世界里的决定卡片（工单 #179 验收标准 2）：在真实运行的系统上，文本工具项目产生一个待恢复的决定请求。
+// 点大厅的板子打开卡片，点选项盖章回答；事件到达以后这个决定移出等待列表，画面上的纸收起。
+// 随后回答「继续执行」会在同一事项上再产生一个待恢复的决定请求，用文字列表里的页面卡片同样回答它。
+test("真实系统上的决定请求：点板子打开卡片盖章回答，文字列表里的同一个决定请求也能回答", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    const id = await projectId("文本工具");
+    await openFloor(page, id);
+    const pending = await decisionsOf(id);
+    expect(pending.length).toBeGreaterThan(0);
+    const target = pending[0];
+    // 文字列表里的页面卡片出现，说明画面已经拿到这份决定请求（板子上才有这张便条）
+    await expect(page.locator(`#decision-${target.decision_id}`)).toBeVisible();
+
+    // 点大厅的板子打开卡片：画面里的横线纸上叠一个说明的输入框，打开时可见。
+    // 板的命中范围在画面逻辑坐标里固定（大厅地面上），点一次没打开时重试
+    const note = page.locator('textarea[aria-label="决定的说明"]');
+    for (let i = 0; i < 10; i += 1) {
+      await clickLogical(page, 82, 172);
+      try {
+        await note.waitFor({ state: "visible", timeout: 1000 });
+        break;
+      } catch {
+        // 画面还没就绪，重试
+      }
+    }
+    await expect(note).toBeVisible();
+    await expect(page.locator(".floor-screen canvas")).toHaveCount(1);
+
+    // 点第一个选项的章（继续执行）回答：命令带着决定的版本发出
+    await clickLogical(page, 110, 270);
+    await waitUntil(
+      async () => !(await decisionsOf(id)).some((row) => row.decision_id === target.decision_id),
+      "回答以后这个决定移出等待列表",
+    );
+    // 纸在盖章 1.2 秒以后收起：说明的输入框不再可见
+    await expect(page.locator('textarea[aria-label="决定的说明"]')).toBeHidden();
+
+    // 回答「继续执行」以后同一事项再次遇到模型不可用，产生新的待恢复决定请求；用文字列表的页面卡片回答它
+    const next = await waitUntilDecision(id);
+    const card = page.locator(`#decision-${next.decision_id}`);
+    await expect(card).toBeVisible();
+    await card.locator(".decision-answer button").first().click();
+    await waitUntil(
+      async () => !(await decisionsOf(id)).some((row) => row.decision_id === next.decision_id),
+      "文字列表里的决定请求被回答",
+    );
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
+type DecisionRow = { decision_id: string; version: number; status: string };
+
+async function decisionsOf(projectId: string): Promise<DecisionRow[]> {
+  const data = await query<{ decisions: DecisionRow[] }>("decisions.list", { project_id: projectId, status: "open" });
+  return data.decisions;
+}
+
+/** 等一个等待回答的决定请求出现，返回它。 */
+async function waitUntilDecision(projectId: string): Promise<DecisionRow> {
+  for (let i = 0; i < 150; i += 1) {
+    const rows = await decisionsOf(projectId);
+    if (rows.length > 0) return rows[0];
+    const { promise, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, 400);
+    await promise;
+  }
+  throw new Error("等待超时：新的待恢复决定请求没有出现");
+}
+
+/** 在楼层画布上用画面逻辑坐标点一下（换算成画布元素内的 CSS 坐标，按元素点，避开缩放误差）。 */
+async function clickLogical(page: Page, x: number, y: number): Promise<void> {
+  const canvas = page.locator(".floor-screen canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const size = await canvas.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  });
+  await canvas.click({ position: { x: (x / 640) * size.width, y: (y / 320) * size.height } });
+}

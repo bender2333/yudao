@@ -121,24 +121,42 @@ export function blockedText(decision: DecisionView): { text: string; muted: bool
   return { text: parts.join("，"), muted: false };
 }
 
-// 给像素画面用的纯文字版本（原型 v9 的 Y9.cards.face）：与页面卡片同一份材料，不含界面元素
-export function face(decision: DecisionView, now: number): {
+// 给像素画面用的纯文字版本（原型 v9 的 Y9.cards.face）：与页面卡片同一份材料，不含界面元素。
+// where 是「项目 · 事项」，由调用处按快照把标识解析成名称；解析不到时回落到标识。
+// options 保留 note_required（原型选项的标记）：为真时，没有写说明就不提交。
+export function face(
+  decision: DecisionView,
+  now: number,
+  names?: { projectName: string; workItemTitle: string },
+): {
   id: string;
   kind: string;
+  version: number;
   title: string;
+  work_item_id: string | null;
+  where: string;
   waited: string;
   blocks: string;
   rows: MaterialRow[];
-  options: { id: string; label: string }[];
+  links: MaterialLink[];
+  options: { id: string; label: string; note_required: boolean }[];
 } {
+  const project = names?.projectName || decision.project_id || "项目流";
+  const item = names?.workItemTitle || decision.work_item_id;
+  const request = (decision.request ?? {}) as Record<string, unknown>;
+  const options = (request.options ?? []) as { id: string; label: string; note_required?: boolean }[];
   return {
     id: decision.decision_id,
     kind: decision.kind,
+    version: decision.version,
     title: label(DECISION_KIND, decision.kind),
+    work_item_id: decision.work_item_id,
+    where: item ? `${project} · ${item}` : project,
     waited: `已等待 ${waitedSeconds(decision.requested_at, now)} 秒`,
     blocks: blockedText(decision).text,
     rows: materialRows(decision),
-    options: (decision.request?.options ?? []).map((option) => ({ id: option.id, label: option.label })),
+    links: decisionLinks(decision),
+    options: options.map((option) => ({ id: option.id, label: option.label, note_required: Boolean(option.note_required) })),
   };
 }
 

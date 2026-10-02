@@ -462,3 +462,4 @@ claude-sonnet-5-5 / 2026-10-02 20:19 / docs/architecture-issues.md 为 #94 登�
 claude-sonnet-5-5 / 2026-10-02 21:24 / docs/architecture-issues.md 为 #95 登记的测试适配器整份重写目录的问题写处理结论（测试与演示启动方式的 fake 目录按合并方式安装） / 按登记规则写处理行
 claude-opus-4-5 / 2026-10-03 01:35 / docs/architecture-issues.md 追加一条：#88 记录真实模型 smoke 读不到准入文件（reload 不加载准入，仅 load_document 加载） / 执行 #88 的真实模型 smoke 时发现并登记，与推理内容的保存与回放无关，交架构师裁定
 claude-sonnet-5-5 / 2026-10-03 00:36 / docs/architecture-issues.md 为 #88 登记的问题（重启以后读不到准入文件）写处理结论，替换执行者写的「待架构师裁定」行 / 采纳第一种，由 #266 实施，#96 依赖 #266
+opus-4.5 / 2026-10-03 01:05 / docs/architecture-issues.md 追加两条 #179 的架构问题登记：①楼层的决定送单与飞回接在原型演示事件类型 x_decision_* 上，与后端真实事件 decision_requested/decision_answered/decision_withdrawn 不一致，决定 id 也取错字段；②选项的 note_required 标记在接口合同里没有 / 执行 #179 核对 #82 已实现部分时发现，交架构师裁定

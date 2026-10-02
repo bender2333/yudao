@@ -17,7 +17,7 @@ import { mountMachines, syncCharacters } from "../../src/renderer/src/pixel/worl
 import { createFloorState } from "../../src/renderer/src/pixel/world/floor.ts";
 import { createScene } from "../../src/renderer/src/pixel/world/scene.ts";
 import { createFloorDriver } from "../../src/renderer/src/pixel/world/floor.ts";
-import type { FloorModel, LoopItem, PixelFloorEvent, RoleInfo } from "../../src/renderer/src/pixel/world/types.ts";
+import type { DecisionFace, FloorModel, LoopItem, PixelFloorEvent, RoleInfo, Task } from "../../src/renderer/src/pixel/world/types.ts";
 
 // ---------------------------------------------------------------------------
 // 确定时钟与手写数据
@@ -523,4 +523,78 @@ test("系统：管道的流动由 stateOf 决定，停止以后光点留在原�
     scene.stepScene(50);
   }
   assert.ok(Math.abs(pipe.flow!.phase - phase) < 1, "停下的管道里光点还在移动");
+});
+
+// ---------------------------------------------------------------------------
+// 决定请求的世界动作（原型 v9 设计说明第 9 节，工单 #179）：真实事件 decision_requested 让提出决定的
+// 部门的经理走到门口送出决定单、决定单飞向大厅的板；decision_answered 让板上的决定单飞回部门门口。
+
+const decisionFace = (id: string): DecisionFace => ({
+  id, kind: "model_unavailable", version: 3, title: "模型引用无法使用", work_item_id: "w1", where: "项目 · 测试事项",
+  waited: "已等待 1 分", blocks: "不挡住事项", rows: [{ term: "部门", value: "工程" }], links: [],
+  options: [{ id: "continue", label: "继续执行" }],
+});
+
+test("决定请求：提出决定的部门的经理走到门口送单，决定单飞向大厅的板", () => {
+  const h = mountFloor(model({ decisions: [decisionFace("d1")] }));
+  h.step(300);
+  const board = h.driver.boardRect();
+  // 送单期间板上还看不到这张单子
+  h.driver.playEvent({ type: "decision_requested", event_id: "d1", department: "engineering", work_item_id: "w1", payload: { kind: "model_unavailable" } });
+  h.step(200);
+  const post = h.driver.world.characters["e-mgr"].current ?? h.driver.world.characters["e-mgr"].queue[0];
+  assert.equal(post?.taskKey, "x_decision_issued");
+  assert.equal(post?.spot, "door");
+  // 送单动作收尾以后决定单沿弧线飞向板
+  let flying = 0;
+  for (let i = 0; i < 80 && !flying; i++) {
+    h.step(100);
+    flying = h.scene.flyers.length;
+  }
+  assert.equal(flying, 1);
+  assert.equal(h.scene.flyers[0].bmp, "decision");
+  assert.deepEqual(h.scene.flyers[0].to, [board.x + board.w / 2, board.y + board.h / 2]);
+  // 落下来以后飞行结束，板上不再隐藏这张单子
+  h.step(3000);
+  assert.equal(h.scene.flyers.length, 0);
+  assert.equal(h.driver.decisionHidden("d1", h.scene.realT), false);
+});
+
+test("回答到达：正在展开的那张纸盖章，决定单从板上飞回提出决定的部门的门口", () => {
+  const h = mountFloor(model({ decisions: [decisionFace("d2")] }));
+  h.step(300);
+  const stamped: { id: string; text: string }[] = [];
+  h.scene.cardStamped = (id, text) => stamped.push({ id, text });
+  h.driver.playEvent({ type: "decision_answered", department: "engineering", work_item_id: "w1", payload: { decision_id: "d2", option: "continue", base_version: 3 } });
+  h.step(100);
+  assert.deepEqual(stamped, [{ id: "d2", text: "已回答" }]);
+  assert.equal(h.scene.flyers.length, 1);
+  assert.equal(h.scene.flyers[0].bmp, "decision");
+  // 飞回提出决定的部门的门口：终点是部门房间的门
+  const room = h.driver.world.rooms.engineering;
+  assert.equal(h.scene.flyers[0].to[0], room.door);
+  // 到达以后经理在门口收下（走进收单的任务）
+  let take: Task | null = null;
+  for (let i = 0; i < 60 && !take; i++) {
+    h.step(100);
+    const mgr = h.driver.world.characters["e-mgr"];
+    take = mgr.current ?? mgr.queue[0] ?? null;
+  }
+  assert.equal(take?.taskKey, "x_decision_answered");
+});
+
+test("决定请求没有部门时（初始 PRD）从大厅上方飞进来", () => {
+  const h = mountFloor(model({ decisions: [decisionFace("d3")] }));
+  h.step(300);
+  h.driver.playEvent({ type: "decision_requested", event_id: "d3", department: null, work_item_id: "w1", payload: { kind: "model_unavailable" } });
+  let flying = 0;
+  for (let i = 0; i < 20 && !flying; i++) {
+    h.step(100);
+    flying = h.scene.flyers.length;
+  }
+  assert.equal(flying, 1);
+  // 起点在大厅上方（板子的正上方，画面顶边之上）
+  const board = h.driver.boardRect();
+  assert.equal(h.scene.flyers[0].from[0], board.x + board.w / 2);
+  assert.ok(h.scene.flyers[0].from[1] < board.y);
 });

@@ -58,11 +58,13 @@ interface Shell extends ShellPaint {
   floor2?: string;
 }
 
-const R = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string): void => {
+/** 画一个实心矩形（画面与决定卡片共用的画布原语，坐标取整保证像素清晰）。 */
+export const R = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string): void => {
   c.fillStyle = col;
   c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
 };
-const RB = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string, ink?: string): void => {
+/** 画一个带描边的矩形（画面与决定卡片共用）。 */
+export const RB = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string, ink?: string): void => {
   R(c, x - 1, y - 1, w + 2, h + 2, ink ?? PAL.ink);
   R(c, x, y, w, h, col);
 };
@@ -73,6 +75,8 @@ export class FloorRenderer {
   private bgKey = "";
   /** 覆盖层的数据由宿主设置（setOverlay）。 */
   overlay: { id: string | null; data: Record<string, unknown> | null } = { id: null, data: null };
+  /** 世界里的决定卡片：打开时画在最上层（工单 #179）。 */
+  card: { draw: (c: CanvasRenderingContext2D) => void } | null = null;
 
   constructor(private readonly driver: FloorDriver, private readonly scene: SceneLike) {}
 
@@ -102,6 +106,7 @@ export class FloorRenderer {
     this.arrows(c);
     this.overlayLayer(c);
     this.infoBar(c);
+    this.card?.draw(c);
   }
 
   private rooms(): { hall: Room; lib: Room; depts: Room[]; door: NonNullable<World["machineDoor"]>; gate: Room } {
