@@ -1372,7 +1372,7 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | UnknownActionRequested;
+    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested;
     answer: DecisionAnswerRecord | null;
 };
 
@@ -2132,6 +2132,44 @@ export type OverlayCapability = {
      * Queries
      */
     queries: Array<string>;
+};
+
+/**
+ * PauseRequested
+ */
+export type PauseRequested = {
+    /**
+     * Kind
+     */
+    kind: 'no_tool_call' | 'workspace_unrepresentable';
+    /**
+     * Blocks
+     */
+    blocks: 'run';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality';
+    /**
+     * Stop Reason
+     */
+    stop_reason: 'no_tool_call' | 'workspace_unrepresentable';
+    /**
+     * Resumed At Phase
+     */
+    resumed_at_phase: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
 };
 
 /**
@@ -6533,7 +6571,7 @@ export type DecisionRequestedEvent = {
     /**
      * Payload
      */
-    payload: ModelUnavailableRequested | UnknownActionRequested;
+    payload: ModelUnavailableRequested | UnknownActionRequested | PauseRequested;
 };
 
 /**
@@ -10801,6 +10839,91 @@ export type ReviewObservation = {
 };
 
 /**
+ * RunContinuedEvent
+ */
+export type RunContinuedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'run_continued';
+    payload: RunContinuedPayload;
+};
+
+/**
+ * RunContinuedPayload
+ */
+export type RunContinuedPayload = {
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Stop Reason
+     */
+    stop_reason: 'no_tool_call' | 'workspace_unrepresentable';
+    /**
+     * Resumed At Phase
+     */
+    resumed_at_phase: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
+};
+
+/**
  * RunCreatedEvent
  */
 export type RunCreatedEvent = {
@@ -13500,6 +13623,8 @@ export type EventObject = ({
 } & RunFailedEvent) | ({
     type: 'run_resumed';
 } & RunResumedEvent) | ({
+    type: 'run_continued';
+} & RunContinuedEvent) | ({
     type: 'decision_requested';
 } & DecisionRequestedEvent) | ({
     type: 'decision_answered';

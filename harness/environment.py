@@ -430,7 +430,7 @@ class LocalEnvironment:
         try:
             self.workspace.snapshot()
         except UnrepresentableWorkspace as exc:
-            workspace_error = str(exc)
+            workspace_error = {"message": str(exc), "paths": list(exc.paths)}
         return {
             "name": name,
             "argv": argv,

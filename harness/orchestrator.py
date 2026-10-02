@@ -26,8 +26,8 @@ from .compaction import response_reserve
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
-    DEFINITIONS_CHANGED, MODEL_UNAVAILABLE, UNKNOWN_ACTION, DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision,
-    blocks_activation, blocks_run,
+    DEFINITIONS_CHANGED, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION, DecisionClosed, DecisionKind,
+    DecisionNotFound, InvalidOption, StaleDecision, blocks_activation, blocks_run,
 )
 from .environment import LocalEnvironment
 from .deltas import DeltaChannel
@@ -1068,15 +1068,18 @@ class Orchestrator:
             )
             result = await activation.driver.result()
         except UnrepresentableWorkspace as exc:
-            # 打开工作区或驱动开始前发现无法表示的条目：以 workspace_unrepresentable 暂停
-            self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version)
+            # 打开工作区或驱动开始前发现无法表示的条目：以 workspace_unrepresentable 暂停，
+            # 条目在工作区内的相对路径写进决定请求的事实引用
+            self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version,
+                          facts=list(exc.paths))
             return
         except Exception as exc:
             # 步骤驱动没有开始：依据是激活开始时的运行状态
             self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
             return
         if isinstance(result, Stopped) and result.reason is not None:
-            self._end_run(activation, result.reason, result.message, result.version, target=result.target)
+            self._end_run(activation, result.reason, result.message, result.version,
+                          target=result.target, facts=result.facts)
             return
 
         current = self.project(run_id)
@@ -1107,7 +1110,7 @@ class Orchestrator:
             )
         except UnrepresentableWorkspace as exc:
             # 提案提交（提交判断读取工作区事实、交付封存取得公开树）发现无法表示的条目：暂停，错误不再归入提交错误
-            self._end_run(activation, "workspace_unrepresentable", str(exc), None)
+            self._end_run(activation, "workspace_unrepresentable", str(exc), None, facts=list(exc.paths))
         except Exception as exc:
             self._end_run(activation, "host_commit_error", f"{type(exc).__name__}: {exc}", None)
 
@@ -1343,7 +1346,7 @@ class Orchestrator:
         ))
 
     def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None,
-                 *, target: dict[str, Any] | None = None) -> None:
+                 *, target: dict[str, Any] | None = None, facts: list[str] | None = None) -> None:
         # 在一个事务中按停止原因暂停或结束运行；模型引用无法使用（provider_unavailable）时 run 进入待恢复。
         # version 是作出停止判断时 run 流的版本：同一事务中核对此后有没有用户的命令或输入写入；有写入、并且写入
         # 改变了这次激活的依据（输入或指导）时，停止判断已经过期，按安全节点停止处理，运行继续，由下一次激活处理
@@ -1357,7 +1360,7 @@ class Orchestrator:
                 self._await_model(transaction, scope.department, target, reason, message,
                                   facts=self._failed_attempts(transaction, scope.activation_id))
                 return
-            self._end(transaction, reason, message)
+            self._end(transaction, reason, message, facts=facts)
 
         self.writes.transact(run_stream(activation.run_id), end)
 
@@ -1420,7 +1423,17 @@ class Orchestrator:
                 payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
             ))
             transaction.on_commit(lambda: self._wake(projection.run_id))
-            if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name, UNKNOWN_ACTION.name):
+            if decision.kind in RESUMABLE_PAUSE_KINDS:
+                # 暂停以后继续（工单 #204）：继续时从暂停位置恢复阶段并让 run 接着执行；停止时 run 保持暂停，
+                # 停止原因就是暂停时的原因，什么都不改写。已用的激活次数、模型步数与运行时间不重新计算
+                if option == "continue":
+                    self._continue_paused_run(transaction, decision_id, decision)
+                    if blocks_run(transaction.decisions.values()):
+                        return None
+                    return transaction.projection.run_id
+                return None
+            if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name,
+                                                      UNKNOWN_ACTION.name):
                 self._fail(transaction, "cancelled", "run stopped by the user's decision")
                 return None
             if decision.kind == UNKNOWN_ACTION.name and option == "continue":
@@ -1432,6 +1445,25 @@ class Orchestrator:
             return projection.run_id
 
         return self.writes.transact(saved.stream, answer, command=command)
+
+    def _continue_paused_run(self, transaction: Transaction, decision_id: str, decision: DecisionRequest) -> None:
+        # 用户回答「处理以后继续执行」：把 run 从 PAUSED 恢复到暂停时的阶段，下一次激活由流程编排接着开始。
+        # 不写限额与计数字段（激活次数、模型步数、运行时间保持暂停时的值）；连续不调用工具的计数属于步骤驱动的
+        # 一次激活内部状态，暂停时激活已经结束，继续以后的第一次激活从零开始
+        projection = transaction.projection
+        if projection.phase != "PAUSED":
+            return
+        resumed_at_phase = decision.request.get("resumed_at_phase")
+        if resumed_at_phase is None:
+            raise ValueError(f"pause decision {decision_id} has no resumed_at_phase")
+        transaction.append(NewEvent(
+            EventType.RUN_CONTINUED, actor="system", department=decision.request["department"],
+            parent_event_id=decision_id,
+            state_before="PAUSED", state_after=resumed_at_phase,
+            payload={"decision_id": decision_id, "stop_reason": decision.request["stop_reason"],
+                     "resumed_at_phase": resumed_at_phase},
+        ))
+        transaction.on_commit(lambda: self._wake(projection.run_id))
 
     def _verify_unknown_action(self, transaction: Transaction, decision: DecisionRequest,
                                note: str | None) -> None:
@@ -1466,12 +1498,14 @@ class Orchestrator:
         return (projection.input_version != basis.input_version
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
-    def _end(self, transaction: Transaction, reason: str, message: str) -> None:
+    def _end(self, transaction: Transaction, reason: str, message: str,
+             *, facts: list[str] | None = None) -> None:
         # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。完成（放行或基线核验）只由接纳写入。
-        # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径
+        # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径。
+        # facts 是暂停决定请求要带的事实引用（workspace_unrepresentable 为条目在工作区内的相对路径）
         outcome = DEFINITIONS.stop_reason(reason).outcome
         if outcome == "paused":
-            self._pause(transaction, reason, message)
+            self._pause(transaction, reason, message, facts=facts)
         elif outcome == "failed":
             self._fail(transaction, reason, message)
         else:
@@ -1489,11 +1523,13 @@ class Orchestrator:
                 payload={"decision_id": decision.decision_id, "reason": reason},
             ))
 
-    def _pause(self, transaction: Transaction, reason: str, message: str | None = None) -> None:
+    def _pause(self, transaction: Transaction, reason: str, message: str | None = None,
+               *, facts: list[str] | None = None) -> None:
         projection = transaction.projection
         if projection.phase in TERMINAL_PHASES:
             return
         department = projection.active_department
+        paused_at_phase = projection.phase
         projection = self._close_request(transaction, status="stopped", reason=reason,
                                          return_phase=projection.phase, return_work_valid=False)
         self._withdraw_decisions(transaction, reason)
@@ -1512,7 +1548,34 @@ class Orchestrator:
                 "token_used": projection.token_used,
             },
         ))
+        # 因不调用工具或工作区无法表示而暂停时发出决定请求（D09，工单 #204）：阻塞整个 run，
+        # 选项为「处理以后继续执行」与「停止事项」，说明写明停止原因与人工处理说明；
+        # workspace_unrepresentable 的 facts 是条目在工作区内的相对路径。
+        # max_cycles 与 model_steps_exhausted 不发出这个请求，仍按原样暂停
+        kind = RESUMABLE_PAUSE_KINDS.get(reason)
+        if kind is not None:
+            self._request_pause_resume(transaction, kind, department, paused_at_phase, reason, message, facts or [])
         transaction.on_commit(lambda: self.sessions.close_run(projection.run_id))
+
+    def _request_pause_resume(self, transaction: Transaction, kind: DecisionKind, department: str,
+                              paused_at_phase: str, reason: str, message: str | None,
+                              facts: list[str]) -> None:
+        # 暂停以后继续的决定请求：说明写明停止原因与人工处理说明，工作区无法表示的条目列为事实引用
+        human = DEFINITIONS.stop_reason(reason).human_action
+        description = f"运行暂停，停止原因为 {reason}。{human}"
+        if message:
+            description = f"{description} 停止说明：{message}"
+        transaction.append(NewEvent(
+            EventType.DECISION_REQUESTED, actor="system", department=department,
+            state_before="PAUSED", state_after="PAUSED",
+            payload={
+                "kind": kind.name, "blocks": kind.blocks,
+                "options": [{"id": option.id, "label": option.label} for option in kind.options],
+                "description": description, "facts": list(facts), "department": department,
+                "stop_reason": reason, "resumed_at_phase": paused_at_phase,
+            },
+        ))
+        transaction.on_commit(lambda: self._wake(transaction.projection.run_id))
 
     def _fail(self, transaction: Transaction, reason: str, message: str,
               *, input_save_failure: dict[str, str] | None = None) -> None:

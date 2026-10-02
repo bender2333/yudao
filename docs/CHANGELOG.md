@@ -377,6 +377,7 @@ claude-opus-5-5 / 2026-10-01 01:46 / 新增 docs/adr/0023-client-installed-apart
 claude-opus-5-5 / 2026-10-01 01:46 / docs/design/app-and-interface.md 第 6.1、6.2、8、10 节、`system.status` 与 `agent.package` 按客户端的安装、更新与发布修改（更新页与更新源、本机停止请求、命令行入口 yudao、发布版本号与正在运行的 run 数、执行代理安装包随 wheel 提供）；docs/design/execution-environment.md 第 5.3.2 节执行代理的安装包改为发布时构建、随 Yudao 服务的 wheel 提供，第 12 节 #144 一行同步；docs/requirements/web-game-frontend.md（D30）与 docs/requirements/stage-requirements-overview.md 第 6 节第 5 项写明已确定并登记遗留；CLAUDE.md 工作流程第 7 步加入发布；CONTEXT.md 加入「Yudao 服务」「桌面客户端」「发布」 / 同上
 
 claude-opus-5-5 / 2026-10-01 02:01 / docs/design/client-packaging-and-release.md 第 12 节与 docs/stage-3-plan.md（第 3 节界面工作线一行、第 9 节 M1 一行、开头更新日期）、docs/design/README.md（新增设计说明一项）、docs/requirements/README.md（D30 一行）填入工单号 #206 至 #209 / 四张 M1 工单已建立，#79、#144、#183 已修改，#144 增加 #206、#209 的阻塞
+claude-opus-4-5 / 2026-10-01 06:20 / docs/requirements/execution-limits.md（D09）实现状态补写 #204：因 no_tool_call 或 workspace_unrepresentable 暂停的 run 发出决定请求，回答继续以后从暂停位置继续 / 工单 #204 实施，登记表的实现状态与代码一致
 
 opencode-go/deepseek-v4.1-flash / 2026-10-01 03:30 / docs/design/model-management.md 第 4.6、9.1、9.2 节：目录文档的请求档位校验改为「只能为空或者属于档位全集」，部门默认与部门设置弹窗的档位下拉写明已保存档位超出当前模型支持档位时保留并按模型限制，界面的选择范围不等于保存规则；docs/architecture-issues.md 为 #87 登记的一条追加架构师的处理结论（保存只核对档位全集，限制在每次请求按第 7.3 节进行）/ #87 第 4 轮按架构师结论实施，文档与实现保持一致
 

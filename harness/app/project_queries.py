@@ -1471,7 +1471,7 @@ PROJECTS_LIST = QueryDefinition(
                 ProjectEventType.ADOPTION_HELD, ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED,
                 ProjectEventType.COMMAND_CONFIGURED, ProjectEventType.MATERIAL_RECORDED,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
-                EventType.RUN_RESUMED, EventType.TOOL_STARTED, EventType.ACTION_VERIFIED,
+                EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.TOOL_STARTED, EventType.ACTION_VERIFIED,
                 EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
 )
 
@@ -1482,6 +1482,7 @@ PROJECT_OVERVIEW = QueryDefinition(
                 ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
                 ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_CONTINUED,
                 EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED, EventType.COLLABORATION_REQUESTED,
                 EventType.COLLABORATION_RESPONDED, EventType.DECISION_REQUESTED),
 )
@@ -1491,7 +1492,7 @@ PROJECT_LOOP = QueryDefinition(
     replayable=True,
     changed_by=(ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
                 EventType.TRANSITION, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
-                EventType.RUN_PAUSED, EventType.RUN_RESUMED, EventType.DEPARTMENT_ACTIVATED,
+                EventType.RUN_PAUSED, EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.DEPARTMENT_ACTIVATED,
                 EventType.COLLABORATION_REQUESTED, EventType.TOOL_STARTED, EventType.TOOL_CALLED,
                 EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED,
                 EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
