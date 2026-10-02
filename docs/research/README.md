@@ -1,5 +1,7 @@
 # 后续开发设计与调研资料
 
+> 2026-10-02 新资料：[游戏世界与代码世界的映射：可行性、图灵完备与路径](game-world-as-projection.md)。支持 [D30](../requirements/web-game-frontend.md) 的后续方向讨论：把像素世界推进到完整的游戏、以及「面向对象是方块、过程是传送带」的 3D 可视化编程设想是否可行。核对《异星工厂》《缺氧》《我的世界》等游戏的图灵完备事实，给出代替图灵完备的三条标准（保持结构、可以回链、不说谎并且范围内不遗漏）；区分模拟与投影两种柏拉图洞穴，指出 Yudao 已在投影一边（ADR-0008、ADR-0013、原型 v8 与 v9 的规则）；整理可视化编程与软件可视化六十年的先例（ToonTalk、CodeCity、Gource、LabVIEW、Baba Is You 等）；提出世界的五层映射（地形、人物与房间、传送带、规则、动力）、殖民地模拟式的指挥方式与按依赖排序的五步路径。没有形成决定，待用户确认的五项列在第 8 节。
+
 > 2026-10-01 新资料：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务：事实调研](network-and-mcp-references.md)。支持[网络取回与 MCP 工具设计说明](../design/network-and-mcp.md)与 [ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)：OpenCode、OMP、Claude Code、Codex 的 MCP 客户端与网页取回做法；官方 MCP Python SDK 2.2.0 的传输、取消、Windows 进程与工具注解；国内可用的搜索类 MCP 服务器；控制主机的网络环境。只整理事实与来源。
 
 > 2026-10-01 新资料：[M1 试用时桌面客户端的打包与安装：事实调研](client-packaging-and-update.md)。支持[桌面客户端的安装、更新与发布设计说明](../design/client-packaging-and-release.md)与 [ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)：OpenCode 桌面版的打包、本机服务与更新做法；electron-builder 与 Electron Forge；electron-updater 的 generic 提供方、无签名与降级；Windows 上的代码签名与「来自网络」标记；Ollama、LM Studio、Docker Desktop 管理本机服务的做法；`uv tool install` 的行为；GitHub Actions 与 Release。只整理事实与来源。
