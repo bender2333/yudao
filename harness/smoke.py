@@ -17,7 +17,7 @@ from .app.contracts import Rejected
 from .app.project_and_work_item_commands import WorkItemCreate
 from .app.project_commands import ProjectCreate
 from .artifacts import ArtifactStore
-from .assembly import PENDING_GUIDANCE, ContextAssembly, StepFrame, model_limits, pending_guidance
+from .assembly import PENDING_GUIDANCE, TARGET_KEYS, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
 from .contracts import current_contract_hash, current_plan_hash
 from .definitions import DEFINITIONS
@@ -731,8 +731,12 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 engineering_plan_hash=basis["engineering_plan_hash"], input_version=basis["input_version"],
             )
             before = events[:index]
+            # 回放用的调用目标与本次请求事件记录的一致：CONTEXT_ASSEMBLED 事件本身带目标字段，
+            # 其余事件取同一激活同一步的请求事件
+            target_source = payload if "context_window" in payload else recorded.payload
             pinned = assembly.pin(current_work, frame, limits, step_id=payload.get("step_id", 1), events=before,
                                   snapshot_hash=_assembly_snapshot_hash(events, index),
+                                  call_target={key: target_source.get(key) for key in TARGET_KEYS},
                                   input_modalities=tuple(target_modalities or ()))
             if event.type == EventType.DEPARTMENT_INPUT:
                 if payload.get("step_id") != 1:

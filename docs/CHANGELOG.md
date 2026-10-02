@@ -460,3 +460,4 @@ claude-sonnet-5-5 / 2026-10-02 16:34 / docs/architecture-issues.md 追加 #207 �
 claude-sonnet-5-5 / 2026-10-02 17:07 / docs/architecture-issues.md 为 #82 登记的两条问题（录制场景数与固定时刻、决定板与卡片的归属）写处理结论 / 按登记规则写处理行；结论同时写入 #178、#179 的任务评论
 claude-sonnet-5-5 / 2026-10-02 20:19 / docs/architecture-issues.md 为 #94 登记的 catalog.change_impact 对结构非法文档返回 500 的问题写处理结论（422，沿用查询错误形状，#261 实施），并把与 #82 的条目挤在一起的位置补一个空行 / 按登记规则写处理行
 claude-sonnet-5-5 / 2026-10-02 21:24 / docs/architecture-issues.md 为 #95 登记的测试适配器整份重写目录的问题写处理结论（测试与演示启动方式的 fake 目录按合并方式安装） / 按登记规则写处理行
+claude-opus-4-5 / 2026-10-03 01:35 / docs/architecture-issues.md 追加一条：#88 记录真实模型 smoke 读不到准入文件（reload 不加载准入，仅 load_document 加载） / 执行 #88 的真实模型 smoke 时发现并登记，与推理内容的保存与回放无关，交架构师裁定

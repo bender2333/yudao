@@ -301,11 +301,55 @@ class StepRecorder:
         # 模型调用交回的一条流式输出：序列化请求、解码后的流事件、完整响应、用量或一条输出
         self._record(*self._observe(request, _Observation.from_stream(event)))
 
+    def _record_reasoning(self, request: ModelRequest, reasoning: dict[str, Any], *,
+                          provider: str | None, model: str | None) -> list[Draft]:
+        # response() 交回的推理内容：逐条写成模型输出事件，跳过已经在流式观察中写过的条目
+        return self._reasoning_drafts(request, list(reasoning.get("items") or []),
+                                      provider=provider, model=model)
+
+    def _reasoning_drafts(self, request: ModelRequest, items: list[Any], *,
+                          provider: str | None, model: str | None) -> list[Draft]:
+        # 每条推理内容写成一条模型输出事件，保存为工件。回放时按事件里的调用目标判断是否原样发送：
+        # 每条记录的调用目标与它产生时的一致（同一个步骤驱动在写观察时填的公开部分）
+        scope = self.scope
+        drafts: list[Draft] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            identity = str(item.get("id") or "")
+            key = (f"{request.attempt_id or request.step_id}:reasoning", identity)
+            if identity and key in self._seen:
+                continue
+            if identity:
+                self._seen.add(key)
+            payload = _redact(item)
+            ref = self._artifacts.put(scope.run_id, "model_reasoning", json_dumps(payload),
+                                      media_type="application/json")
+            item_payload: dict[str, Any] = {
+                "reasoning_ref": asdict(ref),
+                "attempt_id": request.attempt_id,
+                "logical_call_id": request.logical_call_id,
+                "collaboration_request_id": request.request_id,
+                "context_event_id": request.context_event_id,
+                "activation_id": request.activation_id,
+                "step_id": request.step_id,
+                "purpose": request.purpose,
+            }
+            item_payload.update(scope.work_basis())
+            item_payload.update(scope.versions())
+            item_payload.update(self._call_target(request))
+            drafts.append(self._draft(EventType.MODEL_REASONING, provider=provider, model=model,
+                                      payload=item_payload, artifact_hashes=[ref.content_hash]))
+        return drafts
+
     def response(self, request: ModelRequest, result: ModelResponse) -> None:
-        # 调用尝试的结果：每个输出条目写成模型输出，再按这一步报告的用量记账
+        # 调用尝试的结果：先写推理内容，再写每个输出条目，最后按这一步报告的用量记账。
+        # 推理内容在回答里先于它伴随的消息与工具调用出现，回放时也保持这个顺序（设计说明第 7.6 节）
         provider = result.provider or self.scope.provider
         model = result.model
         drafts: list[Draft] = []
+        if result.reasoning:
+            drafts.extend(self._record_reasoning(request, result.reasoning, provider=provider, model=model))
         for index, item in enumerate(result.output):
             content = item.get("content") or []
             text = "\n".join(str(part.get("text", "")) for part in content if isinstance(part, dict)) if isinstance(content, list) else str(content)
@@ -613,7 +657,9 @@ class StepRecorder:
             key = (f"{request.attempt_id or request.step_id}:{observation.kind}", observation.id)
             if key in self._seen:
                 return []
-            self._seen.add(key)
+            if observation.kind != "reasoning":
+                # 推理内容的去重由 _reasoning_drafts 按条目身份完成
+                self._seen.add(key)
         if observation.kind == "request":
             if not isinstance(observation.payload, dict):
                 raise ProviderError("Serialized provider request is not a JSON object", reason="provider_protocol")
@@ -735,6 +781,8 @@ class StepRecorder:
                 "summary": safe_text[:160],
             }
             event_type = EventType.MODEL_MESSAGE
+        elif observation.kind == "reasoning":
+            return self._reasoning_drafts(request, [observation.payload], provider=provider, model=model)
         else:
             raise ValueError(f"unknown adapter observation: {observation.kind}")
         payload["attempt_id"] = request.attempt_id

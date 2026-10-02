@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from .store import REASONING_BUDGET_TOKENS
+
+RESPONSES_REASONING_INCLUDE = "reasoning.encrypted_content"
+
+# 一个协议实现从一次回答里读出的推理内容：按各协议自己的字段保存的一组条目
+@dataclass
+class ReasoningOutput:
+    items: list[dict[str, Any]] = field(default_factory=list)
 
 # 推理参数编码（设计说明第 7.4 节）：三个协议适配器共用这里的取值规则，
 # 档位与推理参数方式都取自冻结目标，协议层不认识部门与请求档位
