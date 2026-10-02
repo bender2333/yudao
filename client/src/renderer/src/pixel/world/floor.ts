@@ -10,7 +10,7 @@ import { actorOf, charFor, primaryOf, syncCharacters, mountMachines } from "./sc
 import { say, sayMs } from "./say.ts";
 import { signal, signalOn } from "./signals.ts";
 import type {
-  Catalog, Character, DecisionView, DeclContext, FloorModel, LoopItem, PackageVisual, PixelFloorEvent, SceneLike, Task, World,
+  Catalog, Character, DecisionView, DeclContext, FloorModel, LoopItem, PackageVisual, PixelFloorEvent, SceneLike, Task, TaskDef, TaskFx, World,
 } from "./types.ts";
 import { createWorld } from "./declare.ts";
 
@@ -233,7 +233,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
   };
 
   /** 任务声明里的效果：信号、房间闪光、包裹沿管道走。 */
-  function applyFx(fx: { signal?: string; ms?: number; flash?: { room: string; color: string; ms?: number }; send?: { link: string; bmp: string; color?: string; reverse?: boolean; then?: unknown[] } }, department: string): void {
+  function applyFx(fx: TaskFx, department: string): void {
     if (fx.signal) signal(world, scene, fx.signal, fx.ms ?? 0);
     if (fx.flash) flash(fx.flash.room === "self" ? department : fx.flash.room, PAL_MAP[fx.flash.color] ?? "#ffffff", fx.flash.ms ?? 900);
     if (fx.send) {
@@ -243,19 +243,18 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
         color: fx.send.color ? (PAL_MAP[fx.send.color] ?? "#ffffff") : null,
         linkKey: link.id,
         onDone: () => {
-          for (const next of fx.send!.then ?? []) applyFx(next as never, department);
+          for (const next of fx.send!.then ?? []) applyFx(next, department);
         },
       });
     }
   }
 
   /** 交给 dispatch 的 make：任务头顶说的内容与声明里的效果。 */
-  function extrasOf(def: { fx?: unknown[]; label: string }, ev: PixelFloorEvent, ch: Character, side?: "to" | "from"): Partial<Task> {
+  function extrasOf(def: TaskDef, ev: PixelFloorEvent, ch: Character, side?: "to" | "from"): Partial<Task> {
     const out: Partial<Task> = sayOf(ev, ch.department!, side ?? null);
-    const list = def.fx as { when: string }[] | undefined;
-    if (list) {
+    if (def.fx) {
       const run = (when: string) => (): void => {
-        for (const fx of list.filter((x) => x.when === when)) applyFx(fx as never, ch.department!);
+        for (const fx of def.fx!.filter((x) => x.when === when)) applyFx(fx, ch.department!);
       };
       out.start = run("start");
       out.done = run("done");

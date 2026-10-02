@@ -6,7 +6,7 @@
 // 放在渲染层 render-decl.ts 里，与这里的声明一一对应。
 
 import decl from "../generated/floor-decl.json" with { type: "json" };
-import type { Catalog, DeclContext, IdleDef, LinkDef, RestFn, RestState, RoleRestFn, RoomDef, RoomVisual, TaskDef } from "./types.ts";
+import type { Catalog, DeclContext, IdleDef, LinkDef, PixelFloorEvent, RestFn, RestState, RoleRestFn, RoomDef, RoomVisual, TaskDef } from "./types.ts";
 
 /** 任务目录（数据来自原型 floor-decl.js 的 TASKS）。 */
 export const TASKS = decl.tasks as unknown as Record<string, TaskDef>;
@@ -117,7 +117,7 @@ export const roleRest: RoleRestFn = (ctx, d, it, role, isPrimary, roomRest) => {
 };
 
 /** 事件落在哪个任务上：大多数事件类型本身就是任务键；少数按载荷再分支。 */
-export function keyOf(ev: { type: string; tool?: string | null; department?: string | null; payload?: Record<string, unknown> }): string {
+export function keyOf(ev: Pick<PixelFloorEvent, "type" | "department" | "tool" | "payload">): string {
   const pl = (ev.payload ?? {}) as Record<string, unknown>;
   if (ev.type === "qa_submitted") return pl.verdict === "release" ? "qa_submitted_release" : "qa_submitted_rework";
   if (ev.type === "x_review_recorded") return pl.verdict === "passed" ? "x_review_recorded_passed" : "x_review_recorded_returned";

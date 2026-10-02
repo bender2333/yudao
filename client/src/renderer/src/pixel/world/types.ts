@@ -194,6 +194,12 @@ export interface Pipe {
   def: LinkDef;
 }
 
+/** 房间声明里的 spots 指向的画布位置（文件柜、终端、监控屏等陈设的 x）。 */
+export interface SpotTarget {
+  x: number;
+  y: number;
+}
+
 /** 管道的端点：房间，或者走廊尽头通往机房的门（它不是房间，位置固定）。 */
 export interface Endpoint {
   pipeOut: number;
@@ -267,7 +273,7 @@ export interface World {
 export interface Catalog {
   tasks: Record<string, TaskDef>;
   idle: IdleDef[];
-  keyOf: (event: PixelFloorEvent) => string;
+  keyOf: (event: Pick<PixelFloorEvent, "type" | "department" | "tool" | "payload">) => string;
   /** 部门声明（运维房间的声明也在这里）。 */
   roomDefs: RoomDef[];
   linkDefs: LinkDef[];

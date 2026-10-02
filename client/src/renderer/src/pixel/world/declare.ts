@@ -2,7 +2,7 @@
 // 房间按声明顺序从左到右排布，管道按 kind 对应的路由规则算折线，节点由声明直接给出几何。
 // 这里不依赖渲染：房间、管道、工位与路由都是纯计算，可以在 node --test 下核对。
 
-import type { Catalog, Endpoint, Geo, LinkDef, LinkHop, Pipe, Room, RoomDef, World } from "./types.ts";
+import type { Catalog, Endpoint, Geo, LinkDef, LinkHop, Pipe, Room, RoomDef, SpotTarget, World } from "./types.ts";
 
 /** 沿用 v8 floor.js 与原型 ecs.js 的常量（像素级一致）。 */
 export const GEO: Geo = {
@@ -63,9 +63,10 @@ export function declareRooms(world: World, defs: RoomDef[], flags: Record<string
       seats: null,
       def: d,
     };
+    // 房间声明里的 spots 把文件柜、终端等陈设的位置对到房间里已有的陈设上
+    const spots = room as unknown as Record<string, SpotTarget>;
     for (const key of Object.keys(d.spots ?? {})) {
-      const spotAt = d.spots![key](room);
-      (room as unknown as Record<string, { x: number; y: number }>)[key] = { ...(room as unknown as Record<string, { x: number; y: number }>)[key], x: spotAt };
+      spots[key] = { ...spots[key], x: d.spots![key](room) };
     }
     world.rooms[d.id] = room;
     world.roomOrder.push(d.id);

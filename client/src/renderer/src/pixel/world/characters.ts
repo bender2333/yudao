@@ -5,7 +5,7 @@
 import { roomOf } from "./declare.ts";
 import { actorOf, charsOf, charFor } from "./scene.ts";
 import { polyLength, pointAt } from "./declare.ts";
-import type { Character, HeadIconKind, IdleDef, RestState, Seat, SpotKind, Step, Task, TaskDef, World } from "./types.ts";
+import type { Character, HeadIconKind, IdleDef, PixelFloorEvent, RestState, Seat, SpotKind, Step, Task, TaskDef, World } from "./types.ts";
 import type { SceneLike } from "./types.ts";
 
 /** 队列里最多留几个可以被挤掉的任务（must 的任务不受限制）。 */
@@ -48,13 +48,13 @@ export function enqueue(world: World, who: string, key: string, extra?: EnqueueE
 }
 
 /** 事件到达：命中任务目录则入队并返回真；没有命中返回假，由调用方按信号处理。 */
-export function dispatch<E>(
+export function dispatch(
   world: World,
-  event: { type: string; department?: string | null; role?: string | null; work_item_id?: string | null; payload?: Record<string, unknown> },
-  make?: (def: TaskDef, event: E, character: Character, side?: "to" | "from") => Partial<Task> | null,
+  event: PixelFloorEvent,
+  make?: (def: TaskDef, event: PixelFloorEvent, character: Character, side?: "to" | "from") => Partial<Task> | null,
 ): boolean {
   if (!event || !event.type) throw new Error("dispatch 需要事件对象");
-  const key = world.catalog.keyOf(event as never);
+  const key = world.catalog.keyOf(event);
   const def = world.catalog.tasks[key];
   if (!def) return false;
   // 任务声明了 dept 就由那个部门做（事件本身可以没有部门字段），否则是事件的部门
@@ -82,11 +82,11 @@ export function dispatch<E>(
     extra.withId = toward.id;
     if (def.then) {
       extra.onDone = () => {
-        enqueue(world, toward.id, def.then!, make ? make(world.catalog.tasks[def.then!], event as unknown as E, toward, "to") : null);
+        enqueue(world, toward.id, def.then!, make ? make(world.catalog.tasks[def.then!], event, toward, "to") : null);
       };
     }
   }
-  if (make) Object.assign(extra, make(def, event as unknown as E, ch));
+  if (make) Object.assign(extra, make(def, event, ch));
   return Boolean(enqueue(world, ch.id, key, extra));
 }
 

@@ -95,7 +95,7 @@ export class FloorRenderer {
     for (const actor of this.scene.actors) {
       if (!actor.icon) continue;
       c.globalAlpha = actor.dim;
-      drawIcon(c, this.scene as never, actor as never);
+      drawIcon(c, this.scene, actor);
       c.globalAlpha = 1;
     }
     this.bubbles(c);
@@ -736,7 +736,7 @@ export function drawSpeeches(
   const rects: { x: number; y: number; w: number; h: number }[] = [];
   for (const it of list.slice().sort((p, q) => p.a.x - q.a.x)) {
     const a = it.a;
-    const [hx, hy] = headTop(scene as never, a as never);
+    const [hx, hy] = headTop(scene, a);
     const text = it.tail && it.text.length > 24 ? `…${it.text.slice(-23)}` : it.text;
     const lay = layoutSpeech(c, text, size, maxW);
     const w = lay.w;
