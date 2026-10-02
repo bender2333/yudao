@@ -240,24 +240,21 @@ def main() -> int:
         if not thread.is_alive():
             raise RuntimeError("接口层在启动过程中结束")
 
-    # 先建示例项目与决定请求，再保存一份指向测试内上游的目录（工单 #93）
-    asyncio.run(seed(application, system))
+    # 先建示例项目与决定请求，再保存一份指向测试内上游的目录（工单 #93）。
+    # 数据目录里已经有项目时不再预置：客户端「重新启动服务」会在同一个数据目录上再启动一次
+    # （工单 #207 的验收），重复预置会让 work_item.create 被拒绝。真正的 `yudao api` 也不预置数据
+    already_seeded = bool(application.query("projects.list", ProjectsList(include_archived=True)).data.projects)
+    if not already_seeded:
+        asyncio.run(seed(application, system))
     asyncio.run(seed_catalog(application, upstream_base, models_server.base))
 
     port = server.servers[0].sockets[0].getsockname()[1]
+    print(json.dumps({"port": port, "data_dir": str(data_dir)}), flush=True)
     if args.mode == "api":
-        # 客户端按能力清单判断服务是否可用：先报就绪再预置事项（预置事项要跑几轮 FakeAdapter 的调用）
-        print(json.dumps({"port": port, "data_dir": str(data_dir)}), flush=True)
-        # 数据目录里已经有项目时不再预置：客户端「重新启动服务」会在同一个数据目录上再启动一次
-        # （工单 #207 的验收），重复预置会让 work_item.create 被拒绝。真正的 `yudao api` 也不预置数据
-        if not application.query("projects.list", ProjectsList(include_archived=True)).data.projects:
-            asyncio.run(seed(application, system))
         # 进程一直服务到收到本机停止请求（数据目录的进程锁随退出释放）
         thread.join()
         return 0
 
-    asyncio.run(seed(application, system))
-    print(json.dumps({"port": port, "data_dir": str(data_dir)}), flush=True)
     # fixture 模式：标准输入关闭时退出（由 Playwright 的 fixture 控制生命周期）
     try:
         sys.stdin.read()
