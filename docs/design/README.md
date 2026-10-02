@@ -26,6 +26,10 @@
   - 内容：试用会话与执行位置上的程序；交付说明中的启动方式；Playwright MCP 浏览器工具；computer use（屏幕从哪里来待专题 2 讨论）；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
   - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。工单：父工单 #123（#147 至 #155），属于里程碑 M4。
   - 需求：[D34](../requirements/browser-and-computer-use.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
+- [网络取回与 MCP 工具](network-and-mcp.md)
+  - 内容：取回与登记的 MCP 服务器的放置（固定在控制主机）；项目的登记（取回的来源、MCP 服务器、工具清单快照与处理方式、版本与固定、凭据）；授权与一次性批准；网络取回（地址规则、重定向、内容与保存）；MCP 服务器（官方 SDK、运行规则、结果）；恢复契约；外部来源工件与证据；应用层接口；界面；含模块图与时序图。
+  - 状态：2026-10-01 设计，用户逐轮采纳推荐，未实施。工单：父工单 #122（#68 网络取回、#69 MCP 客户端模块、#236 登记的 MCP 服务器，界面 #237 至 #239），属于里程碑 M3。
+  - 需求：[D36](../requirements/network-and-mcp.md)。ADR：[0025](../adr/0025-network-and-mcp-run-on-control-host.md)。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../research/network-and-mcp-references.md)。
 - [接入已有项目](existing-project-onboarding.md)
   - 内容：建档事项（事项种类、命令、决定请求）；产品的初始 PRD、工程的结构说明、质检的基线核对；用户确认的往返与基线采纳；大仓库的仓库概况；失败与中断；含流程图、时序图与模块交互图。
   - 状态：设计已确认，未实施（2026-09-29 用户确认第 12 节的决定：已有代码只经 `project.onboard` 进入、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）。工单：父工单 #124（#134 至 #139），属于里程碑 M2。
