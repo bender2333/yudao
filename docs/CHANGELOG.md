@@ -468,3 +468,4 @@ claude-opus-4-6 / 2026-10-03 04:05 / 新增 docs/stage-3/d24-real-provider-accep
 opus-4.5 / 2026-10-03 01:05 / docs/architecture-issues.md 追加两条 #179 的架构问题登记：①楼层的决定送单与飞回接在原型演示事件类型 x_decision_* 上，与后端真实事件 decision_requested/decision_answered/decision_withdrawn 不一致，决定 id 也取错字段；②选项的 note_required 标记在接口合同里没有 / 执行 #179 核对 #82 已实现部分时发现，交架构师裁定
 claude-sonnet-5-5 / 2026-10-03 03:26 / docs/architecture-issues.md 为 #179 登记的两条问题写处理结论（楼层的决定分支改接真实事件，已随 #179 合并；决定选项增加 note_required，由 #136 实施） / 按登记规则写处理行
 claude-opus-4-5 / 2026-10-03 12:55 / docs/architecture-issues.md 改写 #177 的架构问题条目：原条目把端到端停住归因于检查时限，实际是 `_run_process` 启动子进程时继承了服务进程的标准输入（一根从不写入的管道），解释器启动阶段在该句柄上等待；已改为按根因记录并写明修正（标准输入接空设备）。另追加一条 #177 的新问题：部门房间在事项结束很快时清空排队动作，传信的两端说话被丢弃 / 用 py-spy 抓到卡住子进程的原生调用栈定位根因；端到端用例第 2、3 条仍不通过，如实登记
+执行者 / 2026-10-03 05:40 / docs/architecture-issues.md 追加一条 #180 的架构问题登记并写处理结论：关键事实的种类无法只由事件种类得出（qa_submitted 分放行与返工），ReportFact 增加 kind 字段 / 执行 #180 实现时间轴刻度着色时发现，按登记规则一并写处理行

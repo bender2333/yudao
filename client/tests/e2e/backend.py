@@ -46,7 +46,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
 from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.data_directory import default_data_dir  # noqa: E402
 from harness.models import Usage  # noqa: E402
-from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, review_turn  # noqa: E402
+from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
 from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E402
 
@@ -60,7 +60,24 @@ def script():
         plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
-        # 第二个项目：产品提交规格以后，工程部门的请求被提供方报告为不可用，
+        # 第二个项目（交付历史）：一轮包含询问与回答、返工、放行与采纳的运行，
+        # 供首页与概览的时间轴核对交接、返工、询问与回答、采纳都有关键事实（工单 #180 的验收）
+        product_spec(),
+        plan_turn(),
+        delivery_turn(),
+        # 工程向产品提出询问，产品回答（collaboration_requested / collaboration_responded）
+        collaboration_request("product", "How should unknown flags be handled?",
+                              background="Engineering is preparing its independent delivery.",
+                              expected_result="Explain the intended behavior without changing files."),
+        response_turn("answered", "Print the argument as defined in the current requirement."),
+        # 质检退回工程（qa_submitted 的结论为 rework_engineering，返工）
+        review_turn("rework_engineering", "Missing usage text when no argument is provided.",
+                    defects=[{"severity": "major", "summary": "no usage text on empty argv"}]),
+        plan_turn(reason="Address the quality review by adding the missing usage behavior"),
+        delivery_turn("added usage text"),
+        # 放行（qa_submitted 的结论为 release），随后由项目采纳（deliverable_adopted）
+        review_turn("release", "checks passed on the current snapshot"),
+        # 第三个项目：产品提交规格以后，工程部门的请求被提供方报告为不可用，
         # run 停在这次请求之前并发出 model_unavailable 的决定请求（供托盘与待你决定的验收）
         FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
@@ -70,7 +87,7 @@ def script():
         plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
-        # 第三个项目：预置时没有事项。执行槽位空出来以后，端到端测试在界面上提交需求并开始事项，
+        # 第四个项目：预置时没有事项。执行槽位空出来以后，端到端测试在界面上提交需求并开始事项，
         # 这四轮让第二个事项的全过程也在浏览器里随事件流走完
         product_spec(),
         plan_turn(),
@@ -133,9 +150,11 @@ def room_script():
 
 
 async def seed(application: Application, system: LoopSystem) -> None:
-    # 三个项目：第一个走完一轮三部门（供项目列表与看板）；第二个的事项停在模型不可用，留下一个
-    # 等待回答的决定请求，run 没有进终态，system.status 的 running_runs 因此大于 0（工单 #207 的
-    # 停止确认与「正在运行的事项」验收用它）；第三个只建档，端到端测试在界面上提交需求开始事项
+    # 四个项目：第一个走完一轮三部门（供项目列表与看板）；第二个（交付历史）走完一轮包含询问与回答、
+    # 返工、放行与采纳（供时间轴与回放，工单 #180）；第三个的事项停在模型不可用，留下一个等待回答的
+    # 决定请求，run 没有进终态，system.status 的 running_runs 因此大于 0（工单 #207 的停止确认与
+    # 「正在运行的事项」验收用它）；第四个只建档，端到端测试在界面上提交需求开始事项。
+    # 执行槽位一次一个事项，因此每个项目的事项在当前事项结算以后再建
     created = await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="示例项目", goal="实现一个回声工具"),
         actor="user:local")
@@ -157,7 +176,18 @@ async def seed(application: Application, system: LoopSystem) -> None:
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
-    # 第二个项目：第二个事项停在模型不可用，留下一个等待回答的决定请求
+    # 第二个项目（交付历史）：走完一轮包含询问与回答、返工、放行与采纳的事项（工单 #180 的时间轴与回放）
+    created = await application.command(
+        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="交付历史", goal="回放关键事实"),
+        actor="user:local")
+    history_project = created.refs.project_id
+    item = await application.command(
+        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=history_project, text="实现交付历史"),
+        actor="user:local")
+    task = system.orchestrator.work_item_execution(item.refs.run_id)
+    if task is not None:
+        await task
+    # 第三个项目：第二个事项停在模型不可用，留下一个等待回答的决定请求
     created = await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="文本工具", goal="逐行处理文本"),
         actor="user:local")
@@ -168,7 +198,7 @@ async def seed(application: Application, system: LoopSystem) -> None:
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
-    # 第三个项目：只建档、不建事项。端到端测试在界面上提交需求开始事项，
+    # 第四个项目：只建档、不建事项。端到端测试在界面上提交需求开始事项，
     # 由事件流把第二个事项的全过程（产品 → 工程 → 质检 → 采纳）走完
     await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="实时项目", goal="在界面上走完一个事项"),
