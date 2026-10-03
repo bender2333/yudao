@@ -208,7 +208,7 @@ class Orchestrator:
         self.step_limits = step_limits
         self.deltas = deltas if deltas is not None else DeltaChannel()
         self.artifacts = artifacts
-        self.workspace_root = Path(workspace_root)
+        self.workspace_root = Path(workspace_root).absolute().resolve()
         self.materials_root = self.workspace_root.parent / "materials"
         self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
         self.submissions = SubmissionWriter(artifacts, self.materials_root, self.git_versions)
@@ -278,8 +278,8 @@ class Orchestrator:
         )
         frozen_commands = _validate_frozen_commands(registered_commands, command_versions)
         run_id = run_id or new_id("run")
-        material_dir = (self.materials_root / run_id).resolve()
-        if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
+        material_dir = self.materials_root / run_id
+        if material_dir == self.materials_root or not material_dir.is_relative_to(self.materials_root):
             raise ValueError("run_id must stay within the run materials directory")
         # 工作区先于其余材料落盘：从封存快照建立失败时不留下半个 run。
         environment = LocalEnvironment.establish(self.workspace_root / run_id, initial_tree)
