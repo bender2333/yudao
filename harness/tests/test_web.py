@@ -21,6 +21,7 @@ from harness.proposals import product_spec
 from harness.runtime import LoopSystem, RunTerminalError
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
 from harness.tests.saved_rewrite import rewrite_saved_event
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 from harness.web.server import serve
 from harness.views import retry_view
 from harness.models import EventType
@@ -88,7 +89,7 @@ def provider_config(tmp_path, *, credential_ref="MISSING_PROVIDER_KEY"):
     return config
 
 
-def wait_until(predicate, timeout=45.0, interval=0.05):
+def wait_until(predicate, timeout=WAIT_FOR_HOST_WORK_SEC, interval=0.05):
     deadline = time.monotonic() + timeout
     last = None
     while time.monotonic() < deadline:
@@ -99,7 +100,7 @@ def wait_until(predicate, timeout=45.0, interval=0.05):
     raise AssertionError(f"timeout waiting, last={last!r}")
 
 
-def wait_terminal(host, port, run_id, timeout=45.0):
+def wait_terminal(host, port, run_id, timeout=WAIT_FOR_HOST_WORK_SEC):
     def check():
         status, body, _ = request(host, port, "GET", f"/api/runs/{run_id}")
         if status != 200:

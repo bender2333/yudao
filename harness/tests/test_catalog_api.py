@@ -8,6 +8,7 @@ from harness.app.application import Application
 from harness.models import CatalogEventType
 from harness.tests.api_helpers import running_api
 from harness.tests.protocol_helpers import responses_responder, serve
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 模型目录与凭据的查询与命令：真实启动 FastAPI 应用，目录文件与 .env 是真实文件，事件日志是真实 SQLite；
 # 连接测试与模型测试经测试内启动的真实 HTTP 服务，不使用桩替身。
@@ -81,7 +82,7 @@ def _catalog_events(store):
                                               if not key.startswith("_")])
 
 
-def _wait_for(store, predicate, *, timeout=15.0, description="catalog event"):
+def _wait_for(store, predicate, *, timeout=WAIT_FOR_HOST_WORK_SEC, description="catalog event"):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         matched = [event for event in _catalog_events(store) if predicate(event)]
@@ -113,7 +114,7 @@ def test_startup_backfills_catalog_revised_and_stale_base_is_rejected(tmp_path):
     with running_api(opened) as client:
         # 启动时目录修订号与最后一条 catalog_revised 不同：补写一条
         [startup] = _wait_for(opened.store, lambda event: event.payload["operation"] == "startup",
-                              timeout=5.0, description="startup catalog_revised")
+                              description="startup catalog_revised")
         before = _catalog(client)
         assert startup.payload["revision"] == before["revision"] >= 1
         assert startup.actor == "system" and startup.command_id is None
@@ -126,7 +127,7 @@ def test_startup_backfills_catalog_revised_and_stale_base_is_rejected(tmp_path):
         body = response.json()
         assert body["refs"] == {"provider_id": "p2"} and body["duplicate"] is False
         [saved] = _wait_for(opened.store, lambda event: event.payload.get("operation") == "save_connection",
-                            timeout=5.0, description="save_connection catalog_revised")
+                            description="save_connection catalog_revised")
         after = _catalog(client)
         assert saved.payload["revision"] == after["revision"] > before["revision"]
         assert saved.payload["provider_id"] == "p2" and saved.payload["base_revision"] == before["revision"]
@@ -170,7 +171,7 @@ def test_connection_delete_lists_referrers_and_removes_the_definitions(tmp_path)
         deleted = _command(client, "catalog.connection.delete", base_version=latest, provider_id="p2")
         assert deleted.status_code == 200, deleted.text
         [event] = _wait_for(opened.store, lambda item: item.payload.get("operation") == "delete_connection",
-                            timeout=5.0, description="delete_connection catalog_revised")
+                            description="delete_connection catalog_revised")
         after = _catalog(client)
         assert event.payload["revision"] == after["revision"] > latest
         assert [item["id"] for item in after["providers"]] == ["p1"]
@@ -187,7 +188,7 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
         defaults = _command(client, "catalog.department_defaults.save", base_version=current, bindings=bindings)
         assert defaults.status_code == 200, defaults.text
         [bound] = _wait_for(opened.store, lambda item: item.payload.get("operation") == "department_defaults",
-                            timeout=5.0, description="department_defaults catalog_revised")
+                            description="department_defaults catalog_revised")
         after_defaults = _catalog(client)
         assert bound.payload["revision"] == after_defaults["revision"] > current
         assert set(after_defaults["bindings"]) == set(DEPARTMENTS)
@@ -211,7 +212,7 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
                                                    for department in DEPARTMENTS}})
         assert imported.status_code == 200, imported.text
         [event] = _wait_for(opened.store, lambda item: item.payload.get("operation") == "save_document",
-                            timeout=5.0, description="save_document catalog_revised")
+                            description="save_document catalog_revised")
         after = _catalog(client)
         assert event.payload["revision"] == after["revision"] > current
         assert [item["id"] for item in after["providers"]] == ["p3"]
@@ -292,7 +293,7 @@ def test_model_test_admits_and_connection_test_does_not(tmp_path):
                                   model_id="m1")
                 assert tested.status_code == 200, tested.text
                 [finished] = _wait_for(opened.store,
-                                       lambda item: item.payload.get("kind") == "model", timeout=15.0,
+                                       lambda item: item.payload.get("kind") == "model",
                                        description="catalog_test_finished (model)")
                 assert finished.payload["ok"] is True and finished.payload["admitted"] is True
                 assert finished.payload["model_id"] == "m1" and finished.payload["error"] is None
@@ -307,7 +308,7 @@ def test_model_test_admits_and_connection_test_does_not(tmp_path):
                                   base_version=before_connection["revision"], provider_id="p1")
                 assert tested.status_code == 200, tested.text
                 [connection] = _wait_for(opened.store,
-                                         lambda item: item.payload.get("kind") == "connection", timeout=15.0,
+                                         lambda item: item.payload.get("kind") == "connection",
                                          description="catalog_test_finished (connection)")
                 assert connection.payload["ok"] is True and connection.payload["admitted"] is None
                 assert connection.payload["base_revision"] == before_connection["revision"]
@@ -327,7 +328,7 @@ def test_candidates_collect_reads_the_models_url_and_writes_an_event(tmp_path):
             collected = _command(client, "catalog.candidates.collect", base_version=current, provider_id="p1")
             assert collected.status_code == 200, collected.text
             [event] = _wait_for(opened.store, lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
-                                timeout=15.0, description="catalog_candidates_collected")
+                                description="catalog_candidates_collected")
             assert event.payload["status"] == "ok" and event.payload["provider_id"] == "p1"
             assert set(event.payload["candidate_ids"]) == {"m1", "m9"}
             assert event.payload["source_url"] == models_url
@@ -349,7 +350,7 @@ def test_credential_commands_keep_keys_out_of_events_and_queries(tmp_path):
                          secret=replacement, persist=True)
         assert saved.status_code == 200, saved.text
         [changed] = _wait_for(opened.store, lambda item: item.type == CatalogEventType.CREDENTIAL_CHANGED,
-                              timeout=5.0, description="credential_changed")
+                              description="credential_changed")
         assert (changed.payload["ref"], changed.payload["action"], changed.payload["persisted"]) == (
             REF, "set", True)
         assert changed.payload["version"] == 1
@@ -365,14 +366,14 @@ def test_credential_commands_keep_keys_out_of_events_and_queries(tmp_path):
         cleared = _command(client, "credential.clear_override", base_version=1, ref=REF)
         assert cleared.status_code == 200, cleared.text
         [cleared_event] = _wait_for(opened.store, lambda item: item.payload.get("action") == "clear_override",
-                                    timeout=5.0, description="credential_changed (clear_override)")
+                                    description="credential_changed (clear_override)")
         assert cleared_event.payload["version"] == 2
         assert _catalog(client)["providers"][0]["credential"]["source"] == "dotenv"
 
         removed = _command(client, "credential.remove_persisted", base_version=2, ref=REF)
         assert removed.status_code == 200, removed.text
         [removed_event] = _wait_for(opened.store, lambda item: item.payload.get("action") == "remove_persisted",
-                                    timeout=5.0, description="credential_changed (remove_persisted)")
+                                    description="credential_changed (remove_persisted)")
         assert removed_event.payload["version"] == 3 and removed_event.payload["persisted"] is True
         final = _catalog(client)["providers"][0]["credential"]
         assert final["configured"] is False and final["version"] == 3
@@ -386,7 +387,7 @@ def test_external_file_change_is_appended_as_catalog_revised(tmp_path):
         _write_document(opened.config, {"providers": [_provider("p9")], "models": [_document_model("p9", "m9")],
                                         "bindings": {}})
         [event] = _wait_for(opened.store, lambda item: item.payload.get("operation") == "reload",
-                            timeout=15.0, description="外部修改的 catalog_revised")
+                            description="外部修改的 catalog_revised")
         after = _catalog(client)
         assert event.payload["revision"] == after["revision"] > current
         assert [item["id"] for item in after["providers"]] == ["p9"]
@@ -406,7 +407,7 @@ def test_reload_command_appends_only_when_the_file_changed(tmp_path):
         reloaded = _command(client, "catalog.reload", base_version=current)
         assert reloaded.status_code == 200, reloaded.text
         [event] = _wait_for(opened.store, lambda item: item.payload.get("operation") == "reload",
-                            timeout=5.0, description="reload catalog_revised")
+                            description="reload catalog_revised")
         after = _catalog(client)
         assert event.payload["revision"] == after["revision"] > current
         assert event.payload["base_revision"] == current
@@ -425,7 +426,7 @@ def test_reload_command_appends_only_when_the_file_changed(tmp_path):
         [second] = _wait_for(opened.store,
                              lambda item: item.payload.get("operation") == "reload"
                              and item.payload["base_revision"] == after["revision"],
-                             timeout=5.0, description="按旧修订号提交的 reload")
+                             description="按旧修订号提交的 reload")
         assert second.payload["revision"] == _catalog(client)["revision"] > latest
 
 

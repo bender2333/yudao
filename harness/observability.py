@@ -401,23 +401,9 @@ class ObservabilityQuery:
                     "status": payload.get("status"),
                 })
             if event.type in {EventType.COLLABORATION_REQUESTED, EventType.COLLABORATION_RESPONDED}:
-                requester = payload.get("requester")
-                recipient = payload.get("recipient")
+                requester, recipient = _collaboration_parties(event, payload, events)
                 request_id = payload.get("request_id")
                 related = department in {requester, recipient}
-                if not related:
-                    related_request = next(
-                        (item for item in events
-                         if item.type == EventType.COLLABORATION_REQUESTED
-                         and item.payload.get("id") == request_id),
-                        None,
-                    )
-                    related = related_request is not None and department in {
-                        related_request.payload.get("requester"), related_request.payload.get("recipient"),
-                    }
-                    if related and requester is None:
-                        requester = related_request.payload.get("requester")
-                        recipient = related_request.payload.get("recipient")
                 if related:
                     source_role = recipient if event.type == EventType.COLLABORATION_RESPONDED else requester
                     is_self = source_role == department
@@ -454,9 +440,8 @@ class ObservabilityQuery:
                 EventType.COLLABORATION_RESPONDED,
                 EventType.COLLABORATION_CLOSED,
             }:
-                request_department = payload.get("requester") or payload.get("request_id")
-                recipient = payload.get("recipient")
-                if event.type == EventType.TRANSITION or department in {role, request_department, recipient}:
+                requester, recipient = _collaboration_parties(event, payload, events)
+                if event.type == EventType.TRANSITION or department in {role, requester, recipient}:
                     handovers.append({
                         "event_id": event.event_id,
                         "seq": event.stream_version,
@@ -1351,6 +1336,23 @@ def _validate_context_parts(parts: list[Any], injected: Any) -> None:
             raise ValueError("context part identity does not match its manifest")
 
 
+def _collaboration_parties(event: Event, payload: dict[str, Any],
+                           events: list[Event]) -> tuple[str | None, str | None]:
+    # 协作事件的两端：请求事件的载荷直接带发问方与回答方；旧回答事件（工单 #275 之前）没有这两个字段，
+    # 按 request_id 查找对应请求补齐。协作关闭事件同样按请求身份补齐两端
+    requester, recipient = payload.get("requester"), payload.get("recipient")
+    if event.type != EventType.COLLABORATION_REQUESTED and requester is None:
+        related_request = next(
+            (item for item in events
+             if item.type == EventType.COLLABORATION_REQUESTED
+             and item.payload.get("id") == payload.get("request_id")),
+            None,
+        )
+        if related_request is not None:
+            requester = related_request.payload.get("requester")
+            recipient = related_request.payload.get("recipient")
+    return requester, recipient
+
 def _handover_title(event: Event) -> str:
     payload = event.payload or {}
     if event.type == EventType.TRANSITION:
@@ -1358,6 +1360,10 @@ def _handover_title(event: Event) -> str:
     if event.type == EventType.COLLABORATION_REQUESTED:
         return f"{payload.get('requester') or event.department or '未知'} -> {payload.get('recipient') or '未知'}"
     if event.type == EventType.COLLABORATION_RESPONDED:
+        # 回答方回应发问方：两端从载荷取出；旧事件没有这两个字段时退回请求身份
+        requester, recipient = payload.get("requester"), payload.get("recipient")
+        if requester and recipient:
+            return f"{recipient} -> {requester}"
         return f"协作回应 · {payload.get('request_id') or '未知请求'}"
     if event.type == EventType.COLLABORATION_CLOSED:
         return f"协作关闭 · {payload.get('request_id') or '未知请求'}"

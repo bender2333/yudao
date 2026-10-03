@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -16,6 +17,7 @@ from harness.models import CatalogEventType, EventType
 from harness.providers import capabilities
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import list_files_turn, system_with
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 KEY = "issue146-key"
 # 质检缺少图像输入的影响（设计说明第 5.6 节）
@@ -135,8 +137,8 @@ def _catalog(client):
     return response.json()["data"]
 
 def _wait_for(store, predicate, *, description):
-    import time
-    for _ in range(600):
+    deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
+    while time.monotonic() < deadline:
         for event in store.read(0, limit=100_000):
             if predicate(event):
                 return event
