@@ -40,7 +40,8 @@ class Acceptance:
 
 class SubmissionWriter:
     def __init__(self, artifacts: ArtifactStore, materials_root: Path, git_versions: GitVersionStore) -> None:
-        self.artifacts, self.materials_root = artifacts, materials_root
+        self.artifacts = artifacts
+        self.materials_root = Path(materials_root).absolute().resolve()
         self.git_versions = git_versions
 
     def prepare(self, transaction: Transaction, *, projection: RunProjection, snapshot: WorkspaceSnapshot,
@@ -210,8 +211,8 @@ class SubmissionWriter:
                            for event_type, payload, hashes in prepared], event, restore_materials)
 
     def _write_material(self, run_id: str, name: str, raw: bytes) -> None:
-        folder = (self.materials_root / run_id).resolve()
-        if not folder.is_relative_to(self.materials_root.resolve()) or folder == self.materials_root.resolve():
+        folder = self.materials_root / run_id
+        if not folder.is_relative_to(self.materials_root) or folder == self.materials_root:
             raise ValueError("run materials must stay within their root")
         folder.mkdir(parents=True, exist_ok=True)
         temporary = None

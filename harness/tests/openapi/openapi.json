@@ -13855,6 +13855,40 @@
       "CollaborationRespondedPayload": {
         "additionalProperties": false,
         "properties": {
+          "requester": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Requester"
+          },
+          "recipient": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recipient"
+          },
           "request_id": {
             "title": "Request Id",
             "type": "string"

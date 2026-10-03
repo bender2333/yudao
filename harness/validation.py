@@ -488,7 +488,9 @@ def _accept_response(proposal: dict[str, Any], projection: RunProjection, depart
     if errors:
         return ProposalDecision(False, [FieldError(**item) for item in errors])
     phase, valid = resume_phase(projection.pending_request, projection, events, snapshot_hash=facts.digest)
-    payload = {"request_id": projection.pending_request.id, "status": proposal["status"], "text": proposal["text"].strip(),
+    # 发问方与回答方从对应请求取出，与请求里的值相同（工单 #275）
+    payload = {"requester": projection.pending_request.requester, "recipient": projection.pending_request.recipient,
+               "request_id": projection.pending_request.id, "status": proposal["status"], "text": proposal["text"].strip(),
                "result_event_ids": list(proposal.get("result_event_ids", [])), "return_phase": phase, "return_work_valid": valid}
     return ProposalDecision(True, artifact={**payload, "kind": "collaboration_response", "content_hash": canonical_hash(payload)})
 

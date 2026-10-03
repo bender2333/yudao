@@ -14,14 +14,14 @@ from harness.proposals import delivery_turn, plan_turn, product_spec, review_tur
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tests.test_web import get_json, request, running_server, wait_until
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 
 # 等待一次事项结算或一次工作线程结束（`_wait_work_item`、`wait_until`、worker 的会合点）的墙钟界限只用来
 # 防止测试一直等待，按 #107 的裁定（架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常
-# 用时的值，与 #112 实施方案的 120 秒同一口径。一次结算含一次版本存储写入，正常用时数秒；
-# 事项是否按预期结束由等待之后的状态断言核对。
-_WAIT_LIMIT = 120
+# 用时的值。一次结算含一次版本存储写入，正常用时数秒；事项是否按预期结束由等待之后的状态断言核对。
+_WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
 
 
 def _release_script(summary="v1", files=None):

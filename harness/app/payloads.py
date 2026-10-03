@@ -714,6 +714,10 @@ class CollaborationRequestedPayload(Payload):
 
 
 class CollaborationRespondedPayload(Payload):
+    # 发问方与回答方：写入回答事件时由控制核心从对应请求取出，与请求里的值相同。
+    # 旧事件（工单 #275 之前）没有这两个字段，缺省含义为未知：读取时按 request_id 查找对应请求补齐（见 projection.py）
+    requester: Department | None = None
+    recipient: Department | None = None
     request_id: str
     status: Literal["answered", "declined", "needs_work", "completed"]
     text: str

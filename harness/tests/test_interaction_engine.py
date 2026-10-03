@@ -18,6 +18,7 @@ from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem, RunTerminalError
 from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_history, from_another_thread,
                                    recorded_context, wait_for_file)
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 
 CHANGE_RECORD = {
@@ -273,7 +274,7 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
             assert received.product_work_input_version == 1
         finally:
             (signals / "release").write_text("go")
-        current = future.result(timeout=30)
+        current = future.result(timeout=WAIT_FOR_HOST_WORK_SEC)
     assert current.phase == "PRODUCT_SPEC" and current.processed_input_version == 1
     assert system.workspace(run_id).list_files() == ["src/first.py"]
     events = system.store.list_events(run_id)
