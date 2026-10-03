@@ -2956,6 +2956,10 @@ export type ReportFact = {
      */
     type: string;
     /**
+     * Kind
+     */
+    kind: string | null;
+    /**
      * Label
      */
     label: string;
