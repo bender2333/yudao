@@ -474,7 +474,9 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         const actor = actorOf(a.id);
         const inTail = actor ? scene.inTail(actor) : true;
         const justStarted = actor?.step?.st.key === true && scene.realT - actor.step.t0 < 600;
-        if (inTail || (waited >= 900 && !justStarted)) {
+        // 传信与交接的动作要说话：头顶的话还没说完时先等着，否则新的话会把上一句盖掉，看不出来
+        const saying = KEEP_ON_STOP[q[0].from] === true && a.say !== null && scene.realT < a.say.until;
+        if (!saying && (inTail || (waited >= 900 && !justStarted))) {
           const next = q.shift()!;
           if (actor?.script) scene.cancel(actor);
           next.fn();
@@ -577,9 +579,11 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       const p = plan(a);
       p.spot("pipe");
       p.add(S.call(() => {
-        say(sayEv, a, "to");
         scene.fly({ bmp, from: [L.pipe.x + 10, L.pipe.base - 8], to: [p.x + 6, p.y - 18], ms: 620, arc: 8, onDone: () => { const actor = actorOf(a.id); if (actor) actor.hold = bmp; } });
       }), S.anim("reach", 700, true), S.anim("catch", 900));
+      // 收到交接的一方立刻说话：动作脚本可能在后续事件到达时被替换，
+      // 说在脚本步骤里会随之丢失（真实系统的事项在 1 秒左右连续走完阶段）
+      say(sayEv, a, "to");
       if (isOps() || art === "prd") {
         p.sit("carry");
         p.add(S.call(() => arrivalArt(a, art)), S.hold(null), S.anim("sit_happy", 600));
@@ -1427,12 +1431,18 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       fn(ev, a);
     };
     if (IMMEDIATE.has(action) || (actor && scene.inTail(actor))) {
-      a.queue = [];
+      // 立即执行时清掉排队的普通动作；传信与交接的条目留下，它们继续执行到结束
+      a.queue = a.queue.filter((entry) => KEEP_ON_STOP[entry.from]);
       start();
       return;
     }
     a.queue.push({ fn: start, at: scene.realT, from: ev.type });
-    if (a.queue.length > 3) a.queue.shift();
+    // 队列上限 3：超出时挤掉一个；传信与交接的条目不被挤掉，否则它们在能执行之前就被后来的事件顶掉。
+    // 真实系统的事项在 1 秒左右连续走完整个流程，事件成串到达，这些条目一旦被顶掉就再也补不回来。
+    if (a.queue.length > 3) {
+      const victim = a.queue.findIndex((entry) => !KEEP_ON_STOP[entry.from]);
+      if (victim >= 0) a.queue.splice(victim, 1);
+    }
   }
 
   // 与原型 room.js 一致：建立画面时先按缺省角色设置同步一次（一个部门一个 Agent），快照到达时再同步
