@@ -72,7 +72,8 @@ class ReadOnlyCore:
     read_only = True
 
     def __init__(self, data_dir: str | Path) -> None:
-        self.data_dir = Path(data_dir)
+        # 数据目录可能以 8.3 短路径给出（工单 #250）：与可写打开一致，在这里解析一次再派生其余路径
+        self.data_dir = Path(data_dir).absolute().resolve()
         self.store = EventStore(self.data_dir / "events.sqlite", read_only=True)
         self.artifacts = ArtifactStore(self.data_dir / "artifacts", read_only=True)
         self.git_versions = GitVersionStore(self.data_dir / "git", read_only=True)
