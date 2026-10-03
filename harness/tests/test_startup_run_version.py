@@ -1,18 +1,23 @@
-# 启动时核对 run 事件版本（ADR-0019，工单 #126）：用一份由较早 run 事件版本写入的数据目录启动，
-# 项目、当前 PRD、采纳成果与项目设置完整重建；未结束的 run 记为因升级停止，事项用已采纳成果重新开始并带有
-# 「因升级重新开始」的优先级。run 事件版本相同的未结束 run 不被本工单停止（交给 #16 自动继续）。
+# 启动时核对 run 事件版本（ADR-0019，工单 #126、#232）：用一份由较早 run 事件版本写入的数据目录启动，
+# 项目、当前 PRD、采纳成果与项目设置完整重建；未结束的 run 交给用户决定按新版本继续还是停止，
+# 用户选择「按新版本继续」以后照常继续。run 事件版本相同的未结束 run 不被本文件改动（交给 #16 自动继续）。
 # 数据目录是真实的 SQLite 事件日志，较早版本由删除 run_created 中的版本字段得到（旧事件没有这个字段）。
 
 import json
 import sqlite3
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.models import EventType, ProjectEventType
+from harness.event_store import Command, run_stream
+from harness.models import EventType, ProjectEventType, new_id
 from harness.projection import project_run, saved_project
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
-from harness.streams import PRIORITY_UPGRADE_RESTART, PRIORITY_USER, RUN_EVENT_VERSION, STOP_REASON_UPGRADE
+from harness.streams import PRIORITY_USER, RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from harness.tests.helpers import happy_script
+
+def _answer_command() -> Command:
+    # 回答决定请求经应用层的 decision.answer 命令；这里直接调用流程编排，造一个身份
+    return Command(command_id=new_id("cmd"), name="decision.answer", digest="test", actor="user")
 
 def _adopted_project(data_dir):
     # 一个项目：第一个事项完成并被采纳，项目有了当前采纳成果
@@ -51,7 +56,8 @@ def _older_version_data_dir(data_dir):
     finally:
         connection.close()
 
-def test_starting_from_an_older_run_event_version_stops_and_restarts(data_dir):
+def test_starting_from_an_older_run_event_version_asks_the_user(data_dir):
+    # 版本不同的未结束 run 交给用户决定；选择「按新版本继续」以后照常继续
     system, project_id, first_run, adopted = _adopted_project(data_dir)
     assert adopted is not None and adopted.type == ProjectEventType.DELIVERABLE_ADOPTED
     second_run = _second_unfinished_run(system, project_id)
@@ -66,9 +72,8 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts(data_dir):
     _older_version_data_dir(data_dir)
 
     # 重启：项目流在任何版本下都完整读取与重建
-    adapter = FakeAdapter([])
-    restarted = LoopSystem.for_testing(data_dir, adapter)
-    # 项目流的长期事实完整重建（重新开始的新事项不改动这些事实）
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    # 项目流的长期事实完整重建
     after = saved_project(restarted.store, project_id).to_dict()
     assert {key: after[key] for key in facts_before} == facts_before
     project = restarted.projects.projection(project_id)
@@ -77,28 +82,66 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts(data_dir):
     # 项目设置完整重建：部门 Prompt 与登记命令
     assert project.department_settings["engineering"].source == "configured"
     assert "lint" in project.commands
-    # 重放不调用模型
-    assert adapter.invocations == []
 
-    # 版本不同的未结束 run 记为因升级停止
-    stopped = project_run(restarted.store, second_run)
-    assert (stopped.phase, stopped.stop_reason) == ("FAILED", STOP_REASON_UPGRADE)
-    # 第一个事项已经结束，不因升级停止
-    assert project_run(restarted.store, first_run).stop_reason == "released"
+    # 版本不同的未结束 run 发出决定请求，交给用户；没有取得执行权，也没有重新开始事项
+    request = next(decision for decision in restarted.writes.read(run_stream(second_run)).decisions.values()
+                   if decision.request["kind"] == "definitions_changed")
+    assert request.request["reason"] == "run_event_version_changed"
+    assert request.request["blocks"] == "run"
+    assert [option["id"] for option in request.request["options"]] == ["continue", "stop"]
+    assert request.request["recorded_run_event_version"] == 0
+    assert request.request["current_run_event_version"] == RUN_EVENT_VERSION
+    assert second_run not in restarted.resumed_runs
+    created = project_run(restarted.store, second_run)
+    assert (created.phase, created.stop_reason) == ("PRODUCT_SPEC", None)
 
-    # 对应的事项用已采纳成果重新开始，并记下「因升级重新开始」的优先级
+    # 回答「按新版本继续」
+    restarted.orchestrator.answer_decision(request.decision_id, "continue", None,
+                                           base_version=request.version, command=_answer_command())
+    restarted.close()
+
+    # 再次启动：用户已经选择按新版本继续，这个 run 取得执行权并继续，后续事件按新版本记录
+    continuing = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    assert second_run in continuing.resumed_runs
+    finished = project_run(continuing.store, second_run)
+    # 继续以后 run 照常运行到自己的终态，不因版本不同停止
+    assert finished.stop_reason != STOP_REASON_UPGRADE
+    # 未结束的 run 留在原来的事项上，没有新建事项
+    started = [event for event in continuing.store.list_project_events(project_id)
+               if event.type == ProjectEventType.WORK_ITEM_CREATED]
+    assert [event.payload["priority"] for event in started] == [PRIORITY_USER, PRIORITY_USER]
+    # 第一个事项已经结束，不因版本不同停止
+    assert project_run(continuing.store, first_run).stop_reason == "released"
+    # 旧版本的 run 事件保留供查阅
+    assert continuing.store.end_position() > end
+    continuing.close()
+
+def test_an_old_version_run_is_not_stopped_or_restarted_at_startup(data_dir):
+    # 版本不同的未结束 run 不按升级停止，也不用已采纳成果重新开始；事项保持原样，启动时发出
+    # definitions_changed 决定请求（#16 的现有机制），选项为「按新版本继续」与「停止」
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
+    project_id = system.projects.register("旧版本升级", "核对旧版本 run 的启动处理")
+    run_id = _second_unfinished_run(system, project_id)
+    system.close()
+
+    _older_version_data_dir(data_dir)
+
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    assert run_id in restarted.startup_runs.other_version
+    assert run_id not in restarted.resumed_runs
+    assert project_run(restarted.store, run_id).stop_reason != STOP_REASON_UPGRADE
     started = [event for event in restarted.store.list_project_events(project_id)
                if event.type == ProjectEventType.WORK_ITEM_CREATED]
-    priorities = [event.payload["priority"] for event in started]
-    assert priorities[-1] == PRIORITY_UPGRADE_RESTART
-    new_run_id = started[-1].payload["run_id"]
-    assert new_run_id != second_run
-    new_run = project_run(restarted.store, new_run_id)
-    assert new_run.baseline is not None
-    assert new_run.baseline["adoption_id"] == adoption_before.adoption_id
-    assert new_run.run_event_version == RUN_EVENT_VERSION
-    # 旧版本的 run 事件保留供查阅
-    assert restarted.store.end_position() > end
+    assert [event.payload["priority"] for event in started] == [PRIORITY_USER]
+    requests = [decision for decision in restarted.writes.read(run_stream(run_id)).decisions.values()
+                if decision.request["kind"] == "definitions_changed"]
+    assert len(requests) == 1, requests
+    request = requests[0]
+    assert request.request["reason"] == "run_event_version_changed"
+    assert request.request["blocks"] == "run"
+    assert [option["id"] for option in request.request["options"]] == ["continue", "stop"]
+    assert request.request["recorded_run_event_version"] == 0
+    assert request.request["current_run_event_version"] == RUN_EVENT_VERSION
     restarted.close()
 
 def test_same_version_unfinished_runs_are_left_to_automatic_continuation(data_dir):

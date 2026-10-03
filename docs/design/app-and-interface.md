@@ -309,6 +309,7 @@ sequenceDiagram
 | 模型引用无法使用时的待恢复 | 继续执行（修复配置以后）、停止事项 | run | 模型管理设计说明第 5.5 节 | #49 |
 | 暂停以后继续（停止原因 `no_tool_call`、`workspace_unrepresentable`） | 处理以后继续执行、停止事项 | run | [D09](../requirements/execution-limits.md) | #204 |
 | 继续旧事项时定义版本不同（`definitions_changed`） | 按新版本继续、停止事项 | run | 总体架构第 7.4 节，[ADR-0014](../adr/0014-versioned-definitions.md) | #16 |
+| 启动时 run 事件版本不同（同一 `definitions_changed` 种类） | 按新版本继续、停止事项 | run | [ADR-0019](../adr/0019-project-stream-across-versions.md) | #232 |
 | 核实结果未知的动作 | 重新执行（只对契约声明可以重复的动作提供）、按当前实际状态继续、停止事项；只在自动核实与自动重新执行一次都没有得到结果时发出，连续两次结果未知时材料写明 | 动作 | 恢复契约第 4 节，原型第 4.3 节 | #17；自动核实与自动重新执行 #242 |
 | 质检无法核验 | 重新核验、停止事项 | run | [浏览器与 computer use 设计说明](browser-and-computer-use.md)第 8.4 节 | #151 |
 | 使用本机桌面（桌面种类的试用会话开始之前） | 开始（本次会话）、本事项内都允许、拒绝；拒绝时 `trial_start` 的结果写明用户没有交出桌面 | 动作 | [浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1 节 | #246 |

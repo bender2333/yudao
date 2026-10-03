@@ -18,8 +18,8 @@ from .projection import RunNotFoundError, RunProjection, load_projection, projec
 from .projects import ProjectService
 from .providers import ProviderFacade
 from .streams import (
-    DRAIN_DRAINING, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED, RUN_EVENT_VERSION,
-    STOP_REASON_UPGRADE, DrainState, classify_startup_runs,
+    DRAIN_DRAINING, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED,
+    DrainState, classify_startup_runs,
 )
 from .replay_check import verify_replay
 from .workspace import Workspace
@@ -94,31 +94,24 @@ class LoopSystem:
         self.orchestrator.projects = self.projects
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
-        # 启动时核对 run 事件版本（ADR-0019，工单 #126）：版本相同的未结束 run 交给 #16 自动继续，这里不动它们；
-        # 版本不同（含旧事件没有记录版本）的未结束 run 记为因升级停止，对应的事项用采纳成果重新开始
+        # 启动时核对 run 事件版本（ADR-0019，工单 #126、#232）：版本相同的未结束 run 交给 #16 自动继续；
+        # 版本不同（含旧事件没有记录版本）的未结束 run 由 #16 发出 definitions_changed 决定请求交给用户，
+        # 用户选择「按新版本继续」以后照常继续，「停止事项」则运行以 cancelled 结束。
+        # 强制升级只在排空期间由用户发起，启动时不自动停止正在进行的事项
         self.startup_runs = classify_startup_runs(self.store)
-        for run_id in self.startup_runs.other_version:
-            self.upgrade_run(run_id)
-        # 启动的最后一步：自动继续 run 事件版本相同的未结束 run（工单 #16）
+        # 启动的最后一步：自动继续未结束的 run（工单 #16）
         self.resumed_runs = self.resume_startup_runs() if resume_on_startup else {}
         # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明第 10 节第 1 项）
         self.facade.set_reload_listener(self.sync_catalog_revision)
 
-    def upgrade_run(self, run_id: str) -> tuple[str, str] | None:
-        # 按强制升级处理一个未结束的 run：记为因升级停止，再用项目当前的采纳成果为它所属的事项开始新的 run。
-        # 已经结束的 run 不停止；没有对应事项的 run 只停止，不重新开始
-        projection = self.orchestrator.stop_for_upgrade(
-            run_id, reason=f"recorded version differs from {RUN_EVENT_VERSION}")
-        if projection.phase == "FAILED" and projection.stop_reason == STOP_REASON_UPGRADE:
-            return self.projects.restart_work_item_for_upgrade(run_id)
-
     def resume_startup_runs(self) -> dict[str, int]:
-        # 启动时自动继续所有因进程中断而未结束、run 事件版本相同的 run（工单 #16，恢复契约第 3、5.2 节）：
-        # 每个 run 由流程编排原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
+        # 启动时自动继续所有因进程中断而未结束的 run（工单 #16，恢复契约第 3、5.2 节）：
+        # 每个 run 由流程编排先核对 run 事件版本与定义版本（不同时发出决定请求，不取得执行权），
+        # 再原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
         # 3.1 保持单任务运行：取得执行权以后串行运行到停止，不并发推进两个 run。
         # 返回取得执行权的 run 与它这次取得的执行权编号
         resumed: dict[str, int] = {}
-        for run_id in self.startup_runs.same_version:
+        for run_id in (*self.startup_runs.same_version, *self.startup_runs.other_version):
             claimed = self.orchestrator.resume_incomplete_run(run_id)
             if claimed is None:
                 continue

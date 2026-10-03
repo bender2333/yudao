@@ -12,8 +12,9 @@ from dataclasses import dataclass
 from .event_store import EventStore
 from .models import TERMINAL_PHASES
 
-# 当前的 run 事件版本：run 事件的语义改变时提高这个版本。每个 run 在创建时把它记进 run_created 事件
-RUN_EVENT_VERSION = 1
+# 当前的 run 事件版本：run 事件的语义改变时提高这个版本。每个 run 在创建时把它记进 run_created 事件。
+# 版本 2：删除事件种类 department_prompt_updated 与 run_created 的 department_prompts 字段（#89）
+RUN_EVENT_VERSION = 2
 
 # run 流：事项的进行过程（每次 run 的交接、询问、尝试与动作）
 RUN_EVENT_TYPES = frozenset({
@@ -103,6 +104,10 @@ DECLARED_EVENT_TYPES = RUN_EVENT_TYPES | PROJECT_EVENT_TYPES | CATALOG_EVENT_TYP
 # 因升级停止的停止原因（定义在 definitions/stop_reasons.json）：run 事件版本与当前版本不同时，
 # 未结束的 run 以这个原因停止，对应的事项用已采纳成果重新开始
 STOP_REASON_UPGRADE = "run_event_version_changed"
+
+# 启动时核对 run 事件版本（ADR-0019，工单 #232）：版本不同的未结束 run 交给用户决定（按新版本继续或停止），
+# 决定请求的种类为 definitions_changed（#16 的现有机制），原因写在请求里
+DECISION_REASON_RUN_EVENT_VERSION = "run_event_version_changed"
 
 # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
 PRIORITY_UPGRADE_RESTART = "upgrade_restart"

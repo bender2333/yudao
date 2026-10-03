@@ -468,3 +468,4 @@ claude-opus-4-6 / 2026-10-03 04:05 / 新增 docs/stage-3/d24-real-provider-accep
 opus-4.5 / 2026-10-03 01:05 / docs/architecture-issues.md 追加两条 #179 的架构问题登记：①楼层的决定送单与飞回接在原型演示事件类型 x_decision_* 上，与后端真实事件 decision_requested/decision_answered/decision_withdrawn 不一致，决定 id 也取错字段；②选项的 note_required 标记在接口合同里没有 / 执行 #179 核对 #82 已实现部分时发现，交架构师裁定
 claude-sonnet-5-5 / 2026-10-03 03:26 / docs/architecture-issues.md 为 #179 登记的两条问题写处理结论（楼层的决定分支改接真实事件，已随 #179 合并；决定选项增加 note_required，由 #136 实施） / 按登记规则写处理行
 执行者 / 2026-10-03 05:40 / docs/architecture-issues.md 追加一条 #180 的架构问题登记并写处理结论：关键事实的种类无法只由事件种类得出（qa_submitted 分放行与返工），ReportFact 增加 kind 字段 / 执行 #180 实现时间轴刻度着色时发现，按登记规则一并写处理行
+执行者 / 2026-10-03 06:20 / docs/design/app-and-interface.md 第 3.3 节的决定种类表增加「启动时 run 事件版本不同」一行；docs/design/recovery-contract-and-fault-matrix.md 第 1 节控制恢复的目标改为「版本不同时发出决定请求交给用户」，第 6 节故障矩阵第 10 行同步 / 执行 #232 把 run 事件版本不同的未结束 run 从「启动时按强制升级停止并重新开始」改为「启动时发出 definitions_changed 决定请求交给用户」，与 #16 的现有机制一致
