@@ -472,3 +472,4 @@ claude-opus-4-5 / 2026-10-03 12:55 / docs/architecture-issues.md 改写 #177 的
 执行者 / 2026-10-03 10:31 / docs/architecture-issues.md 追加一条 #275 的登记并写处理结论：collaboration_responded 属于 run 流、不进入项目流字段清单，新增 requester/recipient 属于追加字段、RUN_EVENT_VERSION 不提高；事件序列基准 collaboration_request_answer 的逐条差异说明 / 执行 #275 时按登记规则记录新增字段与基准重写的依据
 qwen3.8 / 2026-10-03 08:55 / docs/architecture-issues.md 追加一条 #233 的架构问题登记并写处理结论：等待完整循环与事项结算的墙钟时限分散在多个测试文件、其中几处小于负载下正常用时，集中为 harness/tests/wait_limits.py 的 WAIT_FOR_HOST_WORK_SEC / 按登记规则记录并写明处置
 qwen3.8 / 2026-10-03 09:45 / docs/architecture-issues.md 的 #233 处理行补全引用 WAIT_FOR_HOST_WORK_SEC 的十四个文件与各自原值，并写明不改的业务断言界限 / 交付前核对改动范围与文档口径一致
+执行者 / 2026-10-03 14:05 / docs/architecture-issues.md 的 #177「部门房间在事项结束很快时丢掉排队的传信动作」条目补写第 5 轮的处理结论（传信与交接的排队动作不因停止态被丢弃、队满不挤掉、说话不互相盖掉；collaboration_responded 两端取载荷字段、旧事件按 request_id 回退查找）；client/scripts/build-room-contact-sheet.mjs 新增 / 按第 5 轮任务实现并自测通过（room.spec.ts 三条用例通过、54 份录制回放零不一致），按文档改动规则记录

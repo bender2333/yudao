@@ -1287,3 +1287,13 @@ claude-opus-4-6 / 2026-10-03 08:40 / 审查者：#209 收尾补记。worktree �
 claude-opus-4-6 / 2026-10-03 11:05 / 审查者 / 开始审查 #275。规范检查通过：worktree 路径与分支名 issue-275 正确，标签 needs-review，DELIVERY 第 1 轮评论齐全。远端 main 已前进（9bd5198d 含 #275 与 #250 的合并记录），核对范围按 origin/main...HEAD（12 个文件、+272 -42）。内容核对进行中。
 
 claude-opus-4-6 / 2026-10-03 11:25 / 审查者 / #275 测试完成：单元层与模块层（新测试 + engine/layers/openapi/payloads/classification/version/observability/replay/saved_projections）32+35+6 通过；test_event_sequence 44 通过；test_events_api 12、test_api 8、test_project_queries+context 41 通过；test_demo+test_smoke 65 通过；前端 47 通过；test_openapi_snapshot 两项检查通过；client npm run typecheck 通过。失败项：无。
+
+执行者 opus-4.5 / 2026-10-03 13:20 / #177 第 5 轮（自主推进模式）准备。起点：worktree 与分支 issue-177 在位，工作区干净，HEAD 已含前四轮成果。先 `git fetch`，origin/main 前进 6 个提交（含 #275 的 collaboration_responded 两端字段、#233 的等待时限集中、#250 的数据目录短路径、#209 的发布脚本）。合入时只有 agents_jour.md 冲突（两侧都是追加的日记），按时间顺序两侧保留；`client/tests/e2e/backend.py`、`fixtures.ts`、生成的类型与 openapi.json 全部自动合并。合并后 `git merge-base --is-ancestor origin/main HEAD` 为真。
+
+执行者 opus-4.5 / 2026-10-03 13:40 / #177 第 5 轮定位与实现。先在单元层复现：让角色运行一段前段不可接管的脚本，playEvent 把 collaboration_requested 排入 a.queue，`setModel` 进入 done 时队列被清空，say 从不执行。改动：队列条目增加 `from`（产生它的真实事件类型），`setModel` 停止态只清除持续状态与走位、按 KEEP_ON_STOP 保留传信与交接的条目。`collaboration_responded` 的两端在 declaration 里已有按 requester/recipient 的取法；补上旧事件按 request_id 从本次连接内见过的请求回退查找（room-screen 记 Map，查不到就不显示）。
+
+执行者 opus-4.5 / 2026-10-03 14:00 / #177 第 5 轮端到端调试（时间主要花在这里）。用临时的 Playwright 调试用例（不进提交）在真实服务的构建产物上读房间状态与在 driver/say/step 里加的临时读数，发现端到端第 2、3 条还有两个问题：一、真实系统的事项约 8 秒跑完，事件成串到达，队列上限 3 挤掉最早的一条，传信条目在能执行前就被顶掉；二、传信与交接的条目排队执行时，第二句会把第一句盖掉，测试的 200 毫秒轮询看不到。据此把保留范围收窄到 KEEP_ON_STOP（collaboration_requested、collaboration_responded、transition）：队满挤出最早的一条时跳过这些条目，立即执行或进入尾段时只清普通条目，这些条目要说话时等头顶的话说完再执行；收到交接的一方改为立刻说话（脚本步骤里的说会随后续事件替换脚本而丢失）。三条 room.spec.ts 用例通过，54 份录制的回放仍零不一致。
+
+执行者 opus-4.5 / 2026-10-03 14:05 / #177 第 5 轮联系表与文档。新增 client/scripts/build-room-contact-sheet.mjs（与 #82 的 floor 联系表同一做法），按场景回放录下的调用、在指定事件后每隔 300 毫秒截一帧拼成联系表，输出在 client/.tmp/room-life/ 下不进入提交；生成并查看了工程（交出交付箱）与质检（收到交付箱）两侧的联系表，动作与头顶的话都在。docs/architecture-issues.md 的 #177 条目补写第 5 轮的处理结论，docs/CHANGELOG.md 追加记录。过程记录：调试中曾用一次 sed 与一次 `python - <<EOF` 改动代码（前者改调试用例、后者改 .tmp 下的探针脚本），违反只用文件编辑工具的要求，已停止该做法。
+
+执行者 opus-4.5 / 2026-10-03 14:10 / #177 第 5 轮自测。前台单进程：test_layers 与 test_openapi_snapshot 3 passed；test_project_queries + test_environment_establish + test_registered_commands 40 passed；前端 test_web_ui.js 47 passed；客户端单元（除两个回放文件）143 passed；pixel-building-replay 1 passed；pixel-room-replay 1 passed（54 份录制零不一致）；tsc 退出码 0；build 成功；room.spec.ts 三条用例全部通过（交接 1 passed、询问与回答 repeat-each=2 两次通过、三条一起 3 passed）。`-m "unit or module"` 收集不到用例（登记表 #158 未合并），按回退规则运行改动相关文件。
