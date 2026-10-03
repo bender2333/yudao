@@ -122,6 +122,80 @@ yudao replay <run_id>
 
 只读的子命令（`replay`、`project`）默认使用上面说的用户数据目录，用 `--data-dir` 指向其他目录。
 
+## 安装与启动
+
+上面「快速开始」是从源码运行的开发方式。按发布版本安装时，Yudao 服务与桌面客户端分开安装，两者出自同一个发布，版本号相同（[桌面客户端的安装、更新与发布设计说明](docs/design/client-packaging-and-release.md)，[ADR-0023](docs/adr/0023-client-installed-apart-release-is-one-wheel.md)）。
+
+一次发布是一个 wheel `yudao_harness-<版本>-py3-none-any.whl`，其中包含 Yudao 服务的代码、桌面客户端的安装程序与更新清单。
+
+### 控制主机上的 Yudao 服务
+
+前提：控制主机上有 [uv](https://docs.astral.sh/uv/)。安装 uv：
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+uv 的可执行文件目录（Windows 为 `%USERPROFILE%\.local\bin`）要加入 `PATH`，重新打开终端以后生效。
+
+安装 Yudao 服务：
+
+```bash
+uv tool install --python 3.12 <wheel 的路径>
+```
+
+`yudao` 命令安装到 uv 的可执行文件目录（Windows 为 `%USERPROFILE%\.local\bin`）；该目录不在 `PATH` 中时，按 uv 的提示运行 `uv tool update-shell`。
+
+安装以后启动：
+
+```bash
+yudao api
+```
+
+`yudao api` 的参数与 `python -m harness api` 相同：`--data-dir`、`--host`、`--port`、`--access`、`--provider-config`。
+
+控制主机换到另一台机器时，从私有仓库的 Release 取得 wheel：
+
+```bash
+gh release download v<版本> --pattern 'yudao_harness-*.whl'
+```
+
+### 桌面客户端
+
+客户端是 Windows x64 程序，与控制主机在同一台电脑上或局域网内的另一台电脑上都可以运行。
+
+与控制主机在同一台电脑上：
+
+```bash
+yudao client install
+```
+
+它运行 wheel 附带的客户端安装程序，安装到 `%LOCALAPPDATA%\Programs\Yudao`，按用户安装，不需要管理员权限。
+
+在另一台电脑上：从更新源下载安装程序后运行（要求 Yudao 服务以局域网访问方式运行）：
+
+```powershell
+Invoke-WebRequest http://<控制主机地址>:<端口>/client-update/Yudao-Setup-<版本>.exe -OutFile Yudao-Setup-<版本>.exe
+.\Yudao-Setup-<版本>.exe
+```
+
+用浏览器下载会写入「来自网络」标记，出现 SmartScreen 警告，点「仍要运行」可以继续。客户端连接本机地址 `http://127.0.0.1:8765` 时，服务没有运行则由客户端启动它。
+
+### 升级
+
+Yudao 服务按 [ADR-0019](docs/adr/0019-project-stream-across-versions.md) 先排空，停止服务，再安装新的 wheel，然后重新启动。排空是命令 `runtime.start_drain`，停止开始新事项并等待进行中的 run 结束：
+
+```bash
+curl -X POST http://127.0.0.1:8765/api/commands/runtime.start_drain \
+  -H "Content-Type: application/json" \
+  -d '{"command_id": "<客户端生成的 UUID>"}'
+# 等待进行中的 run 结束，停止 Yudao 服务
+uv tool install --reinstall --python 3.12 <新的 wheel 的路径>
+yudao api
+```
+
+同一个地址上的文件被替换以后，没有 `--reinstall` 的再次安装按「已经安装」结束，所以升级要带 `--reinstall`。客户端在连接时读取服务的能力清单，接口版本不同时显示更新页，一键更新到与服务相同的版本。
+
 ## 测试
 
 Python 测试在项目环境中运行：
