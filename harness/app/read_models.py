@@ -381,8 +381,10 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
                  "direction_from": payload["requester"], "direction_to": payload["recipient"],
                  "status": "等待回答", "content": payload["question"]}]
     if event.type == EventType.COLLABORATION_RESPONDED:
-        return [{**base, "flow_id": payload["request_id"], "kind": "咨询", "direction_from": None,
-                 "direction_to": None, "status": _CONSULTATION_STATUS.get(payload["status"], payload["status"]),
+        # 回答方回应发问方：两端从载荷取出；旧事件没有这两个字段时方向留空（工单 #275）
+        return [{**base, "flow_id": payload["request_id"], "kind": "咨询",
+                 "direction_from": payload.get("recipient"), "direction_to": payload.get("requester"),
+                 "status": _CONSULTATION_STATUS.get(payload["status"], payload["status"]),
                  "content": payload["text"]}]
     if event.type == EventType.COLLABORATION_CLOSED:
         return [{**base, "flow_id": payload["request_id"], "kind": "咨询", "direction_from": None,
