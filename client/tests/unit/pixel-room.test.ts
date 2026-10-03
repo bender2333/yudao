@@ -238,6 +238,34 @@ test("事项进入停止态时，不是传信与交接的排队动作被清除",
   assert.equal(rm.actor("eng-architect")?.queue.length, 0, "停止态应清除普通排队动作");
 });
 
+test("事件成串到达时，队满挤掉的是普通动作，传信动作留在队列里", () => {
+  const rm = mountRoom("engineering", ENG);
+  rm.step(500);
+  const scene = rm.driver.scene;
+  const actor = scene.actors.find((a) => a.id === "ch-eng-architect")!;
+  scene.run(actor, [{ t: "anim", name: "type", ms: 60000, key: true }, { t: "anim", name: "type", ms: 60000 }], { tail: 1 });
+  rm.step(100);
+  rm.driver.playEvent({ type: "collaboration_requested", department: "engineering", label: "工程询问产品：线路偏好", payload: { from: "engineering", to: "product", request_id: "q1" } } as PixelFloorEvent);
+  assert.equal(rm.actor("eng-architect")?.queue.length, 1);
+  // 后面的普通动作连续到达，队满时只挤普通的那些
+  for (const ev of ["model_requested", "model_attempt_finished", "proposal_submitted", "plan_accepted", "department_activated"]) {
+    rm.driver.playEvent({ type: ev, department: "engineering", role: "eng-architect", payload: {} } as PixelFloorEvent);
+  }
+  const queued = rm.actor("eng-architect")!.queue.map((entry) => entry.from);
+  assert.ok(queued.includes("collaboration_requested"), `传信动作不应被挤掉，实际队列：${queued.join("、")}`);
+});
+
+test("收到交接的一方立刻说话：后一个交接事件替换脚本时上一句还在", () => {
+  const q = mountRoom("quality", QUA);
+  q.step(500);
+  // 先收到工程送来的交付箱，紧接着质检把放行单送走；两步之间没有停顿
+  q.driver.playEvent({ type: "transition", department: "engineering", payload: { from: "engineering", to: "quality", artifact: "box" } } as PixelFloorEvent);
+  const afterBox = q.actor("q-test")?.say?.text;
+  q.driver.playEvent({ type: "transition", department: "quality", payload: { from: "quality", to: "adopted", artifact: "release" } } as PixelFloorEvent);
+  assert.equal(afterBox, "收到交付箱，来自工程");
+  assert.equal(q.actor("q-test")?.say?.text, "现在把放行单送给成果库");
+});
+
 // ---------------------------------------------------------------------------
 // 事件到动作的解析
 
