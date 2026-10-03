@@ -106,6 +106,11 @@ export async function createRoomView(opts: RoomViewOptions): Promise<RoomView> {
     draw();
   };
   window.addEventListener("resize", onResize);
+  // 宿主尺寸变化（窄屏下滚动条出现、侧栏展开）不一定伴随窗口 resize：
+  // 直接观察宿主元素，尺寸变了就按新的宽度重排，画布不会比容器宽。
+  const observer = typeof ResizeObserver === "undefined" ? null
+    : new ResizeObserver(() => { applyLayout(); draw(); });
+  observer?.observe(opts.host);
 
   return {
     size: { W, H },
@@ -128,6 +133,7 @@ export async function createRoomView(opts: RoomViewOptions): Promise<RoomView> {
     destroy() {
       offTick();
       window.removeEventListener("resize", onResize);
+      observer?.disconnect();
       if (canvas.parentNode === opts.host) opts.host.removeChild(canvas);
       texture.destroy(true);
       app.destroy(false, { children: true });
