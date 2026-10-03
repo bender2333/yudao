@@ -212,7 +212,7 @@ def test_work_item_runs_settles_and_exposes_read_models(data_dir):
 
         department = get_json(host, port, f"/api/projects/{project_id}/departments/engineering")
         assert department["department"] == "engineering" and department["project_id"] == project_id
-        assert department["prompt_config"] == {"version": 0, "source": "default"}
+        assert department["department_setting"] == {"version": 0, "source": "default"}
         assert [entry["work_item_id"] for entry in department["items"]] == [work_item_id]
         assert department["items"][0]["view"]["run_id"] == run_id and department["items"][0]["view"]["department"] == "engineering"
         focused = get_json(host, port, f"/api/projects/{project_id}/departments/engineering?work_item={work_item_id}")
@@ -222,10 +222,10 @@ def test_work_item_runs_settles_and_exposes_read_models(data_dir):
         status, raw, _ = request(host, port, "GET", f"/api/projects/{project_id}/departments/finance")
         assert status == 400, raw
 
-        prompt = get_json(host, port, f"/api/projects/{project_id}/prompts/quality")
+        prompt = get_json(host, port, f"/api/projects/{project_id}/department-settings/quality")
         quality_prompt = DEFINITIONS.role("quality").prompt
         assert prompt == {"department": "quality", "text": quality_prompt, "default_text": quality_prompt,
-                          "prompt_configured": False, "provider_id": None, "model_id": None,
+                          "department_setting_configured": False, "provider_id": None, "model_id": None,
                           "requested_tier": None, "version": 0, "updated_at": None, "source": "default"}
 
         # GET /api/runs 仍列出项目 run 与 bare run；POST /api/runs 已删除。
@@ -274,7 +274,7 @@ def test_two_projects_are_isolated_over_http(data_dir):
         _wait_work_item(host, port, project_a, created_a["work_item_id"])
         created_b = _post(host, port, f"/api/projects/{project_b}/work-items", {"text": "B 的事项"}, 201)
         _wait_work_item(host, port, project_b, created_b["work_item_id"])
-        _put(host, port, f"/api/projects/{project_b}/prompts/quality", {"text": "只属于 B 的质检 Prompt", "base_version": 0})
+        _put(host, port, f"/api/projects/{project_b}/department-settings/quality", {"text": "只属于 B 的质检部门设置", "base_version": 0})
         _post(host, port, f"/api/projects/{project_b}/materials", {"text": "只属于 B 的材料"}, 201)
 
         status, raw_a, _ = request(host, port, "GET", f"/api/projects/{project_a}")
@@ -331,14 +331,14 @@ def test_two_projects_are_isolated_over_http(data_dir):
 
 
 # ---------------------------------------------------------------------------
-# §13.8 Prompt 配置接口
+# §13.8 部门设置接口
 
 
-def test_prompt_config_endpoints(data_dir):
+def test_department_setting_endpoints(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     with running_server(system) as (_server, host, port):
         project_id = _register(host, port)
-        path = f"/api/projects/{project_id}/prompts/engineering"
+        path = f"/api/projects/{project_id}/department-settings/engineering"
         assert get_json(host, port, path)["version"] == 0
         status, body = _put(host, port, path, {"text": "工程 v1", "base_version": 0})
         assert status == 200 and body["version"] == 1 and body["source"] == "configured" and body["unchanged"] is False
@@ -348,23 +348,23 @@ def test_prompt_config_endpoints(data_dir):
         status, body = _put(host, port, path, {"text": "   ", "base_version": 1})
         assert status == 400, body
         status, body = _put(host, port, path, {"text": "过期编辑", "base_version": 0})
-        assert status == 409 and body["reason"] == "prompt_config_conflict", body
+        assert status == 409 and body["reason"] == "department_setting_conflict", body
         assert body["current"]["version"] == 1 and body["current"]["text"] == "工程 v1"
         status, body = _put(host, port, path, {"text": "工程 v2"})
         assert status == 400, body
         status, body = _put(host, port, path, {"text": "工程 v2", "base_version": "1"})
         assert status == 400, body
-        status, body = _put(host, port, f"/api/projects/{project_id}/prompts/finance", {"text": "x", "base_version": 0})
+        status, body = _put(host, port, f"/api/projects/{project_id}/department-settings/finance", {"text": "x", "base_version": 0})
         assert status == 400, body
-        status, body = _put(host, port, "/api/projects/proj_missing/prompts/engineering", {"text": "x", "base_version": 0})
+        status, body = _put(host, port, "/api/projects/proj_missing/department-settings/engineering", {"text": "x", "base_version": 0})
         assert status == 404, body
         status, body = _put(host, port, path, {"text": "工程 v2", "base_version": 1})
         assert status == 200 and body["version"] == 2
         read = get_json(host, port, path)
         assert read["version"] == 2 and read["text"] == "工程 v2" and read["source"] == "configured"
-        assert get_json(host, port, f"/api/projects/{project_id}/prompts/product")["version"] == 0
+        assert get_json(host, port, f"/api/projects/{project_id}/department-settings/product")["version"] == 0
         department = get_json(host, port, f"/api/projects/{project_id}/departments/engineering")
-        assert department["prompt_config"] == {"version": 2, "source": "configured"} and department["items"] == []
+        assert department["department_setting"] == {"version": 2, "source": "configured"} and department["items"] == []
         detail = get_json(host, port, f"/api/projects/{project_id}")
         assert [entry["version"] for entry in detail["department_setting_history"]] == [1, 2]
         # 新事项记下项目部门设置的版本；部门 Prompt 不在 run 内留副本。
@@ -385,7 +385,7 @@ def test_archived_project_write_commands_return_409(data_dir):
         _post(host, port, f"/api/projects/{project_id}/archive")
         for method, path, body in (
             ("POST", f"/api/projects/{project_id}/work-items", {"text": "归档后的事项"}),
-            ("PUT", f"/api/projects/{project_id}/prompts/product", {"text": "归档后的 Prompt", "base_version": 0}),
+            ("PUT", f"/api/projects/{project_id}/department-settings/product", {"text": "归档后的部门设置", "base_version": 0}),
             ("POST", f"/api/projects/{project_id}/materials", {"text": "归档后的材料"}),
             ("POST", f"/api/projects/{project_id}/rename", {"name": "归档后改名"}),
             ("POST", f"/api/projects/{project_id}/pin", {"pinned": True}),
@@ -399,7 +399,7 @@ def test_archived_project_write_commands_return_409(data_dir):
         assert get_json(host, port, f"/api/projects/{project_id}")["archived"] is False
         material = _post(host, port, f"/api/projects/{project_id}/materials", {"text": "恢复后的材料"}, 201)
         assert material["material_id"].startswith("material_")
-        status, body = _put(host, port, f"/api/projects/{project_id}/prompts/product", {"text": "恢复后的 Prompt", "base_version": 0})
+        status, body = _put(host, port, f"/api/projects/{project_id}/department-settings/product", {"text": "恢复后的部门设置", "base_version": 0})
         assert status == 200 and body["version"] == 1
         created = _post(host, port, f"/api/projects/{project_id}/work-items", {"text": "恢复后的事项"}, 201)
         _wait_work_item(host, port, project_id, created["work_item_id"])

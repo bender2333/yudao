@@ -23,14 +23,14 @@ import {
 export type DepartmentSettingsDraft = {
   model: string;
   tier: string;
-  prompt: string;
+  text: string;
 };
 
 function draftFromSetting(setting: DepartmentSetting | null): DepartmentSettingsDraft {
   return {
     model: selectionValue(setting?.provider_id, setting?.model_id),
     tier: setting?.requested_tier ?? "",
-    prompt: setting?.text ?? "",
+    text: setting?.text ?? "",
   };
 }
 
@@ -134,9 +134,9 @@ export function DepartmentSettingsFields(props: {
       ) : null}
       <TextArea
         label="部门 Prompt"
-        value={props.draft.prompt}
+        value={props.draft.text}
         rows={10}
-        onInput={(value) => props.onDraft({ ...props.draft, prompt: value })}
+        onInput={(value) => props.onDraft({ ...props.draft, text: value })}
       />
       <ReminderList items={props.reminders} testId={`department-reminder-${props.department}`} />
     </div>
@@ -168,7 +168,7 @@ export function DepartmentSettingsSave(props: {
             provider_id: selection.provider_id,
             model_id: selection.model_id,
             requested_tier: props.draft.tier === "" ? null : props.draft.tier,
-            department_prompt: props.draft.prompt,
+            department_prompt: props.draft.text,
           }).then((ok) => { if (ok) { props.onSaved(); } });
         }}
       />

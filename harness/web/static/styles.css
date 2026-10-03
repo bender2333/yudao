@@ -683,11 +683,11 @@ body { overflow-x: hidden; }
 #yudao-workbench .yp-menu { position: absolute; right: 0; top: 40px; z-index: 5; min-width: 175px; background: var(--yp-surface); border: 1px solid var(--yp-line); box-shadow: 0 10px 30px light-dark(#1c33231f, #00000060); border-radius: 7px; padding: 5px; }
 #yudao-workbench .yp-menu button { width: 100%; display: flex; gap: 8px; align-items: center; text-align: left; padding: 8px; border: 0; border-radius: 4px; background: transparent; font-size: 12px; }
 #yudao-workbench .yp-menu button:hover { background: var(--yp-soft); }
-#yudao-workbench .yp-prompt-editor { max-width: 700px; }
-#yudao-workbench .yp-prompt-editor textarea { min-height: 260px; font: 13px/1.7 "Microsoft YaHei UI", system-ui, sans-serif; }
-#yudao-workbench .yp-prompt-current { margin-top: 14px; padding: 12px; border: 1px solid var(--yp-line); border-radius: 7px; background: var(--yp-soft); }
-#yudao-workbench .yp-prompt-current p,
-#yudao-workbench .yp-prompt-current pre { margin-top: 8px; }
+#yudao-workbench .yp-department-setting-editor { max-width: 700px; }
+#yudao-workbench .yp-department-setting-editor textarea { min-height: 260px; font: 13px/1.7 "Microsoft YaHei UI", system-ui, sans-serif; }
+#yudao-workbench .yp-department-setting-current { margin-top: 14px; padding: 12px; border: 1px solid var(--yp-line); border-radius: 7px; background: var(--yp-soft); }
+#yudao-workbench .yp-department-setting-current p,
+#yudao-workbench .yp-department-setting-current pre { margin-top: 8px; }
 #yudao-workbench .yp-dh-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 #yudao-workbench .yp-empty { max-width: 55ch; padding: 26px 0; }
 #yudao-workbench .yp-empty h2 { margin-bottom: 7px; }
@@ -762,7 +762,7 @@ body { overflow-x: hidden; }
   #yudao-workbench .yp-board { grid-template-columns: 1fr; }
   #yudao-workbench .yp-flow { grid-template-columns: 1fr; }
   #yudao-workbench .yp-handoff { grid-template-columns: 1fr; gap: 3px; }
-  #yudao-workbench .yp-prompt-editor textarea { font-size: 16px; }
+  #yudao-workbench .yp-department-setting-editor textarea { font-size: 16px; }
 }
 
 @media (min-width: 1440px) {

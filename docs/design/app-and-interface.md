@@ -19,7 +19,7 @@
 | 没有能力清单 | 原型用阶段档位切换显示；后端没有任何接口说明自己提供哪些能力 | 客户端无法按部署显示页面与覆盖层（调研第 3.3 节） |
 | 没有认证 | `harness/__main__.py:124-127` 绑定非本机地址时只打印提示；凭据写入接口（`server.py:770-831`）没有保护 | 从本机以外访问时，API Key 与项目内容没有保护 |
 | 后端提供界面文件 | `server.py:174-177`、`1290-1302` | 与 ADR-0015「后端不提供界面文件」冲突 |
-| 事项内 Prompt 编辑仍在 | `POST /api/runs/{id}/prompts/{dept}`（`server.py:219-220`、`358-363`） | 模型管理设计说明第 10 节已决定删除 |
+| 事项内 Prompt 编辑仍在 | `POST /api/runs/{id}/department-settings/{dept}`（`server.py:219-220`、`358-363`） | 模型管理设计说明第 10 节已决定删除 |
 | 流式输出只有阶段 | `model_stream_progress` 每 0.25 秒写一条事件，只含阶段与 SDK 事件种类（`orchestrator.py:1244-1283`） | 画面无法逐字显示模型输出（原型第 6.3 节，ADR-0011） |
 | 命令行直接读取内部模块 | `__main__.py` 的 `project list`、`project show`、`replay` 直接调用 `LoopSystem` 与投影 | 与 ADR-0015「命令行与客户端经过同一个应用层」冲突 |
 
@@ -219,7 +219,7 @@ sequenceDiagram
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
-| `department_settings.save` | 保存项目部门设置；所选模型不具备部门的建议能力时照常保存，结果带提醒（D24） | 项目、部门、部门 Prompt、模型（模型访问定义引用或跟随部门默认）、推理档位（或跟随） | `department_prompt_configured`；模型与档位的事件由 D24 确定 | 该部门设置的版本 | 部门 Prompt 已有 `PUT /api/projects/{id}/prompts/{dept}`；模型与档位、提醒新增（D24 第 5.2、5.6 节） |
+| `department_settings.save` | 保存项目部门设置；所选模型不具备部门的建议能力时照常保存，结果带提醒（D24） | 项目、部门、部门 Prompt、模型（模型访问定义引用或跟随部门默认）、推理档位（或跟随） | `department_prompt_configured`；模型与档位的事件由 D24 确定 | 该部门设置的版本 | 部门 Prompt 已有 `PUT /api/projects/{id}/department-settings/{dept}`；模型与档位、提醒新增（D24 第 5.2、5.6 节） |
 | `source_directory.save` | 登记与修改本项目的源目录；`project.onboard` 填写的路径是项目的第一条登记，`onboarding.restart` 从登记的源目录重新采集快照 | 项目、名称、路径 | 由界面工作线的工单确定 | 该项目源目录登记的版本 | 新增（界面工作线，#74） |
 | `command_registration.save` | 登记与修改命令 | 项目、登记名、固定参数、允许的额外参数、时限、输出上限、可以重新执行（结果未知时自动重新执行，默认为否；恢复契约第 4 节） | `command_configured`（「可以重新执行」是新增字段，旧事件为否） | 该登记命令的版本 | 已有 `PUT /api/projects/{id}/commands/{name}`；界面入口新增 |
 | `tool_authorization.save` | 保存网络取回的来源与 MCP 服务器（含工具清单快照与每个工具的处理方式）在本项目的整份登记 | 项目、整份登记文档 | `tool_authorization_configured`（项目流，内容是这个版本的整份文档） | 工具授权版本 | 新增（3.2B，[网络取回与 MCP 工具设计说明](network-and-mcp.md)第 4.4 节） |
@@ -331,7 +331,7 @@ sequenceDiagram
 
 ### 3.4 删除的命令
 
-- `POST /api/runs/{id}/prompts/{dept}`：事项内 Prompt 编辑，删除（模型管理设计说明第 10 节）。
+- `POST /api/runs/{id}/department-settings/{dept}`：事项内 Prompt 编辑，删除（模型管理设计说明第 10 节）。
 - `POST /api/runs/{id}/replay`：重放核对不写入，改为查询 `replay.check`。
 - `POST /api/runs`：只返回 404 的占位路由，删除。
 
@@ -435,7 +435,7 @@ sequenceDiagram
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `project.settings` | 基本信息与版本、各部门的项目部门设置与版本（Prompt；模型与档位为 D24）、部门建议能力的提醒（D24，按模型管理设计说明第 5.3 节解析出的本项目各部门及各角色的生效模型判断，包括跟随部门默认或角色默认）、登记的源目录与版本（界面工作线）、登记命令与版本、工具授权（3.2B：整份登记与版本、最近一次探测的结果）、机器授权与版本（登记目录与可以执行的操作为 3.2C，是否作为运行环境与常设授权为 Stage 4）、执行位置与版本（3.2C）、观察窗口与修复失败次数上限（Stage 4）、角色设置（Stage 5） | | 部分已有：`GET /api/projects/{id}/prompts/{dept}`、`/commands`、`/commands/{name}` |
+| `project.settings` | 基本信息与版本、各部门的项目部门设置与版本（Prompt；模型与档位为 D24）、部门建议能力的提醒（D24，按模型管理设计说明第 5.3 节解析出的本项目各部门及各角色的生效模型判断，包括跟随部门默认或角色默认）、登记的源目录与版本（界面工作线）、登记命令与版本、工具授权（3.2B：整份登记与版本、最近一次探测的结果）、机器授权与版本（登记目录与可以执行的操作为 3.2C，是否作为运行环境与常设授权为 Stage 4）、执行位置与版本（3.2C）、观察窗口与修复失败次数上限（Stage 4）、角色设置（Stage 5） | | 部分已有：`GET /api/projects/{id}/department-settings/{dept}`、`/commands`、`/commands/{name}` |
 
 **系统页**
 
@@ -642,18 +642,18 @@ sequenceDiagram
 | `POST /api/runs/{id}/cancel` | `work_item.cancel` |
 | `POST /api/runs/{id}/replay` | `replay.check` |
 | `POST /api/runs/{id}/inputs` | `work_item.append_input` |
-| `POST /api/runs/{id}/prompts/{dept}` | 删除 |
+| `POST /api/runs/{id}/department-settings/{dept}` | 删除 |
 | `POST /api/runs/{id}/departments/{dept}/guidance` | `guidance.send` |
 | `GET /api/projects` | `projects.list` |
 | `POST /api/projects` | `project.create` |
 | `GET /api/projects/{id}`、`/board`、`/work-items/{wid}` | `project.overview`、`project.flow` |
 | `GET /api/projects/{id}/departments/{dept}` | `department.workspace` |
-| `GET /api/projects/{id}/prompts/{dept}`、`/commands`、`/commands/{name}` | `project.settings` |
+| `GET /api/projects/{id}/department-settings/{dept}`、`/commands`、`/commands/{name}` | `project.settings` |
 | `GET /api/projects/{id}/model-attempts`、`/model-usage` | `project.attempts`、`project.usage` |
 | `POST /api/projects/{id}/rename`、`/pin`、`/archive`、`/restore` | `project.rename`、`project.pin`、`project.archive`、`project.restore` |
 | `POST /api/projects/{id}/work-items` | `work_item.create` |
 | `POST /api/projects/{id}/materials` | `material.record` |
-| `PUT /api/projects/{id}/prompts/{dept}` | `department_settings.save` |
+| `PUT /api/projects/{id}/department-settings/{dept}` | `department_settings.save` |
 | `PUT /api/projects/{id}/commands/{name}` | `command_registration.save` |
 | `GET /api/providers`、`/api/provider-presets`、`/api/department-bindings` | `catalog` |
 | `POST /api/providers`、`PUT /api/providers/{id}` | `catalog.connection.save`；带 `providers` 字段时为 `catalog.document.save` |

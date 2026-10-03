@@ -232,8 +232,8 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         parts = self._path_parts()
 
         def dispatch() -> None:
-            if len(parts) == 5 and parts[:2] == ["api", "projects"] and parts[3] == "prompts":
-                return self._configure_prompt(parts[2], unquote(parts[4]))
+            if len(parts) == 5 and parts[:2] == ["api", "projects"] and parts[3] == "department-settings":
+                return self._configure_department_setting(parts[2], unquote(parts[4]))
             if len(parts) == 5 and parts[:2] == ["api", "projects"] and parts[3] == "commands":
                 return self._configure_command(parts[2], unquote(parts[4]))
             if len(parts) == 3 and parts[:2] == ["api", "providers"]:
@@ -273,7 +273,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
         except ProjectArchivedError as exc:
             self._send_json({"error": str(exc), "reason": "project_archived"}, 409)
         except DepartmentSettingConflict as exc:
-            self._send_json({"error": str(exc), "reason": "prompt_config_conflict", "current": exc.current}, 409)
+            self._send_json({"error": str(exc), "reason": "department_setting_conflict", "current": exc.current}, 409)
         except CommandConfigConflict as exc:
             self._send_json({"error": str(exc), "reason": "command_config_conflict", "current": exc.current}, 409)
         except CancelledInputSaveError as exc:
@@ -470,7 +470,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             return self._send_json({"material_id": material_id}, 201)
         self._send_json({"error": "not found"}, 404)
 
-    def _configure_prompt(self, project_id: str, department: str) -> None:
+    def _configure_department_setting(self, project_id: str, department: str) -> None:
         body = self._read_json_body()
         if set(body) != {"text", "base_version"}:
             raise ValueError("body must contain text and base_version")
@@ -887,7 +887,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
             return self._send_json({
                 "department": department,
                 "project_id": project_id,
-                "prompt_config": {"version": setting.version, "source": setting.source},
+                "department_setting": {"version": setting.version, "source": setting.source},
                 "items": [
                     {
                         "work_item_id": item.work_item_id, "title": item.title, "status": item.status,
@@ -896,7 +896,7 @@ class LoopConsoleHandler(BaseHTTPRequestHandler):
                     for item in items
                 ],
             })
-        if rest[:1] == ["prompts"] and len(rest) == 2:
+        if rest[:1] == ["department-settings"] and len(rest) == 2:
             return self._send_json(projects.read_department_setting(project_id, unquote(rest[1])))
         if rest == ["commands"]:
             return self._send_json({"project_id": project_id, "commands": projects.read_commands(project_id)})

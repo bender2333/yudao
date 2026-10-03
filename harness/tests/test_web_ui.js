@@ -100,7 +100,7 @@ function uiDocument() {
     "yudao-workbench", "yp-shell", "yp-sidebar", "yp-topbar",
     "department-workspace-prototype", "dw-main",
     "yp-project-dialog", "yp-project-dialog-form", "yp-project-name", "yp-project-goal", "yp-project-submit", "yp-project-error",
-    "dw-prompt-dialog", "dw-prompt-dialog-form", "dw-prompt-text", "dw-prompt-error", "dw-prompt-meta", "dw-prompt-default", "dw-prompt-restore",
+    "dw-department-setting-dialog", "dw-department-setting-dialog-form", "dw-department-setting-text", "dw-department-setting-error", "dw-department-setting-meta", "dw-department-setting-default", "dw-department-setting-restore",
     "dw-event-dialog", "dw-event-title", "dw-event-version", "dw-event-files", "dw-event-document", "dw-event-json", "dw-event-sources",
     "yp-rename-dialog", "yp-rename-dialog-form", "yp-rename-name", "yp-rename-error",
   ];
@@ -119,12 +119,12 @@ function uiDocument() {
   workbench.querySelectorAll = () => [];
   const projectForm = nodes.get("yp-project-dialog-form");
   projectForm.elements = { name: nodes.get("yp-project-name"), goal: nodes.get("yp-project-goal") };
-  const promptDialog = nodes.get("dw-prompt-dialog");
-  const promptForm = nodes.get("dw-prompt-dialog-form");
-  const promptText = nodes.get("dw-prompt-text");
-  promptDialog.submitButton = node("prompt-submit");
-  promptForm.elements = { text: promptText };
-  promptDialog.querySelector = selector => selector === "button[value='default']" ? promptDialog.submitButton : null;
+  const settingDialog = nodes.get("dw-department-setting-dialog");
+  const settingForm = nodes.get("dw-department-setting-dialog-form");
+  const settingText = nodes.get("dw-department-setting-text");
+  settingDialog.submitButton = node("department-setting-submit");
+  settingForm.elements = { text: settingText };
+  settingDialog.querySelector = selector => selector === "button[value='default']" ? settingDialog.submitButton : null;
   const document = {
     documentElement: { scrollTop: 0 },
     activeElement: null,
@@ -159,7 +159,7 @@ function sampleProject(id = "proj_a", extras = {}) {
     current_adoption: extras.current_adoption || null,
     materials: extras.materials || [],
     overview: { pending: [], recent: [] },
-    prompt_configs: {},
+    department_settings: {},
     ...extras,
   };
 }
@@ -214,7 +214,7 @@ test("department room uses the v5 stage and keeps real guidance contracts", () =
   assert.match(html, /id="dw-dept-form"/);
   assert.match(html, /data-dept-draft="engineering"/);
   assert.match(html, /发送指导/);
-  assert.match(html, /data-prompt-edit="engineering"/);
+  assert.match(html, /data-department-setting-edit="engineering"/);
   assert.match(html, /data-work-scope/);
   assert.match(html, /data-inspector-tab="context"/);
   assert.doesNotMatch(html, /派发协作者|SubAgent|动作步进/);
@@ -330,36 +330,36 @@ test("department drafts are isolated by project scope and work item", () => {
   assert.equal(web.state.deptDrafts[web.deptDraftKey("product")], "事项草稿");
 });
 
-test("Prompt save uses project PUT with base_version and keeps draft on blank or conflict", async () => {
+test("department setting save uses project PUT with base_version and keeps draft on blank or conflict", async () => {
   const calls = [];
   const { document, nodes } = uiDocument();
   const web = loadApp(async (url, options = {}) => {
     calls.push([url, options]);
-    if (options.method === "PUT" && String(url).includes("/prompts/product")) {
+    if (options.method === "PUT" && String(url).includes("/department-settings/product")) {
       const body = JSON.parse(options.body);
       if (!String(body.text || "").trim()) return response({ error: "text is blank" }, 400);
       if (body.base_version === 0 && body.text === "same") return response({ department: "product", text: "same", version: 0, unchanged: true, default_text: "DEFAULT", source: "default" });
-      if (body.base_version === 0) return response({ error: "conflict", reason: "prompt_config_conflict", current: { department: "product", text: "server", version: 2, default_text: "DEFAULT", source: "configured" } }, 409);
+      if (body.base_version === 0) return response({ error: "conflict", reason: "department_setting_conflict", current: { department: "product", text: "server", version: 2, default_text: "DEFAULT", source: "configured" } }, 409);
       return response({ department: "product", text: body.text, version: 1, unchanged: false, default_text: "DEFAULT", source: "configured" });
     }
     return response({});
   }, document);
   web.state.projectId = "proj_a";
   web.state.project = sampleProject("proj_a");
-  web.state.promptConfigs.product = { department: "product", text: "old", version: 0, default_text: "DEFAULT", source: "default" };
-  web.openPromptDialog("product");
-  const dialog = nodes.get("dw-prompt-dialog");
+  web.state.departmentSettingConfigs.product = { department: "product", text: "old", version: 0, default_text: "DEFAULT", source: "default" };
+  web.openDepartmentSettingDialog("product");
+  const dialog = nodes.get("dw-department-setting-dialog");
   assert.equal(dialog.open, true);
-  nodes.get("dw-prompt-text").value = "   ";
-  await web.savePrompt({ preventDefault() {}, submitter: { value: "default" } });
-  assert.equal(nodes.get("dw-prompt-error").hidden, false);
+  nodes.get("dw-department-setting-text").value = "   ";
+  await web.saveDepartmentSetting({ preventDefault() {}, submitter: { value: "default" } });
+  assert.equal(nodes.get("dw-department-setting-error").hidden, false);
   assert.equal(calls.length, 0);
-  nodes.get("dw-prompt-text").value = "new prompt";
-  await web.savePrompt({ preventDefault() {}, submitter: { value: "default" } });
+  nodes.get("dw-department-setting-text").value = "new department setting";
+  await web.saveDepartmentSetting({ preventDefault() {}, submitter: { value: "default" } });
   assert.equal(calls[0][1].method, "PUT");
-  assert.deepEqual(JSON.parse(calls[0][1].body), { text: "new prompt", base_version: 0 });
-  assert.equal(web.state.promptDrafts["proj_a/product"], "new prompt");
-  assert.match(nodes.get("dw-prompt-error").textContent, /conflict|department prompt|配置/);
+  assert.deepEqual(JSON.parse(calls[0][1].body), { text: "new department setting", base_version: 0 });
+  assert.equal(web.state.departmentSettingDrafts["proj_a/product"], "new department setting");
+  assert.match(nodes.get("dw-department-setting-error").textContent, /conflict|department setting|配置/);
 });
 
 test("observation return restores department scope inspector snapshot drafts and scroll", () => {
@@ -369,7 +369,7 @@ test("observation return restores department scope inspector snapshot drafts and
   web.state.view = "department";
   web.state.department = "engineering";
   web.state.workItemId = "wi_1";
-  web.state.inspectorTab = "prompt";
+  web.state.inspectorTab = "department-setting";
   web.state.deptDrafts["proj_a/engineering/wi_1"] = "keep draft";
   web.state.selectedContext["run_1/engineering"] = "ctx-9";
   web.state.runId = "run_1";
@@ -382,7 +382,7 @@ test("observation return restores department scope inspector snapshot drafts and
   assert.equal(web.state.view, "department");
   assert.equal(web.state.department, "engineering");
   assert.equal(web.state.workItemId, "wi_1");
-  assert.equal(web.state.inspectorTab, "prompt");
+  assert.equal(web.state.inspectorTab, "department-setting");
   assert.equal(web.state.deptDrafts["proj_a/engineering/wi_1"], "keep draft");
   assert.equal(web.state.selectedContext["run_1/engineering"], "ctx-9");
 });

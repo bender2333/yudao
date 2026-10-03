@@ -412,7 +412,7 @@ def test_live_input_keeps_originals_and_activates_next_versions(data_dir):
             detail = get_json(host, port, f"/api/runs/{run_id}/events/{item['created_event_id']}")
             assert detail["input"] == addition and detail["intend"] == original + addition
             # run 内没有部门 Prompt 的副本：只列出每次激活记录的版本与摘要
-            assert "current" not in live["prompts"] and "versions" not in live["prompts"]
+            assert "current" not in live["department_setting_activations"] and "versions" not in live["department_setting_activations"]
             assert server.busy()
         finally:
             release.set()
@@ -544,7 +544,7 @@ def test_input_api_rejects_unknown_fields_and_terminal_runs(data_dir):
             status, raw, _ = request(host, port, "POST", f"/api/runs/{run_id}/inputs", body)
             assert status == 400, raw
         # run 内没有部门 Prompt 编辑入口
-        status, _, _ = request(host, port, "POST", f"/api/runs/{run_id}/prompts/product", {"text": "x"})
+        status, _, _ = request(host, port, "POST", f"/api/runs/{run_id}/department-settings/product", {"text": "x"})
         assert status == 404
         system.cancel(run_id)
         before = system.project(run_id)

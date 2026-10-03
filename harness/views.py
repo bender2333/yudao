@@ -326,7 +326,7 @@ def run_payload(store: EventStore, run_id: str) -> dict[str, Any]:
         "context": context_view(projection),
         "inputs": _with_git(projection.inputs, events),
         "department_guidance": _plain(projection.department_guidance),
-        "prompts": {
+        "department_setting_activations": {
             # 部门 Prompt 来自项目部门设置，run 内没有副本；这里只列出每次激活记录的版本与摘要
             "activations": [
                 {"event_id": event.event_id, "department": event.department, **event.payload}

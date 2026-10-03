@@ -69,8 +69,8 @@
     selectedHandoff: null,
     globalDrafts: {},
     deptDrafts: {},
-    promptDrafts: {},
-    promptConfigs: {},
+    departmentSettingDrafts: {},
+    departmentSettingConfigs: {},
     overviewPane: "handoffs",
     boardMode: "flow",
     sidebarCollapsed: false,
@@ -86,7 +86,7 @@
     cancelling: false,
     inputSubmitting: null,
     guidanceSubmitting: {},
-    promptSubmitting: false,
+    departmentSettingSubmitting: false,
     newProjectDraft: { name: "", goal: "" },
     workDraft: { text: "", max_cycles: "8", context_window: "32000" },
     error: "",
@@ -159,10 +159,6 @@
 
   function departmentStatusLabel(status, fallback) {
     return ({ success: "已完成", failed: "失败", running: "处理中", waiting: "等待" }[status] || status || fallback || "未知");
-  }
-
-  function promptStatusLabel(status) {
-    return ({ adopted: "生效中", pending: "待下次激活" }[status] || status || "未知状态");
   }
 
   function guidanceStatusLabel(status) {
@@ -405,7 +401,7 @@
     state.selectedAttemptId = search.get("attempt") || null;
     state.observationDetailTab = ["overview", "request", "response", "events"].includes(search.get("detailTab"))
       ? search.get("detailTab") : "overview";
-    state.inspectorTab = ["context", "provider", "prompt"].includes(search.get("inspectorTab"))
+    state.inspectorTab = ["context", "provider", "department-setting"].includes(search.get("inspectorTab"))
       ? search.get("inspectorTab") : "context";
     state.inspectorCollapsed = search.get("inspector") === "collapsed";
     const contextId = search.get("context");
@@ -859,14 +855,14 @@
     return attemptId && runId ? state.contextDetails.get(`${runId}/${attemptId}`) || null : null;
   }
 
-  function promptMarkup(department, data) {
-    const config = state.promptConfigs[department] || {};
+  function departmentSettingMarkup(department, data) {
+    const config = state.departmentSettingConfigs[department] || {};
     const selectedAttempt = state.selectedContext[`${focusedRunId()}/${department}`];
     const selectedDetail = contextDetailFor(selectedAttempt);
     const snapshotPrompt = selectedDetail?.context?.parts?.find(item => item.source === "department_rules") || null;
     const adopted = data?.prompt || {};
     const actual = snapshotPrompt ? { version: snapshotPrompt.version, text: snapshotPrompt.text } : adopted;
-    return `<div class="dw-inspect-panel" id="dw-panel-prompt" role="tabpanel" aria-labelledby="dw-tab-prompt"><div class="dw-prompt-version"><span>项目当前配置</span><span>${config.source === "configured" ? `配置 v${text(config.version)}` : "默认 v0"}</span></div><pre class="dw-prompt-block">${text(config.text, "当前配置原文不可用")}</pre><div class="dw-prompt-version"><span>所选请求实际 Prompt</span><span>${actual.version ? `run Prompt v${actual.version}` : "尚未绑定请求"}</span></div><pre class="dw-prompt-block">${text(actual.text, "所选请求没有 Prompt 原文")}</pre><p class="dw-small">历史请求不从当前配置回填。</p>${isWritable() ? `<button class="dw-observation-link" type="button" data-prompt-edit="${escapeHtml(department)}" title="配置 Prompt"><i data-lucide="pencil" aria-hidden="true"></i>配置 Prompt</button>` : ""}</div>`;
+    return `<div class="dw-inspect-panel" id="dw-panel-department-setting" role="tabpanel" aria-labelledby="dw-tab-department-setting"><div class="dw-prompt-version"><span>项目当前配置</span><span>${config.source === "configured" ? `配置 v${text(config.version)}` : "默认 v0"}</span></div><pre class="dw-prompt-block">${text(config.text, "当前配置原文不可用")}</pre><div class="dw-prompt-version"><span>所选请求实际 Prompt</span><span>${actual.version ? `run Prompt v${actual.version}` : "尚未绑定请求"}</span></div><pre class="dw-prompt-block">${text(actual.text, "所选请求没有 Prompt 原文")}</pre><p class="dw-small">历史请求不从当前配置回填。</p>${isWritable() ? `<button class="dw-observation-link" type="button" data-department-setting-edit="${escapeHtml(department)}" title="配置部门设置"><i data-lucide="pencil" aria-hidden="true"></i>配置部门设置</button>` : ""}</div>`;
   }
 
   function scopeSelectMarkup() {
@@ -904,13 +900,13 @@
   }
 
   function deptSettingsMarkup(department) {
-    const promptButton = isWritable() ? `<button type="button" data-prompt-edit="${escapeHtml(department)}"><i data-lucide="file-text" aria-hidden="true"></i><span>部门 Prompt 设置</span></button>` : "";
-    return `<div class="dept-settings-menu-wrap"><button class="yp-btn" type="button" data-action="toggle-dept-menu" aria-expanded="${state.deptMenu ? "true" : "false"}"><i data-lucide="settings" aria-hidden="true"></i><span>部门设置</span></button><div class="dept-settings-menu" ${state.deptMenu ? "" : "hidden"}><button type="button" data-inspector-tab="provider"><i data-lucide="cpu" aria-hidden="true"></i><span>本次模型</span></button>${promptButton}<button type="button" data-inspector-tab="context"><i data-lucide="file-search" aria-hidden="true"></i><span>Context</span></button><button type="button" data-action="providers"><i data-lucide="sliders-horizontal" aria-hidden="true"></i><span>模型与 Provider</span></button></div></div>`;
+    const settingButton = isWritable() ? `<button type="button" data-department-setting-edit="${escapeHtml(department)}"><i data-lucide="file-text" aria-hidden="true"></i><span>部门设置</span></button>` : "";
+    return `<div class="dept-settings-menu-wrap"><button class="yp-btn" type="button" data-action="toggle-dept-menu" aria-expanded="${state.deptMenu ? "true" : "false"}"><i data-lucide="settings" aria-hidden="true"></i><span>部门设置</span></button><div class="dept-settings-menu" ${state.deptMenu ? "" : "hidden"}><button type="button" data-inspector-tab="provider"><i data-lucide="cpu" aria-hidden="true"></i><span>本次模型</span></button>${settingButton}<button type="button" data-inspector-tab="context"><i data-lucide="file-search" aria-hidden="true"></i><span>Context</span></button><button type="button" data-action="providers"><i data-lucide="sliders-horizontal" aria-hidden="true"></i><span>模型与 Provider</span></button></div></div>`;
   }
 
   function roomInspectMarkup(department, data) {
-    const panel = state.inspectorTab === "provider" ? providerMarkup(data?.provider) : state.inspectorTab === "prompt" ? promptMarkup(department, data) : contextMarkup(department, data);
-    return `<section class="pixel-room-inspect" aria-label="${departmentName(department)}检查"><div class="dw-inspector-tabs" role="tablist" aria-label="检查项"><button id="dw-tab-context" class="dw-inspector-tab ${state.inspectorTab === "context" ? "is-active" : ""}" type="button" data-inspector-tab="context" role="tab" aria-selected="${state.inspectorTab === "context"}">Context</button><button id="dw-tab-provider" class="dw-inspector-tab ${state.inspectorTab === "provider" ? "is-active" : ""}" type="button" data-inspector-tab="provider" role="tab" aria-selected="${state.inspectorTab === "provider"}">Provider</button><button id="dw-tab-prompt" class="dw-inspector-tab ${state.inspectorTab === "prompt" ? "is-active" : ""}" type="button" data-inspector-tab="prompt" role="tab" aria-selected="${state.inspectorTab === "prompt"}">Prompt</button></div>${panel}</section>`;
+    const panel = state.inspectorTab === "provider" ? providerMarkup(data?.provider) : state.inspectorTab === "department-setting" ? departmentSettingMarkup(department, data) : contextMarkup(department, data);
+    return `<section class="pixel-room-inspect" aria-label="${departmentName(department)}检查"><div class="dw-inspector-tabs" role="tablist" aria-label="检查项"><button id="dw-tab-context" class="dw-inspector-tab ${state.inspectorTab === "context" ? "is-active" : ""}" type="button" data-inspector-tab="context" role="tab" aria-selected="${state.inspectorTab === "context"}">Context</button><button id="dw-tab-provider" class="dw-inspector-tab ${state.inspectorTab === "provider" ? "is-active" : ""}" type="button" data-inspector-tab="provider" role="tab" aria-selected="${state.inspectorTab === "provider"}">Provider</button><button id="dw-tab-department-setting" class="dw-inspector-tab ${state.inspectorTab === "department-setting" ? "is-active" : ""}" type="button" data-inspector-tab="department-setting" role="tab" aria-selected="${state.inspectorTab === "department-setting"}">部门设置</button></div>${panel}</section>`;
   }
 
   function renderDepartment(department) {
@@ -1315,12 +1311,12 @@
     }
   }
 
-  async function loadPromptConfig(department, token = state.routeToken) {
+  async function loadDepartmentSetting(department, token = state.routeToken) {
     if (!state.projectId || !department) return;
     try {
-      const data = await fetchJSON(projectPath(state.projectId, `/prompts/${encodeURIComponent(department)}`));
+      const data = await fetchJSON(projectPath(state.projectId, `/department-settings/${encodeURIComponent(department)}`));
       if (token !== state.routeToken) return;
-      state.promptConfigs[department] = data;
+      state.departmentSettingConfigs[department] = data;
     } catch (error) {
       if (token === state.routeToken) setStatus(error.message, "error");
     }
@@ -1425,7 +1421,7 @@
     state.observationData = null;
     state.usageData = null;
     state.observationDetail = null;
-    state.promptConfigs = {};
+    state.departmentSettingConfigs = {};
     state.selectedHandoff = null;
     state.error = "";
   }
@@ -1445,7 +1441,7 @@
       else if (state.view === "overview") renderOverview();
       else if (state.view === "department") renderDepartment(state.department);
       if (state.view === "department") {
-        await loadPromptConfig(state.department, token);
+        await loadDepartmentSetting(state.department, token);
         await loadDepartment(state.department, token);
       }
       if (state.view === "observability" && state.observationScreen === "list") await loadObservationData();
@@ -1547,7 +1543,7 @@
     if (state.observationScreen !== "detail") state.observationDetail = null;
     renderCurrent();
     if (state.view === "department") {
-      loadPromptConfig(state.department, token);
+      loadDepartmentSetting(state.department, token);
       loadDepartment(state.department, token);
     }
     if (state.view === "observability" && state.observationScreen === "list") loadObservationData();
@@ -1728,74 +1724,74 @@
     }
   }
 
-  function openPromptDialog(department) {
+  function openDepartmentSettingDialog(department) {
     const key = `${state.projectId}/${department}`;
-    const config = state.promptConfigs[department] || {};
+    const config = state.departmentSettingConfigs[department] || {};
     const currentText = config.text || "";
-    state.promptDrafts[key] = state.promptDrafts[key] ?? currentText;
-    const dialog = document.getElementById("dw-prompt-dialog");
-    const textarea = document.getElementById("dw-prompt-text");
-    const meta = document.getElementById("dw-prompt-meta");
-    const def = document.getElementById("dw-prompt-default");
+    state.departmentSettingDrafts[key] = state.departmentSettingDrafts[key] ?? currentText;
+    const dialog = document.getElementById("dw-department-setting-dialog");
+    const textarea = document.getElementById("dw-department-setting-text");
+    const meta = document.getElementById("dw-department-setting-meta");
+    const def = document.getElementById("dw-department-setting-default");
     if (!dialog || !textarea) return;
-    textarea.value = state.promptDrafts[key];
+    textarea.value = state.departmentSettingDrafts[key];
     if (meta) meta.textContent = `项目 ${state.project?.name || ""} · ${departmentName(department)} · 当前配置 ${config.source === "configured" ? `v${config.version}` : "默认 v0"}`;
     if (def) def.textContent = config.default_text || "";
-    dialog.dataset.promptKey = key;
-    dialog.dataset.promptDepartment = department;
-    dialog.dataset.promptBase = String(config.version ?? 0);
-    dialog.dataset.promptRouteToken = String(state.routeToken);
-    const errorNode = document.getElementById("dw-prompt-error");
+    dialog.dataset.departmentSettingKey = key;
+    dialog.dataset.departmentSettingDepartment = department;
+    dialog.dataset.departmentSettingBase = String(config.version ?? 0);
+    dialog.dataset.departmentSettingRouteToken = String(state.routeToken);
+    const errorNode = document.getElementById("dw-department-setting-error");
     if (errorNode) errorNode.hidden = true;
     dialog.showModal();
     icons();
     textarea.focus();
   }
 
-  async function savePrompt(event) {
+  async function saveDepartmentSetting(event) {
     event.preventDefault();
-    if (event.submitter?.value === "cancel") return document.getElementById("dw-prompt-dialog")?.close();
-    if (state.promptSubmitting) return;
-    const dialog = document.getElementById("dw-prompt-dialog");
-    const department = dialog?.dataset.promptDepartment;
-    const key = dialog?.dataset.promptKey;
-    const textValue = document.getElementById("dw-prompt-text")?.value || "";
+    if (event.submitter?.value === "cancel") return document.getElementById("dw-department-setting-dialog")?.close();
+    if (state.departmentSettingSubmitting) return;
+    const dialog = document.getElementById("dw-department-setting-dialog");
+    const department = dialog?.dataset.departmentSettingDepartment;
+    const key = dialog?.dataset.departmentSettingKey;
+    const textValue = document.getElementById("dw-department-setting-text")?.value || "";
     if (!key || !department || !state.projectId) return;
     if (!textValue.trim()) {
-      const errorNode = document.getElementById("dw-prompt-error");
-      if (errorNode) { errorNode.hidden = false; errorNode.textContent = "Prompt 不能为空白"; }
+      const errorNode = document.getElementById("dw-department-setting-error");
+      if (errorNode) { errorNode.hidden = false; errorNode.textContent = "部门设置不能为空白"; }
       return;
     }
-    const token = Number(dialog.dataset.promptRouteToken);
+    const token = Number(dialog.dataset.departmentSettingRouteToken);
     if (token !== state.routeToken) return;
-    state.promptDrafts[key] = textValue;
-    state.promptSubmitting = true;
+    state.departmentSettingDrafts[key] = textValue;
+    state.departmentSettingSubmitting = true;
     const submit = dialog.querySelector("button[value='default']");
     if (submit) submit.disabled = true;
-    const errorNode = document.getElementById("dw-prompt-error");
+    const errorNode = document.getElementById("dw-department-setting-error");
     if (errorNode) errorNode.hidden = true;
     try {
-      const result = await fetchJSON(projectPath(state.projectId, `/prompts/${encodeURIComponent(department)}`), {
+      const result = await fetchJSON(projectPath(state.projectId, `/department-settings/${encodeURIComponent(department)}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: textValue, base_version: Number(dialog.dataset.promptBase || 0) }),
+        body: JSON.stringify({ text: textValue, base_version: Number(dialog.dataset.departmentSettingBase || 0) }),
       });
       if (token !== state.routeToken) return;
-      state.promptConfigs[department] = result;
-      delete state.promptDrafts[key];
+      state.departmentSettingConfigs[department] = result;
+      delete state.departmentSettingDrafts[key];
       dialog.close();
       await loadDepartment(department, token);
       renderCurrent();
     } catch (error) {
       if (error.status === 409 && error.payload?.current) {
-        state.promptConfigs[department] = error.payload.current;
-        dialog.dataset.promptBase = String(error.payload.current.version ?? 0);
-        const meta = document.getElementById("dw-prompt-meta");
+        state.departmentSettingConfigs[department] = error.payload.current;
+        dialog.dataset.departmentSettingBase = String(error.payload.current.version ?? 0);
+        const meta = document.getElementById("dw-department-setting-meta");
         if (meta) meta.textContent = `项目 ${state.project?.name || ""} · ${departmentName(department)} · 当前配置 v${error.payload.current.version}（已更新，草稿仍保留）`;
       }
       if (token === state.routeToken && errorNode) { errorNode.hidden = false; errorNode.textContent = error.message; }
     } finally {
-      state.promptSubmitting = false;
+      state.departmentSettingSubmitting = false;
       if (submit) submit.disabled = false;
     }
   }
@@ -1830,7 +1826,7 @@
     if (push) updateRoute({ push: true });
     else updateRoute({ push: false });
     renderCurrent();
-    loadPromptConfig(department, token);
+    loadDepartmentSetting(department, token);
     loadDepartment(department, token);
     if (state.projectId) openStream(state.projectId, token);
   }
@@ -1932,7 +1928,7 @@
       updateRoute({ push: true });
       renderCurrent();
       if (state.view === "department") {
-        loadPromptConfig(state.department, token);
+        loadDepartmentSetting(state.department, token);
         loadDepartment(state.department, token);
       }
       restoreScroll(snapshot?.scroll || 0);
@@ -1998,10 +1994,10 @@
       renderDepartment(state.department);
       return;
     }
-    if (target.dataset.promptEdit) {
+    if (target.dataset.departmentSettingEdit) {
       state.deptMenu = false;
-      const department = target.dataset.promptEdit.includes("/") ? target.dataset.promptEdit.split("/").pop() : target.dataset.promptEdit;
-      loadPromptConfig(department).then(() => openPromptDialog(department));
+      const department = target.dataset.departmentSettingEdit.includes("/") ? target.dataset.departmentSettingEdit.split("/").pop() : target.dataset.departmentSettingEdit;
+      loadDepartmentSetting(department).then(() => openDepartmentSettingDialog(department));
       return;
     }
     if (target.dataset.dhAction) {
@@ -2036,7 +2032,7 @@
       updateRoute({ push: true });
       renderCurrent();
       if (state.view === "department") {
-        loadPromptConfig(state.department, token);
+        loadDepartmentSetting(state.department, token);
         loadDepartment(state.department, token);
       }
       if (state.runId) loadRunPayload(state.runId, token, true);
@@ -2080,11 +2076,11 @@
       state.newProjectDraft = { name: projectForm.elements.name.value, goal: projectForm.elements.goal.value };
     });
     projectForm?.addEventListener("submit", createProject);
-    document.getElementById("dw-prompt-dialog-form")?.addEventListener("submit", savePrompt);
-    document.getElementById("dw-prompt-restore")?.addEventListener("click", () => {
-      const department = document.getElementById("dw-prompt-dialog")?.dataset.promptDepartment;
-      const config = state.promptConfigs[department] || {};
-      const textarea = document.getElementById("dw-prompt-text");
+    document.getElementById("dw-department-setting-dialog-form")?.addEventListener("submit", saveDepartmentSetting);
+    document.getElementById("dw-department-setting-restore")?.addEventListener("click", () => {
+      const department = document.getElementById("dw-department-setting-dialog")?.dataset.departmentSettingDepartment;
+      const config = state.departmentSettingConfigs[department] || {};
+      const textarea = document.getElementById("dw-department-setting-text");
       if (textarea) textarea.value = config.default_text || "";
     });
     document.getElementById("yp-rename-dialog-form")?.addEventListener("submit", async event => {
@@ -2205,7 +2201,7 @@
     openEvent,
     usageMarkup,
     contextMarkup,
-    promptMarkup,
+    departmentSettingMarkup,
     createProject,
     startWorkItem,
     recordMaterial,
@@ -2213,8 +2209,8 @@
     addGlobalInput,
     addDepartmentGuidance,
     openProjectDialog,
-    openPromptDialog,
-    savePrompt,
+    openDepartmentSettingDialog,
+    saveDepartmentSetting,
     refreshCurrent,
     updateRoute,
     handlePopState,
