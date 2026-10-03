@@ -12,6 +12,7 @@ from harness.adapters.base import Availability
 from harness.providers.call import CallUsage, ModelDelta, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 _USAGE = CallUsage(input_tokens=10, output_tokens=5, total_tokens=15, reported=True)
 
@@ -67,7 +68,8 @@ def _wait_for(event: "asyncio.Event", timeout: float = 15.0) -> bool:
         time.sleep(0.02)
     return event.is_set()
 
-def _wait_for_live_release(application: Application, attempt_id: str, timeout: float = 20.0) -> bool:
+def _wait_for_live_release(application: Application, attempt_id: str,
+                           timeout: float = WAIT_FOR_HOST_WORK_SEC) -> bool:
     # 等这次调用尝试结束（片段已经释放）：调用尝试的结束与释放都在服务的事件循环里完成
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -76,7 +78,8 @@ def _wait_for_live_release(application: Application, attempt_id: str, timeout: f
         time.sleep(0.02)
     return application.live_attempt(attempt_id) == {}
 
-def _wait_for_attempt_response(client: httpx.Client, run_id: str, attempt_id: str, timeout: float = 20.0):
+def _wait_for_attempt_response(client: httpx.Client, run_id: str, attempt_id: str,
+                               timeout: float = WAIT_FOR_HOST_WORK_SEC):
     # 等调用尝试的结果写进读取模型：模型输出与用量在调用结束以后记录
     deadline = time.monotonic() + timeout
     attempt = None
