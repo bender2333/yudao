@@ -34,7 +34,8 @@ class CancelledInputSaveError(RuntimeError):
 class InteractionWriter:
     def __init__(self, store: EventStore, artifacts: ArtifactStore, materials_root: Path,
                  git_versions: GitVersionStore) -> None:
-        self.store, self.artifacts, self.materials_root = store, artifacts, materials_root
+        self.store, self.artifacts = store, artifacts
+        self.materials_root = Path(materials_root).absolute().resolve()
         self.git_versions = git_versions
         # 原始意图材料的发布依次进行：「读取已经提交的原始意图、写出文件」之间不插入另一次发布
         self._publication = threading.Lock()
@@ -122,8 +123,8 @@ class InteractionWriter:
             self._write_intend(run_id, self.artifacts.get_for_run(run_id, ref))
 
     def _write_intend(self, run_id: str, original: bytes) -> None:
-        folder = (self.materials_root / run_id).resolve()
-        if folder == self.materials_root.resolve() or not folder.is_relative_to(self.materials_root.resolve()):
+        folder = self.materials_root / run_id
+        if folder == self.materials_root or not folder.is_relative_to(self.materials_root):
             raise ValueError("run_id must stay within the run materials directory")
         folder.mkdir(parents=True, exist_ok=True)
         temporary = None
