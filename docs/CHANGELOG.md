@@ -465,7 +465,9 @@ claude-sonnet-5-5 / 2026-10-02 21:24 / docs/architecture-issues.md 为 #95 登�
 claude-fable-5-1 / 2026-10-03 00:13 / docs/research/game-world-as-projection.md 增加第 5.5 节「怎样做映射：七种元件与一张工作表」：地点、物、连接、流、规则、操作、仪表七种元件的判别法，八列工作表与示例行，六步做法 / 用户追问映射到底怎样做，只有「组件像水管、信息像水」的片段
 claude-opus-4-5 / 2026-10-03 01:35 / docs/architecture-issues.md 追加一条：#88 记录真实模型 smoke 读不到准入文件（reload 不加载准入，仅 load_document 加载） / 执行 #88 的真实模型 smoke 时发现并登记，与推理内容的保存与回放无关，交架构师裁定
 claude-sonnet-5-5 / 2026-10-03 00:36 / docs/architecture-issues.md 为 #88 登记的问题（重启以后读不到准入文件）写处理结论，替换执行者写的「待架构师裁定」行 / 采纳第一种，由 #266 实施，#96 依赖 #266
+claude-opus-4-6 / 2026-10-03 03:35 / client/README.md 的目录、常用命令与新增「安装包与更新」一节按 #208 的交付更新（build:installer、appId/产品名/版本可改写、更新页与更新源、不签名无 SmartScreen） / 文档与实现保持一致，README 原写「客户端安装包与更新由 #208 实现」已过时
 
 claude-opus-4-6 / 2026-10-03 04:05 / 新增 docs/stage-3/d24-real-provider-acceptance/report.md 与 evidence/ 下九份原始证据；更新 docs/current-baseline.md 的模型管理（D24）一行、docs/architecture-issues.md 追加 Messages 历史翻译缺陷一条 / 工单 #96（D24 真实 Provider 验收）交付验收报告，逐条对照模型管理设计说明第 4 至 7 节记录真实请求与响应、调用目标、待恢复与继续、导出与重放；当前验收基线随之更新
 opus-4.5 / 2026-10-03 01:05 / docs/architecture-issues.md 追加两条 #179 的架构问题登记：①楼层的决定送单与飞回接在原型演示事件类型 x_decision_* 上，与后端真实事件 decision_requested/decision_answered/decision_withdrawn 不一致，决定 id 也取错字段；②选项的 note_required 标记在接口合同里没有 / 执行 #179 核对 #82 已实现部分时发现，交架构师裁定
 claude-sonnet-5-5 / 2026-10-03 03:26 / docs/architecture-issues.md 为 #179 登记的两条问题写处理结论（楼层的决定分支改接真实事件，已随 #179 合并；决定选项增加 note_required，由 #136 实施） / 按登记规则写处理行
+执行者 / 2026-10-03 05:40 / docs/architecture-issues.md 追加一条 #180 的架构问题登记并写处理结论：关键事实的种类无法只由事件种类得出（qa_submitted 分放行与返工），ReportFact 增加 kind 字段 / 执行 #180 实现时间轴刻度着色时发现，按登记规则一并写处理行

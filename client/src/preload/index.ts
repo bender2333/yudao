@@ -14,6 +14,14 @@ export type LoginItemSettings = {
   openAtLogin: boolean;
 };
 
+// 更新页的进度（设计说明第 5.2 节）：主进程每走一步经 IPC 报告一次
+export type UpdateProgress = {
+  phase: "checking" | "downloading" | "downloaded" | "installing" | "none" | "failed";
+  percent?: number;
+  version?: string;
+  message?: string;
+};
+
 const api = {
   getSettings: (): Promise<ConnectionSettings> => ipcRenderer.invoke("yudao:settings:get"),
   saveSettings: (value: ConnectionSettings): Promise<boolean> => ipcRenderer.invoke("yudao:settings:set", value),
@@ -33,6 +41,17 @@ const api = {
   getLoginItem: (): Promise<LoginItemSettings> => ipcRenderer.invoke("yudao:login-item:get"),
   setLoginItem: (openAtLogin: boolean): Promise<LoginItemSettings> =>
     ipcRenderer.invoke("yudao:login-item:set", openAtLogin),
+  // 客户端的发布版本号：更新页写明两边的发布版本号
+  getClientVersion: (): Promise<string> => ipcRenderer.invoke("yudao:client-version"),
+  // 更新（设计说明第 5.2 节）：传入更新页当前连接的地址，主进程按地址加 /client-update/ 更新。
+  // 每一步经 onProgress 回调报告（检查、下载百分比、下载完成、安装、失败原因）
+  startUpdate: (address: string): Promise<{ phase: string; version: string; message: string }> =>
+    ipcRenderer.invoke("yudao:update:start", address),
+  onUpdateProgress: (listener: (progress: UpdateProgress) => void): (() => void) => {
+    const handler = (_event: unknown, progress: UpdateProgress): void => listener(progress);
+    ipcRenderer.on("yudao:update:progress", handler);
+    return () => ipcRenderer.removeListener("yudao:update:progress", handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("yudao", api);

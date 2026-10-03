@@ -18,6 +18,8 @@ import { DecisionCardList } from "../decisions/card";
 import { sortByRequested } from "../decisions/card-logic";
 import { statusItems, type StatusItem } from "./status-items";
 import { BuildingSection } from "./building-section";
+import { Timeline } from "../timeline/timeline";
+import { ticksInRefs, ticksOf } from "../timeline/logic";
 
 const RANGE_LABELS: Record<string, string> = { since_seen: "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天" };
 
@@ -26,10 +28,17 @@ export type AwayRangeId = "since_seen" | "24h" | "7d";
 export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => void }) {
   const [range, setRange] = useState<AwayRangeId>("since_seen");
   const [openItem, setOpenItem] = useState<string | null>(null);
+  // 回放位置（全局位置）：为 null 时是实时画面；不为 null 时楼与项目列表按位置带 at 读取
+  const [at, setAt] = useState<number | null>(null);
+  // 时间轴上选中的刻度：报告项与刻度互相高亮（设计说明第 5.4 节）
+  const [selected, setSelected] = useState<number | null>(null);
 
   const changeRange = (next: AwayRangeId) => {
     setRange(next);
     setOpenItem(null);
+    setSelected(null);
+    // 换范围以后回到现在：起点状态由新的范围给出
+    setAt(null);
   };
 
   const decisions = useSnapshot<DecisionList>(
@@ -40,6 +49,14 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
   );
   const report = useSnapshot<AwayReport>(props.app, "page.home.report", "home.away_report", { range });
   const projects = useSnapshot<ProjectList>(props.app, "page.home.projects", "projects.list", {});
+  // 回放时的项目列表：带 at 读取，画面与项目列表都按该时刻的状态显示（设计说明第 4.1 节）
+  const replayProjects = useSnapshot<ProjectList>(
+    props.app,
+    "page.home.replay.projects",
+    "projects.list",
+    { at },
+    at === null,
+  );
 
   // 项目标识到名称：来自 projects.list（决定请求只带标识）
   const projectNames = useMemo(() => {
@@ -55,12 +72,37 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
   const waiting = useMemo(() => sortByRequested(decisions.data?.decisions ?? []), [decisions.data]);
   const items = statusItems(waiting.length);
 
+  // 报告项展开时高亮的刻度：报告的来源事件位置与刻度位置相同即高亮
+  const highlights = useMemo(() => {
+    if (report.data === null || openItem === null) {
+      return [];
+    }
+    const item = report.data.summary.find((row) => row.id === openItem);
+    if (!item) {
+      return [];
+    }
+    return ticksInRefs(item.refs, ticksOf(report.data.facts));
+  }, [report.data, openItem]);
+
+  const replaying = at !== null;
+
   return (
-    <div className="page home">
+    <div className={`page home${replaying ? " is-replay" : ""}`}>
       <Loading state={decisions} />
       <StatusRow items={items} onNavigate={props.onNavigate} />
 
-      <BuildingSection app={props.app} projects={projects.data} onNavigate={props.onNavigate} />
+      <BuildingSection
+        app={props.app}
+        projects={replaying ? replayProjects.data : projects.data}
+        at={at}
+        onNavigate={props.onNavigate}
+      />
+
+      {replaying ? (
+        <p className="replay-banner" role="status">
+          回放中 · {formatTime(report.data?.facts.find((fact) => fact.position === at)?.at ?? null)}
+        </p>
+      ) : null}
 
       <Section title="待你决定" note="跨项目，按发出时间排列">
         <DecisionNames
@@ -79,11 +121,16 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
         onRange={changeRange}
         openItem={openItem}
         onToggleItem={(id) => setOpenItem(openItem === id ? null : id)}
+        at={at}
+        onPosition={setAt}
+        selected={selected}
+        onSelect={setSelected}
+        highlights={highlights}
       />
 
       <Section title="项目" note="数据来自 projects.list">
-        {projects.data === null ? (
-          <Loading state={projects} />
+        {(replaying ? replayProjects.data : projects.data) === null ? (
+          <Loading state={replaying ? replayProjects : projects} />
         ) : (
           <div className="table-scroll">
             <table>
@@ -98,7 +145,7 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
                 </tr>
               </thead>
               <tbody>
-                {projects.data.projects
+                {(replaying ? replayProjects.data : projects.data)!.projects
                   .filter((project) => !project.archived)
                   .map((project) => (
                     <tr key={project.project_id}>
@@ -223,7 +270,7 @@ function StatusRow(props: { items: StatusItem[]; onNavigate: (hash: string) => v
 
 // 离开期间的报告（第 4.4 节）：上次查看的时间、范围切换、「已看过」（home.mark_seen）；
 // 汇总项取自 home.away_report，每项数字可以点击，展开来源事件；没有来源事件的项不显示。
-// 时间轴与画面的回放由像素画面六（#180）实现，这里只留出位置。
+// 时间轴放在报告下方（第 5.5 节）：刻度取关键事实，与楼联动回放；报告项与刻度互相高亮。
 function AwayReportSection(props: {
   app: ClientApp;
   report: { data: AwayReport | null; loading: boolean };
@@ -231,6 +278,11 @@ function AwayReportSection(props: {
   onRange: (range: AwayRangeId) => void;
   openItem: string | null;
   onToggleItem: (id: string) => void;
+  at: number | null;
+  onPosition: (position: number | null) => void;
+  selected: number | null;
+  onSelect: (position: number) => void;
+  highlights: number[];
 }) {
   const data = props.report.data;
   const command = useCommand(props.app, JSON.stringify(data?.range ?? null));
@@ -275,40 +327,55 @@ function AwayReportSection(props: {
       ) : (
         <>
           <div className="report-items">
-            {data.summary.map((item) => (
-              <div key={item.id} className={`report-item${props.openItem === item.id ? " open" : ""}`}>
-                <button type="button" className="report-head" onClick={() => props.onToggleItem(item.id)}>
-                  <span className="report-label">{item.label}</span>
-                  <span className="report-value">
-                    {item.value}
-                    <small>{item.unit}</small>
-                  </span>
-                  {item.detail ? <span className="report-detail">{item.detail}</span> : null}
-                </button>
-                {props.openItem === item.id ? (
-                  item.refs.length === 0 ? (
-                    <p className="note">{item.detail ?? ""}（来源：范围内的调用尝试记录）</p>
-                  ) : (
-                    <ul className="source-list">
-                      {item.refs.map((position) => {
-                        const fact = data.facts.find((row) => row.position === position);
-                        return (
-                          <li key={position}>
-                            <span className="note">{formatTime(fact?.at ?? null)}</span>{" "}
-                            {fact?.label ?? "来源事件"}{" "}
-                            <code>{fact?.type ?? `事件 ${position}`}</code>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )
-                ) : null}
-              </div>
-            ))}
+            {data.summary.map((item) => {
+              // 刻度选中时高亮对应的报告项（点击刻度，报告中的项高亮）
+              const lit = props.selected !== null && item.refs.includes(props.selected);
+              return (
+                <div key={item.id} className={`report-item${props.openItem === item.id ? " open" : ""}${lit ? " highlight" : ""}`}>
+                  <button type="button" className="report-head" onClick={() => props.onToggleItem(item.id)}>
+                    <span className="report-label">{item.label}</span>
+                    <span className="report-value">
+                      {item.value}
+                      <small>{item.unit}</small>
+                    </span>
+                    {item.detail ? <span className="report-detail">{item.detail}</span> : null}
+                  </button>
+                  {props.openItem === item.id ? (
+                    item.refs.length === 0 ? (
+                      <p className="note">{item.detail ?? ""}（来源：范围内的调用尝试记录）</p>
+                    ) : (
+                      <ul className="source-list">
+                        {item.refs.map((position) => {
+                          const fact = data.facts.find((row) => row.position === position);
+                          return (
+                            <li key={position}>
+                              <span className="note">{formatTime(fact?.at ?? null)}</span>{" "}
+                              {fact?.label ?? "来源事件"}{" "}
+                              <code>{fact?.type ?? `事件 ${position}`}</code>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-          <p className="note">关键事实 {data.facts.length} 条；时间轴与画面的回放由像素画面六（#180）实现。</p>
         </>
       )}
+      {data !== null ? (
+        <Timeline
+          facts={data.facts}
+          fromPosition={data.range.from_position}
+          fromAt={data.range.from_at}
+          project={null}
+          onPosition={props.onPosition}
+          onSelect={props.onSelect}
+          highlight={props.highlights}
+          liveNote={`实时画面 · ${data.facts.length} 条关键事实`}
+        />
+      ) : null}
     </Section>
   );
 }

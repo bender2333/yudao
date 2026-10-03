@@ -7,6 +7,7 @@
 import { useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
+  AwayReport,
   EventDetailResult,
   ProjectFlowResult,
   ProjectOverviewResult,
@@ -17,12 +18,16 @@ import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, SubmitButton, Table, TextArea,
   TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
 import { FloorScreen } from "./floor-screen";
+import { Timeline } from "../timeline/timeline";
+import { ticksOf } from "../timeline/logic";
 import { PHASE_LABELS, WORK_ITEM_STATUS, departmentName, formatTime, label } from "./labels";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 
 export function OverviewPage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
   const workItem = props.route.workItemId;
+  // 回放位置（全局位置）：为 null 时是实时画面（设计说明第 5.5 节）
+  const [at, setAt] = useState<number | null>(null);
   const overview = useSnapshot<ProjectOverviewResult>(props.app, "page.overview", "project.overview", {
     project_id: projectId,
     work_item: workItem,
@@ -32,19 +37,41 @@ export function OverviewPage(props: { app: ClientApp; route: Route }) {
     work_item: workItem,
   });
 
+  // 时间轴的刻度：本项目范围内的关键事实（home.away_report 按项目筛选）
+  const report = useSnapshot<AwayReport>(props.app, "page.overview.timeline", "home.away_report", {
+    range: "7d", project: projectId,
+  });
+
   const data = overview.data;
   const items = data === null ? [] : data.work_items;
   const current = pickCurrent(items, workItem);
   const command = useCommand(props.app, pageKey([data?.version, data?.stats.total, workItem]));
 
   return (
-    <div className="page">
+    <div className={`page${at !== null ? " is-replay" : ""}`}>
       <Loading state={overview} />
       {data ? (
         <>
           <Summary data={data} />
-          <Section title="循环画面" note="项目楼层与管道（像素画面，工单 #82）">
-            <FloorScreen app={props.app} projectId={projectId} workItemId={workItem} />
+          <Section title="循环画面" note="项目楼层与管道（像素画面，工单 #82）；下方时间轴回放本项目的关键事实">
+            {at !== null ? (
+              <p className="replay-banner" role="status">
+                回放中 · {formatTime(atTimeOf(report.data, at))}
+              </p>
+            ) : null}
+            <FloorScreen app={props.app} projectId={projectId} workItemId={workItem} at={at} />
+            {report.data !== null ? (
+              <Timeline
+                facts={report.data.facts}
+                fromPosition={report.data.range.from_position}
+                fromAt={report.data.range.from_at}
+                project={projectId}
+                onPosition={setAt}
+                onSelect={() => undefined}
+                highlight={[]}
+                liveNote={`实时画面 · ${ticksOf(report.data.facts, projectId).length} 条关键事实`}
+              />
+            ) : null}
           </Section>
           <CurrentItem app={props.app} projectId={projectId} item={current} command={command} />
           <Board items={items} />
@@ -53,6 +80,12 @@ export function OverviewPage(props: { app: ClientApp; route: Route }) {
       ) : null}
     </div>
   );
+}
+
+// 回放位置对应的时刻：范围内关键事实里位置相同的那条；没有时取范围的起点
+function atTimeOf(report: AwayReport | null, at: number): string | null {
+  if (report === null) return null;
+  return report.facts.find((fact) => fact.position === at)?.at ?? report.range.from_at;
 }
 
 function Summary(props: { data: ProjectOverviewResult }) {

@@ -22,12 +22,15 @@ type ProjectRow = ProjectList["projects"][number];
 export interface BuildingSectionProps {
   app: ClientApp;
   projects: ProjectList | null;
+  /** 回放位置（全局位置）：不为 null 时每个项目的 project.loop 按位置带 at 读取。 */
+  at?: number | null;
   onNavigate: (hash: string) => void;
 }
 
 /** 首页的楼：画布、按项目打开的事项查询与事件流接线。 */
 export function BuildingSection(props: BuildingSectionProps): React.JSX.Element {
-  const items = useProjectItems(props.app, props.projects);
+  const at = props.at ?? null;
+  const items = useProjectItems(props.app, props.projects, at);
   const model = useMemo(() => buildingModelOf(
     (props.projects?.projects ?? []).map(toProjectRow),
     (projectId) => items[projectId] ?? [],
@@ -35,8 +38,8 @@ export function BuildingSection(props: BuildingSectionProps): React.JSX.Element 
   ), [props.projects, items]);
 
   return (
-    <Section title="全部项目与机器" note="每个项目一层；点击楼层进入项目概览">
-      <BuildingCanvas app={props.app} model={model} onNavigate={props.onNavigate} />
+    <Section title="全部项目与机器" note={at !== null ? "回放中：每个项目一层，按所选位置的快照显示" : "每个项目一层；点击楼层进入项目概览"}>
+      <BuildingCanvas app={props.app} model={model} onNavigate={props.onNavigate} live={at === null} />
       {model.floors.length === 0 ? (
         <p className="note">还没有项目</p>
       ) : (
@@ -81,7 +84,7 @@ function toProjectRow(row: ProjectRow): BuildingProjectRow {
 // 每个项目的事项：为每行项目打开一次 project.loop，汇总成项目标识到事项的表。
 // 项目集合变化时重新打开；查询随事件刷新。事项表用一个合并后的状态存放，避免每个项目各存一份
 
-function useProjectItems(app: ClientApp, projects: ProjectList | null): Record<string, BuildingItemRow[]> {
+function useProjectItems(app: ClientApp, projects: ProjectList | null, at: number | null): Record<string, BuildingItemRow[]> {
   const ids = useMemo(
     () => [...new Set((projects?.projects ?? []).map((p) => p.project_id))].sort(),
     [projects],
@@ -96,9 +99,11 @@ function useProjectItems(app: ClientApp, projects: ProjectList | null): Record<s
     }
     const open = key.split(",");
     for (const projectId of open) {
+      const params: Record<string, unknown> = { project_id: projectId };
+      if (at !== null) params.at = at;
       void views.open<ProjectLoopResult>(`home.building.${projectId}`, {
         query: "project.loop",
-        params: { project_id: projectId },
+        params,
       }, (data) => {
         setItems((current) => ({ ...current, [projectId]: data.work_items.map(toItemRow) }));
       });
@@ -108,7 +113,7 @@ function useProjectItems(app: ClientApp, projects: ProjectList | null): Record<s
         views.close(`home.building.${projectId}`);
       }
     };
-  }, [app, key]);
+  }, [app, key, at]);
   return items;
 }
 
@@ -127,13 +132,15 @@ function toItemRow(row: ProjectLoopResult["work_items"][number]): BuildingItemRo
 // ---------------------------------------------------------------------------
 // 楼的画布：PixiJS 挂在宿主元素上，订阅事件流与重新同步
 
-function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigate: (hash: string) => void }): React.JSX.Element {
+function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigate: (hash: string) => void; live: boolean }): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<BuildingView | null>(null);
   const clockRef = useRef<ReturnType<typeof createRafClock> | null>(null);
   const navigateRef = useRef(props.onNavigate);
+  const liveRef = useRef(props.live);
   const [error, setError] = useState<string | null>(null);
   navigateRef.current = props.onNavigate;
+  liveRef.current = props.live;
 
   // 建立画面：PixiJS 的 Application 挂在宿主元素上，时钟与事件流分别订阅
   useEffect(() => {
@@ -180,9 +187,11 @@ function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigat
     viewRef.current?.setModel(props.model);
   }, [props.model]);
 
-  // 事件只决定动作的起点（事件流不按项目筛选，事件本身带项目标识）
+  // 事件只决定动作的起点（事件流不按项目筛选，事件本身带项目标识）。
+  // 回放期间不按事件流更新画面（设计说明第 4.1 节：客户端不按事件流更新回放的视图）
   useEffect(() => {
     const off = props.app.subscribeEvents((event) => {
+      if (!liveRef.current) return;
       const buildingEvent = buildingEventOf(event);
       if (buildingEvent) viewRef.current?.playEvent(buildingEvent);
     });
