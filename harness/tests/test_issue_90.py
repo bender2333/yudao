@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from typing import Any
 
@@ -20,6 +21,7 @@ from harness.event_store import catalog_stream
 from harness.models import DEPARTMENTS, CatalogEventType
 from harness.tests.api_helpers import running_api
 from harness.tests.protocol_helpers import serve, sse
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 KEY_A = "issue90-key-a"
 KEY_B = "issue90-key-b"
@@ -187,8 +189,7 @@ def _start_work_item(client, project_id: str) -> str:
 
 def _finish(system, run_id: str) -> None:
     # 事项的执行在接口进程的事件循环中作为任务运行；等这个任务结束（停在阻塞处或终止）
-    import time
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
     while time.monotonic() < deadline:
         task = system.orchestrator.work_item_execution(run_id)
         if task is None or task.done():

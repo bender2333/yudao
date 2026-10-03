@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import uuid
 from typing import Any
 
@@ -16,6 +17,7 @@ from harness.app.application import Application
 from harness.models import DEPARTMENTS, EventType
 from harness.tests.api_helpers import running_api
 from harness.tests.protocol_helpers import serve, sse
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 KEY_A = "issue92-key-a"
 KEY_B = "issue92-key-b"
@@ -153,8 +155,7 @@ def _run_of(system, project_id: str) -> str:
     return items[-1].run_id
 
 def _finish(system, run_id: str) -> None:
-    import time
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
     while time.monotonic() < deadline:
         task = system.orchestrator.work_item_execution(run_id)
         if task is None or task.done():
