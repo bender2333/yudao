@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 import { createRoomDriver } from "../../src/renderer/src/pixel/room/driver.ts";
 import { emptyRoomModel, letterSides, quoted } from "../../src/renderer/src/pixel/room/room.ts";
-import { layoutDesks, poseAnim, resolveAction, spriteForRole, toolSpot } from "../../src/renderer/src/pixel/room/decl.ts";
+import { collaborationSides, layoutDesks, poseAnim, resolveAction, spriteForRole, toolSpot } from "../../src/renderer/src/pixel/room/decl.ts";
 import { say, sayMs } from "../../src/renderer/src/pixel/world/say.ts";
 import { eventActionTypes, sayCatalogTypes } from "../../src/renderer/src/pixel/world/floor-decl.ts";
 import type { RoomModel } from "../../src/renderer/src/pixel/room/room.ts";
@@ -192,6 +192,50 @@ test("询问信的两端：从事件载荷读出，回答方是事件所在的�
   assert.deepEqual(letterSides(req), { asker: "engineering", answerer: "product" });
   const res: PixelFloorEvent = { type: "collaboration_responded", department: "product", payload: { from: "product", to: "engineering" } };
   assert.deepEqual(letterSides(res), { asker: "engineering", answerer: "product" });
+});
+
+test("传信的两端：真实事件用 requester 与 recipient，旧事件按 request_id 回退查找", () => {
+  const requests = new Map([["q1", { requester: "engineering", recipient: "product" }]]);
+  const asked = collaborationSides("collaboration_requested", { requester: "engineering", recipient: "product", request_id: "q1" }, "engineering");
+  assert.deepEqual(asked, { from: "engineering", to: "product" });
+  // 旧事件没有 requester/recipient：从见过的请求补齐，回答方是事件所在的部门
+  const oldReply = collaborationSides("collaboration_responded", { request_id: "q1" }, "product", requests);
+  assert.deepEqual(oldReply, { from: "engineering", to: "product" });
+  // 找不到对应请求时不给两端，调用方因此不显示这个事件
+  assert.equal(collaborationSides("collaboration_responded", { request_id: "q9" }, "product", requests), null);
+});
+
+test("事项很快结束时，已经排队的传信动作不被停止态丢弃，两端照样说话", () => {
+  const rm = mountRoom("engineering", ENG);
+  rm.step(500);
+  const scene = rm.driver.scene;
+  const actor = scene.actors.find((a) => a.id === "ch-eng-architect")!;
+  // 让发问的角色正在做一段长动作（关键步骤之后才可被接管），传信事件因此排入队列
+  scene.run(actor, [{ t: "anim", name: "type", ms: 60000, key: true }, { t: "anim", name: "type", ms: 60000 }], { tail: 1 });
+  rm.step(100);
+  const ask: PixelFloorEvent = { type: "collaboration_requested", department: "engineering", work_item_id: "w1", label: "工程询问产品：线路偏好是否改变最短距离", payload: { from: "engineering", to: "product", request_id: "q1" } };
+  rm.driver.playEvent(ask);
+  assert.equal(rm.actor("eng-architect")?.queue.length, 1, "传信动作应排入队列");
+  // 事项很快进入停止态（真实系统约 1 秒跑到 done）
+  rm.driver.setModel({ ...emptyRoomModel("engineering"), status: "done", roles: ENG });
+  assert.equal(rm.actor("eng-architect")?.queue.length, 1, "停止态应保留已排队的传信动作");
+  rm.step(1500);
+  assert.equal(rm.actor("eng-architect")?.say?.text, "现在向产品发出询问：线路偏好是否改变最短距离");
+  assert.equal(rm.actor("eng-architect")?.doing, "send_letter");
+});
+
+test("事项进入停止态时，不是传信与交接的排队动作被清除", () => {
+  const rm = mountRoom("engineering", ENG);
+  rm.step(500);
+  const scene = rm.driver.scene;
+  const actor = scene.actors.find((a) => a.id === "ch-eng-architect")!;
+  scene.run(actor, [{ t: "anim", name: "type", ms: 60000, key: true }, { t: "anim", name: "type", ms: 60000 }], { tail: 1 });
+  rm.step(100);
+  // 读取文件这类普通动作排入队列
+  rm.driver.playEvent({ type: "tool_started", department: "engineering", role: "eng-architect", tool: "read_file", payload: {} } as PixelFloorEvent);
+  assert.ok((rm.actor("eng-architect")?.queue.length ?? 0) >= 1, "普通动作应排入队列");
+  rm.driver.setModel({ ...emptyRoomModel("engineering"), status: "done", roles: ENG });
+  assert.equal(rm.actor("eng-architect")?.queue.length, 0, "停止态应清除普通排队动作");
 });
 
 // ---------------------------------------------------------------------------

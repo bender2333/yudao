@@ -148,17 +148,23 @@ export function handoffOf(pl: Record<string, unknown>): Handoff | null {
   return { from, to, artifact: from === "product" ? "prd" : from === "engineering" ? "box" : "release" };
 }
 
-/** 一次跨部门的传信：发问方与收信方（原型 collaboration 事件载荷的 from/to 两个字段）。 */
+/** 一次跨部门的传信：发问方与收信方（原型 collaboration 事件载荷的 from/to 两个字段）。
+ *  `requests` 是本次连接内见过的询问（`request_id` 到两端），用于旧事件缺少 requester/recipient 时补齐；
+ *  查不到就不给出两端，调用方因此不显示这个事件。 */
 export function collaborationSides(evType: string, pl: Record<string, unknown>,
-                                  department: string | null): { from: string; to: string } | null {
+                                  department: string | null,
+                                  requests?: Map<string, { requester: string; recipient: string }>):
+                                  { from: string; to: string } | null {
   // 真实系统的载荷写的是 requester 与 recipient；回答方是事件所在的部门，发问方是 requester
-  const requester = (pl.requester as string) ?? null;
-  const recipient = (pl.recipient as string) ?? null;
+  const requestId = typeof pl.request_id === "string" ? pl.request_id : null;
+  const seen = requestId && requests ? requests.get(requestId) ?? null : null;
+  const requester = (pl.requester as string) ?? seen?.requester ?? null;
+  const recipient = (pl.recipient as string) ?? seen?.recipient ?? null;
   if (evType === "collaboration_requested") {
     if (requester && recipient) return { from: requester, to: recipient };
   }
   if (evType === "collaboration_responded") {
-    const answerer = department ?? (pl.to as string) ?? null;
+    const answerer = department ?? recipient ?? (pl.to as string) ?? null;
     if (requester && answerer) return { from: requester, to: answerer };
   }
   // 原型形状（录制数据）：from/to 已经是部门

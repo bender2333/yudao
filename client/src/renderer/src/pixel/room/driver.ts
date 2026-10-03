@@ -29,7 +29,8 @@ export interface RoomActor {
   doing: string | null;
   persist: { anim: string; icon?: { kind: string; text?: string } | null; hold?: string | null; write?: boolean; until?: number } | null;
   say: { text: string; until: number } | null;
-  queue: { fn: () => void; at: number }[];
+  /** 排队的动作：`from` 是产生它的真实事件类型，事项进入停止态时据此决定保留或清除。 */
+  queue: { fn: () => void; at: number; from: string }[];
   formSign: string | null;
   /** 流式输出的累计文字：第一段取代默认的标签，后续片段接在后面。 */
   streamText: string | null;
@@ -179,6 +180,10 @@ const OWN_SPEECH = new Set(["hand_back"]);
 const THINK_ACTIONS = new Set(["type_think", "stream_text"]);
 /** 状态类动作立即执行（原型 IMMEDIATE）。 */
 const IMMEDIATE = new Set(["paused", "failed", "done", "cancelled", "puzzled", "hold_card", "resume"]);
+/** 事项进入停止态时保留的排队动作：传信与交接的说话与送信不因事项很快结束而丢失。
+ *  真实系统的 FakeAdapter 让一个事项在 1 秒左右跑到 done，传信事件排队后不到 900 毫秒就被清除，
+ *  两端因此从不说话；这些动作已经由事件排入，继续执行到结束。 */
+const KEEP_ON_STOP: Record<string, true> = { collaboration_requested: true, collaboration_responded: true, transition: true };
 
 /** 建立部门房间的驱动。 */
 export function createRoomDriver(opts: { department: string; sceneOptions: SceneOptions }): RoomDriver {
@@ -334,7 +339,8 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       for (const a of roleActors()) {
         if (s === "interrupted" || a.role.status === "away") continue;
         a.persist = null;
-        a.queue = [];
+        // 持续状态与走位清除；已经排入的传信与交接动作继续执行到结束
+        a.queue = a.queue.filter((q) => KEEP_ON_STOP[q.from]);
       }
       if (s !== "failed") for (const a of roleActors()) { if (!a.persist) ds(a).redLamp = false; }
     }
@@ -1425,7 +1431,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       start();
       return;
     }
-    a.queue.push({ fn: start, at: scene.realT });
+    a.queue.push({ fn: start, at: scene.realT, from: ev.type });
     if (a.queue.length > 3) a.queue.shift();
   }
 
