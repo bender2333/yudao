@@ -894,14 +894,17 @@ class ProviderFacade:
             self._admission_seen = True
             return target
 
-    def _load_admissions_file(self) -> None:
-        # 读取独立准入文件：缺文件即空记录，坏内容报错并保留内存记录
+    def _load_admissions_file(self, *, keep_when_missing: bool = False) -> None:
+        # 读取独立准入文件：缺文件即空记录，坏内容报错并保留内存记录。
+        # 进程启动（load_document）缺文件就是空态；进行中的重新读取（_poll_config_file）缺文件时
+        # 保留内存记录：本进程写入的准入尚未落盘或文件被外部删除都不作废已通过的测试（工单 #266）
         if self._admission_path is None:
             return
         try:
             data = self._admission_path.read_bytes()
         except OSError:
-            self._admissions = {}
+            if not keep_when_missing:
+                self._admissions = {}
             self._admission_seen = True
             return
         raw = json.loads(data.decode("utf-8"))
@@ -1206,6 +1209,9 @@ class ProviderFacade:
             self._store = ProviderStore.empty()
             self._store.revision = previous_revision + 1
             self._bindings = {}
+            # 目录文件被删除时准入记录一并清空：定义已不存在，记录无从生效（工单 #266）
+            self._admissions = {}
+            self._admission_seen = True
             self._config_state = "deleted"
             self._reload_error = None
             self._disk_config_hash = None
@@ -1235,6 +1241,9 @@ class ProviderFacade:
             store.revision = previous_revision + 1
         self._store = store
         self._bindings = bindings
+        # 外部修改目录并成功发布以后一并读取准入文件，读取口径与 load_document 相同：
+        # 记录是否仍然有效按受影响字段逐项判断，作废的记录不恢复为已准入（工单 #266）
+        self._load_admissions_file(keep_when_missing=True)
         self._config_state = "loaded" if (store.providers or store.models or bindings) else "empty"
         self._reload_error = None
         self._disk_config_hash = digest
@@ -1320,11 +1329,16 @@ def _stream_event(event: Mapping[str, Any]) -> ModelStreamEvent | None:
     if kind == "message":
         text = event.get("text")
         return ModelStreamEvent(kind="message", text=str(text) if text is not None else "", **identity)
+    if kind == "reasoning":
+        return ModelStreamEvent(kind="reasoning", **identity)
     return None
 
 
 def _model_response(result: InvokeResult) -> ModelResponse:
     # 只记录服务实际返回的模型，未返回保持未知，不拿请求模型冒充
+    reasoning = None
+    if result.reasoning is not None and result.reasoning.items:
+        reasoning = {"items": result.reasoning.items}
     return ModelResponse(
         output=result.output,
         usage=_call_usage(result.usage),
@@ -1332,6 +1346,7 @@ def _model_response(result: InvokeResult) -> ModelResponse:
         model=result.actual_model or "",
         response_id=result.response_id,
         sdk_response=dict(result.wire_evidence),
+        reasoning=reasoning,
     )
 
 

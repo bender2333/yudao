@@ -23,6 +23,20 @@ export type LoginItemSettings = {
   openAtLogin: boolean;
 };
 
+// 更新页的进度（设计说明第 5.2 节）：与 src/preload/index.ts 的 UpdateProgress 相同
+export type UpdateProgress = {
+  phase: "checking" | "downloading" | "downloaded" | "installing" | "none" | "failed";
+  percent?: number;
+  version?: string;
+  message?: string;
+};
+
+export type UpdateRun = {
+  phase: string;
+  version: string;
+  message: string;
+};
+
 export type DesktopApi = {
   getSettings: () => Promise<ConnectionSettings>;
   saveSettings: (settings: ConnectionSettings) => Promise<boolean>;
@@ -35,13 +49,23 @@ export type DesktopApi = {
   restartLocalService: (allowLan: boolean) => Promise<LocalServiceStop>;
   getLoginItem: () => Promise<LoginItemSettings>;
   setLoginItem: (openAtLogin: boolean) => Promise<LoginItemSettings>;
+  // 客户端的发布版本号：更新页写明两边的发布版本号
+  getClientVersion: () => Promise<string>;
+  // 更新（设计说明第 5.2 节）：地址为更新页当前连接的地址，每一步经 onUpdateProgress 回调报告
+  startUpdate: (address: string) => Promise<UpdateRun>;
+  onUpdateProgress: (listener: (progress: UpdateProgress) => void) => () => void;
 };
 
 import type { FloorTestHooks } from "./pixel/floor/view";
+import type { PixelFloorTestMount } from "./pixel/floor/dev-mount";
+import type { DecisionAnswer, DecisionResult } from "./pixel/floor/card";
+import type { FloorModel } from "./pixel/world/types";
 
 declare global {
   interface Window {
     yudao: DesktopApi;
     __floorViewForTest?: FloorTestHooks;
+    /** 开发构建里的像素画面测试入口（只在 import.meta.env.DEV 下安装）。 */
+    __pixelFloorTest?: { mount: (model: FloorModel, opts?: { answer?: (payload: DecisionAnswer) => DecisionResult }) => Promise<PixelFloorTestMount> };
   }
 }

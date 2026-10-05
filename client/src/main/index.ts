@@ -3,6 +3,7 @@
 // 退出客户端不停止 Yudao 服务（ADR-0023）：只有托盘菜单的「停止 Yudao」发本机停止请求。
 
 import { app, BrowserWindow } from "electron";
+import { join } from "node:path";
 import { stopLocalServiceConfirming } from "./local-service";
 import { serveRendererProtocol } from "./protocol";
 import { createMainWindow, registerIpc } from "./window";
@@ -17,6 +18,12 @@ import { clickTrayMenu, createTray, notificationLog, trayMenuLabels, trayCount, 
 // 也决定任务栏与通知的归属（设计说明第 4.5 节）；不设时 Electron 用 electron.app.Electron，
 // 开发时同一台机器上的多个 Electron 应用会共用一条启动项并互相覆盖
 app.setAppUserModelId("com.yudao.client");
+
+// 客户端只保存自己的设置（连接设置等，设计说明第 3.3 节），用户数据目录按应用名分开：
+// 用户安装的那一份的产品名是 Yudao，测试构建用测试自己的产品名，因此测试运行（包括安装程序的
+// --force-run 启动的那一份）不写用户那一份（工单验收第 7 项）。electron-builder 把产品名写进
+// 打包内的 package.json，与测试构建不同的产品名对应不同的目录
+app.setPath("userData", join(app.getPath("appData"), app.getName()));
 
 // 端到端测试：测试传入独立的用户数据目录，客户端不写用户已经安装的那一份（工单验收第 7 项同口径）
 if (process.env.YUDAO_E2E_USER_DATA) {

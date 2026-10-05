@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from .adapters.base import ProviderError
@@ -16,6 +16,32 @@ from .models import (ArtifactRef, DepartmentGuidance, DepartmentPrompt, Event, E
                      canonical_hash, estimate_tokens, json_dumps)
 
 PENDING_GUIDANCE = frozenset({"received", "in_input"})
+
+# 判定「同一连接、同一协议、同一上游模型」的取值来自调用目标（设计说明第 7.6 节）
+TARGET_KEYS = ("provider_config_id", "protocol", "requested_model")
+
+def _same_target(record_target: dict[str, Any], call_target: dict[str, Any]) -> bool:
+    return tuple(record_target.get(key) for key in TARGET_KEYS) == tuple(
+        call_target.get(key) for key in TARGET_KEYS)
+
+def replayable_history(history: list[dict[str, Any]], call_target: dict[str, Any]) -> list[dict[str, Any]]:
+    # 把部门历史装配成可发给本次调用目标的形式（设计说明第 7.6 节）：
+    # 同一条目产生时与本次调用目标同一连接、同一协议、同一上游模型时原样回放；
+    # 不同时丢弃推理内容与该协议专用的条目 ID，消息与工具调用的配对（call_id）保持完整
+    result: list[dict[str, Any]] = []
+    for record in history:
+        item = record["item"]
+        same = _same_target(record.get("target") or {}, call_target)
+        if isinstance(item, dict) and item.get("type") == "reasoning":
+            if same:
+                result.append(record)
+            continue
+        if same or not isinstance(item, dict) or "id" not in item:
+            result.append(record)
+            continue
+        stripped = {key: value for key, value in item.items() if key != "id"}
+        result.append({**record, "item": stripped, "item_digest": canonical_hash(stripped)})
+    return result
 
 
 def pending_guidance(projection: RunProjection, department: str) -> list[DepartmentGuidance]:
@@ -66,6 +92,8 @@ class PinnedStep:
     # 调用目标的输入方式（设计说明第 5.6 节）：装配请求的工具定义时按它决定提供哪些工具
     input_modalities: tuple[str, ...]
     context: AssembledContext
+    # 本次逻辑调用的调用目标（公开部分）；回放部门历史时按它筛掉来源不同的推理内容
+    call_target: dict[str, Any] = field(default_factory=dict)
 
     @property
     def department_input(self) -> dict[str, Any] | None:
@@ -121,15 +149,24 @@ class ContextAssembly:
         for event in events:
             if event.department != department:
                 continue
-            if event.type in {EventType.MODEL_MESSAGE, EventType.DEPARTMENT_INPUT, EventType.TOOL_CALL_REQUIRED}:
+            if event.type in {EventType.MODEL_REASONING, EventType.MODEL_MESSAGE,
+                              EventType.DEPARTMENT_INPUT, EventType.TOOL_CALL_REQUIRED}:
                 if event.payload.get("purpose") == "compaction":
                     continue
-                if event.type == EventType.MODEL_MESSAGE and (
+                if event.type in {EventType.MODEL_REASONING, EventType.MODEL_MESSAGE} and (
                     event.payload.get("activation_id"), event.payload.get("step_id")
                 ) in failed_steps:
                     continue
-                ref = ArtifactRef(**event.payload["message_ref" if event.type == EventType.MODEL_MESSAGE else "input_ref"])
+                key = {
+                    EventType.MODEL_REASONING: "reasoning_ref",
+                    EventType.MODEL_MESSAGE: "message_ref",
+                }.get(event.type, "input_ref")
+                ref = ArtifactRef(**event.payload[key])
                 item = json.loads(self.artifacts.get_for_run(event.run_id, ref))
+                if event.type == EventType.MODEL_MESSAGE and isinstance(item, dict) \
+                        and item.get("type") == "reasoning":
+                    # 适配器为界面汇总发出的推理观测不进入历史；推理内容由 MODEL_REASONING 保存（设计说明第 7.6 节）
+                    continue
             elif event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED} and "input_item" in event.payload:
                 if (event.payload.get("activation_id"), event.payload.get("step_id")) in failed_steps:
                     continue
@@ -138,11 +175,12 @@ class ContextAssembly:
                 continue
             records.append({"event_id": event.event_id, "seq": event.stream_version,
                             "activation_id": event.payload["activation_id"], "step_id": event.payload["step_id"],
-                            "type": event.type, "item": item, "item_digest": canonical_hash(item)})
+                            "type": event.type, "item": item, "item_digest": canonical_hash(item),
+                            "target": {key: event.payload.get(key) for key in TARGET_KEYS}})
         return records
 
     def pin(self, projection: RunProjection, frame: StepFrame, limits: ModelLimits, *, step_id: int,
-            events: list[Event], snapshot_hash: str,
+            events: list[Event], snapshot_hash: str, call_target: dict[str, Any] | None = None,
             input_modalities: tuple[str, ...] = ("text",)) -> PinnedStep:
         # 装配这一步的固定部分。待处理指导的原文只在激活第一步交给部门；
         # guidance_results 按给定的事件与工作区快照计算
@@ -155,14 +193,16 @@ class ContextAssembly:
             input_modalities=input_modalities,
         )
         return PinnedStep(projection, frame, limits, step_id, guidance, events, snapshot_hash,
-                          input_modalities, context)
+                          input_modalities, context, dict(call_target or {}))
 
     def request(self, pinned: PinnedStep, history: list[dict[str, Any]]) -> StepRequest:
         # 在固定部分之后接上部门历史：按激活采用的版本取最近一次压缩的检查点，
-        # 历史放不进窗口时装配一次压缩请求，否则装配工作请求
+        # 历史放不进窗口时装配一次压缩请求，否则装配工作请求。
+        # 回放前按本次调用目标筛掉来源不同的推理内容与该协议专用的条目 ID（设计说明第 7.6 节）
         frame, limits = pinned.frame, pinned.limits
+        replay_history = replayable_history(history, pinned.call_target)
         checkpoint, checkpoint_id = self._checkpoint(pinned)
-        plan = plan_compaction(history, checkpoint, limits.context_window, pinned.context.input_items,
+        plan = plan_compaction(replay_history, checkpoint, limits.context_window, pinned.context.input_items,
                                pinned.context.tools, output_limit=limits.output_limit)
         if plan is not None:
             context = self.assembler.assemble_compaction(
@@ -173,7 +213,7 @@ class ContextAssembly:
             context = self.assembler.assemble(
                 pinned.projection, department=frame.department, session_id=frame.session_id,
                 activation_id=frame.activation_id, step_id=pinned.step_id, prompt=frame.prompt,
-                history=visible_history(history, checkpoint), compaction_event_id=checkpoint_id,
+                history=visible_history(replay_history, checkpoint), compaction_event_id=checkpoint_id,
                 context_window=limits.context_window, max_output_tokens=limits.output_limit,
                 guidance=pinned.guidance, guidance_only=frame.guidance_only,
                 events=pinned.events, snapshot_hash=pinned.snapshot_hash,

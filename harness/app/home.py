@@ -34,6 +34,28 @@ FACT_TYPES: frozenset[str] = frozenset({
 })
 REWORK_VERDICTS = frozenset({"rework_product", "rework_engineering"})
 
+# 关键事实的种类（时间轴刻度与离开期间的报告使用，设计说明第 5.5 节）：刻度按种类着色。
+# 与原型 v9 的 contract/registry.js 的 KEY_KINDS 一致；判定用事件的种类与载荷（质检的结论分放行与返工）。
+# 故障、修复、部署与回滚、进入与离开等待属于 Stage 4，事件种类登记以后在这里补上
+FACT_KINDS: dict[str, str] = {
+    EventType.TRANSITION: "handoff",
+    EventType.COLLABORATION_REQUESTED: "ask",
+    EventType.COLLABORATION_RESPONDED: "answer",
+    EventType.RUN_DONE: "release",
+    EventType.RUN_PAUSED: "release",
+    EventType.RUN_FAILED: "release",
+    ProjectEventType.DELIVERABLE_ADOPTED: "adopt",
+    EventType.DECISION_REQUESTED: "decision",
+    EventType.DECISION_ANSWERED: "decision",
+    EventType.DECISION_WITHDRAWN: "decision",
+}
+
+def _fact_kind(event: Event | ProjectEvent) -> str | None:
+    # 一条关键事实的种类：质检按结论分为放行与返工，其余按事件种类查表；不是关键事实时返回 None
+    if event.type == EventType.QA_SUBMITTED:
+        return "rework" if event.payload.get("verdict") in REWORK_VERDICTS else "release"
+    return FACT_KINDS.get(event.type)
+
 class AwayReportRequest(Contract):
     # 所选范围（默认自上次查看）与可选的项目筛选
     range: Literal["since_seen", "24h", "7d"] = "since_seen"
@@ -49,10 +71,12 @@ class ReportItem(Contract):
     detail: str | None = None
 
 class ReportFact(Contract):
-    # 范围内的一条关键事实：时间、项目、种类、事件位置，供画面回放与时间轴使用
+    # 范围内的一条关键事实：时间、项目、种类、事件位置，供画面回放与时间轴使用。
+    # kind 是刻度按种类着色用的关键事实种类（handoff、ask、answer、rework、release、adopt、decision 等）
     position: int
     at: AwareDatetime
     type: str
+    kind: str | None
     label: str
     project_id: str | None
     work_item_id: str | None
@@ -156,7 +180,8 @@ def _summary(events: list[Event | ProjectEvent]) -> list[ReportItem]:
 
 def _fact(event: Event | ProjectEvent) -> ReportFact:
     return ReportFact(
-        position=event.position, at=event.created_at, type=event.type, label=event_label(event.type, event.payload),
+        position=event.position, at=event.created_at, type=event.type, kind=_fact_kind(event),
+        label=event_label(event.type, event.payload),
         project_id=event.project_id, work_item_id=event.work_item_id,
     )
 

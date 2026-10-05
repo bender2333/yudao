@@ -18,6 +18,7 @@ from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem
 from harness.snapshot import git_provenance, ingest_snapshot, restore_snapshot
 from harness.tests.api_helpers import running_api
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 GOAL = "把一份可信代码快照接入后完成增量变更。"
 REQUIREMENT = "run the CLI with a word"
@@ -68,7 +69,7 @@ def _symlink(target, link, *, directory=False):
     except OSError:
         pytest.skip("symbolic links are unavailable")
 
-def _wait_for(predicate, timeout=60.0):
+def _wait_for(predicate, timeout=WAIT_FOR_HOST_WORK_SEC):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():

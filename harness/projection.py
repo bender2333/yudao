@@ -597,8 +597,12 @@ def apply_event(state: RunProjection, event: Event) -> None:
     if etype in {EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED}:
         _clear_feedback(state, event.department)
         if etype == EventType.COLLABORATION_RESPONDED:
+            # 发问方与回答方：旧事件没有这两个字段，按 request_id 查找对应请求（工单 #275）
+            request = next((item for item in state.requests if item.id == payload["request_id"]), None)
             state.responses.append(CollaborationResponse(
                 id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
+                requester=payload.get("requester") or (request.requester if request else None),
+                recipient=payload.get("recipient") or (request.recipient if request else None),
                 request_id=payload["request_id"], status=payload["status"], text=payload["text"],
                 result_event_ids=list(payload["result_event_ids"]), return_phase=payload["return_phase"],
                 return_work_valid=payload["return_work_valid"],

@@ -33,7 +33,7 @@ from .call import ModelDelta
 from .errors import CancelledError, ProviderError
 from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
-from .reasoning import responses_reasoning
+from .reasoning import RESPONSES_REASONING_INCLUDE, ReasoningOutput, responses_reasoning
 from .resolve import FrozenTarget
 from .tls import certificate_verification_failed, service_address, ssl_context
 
@@ -461,6 +461,8 @@ class _ResponsesInvoker:
                 **({"tool_choice": "required"} if provider_input.tool_choice == "required" else {}),
                 store=False,
                 stream=True,
+                # 推理内容（设计说明第 7.6 节）：要求上游返回加密的推理内容，供下次同模型请求回放
+                include=[RESPONSES_REASONING_INCLUDE],
                 **output_limit,
                 **({} if reasoning is None else {"reasoning": reasoning}),
             ), trace)
@@ -504,6 +506,7 @@ class _ResponsesInvoker:
                     ]
                     for item in output:
                         await self._observe_item(invocation, item, seen_items, actual_model=actual_model)
+                    reasoning = _responses_reasoning(output)
                     raw_usage = (
                         _redact_sdk_json(
                             response.usage.model_dump(mode="json", exclude_unset=True),
@@ -554,6 +557,7 @@ class _ResponsesInvoker:
                         model=invocation.config.model,
                         response_id=response.id, protocol="responses",
                         actual_model=actual_model or "",
+                        reasoning=reasoning,
                         wire_evidence={"response_id": response.id, "attempt_id": invocation.attempt_id},
                     )
                     clock.stop()
@@ -594,6 +598,19 @@ class _ResponsesInvoker:
             part.get("text", "") for part in (item.get("content") or [])
             if isinstance(part, dict) and part.get("type") == "output_text"
         )
+        # 推理内容（设计说明第 7.6 节）：以 reasoning 观察交回，按它在回答中的位置保存，
+        # 供下次同模型的请求原样回放
+        if item.get("type") == "reasoning":
+            await invocation.emit({
+                "kind": "reasoning",
+                "id": item_id,
+                "session_id": invocation.session_id,
+                "attempt_id": invocation.attempt_id,
+                "provider": invocation.config.provider,
+                "model": _actual_model(item) or actual_model,
+                "payload": item,
+            })
+            return
         await invocation.emit({
             "kind": "message",
             "id": item_id,
@@ -605,6 +622,13 @@ class _ResponsesInvoker:
             "payload": item,
         })
 
+
+def _responses_reasoning(output: list[dict[str, Any]]) -> ReasoningOutput | None:
+    # Responses 的推理内容是回答输出里的 reasoning 条目（含 encrypted_content）；原样保存供下次请求回放
+    items = [item for item in output if item.get("type") == "reasoning"]
+    if not items:
+        return None
+    return ReasoningOutput(items=items)
 
 def _stream_deltas(payload: dict[str, Any], offsets: dict[str, int]) -> list[ModelDelta]:
     # 这一条流事件里的文字片段：回答文字进 output，推理摘要进 reasoning，工具调用的参数进 tool_arguments

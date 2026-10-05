@@ -52,6 +52,8 @@ export type CommandState = {
   busy: boolean;
   submitted: boolean;
   rejection: Rejected | null;
+  // 最近一次被接受时应用层带回的受理回执（例如保存部门设置带回的建议能力提醒）
+  accepted: Record<string, unknown> | null;
   submit: (name: string, body: Record<string, unknown>) => Promise<boolean>;
 };
 
@@ -60,6 +62,7 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [rejection, setRejection] = useState<Rejected | null>(null);
+  const [accepted, setAccepted] = useState<Record<string, unknown> | null>(null);
   const lastKey = useRef(dataKey);
 
   useEffect(() => {
@@ -81,6 +84,7 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
         const outcome = await app.command(name, { command_id: globalThis.crypto.randomUUID(), ...body });
         if (outcome.ok) {
           setSubmitted(true);
+          setAccepted(outcome.accepted);
           return true;
         }
         setRejection(outcome.rejection);
@@ -92,7 +96,7 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
     [app],
   );
 
-  return { busy, submitted, rejection, submit };
+  return { busy, submitted, rejection, accepted, submit };
 }
 
 // 命令被拒绝时的说明：基准版本过期时提示重新读取（工单验收第 3 条）

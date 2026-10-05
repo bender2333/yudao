@@ -673,6 +673,13 @@ button.link {
 .floor-text-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; }
 .floor-text-list li { display: flex; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--line, #0002); }
 
+/* 首页的楼（像素画面五，工单 #178）：每层一个项目，画布按整数倍最近邻缩放，楼层多时纵向滚动 */
+.building-canvas { line-height: 0; }
+.building-canvas canvas { image-rendering: pixelated; display: block; width: 100%; cursor: default; }
+.building-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; }
+.building-list li { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--line, #0002); }
+.building-list li .count { color: #e0a13a; }
+
 .gallery-page { padding: 16px 20px 48px; color: #e8e6f0; overflow: auto; height: 100%; }
 .gallery-head h1 { font-size: 20px; margin: 0 0 6px; }
 .gallery-head p { margin: 0 0 10px; font-size: 12px; color: #b9b5c8; }
@@ -966,5 +973,155 @@ button.link {
     right: 8px;
     left: 8px;
     width: auto;
+  }
+}
+
+/* 时间轴与回放（原型 v8 设计说明第 5.5 节，工单 #180）：首页在报告下方，概览在循环画面下方。
+   刻度取关键事实，按种类着色；没有关键事实的时间段用折断符号表示。 */
+
+.timeline {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.timeline-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timeline-bar button.small {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.speed-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.speed-seg button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.speed-seg button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.replay-status {
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.replay-banner {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.ticks {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  padding: 8px 4px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--border) 30%, transparent);
+  min-height: 40px;
+}
+
+.tick {
+  flex: none;
+  width: 12px;
+  height: 24px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.tick span {
+  width: 6px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--tick, var(--muted));
+  opacity: 0.85;
+  display: block;
+}
+
+.tick.past span {
+  opacity: 0.45;
+}
+
+.tick.current span {
+  width: 8px;
+  height: 24px;
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--tick, var(--muted));
+}
+
+.tick.highlight span {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.tick-break {
+  flex: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.tick-break small {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.timeline-legends {
+  display: flex;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.timeline-legends .legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--tick, var(--muted));
+  margin-right: 4px;
+}
+
+.report-item.highlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+@media (max-width: 700px) {
+  .report-item.highlight {
+    box-shadow: none;
   }
 }

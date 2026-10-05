@@ -10,6 +10,7 @@ from harness.projection import project_run
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 项目与事项的命令（应用层与接口层设计说明第 3、7.2 节，工单 #74）：真实启动 FastAPI 应用（uvicorn），
 # 经 HTTP 提交命令、读取查询；控制核心在服务生命周期中建立，事件日志是真实的 SQLite 文件，
@@ -54,7 +55,7 @@ def _post(client, command: str, **body):
     return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})
 
 
-def _wait_for(predicate, timeout=60.0):
+def _wait_for(predicate, timeout=WAIT_FOR_HOST_WORK_SEC):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():

@@ -403,6 +403,13 @@ class ModelMessagePayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
     step_id: int
     purpose: Purpose
 
+class ModelReasoningPayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
+    # 上游返回的一条推理内容（设计说明第 7.6 节）；产生它的连接、协议与上游模型随调用目标记录
+    reasoning_ref: ArtifactRef
+    activation_id: str
+    step_id: int
+    purpose: Purpose
+
 
 class ModelRequestedPayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
     activation_id: str
@@ -707,6 +714,10 @@ class CollaborationRequestedPayload(Payload):
 
 
 class CollaborationRespondedPayload(Payload):
+    # 发问方与回答方：写入回答事件时由控制核心从对应请求取出，与请求里的值相同。
+    # 旧事件（工单 #275 之前）没有这两个字段，缺省含义为未知：读取时按 request_id 查找对应请求补齐（见 projection.py）
+    requester: Department | None = None
+    recipient: Department | None = None
     request_id: str
     status: Literal["answered", "declined", "needs_work", "completed"]
     text: str
@@ -1220,6 +1231,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.CONTEXT_ASSEMBLED: ContextAssembledPayload,
     EventType.MODEL_REQUEST_SERIALIZED: ModelRequestSerializedPayload,
     EventType.MODEL_MESSAGE: ModelMessagePayload,
+    EventType.MODEL_REASONING: ModelReasoningPayload,
     EventType.MODEL_REQUESTED: ModelRequestedPayload,
     EventType.MODEL_STREAM_PROGRESS: ModelStreamProgressPayload,
     EventType.MODEL_ATTEMPT_FINISHED: ModelAttemptFinishedPayload,

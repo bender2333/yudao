@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from harness.app.application import Application
 from harness.models import CatalogEventType
 from harness.tests.api_helpers import running_api
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 获取模型列表带凭据、连接测试对三种协议发送真实请求：
 # 上游是测试内启动的真实 HTTP 服务，事件日志是真实 SQLite，不使用桩替身。
@@ -117,7 +118,7 @@ def _catalog_events(store):
                                                if not key.startswith("_")])
 
 
-def _wait_for(store, predicate, *, timeout=20.0, description="catalog event"):
+def _wait_for(store, predicate, *, timeout=WAIT_FOR_HOST_WORK_SEC, description="catalog event"):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         matched = [event for event in _catalog_events(store) if predicate(event)]

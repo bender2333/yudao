@@ -208,7 +208,7 @@ class Orchestrator:
         self.step_limits = step_limits
         self.deltas = deltas if deltas is not None else DeltaChannel()
         self.artifacts = artifacts
-        self.workspace_root = Path(workspace_root)
+        self.workspace_root = Path(workspace_root).absolute().resolve()
         self.materials_root = self.workspace_root.parent / "materials"
         self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
         self.submissions = SubmissionWriter(artifacts, self.materials_root, self.git_versions)
@@ -278,8 +278,8 @@ class Orchestrator:
         )
         frozen_commands = _validate_frozen_commands(registered_commands, command_versions)
         run_id = run_id or new_id("run")
-        material_dir = (self.materials_root / run_id).resolve()
-        if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
+        material_dir = self.materials_root / run_id
+        if material_dir == self.materials_root or not material_dir.is_relative_to(self.materials_root):
             raise ValueError("run_id must stay within the run materials directory")
         # 工作区先于其余材料落盘：从封存快照建立失败时不留下半个 run。
         environment = LocalEnvironment.establish(self.workspace_root / run_id, initial_tree)
@@ -348,21 +348,35 @@ class Orchestrator:
 
     def _install_test_call_target(self, context_window: int) -> None:
         # 测试系统的确定性适配器：用它的名称与模型名登记一个 fake 协议的模型访问定义。
-        # 声明的输出上限取不改变默认保留的值，使既有的阈值行为与事项窗口一致
+        # 声明的输出上限取不改变默认保留的值，使既有的阈值行为与事项窗口一致。
+        # 目录里已有内容时按合并处理：保留已有的连接、定义与部门默认，只补上缺的 fake 连接，
+        # 并且只给它补上还没有默认的部门——测试适配器不覆盖用户在目录与项目里写入的模型选择
         if self.facade is None:
             raise ValueError("a provider facade is required for runs")
         provider_id = self.test_provider
         model_id = f"{provider_id}-model"
-        self.facade.store_document({
-            "providers": [{"id": provider_id, "name": provider_id, "protocol": "fake", "base_url": ""}],
-            "models": [{
+        view = self.facade.providers_view()
+        # providers_view 给界面用的字段比目录文档多（credential、credential_configured、models），
+        # 这里只取目录定义本身的字段，未知字段会被整份拒绝
+        providers = [
+            {key: item[key] for key in (
+                "id", "name", "protocol", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")}
+            for item in view["providers"]
+        ]
+        models = list(view["models"])
+        bindings = {key: dict(value) for key, value in view["bindings"].items()}
+        if not any(item["id"] == provider_id for item in providers):
+            providers.append({"id": provider_id, "name": provider_id, "protocol": "fake", "base_url": ""})
+        if not any(item["id"] == model_id for item in models):
+            models.append({
                 "id": model_id, "provider_id": provider_id, "model": self.test_model,
                 "context_window": context_window,
                 "max_output_tokens": response_reserve(context_window, None),
-            }],
-            "bindings": {department: {"provider_id": provider_id, "model_id": model_id}
-                         for department in DEPARTMENTS},
-        })
+            })
+        for department in DEPARTMENTS:
+            bindings.setdefault(department, {"provider_id": provider_id, "model_id": model_id})
+        self.facade.store_document({"providers": providers, "models": models, "bindings": bindings})
+
     def _environment(self, run_id: str) -> LocalEnvironment:
         return LocalEnvironment.open(self.workspace_root / run_id)
 
@@ -993,10 +1007,9 @@ class Orchestrator:
         # Prompt 原文的工件在项目层写入项目作用域，这里只取它的引用与版本
         setting = self._project_department_setting(projection, department)
         if setting is None or not setting.configured_prompt or setting.prompt_ref is None:
-            # 没有项目部门设置的部门 Prompt 时，事项种类的部门说明优先于 roles.json 的角色说明（工单 #134）：
-            # 建档等种类在种类定义中写明本种类的角色说明，未写明的部门沿用自己的角色说明
-            work = DEFINITIONS.department_work(department, projection.kind)
-            text = work.prompt if work is not None else DEFINITIONS.role(department).prompt
+            # 没有项目部门设置的部门 Prompt 时，固定取内置默认 Prompt（roles.json 的角色说明）；
+            # 事项种类的工作说明是单独的请求材料，由上下文装配在部门 Prompt 之后放入（工单 #248）
+            text = DEFINITIONS.role(department).prompt
             ref = save_department_prompt(self.artifacts, projection.run_id, department, text)
             return DepartmentPrompt(department, 0, text, ref, "")
         return DepartmentPrompt(

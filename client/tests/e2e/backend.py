@@ -31,6 +31,7 @@ from harness.adapters.base import ProviderError  # noqa: E402
 from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
 from harness.app.application import Application  # noqa: E402
+from harness.app.client_update import ReleaseAssets  # noqa: E402
 from harness.app.catalog_commands import (  # noqa: E402
     BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, ModelInput, ProviderInput,
 )
@@ -45,7 +46,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
 from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.data_directory import default_data_dir  # noqa: E402
 from harness.models import Usage  # noqa: E402
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn  # noqa: E402
+from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
 from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E402
 
@@ -59,7 +60,24 @@ def script():
         plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
-        # 第二个项目：产品提交规格以后，工程部门的请求被提供方报告为不可用，
+        # 第二个项目（交付历史）：一轮包含询问与回答、返工、放行与采纳的运行，
+        # 供首页与概览的时间轴核对交接、返工、询问与回答、采纳都有关键事实（工单 #180 的验收）
+        product_spec(),
+        plan_turn(),
+        delivery_turn(),
+        # 工程向产品提出询问，产品回答（collaboration_requested / collaboration_responded）
+        collaboration_request("product", "How should unknown flags be handled?",
+                              background="Engineering is preparing its independent delivery.",
+                              expected_result="Explain the intended behavior without changing files."),
+        response_turn("answered", "Print the argument as defined in the current requirement."),
+        # 质检退回工程（qa_submitted 的结论为 rework_engineering，返工）
+        review_turn("rework_engineering", "Missing usage text when no argument is provided.",
+                    defects=[{"severity": "major", "summary": "no usage text on empty argv"}]),
+        plan_turn(reason="Address the quality review by adding the missing usage behavior"),
+        delivery_turn("added usage text"),
+        # 放行（qa_submitted 的结论为 release），随后由项目采纳（deliverable_adopted）
+        review_turn("release", "checks passed on the current snapshot"),
+        # 第三个项目：产品提交规格以后，工程部门的请求被提供方报告为不可用，
         # run 停在这次请求之前并发出 model_unavailable 的决定请求（供托盘与待你决定的验收）
         FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
@@ -69,7 +87,7 @@ def script():
         plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
-        # 第三个项目：预置时没有事项。执行槽位空出来以后，端到端测试在界面上提交需求并开始事项，
+        # 第四个项目：预置时没有事项。执行槽位空出来以后，端到端测试在界面上提交需求并开始事项，
         # 这四轮让第二个事项的全过程也在浏览器里随事件流走完
         product_spec(),
         plan_turn(),
@@ -79,9 +97,11 @@ def script():
 
 
 async def seed(application: Application, system: LoopSystem) -> None:
-    # 三个项目：第一个走完一轮三部门（供项目列表与看板）；第二个的事项停在模型不可用，留下一个
-    # 等待回答的决定请求，run 没有进终态，system.status 的 running_runs 因此大于 0（工单 #207 的
-    # 停止确认与「正在运行的事项」验收用它）；第三个只建档，端到端测试在界面上提交需求开始事项
+    # 四个项目：第一个走完一轮三部门（供项目列表与看板）；第二个（交付历史）走完一轮包含询问与回答、
+    # 返工、放行与采纳（供时间轴与回放，工单 #180）；第三个的事项停在模型不可用，留下一个等待回答的
+    # 决定请求，run 没有进终态，system.status 的 running_runs 因此大于 0（工单 #207 的停止确认与
+    # 「正在运行的事项」验收用它）；第四个只建档，端到端测试在界面上提交需求开始事项。
+    # 执行槽位一次一个事项，因此每个项目的事项在当前事项结算以后再建
     created = await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="示例项目", goal="实现一个回声工具"),
         actor="user:local")
@@ -103,7 +123,18 @@ async def seed(application: Application, system: LoopSystem) -> None:
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
-    # 第二个项目：第二个事项停在模型不可用，留下一个等待回答的决定请求
+    # 第二个项目（交付历史）：走完一轮包含询问与回答、返工、放行与采纳的事项（工单 #180 的时间轴与回放）
+    created = await application.command(
+        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="交付历史", goal="回放关键事实"),
+        actor="user:local")
+    history_project = created.refs.project_id
+    item = await application.command(
+        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=history_project, text="实现交付历史"),
+        actor="user:local")
+    task = system.orchestrator.work_item_execution(item.refs.run_id)
+    if task is not None:
+        await task
+    # 第三个项目：第二个事项停在模型不可用，留下一个等待回答的决定请求
     created = await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="文本工具", goal="逐行处理文本"),
         actor="user:local")
@@ -114,7 +145,7 @@ async def seed(application: Application, system: LoopSystem) -> None:
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
-    # 第三个项目：只建档、不建事项。端到端测试在界面上提交需求开始事项，
+    # 第四个项目：只建档、不建事项。端到端测试在界面上提交需求开始事项，
     # 由事件流把第二个事项的全过程（产品 → 工程 → 质检 → 采纳）走完
     await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="实时项目", goal="在界面上走完一个事项"),
@@ -174,10 +205,20 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
     ), actor="user:local")
     if isinstance(saved, Rejected):
         raise RuntimeError(f"catalog seed rejected: {saved.reason} {saved.message}")
+    # 预置这个模型为已准入：部门设置弹窗的模型下拉只列出已准入定义，
+    # 因此要有一条真实通过模型测试的候选（工单 #95 的验收）。测试的真实请求走同一条凭据与上游路径，
+    # 这里在服务开始服务之前直接调用 Provider 模块的入口，等同于界面上的一次模型测试。
+    # 准入记录与凭据来源分开保存：测试完成以后清除内存里的 Key，让界面从「凭据缺失」开始，
+    # 需要凭据的用例自己按界面或命令设置（模型管理页的用例核对缺失状态）
+    facade = application.system.facade
+    facade.set_credential("OPENCODE_GO_KEY", "seed-only-key", persist=False)
+    result = await asyncio.to_thread(facade.model_test, "opencode-go", "glm-4.6")
+    if not result.get("ok"):
+        raise RuntimeError(f"catalog model test rejected: {result.get('error')} {result.get('message')}")
+    facade.clear_credential_override("OPENCODE_GO_KEY")
     if not admit_and_bind:
         return
     # 给这条定义写准入记录并让三个部门默认都绑定它：作废准入与删除引用方两类用例需要真实的引用方
-    facade = application.system.facade
     facade.record_admission("opencode-go", "glm-4.6", admitted_model="glm-4.6")
     await accept(application, "catalog.department_defaults.save", CatalogDepartmentDefaultsSave(
         command_id=str(uuid.uuid4()), base_version=facade.catalog_revision(),
@@ -209,6 +250,10 @@ def main() -> int:
     # 端到端测试核对「接口版本不同时只显示更新页」：让服务报告一个不同的接口版本，
     # 就像一个已经升级或尚未升级的部署那样（真实 HTTP 响应，不改动被测代码）
     parser.add_argument("--api-version", type=int, default=None)
+    # 更新源（设计说明第 5.1 节，工单 #208）：把发布资源目录指到这里，服务从它提供
+    # /client-update/latest.yml 与安装程序。不给出时用 wheel 内的 harness/release_assets，
+    # 从源码运行没有这个目录，请求返回 404（更新页的「控制主机没有提供客户端安装包」）
+    parser.add_argument("--release-assets", default=None)
     # api：以 `yudao api` 命令的方式运行（工单 #207）。命令行的替身把收到的参数原样交给本脚本，
     # 因此这里接到的子命令与真正的 yudao 命令一致；端口固定为客户端连接的本机端口，
     # 接受本机停止请求并在收到以后退出，与 harness.api.server 的行为一致
@@ -242,9 +287,11 @@ def main() -> int:
         application.reported_api_version = args.api_version
 
     # 本机停止请求：请求到达时让 uvicorn 优雅退出（harness/api/server.py 的 _request_stop）
+    assets = ReleaseAssets(Path(args.release_assets)) if args.release_assets else ReleaseAssets()
     server = uvicorn.Server(uvicorn.Config(
         lambda: create_app(lambda: application, access=args.access,
-                            on_stop=lambda: setattr(server, "should_exit", True)),
+                            on_stop=lambda: setattr(server, "should_exit", True),
+                            release_assets=assets),
         host=args.host, port=port,
         log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0))
 

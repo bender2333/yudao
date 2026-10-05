@@ -10,6 +10,7 @@ from harness.models import EventType, TERMINAL_PHASES, Usage
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 用户决定在应用层与接口层的行为（设计说明第 3.3、4.3 节）：未回答的请求由查询 decisions.list 读取，回答经命令
 # decision.answer 提交；回答「继续执行」时流程编排在服务的事件循环中把这个 run 继续运行到结束，「停止事项」时
@@ -70,7 +71,7 @@ def _answer(client, command_id: str, **body):
     return client.post("/api/commands/decision.answer", json={"command_id": command_id, **body})
 
 
-def _wait_for_completion(system: LoopSystem, run_id: str, timeout_sec: float = 30.0):
+def _wait_for_completion(system: LoopSystem, run_id: str, timeout_sec: float = WAIT_FOR_HOST_WORK_SEC):
     # 回答以后 run 由服务的事件循环中的任务继续运行：等到任务结束并且 run 到了终态，再核对它的投影
     deadline = time.monotonic() + timeout_sec
     while time.monotonic() < deadline:

@@ -7,9 +7,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, WorkItemLoop } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
-import { createRafClock } from "../../pixel/clock";
+import { createRafClock, type Clock } from "../../pixel/clock";
 import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
+import type { DecisionAnswer, DecisionResult } from "../../pixel/floor/card";
 import type { FloorModel, LoopItem, PixelFloorEvent } from "../../pixel/world/types";
+import { face, sortByRequested } from "../decisions/card-logic";
+import { DecisionCardList } from "../decisions/card.tsx";
 import { useSnapshot } from "./use-snapshot";
 
 /** 画面里的事项：project.loop 的行加上队列位置与等待模型服务的时间。 */
@@ -19,6 +22,8 @@ export interface FloorScreenProps {
   app: ClientApp;
   projectId: string;
   workItemId: string | null;
+  /** 回放位置（全局位置）：不为 null 时 project.loop 按位置带 at 读取；回放期间按一个部门一个角色画，不显示决定请求。 */
+  at?: number | null;
 }
 
 /** 覆盖层的名称与中文标签（按能力清单显示）。 */
@@ -30,7 +35,7 @@ const OVERLAY_LABELS: [string, string][] = [
   ["semantic_records", "语义记录"],
 ];
 
-/** 把查询结果组装成楼层画面数据：事项、角色列表、决定请求、执行槽位与运维数据。 */
+/** 把查询结果组装成楼层画面数据：事项、角色列表、决定请求（纯文字版本）、执行槽位与运维数据。 */
 export function floorModelOf(input: {
   loop: ProjectLoopResult | null;
   workspaces: Record<string, { roles?: { id: string; name: string; kind: string; status: string }[] }>;
@@ -39,6 +44,7 @@ export function floorModelOf(input: {
   ops: { version?: string; fault?: boolean; auto_repair_stopped?: boolean } | null;
   machines: { id: string; name: string; actions: number; unknown?: boolean; online?: boolean }[] | null;
   interrupted: boolean;
+  now?: number;
 }): FloorModel {
   const items: LoopItem[] = (input.loop?.work_items ?? []).map((row, index) => ({
     ...(row as LoopRow),
@@ -48,6 +54,10 @@ export function floorModelOf(input: {
   for (const [department, workspace] of Object.entries(input.workspaces)) {
     if (workspace.roles && workspace.roles.length) roles[department] = workspace.roles;
   }
+  const now = input.now ?? Date.now();
+  // 决定请求的画面内容（纯文字版本，与页面卡片同一份材料）：事项标题取本项目事项表的 sign
+  const titleOf = (workItemId: string | null): string =>
+    workItemId ? items.find((it) => it.work_item_id === workItemId)?.sign ?? workItemId : "";
   return {
     items,
     open_requests: [],
@@ -58,9 +68,9 @@ export function floorModelOf(input: {
     ops: input.ops,
     interrupted: input.interrupted,
     roles: Object.keys(roles).length ? roles : null,
-    decisions: (input.decisions ?? []).map((d) => ({
-      id: d.decision_id, kind: d.kind, version: d.version, title: d.kind, work_item_id: d.work_item_id, status: d.status,
-    })),
+    decisions: (input.decisions ?? [])
+      .filter((d) => d.status === "open")
+      .map((d) => face(d, now, { projectName: d.project_id ?? "", workItemTitle: titleOf(d.work_item_id) })),
   };
 }
 
@@ -71,6 +81,7 @@ export function floorEventOf(event: EventObject, projectId: string): PixelFloorE
   const payload = event.payload as unknown as Record<string, unknown>;
   return {
     type: event.type,
+    event_id: event.event_id,
     department: event.department,
     role: event.role,
     label: event.label,
@@ -83,20 +94,39 @@ export function floorEventOf(event: EventObject, projectId: string): PixelFloorE
 
 /** 循环画面：画布、覆盖层切换、窄屏文字列表与决定卡片。 */
 export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
+  const at = props.at ?? null;
+  const replaying = at !== null;
   const loop = useSnapshot<ProjectLoopResult>(props.app, "page.loop", "project.loop", {
     project_id: props.projectId,
     work_item: props.workItemId,
+    ...(at === null ? {} : { at }),
   });
+  // 回放到过去的时间点时不显示决定请求（设计说明第 5.5 节、原型 v9 第 8 节）
   const decisions = useSnapshot<DecisionList>(props.app, "page.decisions", "decisions.list", {
     project_id: props.projectId, status: ["open"],
-  });
+  }, replaying);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<FloorView | null>(null);
-  const clockRef = useRef<ReturnType<typeof createRafClock> | null>(null);
+  const modelRef = useRef<FloorModel | null>(null);
+  const clockRef = useRef<Clock | null>(null);
   const resyncRef = useRef<(() => void) | null>(null);
+  const decideRef = useRef<((payload: DecisionAnswer) => Promise<DecisionResult>) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<string | null>(null);
   const capabilities = props.app.currentCapabilities;
+
+  // 画面内的回答：走与页面卡片同一条命令 decision.answer，带上决定的版本与说明；拒绝时把原因交给卡片
+  decideRef.current = async (payload) => {
+    const outcome = await props.app.command("decision.answer", {
+      command_id: globalThis.crypto.randomUUID(),
+      decision_id: payload.decision_id,
+      option: payload.option,
+      ...(payload.note === "" ? {} : { note: payload.note }),
+      base_version: payload.base_version,
+    });
+    if (outcome.ok) return { accepted: true, message: "" };
+    return { accepted: false, message: outcome.rejection.message };
+  };
 
   // 建立画面：PixiJS 的 Application 挂在宿主元素上，时钟与事件流分别订阅
   useEffect(() => {
@@ -111,12 +141,27 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     clockRef.current = clock;
     void (async () => {
       try {
-        const view = await createFloorView({ host, clock });
+        const view = await createFloorView({
+          host,
+          clock,
+          // 说明栏的输入框加在画布所在的容器里（画面里的横线纸上叠一个透明的输入框）
+          cardHost: host,
+          onDecide: async (payload) => {
+            const decide = decideRef.current;
+            if (!decide) throw new Error("画面还没有接上回答命令");
+            return decide(payload);
+          },
+          onGo: (target) => {
+            window.location.hash = target.startsWith("#") ? target.slice(1) : target;
+          },
+        });
         if (cancelled) {
           view.destroy();
           return;
         }
         viewRef.current = view;
+        // 画面建立以后立刻用当前的数据配置它：查询可能早于画面就绪，之后数据不再变化时不会再有 setModel
+        if (modelRef.current) view.setModel(modelRef.current);
         // 端到端测试经这个入口读取画面的当前状态；只在开发构建里暴露
         if (import.meta.env.DEV) {
           (window as unknown as { __floorViewForTest?: FloorTestHooks }).__floorViewForTest = floorTestHooks(view, () => resyncRef.current?.());
@@ -138,28 +183,31 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     () => floorModelOf({
       loop: loop.data,
       workspaces: {},
-      decisions: decisions.data?.decisions ?? null,
+      // 回放期间不显示决定请求，部门按一个部门一个角色画（设计说明第 5.5 节）
+      decisions: replaying ? null : decisions.data?.decisions ?? null,
       slots: null,
       ops: null,
       machines: null,
       interrupted: false,
     }),
-    [loop.data, decisions.data],
+    [loop.data, decisions.data, replaying],
   );
 
   // 每次查询结果到达：状态以查询为准
   useEffect(() => {
+    modelRef.current = model;
     viewRef.current?.setModel(model);
   }, [model]);
 
-  // 事件只决定动作的起点
+  // 事件只决定动作的起点；回放期间不按事件流更新画面（设计说明第 4.1 节）
   useEffect(() => {
+    if (replaying) return;
     const off = props.app.subscribeEvents((event) => {
       const floorEvent = floorEventOf(event, props.projectId);
       if (floorEvent) viewRef.current?.playEvent(floorEvent);
     });
     return off;
-  }, [props.app, props.projectId]);
+  }, [props.app, props.projectId, replaying]);
 
   // 重新同步：画面回到查询给出的状态，不补播
   useEffect(() => {
@@ -186,6 +234,11 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     project_id: props.projectId,
   });
   void flow;
+  // 文字列表里的决定请求：与画面同源的查询结果，按发出时间排列
+  const openDecisions = useMemo(
+    () => sortByRequested((decisions.data?.decisions ?? []).filter((d) => d.status === "open")),
+    [decisions.data],
+  );
 
   return (
     <div className="floor-screen">
@@ -203,7 +256,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
       </div>
       <div className="floor-canvas" ref={hostRef} />
       {error !== null ? <p className="pixel-canvas-error">楼层画面加载失败：{error}</p> : null}
-      <FloorTextList items={model.items} />
+      <FloorTextList items={model.items} decisions={openDecisions} app={props.app} />
     </div>
   );
 }
@@ -232,20 +285,41 @@ function overlayData(
   return null;
 }
 
-/** 宽度不足时的文字列表：事项、所在部门、第几轮、状态（设计说明第 5.7 节）。 */
-function FloorTextList(props: { items: LoopItem[] }): React.JSX.Element {
-  if (props.items.length === 0) return <p className="note">项目还没有事项</p>;
+/** 宽度不足时的文字列表：事项、所在部门、第几轮、状态（设计说明第 5.7 节），以及等待回答的决定请求。 */
+function FloorTextList(props: {
+  items: LoopItem[];
+  decisions: DecisionView[];
+  app: ClientApp;
+}): React.JSX.Element {
+  const now = Date.now();
+  const titleOf = (workItemId: string | null): string =>
+    workItemId ? props.items.find((it) => it.work_item_id === workItemId)?.sign ?? workItemId : "";
   return (
-    <ul className="floor-text-list">
-      {props.items.map((item) => (
-        <li key={item.work_item_id}>
-          <strong>{item.sign}</strong>
-          <span>{item.department ?? "—"}</span>
-          <span>第 {item.round} 轮</span>
-          <span>{item.status}</span>
-        </li>
-      ))}
-    </ul>
+    <>
+      {props.items.length === 0 ? <p className="note">项目还没有事项</p> : (
+        <ul className="floor-text-list">
+          {props.items.map((item) => (
+            <li key={item.work_item_id}>
+              <strong>{item.sign}</strong>
+              <span>{item.department ?? "—"}</span>
+              <span>第 {item.round} 轮</span>
+              <span>{item.status}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答（设计说明第 9 节） */}
+      <DecisionCardList
+        app={props.app}
+        decisions={props.decisions}
+        now={now}
+        names={(decision) => ({ projectName: decision.project_id ?? "", workItemTitle: titleOf(decision.work_item_id) })}
+        onNavigate={(hash) => {
+          window.location.hash = hash.startsWith("#") ? hash.slice(1) : hash;
+        }}
+        emptyText="没有等待回答的决定请求"
+      />
+    </>
   );
 }
 

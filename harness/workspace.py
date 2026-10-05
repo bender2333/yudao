@@ -35,7 +35,8 @@ class WorkspaceSnapshot:
 
 class Workspace:
     def __init__(self, root: str | Path) -> None:
-        supplied = Path(root).absolute()
+        # 数据目录可能以 8.3 短路径给出（工单 #250）：根在这里解析一次，解析与比较都从同一份路径派生
+        supplied = Path(root).absolute().resolve()
         self.root = resolve_public_path(supplied.parent, supplied.name)
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / CHECKS_DIR).mkdir(exist_ok=True)

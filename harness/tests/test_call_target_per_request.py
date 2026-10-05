@@ -16,10 +16,11 @@ from harness.models import DEPARTMENTS, EventType
 from harness.proposals import engineering_plan, product_spec
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade
 from harness.providers.errors import CatalogValidationError
-from harness.runtime import LoopSystem
-from harness.tests.protocol_helpers import serve, sse
 from harness.event_store import Command
 from harness.projection import saved_decisions
+from harness.runtime import LoopSystem
+from harness.tests.protocol_helpers import serve, sse
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 MILLISECOND_RETRIES = StepLimits(retry_initial_delay_sec=0.001, retry_max_delay_sec=0.001)
 
@@ -228,7 +229,7 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
             except CatalogValidationError as exc:  # 目录校验失败时测试立即失败，不掩盖原因
                 raise AssertionError(f"binding update rejected: {exc}") from exc
             release.set()
-            result = future.result(timeout=30)
+            result = future.result(timeout=WAIT_FOR_HOST_WORK_SEC)
 
         assert result.phase == "ENGINEERING", result.error
         # 这一次逻辑调用的重试仍发往原目标

@@ -9,6 +9,7 @@ import { RENDERER_ORIGIN } from "./protocol";
 import { restartLocalServiceConfirming, startYudaoService, stopLocalServiceConfirming } from "./local-service";
 import { defaultSettings, loadSettings, saveSettings, type ConnectionSettings } from "./settings";
 import { setTrayConnectedLocal, notify, setTrayCount } from "./tray";
+import { runUpdate, updateFeedUrl, type UpdateProgress } from "./update";
 
 export const SETTINGS_GET = "yudao:settings:get";
 export const SETTINGS_SET = "yudao:settings:set";
@@ -20,6 +21,9 @@ export const LOCAL_SERVICE_STOP = "yudao:local-service:stop";
 export const LOCAL_SERVICE_RESTART = "yudao:local-service:restart";
 export const LOGIN_ITEM_GET = "yudao:login-item:get";
 export const LOGIN_ITEM_SET = "yudao:login-item:set";
+export const UPDATE_START = "yudao:update:start";
+export const UPDATE_PROGRESS = "yudao:update:progress";
+export const CLIENT_VERSION = "yudao:client-version";
 
 export function createMainWindow(size: { width: number; height: number }): BrowserWindow {
   const window = new BrowserWindow({
@@ -88,4 +92,16 @@ export function registerIpc(): void {
     app.setLoginItemSettings({ openAtLogin: openAtLogin === true });
     return { openAtLogin: app.getLoginItemSettings().openAtLogin };
   });
+  // 更新（设计说明第 5.2 节）：更新页给出当前连接的地址，主进程按地址加 /client-update/ 更新。
+  // 每一步经 UPDATE_PROGRESS 报告给更新页；更新成功后客户端退出并静默安装，界面不再收到结果
+  ipcMain.handle(UPDATE_START, async (event, address: string) => {
+    const report = (progress: UpdateProgress): void => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(UPDATE_PROGRESS, progress);
+      }
+    };
+    return runUpdate(updateFeedUrl(address), report);
+  });
+  // 客户端的发布版本号：更新页写明客户端与 Yudao 服务两边的发布版本号与接口版本
+  ipcMain.handle(CLIENT_VERSION, () => app.getVersion());
 }

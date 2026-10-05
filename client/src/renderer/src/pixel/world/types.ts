@@ -370,13 +370,19 @@ export interface OpenRequest {
   work_item_id: string;
 }
 
-export interface DecisionView {
+/** 决定请求在画面上的内容（原型 Y9.cards.face 的纯文字版本，与页面卡片同一份材料，工单 #179）。 */
+export interface DecisionFace {
   id: string;
   kind: string;
   version: number;
   title: string;
   work_item_id: string | null;
-  [key: string]: unknown;
+  where: string;
+  waited: string;
+  blocks: string;
+  rows: { term: string; value: string }[];
+  links: { label: string; href: string }[];
+  options: { id: string; label: string; kind?: string | null; note_required?: boolean }[];
 }
 
 export interface MachineView {
@@ -398,7 +404,7 @@ export interface FloorModel {
   ops: OpsView | null;
   interrupted: boolean;
   roles: Record<string, RoleInfo[]> | null;
-  decisions: DecisionView[];
+  decisions: DecisionFace[];
 }
 
 export interface OpsView {
@@ -410,6 +416,8 @@ export interface OpsView {
 /** 项目楼层收到的事件（事件流里本项目的事件）。 */
 export interface PixelFloorEvent {
   type: string;
+  /** 事件的标识：决定请求的身份取自它（投影按 event_id 登记决定请求）。 */
+  event_id?: string | null;
   department?: string | null;
   role?: string | null;
   tool?: string | null;

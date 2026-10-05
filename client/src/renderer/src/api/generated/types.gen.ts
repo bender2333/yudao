@@ -2956,6 +2956,10 @@ export type ReportFact = {
      */
     type: string;
     /**
+     * Kind
+     */
+    kind: string | null;
+    /**
      * Label
      */
     label: string;
@@ -5617,6 +5621,14 @@ export type CollaborationRespondedEvent = {
  * CollaborationRespondedPayload
  */
 export type CollaborationRespondedPayload = {
+    /**
+     * Requester
+     */
+    requester?: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Recipient
+     */
+    recipient?: 'product' | 'engineering' | 'quality' | null;
     /**
      * Request Id
      */
@@ -8975,6 +8987,220 @@ export type ModelMessagePayload = {
      * Summary
      */
     summary: string;
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Step Id
+     */
+    step_id: number;
+    /**
+     * Purpose
+     */
+    purpose: 'work' | 'compaction';
+};
+
+/**
+ * ModelReasoningEvent
+ */
+export type ModelReasoningEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'model_reasoning';
+    payload: ModelReasoningPayload;
+};
+
+/**
+ * ModelReasoningPayload
+ */
+export type ModelReasoningPayload = {
+    /**
+     * Provider Config Id
+     */
+    provider_config_id: string | null;
+    /**
+     * Model Id
+     */
+    model_id: string | null;
+    /**
+     * Provider Name
+     */
+    provider_name: string;
+    /**
+     * Protocol
+     */
+    protocol: string;
+    /**
+     * Base Url
+     */
+    base_url: string | null;
+    /**
+     * Requested Provider
+     */
+    requested_provider: string;
+    /**
+     * Requested Protocol
+     */
+    requested_protocol: string;
+    /**
+     * Requested Model
+     */
+    requested_model: string;
+    /**
+     * Credential Ref
+     */
+    credential_ref: string | null;
+    /**
+     * Credential Version
+     */
+    credential_version: string | null;
+    /**
+     * Context Window
+     */
+    context_window: number | null;
+    /**
+     * Configured Max Output Tokens
+     */
+    configured_max_output_tokens: number | null;
+    /**
+     * Accepts Required Tool Call
+     */
+    accepts_required_tool_call: boolean | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
+     * Selection Source
+     */
+    selection_source: string | null;
+    /**
+     * Requested Tier
+     */
+    requested_tier: string | null;
+    /**
+     * Sent Tier
+     */
+    sent_tier: string | null;
+    /**
+     * Reasoning Levels
+     */
+    reasoning_levels: Array<string>;
+    /**
+     * Default Reasoning Level
+     */
+    default_reasoning_level: string | null;
+    /**
+     * Reasoning Mode
+     */
+    reasoning_mode: string | null;
+    /**
+     * Input Version
+     */
+    input_version: number;
+    /**
+     * Prompt Version
+     */
+    prompt_version: number;
+    /**
+     * Prompt Hash
+     */
+    prompt_hash: string | null;
+    /**
+     * Guidance Ids
+     */
+    guidance_ids: Array<string>;
+    /**
+     * Guidance Only
+     */
+    guidance_only: boolean;
+    /**
+     * Effective Contract Hash
+     */
+    effective_contract_hash: string | null;
+    /**
+     * Engineering Plan Hash
+     */
+    engineering_plan_hash: string | null;
+    /**
+     * Request Id
+     */
+    request_id: string | null;
+    /**
+     * Attempt Id
+     */
+    attempt_id: string;
+    /**
+     * Logical Call Id
+     */
+    logical_call_id: string;
+    /**
+     * Collaboration Request Id
+     */
+    collaboration_request_id: string | null;
+    /**
+     * Context Event Id
+     */
+    context_event_id: string;
+    reasoning_ref: ArtifactRef;
     /**
      * Activation Id
      */
@@ -13767,6 +13993,8 @@ export type EventObject = ({
 } & ModelRequestSerializedEvent) | ({
     type: 'model_message';
 } & ModelMessageEvent) | ({
+    type: 'model_reasoning';
+} & ModelReasoningEvent) | ({
     type: 'model_requested';
 } & ModelRequestedEvent) | ({
     type: 'model_stream_progress';

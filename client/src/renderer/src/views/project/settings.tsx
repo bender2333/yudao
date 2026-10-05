@@ -5,14 +5,16 @@
 
 import { useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
-import type { ProjectSettingsResult } from "../../api/generated/types.gen";
+import type { Catalog, ProjectSettingsResult } from "../../api/generated/types.gen";
 import type { Route } from "../../shell/routing";
 import {
   CommandFeedback, Empty, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea, TextInput,
-  formatNumberOr, hasCommand, optionalText, pageKey, show, useDraft,
+  formatNumberOr, hasCommand, list, pageKey, text, useDraft,
 } from "./common";
+import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, useDepartmentDraft } from "./department-settings-form";
 import { departmentName } from "./labels";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
+import { followDepartmentLabel, mergedModelId, modelById } from "../models/model-logic";
 
 export function SettingsPage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
@@ -109,43 +111,60 @@ function Basics(props: { app: ClientApp; data: ProjectSettingsResult; command: C
   );
 }
 
-// 部门设置（7.5 节第 2 项）：各部门的项目部门设置，内容同部门设置弹窗。
-// 这里只改部门 Prompt；模型与档位的选择由 #95 加入，读取与保存的版本由 project.settings 给出
+// 部门设置（7.5 节第 2 项）：各部门的项目部门设置，内容同部门设置弹窗（第 9.2 节）。
+// 模型、推理档位与部门 Prompt 三项一起保存；模型与档位由 #95 加入，
+// 读取与保存的版本由 project.settings 给出，部门默认来自 catalog 的 bindings，
+// 生效模型的跟随说明与建议能力提醒按第 5.3、5.6 节计算
 function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
   const { data } = props;
   const entries = Object.entries(data.departments);
   const [editing, setEditing] = useState<string | null>(null);
+  const catalog = useSnapshot<Catalog>(props.app, "page.settings.catalog", "catalog", {});
+  // 生效模型的说明与档位声明：项目设置写入了模型就用它，否则用部门默认（catalog 的 bindings）
+  const bindings = catalog.data?.bindings ?? {};
+  const models = catalog.data?.models ?? [];
 
   return (
-    <Section title="部门设置" note="本项目各部门的项目部门设置；模型与档位由工单 #95 加入">
+    <Section title="部门设置" note="本项目各部门的项目部门设置：模型、推理档位与部门 Prompt（第 9.2 节）">
       {entries.length === 0 ? <Empty text="没有登记部门设置" /> : null}
-      {entries.map(([key, setting]) => (
-        <div className="sub-card" key={key}>
-          <div className="section-head">
-            <h3>
-              {departmentName(key)}（{key}）
-            </h3>
+      {entries.map(([key, setting]) => {
+        const effectiveId = mergedModelId(setting.model_id, key, bindings);
+        const model = modelById(models, effectiveId);
+        const followText = followDepartmentLabel(model?.model ?? (effectiveId ? effectiveId : ""));
+        const reminders = data.department_reminders[key] ?? [];
+        return (
+          <div className="sub-card" key={key}>
+            <div className="section-head">
+              <h3>
+                {departmentName(key)}（{key}）
+              </h3>
+              <p className="note">
+                第 {setting.version} 版；来源 {setting.source}
+                {setting.prompt_configured ? "（本项目已配置部门 Prompt）" : "（使用内置默认 Prompt）"}
+              </p>
+            </div>
             <p className="note">
-              第 {setting.version} 版；来源 {setting.source}
-              {setting.prompt_configured ? "（本项目已配置部门 Prompt）" : "（使用内置默认 Prompt）"}
+              模型与档位：{setting.model_id
+                ? `${model?.model ?? setting.model_id}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`
+                : `${followText}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`}
             </p>
+            <ReminderList items={reminders} testId={`settings-reminder-${key}`} />
+            <pre className="raw prompt-text">{setting.text || "（没有部门 Prompt 文字）"}</pre>
+            {editing === key ? (
+              <DepartmentSettingsForm app={props.app} data={data} department={key} onClose={() => setEditing(null)} />
+            ) : (
+              <button type="button" onClick={() => setEditing(key)}>
+                修改部门设置
+              </button>
+            )}
           </div>
-          <p className="note">模型与档位：{show(optionalText(setting.model_id), "跟随部门默认")}</p>
-          <pre className="raw prompt-text">{setting.text || "（没有部门 Prompt 文字）"}</pre>
-          {editing === key ? (
-            <DepartmentPromptForm app={props.app} data={data} department={key} onClose={() => setEditing(null)} />
-          ) : (
-            <button type="button" onClick={() => setEditing(key)}>
-              修改部门 Prompt
-            </button>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </Section>
   );
 }
 
-function DepartmentPromptForm(props: {
+function DepartmentSettingsForm(props: {
   app: ClientApp;
   data: ProjectSettingsResult;
   department: string;
@@ -153,29 +172,47 @@ function DepartmentPromptForm(props: {
 }) {
   const { data } = props;
   const setting = data.departments[props.department];
-  const [text_, setText] = useDraft(
-    `settings/${data.project_id}/${props.department}/prompt`,
-    setting?.text ?? "",
-  );
-  const command = useCommand(props.app, pageKey([setting?.version, text_]));
+  const [draft, setDraft] = useDepartmentDraft(setting ?? null);
+  const command = useCommand(props.app, pageKey([setting?.version, draft.model, draft.tier, draft.prompt]));
+  const catalog = useSnapshot<Catalog>(props.app, `page.settings.catalog.${props.department}`, "catalog", {});
+  const bindings = catalog.data?.bindings ?? {};
+  const models = catalog.data?.models ?? [];
+  const reminders = data.department_reminders[props.department] ?? [];
+  const savedReminders = list(command.accepted?.reminders).map((item) => text(item)).filter((item) => item !== "");
 
   if (setting === undefined) {
     return <Empty text={`没有 ${departmentName(props.department)} 的部门设置`} />;
   }
 
+  // 生效模型的说明：项目设置写入了模型就用它，否则用部门默认（跟随部门默认的当前值）
+  const effectiveId = mergedModelId(setting.model_id, props.department, bindings);
+  const effectiveModel = modelById(models, effectiveId);
+  const followName = effectiveModel?.model ?? (effectiveId ? effectiveId : "");
+
   return (
     <div className="form">
-      <TextArea label={`${departmentName(props.department)}的部门 Prompt`} value={text_} rows={10} onInput={setText} />
-      <SubmitButton
-        label="保存部门设置"
-        busy={command.busy}
-        disabled={text_ === setting.text}
-        onClick={() => void command.submit("department_settings.save", {
-          project_id: data.project_id,
-          department: props.department,
-          base_version: setting.version,
-          department_prompt: text_,
-        }).then((ok) => { if (ok) { props.onClose(); } })}
+      <DepartmentSettingsFields
+        app={props.app}
+        projectId={data.project_id}
+        department={props.department}
+        draft={draft}
+        onDraft={setDraft}
+        effective={{
+          state: effectiveId ? "effective" : "unset",
+          model: followName,
+        }}
+        reminders={[...reminders, ...savedReminders]}
+      />
+      <div className="row-actions">
+        <button type="button" onClick={() => setDraft({ ...draft, prompt: setting.text })}>恢复默认</button>
+      </div>
+      <DepartmentSettingsSave
+        projectId={data.project_id}
+        department={props.department}
+        setting={setting}
+        draft={draft}
+        command={command}
+        onSaved={props.onClose}
       />
       <button type="button" onClick={props.onClose}>取消</button>
       <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
