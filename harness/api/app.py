@@ -14,6 +14,7 @@ from importlib.metadata import version
 from typing import Annotated, Any
 
 from fastapi import FastAPI, Header, Query, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
@@ -269,11 +270,15 @@ def _signature(*parameters: tuple[str, Any]) -> inspect.Signature:
 
 def _openapi(api: FastAPI) -> dict[str, Any]:
     # 路由生成的文档，加上经事件流送达、不出现在 JSON 回答中的合同类型：事件对象与模型输出片段
+    # 路由文档由 get_openapi 生成，末尾它整体经过 jsonable_encoder(by_alias=True, exclude_none=True)，
+    # 可空字段的 "default": null 因此不出现在路由一侧。手工加入的事件侧类型走同一条编码路径，
+    # 同一个模型被两侧用到时才是同一份合同。
     if api.openapi_schema is None:
         document = get_openapi(title=api.title, version=api.version, routes=api.routes)
         schemas = document.setdefault("components", {}).setdefault("schemas", {})
         for name, contract in (("EventObject", EventObject), ("OutputDelta", OutputDelta)):
-            generated = TypeAdapter(contract).json_schema(ref_template=_COMPONENTS)
+            generated = jsonable_encoder(TypeAdapter(contract).json_schema(ref_template=_COMPONENTS),
+                                         by_alias=True, exclude_none=True)
             for key, value in generated.pop("$defs", {}).items():
                 if schemas.setdefault(key, value) != value:
                     raise ValueError(f"contract type {key} has two different schemas")

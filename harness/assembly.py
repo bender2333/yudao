@@ -12,6 +12,7 @@ from .artifacts import ArtifactStore
 from .compaction import (CompactionCheckpoint, CompactionError, CompactionPlan, finish_compaction, plan_compaction,
                          response_reserve, visible_history)
 from .context import AssembledContext, ContextAssembler, department_work_text
+from .event_store import EventStore
 from .models import (ArtifactRef, DepartmentGuidance, DepartmentPrompt, Event, EventType, RunProjection,
                      canonical_hash, estimate_tokens, json_dumps)
 
@@ -133,9 +134,9 @@ class CompactionResult:
 
 
 class ContextAssembly:
-    def __init__(self, artifacts: ArtifactStore) -> None:
+    def __init__(self, artifacts: ArtifactStore, store: EventStore) -> None:
         self.artifacts = artifacts
-        self.assembler = ContextAssembler(artifacts)
+        self.assembler = ContextAssembler(artifacts, store)
 
     def department_history(self, events: list[Event], department: str) -> list[dict[str, Any]]:
         # 部门历史按事件顺序排列：本部门的工作消息、模型输出、主机提示与工具结果；
