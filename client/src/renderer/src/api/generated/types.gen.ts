@@ -255,6 +255,10 @@ export type ActionView = {
      * Auto Retry Of
      */
     auto_retry_of?: string | null;
+    /**
+     * Verification Reason
+     */
+    verification_reason?: string | null;
 };
 
 /**
@@ -2029,6 +2033,36 @@ export type EventDetailResult = {
      * Artifacts
      */
     artifacts: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * FileActionComparison
+ */
+export type FileActionComparison = {
+    /**
+     * Tool
+     */
+    tool: string;
+    /**
+     * Args
+     */
+    args: {
+        [key: string]: unknown;
+    };
+    /**
+     * Before Snapshot Event
+     */
+    before_snapshot_event: string;
+    /**
+     * Verdict
+     */
+    verdict: 'completed' | 'not_happened' | 'unclear';
+    /**
+     * Detail
+     */
+    detail: {
         [key: string]: unknown;
     };
 };
@@ -4236,6 +4270,7 @@ export type UnknownActionRequested = {
      * Repeat Attempted
      */
     repeat_attempted?: boolean;
+    verification?: FileActionComparison | null;
 };
 
 /**
@@ -5020,11 +5055,12 @@ export type ActionVerifiedPayload = {
     /**
      * Resolution
      */
-    resolution: 'auto_reexecute' | 'continue';
+    resolution: 'auto_reexecute' | 'auto_verify' | 'continue';
     /**
      * Auto Retry Of
      */
     auto_retry_of?: string | null;
+    verification?: FileActionComparison | null;
     /**
      * Note
      */
@@ -14378,6 +14414,10 @@ export type ToolStartedPayload = {
      * Auto Retry Of
      */
     auto_retry_of?: string | null;
+    /**
+     * Verification Reason
+     */
+    verification_reason?: 'not_happened' | null;
 };
 
 /**
