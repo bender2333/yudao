@@ -573,19 +573,26 @@ class ToolStartedPayload(AttemptIdentity, Versions, WorkBasis):
     snapshot_hash: str | None = None
     # 动作前的公开树快照（工单 #17）：许可以后、执行之前写入，中断后按它与动作参数核对实际效果
     before_snapshot_ref: ArtifactRef | None = None
+    # 自动重新执行（工单 #307）：这次尝试是同一个逻辑动作的上一次尝试因为结果未知而重新执行的。
+    # 记被重新执行的 tool_started 事件编号；首次尝试没有这个字段
+    auto_retry_of: str | None = None
 
 
 class ToolSkippedPayload(ToolRecord):
     ok: Literal[False]
     error: str
 
+
 class ActionVerifiedPayload(ToolRecord):
     # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
-    # resolution 为 continue 表示用户选择按当前实际状态继续；选择重新执行时不写核实记录，由步骤驱动补执行。
+    # resolution 为 continue 表示用户选择按当前实际状态继续（工单 #17）；auto_reexecute 表示契约声明
+    # 可以重复、自动重新执行了一次（工单 #307）。两次尝试分别记录，不补造原来那次尝试的 tool_called 回执
     # input_item 让这条结果进入部门历史，模型据此继续
     ok: bool
     error: str | None = None
-    resolution: Literal["continue"]
+    resolution: Literal["auto_reexecute", "continue"]
+    # 自动重新执行时记被重新执行的 tool_started 事件编号；用户决定时为空
+    auto_retry_of: str | None = None
     note: str | None = None
     decision_id: str | None = None
 
@@ -1033,7 +1040,8 @@ class PauseRequested(Payload):
 class UnknownActionRequested(Payload):
     # 工单 #17：动作核实与一致边界。恢复时发现未确认的动作，请求用户决定如何处理。
     # 只阻塞该动作（blocks="action"），不阻塞整个 run。
-    # facts 列出涉及的事件编号（tool_started/tool_called 对）；options 按工具是否可重复决定是否包含 reexecute
+    # facts 列出涉及的事件编号（tool_started/tool_called 对）；options 按工具是否可重复决定是否包含 reexecute；
+    # repeat_attempted 表示这个逻辑动作已经自动重新执行过一次，连续两次结果未知（工单 #307）
     kind: Literal["unknown_action"]
     blocks: Literal["action"]
     options: list[DecisionOption]
@@ -1044,6 +1052,7 @@ class UnknownActionRequested(Payload):
     tool: str
     action_kind: str
     repeatable: bool
+    repeat_attempted: bool = False
 
 
 # 确认接入已有项目的初始 PRD（工单 #136，接入已有项目设计说明第 3.2 节）：请求写在项目流中，

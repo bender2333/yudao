@@ -3841,7 +3841,8 @@
               "running",
               "completed",
               "failed",
-              "unknown"
+              "unknown",
+              "superseded"
             ],
             "title": "Status"
           },
@@ -3926,6 +3927,17 @@
               }
             ],
             "title": "After Snapshot Ref"
+          },
+          "auto_retry_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Retry Of"
           }
         },
         "additionalProperties": false,
@@ -10725,6 +10737,11 @@
           "repeatable": {
             "type": "boolean",
             "title": "Repeatable"
+          },
+          "repeat_attempted": {
+            "type": "boolean",
+            "title": "Repeat Attempted",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -12189,9 +12206,23 @@
             "title": "Error"
           },
           "resolution": {
-            "const": "continue",
+            "enum": [
+              "auto_reexecute",
+              "continue"
+            ],
             "title": "Resolution",
             "type": "string"
+          },
+          "auto_retry_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Retry Of"
           },
           "note": {
             "anyOf": [
@@ -31103,6 +31134,17 @@
                 "type": "null"
               }
             ]
+          },
+          "auto_retry_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Retry Of"
           }
         },
         "required": [

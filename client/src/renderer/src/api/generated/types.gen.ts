@@ -217,7 +217,7 @@ export type ActionView = {
     /**
      * Status
      */
-    status: 'running' | 'completed' | 'failed' | 'unknown';
+    status: 'running' | 'completed' | 'failed' | 'unknown' | 'superseded';
     /**
      * Activation Id
      */
@@ -251,6 +251,10 @@ export type ActionView = {
     after_snapshot_ref?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Auto Retry Of
+     */
+    auto_retry_of?: string | null;
 };
 
 /**
@@ -4228,6 +4232,10 @@ export type UnknownActionRequested = {
      * Repeatable
      */
     repeatable: boolean;
+    /**
+     * Repeat Attempted
+     */
+    repeat_attempted?: boolean;
 };
 
 /**
@@ -5012,7 +5020,11 @@ export type ActionVerifiedPayload = {
     /**
      * Resolution
      */
-    resolution: 'continue';
+    resolution: 'auto_reexecute' | 'continue';
+    /**
+     * Auto Retry Of
+     */
+    auto_retry_of?: string | null;
     /**
      * Note
      */
@@ -14362,6 +14374,10 @@ export type ToolStartedPayload = {
      */
     snapshot_hash?: string | null;
     before_snapshot_ref?: ArtifactRef | null;
+    /**
+     * Auto Retry Of
+     */
+    auto_retry_of?: string | null;
 };
 
 /**
