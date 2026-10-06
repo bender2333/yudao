@@ -80,7 +80,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - `CLAUDE.md`：架构师规则（本文件）。
 - `AGENTS.md`：执行者规则。
 - `claude_jour.md`：架构师日记。
-- `agents_jour.md`：执行者日记。
+- `agents_jour/`：执行者与审查者的日记，一张工单一个文件（`agents_jour/<工单编号>.md`）；`agents_jour.md` 是 2026-10-06 之前的日记，不再追加。
 
 ### docs/
 - `docs/program-roadmap.md`：总体路线图，阶段定义与依赖的入口。
@@ -175,7 +175,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
   `模型 ID / 时间（分钟） / 行动或者想法或者其他`
 - 示例：
   `<当前模型 ID> / 2026-09-24 14:20 / 梳理 docs/ 归档结构，建立 docs/CHANGELOG.md 与 claude_jour.md，并在 CLAUDE.md 中更新文档分类、变更日志与日记规范`
-- 执行者的日记是 `agents_jour.md`，由执行者维护。2026-09-24 之前的设计日记 `jour.md` 已停止追加，位于 `docs/archive/jour.md`，只在追溯历史时读取。
+- 执行者与审查者的日记在 `agents_jour/<工单编号>.md`，由他们各自维护，随工单的分支提交；2026-10-06 之前的日记是 `agents_jour.md`。2026-09-24 之前的设计日记 `jour.md` 已停止追加，位于 `docs/archive/jour.md`，只在追溯历史时读取。
 
 # 规则
 1. 不保留向后兼容。过时的直接删，别加兼容层、别写migration、别留fallback。事件日志中的项目流与机器流是唯一的例外：跨 Yudao 版本保存，只增加字段、事件种类或已有字段的取值，已有字段的含义不变（[ADR-0019](docs/adr/0019-project-stream-across-versions.md)）。

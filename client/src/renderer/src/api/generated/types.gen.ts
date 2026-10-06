@@ -589,6 +589,10 @@ export type Catalog = {
      * Reload Error
      */
     reload_error: string | null;
+    /**
+     * Default Timeout Sec
+     */
+    default_timeout_sec: number;
     presets: CatalogPresets;
     capability_table: CatalogCapabilityTable;
     /**

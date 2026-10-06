@@ -10,7 +10,6 @@ import type { ViewSync } from "../../contract/view-sync";
 import type {
   Catalog,
   CatalogDocument,
-  CatalogTestFinishedPayload,
   ChangeImpact,
   EventObject,
 } from "../../api/generated/types.gen";
@@ -38,6 +37,8 @@ import {
   rowFromManual,
   rowToModelInput,
   rowsSavable,
+  testKeyOf,
+  testText,
   tierOptions,
   type CandidateState,
   type FormState,
@@ -183,9 +184,14 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setForm({ mode: "edit", state: formStateFromProvider(provider) });
   }, []);
 
+  // 新建连接的请求时限取目录合同的 default_timeout_sec（工单 #294）：默认值只在后端有一份
   const openAdd = useCallback(() => {
+    const current = catalogRef.current;
+    if (current === null) {
+      return;
+    }
     setFormStatus(null);
-    setForm({ mode: "add", state: emptyFormState() });
+    setForm({ mode: "add", state: emptyFormState(current.default_timeout_sec) });
   }, []);
 
   const runSave = useCallback(async (body: Record<string, unknown>) => {
@@ -519,6 +525,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                   <tbody>
                     {provider.models.map((model) => {
                       const admission = admissionOf(provider.id, model.id, catalog.admissions);
+                      const result = tests[`model:${model.id}`];
+                      const running = testing[`model:${model.id}`] === true;
                       return (
                         <tr key={model.id} data-testid={`model-${model.id}`}>
                           <td>{model.model}</td>
@@ -529,14 +537,20 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                           <td>{admissionLabel(admission)}</td>
                           <td>
                             <button type="button" data-testid={`row-test-${model.id}`}
-                                    disabled={testing[`model:${model.id}`] === true}
+                                    disabled={running}
                                     onClick={() => void testModel(provider.id, model.id)}>
-                              {testing[`model:${model.id}`] ? "测试中…" : "模型测试"}
+                              {running ? "测试中…" : "模型测试"}
                             </button>
                             <button type="button" data-testid={`row-remove-${model.id}`}
                                     onClick={() => void removeModel(provider.id, model.id)}>
                               移除
                             </button>
+                            {/* 模型测试的结果写在这一行里：通过写用时，失败写原因（工单 #294） */}
+                            {(running || result !== undefined) && (
+                              <p className="mm-meta" role="status" data-testid={`model-result-${model.id}`}>
+                                {running ? "模型测试中…" : result}
+                              </p>
+                            )}
                           </td>
                         </tr>
                       );
@@ -588,6 +602,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           impact={confirmImpactText(saveImpact)}
           busy={busy}
           testing={testing}
+          tests={tests}
           status={formStatus}
           onSubmit={() => void submitForm()}
           onCancel={() => setForm(null)}
@@ -746,19 +761,6 @@ function interpret(outcome: CommandOutcome): SubmitResult {
     ok: false,
     message: current === null || current === undefined ? rejection.message : `${rejection.message}（当前版本 ${current}）`,
   };
-}
-
-function testKeyOf(payload: CatalogTestFinishedPayload): string {
-  return payload.kind === "connection" ? `connection:${payload.provider_id}` : `model:${payload.model_id}`;
-}
-
-function testText(payload: CatalogTestFinishedPayload): string {
-  if (payload.ok) {
-    return payload.kind === "model"
-      ? `模型测试通过（${payload.elapsed_ms} 毫秒${payload.actual_model ? `，实际返回 ${payload.actual_model}` : ""}${payload.admitted ? "，已准入" : ""}）`
-      : `连接测试通过（${payload.elapsed_ms} 毫秒）`;
-  }
-  return payload.kind === "model" ? `模型测试未通过：${payload.error ?? ""}` : `连接测试未通过：${payload.error ?? ""}`;
 }
 
 // 某部门当前绑定到所选模型的已保存请求档位（设计说明第 9.1 节）：绑定指向别的模型时没有已保存档位
