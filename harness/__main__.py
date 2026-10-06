@@ -95,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"phase={projection.phase} outcome={projection.outcome} stop={projection.stop_reason}")
         print(f"transitions: {' | '.join(projection.transitions)}")
         print(f"requests={projection.request_count} reworks={projection.rework_count} events={projection.stream_version}")
-        print(f"console: yudao api --data-dir {args.data_dir}")
+        print(f"api: yudao api --data-dir {args.data_dir}")
         return 0
     if command == "api":
         error = listen_error(args.access, args.host)
