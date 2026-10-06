@@ -75,9 +75,9 @@ def _wait_for(predicate, timeout=_WAIT_LIMIT):
     return False
 
 
-def _open_initial_prd(client, project_id) -> dict:
+def _open_initial_prd(client, project_id) -> dict | None:
     decisions = client.get(f"/api/queries/decisions.list?project_id={project_id}").json()["data"]["decisions"]
-    return next(item for item in decisions if item["kind"] == "initial_prd" and item["status"] == "open")
+    return next((item for item in decisions if item["kind"] == "initial_prd" and item["status"] == "open"), None)
 
 
 def _onboard(client, opened, tmp_path):
