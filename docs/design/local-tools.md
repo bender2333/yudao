@@ -9,7 +9,7 @@
 3. 模型可以看到命令退出状态和输出；成功退出只证明该命令成功，任务是否完成由独立质检判断。
 4. 工程提交确定的完整代码树；质检在独立副本上运行公开检查并给出结论；项目按已有规则采纳。
 
-代码快照接入只包含来源、版本与摘要、文件清单、初始基线和隔离副本，由 `project.onboard` 使用；`work_item.create` 没有代码快照来源。建档事项、初始 PRD 与基线采纳见[接入已有项目设计说明](existing-project-onboarding.md)（[D33](../requirements/existing-project-onboarding.md)）。
+代码快照接入只包含来源、版本与摘要、文件清单、初始基线和隔离副本，由 `project.onboard` 使用；`work_item.create` 没有代码快照来源；`project.create` 的起始文件夹用同一条采集路径，见[项目的起始文件夹设计说明](project-initial-files.md)。建档事项、初始 PRD 与基线采纳见[接入已有项目设计说明](existing-project-onboarding.md)（[D33](../requirements/existing-project-onboarding.md)）。
 
 ## 2. 工具边界
 

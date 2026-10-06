@@ -1,6 +1,6 @@
 # 接入已有项目设计说明
 
-更新：2026-10-02。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定；2026-10-02 建档的读取顺序写在事项种类的工作说明中，用户写入部门 Prompt 以后仍然放入，见第 4.2 节，工单 #248），未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
+更新：2026-10-06（取消等待确认的建档事项只写 `project_decision_withdrawn`，当前 PRD 由 `baseline_adopted` 的字段引用，新建项目可以带起始文件夹，见第 3.1、3.3、5、12 节）。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定；2026-10-02 建档的读取顺序写在事项种类的工作说明中，用户写入部门 Prompt 以后仍然放入，见第 4.2 节，工单 #248），未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
 
 依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0014](../adr/0014-versioned-definitions.md)（带版本的定义）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../prototypes/v8/BUILD.md)第 5.2、8.3 节）。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
@@ -43,7 +43,7 @@
 - 源目录路径按 `source_directory.save` 的规则处理（应用层设计说明第 10 节第 6 项）：命令中填写的路径同时成为这个项目的第一条源目录登记，以后在项目设置中查看与修改。
 - 快照在命令的事务之前采集（与 `start_work_item_from_snapshot` 相同），采集失败时命令被拒绝，不建立项目，不写入任何事件；已经保存的快照工件按内容摘要寻址，重复无害。
 - 拒绝原因：`source_invalid`（新增：源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据从公开树中去掉，不算宿主私有路径）、公开树中有无法表示的条目，`message` 列出工作区内的相对路径与处理方法，处理方法与 D09 的 `workspace_unrepresentable` 相同）、`busy`（3.4A 之前）、`provider_unavailable`；`onboarding.restart` 另有 `not_found`、`project_archived`、`not_allowed`（项目由想法新建、已有基线、已有进行中或等待确认的建档事项）。
-- 取消建档使用已有的 `work_item.cancel`：建档 run 进行中时按原有规则取消 run；run 已结束、正在等待确认时撤销决定请求，项目流记下这个事项的放弃结果（#126 定义的事项结果事件，原因为用户取消）。
+- 取消建档使用已有的 `work_item.cancel`：建档 run 进行中时按原有规则取消 run；run 已结束、正在等待确认时撤销决定请求（写入 `project_decision_withdrawn`，原因为用户取消），投影据此把事项显示为已停止，项目保持没有基线。
 - `project.archive` 在建档事项进行中或等待确认时按原有规则拒绝（`work_item_in_progress`），用户先取消建档事项。
 
 ### 3.2 决定种类
@@ -71,7 +71,7 @@
 | `onboarding_revision_started` | 用户提出修改以后的新一轮：事项、新的 run、所依据的候选事件、修改意见的工件引用 | 新增 |
 | `baseline_adopted` | 建档采纳：采纳编号、事项、run、候选事件、`tree_ref` 与 `code_tree_digest`（等于快照）、当前 PRD（按 #126 为项目流中当前 PRD 规定的字段）、结构说明引用、基线检查、现有缺陷、快照来源 | 新增；投影把它作为项目的当前采纳成果，与 `deliverable_adopted` 并列（`harness/projection.py` 中 `DELIVERABLE_ADOPTED` 的处理） |
 
-建档事项的放弃（取消、停止）使用 #126 定义的事项结果事件。
+建档事项的放弃：等待确认时取消写入 `project_decision_withdrawn`；建档 run 进行中取消或停止时按 run 流的原有规则记录（`run_failed` 与停止原因），项目流不增加事件种类。
 
 **run 流**（跟随 run 事件版本）
 
@@ -234,12 +234,12 @@ sequenceDiagram
 用户确认时，写入口在同一个事务中追加 `project_decision_answered` 与 `baseline_adopted`：
 
 - **第一次采纳的成果是快照本身。** `tree_ref` 与 `code_tree_digest` 就是 `project.onboard` 采集的快照；这是项目的第一个采纳成果（`previous_adoption_id` 为空）。
-- **当前有效要求。** 确认的初始 PRD 成为项目流中的当前 PRD（ADR-0019，字段由 #126 确定）。以后的事项创建时按已有做法取得基线（`projects.py:394-406`），项目上下文写入「仍有效的决定」一节的内容来自这份 PRD；产品在它的基础上写出变更后的 ProductSpec，质检按变更后的完整 PRD 核验，原有功能的失败从此可以判定为缺陷。
+- **当前有效要求。** 确认的初始 PRD 由 `baseline_adopted` 的 `prd_ref` 与 `product_spec_hash` 引用，成为项目的当前 PRD（ADR-0019）。以后的事项创建时按已有做法取得基线（`projects.py:394-406`），项目上下文写入「仍有效的决定」一节的内容来自这份 PRD；产品在它的基础上写出变更后的 ProductSpec，质检按变更后的完整 PRD 核验，原有功能的失败从此可以判定为缺陷。
 - **项目上下文中的基线。** 项目上下文（`project_context_text`，`projects.py:211-241`）对建档采纳写出：「已有项目的代码快照」、文件数、git 提交、基线检查与现有缺陷；不逐个列出快照中的文件。
 - **现有缺陷。** 基线核验中的 `existing_defect` 与其他失败记为采纳成果的已知风险，用户以后可以为它们新建事项修复。
 - 源目录在整个过程中只被读取，不被改写；以后的变更由交付提供（本地通用工具设计说明第 1 节）。
 - **源目录以后的修改不进入项目。** 项目从快照开始在 Yudao 中独立演进，建档以后源目录中的修改不会同步进来；要在源目录的新代码上工作，把它接入为新项目。
-- **已有代码的唯一入口。** 已有代码只经 `project.onboard` 进入 Yudao；`work_item.create` 没有代码快照来源参数，事项总是从项目的采纳成果（或新项目的空树）开始。
+- **已有项目的入口。** 已有项目的代码经 `project.onboard` 接入并建档；`work_item.create` 没有代码快照来源参数，事项总是从项目的起点开始：有采纳成果时是采纳成果，没有时是新建项目时给出的起始文件夹的快照，都没有时是空树（[项目的起始文件夹设计说明](project-initial-files.md)）。
 
 ## 6. 失败与中断
 
@@ -353,7 +353,7 @@ flowchart LR
 
 2026-09-29 用户采纳以下五项，原话：「采纳推荐，目前先支持本机进行，容器就是走本机RPC?这样的话与远程机器通信一致了」。
 
-1. **已有代码只经 `project.onboard` 进入。** `work_item.create` 没有代码快照来源参数（#74 的范围随之缩小为 `source_directory.save`）。由代码快照开始的普通事项没有初始 PRD，采纳以后项目的当前 PRD 只覆盖一次变更，正是 D33 要解决的问题。评测场景 2 的 Yudao 运行器先建档，由运行器回答初始 PRD 的确认，再新建事项；建档的用量与耗时在报告中单独列出（[评测场景设计](evaluation-scenarios.md)第 5.2、9 节）。
+1. **已有项目的代码经 `project.onboard` 接入并建档。** `work_item.create` 没有代码快照来源参数（#74 的范围随之缩小为 `source_directory.save`）。由代码快照开始的普通事项没有初始 PRD，采纳以后项目的当前 PRD 只覆盖一次变更，正是 D33 要解决的问题。评测场景 2 的 Yudao 运行器先建档，由运行器回答初始 PRD 的确认，再新建事项；建档的用量与耗时在报告中单独列出（[评测场景设计](evaluation-scenarios.md)第 5.2、9 节）。新建项目带的起始文件夹（2026-10-06，[项目的起始文件夹设计说明](project-initial-files.md)）不建档，适合少量的起点文件；完整的已有仓库用 `project.onboard`。
 2. **建档以后源目录的修改不进入项目。** Yudao 从快照开始独立演进，源目录以后的修改不会同步进来；要在新代码上工作时，把源目录接入为新项目（第 5 节）。同步外部修改需要合并两条独立演进的代码与 PRD，属于单独的需求。
 3. **检查的时限为 600 秒。** 原来定义中的 `check_timeout_sec` 为 30 秒，真实仓库的测试集常常超过这个时间，超时的检查只能记为失败，基线失真。限额定义的新版本中改为 600 秒（与登记命令的最大时限 `command_timeout_max_sec` 相同），普通事项的检查同样适用（第 4.2 节）。
 4. **验收使用的真实项目。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v9 的示例项目），建档以后的事项实现 issue 842；这个仓库约 1.3 万行、有完整的测试集，与原型的示例数据一致（第 10 节第 1 项）。
