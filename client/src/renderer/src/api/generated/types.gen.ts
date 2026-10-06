@@ -297,6 +297,50 @@ export type AdoptionView = {
      * Event Id
      */
     event_id: string | null;
+    /**
+     * Previous Adoption Id
+     */
+    previous_adoption_id: string | null;
+    /**
+     * Onboarding Baseline
+     */
+    onboarding_baseline: boolean;
+    /**
+     * Snapshot Source
+     */
+    snapshot_source: string | null;
+    /**
+     * Snapshot Provenance
+     */
+    snapshot_provenance: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Existing Defect Count
+     */
+    existing_defect_count: number;
+};
+
+/**
+ * ArtifactRef
+ */
+export type ArtifactRef = {
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Media Type
+     */
+    media_type: string | null;
 };
 
 /**
@@ -425,6 +469,138 @@ export type AwayReport = {
      * Facts
      */
     facts: Array<ReportFact>;
+};
+
+/**
+ * BaselineCheck
+ */
+export type BaselineCheck = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Argv
+     */
+    argv: Array<string>;
+    /**
+     * Exit Code
+     */
+    exit_code: number;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Snapshot Hash
+     */
+    snapshot_hash: string;
+};
+
+/**
+ * BaselineConclusion
+ */
+export type BaselineConclusion = {
+    /**
+     * Requirement
+     */
+    requirement: string;
+    /**
+     * Status
+     */
+    status: 'verified' | 'read_only' | 'existing_defect' | 'unsupported';
+    /**
+     * Evidence
+     */
+    evidence: string;
+};
+
+/**
+ * BaselineOmission
+ */
+export type BaselineOmission = {
+    /**
+     * Capability
+     */
+    capability: string;
+    /**
+     * Location
+     */
+    location: string;
+};
+
+/**
+ * BaselineOtherFailure
+ */
+export type BaselineOtherFailure = {
+    /**
+     * Check
+     */
+    check: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
+ * BaselineReviewProposal
+ */
+export type BaselineReviewProposal = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Conclusions
+     */
+    conclusions: Array<BaselineConclusion>;
+    /**
+     * Omissions
+     */
+    omissions: Array<BaselineOmission>;
+    /**
+     * Checks
+     */
+    checks: Array<BaselineCheck>;
+    /**
+     * Other Failures
+     */
+    other_failures: Array<BaselineOtherFailure>;
+};
+
+/**
+ * BaselineReviewView
+ */
+export type BaselineReviewView = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Conclusions
+     */
+    conclusions: Array<BaselineConclusion>;
+    /**
+     * Omissions
+     */
+    omissions: Array<BaselineOmission>;
+    /**
+     * Checks
+     */
+    checks: Array<BaselineCheck>;
+    /**
+     * Other Failures
+     */
+    other_failures: Array<BaselineOtherFailure>;
 };
 
 /**
@@ -1143,6 +1319,39 @@ export type ChangeImpact = {
 };
 
 /**
+ * CodeSnapshot
+ */
+export type CodeSnapshot = {
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Tree Digest
+     */
+    tree_digest: string;
+    /**
+     * Files
+     */
+    files: Array<string>;
+    /**
+     * Directories
+     */
+    directories: Array<string>;
+    tree_ref: ArtifactRef;
+    /**
+     * Provenance
+     */
+    provenance?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Bytes
+     */
+    bytes?: number | null;
+};
+
+/**
  * CommandCapability
  */
 export type CommandCapability = {
@@ -1376,6 +1585,10 @@ export type DecisionOption = {
      * Label
      */
     label: string;
+    /**
+     * Note Required
+     */
+    note_required?: boolean;
 };
 
 /**
@@ -1436,7 +1649,7 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested;
+    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested;
     answer: DecisionAnswerRecord | null;
 };
 
@@ -2043,6 +2256,73 @@ export type ImpactWorkItem = {
 };
 
 /**
+ * InitialPrdProposal
+ */
+export type InitialPrdProposal = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    prd_ref: ArtifactRef;
+    /**
+     * Summary
+     */
+    summary?: string | null;
+};
+
+/**
+ * InitialPrdRequested
+ */
+export type InitialPrdRequested = {
+    /**
+     * Kind
+     */
+    kind: 'initial_prd';
+    /**
+     * Blocks
+     */
+    blocks: 'work_item';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality';
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Candidate Run Id
+     */
+    candidate_run_id: string;
+    /**
+     * Round
+     */
+    round: number;
+    prd: InitialPrdProposal;
+    structure: StructureProposal;
+    baseline_review: BaselineReviewProposal;
+    overview_ref: ArtifactRef;
+    snapshot: CodeSnapshot;
+    revision_note_ref?: ArtifactRef | null;
+};
+
+/**
  * InputView
  */
 export type InputView = {
@@ -2293,6 +2573,40 @@ export type OnboardRefs = {
 };
 
 /**
+ * OnboardingDecisionRecord
+ */
+export type OnboardingDecisionRecord = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Outcome
+     */
+    outcome: 'answered' | 'withdrawn';
+    /**
+     * Option
+     */
+    option: string | null;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Reason
+     */
+    reason: string | null;
+    /**
+     * Decided At
+     */
+    decided_at: string;
+};
+
+/**
  * OnboardingRestart
  */
 export type OnboardingRestart = {
@@ -2312,6 +2626,49 @@ export type OnboardingRestart = {
      * Source Name
      */
     source_name: string;
+};
+
+/**
+ * OnboardingRound
+ */
+export type OnboardingRound = {
+    /**
+     * Round
+     */
+    round: number;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Candidate Event Id
+     */
+    candidate_event_id: string;
+    /**
+     * Proposed At
+     */
+    proposed_at: string;
+    /**
+     * Prd
+     */
+    prd: string;
+    /**
+     * Structure
+     */
+    structure: string;
+    /**
+     * Overview
+     */
+    overview: string;
+    /**
+     * Revision Note
+     */
+    revision_note: string | null;
+    baseline_review: BaselineReviewView;
+    /**
+     * Decisions
+     */
+    decisions: Array<OnboardingDecisionRecord>;
 };
 
 /**
@@ -3722,6 +4079,25 @@ export type StreamCapability = {
 };
 
 /**
+ * StructureProposal
+ */
+export type StructureProposal = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    structure_ref: ArtifactRef;
+    /**
+     * Code Tree Digest
+     */
+    code_tree_digest: string;
+};
+
+/**
  * SystemStatus
  */
 export type SystemStatus = {
@@ -4351,6 +4727,10 @@ export type WorkItemMaterialsResult = {
      * Materials
      */
     materials: Array<ProjectMaterial>;
+    /**
+     * Onboarding Rounds
+     */
+    onboarding_rounds: Array<OnboardingRound>;
 };
 
 /**
@@ -4850,28 +5230,6 @@ export type AdoptionHeldPayload = {
 };
 
 /**
- * ArtifactRef
- */
-export type ArtifactRef = {
-    /**
-     * Kind
-     */
-    kind: string;
-    /**
-     * Content Hash
-     */
-    content_hash: string;
-    /**
-     * Path
-     */
-    path: string;
-    /**
-     * Media Type
-     */
-    media_type: string | null;
-};
-
-/**
  * Baseline
  */
 export type Baseline = {
@@ -4895,49 +5253,132 @@ export type Baseline = {
 };
 
 /**
- * BaselineConclusion
+ * BaselineAdoptedEvent
  */
-export type BaselineConclusion = {
+export type BaselineAdoptedEvent = {
     /**
-     * Requirement
+     * Position
      */
-    requirement: string;
+    position: number;
     /**
-     * Status
+     * Previous
      */
-    status: 'verified' | 'read_only' | 'existing_defect' | 'unsupported';
+    previous: number;
     /**
-     * Evidence
+     * Event Id
      */
-    evidence: string;
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'baseline_adopted';
+    payload: BaselineAdoptedPayload;
 };
 
 /**
- * BaselineOmission
+ * BaselineAdoptedPayload
  */
-export type BaselineOmission = {
+export type BaselineAdoptedPayload = {
     /**
-     * Capability
+     * Adoption Id
      */
-    capability: string;
+    adoption_id: string;
     /**
-     * Location
+     * Work Item Id
      */
-    location: string;
-};
-
-/**
- * BaselineOtherFailure
- */
-export type BaselineOtherFailure = {
+    work_item_id: string;
     /**
-     * Check
+     * Run Id
      */
-    check: string;
+    run_id: string;
     /**
-     * Reason
+     * Candidate Event Id
      */
-    reason: string;
+    candidate_event_id: string;
+    tree_ref: ArtifactRef;
+    /**
+     * Code Tree Digest
+     */
+    code_tree_digest: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    prd_ref: ArtifactRef;
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    structure_ref: ArtifactRef;
+    /**
+     * Files
+     */
+    files?: Array<string>;
+    /**
+     * Check Names
+     */
+    check_names?: Array<string>;
+    /**
+     * Checks
+     */
+    checks?: Array<BaselineCheck>;
+    /**
+     * Known Risks
+     */
+    known_risks?: Array<string>;
+    snapshot?: CodeSnapshot | null;
+    /**
+     * Existing Defects
+     */
+    existing_defects?: Array<string>;
+    /**
+     * Previous Adoption Id
+     */
+    previous_adoption_id?: string | null;
 };
 
 /**
@@ -5453,35 +5894,6 @@ export type CheckReceipt = {
      * Summary
      */
     summary: string;
-};
-
-/**
- * CodeSnapshot
- */
-export type CodeSnapshot = {
-    /**
-     * Source
-     */
-    source: string;
-    /**
-     * Tree Digest
-     */
-    tree_digest: string;
-    /**
-     * Files
-     */
-    files: Array<string>;
-    /**
-     * Directories
-     */
-    directories: Array<string>;
-    tree_ref: ArtifactRef;
-    /**
-     * Provenance
-     */
-    provenance?: {
-        [key: string]: unknown;
-    } | null;
 };
 
 /**
@@ -6966,7 +7378,7 @@ export type DecisionRequestedEvent = {
     /**
      * Payload
      */
-    payload: ModelUnavailableRequested | UnknownActionRequested | PauseRequested;
+    payload: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested;
 };
 
 /**
@@ -8128,6 +8540,97 @@ export type HomeSeenPayload = {
      * Position
      */
     position: number;
+};
+
+/**
+ * InitialPrdProposedEvent
+ */
+export type InitialPrdProposedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'initial_prd_proposed';
+    payload: InitialPrdProposedPayload;
+};
+
+/**
+ * InitialPrdProposedPayload
+ */
+export type InitialPrdProposedPayload = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Round
+     */
+    round: number;
+    prd: InitialPrdProposal;
+    structure: StructureProposal;
+    baseline_review: BaselineReviewProposal;
+    overview_ref: ArtifactRef;
+    snapshot: CodeSnapshot;
+    revision_note_ref?: ArtifactRef | null;
 };
 
 /**
@@ -10296,6 +10799,114 @@ export type ModelStreamProgressPayload = {
 };
 
 /**
+ * OnboardingBasis
+ */
+export type OnboardingBasis = {
+    /**
+     * Candidate Event Id
+     */
+    candidate_event_id: string;
+    /**
+     * Round
+     */
+    round: number;
+    note_ref?: ArtifactRef | null;
+};
+
+/**
+ * OnboardingRevisionStartedEvent
+ */
+export type OnboardingRevisionStartedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'onboarding_revision_started';
+    payload: OnboardingRevisionStartedPayload;
+};
+
+/**
+ * OnboardingRevisionStartedPayload
+ */
+export type OnboardingRevisionStartedPayload = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Candidate Event Id
+     */
+    candidate_event_id: string;
+    /**
+     * Round
+     */
+    round: number;
+    /**
+     * Note
+     */
+    note: string;
+};
+
+/**
  * PlanAcceptedEvent
  */
 export type PlanAcceptedEvent = {
@@ -10713,6 +11324,259 @@ export type ProjectArchivedEvent = {
  */
 export type ProjectArchivedPayload = {
     [key: string]: never;
+};
+
+/**
+ * ProjectDecisionAnsweredEvent
+ */
+export type ProjectDecisionAnsweredEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'project_decision_answered';
+    payload: ProjectDecisionAnsweredPayload;
+};
+
+/**
+ * ProjectDecisionAnsweredPayload
+ */
+export type ProjectDecisionAnsweredPayload = {
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Option
+     */
+    option: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+};
+
+/**
+ * ProjectDecisionRequestedEvent
+ */
+export type ProjectDecisionRequestedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'project_decision_requested';
+    payload: InitialPrdRequested;
+};
+
+/**
+ * ProjectDecisionWithdrawnEvent
+ */
+export type ProjectDecisionWithdrawnEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'project_decision_withdrawn';
+    payload: ProjectDecisionWithdrawnPayload;
+};
+
+/**
+ * ProjectDecisionWithdrawnPayload
+ */
+export type ProjectDecisionWithdrawnPayload = {
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
 };
 
 /**
@@ -11690,6 +12554,11 @@ export type RunCreatedPayload = {
      * Run Event Version
      */
     run_event_version: number;
+    onboarding_basis?: OnboardingBasis | null;
+    /**
+     * Round
+     */
+    round?: number;
 };
 
 /**
@@ -14274,6 +15143,18 @@ export type EventObject = ({
 } & MaterialRecordedEvent) | ({
     type: 'source_directory_configured';
 } & SourceDirectoryConfiguredEvent) | ({
+    type: 'initial_prd_proposed';
+} & InitialPrdProposedEvent) | ({
+    type: 'project_decision_requested';
+} & ProjectDecisionRequestedEvent) | ({
+    type: 'project_decision_answered';
+} & ProjectDecisionAnsweredEvent) | ({
+    type: 'project_decision_withdrawn';
+} & ProjectDecisionWithdrawnEvent) | ({
+    type: 'onboarding_revision_started';
+} & OnboardingRevisionStartedEvent) | ({
+    type: 'baseline_adopted';
+} & BaselineAdoptedEvent) | ({
     type: 'catalog_revised';
 } & CatalogRevisedEvent) | ({
     type: 'catalog_candidates_collected';
@@ -14808,7 +15689,7 @@ export type CommandDecisionAnswerData = {
 
 export type CommandDecisionAnswerErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, decision_closed, stale_base, option_invalid, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, decision_closed, stale_base, option_invalid, not_allowed, command_id_reused
      */
     409: Rejected;
     /**

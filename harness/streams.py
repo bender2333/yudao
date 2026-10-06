@@ -84,6 +84,12 @@ PROJECT_EVENT_TYPES = frozenset({
     "command_configured",
     "material_recorded",
     "source_directory_configured",
+    "initial_prd_proposed",
+    "project_decision_requested",
+    "project_decision_answered",
+    "project_decision_withdrawn",
+    "onboarding_revision_started",
+    "baseline_adopted",
 })
 
 # 目录流：模型目录与凭据的修订记录，以及排空与强制升级、用户查看过的位置。

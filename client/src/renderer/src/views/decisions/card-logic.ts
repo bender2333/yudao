@@ -160,6 +160,16 @@ export function face(
   };
 }
 
+// 选项要求写说明时，没有说明的回答不提交：返回要显示的提示，可以提交时返回空串。
+// 像素画面（pixel/floor/card.ts）与页面卡片（views/decisions/card.tsx）都按这条规则处理，
+// 提示由同一个函数给出，两处的文字不会分叉。
+export function missingNoteText(option: { label: string; note_required?: boolean }, note: string): string {
+  if (option.note_required && note.trim() === "") {
+    return `「${option.label}」需要在说明里写明修改意见`;
+  }
+  return "";
+}
+
 // 等待回答的请求按发出时间排列（v8 第 4.3 节：跨项目，按发出时间）
 export function sortByRequested(decisions: DecisionView[]): DecisionView[] {
   return [...decisions].sort((a, b) => {
