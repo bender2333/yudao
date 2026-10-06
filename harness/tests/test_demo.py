@@ -40,4 +40,4 @@ def test_demo_fills_four_views(data_dir):
         project_id=projection.project_id, department="product", work_item=projection.work_item_id))
     assert workspace.data.context["manifests"]
     # 产品部门在 demo 改 Prompt 之前的激活用内置默认（版本 0），之后用项目部门设置（版本 1）
-    assert workspace.data.prompt.used_version == 1
+    assert workspace.data.department_setting.used_version == 1
