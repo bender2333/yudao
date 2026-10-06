@@ -3799,7 +3799,7 @@
     "input_modalities": [
      "text"
     ],
-    "input_token_estimate": 8738,
+    "input_token_estimate": 8737,
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "max_output_tokens": 4800,
@@ -3829,7 +3829,7 @@
     "snapshot_hash": "<sha256#50>",
     "source_event_id": null,
     "step_id": 1,
-    "token_estimate": 8744,
+    "token_estimate": 8743,
     "tokens_charged": 0,
     "truncated": false
    }
@@ -4850,7 +4850,7 @@
     "input_modalities": [
      "text"
     ],
-    "input_token_estimate": 6879,
+    "input_token_estimate": 6878,
     "input_version": 1,
     "logical_call_id": "<act#6>:root-1:work",
     "max_output_tokens": 4800,
@@ -4880,7 +4880,7 @@
     "snapshot_hash": "<sha256#77>",
     "source_event_id": null,
     "step_id": 1,
-    "token_estimate": 6886,
+    "token_estimate": 6885,
     "tokens_charged": 0,
     "truncated": false
    }
@@ -6528,7 +6528,7 @@
     "guidance_ids": [],
     "guidance_only": false,
     "injected": "<shared#6>",
-    "input_token_estimate": 8738,
+    "input_token_estimate": 8737,
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
@@ -6541,7 +6541,7 @@
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#69>",
     "step_id": 1,
-    "token_estimate": 8744,
+    "token_estimate": 8743,
     "truncated": false
    },
    {
@@ -6574,7 +6574,7 @@
     "guidance_ids": [],
     "guidance_only": false,
     "injected": "<shared#7>",
-    "input_token_estimate": 6879,
+    "input_token_estimate": 6878,
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
@@ -6587,7 +6587,7 @@
     "session_id": "<ses_qua#1>",
     "source_event_id": "<evt#89>",
     "step_id": 1,
-    "token_estimate": 6886,
+    "token_estimate": 6885,
     "truncated": false
    }
   ],
@@ -9159,7 +9159,7 @@
    {
     "digest": "<sha256#85>",
     "source": "current_delivery_spec",
-    "tokens": 387,
+    "tokens": 386,
     "version": "r2"
    },
    {
@@ -9171,7 +9171,7 @@
    {
     "digest": "<sha256#87>",
     "source": "department_history",
-    "tokens": 3457,
+    "tokens": 3456,
     "version": "quality"
    },
    {

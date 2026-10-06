@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.environment import LocalEnvironment
+from harness.environment import LocalEnvironment, _display_argv
 from harness.models import EventType, json_dumps
 from harness.public_tree import UnrepresentableWorkspace
 from harness.proposals import delivery_turn, plan_turn, product_spec
@@ -149,6 +149,21 @@ def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp
     assert receipt is not None
     assert receipt.exit_code == 3
     assert "host-executed" in receipt.summary
+
+
+def test_check_receipt_shows_the_host_interpreter_as_python():
+    # 回执里的解释器名称固定为 python，各平台的回执文字与 token 估计相同
+    assert json.loads(_display_argv([sys.executable, "-c", "print('smoke ok')"])) == [
+        "python", "-c", "print('smoke ok')"]
+
+
+def test_check_receipt_shows_a_workspace_program_as_its_own_path(tmp_path):
+    # 不是主机解释器的程序原样显示，工作区里的路径不换写法
+    workspace = Workspace(tmp_path)
+    workspace.write_file("tools/echo.py", "raise SystemExit(0)\n")
+    script = str(workspace.root / "tools" / "echo.py")
+    assert _display_argv([script]) == json_dumps([script])
+    assert _display_argv([sys.executable, script]) == json_dumps(["python", script])
 
 
 def test_run_check_requires_command(tmp_path):
