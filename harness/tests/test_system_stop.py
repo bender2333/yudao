@@ -102,6 +102,25 @@ def test_client_update_serves_the_manifest_and_supports_range(tmp_path):
         assert partial.content == installer[4:8]
         assert partial.headers["content-range"] == f"bytes 4-7/{len(installer)}"
 
+def test_client_update_serves_the_installer_of_the_service_version(tmp_path):
+    # 工单 #313：发布资源目录里同时有两个版本的安装程序时，更新源按文件名取文件，不按名字排序取第一个；
+    # 客户端请求的是清单里的那一个。清单引用的安装程序与另一个版本的安装程序字节不同，据此核对
+    directory = tmp_path / "release_assets"
+    directory.mkdir()
+    current = b"current-installer-bytes"
+    (directory / "Yudao-Setup-0.1.1.exe").write_bytes(current)
+    (directory / "Yudao-Setup-0.1.0.exe").write_bytes(b"previous-installer-bytes")
+    (directory / "latest.yml").write_bytes(b"version: 0.1.1\npath: Yudao-Setup-0.1.1.exe\n")
+    data_dir = tmp_path / "data"
+    with running_server(lambda: _open(data_dir), release_assets=ReleaseAssets(directory)) as handle:
+        manifest = handle.client.get("/client-update/latest.yml")
+        assert manifest.status_code == 200
+        named = manifest.text.split("path: ")[1].splitlines()[0]
+        served = handle.client.get(f"/client-update/{named}")
+        assert served.status_code == 200 and served.content == current
+        other = handle.client.get("/client-update/Yudao-Setup-0.1.0.exe")
+        assert other.status_code == 200 and other.content == b"previous-installer-bytes"
+
 def test_client_update_reports_no_installer_without_release_assets(tmp_path):
     # 没有发布资源目录时返回 404，响应写明「没有客户端安装包」
     data_dir = tmp_path / "data"
