@@ -757,6 +757,9 @@ class Adoption:
     product_spec_hash: str | None = None
     structure_ref: dict[str, Any] | None = None
     snapshot: dict[str, Any] | None = None
+    # 建档基线中状态为 existing_defect 的结论（工单 #136）：现有缺陷数按它计数，
+    # known_risks 还包含未被结论覆盖的其他失败
+    existing_defects: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return _plain(self)

@@ -5850,6 +5850,17 @@
               }
             ],
             "title": "Provenance"
+          },
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
           }
         },
         "additionalProperties": false,
@@ -7478,6 +7489,17 @@
           },
           "prd_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
           }
         },
         "additionalProperties": false,
@@ -7532,9 +7554,9 @@
             "type": "string",
             "title": "Work Item Id"
           },
-          "run_id": {
+          "candidate_run_id": {
             "type": "string",
-            "title": "Run Id"
+            "title": "Candidate Run Id"
           },
           "round": {
             "type": "integer",
@@ -7576,7 +7598,7 @@
           "facts",
           "department",
           "work_item_id",
-          "run_id",
+          "candidate_run_id",
           "round",
           "prd",
           "structure",
@@ -12887,6 +12909,14 @@
                 "type": "null"
               }
             ]
+          },
+          "existing_defects": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Existing Defects",
+            "type": "array"
           },
           "previous_adoption_id": {
             "anyOf": [
@@ -25293,21 +25323,7 @@
             "type": "string"
           },
           "payload": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelUnavailableRequested"
-              },
-              {
-                "$ref": "#/components/schemas/UnknownActionRequested"
-              },
-              {
-                "$ref": "#/components/schemas/PauseRequested"
-              },
-              {
-                "$ref": "#/components/schemas/InitialPrdRequested"
-              }
-            ],
-            "title": "Payload"
+            "$ref": "#/components/schemas/InitialPrdRequested"
           }
         },
         "required": [

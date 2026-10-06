@@ -87,6 +87,8 @@ class CodeSnapshot(Payload):
     tree_ref: ArtifactRef
     # 快照的 git 来源：提交、分支与是否有未提交的修改；源目录不是 git 仓库或旧事件没有这个字段时为空
     provenance: dict[str, Any] | None = None
+    # 快照所有公开文件的总字节数；旧事件没有这个字段时为空（ADR-0019）
+    bytes: int | None = None
 
 
 class InputRecord(Payload):
@@ -960,12 +962,13 @@ class DecisionOption(Payload):
     # 空说明的回答由服务端以 not_allowed 拒绝；旧事件没有这个字段时按不必填理解
     note_required: bool = False
 
-
 class InitialPrdProposal(Payload):
-    # 候选中的初始 PRD：接纳它的事件编号、ProductSpec 的内容哈希与 PRD.md 的工件引用
+    # 候选中的初始 PRD：接纳它的事件编号、ProductSpec 的内容哈希与 PRD.md 的工件引用；
+    # summary 是给用户看的 PRD 摘要（原型 v8 的 materials.prd_summary）
     event_id: str
     content_hash: str
     prd_ref: ArtifactRef
+    summary: str | None = None
 
 
 class StructureProposal(Payload):
@@ -1056,7 +1059,8 @@ class InitialPrdRequested(Payload):
     facts: list[str]
     department: Department
     work_item_id: str
-    run_id: str
+    # 提出修改以后要继续的建档 run（候选所属的 run）；这个请求本身不属于任何 run
+    candidate_run_id: str
     round: int
     prd: InitialPrdProposal
     structure: StructureProposal
@@ -1294,6 +1298,8 @@ class BaselineAdoptedPayload(Payload):
     checks: list[BaselineCheck] = []
     known_risks: list[str] = []
     snapshot: CodeSnapshot | None = None
+    # 基线核验中状态为 existing_defect 的结论；现有缺陷数按它计数（known_risks 还含其他失败）
+    existing_defects: list[str] = []
     previous_adoption_id: str | None = None
 
 
@@ -1431,7 +1437,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.MATERIAL_RECORDED: MaterialRecordedPayload,
     ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: SourceDirectoryConfiguredPayload,
     ProjectEventType.INITIAL_PRD_PROPOSED: InitialPrdProposedPayload,
-    ProjectEventType.PROJECT_DECISION_REQUESTED: DecisionRequestedPayload,
+    ProjectEventType.PROJECT_DECISION_REQUESTED: InitialPrdRequested,
     ProjectEventType.PROJECT_DECISION_ANSWERED: ProjectDecisionAnsweredPayload,
     ProjectEventType.PROJECT_DECISION_WITHDRAWN: ProjectDecisionWithdrawnPayload,
     ProjectEventType.ONBOARDING_REVISION_STARTED: OnboardingRevisionStartedPayload,

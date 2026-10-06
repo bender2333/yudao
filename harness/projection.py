@@ -221,9 +221,9 @@ def apply_decision_event(decisions: dict[str, DecisionRequest], event: Event | P
                                "withdrawn_at": event.created_at}
         return decision.decision_id
     if event.type == ProjectEventType.PROJECT_DECISION_REQUESTED:
-        # 项目流中的决定请求（工单 #136）：与 run 流中的请求同字段，所属的事项与 run 写在载荷里
+        # 项目流中的决定请求（工单 #136）：不属于任何 run，run_id 为空，所属事项与候选 run 在载荷里
         decisions[event.event_id] = DecisionRequest(
-            decision_id=event.event_id, stream=event.stream, run_id=payload.get("run_id"),
+            decision_id=event.event_id, stream=event.stream, run_id=None,
             project_id=event.project_id, work_item_id=payload.get("work_item_id"),
             requested_at=event.created_at, request=dict(payload),
         )
@@ -1089,6 +1089,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             adopted_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
             prd_ref=payload["prd_ref"], product_spec_hash=payload["product_spec_hash"],
             structure_ref=payload["structure_ref"], snapshot=payload.get("snapshot"),
+            existing_defects=list(payload.get("existing_defects") or []),
         )
         state.adoptions.append(adoption)
         state.current_adoption = adoption

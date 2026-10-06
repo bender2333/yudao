@@ -53,10 +53,10 @@ async def _answer_decision(application: Application, command: Command, request: 
 
 
 def _decision_refs(events: list[Event | ProjectEvent]) -> DecisionRefs:
-    # 回答首先写入，结束运行的事件跟在它后面；项目流中的请求属于事项，所属的 run 取自载荷
+    # 回答首先写入，结束运行的事件跟在它后面。项目流中的请求属于事项、不属于任何 run（工单 #136），
+    # 项目事件的 run_id 由载荷给出，载荷没有 run_id 时为空
     [answered] = events[:1]
-    return DecisionRefs(decision_id=answered.payload["decision_id"],
-                        run_id=answered.run_id if answered.project_id is None else answered.payload.get("run_id"))
+    return DecisionRefs(decision_id=answered.payload["decision_id"], run_id=answered.run_id)
 
 
 DECISION_ANSWER = CommandDefinition(

@@ -6,7 +6,7 @@
       "check_names": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线不声明改动文件，基线检查按名称取自被确认的候选",
       "checks": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的基线检查取自被确认候选中的检查回执",
       "code_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码树摘要等于建档快照的摘要",
-      "files": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线不声明改动文件，代码以快照为准",
+      "files": "这个事件种类是新增的，旧版本的项目流中没有它：以代码为准：填入快照的全部文件",
       "known_risks": "这个事件种类是新增的，旧版本的项目流中没有它：已知风险取自基线核验中状态为 existing_defect 的结论与其他失败",
       "prd_ref": "这个事件种类是新增的，旧版本的项目流中没有它：初始 PRD 的工件引用取自被确认的建档候选",
       "previous_adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线是项目的第一个采纳版本，上一版为空",
@@ -16,7 +16,9 @@
       "structure_ref": "这个事件种类是新增的，旧版本的项目流中没有它：现有结构说明的工件引用取自被确认的建档候选",
       "summary": "这个事件种类是新增的，旧版本的项目流中没有它：采纳摘要取自建档 run 的现有结构说明",
       "tree_ref": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码树取自建档快照",
-      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线属于建档事项"
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线属于建档事项",
+      "existing_defects": "这个事件种类是新增的，旧版本的项目流中没有它：现有缺陷取自基线核验中状态为 existing_defect 的结论"
+    },
     "command_configured": {
       "repeatable": "旧事件没有登记「可以重新执行」这个声明（#242）；没有这个字段时按否处理，结果未知的动作不自动重新执行"
     },
@@ -172,6 +174,7 @@
       "check_names": "array[string]",
       "checks": "array[object]",
       "code_tree_digest": "string",
+      "existing_defects": "array[string]",
       "files": "array[string]",
       "known_risks": "array[string]",
       "prd_ref": "object",
@@ -252,7 +255,23 @@
       "run_id": "string?",
       "work_item_id": "string"
     },
-    "project_decision_requested": {},
+    "project_decision_requested": {
+      "baseline_review": "object",
+      "blocks": "const string[work_item]",
+      "candidate_run_id": "string",
+      "department": "const string[product]",
+      "description": "string",
+      "facts": "array[string]",
+      "kind": "const string[initial_prd]",
+      "options": "array[object]",
+      "overview_ref": "object",
+      "prd": "object",
+      "revision_note_ref": "object?",
+      "round": "integer",
+      "snapshot": "object",
+      "structure": "object",
+      "work_item_id": "string"
+    },
     "project_decision_withdrawn": {
       "decision_id": "string",
       "reason": "string",

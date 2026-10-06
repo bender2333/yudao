@@ -33,7 +33,7 @@ from .environment import LocalEnvironment
 from .deltas import DeltaChannel
 from .event_store import Command, EventStore, StreamVersionConflict, is_run_stream, project_stream, run_stream
 from .write_path import NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
-from .tree_archive import load_tree
+from .tree_archive import artifact_run, load_tree
 from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .streams import (
     DECISION_REASON_RUN_EVENT_VERSION, RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
@@ -259,6 +259,8 @@ class Orchestrator:
         kind: str = "change",
         onboarding_basis: dict[str, Any] | None = None,
         round: int = 0,
+        # 与 run 的创建在同一步写入的第二项输入（建档修改轮的用户修改意见原文，工单 #136）
+        additional_input: str | None = None,
     ) -> str:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
@@ -292,6 +294,8 @@ class Orchestrator:
         workspace_digest = environment.snapshot().digest
         # 部门 Prompt 不在 run 内留副本（工单 #89）：每次模型请求按事项种类与项目部门设置读取
         initial = self.interactions.initial(run_id, task)
+        follow_up = (None if additional_input is None else self.interactions.next_input(
+            run_id, initial["initial_input"], additional_input, version=2))
         sessions = self.sessions.create_run_sessions(run_id)
         self._abort[run_id] = Event()
         project_context_ref = None
@@ -346,9 +350,16 @@ class Orchestrator:
             state_after="PRODUCT_SPEC",
             payload={"from": "CREATED", "to": "PRODUCT_SPEC", "route": "CREATED->PRODUCT_SPEC"},
         )
+        note_received = (NewEvent(
+            EventType.USER_INPUT_RECEIVED, actor="user:local", department="product",
+            state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+            payload=follow_up,
+            artifact_hashes=[follow_up["input_ref"]["content_hash"], follow_up["intend_ref"]["content_hash"]],
+        ) if follow_up is not None else None)
         # 新的 run 流从版本 0 开始；同一编号的 run 已经存在时拒绝
-        self.writes.transact(run_stream(run_id), lambda transaction: transaction.append(run_created, transition),
-                             expected_version=0)
+        self.writes.transact(run_stream(run_id), lambda transaction: transaction.append(
+            *((run_created, transition, note_received) if note_received is not None
+              else (run_created, transition))), expected_version=0)
         return run_id
 
     def project(self, run_id: str) -> RunProjection:
@@ -1484,7 +1495,27 @@ class Orchestrator:
                 return self._answer_run_decision(transaction, decision, option, note, base_version, decision_id)
             return self._answer_project_decision(transaction, decision, option, note, base_version, decision_id)
 
-        return self.writes.transact(saved.stream, answer, command=command)
+        revision_run_id = self.writes.transact(saved.stream, answer, command=command)
+        if revision_run_id is not None and not self.store.stream_events(run_stream(revision_run_id), after_version=0):
+            # 建档修改轮：run 在回答事务提交以后单独建立，进程在两者之间中断时启动时按事件补建（设计第 6 节）
+            self._create_missing_revision_run(revision_run_id)
+        return revision_run_id
+
+    def _create_missing_revision_run(self, run_id: str) -> None:
+        # 按 onboarding_revision_started 事件建立缺少的 run；run 流从版本 0 开始，重复创建被拒绝
+        for project_id in self.store.list_project_ids():
+            for event in self.store.list_project_events(project_id):
+                if event.type != ProjectEventType.ONBOARDING_REVISION_STARTED or event.payload["run_id"] != run_id:
+                    continue
+                state = self.projects.projection(project_id)
+                candidate = next((entry for entry in state.initial_prd_candidates
+                                  if entry.event_id == event.payload["candidate_event_id"]), None)
+                if candidate is None:
+                    raise ValueError(f"onboarding candidate {event.payload['candidate_event_id']} is gone")
+                self.create_revision_run(project_id, candidate, run_id, int(event.payload["round"]),
+                                          event.payload.get("note"))
+                return
+        raise ValueError(f"no onboarding revision event names run {run_id}")
 
     def _answer_run_decision(self, transaction: Transaction, decision: DecisionRequest, option: str, note: str | None,
                              base_version: int, decision_id: str) -> str | None:
@@ -1519,34 +1550,35 @@ class Orchestrator:
 
     def _answer_project_decision(self, transaction: Transaction, decision: DecisionRequest, option: str,
                                  note: str | None, base_version: int, decision_id: str) -> str | None:
-        # 项目流中的决定请求（工单 #136）：确认初始 PRD 时在同一事务中追加回答与 baseline_adopted，
-        # 提出修改时追加回答与 onboarding_revision_started 并开始新一轮建档 run。
-        # 项目流中的请求不属于任何 run，返回空（没有 run 需要在这里继续）
+        # 项目流中的决定请求（工单 #136）：确认初始 PRD 时在同一事务中追加回答与 baseline_adopted；
+        # 提出修改时在同一个事务中追加回答与 onboarding_revision_started，返回新 run 编号，
+        # 由调用方 start：run 在事务提交以后单独建立（设计第 4.7、6 节）
         if option == "revise" and not (note or "").strip():
             raise NoteRequired(decision, option)
         request = decision.request
         work_item_id = request["work_item_id"]
-        run_id = request.get("run_id")
+        candidate_run_id = request.get("candidate_run_id")
         transaction.append(NewProjectEvent(ProjectEventType.PROJECT_DECISION_ANSWERED, {
             "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
-            "work_item_id": work_item_id, "run_id": run_id,
+            "work_item_id": work_item_id, "run_id": candidate_run_id,
         }, actor="system"))
         if decision.kind != INITIAL_PRD.name:
             return None
         candidate = next((item for item in transaction.projection.initial_prd_candidates
-                          if item.run_id == run_id), None)
+                          if item.run_id == candidate_run_id), None)
         if candidate is None:
             return None
         if option == "confirm":
             self._adopt_baseline(transaction, candidate, decision_id)
             return None
-        self._start_onboarding_revision(transaction, candidate, note, decision_id)
-        return None
+        return self._start_onboarding_revision(transaction, candidate, note)
 
     def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
         # 采纳建档基线（工单 #136，设计第 5 节）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
         # 都取自建档候选；现有缺陷与其他失败记为采纳成果的已知风险
         snapshot = candidate.snapshot
+        defects = [item["requirement"] for item in candidate.baseline_review["conclusions"]
+                   if item["status"] == "existing_defect"]
         known_risks = [f'现有缺陷：{item["requirement"]}（{item["evidence"]}）'
                        for item in candidate.baseline_review["conclusions"]
                        if item["status"] == "existing_defect"]
@@ -1560,28 +1592,30 @@ class Orchestrator:
             "structure_ref": candidate.structure["structure_ref"], "files": list(snapshot.get("files") or []),
             "check_names": [item["name"] for item in candidate.baseline_review["checks"]],
             "checks": list(candidate.baseline_review["checks"]), "known_risks": known_risks,
-            "snapshot": snapshot, "previous_adoption_id": None,
+            "snapshot": snapshot, "previous_adoption_id": None, "existing_defects": defects,
         }, actor="system"))
 
-    def _start_onboarding_revision(self, transaction: Transaction, candidate: Any, note: str | None,
-                                   decision_id: str) -> None:
-        # 建档修改轮（工单 #136，设计第 3.3、4.7 节）：同一个建档事项开始新一轮 run，从快照重新建立工作区。
-        # 修改轮事件在答案的同一个事务中写入，run 与修改意见的输入在事务提交以后创建：
-        # 进程在两者之间中断时，启动时按 onboarding_revision_started 补建（设计第 6 节）
+    def _start_onboarding_revision(self, transaction: Transaction, candidate: Any, note: str | None) -> str:
+        # 建档修改轮（工单 #136，设计第 3.3、4.7、6 节）：修改轮事件与回答在同一个事务中写入，返回新 run 编号；
+        # run 在事务提交以后单独一步建立（事务之间中断时，启动时按 onboarding_revision_started 补建）。
+        # 事务提交到 run 建立之间是一个可以单独被终止的窗口
         round_number = candidate.round + 1
         run_id = new_id("run")
-        item = transaction.projection.work_item(candidate.work_item_id)
-        text = "" if item is None else item.text
-        transaction.on_commit(lambda: self._create_revision_run(
-            transaction.projection.project_id, candidate, text, run_id, round_number, note))
+        transaction.append(NewProjectEvent(ProjectEventType.ONBOARDING_REVISION_STARTED, {
+            "work_item_id": candidate.work_item_id, "run_id": run_id,
+            "candidate_event_id": candidate.event_id, "round": round_number,
+            "note": None if note is None else note.strip(),
+        }, actor="system"))
+        return run_id
 
-    def create_revision_run(self, project_id: str, candidate: Any, text: str, run_id: str, round_number: int,
+    def create_revision_run(self, project_id: str, candidate: Any, run_id: str, round_number: int,
                             note: str | None) -> None:
         # 建立修改轮的 run：从同一个快照建立工作区，run_created 的 onboarding_basis 记下这一轮的依据，
-        # 修改意见的工件按这一轮 run 的目录存放并作为它的第一项用户输入。
+        # 修改意见的工件按这一轮 run 的目录存放，并与 run 的创建在同一步作为它的第二项输入写入。
         # 启动补做按同一条 onboarding_revision_started 事件再调一次，run 流从版本 0 开始，重复创建被拒绝
         snapshot = candidate.snapshot
-        tree = load_tree(self.artifacts, candidate.run_id, ArtifactRef(**snapshot["tree_ref"]))
+        tree_ref = ArtifactRef(**snapshot["tree_ref"])
+        tree = load_tree(self.artifacts, artifact_run(tree_ref.path), tree_ref)
         # 项目上下文、限额与部门 Prompt 版本取自同一个建档事项（这一轮仍是它）；
         # 冻结的登记命令取自上一轮 run 的 run_created：事项创建时的副本，命令版本仍随项目后续变化
         prior = project_run(self.store, candidate.run_id)
@@ -1593,7 +1627,7 @@ class Orchestrator:
             ref = self.artifacts.put(run_id, "revision_note", note.strip(), media_type="text/markdown")
             note_ref = asdict(ref)
         self.create_run(
-            text, max_cycles=item.max_cycles, run_time_limit_sec=item.run_time_limit_sec,
+            item.text, max_cycles=item.max_cycles, run_time_limit_sec=item.run_time_limit_sec,
             context_window=item.context_window, run_id=run_id, kind="onboarding", initial_tree=tree,
             code_snapshot=snapshot, project_id=project_id, work_item_id=candidate.work_item_id,
             project_context=self.artifacts.get(ArtifactRef(**prior.project_context_ref)).decode("utf-8"),
@@ -1603,29 +1637,8 @@ class Orchestrator:
             round=round_number,
             onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
                               "note_ref": note_ref},
+            additional_input=note.strip() if note_ref is not None else None,
         )
-        if note_ref is not None:
-            self.add_input(run_id, note.strip())
-
-    def _create_revision_run(self, project_id: str, candidate: Any, text: str, run_id: str, round_number: int,
-                             note: str | None) -> None:
-        # 先写入修改轮事件（run 已登记、run 还没有创建），再建立 run；建立失败时记下这个事项的失败原因
-        self.writes.transact(project_stream(project_id), lambda transaction: transaction.append(NewProjectEvent(
-            ProjectEventType.ONBOARDING_REVISION_STARTED, {
-                "work_item_id": candidate.work_item_id, "run_id": run_id,
-                "candidate_event_id": candidate.event_id, "round": round_number,
-                "note": None if note is None else note.strip(),
-            }, actor="system")))
-        try:
-            self.create_revision_run(project_id, candidate, text, run_id, round_number, note)
-        except Exception as exc:
-            self.writes.append(project_stream(project_id), NewProjectEvent(
-                ProjectEventType.WORK_ITEM_START_FAILED,
-                {"work_item_id": candidate.work_item_id, "run_id": run_id,
-                 "error": str(exc) or type(exc).__name__},
-                actor="system",
-            ))
-            raise
 
     def _continue_paused_run(self, transaction: Transaction, decision_id: str, decision: DecisionRequest) -> None:
         # 用户回答「处理以后继续执行」：把 run 从 PAUSED 恢复到暂停时的阶段，下一次激活由流程编排接着开始。

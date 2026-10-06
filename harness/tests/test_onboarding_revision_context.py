@@ -64,8 +64,9 @@ def _two_round_onboarding(tmp_path: Path) -> dict:
     [decision] = open_decisions
     assert decision.kind == "initial_prd"
     command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:revise:{decision.version}", "user:local")
-    assert system.orchestrator.answer_decision(decision.decision_id, "revise", NOTE,
-                                               base_version=decision.version, command=command) is None
+    revision_run_id = system.orchestrator.answer_decision(
+        decision.decision_id, "revise", NOTE, base_version=decision.version, command=command)
+    assert revision_run_id is not None
 
     revision = next(event for event in system.store.list_project_events(project_id)
                     if event.type == ProjectEventType.ONBOARDING_REVISION_STARTED)

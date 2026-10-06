@@ -262,8 +262,8 @@ def _work_item_stats(items: list[Any]) -> WorkItemStats:
 
 def _adoption(item: Any) -> AdoptionView | None:
     # 建档基线（工单 #136，设计第 5 节）：prd_ref 有值说明这次采纳的成果是接入时采集的快照本身；
-    # 快照来源取它的 source 与 provenance，旧事件没有 provenance 时为空。现有缺陷数是基线核验里的
-    # existing_defect 与其他失败（写入采纳成果时就是全部已知风险）；普通交付采纳不是建档基线，为 0
+    # 快照来源取它的 source 与 provenance，旧事件没有 provenance 时为空。现有缺陷数是基线核验里状态为
+    # existing_defect 的结论数；known_risks 还含未被结论覆盖的其他失败，不计入。普通交付采纳不是建档基线，为 0
     if item is None:
         return None
     snapshot = item.snapshot or {}
@@ -275,7 +275,7 @@ def _adoption(item: Any) -> AdoptionView | None:
         onboarding_baseline=baseline, snapshot_source=snapshot.get("source"),
         previous_adoption_id=item.previous_adoption_id,
         snapshot_provenance=snapshot.get("provenance"),
-        existing_defect_count=len(item.known_risks) if baseline else 0,
+        existing_defect_count=len(item.existing_defects) if baseline else 0,
     )
 
 

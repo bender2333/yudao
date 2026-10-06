@@ -1341,6 +1341,10 @@ export type CodeSnapshot = {
     provenance?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Bytes
+     */
+    bytes?: number | null;
 };
 
 /**
@@ -2260,6 +2264,10 @@ export type InitialPrdProposal = {
      */
     content_hash: string;
     prd_ref: ArtifactRef;
+    /**
+     * Summary
+     */
+    summary?: string | null;
 };
 
 /**
@@ -2295,9 +2303,9 @@ export type InitialPrdRequested = {
      */
     work_item_id: string;
     /**
-     * Run Id
+     * Candidate Run Id
      */
-    run_id: string;
+    candidate_run_id: string;
     /**
      * Round
      */
@@ -5359,6 +5367,10 @@ export type BaselineAdoptedPayload = {
      */
     known_risks?: Array<string>;
     snapshot?: CodeSnapshot | null;
+    /**
+     * Existing Defects
+     */
+    existing_defects?: Array<string>;
     /**
      * Previous Adoption Id
      */
@@ -11471,10 +11483,7 @@ export type ProjectDecisionRequestedEvent = {
      * Type
      */
     type: 'project_decision_requested';
-    /**
-     * Payload
-     */
-    payload: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested;
+    payload: InitialPrdRequested;
 };
 
 /**
