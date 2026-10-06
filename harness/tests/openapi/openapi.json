@@ -12222,7 +12222,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Auto Retry Of"
           },
           "note": {
@@ -31134,8 +31133,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           },
           "auto_retry_of": {
             "anyOf": [
@@ -31146,7 +31144,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Auto Retry Of"
           }
         },
