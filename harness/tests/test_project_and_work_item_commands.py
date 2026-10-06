@@ -278,6 +278,39 @@ def test_work_item_execution_runs_in_loop_and_settles_on_completion(data_dir):
         assert project_run(opened.store, run_id).phase == "DONE"
 
 
+def test_busy_does_not_block_on_in_process_task_table_after_terminal_event(data_dir):
+    # #231：run 的终态已经写入事件日志，但进程内的任务表（_work_item_tasks）要到事件循环的
+    # 下一轮才摘除这一条目；这个窗口内 busy() 只能按事件日志判断，不能把任务表非空当作占用
+    # （#202、#219 的结论）。构造这个窗口而不是靠等待时间碰运气：run 真正跑完以后，
+    # 手工把一个还没有结束的协程放回任务表，模拟摘除之前的瞬间，断言新事项仍被接受。
+    opened = _Opened(data_dir, adapter=FakeAdapter(demo_script()))
+    with running_api(opened) as client:
+        created = _post(client, "project.create", name="任务表窗口", goal="验证占用判断")
+        project_id = created.json()["refs"]["project_id"]
+        item_res = _post(client, "work_item.create", project_id=project_id, text="构建 CLI 工具")
+        assert item_res.status_code == 200, item_res.text
+        run_id = item_res.json()["refs"]["run_id"]
+
+        # run 跑到终态并完成结算：事件日志里已经没有未结束的 run
+        assert _wait_for(lambda: project_run(opened.store, run_id).phase == "DONE")
+        assert _wait_for(lambda: any(
+            event.type == ProjectEventType.DELIVERABLE_ADOPTED
+            for event in opened.store.list_project_events(project_id)))
+
+        orchestrator = opened.system.orchestrator
+        assert run_id not in orchestrator._work_item_tasks  # noqa: SLF001 — 真正的清理此时已经发生
+
+        # 手工把一个还没有结束的任务放回任务表，模拟终态事件已写入、摘除还没有发生的瞬间
+        # busy() 修复以后不再读这个表，占位对象不需要是真的 asyncio 任务
+        orchestrator._work_item_tasks[run_id] = object()  # noqa: SLF001
+        try:
+            assert orchestrator.busy() is False
+            second = _post(client, "work_item.create", project_id=project_id, text="第二个事项")
+            assert second.status_code == 200, second.text
+        finally:
+            del orchestrator._work_item_tasks[run_id]  # noqa: SLF001
+
+
 def test_startup_settles_pending_and_query_does_not_settle(data_dir):
     # run 达到 DONE、进程在结算前退出；重启服务时由流程编排补做结算
     system = LoopSystem.for_testing(data_dir, FakeAdapter(demo_script()))

@@ -307,7 +307,7 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
           ["选择来源", selectionSourceName(optionalText(callTarget.selection_source))],
           ["模型", `请求 ${show(optionalText(attempt.requested_model))}，实际 ${show(optionalText(attempt.actual_model))}`],
           ["协议与档位", `请求 ${show(optionalText(callTarget.requested_tier))}，实际发送 ${show(optionalText(callTarget.sent_tier))}`],
-          ["部门 Prompt 版本", attempt.prompt_version === null || attempt.prompt_version === undefined ? "未上报" : `第 ${String(attempt.prompt_version)} 版`],
+          ["部门设置版本", attempt.prompt_version === null || attempt.prompt_version === undefined ? "未上报" : `第 ${String(attempt.prompt_version)} 版`],
           ["第几步 / 第几次尝试", `${show(optionalText(attempt.step))} / ${show(optionalText(attempt.attempt))}`],
           ["开始与结束", `${formatTime(optionalText(attempt.started_at))} → ${formatTime(optionalText(attempt.finished_at))}（${formatNumberOr(numberValue(attempt.duration_ms), " 毫秒")}）`],
           ["用量", text(attempt.usage) === "" ? "未上报" : JSON.stringify(attempt.usage)],
