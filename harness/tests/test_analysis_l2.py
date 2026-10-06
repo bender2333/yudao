@@ -8,6 +8,7 @@ from harness.analysis import load_evidence_pack
 from harness.analysis.records import EvidenceError
 from harness.analysis.review import MATERIAL_PROTOCOL, review_from_manifest
 from harness.models import json_dumps
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 REQ_EMPTY = {"id": "empty-input", "version": "v1", "text": "空输入不会崩溃"}
 REQ_ECHO = {"id": "echo", "version": "v1", "text": "正常输入结果保持正确"}
@@ -18,7 +19,7 @@ CHECK_EMPTY = {
     "expected_stdout_utf8": "",
     "expected_exit_code": 0,
     "repeats": 1,
-    "timeout_sec": 2,
+    "timeout_sec": WAIT_FOR_HOST_WORK_SEC,
 }
 CHECK_ECHO = {
     "id": "echo",
@@ -27,7 +28,7 @@ CHECK_ECHO = {
     "expected_stdout_utf8": "hello\n",
     "expected_exit_code": 0,
     "repeats": 1,
-    "timeout_sec": 2,
+    "timeout_sec": WAIT_FOR_HOST_WORK_SEC,
 }
 CRASH_EMPTY = "import sys\ndata = sys.stdin.read()\nif not data:\n    raise SystemExit(1)\nsys.stdout.write(data)\n"
 BREAK_ECHO = "import sys\ndata = sys.stdin.read()\nsys.stdout.write(data[::-1] if data else '')\n"
