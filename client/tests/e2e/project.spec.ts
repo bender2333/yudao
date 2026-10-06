@@ -217,7 +217,7 @@ async function pathText(page: Page): Promise<string> {
 
 // 试用页面上不应出现的开发用语与英文内部提示（工单 #303 的验收）：接口名、工单编号、
 // 内部词 run、英文停止原因与英文阶段名。`Yudao` 是产品名，先去掉再检查。
-const FORBIDDEN = /(?<![A-Za-z])run(?![A-Za-z])|released|observe-detail|project\.(overview|flow|attempts|settings)|work_item\.(inputs|create|append_input|cancel|reorder)|material\.record|event\.detail|guidance\.send|department_settings\.save|run\.(actions|attempt)|[A-Z][A-Z_]{3,}|#\d+/;
+const FORBIDDEN = /(?<![A-Za-z])run(?![A-Za-z])|released|observe-detail|project\.(overview|flow|attempts|settings)|work_item\.(inputs|create|append_input|cancel|reorder)|material\.record|event\.detail|guidance\.send|department_settings\.save|run\.(actions|attempt)|[A-Z][A-Z_]{3,}|#\d+|设计说明|TODO/;
 
 async function expectNoDeveloperText(page: Page, where: string): Promise<void> {
   const text = (await bodyText(page)).replaceAll("Yudao", "");
@@ -245,6 +245,21 @@ async function settingsVersion(page: Page, id: string): Promise<number> {
 // 结束时核对控制台错误为零。改变服务端状态的用例排在后面（决定解答与实时事项放最后）。
 
 test.describe("项目页面（1440×900）", () => {
+  test("连接设置页：访问令牌写明当前版本不需要填写，页面上没有开发用语", async () => {
+    const client = await openProjectClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      await page.evaluate(() => { window.location.hash = "#/connect"; });
+      await expect(page.getByLabel("访问令牌")).toBeDisabled();
+      await expect(page.locator(".gate .note")).toHaveText("访问令牌：当前版本不需要填写，以后需要时再启用。");
+      await expectNoDeveloperText(page, "连接设置页");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
   test("概览：摘要、循环画面、看板与流转记录都来自查询", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);

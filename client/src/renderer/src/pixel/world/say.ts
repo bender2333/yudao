@@ -54,7 +54,7 @@ const commandOf = (ev: PixelFloorEvent, pl: Record<string, unknown>): string | n
   (pl.command as string) || (pl.name as string) || (/([A-Za-z][\w.\-]*)\s*$/.exec(String(ev.label || "")) || [])[1] || null;
 
 function toolText(ev: PixelFloorEvent, pl: Record<string, unknown>): string | null {
-  const tool = String(ev.tool ?? pl.tool ?? "");
+  const tool = String(ev.tool ?? pl.tool ?? pl.name ?? "");
   const file = fileOf(ev, pl);
   if (tool === "search") return `现在翻找资料${pl.query ? `：${cut(pl.query, 12)}` : ""}`;
   if (/^read/.test(tool)) return `现在阅读${file ? ` ${cut(baseName(file), 16)}` : "资料"}`;

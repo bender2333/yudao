@@ -192,16 +192,21 @@ test.describe("系统首页（1440×900）", () => {
         const target = before[0];
         const card = client.page.locator(`#decision-${target.decision_id}`);
         await expect(card).toBeVisible();
-        // 按卡片给出的选项回答（继续执行），提交以后显示「已提交」（事件很快到达时卡片会先移出列表）
+        // 按卡片给出的选项回答（继续执行）。提交以后只显示一条「已提交」提示（工单 #319：
+        // 提交提示重复过一次）；事件很快到达时卡片先移出列表，这两种情况都算通过
         await card.getByRole("button", { name: "继续执行" }).click();
         await expect
           .poll(async () => {
-            const hint = await card.locator("span.hint").count();
-            if (hint > 0) {
+            const hints = await card.locator("span.hint").allInnerTexts();
+            const submitted = hints.filter((line) => line.includes("已提交"));
+            if (submitted.length > 1) {
+              return `重复：${submitted.join(" / ")}`;
+            }
+            if (submitted.length === 1) {
               return "已提交";
             }
             return (await card.count()) === 0 ? "已提交" : "";
-          }, { message: "提交以后显示「已提交」" })
+          }, { message: "提交以后显示一条「已提交」" })
           .toBe("已提交");
         // 事件到达以后这张卡片移出等待列表
         await waitUntil(

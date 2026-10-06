@@ -206,7 +206,7 @@ function UsageSection(props: { usage: { data: UsageReport | null; loading: boole
   const totals = dict(data.totals);
 
   return (
-    <Section title="用量统计" note="只读显示，不显示成预算（第 7.4 节）">
+    <Section title="用量统计" note="只读显示用量，不做预算判断">
       <KeyValue
         items={[
           ["请求数", `${formatNumberOr(numberValue(totals.attempts))}（上报 ${formatNumberOr(numberValue(totals.reported))}）`],

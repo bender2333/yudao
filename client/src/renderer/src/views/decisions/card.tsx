@@ -131,7 +131,6 @@ export function DecisionCard(props: DecisionCardProps) {
                 {option.label}
               </button>
             ))}
-            {isSubmitted ? <span className="hint" role="status">已提交，等待控制主机确认</span> : null}
           </div>
           {noteMissing === "" ? null : (
             <span className="hint" role="status">

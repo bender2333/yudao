@@ -52,7 +52,6 @@ def value_name(value: Any) -> str:
 def item_count(items: Any) -> str:
     # 标识清单按数量写，说明里不出现一串机器标识
     return f"{len(items)} 个"
-    return f"{DEPARTMENT_LABELS.get(value, value)}部门"
 
 
 def event_label(event_type: str, payload: dict[str, Any]) -> str:

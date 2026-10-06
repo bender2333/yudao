@@ -664,6 +664,9 @@ class DepartmentWorkspaceResult(Contract):
     work_item_id: str | None
     run_id: str | None
     phase: str | None
+    # 事项状态与停止原因：用户停止的事项在部门页写「已停止」，不写「执行失败」（工单 #319）
+    status: str | None
+    stop_reason: str | None
     active: bool
     department_setting: DepartmentSettingState
     setting: DepartmentSetting
@@ -852,6 +855,8 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             project_id=state.project_id, department=request.department,
             work_item_id=None if item is None else item.work_item_id,
             run_id=None if run is None else run.run_id, phase=None if run is None else run.phase,
+            status=None if item is None else item.status,
+            stop_reason=None if run is None else run.stop_reason,
             active=False if run is None else run.active_department == request.department,
             department_setting=DepartmentSettingState(
                 department=request.department, configured_version=configured.version,

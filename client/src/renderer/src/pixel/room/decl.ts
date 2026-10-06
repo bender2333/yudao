@@ -80,7 +80,8 @@ export function resolveAction(ev: PixelFloorEvent): string | null {
   if (!entry) return null;
   if (typeof entry === "string") return entry;
   const pl = (ev.payload ?? {}) as Record<string, unknown>;
-  const key = entry.by === "tool" ? (ev.tool ?? (pl.tool as string))
+  // 真实系统把工具名写在载荷的 name 上（登记命令与读取工具都如此），没有映射字段时按它取
+  const key = entry.by === "tool" ? (ev.tool ?? (pl.tool as string) ?? (pl.name as string))
     : entry.by === "reason" ? ((pl.reason as string) ?? (pl.stopReason as string))
       : entry.by === "kind" ? (pl.kind as string)
         : (pl.verdict as string);
