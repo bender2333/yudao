@@ -66,6 +66,8 @@ class AdoptionView(Contract):
     code_tree_digest: str
     adopted_at: str
     event_id: str | None
+    # 采纳链：上一次采纳的成果。建档基线是第一个采纳成果，这里为空（设计第 5 节）
+    previous_adoption_id: str | None
     # 建档基线特有的三项（工单 #136，设计第 3.4 节）：是否为建档采纳的基线、快照来源（采集的源目录与
     # git 提交、分支、是否有未提交的修改）、现有缺陷数。普通事项的交付采纳：基线为假、来源为空、缺陷数为 0
     onboarding_baseline: bool
@@ -272,6 +274,7 @@ def _adoption(item: Any) -> AdoptionView | None:
         files=list(item.files), check_names=list(item.check_names), known_risks=list(item.known_risks),
         code_tree_digest=item.code_tree_digest, adopted_at=item.adopted_at, event_id=item.event_id,
         onboarding_baseline=baseline, snapshot_source=snapshot.get("source"),
+        previous_adoption_id=item.previous_adoption_id,
         snapshot_provenance=snapshot.get("provenance"),
         existing_defect_count=len(item.known_risks) if baseline else 0,
     )
