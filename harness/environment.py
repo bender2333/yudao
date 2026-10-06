@@ -606,10 +606,9 @@ def _resolve_argv(workspace: Workspace, argv: list[str], *, cwd: Path | None = N
 
 def _display_argv(argv: list[str]) -> str:
     shown = []
-    python = Path(sys.executable).name
     for index, item in enumerate(argv):
         if index == 0 and Path(item).resolve() == Path(sys.executable).resolve():
-            shown.append(python)
+            shown.append("python")
         else:
             shown.append(item)
     return json_dumps(shown)

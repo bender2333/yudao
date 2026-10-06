@@ -20,11 +20,8 @@ from .data_directory import DISTRIBUTION, configure_logging, default_data_dir
 from .data_directory import default_dotenv as default_dotenv_path
 from .data_directory import default_provider_config as default_provider_config_path
 from .demo import run_demo
-from .providers import ProviderFacade
-from .runtime import LoopSystem
 from .smoke import DEFAULT_DIR as SMOKE_DIR
 from .smoke import run_smoke, smoke_exit_code
-from .web.server import serve
 
 # 数据目录的进程锁：同一个数据目录只允许一个服务进程（应用层与接口层设计说明第 7.2 节），锁在进程退出时释放
 SERVICE_LOCK = "service.lock"
@@ -53,14 +50,6 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
     demo = sub.add_parser("demo", help="run a fake end-to-end sample")
     demo.add_argument("--data-dir", default=str(default_dir))
-    demo.add_argument("--serve", action="store_true")
-    demo.add_argument("--host", default="127.0.0.1")
-    demo.add_argument("--port", type=int, default=8765)
-    web = sub.add_parser("serve", help="serve the loop console")
-    web.add_argument("--data-dir", default=str(default_dir))
-    web.add_argument("--host", default="127.0.0.1")
-    web.add_argument("--port", type=int, default=8765)
-    web.add_argument("--provider-config", default=str(default_config))
     # 写在 api 之前或之后的选项都有效；没有写时取上面的默认值
     api = sub.add_parser("api", help="serve the application interface (commands, queries, capabilities)")
     api.add_argument("--data-dir", default=argparse.SUPPRESS)
@@ -93,7 +82,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    command = args.command or "serve"
+    # 不写子命令时启动新接口（应用层与接口层设计说明第 7.3、7.4 节）
+    command = args.command or "api"
 
     if command == "demo":
         lock = _lock_data_dir(args.data_dir)
@@ -105,17 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"phase={projection.phase} outcome={projection.outcome} stop={projection.stop_reason}")
         print(f"transitions: {' | '.join(projection.transitions)}")
         print(f"requests={projection.request_count} reworks={projection.rework_count} events={projection.stream_version}")
-        if args.serve:
-            return _serve(system, args.host, args.port)
-        print(f"console: python -m harness demo --serve --data-dir {args.data_dir}")
+        print(f"console: yudao api --data-dir {args.data_dir}")
         return 0
-    if command == "serve":
-        # 无参等价全默认 serve：缺配置空态启动，只读任务与配置管理可用
-        lock = _lock_data_dir(args.data_dir)
-        if lock is None:
-            return 1
-        system = production_system(args.data_dir, args.provider_config)
-        return _serve(system, args.host, args.port)
     if command == "api":
         error = listen_error(args.access, args.host)
         if error is not None:
@@ -158,32 +139,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"report: {Path(args.data_dir) / 'smoke-report.md'}")
         return smoke_exit_code(report)
     return 1
-
-
-def _serve(system: LoopSystem, host: str, port: int) -> int:
-    # 服务可启动与任务可创建分开：未就绪提示后仍进控制台，只禁新建真实任务
-    status = system.provider_status()
-    if not status.get("available", False):
-        print(status.get("message", "provider unavailable"), file=sys.stderr)
-    # 控制台默认只绑回环；若显式暴露到非本地网络，需要另行提供认证能力，
-    # 本项不实现远程管理鉴权，凭据写入接口仍按本地管理能力处理
-    if host not in {"127.0.0.1", "localhost", "::1"}:
-        print("console is bound to a non-loopback address without remote authentication", file=sys.stderr)
-    try:
-        server = serve(system, host=host, port=port)
-    except OSError as exc:
-        print(f"cannot serve {host}:{port}: {exc}", file=sys.stderr)
-        return 1
-    print(f"Yudao console {server.base_url}")
-    system.start_provider_watching()
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("stopped")
-    finally:
-        server.server_close()
-        system.close()
-    return 0
 
 
 def _print_query(data_dir: str | Path, name: str, request: Any) -> int:
@@ -236,15 +191,6 @@ def _provider_paths(data_dir: str | Path, provider_config: str | Path | None) ->
     return config, default_dotenv_path(data_dir).resolve()
 
 
-def production_system(data_dir: str | Path, provider_config: str | Path | None) -> LoopSystem:
-    # serve 使用的系统：模型目录与当前目录下的凭据文件 .yudao/.env 解析为固定绝对路径并读取一致版本，
-    # 文件缺少或内容损坏时都以空态启动
-    facade = ProviderFacade()
-    config, dotenv = _provider_paths(data_dir, provider_config)
-    facade.configure_paths(config, dotenv)
-    facade.reload()
-    system = LoopSystem(data_dir, facade=facade)
-    return system
 
 
 if __name__ == "__main__":

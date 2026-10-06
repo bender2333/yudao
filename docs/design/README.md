@@ -48,7 +48,7 @@
   - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)。调研：[客户端打包与更新](../research/client-packaging-and-update.md)。
 - [部门定向指导](department-guidance.md)
   - 内容：部门指导的处理时机、原文范围与放行关系。
-  - 状态：2026-09-06 设计；指导接口已在 `harness/web/server.py` 实现。
+  - 状态：2026-09-06 设计；指导经 `guidance.send` 命令接收，`department.workspace` 查询读取。
   - 需求：[D20](../requirements/department-guidance.md)。
 - [语义系统](semantic-system.md)
   - 内容：整理（轨迹、七类图谱内容与抽象层、写入与证据核对）与上下文组装（栏目、目录、接触时附加、通知、查询、各角色的上下文、长度控制、提示缓存）。
