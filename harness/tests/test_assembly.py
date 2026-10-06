@@ -27,7 +27,7 @@ def _rebuild_recorded_steps(system, run_id):
         return json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**ref)))
 
     events = system.store.list_events(run_id)
-    assembly = ContextAssembly(system.artifacts)
+    assembly = ContextAssembly(system.artifacts, system.store)
     projection = RunProjection()
     frames, steps, outputs = {}, {}, {}
     counts = {"work": 0, "compaction": 0, "recorded": 0}

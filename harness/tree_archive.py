@@ -13,6 +13,11 @@ from .public_tree import CapturedFile, CapturedTree, TreeError, validate_manifes
 ARCHIVE_FORMAT = "yudao-tree-archive-v1"
 
 
+def artifact_run(path: str) -> str:
+    # 工件引用所属的 run：工件按所属 run 的目录存放（工单 #136，第 2 轮起的候选与基线取自己那一轮的快照工件）
+    return str(path).split("/", 1)[0]
+
+
 def store_tree(store: ArtifactStore, run_id: str, tree: CapturedTree) -> ArtifactRef:
     """Store every original blob and publish the manifest only after read-back checks."""
     _validate_run_id(run_id)

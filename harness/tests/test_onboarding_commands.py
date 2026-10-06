@@ -161,8 +161,8 @@ def test_source_invalid_rejects_without_building_the_project(data_dir, tmp_path)
         assert system.store.list_project_ids() == []
 
 def test_new_work_item_is_rejected_before_the_baseline(data_dir, tmp_path):
-    # 验收（第 10 节第 10 项）：建档进行中新建事项被拒绝（work_item_in_progress）；
-    # 建档停止以后返回 not_allowed，onboarding.restart 可用并开始新的建档事项
+    # 验收（第 10 节第 10 项）：建档进行中与等待确认初始 PRD 时新建事项都被拒绝（work_item_in_progress）；
+    # 建档事项被取消、撤销以后返回 not_allowed，onboarding.restart 可用并开始新的建档事项
     source = _source(tmp_path / "source")
     opened = _Opened(data_dir)
     with running_api(opened) as client:
@@ -176,7 +176,14 @@ def test_new_work_item_is_rejected_before_the_baseline(data_dir, tmp_path):
         assert rejected.json()["reason"] == "work_item_in_progress"
         assert _wait_for(lambda: opened.system.project(first_run).phase == "DONE")
         assert _wait_for(lambda: _idle(client))
-        # 建档已经结束，项目还没有基线：普通事项返回 not_allowed
+        # 建档结束、等待用户确认：普通事项仍然被拒绝
+        waiting = _post(client, "work_item.create", project_id=project_id, text="等待确认时新建")
+        assert waiting.status_code == 409, waiting.text
+        assert waiting.json()["reason"] == "work_item_in_progress"
+        # 取消等待确认的建档事项以后：普通事项返回 not_allowed
+        cancelled = _post(client, "work_item.cancel",
+                          work_item_id=opened.system.projects.projection(project_id).work_items[0].work_item_id)
+        assert cancelled.status_code == 200, cancelled.text
         after = _post(client, "work_item.create", project_id=project_id, text="建档后新建")
         assert after.status_code == 409, after.text
         assert after.json()["reason"] == "not_allowed"
@@ -202,13 +209,12 @@ def test_projects_list_and_loop_show_onboarding_status_and_kind(data_dir, tmp_pa
         assert row["onboarding_status"] == "onboarding"
         loop = client.get(f"/api/queries/project.loop?project_id={project_id}").json()["data"]
         assert loop["work_items"][0]["kind"] == "onboarding"
-        # 建档停止、还没有基线：状态为 awaiting_onboarding（等待建档）
+        # 建档结束、等待用户确认初始 PRD：状态为 awaiting_initial_prd（等待确认）
         assert _wait_for(lambda: opened.system.project(accepted.json()["refs"]["run_id"]).phase == "DONE")
         assert _wait_for(lambda: _idle(client))
         row = next(entry for entry in client.get("/api/queries/projects.list").json()["data"]["projects"]
                    if entry["project_id"] == project_id)
-        assert row["onboarding_status"] == "awaiting_onboarding"
-        # 由想法新建的项目没有建档状态标记
+        assert row["onboarding_status"] == "awaiting_initial_prd"
         created = _post(client, "project.create", name="想法项目", goal=GOAL)
         idea_id = created.json()["refs"]["project_id"]
         row = next(entry for entry in client.get("/api/queries/projects.list").json()["data"]["projects"]

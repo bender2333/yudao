@@ -557,7 +557,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     intend_bytes = b""
     received_version = 0
     current_work = RunProjection()
-    assembly = ContextAssembly(artifacts)
+    assembly = ContextAssembly(artifacts, store)
     events = store.list_events(run_id)
     # 重新装配使用当前加载的定义，只能审计按同一版本定义发出的请求；版本不同时先写明，之后的不一致由它引起
     recorded = {event.payload.get("definitions_version") for event in events
