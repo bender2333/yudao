@@ -204,8 +204,9 @@ Python 测试在项目环境中运行：
 
 ```bash
 uv run python -m pytest harness/tests -q
-node --test harness/tests/test_web_ui.js
 ```
+
+客户端的检查在 `client/` 中运行：单元用 `cd client && npm test`，端到端用 `cd client && npm run test:e2e`。
 
 应用接口的 OpenAPI 快照（`harness/tests/openapi/openapi.json`）由 `test_openapi_snapshot.py` 与运行中的服务比较；由快照生成 TypeScript 接口类型并编译：
 

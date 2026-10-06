@@ -1,3 +1,4 @@
+from harness.__main__ import main
 from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace, ProjectFlow, WorkItemMaterials
 from harness.demo import DEMO_CHANGE, DEMO_TASK, run_demo
@@ -41,3 +42,11 @@ def test_demo_fills_four_views(data_dir):
     assert workspace.data.context["manifests"]
     # 产品部门在 demo 改 Prompt 之前的激活用内置默认（版本 0），之后用项目部门设置（版本 1）
     assert workspace.data.department_setting.used_version == 1
+
+
+def test_the_demo_command_prints_the_api_start_command_for_the_same_data_directory(data_dir, capsys):
+    # 旧 Web 控制台已删除（#78），演示的收尾一行给出接口服务的启动命令，写明同一个数据目录
+    assert main(["demo", "--data-dir", str(data_dir)]) == 0
+    printed = capsys.readouterr().out
+    assert f"api: yudao api --data-dir {data_dir}" in printed
+    assert "console" not in printed
