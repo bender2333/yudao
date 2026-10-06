@@ -20,7 +20,7 @@ from .public_tree import (
 )
 from .tree_archive import load_tree, store_tree
 
-SNAPSHOT_FIELDS = frozenset({"source", "tree_digest", "files", "directories", "tree_ref", "provenance"})
+SNAPSHOT_FIELDS = frozenset({"source", "tree_digest", "files", "directories", "tree_ref", "provenance", "bytes"})
 
 
 def ingest_snapshot(source_dir: str | Path, artifacts: ArtifactStore, run_id: str) -> tuple[CapturedTree, dict[str, Any]]:
@@ -35,6 +35,8 @@ def ingest_snapshot(source_dir: str | Path, artifacts: ArtifactStore, run_id: st
         "directories": list(tree.directories),
         "tree_ref": asdict(ref),
         "provenance": git_provenance(source_dir),
+        # 快照所有公开文件的总字节数：确认卡片显示快照规模用（原型 v8 快照的 bytes）
+        "bytes": sum(len(item.data) for item in tree.files),
     }
     return tree, record
 
@@ -58,8 +60,9 @@ def restore_snapshot(
     artifacts: ArtifactStore, run_id: str, snapshot: dict[str, Any], destination: str | Path
 ) -> Path:
     # 仅凭持久化工件恢复：不读源目录，不执行任何命令。
-    # 旧事件没有 provenance 字段（缺省为空，ADR-0019），恢复只依据 tree_ref 与 tree_digest
-    if not isinstance(snapshot, dict) or set(snapshot) not in (SNAPSHOT_FIELDS, SNAPSHOT_FIELDS - {"provenance"}):
+    # 旧事件可能没有 provenance 或 bytes（缺省为空，ADR-0019），恢复只依据 tree_ref 与 tree_digest
+    if not isinstance(snapshot, dict) or not {"source", "tree_digest", "files", "directories",
+                                              "tree_ref"} <= set(snapshot):
         raise TreeError("快照记录字段不完整，无法恢复")
     tree = load_tree(artifacts, run_id, ArtifactRef(**snapshot["tree_ref"]))
     if tree.digest != snapshot["tree_digest"]:

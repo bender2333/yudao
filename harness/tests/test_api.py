@@ -172,7 +172,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "source_directory.save",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "decision.answer", "reasons": ["not_found", "decision_closed", "stale_base", "option_invalid",
-                                               "command_id_reused"]},
+                                               "not_allowed", "command_id_reused"]},
         {"name": "catalog.connection.save", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
         {"name": "catalog.connection.delete", "reasons": ["stale_base", "not_found", "in_use", "command_id_reused"]},
         {"name": "catalog.model.remove",
@@ -229,7 +229,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
     assert capabilities["decisions"] == ["model_unavailable", "definitions_changed", "unknown_action",
-                                         "no_tool_call", "workspace_unrepresentable"]
+                                         "no_tool_call", "workspace_unrepresentable", "initial_prd"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id

@@ -10,7 +10,7 @@ import type { ClientApp } from "../../contract/client-app";
 import { CommandFeedback, KeyValue, TextArea, hasCommand } from "../project/common";
 import { DECISION_KIND, formatDuration, formatTime, label } from "../project/labels";
 import { useCommand } from "../project/use-snapshot";
-import { blockedText, decisionLinks, materialRows, viewHref, waitedSeconds } from "./card-logic";
+import { blockedText, decisionLinks, materialRows, missingNoteText, viewHref, waitedSeconds } from "./card-logic";
 
 export type DecisionCardProps = {
   app: ClientApp | null;
@@ -30,6 +30,8 @@ const submitted = new Set<string>();
 export function DecisionCard(props: DecisionCardProps) {
   const { decision } = props;
   const [note, setNote] = useState("");
+  // 选项要求写说明而说明为空时，提示放在这里并阻止提交（像素画面用同一个函数给同样的提示）
+  const [noteMissing, setNoteMissing] = useState("");
   const command = useCommand(props.app, `${decision.version}/${decision.status}`);
   const answered = decision.status !== "open";
   const waiting = decision.status === "open";
@@ -49,6 +51,16 @@ export function DecisionCard(props: DecisionCardProps) {
   const options = decision.request?.options ?? [];
 
   const answer = (optionId: string) => {
+    const option = options.find((item) => item.id === optionId);
+    if (option === undefined) {
+      return;
+    }
+    const missing = missingNoteText(option, note);
+    if (missing !== "") {
+      setNoteMissing(missing);
+      return;
+    }
+    setNoteMissing("");
     const trimmed = note.trim();
     void command
       .submit("decision.answer", {
@@ -121,6 +133,11 @@ export function DecisionCard(props: DecisionCardProps) {
             ))}
             {isSubmitted ? <span className="hint" role="status">已提交，等待控制主机确认</span> : null}
           </div>
+          {noteMissing === "" ? null : (
+            <span className="hint" role="status">
+              {noteMissing}
+            </span>
+          )}
           <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
         </div>
       )}

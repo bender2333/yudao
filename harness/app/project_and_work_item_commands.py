@@ -178,7 +178,7 @@ async def _create_work_item(application: "Application", command: Command, reques
     # 建档之前的事项（3.8 第 2 节）：接入已有项目还没有基线时，普通事项不能开始
     onboarding = [item for item in project.work_items if item.kind == "onboarding"]
     if project.source == "existing" and project.current_adoption is None and onboarding:
-        if any(item.status == "in_progress" for item in onboarding):
+        if any(item.status in ("in_progress", "awaiting_initial_prd") for item in onboarding):
             raise Rejection("work_item_in_progress", "项目正在建档，结束以后才能新建事项")
         raise Rejection("not_allowed", "项目还没有完成建档，请重新开始建档")
     # 排空期间（3.1，ADR-0019）：Yudao 停止开始新事项，新建的事项排队不开始
@@ -262,14 +262,19 @@ class WorkItemCancel(CommandRequest):
 
 
 async def _cancel_work_item(application: "Application", command: Command, request: WorkItemCancel) -> None:
+    system = application.system
     run_id = _run_id_for(application, request.work_item_id)
     try:
-        projection = application.system.projects.orchestrator.project(run_id)
+        projection = system.orchestrator.project(run_id)
     except RunNotFoundError as missing:
         raise Rejection("not_found", "没有这个事项，请重新读取以后提交") from missing
     if projection.phase in TERMINAL_PHASES:
+        # 建档 run 已结束、正在等待确认初始 PRD 时，取消撤销项目流中的决定请求（工单 #136，设计第 3.1 节）
+        withdrawn = system.projects.withdraw_waiting_initial_prd(request.work_item_id, command=command)
+        if withdrawn:
+            return
         raise Rejection("run_terminal", "事项已经结束，不能再取消")
-    application.system.orchestrator.cancel(run_id, command=command)
+    system.orchestrator.cancel(run_id, command=command)
 
 
 class GuidanceSend(CommandRequest):

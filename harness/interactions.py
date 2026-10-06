@@ -46,6 +46,12 @@ class InteractionWriter:
         return {"initial_input": received,
                 "intend_ref": received["intend_ref"], "git_version": received["git_version"]}
 
+    def next_input(self, run_id: str, previous: dict[str, Any], text: str, *, version: int) -> dict[str, Any]:
+        # run_created 里第一项输入之后的输入：接在同一份原始意图之后，与 run 的创建在同一步写入
+        return self._input(run_id, text, version=version, kind="text",
+                           previous_ref=ArtifactRef(**previous["intend_ref"]),
+                           parent_commit=previous["git_version"]["commit"])
+
     def receive(self, transaction: Transaction, text: str, *, command: bool,
                 base_version: int | None = None) -> Event:
         # 保存输入的原文：更新并发布原始意图，在事务中追加 user_input_received。

@@ -10,6 +10,7 @@ import {
   decisionLinks,
   face,
   materialRows,
+  missingNoteText,
   sortByRequested,
   viewHref,
   waitedSeconds,
@@ -138,4 +139,18 @@ test("给画面用的卡片内容带上决定版本、项目与事项、链接�
   // 没有给出名称时回落到标识
   const bare = face(decision(), now);
   assert.equal(bare.where, "p1 · w1");
+});
+
+test("要求写说明的选项在说明为空时不提交，有说明时通过", () => {
+  // 「提出修改」要求写明修改意见（工单 #136 的决定选项标记 note_required）：说明为空时给出提示，
+  // 页面卡片与像素画面都用这一条规则，写了说明才提交。空白字符不算说明。
+  const revise = { label: "提出修改", note_required: true };
+  const confirm = { label: "确认", note_required: false };
+  assert.equal(missingNoteText(revise, ""), "「提出修改」需要在说明里写明修改意见");
+  assert.equal(missingNoteText(revise, "   \n "), "「提出修改」需要在说明里写明修改意见");
+  assert.equal(missingNoteText(revise, "第三条要求缺少异常处理"), "");
+  // 标记缺省（旧的决定请求）与标记为假时不阻止提交
+  assert.equal(missingNoteText({ label: "确认" }, ""), "");
+  assert.equal(missingNoteText(confirm, ""), "");
+  assert.equal(missingNoteText(confirm, "补充说明"), "");
 });

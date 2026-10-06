@@ -113,7 +113,8 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
         request = decision["request"]
         assert (request["department"], request["reason"], request["message"]) == (
             "engineering", "provider_unavailable", UNAVAILABLE)
-        assert request["options"] == [{"id": "continue", "label": "继续执行"}, {"id": "stop", "label": "停止事项"}]
+        assert request["options"] == [{"id": "continue", "label": "继续执行", "note_required": False},
+                                      {"id": "stop", "label": "停止事项", "note_required": False}]
         assert request["description"] and request["target"]["requested_model"] == "fake-script"
         [failed] = [event for event in system.store.list_events(run_id)
                     if event.type == EventType.MODEL_ATTEMPT_FAILED]
