@@ -5623,6 +5623,11 @@
               }
             ],
             "title": "Output Limit"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -5667,6 +5672,10 @@
           "output_limit": {
             "type": "integer",
             "title": "Output Limit"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable"
           }
         },
         "additionalProperties": false,
@@ -5677,7 +5686,8 @@
           "argv",
           "args",
           "timeout_sec",
-          "output_limit"
+          "output_limit",
+          "repeatable"
         ],
         "title": "CommandSetting"
       },
@@ -13880,6 +13890,11 @@
           "base_version": {
             "title": "Base Version",
             "type": "integer"
+          },
+          "repeatable": {
+            "default": false,
+            "title": "Repeatable",
+            "type": "boolean"
           }
         },
         "required": [
@@ -17953,6 +17968,11 @@
           "output_limit": {
             "title": "Output Limit",
             "type": "integer"
+          },
+          "repeatable": {
+            "default": false,
+            "title": "Repeatable",
+            "type": "boolean"
           }
         },
         "required": [

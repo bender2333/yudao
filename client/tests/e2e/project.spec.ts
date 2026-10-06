@@ -504,10 +504,10 @@ test.describe("项目页面（1440×900）", () => {
       await expect(basics.getByRole("button", { name: "归档项目" })).toBeVisible();
       const departments = await section(page, "部门设置");
       await expect(departments).toContainText("产品（product）");
-      await expect(departments).toContainText("第 1 版；来源 configured（本项目已配置部门 Prompt）");
-      await expect(departments.locator("pre.prompt-text").first()).toContainText(PRODUCT_PROMPT);
+      await expect(departments).toContainText("1 版；来源 configured（本项目已写入部门设置）");
+      await expect(departments.locator("pre.department-setting-text").first()).toContainText(PRODUCT_PROMPT);
       await expect(departments).toContainText("工程（engineering）");
-      await expect(departments).toContainText("第 0 版；来源 default（使用内置默认 Prompt）");
+      await expect(departments).toContainText("0 版；来源 default（跟随部门默认）");
       await expect(departments).toContainText("质检（quality）");
       // 修改部门设置：模型、推理档位与部门 Prompt 三项（第 9.2 节）
       await departments.getByRole("button", { name: "修改部门设置" }).first().click();
@@ -521,6 +521,9 @@ test.describe("项目页面（1440×900）", () => {
       await expect(registry).toContainText("--verbose");
       await expect(registry).toContainText("30 秒");
       await expect(registry).toContainText("第 1 版");
+      // 可以重新执行（工单 #242）：表里有一列，样例登记没有声明
+      await expect(registry.getByRole("columnheader", { name: "可以重新执行" })).toBeVisible();
+      await expect(registry.getByRole("row").filter({ hasText: "smoke" })).toContainText("否");
       await expect(registry.getByRole("button", { name: "登记新命令" })).toBeVisible();
       const sources = await section(page, "源目录");
       await expect(sources).toContainText("没有登记源目录");
@@ -680,6 +683,8 @@ test.describe("项目页面（1440×900）", () => {
       await registry.getByRole("button", { name: "登记新命令" }).click();
       const form = page.locator(".modal-backdrop");
       await expect(form.locator(".modal-head h2")).toHaveText("登记新命令");
+      // 可以重新执行（工单 #242）：新登记默认关闭
+      await expect(form.getByLabel("可以重新执行")).not.toBeChecked();
       await form.getByLabel("登记名").fill("echo-live");
       await form.getByLabel("固定参数").fill("python -c print(1)");
       await form.getByRole("button", { name: "保存" }).click();
@@ -687,6 +692,17 @@ test.describe("项目页面（1440×900）", () => {
       await expect(registry).toContainText("echo-live");
       await expect(registry).toContainText("python -c print(1)");
       await expect(registry).toContainText("第 1 版");
+      await expect(registry.getByRole("row").filter({ hasText: "echo-live" })).toContainText("否");
+      // 修改登记并勾选「可以重新执行」，命令表由事件流更新
+      await registry.getByRole("row").filter({ hasText: "echo-live" })
+        .getByRole("button", { name: "修改" }).click();
+      const editForm = page.locator(".modal-backdrop");
+      await expect(editForm.getByLabel("可以重新执行")).not.toBeChecked();
+      await editForm.getByLabel("可以重新执行").check();
+      await editForm.getByRole("button", { name: "保存" }).click();
+      await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+      await expect(registry.getByRole("row").filter({ hasText: "echo-live" })).toContainText("是");
+      await expect(registry.getByRole("row").filter({ hasText: "echo-live" })).toContainText("第 2 版");
       // 文本工具：给产品部门发一条指导，指导列表由事件流更新
       await gotoView(page, blockedId, "dept/product");
       await expect(await section(page, "产品工作间")).toContainText("工程处理中");

@@ -818,6 +818,8 @@ class RegisteredCommand:
     base_version: int | None = None
     updated_at: str | None = None
     event_id: str | None = None
+    # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）；旧事件没有这个字段时为否
+    repeatable: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return _plain(self)
@@ -825,7 +827,8 @@ class RegisteredCommand:
     def frozen(self) -> dict[str, Any]:
         # 事项创建时冻结进 run 的执行形态：只有固定参数与限额，没有版本管理字段
         return {"argv": list(self.argv), "args": list(self.args),
-                "timeout_sec": self.timeout_sec, "output_limit": self.output_limit}
+                "timeout_sec": self.timeout_sec, "output_limit": self.output_limit,
+                "repeatable": self.repeatable}
 
 
 @dataclass
