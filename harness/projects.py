@@ -635,10 +635,12 @@ class ProjectService:
 
 
     def _work_item_created(self, transaction: Transaction, project: ProjectProjection, text: str, *,
-                           title: str | None, max_cycles: int, run_time_limit_sec: int, context_window: int,
+                           title: str, max_cycles: int, run_time_limit_sec: int, context_window: int,
                            baseline: dict[str, Any] | None, initial_tree: Any, snapshot: dict[str, Any] | None,
                            source_run: Any, work_item_id: str, run_id: str,
-                           priority: str = PRIORITY_USER, kind: str = "change") -> _NewWorkItem:
+                           priority: str = PRIORITY_USER, kind: str = "change",
+                           round: int | None = None, onboarding_basis: dict[str, Any] | None = None,
+                           additional_input: str | None = None) -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
@@ -669,7 +671,8 @@ class ProjectService:
                 initial_tree=initial_tree, code_snapshot=snapshot, project_context=context_text,
                 prompt_config_versions=prompt_config_versions,
                 registered_commands=frozen_commands, command_versions=command_versions, kind=kind,
-                round=1 if kind == "onboarding" else 0,
+                round=(1 if kind == "onboarding" else 0) if round is None else round,
+                onboarding_basis=onboarding_basis, additional_input=additional_input,
             ),
         )
 
@@ -696,6 +699,8 @@ class ProjectService:
             item = project.work_item_for_run(run_id)
             if item is None:
                 return None
+            if item.kind == "onboarding":
+                return self._onboarding_restarted(transaction, project, item, run_id)
             point = self._work_item_start_point(project)
             return self._work_item_created(
                 transaction, project, item.text, title=item.title, max_cycles=item.max_cycles,
@@ -718,6 +723,29 @@ class ProjectService:
             ))
             raise
         return created.work_item_id, created.run_id
+
+    def _onboarding_restarted(self, transaction: Transaction, project: ProjectProjection,
+                              item: WorkItem, run_id: str) -> _NewWorkItem:
+        # 建档事项因升级重新开始（设计第 6 节最后一行）：第一轮用建档事项记录的快照重建，与开始建档时同样
+        # 从快照开始、种类为 onboarding、没有基线、轮次为 1；修改轮带上一轮候选与修改意见重新开始，与回答
+        # 「提出修改」建立的 run 依据相同（轮次、上一轮候选的事件编号、修改意见原文）。
+        # 登记的是同一个建档事项的新 run：事项编号沿用
+        snapshot = item.snapshot
+        if snapshot is None:
+            raise ValueError(f"onboarding work item {item.work_item_id} has no source snapshot")
+        ref = ArtifactRef(**snapshot["tree_ref"])
+        tree = load_tree(self.artifacts, artifact_run(ref.path), ref)
+        prior = project_run(self.store, run_id)
+        basis = prior.onboarding_basis
+        note = None if basis is None or basis.get("note_ref") is None else self.artifacts.get(
+            ArtifactRef(**basis["note_ref"])).decode("utf-8")
+        return self._work_item_created(
+            transaction, project, item.text, title=item.title, max_cycles=item.max_cycles,
+            run_time_limit_sec=item.run_time_limit_sec, context_window=item.context_window,
+            baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
+            work_item_id=item.work_item_id, run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
+            kind="onboarding", round=prior.round, onboarding_basis=basis, additional_input=note,
+        )
 
     def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,
                         command: Command | None = None) -> str:
