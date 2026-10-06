@@ -6,7 +6,7 @@ import uuid
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.app.commands import Rejection
-from harness.app.contracts import EVENT_TYPES, CommandRequest, Contract, NoRefs, Snapshot, Text
+from harness.app.contracts import EVENT_TYPES, API_VERSION, CommandRequest, Contract, NoRefs, Snapshot, Text
 from harness.app.project_commands import PROJECT_CREATE
 from harness.app.registry import CommandDefinition, QueryDefinition, Registry
 from harness.app.system_queries import SYSTEM_STATUS
@@ -234,7 +234,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id
     assert deployment["version"] == document["info"]["version"]
-    assert deployment["api_version"] == 1
+    assert deployment["api_version"] == API_VERSION
     assert deployment["access"] == "local"
     # 事件种类：现有全部 run 事件、项目事件与目录事件，与 OpenAPI 中事件对象的联合一致
     known = {value for owner in (EventType, ProjectEventType, CatalogEventType)

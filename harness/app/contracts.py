@@ -140,8 +140,9 @@ AccessMode = Literal["local", "lan"]
 
 
 # 接口版本（第 6.1 节）：删除或改变已有的查询、命令、事件种类及其字段时提高；增加查询、命令、
-# 事件种类或字段时不变。客户端在构建时记录生成类型所用的接口版本，与它核对
-API_VERSION = 1
+# 事件种类或字段时不变。客户端在构建时记录生成类型所用的接口版本，与它核对。
+# 版本 2：删除 run 流事件种类 department_prompt_updated 与 run_created 的 department_prompts 字段（#89）
+API_VERSION = 2
 
 
 class Deployment(Contract):
