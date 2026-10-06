@@ -1,6 +1,6 @@
 # 浏览器与 computer use 设计说明
 
-更新：2026-10-02。状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定，第 3 项 2026-09-30 按 ADR-0022 修改；2026-10-01 按 3.2B 的设计，#69 是 MCP 客户端模块，见第 4.1 节；2026-10-02 专题 2 决定 computer use 在控制主机的交互桌面上用真实输入进行（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)），启动命令按系统给出，见第 16 节第 7 至 12 项）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2D，父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单见第 17 节。
+更新：2026-10-02；2026-10-07 按 [ADR-0029](../adr/0029-departments-form-by-information-cohesion.md) 与 [ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md)：试用浏览器拒绝 Yudao 服务自己的地址，试用用例分可执行检验与模型阅读，等待桌面与等待桌面解锁有时长上限。状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定，第 3 项 2026-09-30 按 ADR-0022 修改；2026-10-01 按 3.2B 的设计，#69 是 MCP 客户端模块，见第 4.1 节；2026-10-02 专题 2 决定 computer use 在控制主机的交互桌面上用真实输入进行（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)），启动命令按系统给出，见第 16 节第 7 至 12 项）。路线位置：[Stage 3 计划](../stage-3-plan.md) 3.2D，父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单见第 17 节。
 
 依据：需求 [D34](../requirements/browser-and-computer-use.md)；[ADR-0022](../adr/0022-run-directly-without-containers.md)（代码在执行位置上直接运行）；[执行环境服务设计说明](execution-environment.md)（3.2C：执行环境服务、执行代理、执行位置、执行位置上的程序、动作回执）；[模型管理设计说明](model-management.md)第 4.3、5.6、6 节（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)第 6.3、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4.3 节；[本地通用工具设计说明](local-tools.md)第 2 节；[语义系统设计说明](semantic-system.md)第 5.5、13 节；[评测场景](evaluation-scenarios.md)场景 1；[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 7.1、7.3、8.3、9.4 节）。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)、[computer use 实现调研](../research/computer-use-implementations.md)。工单：[#122](https://github.com/bender2333/yudao/issues/122)（3.2B）、[#69](https://github.com/bender2333/yudao/issues/69)（MCP 客户端模块）、[#146](https://github.com/bender2333/yudao/issues/146)（输入方式与建议能力）、[#128](https://github.com/bender2333/yudao/issues/128)（执行环境的合同）。用词以 `CONTEXT.md` 为准。
 
@@ -189,7 +189,8 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 | `--image-responses` | `allow` | 截图以 MCP 图像内容返回，由 Yudao 决定是否放进请求（第 6 节） |
 | `--snapshot-mode` | `full` | 每个动作的结果带页面的可访问性结构 |
 | `--output-dir` | 会话目录中的 `mcp-output` | 工具以文件名保存的内容留在会话目录，会话结束时删除 |
-| 其余参数 | 默认值 | 动作时限 5 秒、导航时限 60 秒；不设置允许或禁止的来源 |
+| 来源限制 | 阻止 Yudao 服务自己监听的全部地址与端口 | 与网络取回使用同一条规则（[网络取回与 MCP 工具设计说明](network-and-mcp.md)第 6.3 节）：会话中的页面不能经浏览器读到服务的接口，也就读不到作者的工作过程、评价材料与全部事件 |
+| 其余参数 | 默认值 | 动作时限 5 秒、导航时限 60 秒 |
 
 工具定义由代码仓库中的提取脚本从这个固定版本的 `tools/list` 生成，写进定义；升级 Playwright MCP 时同时更新第 3.2 节的版本与生成的定义。Yudao 直接使用 Playwright MCP 给出的工具定义与只读标注，不在调用时另外核实。
 
@@ -227,8 +228,8 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 - **只在控制主机上**：Yudao 服务由客户端在用户的登录会话中启动，能看到交互桌面。开发板没有屏幕；登记的 Windows 机器上执行代理以服务运行，处在 Session 0，没有交互桌面。执行位置不是本机进程时，桌面种类的 `trial_start` 被工具许可拒绝，原因写明「桌面程序只能在控制主机上试用」；质检把依赖它的条目记为无法核验，决定请求的说明写明要把质检的检查位置改为控制主机以后重新开始事项（执行位置在创建 run 时冻结）。
 - **只用真实输入**：输入用 `SendInput`，不使用后台投递（`PostMessage`）。后台投递对 Tk 的按键与文字、Chromium 的全部事件、WPF 的大部分事件无效（OMP `fdfeef1f78` 的 `crates/pi-natives/src/desktop/win32/delivery.rs` 第 63–88 行）；试用记录要反映用户能完成的操作，这与第 4.2 节不提供脚本工具的理由相同。
 - **开始前经用户同意**：桌面种类的 `trial_start` 先发出决定请求「使用本机桌面」，阻塞范围为这个动作，机制与 3.2B 的一次性批准相同。说明写明部门、要启动的程序、期间会移动鼠标与输入文字。选项：「开始」（本次会话）、「本事项内都允许」（同一事项之后的桌面会话不再询问，从决定事件重建，重新启动以后仍然有效）、「拒绝」（`trial_start` 的结果写明用户没有交出桌面，质检把依赖它的条目记为无法核验）。
-- **同一时刻只有一个桌面会话**：范围是整台控制主机的全部项目、run 与部门。已有桌面会话时，另一个桌面种类的 `trial_start` 在同意以后排队，按请求的先后取得桌面，run 显示「等待桌面」，不报错。网页种类的会话使用 headless 浏览器，不受影响。
-- **锁屏与安全桌面**：每个屏幕动作发出之前，执行代码核对当前的输入桌面是用户的普通桌面、没有锁定。锁定或处在 UAC 等安全桌面时动作不发出，run 显示「等待桌面解锁」，解锁以后自动继续；等待时间不计入运行时间上限，与等待机器相同（3.2C 第 6.5 节）。
+- **同一时刻只有一个桌面会话**：范围是整台控制主机的全部项目、run 与部门。已有桌面会话时，另一个桌面种类的 `trial_start` 在同意以后排队，按请求的先后取得桌面，run 显示「等待桌面」，不报错；等待的时长上限是 `wait.desktop.max_sec`（暂定默认值，见规则登记），超过时发出决定请求并通知用户一次。网页种类的会话使用 headless 浏览器，不受影响。
+- **锁屏与安全桌面**：每个屏幕动作发出之前，执行代码核对当前的输入桌面是用户的普通桌面、没有锁定。锁定或处在 UAC 等安全桌面时动作不发出，run 显示「等待桌面解锁」，解锁以后自动继续；等待时间不计入运行时间上限，与等待机器相同（3.2C 第 6.5 节），各有时长上限（`wait.desktop_unlock.max_sec`，暂定默认值，见规则登记），超过时发出决定请求并通知用户一次。
 - **用户正在操作**：会话期间执行代码用低层鼠标与键盘钩子记录用户真实输入的时间，按系统的注入标记排除 Yudao 自己发出的输入。最近 3 秒内有用户输入时，动作等到用户停止操作满 3 秒才发出；动作发出之前先把被测程序的窗口切回前台。
 - **提示与停止**：桌面会话期间，客户端在主显示器边缘显示一圈提示框，写明「质检正在使用桌面」（工程会话写工程），提示框不出现在截图中（`WDA_EXCLUDEFROMCAPTURE`）、鼠标可以穿透，做法与 UI-TARS-desktop、Cua Driver 相同；托盘菜单出现「停止使用桌面」，选择后经命令 `trial.stop_desktop` 结束会话，结束方式记为「用户停止」，部门看到的工具结果写明用户停止了试用会话。不设置全局快捷键，被测程序自己可能使用这些按键。
 
@@ -339,7 +340,7 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 质检的内置 Prompt 写明生成测试的规则：
 
-1. 读取 ProductSpec 的每条验收条件，决定核验方式：能用命令核对的（数据、计算、接口）用 `run_check`；需要在界面上操作才能观察的用试用用例；一条验收条件可以同时使用两种。
+1. 读取 ProductSpec 的每条验收条件，登记检验方式：命令检查（`run_check`）、试用用例、主机测量、带参照材料的判定点、人、开环。能用命令核对的（数据、计算、接口）用 `run_check`；需要在界面上操作才能观察的用试用用例；没有可执行检验的条件标为开环，写进放行记录；一条验收条件可以同时使用两种。
 2. 每个试用用例从一条或几条验收条件导出：前置状态、操作步骤、预期结果。
 3. 按当前交付说明的启动方式用 `trial_start` 开始试用会话；交付说明没有写需要的启动方式时按第 3.3 节退回工程。
 4. 用 `trial_case_begin` 打开用例，按计划操作，观察结果；用 `trial_case_end` 给出结论。
@@ -356,7 +357,9 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 ### 8.3 QAReview 的逐条结论与放行
 
-`qa_review` 提案增加必填字段 `criteria`：当前 ProductSpec 的每条验收条件一项，`{criterion, result, checks, trial_cases, note}`，`result` 为 `passed`、`failed`、`unverified`。
+`qa_review` 提案增加必填字段 `criteria`：当前 ProductSpec 的每条验收条件一项，`{criterion, method, result, checks, trial_cases, note}`，`method` 是检验方式，`result` 为 `passed`、`failed`、`unverified`。
+
+试用用例按步骤分类：含断言工具（`browser_verify_*`）或检查回执的步骤算可执行的检验，只凭截图由质检的模型判断的步骤算模型阅读；新功能的检验在基线快照上运行应当失败，在交付快照上运行应当通过，两次都由主机执行，只有通过这一记录的检验单独计数。放行记录写出检验覆盖比例（有可执行的检验并已在当前快照上运行的条件数除以条件总数）、模型阅读的条件数与开环的条件数（[验证的独立性设计说明](independent-verification.md)第 7 节）。
 
 U 的核对（在现有核对之上，`validation.py` 第 428 行起）：
 
@@ -414,7 +417,7 @@ QAReview 工件的 `evidence_refs` 写入逐条结论引用的检查回执与试
 
 ## 10. 安全
 
-按用户决定（D34），与普通浏览器 MCP 的默认做法相同，不另加限制：不设置允许或禁止访问的来源；浏览器可以访问外网；Chromium 使用自己的沙箱。Playwright MCP 的 README 写明它不是安全边界。
+按用户决定（D34），与普通浏览器 MCP 的默认做法相同，不另加限制，只有一项例外：浏览器拒绝访问 Yudao 服务自己监听的地址与端口，规则与网络取回相同；其余来源不设限制，浏览器可以访问外网；Chromium 使用自己的沙箱。Playwright MCP 的 README 写明它不是安全边界。
 
 代码在执行位置上直接运行（ADR-0022，3.2C 第 8 节），Yudao 不提供操作系统层面的沙箱：交付的软件、Playwright MCP 与浏览器以所在账户的权限运行，在控制主机上是运行 Yudao 的账户，在登记的机器上是执行代理所在的账户，能读写这个账户能访问的全部文件。启动方式中的命令由工程写出，它运行的是工程交付的代码，这与登记命令运行工程写的构建与测试脚本相同。Yudao 保证的范围与登记的命令相同：进程的环境变量中没有凭据，模型凭据只在控制主机上，不进入试用副本，也不发给执行代理。来源不明的项目，把执行位置设到另一台登记的机器。
 

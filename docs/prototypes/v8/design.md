@@ -466,7 +466,7 @@ Stage 5 起房间围绕中心角色布置：中心角色的工位在房间中央
 | 设置 | `project.settings`、`machines.list` | `project.rename`、`project.pin`、`project.archive`、`project.restore`、`department_settings.save`、`command_registration.save`、`tool_authorization.save`、`machine_authorization.save`、`role_settings.save` |
 | 模型管理 | `catalog`、`catalog.document` | 模型管理的各项命令 |
 | 机器 | `machines.list` | `machine.save` |
-| 运行与执行槽位 | `runtime.slots`、`system.status` | `runtime.set_slots`、`queue.cancel` |
+| 运行与执行槽位 | `runtime.slots`、`system.status` | `parameter.set`（参数 `execution.slots`）、`queue.cancel` |
 | 工具与扩展 | `tools.registry` | — |
 
 原型的示例数据使用应用层设计说明中的字段名称（事件对象的 `position`、`project_id`、`actor` 等）与带点号的命令名称。每个区块标明读取的查询、提交的命令与所属档位。

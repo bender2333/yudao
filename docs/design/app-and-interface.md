@@ -1,6 +1,6 @@
 # 应用层与接口层设计说明
 
-更新：2026-10-06（`project.create` 增加可选的起始文件夹；启动时 run 事件版本不同的未结束 run 按强制升级处理，第 3.3 节决定种类表删去对应的一行）。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有项目的代码经 `project.onboard` 接入并建档（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。2026-10-01 用户确认桌面客户端的安装、更新与发布（[设计说明](client-packaging-and-release.md)）：第 6.1、6.2、8、10 节与 `system.status`、`agent.package` 相应修改。同日用户确认网络取回与 MCP 工具（[设计说明](network-and-mcp.md)）：`tool_authorization.save` 的内容、新增 `tool_server.probe`、决定种类 `tool_approval`、`project.settings`、`tools.registry` 与 `run.actions` 相应修改。2026-10-02 用户确认 computer use 在控制主机的交互桌面上进行：增加命令 `trial.stop_desktop`、决定种类「使用本机桌面」与两个待恢复原因（第 3.2、3.3、10 节），命令共 43 个。
+更新：2026-10-06（`project.create` 增加可选的起始文件夹；启动时 run 事件版本不同的未结束 run 按强制升级处理，第 3.3 节决定种类表删去对应的一行）。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有项目的代码经 `project.onboard` 接入并建档（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。2026-10-01 用户确认桌面客户端的安装、更新与发布（[设计说明](client-packaging-and-release.md)）：第 6.1、6.2、8、10 节与 `system.status`、`agent.package` 相应修改。同日用户确认网络取回与 MCP 工具（[设计说明](network-and-mcp.md)）：`tool_authorization.save` 的内容、新增 `tool_server.probe`、决定种类 `tool_approval`、`project.settings`、`tools.registry` 与 `run.actions` 相应修改。2026-10-02 用户确认 computer use 在控制主机的交互桌面上进行：增加命令 `trial.stop_desktop`、决定种类「使用本机桌面」与两个待恢复原因（第 3.2、3.3、10 节）。2026-10-07 按 ADR-0027 至 ADR-0031 与[规则登记与参数设计说明](rules-and-parameters.md)新增命令 `parameter.set`、`definition.propose`、`definition.adopt`、`definition.withdraw`、`experiment.start`，执行槽位数改由 `parameter.set` 修改（命令共 48 个）、六个读取模型（查询共 41 个）、事件对象的 `source` 字段、第 5.8 节画面诚实性的七条不变式，机器的上线与离线写入机器流，决定种类增加内核修改、实例升级与等待超过时长上限。
 
 依据：[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（桌面客户端与 HTTP 合同）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与全局位置）、[ADR-0011](../adr/0011-async-control-core.md)（异步）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../prototypes/v7/design.md)第 7 节、[构建约定](../prototypes/v7/BUILD.md)第 3.5、5、6 节；依据改为原型 v9（原型设计已结束，[v9 设计说明](../prototypes/v9/design.md)与[构建约定](../prototypes/v9/BUILD.md)，屏幕清单、页面导航与接口层沿用 [v8 设计说明](../prototypes/v8/design.md)与[构建约定](../prototypes/v8/BUILD.md)），系统首页、机器页与托盘提醒以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。
 
@@ -180,7 +180,7 @@ sequenceDiagram
 
 接受表示事件已经追加。客户端在事件流到达位置 P 之前显示「已提交」，到达以后按事件显示最终状态（可观测性设计第 5 节）。
 
-拒绝原因是一份封闭清单，每个命令在合同中声明自己可能返回的原因：`stale_base`（基准版本过期）、`not_found`、`already_exists`、`project_archived`、`work_item_in_progress`、`run_terminal`、`busy`（没有空闲的执行槽位；3.4A 加入排队以后由排队代替）、`provider_unavailable`（新建事项时项目的三个部门无法解析调用目标）、`catalog_invalid`（目录校验失败，附字段位置）、`in_use`（仍被引用，附引用方）、`decision_closed`（决定请求已回答或已撤销）、`option_invalid`、`not_allowed`（对象状态不允许，附说明）、`command_id_reused`、`source_invalid`（接入已有项目时源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据不算）、公开树中有无法表示的条目，附工作区内的相对路径与处理方法；3.8）。
+拒绝原因是一份封闭清单，每个命令在合同中声明自己可能返回的原因：`stale_base`（基准版本过期）、`not_found`、`already_exists`、`project_archived`、`work_item_in_progress`、`run_terminal`、`busy`（没有空闲的执行槽位；3.4A 加入排队以后由排队代替）、`provider_unavailable`（新建事项时项目的三个部门无法解析调用目标）、`catalog_invalid`（目录校验失败，附字段位置）、`in_use`（仍被引用，附引用方）、`decision_closed`（决定请求已回答或已撤销）、`option_invalid`、`not_allowed`（对象状态不允许，附说明）、`command_id_reused`、`source_invalid`（接入已有项目时源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据不算）、公开树中有无法表示的条目，附工作区内的相对路径与处理方法；3.8）、`out_of_bounds`（`parameter.set` 的取值超出规则登记的界限，附界限）、`candidate_invalid`（`definition.propose` 的候选没有通过结构校验，附字段位置）。
 
 ### 3.2 命令清单
 
@@ -206,7 +206,7 @@ sequenceDiagram
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
 | `material.record` | 记录原文 | 项目、原文、部门（可选） | `material_recorded` | 空 | 已有 `POST /api/projects/{id}/materials` |
-| `work_item.create` | 新建事项并开始执行，从项目的采纳成果开始 | 项目、事项原文、标题（可选） | `work_item_created`、`run_created`、`user_input_received` | 空 | 已有 `POST /api/projects/{id}/work-items`；删除 `max_cycles`、`run_time_limit_sec`、`context_window` 三个参数（D24 第 10 节，限额属于 ADR-0014 的定义）与代码快照来源 `source_dir`（已有代码经 `project.onboard` 进入，第 10 节第 6 项） |
+| `work_item.create` | 新建事项并开始执行，从项目的采纳成果开始 | 项目、事项原文、标题（可选） | `work_item_created`、`run_created`、`user_input_received` | 空 | 已有 `POST /api/projects/{id}/work-items`；删除 `max_cycles`、`run_time_limit_sec`、`context_window` 三个参数（D24 第 10 节，限额是规则登记中的参数，由 `parameter.set` 修改，创建 run 时冻结）与代码快照来源 `source_dir`（已有代码经 `project.onboard` 进入，第 10 节第 6 项） |
 | `work_item.append_input` | 追加需求 | 事项、原文 | `user_input_received` | 事项的输入版本（记录依据） | 已有 `POST /api/runs/{id}/inputs`，作用对象改为事项 |
 | `work_item.cancel` | 取消事项 | 事项 | `run_failed`（停止原因 `cancelled`） | 事项版本（记录依据） | 已有 `POST /api/runs/{id}/cancel` |
 | `trial.stop_desktop` | 结束控制主机上进行中的桌面会话（客户端托盘菜单「停止使用桌面」） | 无 | `trial_session_ended`（结束方式「用户停止」） | 无 | 新增（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1 节） |
@@ -263,8 +263,19 @@ sequenceDiagram
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
-| `runtime.set_slots` | 设置执行槽位数 | 槽位数 | 由 3.4A 确定 | 槽位设置版本 | 新增（#19） |
 | `queue.cancel` | 取消排队 | 事项 | 由 3.4A 确定 | 事项版本（记录依据） | 新增（#19） |
+
+**规则、参数与对照（B3，Stage 6 起含系统提出的候选）**
+
+| 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
+| --- | --- | --- | --- | --- | --- |
+| `parameter.set` | 修改界限以内的参数：时间上限、轮次上限、执行槽位数（`execution.slots`）、验证密度、可见范围、判定点的阈值、项目级的检查时限与建档单轮上限；只作用于之后创建的 run，达到上限的 run 不因此继续；撤回就是把参数改回原值 | 参数条目、新值、理由；项目级参数另带项目 | 由 B3 确定（带修改者、原值、新值与理由） | 参数版本（全部当前值的内容摘要） | 新增（B3；执行槽位数 #19） |
+| `definition.propose` | 提出循环方式的候选：增减角色、部门、观察者，许可关系，判定点的位置，是否允许子循环；生成候选版本并运行结构校验 | 修改内容、理由、引用的运行证据 | 由 Stage 6 的工单确定 | 空 | 新增（Stage 6） |
+| `definition.adopt` | 在写明的范围内采用已通过结构校验的候选 | 候选、范围 | 由 Stage 6 的工单确定 | 候选的版本 | 新增（Stage 6） |
+| `definition.withdraw` | 撤回已采用的版本，即采用上一个版本 | 版本 | 由 Stage 6 的工单确定 | 当前采用的版本 | 新增（Stage 6） |
+| `experiment.start` | 在指定的两个版本上运行同一组任务，结果回填对照记录 | 两个版本（定义摘要与参数摘要）、任务集、对照约定 | 由评测工作线的工单确定 | 空 | 新增（持续改进工作线） |
+
+目标由已有的 `project.set_goal` 修改。没有修改某一次运行里交接去向的命令，也没有修改基础规则与内核清单的命令。
 
 **模型管理（D24）**
 
@@ -298,7 +309,7 @@ sequenceDiagram
 | `semantic.mark_invalid` | 把一条内容标记失效 | 内容、理由 | 由 #37 确定 | 该条内容的版本 | 新增（#37） |
 | `semantic.correct` | 写入更正 | 内容、更正文字、理由 | 由 #37 确定 | 该条内容的版本 | 新增（#37） |
 
-命令共 43 个：由已有路由改成的 23 个（其中项目部门设置的模型与档位部分为新增），新增 20 个。原型构建约定第 3.5 节的命令标识由本清单代替。
+命令共 48 个：由已有路由改成的 23 个（其中项目部门设置的模型与档位部分为新增），新增 25 个。原型构建约定第 3.5 节的命令标识由本清单代替。
 
 ### 3.3 用户决定的回答
 
@@ -315,9 +326,12 @@ sequenceDiagram
 | 一次性批准登记之外的网络取回与「使用前询问」的 MCP 工具（`tool_approval`） | 批准（本事项内有效）、拒绝；回答可以附说明，拒绝时的说明随工具结果交给模型 | 动作 | [网络取回与 MCP 工具设计说明](network-and-mcp.md)第 5 节，原型第 4.6 节 | #68、#236 |
 | 授权常设授权清单以外的外部动作 | 批准这一次、拒绝 | 动作 | D27、原型第 4.2 节 | Stage 4 |
 | 进入等待模型服务的通知 | 已阅；取消使用 `work_item.cancel` | 不阻塞 | D17、路线图第 5.1 节 | Stage 4 |
-| 判定点置信不足时的裁定 | 判定点给出的选项 | 由判定点确定 | D28 | Stage 6 |
+| 判定点升级以后仍然不确定、并且没有独立的下游核验时的裁定 | 判定点给出的选项 | 取能够隔开的最小范围 | D28、ADR-0028 | Stage 5 |
 | 证据核对的校准样本裁定 | 由 #40 的校准设计给出 | 不阻塞 | 语义系统设计说明第 7.2、14 节 | #40、#41 |
-| 采用 Stage 6 的定义候选 | 采用、不采用 | 不阻塞 | ADR-0014 | Stage 6 |
+| 采用定义候选（`definition.adopt`） | 采用、不采用 | 不阻塞 | ADR-0014、ADR-0030 | Stage 6 |
+| 内核修改（交付的改动路径与内核清单有交集） | 批准采纳、拒绝；材料附差异 | run | [ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md) | B1 |
+| 实例升级（发布检查对待发布的提交运行以后） | 批准升级、拒绝；材料附检查结果 | 不阻塞 | ADR-0027 | B7 |
+| 等待超过时长上限（等待模型服务、等待机器、等待桌面、等待桌面解锁） | 继续等待、停止事项 | run | [ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md) | #143、#246、Stage 4 |
 | 确认接入已有项目的初始 PRD（`initial_prd`） | 确认、提出修改（必须附说明，说明为空时以 `not_allowed` 拒绝） | 事项：建档事项与同一项目中排在它后面的事项；请求写在项目流中，不属于任何 run | [D33](../requirements/existing-project-onboarding.md)、[接入已有项目设计说明](existing-project-onboarding.md)第 3.2 节 | 3.8 |
 | 同一故障连续修复失败后停止自动修复 | 由 D27 的设计给出 | 故障记录 | D27、路线图第 5.1 节 | Stage 4 |
 | 需要恢复备份的回滚 | 回滚并恢复备份、不回滚 | 故障记录 | D27、路线图第 5.1 节 | Stage 4 |
@@ -431,6 +445,17 @@ sequenceDiagram
 | `project.usage` | 用量汇总，按事项与筛选条件分组，未上报的项为空 | 调用尝试表的位置 | 已有 `GET /api/projects/{id}/model-usage` 与 `GET /api/runs/{id}/model-usage`，合并 |
 | `run.attempt` | 请求详情：输入、输出、SDK 流事件、用量、错误；调用目标的公开部分，含输入方式（D24 第 6 节，取自请求事件）；按栏目的来源、用量与上限及放入原因（#24）；语义视图（Stage 5） | | 已有 `GET /api/runs/{id}/model-attempts/{aid}`；调用目标新增（D24）；栏目与语义视图新增（#24、Stage 5） |
 
+**循环、裁决、检验与规则（迭代底座与自举工作线）**
+
+| 查询 | 返回内容 | 位置 | 现状 |
+| --- | --- | --- | --- |
+| `run.loops` | 每个事项下各层的循环实例：层、已用量与上限、轮次、收敛状态（收敛中、停滞、震荡、漂移、达到边界）、停止原因；进展只来自主机记录的事实 | 知识层投影的位置；可回放 | 新增（自举试点的首批工单） |
+| `judgements.list` | 每个裁决点上的记录：手段（规则、决策模型、升级）、依据、结果、概率、去向、校准状态 | 可回放 | 新增（Stage 5；证据核对为第一个判定点） |
+| `acceptance.coverage` | 每条验收条件的检验方式（命令检查、试用用例、主机测量、判定点、人、开环）、最近的结果、是否开环；检验覆盖比例、模型阅读的条件数、开环的条件数 | 质检逐条结论的位置 | 新增（3.2D #151） |
+| `product.map` | 被造出来的产品的底图：公开树清单、依赖边、检查回执与文件的对应；依赖边由登记的命令在执行环境里导出，输出保存为工件 | 封存时生成的工件的位置 | 新增（Stage 4） |
+| `rules.registry` | 规则登记：每条的取值、界限、种类、形式、四项记录、修改历史与对照记录的引用 | 参数事件的位置；可回放 | 新增（B3） |
+| `org.graph` | 部门、角色、观察者、判定点与许可关系 | 定义的版本 | 新增（Stage 5） |
+
 **设置**
 
 | 查询 | 返回内容 | 位置 | 现状 |
@@ -446,7 +471,7 @@ sequenceDiagram
 | `catalog.change_impact` | 按拟议的修改计算会作废准入的定义、引用方（部门默认的哪个部门、哪个项目的哪个部门）与正在使用它们的进行中事项，不写入任何内容（模型管理设计说明第 4.4 节） | | 新增（#90） |
 | `runtime.slots` | 槽位数、占用、跨项目队列、重启后的队列状态 | | 新增（#19） |
 | `tools.registry` | 各项目的来源登记与最近的取回记录；各项目的 MCP 服务器、最近一次状态、工具与处理方式、恢复约定（可重复或不自动重试）（3.2B）；内置工具：Playwright MCP 的版本、浏览器工具与恢复契约，屏幕工具与屏幕尺寸，每个工具是否需要图像输入（3.2D）；只读观察者（Stage 5，#98）；准入钩子（Stage 6） | | 新增（3.2B）；内置工具随 3.2D 加入；观察者与准入钩子随所属阶段加入 |
-| `machines.list` | 控制主机一项：系统与架构、执行位置上的程序、正在执行的动作（3.2C）；登记的机器：名称、地址、用途、在线状态（最近一次成功探测的时间）、系统与架构、执行代码是否一致、安装命令与升级命令（按控制主机的每个 IPv4 地址各给一条，带网卡名称，去掉回环、169.254.0.0/16 与 198.18.0.0/15；客户端经非回环地址连接时，那个地址排在第一位；执行环境服务设计说明第 5.3.2 节）、正在执行的动作（项目、部门、工具）、授权使用它的项目（3.2C）；它是哪些项目的运行环境（Stage 4） | 可回放（第 4.1 节 `at`） | 新增（3.2C，执行环境服务设计说明第 7.4 节）；运行环境在 Stage 4 加入 |
+| `machines.list` | 控制主机一项：系统与架构、执行位置上的程序、正在执行的动作（3.2C）；登记的机器：名称、地址、用途、在线状态（取自这台机器的机器流中最近一条上线或离线事件的种类与时间）、系统与架构、执行代码是否一致、安装命令与升级命令（按控制主机的每个 IPv4 地址各给一条，带网卡名称，去掉回环、169.254.0.0/16 与 198.18.0.0/15；客户端经非回环地址连接时，那个地址排在第一位；执行环境服务设计说明第 5.3.2 节）、正在执行的动作（项目、部门、工具）、授权使用它的项目（3.2C）；它是哪些项目的运行环境（Stage 4）；探测得到的瞬时值（最近一次探测的时间与耗时）只经实时通道显示，不属于查询结果 | 可回放（第 4.1 节 `at`） | 新增（3.2C，执行环境服务设计说明第 7.4 节）；运行环境在 Stage 4 加入 |
 | `agent.package` | 执行代理的安装包（wheel）：发布时构建，包含在 Yudao 服务的 wheel 内，从包内的发布资源目录读取，不在运行时生成；远程机器按 `machines.list` 给出的安装与升级命令下载，接口以局域网访问方式运行时远程机器才能下载；从源码运行没有这个文件时返回 404 | | 新增（#144，执行环境服务设计说明第 5.3.2 节，[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)） |
 | `ops.status` | 运行责任、发布记录、故障链路、故障记录与修复失败次数、备份、运行指标、待授权的外部动作 | | 新增（Stage 4） |
 | `meta.observations` | 流转统计、不符合项、判定点与判定记录 | | 新增（Stage 6） |
@@ -458,7 +483,7 @@ sequenceDiagram
 | `run.export` | 一个 run 的全部事件、投影与观测记录 | | 已有 `GET /api/runs/{id}/export` |
 | `replay.check` | 删除保存的投影后在内存中重放一个 run 或项目，与保存的投影比较，返回是否一致与差异 | | 已有 `POST /api/runs/{id}/replay` 与命令行 `replay`，改为查询 |
 
-查询共 34 个：由已有路由改成或合并的 14 个，新增 20 个。
+查询共 41 个：由已有路由改成或合并的 14 个，其余为新增。
 
 ### 4.4 删除的读取路由
 
@@ -494,7 +519,8 @@ sequenceDiagram
 | `project_id`、`work_item_id`、`run_id` | 所属对象；没有时为空 |
 | `department` | 部门；项目事件为空 |
 | `role` | 角色（Stage 5 起） |
-| `actor` | 提出者：`user:local`（加入令牌以后为 `user:<令牌名称>`）、`department:<部门>`、`system`、`observer:<名称>` |
+| `actor` | 提出者：`user:local`（局域网访问方式加入令牌以后为 `user:<令牌名称>`）、`department:<部门>`、`system`、`observer:<名称>` |
+| `source` | 事实来源：`rule`（确定规则判定）、`decision_model`（决策模型判定，`payload` 带概率）、`role_statement`（角色陈述）、`host_measurement`（主机测量）、`user`（用户）；由应用层按事件种类对应表（定义的一部分）给出，事件载荷不增加字段 |
 | `command_id` | 引起这条事件的命令；没有时为空 |
 | `label` | 一句中文说明，由应用层按事件种类生成，客户端与命令行共用 |
 | `payload` | 该事件种类的完整载荷；每个种类一个 pydantic 类型，工件以引用出现，原文用 `event.detail` 取得 |
@@ -503,7 +529,7 @@ sequenceDiagram
 
 事件种类与载荷类型是一个以 `type` 区分的联合，OpenAPI 中完整列出，客户端生成的类型与之一致。
 
-`actor` 由写入方经写入口声明，每条事件都有：命令写入的事件为命令的提出者；角色任务中的记录与提案为 `department:<部门>`；流程编排与控制核心自己的判断（激活的开始与结束、交接、停止、结算）为 `system`；观察者的提案为 `observer:<名称>`。`role` 在 Stage 5 之前为空，部门只在 `department` 字段中出现。
+`actor` 由写入方经写入口声明，每条事件都有：命令写入的事件为命令的提出者；角色任务中的记录与提案为 `department:<部门>`；流程编排与控制核心自己的判断（激活的开始与结束、交接、停止、结算）为 `system`；观察者的提案为 `observer:<名称>`。`role` 在 Stage 5 之前为空，部门只在 `department` 字段中出现。机器的上线与离线事件的 `actor` 为 `system`，`source` 为 `host_measurement`，写在这台机器的机器流中。
 
 ### 5.3 范围筛选
 
@@ -570,6 +596,22 @@ sequenceDiagram
 - 连接恢复不触发任何命令，不重新执行事项（可观测性设计第 6 节）。
 - 托盘提醒：客户端常驻系统托盘，窗口关闭时保持一条不按项目筛选的事件流连接。出现新的决定请求、进入等待模型服务、磁盘空间不足（事件名称由 Stage 4 确定）时发出系统通知；托盘图标显示 `decisions.list` 中等待回答的数量。提醒只依据事件流与查询，不另设通知接口。
 
+### 5.8 画面诚实性的七条不变式
+
+画面分两层：事实层是事件日志的函数，进入自动化测试；表演层可以有自己的状态，但不占用承载事实的视觉通道，不回写。角色当前的任务与流式输出属于事实。
+
+| 编号 | 不变式 | 测试 |
+| --- | --- | --- |
+| H1 | 事实层是事件的函数 | 同一段事件前缀两次计算的事实层相同；增量更新与从头计算一致 |
+| H2 | 表演层不占用承载事实的视觉通道 | 视觉通道表写明哪些通道承载事实；关闭表演层前后，这些通道上的取值相同 |
+| H3 | 表演层不回写 | 表演层的模块不能导入命令接口（导入方向的测试）；命令只由用户的操作发出 |
+| H4 | 每条事实带来源 | 事实层里每个事实元素的来源非空，决策模型判定的带概率 |
+| H5 | 开环可见 | 没有可执行检验的验收条件带开环标记 |
+| H6 | 固定画出的只有边界、裁决点与权威关系 | 事件为空时轨迹元素的数量为 0；连线的集合等于组织定义中的许可关系 |
+| H7 | 回放一致 | 时间轴上某个位置的事实层，等于当时那段事件前缀的计算结果 |
+
+H1、H2、H4 至 H7 写成客户端的单元测试，使用录制的事件夹具；H3 写成导入方向的测试。七条在三处运行：执行者与审查者运行与改动相关的测试，架构师的集成层批量运行，发布检查。固定画出的连线由组织定义的许可关系导出，包裹的移动表示轨迹；机器在线状态来自机器流中的事件。
+
 ## 6. 能力清单与认证
 
 ### 6.1 能力清单
@@ -599,17 +641,17 @@ sequenceDiagram
 | 访问方式 | 监听地址 | 认证 | 其他检查 |
 | --- | --- | --- | --- |
 | 本机（默认） | 只能是回环地址（`127.0.0.1`、`::1`）；设置了其他地址时拒绝启动 | 不需要令牌；提出者为 `user:local` | `Host` 必须是 `127.0.0.1`、`localhost` 或 `[::1]` 加端口，防止 DNS 重新绑定；带 `Origin` 的请求只接受桌面客户端页面的来源；命令只接受 `application/json`；CORS 只允许客户端页面的来源 |
-| 局域网 | 任意地址 | 认证这一步保留，当前直接通过；提出者为 `user:local`（TODO：离开局域网访问之前改为访问令牌加 TLS，见第 6.3 节） | 带 `Origin` 的请求只接受桌面客户端页面的来源；命令只接受 `application/json`；CORS 只允许客户端页面的来源 |
+| 局域网 | 任意地址 | 访问令牌（B7 加入）；提出者为 `user:<令牌名称>`；TLS 在离开局域网访问之前加入（第 6.3 节） | 带 `Origin` 的请求只接受桌面客户端页面的来源；命令只接受 `application/json`；CORS 只允许客户端页面的来源 |
 
-- 控制主机是一台常开的机器（[ADR-0018](../adr/0018-single-control-host-remote-execution.md)），客户端通常运行在用户日常使用的电脑上，使用局域网访问方式，只在家里的局域网内访问。2026-09-28 用户决定：只在局域网内使用期间，安全只保留位置并标为 TODO。从外面访问与手机使用随消息渠道（路线图第 5.4 节）放到以后。本机访问方式用于客户端与服务在同一台电脑上的情况（第 10 节第 8 项）。访问方式是服务的启动参数：客户端自动启动服务时按「本机」一项的开关「允许局域网访问」决定（[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.3 节）。
-- 接口层的认证这一步与客户端连接设置中的令牌一栏保留位置，局域网访问方式下不校验。
+- 控制主机是一台常开的机器（[ADR-0018](../adr/0018-single-control-host-remote-execution.md)），客户端通常运行在用户日常使用的电脑上，使用局域网访问方式，只在家里的局域网内访问。2026-09-28 用户决定只在局域网内使用；2026-10-07 起令牌随自举加入（[ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)），TLS 在离开局域网访问之前加入。从外面访问与手机使用随消息渠道（路线图第 5.4 节）放到以后。本机访问方式用于客户端与服务在同一台电脑上的情况（第 10 节第 8 项）。访问方式是服务的启动参数：客户端自动启动服务时按「本机」一项的开关「允许局域网访问」决定（[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.3 节）。
+- 接口层在局域网访问方式下校验客户端连接设置中的令牌，本机访问方式不校验。
 - 事件中只有凭据引用、来源与版本；局域网内凭据命令以明文传输（TODO，随第 6.3 节加入 TLS）。
 - 后端不提供界面文件；FastAPI 自带的文档页面（`/docs`、`/redoc`）关闭，只提供 `/openapi.json`。另提供客户端的更新源 `/client-update/`（更新清单与安装程序，不属于查询与命令）与执行代理的安装包（`agent.package`），文件来自 Yudao 服务的 wheel 内的发布资源目录（[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)，设计说明第 5.1 节）。
 - 本机停止请求 `POST /api/system/stop`：两种访问方式下都只接受来自回环地址的请求，带 `Origin` 的请求只接受桌面客户端页面的来源；不属于命令（不产生领域事件，不带基准版本，不经过命令注册表）。服务收到以后停止接受新请求，关闭事件流连接，等待进行中的写入完成，释放数据目录的进程锁并退出；进行中的 run 在下次启动时按 3.1 自动继续。它与排空不同：排空停止开始新事项并等待 run 结束，用于升级之前（设计说明第 4.4 节）。
 
-### 6.3 令牌与 TLS（TODO）
+### 6.3 令牌与 TLS
 
-离开局域网访问之前实现，当前不实施：
+令牌在自举项目的执行位置设到控制主机以外的登记机器之前加入（B7，里程碑 M3），执行位置上的代码取不到令牌；TLS 在离开局域网访问之前加入：
 
 - 所有路径（能力清单、OpenAPI、查询、命令、事件流）都需要 `Authorization: Bearer <令牌>`，提出者为 `user:<令牌名称>`；认证失败返回 401，不附原因。
 - 服务自己提供 TLS（配置证书与私钥），或只监听回环地址并由同机的反向代理终止 TLS；证书的来源与客户端的信任方式在那时确定。
@@ -699,11 +741,11 @@ sequenceDiagram
 - #49：回答命令与决定请求的查询通过本设计的骨架工单登记，#49 排在骨架工单之后（第 10 节第 2 项）。
 - #17、#49：核实结果未知的动作（#17）与模型引用无法使用时的待恢复（#49）都由 `decision.answer` 回答，命令行与接口共用这一个入口；中断的 run 在启动时自动继续，不发出决定请求（第 3.3 节）。
 - 3.1（#119）：新增 `runtime.start_drain`、`runtime.force_upgrade`；强制升级只记下「因升级重新开始」的优先级。
-- #19：`busy` 拒绝由排队代替；新增 `runtime.slots`、`runtime.set_slots`、`queue.cancel`；按 3.1 记下的优先级把因升级重新开始的事项排在队列最前面。
+- #19：`busy` 拒绝由排队代替；新增 `runtime.slots`、`queue.cancel`，执行槽位数由 `parameter.set`（参数 `execution.slots`）修改；按 3.1 记下的优先级把因升级重新开始的事项排在队列最前面。
 - #74：新增 `source_directory.save`；`work_item.create` 没有代码快照来源。
 - 3.8（#124）：新增 `project.onboard`、`onboarding.restart`、拒绝原因 `source_invalid`、项目流中的决定请求与 `initial_prd` 种类；删除 `work_item.create` 的代码快照来源（接入已有项目设计说明第 13 节）。
 - 3.2C（#120）：`machine.save`、`machine_authorization.save` 的事件，新增 `execution_placement.save`；`machines.list`、`system.status`、`project.settings`、`run.actions` 的执行位置与机器内容（执行环境服务设计说明第 7、12 节）。
-- 3.2D（#123）：新增查询 `run.trials`、`evidence.screenshot`，决定种类「质检无法核验」「使用本机桌面」，命令 `trial.stop_desktop`，run 的待恢复原因「等待桌面」「等待桌面解锁」（等待时间不计入运行时间上限）；`work_item.materials`、`run.actions`、`department.workspace`、`tools.registry` 增加试用与截图的内容（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1、7.2、12 节，工单 #151、#152、#246）。
+- 3.2D（#123）：新增查询 `run.trials`、`evidence.screenshot`，决定种类「质检无法核验」「使用本机桌面」，命令 `trial.stop_desktop`，run 的待恢复原因「等待桌面」「等待桌面解锁」（等待时间不计入运行时间上限，各有时长上限，超过时发出决定请求）；`work_item.materials`、`run.actions`、`department.workspace`、`tools.registry` 增加试用与截图的内容（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1、7.2、12 节，工单 #151、#152、#246）。
 - #24：「按栏目读取上下文清单的查询接口」登记为应用层查询（`run.attempt` 的栏目部分）。
 - #37：`semantic.mark_invalid`、`semantic.correct` 登记为应用层命令。
 - 原型构建约定第 3.5 节的命令标识、第 6.1 节的事件对象由本设计代替；设计文档索引加入本文件；[部门定向指导](department-guidance.md)状态行与前端技术调研第 6 节的现状已随 #78 更新；总体架构第 10 节加入本设计的工单。
@@ -741,6 +783,9 @@ sequenceDiagram
 12. 同一场景把历史事件数量增加十倍，每个查询的耗时不随之增加。
 13. 命令行的 `project list`、`project show`、`replay` 输出与对应查询的结果相同。
 14. 删除工单完成以后，仓库中没有 `harness/web/`，后端不返回任何界面文件。
+15. 参数命令：`parameter.set` 接受界内取值并写成事件，超出界限以 `out_of_bounds` 拒绝；参数修改以后，正在运行与已经停止的 run 使用自己冻结的值，之后创建的 run 使用新值；撤回是一条命令。
+16. 画面诚实性：第 5.8 节的 H1 至 H7 各有对应的测试。
+17. 新增的读取模型（第 4.3 节）对录制的事件夹具给出期望的结果，机器的在线状态只取自机器流。
 
 ## 10. 决定
 
@@ -754,7 +799,7 @@ sequenceDiagram
 6. **接入已有项目的源目录。** 已有项目的代码经 `project.onboard` 接入并建档（2026-09-29 用户决定，接入已有项目设计说明第 12 节第 1 项；新建项目的起始文件夹见 2026-10-06 的补充，[项目的起始文件夹设计说明](project-initial-files.md)）；`work_item.create` 没有代码快照来源。`project.onboard` 填写的源目录路径是控制主机上的路径，同时成为这个项目的第一条源目录登记；以后在项目设置中用 `source_directory.save` 查看与修改，`onboarding.restart` 只能选择登记过的源目录。
 7. **Web 控制台的删除。** 按第 7.3 节：已由 #78 删除。
 8. **桌面客户端启动本机的 Yudao 服务。** 连接「本机」时，桌面客户端在 Yudao 服务没有运行时启动它（`yudao api`），启动为独立的后台进程；退出客户端不停止 Yudao 服务，托盘菜单有「停止 Yudao」，用第 6.2 节的本机停止请求停止；也可以按地址连接已经运行的本机或远端部署。2026-10-01 用户决定（[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)，[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.3 至 4.5 节）。
-9. **执行槽位数。** 执行槽位数是部署设置，经命令修改并写成事件；它取决于运行机器的能力，不属于随系统发布的定义。
+9. **执行槽位数。** 执行槽位数是规则登记中的参数（`execution.slots`，暂定默认值 3，见规则登记），由 `parameter.set` 修改并写成事件；它取决于运行机器的能力。
 10. **取消排队的结果。** 由 3.4A（#19）的设计确定。
 11. **D24 的实施工单。** D24 模型管理属于 Stage 3，父工单 #83，子工单 #84 至 #96；其中 #93、#94 建立模型管理页，#95 建立部门设置弹窗与部门工作间的模型显示，它们依赖 D24 的后端工单。D26 的后端工单是 #50 下的子工单。
 12. **长期目标的修改。** 长期目标可以修改（2026-09-30 用户决定），经 `project.set_goal` 写成项目流中的事件。创建 run 时在 `run_created` 中记下当时的长期目标，部门请求中的项目上下文使用这个值：之后开始的事项使用新目标，进行中的事项按开始时的目标做完。由 #203 实施，设置页的修改入口由 #80 实现。

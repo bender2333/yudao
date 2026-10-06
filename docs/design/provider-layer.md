@@ -1,6 +1,6 @@
 # Provider 设计说明：统一调用、多厂商接入与配置生效
 
-日期：2026-09-19。状态：设计中，未实现。所属阶段：[Stage 2.7](../archive/stage-2-provider-plan.md)。需求合同：[D22 启动与热生效](../requirements/startup-provider-reload.md)、[D23 统一 Provider 层](../requirements/provider-layer.md)。
+日期：2026-09-19。状态：Stage 2.7 已实现（[执行报告](../archive/stage-2-7-provider-report.md)；Anthropic Messages 的真实覆盖由 #96 验收）。所属阶段：[Stage 2.7](../archive/stage-2-provider-plan.md)。需求合同：[D22 启动与热生效](../requirements/startup-provider-reload.md)、[D23 统一 Provider 层](../requirements/provider-layer.md)。
 
 > 2026-09-24：模型目录、部门选择、调用目标解析、推理档位与配置生效时机以[模型管理设计说明](model-management.md)为准。本文中「冻结目标」「新任务取得有效修订，旧任务保留原目标」「协议归于模型访问定义」的内容由它取代；模块边界、统一调用、取消与观测部分继续有效。
 
@@ -198,11 +198,11 @@ sequenceDiagram
 
 ### 7.3 限流、额度和费用
 
-- 网络抖动、明确临时限流按 D17 有界重试；确认凭据无效、无订阅权限或额度耗尽时给出相应原因，不无限等待或自动换 Key/模型/服务。
+- 网络抖动、明确临时限流按 D17 有界重试；确认凭据无效、无订阅权限或额度耗尽时给出相应原因，不无限等待：等待模型服务有时长上限（`wait.model_service.max_sec`，暂定默认值，见规则登记），不自动换 Key、模型或服务。
 - 仅凭 HTTP 429 不能断定月额度耗尽；优先结构化错误、可核实头和有来源状态，未知保持未知。已知服务等待超过现行 D17 上限时明确停止。
 - 页面可以提供官方套餐控制台入口。可选额度查询带时间和来源，接口不稳定/失败则显示未知或已过期；其失败不等于推理不可用。
 - Go 官方有“Use balance”设置，用户开启后可能在同一 Go 端点消耗 Zen 余额。Yudao 不调整该设置，也不承诺“订阅请求必然不再付费”；缺少响应证据时不能把费用标零。
-- 不建立新的计费系统，不用月费推算每次调用价格，不把套餐剩余额度变成 D09 的本地 token 预算。
+- 不建立计费系统与预算控制，不用月费推算每次调用价格，不把套餐剩余额度变成 D09 的本地 token 预算。费用等于用量乘以用户在模型访问定义中填写的单价，进入评测报告与对照记录，不进入运行中的控制；没有填写单价时费用保持未知，不填零（[模型管理设计说明](model-management.md)第 4.3 节）。
 
 事实依据和限制见 [一手资料报告](../research/opencode-go-provider-integration.md)。
 
