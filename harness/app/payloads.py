@@ -1190,6 +1190,8 @@ class CatalogTestFinishedPayload(Payload):
     ok: bool
     protocol: str | None
     error: str | None
+    # 连接测试实际读取的模型列表地址；模型测试与没读到地址时为空
+    source_url: str | None
     actual_model: str | None
     elapsed_ms: int
     admitted: bool | None

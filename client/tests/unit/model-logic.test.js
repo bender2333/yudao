@@ -41,6 +41,8 @@ import {
   admissionLabel,
   rowCapacityValid,
   canSaveRows,
+  sanitizeModelId,
+  saveSuccessText,
 } from "../../src/renderer/src/views/models/model-logic.ts";
 
 const PRESETS = [
@@ -319,6 +321,7 @@ test("添加时的表单为空，编辑时恢复服务方案、协议与已保�
 test("点击候选预填并标明来源；未「接受」的行不能保存（验收第 3 项）", () => {
   const row = rowFromCandidate({ id: "deepseek-v4-flash", context_window: 500000, max_output_tokens: 64000 }, TABLE, "opencode-go");
   assert.equal(row.id, "deepseek-v4-flash");
+  assert.equal(row.model, "deepseek-v4-flash");
   assert.equal(row.context_window, "500000");
   assert.equal(row.capacity_confirmed, false);
   assert.equal(rowSavable(row), false);
@@ -448,5 +451,43 @@ test("容量的缺项与非法关系在界面写明（工单 #294）", () => {
   assert.equal(rowCapacityValid({ context_window: null, max_output_tokens: 100 }), false);
   assert.equal(rowCapacityValid({ context_window: 1000, max_output_tokens: null }), false);
   assert.equal(rowCapacityValid({ context_window: 1000, max_output_tokens: 100 }), true);
+});
+
+test("上游模型 ID 带斜杠时预填的访问定义 ID 是合法标识符，上游 ID 保持原值（工单 #302）", () => {
+  const row = rowFromCandidate(
+    { id: "cbcn/deepseek-v4.1-flash", context_window: 128000, max_output_tokens: 16000 },
+    TABLE, CUSTOM_PRESET_ID,
+  );
+  // ID 换成合法写法：后端只接受字母数字打头的简单标识符，带斜杠保存会被拒
+  assert.equal(row.id, "cbcn-deepseek-v4.1-flash");
+  // 上游模型 ID 原样保留：请求发往上游时用的就是它
+  assert.equal(row.model, "cbcn/deepseek-v4.1-flash");
+  assert.match(sanitizeModelId("openai/gpt-4o:mini"), /^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
+  assert.match(sanitizeModelId("/开头/x"), /^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
+  // 两个不同的上游 ID 清洗以后不撞车，保存时才不会撞 ID 重复
+  assert.notEqual(sanitizeModelId("a/x"), sanitizeModelId("b/x"));
+});
+
+test("连接测试结果写明读取的模型列表地址（工单 #302）", () => {
+  const passed = testText({
+    kind: "connection", ok: true, elapsed_ms: 123, error: null,
+    source_url: "https://cbcn.com/v1/models",
+  });
+  assert.equal(passed, "已读取模型列表地址 https://cbcn.com/v1/models：连接测试通过（123 毫秒）");
+  // 未通过时同样写明是哪个地址没有读到，不让人误以为请求地址也通过了
+  const failed = testText({
+    kind: "connection", ok: false, elapsed_ms: 8, error: "HTTP 401",
+    source_url: "https://cbcn.com/v1/models",
+  });
+  assert.match(failed, /https:\/\/cbcn\.com\/v1\/models/);
+  assert.match(failed, /HTTP 401/);
+  // 模型测试不写地址：它证明的是这一条定义可调
+  const model = testText({ kind: "model", ok: true, elapsed_ms: 50, actual_model: "glm-4.6", admitted: true, error: null });
+  assert.doesNotMatch(model, /模型列表地址/);
+});
+
+test("添加与保存的成功提示用词不同（工单 #302）", () => {
+  assert.equal(saveSuccessText("add"), "已添加 Provider 配置。");
+  assert.equal(saveSuccessText("edit"), "已保存 Provider 配置。");
 });
 

@@ -619,6 +619,14 @@ export type Catalog = {
     department_reminders: {
         [key: string]: Array<string>;
     };
+    /**
+     * Model Reminders
+     */
+    model_reminders: {
+        [key: string]: {
+            [key: string]: Array<string>;
+        };
+    };
 };
 
 /**
@@ -5377,6 +5385,10 @@ export type CatalogTestFinishedPayload = {
      * Error
      */
     error: string | null;
+    /**
+     * Source Url
+     */
+    source_url: string | null;
     /**
      * Actual Model
      */
