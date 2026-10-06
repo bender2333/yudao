@@ -98,6 +98,9 @@ class LoopSystem:
         # 启动时补建缺少的建档修改轮 run（工单 #136，设计第 6 节）：回答「提出修改」以后
         # 修改轮事件已经写入项目流，run 在事务提交以后创建，两者之间中断时在这里补建
         self.recovered_revision_runs = self.projects.create_missing_revision_runs_on_startup()
+        # 启动时补建缺少的普通事项 run（工单 #321，设计第 7 节）：work_item_created 已提交而 run 还没有创建时
+        # 进程中断，这里按事项记录（含起始文件夹快照）补建
+        self.recovered_work_item_runs = self.projects.create_missing_work_item_runs_on_startup()
         # 启动时核对 run 事件版本（ADR-0019，工单 #126、#232）：版本相同的未结束 run 交给 #16 自动继续；
         # 版本不同（含旧事件没有记录版本）的未结束 run 由 #16 发出 definitions_changed 决定请求交给用户，
         # 用户选择「按新版本继续」以后照常继续，「停止事项」则运行以 cancelled 结束。

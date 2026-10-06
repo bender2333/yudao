@@ -956,6 +956,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         state.goal = payload["goal"]
         state.goal_ref = payload["goal_ref"]
         state.source = payload["source"]
+        state.initial_snapshot = payload.get("initial_snapshot")
         state.created_at = event.created_at
         return
     if etype == ProjectEventType.PROJECT_RENAMED:

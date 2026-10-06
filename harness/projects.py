@@ -12,7 +12,7 @@ from typing import Any
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
 from .department_prompts import save_department_prompt
-from .event_store import Command, EventStore, project_stream, run_stream
+from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
 from .materials import save_text_material
 from .models import (
     Adoption,
@@ -40,7 +40,7 @@ from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
 from .decisions import INITIAL_PRD
-from .streams import PRIORITY_UPGRADE_RESTART, PRIORITY_USER
+from .streams import DRAIN_STARTED, PRIORITY_UPGRADE_RESTART, PRIORITY_USER, classify_startup_runs
 from .tree_archive import artifact_run, load_tree
 
 TITLE_LIMIT = 40
@@ -411,17 +411,25 @@ class ProjectService:
     # 项目登记与状态
 
     def register(self, name: str, goal: str, *, source: str = "idea",
+                 initial_directory: str | None = None,
                  command: Command | None = None) -> str:
         # command 是引起登记的命令：同一命令身份已经登记时写入口在判断之前拒绝（DuplicateCommand、CommandIdReused），
         # 不保存目标原文，也不新建项目。source 为 idea（想法新建）或 existing（接入已有项目）
+        # initial_directory 是新建项目时一次性的起点文件夹（工单 #321，设计第 3 节）：
+        # 在事务之前与 project.onboard 相同的采集路径只读采集公开树，采集失败时命令被拒绝，
+        # 不建立项目，不写入任何事件。采集的快照所属范围是项目（与 project_goal 工件相同），不属于任何 run
         _require_text("name", name)
         _require_text("goal", goal)
         project_id = new_id("proj")
+        snapshot = None
+        if initial_directory is not None:
+            _tree, snapshot = ingest_snapshot(initial_directory, self.artifacts, project_id)
 
         def register(transaction: Transaction) -> None:
             goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
                 "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": source,
+                **({} if snapshot is None else {"initial_snapshot": snapshot}),
             }, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
@@ -583,33 +591,47 @@ class ProjectService:
         work_item_id, run_id = new_id("wi"), new_id("run")
 
         def create(transaction: Transaction) -> _NewWorkItem:
-            # 事项的基线、Prompt 与登记命令取自事务中的项目投影
+            # 事项的基线、初始树、快照与登记命令取自事务中的项目投影
             project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
-            baseline = None
-            initial_tree = None
-            source_run = None
-            if project.current_adoption is not None:
-                adoption = project.current_adoption
-                source_run = project_run(self.store, adoption.run_id)
-                if source_run.project_id != project_id:
-                    raise ValueError("source run does not belong to this project")
-                baseline = {
-                    "adoption_id": adoption.adoption_id, "source_run_id": adoption.run_id,
-                    "delivery_event_id": adoption.delivery_event_id, "tree_ref": adoption.tree_ref,
-                    "code_tree_digest": adoption.code_tree_digest,
-                }
-                initial_tree = load_tree(self.artifacts, artifact_run(adoption.tree_ref["path"]),
-                                         ArtifactRef(**adoption.tree_ref))
-                if initial_tree.digest != adoption.code_tree_digest:
-                    raise ValueError("archived tree does not match the adopted deliverable digest")
+            point = self._work_item_start_point(project)
             return self._work_item_created(
                 transaction, project, text, title=title, max_cycles=max_cycles,
                 run_time_limit_sec=run_time_limit_sec, context_window=context_window,
-                baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
-                work_item_id=work_item_id, run_id=run_id,
+                baseline=point.baseline, initial_tree=point.initial_tree, snapshot=point.snapshot,
+                source_run=point.source_run, work_item_id=work_item_id, run_id=run_id,
             )
 
         return self._start(project_id, create, command=command)
+
+    def _work_item_start_point(self, project: ProjectProjection) -> _StartPoint:
+        # 事项的起点只在这里求出（工单 #321，设计第 2 节），按下面的顺序取第一个存在的：
+        # 当前采纳成果的代码树、项目的起始文件夹快照（只在第一次采纳之前使用）、空树。
+        # 开始事项、排空期间排队的事项、因升级重新开始的事项都调用它，不各写一遍
+        if project.current_adoption is not None:
+            adoption = project.current_adoption
+            source_run = project_run(self.store, adoption.run_id)
+            if source_run.project_id != project.project_id:
+                raise ValueError("source run does not belong to this project")
+            baseline = {
+                "adoption_id": adoption.adoption_id, "source_run_id": adoption.run_id,
+                "delivery_event_id": adoption.delivery_event_id, "tree_ref": adoption.tree_ref,
+                "code_tree_digest": adoption.code_tree_digest,
+            }
+            initial_tree = load_tree(self.artifacts, artifact_run(adoption.tree_ref["path"]),
+                                     ArtifactRef(**adoption.tree_ref))
+            if initial_tree.digest != adoption.code_tree_digest:
+                raise ValueError("archived tree does not match the adopted deliverable digest")
+            return _StartPoint(baseline=baseline, initial_tree=initial_tree, source_run=source_run, snapshot=None)
+        snapshot = project.initial_snapshot
+        if snapshot:
+            # 起始文件夹快照不是采纳成果：基线为空，事项种类仍是 change，
+            # 快照记录随 work_item_created 写入，run 创建被中断时启动核对按这条记录建立缺少的 run
+            initial_tree = load_tree(self.artifacts, artifact_run(snapshot["tree_ref"]["path"]),
+                                     ArtifactRef(**snapshot["tree_ref"]))
+            if initial_tree.digest != snapshot["tree_digest"]:
+                raise ValueError("archived tree does not match the initial directory snapshot digest")
+            return _StartPoint(baseline=None, initial_tree=initial_tree, source_run=None, snapshot=snapshot)
+        return _StartPoint(baseline=None, initial_tree=None, source_run=None, snapshot=None)
 
 
     def _work_item_created(self, transaction: Transaction, project: ProjectProjection, text: str, *,
@@ -674,26 +696,12 @@ class ProjectService:
             item = project.work_item_for_run(run_id)
             if item is None:
                 return None
-            baseline, initial_tree, source_run = None, None, None
-            adoption = project.current_adoption
-            if adoption is not None:
-                source = project_run(self.store, adoption.run_id)
-                if source.project_id != run.project_id:
-                    raise ValueError("source run does not belong to this project")
-                baseline = {
-                    "adoption_id": adoption.adoption_id, "source_run_id": adoption.run_id,
-                    "delivery_event_id": adoption.delivery_event_id, "tree_ref": adoption.tree_ref,
-                    "code_tree_digest": adoption.code_tree_digest,
-                }
-                initial_tree = load_tree(self.artifacts, artifact_run(adoption.tree_ref["path"]),
-                                         ArtifactRef(**adoption.tree_ref))
-                if initial_tree.digest != adoption.code_tree_digest:
-                    raise ValueError("archived tree does not match the adopted deliverable digest")
-                source_run = source
+            point = self._work_item_start_point(project)
             return self._work_item_created(
                 transaction, project, item.text, title=item.title, max_cycles=item.max_cycles,
                 run_time_limit_sec=item.run_time_limit_sec, context_window=item.context_window,
-                baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
+                baseline=point.baseline, initial_tree=point.initial_tree, snapshot=point.snapshot,
+                source_run=point.source_run,
                 work_item_id=new_id("wi"), run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
             )
 
@@ -722,21 +730,12 @@ class ProjectService:
 
         def queue(transaction: Transaction) -> str:
             project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
-            source_run = None
-            baseline, initial_tree = None, None
-            adoption = project.current_adoption
-            if adoption is not None:
-                source_run = project_run(self.store, adoption.run_id)
-                baseline = {
-                    "adoption_id": adoption.adoption_id, "source_run_id": adoption.run_id,
-                    "delivery_event_id": adoption.delivery_event_id, "tree_ref": adoption.tree_ref,
-                    "code_tree_digest": adoption.code_tree_digest,
-                }
+            point = self._work_item_start_point(project)
             self._work_item_created(
                 transaction, project, text, title=title, max_cycles=DEFINITIONS.limits.max_cycles,
                 run_time_limit_sec=DEFINITIONS.limits.run_time_limit_sec, context_window=32_000,
-                baseline=baseline, initial_tree=initial_tree, snapshot=None, source_run=source_run,
-                work_item_id=work_item_id, run_id=run_id, priority=PRIORITY_USER,
+                baseline=point.baseline, initial_tree=point.initial_tree, snapshot=point.snapshot,
+                source_run=point.source_run, work_item_id=work_item_id, run_id=run_id, priority=PRIORITY_USER,
             )
             return work_item_id
 
@@ -795,6 +794,62 @@ class ProjectService:
                     project_id, candidate, run_id, int(event.payload["round"]), event.payload.get("note"))
                 created.append(run_id)
         return created
+
+    def create_missing_work_item_runs_on_startup(self) -> list[str]:
+        # 启动时按 work_item_created 建立缺少的 run（工单 #321，设计第 7 节）：
+        # 事项登记的事务已经提交、run 还没有创建时进程中断，事项的 run 流没有任何事件，
+        # 这里按事项记录（基线或起始文件夹快照都在里面）补建。run 流从版本 0 开始，重复创建被拒绝。
+        # 排空期间排队的事项同样没有 run，但它们按设计等升级完成以后才开始：排空还没有结束时这里不补建
+        if self._draining():
+            return []
+        created: list[str] = []
+        for project_id in self.store.list_project_ids():
+            state = self.projection(project_id)
+            for item in state.work_items:
+                if item.kind == "onboarding":
+                    continue
+                if self.store.stream_events(run_stream(item.run_id), after_version=0):
+                    continue
+                snapshot = item.snapshot
+                tree = None
+                if snapshot:
+                    # 起始文件夹快照的所属范围是项目：按 tree_ref 的第一段取得（工单 #321）
+                    ref = ArtifactRef(**snapshot["tree_ref"])
+                    tree = load_tree(self.artifacts, artifact_run(ref.path), ref)
+                else:
+                    baseline = item.baseline
+                    if baseline is not None:
+                        ref = ArtifactRef(**baseline["tree_ref"])
+                        tree = load_tree(self.artifacts, artifact_run(ref.path), ref)
+                # 事项记录了创建时的登记命令版本；冻结的副本按这些版本从项目当前的命令登记表取得，
+                # 版本已经变化的命令按不存在处理并拒绝补建（工作区与命令登记不一致，fast-fail）
+                commands = state.commands
+                frozen = {}
+                for name, version in item.command_versions.items():
+                    config = commands.get(name)
+                    if config is None or config.version != version:
+                        raise ValueError(f"registered command {name} changed since work item {item.work_item_id}")
+                    frozen[name] = config.frozen()
+                self.orchestrator.create_run(
+                    item.text, max_cycles=item.max_cycles, run_time_limit_sec=item.run_time_limit_sec,
+                    context_window=item.context_window, run_id=item.run_id,
+                    project_id=project_id, work_item_id=item.work_item_id,
+                    baseline=item.baseline, initial_tree=tree, code_snapshot=snapshot,
+                    project_context=self.artifacts.get(
+                        ArtifactRef(**item.project_context_ref)).decode("utf-8"),
+                    prompt_config_versions=dict(item.prompt_config_versions),
+                    registered_commands=frozen or None, command_versions=dict(item.command_versions) or None,
+                )
+                created.append(item.run_id)
+        return created
+
+    def _draining(self) -> bool:
+        # 排空还没有结束（目录流里有开始排空的事件，还有未结束的 run）：
+        # 排空期间排队的事项按设计等升级完成以后才开始，这里不补建它们的 run
+        if not any(event.type == DRAIN_STARTED for event in self.store.stream_events(catalog_stream())):
+            return False
+        unfinished = classify_startup_runs(self.store)
+        return bool(unfinished.same_version or unfinished.other_version)
 
     def withdraw_waiting_initial_prd(self, work_item_id: str, *, command: Command | None = None) -> bool:
         # 取消等待确认初始 PRD 的建档事项：撤销项目流中还没有回答的决定请求（工单 #136，设计第 3.1、6 节）。
@@ -1098,6 +1153,15 @@ class ProjectService:
                 item.status in ("in_progress", "awaiting_initial_prd") for item in project.work_items):
             raise WorkItemInProgressError(f"work item in progress: {project_id}")
 
+
+@dataclass(frozen=True)
+class _StartPoint:
+    # 事项的起点（工单 #321，设计第 2 节）：采纳成果的基线与初始树、起始文件夹快照记录、基线所属的 run。
+    # 起始文件夹快照不是采纳成果：它的基线与 source_run 为空，snapshot 带快照记录，事项种类仍是 change
+    baseline: dict[str, Any] | None
+    initial_tree: Any
+    source_run: Any
+    snapshot: dict[str, Any] | None
 
 @dataclass(frozen=True)
 class _NewWorkItem:
