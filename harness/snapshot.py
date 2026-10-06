@@ -23,11 +23,12 @@ from .tree_archive import load_tree, store_tree
 SNAPSHOT_FIELDS = frozenset({"source", "tree_digest", "files", "directories", "tree_ref", "provenance", "bytes"})
 
 
-def ingest_snapshot(source_dir: str | Path, artifacts: ArtifactStore, run_id: str) -> tuple[CapturedTree, dict[str, Any]]:
+def ingest_snapshot(source_dir: str | Path, artifacts: ArtifactStore, scope: str) -> tuple[CapturedTree, dict[str, Any]]:
+    # scope 是工件所属范围：建档与修改轮的快照属于那个 run，项目起始文件夹的快照属于项目（工单 #321）
     # 只读采集：先拒绝宿主私有路径，再采集封存；源目录不被写入
     _reject_private_paths(source_dir)
     tree = capture_public_tree(source_dir)
-    ref = store_tree(artifacts, run_id, tree)
+    ref = store_tree(artifacts, scope, tree)
     record = {
         "source": str(Path(source_dir).absolute()),
         "tree_digest": tree.digest,
@@ -57,14 +58,14 @@ def git_provenance(source_dir: str | Path) -> dict[str, Any]:
     return {"commit": commit, "branch": repository.head.shorthand, "dirty": bool(repository.status())}
 
 def restore_snapshot(
-    artifacts: ArtifactStore, run_id: str, snapshot: dict[str, Any], destination: str | Path
+    artifacts: ArtifactStore, scope: str, snapshot: dict[str, Any], destination: str | Path
 ) -> Path:
     # 仅凭持久化工件恢复：不读源目录，不执行任何命令。
     # 旧事件可能没有 provenance 或 bytes（缺省为空，ADR-0019），恢复只依据 tree_ref 与 tree_digest
     if not isinstance(snapshot, dict) or not {"source", "tree_digest", "files", "directories",
                                               "tree_ref"} <= set(snapshot):
         raise TreeError("快照记录字段不完整，无法恢复")
-    tree = load_tree(artifacts, run_id, ArtifactRef(**snapshot["tree_ref"]))
+    tree = load_tree(artifacts, scope, ArtifactRef(**snapshot["tree_ref"]))
     if tree.digest != snapshot["tree_digest"]:
         raise TreeError("封存摘要与快照记录不一致，拒绝恢复")
     return materialize_tree(tree, destination)

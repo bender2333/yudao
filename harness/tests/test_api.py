@@ -140,7 +140,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         capabilities = client.get("/api/capabilities").json()
         document = client.get("/openapi.json").json()
     assert capabilities["commands"] == [
-        {"name": "project.create", "reasons": ["command_id_reused"]},
+        {"name": "project.create", "reasons": ["source_invalid", "command_id_reused"]},
         {"name": "project.onboard",
          "reasons": ["source_invalid", "busy", "provider_unavailable", "command_id_reused"]},
         {"name": "onboarding.restart",

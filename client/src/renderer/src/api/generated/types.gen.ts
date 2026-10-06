@@ -2787,6 +2787,10 @@ export type ProjectCreate = {
      * Goal
      */
     goal: string;
+    /**
+     * Initial Directory
+     */
+    initial_directory?: string | null;
 };
 
 /**
@@ -2909,6 +2913,10 @@ export type ProjectOverviewResult = {
      * Work Items
      */
     work_items: Array<WorkItemCard>;
+    /**
+     * Start Point
+     */
+    start_point?: string | null;
 };
 
 /**
@@ -11842,6 +11850,7 @@ export type ProjectRegisteredPayload = {
      * Source
      */
     source: 'idea' | 'existing';
+    initial_snapshot?: CodeSnapshot | null;
 };
 
 /**
@@ -15253,7 +15262,7 @@ export type CommandProjectCreateData = {
 
 export type CommandProjectCreateErrors = {
     /**
-     * 命令被拒绝，可能的原因：command_id_reused
+     * 命令被拒绝，可能的原因：source_invalid, command_id_reused
      */
     409: Rejected;
     /**

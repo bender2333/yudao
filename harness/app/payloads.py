@@ -1122,6 +1122,9 @@ class ProjectRegisteredPayload(Payload):
     goal_ref: ArtifactRef
     # 项目来源：想法新建为 idea，接入已有项目为 existing
     source: Literal["idea", "existing"]
+    # 起始文件夹快照记录（工单 #321）：新建项目时给出的起点文件夹的只读采集结果。
+    # 旧事件没有这个字段时缺省为没有起始文件夹（ADR-0019）
+    initial_snapshot: CodeSnapshot | None = None
 
 
 class ProjectRenamedPayload(Payload):

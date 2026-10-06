@@ -34,7 +34,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：command_id_reused",
+            "description": "命令被拒绝，可能的原因：source_invalid, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -8391,6 +8391,18 @@
             "type": "string",
             "minLength": 1,
             "title": "Goal"
+          },
+          "initial_directory": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Directory"
           }
         },
         "additionalProperties": false,
@@ -8587,6 +8599,17 @@
             },
             "type": "array",
             "title": "Work Items"
+          },
+          "start_point": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Point"
           }
         },
         "additionalProperties": false,
@@ -26050,6 +26073,16 @@
             ],
             "title": "Source",
             "type": "string"
+          },
+          "initial_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

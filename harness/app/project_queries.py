@@ -224,6 +224,9 @@ class ProjectOverviewResult(Contract):
     current_adoption: AdoptionView | None
     stats: WorkItemStats
     work_items: list[WorkItemCard]
+    # 起点说明（工单 #321）：项目还没有采纳成果时给出起始文件夹与它的文件数，供界面显示
+    # 「起点：起始文件夹（N 个文件）」；有采纳成果以后起点是采纳成果，不再返回
+    start_point: str | None = None
 
 
 def _project_overview(application: Application, request: ProjectOverview) -> Snapshot[ProjectOverviewResult]:
@@ -236,6 +239,8 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
             project_id=state.project_id, name=state.name, goal=state.goal, version=state.stream_version,
             current_adoption=_adoption(state.current_adoption),
             stats=_work_item_stats(items),
+            start_point=(None if state.current_adoption is not None or not state.initial_snapshot
+                         else f"起点：起始文件夹（{len(state.initial_snapshot.get('files') or [])} 个文件）"),
             work_items=[
                 WorkItemCard(
                     work_item_id=item.work_item_id, kind=item.kind, title=item.title, text=item.text, run_id=item.run_id,
