@@ -110,6 +110,8 @@ class FrozenCommand(Payload):
     args: list[str]
     timeout_sec: int
     output_limit: int
+    # 随登记一起固定的「可以重新执行」声明（工单 #242）
+    repeatable: bool = False
 
 
 class Usage(Payload):
@@ -1129,6 +1131,9 @@ class CommandConfiguredPayload(Payload):
     timeout_sec: int
     output_limit: int
     base_version: int
+    # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）：结果未知时「重新执行一次」的选项按这个声明提供；
+    # 自动重新执行由后续工单实现；旧事件没有这个字段，按否处理
+    repeatable: bool = False
 
 
 class MaterialRecordedPayload(Payload):
