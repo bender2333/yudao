@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
@@ -61,8 +62,8 @@ from .providers.selection import ModelSelection
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
-from .recovery import (ACTION_UNKNOWN, action_repeatable, build_unknown_action_request, classify_actions,
-                       resolved_by_decision)
+from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS, action_repeatable, build_unknown_action_request,
+                       classify_actions, file_action_comparisons, resolved_by_decision)
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
@@ -729,8 +730,11 @@ class Orchestrator:
         self.writes.transact(run_stream(run_id), request)
 
     def _await_unknown_actions(self, run_id: str) -> None:
-        # 工单 #17、#307（恢复契约第 4 节）：恢复时找出结果未知的动作，逐个发出「核实结果未知的动作」决定请求。
-        # 请求只阻塞这个动作（blocks=action），不阻塞整个 run；「重新执行」只在动作契约声明可以重复时给出。
+        # 工单 #17、#307、#308（恢复契约第 4 节）：恢复时找出结果未知的动作。文件工具（写入、编辑、
+        # 删除、移动）先按动作前的公开树快照与当前公开树核实（工单 #308）：
+        # 已经完成的记一条自动核实记录，不补造原来的回执；没有发生的由步骤驱动自动重新执行一次，
+        # 由它决定这次恢复发出哪些「核实结果未知的动作」决定请求。请求只阻塞这个动作（blocks=action），
+        # 不阻塞整个 run；「重新执行」只在动作契约声明可以重复时给出。
         # 跳过三种动作：已经被后来的尝试取代的那一次、由新的尝试接手的动作、契约声明可以重复而且还有
         # 自动重新执行机会的动作（步骤驱动会先自动重新执行一次，用户不必回答）。
         # 同一个动作只发一次请求：已经有它未回答的请求时不再发
@@ -738,13 +742,24 @@ class Orchestrator:
             projection = transaction.projection
             if projection.phase in TERMINAL_PHASES:
                 return
-            actions = classify_actions(transaction.events())
-            resolved = resolved_by_decision(transaction.events(), transaction.decisions.values())
+            events = transaction.events()
+            actions = classify_actions(events)
+            resolved = resolved_by_decision(events, transaction.decisions.values())
+            # 文件动作的对比结论一次算完（工单 #308）：当前公开树在这一个事务里读一次
+            comparisons: dict[str, dict[str, Any]] = {}
+            if any(info["status"] == ACTION_UNKNOWN and info["tool"] in FILE_ACTION_TOOLS
+                   and info["started_event"] is not None for info in actions.values()):
+                tree = self._environment(run_id).query(FactsQuery(tree=True)).tree
+                if tree is not None:
+                    comparisons = file_action_comparisons(
+                        events, artifacts=self.artifacts, run_id=run_id,
+                        current_entries=list(zip(tree.files, tree.hashes)))
             for identity, info in actions.items():
-                if (info["status"] != ACTION_UNKNOWN or info["started_event"] is None or identity in resolved
+                started = info["started_event"]
+                if (info["status"] != ACTION_UNKNOWN or started is None or identity in resolved
                         or info["superseded"] or (info["auto_retry_available"]
                                                  and action_repeatable(info["tool"],
-                                                                      info["started_event"].payload.get("args"),
+                                                                      started.payload.get("args"),
                                                                       registered_commands=projection.registered_commands))):
                     continue
                 action_id = identity[2]
@@ -753,16 +768,28 @@ class Orchestrator:
                        and decision.status == "open"
                        for decision in transaction.decisions.values()):
                     continue
+                comparison = comparisons.get(action_id)
+                if comparison is not None and comparison["verdict"] == "completed":
+                    transaction.append(self._auto_verified(started, projection.phase, comparison))
+                    continue
+                if (comparison is not None and comparison["verdict"] == "not_happened"
+                        and info["auto_retry_available"]):
+                    # 自动核实确认动作没有发生，还有重新执行的机会：步骤驱动按新的尝试重新执行一次，
+                    # 不发决定请求；这次记录由 run.recovery 按「自动核实（没有发生，重新执行）」给出。
+                    # 机会用掉以后核实仍然判没有发生，按 #307 第 3 步交给用户决定
+                    continue
                 tool_def = DEFINITIONS.tools.get(info["tool"])
                 payload = build_unknown_action_request(
                     action_id=action_id, tool=info["tool"],
                     action_kind="" if tool_def is None or tool_def.action is None else tool_def.action,
                     department=projection.active_department or "",
-                    facts=[info["started_event"].event_id],
-                    args=info["started_event"].payload.get("args"),
+                    facts=[started.event_id],
+                    args=started.payload.get("args"),
                     registered_commands=projection.registered_commands,
                     # 自动重新执行的机会已经用掉：新的尝试仍然结果未知，材料写明连续两次结果未知
                     repeat_attempted=not info["auto_retry_available"])
+                if comparison is not None:
+                    payload = {**payload, "verification": comparison}
                 transaction.append(NewEvent(
                     EventType.DECISION_REQUESTED, actor="system", department=projection.active_department,
                     state_before=projection.phase, state_after=projection.phase,
@@ -771,6 +798,22 @@ class Orchestrator:
             transaction.on_commit(lambda: self._wake(run_id))
 
         self.writes.transact(run_stream(run_id), request)
+
+    def _auto_verified(self, started: Any, phase: str, comparison: dict[str, Any]) -> NewEvent:
+        # 自动核实（工单 #308）：对比确认动作已经完成时记一条核实记录，不补造原来的 tool_called 回执。
+        # 结果进入部门历史：input_item 按原来的动作编号给出，与同一条结果的其它记录共享这个编号
+        payload = started.payload or {}
+        action_id = str(payload.get("id") or "")
+        result = {"ok": True, "output": {"resolved": "auto_verify", "verification": comparison}, "error": None}
+        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
+        return NewEvent(
+            EventType.ACTION_VERIFIED, actor="system", department=started.department,
+            state_before=phase, state_after=phase, parent_event_id=started.event_id,
+            payload={"id": action_id, "name": str(payload.get("name") or ""), "step_id": payload.get("step_id"),
+                     "activation_id": payload.get("activation_id"),
+                     "purpose": payload.get("purpose", "work"), "input_item": input_item,
+                     "ok": True, "resolution": "auto_verify", "verification": comparison},
+        )
 
     def _claim_and_resume(self, run_id: str) -> tuple[int, RunProjection]:
         # 取得执行权并写入 run_resumed：中断位置与继续的依据取自取得执行权时的投影。

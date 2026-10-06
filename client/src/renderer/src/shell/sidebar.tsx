@@ -180,7 +180,8 @@ export function Sidebar(props: SidebarProps) {
   );
 }
 
-// 新建项目：名称与长期目标必填；接入已有项目另登记源目录的名称与路径
+// 新建项目：名称与长期目标必填；从想法新建可以另填一个起始文件夹（留空则从空项目开始），
+// 接入已有项目另登记源目录的名称与路径
 function NewProject(props: {
   mode: "idea" | "existing";
   busy: boolean;
@@ -193,11 +194,12 @@ function NewProject(props: {
   const [goal, setGoal] = useState("");
   const [sourceName, setSourceName] = useState("");
   const [sourcePath, setSourcePath] = useState("");
+  const [initialDirectory, setInitialDirectory] = useState("");
   const ready = name.trim() !== "" && goal.trim() !== "" && (props.mode === "idea" || (sourceName.trim() !== "" && sourcePath.trim() !== ""));
   const commandName = props.mode === "idea" ? "project.create" : "project.onboard";
 
   // 本次提交被接受以后等事件到达：项目列表由事件到达时重新查询，列表出现新内容以后「已提交」消失，
-  // 这时关闭表单，四个字段随表单一起清空（工单 #295 第 1 项）。
+  // 这时关闭表单，各字段随表单一起清空（工单 #295 第 1 项）。
   // 被拒绝时 submit 返回假，表单保留已填字段并显示原因；等待只记在这一次挂载上，
   // 取消以后重新打开的表单不会因为上一次提交的余波自己关闭
   const [waitingWrite, setWaitingWrite] = useState(false);
@@ -215,8 +217,9 @@ function NewProject(props: {
         if (!ready) {
           return;
         }
+        const directory = initialDirectory.trim();
         void props.onSubmit(commandName, props.mode === "idea"
-          ? { name: name.trim(), goal: goal.trim() }
+          ? { name: name.trim(), goal: goal.trim(), ...(directory === "" ? {} : { initial_directory: directory }) }
           : { name: name.trim(), goal: goal.trim(), source_name: sourceName.trim(), source_path: sourcePath.trim() })
           .then((ok) => setWaitingWrite(ok));
       }}
@@ -235,6 +238,17 @@ function NewProject(props: {
         <span>长期目标</span>
         <textarea rows={3} value={goal} onChange={(event) => setGoal(event.target.value)} required />
       </label>
+      {props.mode === "idea" ? (
+        <label className="field">
+          <span>起始文件夹</span>
+          <input
+            type="text"
+            value={initialDirectory}
+            placeholder="控制主机上的文件夹路径，留空则从空项目开始"
+            onChange={(event) => setInitialDirectory(event.target.value)}
+          />
+        </label>
+      ) : null}
       {props.mode === "existing" ? (
         <>
           <label className="field">

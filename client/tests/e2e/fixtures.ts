@@ -15,7 +15,8 @@ export type Backend = {
   dataDir: string;
   /** 部门房间的端到端验收预置的项目标识（--room 模式）；其他模式为空。 */
   roomProject: string | null;
-  // 建档脚本模式下后端建好的真实源目录，接入已有项目的对话框填这个路径（工单 #137）
+  // 建档脚本（工单 #137）与起始文件夹脚本（工单 #323）下后端建好的真实目录：
+  // 前者填进接入对话框的源目录路径，后者填进从想法新建的起始文件夹
   sourceDir: string | null;
   stop: () => Promise<void>;
 };
@@ -62,7 +63,7 @@ function newestModification(directory: string): number {
 // 更新地址里的端口要与它一致，客户端才会从同一个服务下载安装程序；room 用流式慢模型跑
 // 一个项目，供部门房间在请求进行中观察（工单 #177）
 export async function startBackend(
-  options: { apiVersion?: number; room?: boolean; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding"; rejectUpstream?: boolean } = {},
+  options: { apiVersion?: number; room?: boolean; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding" | "initial"; rejectUpstream?: boolean } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {

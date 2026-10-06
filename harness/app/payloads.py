@@ -576,6 +576,9 @@ class ToolStartedPayload(AttemptIdentity, Versions, WorkBasis):
     # 自动重新执行（工单 #307）：这次尝试是同一个逻辑动作的上一次尝试因为结果未知而重新执行的。
     # 记被重新执行的 tool_started 事件编号；首次尝试没有这个字段
     auto_retry_of: str | None = None
+    # 自动重新执行的依据（工单 #308）：not_happened 表示自动核实确认上一次尝试没有发生，
+    # 由这次尝试重新执行；契约声明可以重复的动作没有这个字段
+    verification_reason: Literal["not_happened"] | None = None
 
 
 class ToolSkippedPayload(ToolRecord):
@@ -583,16 +586,30 @@ class ToolSkippedPayload(ToolRecord):
     error: str
 
 
+class FileActionComparison(Payload):
+    # 文件动作的自动核实依据（工单 #308）：动作前的公开树快照、动作参数与当前公开树的对比。
+    # verdict 为 completed 表示只有目标路径变成参数里的目标内容、其它路径都没有变；not_happened 表示
+    # 公开树与动作前相同，动作没有发生；unclear 表示另有改动或目标内容不符，交给用户决定
+    tool: str
+    args: dict[str, Any]
+    before_snapshot_event: str
+    verdict: Literal["completed", "not_happened", "unclear"]
+    detail: dict[str, Any]
+
+
 class ActionVerifiedPayload(ToolRecord):
     # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
     # resolution 为 continue 表示用户选择按当前实际状态继续（工单 #17）；auto_reexecute 表示契约声明
-    # 可以重复、自动重新执行了一次（工单 #307）。两次尝试分别记录，不补造原来那次尝试的 tool_called 回执
+    # 可以重复、自动重新执行了一次（工单 #307）；auto_verify 表示自动核实确认动作已经完成
+    # （工单 #308）。两次尝试分别记录，不补造原来那次尝试的 tool_called 回执
     # input_item 让这条结果进入部门历史，模型据此继续
     ok: bool
     error: str | None = None
-    resolution: Literal["auto_reexecute", "continue"]
-    # 自动重新执行时记被重新执行的 tool_started 事件编号；用户决定时为空
+    resolution: Literal["auto_reexecute", "auto_verify", "continue"]
+    # 自动重新执行时记被重新执行的 tool_started 事件编号；自动核实与用户决定时为空
     auto_retry_of: str | None = None
+    # 自动核实的依据（工单 #308）：动作前快照、动作参数与当前公开树的对比结论
+    verification: FileActionComparison | None = None
     note: str | None = None
     decision_id: str | None = None
 
@@ -1042,6 +1059,8 @@ class UnknownActionRequested(Payload):
     # 只阻塞该动作（blocks="action"），不阻塞整个 run。
     # facts 列出涉及的事件编号（tool_started/tool_called 对）；options 按工具是否可重复决定是否包含 reexecute；
     # repeat_attempted 表示这个逻辑动作已经自动重新执行过一次，连续两次结果未知（工单 #307）
+    # verification 是文件动作的自动核实结论（工单 #308）：另有改动或目标内容不符时写明对比结果；
+    # 不是文件动作、没有动作前快照或读不到当前公开树时没有这个字段
     kind: Literal["unknown_action"]
     blocks: Literal["action"]
     options: list[DecisionOption]
@@ -1053,6 +1072,7 @@ class UnknownActionRequested(Payload):
     action_kind: str
     repeatable: bool
     repeat_attempted: bool = False
+    verification: FileActionComparison | None = None
 
 
 # 确认接入已有项目的初始 PRD（工单 #136，接入已有项目设计说明第 3.2 节）：请求写在项目流中，
