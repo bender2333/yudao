@@ -14,7 +14,7 @@ from harness.proposals import product_spec
 from harness.providers import ProviderFacade
 from harness.providers.credentials import CredentialChain
 from harness.runtime import LoopSystem
-from harness.streams import RUN_EVENT_VERSION
+from harness.streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from harness.tests.helpers import delivery_turn, plan_turn, review_turn
 from harness.tests.protocol_helpers import serve, sse
 from harness.write_path import NewEvent
@@ -366,14 +366,16 @@ def test_credentials_are_resolved_from_the_host_again_and_not_written_into_event
         server.server_close()
 
 def test_resumed_runs_are_distinct_from_runs_stopped_for_an_upgrade(data_dir):
-    # run 事件版本不同的未结束 run 仍按 #126 记为因升级停止，不由恢复继续
+    # run 事件版本不同的未结束 run 按强制升级处理（工单 #322）：记为因升级停止，不由恢复继续，
+    # 恢复继续的只有版本与当前相同的 run
     _system, _project_id, run_id = _unfinished_run(data_dir)
     _older_run_event_version(data_dir)
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_parked_script()))
-    assert run_id in restarted.startup_runs.other_version
-    assert restarted.resumed_runs == {}
+    assert restarted.startup_runs.other_version == ()
+    assert run_id not in restarted.resumed_runs, "版本不同的 run 已经停止并重新开始，恢复不再继续它"
     assert _resumed_events(restarted, run_id) == []
+    assert project_run(restarted.store, run_id).stop_reason == STOP_REASON_UPGRADE
     restarted.close()
 
 def test_a_run_waiting_for_the_user_is_not_continued_by_startup(data_dir):

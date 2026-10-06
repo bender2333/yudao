@@ -107,13 +107,9 @@ CATALOG_EVENT_TYPES = frozenset({
 # 全部声明过分类的事件种类
 DECLARED_EVENT_TYPES = RUN_EVENT_TYPES | PROJECT_EVENT_TYPES | CATALOG_EVENT_TYPES
 
-# 因升级停止的停止原因（定义在 definitions/stop_reasons.json）：排空期间由用户发起的强制升级把
-# 正在进行的 run 以这个原因停止，对应的事项用已采纳成果重新开始
+# 因升级停止的停止原因（定义在 definitions/stop_reasons.json）：排空期间由用户发起的强制升级，以及启动时
+# run 事件版本与当前不同的未结束 run（#322），都以这个原因停止，对应的事项用项目的起点重新开始
 STOP_REASON_UPGRADE = "run_event_version_changed"
-
-# 启动时核对 run 事件版本（ADR-0019，工单 #232）：版本不同的未结束 run 交给用户决定（按新版本继续或停止），
-# 决定请求的种类为 definitions_changed（#16 的现有机制），原因写在请求里
-DECISION_REASON_RUN_EVENT_VERSION = "run_event_version_changed"
 
 # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
 PRIORITY_UPGRADE_RESTART = "upgrade_restart"
@@ -131,9 +127,10 @@ FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
 @dataclass(frozen=True)
 class StartupRuns:
     # 启动时按 run 事件版本分类的 run：
-    # same_version 是版本与当前相同且未结束的 run，交给 #16 自动继续，本工单不动它们；
-    # other_version 是未结束且版本不同（含旧事件没有记录版本）的 run，交给 #16 发出决定请求交给用户，
-    # 强制升级（排空期间由用户发起）把两类未结束 run 都停止；finished 是已结束的 run
+    # same_version 是版本与当前相同且未结束的 run，交给 #16 自动继续；
+    # other_version 是未结束且版本不同（含旧事件没有记录版本）的 run，交给启动序列按强制升级处理
+    # （#322），强制升级（排空期间由用户发起）把两类未结束 run 都停止；
+    # finished 是已结束的 run
     same_version: tuple[str, ...]
     other_version: tuple[str, ...]
     finished: tuple[str, ...]
