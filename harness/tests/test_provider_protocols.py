@@ -7,6 +7,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import pytest
 
+from harness.definitions import DEFINITIONS
+from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType
 from harness.providers import (
     CredentialChain,
@@ -31,7 +33,7 @@ from harness.tests.protocol_helpers import (
     serve,
     sse,
 )
-from harness.tests.test_event_sequence import BROKEN_STREAMS, PARTIAL_OUTPUT, product_spec_reply
+from harness.tests.test_event_sequence import BROKEN_STREAMS, PARTIAL_OUTPUT, empty_reply, product_spec_reply
 
 HI = [{"role": "user", "content": "hi"}]
 
@@ -748,3 +750,99 @@ def test_credential_rejection_is_unavailable_and_never_retried(protocol, status)
     assert error.diagnostics["status_code"] == status
     assert error.diagnostics["request_observation_id"] == "a"
     assert len(provider.requests) == 1
+
+
+# 空输出（工单 #305）：流正常结束、没有任何可见输出项。结束原因按各协议自己的写法给出，
+# Responses 走 completed 且 incomplete_details 为空，Chat 与 Messages 各用一个终态结束原因
+EMPTY_OUTPUT_FINISH_REASONS = {"responses": "completed", "chat_completions": "length",
+                               "messages": "max_tokens"}
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+def test_stream_that_ends_without_any_visible_output_is_a_retryable_empty_output_failure(protocol):
+    provider = ScriptedProvider([empty_reply(protocol)])
+    try:
+        facade = facade_with(provider.base + "/v1", protocol=protocol)
+        with pytest.raises(ProviderError) as caught:
+            invoke(facade, bound_target(facade),
+                   model_call(HI, max_output_tokens=2048, session_id="s", attempt_id="a"))
+    finally:
+        provider.close()
+    error = caught.value
+    assert str(error) == "Model response contained no output items"
+    assert error.reason == "empty_output"
+    assert error.retryable is True
+    assert error.diagnostics == {
+        "error_type": "empty_output",
+        "finish_reason": EMPTY_OUTPUT_FINISH_REASONS[protocol],
+        "usage_reported": True,
+        "output_tokens": 10,
+        "max_output_tokens": 2048,
+        "has_reasoning": False,
+    }
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+def test_reasoning_only_reply_counts_as_empty_output(protocol):
+    # 只有推理内容的回复：推理不是可见输出，仍然按空输出处理，诊断写明出现过推理内容
+    provider = ScriptedProvider([empty_reply(protocol, reasoning="先看代码再决定。")])
+    try:
+        facade = facade_with(provider.base + "/v1", protocol=protocol)
+        with pytest.raises(ProviderError) as caught:
+            invoke(facade, bound_target(facade),
+                   model_call(HI, max_output_tokens=2048, session_id="s", attempt_id="a"))
+    finally:
+        provider.close()
+    assert caught.value.reason == "empty_output"
+    assert caught.value.diagnostics["has_reasoning"] is True
+    assert caught.value.diagnostics["finish_reason"] == EMPTY_OUTPUT_FINISH_REASONS[protocol]
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+def test_empty_output_is_retried_and_the_run_continues(protocol, data_dir):
+    # 空输出按 D17 安排重试：第二次正常回复，事项照常推进到下一个部门
+    provider = ScriptedProvider([empty_reply(protocol), product_spec_reply(protocol)])
+    try:
+        system, run_id = provider_system(data_dir, provider.base, protocol, step_limits=FAST_RETRIES)
+        try:
+            result = system.activate_once(run_id)
+            events = system.store.list_events(run_id)
+        finally:
+            system.close()
+    finally:
+        provider.close()
+    failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    assert result.phase == "ENGINEERING", result.error
+    assert len(failed) == 1
+    assert failed[0].payload["reason"] == "empty_output"
+    assert failed[0].payload["retryable"] is True and failed[0].payload["will_retry"] is True
+    assert failed[0].payload["diagnostics"]["error_type"] == "empty_output"
+    assert len(provider.requests) == 2
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+def test_repeated_empty_output_stops_the_run_as_a_provider_failure_without_pausing(protocol, data_dir):
+    # 空输出一直重试用完：沿用已有的模型服务故障处理，运行失败而不是以 no_tool_call 暂停
+    # 停止原因清单（D09）不新增取值，empty_output 在重试用完之后按 provider_error 记
+    provider = ScriptedProvider([empty_reply(protocol) for _ in range(DEFINITIONS.limits.max_provider_attempts)])
+    try:
+        system, run_id = provider_system(data_dir, provider.base, protocol,
+                                         step_limits=StepLimits(max_provider_attempts=1))
+        try:
+            result = system.activate_once(run_id)
+            events = system.store.list_events(run_id)
+        finally:
+            system.close()
+    finally:
+        provider.close()
+    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert result.stop_reason in DEFINITIONS.stop_reasons
+    failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    assert len(failed) == 1
+    assert failed[0].payload["reason"] == "empty_output"
+    assert failed[0].payload["will_retry"] is False
+    assert not [event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]
+    assert not [event for event in events if event.type == EventType.RUN_PAUSED]
+    assert len(provider.requests) == 1
+

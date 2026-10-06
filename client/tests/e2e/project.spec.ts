@@ -473,6 +473,11 @@ test.describe("项目页面（1440×900）", () => {
       await expect(detail).toContainText("选择来源");
       await expect(detail).toContainText("部门默认");
       await expect(detail).toContainText("是否可重试");
+      // 失败类型与结束原因（工单 #305）：详情里给出这两行；这一次请求成功，因此没有失败类型、结束原因未上报
+      await expect(detail).toContainText("失败类型");
+      await expect(detail.locator(".line", { hasText: "失败类型" }).locator(".value")).toHaveText("没有");
+      await expect(detail).toContainText("结束原因");
+      await expect(detail.locator(".line", { hasText: "结束原因" }).locator(".value")).toHaveText("未上报");
       await detail.getByRole("button", { name: "返回请求记录" }).click();
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
       expect(await activeTabCount(page)).toBe(1);
