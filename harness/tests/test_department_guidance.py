@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import json
-import threading
-from http.client import HTTPConnection
+import uuid
 
 import pytest
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
+from harness.app.application import Application
+from harness.app.project_queries import DepartmentWorkspace
 from harness.models import EventType
-from harness.observability import ObservabilityQuery
 from harness.proposals import (
     collaboration_request, delivery_turn, engineering_plan, guidance_response, plan_turn,
     product_spec, response_turn, review_turn,
 )
 from harness.runtime import LoopSystem
+from harness.tests.api_helpers import running_api
 from harness.tests.helpers import recorded_context
-from harness.web.server import serve
 
 
 def _guidance_id(request):
@@ -43,7 +43,8 @@ def _guidance_results(request):
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("echo")
+    project_id = system.projects.register("指导", "把文本按行处理清楚")
+    work_item_id, run_id = system.projects.start_work_item(project_id, "echo")
     system.activate_once(run_id)
 
     system.add_guidance(run_id, "engineering", "请优先检查错误输出的边界行为。")
@@ -63,10 +64,13 @@ def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_pa
     assert guidance.id in applied.payload["guidance_ids"]
     assert any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED for event in events)
 
-    query = ObservabilityQuery(system.store, system.artifacts)
-    department = query.department(run_id, "engineering")
-    assert department["guidance"][0]["text"] == guidance.text
-    assert not any(item.get("text") == guidance.text for item in query.department(run_id, "product")["messages"])
+    application = Application(system)
+    engineering = application.query("department.workspace", DepartmentWorkspace(
+        project_id=project_id, department="engineering", work_item=work_item_id))
+    assert engineering.data.guidance[0].text == guidance.text
+    product = application.query("department.workspace", DepartmentWorkspace(
+        project_id=project_id, department="product", work_item=work_item_id))
+    assert not any(message.get("text") == guidance.text for message in product.data.messages)
 
 
 def test_guidance_for_previous_department_gets_a_read_only_activation_before_release(tmp_path):
@@ -112,41 +116,19 @@ def test_guidance_received_during_model_request_invalidates_old_submission(tmp_p
     assert any(event.type == EventType.PROPOSAL_SUBMITTED for event in system.store.list_events(run_id)) is False
 
 
-def test_guidance_http_command_returns_persisted_target_record(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([]))
-    run_id = system.create_run("echo")
-    server = serve(system, host="127.0.0.1", port=0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        connection = HTTPConnection(host, port)
-        body = json.dumps({"text": "请记录当前验收边界。"}).encode("utf-8")
-        connection.request(
-            "POST",
-            f"/api/runs/{run_id}/departments/quality/guidance",
-            body=body,
-            headers={"Content-Type": "application/json", "Content-Length": str(len(body))},
-        )
-        response = connection.getresponse()
-        payload = json.loads(response.read())
-        connection.close()
-        assert response.status == 201
-        assert payload["department"] == "quality"
-        assert payload["guidance_id"]
-
-        connection = HTTPConnection(host, port)
-        connection.request("GET", f"/api/runs/{run_id}/departments/quality")
-        response = connection.getresponse()
-        department = json.loads(response.read())
-        connection.close()
-        assert response.status == 200
-        assert department["guidance"][0]["id"] == payload["guidance_id"]
-        assert department["guidance"][0]["text"] == "请记录当前验收边界。"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
+def test_guidance_command_returns_persisted_target_record(data_dir):
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    project_id = system.projects.register("指导", "把文本按行处理清楚")
+    work_item_id, run_id = system.projects.start_work_item(project_id, "echo")
+    application = Application(system)
+    with running_api(lambda: application) as client:
+        sent = client.post("/api/commands/guidance.send", json={
+            "command_id": str(uuid.uuid4()), "work_item_id": work_item_id, "department": "quality",
+            "text": "请记录当前验收边界。"})
+        assert sent.status_code == 200
+        workspace = application.query("department.workspace", DepartmentWorkspace(
+            project_id=project_id, department="quality", work_item=work_item_id))
+        assert workspace.data.guidance[0].text == "请记录当前验收边界。"
 
 
 def test_guidance_not_completed_by_activation_or_rejection(tmp_path):

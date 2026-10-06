@@ -14,12 +14,12 @@
 ## 分层
 
 ```text
-任务与观察层  本地 Web 控制台 / REST / SSE
+任务与观察层  桌面客户端 / 应用接口 / REST / 事件流（SSE）
 三部门循环核  Orchestrator、逐步上下文装配、合同校验、循环次数与停止判定
 基础能力层    单次 Responses 模型请求、宿主工具、工作区、事件、工件与 Git 版本存储
 ```
 
-Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并返回输出，不执行工具、不管理部门历史、不决定循环。内核消费模型输出，调用工具或校验提交，再装配下一步输入。每一步的部门指令、当前合同、本部门历史与工具 schema 都保存为可核对摘要的工件。
+Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并返回输出，不执行工具、不管理部门历史、不决定循环。内核消费模型输出，调用工具或校验提交，再装配下一步输入。每一步的部门指令、当前合同、本部门历史与工具 schema 都保存为可核对摘要的工件。界面由桌面客户端提供，后端不返回界面文件。
 
 ## 快速开始
 
@@ -96,7 +96,7 @@ yudao api
 
 默认数据目录是用户数据目录：Windows 为 `%LOCALAPPDATA%\Yudao`，Linux 为 `~/.local/share/yudao`（遵守 `XDG_DATA_HOME`）。事件日志、工件、进程锁 `service.lock`、`providers.json`、`.env` 与日志目录 `logs/` 都在其中；日志按大小轮换。开发、评测与走查用 `--data-dir` 指向其他目录。
 
-旧的 Web 控制台（`uv run python -m harness`，等价 `serve` 子命令）冻结，桌面客户端完成以后删除。
+不写子命令时启动的就是应用接口（与 `api` 子命令相同）；旧 Web 控制台与 `serve` 子命令已删除，观察与操作走桌面客户端。
 
 服务提供桌面客户端使用的应用接口（命令、查询、能力清单与 OpenAPI，见[应用层与接口层设计说明](docs/design/app-and-interface.md)）与客户端的更新源：
 
@@ -111,8 +111,10 @@ yudao api
 ### 运行演示（无需 API 密钥）
 
 ```bash
-uv run python -m harness demo --serve --port 8765
+uv run python -m harness demo
 ```
+
+演示经应用层的命令新建项目与事项，运行结束后打印 run id、阶段、流转与计数。
 
 ### 重放历史任务
 
@@ -223,26 +225,20 @@ uv run python -m harness smoke --provider-config .yudao/providers.json --scenari
 
 ## 如何使用
 
+界面由桌面客户端提供，命令与查询经应用接口提交与读取。下面的例子用 `curl` 直接调用接口；每条命令都带客户端生成的 `command_id`（重试使用同一个值）。
+
 ### 1. 创建项目与任务
-
-通过 Web 界面：
-1. 访问控制台首页
-2. 点击"新建项目"，输入项目名称
-3. 在项目中点击"作为新事项开始"
-4. 输入需求描述，例如："创建一个 Python 脚本，从 CSV 读取数据并输出统计信息"
-
-通过 API：
 
 ```bash
 # 创建项目
-curl -X POST http://localhost:8765/api/projects \
+curl -X POST http://localhost:8765/api/commands/project.create \
   -H "Content-Type: application/json" \
-  -d '{"name": "我的项目"}'
+  -d '{"command_id": "c1", "name": "我的项目", "goal": "创建一个 Python 脚本，从 CSV 读取数据并输出统计信息"}'
 
-# 创建任务
-curl -X POST http://localhost:8765/api/projects/{project_id}/work-items \
+# 创建任务（被接受以后由流程编排开始执行）
+curl -X POST http://localhost:8765/api/commands/work_item.create \
   -H "Content-Type: application/json" \
-  -d '{"intent": "创建一个 hello world 脚本"}'
+  -d '{"command_id": "c2", "project_id": "{project_id}", "text": "创建一个 hello world 脚本"}'
 ```
 
 ### 2. 观察三部门协作
@@ -253,106 +249,84 @@ curl -X POST http://localhost:8765/api/projects/{project_id}/work-items \
 - **工程部 (Engineering)**: 制定计划，实现代码
 - **质检部 (Quality)**: 独立验证，放行交付
 
-在 Web 界面可以：
-- **总览页**: 查看部门流转和交接状态
-- **部门页**: 查看各部门的工作消息和历史
-- **观测页**: 查看模型请求、用量统计、Context/Trace
+读取状态用查询（快照带全局位置；事件流从该位置补齐）：
+
+```bash
+# 项目概览与流转
+curl "http://localhost:8765/api/queries/project.overview?project_id={project_id}"
+curl "http://localhost:8765/api/queries/project.flow?project_id={project_id}&work_item={work_item_id}"
+
+# 部门工作间：部门消息、指导记录、Context 快照与部门 Prompt
+curl "http://localhost:8765/api/queries/department.workspace?project_id={project_id}&department=product&work_item={work_item_id}"
+```
 
 ### 3. 追加需求与调整方向
 
-任务运行中可以追加输入：
+任务运行中可以追加输入与部门定向指导：
 
 ```bash
-# 全局输入（交给产品处理）
-curl -X POST http://localhost:8765/api/runs/{run_id}/inputs \
+# 追加输入（交给产品处理）
+curl -X POST http://localhost:8765/api/commands/work_item.append_input \
   -H "Content-Type: application/json" \
-  -d '{"text": "需要支持 UTF-8 编码"}'
+  -d '{"command_id": "c3", "work_item_id": "{work_item_id}", "text": "需要支持 UTF-8 编码"}'
 
 # 部门定向指导（直接给工程/质检）
-curl -X POST http://localhost:8765/api/runs/{run_id}/departments/engineering/guidance \
+curl -X POST http://localhost:8765/api/commands/guidance.send \
   -H "Content-Type: application/json" \
-  -d '{"text": "使用 pandas 库处理 CSV"}'
+  -d '{"command_id": "c4", "work_item_id": "{work_item_id}", "department": "engineering", "text": "使用 pandas 库处理 CSV"}'
 ```
-
-Web 界面：
-- 总览页底部输入框：全局追加
-- 部门页指导区：定向指导
 
 ### 4. 查看失败原因
 
-如果任务失败或暂停：
-1. 进入**观测页** → **请求列表**
-2. 筛选失败状态
-3. 点击失败请求查看详情：
-   - **Context**: 查看失败时的上下文快照
-   - **Trace**: 查看错误分类和重试历史
-   - **Response**: 查看部分输出（如有）
+如果任务失败或暂停，读取调用尝试（可按部门、状态、Provider 与模型筛选）：
+
+```bash
+curl "http://localhost:8765/api/queries/project.attempts?project_id={project_id}&work_item={work_item_id}&status=failed"
+```
+
+按某个调用尝试的标识读取详情（输入、输出、SDK 流事件、用量与错误）：
+
+```bash
+curl "http://localhost:8765/api/queries/run.attempt?run_id={run_id}&attempt_id={attempt_id}"
+```
 
 ### 5. 取消任务
 
 ```bash
-curl -X POST http://localhost:8765/api/runs/{run_id}/cancel
+curl -X POST http://localhost:8765/api/commands/work_item.cancel \
+  -H "Content-Type: application/json" \
+  -d '{"command_id": "c5", "work_item_id": "{work_item_id}"}'
 ```
-
-或在 Web 界面点击"取消"按钮。
 
 ### 6. 下载交付物
 
 任务完成后：
 
 ```bash
-# 导出事件与投影
-curl http://localhost:8765/api/runs/{run_id}/export > run.json
+# 导出事件、投影、调用尝试与用量
+curl "http://localhost:8765/api/queries/run.export?run_id={run_id}" > run.json
 
-# 下载交付文件
-curl "http://localhost:8765/api/runs/{run_id}/events/{event_id}/files?path=output.csv" > output.csv
+# 下载交付文件（按交付事件与路径）
+curl "http://localhost:8765/api/queries/delivery.file?event_id={event_id}&path=output.csv" > output.csv
 ```
-
-Web 界面可在事项详情页查看完整交付清单和 Git 差异。
 
 ### 7. 编辑部门 Prompt
 
 ```bash
-curl -X POST http://localhost:8765/api/runs/{run_id}/prompts/engineering \
+curl -X POST http://localhost:8765/api/commands/department_settings.save \
   -H "Content-Type: application/json" \
-  -d '{"text": "你是资深 Python 工程师，优先使用标准库..."}'
+  -d '{"command_id": "c6", "project_id": "{project_id}", "department": "engineering", "base_version": 0, "text": "你是资深 Python 工程师，优先使用标准库..."}'
 ```
 
 Prompt 在下次该部门激活时生效，当前激活不受影响。
 
 ## HTTP 接口
 
-`python -m harness api` 提供的应用接口：`POST /api/commands/{名称}`（命令带 `command_id`，接受返回位置，拒绝返回 409 与原因）、`GET /api/queries/{名称}`（快照与位置）、`GET /api/capabilities`（能力清单）、`GET /openapi.json`；已登记的命令与查询以能力清单为准。
-
-下表是旧 Web 控制台（`python -m harness serve`）的接口，冻结，桌面客户端完成以后删除。查询接口只读。创建 run 和取消走控制层，界面不能直接改 spec、投影或完成状态。
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/` | 控制台：项目列表、看板、部门视图、观测 |
-| GET | `/api/health` | 健康检查与 Provider 可用性 |
-| GET | `/api/projects` | 项目列表 |
-| POST | `/api/projects` | 创建项目 |
-| GET | `/api/projects/{id}` | 项目详情 |
-| POST | `/api/projects/{id}/work-items` | 创建任务 |
-| GET | `/api/projects/{id}/stream` | 项目级 SSE |
-| GET | `/api/runs/{id}` | 任务详情 |
-| GET | `/api/runs/{id}/events` | 事件列表 |
-| GET | `/api/runs/{id}/events/{event_id}` | 事件详情（含 Git diff） |
-| GET | `/api/runs/{id}/events/{event_id}/files?path=...` | 下载交付文件 |
-| GET | `/api/runs/{id}/stream` | 任务级 SSE |
-| GET | `/api/runs/{id}/export` | 导出事件与投影 |
-| POST | `/api/runs/{id}/replay` | 校验可重放性 |
-| POST | `/api/runs/{id}/cancel` | 取消任务 |
-| POST | `/api/runs/{id}/inputs` | 追加全局输入 |
-| POST | `/api/runs/{id}/departments/{dept}/guidance` | 部门定向指导 |
-| POST | `/api/runs/{id}/prompts/{department}` | 修改部门 prompt |
-| GET | `/api/runs/{id}/departments/{dept}` | 部门视图 |
-| GET | `/api/runs/{id}/model-attempts` | 模型请求列表 |
-| GET | `/api/runs/{id}/model-attempts/{id}` | 请求详情（Context/Trace） |
+`python -m harness api`（无参启动相同）提供的应用接口：`POST /api/commands/{名称}`（命令带 `command_id`，接受返回位置，拒绝返回 409 与原因）、`GET /api/queries/{名称}`（快照与位置）、`GET /api/events`（按范围筛选、从位置补齐的事件流）、`GET /api/capabilities`（能力清单）、`GET /openapi.json`；已登记的命令与查询以能力清单为准。查询只读，创建事项与取消走命令，界面不能直接改 spec、投影或完成状态。旧 Web 控制台与它的一批旧路由已经删除（[应用层与接口层设计说明](docs/design/app-and-interface.md)第 7.1、7.3 节）。
 
 ## 任务内 Git 版本
 
-原文、需求/spec 与 PRD、计划与 PLAN、交付代码和公开验收记录在正式接纳时形成 Git 提交。新需求引起的 spec 变化可以在 Web 对应事件详情中查看提交、父提交及真实 diff。查询核验当前和父版本与正式材料一致，缺失或篡改会明确报错。
+原文、需求/spec 与 PRD、计划与 PLAN、交付代码和公开验收记录在正式接纳时形成 Git 提交。新需求引起的 spec 变化可以在对应事件详情（`event.detail`）中查看提交、父提交及真实 diff。查询核验当前和父版本与正式材料一致，缺失或篡改会明确报错。
 
 每个任务的仓库保存在 `<data-dir>/git/<run_id>.git`，由主机调用 Git CLI 管理。事件决定哪些版本已经接纳；`refs/snapshots/` 仅保留不可变对象。新输入或需求提交保留上次正式交付代码，工作目录中的修改到交付接纳时才进入代码版本。部门私有历史与 Git 元数据不进入公开交付或跨部门上下文。
 
@@ -360,7 +334,7 @@ Git 与完整交付封存使用同一次采集的文件字节，空目录和独�
 
 ## 模型配置
 
-模型接入由独立的 Provider 模块承担（`harness/providers/`），三部门循环、Web、CLI 与 smoke 都经同一接口调用，不各自直连 SDK。Provider 配置、模型访问定义与部门绑定统一管理，产品、工程、质检分别绑定，允许共享或使用不同服务。创建任务前验证三部门绑定、凭据与模型准入；缺失配置明确拒绝创建。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 Provider，详见 [D17](docs/requirements/provider-retries.md)、[D18](docs/requirements/department-providers.md)、[D23](docs/requirements/provider-layer.md)。
+模型接入由独立的 Provider 模块承担（`harness/providers/`），三部门循环、界面、CLI 与 smoke 都经同一接口调用，不各自直连 SDK。Provider 配置、模型访问定义与部门绑定统一管理，产品、工程、质检分别绑定，允许共享或使用不同服务。创建任务前验证三部门绑定、凭据与模型准入；缺失配置明确拒绝创建。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 Provider，详见 [D17](docs/requirements/provider-retries.md)、[D18](docs/requirements/department-providers.md)、[D23](docs/requirements/provider-layer.md)。
 
 需要 Python 3.11 或更新版本，`uv sync --frozen` 按锁文件安装 SDK：OpenAI SDK 经 HTTPX 连接，Anthropic SDK 经 HTTPX2 连接。运行不需要 OMP、Bun、Node 或 OMP profile；Node 仅用于前端自动化测试。
 
