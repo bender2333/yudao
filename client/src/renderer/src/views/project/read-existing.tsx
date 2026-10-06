@@ -48,7 +48,7 @@ export function ReadExisting(props: { app: ClientApp; runId: string | null; item
   return (
     <Section
       title="阅读已有项目"
-      note="建档事项里部门读取代码快照的动作；由 read_file、search 与 read_range 的 tool_started 事件驱动"
+      note="建档事项里部门读取代码快照的动作"
     >
       {last === null ? (
         <p className="note">这个部门还没有开始读取代码快照。</p>

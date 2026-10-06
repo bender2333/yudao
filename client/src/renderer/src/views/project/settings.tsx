@@ -12,7 +12,7 @@ import {
   formatNumberOr, hasCommand, list, pageKey, text, useDraft,
 } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, useDepartmentDraft } from "./department-settings-form";
-import { departmentName } from "./labels";
+import { SETTING_SOURCE, departmentName, label } from "./labels";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { followDepartmentLabel, mergedModelId, modelById } from "../models/model-logic";
 
@@ -50,7 +50,7 @@ function Basics(props: { app: ClientApp; data: ProjectSettingsResult; command: C
   const base = { project_id: data.project_id, base_version: data.version };
 
   return (
-    <Section title="基本信息" note={`数据来自 project.settings（项目版本 ${data.version}）`}>
+    <Section title="基本信息" note={`当前项目版本 ${data.version}`}>
       <KeyValue
         items={[
           ["项目", data.project_id],
@@ -139,8 +139,7 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
                 {departmentName(key)}（{key}）
               </h3>
               <p className="note">
-                {setting.version} 版；来源 {setting.source}
-                {setting.department_setting_configured ? "（本项目已写入部门设置）" : "（跟随部门默认）"}
+                {setting.version} 版；来源 {label(SETTING_SOURCE, setting.source)}
               </p>
             </div>
             <p className="note">
@@ -231,7 +230,7 @@ function CommandRegistry(props: { app: ClientApp; data: ProjectSettingsResult })
   if (!hasCommand(props.app, "command_registration.save")) {
     return (
       <Section title="登记命令">
-        <Empty text="这个部署没有登记 command_registration.save 命令" />
+        <Empty text="这台主机没有提供登记命令的操作" />
       </Section>
     );
   }

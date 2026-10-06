@@ -130,7 +130,7 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
         highlights={highlights}
       />
 
-      <Section title="项目" note="数据来自 projects.list">
+      <Section title="项目" note="按项目列出长期目标、当前成果与等待数量">
         {(replaying ? replayProjects.data : projects.data) === null ? (
           <Loading state={replaying ? replayProjects : projects} />
         ) : (
@@ -304,7 +304,7 @@ function AwayReportSection(props: {
       title="离开期间的报告"
       note={
         data === null
-          ? "数据来自 home.away_report"
+          ? "正在读取这段时间的完成情况"
           : `上次查看：${formatTime(data.last_seen.at)}`
       }
     >

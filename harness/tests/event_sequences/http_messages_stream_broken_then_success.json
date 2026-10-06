@@ -2401,7 +2401,7 @@
    "CREATED->PRODUCT_SPEC",
    "PRODUCT_SPEC->ENGINEERING"
   ],
-  "waiting_reason": "engineering is implementing against the current ProductSpec",
+  "waiting_reason": "工程正在按有效需求实现",
   "work_item_id": null,
   "workspace_digest": "<sha256#1>",
   "yielded_work": null
