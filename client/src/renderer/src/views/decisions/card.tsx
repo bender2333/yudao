@@ -28,6 +28,7 @@ export type DecisionCardProps = {
 const submitted = new Set<string>();
 
 export function DecisionCard(props: DecisionCardProps) {
+  const { decision } = props;
   const [note, setNote] = useState("");
   // 选项要求写说明而说明为空时，提示放在这里并阻止提交（像素画面用同一个函数给同样的提示）
   const [noteMissing, setNoteMissing] = useState("");
