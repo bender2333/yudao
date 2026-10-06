@@ -1,6 +1,6 @@
 # 评测工具
 
-本目录是与 `harness/` 分开的评测工具，只通过公开接口观察 Yudao（[评测场景设计](../docs/design/evaluation-scenarios.md)第 7 节）。本工单建立了场景 3 的评分器、材料与参考实现。
+本目录是与 `harness/` 分开的评测工具，只通过公开接口观察 Yudao（[评测场景设计](../docs/design/evaluation-scenarios.md)第 7 节）。场景 3 是从较长的 PRD 新建项目，场景 2 是在已有代码上加功能。
 
 ## 目录结构
 
@@ -13,6 +13,12 @@ flowchart TD
     REF[scenarios/scenario-3/reference<br/>参考实现] --> S
 ```
 
+场景 2 的材料来自公开数据集 FeatBench：交付的起点是 `openai/openai-agents-python` 在任务基准提交上的仓库，材料里记录提交号，运行器检出它并按锁文件建立 Python 3.13 环境。
+
+- `scenarios/scenario-2/materials/`：需求原文（`requirement.md`，FeatBench 的 problem_statement 原文）、需求条目表（`requirement-table.json`）、材料来源与运行环境（`manifest.json`）。
+- `scenarios/scenario-2/checks/`：8 条 F2P（`f2p.json`）、331 条 P2P（`p2p.json`）、登记的排除用例（`excluded.json`）、隐藏测试文件（`tests/`，按交付里的相对路径存放）与清单模块（`pytest_checks.py`）。
+- `scenarios/scenario-2/reference/gold.patch`：参考实现，FeatBench 记录的 gold patch。
+- `scenarios/scenario-2/validate.py`：核对材料本身——套上参考实现应当 8 条 F2P 全通过且 P2P 失败 0 条，原样的仓库 8 条全不通过且 P2P 失败 0 条。
 - `scenarios/scenario-3/materials/`：需求原文（`prd.md`，PRD 的英文译本）、接口约定（`interface-agreement.md`）、需求条目表（`requirement-table.json`）、交给被测方的起点（`start/files/`）。这些是公开部分，运行时交给被测方。
 - `scenarios/scenario-3/files/`：题目数据文件 `subway_data.json`，运行器放到起点。
 - `scenarios/scenario-3/checks/`：隐藏检查。只有评分器读取，不进入被测方的运行目录，运行结束以后才复制到评分目录。
@@ -23,11 +29,13 @@ flowchart TD
 
 ## 材料版本
 
-材料版本是 `scenario-3@2`。修改 PRD、接口约定、条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
+场景 3 的材料版本是 `scenario-3@2`，场景 2 的是 `scenario-2@1`。修改需求原文、需求条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
 
 ## 需求条目与检查
 
-7 个需求条目与 24 条检查的对应见 `scenarios/scenario-3/materials/requirement-table.json`（评分器内的对应表在 `checks/command_checks.py` 的 `REQUIREMENT_TABLE`，两者一致）。检查分三类：单元 12 条、命令行 10 条、文件比对 2 条。
+场景 3 有 7 个需求条目与 24 条检查，对应见 `scenarios/scenario-3/materials/requirement-table.json`（评分器内的对应表在 `checks/command_checks.py` 的 `REQUIREMENT_TABLE`，两者一致）。检查分三类：单元 12 条、命令行 10 条、文件比对 2 条。
+
+场景 2 有 6 个需求条目与 8 条 F2P 的对应，见 `scenarios/scenario-2/materials/requirement-table.json`。8 条 F2P 计入完成度与正确性；331 条 P2P 是原有功能测试，失败条数单独报告，不影响完成度（[评测场景设计](../docs/design/evaluation-scenarios.md)第 4.2 节）。隐藏测试文件以文件形态放在 `checks/tests/` 下，评分时盖掉交付里的同名文件，被测方改测试不改变评分。
 
 ## 运行评分器
 
@@ -35,7 +43,7 @@ flowchart TD
 uv run python evals/scorer/scorer.py --delivery <交付目录> --result <结果文件>
 ```
 
-`--delivery` 指向被测方交付的目录，其中应有一个 `src/` 子目录。评分器在评分目录中运行检查，隐藏检查、条目表与参考实现不进入交付目录。
+场景 3 的评分器把交付当作一个带 `src/` 子目录的项目。场景 2 的评分器针对一份仓库：`--delivery` 指向交付副本，评分器把隐藏测试文件盖上去，再用交付自带的 Python 3.13 环境运行 F2P 与 P2P 两份清单。
 
 ## 运行评分器自己的测试
 
@@ -51,6 +59,7 @@ uv run python -m pytest evals/tests
 export YUDAO_EVAL_BASE_URL=<模型服务地址>
 export YUDAO_EVAL_API_KEY=<凭据>
 uv run python evals/runner/run_eval.py \
+    --scenario scenario3 \
     --model yudao-eval/<模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
@@ -58,10 +67,12 @@ uv run python evals/runner/run_eval.py \
     --report docs/evaluation/scenario-3-opencode.md
 ```
 
+场景 2 用 `--scenario scenario2`，结果写到 `scenario-2-opencode.json` 与 `scenario-2-opencode.md`。它的运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
+
 运行器保证下面这些：
 
 - 运行目录在 Yudao 仓库之外，并且是 git 仓库。没有版本控制的目录被 OpenCode 当成全局目录，交付会落到系统临时目录而不是运行目录。
-- 隐藏检查、条目表与参考实现不进入运行目录；它们在运行结束以后才复制到评分目录。
+- 隐藏检查、条目表与参考实现不进入运行目录；它们在运行结束以后才复制到评分目录。场景 2 的运行目录是仓库，材料只把需求原文放进去，隐藏测试文件与两份清单都不进去。
 - 取回与搜索工具（`webfetch`、`websearch`）在运行配置里关闭，运行器另外检查 JSON 输出里没有这两类工具的调用。
 - 消息用短指示加上材料附件（`prd.md`、`interface-agreement.md`、`subway_data.json`），不把需求全文放进命令行。
 - JSON 输出里出现材料目录的路径时这次运行作废（`void`），不计入结果；这类运行在报告的第六节列出。
@@ -80,4 +91,4 @@ uv run python -m pytest evals/tests/test_opencode_runner.py
 
 ## 运行环境
 
-场景 3 的运行环境是 uv 管理的 Python 3.13。评分器与隐藏检查在被测交付的目录之外运行，不在交付目录中写入除导出文件与探测脚本以外的内容。
+两个场景的运行环境都是 uv 管理的 Python 3.13。场景 3 的评分器与隐藏检查在被测交付的目录之外运行，不在交付目录中写入除导出文件与探测脚本以外的内容。场景 2 的评分器在交付副本的副本里运行，用交付自带的虚拟环境（`uv run --project <交付> --no-sync`），不重新建立依赖。
