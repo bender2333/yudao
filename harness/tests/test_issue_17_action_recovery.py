@@ -30,16 +30,21 @@ def _engineering_run(data_dir, script):
     return system, run_id
 
 def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-write", before=None):
-    # 追加一条动作前快照与一条没有结果的 tool_started：表示「写入效果已经写入、完成确认没有保存」的中断状态
+    # 追加一条动作前快照与一条没有结果的 tool_started：表示「写入效果已经写入、完成确认没有保存」的中断状态。
+    # 挂在这个 run 最后一次激活的第 1 步上：那一步的装配记录真实存在，自动重新执行照抄它的调用目标
     before = {"digest": "sha256:" + action_id, "files": []} if before is None else before
     ref = system.artifacts.put(run_id, "snapshot/before", json.dumps(before, ensure_ascii=False),
                                media_type="application/json")
+    activated = [event for event in system.store.list_events(run_id)
+                 if event.type == EventType.DEPARTMENT_ACTIVATED]
+    args = ({"name": "smoke", "argv": ["python", "src/echo.py"]} if tool == "run_check"
+            else {"path": "src/a.py", "content": "A"})
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
         state_before="ENGINEERING", state_after="ENGINEERING",
-        payload={"id": action_id, "name": tool, "args": {"path": "src/a.py", "content": "A"},
-                 "step_id": 1, "activation_id": "act_" + action_id, "attempt": 1, "purpose": "work",
-                 "before_snapshot_ref": asdict(ref)}))
+        payload={"id": action_id, "name": tool, "args": args,
+                 "step_id": 1, "activation_id": activated[-1].payload["activation_id"], "attempt": 1,
+                 "purpose": "work", "before_snapshot_ref": asdict(ref)}))
     return ref
 
 def _decisions(system, run_id, kind=None):
@@ -81,15 +86,46 @@ def test_a_lost_write_action_asks_the_user_and_is_not_blindly_redone(data_dir):
             if event.type == EventType.TOOL_CALLED and event.payload.get("id") == "lost-write"] == []
     reopened.close()
 
-def test_a_lost_repeatable_action_offers_reexecute(data_dir):
-    # 契约声明可以重复的动作（检查）：三个选项都提供
+def _append_retry(system, run_id, previous, *, tool="run_check", action_id="lost-check"):
+    # 追加自动重新执行的那一次尝试：同样的调用编号，auto_retry_of 写明它取代的那次 tool_started 事件编号，
+    # 没有结果——表示进程在新的尝试执行到一半时再次中断
+    system.writes.append(run_stream(run_id), NewEvent(
+        EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
+        state_before="ENGINEERING", state_after="ENGINEERING",
+        payload={"id": action_id, "name": tool, "args": dict(previous.payload.get("args") or {}),
+                 "step_id": previous.payload.get("step_id"), "activation_id": previous.payload.get("activation_id"),
+                 "attempt": 1, "purpose": "work", "auto_retry_of": previous.event_id}))
+
+def test_a_lost_repeatable_action_is_automatically_retried_once(data_dir):
+    # 契约声明可以重复的动作（检查）：恢复时自动重新执行一次，不询问用户（工单 #307，恢复契约第 4 节第 2 步）
     system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
     _append_lost_write(system, run_id, tool="run_check", action_id="lost-check")
     system.close()
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    requests = _decisions(restarted, run_id, kind="unknown_action")
-    assert [option["id"] for option in requests[0].payload["options"]] == ["reexecute", "continue", "stop"]
+    assert _decisions(restarted, run_id, kind="unknown_action") == []
+    retried = [event for event in restarted.store.list_events(run_id)
+               if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-check"]
+    assert len(retried) == 2 and retried[1].payload["auto_retry_of"] == retried[0].event_id
+    restarted.close()
+
+def test_a_retried_action_still_unknown_asks_the_user_with_repeat_attempted(data_dir):
+    # 新的尝试仍然结果未知（自动重新执行的机会已经用掉）：恢复不再重新执行，只发出决定请求，
+    # 材料写明连续两次结果未知，「重新执行」照旧提供（恢复契约第 4 节第 3 步）
+    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    _append_lost_write(system, run_id, tool="run_check", action_id="lost-check")
+    [previous] = [event for event in system.store.list_events(run_id)
+                  if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-check"]
+    _append_retry(system, run_id, previous)
+    system.close()
+
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    started = [event for event in restarted.store.list_events(run_id)
+               if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-check"]
+    assert len(started) == 2, "the automatic retry happens once per logical action"
+    [request] = _decisions(restarted, run_id, kind="unknown_action")
+    assert [option["id"] for option in request.payload["options"]] == ["reexecute", "continue", "stop"]
+    assert request.payload["repeat_attempted"] is True
     restarted.close()
 
 def test_an_open_unknown_action_blocks_the_next_activation(data_dir):

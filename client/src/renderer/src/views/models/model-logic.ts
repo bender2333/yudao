@@ -285,6 +285,7 @@ export function testKeyOf(payload: { kind: "connection" | "model"; provider_id: 
 
 // 一条测试结果的显示文字（工单 #294）：通过写用时与实际返回的模型，未通过写上游给出的原因；
 // 模型行与连接卡片按它显示，用户不必去猜上一次测试的结果
+// 连接测试写明读的是哪个模型列表地址：地址不对时不会让人误以为请求地址也通过了（工单 #302）
 export function testText(payload: {
   kind: "connection" | "model";
   ok: boolean;
@@ -292,17 +293,23 @@ export function testText(payload: {
   elapsed_ms: number;
   actual_model?: string | null;
   admitted?: boolean | null;
+  source_url?: string | null;
 }): string {
   if (!payload.ok) {
-    return payload.kind === "model"
+    const failed = payload.kind === "model"
       ? `模型测试未通过：${payload.error ?? ""}`
       : `连接测试未通过：${payload.error ?? ""}`;
+    return payload.kind === "connection" && payload.source_url
+      ? `读取模型列表地址 ${payload.source_url} 时${failed}`
+      : failed;
   }
   if (payload.kind === "model") {
     const actual = payload.actual_model ? `，实际返回 ${payload.actual_model}` : "";
     return `模型测试通过（${payload.elapsed_ms} 毫秒${actual}${payload.admitted ? "，已准入" : ""}）`;
   }
-  return `连接测试通过（${payload.elapsed_ms} 毫秒）`;
+  return payload.source_url
+    ? `已读取模型列表地址 ${payload.source_url}：连接测试通过（${payload.elapsed_ms} 毫秒）`
+    : `连接测试通过（${payload.elapsed_ms} 毫秒）`;
 }
 
 // 保存会作废准入的影响列表与删除的引用方（设计说明第 4.4、4.5 节，工单 #94）。
@@ -455,6 +462,13 @@ export type CandidateState = {
   error: string | null;
 };
 
+// 模型访问定义 ID 的字符规则与后端 store.py 的简单标识符校验一致：
+// 首字符是字母或数字，其余只允许字母、数字、点、减号、下划线、冒号。
+// 上游模型 ID 常带「/」（例如 cbcn/deepseek-v4.1-flash），这种写法保存会被拒（工单 #302）
+export function sanitizeModelId(value: string): string {
+  return value.trim().replace(/[^A-Za-z0-9._:-]+/g, "-").replace(/^[-._:-]+/, "");
+}
+
 export function numberToText(value: number | null): string {
   return value === null ? "" : String(value);
 }
@@ -472,12 +486,14 @@ export function prefillSourceText(prefill: PrefillValue): string {
   return parts.join(" · ");
 }
 
-// 点击候选建立的一行：容量与输入方式按第 4.3 节预填并标明来源，容量未经用户「接受」以前不能保存
+// 点击候选建立的一行：容量与输入方式按第 4.3 节预填并标明来源，容量未经用户「接受」以前不能保存。
+// 访问定义 ID 预填为符合规则的写法（上游模型 ID 带「/」时换成「-」，工单 #302），
+// 上游模型 ID 保持上游写法原样：请求发往上游时用的就是它
 export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCapabilityTable, presetId: string): FormRow {
   const prefill = prefillModel(candidate.id, candidate, table, presetId);
   return {
     key: crypto.randomUUID(),
-    id: candidate.id,
+    id: sanitizeModelId(candidate.id) || candidate.id,
     model: candidate.id,
     context_window: numberToText(prefill.context_window),
     max_output_tokens: numberToText(prefill.max_output_tokens),
@@ -695,3 +711,8 @@ export function modelById(models: CatalogModel[], modelId: string): CatalogModel
 
 // 一次保存以后要提示的生效说明（设计说明第 9.2 节）
 export const DEPARTMENT_SAVE_NOTICE = "从本部门下一次模型请求起生效";
+
+// 连接保存成功以后的提示（工单 #302）：添加与保存两种来源用词不同；表单收起以后仍要看得见
+export function saveSuccessText(mode: "add" | "edit"): string {
+  return mode === "add" ? "已添加 Provider 配置。" : "已保存 Provider 配置。";
+}

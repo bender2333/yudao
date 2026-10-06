@@ -4,7 +4,7 @@ from __future__ import annotations
 from . import chat, messages, responses
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial, load_dotenv_dict, parse_dotenv_text
-from .discovery import probe_connection, refresh_candidates
+from .discovery import effective_models_url, probe_connection, refresh_candidates
 from .errors import (
     CatalogValidationError,
     CancelledError,
@@ -61,6 +61,7 @@ __all__ = [
     "list_presets",
     "get_preset",
     "build_identity_headers",
+    "effective_models_url",
     "probe_connection",
     "refresh_candidates",
     "ModelCall",

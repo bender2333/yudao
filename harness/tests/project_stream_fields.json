@@ -6,6 +6,7 @@
       "check_names": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线不声明改动文件，基线检查按名称取自被确认的候选",
       "checks": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的基线检查取自被确认候选中的检查回执",
       "code_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码树摘要等于建档快照的摘要",
+      "existing_defects": "这个事件种类是新增的，旧版本的项目流中没有它：现有缺陷取自基线核验中状态为 existing_defect 的结论",
       "files": "这个事件种类是新增的，旧版本的项目流中没有它：以代码为准：填入快照的全部文件",
       "known_risks": "这个事件种类是新增的，旧版本的项目流中没有它：已知风险取自基线核验中状态为 existing_defect 的结论与其他失败",
       "prd_ref": "这个事件种类是新增的，旧版本的项目流中没有它：初始 PRD 的工件引用取自被确认的建档候选",
@@ -16,8 +17,7 @@
       "structure_ref": "这个事件种类是新增的，旧版本的项目流中没有它：现有结构说明的工件引用取自被确认的建档候选",
       "summary": "这个事件种类是新增的，旧版本的项目流中没有它：采纳摘要取自建档 run 的现有结构说明",
       "tree_ref": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码树取自建档快照",
-      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线属于建档事项",
-      "existing_defects": "这个事件种类是新增的，旧版本的项目流中没有它：现有缺陷取自基线核验中状态为 existing_defect 的结论"
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线属于建档事项"
     },
     "command_configured": {
       "repeatable": "旧事件没有登记「可以重新执行」这个声明（#242）；没有这个字段时按否处理，结果未知的动作不自动重新执行"
@@ -48,6 +48,14 @@
       "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：修改轮由新的建档 run 承担",
       "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：修改轮属于同一个建档事项"
     },
+    "project_decision_answered": {
+      "base_version": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求在此之前只写在 run 流中",
+      "decision_id": "这个事件种类是新增的，旧版本的项目流中没有它：所回答的请求在此之前只写在 run 流中",
+      "note": "这个事件种类是新增的，旧版本的项目流中没有它：说明可以为空",
+      "option": "这个事件种类是新增的，旧版本的项目流中没有它：所选的选项在此之前只写在 run 流中",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求不属于任何 run 时为空",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中决定请求所属的事项"
+    },
     "project_decision_requested": {
       "baseline_review": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求带的基线核验取自被确认前的候选",
       "blocks": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求挡住所属事项",
@@ -65,14 +73,6 @@
       "structure": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求带的现有结构说明取自被确认前的候选",
       "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求属于建档事项"
     },
-    "project_decision_answered": {
-      "base_version": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求在此之前只写在 run 流中",
-      "decision_id": "这个事件种类是新增的，旧版本的项目流中没有它：所回答的请求在此之前只写在 run 流中",
-      "note": "这个事件种类是新增的，旧版本的项目流中没有它：说明可以为空",
-      "option": "这个事件种类是新增的，旧版本的项目流中没有它：所选的选项在此之前只写在 run 流中",
-      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求不属于任何 run 时为空",
-      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中决定请求所属的事项"
-    },
     "project_decision_withdrawn": {
       "decision_id": "这个事件种类是新增的，旧版本的项目流中没有它：被撤销的请求在此之前只写在 run 流中",
       "reason": "这个事件种类是新增的，旧版本的项目流中没有它：撤销原因在此之前只写在 run 流中",
@@ -82,6 +82,9 @@
     "project_goal_changed": {
       "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
       "goal_ref": "这个事件种类是新增的，旧版本的项目流中没有它：目标原文的引用取自 project_registered（或此前最后一条 project_goal_changed）"
+    },
+    "project_registered": {
+      "initial_snapshot": "旧事件没有这个字段（#321）：没有这个字段的项目没有起始文件夹，事项从空树开始"
     },
     "work_item_created": {
       "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
@@ -276,7 +279,7 @@
       "baseline_review": "object",
       "blocks": "const string[work_item]",
       "candidate_run_id": "string",
-      "department": "const string[product]",
+      "department": "enum string[engineering, product, quality]",
       "description": "string",
       "facts": "array[string]",
       "kind": "const string[initial_prd]",
@@ -305,6 +308,7 @@
     "project_registered": {
       "goal": "string",
       "goal_ref": "object",
+      "initial_snapshot": "object?",
       "name": "string",
       "source": "enum string[existing, idea]"
     },

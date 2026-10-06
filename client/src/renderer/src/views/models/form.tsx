@@ -14,6 +14,7 @@ import {
   admissionLabel,
   admissionOf,
   capacityIssueText,
+  connectionTestable,
   defaultLevelOptions,
   intFromInput,
   patchRowCapacity,
@@ -184,8 +185,15 @@ export function ProviderForm(props: ProviderFormProps) {
         <label className="mm-field">
           <span className="mm-label">模型列表地址</span>
           <input value={state.models_url} placeholder="留空时使用服务方案的地址"
+                 data-testid="provider-models-url"
                  onChange={(event) => props.onPatch({ models_url: event.target.value })} />
         </label>
+        {/* 自定义方案没有预置地址：不填就取不到候选，这里写明两种取得候选的方式（设计说明第 4.3 节） */}
+        {!connectionTestable(state, preset) && (
+          <p className="mm-hint" role="status" data-testid="models-url-hint">
+            自定义方案没有预置的模型列表地址：填写后点「获取模型列表」才能取得候选（常见写法是请求地址加 /models），也可以「手动添加一行」。
+          </p>
+        )}
       </details>
 
       <p className="mm-hint">一份连接声明一种协议，地址是该协议的请求基址；模型访问定义不声明协议。表单不保存 API Key。</p>
@@ -263,6 +271,10 @@ export function ProviderForm(props: ProviderFormProps) {
 
       <section className="mm-models" data-testid="model-rows">
         <h4>模型访问定义</h4>
+        <p className="mm-hint">
+          ID 是本系统内的标识，只能使用字母、数字与 <code>.</code> <code>-</code> <code>_</code> <code>:</code>；
+          上游模型 ID 保持上游的写法，请求发往上游时用的就是它。
+        </p>
         {state.rows.length === 0 && <p className="mm-hint">还没有模型访问定义；获取模型列表以后点击候选，或手动添加。</p>}
         {state.rows.map((row) => {
           const admission = admissionOf(state.id, row.id, props.admissions);
@@ -274,12 +286,13 @@ export function ProviderForm(props: ProviderFormProps) {
             context_window: intFromInput(row.context_window),
             max_output_tokens: intFromInput(row.max_output_tokens),
           });
+          const capacityConfirmed = (row.saved || row.capacity_confirmed) && capacityIssue === "";
           return (
             <fieldset className="mm-row" key={row.key} data-testid={`model-row-${rowKey}`}>
               <legend>{row.id || "新的定义"}</legend>
               <label className="mm-field">
                 <span className="mm-label">ID</span>
-                <input value={row.id} required
+                <input value={row.id} required data-testid={`row-id-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, { id: event.target.value })} />
               </label>
               <label className="mm-field">
@@ -287,6 +300,11 @@ export function ProviderForm(props: ProviderFormProps) {
                 <input value={row.model} required data-testid={`row-model-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, { model: event.target.value })} />
               </label>
+              {row.model.trim() !== "" && row.model !== row.id && (
+                <p className="mm-hint" data-testid={`id-differs-${rowKey}`}>
+                  发给上游的是「{row.model}」，ID「{row.id}」只在本系统内使用。
+                </p>
+              )}
               <label className="mm-field">
                 <span className="mm-label">窗口</span>
                 <input type="number" min="1" value={row.context_window} data-testid={`row-window-${rowKey}`}
@@ -298,7 +316,7 @@ export function ProviderForm(props: ProviderFormProps) {
                        onChange={(event) => props.onPatchRow(row.key, patchRowCapacity(row, "max_output_tokens", event.target.value))} />
               </label>
               <div className="mm-actions mm-row-actions">
-                {row.saved || row.capacity_confirmed
+                {capacityConfirmed
                   ? <span className="mm-ok" data-testid={`capacity-confirmed-${rowKey}`}>容量已确认</span>
                   : (
                     <button type="button" data-testid={`accept-capacity-${rowKey}`}

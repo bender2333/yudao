@@ -14,19 +14,20 @@ ARCHIVE_FORMAT = "yudao-tree-archive-v1"
 
 
 def artifact_run(path: str) -> str:
-    # 工件引用所属的 run：工件按所属 run 的目录存放（工单 #136，第 2 轮起的候选与基线取自己那一轮的快照工件）
+    # 工件引用所属的范围：工件按所属范围的目录存放。运行内的树属于那个 run（工单 #136），
+    # 项目起始文件夹的快照属于项目（工单 #321）。读取时按 tree_ref.path 的第一段取得，不假设属于某个 run
     return str(path).split("/", 1)[0]
 
 
-def store_tree(store: ArtifactStore, run_id: str, tree: CapturedTree) -> ArtifactRef:
+def store_tree(store: ArtifactStore, scope: str, tree: CapturedTree) -> ArtifactRef:
     """Store every original blob and publish the manifest only after read-back checks."""
-    _validate_run_id(run_id)
+    _validate_scope(scope)
     if not isinstance(tree, CapturedTree):
         raise TreeError("Archiving requires a fully captured tree")
     blobs = []
     for item in tree.files:
-        ref = store.put(run_id, "tree_file", item.data, media_type="application/octet-stream")
-        if store.get_for_run(run_id, ref) != item.data:
+        ref = store.put(scope, "tree_file", item.data, media_type="application/octet-stream")
+        if store.get_for_run(scope, ref) != item.data:
             raise TreeError(f"Stored tree file differs from its captured bytes: {item.path}")
         blobs.append({"path": item.path, "artifact": ref.__dict__})
     payload = {
@@ -36,20 +37,20 @@ def store_tree(store: ArtifactStore, run_id: str, tree: CapturedTree) -> Artifac
         "blobs": blobs,
     }
     raw = json_dumps(payload).encode("utf-8")
-    ref = store.put(run_id, "tree_manifest", raw, media_type="application/json")
-    if store.get_for_run(run_id, ref) != raw:
+    ref = store.put(scope, "tree_manifest", raw, media_type="application/json")
+    if store.get_for_run(scope, ref) != raw:
         raise TreeError("Stored tree manifest differs from its captured contents")
-    if load_tree(store, run_id, ref) != tree:
+    if load_tree(store, scope, ref) != tree:
         raise TreeError("Stored tree did not pass complete read-back verification")
     return ref
 
 
-def load_tree(store: ArtifactStore, run_id: str, ref: ArtifactRef) -> CapturedTree:
+def load_tree(store: ArtifactStore, scope: str, ref: ArtifactRef) -> CapturedTree:
     """Read only persisted artifacts; never consult or execute an old workspace."""
-    _validate_run_id(run_id)
+    _validate_scope(scope)
     if not isinstance(ref, ArtifactRef) or ref.kind != "tree_manifest" or ref.media_type != "application/json":
         raise TreeError("A tree archive requires its manifest artifact reference")
-    raw = store.get_for_run(run_id, ref)
+    raw = store.get_for_run(scope, ref)
     try:
         payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object, parse_constant=_reject_constant)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -81,7 +82,7 @@ def load_tree(store: ArtifactStore, run_id: str, ref: ArtifactRef) -> CapturedTr
         references.append(ArtifactRef(**record))
     files = []
     for item, reference in zip(manifest["files"], references):
-        data = store.get_for_run(run_id, reference)
+        data = store.get_for_run(scope, reference)
         if len(data) != item["size"]:
             raise TreeError(f"Tree file size does not match the manifest: {item['path']}")
         files.append(CapturedFile(item["path"], data))
@@ -91,10 +92,10 @@ def load_tree(store: ArtifactStore, run_id: str, ref: ArtifactRef) -> CapturedTr
     return tree
 
 
-def _validate_run_id(run_id: str) -> None:
-    validate_public_path(run_id)
-    if "/" in run_id:
-        raise TreeError("Artifact run id must be one path component")
+def _validate_scope(scope: str) -> None:
+    validate_public_path(scope)
+    if "/" in scope:
+        raise TreeError("Artifact scope must be one path component")
 
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

@@ -35,13 +35,13 @@ def release_version() -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    # 命令行的子命令、选项与默认值。默认数据目录是用户数据目录，在解析时按当前环境变量求出，
-    # 因此测试用环境变量改写用户数据目录的根就能改变默认值（设计说明第 3.4 节）
+    # 命令行的子命令、选项与默认值。--data-dir 自身不给默认值，写在子命令之前或之后都生效，
+    # 两处都没有给出时由 _data_dir 按子命令求出（设计说明第 3.4 节），因此测试用环境变量
+    # 改写用户数据目录的根就能改变默认值
     # Provider 目录文件与 .env 按生效的数据目录求出，因此 --provider-config 不给默认值
-    default_dir = default_data_dir()
     parser = argparse.ArgumentParser(description="Yudao Loop System")
     parser.add_argument("--version", action="version", version=release_version())
-    parser.add_argument("--data-dir", default=str(default_dir))
+    parser.add_argument("--data-dir", default=None)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     # 访问方式（设计说明第 6.2 节）：本机只能监听回环地址；局域网监听任意地址
@@ -49,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-config", default=None)
     sub = parser.add_subparsers(dest="command")
     demo = sub.add_parser("demo", help="run a fake end-to-end sample")
-    demo.add_argument("--data-dir", default=str(default_dir))
+    demo.add_argument("--data-dir", default=argparse.SUPPRESS)
     # 写在 api 之前或之后的选项都有效；没有写时取上面的默认值
     api = sub.add_parser("api", help="serve the application interface (commands, queries, capabilities)")
     api.add_argument("--data-dir", default=argparse.SUPPRESS)
@@ -63,27 +63,34 @@ def build_parser() -> argparse.ArgumentParser:
     replay = sub.add_parser("replay", help="rebuild a run or project projection from the event store")
     replay.add_argument("run_id", nargs="?")
     replay.add_argument("--project", dest="project_id", help="rebuild a project projection twice and compare")
-    replay.add_argument("--data-dir", default=str(default_dir))
+    replay.add_argument("--data-dir", default=argparse.SUPPRESS)
+    # 写在 smoke 之前或之后的 --data-dir 与 --provider-config 都有效，两处都没有给出时由 _data_dir 求出
     smoke = sub.add_parser("smoke", help="run a real-provider three-department smoke test")
-    smoke.add_argument("--data-dir", default=str(SMOKE_DIR))
+    smoke.add_argument("--data-dir", default=argparse.SUPPRESS)
     smoke.add_argument("--scenario", choices=("happy", "collaboration", "all"), default="all")
-    smoke.add_argument("--provider-config", default=None)
+    smoke.add_argument("--provider-config", default=argparse.SUPPRESS)
     project = sub.add_parser("project", help="read-only project queries")
     project_sub = project.add_subparsers(dest="project_command", required=True)
     project_list = project_sub.add_parser("list", help="list projects")
-    project_list.add_argument("--data-dir", default=str(default_dir))
+    project_list.add_argument("--data-dir", default=argparse.SUPPRESS)
     project_list.add_argument("--archived", action="store_true", help="include archived projects")
     project_show = project_sub.add_parser("show", help="print one project projection")
     project_show.add_argument("project_id")
-    project_show.add_argument("--data-dir", default=str(default_dir))
+    project_show.add_argument("--data-dir", default=argparse.SUPPRESS)
     return parser
 
+def _data_dir(args: argparse.Namespace, command: str) -> str:
+    # 生效的数据目录：命令行给出时以它为准（写在子命令之前或之后都生效）；
+    # 没有给出时 smoke 取 harness/smoke.py 的 DEFAULT_DIR，其余子命令取用户数据目录（设计说明第 3.4 节）
+    given = getattr(args, "data_dir", None)
+    return given if given is not None else str(SMOKE_DIR if command == "smoke" else default_data_dir())
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     # 不写子命令时启动新接口（应用层与接口层设计说明第 7.3、7.4 节）
     command = args.command or "api"
+    args.data_dir = _data_dir(args, command)
 
     if command == "demo":
         lock = _lock_data_dir(args.data_dir)
@@ -95,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"phase={projection.phase} outcome={projection.outcome} stop={projection.stop_reason}")
         print(f"transitions: {' | '.join(projection.transitions)}")
         print(f"requests={projection.request_count} reworks={projection.rework_count} events={projection.stream_version}")
-        print(f"console: yudao api --data-dir {args.data_dir}")
+        print(f"api: yudao api --data-dir {args.data_dir}")
         return 0
     if command == "api":
         error = listen_error(args.access, args.host)

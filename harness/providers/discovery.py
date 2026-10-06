@@ -20,7 +20,7 @@ def refresh_candidates(
     api_key: str = "",
     timeout_sec: float = 30.0,
 ) -> dict[str, Any]:
-    source_url = _effective_models_url(provider, models_url_override)
+    source_url = effective_models_url(provider, models_url_override)
     fetched_at = datetime.now(timezone.utc).isoformat()
     if not source_url:
         return _unknown(provider, "", fetched_at, "未提供模型列表地址，请填写或选择带模型列表的服务方案")
@@ -65,7 +65,7 @@ def probe_connection(
     api_key: str = "",
     timeout_sec: float = 30.0,
 ) -> dict[str, Any]:
-    source_url = _effective_models_url(provider)
+    source_url = effective_models_url(provider)
     if not source_url:
         return {"ok": False, "source_url": "", "protocol": provider.protocol,
                 "reason": "no_models_url", "message": "连接与服务方案都没有模型列表地址，不提供连接测试"}
@@ -99,7 +99,8 @@ def _auth_headers(protocol: str, api_key: str) -> dict[str, str]:
         return {"x-api-key": api_key}
     return {"Authorization": f"Bearer {api_key}"}
 
-def _effective_models_url(provider: ProviderDefinition, override: str | None = None) -> str:
+def effective_models_url(provider: ProviderDefinition, override: str | None = None) -> str:
+    # 模型列表地址的来源：先取本次填写的覆盖值，其次连接自己填的地址，最后服务方案预置的地址（设计说明第 4.3 节）
     if isinstance(override, str) and override.strip():
         return override.strip()
     if provider.models_url:
@@ -164,4 +165,4 @@ def _unknown(provider: ProviderDefinition, source_url: str, fetched_at: str, err
     }
 
 
-__all__ = ["probe_connection", "refresh_candidates"]
+__all__ = ["effective_models_url", "probe_connection", "refresh_candidates"]
