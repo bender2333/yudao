@@ -42,11 +42,12 @@ from .selection import (
     merge_selection,
 )
 from . import capabilities, suggested
-from .store import ModelDefinition, ProviderDefinition, ProviderStore, SUPPORTED_PROTOCOLS
+from .store import DEFAULT_TIMEOUT_SEC, ModelDefinition, ProviderDefinition, ProviderStore, SUPPORTED_PROTOCOLS
 from .tls import ssl_context
 
 __all__ = [
     "ssl_context",
+    "DEFAULT_TIMEOUT_SEC",
     "capabilities",
     "suggested",
     "ProviderFacade",
