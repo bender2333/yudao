@@ -197,6 +197,11 @@ test.describe("接入已有项目（1440×900）", () => {
       await expect(rejection.locator(".rejection-paths li").first()).toContainText("docs/alpha");
       await expect(rejection.locator(".rejection-paths li").nth(1)).toContainText("docs/beta");
       await expect(form).toBeVisible();
+      // 被拒绝时四个字段保留已填的值，用户改正以后可以直接重新提交（工单 #295 第 1 项）
+      await expect(form.getByLabel("项目名称")).toHaveValue("不该出现的项目");
+      await expect(form.getByLabel("长期目标")).toHaveValue(GOAL);
+      await expect(form.getByLabel("源目录名称")).toHaveValue(SOURCE_NAME);
+      await expect(form.getByLabel("源目录路径")).not.toHaveValue("");
 
       // 没有出现新项目
       expect((await projects(page)).map((project) => project.project_id)).toEqual(before);

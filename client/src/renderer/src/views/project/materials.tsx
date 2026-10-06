@@ -33,7 +33,7 @@ export function MaterialsPage(props: { app: ClientApp; route: Route }) {
         note={`只读，按事项查看；本页的事项 ${chosen ?? "无"}${requested === null && chosen !== null ? "（未选中事项，取当前事项）" : requested === null ? "" : "（顶栏选中）"}`}
       >
         <Loading state={overview} />
-        {chosen === null ? <Empty text="项目还没有事项，没有资料可看" /> : null}
+        {overview.data !== null && chosen === null ? <Empty text="项目还没有事项，没有资料可看" /> : null}
         <Loading state={materials} />
         {data ? (
           <>
