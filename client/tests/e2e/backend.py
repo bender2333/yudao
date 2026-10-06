@@ -258,6 +258,15 @@ async def seed(application: Application, system: LoopSystem) -> None:
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="实时项目", goal="在界面上走完一个事项"),
         actor="user:local")
 
+async def seed_onboarding(application: Application) -> None:
+    # 建档脚本的预置（工单 #332）：只建一个空项目，不跑事项。建档轮次全部留给接入已有项目用：
+    # 接入的建档 run 要走过产品、工程与质检共六次模型调用，重新开始建档再来六次，
+    # 窄屏用例再一轮；预置事项消耗这些轮次会让接入的建档 run 在第一次模型请求就耗尽脚本
+    # （fake adapter script exhausted），事项以 provider_error 停下，读取动作一个也没有。
+    await application.command(
+        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="预置项目", goal="接入前的空项目"),
+        actor="user:local")
+
 async def seed_room(application: Application, system: LoopSystem) -> str:
     # 部门房间的端到端验收（工单 #177）：建一个项目并跑完第一个事项（让部门工作间有默认选中的事项，
     # 房间照常渲染）。端到端测试随后打开房间，再经命令开始第二个事项：命令在接口进程的事件循环里
@@ -490,6 +499,8 @@ def main() -> int:
     if not already_seeded:
         if args.room:
             room_project = asyncio.run(seed_room(application, system))
+        elif args.script == "onboarding":
+            asyncio.run(seed_onboarding(application))
         elif args.script != "initial":
             # 起始文件夹的用例自己在界面上建项目并开始事项，不需要预置的项目与事项（工单 #323）
             asyncio.run(seed(application, system))

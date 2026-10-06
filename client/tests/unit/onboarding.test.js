@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   ONBOARDING_REJECTION_REASONS,
+  lastReadExistingAction,
   projectOnboardingMark,
   readExistingAction,
   sourceInvalidLines,
@@ -106,4 +107,22 @@ test("读取、搜索与区间阅读三种工具驱动阅读已有项目，其�
 test("只有 tool_started 事件驱动阅读已有项目，其他事件不驱动", () => {
   assert.equal(readExistingAction(toolStarted({ type: "tool_called", payload: { name: "read_file" } })), null);
   assert.equal(readExistingAction(toolStarted({ type: "model_message", payload: {} })), null);
+});
+
+function action(overrides) {
+  return { tool: "read_file", department: "product", created_at: "2026-10-07T01:00:00+00:00", ...overrides };
+}
+
+test("页面打开以前已经发生的读取按动作列表读出最近一次", () => {
+  const last = lastReadExistingAction([
+    action({}),
+    action({ tool: "run_check", created_at: "2026-10-07T02:00:00+00:00" }),
+    action({ tool: "read_range", department: "quality", created_at: "2026-10-07T03:00:00+00:00" }),
+  ]);
+  assert.deepEqual(last, { tool: "read_range", department: "quality", at: "2026-10-07T03:00:00+00:00" });
+});
+
+test("动作列表里没有读取时没有已发生的读取", () => {
+  assert.equal(lastReadExistingAction([]), null);
+  assert.equal(lastReadExistingAction([action({ tool: "submit_structure" })]), null);
 });

@@ -12,6 +12,7 @@ export const WORK_ITEM_STATUS: Record<string, string> = {
   in_progress: "进行中",
   adopted: "已采纳",
   released_unsettled: "已放行",
+  awaiting_initial_prd: "等待确认初始 PRD",
   stopped: "已停止",
   held: "排队中",
 };

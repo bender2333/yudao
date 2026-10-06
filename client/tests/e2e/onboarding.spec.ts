@@ -5,7 +5,7 @@
 // 三条验收：
 //   1. 经对话框完成一次接入，建档状态标记随事件变化，部门房间出现「阅读已有项目」的动作；
 //   2. 填写无效的源目录时对话框显示 source_invalid 的原因与相对路径，没有出现新项目；
-//   3. 建档停止以后「重新开始建档」可用，点击以后出现新的建档事项。
+//   3. 放弃等待确认的建档以后「重新开始建档」可用，点击以后出现新的建档事项。
 // 两种窗口尺寸：1440×900 走完整流程，390×844 核对接入对话框与状态标记可用。控制台错误为零。
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
@@ -158,19 +158,21 @@ test.describe("接入已有项目（1440×900）", () => {
       await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes(PROJECT),
         page, "侧栏出现接入的项目");
 
-      // 建档状态标记：建档事项跑完基线核验以后停下，标记变成等待建档
+      // 建档状态标记：建档事项跑完基线核验以后停下并等用户确认初始 PRD（工单 #136），标记随之变化
       const id = await projectId(page);
       await navigate(page, id, "overview");
-      await waitUntil(async () => (await bodyText(page)).includes("等待建档"), page,
-        "建档停下以后项目标记为等待建档", 180_000);
-      await expect(page.locator(".project-entry").filter({ hasText: PROJECT })).toContainText("等待建档");
+      await waitUntil(async () => (await bodyText(page)).includes("等待确认初始 PRD"), page,
+        "建档停下以后项目标记为等待确认初始 PRD", 180_000);
+      await expect(page.locator(".project-entry").filter({ hasText: PROJECT })).toContainText("等待确认初始 PRD");
 
-      // 部门工作间的「阅读已有项目」动作：由 read_file 等工具的 tool_started 事件驱动，
-      // 事件到达以后页面自动显示（页面不刷新）
+      // 部门工作间的「阅读已有项目」动作：由 read_file、search 与 read_range 的 tool_started 事件驱动。
+      // 建档在页面打开以前就跑完了读取，订阅收不到那些事件，区块按 run.actions 的动作列表显示最近一次读取
+      // （工单 #332）。脚本里质检的读取是 read_range，工程读的是 src/echo.py 的区间。
       await navigate(page, id, "dept/engineering");
       await waitUntil(async () => (await (await section(page, "阅读已有项目")).count()) > 0, page,
         "部门工作间出现阅读已有项目的区块", 60_000);
-      await expect(await section(page, "阅读已有项目")).toContainText("read_file");
+      await expect(await section(page, "阅读已有项目")).toContainText("正在阅读已有项目");
+      await expect(await section(page, "阅读已有项目")).toContainText("read_range");
 
       expect(errors).toEqual([]);
     } finally {
@@ -212,7 +214,7 @@ test.describe("接入已有项目（1440×900）", () => {
     }
   });
 
-  test("建档停止以后重新开始建档可用，点击以后出现新的建档事项", async () => {
+  test("放弃等待确认的建档以后重新开始建档可用，点击以后出现新的建档事项", async () => {
     test.setTimeout(300_000);
     const client = await openClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
@@ -220,8 +222,15 @@ test.describe("接入已有项目（1440×900）", () => {
     try {
       const id = await projectId(page);
       await navigate(page, id, "overview");
+      // 建档停下以后等用户确认初始 PRD（工单 #136）。重新开始建档只在没有等待中的决定请求时可用，
+      // 用户先放弃本次建档（work_item.cancel 撤销那条请求），项目回到「等待建档」
+      await waitUntil(async () => (await bodyText(page)).includes("等待确认初始 PRD"), page,
+        "概览显示建档事项等待确认初始 PRD", 120_000);
+      const current = await section(page, "当前事项");
+      await current.getByRole("button", { name: "放弃本次建档" }).click();
+
       await waitUntil(async () => (await (await section(page, "重新开始建档")).count()) > 0, page,
-        "概览出现重新开始建档的区块", 120_000);
+        "放弃以后概览出现重新开始建档的区块", 120_000);
 
       const restart = await section(page, "重新开始建档");
       await expect(restart).toContainText(SOURCE_NAME);
@@ -263,7 +272,8 @@ test.describe("接入已有项目（390×844）", () => {
         window.location.hash = "#/home";
       });
       await expect(page.locator(".page.home")).toBeVisible();
-      await waitUntil(async () => (await bodyText(page)).includes("等待建档"), page, "首页显示建档状态标记", 180_000);
+      await waitUntil(async () => (await bodyText(page)).includes("等待确认初始 PRD"), page,
+        "首页显示建档状态标记", 180_000);
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);

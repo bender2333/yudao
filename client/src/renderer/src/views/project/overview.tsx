@@ -114,12 +114,13 @@ function Summary(props: { data: ProjectOverviewResult }) {
   );
 }
 
-// 当前事项：所选事项优先，否则进行中的一项；都找不到时不显示（界面不猜）
+// 当前事项：所选事项优先，否则进行中或等待确认初始 PRD 的一项；都找不到时不显示（界面不猜）。
+// 建档事项等用户确认时没有在执行，但用户要在这一处放弃它并重新开始建档（工单 #136）
 function pickCurrent(items: WorkItemCard[], selected: string | null): WorkItemCard | null {
   if (selected) {
     return items.find((item) => item.work_item_id === selected) ?? null;
   }
-  return items.find((item) => item.status === "in_progress") ?? null;
+  return items.find((item) => item.status === "in_progress" || item.status === "awaiting_initial_prd") ?? null;
 }
 
 function CurrentItem(props: {
@@ -213,10 +214,13 @@ function CurrentItem(props: {
           <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
         </div>
       ) : null}
-      {item.status === "in_progress" && hasCommand(props.app, "work_item.cancel") ? (
+      {/* 建档事项等用户确认初始 PRD 时事项本身没有在执行，取消撤销那条决定请求（工单 #136），
+          用户因此能回到「等待建档」并重新开始建档（设计第 3.1 节） */}
+      {(item.status === "in_progress" || item.status === "awaiting_initial_prd")
+        && hasCommand(props.app, "work_item.cancel") ? (
         <div className="composer">
           <SubmitButton
-            label="取消事项"
+            label={item.status === "awaiting_initial_prd" ? "放弃本次建档" : "取消事项"}
             busy={props.command.busy}
             onClick={() => {
               void props.command.submit("work_item.cancel", { work_item_id: item.work_item_id, base_version: item.version });
