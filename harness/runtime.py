@@ -110,6 +110,8 @@ class LoopSystem:
         # 每个 run 由流程编排先核对 run 事件版本与定义版本（不同时发出决定请求，不取得执行权），
         # 再原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
         # 3.1 保持单任务运行：取得执行权以后串行运行到停止，不并发推进两个 run。
+        # 运行到停止与结算都经流程编排的 run_until_stop_and_settle（工单 #299）：这条入口与事项开始、
+        # 回答决定以后继续共用同一处结算，不在这里各补一遍
         # 返回取得执行权的 run 与它这次取得的执行权编号
         resumed: dict[str, int] = {}
         for run_id in (*self.startup_runs.same_version, *self.startup_runs.other_version):
@@ -118,8 +120,7 @@ class LoopSystem:
                 continue
             epoch, _ = claimed
             resumed[run_id] = epoch
-            self.run_until_stop(run_id)
-            self.projects.settle(run_id)
+            asyncio.run(self.orchestrator.run_until_stop_and_settle(run_id))
         return resumed
 
     @classmethod

@@ -37,8 +37,8 @@ def release_version() -> str:
 def build_parser() -> argparse.ArgumentParser:
     # 命令行的子命令、选项与默认值。默认数据目录是用户数据目录，在解析时按当前环境变量求出，
     # 因此测试用环境变量改写用户数据目录的根就能改变默认值（设计说明第 3.4 节）
+    # Provider 目录文件与 .env 按生效的数据目录求出，因此 --provider-config 不给默认值
     default_dir = default_data_dir()
-    default_config = default_provider_config_path(default_dir)
     parser = argparse.ArgumentParser(description="Yudao Loop System")
     parser.add_argument("--version", action="version", version=release_version())
     parser.add_argument("--data-dir", default=str(default_dir))
@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=8765)
     # 访问方式（设计说明第 6.2 节）：本机只能监听回环地址；局域网监听任意地址
     parser.add_argument("--access", choices=get_args(AccessMode), default="local")
-    parser.add_argument("--provider-config", default=str(default_config))
+    parser.add_argument("--provider-config", default=None)
     sub = parser.add_subparsers(dest="command")
     demo = sub.add_parser("demo", help="run a fake end-to-end sample")
     demo.add_argument("--data-dir", default=str(default_dir))
@@ -185,9 +185,9 @@ def _lock_data_dir(data_dir: str | Path) -> FileLock | None:
 
 def _provider_paths(data_dir: str | Path, provider_config: str | Path | None) -> tuple[Path | None, Path]:
     # 服务进程读取的模型目录与凭据文件：默认都在数据目录内（设计说明第 3.4 节），解析为固定的绝对路径；
-    # 目录文件为空字符串时不读取
-    config = default_provider_config_path(data_dir) if provider_config is None else (
-        None if provider_config == "" else Path(provider_config).resolve())
+    # 没有明确给 --provider-config 时按生效的 --data-dir 求出，明确给了以它为准；目录文件为空字符串时不读取
+    config = (default_provider_config_path(Path(data_dir).resolve()) if provider_config is None else
+              (None if provider_config == "" else Path(provider_config).resolve()))
     return config, default_dotenv_path(data_dir).resolve()
 
 

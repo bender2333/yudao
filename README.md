@@ -94,7 +94,7 @@ yudao api
 
 `yudao api` 的参数与 `python -m harness api` 相同：`--data-dir`、`--host`、`--port`、`--access`、`--provider-config`。`yudao --version` 输出发布版本号；`yudao client install` 运行随 wheel 发布的桌面客户端安装程序。
 
-默认数据目录是用户数据目录：Windows 为 `%LOCALAPPDATA%\Yudao`，Linux 为 `~/.local/share/yudao`（遵守 `XDG_DATA_HOME`）。事件日志、工件、进程锁 `service.lock`、`providers.json`、`.env` 与日志目录 `logs/` 都在其中；日志按大小轮换。开发、评测与走查用 `--data-dir` 指向其他目录。
+默认数据目录是用户数据目录：Windows 为 `%LOCALAPPDATA%\Yudao`，Linux 为 `~/.local/share/yudao`（遵守 `XDG_DATA_HOME`）。事件日志、工件、进程锁 `service.lock`、`providers.json`、`.env` 与日志目录 `logs/` 都在其中；日志按大小轮换。开发、评测与走查用 `--data-dir` 指向其他目录。`--provider-config` 没有给出时目录文件为 `<--data-dir>/providers.json`，准入记录 `admissions.json` 与它同目录；明确给出时以该路径为准。
 
 不写子命令时启动的就是应用接口（与 `api` 子命令相同）；旧 Web 控制台与 `serve` 子命令已删除，观察与操作走桌面客户端。
 
