@@ -185,7 +185,7 @@ Yudao 服务提供：
 1. 核对：工作区干净；当前提交在 main 上并已推送；版本号三处相同；Node 版本不低于 22.12，uv 可用。
 2. 构建客户端：`npm ci`，electron-builder 生成安装程序、blockmap 与 `latest.yml`。
 3. M3 起构建执行代理的 wheel。
-4. 把以上文件复制进 `harness/release_assets/`（该目录被 git 忽略），`uv build --wheel` 生成 Yudao 服务的 wheel；核对 wheel 内含这些文件，`latest.yml` 中的 SHA-512 与安装程序一致。
+4. 把以上文件复制进 `harness/release_assets/`（该目录被 git 忽略），删除仓库根下的 `build/` 与 `*.egg-info`，`uv build --wheel` 生成 Yudao 服务的 wheel；核对 wheel 内含这些文件，`latest.yml` 中的 SHA-512 与安装程序一致，`harness/release_assets/` 中只有本次版本的文件（出现其他版本的文件时写明文件名退出；`client install` 与更新源都按服务自身版本的文件名取安装程序）。
 5. 仅在带 `--publish` 时：打标签 `v<版本>` 并推送，`gh release create v<版本>` 把 wheel 上传到私有仓库的 Release，作为备份。
 6. 输出 wheel 的路径与 SHA-256。
 

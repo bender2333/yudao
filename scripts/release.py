@@ -6,8 +6,9 @@
 #   1. 核对：工作区干净；当前提交在 main 上并已推送；版本号三处相同；Node 不低于 22.12，uv 可用。
 #   2. 构建客户端：npm ci，electron-builder 生成安装程序、blockmap 与 latest.yml。
 #   3. M3 起构建执行代理的 wheel（#144 加入），现在留出 release_assets/ 中的位置。
-#   4. 复制进 harness/release_assets/，uv build --wheel 生成 Yudao 服务的 wheel；
-#      核对 wheel 内含这些文件，latest.yml 中的 SHA-512 与安装程序一致。
+#   4. 复制进 harness/release_assets/，删除仓库根下的 build/ 与 *.egg-info，uv build --wheel 生成
+#      Yudao 服务的 wheel；核对 wheel 内含这些文件，latest.yml 中的 SHA-512 与安装程序一致，
+#      wheel 的 harness/release_assets/ 中没有其他版本的文件。
 #   5. 仅带 --publish 时：打标签 v<版本> 并推送，gh release create 把 wheel 上传到 Release。
 #   6. 输出 wheel 的路径与 SHA-256。
 #
@@ -220,8 +221,21 @@ def assemble_assets(repo_root: Path, client: dict[str, Path]) -> dict[str, Path]
         copied[key] = target
     return copied
 
+def clean_build_artifacts(repo_root: Path) -> None:
+    # 第 4 步：删除仓库根下的 build/ 与 *.egg-info 以后再构建。
+    # setuptools 把 harness/release_assets/ 复制进 build/lib/harness/release_assets/ 以后不会清理它，
+    # 上一次构建留下的安装程序会跟着这次构建一起进 wheel（工单 #313）
+    build_dir = repo_root / "build"
+    if build_dir.exists():
+        shutil.rmtree(build_dir)
+    for egg_info in repo_root.glob("*.egg-info"):
+        if egg_info.is_dir():
+            shutil.rmtree(egg_info)
+
 def build_wheel(repo_root: Path, version: str, output_dir: Path) -> Path:
-    # 第 4 步后半：uv build --wheel 生成 Yudao 服务的 wheel
+    # 第 4 步后半：uv build --wheel 生成 Yudao 服务的 wheel。每次构建都先清空构建产物，
+    # 从当前工作区重新产生全部文件
+    clean_build_artifacts(repo_root)
     output_dir.mkdir(parents=True, exist_ok=True)
     _run(["uv", "build", "--wheel", "--out-dir", str(output_dir)], cwd=repo_root)
     expected = output_dir / f"yudao_harness-{version}-py3-none-any.whl"
@@ -229,15 +243,24 @@ def build_wheel(repo_root: Path, version: str, output_dir: Path) -> Path:
         raise ReleaseError(f"uv build 没有生成 {expected}")
     return expected
 
-def verify_wheel_contents(wheel: Path, assets: dict[str, Path]) -> None:
-    # 核对 wheel 内含客户端安装程序、blockmap 与 latest.yml（设计说明第 6.3 节第 4 步）。
+def verify_wheel_contents(wheel: Path, assets: dict[str, Path], version: str) -> None:
+    # 核对 wheel 内含客户端安装程序、blockmap 与 latest.yml（设计说明第 6.3 节第 4 步），
+    # 并且 harness/release_assets/ 里只有本次版本的文件：出现其他版本的文件时写明文件名。
+    # 允许的文件名取自本次构建刚复制进发布资源目录的文件，加上执行代理的 wheel（M3 起由 #144 加入）。
     # wheel 是一个 ZIP 包，用标准库 zipfile 读取其中的文件名
+    allowed = {path.name for path in assets.values()} | {f"yudao_agent-{version}-py3-none-any.whl"}
+    prefix = "harness/release_assets/"
     with zipfile.ZipFile(wheel) as archive:
-        names = set(archive.namelist())
+        names = archive.namelist()
     for key, path in assets.items():
-        member = f"harness/release_assets/{path.name}"
+        member = f"{prefix}{path.name}"
         if member not in names:
             raise ReleaseError(f"wheel {wheel.name} 中缺少 {member}（{key}）")
+    foreign = sorted(name[len(prefix):] for name in names
+                     if name.startswith(prefix) and name[len(prefix):] not in allowed)
+    if foreign:
+        raise ReleaseError(f"wheel {wheel.name} 的 {prefix} 中有本次版本 {version} 以外的文件："
+                           + "、".join(foreign))
 
 def publish(repo_root: Path, version: str, wheel: Path, *, remote: str) -> None:
     # 第 5 步：仅带 --publish 时。打标签 v<版本> 并推送，
@@ -257,7 +280,7 @@ def release(repo_root: Path, *, publish_flag: bool, app_id: str, product_name: s
     verify_manifest_matches_installer(client["manifest"], client["installer"])
     assets = assemble_assets(repo_root, client)
     wheel = build_wheel(repo_root, version, output_dir)
-    verify_wheel_contents(wheel, assets)
+    verify_wheel_contents(wheel, assets, version)
     if publish_flag:
         publish(repo_root, version, wheel, remote=remote)
     return {"version": version, "wheel": wheel, "sha256": sha256_hex(wheel)}
