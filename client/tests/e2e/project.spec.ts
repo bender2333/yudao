@@ -359,7 +359,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
       await expect(inspect).toContainText("上下文清单");
       await tabs.nth(2).click();
-      await expect(inspect.locator(".kv").first()).toContainText("第 1 版（来源 configured）");
+      await expect(inspect.locator(".kv").first()).toContainText("第 1 版（来源 本项目写入）");
       await expect(inspect.locator("pre.raw")).toContainText(PRODUCT_PROMPT);
       const messages = await section(page, "部门消息");
       await expect(messages.locator("ul.message-list li").first()).toBeVisible();
@@ -385,13 +385,13 @@ test.describe("项目页面（1440×900）", () => {
       await expect(await section(page, "工程工作间")).toContainText("按有效需求实现并封存交付");
       const engineering = page.locator('section.card:has([role="tablist"])').first();
       await engineering.locator('[role="tab"]').nth(2).click();
-      await expect(engineering.locator(".kv").first()).toContainText("第 0 版（来源 default）");
+      await expect(engineering.locator(".kv").first()).toContainText("第 0 版（来源 跟随部门默认）");
       await gotoView(page, id, "dept/quality");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL["dept/quality"]}`);
       await expect(await section(page, "质检工作间")).toContainText("按验收条件核验并给出放行或返工");
       const quality = page.locator('section.card:has([role="tablist"])').first();
       await quality.locator('[role="tab"]').nth(2).click();
-      await expect(quality.locator(".kv").first()).toContainText("第 0 版（来源 default）");
+      await expect(quality.locator(".kv").first()).toContainText("第 0 版（来源 跟随部门默认）");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -508,7 +508,7 @@ test.describe("项目页面（1440×900）", () => {
       await gotoView(page, id, "settings");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.settings}`);
       const basics = await section(page, "基本信息");
-      await expect(basics.locator(".section-head .note")).toContainText("数据来自 project.settings（项目版本 ");
+      await expect(basics.locator(".section-head .note")).toContainText("当前项目版本 ");
       await expect(basics).toContainText("当前名称");
       await expect(basics).toContainText(SAMPLE);
       await expect(basics).toContainText(SAMPLE_GOAL);
@@ -520,10 +520,10 @@ test.describe("项目页面（1440×900）", () => {
       await expect(basics.getByRole("button", { name: "归档项目" })).toBeVisible();
       const departments = await section(page, "部门设置");
       await expect(departments).toContainText("产品（product）");
-      await expect(departments).toContainText("1 版；来源 configured（本项目已写入部门设置）");
+      await expect(departments).toContainText("1 版；来源 本项目写入");
       await expect(departments.locator("pre.raw").first()).toContainText(PRODUCT_PROMPT);
       await expect(departments).toContainText("工程（engineering）");
-      await expect(departments).toContainText("0 版；来源 default（跟随部门默认）");
+      await expect(departments).toContainText("0 版；来源 跟随部门默认");
       await expect(departments).toContainText("质检（quality）");
       // 修改部门设置：模型、推理档位与部门 Prompt 三项（第 9.2 节）
       await departments.getByRole("button", { name: "修改部门设置" }).first().click();

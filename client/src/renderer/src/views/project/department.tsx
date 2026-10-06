@@ -15,7 +15,7 @@ import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, useDepartmentDraft } from "./department-settings-form";
-import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
+import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, SETTING_SOURCE, departmentName, formatTime, label } from "./labels";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
@@ -288,7 +288,7 @@ function DepartmentSettingState(props: { data: DepartmentWorkspaceResult }) {
     <>
       <KeyValue
         items={[
-          ["项目当前配置", `第 ${setting.configured_version} 版（来源 ${show(setting.source, "未写明")}）`],
+          ["项目当前配置", `第 ${setting.configured_version} 版（来源 ${label(SETTING_SOURCE, setting.source)}）`],
           ["所选请求实际使用的版本", setting.used_version === null
             ? "这次运行还没有用到部门设置"
             : `第 ${setting.used_version} 版（事件 ${show(setting.used_event_id)}）`],
