@@ -2899,7 +2899,7 @@
   "transitions": [
    "CREATED->PRODUCT_SPEC"
   ],
-  "waiting_reason": "paused:no_tool_call",
+  "waiting_reason": "已暂停：部门连续多次没有调用工具",
   "work_item_id": null,
   "workspace_digest": "<sha256#1>",
   "yielded_work": null

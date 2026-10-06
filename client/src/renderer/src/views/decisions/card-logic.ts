@@ -3,7 +3,7 @@
 // 材料按决定种类从决定请求携带的事实里读出。这里是纯函数，界面与单元测试都直接调用。
 
 import type { DecisionView } from "../../api/generated/types.gen";
-import { DECISION_KIND, label } from "../project/labels.ts";
+import { DECISION_KIND, PHASE_LABELS, STOP_REASON, label } from "../project/labels.ts";
 
 export type MaterialRow = { term: string; value: string };
 export type MaterialLink = { label: string; href: string };
@@ -47,8 +47,10 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
     case "no_tool_call":
     case "workspace_unrepresentable":
       push("部门", dept(request.department));
-      push("停止原因", request.stop_reason);
-      push("停止时所处阶段", request.resumed_at_phase);
+      push("停止原因", typeof request.stop_reason === "string" && request.stop_reason !== ""
+        ? label(STOP_REASON, request.stop_reason) : "");
+      push("停止时所处阶段", typeof request.resumed_at_phase === "string" && request.resumed_at_phase !== ""
+        ? label(PHASE_LABELS, request.resumed_at_phase) : "");
       break;
     case "unknown_action":
       push("动作", request.action_id);

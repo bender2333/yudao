@@ -6,31 +6,56 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import CatalogEventType, EventType, ProjectEventType
+from ..models import (PHASES, STOP_REASON_LABELS, CatalogEventType, EventType, ProjectEventType,
+                     stop_reason_name)
+
+
+# 阶段的中文名（harness/models.py 的 PHASES 是同一份取值）：事件说明里的阶段按中文写
+PHASE_NAMES: dict[str, str] = {
+    "CREATED": "等待开始",
+    "PRODUCT_SPEC": "产品处理中",
+    "ENGINEERING": "工程处理中",
+    "DELIVERY": "交付核验中",
+    "QUALITY": "质检处理中",
+    "REWORK_PRODUCT": "产品返工中",
+    "REWORK_ENGINEERING": "工程返工中",
+    "DONE": "已完成",
+    "PAUSED": "已暂停",
+    "FAILED": "执行失败",
+}
+if set(PHASE_NAMES) != set(PHASES):
+    raise KeyError("阶段的中文名必须与控制核心的阶段取值相同：" + "、".join(PHASES))
+
+STOP_REASON_NAMES = STOP_REASON_LABELS
+
+
+def phase_name(phase: Any) -> str:
+    # 阶段的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
+    return PHASE_NAMES.get(str(phase or ""), str(phase or ""))
+
 
 def event_label(event_type: str, payload: dict[str, Any]) -> str:
     # 一条事件的中文说明；载荷中的关键字段填进说明里，缺失时用空串
     template = _LABELS.get(event_type)
     if template is None:
         raise KeyError(f"no event label is defined for {event_type}")
-    if event_type == EventType.RUN_DONE:
-        # 结束说明按停止原因写成中文，不直接显示英文的停止原因
-        return template.format_map({"stop_reason": _done_text(payload)})
-    return template.format_map(_Missing(payload))
+    # 阶段与停止原因都取中文名，说明里不出现机器标识
+    return template.format_map(_Translated(payload))
 
-class _Missing(dict):
-    # 模板里出现载荷没有的字段时填入空串：说明仍然生成，不因此失败
+
+class _Translated(dict):
+    # 载荷里的阶段与停止原因取中文名，其余字段原样；载荷没有的字段填入空串，说明仍然生成
+    _NAMES = {
+        "from_phase": phase_name, "to_phase": phase_name, "stop_reason": stop_reason_name,
+        "resumed_at_phase": phase_name, "paused_at_phase": phase_name,
+    }
+
     def __missing__(self, key: str) -> str:
         return ""
 
-def _done_text(payload: dict[str, Any]) -> str:
-    # 以完成结束的两种停止原因（普通事项的放行、建档事项的基线核验）
-    return {"released": "已完成并放行", "baseline_verified": "已完成基线核验"}.get(str(payload.get("stop_reason") or ""),
-                                                                       _stop_text(payload))
-
-
-def _stop_text(payload: dict[str, Any]) -> str:
-    return str(payload.get("stop_reason") or "")
+    def __getitem__(self, key: str) -> Any:
+        translate = self._NAMES.get(key)
+        return translate(dict.__getitem__(self, key)) if translate is not None else dict.__getitem__(self, key)
 
 _LABELS: dict[str, str] = {
     EventType.RUN_CREATED: "建立了事项：{task}",

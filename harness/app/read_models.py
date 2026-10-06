@@ -16,6 +16,7 @@ from ..event_store import EventStore
 from ..models import Event, EventType, ProjectEvent, json_dumps
 from ..observability import AttemptFold, search_text
 from ..projects import REWORK_VERDICTS
+from .labels import phase_name
 
 ATTEMPTS = "attempts"
 FLOWS = "flows"
@@ -375,7 +376,7 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
                  "direction_from": _TRANSITION_DEPARTMENTS.get(event.state_before) or event.state_before,
                  "direction_to": _TRANSITION_DEPARTMENTS.get(event.state_after) or event.state_after,
                  "status": "已退回" if kind == "返工" else "已完成",
-                 "content": f"{event.state_before}→{event.state_after}"}]
+                 "content": f"{phase_name(event.state_before)} → {phase_name(event.state_after)}"}]
     if event.type == EventType.COLLABORATION_REQUESTED:
         return [{**base, "flow_id": payload["id"], "kind": "咨询",
                  "direction_from": payload["requester"], "direction_to": payload["recipient"],

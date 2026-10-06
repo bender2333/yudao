@@ -20,8 +20,9 @@ import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, Submit
 import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { ticksOf } from "../timeline/logic";
-import { PHASE_LABELS, WORK_ITEM_STATUS, departmentName, formatTime, label } from "./labels";
+import { INPUT_KIND, PHASE_LABELS, STOP_REASON, WORK_ITEM_STATUS, departmentName, formatTime, label } from "./labels";
 import { RestartOnboarding } from "./restart-onboarding";
+import { BOARD_TITLES, boardColumns } from "./board";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 
 export function OverviewPage(props: { app: ClientApp; route: Route }) {
@@ -54,7 +55,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route }) {
       {data ? (
         <>
           <Summary data={data} />
-          <Section title="循环画面" note="项目楼层与管道（像素画面，工单 #82）；下方时间轴回放本项目的关键事实">
+          <Section title="循环画面" note="项目楼层与管道；下方时间轴回放本项目的关键事实">
             {at !== null ? (
               <p className="replay-banner" role="status">
                 回放中 · {formatTime(atTimeOf(report.data, at))}
@@ -93,7 +94,7 @@ function atTimeOf(report: AwayReport | null, at: number): string | null {
 function Summary(props: { data: ProjectOverviewResult }) {
   const adoption = props.data.current_adoption;
   return (
-    <Section title="项目摘要" note={`数据来自 project.overview（项目版本 ${props.data.version}）`}>
+    <Section title="项目摘要" note={`当前读取的是项目版本 ${props.data.version}`}>
       <KeyValue
         items={[
           ["名称", props.data.name],
@@ -149,7 +150,7 @@ function CurrentItem(props: {
                   .then((ok) => { if (ok) setRecordText(""); });
               }}
             />
-          ) : <p className="note">能力清单没有登记 material.record，不能记录原文</p>}
+          ) : <p className="note">这台主机没有提供记录原文的操作</p>}
         </div>
         <div className="composer">
           <TextArea label="新的要求" value={recordText} onInput={setRecordText} />
@@ -167,8 +168,8 @@ function CurrentItem(props: {
                 void props.command.submit("work_item.create", body).then((ok) => { if (ok) { setRecordText(""); setNewTitle(""); } });
               }}
             />
-          ) : <p className="note">能力清单没有登记 work_item.create，不能新建事项</p>}
-          <p className="note">新事项另外选择可信源目录作为代码快照属于 3.2A，在设置页的登记命令与源目录同级。</p>
+          ) : <p className="note">这台主机没有提供新建事项的操作</p>}
+          <p className="note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
           <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
         </div>
       </Section>
@@ -180,14 +181,16 @@ function CurrentItem(props: {
     ? (inputs.loading ? "正在读取" : "没有输入记录")
     : `已接收第 ${data.input_version} 版输入，已由有效需求接纳到第 ${data.processed_input_version} 版`
       + `${data.input_version > data.processed_input_version ? "（还有输入没有接纳）" : ""}`;
-
+  // 停止的事项没有在处理的部门，这一项不写进去
+  const department = departmentName(item.department);
+  const note = `${item.title}（事项标识 ${item.work_item_id}，第 ${item.round} 轮${department === "" ? "" : `，部门 ${department}`}）`;
   return (
-    <Section title="当前事项" note={`${item.title}（事项标识 ${item.work_item_id}，第 ${item.round} 轮，部门 ${departmentName(item.department)}）`}>
+    <Section title="当前事项" note={note}>
       <KeyValue
         items={[
           ["状态", `${label(WORK_ITEM_STATUS, item.status)}${item.phase ? ` · ${label(PHASE_LABELS, item.phase)}` : ""}`],
           ["待决问题", show(item.pending_question, "没有")],
-          ["停止原因", show(item.stop_reason, "没有")],
+          ["停止原因", item.stop_reason === null || item.stop_reason === "" ? "没有" : label(STOP_REASON, item.stop_reason)],
           ["未能开始", show(item.start_error, "没有")],
           ["处理进度", processing],
         ]}
@@ -247,11 +250,11 @@ function InputRecords(props: { app: ClientApp; inputs: WorkItemInputsResult["inp
             <div className="input-head">
               <strong>第 {input.version} 版</strong>
               <span className="byte-range">字节 {input.byte_start}–{input.byte_end}</span>
-              <span className="byte-range">{input.kind}</span>
+              <span className="byte-range">{label(INPUT_KIND, input.kind)}</span>
               <button type="button" className="link" onClick={() => setOpenEvent(input.created_event_id)}>查看原始事件</button>
             </div>
             <p className="raw-text">{input.text}</p>
-            <p className="byte-range">依据事件 {input.created_event_id}，git 版本 {optionalText(input.git_version?.commit) ?? "未上报"}</p>
+            <p className="byte-range">来自事件 {input.created_event_id}，git 版本 {optionalText(input.git_version?.commit) ?? "未上报"}</p>
           </li>
         ))}
       </ul>
@@ -260,45 +263,11 @@ function InputRecords(props: { app: ClientApp; inputs: WorkItemInputsResult["inp
   );
 }
 
-export type BoardColumns = {
-  queue: WorkItemCard[];
-  product: WorkItemCard[];
-  engineering: WorkItemCard[];
-  quality: WorkItemCard[];
-  released: WorkItemCard[];
-  adopted: WorkItemCard[];
-};
-
-// 事项看板的分列（纯函数，单元测试直接调用）：列为排队中、产品、工程、质检、已放行、已采纳
-export function boardColumns(items: WorkItemCard[]): BoardColumns {
-  const columns: BoardColumns = { queue: [], product: [], engineering: [], quality: [], released: [], adopted: [] };
-  for (const item of items) {
-    if (item.status === "adopted") {
-      columns.adopted.push(item);
-    } else if (item.status === "released_unsettled") {
-      columns.released.push(item);
-    } else if (item.status === "not_started" || item.status === "held") {
-      columns.queue.push(item);
-    } else if (item.department === "engineering") {
-      columns.engineering.push(item);
-    } else if (item.department === "quality") {
-      columns.quality.push(item);
-    } else {
-      columns.product.push(item);
-    }
-  }
-  return columns;
-}
-
-const BOARD_TITLES: [keyof BoardColumns, string][] = [
-  ["queue", "排队中"], ["product", "产品"], ["engineering", "工程"], ["quality", "质检"], ["released", "已放行"], ["adopted", "已采纳"],
-];
-
 function Board(props: { items: WorkItemCard[] }) {
   const columns = boardColumns(props.items);
 
   return (
-    <Section title="事项看板" note="排队中一列的顺序就是执行顺序；拖动调整顺序（work_item.reorder）属于 3.4A，后端登记以后加入">
+    <Section title="事项看板" note="排队中一列的顺序就是执行顺序">
       {props.items.length === 0 ? <Empty text="项目还没有事项" /> : (
         <div className="board">
           {BOARD_TITLES.map(([key, title]) => (
@@ -309,11 +278,11 @@ function Board(props: { items: WorkItemCard[] }) {
                   <strong>{item.title}</strong>
                   <div className="card-meta">
                     <span>{label(WORK_ITEM_STATUS, item.status)}</span>
-                    <span>{departmentName(item.department)}</span>
+                    {departmentName(item.department) === "" ? null : <span>{departmentName(item.department)}</span>}
                     <span>第 {item.round} 轮</span>
                   </div>
                   {item.pending_question ? <p className="card-note">待决问题：{item.pending_question}</p> : null}
-                  {item.stop_reason ? <p className="card-note">停止原因：{item.stop_reason}</p> : null}
+                  {item.stop_reason ? <p className="card-note">停止原因：{label(STOP_REASON, item.stop_reason)}</p> : null}
                   {item.start_error ? <p className="card-note">未能开始：{item.start_error}</p> : null}
                 </article>
               ))}
@@ -346,7 +315,7 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
   }
 
   return (
-    <Section title="流转记录" note="点击时间打开原始事件（event.detail）">
+    <Section title="流转记录" note="点击时间打开原始事件">
       {records.length === 0 ? <Empty text="项目还没有流转记录" /> : (
         <Table
           head={["时间", "方向", "类型", "内容", "状态"]}
@@ -354,7 +323,7 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
             <button type="button" className="link" key={record.flow_id} onClick={() => setOpenEvent(record.event_id)}>
               {formatTime(record.created_at)}
             </button>,
-            `${departmentName(record.direction_from)} → ${departmentName(record.direction_to)}`,
+            `${departmentName(record.direction_from) || "没有"} → ${departmentName(record.direction_to) || "没有"}`,
             record.kind,
             record.content,
             <span key={`${record.flow_id}-status`} className={record.kind === "返工" || record.status === "已退回" ? "rework" : undefined}>

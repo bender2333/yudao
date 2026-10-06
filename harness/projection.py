@@ -22,6 +22,7 @@ from .models import (
     CollaborationRequest,
     CollaborationResponse,
     DecisionRequest,
+    DEPARTMENT_LABELS,
     DepartmentGuidance,
     DepartmentSetting,
     ArtifactRef,
@@ -255,7 +256,7 @@ def _settle_run_state(state: RunProjection) -> None:
     # 由阶段、停止原因与待处理的协作请求得出的字段；可以重复计算，结果只取决于这些字段
     state.waiting_reason = waiting_reason_for(state.phase, state.stop_reason)
     if state.pending_request is not None:
-        state.waiting_reason = f"{state.pending_request.recipient} is handling a request from {state.pending_request.requester}"
+        state.waiting_reason = f"{DEPARTMENT_LABELS[state.pending_request.recipient]}部门正在处理来自{DEPARTMENT_LABELS[state.pending_request.requester]}部门的请求"
     if state.phase in TERMINAL_PHASES:
         state.outcome = {"DONE": "done", "PAUSED": "paused", "FAILED": "failed"}[state.phase]
         state.active_department = None
