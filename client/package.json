@@ -1,6 +1,6 @@
 {
   "name": "yudao-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Yudao 桌面客户端：Electron 外壳、生成的接口类型、连接设置与事件流同步",
