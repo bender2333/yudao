@@ -9,12 +9,14 @@ import time
 
 import pytest
 
+from harness.app.application import Application
 from harness.models import EventType
 from harness.providers import (
     CredentialChain,
     ProviderFacade,
 )
 from harness.runtime import LoopSystem
+from harness.tests.api_helpers import running_api
 
 
 # ---------------------------------------------------------------------------
@@ -111,33 +113,24 @@ def test_no_config_start(tmp_path):
 # 2. CLI 默认命令
 # ---------------------------------------------------------------------------
 
-def test_cli_default_command(tmp_path, monkeypatch, capsys):
-    # 不写子命令时启动控制台。默认端口是 8765；只给端口时，地址是 127.0.0.1，数据目录与模型目录取
-    # 用户数据目录（设计说明第 3.4 节）；没有模型目录时以空态启动，停止时正常退出。
-    # 测试用环境变量把用户数据目录的根改到临时目录，不写用户的真实目录
+def test_cli_default_command(tmp_path):
+    # 不写子命令时启动新接口（应用层与接口层设计说明第 7.3、7.4 节）：默认端口 8765，
+    # 没有 serve 子命令；服务以空态启动，system.status 返回 Provider 不可用与默认的模型目录路径
     from harness.__main__ import build_parser
-    from harness.tests.console_helpers import run_console
-    from harness.tests.test_provider_config_web import get_json
 
-    assert build_parser().parse_args([]).port == 8765
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
-    data_dir = tmp_path / "Local" / "Yudao"
-    seen = {}
+    parser = build_parser()
+    assert parser.parse_args([]).port == 8765
+    assert parser.parse_args([]).command is None
+    with pytest.raises(SystemExit):
+        parser.parse_args(["serve"])
 
-    def check(host: str, port: int) -> None:
-        seen["address"] = (host, port)
-        seen["health"] = get_json(host, port, "/api/health")
-
-    assert run_console(["--port", "0"], check) == 0
-    assert seen["address"][0] == "127.0.0.1"
-    health = seen["health"]
-    assert health["provider_available"] is False
-    assert health["provider_reload_error"] is None
-    assert health["provider_config"] == str((data_dir / "providers.json").resolve())
+    data_dir = tmp_path / "data"
+    with running_api(lambda: Application.open(data_dir, provider_config=data_dir / "providers.json",
+                                              dotenv=data_dir / ".env")) as client:
+        status = client.get("/api/queries/system.status").json()["data"]
+    assert status["provider"]["available"] is False
+    assert status["catalog"]["reload_error"] is None
     assert (data_dir / "events.sqlite").is_file()
-    assert "stopped" in capsys.readouterr().out
 
 
 _ABSENT_KEY = "YUDAO_STARTUP_ABSENT_KEY"
@@ -172,16 +165,13 @@ def _startup_config(state: str):
 
 
 @pytest.mark.parametrize("state", ["missing", "invalid_json", "empty_catalog", "unbound", "missing_key"])
-def test_console_starts_in_every_unready_state_and_blocks_the_first_request(tmp_path, monkeypatch, state):
-    # 模型目录文件缺少、JSON 损坏、目录为空、没有绑定、缺少凭据：命令行装配的系统与控制台照常启动；
-    # 创建事项不再解析调用目标（#45），第一次请求解析失败时进入待恢复，运行不是失败结束。
+def test_service_starts_in_every_unready_state_and_blocks_the_first_request(tmp_path, monkeypatch, state):
+    # 模型目录文件缺少、JSON 损坏、目录为空、没有绑定、缺少凭据：服务照常启动，system.status 与 catalog
+    # 返回 Provider 不可用；创建事项不再解析调用目标（#45），第一次请求解析失败时进入待恢复，运行不是失败结束。
     # 凭据文件默认在数据目录内（设计说明第 3.4 节）
-    from harness.__main__ import production_system
     from harness.projection import saved_decisions
-    from harness.tests.test_provider_config_web import get_json, request, running_server
 
     monkeypatch.delenv(_ABSENT_KEY, raising=False)
-    monkeypatch.chdir(tmp_path)
     config_path = tmp_path / "providers.json"
     content = _startup_config(state)
     if isinstance(content, str):
@@ -189,32 +179,30 @@ def test_console_starts_in_every_unready_state_and_blocks_the_first_request(tmp_
     elif content is not None:
         _write_json(config_path, content)
 
-    system = production_system(tmp_path / "data", config_path)
-    with running_server(system) as (_server, host, port):
-        status, html = request(host, port, "GET", "/")
-        assert status == 200
-        assert "provider-config.js" in html
-        health = get_json(host, port, "/api/health")
-        listed = get_json(host, port, "/api/providers")
-    assert health["provider_available"] is False
-    assert isinstance(listed["providers"], list)
-    status_view = system.facade.config_status()
-    assert status_view["dotenv_path"] == str((tmp_path / "data" / ".env").resolve())
-    if state == "invalid_json":
-        assert status_view["reload_error"]
-        assert health["provider_reload_error"]
-    else:
-        assert status_view["reload_error"] is None
-    if state == "missing_key":
-        assert _ABSENT_KEY in status_view["message"]
-    run_id = system.create_run("create without a ready provider")
-    assert system.list_run_ids() == [run_id]
-    blocked = system.run_until_stop(run_id)
-    assert (blocked.outcome, blocked.stop_reason) == ("running", None)
-    _position, decisions = saved_decisions(system.store, statuses=("open",))
-    assert [decision.request["kind"] for decision in decisions] == ["model_unavailable"]
-    assert not any(event.type == EventType.MODEL_REQUESTED for event in system.store.list_events(run_id))
-    system.close()
+    data_dir = tmp_path / "data"
+    application = Application.open(data_dir, provider_config=config_path, dotenv=data_dir / ".env")
+    system = application.system
+    with running_api(lambda: application) as client:
+        status = client.get("/api/queries/system.status").json()["data"]
+        catalog = client.get("/api/queries/catalog").json()["data"]
+        assert status["provider"]["available"] is False
+        assert isinstance(catalog["providers"], list)
+        status_view = system.facade.config_status()
+        assert status_view["dotenv_path"] == str((data_dir / ".env").resolve())
+        if state == "invalid_json":
+            assert status_view["reload_error"]
+            assert status["catalog"]["reload_error"]
+        else:
+            assert status_view["reload_error"] is None
+        if state == "missing_key":
+            assert _ABSENT_KEY in status_view["message"]
+        run_id = system.create_run("create without a ready provider")
+        assert system.list_run_ids() == [run_id]
+        blocked = system.run_until_stop(run_id)
+        assert (blocked.outcome, blocked.stop_reason) == ("running", None)
+        _position, decisions = saved_decisions(system.store, statuses=("open",))
+        assert [decision.request["kind"] for decision in decisions] == ["model_unavailable"]
+        assert not any(event.type == EventType.MODEL_REQUESTED for event in system.store.list_events(run_id))
 
 
 # ---------------------------------------------------------------------------

@@ -917,7 +917,7 @@ def _setting_view(setting: DepartmentSetting) -> dict[str, Any]:
         "department": setting.department,
         "text": setting.text,
         "default_text": DEFINITIONS.role(setting.department).prompt,
-        "prompt_configured": setting.configured_prompt,
+        "department_setting_configured": setting.configured_prompt,
         "provider_id": setting.provider_id,
         "model_id": setting.model_id,
         "requested_tier": setting.requested_tier,

@@ -319,10 +319,10 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
     workspace = application.query("department.workspace", DepartmentWorkspace(
         project_id=project_id, department="product", work_item=work_item_id,
     ))
-    assert workspace.data.prompt.configured_version == 1
-    assert workspace.data.prompt.prompt_configured is True
+    assert workspace.data.department_setting.configured_version == 1
+    assert workspace.data.department_setting.department_setting_configured is True
     # 实际采用的版本来自该部门最近一次模型请求事件（run 内没有 Prompt 副本）
-    assert workspace.data.prompt.used_version == 1
+    assert workspace.data.department_setting.used_version == 1
     assert workspace.data.setting.model_id is None and workspace.data.setting.requested_tier is None
 
     actions = application.query("run.actions", RunActions(run_id=run_id))
@@ -442,7 +442,7 @@ def test_event_detail_includes_compaction_summary_and_its_sources(tmp_path):
 
 
 def test_delivery_detail_and_file_use_the_archived_bytes(data_dir):
-    # 封存的清单与文件原文取自交付封存，不取自当前工作区（旧路由 test_web.py 的对应场景）
+    # 封存的清单与文件原文取自交付封存，不取自当前工作区
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("封存", GOAL)
     _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")

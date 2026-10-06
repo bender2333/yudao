@@ -17,6 +17,7 @@ import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section,
 import { DepartmentSettingsFields, DepartmentSettingsSave, useDepartmentDraft } from "./department-settings-form";
 import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
+import { ReadExisting } from "./read-existing";
 
 export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
@@ -38,7 +39,7 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
     work_item: workItem,
   }, workItem === null);
   const data = workspace.data;
-  const command = useCommand(props.app, pageKey([data?.work_item_id, data?.prompt.configured_version, data?.phase]));
+  const command = useCommand(props.app, pageKey([data?.work_item_id, data?.department_setting.configured_version, data?.phase]));
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
@@ -57,6 +58,11 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
           <Section title="部门房间" note="房间画面与小人由工单 #177 填入，这里留出位置">
             <Empty text="部门房间的位置（第 8 节）" />
           </Section>
+          <ReadExisting
+            app={props.app}
+            runId={data.run_id}
+            item={items.find((item) => item.work_item_id === workItem) ?? null}
+          />
           <InspectArea app={props.app} data={data} />
           <MessagesAndGuidance app={props.app} data={data} command={command} />
           {settingsOpen ? <SettingsDialog app={props.app} data={data} onClose={() => setSettingsOpen(false)} /> : null}
@@ -139,10 +145,10 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
 const INSPECT_TABS = [
   { id: "actions", label: "动作与回执" },
   { id: "context", label: "Context" },
-  { id: "prompt", label: "部门 Prompt" },
+  { id: "department-setting", label: "部门设置" },
 ];
 
-// 检查区：页签切换动作与回执、Context 与部门 Prompt
+// 检查区：页签切换动作与回执、Context 与部门设置
 function InspectArea(props: { app: ClientApp; data: DepartmentWorkspaceResult }) {
   const [tab, setTab] = useState("actions");
   const data = props.data;
@@ -165,7 +171,7 @@ function InspectArea(props: { app: ClientApp; data: DepartmentWorkspaceResult })
       </div>
       {tab === "actions" ? <Actions app={props.app} runId={data.run_id} /> : null}
       {tab === "context" ? <ContextPanel data={data} /> : null}
-      {tab === "prompt" ? <PromptState data={data} /> : null}
+      {tab === "department-setting" ? <DepartmentSettingState data={data} /> : null}
     </section>
   );
 }
@@ -270,21 +276,21 @@ function ContextPanel(props: { data: DepartmentWorkspaceResult }) {
   );
 }
 
-// 部门 Prompt：项目当前配置与所选请求实际使用的版本
-function PromptState(props: { data: DepartmentWorkspaceResult }) {
-  const prompt = props.data.prompt;
+// 部门设置：项目当前配置与所选请求实际使用的版本
+function DepartmentSettingState(props: { data: DepartmentWorkspaceResult }) {
+  const setting = props.data.department_setting;
   return (
     <>
       <KeyValue
         items={[
-          ["项目当前配置", `第 ${prompt.configured_version} 版（来源 ${show(prompt.source, "未写明")}）`],
-          ["所选请求实际使用的版本", prompt.used_version === null
-            ? "这次运行还没有用到部门 Prompt"
-            : `第 ${prompt.used_version} 版（事件 ${show(prompt.used_event_id)}）`],
+          ["项目当前配置", `第 ${setting.configured_version} 版（来源 ${show(setting.source, "未写明")}）`],
+          ["所选请求实际使用的版本", setting.used_version === null
+            ? "这次运行还没有用到部门设置"
+            : `第 ${setting.used_version} 版（事件 ${show(setting.used_event_id)}）`],
         ]}
       />
       <h3 className="sub">配置的内容</h3>
-      <pre className="raw">{prompt.configured_text === "" ? "（空）" : prompt.configured_text}</pre>
+      <pre className="raw">{setting.configured_text === "" ? "（空）" : setting.configured_text}</pre>
     </>
   );
 }
@@ -374,7 +380,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
 function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult; onClose: () => void }) {
   const { data } = props;
   const [draft, setDraft] = useDepartmentDraft(data.setting);
-  const command = useCommand(props.app, pageKey([data.setting.version, draft.model, draft.tier, draft.prompt]));
+  const command = useCommand(props.app, pageKey([data.setting.version, draft.model, draft.tier, draft.text]));
   const canSave = hasCommand(props.app, "department_settings.save");
   // 保存结果带回的提醒（第 5.6 节「保存时」）：照常保存，提醒在设置旁显示
   const savedReminders = list(command.accepted?.reminders).map((item) => text(item)).filter((item) => item !== "");
@@ -393,7 +399,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
         reminders={reminders}
       />
       <div className="row-actions">
-        <button type="button" onClick={() => setDraft({ ...draft, prompt: data.setting.text })}>恢复默认</button>
+        <button type="button" onClick={() => setDraft({ ...draft, text: data.setting.text })}>恢复默认</button>
       </div>
       {canSave ? (
         <DepartmentSettingsSave

@@ -9,34 +9,23 @@ from __future__ import annotations
 import json
 import math
 from collections import defaultdict
-from dataclasses import asdict
-from typing import Any, Iterable
+from typing import Any
 
 from .artifacts import ArtifactStore
 from .event_store import EventStore
 from .models import (
     ArtifactRef,
-    DEPARTMENTS,
-    DepartmentPrompt,
     Event,
     EventType,
-    ProjectEventType,
-    Usage,
     canonical_hash,
-    hash_bytes,
     json_dumps,
 )
-from .projection import RunNotFoundError, project_run
 from .providers.resolve import CALL_TARGET_FIELDS
-from .views import compaction_coverage, event_card, run_payload
+from .views import compaction_coverage
 
 
 SCHEMA_VERSION = 1
-DEFAULT_LIMIT = 50
-MAX_LIMIT = 200
-ATTEMPT_STATUSES = frozenset({"prepared", "requesting", "completed", "failed", "cancelled"})
 STREAM_PROGRESS_EVENT = "model_stream_progress"
-USAGE_SOURCES = frozenset({"reported", "missing", "unknown"})
 USAGE_FIELDS = (
     "input_tokens",
     "output_tokens",
@@ -46,14 +35,6 @@ USAGE_FIELDS = (
     "cost",
     "latency_ms",
 )
-DEPARTMENT_MATERIAL_EVENTS = frozenset({
-    EventType.SPEC_ACCEPTED,
-    EventType.PRODUCT_DECISION_ACCEPTED,
-    EventType.CONTRACT_ACCEPTED,
-    EventType.PLAN_ACCEPTED,
-    EventType.DELIVERY_ACCEPTED,
-    EventType.QA_SUBMITTED,
-})
 
 
 class AttemptNotFoundError(KeyError):
@@ -67,85 +48,11 @@ class ObservabilityQuery:
         self.store = store
         self.artifacts = artifacts
 
-    def list_model_attempts(
-        self,
-        run_id: str,
-        *,
-        department: str | None = None,
-        status: str | None = None,
-        q: str | None = None,
-        provider: str | None = None,
-        requested_model: str | None = None,
-        actual_model: str | None = None,
-        cursor: str | None = None,
-        limit: int = DEFAULT_LIMIT,
-    ) -> dict[str, Any]:
-        records = self._filtered_attempts(
-            run_id, department=department, status=status, q=q,
-            provider=provider, requested_model=requested_model, actual_model=actual_model,
-        )
-        offset = _cursor_offset(cursor, len(records))
-        page = [_public_attempt(record) for record in records[offset : offset + _limit(limit)]]
-        next_offset = offset + len(page)
-        sent_records = [record for record in records if record.get("sent")]
-        return {
-            "run_id": run_id,
-            "version": SCHEMA_VERSION,
-            "items": page,
-            "total": len(records),
-            "next_cursor": str(next_offset) if next_offset < len(records) else None,
-            "total_attempts": len(sent_records),
-            "running_attempts": sum(_public_status(record) == "running" for record in sent_records),
-            "prepared_attempts": len(records) - len(sent_records),
-        }
-
-    def model_attempt_detail(self, run_id: str, attempt_id: str) -> dict[str, Any]:
-        records = self._attempt_records(run_id)
-        attempt = records.get(attempt_id)
-        if attempt is None:
-            raise AttemptNotFoundError(attempt_id)
-        events = self.store.list_events(run_id)
-        context_event = _event_by_id(events, attempt.get("context_event_id"))
-        if context_event is None:
-            context_event = next(
-                (event for event in events
-                 if event.type == EventType.CONTEXT_ASSEMBLED
-                 and _attempt_id_for(event.payload, event.department) == attempt_id),
-                None,
-            )
-        lifecycle_events = [
-            event_card(event) for event in events
-            if _same_attempt(event, attempt)
-            and event.type in {
-                EventType.CONTEXT_ASSEMBLED,
-                EventType.MODEL_REQUESTED,
-                EventType.MODEL_REQUEST_SERIALIZED,
-                EventType.MODEL_REASONING,
-                EventType.MODEL_MESSAGE,
-                EventType.MODEL_ATTEMPT_FINISHED,
-                EventType.MODEL_ATTEMPT_FAILED,
-                EventType.MODEL_RETRY_SCHEDULED,
-                STREAM_PROGRESS_EVENT,
-            }
-        ]
-        tool_events = [
-            _event_detail(event) for event in events
-            if _same_attempt(event, attempt)
-            and event.type in {
-                EventType.TOOL_STARTED,
-                EventType.TOOL_CALLED,
-                EventType.TOOL_SKIPPED,
-            }
-            and event.payload.get("name") != "provider_usage"
-        ]
-        return self.attempt_detail(run_id, attempt, records, context_event=context_event,
-                                   lifecycle_events=lifecycle_events, tool_events=tool_events)
-
     def attempt_detail(self, run_id: str, attempt: dict[str, Any], records: dict[str, dict[str, Any]], *,
                        context_event: Event | None = None, lifecycle_events: list[dict[str, Any]] | None = None,
                        tool_events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         # 一次尝试的详情；记录可以由调用方给出（读取模型的调用尝试表按运行给出这个 run 的记录），
-        # 事件列表与工具回执只在给出时出现（旧控制台给出，读取模型按引用读取工件）
+        # 事件列表与工具回执只在调用方给出时出现，工件按引用读取
         context = self._context_detail(run_id, context_event, attempt)
         sdk_request = self._artifact_json(run_id, attempt.get("sdk_request_ref"))
         sdk_response = self._artifact_json(run_id, attempt.get("response_ref"))
@@ -179,414 +86,9 @@ class ObservabilityQuery:
         }
         return detail
 
-    def export_run(self, run_id: str) -> dict[str, Any]:
-        """Return the complete read-only observation bundle for one run."""
-
-        records = self._attempt_records(run_id)
-        attempts = [
-            self.model_attempt_detail(run_id, item["id"])
-            for item in sorted(records.values(), key=lambda value: (value.get("seq", 0), value.get("attempt", 0)))
-        ]
-        return {
-            "run_id": run_id,
-            "version": SCHEMA_VERSION,
-            "attempts": attempts,
-            "usage": self.model_usage(run_id),
-            "departments": {department: self.department(run_id, department) for department in DEPARTMENTS},
-        }
-
-    def model_usage(
-        self,
-        run_id: str,
-        *,
-        department: str | None = None,
-        status: str | None = None,
-        q: str | None = None,
-        provider: str | None = None,
-        requested_model: str | None = None,
-        actual_model: str | None = None,
-        cursor: str | None = None,
-        limit: int = DEFAULT_LIMIT,
-    ) -> dict[str, Any]:
-        records = self._filtered_attempts(
-            run_id, department=department, status=status, q=q,
-            provider=provider, requested_model=requested_model, actual_model=actual_model,
-        )
-        # Usage intentionally uses the complete filtered set. Cursor/limit are
-        # accepted for the shared filter contract but never narrow the sum.
-        _cursor_offset(cursor, len(records))
-        _limit(limit)
-        return {"run_id": run_id, **self.usage_summary(
-            records, department=department, status=status, q=q,
-            provider=provider, requested_model=requested_model, actual_model=actual_model,
-        )}
-
-    def attempt_records(
-        self,
-        run_id: str,
-        *,
-        department: str | None = None,
-        status: str | None = None,
-        q: str | None = None,
-        provider: str | None = None,
-        requested_model: str | None = None,
-        actual_model: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Complete filtered attempt records for one run, in seq order (project-level callers merge them)."""
-
-        return self._filtered_attempts(
-            run_id, department=department, status=status, q=q,
-            provider=provider, requested_model=requested_model, actual_model=actual_model,
-        )
-
     @staticmethod
     def public_attempt(record: dict[str, Any]) -> dict[str, Any]:
         return _public_attempt(record)
-
-    def usage_summary(
-        self,
-        records: list[dict[str, Any]],
-        *,
-        department: str | None = None,
-        status: str | None = None,
-        q: str | None = None,
-        provider: str | None = None,
-        requested_model: str | None = None,
-        actual_model: str | None = None,
-    ) -> dict[str, Any]:
-        """Usage body for an already filtered record set; the same shape serves one run or a whole project."""
-
-        prepared_count = sum(not record.get("sent") for record in records)
-        records = [record for record in records if record.get("sent")]
-        total = _usage_totals(records, source="reported")
-        department_groups: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
-        model_groups: dict[tuple[str | None, str | None, str | None], list[dict[str, Any]]] = defaultdict(list)
-        for record in records:
-            department_groups[record.get("department")].append(record)
-            model_groups[(
-                record.get("requested_provider"),
-                record.get("requested_model"),
-                record.get("actual_model"),
-            )].append(record)
-
-        def group_payload(label: str, items: list[dict[str, Any]], **identity: Any) -> dict[str, Any]:
-            summary = _usage_totals(items, source="reported")
-            reported = sum(_has_reported_usage(item) for item in items)
-            group_coverage = _coverage(reported, len(items))
-            group_coverage["fields"] = _field_coverage(items)
-            return {
-                "key": label,
-                "label": label,
-                **identity,
-                **{field: summary[field] for field in USAGE_FIELDS},
-                "currency": summary.get("currency"),
-                "cost_status": summary.get("cost_status"),
-                "coverage": group_coverage,
-                "running_attempts": sum(_public_status(item) == "running" for item in items),
-            }
-
-        department_payload = [
-            group_payload(str(department_name or "未知部门"), items, department=department_name)
-            for department_name, items in department_groups.items()
-        ]
-        model_payload = [
-            group_payload(
-                (
-                    f"{provider or '未知 Provider'} · {model}"
-                    if model
-                    else f"{provider or '未知 Provider'} · {requested or '未知模型'}（请求） · 实际模型未知"
-                ),
-                items,
-                provider=provider,
-                model=model,
-                requested_model=requested,
-            )
-            for (provider, requested, model), items in model_groups.items()
-        ]
-        department_payload.sort(key=lambda item: item["label"])
-        model_payload.sort(key=lambda item: item["label"])
-        reported = sum(_has_reported_usage(item) for item in records)
-        coverage = _coverage(reported, len(records))
-        coverage["fields"] = _field_coverage(records)
-        return {
-            "version": SCHEMA_VERSION,
-            "totals": {field: total[field] for field in USAGE_FIELDS},
-            "currency": total.get("currency"),
-            "cost_status": total.get("cost_status"),
-            "coverage": coverage,
-            "groups": {"departments": department_payload, "models": model_payload},
-            "total_attempts": len(records),
-            "prepared_attempts": prepared_count,
-            "filters": {
-                "department": department,
-                "status": status,
-                "q": q,
-                "provider": provider,
-                "requested_model": requested_model,
-                "actual_model": actual_model,
-            },
-        }
-
-    def department(self, run_id: str, department: str) -> dict[str, Any]:
-        if department not in DEPARTMENTS:
-            raise ValueError("unknown department")
-        projection = project_run(self.store, run_id)
-        events = self.store.list_events(run_id)
-        records = self._attempt_records(run_id)
-        attempts = [item for item in records.values() if item.get("department") == department]
-        attempts.sort(key=lambda item: item.get("seq", 0))
-
-        messages = []
-        handovers = []
-        for event in events:
-            payload = event.payload or {}
-            role = event.department
-            if event.type in {
-                EventType.USER_INPUT_RECEIVED,
-                EventType.DEPARTMENT_INPUT,
-                EventType.MODEL_REASONING,
-                EventType.MODEL_MESSAGE,
-                EventType.DEPARTMENT_GUIDANCE_RECEIVED,
-            }:
-                if event.type in {EventType.MODEL_MESSAGE, EventType.MODEL_REASONING}:
-                    attempt = records.get(_attempt_id_for(payload, role))
-                    if attempt is not None and attempt.get("status") in {"failed", "cancelled"}:
-                        continue
-                if event.type == EventType.USER_INPUT_RECEIVED:
-                    source_type = "user"
-                    source_role = "user"
-                    text = payload.get("text", "")
-                elif event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED:
-                    if payload.get("department") != department:
-                        continue
-                    source_type = "user"
-                    source_role = "user"
-                    text = payload.get("text", "")
-                elif role == department:
-                    source_type = "department"
-                    source_role = role
-                    text = self._message_text(run_id, payload, event.type)
-                else:
-                    continue
-                messages.append({
-                    "event_id": event.event_id,
-                    "seq": event.stream_version,
-                    "type": event.type,
-                    "source_type": source_type,
-                    "source_role": source_role,
-                    "source": "用户指导" if event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED else {
-                        "user": "用户", "department": "本部门", "other_department": "其他部门"
-                    }[source_type],
-                    "kind": {"user": "user", "department": "self", "other_department": "other"}[source_type],
-                    "detail": f"{event.type} · {event.event_id}",
-                    "text": text,
-                    "created_at": event.created_at,
-                    "attempt_id": payload.get("attempt_id"),
-                    "context_event_id": payload.get("context_event_id"),
-                    "guidance_id": payload.get("id") if event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED else None,
-                })
-            if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED and payload.get("department") == department:
-                messages.append({
-                    "event_id": event.event_id,
-                    "seq": event.stream_version,
-                    "type": event.type,
-                    "source_type": "department",
-                    "source_role": department,
-                    "source": "本部门",
-                    "kind": "self",
-                    "detail": f"部门指导回应 · {event.event_id}",
-                    "text": payload.get("text", ""),
-                    "created_at": event.created_at,
-                    "guidance_id": payload.get("guidance_id"),
-                    "status": payload.get("status"),
-                })
-            if event.type in {EventType.COLLABORATION_REQUESTED, EventType.COLLABORATION_RESPONDED}:
-                requester, recipient = _collaboration_parties(event, payload, events)
-                request_id = payload.get("request_id")
-                related = department in {requester, recipient}
-                if related:
-                    source_role = recipient if event.type == EventType.COLLABORATION_RESPONDED else requester
-                    is_self = source_role == department
-                    text = payload.get("text") or payload.get("question") or payload.get("background") or ""
-                    messages.append({
-                        "event_id": event.event_id,
-                        "seq": event.stream_version,
-                        "type": event.type,
-                        "source_type": "department" if is_self else "other_department",
-                        "source_role": source_role,
-                        "source": "本部门" if is_self else "其他部门",
-                        "kind": "self" if is_self else "other",
-                        "detail": f"{event.type} · {event.event_id}",
-                        "text": text,
-                        "created_at": event.created_at,
-                        "collaboration_request_id": request_id,
-                    })
-            if event.type in DEPARTMENT_MATERIAL_EVENTS and role == department:
-                messages.append({
-                    "event_id": event.event_id,
-                    "seq": event.stream_version,
-                    "type": event.type,
-                    "source_type": "department",
-                    "source_role": role,
-                    "source": "本部门",
-                    "kind": "self",
-                    "detail": f"{event.type} · {event.event_id}",
-                    "text": _material_summary(event),
-                    "created_at": event.created_at,
-                })
-            if event.type in {
-                EventType.TRANSITION,
-                EventType.COLLABORATION_REQUESTED,
-                EventType.COLLABORATION_RESPONDED,
-                EventType.COLLABORATION_CLOSED,
-            }:
-                requester, recipient = _collaboration_parties(event, payload, events)
-                if event.type == EventType.TRANSITION or department in {role, requester, recipient}:
-                    handovers.append({
-                        "event_id": event.event_id,
-                        "seq": event.stream_version,
-                        "type": event.type,
-                        "source_role": role,
-                        "created_at": event.created_at,
-                        "title": _handover_title(event),
-                        "body": _handover_body(event),
-                        "detail": _handover_detail(event),
-                        "payload": payload,
-                    })
-
-        adopted_activation = next(
-            (event for event in reversed(events)
-             if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == department),
-            None,
-        )
-        # 部门 Prompt 来自项目部门设置（run 内没有副本）：当前设置与该激活实际采用的版本
-        current_prompt = _project_department_prompt(self.store, projection.project_id, department)
-        latest_prompt = asdict(current_prompt)
-        prompt = None
-        if adopted_activation is not None:
-            prompt = _project_department_prompt(
-                self.store, projection.project_id, department,
-                version=adopted_activation.payload.get("prompt_version"),
-                prompt_hash=adopted_activation.payload.get("prompt_hash"),
-            )
-        binding = projection.provider_bindings.get(department)
-        provider = _department_provider(binding)
-        run = run_payload(self.store, run_id)
-        context_items = []
-        for attempt in attempts:
-            context_items.append({
-                "id": attempt.get("id"),
-                "title": f"模型输入 · 第 {attempt.get('attempt') or '?'} 次",
-                "meta": f"{_public_status(attempt)} · {attempt.get('context_event_id') or 'Context 未记录'}",
-                "body": f"Context 快照 {attempt.get('context_event_id') or '未记录'}，对应尝试 {attempt.get('id')}",
-                "snapshot_at": attempt.get("prepared_at"),
-                "status": _public_status(attempt),
-                "stage": attempt.get("stage", attempt.get("status")),
-                "purpose": attempt.get("purpose"),
-                "partial_output": attempt.get("partial_output", False),
-                "output_item_count": attempt.get("output_item_count", 0),
-            })
-        department_status = (
-            "failed" if projection.phase == "FAILED" else
-            "success" if projection.phase == "DONE" else
-            "running" if projection.active_department == department else "waiting"
-        )
-        return {
-            "run_id": run_id,
-            "version": SCHEMA_VERSION,
-            "department": department,
-            "task": projection.task,
-            "role": {"product": "需求与方案", "engineering": "实现与交付", "quality": "验证与反馈"}[department],
-            "status": department_status,
-            "overview": run["board"],
-            "history": run["timeline"],
-            "materials": run["evidence"],
-            "api": {
-                "run": f"/api/runs/{run_id}",
-                "events": f"/api/runs/{run_id}/events",
-                "model_attempts": f"/api/runs/{run_id}/model-attempts",
-                "model_usage": f"/api/runs/{run_id}/model-usage",
-            },
-            "messages": messages,
-            "handovers": handovers,
-            "contexts": context_items,
-            "guidance": [
-                {
-                    **asdict(item),
-                    "guidance_ref": asdict(item.guidance_ref),
-                }
-                for item in projection.department_guidance if item.department == department
-            ],
-            "pending_guidance": [
-                item.id for item in projection.department_guidance
-                if item.department == department and item.status in {"received", "in_input"}
-            ],
-            "provider": provider,
-            "prompt": {
-                "department": department,
-                "version": None if prompt is None else prompt.version,
-                "text": None if prompt is None else prompt.text,
-                "prompt_ref": None if prompt is None else asdict(prompt.prompt_ref),
-                "created_event_id": None if prompt is None else prompt.created_event_id,
-                "status": "adopted" if adopted_activation is not None and prompt is not None else "unknown" if adopted_activation is not None else "pending",
-                "adopted_activation_id": None if adopted_activation is None else adopted_activation.payload.get("activation_id"),
-                "adopted_event_id": None if adopted_activation is None else adopted_activation.event_id,
-            },
-            "prompt_latest": {**latest_prompt, "status": "pending"},
-        }
-
-    def _filtered_attempts(
-        self,
-        run_id: str,
-        *,
-        department: str | None,
-        status: str | None,
-        q: str | None,
-        provider: str | None = None,
-        requested_model: str | None = None,
-        actual_model: str | None = None,
-    ) -> list[dict[str, Any]]:
-        if department is not None and department not in DEPARTMENTS:
-            raise ValueError("unknown department")
-        if status is not None and status not in {"success", "failed", "cancelled", "running"}:
-            raise ValueError("unknown model attempt status")
-        records = list(self._attempt_records(run_id).values())
-        needle = q.strip().casefold() if isinstance(q, str) and q.strip() else None
-        provider_needle = provider.strip() if isinstance(provider, str) and provider.strip() else None
-        requested_needle = requested_model.strip() if isinstance(requested_model, str) and requested_model.strip() else None
-        actual_needle = actual_model.strip() if isinstance(actual_model, str) and actual_model.strip() else None
-        result = []
-        for record in records:
-            if department is not None and record.get("department") != department:
-                continue
-            if status is not None and _public_status(record) != status:
-                continue
-            if provider_needle is not None and provider_needle not in {
-                record.get("requested_provider"), record.get("actual_provider"),
-            }:
-                continue
-            if requested_needle is not None and record.get("requested_model") != requested_needle:
-                continue
-            if actual_needle is not None:
-                # 超时/断连等失败拿不到 actual_model 时回退到 requested_model，
-                # 按 actual_model 筛选才不会漏掉这些记录；有实际返回的仍只按实际值匹配。
-                effective_actual = record.get("actual_model") or record.get("requested_model")
-                if effective_actual != actual_needle:
-                    continue
-            if needle is not None and needle not in search_text(record):
-                continue
-            result.append(record)
-        result.sort(key=lambda item: (item.get("seq", 0), item.get("attempt", 0)))
-        return result
-
-    def _attempt_records(self, run_id: str) -> dict[str, dict[str, Any]]:
-        events = self.store.list_events(run_id)
-        if not events:
-            raise RunNotFoundError(run_id)
-        fold = AttemptFold(self.artifacts, run_id)
-        for event in events:
-            fold.merge(event)
-        return fold.records()
 
     def _context_detail(self, run_id: str, event: Event | None,
                         attempt: dict[str, Any]) -> dict[str, Any] | None:
@@ -643,135 +145,6 @@ class ObservabilityQuery:
             if isinstance(item, dict):
                 result.append(item)
         return result
-
-    def _message_text(self, run_id: str, payload: dict[str, Any], event_type: str) -> str:
-        if event_type == EventType.MODEL_REASONING:
-            return self._reasoning_text(run_id, payload)
-        key = "message_ref" if event_type == EventType.MODEL_MESSAGE else "input_ref"
-        item = self._artifact_json(run_id, payload.get(key))
-        if isinstance(item, dict):
-            content = item.get("content")
-            if isinstance(content, str):
-                if event_type == EventType.DEPARTMENT_INPUT:
-                    return _work_description(content)
-                return content
-            if isinstance(content, list):
-                text = "\n".join(
-                    str(part.get("text", "")) for part in content
-                    if isinstance(part, dict) and part.get("text") is not None
-                )
-                if text:
-                    return text
-            item_type = item.get("type")
-            if item_type == "function_call":
-                name = item.get("name") or "unknown tool"
-                arguments = item.get("arguments")
-                return f"工具调用：{name} · 参数 {_short_text(arguments)}"
-            if event_type == EventType.MODEL_MESSAGE:
-                return f"模型返回 {item_type or '非文本 item'}，没有可显示文本"
-        return str(payload.get("summary") or "")
-
-    def _reasoning_text(self, run_id: str, payload: dict[str, Any]) -> str:
-        # 推理内容按协议保存在推理条目里：可显示的文字按协议字段取，取不到时说明没有可显示文本
-        item = self._artifact_json(run_id, payload.get("reasoning_ref"))
-        if not isinstance(item, dict):
-            return ""
-        parts = [
-            str(part.get("text") or "")
-            for part in item.get("summary") or []
-            if isinstance(part, dict) and part.get("text")
-        ]
-        if not parts and isinstance(item.get("reasoning_content"), str):
-            parts = [item["reasoning_content"]]
-        if not parts:
-            parts = [
-                str(block.get("thinking") or "")
-                for block in item.get("blocks") or []
-                if isinstance(block, dict) and block.get("thinking")
-            ]
-        text = "\n".join(part for part in parts if part)
-        return text or "模型返回推理内容，没有可显示文本"
-
-
-def list_model_attempts(store: EventStore, artifacts: ArtifactStore, run_id: str, **filters: Any) -> dict[str, Any]:
-    return ObservabilityQuery(store, artifacts).list_model_attempts(run_id, **filters)
-
-
-def model_attempt_detail(store: EventStore, artifacts: ArtifactStore, run_id: str, attempt_id: str) -> dict[str, Any]:
-    return ObservabilityQuery(store, artifacts).model_attempt_detail(run_id, attempt_id)
-
-
-def model_usage(store: EventStore, artifacts: ArtifactStore, run_id: str, **filters: Any) -> dict[str, Any]:
-    return ObservabilityQuery(store, artifacts).model_usage(run_id, **filters)
-
-
-def export_observability(store: EventStore, artifacts: ArtifactStore, run_id: str) -> dict[str, Any]:
-    return ObservabilityQuery(store, artifacts).export_run(run_id)
-
-
-def _project_department_prompt(store: EventStore, project_id: str | None, department: str, *,
-                               version: int | None = None,
-                               prompt_hash: str | None = None) -> DepartmentPrompt | None:
-    # 界面读取的部门 Prompt：没有给出 version 时是该 run 所属项目当前的部门设置；
-    # 给出 version 与 prompt_hash 时是该激活实际采用的版本，取自项目部门设置的版本历史，
-    # 历史中没有匹配（版本或内容哈希不符）时返回空。不属于项目的运行使用内置默认 Prompt
-    from .definitions import DEFINITIONS
-    from .projection import saved_project
-    from .projects import _default_settings
-    text = DEFINITIONS.role(department).prompt
-    ref = ArtifactRef(kind="text", content_hash="", path="")
-    event_id = ""
-    if project_id is None:
-        if version is None:
-            ref = ArtifactRef(kind="department_prompt", content_hash=hash_bytes(text.encode("utf-8")), path="")
-            return DepartmentPrompt(department, 0, text, ref, "")
-        if version == 0:
-            computed = hash_bytes(text.encode("utf-8"))
-            if prompt_hash is not None and prompt_hash != computed:
-                return None
-            ref = ArtifactRef(kind="department_prompt", content_hash=computed, path="")
-            return DepartmentPrompt(department, 0, text, ref, "")
-        return None
-    if version is None:
-        state = saved_project(store, project_id)
-        if state is not None:
-            _default_settings(state)
-            setting = state.department_settings.get(department)
-            if setting is not None and setting.configured_prompt:
-                returned = setting.version
-                if setting.prompt_ref is not None:
-                    ref = ArtifactRef(**setting.prompt_ref)
-                return DepartmentPrompt(department, returned, setting.text, ref,
-                                        "" if setting.event_id is None else setting.event_id)
-        ref = ArtifactRef(kind="department_prompt", content_hash=hash_bytes(text.encode("utf-8")), path="")
-        return DepartmentPrompt(department, 0, text, ref, "")
-    if version == 0:
-        wanted = prompt_hash
-        computed = hash_bytes(text.encode("utf-8"))
-        if wanted is not None and wanted != computed:
-            return None
-        ref = ArtifactRef(kind="department_prompt", content_hash=computed, path="")
-        return DepartmentPrompt(department, 0, text, ref, "")
-    for event in store.list_project_events(project_id):
-        if event.type != ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED:
-            continue
-        payload = event.payload
-        if payload.get("department") != department or int(payload.get("version", 0)) != version:
-            continue
-        if prompt_hash is not None:
-            recorded = payload.get("department_prompt_ref", payload.get("prompt_ref")) or {}
-            if recorded.get("content_hash") != prompt_hash:
-                return None
-        text = payload.get("department_prompt", payload.get("text")) or text
-        prompt_ref = payload.get("department_prompt_ref", payload.get("prompt_ref"))
-        if prompt_ref is not None:
-            ref = ArtifactRef(**prompt_ref)
-        return DepartmentPrompt(department, version, text, ref, event.event_id)
-    return None
-
-def department_view(store: EventStore, artifacts: ArtifactStore, run_id: str, department: str) -> dict[str, Any]:
-    return ObservabilityQuery(store, artifacts).department(run_id, department)
-
 
 def artifact_json(artifacts: ArtifactStore, run_id: str, ref: Any) -> Any:
     if not isinstance(ref, dict):
@@ -842,7 +215,7 @@ def attempt_usage(artifacts: ArtifactStore, run_id: str, record: dict[str, Any])
 class AttemptFold:
     """把 run 事件逐步并入调用尝试记录（应用层的调用尝试表使用）。
 
-    与整段扫描使用同一套合并规则：merge 一次事件，records() 得到与 ObservabilityQuery._attempt_records 相同的记录。
+    merge 一次事件，records() 得到完整的调用尝试记录：应用层的调用尝试表从它建立。
     state() 与 load_state() 用于把折叠状态保存在读取模型里，按订阅逐步更新；用量只在它依据的字段变化时重新计算。
     """
 
@@ -1014,23 +387,6 @@ def _public_status(record: dict[str, Any]) -> str:
     return "failed"
 
 
-def _department_provider(binding: dict[str, Any] | None) -> dict[str, Any] | None:
-    # 部门最近一次请求解析出的调用目标：字段取自请求事件的载荷
-    if not isinstance(binding, dict):
-        return None
-    return {
-        "provider": binding.get("provider_name") or binding.get("provider_config_id"),
-        "model": binding.get("requested_model"),
-        "protocol": binding.get("protocol"),
-        "base_url": binding.get("base_url"),
-        "context_window": binding.get("context_window"),
-        "max_output_tokens": binding.get("configured_max_output_tokens"),
-        "temperature": None,
-        "selection_source": binding.get("selection_source"),
-        # 最近一次请求的请求档位与实际发送的档位（设计说明第 9.3 节）
-        "requested_tier": binding.get("requested_tier"),
-        "sent_tier": binding.get("sent_tier"),
-    }
 
 
 def _new_attempt(attempt_id: str, event: Event, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1159,32 +515,10 @@ def _logical_call_id(activation: Any, root: Any, purpose: Any) -> str:
     return f"{activation or 'activation'}:root-{root or 1}:{purpose or 'work'}"
 
 
-def _same_attempt(event: Event, record: dict[str, Any]) -> bool:
-    payload = event.payload or {}
-    attempt_id = payload.get("attempt_id")
-    if attempt_id and attempt_id == record.get("id"):
-        return True
-    return (
-        payload.get("activation_id") == record.get("activation_id")
-        and payload.get("step_id") == record.get("step")
-        and payload.get("attempt", 1) == record.get("attempt", 1)
-    )
 
 
-def _event_by_id(events: Iterable[Event], event_id: Any) -> Event | None:
-    return next((event for event in events if event.event_id == event_id), None)
 
 
-def _event_detail(event: Event) -> dict[str, Any]:
-    return {
-        "event_id": event.event_id,
-        "seq": event.stream_version,
-        "type": event.type,
-        "department": event.department,
-        "created_at": event.created_at,
-        "payload": event.payload,
-        "artifact_hashes": event.artifact_hashes,
-    }
 
 
 def _detail_events(lifecycle: list[dict[str, Any]], sdk_events: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1246,36 +580,10 @@ def _cost_value(value: Any) -> int | float | None:
     return value
 
 
-def _work_description(content: str) -> str:
-    lines = content.splitlines()
-    start = next((index + 1 for index, line in enumerate(lines) if line.strip() == "[current_work]"), None)
-    if start is None:
-        return _short_text(content, 1200)
-    end = next((index for index in range(start, len(lines)) if lines[index].startswith("[")), len(lines))
-    description = "\n".join(lines[start:end]).strip()
-    return _short_text(description, 1200)
 
 
-def _short_text(value: Any, limit: int = 240) -> str:
-    if value is None:
-        return ""
-    if not isinstance(value, str):
-        value = json_dumps(value)
-    value = " ".join(value.split())
-    return value if len(value) <= limit else value[: limit - 3] + "..."
 
 
-def _material_summary(event: Event) -> str:
-    payload = event.payload or {}
-    values = {
-        EventType.SPEC_ACCEPTED: payload.get("goal") or "已接纳产品要求",
-        EventType.PRODUCT_DECISION_ACCEPTED: payload.get("statement") or "已接纳产品决定",
-        EventType.CONTRACT_ACCEPTED: "已形成当前有效合同",
-        EventType.PLAN_ACCEPTED: payload.get("objective") or "已接纳工程计划",
-        EventType.DELIVERY_ACCEPTED: payload.get("summary") or "已接纳工程交付",
-        EventType.QA_SUBMITTED: payload.get("rationale") or payload.get("verdict") or "已提交质检结果",
-    }
-    return _short_text(values.get(event.type) or event.type, 1200)
 
 
 def _summaries_from_parts(parts: list[Any] | None) -> list[dict[str, Any]]:
@@ -1336,62 +644,10 @@ def _validate_context_parts(parts: list[Any], injected: Any) -> None:
             raise ValueError("context part identity does not match its manifest")
 
 
-def _collaboration_parties(event: Event, payload: dict[str, Any],
-                           events: list[Event]) -> tuple[str | None, str | None]:
-    # 协作事件的两端：请求事件的载荷直接带发问方与回答方；旧回答事件（工单 #275 之前）没有这两个字段，
-    # 按 request_id 查找对应请求补齐。协作关闭事件同样按请求身份补齐两端
-    requester, recipient = payload.get("requester"), payload.get("recipient")
-    if event.type != EventType.COLLABORATION_REQUESTED and requester is None:
-        related_request = next(
-            (item for item in events
-             if item.type == EventType.COLLABORATION_REQUESTED
-             and item.payload.get("id") == payload.get("request_id")),
-            None,
-        )
-        if related_request is not None:
-            requester = related_request.payload.get("requester")
-            recipient = related_request.payload.get("recipient")
-    return requester, recipient
-
-def _handover_title(event: Event) -> str:
-    payload = event.payload or {}
-    if event.type == EventType.TRANSITION:
-        return payload.get("route") or f"{event.state_before} -> {event.state_after}"
-    if event.type == EventType.COLLABORATION_REQUESTED:
-        return f"{payload.get('requester') or event.department or '未知'} -> {payload.get('recipient') or '未知'}"
-    if event.type == EventType.COLLABORATION_RESPONDED:
-        # 回答方回应发问方：两端从载荷取出；旧事件没有这两个字段时退回请求身份
-        requester, recipient = payload.get("requester"), payload.get("recipient")
-        if requester and recipient:
-            return f"{recipient} -> {requester}"
-        return f"协作回应 · {payload.get('request_id') or '未知请求'}"
-    if event.type == EventType.COLLABORATION_CLOSED:
-        return f"协作关闭 · {payload.get('request_id') or '未知请求'}"
-    return event.type
 
 
-def _handover_body(event: Event) -> str:
-    payload = event.payload or {}
-    if event.type == EventType.COLLABORATION_REQUESTED:
-        return _short_text(payload.get("question") or payload.get("background"), 1200)
-    if event.type == EventType.COLLABORATION_RESPONDED:
-        return _short_text(payload.get("text"), 1200)
-    if event.type == EventType.COLLABORATION_CLOSED:
-        return _short_text(payload.get("reason"), 1200)
-    if event.type == EventType.TRANSITION:
-        return _short_text(payload.get("route"), 1200)
-    return _material_summary(event)
 
 
-def _handover_detail(event: Event) -> str:
-    payload = event.payload or {}
-    if event.type == EventType.COLLABORATION_REQUESTED:
-        return _short_text(payload.get("expected_result") or payload.get("background"), 1200)
-    if event.type == EventType.COLLABORATION_RESPONDED:
-        return str(payload.get("status") or "")
-    if event.type == EventType.COLLABORATION_CLOSED:
-        return str(payload.get("status") or "")
-    return str(payload.get("reason") or "")
 
 
 def search_text(record: dict[str, Any]) -> str:
@@ -1402,22 +658,8 @@ def search_text(record: dict[str, Any]) -> str:
     )).casefold()
 
 
-def _limit(value: int) -> int:
-    if type(value) is not int or not 1 <= value <= MAX_LIMIT:
-        raise ValueError(f"limit must be an integer between 1 and {MAX_LIMIT}")
-    return value
 
 
-def _cursor_offset(cursor: str | None, total: int) -> int:
-    if cursor in (None, ""):
-        return 0
-    try:
-        offset = int(cursor)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("cursor must be a non-negative integer") from exc
-    if offset < 0 or offset > total:
-        raise ValueError("cursor is outside the result set")
-    return offset
 
 
 def _has_usage_values(values: dict[str, Any]) -> bool:
@@ -1432,95 +674,12 @@ def _usage_field_state(field: str, value: Any, source: str) -> str:
     return source if source in {"reported", "unknown"} else "unknown"
 
 
-def _usage_source(usage: Any) -> str:
-    if not isinstance(usage, dict):
-        return "missing"
-    source = usage.get("source")
-    if source in USAGE_SOURCES:
-        return source
-    if usage.get("reported") is True:
-        return "reported"
-    if usage.get("reported") is False and _has_usage_values(usage):
-        return "unknown"
-    return "missing" if not _has_usage_values(usage) else "unknown"
 
 
-def _usage_totals(
-    records: Iterable[dict[str, Any]],
-    *,
-    source: str | None = None,
-) -> dict[str, Any]:
-    items = list(records)
-    selected = [item for item in items if source is None or _usage_source(item.get("usage")) == source]
-    values: dict[str, Any] = {}
-    coverage: dict[str, dict[str, Any]] = {}
-    currency: str | None = None
-    cost_status = "missing"
-    for field in USAGE_FIELDS:
-        candidates = items if field == "latency_ms" else selected
-        known = [item.get("usage", {}).get(field) for item in candidates if item.get("usage", {}).get(field) is not None]
-        if field == "cost":
-            if not known:
-                values[field] = None
-                cost_status = "missing"
-            else:
-                currencies = {
-                    item.get("usage", {}).get("currency")
-                    for item in candidates if item.get("usage", {}).get(field) is not None
-                }
-                if len(currencies) == 1 and None not in currencies:
-                    currency = next(iter(currencies))
-                    values[field] = sum(known)
-                    cost_status = "reported"
-                else:
-                    values[field] = None
-                    currency = None
-                    cost_status = "mixed_currency"
-        else:
-            values[field] = sum(known) if known else None
-        total = len(items)
-        values_count = len(known)
-        coverage[field] = {
-            "reported": values_count,
-            "total": total,
-            "ratio": values_count / total if total else 0.0,
-        }
-    statuses = [item.get("status") for item in items]
-    return {
-        **values,
-        "currency": currency,
-        "cost_status": cost_status,
-        "coverage": coverage,
-        "attempt_count": len(items),
-        "in_progress_count": sum(status in {"prepared", "requesting"} for status in statuses),
-        "completed_count": sum(status == "completed" for status in statuses),
-        "failed_count": sum(status == "failed" for status in statuses),
-        "cancelled_count": sum(status == "cancelled" for status in statuses),
-    }
 
 
-def _has_reported_usage(record: dict[str, Any]) -> bool:
-    usage = record.get("usage") or {}
-    return _usage_source(usage) == "reported" and _has_usage_values(usage)
 
 
-def _coverage(reported: int, total: int) -> dict[str, Any]:
-    return {
-        "reported_attempts": reported,
-        "attempts": total,
-        "percent": round(reported * 100 / total, 2) if total else 0.0,
-    }
 
 
-def _field_coverage(records: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    items = list(records)
-    total = len(items)
-    result = {}
-    for field in USAGE_FIELDS:
-        reported = sum(
-            _usage_source(item.get("usage")) == "reported"
-            and item.get("usage", {}).get(field) is not None
-            for item in items
-        )
-        result[field] = _coverage(reported, total)
-    return result
+

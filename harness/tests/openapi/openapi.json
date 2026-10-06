@@ -6088,64 +6088,6 @@
         ],
         "title": "DeliveryFileResult"
       },
-      "DepartmentPromptState": {
-        "properties": {
-          "department": {
-            "type": "string",
-            "title": "Department"
-          },
-          "configured_version": {
-            "type": "integer",
-            "title": "Configured Version"
-          },
-          "configured_text": {
-            "type": "string",
-            "title": "Configured Text"
-          },
-          "source": {
-            "type": "string",
-            "title": "Source"
-          },
-          "used_version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Used Version"
-          },
-          "used_event_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Used Event Id"
-          },
-          "prompt_configured": {
-            "type": "boolean",
-            "title": "Prompt Configured",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "department",
-          "configured_version",
-          "configured_text",
-          "source",
-          "used_version",
-          "used_event_id"
-        ],
-        "title": "DepartmentPromptState"
-      },
       "DepartmentSetting": {
         "properties": {
           "department": {
@@ -6197,9 +6139,9 @@
             ],
             "title": "Requested Tier"
           },
-          "prompt_configured": {
+          "department_setting_configured": {
             "type": "boolean",
-            "title": "Prompt Configured",
+            "title": "Department Setting Configured",
             "default": false
           }
         },
@@ -6212,6 +6154,64 @@
           "source"
         ],
         "title": "DepartmentSetting"
+      },
+      "DepartmentSettingState": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "configured_version": {
+            "type": "integer",
+            "title": "Configured Version"
+          },
+          "configured_text": {
+            "type": "string",
+            "title": "Configured Text"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "used_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Version"
+          },
+          "used_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Event Id"
+          },
+          "department_setting_configured": {
+            "type": "boolean",
+            "title": "Department Setting Configured",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department",
+          "configured_version",
+          "configured_text",
+          "source",
+          "used_version",
+          "used_event_id"
+        ],
+        "title": "DepartmentSettingState"
       },
       "DepartmentSettingsSave": {
         "properties": {
@@ -6350,8 +6350,8 @@
             "type": "boolean",
             "title": "Active"
           },
-          "prompt": {
-            "$ref": "#/components/schemas/DepartmentPromptState"
+          "department_setting": {
+            "$ref": "#/components/schemas/DepartmentSettingState"
           },
           "setting": {
             "$ref": "#/components/schemas/DepartmentSetting"
@@ -6408,7 +6408,7 @@
           "run_id",
           "phase",
           "active",
-          "prompt",
+          "department_setting",
           "setting",
           "effective",
           "guidance",
