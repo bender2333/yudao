@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import type { DecisionView } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { CommandFeedback, KeyValue, TextArea, hasCommand } from "../project/common";
-import { DECISION_KIND, formatDuration, formatTime, label } from "../project/labels";
+import { DECISION_BLOCKS, DECISION_KIND, formatDuration, formatTime, label } from "../project/labels";
 import { useCommand } from "../project/use-snapshot";
 import { blockedText, decisionLinks, materialRows, viewHref, waitedSeconds } from "./card-logic";
 
@@ -70,7 +70,7 @@ export function DecisionCard(props: DecisionCardProps) {
       <header className="decision-head">
         <div className="decision-title">
           <strong>{label(DECISION_KIND, decision.kind)}</strong>
-          <span className="tag">{decision.blocks === "" ? "不阻塞" : `阻塞 ${decision.blocks}`}</span>
+          <span className="tag">{decision.blocks === "" ? "不阻塞" : `阻塞范围：${label(DECISION_BLOCKS, decision.blocks)}`}</span>
         </div>
         <div className="decision-meta">
           <span>

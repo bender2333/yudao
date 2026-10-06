@@ -137,7 +137,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
       <p className="note">
         {data.work_item_id === null
           ? "这个范围没有事项"
-          : `所选事项 ${data.work_item_id}，运行 ${show(data.run_id, "未创建")}`}
+          : `所选事项 ${data.work_item_id}`}
         {props.scopeNote}
       </p>
       <div className="composer">
@@ -149,11 +149,11 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
 
 const INSPECT_TABS = [
   { id: "actions", label: "动作与回执" },
-  { id: "context", label: "Context" },
+  { id: "context", label: "上下文" },
   { id: "department-setting", label: "部门设置" },
 ];
 
-// 检查区：页签切换动作与回执、Context 与部门设置
+// 检查区：页签切换动作与回执、上下文清单与压缩记录、部门设置
 function InspectArea(props: { app: ClientApp; data: DepartmentWorkspaceResult }) {
   const [tab, setTab] = useState("actions");
   const data = props.data;
@@ -369,7 +369,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
           </div>
         ) : (
           <p className="note">
-            {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "能力清单没有登记 guidance.send，不能发送指导"}
+            {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "这台主机没有提供发送指导的操作"}
           </p>
         )}
       </Section>
@@ -416,7 +416,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
           onSaved={props.onClose}
         />
       ) : (
-        <p className="note">能力清单没有登记 department_settings.save</p>
+        <p className="note">这台主机没有提供保存部门设置的操作</p>
       )}
       <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
     </Modal>

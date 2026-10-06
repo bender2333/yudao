@@ -25,13 +25,37 @@ export const RECOVERY_STATE: Record<string, string> = {
 };
 
 export const PHASE_LABELS: Record<string, string> = {
+  CREATED: "等待开始",
   PRODUCT_SPEC: "产品处理中",
-  ENGINEERING_PLAN: "工程计划中",
   ENGINEERING: "工程处理中",
+  DELIVERY: "交付核验中",
   QUALITY: "质检处理中",
+  REWORK_PRODUCT: "产品返工中",
+  REWORK_ENGINEERING: "工程返工中",
   DONE: "已完成",
   FAILED: "执行失败",
   PAUSED: "已暂停",
+};
+
+// 停止原因的中文名（harness/definitions/stop_reasons.json 的取值与 done 的两种一致）
+export const STOP_REASON: Record<string, string> = {
+  released: "已完成并放行",
+  baseline_verified: "已完成基线核验",
+  max_cycles: "循环次数已达上限",
+  model_steps_exhausted: "部门步数已达上限",
+  no_tool_call: "部门连续多次没有调用工具",
+  workspace_unrepresentable: "工作区有无法表示的条目",
+  time_limit: "运行时间已达上限",
+  cancelled: "运行已被取消",
+  provider_error: "模型服务失败",
+  provider_timeout: "模型服务请求超时",
+  provider_protocol: "模型服务协议不符",
+  unsupported_protocol: "不支持的协议",
+  retry_after_too_long: "要求等待的时间过长",
+  context_overflow: "上下文超过窗口",
+  compaction_failed: "上下文压缩失败",
+  host_commit_error: "主机保存失败",
+  run_event_version_changed: "因 Yudao 升级停止",
 };
 
 export const ACTION_STATUS: Record<string, string> = {
@@ -69,10 +93,22 @@ export const DECISION_KIND: Record<string, string> = {
   initial_prd: "接入已有项目的初始 PRD 等待确认",
 };
 
+// 决定请求的阻塞范围（DecisionView 的 blocks 取值）：卡片头的标记按中文写，不出现内部词 run
+export const DECISION_BLOCKS: Record<string, string> = {
+  run: "整次运行",
+  action: "单个动作",
+};
+
 export const INPUT_PROGRESS: Record<string, string> = {
   received: "已接收",
   assigned: "已交给产品处理",
   accepted: "已由有效需求接纳",
+};
+
+// 输入种类的中文名（work_item.inputs 的 kind 取值：文字或登记命令）
+export const INPUT_KIND: Record<string, string> = {
+  text: "文字",
+  command: "登记命令",
 };
 
 export function label(map: Record<string, string>, value: string | null | undefined): string {
@@ -84,7 +120,8 @@ export function label(map: Record<string, string>, value: string | null | undefi
 
 export function departmentName(value: string | null | undefined): string {
   if (!value) {
-    return "未知部门";
+    // 事项停止后没有在处理的部门；调用处按位置决定写「没有」还是省略这一格
+    return "";
   }
   return DEPARTMENTS[value]?.name ?? value;
 }

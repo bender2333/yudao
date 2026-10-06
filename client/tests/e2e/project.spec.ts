@@ -21,15 +21,15 @@ const SEEDED_MATERIAL = "回声工具要能在终端里逐行回显输入。";
 const VIEWS = ["overview", "dept/product", "dept/engineering", "dept/quality", "materials", "observe", "settings"] as const;
 type View = (typeof VIEWS)[number];
 
-// 顶栏路径把项目名与路由名拼在一起（app.tsx 的 pathLabel）
+// 顶栏路径把项目名与页名拼在一起（app.tsx 的 pathLabel）：页名与页签一致
 const PATH_LABEL: Record<View, string> = {
-  overview: "overview",
-  "dept/product": "dept",
-  "dept/engineering": "dept",
-  "dept/quality": "dept",
-  materials: "materials",
-  observe: "observe",
-  settings: "settings",
+  overview: "概览",
+  "dept/product": "产品",
+  "dept/engineering": "工程",
+  "dept/quality": "质检",
+  materials: "资料",
+  observe: "观测",
+  settings: "设置",
 };
 
 let backend: Backend;
@@ -215,6 +215,16 @@ async function pathText(page: Page): Promise<string> {
   return (await page.locator(".topbar .path").innerText()).trim();
 }
 
+// 试用页面上不应出现的开发用语与英文内部提示（工单 #303 的验收）：接口名、工单编号、
+// 内部词 run、英文停止原因与英文阶段名。`Yudao` 是产品名，先去掉再检查。
+const FORBIDDEN = /(?<![A-Za-z])run(?![A-Za-z])|released|observe-detail|project\.(overview|flow|attempts|settings)|work_item\.(inputs|create|append_input|cancel|reorder)|material\.record|event\.detail|guidance\.send|department_settings\.save|run\.(actions|attempt)|[A-Z][A-Z_]{3,}|#\d+/;
+
+async function expectNoDeveloperText(page: Page, where: string): Promise<void> {
+  const text = (await bodyText(page)).replaceAll("Yudao", "");
+  const found = text.match(FORBIDDEN);
+  expect.soft(found?.[0] ?? null, `${where}：页面文字不应出现开发用语与英文内部提示`).toBeNull();
+}
+
 async function openDecisions(page: Page): Promise<{ decision_id: string; version: number; project_id: string }[]> {
   const data = await fetchQuery<{ decisions: { decision_id: string; version: number; project_id: string; status: string }[] }>(
     page,
@@ -254,14 +264,14 @@ test.describe("项目页面（1440×900）", () => {
       const floor = await section(page, "循环画面");
       await expect(floor.locator(".floor-screen canvas")).toHaveCount(1);
       const board = await section(page, "事项看板");
-      await expect(board.locator(".board-col")).toHaveCount(6);
+      await expect(board.locator(".board-col")).toHaveCount(7);
       await expect(board.locator("h3").filter({ hasText: "已采纳" })).toContainText("（1）");
       await expect(board.locator(".board-card strong")).toHaveText(SAMPLE_ITEM);
       const flow = await section(page, "流转记录");
       await expect(flow).toContainText("需求交接");
       await expect(flow).toContainText("版本交付");
-      await expect(flow).toContainText("PRODUCT_SPEC→ENGINEERING");
-      await expect(flow).toContainText("ENGINEERING→DELIVERY");
+      await expect(flow).toContainText("产品处理中 → 工程处理中");
+      await expect(flow).toContainText("工程处理中 → 交付核验中");
       await expect(flow).toContainText("已完成");
       // 时间列是按钮：点开原始事件的详情弹窗（event.detail）
       const row = flow.locator("tbody tr").filter({ hasText: "需求交接" }).first();
@@ -273,6 +283,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(raw).toContainText('"type"');
       await modal.getByRole("button", { name: "关闭" }).click();
       await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+      await expectNoDeveloperText(page, "概览");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -324,7 +335,6 @@ test.describe("项目页面（1440×900）", () => {
       await expect(title).toContainText("（来源 部门默认）");
       await expect(title).toContainText("工位：产品 Agent");
       await expect(title).toContainText("所选事项 wi_");
-      await expect(title).toContainText("运行 run_");
       // 部门设置弹窗：标题为「本项目 · 某部门设置」，模型、推理档位与部门 Prompt 三项（第 9.2 节）
       await title.getByRole("button", { name: "部门设置" }).click();
       const dialog = page.locator(".modal-backdrop");
@@ -357,6 +367,7 @@ test.describe("项目页面（1440×900）", () => {
       console.log("STEP dept");
       await expect(guidance).toContainText("这个部门还没有指导记录");
       await expect(guidance.getByLabel("向产品下达指导")).toBeVisible();
+      await expectNoDeveloperText(page, "部门工作间");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -460,9 +471,9 @@ test.describe("项目页面（1440×900）", () => {
       await providerFilter.fill("");
       await record.getByRole("button", { name: "按条件筛选" }).click();
       await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
-      // 请求详情：点第一行的「详情」，顶栏路径换成 observe-detail
+      // 请求详情：点第一行的「详情」，顶栏路径换成请求详情
       await page.locator("section.card table").first().locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
-      await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / observe-detail`);
+      await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / 请求详情`);
       expect(await activeTabCount(page)).toBe(0);
       const detail = await section(page, "请求详情");
       await expect(detail.locator(".section-head .note")).toContainText("请求标识 act_");
@@ -509,10 +520,10 @@ test.describe("项目页面（1440×900）", () => {
       await expect(basics.getByRole("button", { name: "归档项目" })).toBeVisible();
       const departments = await section(page, "部门设置");
       await expect(departments).toContainText("产品（product）");
-      await expect(departments).toContainText("第 1 版；来源 configured（本项目已配置部门 Prompt）");
-      await expect(departments.locator("pre.prompt-text").first()).toContainText(PRODUCT_PROMPT);
+      await expect(departments).toContainText("1 版；来源 configured（本项目已写入部门设置）");
+      await expect(departments.locator("pre.raw").first()).toContainText(PRODUCT_PROMPT);
       await expect(departments).toContainText("工程（engineering）");
-      await expect(departments).toContainText("第 0 版；来源 default（使用内置默认 Prompt）");
+      await expect(departments).toContainText("0 版；来源 default（跟随部门默认）");
       await expect(departments).toContainText("质检（quality）");
       // 修改部门设置：模型、推理档位与部门 Prompt 三项（第 9.2 节）
       await departments.getByRole("button", { name: "修改部门设置" }).first().click();
@@ -768,7 +779,7 @@ test.describe("项目页面（390×844）", () => {
       await page.locator(".modal-backdrop").getByRole("button", { name: "取消" }).click();
       await gotoView(page, id, "observe");
       await page.locator("section.card table").first().locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
-      await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / observe-detail`);
+      await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / 请求详情`);
       await expectNoOverflow(page, "请求详情页面");
       // 深色配色下再查一遍
       await page.emulateMedia({ colorScheme: "dark" });
