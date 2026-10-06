@@ -87,6 +87,15 @@ def _git_init(root: Path) -> None:
 def _idle(client) -> bool:
     return client.get("/api/queries/system.status").json()["data"]["drain"]["running_runs"] == 0
 
+
+def _awaiting_initial_prd(client, project_id) -> bool:
+    # 建档 run 结束以后，结算在另一个事务里写入初始 PRD 的候选与确认请求（工单 #337）。
+    # 两个事务之间事项的状态是 released_unsettled，此时 work_item.create 返回 not_allowed；
+    # 状态为 awaiting_initial_prd 才是「建档结束、等待用户确认」。
+    loop = client.get(f"/api/queries/project.loop?project_id={project_id}").json()["data"]
+    return any(item["kind"] == "onboarding" and item["status"] == "awaiting_initial_prd"
+               for item in loop["work_items"])
+
 def test_project_onboard_reaches_baseline_verified_over_http(data_dir, tmp_path):
     # 验收：经 HTTP 命令 project.onboard 完成从接入到建档 run 以 baseline_verified 结束；源目录内容与修改时间不变
     source = _source(tmp_path / "source")
@@ -169,13 +178,12 @@ def test_new_work_item_is_rejected_before_the_baseline(data_dir, tmp_path):
         accepted = _post(client, "project.onboard", name="已有项目", goal=GOAL,
                          source_name="src", source_path=str(source))
         project_id = accepted.json()["refs"]["project_id"]
-        first_run = accepted.json()["refs"]["run_id"]
         # 建档进行中（run 已经创建，还没有结束）
         rejected = _post(client, "work_item.create", project_id=project_id, text="建档中新建")
         assert rejected.status_code == 409, rejected.text
         assert rejected.json()["reason"] == "work_item_in_progress"
-        assert _wait_for(lambda: opened.system.project(first_run).phase == "DONE")
-        assert _wait_for(lambda: _idle(client))
+        assert _wait_for(lambda: _awaiting_initial_prd(client, project_id)), \
+            "the onboarding item did not reach awaiting_initial_prd"
         # 建档结束、等待用户确认：普通事项仍然被拒绝
         waiting = _post(client, "work_item.create", project_id=project_id, text="等待确认时新建")
         assert waiting.status_code == 409, waiting.text
@@ -210,8 +218,8 @@ def test_projects_list_and_loop_show_onboarding_status_and_kind(data_dir, tmp_pa
         loop = client.get(f"/api/queries/project.loop?project_id={project_id}").json()["data"]
         assert loop["work_items"][0]["kind"] == "onboarding"
         # 建档结束、等待用户确认初始 PRD：状态为 awaiting_initial_prd（等待确认）
-        assert _wait_for(lambda: opened.system.project(accepted.json()["refs"]["run_id"]).phase == "DONE")
-        assert _wait_for(lambda: _idle(client))
+        assert _wait_for(lambda: _awaiting_initial_prd(client, project_id)), \
+            "the onboarding item did not reach awaiting_initial_prd"
         row = next(entry for entry in client.get("/api/queries/projects.list").json()["data"]["projects"]
                    if entry["project_id"] == project_id)
         assert row["onboarding_status"] == "awaiting_initial_prd"
