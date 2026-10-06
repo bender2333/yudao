@@ -249,13 +249,12 @@ def test_project_onboard_http_entry(data_dir, tmp_path):
         run_id = accepted["refs"]["run_id"]
 
         def settled():
+            # 建档 run 结束以后由结算写出初始 PRD 的候选与确认请求，事项状态才是 awaiting_initial_prd
+            # （工单 #136 起 #337）；两个事务之间是 released_unsettled，不算结算完成
             project = client.get(f"/api/queries/project.overview?project_id={project_id}").json()["data"]
             item = next(entry for entry in project["work_items"]
                         if entry["work_item_id"] == accepted["refs"]["work_item_id"])
-            # 建档 run 结束时事项停在 released_unsettled（基线采纳由 #136 实现）
-            if item["status"] not in {"released_unsettled", "stopped", "adopted", "held"}:
-                return False
-            return client.get("/api/queries/system.status").json()["data"]["drain"]["running_runs"] == 0
+            return item["status"] == "awaiting_initial_prd"
 
         assert _wait_for(settled), "the onboarding run did not stop"
         run = system.project(run_id)
