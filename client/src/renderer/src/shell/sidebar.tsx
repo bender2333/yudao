@@ -4,13 +4,15 @@
 // 项目列表本身由外壳的视图同步给出，命令被接受以后由事件到达时重新查询。
 
 import { useMemo, useState } from "react";
-import type { Capabilities, ProjectRow, Rejected } from "../api/generated/types.gen";
+import type { Capabilities, DecisionView, ProjectRow, Rejected } from "../api/generated/types.gen";
 import type { ClientApp } from "../contract/client-app";
 import { useCommand } from "../views/project/use-snapshot";
+import { ONBOARDING_REJECTION_REASONS, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
 
 export type SidebarProps = {
   app: ClientApp;
   capabilities: Capabilities;
+  decisions: DecisionView[];
   projects: ProjectRow[];
   activeProjectId: string | null;
   activeName: string;
@@ -26,10 +28,14 @@ const SYSTEM_ENTRIES: { page: string; label: string; query: string }[] = [
 ];
 
 // 项目状态标记：只用项目列表里已有的计数与标记，取值为真的才显示
-function statusMarks(project: ProjectRow): string[] {
+function statusMarks(project: ProjectRow, decisions: DecisionView[]): string[] {
   const marks: string[] = [];
   if (project.in_progress_count > 0) {
     marks.push("运行中");
+  }
+  const onboarding = projectOnboardingMark(project, decisions);
+  if (onboarding !== null) {
+    marks.push(onboarding);
   }
   if (project.interrupted_count > 0) {
     marks.push(`中断 ${project.interrupted_count}`);
@@ -39,12 +45,6 @@ function statusMarks(project: ProjectRow): string[] {
   }
   if (project.waiting_resume_count > 0) {
     marks.push(`待恢复 ${project.waiting_resume_count}`);
-  }
-  if (project.onboarding_status === "onboarding") {
-    marks.push("建档中");
-  }
-  if (project.onboarding_status === "awaiting_onboarding") {
-    marks.push("待建档");
   }
   if (project.archived) {
     marks.push("已归档");
@@ -61,7 +61,8 @@ export function Sidebar(props: SidebarProps) {
   const [menuFor, setMenuFor] = useState<string | null>(null);
 
   // 项目列表由外壳打开（viewId "shell.projects"）：命令被接受以后事件到达，列表按事件种类重新查询
-  const command = useCommand(props.app, JSON.stringify(props.projects));
+  const markKey = useMemo(() => JSON.stringify(props.decisions.map((decision) => [decision.decision_id, decision.status])), [props.decisions]);
+  const command = useCommand(props.app, JSON.stringify(props.projects) + markKey);
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return props.projects.filter((project) => {
@@ -130,7 +131,7 @@ export function Sidebar(props: SidebarProps) {
         </p>
         {visible.length === 0 && <span className="nav-item" aria-disabled="true">没有符合的项目</span>}
         {visible.map((project) => {
-          const marks = statusMarks(project);
+          const marks = statusMarks(project, props.decisions);
           const pending = props.pendingByProject[project.project_id] ?? 0;
           return (
             <div key={project.project_id} className="project-entry">
@@ -238,7 +239,17 @@ function NewProject(props: {
       <button type="submit" className="primary" disabled={props.busy || !ready}>
         {props.busy ? "正在提交" : props.mode === "idea" ? "新建项目" : "接入项目"}
       </button>
-      {props.rejection ? <p className="error" role="status">{props.rejection.message}（原因 {props.rejection.reason}）</p> : null}
+      {props.rejection ? (
+        <div className="rejection" role="status">
+          <p className="error">
+            {ONBOARDING_REJECTION_REASONS[props.rejection.reason] ?? "命令被拒绝"}
+            （原因 {props.rejection.reason}）
+          </p>
+          <ul className="rejection-paths">
+            {sourceInvalidLines(props.rejection).map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        </div>
+      ) : null}
       {props.submitted ? <p className="hint" role="status">已提交，等待写入结果</p> : null}
     </form>
   );

@@ -242,7 +242,7 @@ def test_setting_only_a_prompt_clears_the_project_model_choice(tmp_path):
             assert saved.status_code == 200, saved.text
             setting = _settings(client, project_id, "engineering")
             assert setting["model_id"] is None and setting["provider_id"] is None
-            assert setting["prompt_configured"] is True
+            assert setting["department_setting_configured"] is True
 
             started = _post(client, "work_item.create", project_id=project_id, text="echo")
             run_id = started.json()["refs"]["run_id"]

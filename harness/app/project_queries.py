@@ -553,14 +553,14 @@ class DepartmentWorkspace(Contract):
     work_item: str | None = None
 
 
-class DepartmentPromptState(Contract):
+class DepartmentSettingState(Contract):
     department: str
     configured_version: int
     configured_text: str
     source: str
     used_version: int | None
     used_event_id: str | None
-    prompt_configured: bool = False
+    department_setting_configured: bool = False
 
 
 class GuidanceRecord(Contract):
@@ -597,7 +597,7 @@ class DepartmentWorkspaceResult(Contract):
     run_id: str | None
     phase: str | None
     active: bool
-    prompt: DepartmentPromptState
+    department_setting: DepartmentSettingState
     setting: DepartmentSetting
     effective: EffectiveModel
     guidance: list[GuidanceRecord]
@@ -668,10 +668,10 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             work_item_id=None if item is None else item.work_item_id,
             run_id=None if run is None else run.run_id, phase=None if run is None else run.phase,
             active=False if run is None else run.active_department == request.department,
-            prompt=DepartmentPromptState(
+            department_setting=DepartmentSettingState(
                 department=request.department, configured_version=configured.version,
                 configured_text=configured.text, source=configured.source,
-                prompt_configured=configured.configured_prompt,
+                department_setting_configured=configured.configured_prompt,
                 used_version=used_version,
                 used_event_id=None if configured.event_id is None else configured.event_id,
             ),
@@ -679,7 +679,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
                 department=request.department, version=configured.version, text=configured.text,
                 source=configured.source, provider_id=configured.provider_id,
                 model_id=configured.model_id, requested_tier=configured.requested_tier,
-                prompt_configured=configured.configured_prompt),
+                department_setting_configured=configured.configured_prompt),
             effective=effective,
             guidance=guidance, messages=messages, context=context,
             last_call=_last_call(run, request.department),
@@ -1275,7 +1275,7 @@ class DepartmentSetting(Contract):
     provider_id: str | None = None
     model_id: str | None = None
     requested_tier: str | None = None
-    prompt_configured: bool = False
+    department_setting_configured: bool = False
 
 
 class CommandSetting(Contract):
@@ -1319,7 +1319,7 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
             provider_id=state.department_settings[department].provider_id,
             model_id=state.department_settings[department].model_id,
             requested_tier=state.department_settings[department].requested_tier,
-            prompt_configured=state.department_settings[department].configured_prompt)
+            department_setting_configured=state.department_settings[department].configured_prompt)
         for department in DEPARTMENTS
     }
     return Snapshot[ProjectSettingsResult](

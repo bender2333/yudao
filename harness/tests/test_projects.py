@@ -437,7 +437,7 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
 # §13.8 部门 Prompt 项目配置
 
 
-def test_department_prompt_configuration_versions_conflicts_and_effect_timing(data_dir):
+def test_department_setting_versions_conflicts_and_effect_timing(data_dir):
     # 部门 Prompt 保存在项目部门设置中，run 内没有副本：修改从该部门的下一次模型请求起生效
     adapter = FakeAdapter([*_release_script("A"), *_release_script("B", files=_v2_files())])
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -445,7 +445,7 @@ def test_department_prompt_configuration_versions_conflicts_and_effect_timing(da
     default = system.projects.read_department_setting(project_id, "engineering")
     default_text = DEFINITIONS.role("engineering").prompt
     assert default == {"department": "engineering", "text": default_text,
-                       "default_text": default_text, "prompt_configured": False, "provider_id": None,
+                       "default_text": default_text, "department_setting_configured": False, "provider_id": None,
                        "model_id": None, "requested_tier": None, "version": 0, "updated_at": None,
                        "source": "default"}
     v1 = "工程 Prompt v1：先写计划再写代码。"
@@ -453,7 +453,7 @@ def test_department_prompt_configuration_versions_conflicts_and_effect_timing(da
         project_id, "engineering", ModelSelection(department_prompt=v1), 0)
     assert (saved["version"], saved["source"], saved["unchanged"], saved["text"]) == (1, "configured", False, v1)
     assert saved["updated_at"] is not None and saved["default_text"] == default_text
-    assert saved["prompt_configured"] is True
+    assert saved["department_setting_configured"] is True
     again = system.projects.configure_department_settings(
         project_id, "engineering", ModelSelection(department_prompt=v1), 1)
     assert (again["version"], again["unchanged"]) == (1, True)

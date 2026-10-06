@@ -21,6 +21,7 @@ import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { ticksOf } from "../timeline/logic";
 import { PHASE_LABELS, WORK_ITEM_STATUS, departmentName, formatTime, label } from "./labels";
+import { RestartOnboarding } from "./restart-onboarding";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 
 export function OverviewPage(props: { app: ClientApp; route: Route }) {
@@ -74,6 +75,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route }) {
             ) : null}
           </Section>
           <CurrentItem app={props.app} projectId={projectId} item={current} command={command} />
+          <RestartOnboarding app={props.app} projectId={projectId} />
           <Board items={items} />
           <FlowTable app={props.app} flow={flow} />
         </>
