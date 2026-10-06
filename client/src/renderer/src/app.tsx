@@ -37,6 +37,7 @@ export function App() {
   const [pending, setPending] = useState(0);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [pendingByProject, setPendingByProject] = useState<Record<string, number>>({});
+  const [decisions, setDecisions] = useState<DecisionView[]>([]);
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -149,6 +150,7 @@ export function App() {
         }
       }
       setPendingByProject(grouped);
+      setDecisions(data.decisions);
     });
     void views.open<SystemStatus>("shell.status", { query: "system.status", params: undefined }, (data) => {
       setSystemStatus(data);
@@ -345,6 +347,7 @@ export function App() {
       <Sidebar
         app={app}
         capabilities={capabilities}
+        decisions={decisions}
         projects={projects}
         activeProjectId={route.projectId}
         activeName={route.name}
