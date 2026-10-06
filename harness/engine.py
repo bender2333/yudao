@@ -603,9 +603,7 @@ class StepDriver:
             request_id=payload.get("collaboration_request_id"), context_event_id=payload.get("context_event_id"),
             effective_contract_hash=self._scope.basis.effective_contract_hash,
             engineering_plan_hash=self._scope.basis.engineering_plan_hash,
-            call_target=recovered_call_target(events, str(payload.get("activation_id") or ""),
-                                             int(payload.get("step_id") or 0)),
-            purpose="work",
+            call_target=dict(self._call_public or {}), purpose="work",
         )
 
     async def _execute_call(self, request: "_RecoveredCall", item: dict[str, Any]) -> None:
