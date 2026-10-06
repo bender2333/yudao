@@ -1,0 +1,13 @@
+{
+  "count": 8,
+  "tests": [
+    "tests/model_settings/test_serialization.py::test_all_fields_serialization",
+    "tests/model_settings/test_serialization.py::test_extra_args_resolve",
+    "tests/model_settings/test_serialization.py::test_extra_args_resolve_both_none",
+    "tests/model_settings/test_serialization.py::test_extra_args_resolve_with_none",
+    "tests/model_settings/test_serialization.py::test_extra_args_serialization",
+    "tests/models/test_kwargs_functionality.py::test_empty_kwargs_handling",
+    "tests/models/test_kwargs_functionality.py::test_litellm_kwargs_forwarded",
+    "tests/models/test_kwargs_functionality.py::test_openai_chatcompletions_kwargs_forwarded"
+  ]
+}
