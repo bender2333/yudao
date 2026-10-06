@@ -61,11 +61,13 @@ class FactsQuery(BaseModel):
 
 
 class TreeFacts(BaseModel):
-    # 公开树的清单（文件的相对路径）与摘要，以及工作区中记录的检查回执
+    # 公开树的清单（文件的相对路径）、摘要、每个文件的内容哈希，以及工作区中记录的检查回执。
+    # hashes 与 files 同序同长：动作前后的公开树快照工件按它比较实际效果（工单 #308）
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     digest: str
     files: tuple[str, ...]
+    hashes: tuple[str, ...] = ()
     checks: tuple[CheckReceipt, ...]
 
     def has_file(self, rel: str) -> bool:

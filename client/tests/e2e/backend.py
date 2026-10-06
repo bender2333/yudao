@@ -99,6 +99,20 @@ def script():
         review_turn("release", "checks passed on the current snapshot"),
     ]
 
+
+def initial_script():
+    # 起始文件夹的端到端验收（工单 #323）：产品先列出工作区里的文件、再读一个起点文件夹里的文件，
+    # 然后走完一轮三部门。工作区由起始文件夹的快照建成，这两次读取的输出因此在部门工作间的
+    # 「动作与回执」与事件详情里给出起点文件夹里的文件。
+    return [
+        read_turn("list-initial", "list_files", {}),
+        read_turn("read-initial", "read_file", {"path": "README.md"}),
+        product_spec(),
+        plan_turn(),
+        delivery_turn(),
+        review_turn("release", "checks passed on the current snapshot"),
+    ]
+
 def room_script():
     # 部门房间的端到端验收（工单 #177）：产品的模型请求分三段流式返回，每段之间停顿；
     # 之后产品向工程发出一次询问（工程收到并回答），再走完交付与质检放行。端到端测试在请求
@@ -409,9 +423,10 @@ def main() -> int:
     parser.add_argument("--room", action="store_true")
     # 预置时给定义写准入并让三个部门默认绑定它：作废准入与删除引用方的用例需要真实的引用方（工单 #94）
     parser.add_argument("--admit-and-bind", action="store_true")
-    # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137），
-    # 它需要的轮次与默认脚本的预置事项不同，因此由用例选择
-    parser.add_argument("--script", choices=("default", "onboarding"), default="default")
+    # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
+    # initial 是从想法新建带起始文件夹用的脚本（工单 #323）。它们需要的轮次与默认脚本的预置事项不同，
+    # 因此由用例选择
+    parser.add_argument("--script", choices=("default", "onboarding", "initial"), default="default")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
     parser.add_argument("--reject-upstream", action="store_true")
@@ -448,6 +463,8 @@ def main() -> int:
         adapter_script = room_script()
     elif args.script == "onboarding":
         adapter_script = onboarding_script()
+    elif args.script == "initial":
+        adapter_script = initial_script()
     else:
         adapter_script = script()
     system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=2.5 if args.room else 0.0))
@@ -470,9 +487,9 @@ def main() -> int:
         if not thread.is_alive():
             raise RuntimeError("接口层在启动过程中结束")
 
-    # 接入已有项目需要一个真实的源目录：起服务前建好目录，把路径一并报给测试，
-    # 测试在对话框里填这个路径走完整的接入流程（工单 #137）
-    source_dir = source_directory(Path(tempfile.mkdtemp(prefix="yudao-e2e-source-"))) if args.script == "onboarding" else None
+    # 接入已有项目与起始文件夹都需要一个真实的目录：起服务前建好目录，把路径一并报给测试，
+    # 测试在对话框里填这个路径走完整的流程（工单 #137、#323）
+    source_dir = source_directory(Path(tempfile.mkdtemp(prefix="yudao-e2e-source-"))) if args.script in ("onboarding", "initial") else None
 
     # 先建示例项目与决定请求，再保存一份指向测试内上游的目录（工单 #93）。
     # 数据目录里已经有项目时不再预置：客户端「重新启动服务」会在同一个数据目录上再启动一次
@@ -484,7 +501,8 @@ def main() -> int:
             room_project = asyncio.run(seed_room(application, system))
         elif args.script == "onboarding":
             asyncio.run(seed_onboarding(application))
-        else:
+        elif args.script != "initial":
+            # 起始文件夹的用例自己在界面上建项目并开始事项，不需要预置的项目与事项（工单 #323）
             asyncio.run(seed(application, system))
     asyncio.run(seed_catalog(application, upstream_base, models_server.base,
                              admit_and_bind=args.admit_and_bind, reject_base=reject_base))

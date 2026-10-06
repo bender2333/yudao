@@ -8,12 +8,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+import json
+from collections.abc import Container, Iterable, Mapping, Sequence
 from typing import Any
 
 from .decisions import UNKNOWN_ACTION
 from .definitions import DEFINITIONS
-from .models import DecisionRequest, Event, EventType
+from .models import ArtifactRef, DecisionRequest, Event, EventType, hash_bytes
 
 # 动作的三类处置（恢复契约第 4 节）：completed 已有结果；unknown 已经发出但结果没有得到确认，必须核实或
 # 交给用户；还有一类是没有发出任何事件的调用，由步骤驱动按保存的模型响应补执行，见 engine 的补执行。
@@ -121,14 +122,184 @@ def action_repeatable(tool: str, args: Mapping[str, Any] | None = None, *,
         return bool(entry is not None and entry.get("repeatable"))
     return definition.repeatable
 
+
+FILE_ACTION_TOOLS = ("write_file", "edit_range", "delete_file", "move_file")
+
+
+def _snapshot_entries(snapshot: Mapping[str, Any] | None) -> dict[str, str] | None:
+    # 动作前后的公开树快照（工单 #308）：路径到内容哈希的对照。快照缺字段时按不可比对处理，调用方判 unclear
+    if not isinstance(snapshot, Mapping):
+        return None
+    entries = snapshot.get("entries")
+    if not isinstance(entries, list):
+        return None
+    result: dict[str, str] = {}
+    for item in entries:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            return None
+        path, content_hash = item
+        if not isinstance(path, str) or not isinstance(content_hash, str):
+            return None
+        result[path] = content_hash
+    return result
+
+
+def verify_file_action(tool: str, args: Mapping[str, Any] | None, *,
+                       before_snapshot: Mapping[str, Any] | None,
+                       current_entries: Sequence[Sequence[str]]) -> dict[str, Any]:
+    # 文件工具的结果核实（工单 #308，恢复契约第 4 节第 1 步）：把动作前快照、动作参数与当前公开树对比。
+    # 三种处置：没有变化返回 not_happened；只有目标路径变成目标内容返回 completed；其余返回 unclear。
+    # 3.2C 的远程动作后来按同样的方式使用这个函数，不在各处重写。调用方在恢复的事务之内使用，不在这里读写事件
+    before = _snapshot_entries(before_snapshot)
+    current: dict[str, str] = {}
+    for item in current_entries:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            return {"verdict": "unclear", "detail": {"reason": "当前公开树的形状无法解析"}}
+        path, content_hash = item
+        if not isinstance(path, str) or not isinstance(content_hash, str):
+            return {"verdict": "unclear", "detail": {"reason": "当前公开树的形状无法解析"}}
+        current[path] = content_hash
+    if before is None:
+        return {"verdict": "unclear", "detail": {"reason": "动作前的快照缺失或形状不对"}}
+    arguments = args if isinstance(args, Mapping) else {}
+    if tool == "write_file":
+        return _verify_write(arguments, before=before, current=current)
+    if tool == "edit_range":
+        return _verify_edit(arguments, before=before, current=current)
+    if tool == "delete_file":
+        return _verify_delete(arguments, before=before, current=current)
+    if tool == "move_file":
+        return _verify_move(arguments, before=before, current=current)
+    return {"verdict": "unclear", "detail": {"reason": f"不是文件工具：{tool}"}}
+
+
+def file_action_comparisons(events: Sequence[Event], *, artifacts: Any, run_id: str,
+                            current_entries: Sequence[Sequence[str]]) -> dict[str, dict[str, Any]]:
+    # 结果未知的文件动作逐个核实（工单 #308）：动作前快照按 tool_started 记下的引用取回，
+    # 与动作参数、当前公开树按 verify_file_action 对比。恢复与自动重新执行走同一个函数。
+    # 没有引用、引用取不到或看不懂的动作不在结论里，调用方按通常路径发决定请求
+    results: dict[str, dict[str, Any]] = {}
+    for info in classify_actions(events).values():
+        started = info["started_event"]
+        if (info["status"] != ACTION_UNKNOWN or started is None
+                or info["tool"] not in FILE_ACTION_TOOLS):
+            continue
+        ref = (started.payload or {}).get("before_snapshot_ref")
+        if not isinstance(ref, Mapping):
+            continue
+        before_snapshot = json.loads(artifacts.get_for_run(run_id, ArtifactRef(**ref)))
+        if not isinstance(before_snapshot, Mapping):
+            continue
+        result = verify_file_action(info["tool"], (started.payload or {}).get("args"),
+                                    before_snapshot=before_snapshot, current_entries=current_entries)
+        results[info["action_id"]] = {"tool": info["tool"], "args": (started.payload or {}).get("args"),
+                                      "before_snapshot_event": started.event_id,
+                                      "verdict": str(result["verdict"]), "detail": result["detail"]}
+    return results
+
+
+def _verify_write(arguments: Mapping[str, Any], *, before: dict[str, str],
+                  current: dict[str, str]) -> dict[str, Any]:
+    # 写入（环境按全文件内容落盘）：目标内容是参数 content 的字节；路径用执行环境落盘时的二进制口径核对
+    path = arguments.get("path")
+    content = arguments.get("content")
+    if not isinstance(path, str) or not isinstance(content, str):
+        return {"verdict": "unclear", "detail": {"reason": "动作参数缺失或形状不对"}}
+    return _compare_single_target(path=path, target=hash_bytes(content.encode("utf-8")),
+                                  before=before, current=current)
+
+
+def _verify_edit(arguments: Mapping[str, Any], *, before: dict[str, str],
+                 current: dict[str, str]) -> dict[str, Any]:
+    # 编辑的快照只存哈希，离线算不出合并以后的确切字节：用间接判据——目标路径内容已变、其它路径都没变。
+    # 判据在 detail 写明，供决定请求与核实依据引用
+    path = arguments.get("path")
+    if not isinstance(path, str):
+        return {"verdict": "unclear", "detail": {"reason": "动作参数缺失或形状不对"}}
+    if path not in before:
+        return {"verdict": "unclear", "detail": {"reason": f"动作前的快照没有目标路径：{path}"}}
+    detail = {"path": path, "changed": current.get(path) != before.get(path),
+              "others_unchanged": all(current.get(key) == value for key, value in before.items()
+                                      if key != path)
+              and all(key in before or key == path for key in current)}
+    changed = current.get(path)
+    if changed is None or changed == before.get(path):
+        if current == before:
+            return {"verdict": "not_happened", "detail": {**detail, "reason": "公开树与动作前相同"}}
+        return {"verdict": "unclear", "detail": {**detail, "reason": "目标内容与动作前相同，但另有改动"}}
+    if detail["others_unchanged"]:
+        return {"verdict": "completed", "detail": {**detail, "reason": "只有目标路径内容变化"}}
+    return {"verdict": "unclear", "detail": {**detail, "reason": "目标路径已变，但另有改动"}}
+
+
+def _verify_delete(arguments: Mapping[str, Any], *, before: dict[str, str],
+                   current: dict[str, str]) -> dict[str, Any]:
+    # 删除的目标：路径在当前公开树消失；reason 写明存活还是另有改动
+    path = arguments.get("path")
+    if not isinstance(path, str):
+        return {"verdict": "unclear", "detail": {"reason": "动作参数缺失或形状不对"}}
+    if current == before:
+        return {"verdict": "not_happened", "detail": {"reason": "公开树与动作前相同"}}
+    if path not in before:
+        return {"verdict": "unclear", "detail": {"reason": f"动作前的快照没有目标路径：{path}"}}
+    if path in current:
+        return {"verdict": "unclear", "detail": {"reason": f"目标路径仍然存在：{path}"}}
+    others_before = {key: value for key, value in before.items() if key != path}
+    others_current = {key: value for key, value in current.items() if key != path}
+    if others_current == others_before:
+        return {"verdict": "completed", "detail": {"reason": f"只有目标路径消失：{path}"}}
+    return {"verdict": "unclear", "detail": {"reason": "目标路径消失，但另有改动"}}
+
+
+def _verify_move(arguments: Mapping[str, Any], *, before: dict[str, str],
+                 current: dict[str, str]) -> dict[str, Any]:
+    # 移动的目标：来源消失，目标出现，且目标内容的哈希等于动作前来源的哈希（工作区只做改名，不改字节）
+    source = arguments.get("source")
+    destination = arguments.get("destination")
+    if not isinstance(source, str) or not isinstance(destination, str):
+        return {"verdict": "unclear", "detail": {"reason": "动作参数缺失或形状不对"}}
+    if current == before:
+        return {"verdict": "not_happened", "detail": {"reason": "公开树与动作前相同"}}
+    if source not in before:
+        return {"verdict": "unclear", "detail": {"reason": f"动作前的快照没有来源路径：{source}"}}
+    if source in current:
+        return {"verdict": "unclear", "detail": {"reason": f"来源路径仍然存在：{source}"}}
+    if current.get(destination) != before.get(source):
+        return {"verdict": "unclear", "detail": {"reason": "目标内容与动作前来源内容不符"}}
+    others_before = {key: value for key, value in before.items() if key not in (source, destination)}
+    others_current = {key: value for key, value in current.items() if key not in (source, destination)}
+    if destination in before:
+        return {"verdict": "unclear", "detail": {"reason": f"目标路径在动作前已经存在：{destination}"}}
+    if others_current == others_before:
+        return {"verdict": "completed", "detail": {"reason": "来源消失，目标出现且内容与来源相同"}}
+    return {"verdict": "unclear", "detail": {"reason": "移动已经发生，但另有改动"}}
+
+
+def _compare_single_target(path: str, target: str, *, before: dict[str, str],
+                           current: dict[str, str]) -> dict[str, Any]:
+    # 单个目标路径的对比：动作前后的差异恰好是「目标路径变成目标内容」，其余路径都没有变
+    if current == before:
+        return {"verdict": "not_happened", "detail": {"reason": "公开树与动作前相同"}}
+    if current.get(path) != target:
+        reason = f"目标路径不存在：{path}" if path not in current else f"目标内容不符：{path}"
+        return {"verdict": "unclear", "detail": {"reason": reason}}
+    others_before = {key: value for key, value in before.items() if key != path}
+    others_current = {key: value for key, value in current.items() if key != path}
+    if others_current == others_before:
+        return {"verdict": "completed", "detail": {"reason": "只有目标路径变成目标内容"}}
+    return {"verdict": "unclear", "detail": {"reason": "目标内容相符，但另有改动"}}
+
+
 def auto_retry_actions(events: Sequence[Event], decisions: Iterable[Any], *,
                        registered_commands: Mapping[str, Any] | None = None,
-                       department: str | None = None) -> list[dict[str, Any]]:
+                       department: str | None = None,
+                       not_happened: Container[str] = ()) -> list[dict[str, Any]]:
     # 恢复契约第 4 节第 2 步（工单 #307）：要自动重新执行的结果未知动作，按事件日志的先后顺序给出。判据有四条：
     # - 这一次尝试的结果未知（有 tool_started、没有结果或核实记录），没有被后来的尝试取代，也没有被
     #   已经回答的「按当前实际状态继续」覆盖；
     # - 这个逻辑动作还没有用掉自动重新执行的一次机会（重新执行链上还没有带 auto_retry_of 的尝试）；
-    # - 契约声明可以重复（读取、搜索、检查，以及登记时声明可以重新执行的命令），入口是 action_repeatable；
+    # - 契约声明可以重复（入口是 action_repeatable），或者自动核实确认这个文件动作没有发生
+    #   （工单 #308，调用方给出这些动作的编号）——两者共用这一次机会；
     # - 给出 department 时只取这个部门的动作。
     # 返回的是 classify_actions 的那一条，started_event 是这一次尝试的 tool_started 事件
     resolved = resolved_by_decision(events, decisions)
@@ -136,8 +307,9 @@ def auto_retry_actions(events: Sequence[Event], decisions: Iterable[Any], *,
             if info["status"] == ACTION_UNKNOWN and info["started_event"] is not None
             and not info["superseded"] and identity not in resolved and info["auto_retry_available"]
             and (department is None or info["started_event"].department == department)
-            and action_repeatable(info["tool"], (info["started_event"].payload or {}).get("args"),
-                                  registered_commands=registered_commands)]
+            and (info["action_id"] in not_happened
+                 or action_repeatable(info["tool"], (info["started_event"].payload or {}).get("args"),
+                                      registered_commands=registered_commands))]
 
 
 def resolution_options(tool: str, args: Mapping[str, Any] | None = None, *,

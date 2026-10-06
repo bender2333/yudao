@@ -108,6 +108,8 @@ function Summary(props: { data: ProjectOverviewResult }) {
           ["事项统计", `共 ${props.data.stats.total}：进行中 ${props.data.stats.in_progress}、排队中 ${props.data.stats.not_started}、已采纳 ${props.data.stats.adopted}、已放行 ${props.data.stats.released_unsettled}、已停止 ${props.data.stats.stopped}`],
         ]}
       />
+      {/* 起点只在项目还没有采纳成果时写明：project.overview 在有采纳成果时不返回起点说明 */}
+      {props.data.start_point ? <p className="note">{props.data.start_point}</p> : null}
     </Section>
   );
 }
