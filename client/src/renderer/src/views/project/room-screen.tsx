@@ -113,7 +113,6 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<RoomView | null>(null);
   const clockRef = useRef<Clock | null>(null);
-  const resyncRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // 最近一次的查询结果：数据为空时沿用，避免重新查询期间重建画面；换部门时清空
   const lastDataRef = useRef<{ department: string; data: DepartmentWorkspaceResult; model: RoomModel } | null>(null);
@@ -134,6 +133,12 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    // 工单 #300：换部门时丢掉上一个部门留下的状态。新部门的查询结果到达以前数据为空，
+    // 沿用的模型因此还是上一个部门的，交给新建的画面会被画面拒绝（部门不一致）。
+    // 思考气泡里是上一个部门那次调用尝试的文字，错误提示属于上一个部门的画面，一起清掉。
+    modelRef.current = null;
+    bubbleRef.current.clear();
+    setError(null);
     let cancelled = false;
     const clock = createRafClock(
       (cb: (t: number) => void) => requestAnimationFrame(cb),
@@ -161,6 +166,8 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
       cancelled = true;
       viewRef.current?.destroy();
       viewRef.current = null;
+      // 工单 #300：读取入口一起撤掉，画面换了部门以后不让测试读到上一个部门的旧画面
+      delete (window as unknown as { __roomViewForTest?: RoomTestHooks }).__roomViewForTest;
       clock.destroy();
       clockRef.current = null;
     };
@@ -189,6 +196,8 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
       // 流式输出：模型请求开始时先查询 attempt.live 得到已收到的文字，之后再按 offset 接上片段
       const payload = event.payload as unknown as Record<string, unknown>;
       const attemptId = typeof payload.attempt_id === "string" ? payload.attempt_id : null;
+      // 工单 #300：其他部门的流式输出不属于这个画面（判断方式与 roomEventOf 一致）
+      if (event.department !== null && event.department !== department) return;
       if (event.type === "model_stream_progress" && attemptId !== null) {
         // 先观察这次调用尝试：attempt.live 查询未及时返回时，片段仍能按 offset 接上
         bubble.observe(attemptId);
@@ -207,6 +216,8 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
     });
     // 事件流里的模型输出片段：offset 不小于已有字数的片段接上，逐字出现在思考气泡里
     const offDelta = props.app.subscribeDeltas((delta) => {
+      // 工单 #300：片段带着发出部门的名字，其他部门的文字不进这个画面
+      if (delta.department !== department) return;
       if (bubble.absorb({ attemptId: delta.attempt_id, channel: delta.channel, offset: delta.offset, text: delta.text })) {
         viewRef.current?.setStreamText(bubble.current);
       }
@@ -221,7 +232,6 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
     const off = props.app.subscribeResync(() => {
       if (modelRef.current !== null) viewRef.current?.setModel(modelRef.current);
     });
-    resyncRef.current = () => { if (modelRef.current !== null) viewRef.current?.setModel(modelRef.current); };
     return off;
   }, [props.app]);
 

@@ -226,3 +226,48 @@ test("询问与回答：两端的小人各说一句", async () => {
     }
   }
 });
+
+test("部门页签之间直接切换：每个页签的房间画面属于该部门，页面不出现加载失败", async () => {
+  test.setTimeout(600_000);
+  backend = await startBackend({ room: true });
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    const projectId = backend.roomProject;
+    expect(projectId).not.toBeNull();
+    // 从概览进入，然后依次直接点部门页签（工单 #300：中途不回概览也不刷新页面）
+    await page.evaluate((hash) => { window.location.hash = hash; }, `#/p/${projectId}/overview`);
+    await expect(page.locator(".tabbar .tab").first()).toBeVisible();
+    const tabs: { label: string; department: string }[] = [
+      { label: "产品", department: "product" },
+      { label: "工程", department: "engineering" },
+      { label: "质检", department: "quality" },
+      { label: "产品", department: "product" },
+    ];
+    for (const tab of tabs) {
+      const failed = page.locator(".pixel-canvas-error");
+      await page.locator(".tabbar .tab").filter({ hasText: tab.label }).click();
+      // 画面属于该部门：等读取入口报告这个部门（换部门时画面重建，入口随新画面挂上）。
+      // 页面出现「部门房间加载失败」立刻停下，失败信息里带上那行红字（工单 #300 的现象）
+      await waitUntil(async () => {
+        if (await failed.count() > 0) {
+          throw new Error(`${tab.label}页签出现加载失败：${await failed.innerText()}`);
+        }
+        return (await roomState(page))?.department === tab.department;
+      }, `${tab.label}部门的画面建立`, 60_000);
+      await expect(failed).toHaveCount(0);
+      const state = await roomState(page);
+      expect(state?.department).toBe(tab.department);
+      // 房间数据来自该部门的查询结果：角色属于该部门
+      const workspace = await query<{ room: { roles: { id: string }[] } }>(
+        "department.workspace", { project_id: projectId, department: tab.department });
+      const roleIds = workspace.room.roles.map((r) => r.id).sort();
+      expect(state?.characters.map((c) => c.id).filter((id) => roleIds.includes(id)).sort()).toEqual(roleIds);
+    }
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+    await backend.stop();
+  }
+});
