@@ -684,7 +684,7 @@
    "error": "run wall-clock time <elapsed>s exceeded limit of 3s",
    "artifact_hashes": [],
    "payload": {
-    "human_action": "运行时间已达上限。检查事件记录后，提高 run_time_limit_sec 并新建 run，或在当前阶段人工介入。",
+    "human_action": "运行时间已达上限。检查事件记录后，提高运行时间上限并作为新事项继续，或在当前阶段人工介入。",
     "message": "run wall-clock time <elapsed>s exceeded limit of 3s",
     "stop_reason": "time_limit"
    }
@@ -812,7 +812,7 @@
     "type": "run_created"
    }
   ],
-  "human_action": "运行时间已达上限。检查事件记录后，提高 run_time_limit_sec 并新建 run，或在当前阶段人工介入。",
+  "human_action": "运行时间已达上限。检查事件记录后，提高运行时间上限并作为新事项继续，或在当前阶段人工介入。",
   "input_version": 1,
   "inputs": [
    {
@@ -1114,7 +1114,7 @@
   "transitions": [
    "CREATED->PRODUCT_SPEC"
   ],
-  "waiting_reason": "failed:time_limit",
+  "waiting_reason": "未能完成：运行时间已达上限",
   "work_item_id": null,
   "workspace_digest": "<sha256#1>",
   "yielded_work": null

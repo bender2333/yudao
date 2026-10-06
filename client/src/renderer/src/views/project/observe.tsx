@@ -105,7 +105,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
 
   return (
     <div className="page">
-      <Section title="请求记录" note={`范围：${workItem === null ? "整个项目" : `事项 ${workItem}`}；数据来自 project.attempts`}>
+      <Section title="请求记录" note={`范围：${workItem === null ? "整个项目" : `事项 ${workItem}`}；当前显示这些部门与状态下的请求`}>
         <div className="filters">
           <label className="field">
             <span>部门</span>
@@ -266,7 +266,7 @@ export function ObserveDetailPage(props: { app: ClientApp; route: Route }) {
 
   return (
     <div className="page">
-      <Section title="请求详情" note={`请求标识 ${attemptId}，数据来自 run.attempt`}>
+      <Section title="请求详情" note={`请求标识 ${attemptId}`}>
         <p>
           <button
             type="button"

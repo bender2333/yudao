@@ -15,7 +15,7 @@ import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, useDepartmentDraft } from "./department-settings-form";
-import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
+import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, SETTING_SOURCE, departmentName, formatTime, label } from "./labels";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
@@ -137,7 +137,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
       <p className="note">
         {data.work_item_id === null
           ? "这个范围没有事项"
-          : `所选事项 ${data.work_item_id}，运行 ${show(data.run_id, "未创建")}`}
+          : `所选事项 ${data.work_item_id}`}
         {props.scopeNote}
       </p>
       <div className="composer">
@@ -149,11 +149,11 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
 
 const INSPECT_TABS = [
   { id: "actions", label: "动作与回执" },
-  { id: "context", label: "Context" },
+  { id: "context", label: "上下文" },
   { id: "department-setting", label: "部门设置" },
 ];
 
-// 检查区：页签切换动作与回执、Context 与部门设置
+// 检查区：页签切换动作与回执、上下文清单与压缩记录、部门设置
 function InspectArea(props: { app: ClientApp; data: DepartmentWorkspaceResult }) {
   const [tab, setTab] = useState("actions");
   const data = props.data;
@@ -288,7 +288,7 @@ function DepartmentSettingState(props: { data: DepartmentWorkspaceResult }) {
     <>
       <KeyValue
         items={[
-          ["项目当前配置", `第 ${setting.configured_version} 版（来源 ${show(setting.source, "未写明")}）`],
+          ["项目当前配置", `第 ${setting.configured_version} 版（来源 ${label(SETTING_SOURCE, setting.source)}）`],
           ["所选请求实际使用的版本", setting.used_version === null
             ? "这次运行还没有用到部门设置"
             : `第 ${setting.used_version} 版（事件 ${show(setting.used_event_id)}）`],
@@ -369,7 +369,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
           </div>
         ) : (
           <p className="note">
-            {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "能力清单没有登记 guidance.send，不能发送指导"}
+            {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "这台主机没有提供发送指导的操作"}
           </p>
         )}
       </Section>
@@ -416,7 +416,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
           onSaved={props.onClose}
         />
       ) : (
-        <p className="note">能力清单没有登记 department_settings.save</p>
+        <p className="note">这台主机没有提供保存部门设置的操作</p>
       )}
       <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
     </Modal>

@@ -23,6 +23,7 @@ import { MaterialsPage } from "./views/project/materials";
 import { ObserveDetailPage, ObservePage } from "./views/project/observe";
 import { OverviewPage } from "./views/project/overview";
 import { SettingsPage } from "./views/project/settings";
+import { departmentName } from "./views/project/labels";
 
 // 图鉴页只在开发时用到；用动态导入把它挡在正式包之外
 const LazyGallery = lazy(async () => {
@@ -453,6 +454,19 @@ function buildTabs(route: Route, capabilities: Capabilities): Tab[] {
   return candidates.filter((tab) => has(tab.query)).map((tab) => ({ label: tab.label, hash: tab.hash }));
 }
 
+// 页面路径（工单 #303：不用路由名）：项目内的页名与页签一致，
+// 请求详情与部门恢复页另有页名，其余没有登记页名的页面写「这个页面」
+const PAGE_LABELS: Record<string, string> = {
+  overview: "概览",
+  materials: "资料",
+  observe: "观测",
+  "observe-detail": "请求详情",
+  settings: "设置",
+  recovery: "恢复",
+  connect: "连接设置",
+  "client-settings": "设置",
+};
+
 function pathLabel(route: Route, projects: ProjectRow[]): string {
   if (route.name === "home" || route.name === "not-found") {
     return "首页";
@@ -461,7 +475,9 @@ function pathLabel(route: Route, projects: ProjectRow[]): string {
     // 模型管理页的路径只显示「模型管理」，不显示在项目名之后（设计说明第 9.1 节）
     return route.name === "sys-models" ? "模型管理" : route.systemPage ?? "系统";
   }
+  // 部门页的页名就是部门名，与页签一致（产品、工程、质检）
+  const page = route.name === "dept" ? departmentName(route.department) : PAGE_LABELS[route.name] ?? "这个页面";
   const project = projects.find((item) => item.project_id === route.projectId);
   const name = project?.name ?? route.projectId ?? "";
-  return `${name} / ${route.name}`;
+  return `${name} / ${page}`;
 }
