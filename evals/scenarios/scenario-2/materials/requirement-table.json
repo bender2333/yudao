@@ -1,0 +1,61 @@
+{
+  "scenario": "scenario-2",
+  "title": "ModelSettings passes arbitrary keyword arguments to the model provider",
+  "requirements": [
+    {
+      "id": "R1",
+      "name": "保存与序列化",
+      "description": "extra_args is a field of ModelSettings, defaults to None and is serialized by to_json_dict.",
+      "checks": [
+        "tests/model_settings/test_serialization.py::test_all_fields_serialization",
+        "tests/model_settings/test_serialization.py::test_extra_args_serialization"
+      ]
+    },
+    {
+      "id": "R2",
+      "name": "合并时覆盖的一方优先",
+      "description": "resolve merges the two dictionaries; a key present on both sides takes the override value.",
+      "checks": [
+        "tests/model_settings/test_serialization.py::test_extra_args_resolve"
+      ]
+    },
+    {
+      "id": "R3",
+      "name": "一方为空或两方都为空时的合并",
+      "description": "resolve keeps one side when the other is None and leaves extra_args None when both are None.",
+      "checks": [
+        "tests/model_settings/test_serialization.py::test_extra_args_resolve_with_none",
+        "tests/model_settings/test_serialization.py::test_extra_args_resolve_both_none"
+      ]
+    },
+    {
+      "id": "R4",
+      "name": "透传到 Chat Completions",
+      "description": "OpenAIChatCompletionsModel forwards extra_args to chat.completions.create together with the regular parameters.",
+      "checks": [
+        "tests/models/test_kwargs_functionality.py::test_openai_chatcompletions_kwargs_forwarded"
+      ]
+    },
+    {
+      "id": "R5",
+      "name": "透传到 LiteLLM",
+      "description": "LitellmModel merges extra_args into the keyword arguments of litellm.acompletion.",
+      "checks": [
+        "tests/models/test_kwargs_functionality.py::test_litellm_kwargs_forwarded"
+      ]
+    },
+    {
+      "id": "R6",
+      "name": "参数为空时的行为",
+      "description": "None and an empty dictionary add no keyword arguments and leave the regular parameters intact.",
+      "checks": [
+        "tests/models/test_kwargs_functionality.py::test_empty_kwargs_handling"
+      ]
+    }
+  ],
+  "check_count": 8,
+  "check_types": {
+    "f2p": 8
+  },
+  "pass_to_pass_count": 331
+}

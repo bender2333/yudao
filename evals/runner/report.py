@@ -88,9 +88,14 @@ def write_result(result, path):
     _write(path, json.dumps(result, ensure_ascii=False, indent=2) + "\n")
 
 
+def _scenario_title(scenario):
+    return {"scenario-2": "场景 2：在已有代码上加功能",
+            "scenario-3": "场景 3：从较长的 PRD 新建项目"}[scenario]
+
+
 def write_report(result, path, run_reports):
     lines = []
-    lines.append("# 场景 3 · OpenCode 一侧评测报告")
+    lines.append("# " + _scenario_title(result["scenario"]) + " · OpenCode 一侧评测报告")
     lines.append("")
     lines.append("## 一、基本信息")
     lines.append("")
@@ -180,6 +185,24 @@ def run_section(run, scores):
             lines.append("| " + item["id"] + " | " + item["requirement"] + " | "
                          + label + " | " + item["detail"].replace("|", "/") + " |")
         lines.append("")
+
+    regression = scores.get("regression")
+    if regression is not None:
+        lines.append("原有功能（" + str(regression["total"]) + " 条 P2P，失败条数不计入完成度）：")
+        lines.append("")
+        lines.append("| 项目 | 取值 |")
+        lines.append("| --- | --- |")
+        lines.append("| 通过 | " + str(regression["passed"]) + " |")
+        lines.append("| 失败 | " + str(regression["failed"]) + " |")
+        lines.append("")
+        if regression["failures"]:
+            lines.append("失败的原有功能测试：")
+            lines.append("")
+            lines.append("| 测试 | 详情 |")
+            lines.append("| --- | --- |")
+            for item in regression["failures"]:
+                lines.append("| " + item["id"] + " | " + item["detail"].replace("|", "/") + " |")
+            lines.append("")
     return lines
 
 

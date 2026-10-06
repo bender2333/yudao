@@ -1,0 +1,631 @@
+{
+  "scenario": "scenario-3",
+  "material_version": "scenario-3@2",
+  "scorer_version": "scorer-3@2",
+  "side": "yudao",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "yudao_commit": "84933d03",
+  "network": {
+    "allowed": false,
+    "note": "Yudao 的评测项目不登记取回来源与 MCP 服务器，运行中也没有这两类工具的调用。"
+  },
+  "host_environment": {
+    "system": "Windows 11 (AMD64)",
+    "python": "3.14.7",
+    "uv": "uv 0.11.14 (3fdfdc7d4 2026-05-12 x86_64-pc-windows-msvc)",
+    "node": "v24.14.0",
+    "opencode": "1.18.33",
+    "git": "git version 2.53.0.windows.1"
+  },
+  "run_count": 2,
+  "void_runs": [],
+  "model_service_failures": [],
+  "notes": [
+    "起点缺口：Yudao 的接口没有把文件放进新建项目空工作区的命令，本运行的工作区里没有题目提供的 `subway_data.json`；运行器请工程按接口约定自行写出这份数据文件。工作区从空目录建立（Yudao 默认的执行位置是控制主机上的本机进程）。",
+    "被测模型有 5 次调用返回成功但没有任何输出项（`status=success`、`output_item_count=0`、无错误）。主机把这类调用当成一次正常的模型回复，连续多次以后按 `no_tool_call` 暂停，停止原因与真实原因不符；详见 docs/architecture-issues.md 中本工单的登记。"
+  ],
+  "summary": {
+    "cycles": {
+      "count": 2,
+      "mean": 3.5,
+      "min": 3.0,
+      "max": 4.0
+    },
+    "rework": {
+      "count": 2,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "collaboration": {
+      "count": 2,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "model_requests": {
+      "count": 2,
+      "mean": 6.0,
+      "min": 5.0,
+      "max": 7.0
+    },
+    "input_tokens": {
+      "count": 2,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "output_tokens": {
+      "count": 2,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "total_tokens": {
+      "count": 2,
+      "mean": 114151.5,
+      "min": 77230.0,
+      "max": 151073.0
+    },
+    "cost": {
+      "count": 2,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "elapsed_seconds": {
+      "count": 2,
+      "mean": 284.85,
+      "min": 150.8,
+      "max": 418.9
+    }
+  },
+  "runs": [
+    {
+      "run_id": "yudao-run2-1",
+      "yudao_run_id": "run_42b541e497924440",
+      "served_model": "deepseek/deepseek-v4.1-flash",
+      "evidence_dir": "C:\\project\\yudao-worktrees\\issue-192\\.yudao\\evals\\scenario-3\\yudao\\yudao-run2-1",
+      "metrics": {
+        "end_status": "ended",
+        "end_reason": "no_tool_call",
+        "outcome": "paused",
+        "stop_reason": "no_tool_call",
+        "phase": "PAUSED",
+        "cycles": 3,
+        "rework": 0,
+        "collaboration": 0,
+        "model_requests": 7,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "total_tokens": 151073,
+        "cost": 0.0,
+        "model_latency_ms": 416269,
+        "elapsed_seconds": 418.9,
+        "timed_out": false,
+        "model_service_failure": false,
+        "empty_model_responses": 4,
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": true,
+            "detail": "运行在时间上限内结束"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": false,
+            "detail": "没有质检提交或没有封存的交付"
+          },
+          "no_write_before_plan_accepted": {
+            "passed": true,
+            "detail": "工程没有写入文件"
+          },
+          "replay_consistent": {
+            "passed": true,
+            "detail": "重放结果与记录一致"
+          },
+          "no_false_release": {
+            "passed": true,
+            "detail": "没有放行，不存在误放行；隐藏检查的失败条目：cmd_0_1、cmd_1_1、cmd_2_1、cmd_3_1a、cmd_3_1b、cmd_4_1、cmd_4_2、cmd_5_1a、cmd_7_1、cmd_8_1、file_11_1、file_11_2、unit_10_1、unit_10_2、unit_12_1、unit_2_2、unit_2_3、unit_2_4、unit_2_5、unit_5_2、unit_6_1、unit_6_2、unit_8_2、unit_9_1"
+          }
+        }
+      },
+      "delivery_files": 0,
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@2",
+        "scorer_version": "scorer-3@2",
+        "completion": 0.0,
+        "correctness": 0.0,
+        "not_done_count": 24,
+        "wrong_count": 0,
+        "not_done": [
+          "cmd_0_1",
+          "cmd_1_1",
+          "cmd_2_1",
+          "cmd_3_1a",
+          "cmd_3_1b",
+          "cmd_4_1",
+          "cmd_4_2",
+          "cmd_5_1a",
+          "cmd_7_1",
+          "cmd_8_1",
+          "file_11_1",
+          "file_11_2",
+          "unit_10_1",
+          "unit_10_2",
+          "unit_12_1",
+          "unit_2_2",
+          "unit_2_3",
+          "unit_2_4",
+          "unit_2_5",
+          "unit_5_2",
+          "unit_6_1",
+          "unit_6_2",
+          "unit_8_2",
+          "unit_9_1"
+        ],
+        "wrong": [],
+        "requirements": {
+          "R1": {
+            "passed": 0,
+            "total": 5,
+            "score": 0.0
+          },
+          "R2": {
+            "passed": 0,
+            "total": 3,
+            "score": 0.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 0,
+            "total": 3,
+            "score": 0.0
+          },
+          "R5": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R6": {
+            "passed": 0,
+            "total": 2,
+            "score": 0.0
+          },
+          "R7": {
+            "passed": 0,
+            "total": 9,
+            "score": 0.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "yudao-limit-1-1",
+      "yudao_run_id": "run_a59cdf315b8941c7",
+      "served_model": "deepseek/deepseek-v4.1-flash",
+      "evidence_dir": "C:\\project\\yudao-worktrees\\issue-192\\.yudao\\evals\\scenario-3\\yudao\\yudao-limit-1-1",
+      "metrics": {
+        "end_status": "ended",
+        "end_reason": "time_limit",
+        "outcome": "failed",
+        "stop_reason": "cancelled",
+        "phase": "FAILED",
+        "cycles": 4,
+        "rework": 0,
+        "collaboration": 0,
+        "model_requests": 5,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "total_tokens": 77230,
+        "cost": 0.0,
+        "model_latency_ms": 121186,
+        "elapsed_seconds": 150.8,
+        "timed_out": true,
+        "model_service_failure": false,
+        "empty_model_responses": 1,
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": false,
+            "detail": "运行到时间上限，被运行器结束"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": false,
+            "detail": "没有质检提交或没有封存的交付"
+          },
+          "no_write_before_plan_accepted": {
+            "passed": true,
+            "detail": "工程没有写入文件"
+          },
+          "replay_consistent": {
+            "passed": true,
+            "detail": "重放结果与记录一致"
+          },
+          "no_false_release": {
+            "passed": true,
+            "detail": "没有放行，不存在误放行；隐藏检查的失败条目：cmd_0_1、cmd_1_1、cmd_2_1、cmd_3_1a、cmd_3_1b、cmd_4_1、cmd_4_2、cmd_5_1a、cmd_7_1、cmd_8_1、file_11_1、file_11_2、unit_10_1、unit_10_2、unit_12_1、unit_2_2、unit_2_3、unit_2_4、unit_2_5、unit_5_2、unit_6_1、unit_6_2、unit_8_2、unit_9_1"
+          }
+        }
+      },
+      "delivery_files": 0,
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@2",
+        "scorer_version": "scorer-3@2",
+        "completion": 0.0,
+        "correctness": 0.0,
+        "not_done_count": 24,
+        "wrong_count": 0,
+        "not_done": [
+          "cmd_0_1",
+          "cmd_1_1",
+          "cmd_2_1",
+          "cmd_3_1a",
+          "cmd_3_1b",
+          "cmd_4_1",
+          "cmd_4_2",
+          "cmd_5_1a",
+          "cmd_7_1",
+          "cmd_8_1",
+          "file_11_1",
+          "file_11_2",
+          "unit_10_1",
+          "unit_10_2",
+          "unit_12_1",
+          "unit_2_2",
+          "unit_2_3",
+          "unit_2_4",
+          "unit_2_5",
+          "unit_5_2",
+          "unit_6_1",
+          "unit_6_2",
+          "unit_8_2",
+          "unit_9_1"
+        ],
+        "wrong": [],
+        "requirements": {
+          "R1": {
+            "passed": 0,
+            "total": 5,
+            "score": 0.0
+          },
+          "R2": {
+            "passed": 0,
+            "total": 3,
+            "score": 0.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 0,
+            "total": 3,
+            "score": 0.0
+          },
+          "R5": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R6": {
+            "passed": 0,
+            "total": 2,
+            "score": 0.0
+          },
+          "R7": {
+            "passed": 0,
+            "total": 9,
+            "score": 0.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "the delivery has no src directory"
+          }
+        ]
+      }
+    }
+  ]
+}

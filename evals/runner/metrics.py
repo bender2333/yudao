@@ -63,7 +63,7 @@ def _error_text(error):
 
 # 模型服务故障：凭据被拒、连接失败、限流与服务端错误（provider 侧的故障），
 # 这类运行单独记录并补跑，不计入结果。
-_FAILURE_MARKERS = (
+FAILURE_MARKERS = (
     "apierror",
     "providerautherror",
     "providererror",
@@ -91,7 +91,7 @@ _FAILURE_MARKERS = (
 def _is_model_service_failure(errors):
     for text in errors:
         lowered = text.lower()
-        if any(marker in lowered for marker in _FAILURE_MARKERS):
+        if any(marker in lowered for marker in FAILURE_MARKERS):
             return True
     return False
 
