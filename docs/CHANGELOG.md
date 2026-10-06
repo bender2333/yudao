@@ -472,3 +472,7 @@ claude-sonnet-5-5 / 2026-10-03 03:26 / docs/architecture-issues.md 为 #179 登�
 qwen3.8 / 2026-10-03 08:55 / docs/architecture-issues.md 追加一条 #233 的架构问题登记并写处理结论：等待完整循环与事项结算的墙钟时限分散在多个测试文件、其中几处小于负载下正常用时，集中为 harness/tests/wait_limits.py 的 WAIT_FOR_HOST_WORK_SEC / 按登记规则记录并写明处置
 qwen3.8 / 2026-10-03 09:45 / docs/architecture-issues.md 的 #233 处理行补全引用 WAIT_FOR_HOST_WORK_SEC 的十四个文件与各自原值，并写明不改的业务断言界限 / 交付前核对改动范围与文档口径一致
 Leela / 2026-10-03 14:20 / AGENTS.md「自主推进模式」新增「aipro 板子环境（Leela，无独立审查者）」小节：仅限主机名 orangepiaipro、由 Leela 执行、没有另一个独立 agent 实例可接手审查时适用，流程改为本地提交、交付后立刻自我审查（走 REVIEW: PASS 与 review-passed）、推送、建 PR、CI 通过或本地测试通过后直接合并并关闭工单，不等待人工确认 / 用户要求在此环境下由 Leela 一人身兼执行者与审查者、自主完成到合并关闭，与原有「执行者只本地提交、审查者独立核对后才推送建 PR」的分离流程并存，按环境区分适用范围
+
+9router/my-small / 2026-10-06 10:24 / 新增 docs/evaluation/scenario-3-opencode.json 与 docs/evaluation/scenario-3-opencode.md：场景 3（北京地铁票价）OpenCode 一侧三次真实运行的结果与中文报告 / 评测场景设计第 6 节要求结果与报告提交到 docs/evaluation/，原始证据留在 .yudao/evals/ 不进入 Git
+
+9router/my-small / 2026-10-06 10:24 / evals/README.md 增加 runner/ 说明、运行一次评测的用法与运行器保证的条件 / 工单 189 建立了运行器，使用方式需要写清楚

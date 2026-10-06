@@ -240,9 +240,10 @@ def _paths_in(call):
     text = json.dumps({"input": call["input"], "output": call["output"]},
                       ensure_ascii=False)
     found = []
-    for match in re.finditer(r"[A-Za-z]:[\\/][^\\\"']*", text):
+    # 盘符后必须有分隔符，否则会把单独出现的 C: 当成路径
+    for match in re.finditer(r"[A-Za-z]:[\\/][^\\\"'\r\n]*", text):
         candidate = match.group(0).rstrip("\\/,) ")
-        if os.path.isdir(candidate) or os.path.isfile(candidate):
+        if len(candidate) > 3 and os.path.exists(candidate):
             found.append(candidate)
     return found
 
@@ -262,10 +263,13 @@ def test_real_run_is_scored_by_the_scorer(runs_root, tmp_path):
     assert scores["material_version"] == "scenario-3@2"
     assert scores["scorer_version"] == "scorer-3@2"
     assert len(scores["checks"]) == 24
-    assert 0.0 <= scores["correctness"] <= scores["completion"] <= 1.0
+    # 完成度与正确性各自独立：完成度是需求条目得分的平均，
+    # 正确性是已尝试检查的通过比例，二者没有大小关系
+    assert 0.0 <= scores["completion"] <= 1.0
+    assert 0.0 <= scores["correctness"] <= 1.0
     # 隐藏检查与参考实现在评分目录里，不在交付副本里
-    assert os.path.isdir(os.path.join(evidence, "scored", "scoring", "checks"))
-    assert not os.path.exists(os.path.join(evidence, "scored", "scoring", "delivery", "checks"))
+    assert os.path.isdir(os.path.join(evidence, "scoring", "checks"))
+    assert not os.path.exists(os.path.join(evidence, "scoring", "delivery", "checks"))
 
 
 def _run_with_cap(runs_root, run_id):
