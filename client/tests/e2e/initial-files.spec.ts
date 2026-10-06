@@ -167,6 +167,7 @@ test.describe("起始文件夹（1440×900）", () => {
       const name = `起点项目 ${Date.now()}`;
       const form = await newProjectForm(page);
       await fillNewProjectForm(form, name, source);
+      expect(await overflowReport(page)).toEqual([]);
       await form.getByRole("button", { name: "新建项目" }).click();
       await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes(name),
         page, "侧栏出现新建的项目");
@@ -176,6 +177,7 @@ test.describe("起始文件夹（1440×900）", () => {
       await navigate(page, id, "overview");
       const summary = await section(page, "项目摘要");
       await expect(summary).toContainText(`起点：起始文件夹（${files.length} 个文件）`);
+      expect(await overflowReport(page)).toEqual([]);
 
       // 开始事项：概览的「新的要求」提交为新事项
       await page.getByLabel("新的要求").fill("在起始文件夹的基础上继续做");
