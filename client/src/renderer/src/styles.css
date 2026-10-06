@@ -228,6 +228,21 @@ button.primary:disabled {
   color: var(--danger);
 }
 
+/* 命令被拒绝时的说明：原因名一行，服务端列出的相对路径各占一行（工单 #137 验收第 2 条） */
+.rejection { margin: 8px 0; }
+.rejection p { margin: 0; }
+.rejection-paths {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  color: var(--danger);
+  font-size: 12px;
+  /* 相对路径可能很长，窄屏上按字符换行 */
+  overflow-wrap: anywhere;
+}
+
+/* 部门房间里的动作：部门正在做的事（工单 #137 的「阅读已有项目」） */
+.room-action { margin: 0; font-size: 13px; }
+
 fieldset.field {
   display: flex;
   flex-direction: column;

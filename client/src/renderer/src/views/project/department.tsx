@@ -18,6 +18,7 @@ import { DepartmentSettingsFields, DepartmentSettingsSave, useDepartmentDraft } 
 import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
+import { ReadExisting } from "./read-existing";
 
 export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
@@ -57,6 +58,11 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
               ? "（顶栏选中）"
               : workItem !== null ? "（未选中事项，取当前事项）" : "（项目还没有事项）"}
             onOpenSettings={() => setSettingsOpen(true)}
+          />
+          <ReadExisting
+            app={props.app}
+            runId={data.run_id}
+            item={items.find((item) => item.work_item_id === workItem) ?? null}
           />
           <InspectArea app={props.app} data={data} />
           <MessagesAndGuidance app={props.app} data={data} command={command} />
