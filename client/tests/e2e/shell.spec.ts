@@ -192,11 +192,12 @@ test("从想法新建：提交成功、项目出现在列表以后表单关闭�
     // 事件到达、项目出现在列表里：表单随之关闭
     await expect(page.locator(".project-entry").filter({ hasText: name })).toBeVisible();
     await expect(form).toHaveCount(0);
-    // 重新打开表单：四个字段都是空的（字段随表单一起清空）
+    // 重新打开表单：名称、长期目标与起始文件夹都是空的（字段随表单一起清空）
     await page.locator(".sidebar .nav-item", { hasText: "从想法新建" }).click();
     const reopened = page.locator("form.card").filter({ has: page.getByRole("heading", { name: "从想法新建项目" }) });
     await expect(reopened.getByLabel("项目名称")).toHaveValue("");
     await expect(reopened.getByLabel("长期目标")).toHaveValue("");
+    await expect(reopened.getByLabel("起始文件夹")).toHaveValue("");
     expect(errors).toEqual([]);
   } finally {
     await client.close();
