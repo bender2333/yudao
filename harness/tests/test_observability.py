@@ -514,7 +514,7 @@ def test_department_prompt_reports_the_version_recorded_by_the_model_request(tmp
         project_id=project_id, department="product", work_item=work_item_id))
     recorded = next(item["prompt_version"] for item in system.project(run_id).model_requests
                     if item.get("department") == "product")
-    assert workspace.data.prompt.used_version == recorded
+    assert workspace.data.department_setting.used_version == recorded
 
 def test_generic_adapter_failure_closes_raw_capture_and_keeps_stream_evidence(tmp_path: Path):
     class BrokenAdapter:
