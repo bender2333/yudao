@@ -6440,7 +6440,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 1
+            "example": 2
           },
           "contract_digest": {
             "type": "string",

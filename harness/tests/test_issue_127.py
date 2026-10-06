@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import DEFAULT_REGISTRY, Application
+from harness.app.contracts import API_VERSION
 from harness.app.decision_queries import DecisionsList
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import ProjectLoop, ProjectsList
@@ -202,7 +203,7 @@ def test_capabilities_mark_replayable_queries_and_expose_the_interface_version(d
         parameters = document["paths"][f"/api/queries/{name}"]["get"]["parameters"]
         assert any(item["name"] == "at" for item in parameters), name
     deployment = capabilities["deployment"]
-    assert deployment["api_version"] == 1
+    assert deployment["api_version"] == API_VERSION
     assert deployment["access"] == "local"
     assert deployment["contract_digest"]
     assert "home.away_report" in {item["name"] for item in capabilities["queries"]}

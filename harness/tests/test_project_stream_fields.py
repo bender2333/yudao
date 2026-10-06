@@ -1,12 +1,14 @@
-# 项目流字段清单（ADR-0019，工单 #126）：项目流事件种类与字段的登记由清单与合同类型共同核对。
-# 删除事件种类、删除字段或改变字段类型时测试失败；增加种类或字段时通过，但必须写明旧事件中的缺省含义。
-# 写入路径（--write-project-stream-fields）只允许添加新的种类与字段，删除与改类型一律拒绝，清单缺失时提示从 git 恢复。
+# 项目流字段清单（ADR-0019、#241，工单 #126）：项目流事件种类与字段的登记由清单与合同类型共同核对。
+# 删除事件种类、删除字段、改变字段类型或删除取值固定字段（const/enum）的已登记取值时测试失败；
+# 增加种类、字段或扩大取值集合时通过，新种类或新字段必须写明旧事件中的缺省含义（取值扩大不需要）。
+# 写入路径（--write-project-stream-fields）只允许添加新的种类、字段或扩大取值集合，删除与改类型
+# 一律拒绝（删除取值时写明被删除的取值），清单缺失时提示从 git 恢复。
 
 import pytest
 
 from harness.tests import project_stream_fields
 from harness.tests.project_stream_fields import (
-    MANIFEST, ManifestWriteRejected, apply_rewrite, live_fields, load_manifest)
+    MANIFEST, ManifestWriteRejected, apply_rewrite, live_fields, load_manifest, same_type)
 
 def _manifest_documents():
     document = load_manifest()
@@ -17,7 +19,8 @@ def test_the_manifest_lists_every_project_stream_kind():
     assert set(fields) == set(live_fields())
 
 def test_every_field_of_a_listed_kind_keeps_its_declared_type():
-    # 清单中登记的字段在合同类型中以同样的类型存在：删除字段或改变类型时失败
+    # 清单中登记的字段在合同类型中以同样的类型存在：删除字段、改变类型或删除已登记取值时失败；
+    # 取值固定的字段取值集合扩大时仍算同一类型（#241）
     fields, _, _ = _manifest_documents()
     live = live_fields()
     removed, retyped = {}, {}
@@ -26,7 +29,7 @@ def test_every_field_of_a_listed_kind_keeps_its_declared_type():
         for name, declared in manifest_fields.items():
             if name not in live_kind:
                 removed.setdefault(kind, []).append(name)
-            elif live_kind[name] != declared:
+            elif not same_type(declared, live_kind[name]):
                 retyped.setdefault(kind, []).append(f"{name}: {declared} -> {live_kind[name]}")
     assert not removed, f"项目流字段清单中的字段已从合同类型中删除：{removed}"
     assert not retyped, f"项目流字段的类型已改变：{retyped}"
@@ -153,3 +156,40 @@ def test_writing_the_committed_manifest_is_a_no_op(request):
     before = MANIFEST.read_text(encoding="utf-8")
     apply_rewrite()
     assert MANIFEST.read_text(encoding="utf-8") == before
+
+def test_writing_accepts_an_expanded_value_set_and_records_it(scratch_manifest, monkeypatch):
+    # #241：取值固定字段（enum）的取值集合扩大时写入成功，清单记录扩大后的取值集合
+    registered = load_manifest()["fields"]
+    live = _doctored_live(registered, retypes=(
+        ("department_prompt_configured", "department",
+         "enum string[engineering, product, quality, research]"),))
+    monkeypatch.setattr(project_stream_fields, "live_fields", lambda: live)
+    apply_rewrite()
+    written = load_manifest()
+    assert written["fields"]["department_prompt_configured"]["department"] == (
+        "enum string[engineering, product, quality, research]")
+
+def test_writing_rejects_a_removed_value_and_names_it(scratch_manifest, monkeypatch):
+    # #241：取值固定字段删除一个已登记的取值时写入被拒绝，拒绝原因写明被删除的取值；改变字段类型仍被拒绝
+    registered = load_manifest()["fields"]
+    before = scratch_manifest.read_text(encoding="utf-8")
+    live = _doctored_live(registered, retypes=(
+        ("department_prompt_configured", "department", "enum string[engineering, product]"),))
+    monkeypatch.setattr(project_stream_fields, "live_fields", lambda: live)
+    with pytest.raises(ManifestWriteRejected) as caught:
+        apply_rewrite()
+    assert "改变字段类型" in str(caught.value)
+    assert "删除取值 quality" in str(caught.value)
+    assert scratch_manifest.read_text(encoding="utf-8") == before
+
+def test_writing_rejects_changing_the_base_type_of_a_fixed_value_field(scratch_manifest, monkeypatch):
+    # 取值固定字段改变基础类型（不只是取值集合变化）时仍按改变字段类型拒绝
+    registered = load_manifest()["fields"]
+    before = scratch_manifest.read_text(encoding="utf-8")
+    live = _doctored_live(registered, retypes=(
+        ("department_prompt_configured", "department", "enum integer[1, 2, 3]"),))
+    monkeypatch.setattr(project_stream_fields, "live_fields", lambda: live)
+    with pytest.raises(ManifestWriteRejected) as caught:
+        apply_rewrite()
+    assert "改变字段类型" in str(caught.value)
+    assert scratch_manifest.read_text(encoding="utf-8") == before
