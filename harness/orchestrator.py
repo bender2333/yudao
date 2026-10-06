@@ -733,7 +733,9 @@ class Orchestrator:
                     action_id=action_id, tool=info["tool"],
                     action_kind="" if tool_def is None or tool_def.action is None else tool_def.action,
                     department=projection.active_department or "",
-                    facts=[info["started_event"].event_id])
+                    facts=[info["started_event"].event_id],
+                    args=info["started_event"].payload.get("args"),
+                    registered_commands=projection.registered_commands)
                 transaction.append(NewEvent(
                     EventType.DECISION_REQUESTED, actor="system", department=projection.active_department,
                     state_before=projection.phase, state_after=projection.phase,

@@ -794,7 +794,8 @@ class ProjectService:
 
     def configure_command(self, project_id: str, name: str, argv: list[str], *,
                           args: list[str] | None = None, timeout_sec: int | None = None,
-                          output_limit: int | None = None, base_version: int = 0,
+                          output_limit: int | None = None, repeatable: bool = False,
+                          base_version: int = 0,
                           command: Command | None = None) -> dict[str, Any]:
         if type(base_version) is not int or base_version < 0:
             raise ValueError("base_version must be a non-negative integer")
@@ -806,6 +807,7 @@ class ProjectService:
                 raise CommandConfigConflict({} if current is None else _command_view(current))
             normalized = validate_registered_command(name, {
                 "argv": argv, "args": [] if args is None else args,
+                "repeatable": repeatable,
                 **({} if timeout_sec is None else {"timeout_sec": timeout_sec}),
                 **({} if output_limit is None else {"output_limit": output_limit}),
             })
@@ -935,6 +937,7 @@ def _command_view(config: RegisteredCommand) -> dict[str, Any]:
         "timeout_sec": config.timeout_sec,
         "output_limit": config.output_limit,
         "version": config.version,
+        "repeatable": config.repeatable,
         "updated_at": config.updated_at,
     }
 

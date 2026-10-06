@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import Field, field_validator
 
 from ..git_audit import git_version_detail
-from ..definitions import DEFINITIONS
 from ..event_store import run_stream
 from ..models import (
     ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
@@ -28,8 +27,8 @@ from ..projects import ProjectNotFoundError, project_projection
 from ..replay_check import ReplayIntegrityError, verify_replay
 from ..recovery import (
     ACTION_UNKNOWN, OBSERVATION_INTERRUPTED, OBSERVATION_PENDING_VERIFICATION, OBSERVATION_RUNNING,
-    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity, observation_state, open_decisions,
-    open_resume_decisions, unresolved_unknown_actions,
+    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity, action_repeatable, observation_state,
+    open_decisions, open_resume_decisions, unresolved_unknown_actions,
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
@@ -1450,6 +1449,8 @@ class CommandSetting(Contract):
     args: list[str]
     timeout_sec: int
     output_limit: int
+    # 登记时声明的「可以重新执行」（工单 #242）
+    repeatable: bool
 
 
 class SourceDirectorySetting(Contract):
@@ -1496,7 +1497,7 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
             commands={
                 name: CommandSetting(name=value.name, version=value.version, argv=list(value.argv),
                                      args=list(value.args), timeout_sec=value.timeout_sec,
-                                     output_limit=value.output_limit)
+                                     output_limit=value.output_limit, repeatable=value.repeatable)
                 for name, value in state.commands.items()
             },
             source_directories={
@@ -1928,7 +1929,8 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     terminal = run.phase in TERMINAL_PHASES
     state = observation_state(events, decisions.values(), terminal=terminal)
     # 已终止的 run 不再继续：未完成动作与未回答的核实请求不由恢复处理，只显示终止原因
-    unfinished = [] if terminal else _unfinished_actions(events, decisions.values())
+    unfinished = [] if terminal else _unfinished_actions(
+        events, decisions.values(), run.registered_commands)
     verifications = _verification_records(events, decisions.values())
     resume_requests = [] if terminal else open_resume_decisions(decisions.values())
     unknown_requests = [] if terminal else open_decisions(decisions.values(), kind="unknown_action")
@@ -2002,7 +2004,8 @@ def _unusable_target(resume_requests: list[Any]) -> UnusableTarget | None:
                               problem=str(decision.request.get("description") or decision.request.get("message") or ""))
     return None
 
-def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAction]:
+def _unfinished_actions(events: list[Any], decisions: Any,
+                        registered_commands: Any) -> list[UnfinishedAction]:
     # 未完成动作：结果未知的动作（tool_started 没有结果或核实记录）。未发送的动作由保存的模型响应
     # 给出，属于步骤驱动的补执行范围，读取侧只列出已经发出的动作
     action_ids = {identity[2] for identity in unresolved_unknown_actions(events, decisions)}
@@ -2019,15 +2022,14 @@ def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAct
             action_id=action_id, tool=tool, department=event.department, status=ACTION_UNKNOWN,
             activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), purpose=payload.get("purpose"),
-            repeatable=_action_repeatable(tool), before_snapshot_ref=payload.get("before_snapshot_ref"),
+            repeatable=action_repeatable(tool, payload.get("args"),
+                                         registered_commands=registered_commands),
+            before_snapshot_ref=payload.get("before_snapshot_ref"),
             created_at=event.created_at, started_event_id=event.event_id,
         ))
     unfinished.sort(key=lambda item: item.created_at)
     return unfinished
 
-def _action_repeatable(tool_name: str) -> bool:
-    tool = DEFINITIONS.tools.get(tool_name)
-    return bool(tool is not None and tool.repeatable)
 
 def _verification_records(events: list[Any], decisions: Any) -> list[VerificationRecord]:
     # 核实记录：action_verified 事件（用户选择按当前实际状态继续时追加）与已回答的核实请求一起列出。
