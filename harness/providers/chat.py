@@ -32,6 +32,7 @@ from .responses import (
     _connection_error,
     _created_stream,
     _diagnostic_code,
+    _empty_output_error,
     _error_code,
     _http_status_reason,
     _is_context_overflow,
@@ -169,6 +170,8 @@ class _ChatInvoker:
         response_id: str | None = None
         actual_model: str | None = None
         terminal = False
+        # 结束原因（工单 #305）：流正常结束而没有输出项时按它诊断，这个值原先被丢掉
+        finish_reason: str | None = None
         stream = await _created_stream(client.chat.completions.create(
             **(call_params | ({"extra_headers": headers} if headers else {})),
         ), trace)
@@ -217,6 +220,7 @@ class _ChatInvoker:
                         entry["arguments"] += str(function["arguments"])
                 if choice.get("finish_reason"):
                     terminal = True
+                    finish_reason = str(choice["finish_reason"])
         if not terminal:
             # 缺少结束块或用量块即视为不完整流，保留为可重试失败
             raise ProviderError(
@@ -238,6 +242,12 @@ class _ChatInvoker:
             "payload": {"response_id": response_id, "usage": usage_raw},
             "usage": usage,
         })
+        if not output:
+            # 流正常结束却没有任何输出项（只有推理内容同样算）：按失败处理并交给内核重试（工单 #305）
+            raise _empty_output_error(finish_reason=finish_reason, usage=usage,
+                                      max_output_tokens=invocation.provider_input.max_output_tokens,
+                                      reasoning=reasoning is not None)
+
         return InvokeResult(
             output=output, text=text, usage=usage, finish_reason="completed",
             provider=invocation.frozen_target.provider_id, model=actual_model or invocation.frozen_target.model,
