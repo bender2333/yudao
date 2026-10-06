@@ -319,10 +319,10 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
     workspace = application.query("department.workspace", DepartmentWorkspace(
         project_id=project_id, department="product", work_item=work_item_id,
     ))
-    assert workspace.data.prompt.configured_version == 1
-    assert workspace.data.prompt.prompt_configured is True
+    assert workspace.data.department_setting.configured_version == 1
+    assert workspace.data.department_setting.department_setting_configured is True
     # 实际采用的版本来自该部门最近一次模型请求事件（run 内没有 Prompt 副本）
-    assert workspace.data.prompt.used_version == 1
+    assert workspace.data.department_setting.used_version == 1
     assert workspace.data.setting.model_id is None and workspace.data.setting.requested_tier is None
 
     actions = application.query("run.actions", RunActions(run_id=run_id))

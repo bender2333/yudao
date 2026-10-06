@@ -139,8 +139,8 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
                 {departmentName(key)}（{key}）
               </h3>
               <p className="note">
-                第 {setting.version} 版；来源 {setting.source}
-                {setting.prompt_configured ? "（本项目已配置部门 Prompt）" : "（使用内置默认 Prompt）"}
+                {setting.version} 版；来源 {setting.source}
+                {setting.department_setting_configured ? "（本项目已写入部门设置）" : "（跟随部门默认）"}
               </p>
             </div>
             <p className="note">
@@ -149,7 +149,7 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
                 : `${followText}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`}
             </p>
             <ReminderList items={reminders} testId={`settings-reminder-${key}`} />
-            <pre className="raw prompt-text">{setting.text || "（没有部门 Prompt 文字）"}</pre>
+            <pre className="raw department-setting-text">{setting.text || "（没有部门 Prompt 文字）"}</pre>
             {editing === key ? (
               <DepartmentSettingsForm app={props.app} data={data} department={key} onClose={() => setEditing(null)} />
             ) : (
@@ -173,7 +173,7 @@ function DepartmentSettingsForm(props: {
   const { data } = props;
   const setting = data.departments[props.department];
   const [draft, setDraft] = useDepartmentDraft(setting ?? null);
-  const command = useCommand(props.app, pageKey([setting?.version, draft.model, draft.tier, draft.prompt]));
+  const command = useCommand(props.app, pageKey([setting?.version, draft.model, draft.tier, draft.text]));
   const catalog = useSnapshot<Catalog>(props.app, `page.settings.catalog.${props.department}`, "catalog", {});
   const bindings = catalog.data?.bindings ?? {};
   const models = catalog.data?.models ?? [];
@@ -204,7 +204,7 @@ function DepartmentSettingsForm(props: {
         reminders={[...reminders, ...savedReminders]}
       />
       <div className="row-actions">
-        <button type="button" onClick={() => setDraft({ ...draft, prompt: setting.text })}>恢复默认</button>
+        <button type="button" onClick={() => setDraft({ ...draft, text: setting.text })}>恢复默认</button>
       </div>
       <DepartmentSettingsSave
         projectId={data.project_id}
