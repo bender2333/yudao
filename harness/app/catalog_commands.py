@@ -429,6 +429,8 @@ def _test_payload(base_revision: int, kind: str, provider_id: str, model_id: str
         "base_revision": base_revision,
         "kind": kind, "provider_id": provider_id, "model_id": model_id, "ok": bool(result.get("ok")),
         "protocol": result.get("protocol"), "error": error,
+        # 连接测试读的是模型列表地址：把实际读取的地址写进事件，界面才能写明测的是什么
+        "source_url": result.get("source_url"),
         "actual_model": result.get("model") if kind == "model" else None,
         "elapsed_ms": int(round((time.monotonic() - started) * 1000)),
         "admitted": (bool(result["admitted"]) if "admitted" in result and result["admitted"] is not None else None),

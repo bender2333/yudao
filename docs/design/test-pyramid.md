@@ -69,6 +69,7 @@
 - 测试文件之间不再互相导入。现在被其他文件导入的辅助函数移到已有的辅助文件中（`helpers.py`、`api_helpers.py`、`protocol_helpers.py`、`event_sequence.py` 等，按用途选择）：`test_web.py` 的 `running_server`、`request`、`get_json`、`wait_until`；`test_responses.py` 的 `_server`、`_stream`、`_submit_stream`、`_event`、`_response`、`_send`；`test_event_sequence.py` 的 `HTTP_REPLIES`、`HTTP_SCRIPT`、`product_spec_reply`、`BROKEN_STREAMS`、`PARTIAL_OUTPUT`；`test_compaction_engine._runner`。`test_provider_config_web.py` 自己定义的同名 `running_server` 与辅助文件中的合并为一个。一项单元层测试用标准库 `ast` 读取每个测试文件的导入语句，发现导入其他测试文件时失败。
 - 混合了不同层级的文件不拆分，按第 2 节登记为其中最高的一层。
 - 操作控制主机真实桌面的测试（3.2D 的桌面会话与屏幕工具，[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5 节）登记为 `desktop`。这些测试移动真实的鼠标、按下真实的按键、最小化用户的窗口，在用户使用电脑时运行会打断用户。`desktop` 标记同样在 `markers` 中声明；它不属于三层中的任何一层，`-m "unit or module"` 与 `-m integration` 都不选中它，第 4 节的默认运行全部排除它。客户端的 Playwright 测试中操作真实桌面的用例加 `@desktop` 标签，默认运行用 `--grep-invert @desktop` 排除。登记表建立之前，`desktop` 标记直接写在测试文件中，`pyproject.toml` 的默认参数排除它，明确写 `-m desktop` 时才运行（#150 先建立这个标记）。
+- 内核的不变式测试放在 `harness/tests/kernel/`，每个文件按第 2 节的规则登记层；它们同时列在内核清单里，每条基础规则对应的测试名称由发布检查核对存在并运行（[可信内核设计说明](trusted-kernel.md)第 3 节）。
 
 ## 4. 各角色运行哪一层
 

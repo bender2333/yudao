@@ -23,18 +23,26 @@ if TYPE_CHECKING:
 
 class ProjectCreate(CommandRequest):
     # 新建项目：新建类命令，没有依据的对象
+    # initial_directory 是可选的起点文件夹（控制主机上的文件夹路径，工单 #321）：
+    # 它的快照成为项目的起点文件，不建档，项目来源仍是 idea；不可读或含宿主私有路径时以 source_invalid 拒绝
     base_version: None = None
     name: Text
     goal: Text
+    initial_directory: Text | None = None
 
 class ProjectRefs(Contract):
     project_id: str
 
 async def _create_project(application: Application, command: Command, request: ProjectCreate) -> None:
-    application.system.projects.register(request.name, request.goal, command=command)
+    try:
+        application.system.projects.register(request.name, request.goal,
+                                            initial_directory=request.initial_directory, command=command)
+    except TreeError as invalid:
+        raise Rejection("source_invalid", str(invalid)) from invalid
 
 def _project_refs(events: list[Event | ProjectEvent]) -> ProjectRefs:
     return ProjectRefs(project_id=events[0].project_id)
+
 
 class ProjectOnboard(CommandRequest):
     # 接入已有项目：新建项目、登记源目录、采集代码快照、开始建档事项（3.8 第 3.1 节）
@@ -109,7 +117,7 @@ async def _restart_onboarding(application: Application, command: Command, reques
 
 PROJECT_CREATE = CommandDefinition(
     name="project.create", request=ProjectCreate, refs=ProjectRefs, handle=_create_project,
-    derive_refs=_project_refs,
+    derive_refs=_project_refs, reasons=("source_invalid",),
 )
 PROJECT_ONBOARD = CommandDefinition(
     name="project.onboard", request=ProjectOnboard, refs=OnboardRefs, handle=_onboard_project,

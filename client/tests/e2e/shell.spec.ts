@@ -3,6 +3,7 @@
 
 import { expect, test } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
+import { CLIENT_API_VERSION } from "../../src/renderer/src/api/interface-version";
 
 let backend: Backend;
 
@@ -192,11 +193,12 @@ test("从想法新建：提交成功、项目出现在列表以后表单关闭�
     // 事件到达、项目出现在列表里：表单随之关闭
     await expect(page.locator(".project-entry").filter({ hasText: name })).toBeVisible();
     await expect(form).toHaveCount(0);
-    // 重新打开表单：四个字段都是空的（字段随表单一起清空）
+    // 重新打开表单：名称、长期目标与起始文件夹都是空的（字段随表单一起清空）
     await page.locator(".sidebar .nav-item", { hasText: "从想法新建" }).click();
     const reopened = page.locator("form.card").filter({ has: page.getByRole("heading", { name: "从想法新建项目" }) });
     await expect(reopened.getByLabel("项目名称")).toHaveValue("");
     await expect(reopened.getByLabel("长期目标")).toHaveValue("");
+    await expect(reopened.getByLabel("起始文件夹")).toHaveValue("");
     expect(errors).toEqual([]);
   } finally {
     await client.close();
@@ -221,14 +223,14 @@ test("接口版本相同而能力清单多出查询时，客户端正常使用�
 });
 
 test("接口版本不同时客户端只显示更新页（写明两边的版本），不打开页面、不执行命令", async () => {
-  const other = await startBackend({ apiVersion: 2 });
+  const other = await startBackend({ apiVersion: CLIENT_API_VERSION + 1 });
   try {
     const client = await startClient(other, { width: 1440, height: 900 });
     const errors = watchErrors(client);
     try {
       await expect(client.page.getByRole("heading", { name: "请更新客户端" })).toBeVisible();
-      await expect(client.page.locator("text=客户端接口版本：1")).toBeVisible();
-      await expect(client.page.locator("text=Yudao 服务接口版本：2")).toBeVisible();
+      await expect(client.page.locator(`text=客户端接口版本：${CLIENT_API_VERSION}`)).toBeVisible();
+      await expect(client.page.locator(`text=Yudao 服务接口版本：${CLIENT_API_VERSION + 1}`)).toBeVisible();
       // 不打开任何页面：外壳与左侧栏都不出现
       await expect(client.page.locator(".sidebar")).toHaveCount(0);
       expect(errors).toEqual([]);

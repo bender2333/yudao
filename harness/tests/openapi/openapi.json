@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Yudao",
-    "version": "0.1.1"
+    "version": "0.0.0"
   },
   "paths": {
     "/api/commands/project.create": {
@@ -34,7 +34,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：command_id_reused",
+            "description": "命令被拒绝，可能的原因：source_invalid, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -3841,7 +3841,8 @@
               "running",
               "completed",
               "failed",
-              "unknown"
+              "unknown",
+              "superseded"
             ],
             "title": "Status"
           },
@@ -3926,6 +3927,28 @@
               }
             ],
             "title": "After Snapshot Ref"
+          },
+          "auto_retry_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Retry Of"
+          },
+          "verification_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Reason"
           }
         },
         "additionalProperties": false,
@@ -4967,6 +4990,19 @@
             },
             "type": "object",
             "title": "Department Reminders"
+          },
+          "model_reminders": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Model Reminders"
           }
         },
         "additionalProperties": false,
@@ -4982,7 +5018,8 @@
           "models",
           "admissions",
           "bindings",
-          "department_reminders"
+          "department_reminders",
+          "model_reminders"
         ],
         "title": "Catalog"
       },
@@ -7147,6 +7184,47 @@
         ],
         "title": "EventDetailResult"
       },
+      "FileActionComparison": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args"
+          },
+          "before_snapshot_event": {
+            "type": "string",
+            "title": "Before Snapshot Event"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "not_happened",
+              "unclear"
+            ],
+            "title": "Verdict"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tool",
+          "args",
+          "before_snapshot_event",
+          "verdict",
+          "detail"
+        ],
+        "title": "FileActionComparison"
+      },
       "FlowRecord": {
         "properties": {
           "flow_id": {
@@ -8389,6 +8467,18 @@
             "type": "string",
             "minLength": 1,
             "title": "Goal"
+          },
+          "initial_directory": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Directory"
           }
         },
         "additionalProperties": false,
@@ -8585,6 +8675,17 @@
             },
             "type": "array",
             "title": "Work Items"
+          },
+          "start_point": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Point"
           }
         },
         "additionalProperties": false,
@@ -10749,6 +10850,21 @@
           "repeatable": {
             "type": "boolean",
             "title": "Repeatable"
+          },
+          "repeat_attempted": {
+            "type": "boolean",
+            "title": "Repeat Attempted",
+            "default": false
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileActionComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -12213,9 +12329,34 @@
             "title": "Error"
           },
           "resolution": {
-            "const": "continue",
+            "enum": [
+              "auto_reexecute",
+              "auto_verify",
+              "continue"
+            ],
             "title": "Resolution",
             "type": "string"
+          },
+          "auto_retry_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Retry Of"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileActionComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "note": {
             "anyOf": [
@@ -13835,6 +13976,17 @@
             ],
             "title": "Error"
           },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
           "actual_model": {
             "anyOf": [
               {
@@ -13870,6 +14022,7 @@
           "ok",
           "protocol",
           "error",
+          "source_url",
           "actual_model",
           "elapsed_ms",
           "admitted"
@@ -26017,6 +26170,16 @@
             ],
             "title": "Source",
             "type": "string"
+          },
+          "initial_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -31127,6 +31290,29 @@
                 "type": "null"
               }
             ]
+          },
+          "auto_retry_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Retry Of"
+          },
+          "verification_reason": {
+            "anyOf": [
+              {
+                "const": "not_happened",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Reason"
           }
         },
         "required": [

@@ -926,6 +926,9 @@ class ProjectProjection:
     created_at: str = ""
     pinned: bool = False
     archived: bool = False
+    # 起始文件夹快照记录（工单 #321）：新建项目时给出的起点文件夹的只读采集结果，所属范围是项目。
+    # 旧事件没有这个字段时缺省为没有起始文件夹（ADR-0019）
+    initial_snapshot: dict[str, Any] | None = None
     work_items: list[WorkItem] = field(default_factory=list)
     current_adoption: Adoption | None = None
     adoptions: list[Adoption] = field(default_factory=list)

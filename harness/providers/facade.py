@@ -16,7 +16,7 @@ from uuid import uuid4
 
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial
-from .discovery import probe_connection as _probe_connection
+from .discovery import effective_models_url, probe_connection as _probe_connection
 from .discovery import refresh_candidates as _refresh_candidates
 from .errors import CatalogValidationError, ProviderError, ValidationIssue
 from .invoke import (
@@ -722,6 +722,20 @@ class ProviderFacade:
             model = self._store.models.get(model_id)
             return [] if model is None else _suggested_reminders(department, model)
 
+    def model_reminders_by_department(self, model_ids: Sequence[str]) -> dict[str, dict[str, list[str]]]:
+        # 目录中各条模型访问定义在各部门的建议能力提醒（模型 ID → 部门 → 提醒）。
+        # 一次读锁算完：部门默认的下拉选中一条定义时界面立即显示提醒（设计说明第 5.6 节）
+        with self._lock:
+            notes: dict[str, dict[str, list[str]]] = {}
+            for model_id in model_ids:
+                model = self._store.models.get(str(model_id))
+                if model is None:
+                    continue
+                per_department = {department: _suggested_reminders(department, model)
+                                  for department in REQUIRED_DEPARTMENTS}
+                notes[str(model_id)] = {key: value for key, value in per_department.items() if value}
+        return notes
+
     def department_setting_reminders(self, department: str,
                                      project: ModelSelection | Mapping[str, Any] | None,
                                      ) -> list[str]:
@@ -1096,15 +1110,16 @@ class ProviderFacade:
         if not availability["available"]:
             return {"ok": False, "kind": "connection", "target_key": key,
                     "revision": snapshot.revision, "protocol": protocol,
+                    "source_url": effective_models_url(self._store.providers[frozen_target.provider_id]),
                     "reason": availability["reason"], "message": availability["message"]}
         if protocol == "fake":
             return {"ok": True, "kind": "connection", "target_key": key,
-                    "revision": snapshot.revision, "protocol": protocol,
+                    "revision": snapshot.revision, "protocol": protocol, "source_url": "",
                     "reason": "", "message": ""}
         probed = _probe_connection(self._store.providers[frozen_target.provider_id],
                                    api_key=frozen_target.api_key, timeout_sec=frozen_target.timeout_sec)
         return {"ok": probed["ok"], "kind": "connection", "target_key": key,
-                "revision": snapshot.revision, "protocol": protocol,
+                "revision": snapshot.revision, "protocol": protocol, "source_url": probed["source_url"],
                 "reason": probed["reason"], "message": probed["message"]}
 
     def configure_paths(self, config_path: str | Path | None,

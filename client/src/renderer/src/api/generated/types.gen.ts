@@ -217,7 +217,7 @@ export type ActionView = {
     /**
      * Status
      */
-    status: 'running' | 'completed' | 'failed' | 'unknown';
+    status: 'running' | 'completed' | 'failed' | 'unknown' | 'superseded';
     /**
      * Activation Id
      */
@@ -251,6 +251,14 @@ export type ActionView = {
     after_snapshot_ref?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Auto Retry Of
+     */
+    auto_retry_of?: string | null;
+    /**
+     * Verification Reason
+     */
+    verification_reason?: string | null;
 };
 
 /**
@@ -794,6 +802,14 @@ export type Catalog = {
      */
     department_reminders: {
         [key: string]: Array<string>;
+    };
+    /**
+     * Model Reminders
+     */
+    model_reminders: {
+        [key: string]: {
+            [key: string]: Array<string>;
+        };
     };
 };
 
@@ -2038,6 +2054,36 @@ export type EventDetailResult = {
 };
 
 /**
+ * FileActionComparison
+ */
+export type FileActionComparison = {
+    /**
+     * Tool
+     */
+    tool: string;
+    /**
+     * Args
+     */
+    args: {
+        [key: string]: unknown;
+    };
+    /**
+     * Before Snapshot Event
+     */
+    before_snapshot_event: string;
+    /**
+     * Verdict
+     */
+    verdict: 'completed' | 'not_happened' | 'unclear';
+    /**
+     * Detail
+     */
+    detail: {
+        [key: string]: unknown;
+    };
+};
+
+/**
  * FlowRecord
  */
 export type FlowRecord = {
@@ -2783,6 +2829,10 @@ export type ProjectCreate = {
      * Goal
      */
     goal: string;
+    /**
+     * Initial Directory
+     */
+    initial_directory?: string | null;
 };
 
 /**
@@ -2905,6 +2955,10 @@ export type ProjectOverviewResult = {
      * Work Items
      */
     work_items: Array<WorkItemCard>;
+    /**
+     * Start Point
+     */
+    start_point?: string | null;
 };
 
 /**
@@ -4236,6 +4290,11 @@ export type UnknownActionRequested = {
      * Repeatable
      */
     repeatable: boolean;
+    /**
+     * Repeat Attempted
+     */
+    repeat_attempted?: boolean;
+    verification?: FileActionComparison | null;
 };
 
 /**
@@ -5020,7 +5079,12 @@ export type ActionVerifiedPayload = {
     /**
      * Resolution
      */
-    resolution: 'continue';
+    resolution: 'auto_reexecute' | 'auto_verify' | 'continue';
+    /**
+     * Auto Retry Of
+     */
+    auto_retry_of?: string | null;
+    verification?: FileActionComparison | null;
     /**
      * Note
      */
@@ -5826,6 +5890,10 @@ export type CatalogTestFinishedPayload = {
      * Error
      */
     error: string | null;
+    /**
+     * Source Url
+     */
+    source_url: string | null;
     /**
      * Actual Model
      */
@@ -11826,6 +11894,7 @@ export type ProjectRegisteredPayload = {
      * Source
      */
     source: 'idea' | 'existing';
+    initial_snapshot?: CodeSnapshot | null;
 };
 
 /**
@@ -14370,6 +14439,14 @@ export type ToolStartedPayload = {
      */
     snapshot_hash?: string | null;
     before_snapshot_ref?: ArtifactRef | null;
+    /**
+     * Auto Retry Of
+     */
+    auto_retry_of?: string | null;
+    /**
+     * Verification Reason
+     */
+    verification_reason?: 'not_happened' | null;
 };
 
 /**
@@ -15233,7 +15310,7 @@ export type CommandProjectCreateData = {
 
 export type CommandProjectCreateErrors = {
     /**
-     * 命令被拒绝，可能的原因：command_id_reused
+     * 命令被拒绝，可能的原因：source_invalid, command_id_reused
      */
     409: Rejected;
     /**
