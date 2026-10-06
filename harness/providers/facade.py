@@ -955,7 +955,7 @@ class ProviderFacade:
                 if not self._store.providers and not self._store.models and not self._bindings:
                     reason = ("provider_config_missing"
                               if self._config_state in {"empty", "missing", "deleted"} else "provider_invalid")
-                    message = "尚未配置 Provider：请在控制台完成服务接入后再创建事项" if reason == "provider_config_missing" else "; ".join(
+                    message = "尚未配置 Provider：请在模型管理页完成服务接入后再创建事项" if reason == "provider_config_missing" else "; ".join(
                         f"{item['location']}: {item['message']}" for item in issues)
                 else:
                     reason = "provider_unavailable"

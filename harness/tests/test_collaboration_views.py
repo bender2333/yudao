@@ -1,11 +1,13 @@
 import pytest
 
 from harness.adapters.fake import FakeAdapter
+from harness.app.application import Application
+from harness.app.project_queries import ProjectFlow
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_decision, product_spec, response_turn, review_turn
 from harness.runtime import LoopSystem
-from harness.tests.test_web import get_json, running_server
-from harness.views import run_payload
 
+def _application(system: LoopSystem) -> Application:
+    return Application(system)
 
 @pytest.mark.parametrize("requester,recipient", [
     ("product", "engineering"), ("product", "quality"),
@@ -23,18 +25,21 @@ def test_every_consultation_direction_is_visible_and_returns_to_original_work(tm
         *prefix, collaboration_request(recipient, "Clarify the current work.", expected_result="Provide an explanation."),
         response_turn("answered", "The current work can continue without changing requirements or files."), *suffix,
     ]))
-    run_id = system.create_run("build echo", max_cycles=16)
+    project_id = system.projects.register("咨询可见性", "把文本按行处理清楚")
+    work_item_id, run_id = system.projects.start_work_item(project_id, "build echo")
     for _ in range(len(prefix) + 1):
         system.activate_once(run_id)
-    with running_server(system) as (_server, host, port):
-        pending = get_json(host, port, f"/api/runs/{run_id}")
-    assert pending["board"]["phase"] == phase
-    assert pending["board"]["active_department"] == recipient
-    assert pending["board"]["pending_request"]["requester"] == requester
-    assert pending["timeline"]["pending_request"]["recipient"] == recipient
-    assert pending["timeline"]["pending_request"]["return_phase"] == phase
-    if requester == "product":
-        assert pending["timeline"]["current_product_spec"] is None
+    # 咨询记录在流转查询里可见：发起方向、等待状态与问题
+    flow = _application(system).query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
+    consultation = next(record for record in flow.data.records if record.kind == "咨询")
+    assert consultation.direction_from == requester
+    assert consultation.direction_to == recipient
+    assert consultation.status == "等待回答"
+    assert consultation.content == "Clarify the current work."
+    pending = system.project(run_id)
+    assert pending.phase == phase
+    assert pending.active_department == recipient
+    assert pending.pending_request.requester == requester
     responded = system.activate_once(run_id)
     assert responded.phase == phase
     assert responded.active_department == requester
@@ -49,26 +54,21 @@ def test_every_consultation_direction_is_visible_and_returns_to_original_work(tm
     assert final.effective_decisions == []
     assert final.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_cancelled_request_is_visible_with_its_closure_reason_and_event(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("quality", "Review the initial acceptance approach.")]))
-    run_id = system.create_run("build echo")
+    project_id = system.projects.register("取消咨询", "把文本按行处理清楚")
+    work_item_id, run_id = system.projects.start_work_item(project_id, "build echo")
     system.activate_once(run_id)
     system.cancel(run_id)
-    with running_server(system) as (_server, host, port):
-        payload = get_json(host, port, f"/api/runs/{run_id}")
-        assert payload["board"]["pending_request"] is None
-        timeline = payload["timeline"]
-        assert len(timeline["requests"]) == len(timeline["request_closures"]) == 1
-        closure = timeline["request_closures"][0]
-        assert closure["request_id"] == timeline["requests"][0]["id"]
-        assert closure["reason"]
-        assert timeline["responses"] == []
-        detail = get_json(host, port, f"/api/runs/{run_id}/events/{closure['created_event_id']}")
-        assert detail["type"] == "collaboration_closed"
+    flow = _application(system).query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
+    consultations = [record for record in flow.data.records if record.kind == "咨询"]
+    assert len(consultations) == 1
+    closure = consultations[0]
+    assert closure.status == "已取消"
+    assert closure.content
+    assert system.project(run_id).pending_request is None
 
-
-def test_views_keep_product_decision_and_response_as_separate_accepted_events(tmp_path):
+def test_projection_keeps_product_decision_and_response_as_separate_accepted_events(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(),
         collaboration_request("product", "Define handling of dash-prefixed input.",
@@ -79,11 +79,11 @@ def test_views_keep_product_decision_and_response_as_separate_accepted_events(tm
     ]))
     run_id = system.create_run("build echo", max_cycles=16)
     assert system.run_until_stop(run_id).phase == "DONE"
-    timeline = run_payload(system.store, run_id)["timeline"]
-    assert len(timeline["product_decisions"]) == len(timeline["responses"]) == 1
-    decision, response = timeline["product_decisions"][0], timeline["responses"][0]
-    assert decision["created_event_id"] != response["created_event_id"]
-    assert response["result_event_ids"] == [decision["created_event_id"]]
-    assert decision["request_id"] == response["request_id"] == timeline["requests"][0]["id"]
-    assert timeline["effective_decisions"][0]["statement"] == decision["statement"]
-    assert len(timeline["effective_contracts"]) == 2
+    projection = system.project(run_id)
+    assert len(projection.product_decisions) == len(projection.responses) == 1
+    decision, response = projection.product_decisions[0], projection.responses[0]
+    assert decision.created_event_id != response.created_event_id
+    assert response.result_event_ids == [decision.created_event_id]
+    assert decision.request_id == response.request_id == projection.requests[0].id
+    assert projection.effective_decisions[0].statement == decision.statement
+    assert len(projection.effective_contracts) == 2
