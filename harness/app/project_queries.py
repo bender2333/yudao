@@ -692,11 +692,15 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
 MESSAGE_TYPES = (EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_INPUT, EventType.MODEL_MESSAGE,
                  EventType.DEPARTMENT_GUIDANCE_RECEIVED)
 MESSAGE_LIMIT = 100
+DISCARDED_ATTEMPT_STATUSES = ("failed", "cancelled")
 
 
 def _department_messages(application: Application, run_id: str, department: str) -> list[dict[str, Any]]:
-    # 部门消息：用户输入与这个部门的事件，按日志位置排列，取最近的一批。读取走部门与位置的索引
+    # 部门消息：用户输入与这个部门的事件，按日志位置排列，取最近的一批。读取走部门与位置的索引。
+    # 失败与取消的尝试只有观察记录，其模型消息不进入部门上下文；它们仍由观测页的
+    # project.attempts 与 run.attempt 给出。
     store = application.system.store
+    discarded_attempts = _discarded_attempts(application, run_id)
     collected: list[Any] = []
     cursor = 0
     while True:
@@ -706,14 +710,23 @@ def _department_messages(application: Application, run_id: str, department: str)
             break
         collected.extend(batch)
         cursor = batch[-1].position
+    kept = [event for event in collected
+            if not (event.type == EventType.MODEL_MESSAGE
+                    and event.payload.get("attempt_id") in discarded_attempts)]
     return [
         {
             "event_id": event.event_id, "position": event.position, "seq": event.stream_version,
             "type": event.type, "department": event.department, "created_at": event.created_at,
             "text": event.payload.get("text") or event.payload.get("summary") or "",
         }
-        for event in collected[-MESSAGE_LIMIT:]
+        for event in kept[-MESSAGE_LIMIT:]
     ]
+
+
+def _discarded_attempts(application: Application, run_id: str) -> set[str]:
+    # 失败与取消的调用尝试：按事件日志里的尝试记录核对状态，读取走应用层的调用尝试表
+    _position, rows = _read_models(application).attempts(run_id=run_id)
+    return {row["attempt_id"] for row in rows if row["status"] in DISCARDED_ATTEMPT_STATUSES}
 
 
 def _last_used_prompt_version(run: Any, department: str) -> int | None:
@@ -1179,13 +1192,18 @@ USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_wri
 
 
 def _usage_totals(rows: list[Any]) -> UsageTotals:
+    # 用量汇总只累加上报的用量（source == "reported"），未上报的项为空（设计说明第 4.3 节）；
+    # latency_ms 是本地测得的用时，与用量是否上报无关，按全部尝试累加
     values: dict[str, int | float | None] = {field: None for field in USAGE_FIELDS}
     reported = 0
     for row in rows:
         usage = json.loads(row["record"]).get("usage") or {}
-        if usage.get("reported"):
+        is_reported = usage.get("source") == "reported"
+        if is_reported:
             reported += 1
         for field in USAGE_FIELDS:
+            if field != "latency_ms" and not is_reported:
+                continue
             value = usage.get(field)
             if value is None:
                 continue

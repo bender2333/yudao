@@ -284,6 +284,107 @@ def test_cost_totals_follow_reported_provider_values(tmp_path: Path):
     assert report.data.totals.reported == 2
     assert report.data.totals.input_tokens == 2
 
+def test_usage_totals_count_only_reported_attempts(tmp_path: Path):
+    # 用量汇总只累加上报的用量（设计说明第 4.3 节「未上报的项为空」，D09 规定不猜算用量）：
+    # 未上报的尝试计入总数与用时，各项用量为空，也不进入上报计数
+    reported_usage = Usage(input_tokens=11, output_tokens=3, cache_read_tokens=1, cache_write_tokens=2,
+                           total_tokens=17, reported=True)
+    unreported_usage = Usage(input_tokens=100, output_tokens=100, total_tokens=200, reported=False)
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
+        FakeTurn(proposal=product_spec(), usage=reported_usage),
+        FakeTurn(proposal=None, usage=unreported_usage),
+    ]))
+    application, project_id, work_item_id, run_id = _project_run(system, "mixed usage")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+
+    rows = _attempts(application, project_id, work_item_id).data.attempts
+    assert [row.usage["source"] for row in rows] == ["reported", "unknown", "missing"]
+    assert [row.status for row in rows] == ["success", "success", "failed"]
+
+    report = _usage(application, project_id, work_item_id).data
+    totals = report.totals
+    assert totals.attempts == 3
+    assert totals.reported == 1
+    assert totals.input_tokens == 14
+    assert totals.output_tokens == 3
+    assert totals.cache_read_tokens == 1
+    assert totals.cache_write_tokens == 2
+    assert totals.total_tokens == 17
+    assert totals.cost is None
+    # 用时每次尝试都实际测到，与用量是否上报无关
+    assert totals.latency_ms == sum(row.duration_ms for row in rows if row.duration_ms is not None)
+
+    product = next(group for group in report.departments if group.key == "product")
+    assert (product.attempts, product.reported, product.input_tokens, product.total_tokens) == (1, 1, 14, 17)
+    engineering = next(group for group in report.departments if group.key == "engineering")
+    assert (engineering.attempts, engineering.reported, engineering.input_tokens) == (2, 0, None)
+    assert len(report.models) == 1
+    assert (report.models[0].attempts, report.models[0].reported, report.models[0].input_tokens) == (3, 1, 14)
+
+def test_unreported_usage_alone_leaves_every_usage_field_empty(tmp_path: Path):
+    usage = Usage(input_tokens=5, output_tokens=6, total_tokens=11, reported=False)
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([FakeTurn(proposal=product_spec(), usage=usage)]))
+    application, project_id, work_item_id, run_id = _project_run(system, "unreported only")
+    system.activate_once(run_id)
+
+    totals = _usage(application, project_id, work_item_id).data.totals
+    assert totals.attempts == 1
+    assert totals.reported == 0
+    assert totals.input_tokens is None
+    assert totals.output_tokens is None
+    assert totals.cache_read_tokens is None
+    assert totals.cache_write_tokens is None
+    assert totals.total_tokens is None
+    assert totals.cost is None
+    assert totals.latency_ms is not None
+
+def test_department_messages_exclude_failed_and_cancelled_attempts(tmp_path: Path):
+    # 部门消息是部门上下文里的历史：失败与取消的尝试的部分输出不进入上下文，
+    # 这两次尝试仍然出现在观测页（project.attempts 与 run.attempt）
+    def fail_after_message(request):
+        item = {
+            "id": "failed-partial-message",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": "FAILED_PARTIAL_OUTPUT"}],
+        }
+        yield ModelStreamEvent(kind="message", id=item["id"], payload=item, text="FAILED_PARTIAL_OUTPUT",
+                               provider="stub", model="stub-model")
+        raise ProviderError("stream failed", retryable=False)
+
+    failed_system = LoopSystem.for_testing(tmp_path / "failed", FakeAdapter([fail_after_message]))
+    application, project_id, work_item_id, run_id = _project_run(failed_system, "failed partial")
+    failed_system.activate_once(run_id)
+
+    row = _attempts(application, project_id, work_item_id).data.attempts[0]
+    assert row.status == "failed"
+    workspace = application.query("department.workspace", DepartmentWorkspace(
+        project_id=project_id, department="product", work_item=work_item_id))
+    assert not any("FAILED_PARTIAL_OUTPUT" in message["text"] for message in workspace.data.messages)
+    assert not any(message["type"] == EventType.MODEL_MESSAGE for message in workspace.data.messages)
+
+    cancelled_adapter = _BlockingPartialAdapter()
+    cancelled_system = LoopSystem.for_testing(tmp_path / "cancelled", cancelled_adapter)
+    application, project_id, work_item_id, run_id = _project_run(cancelled_system, "cancelled partial")
+    worker = threading.Thread(target=cancelled_system.activate_once, args=(run_id,), daemon=True)
+    worker.start()
+    assert cancelled_adapter.started.wait(3)
+    cancelled_system.cancel(run_id)
+    worker.join(timeout=5)
+    assert not worker.is_alive()
+
+    row = _attempts(application, project_id, work_item_id).data.attempts[0]
+    assert row.status == "cancelled"
+    workspace = application.query("department.workspace", DepartmentWorkspace(
+        project_id=project_id, department="product", work_item=work_item_id))
+    assert not any("PARTIAL_OUTPUT" in message["text"] for message in workspace.data.messages)
+    assert not any(message["type"] == EventType.MODEL_MESSAGE for message in workspace.data.messages)
+    # 观测页仍然给出这次尝试与它的部分输出
+    detail = application.query("run.attempt", RunAttempt(run_id=run_id, attempt_id=row.attempt_id))
+    assert detail.data.attempt["status"] == "cancelled"
+    assert detail.data.attempt["partial_output"] is True
+
 def test_responses_capture_complete_sdk_json_and_decoded_events(tmp_path: Path):
     with _server([_submit_stream()]) as (config, *_):
         system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config))
@@ -413,7 +514,7 @@ def test_department_prompt_reports_the_version_recorded_by_the_model_request(tmp
         project_id=project_id, department="product", work_item=work_item_id))
     recorded = next(item["prompt_version"] for item in system.project(run_id).model_requests
                     if item.get("department") == "product")
-    assert workspace.data.prompt.used_version == recorded
+    assert workspace.data.department_setting.used_version == recorded
 
 def test_generic_adapter_failure_closes_raw_capture_and_keeps_stream_evidence(tmp_path: Path):
     class BrokenAdapter:
