@@ -11,8 +11,27 @@ export type SnapshotState<T> = {
   loading: boolean;
 };
 
-// 打开一个视图：viewId 唯一标识这一处数据；参数为 null 或 undefined 时不发送（查询按省略处理）；
-// skip 为真时不打开，用于还没有事项标识的场合（切换事项以后丢弃迟到的结果）
+// 一处视图在当前参数下页面能看到什么（纯函数，单元测试直接调用）：
+// 参数为 null 或 undefined 时不发送（查询按省略处理），key 就是去掉它们以后的参数签名；
+// skip 为真时这一处视图没有打开（例如项目还没有事项，department.workspace 缺事项标识），
+// 没有打开就没有读取：加载状态为假，调用处据此显示空态，不显示「正在读取数据」（工单 #295 第 3 项）。
+// 参数变了以后、新快照到达之前仍算读取中，且上一处（别的项目、别的事项）的数据不能接着用，
+// 否则调用处会拿它去发下一次查询（换项目以后用旧事项标识发查询会被服务端按找不到拒绝）
+export function snapshotView<T>(
+  state: { data: T | null; loading: boolean; key: string | null },
+  key: string,
+  skip: boolean,
+): SnapshotState<T> {
+  if (skip) {
+    return { data: null, loading: false };
+  }
+  if (state.key !== key) {
+    return { data: null, loading: true };
+  }
+  return { data: state.data, loading: state.loading };
+}
+
+// 打开一个视图：viewId 唯一标识这一处数据；skip 为真时不打开
 export function useSnapshot<T>(
   app: ClientApp | null,
   viewId: string,
@@ -39,12 +58,7 @@ export function useSnapshot<T>(
     };
   }, [app, viewId, query, key, skip]);
 
-  // 参数变了以后、新快照到达之前，页面拿到的是空数据：上一处（别的项目、别的事项）的数据不能接着用，
-  // 否则调用处会拿它去发下一次查询（换项目以后用旧事项标识发查询会被服务端按找不到拒绝）
-  if (skip || state.key !== key) {
-    return { data: null, loading: true };
-  }
-  return { data: state.data, loading: state.loading };
+  return snapshotView(state, key, skip);
 }
 
 // 一条命令的提交状态（工单验收：提交后显示「已提交」，事件到达以后显示最终状态，拒绝时显示原因）

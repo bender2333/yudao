@@ -335,7 +335,11 @@ test.describe("项目页面（1440×900）", () => {
       await expect(dialog.getByLabel("部门 Prompt")).toHaveValue(PRODUCT_PROMPT);
       await dialog.getByRole("button", { name: "关闭" }).click();
       await expect(page.locator(".modal-backdrop")).toHaveCount(0);
-      await expect(await section(page, "部门房间")).toContainText("部门房间的位置");
+      // 部门房间：画布画出内容（工单 #177）
+      const room = await section(page, "部门房间");
+      await expect(room.locator(".room-canvas canvas")).toHaveCount(1);
+      const roomWidth = await room.locator(".room-canvas canvas").evaluate((el) => (el as HTMLCanvasElement).width);
+      expect(roomWidth % 480).toBe(0);
       const inspect = page.locator('section.card:has([role="tablist"])').first();
       const tabs = inspect.locator('[role="tab"]');
       await expect(tabs).toHaveCount(3);
@@ -411,10 +415,11 @@ test.describe("项目页面（1440×900）", () => {
       await expect(viewer.locator("pre.raw")).toContainText("import sys");
       await viewer.getByRole("button", { name: "收起" }).click();
       await expect(page.getByRole("heading", { name: `交付文件 ${DELIVERY_FILE}` })).toHaveCount(0);
-      // 没有事项的项目：资料页写明没有资料可看
+      // 没有事项的项目：资料页显示空态，没有一直转的「正在读取数据」（工单 #295 第 3 项）
       const liveId = await projectId(page, LIVE);
       await gotoView(page, liveId, "materials");
       await expect(await section(page, "资料")).toContainText("项目还没有事项，没有资料可看");
+      await expect(await section(page, "资料")).not.toContainText("正在读取数据");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -676,6 +681,10 @@ test.describe("项目页面（1440×900）", () => {
       await expect(await section(page, "当前事项")).toContainText("项目没有进行中的事项");
       await expect(await section(page, "事项看板")).toContainText("项目还没有事项");
       await expect(await section(page, "项目摘要")).toContainText("尚未采纳");
+      // 没有事项的项目打开部门页：显示空态，没有一直转的「正在读取数据」（工单 #295 第 3 项）
+      await gotoView(page, liveId, "dept/product");
+      await expect(page.locator(".page")).toContainText("项目还没有事项，部门工作间没有内容可显示");
+      await expect(page.locator(".page")).not.toContainText("正在读取数据");
       // 设置页登记一条新命令：命令表由事件流更新，页面不刷新
       await gotoView(page, liveId, "settings");
       const registry = await section(page, "登记命令");
@@ -683,6 +692,9 @@ test.describe("项目页面（1440×900）", () => {
       await registry.getByRole("button", { name: "登记新命令" }).click();
       const form = page.locator(".modal-backdrop");
       await expect(form.locator(".modal-head h2")).toHaveText("登记新命令");
+      // 「固定参数」的提示含程序名并写明按空格拆分（工单 #295 第 2 项）：这条用例就按提示的写法登记
+      await expect(form.getByLabel("固定参数")).toHaveAttribute("placeholder", /python -c print\(1\)/);
+      await expect(form.getByLabel("固定参数")).toHaveAttribute("placeholder", /按空格拆分/);
       // 可以重新执行（工单 #242）：新登记默认关闭
       await expect(form.getByLabel("可以重新执行")).not.toBeChecked();
       await form.getByLabel("登记名").fill("echo-live");

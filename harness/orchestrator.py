@@ -805,6 +805,7 @@ class Orchestrator:
 
     def start(self, run_id: str) -> asyncio.Task[RunProjection]:
         # 在当前事件循环中把这个 run 作为任务运行到停止（run_until_stop）；这个 run 已有任务时，新任务在它结束以后开始。
+        # 停止以后与事项的执行走同一处结算（run_until_stop_and_settle），run 属于事项并已到终态时写入采纳（幂等，工单 #299）。
         # 任务出错时交给事件循环的异常处理报告
         previous = self._tasks.get(run_id)
         task = asyncio.get_running_loop().create_task(self._run_after(previous, run_id))
@@ -842,11 +843,26 @@ class Orchestrator:
         return task
 
     async def _run_work_item(self, previous: asyncio.Task[Any] | None, run_id: str) -> ProjectEvent | None:
-        # 先运行到停止，再由流程编排结算这一次 run（幂等）
+        # 事项的执行：运行到停止以后结算这一次 run，交回结算写入的项目事件（没有时为 None）
         if previous is not None:
             await asyncio.wait([previous])
-        await self.run_until_stop(run_id)
-        return await asyncio.to_thread(self.projects.settle, run_id)
+        _projection, event = await self.run_until_stop_and_settle(run_id)
+        return event
+
+    async def _run_after(self, previous: asyncio.Task[RunProjection] | None, run_id: str) -> RunProjection:
+        # 回答决定以后继续等入口：同样运行到停止并结算，交回停止时的运行状态
+        if previous is not None:
+            await asyncio.wait([previous])
+        projection, _event = await self.run_until_stop_and_settle(run_id)
+        return projection
+
+    async def run_until_stop_and_settle(self, run_id: str) -> tuple[RunProjection, ProjectEvent | None]:
+        # 运行一个 run 直到停止，停止以后由流程编排结算（应用层与接口层设计说明第 7.2 节，工单 #299）。
+        # 把 run 运行到停止的入口都在这里结算，不在各调用方各补一遍：事项开始（start_work_item）、
+        # 回答决定以后继续（start）与启动时的自动继续（LoopSystem.resume_startup_runs）。
+        # 结算是幂等的：不在终态、不属于事项、已经结算过或者没有交付与放行的 run 不再写入（projects.settle）
+        projection = await self.run_until_stop(run_id)
+        return projection, await asyncio.to_thread(self.projects.settle, run_id)
 
     def _work_item_task_done(self, run_id: str, task: asyncio.Task[Any]) -> None:
         if self._work_item_tasks.get(run_id) is task:
@@ -856,11 +872,6 @@ class Orchestrator:
                 "message": f"work item run {run_id} stopped with an error",
                 "exception": task.exception(), "task": task,
             })
-
-    async def _run_after(self, previous: asyncio.Task[RunProjection] | None, run_id: str) -> RunProjection:
-        if previous is not None:
-            await asyncio.wait([previous])
-        return await self.run_until_stop(run_id)
 
     def _task_done(self, run_id: str, task: asyncio.Task[RunProjection]) -> None:
         if self._tasks.get(run_id) is task:

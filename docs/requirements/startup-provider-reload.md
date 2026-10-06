@@ -30,10 +30,10 @@
 | 选项 | 默认值 | 规则 |
 | --- | --- | --- |
 | 子命令 | serve | 无参和省略 serve 的服务选项使用同一解析路径；显式 demo/smoke/replay/project 保留 |
-| data-dir | .yudao/native-loop | 保持现值 |
-| provider-config | .yudao/providers.json | 显式路径优先；路径在启动时解析为固定绝对路径 |
+| data-dir | 用户数据目录（Windows 为 `%LOCALAPPDATA%\Yudao`，Linux 为 `~/.local/share/yudao`） | 桌面客户端的安装、更新与发布设计说明第 3.4 节 |
+| provider-config | `<data-dir>/providers.json` | 显式路径优先；没有明确给出时按生效的 data-dir 求出；路径在启动时解析为固定绝对路径 |
 | host / port | 127.0.0.1 / 8765 | 占用时报错，不静默改端口 |
-| 凭据文件 | .yudao/.env | 固定单路径；不搜索用户主目录或其他项目 |
+| 凭据文件 | `<data-dir>/.env` | 固定单路径，按生效的 data-dir 求出；不搜索用户主目录或其他项目 |
 
 无参等价于全默认 serve。smoke 可使用默认配置路径，但缺少可用配置时应明确失败退出，不启动空壳验收，也不偷偷换 Fake。
 

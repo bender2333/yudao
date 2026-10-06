@@ -313,7 +313,7 @@ function CommandForm(props: {
     <Modal title={props.name === "" ? "登记新命令" : `修改登记命令 ${props.name}`} onClose={props.onClose}>
       <div className="form">
         <TextInput label="登记名" value={name} disabled={props.name !== ""} onInput={setName} />
-        <TextInput label="固定参数" value={argv} placeholder="例如 --mode strict" onInput={setArgv} />
+        <TextInput label="固定参数" value={argv} placeholder="含程序名，按空格拆分，例如 python -c print(1)" onInput={setArgv} />
         <TextInput label="允许的额外参数" value={args} placeholder="留空表示不允许；多个用空格分开" onInput={setArgs} />
         <TextInput label="时限（秒）" value={timeoutText} placeholder="留空表示使用默认值" onInput={setTimeoutText} />
         <TextInput label="输出上限（字节）" value={outputText} placeholder="留空表示使用默认值" onInput={setOutputText} />
