@@ -40,6 +40,9 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
     work_item: workItem,
   }, workItem === null);
   const data = workspace.data;
+  // 事项标识取不到时 department.workspace 不被打开：那一处没有读取动作，页面显示空态，
+  // 不显示「正在读取数据」（工单 #295 第 3 项）
+  const noWorkItem = picked.data !== null && workItem === null;
   const command = useCommand(props.app, pageKey([data?.work_item_id, data?.department_setting.configured_version, data?.phase]));
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -47,6 +50,7 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
     <div className="page">
       <Loading state={picked} />
       <Loading state={workspace} />
+      {noWorkItem ? <Empty text="项目还没有事项，部门工作间没有内容可显示" /> : null}
       <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
         <RoomScreen app={props.app} department={department} data={data} />
       </Section>
