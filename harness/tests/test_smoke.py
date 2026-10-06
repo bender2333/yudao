@@ -1,5 +1,6 @@
 import json
 from dataclasses import asdict, replace
+from pathlib import Path
 
 import pytest
 
@@ -572,3 +573,22 @@ def test_smoke_markdown_reports_model_input_audit(tmp_path):
     assert f"context isolated: `{scenario['context_isolated']}`" in text
     assert f"host receipts verified: `{scenario['check_receipts_verified']}`" in text
     assert "omp" not in text.lower()
+
+
+def test_smoke_reads_the_catalog_in_its_data_directory(tmp_path):
+    # 没有明确给目录文件时 smoke 在自己的数据目录内读取（设计说明第 3.4 节）：
+    # 同一目录先以空态报告缺失，写入目录文件后读取成功，证明读的位置随数据目录移动
+    data_dir = tmp_path / "smoke"
+    missing = run_smoke(data_dir, scenarios=["happy"])
+    assert missing["available"] is False and missing["stop_reason"] == "provider_config_missing"
+    assert Path(missing["provider_config"]) == data_dir / "providers.json"
+    (data_dir / "providers.json").write_text(json.dumps({
+        "providers": [{"id": "fake-provider", "name": "Fake", "protocol": "fake"}],
+        "models": [{"id": "fake-model", "provider_id": "fake-provider", "model": "fake-script",
+                    "context_window": 32_000, "max_output_tokens": 4_096}],
+        "bindings": {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
+                     for department in ("product", "engineering", "quality")},
+    }), encoding="utf-8")
+    report = run_smoke(data_dir, scenarios=["happy"], startup_mode="test")
+    assert Path(report["provider_config"]) == data_dir / "providers.json", report
+    assert report["available"] is True, report
