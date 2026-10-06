@@ -206,9 +206,9 @@ def test_required_tool_choice_is_encoded_per_protocol(tmp_path, protocol, respon
 
 
 def _text_only_stream(protocol: str):
-    # 只回复文字的流式回复：与提交提案的回复同形，只是没有工具调用
+    # 只回复文字的流式回复：没有工具调用，但有可见的回答文字（正常终态、没有输出项属于空输出，另见 #305）
     def reply(_provider: ScriptedProvider, handler: BaseHTTPRequestHandler) -> None:
-        send_reply(handler, 200, "text/event-stream", HTTP_REPLIES[protocol](1, []))
+        send_reply(handler, 200, "text/event-stream", HTTP_REPLIES[protocol](1, [], text="只回复文字，不调用工具。"))
 
     return reply
 

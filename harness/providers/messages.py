@@ -30,6 +30,7 @@ from .responses import (
     _TransportTrace,
     _attach_transport_trace,
     _build_sdk_models,
+    _empty_output_error,
     _connection_error,
     _created_stream,
     _diagnostic_code,
@@ -341,6 +342,12 @@ class _MessagesInvoker:
             "payload": {"response_id": response_id, "usage": usage_raw},
             "usage": usage,
         })
+        if not output:
+            # 流正常结束却没有任何输出项（只有 thinking 块同样算）：按失败处理并交给内核重试（工单 #305）
+            raise _empty_output_error(finish_reason=stop_reason, usage=usage,
+                                      max_output_tokens=invocation.provider_input.max_output_tokens,
+                                      reasoning=reasoning is not None)
+
         return InvokeResult(
             output=output, text=text, usage=usage,
             finish_reason=("tool_use" if tool_blocks else (stop_reason or "completed")),

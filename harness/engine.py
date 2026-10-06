@@ -405,7 +405,11 @@ class StepDriver:
                         ) from retry_error
                     diagnostics = dict(retry_error.diagnostics or {})
                     diagnostics.update(attempts=attempt, max_attempts=limits.max_provider_attempts)
-                    raise ProviderError(str(retry_error), reason=retry_error.reason, diagnostics=diagnostics) from retry_error
+                    raise ProviderError(
+                        str(retry_error),
+                        reason=_exhausted_stop_reason(retry_error.reason),
+                        diagnostics=diagnostics,
+                    ) from retry_error
                 if not self._schedule_retry(request, retry_error, delay, step_id + 1):
                     return Stopped(self._version)
                 if not await self._wait(delay):
@@ -894,6 +898,11 @@ def _retry_after_seconds(error: ProviderError) -> float | None:
         return None
     value = float(value)
     return value if value > 0 and math.isfinite(value) else None
+
+
+def _exhausted_stop_reason(reason: str) -> str:
+    # 空输出是单次调用的失败分类（工单 #305），不在 D09 的停止原因清单里：重试用完以后沿用已有的模型服务故障处理
+    return "provider_error" if reason == "empty_output" else reason
 
 
 def _retry_after_error(error: ProviderError, limits: StepLimits) -> ProviderError:

@@ -10,6 +10,7 @@ import { PAL, PIXEL_FONT_STACK } from "../registry.ts";
 import { mix } from "../grid.ts";
 import { R, RB } from "./render.ts";
 import type { DecisionFace } from "../world/types.ts";
+import { missingNoteText } from "../../views/decisions/card-logic.ts";
 
 export type { DecisionFace };
 
@@ -234,8 +235,9 @@ export function createDecisionCard(canvas: HTMLCanvasElement, opts: DecisionCard
   async function answer(face: DecisionFace, op: DecisionFace["options"][number]): Promise<void> {
     if (submitted[face.id]) return;
     const note = (notes[face.id] || "").trim();
-    if (op.note_required && !note) {
-      msg = { text: `「${op.label}」需要在说明里写明修改意见`, until: o.now() + 2600 };
+    const missing = missingNoteText(op, note);
+    if (missing !== "") {
+      msg = { text: missing, until: o.now() + 2600 };
       return;
     }
     const result = o.onDecide ? await o.onDecide({ decision_id: face.id, option: op.id, note, base_version: face.version }) : null;
