@@ -1,6 +1,7 @@
-# 发布脚本的验收（工单 #209，设计说明第 6.3、9 节）：把仓库复制到临时目录，建立 main 分支
+# 发布脚本的验收（工单 #209、#313，设计说明第 6.3、9 节）：把仓库复制到临时目录，建立 main 分支
 # 与一个本地 bare 远端，运行 scripts/release.py（不带 --publish），核对 wheel 的路径、SHA-256、
-# wheel 内含的客户端安装程序、blockmap 与 latest.yml，以及 latest.yml 中的 SHA-512 与安装程序一致；
+# wheel 内含的客户端安装程序、blockmap 与 latest.yml，latest.yml 中的 SHA-512 与安装程序一致，
+# 以及 wheel 的发布资源目录里只有本次版本的文件（#313）。
 # 同时核对工作区不干净、版本号不一致、当前提交不在 main 上时脚本拒绝。
 #
 # 构建走真实流程：npm ci、electron-builder 生成安装程序与 latest.yml、uv build 生成 wheel。
@@ -102,6 +103,51 @@ def test_build_produces_a_wheel_with_the_client_assets(release_build):
                    f"harness/release_assets/{installer_name}.blockmap",
                    "harness/release_assets/latest.yml"):
         assert member in members, member
+
+def _checkout_copy(workdir: Path) -> Path:
+    # 仓库的一份副本，只用来构建 wheel：核对 build/ 的清理与 wheel 内容的核对，不需要 git 环境
+    source = workdir / "src"
+    shutil.copytree(REPO_ROOT, source, ignore=_ignore)
+    return source
+
+def test_the_wheel_carries_no_installer_from_an_earlier_build_and_rejects_other_versions(tmp_path):
+    # 工单 #313：setuptools 不清理 build/lib，上一次构建的安装程序会跟着这次构建进 wheel；
+    # 发布脚本先删除 build/ 再构建，wheel 的发布资源目录里不留下一次构建的文件。
+    # 发布资源目录里另放一个其他版本的安装程序时，脚本的核对以非零状态退出并写明文件名。
+    source = _checkout_copy(tmp_path)
+    version = _version(source / "pyproject.toml")
+    assets = source / "harness" / "release_assets"
+    assets.mkdir()
+    installer = f"Yudao-Setup-{version}.exe"
+    (assets / installer).write_bytes(b"current-installer")
+    (assets / f"{installer}.blockmap").write_bytes(b"current-blockmap")
+    (assets / "latest.yml").write_bytes(f"version: {version}\n".encode("utf-8"))
+    previous_in_build = "Yudao-Setup-0.0.9.exe"
+    previous_in_assets = "Yudao-Setup-0.0.8.exe"
+    # 上一次构建留在 build/lib 里的安装程序，与本次组装到发布资源目录里的其他版本安装程序
+    stale = source / "build" / "lib" / "harness" / "release_assets"
+    stale.mkdir(parents=True)
+    (stale / previous_in_build).write_bytes(b"installer-from-the-previous-build")
+    (assets / previous_in_assets).write_bytes(b"installer-from-another-version")
+
+    module = _load_release_module()
+    wheel = module.build_wheel(source, version, tmp_path / "dist")
+    with zipfile.ZipFile(wheel) as archive:
+        members = set(archive.namelist())
+    assert f"harness/release_assets/{installer}" in members, installer
+    assert f"harness/release_assets/{previous_in_build}" not in members, previous_in_build
+    assert not (source / "build" / "lib" / "harness" / "release_assets"
+                / previous_in_build).exists()
+    # 其他版本的安装程序确实进了 wheel，核对步骤据此写明文件名退出
+    assert f"harness/release_assets/{previous_in_assets}" in members, previous_in_assets
+    try:
+        module.verify_wheel_contents(
+            wheel, {"installer": assets / installer, "blockmap": assets / f"{installer}.blockmap",
+                    "manifest": assets / "latest.yml"}, version)
+    except module.ReleaseError as error:
+        assert previous_in_assets in str(error)
+    else:
+        raise AssertionError("verify_wheel_contents accepted an installer from another version")
 
 def test_script_prints_the_wheel_path_and_a_matching_sha256(release_build):
     # 验收第 1 项：脚本输出 wheel 的路径与 SHA-256，SHA-256 与文件的实际值一致
