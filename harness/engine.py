@@ -37,7 +37,7 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
                                  event_call_target)
 from .providers.selection import ModelSelection
 from .recording import ActivationScope, StepRecorder
-from .recovery import action_repeatable, auto_retry_actions, classify_actions
+from .recovery import action_repeatable, auto_retry_actions, classify_actions, file_action_comparisons
 from .tools import proposal_kind, tool_action, tool_kind
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
@@ -534,14 +534,25 @@ class StepDriver:
                             reason="model_steps_exhausted")
 
     async def _auto_reexecute_unknown_actions(self) -> None:
-        # 自动重新执行结果未知的动作（工单 #307，恢复契约第 4 节第 2 步）：在步骤循环之前，把契约声明可以重复、
-        # 而且还没有用掉这一次机会的逻辑动作各重新执行一次，不询问用户。新的尝试是同一个逻辑动作的新一次尝试
-        # （同样的调用编号与步骤编号，记在本次激活里），因此 run.actions 列出两次尝试；
-        # 机会的上限取自事件日志，进程重启以后仍然只算一次
+        # 自动重新执行结果未知的动作（工单 #307、#308，恢复契约第 4 节第 2 步）：在步骤循环之前，把契约声明
+        # 可以重复、而且还没有用掉这一次机会的逻辑动作各重新执行一次，不询问用户。自动核实确认没有发生的
+        # 文件动作（工单 #308）同样重新执行一次，与契约声明可以重复的动作共用这一次机会。
+        # 新的尝试是同一个逻辑动作的新一次尝试（同样的调用编号与步骤编号，记在本次激活里），
+        # 因此 run.actions 列出两次尝试；机会的上限取自事件日志，进程重启以后仍然只算一次
         snapshot = self._writes.read(self._stream)
         events = snapshot.events()
+        # 没有发生的文件动作由动作前的快照判出（工单 #308）：当前公开树向执行环境查询，
+        # 读不到时按通常路径处理（只有契约声明可以重复的动作仍然重新执行）
+        not_happened: dict[str, Any] = {}
+        current = self._environment.query(FactsQuery(tree=True)).tree
+        if current is not None:
+            comparisons = file_action_comparisons(
+                events, artifacts=self._artifacts, run_id=self._scope.run_id,
+                current_entries=list(zip(current.files, current.hashes)))
+            not_happened = {action_id: comparison for action_id, comparison in comparisons.items()
+                            if comparison["verdict"] == "not_happened"}
         for info in auto_retry_actions(events, snapshot.decisions.values(),
-                                       department=self._scope.department,
+                                       department=self._scope.department, not_happened=set(not_happened),
                                        registered_commands=dict(snapshot.projection.registered_commands or {})):
             if not self._proceed():
                 return
@@ -549,7 +560,9 @@ class StepDriver:
             args = (started.payload or {}).get("args") or {}
             await self._execute_call(auto_retry_request(self._scope, started, events),
                                      {"id": info["action_id"], "name": info["tool"],
-                                      "arguments": json_dumps(args)})
+                                      "arguments": json_dumps(args),
+                                      "verification_reason": ("not_happened"
+                                                             if info["action_id"] in not_happened else None)})
 
     async def _continue_unexecuted_calls(self) -> None:
         # 工单 #17（恢复契约第 4、5 节）：上一次激活的完整模型响应里，有 Function Call 既没有 tool_started，
@@ -631,6 +644,10 @@ class StepDriver:
             if request.auto_retry_of:
                 # 这一次尝试取代中断时那一次：链上的关系写进 tool_started，上限由它判定
                 call["auto_retry_of"] = request.auto_retry_of
+                if item.get("verification_reason") is not None:
+                    # 自动核实确认上一次尝试没有发生（工单 #308）：依据写进 tool_started，
+                    # run.recovery 的核实记录按它说明这次重新执行的来源
+                    call["verification_reason"] = item["verification_reason"]
             permission, facts = self._begin_tool(request, call)
             if permission.stopped or not permission.allowed:
                 return
@@ -871,11 +888,11 @@ class StepDriver:
 
 
 def _tree_snapshot(tree: TreeFacts | None) -> dict[str, Any] | None:
-    # 公开树的动作前后快照（工单 #17）：摘要用于比对效果是否发生，文件清单给出动作前后的文件集合，
-    # 使核实能判断「效果已经写入」「还没有写入」。不含文件内容，只是依据
+    # 公开树的动作前后快照（工单 #17）：摘要用于比对效果是否发生，entries 给出动作前后每个文件的内容哈希，
+    # 中断以后按它与动作参数核对实际效果（工单 #308）；不含文件内容，只是依据
     if tree is None:
         return None
-    return {"digest": tree.digest, "files": list(tree.files)}
+    return {"digest": tree.digest, "entries": [list(item) for item in zip(tree.files, tree.hashes)]}
 
 def _run_host_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 主机工具由控制核心执行。现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据

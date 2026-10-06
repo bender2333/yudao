@@ -3938,6 +3938,17 @@
               }
             ],
             "title": "Auto Retry Of"
+          },
+          "verification_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Reason"
           }
         },
         "additionalProperties": false,
@@ -7148,6 +7159,47 @@
           "artifacts"
         ],
         "title": "EventDetailResult"
+      },
+      "FileActionComparison": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args"
+          },
+          "before_snapshot_event": {
+            "type": "string",
+            "title": "Before Snapshot Event"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "not_happened",
+              "unclear"
+            ],
+            "title": "Verdict"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tool",
+          "args",
+          "before_snapshot_event",
+          "verdict",
+          "detail"
+        ],
+        "title": "FileActionComparison"
       },
       "FlowRecord": {
         "properties": {
@@ -10779,6 +10831,16 @@
             "type": "boolean",
             "title": "Repeat Attempted",
             "default": false
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileActionComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -12245,6 +12307,7 @@
           "resolution": {
             "enum": [
               "auto_reexecute",
+              "auto_verify",
               "continue"
             ],
             "title": "Resolution",
@@ -12260,6 +12323,16 @@
               }
             ],
             "title": "Auto Retry Of"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileActionComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "note": {
             "anyOf": [
@@ -31204,6 +31277,18 @@
               }
             ],
             "title": "Auto Retry Of"
+          },
+          "verification_reason": {
+            "anyOf": [
+              {
+                "const": "not_happened",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Reason"
           }
         },
         "required": [

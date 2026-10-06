@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Iterator
 
 from .actions import TreeFacts
-from .models import CheckReceipt, json_dumps
+from .models import CheckReceipt, hash_bytes, json_dumps
 from .public_tree import CapturedTree, TreeError, capture_public_tree, excluded_by_ignore_rules, materialize_tree, resolve_public_path, validate_public_path
 
 CHECKS_DIR = ".checks"
@@ -29,7 +29,10 @@ class WorkspaceSnapshot:
 
     @property
     def facts(self) -> TreeFacts:
-        return TreeFacts(digest=self.tree.digest, files=tuple(item.path for item in self.tree.files),
+        # hashes 与 files 同序同长：动作前后的公开树快照工件按它比较实际效果（工单 #308）
+        return TreeFacts(digest=self.tree.digest,
+                         files=tuple(item.path for item in self.tree.files),
+                         hashes=tuple(hash_bytes(item.data) for item in self.tree.files),
                          checks=self.checks)
 
 

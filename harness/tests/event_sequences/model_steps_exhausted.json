@@ -2620,7 +2620,7 @@
    "media_type": "application/json",
    "content": {
     "digest": "<sha256#1>",
-    "files": []
+    "entries": []
    }
   },
   "<art#7>": {

@@ -982,6 +982,9 @@ class ActionView(Contract):
     # 自动重新执行（工单 #307）：这一次尝试取代的那一次 tool_started 事件编号；首次尝试为空。
     # 核实依据（自动重新执行或用户决定）由 run.recovery 给出，run.actions 给的是两次尝试的先后与关系
     auto_retry_of: str | None = None
+    # 自动核实时这次尝试自己的依据（工单 #308）：重新执行时是「上一次尝试没有发生」，
+    # 自动核实确认已完成时是那次对比；由 run.recovery 展开
+    verification_reason: str | None = None
 
 
 class RunActionsResult(Contract):
@@ -1064,6 +1067,7 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
             created_at="" if started_event is None else started_event.created_at, receipt=None,
             before_snapshot_ref=payload.get("before_snapshot_ref"),
             auto_retry_of=payload.get("auto_retry_of"),
+            verification_reason=payload.get("verification_reason"),
         )
     payload = result_event.payload or {}
     if result_event.type == EventType.ACTION_VERIFIED:
@@ -1092,6 +1096,7 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
         before_snapshot_ref=started_payload.get("before_snapshot_ref"),
         after_snapshot_ref=payload.get("after_snapshot_ref"),
         auto_retry_of=started_payload.get("auto_retry_of"),
+        verification_reason=started_payload.get("verification_reason"),
     )
 
 
@@ -2197,8 +2202,9 @@ def _unfinished_actions(events: list[Any], decisions: Any,
 
 
 def _verification_records(events: list[Any], decisions: Any) -> list[VerificationRecord]:
-    # 核实记录有两条来源，都不改写原始观察：
+    # 核实记录有三条来源，都不改写原始观察：
     # - 自动重新执行（工单 #307）：记录追加在取代那一次尝试之后，依据是契约声明可以重复；
+    # - 自动核实（工单 #308）：对比确认动作已经完成，记 action_verified，依据是这次对比；
     # - 用户选择按当前实际状态继续（工单 #17）：action_verified 事件里带着决定请求的编号
     answers = {decision.decision_id: decision for decision in decisions
                if decision.kind == "unknown_action" and decision.status == "answered"}
@@ -2212,8 +2218,12 @@ def _verification_records(events: list[Any], decisions: Any) -> list[Verificatio
         answer = answers.get(decision_id) if isinstance(decision_id, str) else None
         records.append(VerificationRecord(
             action_id=str(payload.get("id") or event.event_id), tool=str(payload.get("name") or ""),
-            basis="用户选择按当前实际状态继续", result="动作效果按当前实际状态接受",
-            decided_by="user", note=None if answer is None else (answer.answer or {}).get("note"),
+            basis="自动核实（已完成）" if payload.get("resolution") == "auto_verify"
+                  else "用户选择按当前实际状态继续",
+            result="动作效果按参数里的目标内容确认完成" if payload.get("resolution") == "auto_verify"
+                   else "动作效果按当前实际状态接受",
+            decided_by="system" if payload.get("resolution") == "auto_verify" else "user",
+            note=None if answer is None else (answer.answer or {}).get("note"),
             decision_id=decision_id if isinstance(decision_id, str) else None,
             at=event.created_at, event_id=event.event_id,
         ))
@@ -2222,9 +2232,9 @@ def _verification_records(events: list[Any], decisions: Any) -> list[Verificatio
 
 
 def _auto_retry_record(events: list[Any], attempt: Any) -> VerificationRecord:
-    # 自动重新执行的核实记录（工单 #307）：依据是契约声明可以重复，不询问用户，因此没有决定请求覆盖它。
-    # 中断时那一次尝试的结果仍然未知，不补造它的回执，也不把它写成已完成；
-    # 结果取自这一次尝试自己写下的回执，这一条记录说明的是「由这一次尝试接手」
+    # 自动重新执行的核实记录（工单 #307、#308）：依据是契约声明可以重复或自动核实确认动作没有发生，
+    # 不询问用户，因此没有决定请求覆盖它。中断时那一次尝试的结果仍然未知，不补造它的回执，
+    # 也不把它写成已完成；结果取自这一次尝试自己写下的回执，这一条记录说明的是「由这一次尝试接手」
     payload = attempt.payload or {}
     result = next((event for event in events
                    if event.type == EventType.TOOL_CALLED
@@ -2237,9 +2247,12 @@ def _auto_retry_record(events: list[Any], attempt: Any) -> VerificationRecord:
         outcome = "新的尝试已经得到结果，动作以这一次尝试的回执为准"
     else:
         outcome = "新的尝试的回执报告失败，动作以这一次尝试的回执为准"
+    # 这一次尝试由自动核实确认没有发生而来时，依据写明这次对比（工单 #308）
+    verified = payload.get("verification_reason") == "not_happened"
     return VerificationRecord(
         action_id=str(payload.get("id") or attempt.event_id), tool=str(payload.get("name") or ""),
-        basis="契约声明可以重复，自动重新执行", result=outcome, decided_by="system", note=None,
+        basis="自动核实（没有发生，重新执行）" if verified else "契约声明可以重复，自动重新执行",
+        result=outcome, decided_by="system", note=None,
         decision_id=None, at=attempt.created_at, event_id=attempt.event_id,
     )
 

@@ -26,6 +26,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, Sequence
@@ -62,9 +63,10 @@ def build_script(items: Sequence[dict[str, Any]]) -> list[Any]:
 def _hold_after(system: LoopSystem, event_type: str, directory: Path, *,
                 action_id: str | None = None) -> None:
     # 在指定事件提交以后停在这个位置：写下 hold 标记以后一直等待，由父进程终止这个进程。
-    # 同步执行的工具（读取）没有可以等待的子进程，只能在这一刻停住，这次动作的结果因此没有落盘；
-    # 父进程见到 hold 标记以后终止，恢复时这次动作的结果未知。
-    # 给出 action_id 时只在这个调用编号的那次事件上停（同一个工具的前几次调用不算）
+    # 同步执行的工具（读取、写入、编辑、删除、移动）没有可以等待的子进程，只能在这一刻停住，
+    # 这次动作的结果因此没有落盘；父进程见到 hold 标记以后终止，恢复时这次动作的结果未知。
+    # 给出 action_id 时只在这个调用编号的那次事件上停（同一个工具的前几次调用不算）。
+    # 恢复途中注册这个钩子时，停住的是恢复自动重新执行的那一次尝试
     marker = directory / "hold"
 
     def hold(event: Any) -> None:
@@ -75,6 +77,41 @@ def _hold_after(system: LoopSystem, event_type: str, directory: Path, *,
             time.sleep(0.1)
 
     after_event(system, event_type, hold)
+
+
+def _await_file(directory: Path, path: str, content: str, pid: int) -> None:
+    # 工单 #308：这个文件的内容变成指定内容以后立刻终止进程（写入已经落盘、回执还没有写），
+    # 用来观察自动核实按动作前快照确认动作已经完成的那一条路径。
+    # 终止由一个另起的看门狗进程做：写入与回执写在同一个进程里，同进程的另一个线程
+    # 抢不到这段窗口，因此看门狗盯住文件系统，看到内容就终止本进程
+    marker = directory / "await-file"
+    script = (
+        "import os,signal,sys,time\n"
+        "from pathlib import Path\n"
+        "root=Path(sys.argv[1]); path=sys.argv[2]; content=sys.argv[3]\n"
+        "marker=Path(sys.argv[4]); pid=int(sys.argv[5])\n"
+        "deadline=time.time()+120\n"
+        "while time.time()<deadline:\n"
+        "    hit=False\n"
+        "    for workspace in sorted(root.glob('*')):\n"
+        "        try:\n"
+        "            hit=(workspace/path).read_text(encoding='utf-8')==content\n"
+        "        except OSError:\n"
+        "            continue\n"
+        "        if hit:\n"
+        "            break\n"
+        "    if hit:\n"
+        "        marker.write_text('awaited',encoding='utf-8')\n"
+        "        os.kill(pid,signal.SIGKILL if os.name!='nt' else signal.SIGTERM)\n"
+        "        os._exit(0)\n"
+        "    time.sleep(0.002)\n"
+    )
+    subprocess.Popen([sys.executable, "-c", script, str(directory), path, content, str(marker), str(pid)],
+                     cwd=REPO_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+                        if os.name == "nt" else {"start_new_session": True}))
+    while True:
+        time.sleep(0.05)
 
 
 # ---------------------------------------------------------------------------
@@ -96,26 +133,38 @@ def main() -> None:
                         help="只在这个调用编号的那次事件上停住")
     parser.add_argument("--workspace-files", type=Path, default=None,
                         help="工作区种子文件的 JSON（路径到内容），在事项开始以前写入")
+    parser.add_argument("--await-file", type=str, default=None,
+                        help="这个工作区文件变成下面的目标内容以后立刻终止进程（写入已落盘、回执未写）")
+    parser.add_argument("--await-dir", type=Path, default=None,
+                        help="工作区所在目录（data_dir/workspaces），await-file 的根目录")
+    parser.add_argument("--await-content", type=str, default=None,
+                        help="await-file 变成的内容")
     args = parser.parse_args()
 
     items = json.loads(args.script.read_text(encoding="utf-8"))
     registry = (json.loads(args.registered_commands.read_text(encoding="utf-8"))
                 if args.registered_commands else None)
-    system = LoopSystem.for_testing(args.data_dir, FakeAdapter(build_script(items)))
-    # 挂起钩子要在系统开始运行以前注册；恢复模式的事件在打开数据目录时就已经发生，
-    # 那里用真实进程的 started 标记终止，不用挂起钩子
-    if args.hold_after is not None and not args.resume_only:
+    # 挂起钩子要在系统开始运行以前注册。恢复发生在打开数据目录的时候，因此挂起时先不自动恢复，
+    # 注册完钩子再恢复：这样恢复途中自动重新执行的那一次尝试也能在指定事件上停住
+    system = LoopSystem.for_testing(args.data_dir, FakeAdapter(build_script(items)),
+                                    resume_on_startup=args.hold_after is None)
+    if args.hold_after is not None:
         _hold_after(system, args.hold_after, args.hold_dir, action_id=args.hold_action)
     if args.resume_only:
         try:
             print(json.dumps({"run_id": None, "phase": "resumed",
-                              "resumed": list(system.resumed_runs)}, ensure_ascii=False), flush=True)
+                              "resumed": list(system.resume_startup_runs())}, ensure_ascii=False), flush=True)
         finally:
             system.close()
         return
     run_id = system.create_run(args.task, registered_commands=registry,
                                command_versions=None if registry is None
                                else {name: 1 for name in registry})
+    if args.await_file is not None:
+        # 工单 #308：另起看门狗进程盯着工作区，看到目标内容落盘就终止本进程（回执来不及写）
+        threading.Thread(target=_await_file,
+                         args=(args.await_dir, args.await_file, args.await_content, os.getpid()),
+                         daemon=True).start()
     if args.workspace_files is not None:
         workspace = system.workspace(run_id)
         for path, content in json.loads(args.workspace_files.read_text(encoding="utf-8")).items():
@@ -138,6 +187,7 @@ if __name__ == "__main__":
 def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: Path, *,
            hold_after: str | None = None, hold_dir: Path | None = None,
            hold_action: str | None = None, workspace_files: Path | None = None,
+           await_file: tuple[str, str] | None = None, await_dir: Path | None = None,
            resume_only: bool = False) -> subprocess.Popen:
     environment = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
     spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
@@ -154,6 +204,9 @@ def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: 
             argv.extend(["--hold-action", hold_action])
     if workspace_files is not None:
         argv.extend(["--workspace-files", str(workspace_files)])
+    if await_file is not None:
+        argv.extend(["--await-file", await_file[0], "--await-dir", str(await_dir),
+                     "--await-content", await_file[1]])
     with log.open("wb") as output:
         return subprocess.Popen(argv, cwd=REPO_ROOT, env=environment, stdout=output,
                                 stderr=subprocess.STDOUT, **spawn)
@@ -217,11 +270,14 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
                 started: Path | None = None,
                 hold_after: str | None = None,
                 hold_action: str | None = None,
+                await_file: tuple[str, str] | None = None,
                 resume_after: bool = True) -> Interrupted:
     # resume_after 为假时 after 打开以后不走启动恢复（连续中断的场景用 restarted 的子进程恢复，
     # 父进程不再碰这份日志，避免重复恢复污染事件）
     # 在真实子进程里运行一个事项，在指定的时刻终止它，再用同一个数据目录重新打开系统走启动恢复。
     # tail 是重启以后模型继续用的脚本（中断前的脚本已经用完）
+    # await_file 是（路径，内容）：这个文件变成这个内容以后子进程自己终止（写入已落盘、回执未写，
+    # 工单 #308 的自动核实路径）；父进程只等着进程自己退出
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     work = data_dir.parent
@@ -241,9 +297,13 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
         files_file.write_text(json.dumps(workspace_files, ensure_ascii=False), encoding="utf-8")
 
     process = _spawn(data_dir, script_file, task, registry_file, log, hold_after=hold_after,
-                     hold_dir=hold_dir, hold_action=hold_action, workspace_files=files_file)
+                     hold_dir=hold_dir, hold_action=hold_action, workspace_files=files_file,
+                     await_file=None if await_file is None else (await_file[0], await_file[1]),
+                     await_dir=None if await_file is None else data_dir / "workspaces")
     try:
-        if started is not None:
+        if await_file is not None:
+            process.wait(STARTUP_TIMEOUT_SEC)
+        elif started is not None:
             _wait_for_marker(Path(started), process, log)
         elif hold_after is not None:
             _wait_for_marker(hold_dir / "hold", process, log)
@@ -269,20 +329,28 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]], *,
               started: Path | None = None,
               kill: bool = True,
               resume_after: bool = True,
-              restart_round: int = 2) -> Interrupted:
+              restart_round: int = 2,
+              hold_after: str | None = None,
+              hold_action: str | None = None) -> Interrupted:
     # 重新启动一个已经存在的数据目录：启动恢复继续未结束的 run，在指定的时刻终止它。
     # 用于连续中断：一次自动重新执行以后再次中断，重启后观察有没有新的尝试或者决定请求。
     # script 是这一次重启以后模型继续用的脚本；kill 为假时让子进程运行到停止（不终止）。
-    # resume_after 为假时 after 打开以后不走启动恢复（父进程不再碰这份日志，避免重复恢复污染事件）
+    # resume_after 为假时 after 打开以后不走启动恢复（父进程不再碰这份日志，避免重复恢复污染事件）。
+    # hold_after 与 hold_action 让恢复途中（自动重新执行的那一次尝试）在指定事件上停住再被终止
     data_dir = Path(data_dir)
     work = data_dir.parent
     log = work / f"restart-{restart_round}.log"
     script_file = work / f"restart-script-{restart_round}.json"
     script_file.write_text(json.dumps(list(script), ensure_ascii=False), encoding="utf-8")
+    hold_dir = work / f"hold-{restart_round}"
+    hold_dir.mkdir(exist_ok=True)
 
-    process = _spawn(data_dir, script_file, "restart", None, log, resume_only=True)
+    process = _spawn(data_dir, script_file, "restart", None, log, resume_only=True,
+                     hold_after=hold_after, hold_dir=hold_dir, hold_action=hold_action)
     try:
-        if started is not None:
+        if hold_after is not None:
+            _wait_for_marker(hold_dir / "hold", process, log)
+        elif started is not None:
             _wait_for_marker(Path(started), process, log)
         else:
             process.wait(STARTUP_TIMEOUT_SEC)

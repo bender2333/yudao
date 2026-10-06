@@ -4222,7 +4222,7 @@
    "media_type": "application/json",
    "content": {
     "digest": "<sha256#1>",
-    "files": []
+    "entries": []
    }
   },
   "<art#21>": {
@@ -4230,8 +4230,11 @@
    "media_type": "application/json",
    "content": {
     "digest": "<sha256#50>",
-    "files": [
-     "src/echo.py"
+    "entries": [
+     [
+      "src/echo.py",
+      "<sha256#51>"
+     ]
     ]
    }
   },
