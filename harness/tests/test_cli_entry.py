@@ -1,14 +1,17 @@
 # 命令行入口（工单 #206，设计说明第 4.1 节）：yudao --version 输出发布版本号；
 # 从源码运行时 yudao client install 说明没有随包的安装程序并以非零状态退出。
 # 模型目录与凭据文件的默认位置（工单 #298，设计说明第 3.4 节）：按生效的 --data-dir 求出
+# --data-dir 与 --provider-config 写在子命令之前或之后都生效（工单 #315）：解析器自身不给默认值，
+# 生效值由 _data_dir 按子命令求出
 
 import sys
 from importlib.metadata import version
 from pathlib import Path
 
 from harness import __main__ as cli
-from harness.__main__ import build_parser, default_data_dir, main, release_version, _provider_paths
+from harness.__main__ import _data_dir, build_parser, default_data_dir, main, release_version, _provider_paths
 from harness.data_directory import default_dotenv, default_provider_config
+from harness.smoke import DEFAULT_DIR
 
 def test_version_option_prints_the_release_version(capsys):
     assert release_version() == version("yudao-harness")
@@ -62,8 +65,35 @@ def test_the_default_data_directory_keeps_the_previous_locations(tmp_path, monke
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     parsed = build_parser().parse_args([])
-    assert parsed.data_dir == str(default_data_dir())
+    data_dir = _data_dir(parsed, "api")
+    assert data_dir == str(default_data_dir())
     assert parsed.provider_config is None
-    config, dotenv = _provider_paths(Path(parsed.data_dir), parsed.provider_config)
+    config, dotenv = _provider_paths(Path(data_dir), parsed.provider_config)
     assert config == default_provider_config(tmp_path / "Yudao")
     assert dotenv == default_dotenv(tmp_path / "Yudao")
+
+def test_smoke_takes_the_data_directory_from_either_position(tmp_path):
+    # 写在 smoke 之前与之后给出同一个 --data-dir 时效果相同（工单 #315）
+    for argv in (["--data-dir", str(tmp_path / "data"), "smoke"],
+                 ["smoke", "--data-dir", str(tmp_path / "data")]):
+        parsed = build_parser().parse_args(argv)
+        assert _data_dir(parsed, "smoke") == str(tmp_path / "data")
+
+def test_smoke_without_a_data_directory_keeps_its_own_default(tmp_path, monkeypatch):
+    # 两处都没有给出时 smoke 的数据目录是 harness/smoke.py 的 DEFAULT_DIR，其余子命令取用户数据目录
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    parsed = build_parser().parse_args(["smoke"])
+    assert _data_dir(parsed, "smoke") == str(DEFAULT_DIR)
+    assert _data_dir(parsed, "demo") == str(tmp_path / "Yudao")
+
+def test_smoke_takes_the_provider_config_from_either_position(tmp_path):
+    # 写在 smoke 之前与之后的 --provider-config 都生效；两处都没有给出时按生效的数据目录求出
+    for argv in (["--provider-config", str(tmp_path / "before.json"), "smoke"],
+                 ["smoke", "--provider-config", str(tmp_path / "after.json")]):
+        parsed = build_parser().parse_args(argv)
+        assert parsed.provider_config == argv[argv.index("--provider-config") + 1]
+    parsed = build_parser().parse_args(["--data-dir", str(tmp_path / "data"), "smoke"])
+    config, dotenv = _provider_paths(_data_dir(parsed, "smoke"), parsed.provider_config)
+    assert config == (tmp_path / "data" / "providers.json").resolve()
+    assert dotenv == default_dotenv(tmp_path / "data").resolve()

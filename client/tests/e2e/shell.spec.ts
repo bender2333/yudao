@@ -3,6 +3,7 @@
 
 import { expect, test } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
+import { CLIENT_API_VERSION } from "../../src/renderer/src/api/interface-version";
 
 let backend: Backend;
 
@@ -221,14 +222,14 @@ test("接口版本相同而能力清单多出查询时，客户端正常使用�
 });
 
 test("接口版本不同时客户端只显示更新页（写明两边的版本），不打开页面、不执行命令", async () => {
-  const other = await startBackend({ apiVersion: 2 });
+  const other = await startBackend({ apiVersion: CLIENT_API_VERSION + 1 });
   try {
     const client = await startClient(other, { width: 1440, height: 900 });
     const errors = watchErrors(client);
     try {
       await expect(client.page.getByRole("heading", { name: "请更新客户端" })).toBeVisible();
-      await expect(client.page.locator("text=客户端接口版本：1")).toBeVisible();
-      await expect(client.page.locator("text=Yudao 服务接口版本：2")).toBeVisible();
+      await expect(client.page.locator(`text=客户端接口版本：${CLIENT_API_VERSION}`)).toBeVisible();
+      await expect(client.page.locator(`text=Yudao 服务接口版本：${CLIENT_API_VERSION + 1}`)).toBeVisible();
       // 不打开任何页面：外壳与左侧栏都不出现
       await expect(client.page.locator(".sidebar")).toHaveCount(0);
       expect(errors).toEqual([]);
