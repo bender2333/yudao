@@ -268,7 +268,9 @@ def call_target_public(
     }
 
 
-_DECISION_TARGET_STRINGS = (
+# 调用目标里合同要求必须是文本的字段（CallTarget 把它们声明为非空字符串）：待恢复决定请求与
+# 自动重新执行（工单 #307）都按它判断解析结果是否已经确定
+CALL_TARGET_REQUIRED_STRINGS = (
     "provider_name", "protocol", "requested_provider", "requested_protocol", "requested_model",
 )
 
@@ -281,7 +283,7 @@ def event_call_target(public: Mapping[str, Any], *, selection_source: str | None
 def decision_call_target(public: Mapping[str, Any]) -> dict[str, Any] | None:
     # 待恢复决定请求里的调用目标：身份还没有解析出来时不填，原因与说明写在请求文本里
     payload = event_call_target(public, selection_source=None)
-    if any(not isinstance(payload.get(key), str) for key in _DECISION_TARGET_STRINGS):
+    if any(not isinstance(payload.get(key), str) for key in CALL_TARGET_REQUIRED_STRINGS):
         return None
     return payload
 

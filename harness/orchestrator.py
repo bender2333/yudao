@@ -59,7 +59,8 @@ from .providers.selection import ModelSelection
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
-from .recovery import ACTION_UNKNOWN, build_unknown_action_request, classify_actions, resolved_by_decision
+from .recovery import (ACTION_UNKNOWN, action_repeatable, build_unknown_action_request, classify_actions,
+                       resolved_by_decision)
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
@@ -709,9 +710,12 @@ class Orchestrator:
             transaction.on_commit(lambda: self._wake(run_id))
 
         self.writes.transact(run_stream(run_id), request)
+
     def _await_unknown_actions(self, run_id: str) -> None:
-        # 工单 #17（恢复契约第 4 节）：恢复时找出结果未知的动作，逐个发出「核实结果未知的动作」决定请求。
+        # 工单 #17、#307（恢复契约第 4 节）：恢复时找出结果未知的动作，逐个发出「核实结果未知的动作」决定请求。
         # 请求只阻塞这个动作（blocks=action），不阻塞整个 run；「重新执行」只在动作契约声明可以重复时给出。
+        # 跳过三种动作：已经被后来的尝试取代的那一次、由新的尝试接手的动作、契约声明可以重复而且还有
+        # 自动重新执行机会的动作（步骤驱动会先自动重新执行一次，用户不必回答）。
         # 同一个动作只发一次请求：已经有它未回答的请求时不再发
         def request(transaction: Transaction) -> None:
             projection = transaction.projection
@@ -720,7 +724,11 @@ class Orchestrator:
             actions = classify_actions(transaction.events())
             resolved = resolved_by_decision(transaction.events(), transaction.decisions.values())
             for identity, info in actions.items():
-                if info["status"] != ACTION_UNKNOWN or info["started_event"] is None or identity in resolved:
+                if (info["status"] != ACTION_UNKNOWN or info["started_event"] is None or identity in resolved
+                        or info["superseded"] or (info["auto_retry_available"]
+                                                 and action_repeatable(info["tool"],
+                                                                      info["started_event"].payload.get("args"),
+                                                                      registered_commands=projection.registered_commands))):
                     continue
                 action_id = identity[2]
                 if any(decision.request.get("kind") == UNKNOWN_ACTION.name
@@ -735,7 +743,9 @@ class Orchestrator:
                     department=projection.active_department or "",
                     facts=[info["started_event"].event_id],
                     args=info["started_event"].payload.get("args"),
-                    registered_commands=projection.registered_commands)
+                    registered_commands=projection.registered_commands,
+                    # 自动重新执行的机会已经用掉：新的尝试仍然结果未知，材料写明连续两次结果未知
+                    repeat_attempted=not info["auto_retry_available"])
                 transaction.append(NewEvent(
                     EventType.DECISION_REQUESTED, actor="system", department=projection.active_department,
                     state_before=projection.phase, state_after=projection.phase,
