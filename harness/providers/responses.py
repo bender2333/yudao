@@ -547,6 +547,13 @@ class _ResponsesInvoker:
                         )
                     if response.output is None:
                         raise ProviderError("Completed model response has no output array")
+                    # 可见输出是回答文字与工具调用；输出项只有推理内容时同样算没有输出（工单 #305）
+                    if not _has_output_items(output):
+                        raise _empty_output_error(
+                            finish_reason=getattr(response.incomplete_details, "reason", None) or response.status,
+                            usage=usage, max_output_tokens=provider_input.max_output_tokens,
+                            reasoning=reasoning is not None,
+                        )
                     text = "\n".join(
                         part.get("text", "") for item in output for part in (item.get("content") or [])
                         if isinstance(part, dict) and part.get("type") == "output_text"
@@ -939,6 +946,51 @@ def _transport_diagnostics(
         "transport_event": snapshot.get("transport_event", "unknown"),
         "cause_type": cause_type or "unknown",
     }
+
+
+def _has_output_items(output: list[dict[str, Any]]) -> bool:
+    # 可见输出：工具调用，或带文字的回答消息。推理条目不算可见输出
+    for item in output:
+        if item.get("type") == "function_call":
+            return True
+        if item.get("type") == "message":
+            for part in item.get("content") or []:
+                if isinstance(part, dict) and part.get("type") == "output_text" and part.get("text"):
+                    return True
+    return False
+
+
+def _empty_output_diagnostics(*, finish_reason: Any, usage: Any, max_output_tokens: int | None,
+                              reasoning: bool) -> dict[str, Any]:
+    # 流正常结束却没有任何输出项（没有文字、没有工具调用，只有推理内容同样算）：诊断保存上游给的结束原因、
+    # 实报的输出 token 数与本次请求的输出上限，用来区分上限截断、内容段丢失与模型真空输出
+    output_tokens = None
+    reported = False
+    if isinstance(usage, dict):
+        reported = bool(usage.get("reported", False))
+        value = usage.get("output_tokens")
+        if isinstance(value, int) and not isinstance(value, bool):
+            output_tokens = value
+    return {
+        "error_type": "empty_output",
+        "finish_reason": finish_reason if isinstance(finish_reason, str) and finish_reason else "unknown",
+        "usage_reported": reported,
+        "output_tokens": output_tokens,
+        "max_output_tokens": max_output_tokens,
+        "has_reasoning": reasoning,
+    }
+
+
+def _empty_output_error(*, finish_reason: Any, usage: Any, max_output_tokens: int | None,
+                         reasoning: bool) -> ProviderError:
+    # 空输出按可重试失败交给内核（工单 #305，D17）：流本身正常结束，因此不按传输错误分类
+    return ProviderError(
+        "Model response contained no output items",
+        reason="empty_output",
+        retryable=True,
+        diagnostics=_empty_output_diagnostics(finish_reason=finish_reason, usage=usage,
+                                               max_output_tokens=max_output_tokens, reasoning=reasoning),
+    )
 
 
 def _safe_cause_type(exc: BaseException) -> str | None:
