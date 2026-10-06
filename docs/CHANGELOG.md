@@ -474,6 +474,10 @@ qwen3.8 / 2026-10-03 08:55 / docs/architecture-issues.md 追加一条 #233 的�
 qwen3.8 / 2026-10-03 09:45 / docs/architecture-issues.md 的 #233 处理行补全引用 WAIT_FOR_HOST_WORK_SEC 的十四个文件与各自原值，并写明不改的业务断言界限 / 交付前核对改动范围与文档口径一致
 qwen3.8 / 2026-10-03 11:20 / docs/design/app-and-interface.md 把对外接口中的部门设置路由统一为部门设置名称：第 1 节现状表的 `/api/runs/{id}/prompts/{dept}`、第 3.2 与 3.4 节的命令行、第 4.3 节的 `project.settings` 现状、第 7.1 节的路由对照表改为 `department-settings/{dept}` / 工单 #234 把 #89 登记的架构问题（同一概念在对外接口用 prompt 字样、内部模型用部门设置）统一为部门设置的写法，文档与实现一致
 Leela / 2026-10-03 14:20 / AGENTS.md「自主推进模式」新增「aipro 板子环境（Leela，无独立审查者）」小节：仅限主机名 orangepiaipro、由 Leela 执行、没有另一个独立 agent 实例可接手审查时适用，流程改为本地提交、交付后立刻自我审查（走 REVIEW: PASS 与 review-passed）、推送、建 PR、CI 通过或本地测试通过后直接合并并关闭工单，不等待人工确认 / 用户要求在此环境下由 Leela 一人身兼执行者与审查者、自主完成到合并关闭，与原有「执行者只本地提交、审查者独立核对后才推送建 PR」的分离流程并存，按环境区分适用范围
+
+9router/my-small / 2026-10-06 10:24 / 新增 docs/evaluation/scenario-3-opencode.json 与 docs/evaluation/scenario-3-opencode.md：场景 3（北京地铁票价）OpenCode 一侧三次真实运行的结果与中文报告 / 评测场景设计第 6 节要求结果与报告提交到 docs/evaluation/，原始证据留在 .yudao/evals/ 不进入 Git
+
+9router/my-small / 2026-10-06 10:24 / evals/README.md 增加 runner/ 说明、运行一次评测的用法与运行器保证的条件 / 工单 189 建立了运行器，使用方式需要写清楚
 claude-sonnet-5-5 / 2026-10-06 08:30 / docs/architecture-issues.md 为 #78 登记的两处口径差异（project.usage 的用量汇总、department.workspace 的失败与取消尝试的部分输出）写处理结论：按旧控制台的口径改新接口，由 #269 实施，设计说明不修改 / 按登记规则写处理行；#78（PR #268）已合并
 exec-137 / 2026-10-06 10:32 / docs/architecture-issues.md 追加一条 #137 的登记：设计说明第 3.3 节把「阅读已有项目的动作」与「部门房间画面」写在同一节，房间画面由 #177 提供、等待确认初始 PRD 的项目流决定由 #136 实现，两者合并前这两处无法端到端验证 / 执行 #137 时发现动作与画面由不同工单承担，按登记规则记录依赖与复核建议
 claude-sonnet-5-5 / 2026-10-06 11:40 / docs/architecture-issues.md 为 #137 登记的两处问题（房间画面与页面区块的关系、等待确认初始 PRD 的标记依赖 #136）写处理结论：两处都不改设计与工单，房间画面按动作图鉴显示读取工具的动作、页面区块是同一批事件的文字列表，标记依据 decisions.list 推导，#136 合并以后由 #138、#139 核对 / 按登记规则写处理行；#137（PR #289）已合并

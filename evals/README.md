@@ -18,7 +18,8 @@ flowchart TD
 - `scenarios/scenario-3/checks/`：隐藏检查。只有评分器读取，不进入被测方的运行目录，运行结束以后才复制到评分目录。
 - `scenarios/scenario-3/reference/`：参考实现，只由评分器用来确认检查本身没有写错。
 - `scorer/`：评分器，对一份交付运行隐藏检查并写出机器可读结果。
-- `tests/`：评分器自己的测试，全部运行真实代码，不使用 mock。
+- `runner/`：OpenCode 一侧的运行器、指标收集与报告（`run_eval.py` 是入口）。它把材料起点复制到仓库之外的运行目录，运行 `opencode run`，从 JSON 事件流收集指标，再用评分器评分，最后写出机器可读结果与中文报告。
+- `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。
 
 ## 材料版本
 
@@ -41,6 +42,41 @@ uv run python evals/scorer/scorer.py --delivery <交付目录> --result <结果�
 ```bash
 uv run python -m pytest evals/tests
 ```
+
+## 运行一次评测
+
+模型服务的地址与凭据只从环境变量读，不写入代码、事件、日志与提交：
+
+```bash
+export YUDAO_EVAL_BASE_URL=<模型服务地址>
+export YUDAO_EVAL_API_KEY=<凭据>
+uv run python evals/runner/run_eval.py \
+    --model yudao-eval/<模型名> \
+    --runs 3 \
+    --runs-root <Yudao 仓库之外的目录> \
+    --result docs/evaluation/scenario-3-opencode.json \
+    --report docs/evaluation/scenario-3-opencode.md
+```
+
+运行器保证下面这些：
+
+- 运行目录在 Yudao 仓库之外，并且是 git 仓库。没有版本控制的目录被 OpenCode 当成全局目录，交付会落到系统临时目录而不是运行目录。
+- 隐藏检查、条目表与参考实现不进入运行目录；它们在运行结束以后才复制到评分目录。
+- 取回与搜索工具（`webfetch`、`websearch`）在运行配置里关闭，运行器另外检查 JSON 输出里没有这两类工具的调用。
+- 消息用短指示加上材料附件（`prd.md`、`interface-agreement.md`、`subway_data.json`），不把需求全文放进命令行。
+- JSON 输出里出现材料目录的路径时这次运行作废（`void`），不计入结果；这类运行在报告的第六节列出。
+- 到达墙钟上限时结束进程，按结束时的目录评分并标记超时，不因为没有跑完而作废。
+
+原始证据（交付副本、输出、评分日志）在 `.yudao/evals/` 下，不进入 Git。
+
+## 运行器自己的测试
+
+```bash
+uv run python -m pytest evals/tests/test_opencode_runner.py
+```
+
+
+其中三项标记 `needs_model`，真实运行模型（每次数分钟），凭据不在环境变量里时跳过。
 
 ## 运行环境
 

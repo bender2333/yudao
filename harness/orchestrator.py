@@ -787,14 +787,11 @@ class Orchestrator:
     # 3.4A 之前只有一个执行槽位：已有事项在执行时新建被拒绝（busy）
 
     def busy(self) -> bool:
-        # 有事项的 run 正在作为任务运行、有 run 正在激活、有 run 正在作为任务运行（start），
-        # 或有事项正在开始（run 还没有创建）时算作占用执行槽位
-        if self._tasks or self._work_item_tasks or self._running or self._active:
-            return True
+        # 执行槽位是否被占用只按事件日志与正在开始的事项判断（#202、#219 的结论），不看进程内的任务表：
+        # run_until_stop 读到终态事件就返回，执行任务从 self._tasks 摘除要等到事件循环的下一轮，
+        # 这个窗口内任务表仍非空，但事件日志已经没有未结束的 run，按任务表判断会把这个窗口误判为占用。
         if getattr(self.projects, "starting", lambda: False)():
             return True
-        # 任务表是进程内的瞬时状态：run 停在等待回答的决定请求上时执行任务已经结束、表中不再有它，
-        # 事项却仍是进行中的（回答以后接着执行）。执行槽位是否被占用以事件日志为准：有未结束的 run 就被占用
         unfinished = classify_startup_runs(self.store)
         return bool(unfinished.same_version or unfinished.other_version)
 
