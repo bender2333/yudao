@@ -17,6 +17,8 @@
       "summary": "这个事件种类是新增的，旧版本的项目流中没有它：采纳摘要取自建档 run 的现有结构说明",
       "tree_ref": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码树取自建档快照",
       "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线属于建档事项"
+    "command_configured": {
+      "repeatable": "旧事件没有登记「可以重新执行」这个声明（#242）；没有这个字段时按否处理，结果未知的动作不自动重新执行"
     },
     "department_prompt_configured": {
       "department_prompt": "旧事件用 text 写部门 Prompt 原文；没有 text 与 department_prompt 时该部门没有写入 Prompt，读取时用内置默认 Prompt（版本 0）",
@@ -188,6 +190,7 @@
       "base_version": "integer",
       "name": "string",
       "output_limit": "integer",
+      "repeatable": "boolean",
       "timeout_sec": "integer",
       "version": "integer"
     },

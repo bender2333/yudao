@@ -1393,6 +1393,10 @@ export type CommandRegistrationSave = {
      * Output Limit
      */
     output_limit?: number | null;
+    /**
+     * Repeatable
+     */
+    repeatable?: boolean;
 };
 
 /**
@@ -1423,6 +1427,10 @@ export type CommandSetting = {
      * Output Limit
      */
     output_limit: number;
+    /**
+     * Repeatable
+     */
+    repeatable: boolean;
 };
 
 /**
@@ -1836,6 +1844,7 @@ export type DepartmentWorkspaceResult = {
      * Reminders
      */
     reminders: Array<string>;
+    room: RoomView;
 };
 
 /**
@@ -3380,6 +3389,168 @@ export type ReviewEntry = {
     checks: Array<{
         [key: string]: unknown;
     }>;
+};
+
+/**
+ * RoomCrt
+ */
+export type RoomCrt = {
+    /**
+     * Target
+     */
+    target: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Protocol
+     */
+    protocol: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Cycle
+     */
+    cycle: number | null;
+};
+
+/**
+ * RoomPipes
+ */
+export type RoomPipes = {
+    /**
+     * Out
+     */
+    out: string;
+    /**
+     * Letters Waiting
+     */
+    letters_waiting: number;
+};
+
+/**
+ * RoomRole
+ */
+export type RoomRole = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Task
+     */
+    task: string | null;
+};
+
+/**
+ * RoomView
+ */
+export type RoomView = {
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Level
+     */
+    level: string;
+    /**
+     * Status
+     */
+    status: string;
+    crt: RoomCrt;
+    /**
+     * Roles
+     */
+    roles: Array<RoomRole>;
+    /**
+     * Existing Read
+     */
+    existing_read: boolean;
+    /**
+     * Pose
+     */
+    pose: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Door
+     */
+    door: string | null;
+    /**
+     * Hold Card
+     */
+    hold_card: string | null;
+    /**
+     * Pending Tool
+     */
+    pending_tool: string | null;
+    /**
+     * Mailbox
+     */
+    mailbox: number;
+    /**
+     * Summaries
+     */
+    summaries: number;
+    /**
+     * Scrolls
+     */
+    scrolls: number;
+    /**
+     * Pinned Notes
+     */
+    pinned_notes: number;
+    /**
+     * Semantic Cards
+     */
+    semantic_cards: number;
+    /**
+     * Machine
+     */
+    machine: string | null;
+    /**
+     * Remote Unknown
+     */
+    remote_unknown: boolean;
+    /**
+     * Waiting Provider
+     */
+    waiting_provider: boolean;
+    pipes: RoomPipes;
+    /**
+     * Trial
+     */
+    trial: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Tool Panel
+     */
+    tool_panel: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Self Test
+     */
+    self_test: {
+        [key: string]: unknown;
+    } | null;
 };
 
 /**
@@ -6188,6 +6359,10 @@ export type CommandConfiguredPayload = {
      * Base Version
      */
     base_version: number;
+    /**
+     * Repeatable
+     */
+    repeatable?: boolean;
 };
 
 /**
@@ -8232,6 +8407,10 @@ export type FrozenCommand = {
      * Output Limit
      */
     output_limit: number;
+    /**
+     * Repeatable
+     */
+    repeatable?: boolean;
 };
 
 /**

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { GALLERY_MEMBERS, type GalleryMember, type GallerySample } from "../../pixel/gallery-data";
 import { paletteSwatch } from "../../pixel/preview";
 import { sampleDrawing } from "../../pixel/samples";
-import { PIXEL_FONT_STACK, PUBLIC_MEMBERS } from "../../pixel/registry";
+import { ACTIONS, BASE_MOTIONS, PIXEL_FONT_STACK, PUBLIC_MEMBERS, ROLE_NAMES, STATUS_ACTIONS } from "../../pixel/registry";
 import type { Grid } from "../../pixel/grid";
 
 /** 把点阵画到底图上，按整数倍放大，采样最近邻。 */
@@ -145,6 +145,78 @@ export function GalleryPage(): React.JSX.Element {
           ))}
         </div>
       </section>
+
+      <ActionGallery />
     </div>
+  );
+}
+
+/** 部门房间与项目楼层里的动作：事件到动作的对照表、状态姿势与基础动作，一项不漏（v8 设计说明第 8.3、8.4 节）。 */
+function ActionGallery(): React.JSX.Element {
+  const actions = Object.entries(ACTIONS);
+  const motions = Object.entries(BASE_MOTIONS);
+  const statuses = Object.entries(STATUS_ACTIONS);
+  return (
+    <section className="gallery-section">
+      <h2>部门房间的动作（{actions.length + motions.length}）</h2>
+      <p className="gallery-caption">
+        每项写明驱动它的事实、来源事件、小人动作、房间变化与所属档位；小人的行为由事件驱动（设计说明第 8.3 节）。
+        当前客户端实现全部动作的解析与播放，Stage 4 与 Stage 5 的动作随对应工作包加入画面。
+      </p>
+      <table className="gallery-actions">
+        <thead>
+          <tr>
+            <th>动作</th>
+            <th>事实</th>
+            <th>来源</th>
+            <th>小人动作</th>
+            <th>房间变化</th>
+            <th>档位</th>
+          </tr>
+        </thead>
+        <tbody>
+          {actions.map(([name, a]) => (
+            <tr key={name} data-action={name}>
+              <td>{a.label}</td>
+              <td>{a.fact}</td>
+              <td><code>{a.source}</code></td>
+              <td>{a.action}</td>
+              <td>{a.room ?? "—"}</td>
+              <td>{a.level === "ui" ? "界面工作线" : a.level}</td>
+            </tr>
+          ))}
+          {motions.map(([name, m]) => (
+            <tr key={name} data-action={name}>
+              <td>{m.label}</td>
+              <td>{m.fact}</td>
+              <td><code>基础动作</code></td>
+              <td>{m.anim}</td>
+              <td>—</td>
+              <td>界面工作线</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h3 className="gallery-caption">部门状态对应的姿势（{statuses.length}）</h3>
+      <table className="gallery-actions">
+        <thead>
+          <tr>
+            <th>状态</th>
+            <th>标识</th>
+            <th>姿势</th>
+          </tr>
+        </thead>
+        <tbody>
+          {statuses.map(([status, action]) => (
+            <tr key={status} data-status={status}>
+              <td>{status}</td>
+              <td><code>{action}</code></td>
+              <td>{ACTIONS[action]?.label ?? action}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="gallery-caption">角色：{Object.values(ROLE_NAMES).join("、")}。</p>
+    </section>
   );
 }

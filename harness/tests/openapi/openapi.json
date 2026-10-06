@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Yudao",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "paths": {
     "/api/commands/project.create": {
@@ -5964,6 +5964,11 @@
               }
             ],
             "title": "Output Limit"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -6008,6 +6013,10 @@
           "output_limit": {
             "type": "integer",
             "title": "Output Limit"
+          },
+          "repeatable": {
+            "type": "boolean",
+            "title": "Repeatable"
           }
         },
         "additionalProperties": false,
@@ -6018,7 +6027,8 @@
           "argv",
           "args",
           "timeout_sec",
-          "output_limit"
+          "output_limit",
+          "repeatable"
         ],
         "title": "CommandSetting"
       },
@@ -6746,6 +6756,9 @@
             },
             "type": "array",
             "title": "Reminders"
+          },
+          "room": {
+            "$ref": "#/components/schemas/RoomView"
           }
         },
         "additionalProperties": false,
@@ -6764,7 +6777,8 @@
           "messages",
           "context",
           "last_call",
-          "reminders"
+          "reminders",
+          "room"
         ],
         "title": "DepartmentWorkspaceResult"
       },
@@ -9299,6 +9313,287 @@
           "checks"
         ],
         "title": "ReviewEntry"
+      },
+      "RoomCrt": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "model",
+          "protocol",
+          "status",
+          "cycle"
+        ],
+        "title": "RoomCrt"
+      },
+      "RoomPipes": {
+        "properties": {
+          "out": {
+            "type": "string",
+            "title": "Out"
+          },
+          "letters_waiting": {
+            "type": "integer",
+            "title": "Letters Waiting"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "out",
+          "letters_waiting"
+        ],
+        "title": "RoomPipes"
+      },
+      "RoomRole": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "status",
+          "task"
+        ],
+        "title": "RoomRole"
+      },
+      "RoomView": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "crt": {
+            "$ref": "#/components/schemas/RoomCrt"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoomRole"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "existing_read": {
+            "type": "boolean",
+            "title": "Existing Read"
+          },
+          "pose": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pose"
+          },
+          "door": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Door"
+          },
+          "hold_card": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Card"
+          },
+          "pending_tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Tool"
+          },
+          "mailbox": {
+            "type": "integer",
+            "title": "Mailbox"
+          },
+          "summaries": {
+            "type": "integer",
+            "title": "Summaries"
+          },
+          "scrolls": {
+            "type": "integer",
+            "title": "Scrolls"
+          },
+          "pinned_notes": {
+            "type": "integer",
+            "title": "Pinned Notes"
+          },
+          "semantic_cards": {
+            "type": "integer",
+            "title": "Semantic Cards"
+          },
+          "machine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Machine"
+          },
+          "remote_unknown": {
+            "type": "boolean",
+            "title": "Remote Unknown"
+          },
+          "waiting_provider": {
+            "type": "boolean",
+            "title": "Waiting Provider"
+          },
+          "pipes": {
+            "$ref": "#/components/schemas/RoomPipes"
+          },
+          "trial": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trial"
+          },
+          "tool_panel": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Panel"
+          },
+          "self_test": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Test"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department",
+          "level",
+          "status",
+          "crt",
+          "roles",
+          "existing_read",
+          "pose",
+          "door",
+          "hold_card",
+          "pending_tool",
+          "mailbox",
+          "summaries",
+          "scrolls",
+          "pinned_notes",
+          "semantic_cards",
+          "machine",
+          "remote_unknown",
+          "waiting_provider",
+          "pipes",
+          "trial",
+          "tool_panel",
+          "self_test"
+        ],
+        "title": "RoomView"
       },
       "RunActionsResult": {
         "properties": {
@@ -14608,6 +14903,11 @@
           "base_version": {
             "title": "Base Version",
             "type": "integer"
+          },
+          "repeatable": {
+            "default": false,
+            "title": "Repeatable",
+            "type": "boolean"
           }
         },
         "required": [
@@ -18678,6 +18978,11 @@
           "output_limit": {
             "title": "Output Limit",
             "type": "integer"
+          },
+          "repeatable": {
+            "default": false,
+            "title": "Repeatable",
+            "type": "boolean"
           }
         },
         "required": [

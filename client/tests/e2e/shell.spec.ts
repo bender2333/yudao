@@ -177,6 +177,32 @@ test("事件流驱动视图刷新：经命令新建项目以后，左侧栏无�
   }
 });
 
+test("从想法新建：提交成功、项目出现在列表以后表单关闭，重新打开时字段为空", async () => {
+  const client = await openClient({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  try {
+    const page = client.page;
+    const name = `表单关闭的项目 ${Date.now()}`;
+    await page.locator(".sidebar .nav-item", { hasText: "从想法新建" }).click();
+    const form = page.locator("form.card").filter({ has: page.getByRole("heading", { name: "从想法新建项目" }) });
+    await expect(form).toBeVisible();
+    await form.getByLabel("项目名称").fill(name);
+    await form.getByLabel("长期目标").fill("核对新建表单的关闭与清空");
+    await form.getByRole("button", { name: "新建项目" }).click();
+    // 事件到达、项目出现在列表里：表单随之关闭
+    await expect(page.locator(".project-entry").filter({ hasText: name })).toBeVisible();
+    await expect(form).toHaveCount(0);
+    // 重新打开表单：四个字段都是空的（字段随表单一起清空）
+    await page.locator(".sidebar .nav-item", { hasText: "从想法新建" }).click();
+    const reopened = page.locator("form.card").filter({ has: page.getByRole("heading", { name: "从想法新建项目" }) });
+    await expect(reopened.getByLabel("项目名称")).toHaveValue("");
+    await expect(reopened.getByLabel("长期目标")).toHaveValue("");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
 test("接口版本相同而能力清单多出查询时，客户端正常使用（新增查询不要求更新客户端）", async () => {
   // 当前部署的接口版本与服务端构建版本相同；服务端的能力清单包含项目与决定相关的查询，
   // 客户端按能力清单打开外壳与项目标签，不出现更新页

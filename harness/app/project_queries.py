@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import Field, field_validator
 
 from ..git_audit import git_version_detail
-from ..definitions import DEFINITIONS
 from ..event_store import run_stream
 from ..models import (
     ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
@@ -28,8 +27,8 @@ from ..projects import ProjectNotFoundError, project_projection
 from ..replay_check import ReplayIntegrityError, verify_replay
 from ..recovery import (
     ACTION_UNKNOWN, OBSERVATION_INTERRUPTED, OBSERVATION_PENDING_VERIFICATION, OBSERVATION_RUNNING,
-    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity, observation_state, open_decisions,
-    open_resume_decisions, unresolved_unknown_actions,
+    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity, action_repeatable, observation_state,
+    open_decisions, open_resume_decisions, unresolved_unknown_actions,
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
@@ -596,6 +595,53 @@ class GuidanceRecord(Contract):
     created_event_id: str
 
 
+class RoomCrt(Contract):
+    # 后墙的 CRT 监视器显示的内容（v8 设计说明第 8.1 节）
+    target: str
+    model: str
+    protocol: str
+    status: str
+    cycle: int | None
+
+class RoomRole(Contract):
+    # 房间里的一个角色（Stage 5 起一个部门有多个角色；当前档一个部门一个 Agent）
+    id: str
+    name: str
+    kind: str
+    status: str
+    task: str | None
+
+class RoomPipes(Contract):
+    # 房间的管道状态：out 是交接管道，letters_waiting 是停在传信管出口的未回答询问数
+    out: str
+    letters_waiting: int
+
+class RoomView(Contract):
+    # 部门房间的画面数据（v8 设计说明第 8 节、v9 设计说明第 1 节）：状态、CRT、角色、门口状态、
+    # 信箱与档案盒的数量、管道状态。Stage 4 与 3.2C、3.2D 的字段在当前档保持为空或零。
+    department: str
+    level: str
+    status: str
+    crt: RoomCrt
+    roles: list[RoomRole]
+    existing_read: bool
+    pose: dict[str, Any] | None
+    door: str | None
+    hold_card: str | None
+    pending_tool: str | None
+    mailbox: int
+    summaries: int
+    scrolls: int
+    pinned_notes: int
+    semantic_cards: int
+    machine: str | None
+    remote_unknown: bool
+    waiting_provider: bool
+    pipes: RoomPipes
+    trial: dict[str, Any] | None
+    tool_panel: dict[str, Any] | None
+    self_test: dict[str, Any] | None
+
 class EffectiveModel(Contract):
     # 本部门当前生效的模型及来源（设计说明第 9.3 节）：按第 5.3 节的选择规则与当前目录计算，不发送请求。
     # state 为 effective 时给出模型与来源；为 unusable 时给出 reason 与 message；
@@ -627,6 +673,7 @@ class DepartmentWorkspaceResult(Contract):
     context: dict[str, Any]
     last_call: dict[str, Any] | None
     reminders: list[str]
+    room: RoomView
 
 
 def _project_selection(setting: Any) -> ModelSelection | None:
@@ -658,6 +705,122 @@ def _effective_model(application: Application, setting: Any, department: str) ->
         requested_tier=public.get("requested_tier"),
         sent_tier=public.get("sent_tier"),
     )
+
+# 房间状态显示的文字（原型 contract/handlers/department.js 的 STATUS_TEXT）
+ROOM_STATUS_TEXT = {
+    "idle": "未工作", "working": "工作中", "asking": "等待回答", "paused": "已暂停", "failed": "失败",
+    "done": "已完成", "cancelled": "已取消", "interrupted": "中断",
+    "pending_verification": "待核实", "waiting_resume": "待恢复",
+}
+# 钉在指导板上的指导状态（原型 PINNED）
+ROOM_PINNED_GUIDANCE = frozenset({"in_input", "explained", "completed", "declined", "needs_work"})
+
+def _room_status(run: Any, department: str, observation: str | None) -> str:
+    # 房间状态（原型 roomStatus）：本部门正在工作时按恢复观察状态、未回答的询问、run 阶段取值；
+    # 本部门参与过这次 run 时按 run 的终态；否则未工作。
+    # 恢复观察状态只取待恢复与待核实这两种由决定请求与未完成动作给出的事实；进程存活性给出的
+    # 「中断」与项目楼层画面一致：当前档还没有来源，房间不显示这个状态。
+    if run is None:
+        return "idle"
+    if run.active_department == department:
+        if observation == OBSERVATION_WAITING_RESUME:
+            return "waiting_resume"
+        if observation == OBSERVATION_PENDING_VERIFICATION:
+            return "pending_verification"
+        if any(request.recipient == department and request.status == "open" for request in run.requests):
+            return "asking"
+        if run.phase == "PAUSED":
+            return "paused"
+        if run.phase == "FAILED":
+            return "failed"
+        if run.phase == "DONE":
+            return "done"
+        return "working"
+    # 本部门参与过这次 run（它的激活记录已写入）时按 run 的终态；否则未工作
+    if department not in run.last_activations:
+        return "idle"
+    if run.stop_reason and run.stop_reason == "cancelled":
+        return "cancelled"
+    if run.phase == "FAILED":
+        return "failed"
+    if run.phase == "PAUSED":
+        return "paused"
+    if run.phase == "DONE":
+        return "done"
+    return "idle"
+
+def _room_door(run: Any, status: str) -> str | None:
+    # 门口立牌的文字（原型 doorOf）：暂停与中断写在牌上，其余状态没有牌子
+    if status == "paused":
+        return "已暂停"
+    if status == "interrupted":
+        return "中断"
+    if run is not None and run.stop_reason and run.stop_reason == "upgrade":
+        return "因升级停止"
+    return None
+
+def _room_view(application: Application, state: Any, item: Any, run: Any, department: str,
+               guidance: list[GuidanceRecord], effective: EffectiveModel) -> RoomView:
+    # 部门房间的画面数据（v8 设计说明第 8 节）：状态、CRT、角色、门口状态、信箱与档案盒、管道状态。
+    # Stage 4（运维）、3.2C（远程执行）与 3.2D（试用）的数据尚未进入 run 投影，这些字段保持为空或零。
+    observation = None if run is None else _recovery_observation(application, run.run_id)
+    status = _room_status(run, department, observation)
+    target = "—" if item is None else item.title
+    protocol = "—"
+    if run is not None:
+        call_target = run.provider_bindings.get(department)
+        if call_target:
+            protocol = call_target.get("requested_protocol") or "—"
+    model_label = effective.model_id or "—"
+    role_id = department + "-agent"
+    role_kind = "ops" if department == "operations" else "agent"
+    role_status = "working" if status == "working" else "idle"
+    role_name = f"{_department_label(department)}部门 Agent"
+    pose = {"role_id": role_id, "action": "typing"} if status == "working" else None
+    letters_waiting = 0
+    if run is not None:
+        letters_waiting = sum(1 for request in run.requests
+                              if request.recipient == department and request.status == "open")
+    waiting_provider = False
+    scrolls = 0
+    if run is not None and department == "product":
+        # 卷轴数的来源是产品写出的 PRD 版本数（v8 设计说明第 8.1 节的卷轴架）
+        scrolls = len(run.product_specs)
+    summaries = 0
+    if run is not None:
+        summaries = max((int(entry.get("n") or 0) for entry in run.compactions), default=0)
+    return RoomView(
+        department=department, level="ui", status=status,
+        crt=RoomCrt(target=target, model=model_label, protocol=protocol,
+                    status=ROOM_STATUS_TEXT[status], cycle=None if run is None else run.cycle_count),
+        roles=[RoomRole(id=role_id, name=role_name, kind=role_kind, status=role_status,
+                        task=None if item is None else item.title)],
+        existing_read=bool(item is not None and item.kind == "onboarding"),
+        pose=pose,
+        door=_room_door(run, status),
+        hold_card=None,
+        pending_tool=None,
+        mailbox=sum(1 for value in guidance if value.status == "received"),
+        summaries=summaries,
+        scrolls=scrolls,
+        pinned_notes=sum(1 for value in guidance if value.status in ROOM_PINNED_GUIDANCE),
+        semantic_cards=0,
+        machine=None,
+        remote_unknown=False,
+        waiting_provider=waiting_provider,
+        pipes=RoomPipes(
+            out="stopped" if status == "interrupted" or waiting_provider
+            else "flowing" if status == "working" else "idle",
+            letters_waiting=letters_waiting,
+        ),
+        trial=None,
+        tool_panel=None,
+        self_test=None,
+    )
+
+def _department_label(department: str) -> str:
+    return {"product": "产品", "engineering": "工程", "quality": "质检", "operations": "运维"}.get(
+        department, department)
 
 
 def _department_workspace(application: Application, request: DepartmentWorkspace
@@ -707,6 +870,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             last_call=_last_call(run, request.department),
             # 当前生效模型不具备本部门建议能力时的提醒（设计说明第 5.6 节「部门工作间」）
             reminders=application.system.facade.model_reminders(effective.model_id, request.department),
+            room=_room_view(application, state, item, run, request.department, guidance, effective),
         ),
     )
 
@@ -1423,6 +1587,8 @@ class CommandSetting(Contract):
     args: list[str]
     timeout_sec: int
     output_limit: int
+    # 登记时声明的「可以重新执行」（工单 #242）
+    repeatable: bool
 
 
 class SourceDirectorySetting(Contract):
@@ -1469,7 +1635,7 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
             commands={
                 name: CommandSetting(name=value.name, version=value.version, argv=list(value.argv),
                                      args=list(value.args), timeout_sec=value.timeout_sec,
-                                     output_limit=value.output_limit)
+                                     output_limit=value.output_limit, repeatable=value.repeatable)
                 for name, value in state.commands.items()
             },
             source_directories={
@@ -1745,6 +1911,10 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 EventType.DEPARTMENT_ACTIVATED, EventType.MODEL_REQUESTED, EventType.MODEL_MESSAGE,
                 EventType.CONTEXT_ASSEMBLED, EventType.COMPACTION_RECORDED, EventType.USER_INPUT_RECEIVED,
                 EventType.DEPARTMENT_INPUT,
+                ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
+                EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.COLLABORATION_REQUESTED,
+                EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED,
                 # 本项目的部门设置修改以后生效模型与来源随之更新（工单 #95 的验收）；
                 # 目录修订（准入作废、连接修改）以后引用可用性随之更新
                 ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, CatalogEventType.CATALOG_REVISED),
@@ -1908,7 +2078,8 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     terminal = run.phase in TERMINAL_PHASES
     state = observation_state(events, decisions.values(), terminal=terminal)
     # 已终止的 run 不再继续：未完成动作与未回答的核实请求不由恢复处理，只显示终止原因
-    unfinished = [] if terminal else _unfinished_actions(events, decisions.values())
+    unfinished = [] if terminal else _unfinished_actions(
+        events, decisions.values(), run.registered_commands)
     verifications = _verification_records(events, decisions.values())
     resume_requests = [] if terminal else open_resume_decisions(decisions.values())
     unknown_requests = [] if terminal else open_decisions(decisions.values(), kind="unknown_action")
@@ -1982,7 +2153,8 @@ def _unusable_target(resume_requests: list[Any]) -> UnusableTarget | None:
                               problem=str(decision.request.get("description") or decision.request.get("message") or ""))
     return None
 
-def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAction]:
+def _unfinished_actions(events: list[Any], decisions: Any,
+                        registered_commands: Any) -> list[UnfinishedAction]:
     # 未完成动作：结果未知的动作（tool_started 没有结果或核实记录）。未发送的动作由保存的模型响应
     # 给出，属于步骤驱动的补执行范围，读取侧只列出已经发出的动作
     action_ids = {identity[2] for identity in unresolved_unknown_actions(events, decisions)}
@@ -1999,15 +2171,14 @@ def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAct
             action_id=action_id, tool=tool, department=event.department, status=ACTION_UNKNOWN,
             activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), purpose=payload.get("purpose"),
-            repeatable=_action_repeatable(tool), before_snapshot_ref=payload.get("before_snapshot_ref"),
+            repeatable=action_repeatable(tool, payload.get("args"),
+                                         registered_commands=registered_commands),
+            before_snapshot_ref=payload.get("before_snapshot_ref"),
             created_at=event.created_at, started_event_id=event.event_id,
         ))
     unfinished.sort(key=lambda item: item.created_at)
     return unfinished
 
-def _action_repeatable(tool_name: str) -> bool:
-    tool = DEFINITIONS.tools.get(tool_name)
-    return bool(tool is not None and tool.repeatable)
 
 def _verification_records(events: list[Any], decisions: Any) -> list[VerificationRecord]:
     # 核实记录：action_verified 事件（用户选择按当前实际状态继续时追加）与已回答的核实请求一起列出。

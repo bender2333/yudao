@@ -1039,6 +1039,8 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             args=list(payload["args"]), timeout_sec=int(payload["timeout_sec"]),
             output_limit=int(payload["output_limit"]), base_version=payload["base_version"],
             updated_at=event.created_at, event_id=event.event_id,
+            # 旧事件没有 repeatable 字段，按否处理（ADR-0019）
+            repeatable=bool(payload.get("repeatable", False)),
         )
         state.commands[command.name] = command
         state.command_history.append(command)

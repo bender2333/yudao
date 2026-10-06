@@ -1,0 +1,41 @@
+{
+  "scenario": "scenario-2",
+  "material_version": "scenario-2@1",
+  "title": "FeatBench 842 model settings extra_args",
+  "source": {
+    "dataset": "github.com/TsinghuaISE/FeatBench 8157fef, dataset/featbench_v1_0.json",
+    "record": "openai__openai-agents-python-842",
+    "upstream_repository": "openai/openai-agents-python",
+    "base_commit": "8dfd6ff35c1b73bc5d2e6a14c0246b03aa2f9f98",
+    "upstream_fix_commit": "0eee6b8305e52aa4de7cae74db4c22633019522a",
+    "version": "v0.0.18",
+    "license": "MIT"
+  },
+  "requirement": {
+    "file": "requirement.md",
+    "origin": "FeatBench problem_statement, verbatim",
+    "characters": 2179
+  },
+  "starting_point": {
+    "kind": "upstream repository at the task base commit",
+    "note": "The runner clones the repository and checks out the base commit. The scenario-2 start point is a repository, so it cannot be stored as files inside the Yudao repository; the base commit pins it exactly."
+  },
+  "runtime": {
+    "python": "3.13",
+    "install": "uv sync --frozen --all-extras --all-packages --group dev --python 3.13",
+    "network": "The environment build needs GitHub and PyPI; this happens before the run.",
+    "test_command": "uv run --python 3.13 python -m pytest <ids from the hidden lists>"
+  },
+  "reference_solution": {
+    "file": "../reference/gold.patch",
+    "origin": "upstream fix commit, the same change FeatBench records as its gold patch",
+    "files": 4
+  },
+  "hidden_checks": {
+    "test_files": "checks/tests/",
+    "f2p": "checks/f2p.json",
+    "p2p": "checks/p2p.json",
+    "excluded": "checks/excluded.json",
+    "note": "The hidden test files are stored as whole files. Scoring overwrites the delivery's copy, so a delivery that edits a test is scored against the material's version."
+  }
+}

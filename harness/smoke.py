@@ -20,6 +20,7 @@ from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, TARGET_KEYS, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
 from .contracts import current_contract_hash, current_plan_hash
+from .data_directory import default_provider_config
 from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
 from .event_store import EventStore, run_stream
@@ -34,7 +35,6 @@ from .tree_archive import load_tree
 
 
 DEFAULT_DIR = Path(".yudao") / "native-validation"
-DEFAULT_PROVIDER_CONFIG = Path(".yudao") / "providers.json"
 
 MODEL_ATTEMPT_FAILED = EventType.MODEL_ATTEMPT_FAILED
 MODEL_RETRY_SCHEDULED = EventType.MODEL_RETRY_SCHEDULED
@@ -73,7 +73,8 @@ def run_smoke(
     selected = scenarios or ["happy", "collaboration"]
     if any(name not in {"happy", "collaboration"} for name in selected):
         raise ValueError("unknown smoke scenario")
-    config_path = Path(provider_config) if provider_config is not None else DEFAULT_PROVIDER_CONFIG
+    config_path = (Path(provider_config) if provider_config is not None
+                   else default_provider_config(data_dir))
     report: dict[str, Any] = {
         "provider_config": str(config_path),
         "available": False,

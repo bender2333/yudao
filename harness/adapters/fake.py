@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from collections.abc import AsyncIterator, Callable, Generator, Sequence
@@ -56,10 +57,12 @@ class FakeAdapter:
     name = "fake"
     model = "fake-script"
 
-    def __init__(self, script: Sequence[TurnSpec] | None = None) -> None:
+    def __init__(self, script: Sequence[TurnSpec] | None = None, *, stream_gap_sec: float = 0.0) -> None:
         self.script = list(script or [])
         self.invocations: list[ModelCall] = []
         self.cancelled: set[str] = set()
+        # 流式轮次里片段之间的停顿：需要订阅方在请求进行中读到 attempt.live 时给出（部门房间验收）
+        self.stream_gap_sec = stream_gap_sec
 
     def availability(self) -> Availability:
         return Availability(True)
@@ -85,6 +88,10 @@ class FakeAdapter:
                     item = finished.value
                     break
                 yield event
+                if self.stream_gap_sec:
+                    # 片段之间让出事件循环并停顿：订阅方（例如部门房间的思考气泡）能在请求进行中
+                    # 读到 attempt.live 的已收到文字。停顿不写入事件，只影响这一轮的节奏
+                    await asyncio.sleep(self.stream_gap_sec)
         if call.attempt_id in self.cancelled:
             yield self._aborted()
             return

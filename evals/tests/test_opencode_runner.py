@@ -22,9 +22,11 @@ import metrics
 import opencode
 import report
 import run_eval
+import scenario3
 
 MODEL = "yudao-eval/cbcn/deepseek-v4.1-flash"
 MODEL_ID = "cbcn/deepseek-v4.1-flash"
+SCENARIO = scenario3
 REPO_ROOT = EVALS_DIR
 
 
@@ -51,7 +53,7 @@ def test_run_directory_holds_only_the_starting_point(runs_root):
                      "manifest.json", ".git", ".opencode-config"}
 
     # 隐藏检查、条目表与参考实现不在运行目录中
-    for label, path in opencode.hidden_dirs().items():
+    for label, path in scenario3.hidden_dirs().items():
         assert not _inside(run_dir, path), label
     assert {"checks", "reference", "requirement-table.json"}.isdisjoint(names)
 
@@ -89,7 +91,7 @@ def test_run_configuration_denies_fetch_and_search(runs_root):
 
 def test_message_points_at_the_same_materials_the_run_directory_has(runs_root):
     run_dir = opencode.create_run_dir(runs_root, "inputs", MODEL, MODEL_ID)
-    attached = opencode.message_files(run_dir)
+    attached = scenario3.message_files(run_dir)
     assert [os.path.basename(path) for path in attached] == \
         ["PRD.md", "interface_agreement.md", "subway_data.json"]
     for path in attached:
@@ -97,7 +99,7 @@ def test_message_points_at_the_same_materials_the_run_directory_has(runs_root):
     # 附加的文件就是交给 Yudao 一侧的同一份公开材料
     with open(os.path.join(run_dir, "PRD.md"), encoding="utf-8") as handle:
         delivered_prd = handle.read()
-    with open(os.path.join(opencode.materials_dir(), "prd.md"), encoding="utf-8") as handle:
+    with open(os.path.join(scenario3.materials_dir(), "prd.md"), encoding="utf-8") as handle:
         assert handle.read() == delivered_prd
 
 
@@ -110,10 +112,10 @@ def test_command_line_fits_the_windows_limit(runs_root):
 
 
 def test_material_path_in_output_voids_the_run():
-    materials = opencode.materials_dir()
+    materials = scenario3.materials_dir()
     assert opencode.material_path_hits("read " + materials)
     assert opencode.material_path_hits("read " + materials.replace("\\", "/"))
-    assert opencode.material_path_hits("read " + opencode.hidden_dirs()["checks"])
+    assert opencode.material_path_hits("read " + scenario3.hidden_dirs()["checks"])
     # 运行目录本身的路径不是泄漏
     assert opencode.material_path_hits("read C:/runs/run-1/PRD.md") == []
     assert opencode.material_path_hits("read C:/project/notes.md") == []

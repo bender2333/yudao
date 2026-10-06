@@ -360,6 +360,8 @@ class CommandRegistrationSave(CommandRequest):
     args: list[str] | None = None
     timeout_sec: int | None = None
     output_limit: int | None = None
+    # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）：结果未知时「重新执行一次」的选项按这个声明提供
+    repeatable: bool = False
 
 
 async def _save_command_registration(application: "Application", command: Command,
@@ -368,6 +370,7 @@ async def _save_command_registration(application: "Application", command: Comman
         application.system.projects.configure_command(
             request.project_id, request.name, request.argv, args=request.args,
             timeout_sec=request.timeout_sec, output_limit=request.output_limit,
+            repeatable=request.repeatable,
             base_version=request.base_version, command=command)
     except ProjectNotFoundError as missing:
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing

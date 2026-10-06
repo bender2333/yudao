@@ -1,0 +1,45 @@
+{
+  "note": "These tests fail on this host for reasons outside the task, so they are not in the F2P or P2P list and the scorer never runs them. Measured on 2026-10-06 with the base commit and the test patch applied, Python 3.13.13.",
+  "tests": [
+    {
+      "test": "tests/models/test_map.py::test_no_prefix_is_openai",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_config.py::test_set_default_openai_api",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_openai_chatcompletions.py::test_get_response_with_no_message",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_openai_chatcompletions.py::test_get_response_with_refusal",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_openai_chatcompletions.py::test_get_response_with_text_message",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_openai_chatcompletions.py::test_get_response_with_tool_call",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_openai_chatcompletions.py::test_store_param",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_openai_chatcompletions_stream.py::test_stream_response_yields_events_for_refusal_content",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_openai_chatcompletions_stream.py::test_stream_response_yields_events_for_text_content",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    },
+    {
+      "test": "tests/test_openai_chatcompletions_stream.py::test_stream_response_yields_events_for_tool_call",
+      "reason": "openai.OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"
+    }
+  ]
+}
