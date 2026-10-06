@@ -21,7 +21,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 
 ## 代码位置
 Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-architecture.md)的职责分层；控制核心各模块与文件的对应见总体架构第 6.1 节。
-- 接口层：`api/`（FastAPI 应用、访问方式、服务启动）、`__main__.py`（命令行入口、数据目录的进程锁）；`web/` 是旧 Web 控制台。
+- 接口层：`api/`（FastAPI 应用、访问方式、服务启动）、`__main__.py`（命令行入口、数据目录的进程锁）。
 - 应用层：`app/`（命令、查询、读取模型与合同）。
 - 控制核心：`orchestrator.py`（流程编排）、`engine.py` 与 `recording.py`（步骤驱动与记录）、`assembly.py`、`context.py`、`compaction.py`（上下文装配）、`adjudication.py` 与 `validation.py`（裁决规则）、`write_path.py`、`event_store.py`、`projection.py`（写入口、事件日志与投影）、`decisions.py`（用户决定）、`runtime.py`（`LoopSystem`，组装整个系统）。
 - 定义：`definitions/`（限额、停止原因、组织、角色、工具、提案合同、服务方案预置表）。
@@ -32,11 +32,11 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 
 ## 常用命令
 - 安装依赖（Python 3.11 或更新版本）：`uv sync --frozen`，按锁文件在仓库内建立项目环境 `.venv`，包含测试依赖。
-- 启动控制台：`uv run python -m harness`（默认端口 8765）；无需凭据的演示：`uv run python -m harness demo --serve --port 8765`
+- 启动服务：`uv run python -m harness api`（无参 `uv run python -m harness` 相同，默认端口 8765）；无需凭据的演示：`uv run python -m harness demo`
 - 测试分为单元、功能与模块、集成三层，每个测试文件属于哪一层写在登记表 `harness/tests/layers.toml` 中，每层的定义与边界见 `docs/design/test-pyramid.md`：
   - 单元层与模块层：`uv run python -m pytest -m "unit or module"`
   - 本次改动或新增的集成层测试文件：`uv run python -m pytest harness/tests/<文件>`
-  - 前端测试：`node --test --test-reporter=dot harness/tests/test_web_ui.js`
+  - 前端测试：`cd client && npm test`（客户端单元）；端到端为 `cd client && npm run test:e2e`
   - 登记表建立之前（#158 合并之前）：运行与本次改动相关的测试文件与前端测试。
   - 每次都运行 `uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`：两项检查整个仓库的模块导入关系与接口合同，任何改动都可能影响它们。`test_openapi_snapshot.py` 里的两项检查分别核对运行中的服务与 `harness/tests/openapi/openapi.json` 相同、按快照重新生成的客户端类型与提交的 `client/src/renderer/src/api/generated/` 逐文件相同；它需要 `harness/tests/openapi` 与 `client` 各安装一次依赖（各自的 `npm install`），未安装时报错写明缺少哪个文件。改动接口合同的工单在用 `--write-openapi-snapshot` 重写快照以后，在 `client` 中运行 `npm run generate:api` 重新生成客户端类型并提交，两项检查才会都通过。
   - 只用单进程运行，不加 `-n`。集成层全部由架构师按批运行，执行者与审查者不运行全量测试。
@@ -132,6 +132,17 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 3. 实现与自测：同普通流程第 3、4 步。只在本地分支提交，不推送，不创建 PR，推送与 PR 由审查者完成。
 4. 交付：在工单下评论，第一行写 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与每层结尾的计数行、逐条的验收核对，不粘贴测试输出；然后把标签从 `in-progress` 改为 `needs-review`。
 5. 不关闭工单，工单由架构师关闭。
+
+### aipro 板子环境（Leela，无独立审查者）
+仅适用于：主机名 `orangepiaipro` 这台 aipro 板子上、由 Leela（Hermes Agent）执行、且没有另一个独立 agent 实例可接手审查的场合。满足这三个条件才按本节执行，其余环境（有 Windows worktree 与独立审查者时）仍按上面的普通自主推进模式，执行者与审查者分离。
+
+本节下 Leela 一人身兼执行者与审查者，流程：
+1. 准备、任务、实现与自测：同上面第 1、2、3 步，但第 3 步的「本地分支提交、不推送、不创建 PR」不适用——允许本地提交。
+2. 交付：写 `DELIVERY:` 评论，标签改 `needs-review`（与普通模式相同，先走这一步，标签含义保留）。
+3. 自我审查：紧接着按「审查流程」第 2、3 步核对自己的交付（内容核对、测试），不等待另一个 agent 实例。核对通过后，直接在工单下评论 `REVIEW: PASS`（附改动清单、测试命令与计数行），把标签从 `needs-review` 改为 `review-passed`。核对不通过时如实记录问题并继续修复，不跳过这一步、不为了流程走完而放过未通过的检查。
+4. 提交、推送、创建 PR（`gh pr create`，正文写 `Closes #<编号>`）。
+5. 确认 CI（如果仓库配置了）通过后，直接合并 PR 并关闭工单，不等待人工确认。没有 CI 时，以本地测试结果为准直接合并。
+6. 工单关闭后不等待用户下一句话：立刻用 `gh issue list --label ready-for-agent` 查找下一个没有阻塞方（`blocked-by` 为空或全部已关闭）、未分配的工单，按优先级（`bug` 标签优先，其次按阻塞其他工单数量多的优先，其余按工单编号从小到大）选一个接上，重复第 1 步。没有符合条件的工单时才停下汇报「当前没有可接的工单」，不能不检查就假定没有、也不能检查完找到了却仍然停下等待。用户的消息（新指令、纠正、暂停）随时可以打断这个循环，打断优先于继续找下一个工单。
 
 ## 架构问题登记
 - **专用记录文件**：`docs/architecture-issues.md`。

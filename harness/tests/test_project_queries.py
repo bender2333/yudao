@@ -442,7 +442,7 @@ def test_event_detail_includes_compaction_summary_and_its_sources(tmp_path):
 
 
 def test_delivery_detail_and_file_use_the_archived_bytes(data_dir):
-    # 封存的清单与文件原文取自交付封存，不取自当前工作区（旧路由 test_web.py 的对应场景）
+    # 封存的清单与文件原文取自交付封存，不取自当前工作区
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("封存", GOAL)
     _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")

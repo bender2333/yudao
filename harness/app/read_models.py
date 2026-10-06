@@ -285,7 +285,7 @@ def _attempt_clauses(*, project_id: str | None, run_id: str | None, work_item_id
                      department: str | None, status: AttemptStatus | None, provider: str | None,
                      requested_model: str | None, actual_model: str | None,
                      q: str | None) -> tuple[list[str], list[Any]]:
-    # 调用尝试表的筛选条件；与旧控制台的筛选规则相同（状态按公开状态，实际模型缺失时回退到请求的模型）
+    # 调用尝试表的筛选条件（状态按公开状态，实际模型缺失时回退到请求的模型）
     clauses: list[str] = []
     params: list[Any] = []
     for column, value in (("project_id", project_id), ("run_id", run_id), ("work_item_id", work_item_id),
@@ -381,8 +381,10 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
                  "direction_from": payload["requester"], "direction_to": payload["recipient"],
                  "status": "等待回答", "content": payload["question"]}]
     if event.type == EventType.COLLABORATION_RESPONDED:
-        return [{**base, "flow_id": payload["request_id"], "kind": "咨询", "direction_from": None,
-                 "direction_to": None, "status": _CONSULTATION_STATUS.get(payload["status"], payload["status"]),
+        # 回答方回应发问方：两端从载荷取出；旧事件没有这两个字段时方向留空（工单 #275）
+        return [{**base, "flow_id": payload["request_id"], "kind": "咨询",
+                 "direction_from": payload.get("recipient"), "direction_to": payload.get("requester"),
+                 "status": _CONSULTATION_STATUS.get(payload["status"], payload["status"]),
                  "content": payload["text"]}]
     if event.type == EventType.COLLABORATION_CLOSED:
         return [{**base, "flow_id": payload["request_id"], "kind": "咨询", "direction_from": None,

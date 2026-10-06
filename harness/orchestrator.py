@@ -1007,10 +1007,9 @@ class Orchestrator:
         # Prompt 原文的工件在项目层写入项目作用域，这里只取它的引用与版本
         setting = self._project_department_setting(projection, department)
         if setting is None or not setting.configured_prompt or setting.prompt_ref is None:
-            # 没有项目部门设置的部门 Prompt 时，事项种类的部门说明优先于 roles.json 的角色说明（工单 #134）：
-            # 建档等种类在种类定义中写明本种类的角色说明，未写明的部门沿用自己的角色说明
-            work = DEFINITIONS.department_work(department, projection.kind)
-            text = work.prompt if work is not None else DEFINITIONS.role(department).prompt
+            # 没有项目部门设置的部门 Prompt 时，固定取内置默认 Prompt（roles.json 的角色说明）；
+            # 事项种类的工作说明是单独的请求材料，由上下文装配在部门 Prompt 之后放入（工单 #248）
+            text = DEFINITIONS.role(department).prompt
             ref = save_department_prompt(self.artifacts, projection.run_id, department, text)
             return DepartmentPrompt(department, 0, text, ref, "")
         return DepartmentPrompt(

@@ -5622,6 +5622,14 @@ export type CollaborationRespondedEvent = {
  */
 export type CollaborationRespondedPayload = {
     /**
+     * Requester
+     */
+    requester?: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Recipient
+     */
+    recipient?: 'product' | 'engineering' | 'quality' | null;
+    /**
      * Request Id
      */
     request_id: string;

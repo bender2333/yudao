@@ -113,7 +113,7 @@ flowchart TB
 
 ### 2.5 代码位置
 
-应用层放在 `harness/app/`，接口层放在 `harness/api/`。`harness/web/` 按第 7.3 节删除。
+应用层放在 `harness/app/`，接口层放在 `harness/api/`。`harness/web/` 已按第 7.3 节删除。
 
 ## 3. 命令
 
@@ -672,16 +672,15 @@ sequenceDiagram
 - run 结束以后的结算（采纳）由流程编排在 run 结束时完成；服务启动时流程编排补做未完成的结算（#17 的「采纳结算幂等」）。查询不再结算。
 - 同一个数据目录只允许一个服务进程：新接口启动时取得数据目录的进程锁（恢复契约为 3.1 规定的单机进程锁），旧控制台在删除之前同样取得这个锁。写入数据目录的子命令（`demo`、`smoke`）同样取得这个锁，服务运行时拒绝；只读的子命令（`project list`、`project show`、`replay`）按第 7.4 节经应用层的查询，以只读方式打开数据目录，不写入保存的投影，不需要锁。
 
-### 7.3 Web 控制台的去留
+### 7.3 Web 控制台的删除
 
-旧控制台（`harness/web/`、`__main__.py` 的 `serve`）冻结，不增加功能，也不改接新接口；新接口以 `python -m harness api` 启动，安装以后使用命令行入口 `yudao api`（[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.1 节）。D30 当前档的项目页面与模型管理页通过验收以后，由一张工单删除 `harness/web/`、`serve` 子命令与相关测试（`test_web.py`、`test_web_ui.js`、`test_projects_web.py`、`test_provider_config_web.py`，以及 `test_collaboration_views.py`、`test_observability.py` 中通过旧路由的部分），无参启动改为启动新接口。
+旧控制台（`harness/web/`、`__main__.py` 的 `serve`）已由 #78 删除：`harness/web/` 整包、`serve` 子命令、只被旧控制台使用的 `harness/views.py` 函数与 `observability.py` 中的模块函数与查询方法都移除；相关测试（`test_web.py`、`test_web_ui.js`、`test_projects_web.py`、`test_provider_config_web.py`，以及 `test_collaboration_views.py`、`test_observability.py` 中通过旧路由或旧查询方法的部分）一并删除或迁移到新接口。无参启动改为启动新接口；安装以后使用命令行入口 `yudao api`（[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.1 节）。
 
 理由：
 
-- 规则 3「绝不为了未完成的复杂度拆掉能跑的东西」：桌面客户端当前档页面完成之前，旧控制台是用户观察运行过程的唯一界面；#15 的真实全链路验收与 D25 的真实模型验收（#42）都需要看过程。
-- 规则 1「不保留向后兼容」：旧控制台不改接新接口，新接口也不带旧路由，两者之间没有兼容层；删除的时机由工单依赖表达。
-- 冻结期间的成本只有现状已有的一项：#43、#44 修改内部模块时保持旧控制台能运行。
-- 旧控制台的问题（读取时结算、定时查询、运行线程）在冻结期间保持原样，新功能（用户决定、恢复、并行）只进入新接口与桌面客户端。
+- 规则 3「绝不为了未完成的复杂度拆掉能跑的东西」：桌面客户端当前档页面完成之前，旧控制台是用户观察运行过程的唯一界面；当前档页面通过验收以后删除的时机成熟。
+- 规则 1「不保留向后兼容」：旧控制台没有改接新接口，新接口也不带旧路由，两者之间没有兼容层；删除的时机由工单依赖表达。
+- 旧控制台的问题（读取时结算、定时查询、运行线程）随旧控制台一起消失，新功能（用户决定、恢复、并行）只存在于新接口与桌面客户端。
 
 ### 7.4 命令行
 
@@ -690,7 +689,7 @@ sequenceDiagram
 | `project list`、`project show` | 调用 `projects.list`、`project.overview` |
 | `replay <run>`、`replay --project` | 调用 `replay.check` |
 | `demo`、`smoke` | 通过应用层的命令新建项目与事项 |
-| `serve` | 按第 7.3 节删除；`api` 启动新接口 |
+| `serve` | 已按第 7.3 节删除；`api`（无参启动相同）启动新接口 |
 | 新增 `token create`、`token list`、`token revoke` | 第 6.3 节 |
 
 ### 7.5 对其他工单与文档的影响
@@ -707,7 +706,7 @@ sequenceDiagram
 - 3.2D（#123）：新增查询 `run.trials`、`evidence.screenshot`，决定种类「质检无法核验」「使用本机桌面」，命令 `trial.stop_desktop`，run 的待恢复原因「等待桌面」「等待桌面解锁」（等待时间不计入运行时间上限）；`work_item.materials`、`run.actions`、`department.workspace`、`tools.registry` 增加试用与截图的内容（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1、7.2、12 节，工单 #151、#152、#246）。
 - #24：「按栏目读取上下文清单的查询接口」登记为应用层查询（`run.attempt` 的栏目部分）。
 - #37：`semantic.mark_invalid`、`semantic.correct` 登记为应用层命令。
-- 原型构建约定第 3.5 节的命令标识、第 6.1 节的事件对象由本设计代替；设计文档索引加入本文件；[部门定向指导](department-guidance.md)状态行「指导接口已在 `harness/web/server.py` 实现」在删除工单中修改；前端技术调研第 6 节的现状在删除工单以后更新；总体架构第 10 节加入本设计的工单。
+- 原型构建约定第 3.5 节的命令标识、第 6.1 节的事件对象由本设计代替；设计文档索引加入本文件；[部门定向指导](department-guidance.md)状态行与前端技术调研第 6 节的现状已随 #78 更新；总体架构第 10 节加入本设计的工单。
 
 ## 8. 使用的技术
 
@@ -753,7 +752,7 @@ sequenceDiagram
 4. **#44 的日志列与写入口接口。** 事件日志保存每条事件的项目、事项、run、部门与种类并建立索引；写入口提供同一事务内的「读取保存的投影、判断、追加」接口与命令身份的唯一约束。两项写进 #44。
 5. **流式进度事件的数量。** 输出片段加入以后，`model_stream_progress` 只在阶段变化时写入；这会改变 #43 的事件序列基准，在事件流工单中实施并有意识地更新基准。
 6. **接入已有项目的源目录。** 已有代码只经 `project.onboard` 进入（2026-09-29 用户决定，接入已有项目设计说明第 12 节第 1 项）；`work_item.create` 没有代码快照来源。`project.onboard` 填写的源目录路径是控制主机上的路径，同时成为这个项目的第一条源目录登记；以后在项目设置中用 `source_directory.save` 查看与修改，`onboarding.restart` 只能选择登记过的源目录。
-7. **Web 控制台的去留。** 按第 7.3 节：冻结，D30 当前档的项目页面与模型管理页通过验收以后删除。
+7. **Web 控制台的删除。** 按第 7.3 节：已由 #78 删除。
 8. **桌面客户端启动本机的 Yudao 服务。** 连接「本机」时，桌面客户端在 Yudao 服务没有运行时启动它（`yudao api`），启动为独立的后台进程；退出客户端不停止 Yudao 服务，托盘菜单有「停止 Yudao」，用第 6.2 节的本机停止请求停止；也可以按地址连接已经运行的本机或远端部署。2026-10-01 用户决定（[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)，[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.3 至 4.5 节）。
 9. **执行槽位数。** 执行槽位数是部署设置，经命令修改并写成事件；它取决于运行机器的能力，不属于随系统发布的定义。
 10. **取消排队的结果。** 由 3.4A（#19）的设计确定。

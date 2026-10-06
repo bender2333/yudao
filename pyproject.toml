@@ -27,7 +27,7 @@ include = ["harness*"]
 # release_assets 是发布资源目录：被 git 忽略，发布脚本把客户端安装包、更新清单与执行代理的 wheel 放进去，
 # 随 wheel 一起发布（设计说明第 5.1、6.1 节）；从源码运行没有这个目录
 [tool.setuptools.package-data]
-harness = ["web/static/*", "definitions/*.json", "release_assets/*"]
+harness = ["definitions/*.json", "release_assets/*"]
 
 # 分层的依赖规则（应用层与接口层设计说明第 2.4 节），由 harness/tests/test_layers.py 检查
 [tool.importlinter]
