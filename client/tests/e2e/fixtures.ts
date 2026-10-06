@@ -36,7 +36,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 // 更新地址里的端口要与它一致，客户端才会从同一个服务下载安装程序；room 用流式慢模型跑
 // 一个项目，供部门房间在请求进行中观察（工单 #177）
 export async function startBackend(
-  options: { apiVersion?: number; room?: boolean; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding" } = {},
+  options: { apiVersion?: number; room?: boolean; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding"; rejectUpstream?: boolean } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {
@@ -53,6 +53,9 @@ export async function startBackend(
   }
   if (options.script !== undefined) {
     script.push("--script", options.script);
+  }
+  if (options.rejectUpstream === true) {
+    script.push("--reject-upstream");
   }
   const child = spawn("uv", ["run", "python", ...script], {
     cwd: repoRoot,

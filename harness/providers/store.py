@@ -19,6 +19,10 @@ from .presets import preset_exists
 SUPPORTED_PROTOCOLS = frozenset({"responses", "chat_completions", "messages", "fake"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 
+# 一份连接的默认请求时限，单位秒（模型管理设计说明第 4.3 节）：真实模型的请求常常超过一分钟，
+# 目录文件、目录命令与界面表单使用同一个值，界面从目录合同的 default_timeout_sec 取它（工单 #294）
+DEFAULT_TIMEOUT_SEC: float = 600.0
+
 # 推理档位全集，由低到高排列（ADR-0006）；模型访问定义声明其中的一个子集
 REASONING_LEVELS = ("minimal", "low", "medium", "high", "xhigh", "max")
 # 推理参数方式：一份声明只使用一种，只用于与它相符的协议（设计说明第 7.4 节）
@@ -45,7 +49,7 @@ class ProviderDefinition:
     protocol: str = ""
     base_url: str = ""
     credential_ref: str = ""
-    timeout_sec: float = 600.0
+    timeout_sec: float = DEFAULT_TIMEOUT_SEC
     preset_id: str = ""
     models_url: str = ""
 
@@ -497,7 +501,7 @@ def _parse_provider(raw: Any, location: str) -> tuple[ProviderDefinition | None,
     return ProviderDefinition(
         id=raw["id"], name=raw["name"], protocol=raw["protocol"],
         base_url=raw.get("base_url", ""), credential_ref=raw.get("credential_ref", ""),
-        timeout_sec=raw.get("timeout_sec", 600.0),
+        timeout_sec=raw.get("timeout_sec", DEFAULT_TIMEOUT_SEC),
         preset_id=raw.get("preset_id", ""), models_url=raw.get("models_url", ""),
     ), issues
 

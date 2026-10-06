@@ -4920,6 +4920,10 @@
             ],
             "title": "Reload Error"
           },
+          "default_timeout_sec": {
+            "type": "number",
+            "title": "Default Timeout Sec"
+          },
           "presets": {
             "$ref": "#/components/schemas/CatalogPresets"
           },
@@ -4971,6 +4975,7 @@
           "revision",
           "config_state",
           "reload_error",
+          "default_timeout_sec",
           "presets",
           "capability_table",
           "providers",

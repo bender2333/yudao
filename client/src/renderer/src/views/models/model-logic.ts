@@ -122,12 +122,35 @@ export function admissionLabel(admission: CatalogAdmission | null): string {
   return `已准入：${admission.admitted_at ?? ""}${admission.admitted_model ? ` · ${admission.admitted_model}` : ""}`;
 }
 
-// 容量是否有效：窗口与输出上限有值，输出上限不大于窗口（设计说明第 4.3 节）
-export function rowCapacityValid(row: { context_window: number | null; max_output_tokens: number | null }): boolean {
-  if (row.context_window === null || row.max_output_tokens === null) {
-    return false;
+// 容量的一行取值：窗口与输出上限（设计说明第 4.3 节）
+type CapacityValues = { context_window: number | null; max_output_tokens: number | null };
+
+// 容量的问题文字：缺少哪一项或哪一项的关系不成立就写明哪一项，没有问题时为空（工单 #294）
+// 界面在「接受容量」旁显示它，目录文档校验用同一个判断，两处的规则不再分开
+export function capacityIssueText(row: CapacityValues): string {
+  const window = row.context_window;
+  const output = row.max_output_tokens;
+  if (window === null && output === null) {
+    return "缺少窗口与输出上限";
   }
-  return row.max_output_tokens > 0 && row.max_output_tokens <= row.context_window;
+  if (window === null) {
+    return "缺少窗口";
+  }
+  if (output === null) {
+    return "缺少输出上限";
+  }
+  if (output <= 0) {
+    return "输出上限必须是正整数";
+  }
+  if (output > window) {
+    return "输出上限不能大于窗口";
+  }
+  return "";
+}
+
+// 容量是否有效：窗口与输出上限有值，输出上限不大于窗口（设计说明第 4.3 节）
+export function rowCapacityValid(row: CapacityValues): boolean {
+  return capacityIssueText(row) === "";
 }
 
 // 未「接受」或修改的行不能保存：这一行的容量必须已确认且有效
@@ -136,28 +159,23 @@ export function canSaveRows(rows: { context_window: number | null; max_output_to
 }
 
 // 表单能否构成一份合法的目录文档（第 4.6 节的必填项与容量关系）：影响查询只对合法的拟议修改发问。
-// 窗口可以留空（只填输出上限），填了窗口时输出上限不大于窗口；输出上限必须有值且为正
+// 容量按第 4.3 节的同一份判断：窗口与输出上限都必须有值，输出上限不大于窗口
 export function formDocumentValid(provider: { id: string; name: string; base_url: string }, rows: FormRow[]): boolean {
   if (provider.id.trim() === "" || provider.name.trim() === "" || provider.base_url.trim() === "") {
     return false;
   }
   return rows.every((row) => {
-    const window = intFromInput(row.context_window);
-    const output = intFromInput(row.max_output_tokens);
     if (row.id.trim() === "" || row.model.trim() === "") {
-      return false;
-    }
-    if (output === null || output <= 0) {
       return false;
     }
     // 推理档位声明的三项一起给出（第 7.1 节）：支持档位与默认档位不能在没有推理参数方式时单独出现
     if (row.reasoning_mode === "" && (row.reasoning_levels.length > 0 || row.default_reasoning_level !== "")) {
       return false;
     }
-    if (window === null) {
-      return true;
-    }
-    return window > 0 && output <= window;
+    return rowCapacityValid({
+      context_window: intFromInput(row.context_window),
+      max_output_tokens: intFromInput(row.max_output_tokens),
+    });
   });
 }
 
@@ -261,8 +279,30 @@ export const PREFILL_SOURCE_LABELS: Record<string, string> = {
 };
 
 // 一条测试的标识：连接测试按连接，模型测试按定义；事件回来时按同一把键找回界面上的「测试中」
-export function testKey(kind: "connection" | "model", providerId: string, modelId: string | null): string {
-  return kind === "connection" ? `connection:${providerId}` : `model:${modelId}`;
+export function testKeyOf(payload: { kind: "connection" | "model"; provider_id: string; model_id: string | null }): string {
+  return payload.kind === "connection" ? `connection:${payload.provider_id}` : `model:${payload.model_id}`;
+}
+
+// 一条测试结果的显示文字（工单 #294）：通过写用时与实际返回的模型，未通过写上游给出的原因；
+// 模型行与连接卡片按它显示，用户不必去猜上一次测试的结果
+export function testText(payload: {
+  kind: "connection" | "model";
+  ok: boolean;
+  error: string | null;
+  elapsed_ms: number;
+  actual_model?: string | null;
+  admitted?: boolean | null;
+}): string {
+  if (!payload.ok) {
+    return payload.kind === "model"
+      ? `模型测试未通过：${payload.error ?? ""}`
+      : `连接测试未通过：${payload.error ?? ""}`;
+  }
+  if (payload.kind === "model") {
+    const actual = payload.actual_model ? `，实际返回 ${payload.actual_model}` : "";
+    return `模型测试通过（${payload.elapsed_ms} 毫秒${actual}${payload.admitted ? "，已准入" : ""}）`;
+  }
+  return `连接测试通过（${payload.elapsed_ms} 毫秒）`;
 }
 
 // 保存会作废准入的影响列表与删除的引用方（设计说明第 4.4、4.5 节，工单 #94）。
@@ -471,11 +511,12 @@ export function rowFromManual(index: number): FormRow {
   };
 }
 
-// 新增 Provider 时的表单：标题为「添加 Provider 配置」，模型访问定义表为空（设计说明第 9.1 节）
-export function emptyFormState(): FormState {
+// 新增 Provider 时的表单：标题为「添加 Provider 配置」，模型访问定义表为空（设计说明第 9.1 节）。
+// 请求时限取目录合同的 default_timeout_sec：默认值只有后端一份，客户端不再各写一个数（工单 #294）
+export function emptyFormState(defaultTimeoutSec: number): FormState {
   return {
     id: "", name: "", protocol: "responses", base_url: "", credential_ref: "",
-    preset_id: CUSTOM_PRESET_ID, models_url: "", timeout_sec: "60", rows: [],
+    preset_id: CUSTOM_PRESET_ID, models_url: "", timeout_sec: String(defaultTimeoutSec), rows: [],
   };
 }
 
@@ -553,6 +594,7 @@ export function rowToModelInput(row: FormRow): Record<string, unknown> {
   };
 }
 
+// 表单的一份连接内容：请求时限留空时不提交这个字段，由后端 ProviderInput 的默认值决定（工单 #294）
 export function providerInputFromForm(state: FormState): Record<string, unknown> {
   const timeout = intFromInput(state.timeout_sec);
   return {
@@ -561,7 +603,7 @@ export function providerInputFromForm(state: FormState): Record<string, unknown>
     protocol: state.protocol,
     base_url: state.base_url,
     credential_ref: state.credential_ref,
-    timeout_sec: timeout === null ? 60 : timeout,
+    ...(timeout === null ? {} : { timeout_sec: timeout }),
     preset_id: state.preset_id,
     models_url: state.models_url,
   };
