@@ -1192,6 +1192,10 @@ export type CommandRegistrationSave = {
      * Output Limit
      */
     output_limit?: number | null;
+    /**
+     * Repeatable
+     */
+    repeatable?: boolean;
 };
 
 /**
@@ -1222,6 +1226,10 @@ export type CommandSetting = {
      * Output Limit
      */
     output_limit: number;
+    /**
+     * Repeatable
+     */
+    repeatable: boolean;
 };
 
 /**
@@ -5955,6 +5963,10 @@ export type CommandConfiguredPayload = {
      * Base Version
      */
     base_version: number;
+    /**
+     * Repeatable
+     */
+    repeatable?: boolean;
 };
 
 /**
@@ -7999,6 +8011,10 @@ export type FrozenCommand = {
      * Output Limit
      */
     output_limit: number;
+    /**
+     * Repeatable
+     */
+    repeatable?: boolean;
 };
 
 /**

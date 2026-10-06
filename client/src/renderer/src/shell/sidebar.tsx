@@ -3,7 +3,7 @@
 // 底部「系统」分组的入口按能力清单显示。新建项目用命令 project.create / project.onboard，
 // 项目列表本身由外壳的视图同步给出，命令被接受以后由事件到达时重新查询。
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Capabilities, DecisionView, ProjectRow, Rejected } from "../api/generated/types.gen";
 import type { ClientApp } from "../contract/client-app";
 import { useCommand } from "../views/project/use-snapshot";
@@ -113,7 +113,7 @@ export function Sidebar(props: SidebarProps) {
           submitted={command.submitted}
           rejection={command.rejection}
           onClose={() => setCreating(null)}
-          onSubmit={(name, body) => void command.submit(name, body)}
+          onSubmit={(name, body) => command.submit(name, body)}
         />
       ) : null}
       <div className="nav-group">
@@ -187,7 +187,7 @@ function NewProject(props: {
   submitted: boolean;
   rejection: Rejected | null;
   onClose: () => void;
-  onSubmit: (name: string, body: Record<string, unknown>) => void;
+  onSubmit: (name: string, body: Record<string, unknown>) => Promise<boolean>;
 }) {
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
@@ -195,6 +195,17 @@ function NewProject(props: {
   const [sourcePath, setSourcePath] = useState("");
   const ready = name.trim() !== "" && goal.trim() !== "" && (props.mode === "idea" || (sourceName.trim() !== "" && sourcePath.trim() !== ""));
   const commandName = props.mode === "idea" ? "project.create" : "project.onboard";
+
+  // 本次提交被接受以后等事件到达：项目列表由事件到达时重新查询，列表出现新内容以后「已提交」消失，
+  // 这时关闭表单，四个字段随表单一起清空（工单 #295 第 1 项）。
+  // 被拒绝时 submit 返回假，表单保留已填字段并显示原因；等待只记在这一次挂载上，
+  // 取消以后重新打开的表单不会因为上一次提交的余波自己关闭
+  const [waitingWrite, setWaitingWrite] = useState(false);
+  useEffect(() => {
+    if (waitingWrite && !props.submitted) {
+      props.onClose();
+    }
+  }, [waitingWrite, props.submitted]);
 
   return (
     <form
@@ -204,9 +215,10 @@ function NewProject(props: {
         if (!ready) {
           return;
         }
-        props.onSubmit(commandName, props.mode === "idea"
+        void props.onSubmit(commandName, props.mode === "idea"
           ? { name: name.trim(), goal: goal.trim() }
-          : { name: name.trim(), goal: goal.trim(), source_name: sourceName.trim(), source_path: sourcePath.trim() });
+          : { name: name.trim(), goal: goal.trim(), source_name: sourceName.trim(), source_path: sourcePath.trim() })
+          .then((ok) => setWaitingWrite(ok));
       }}
     >
       <div className="form-head">
