@@ -263,7 +263,16 @@ test("部门页签之间直接切换：每个页签的房间画面属于该部�
       const workspace = await query<{ room: { roles: { id: string }[] } }>(
         "department.workspace", { project_id: projectId, department: tab.department });
       const roleIds = workspace.room.roles.map((r) => r.id).sort();
-      expect(state?.characters.map((c) => c.id).filter((id) => roleIds.includes(id)).sort()).toEqual(roleIds);
+      // 画面建立早于查询结果到达，角色是数据到了以后才装进画面：等它们出现再断言（工单 #300）
+      await waitUntil(async () => {
+        if (await failed.count() > 0) {
+          throw new Error(`${tab.label}页签出现加载失败：${await failed.innerText()}`);
+        }
+        const present = new Set((await roomState(page))?.characters.map((c) => c.id) ?? []);
+        return roleIds.every((id) => present.has(id));
+      }, `${tab.label}部门的角色装进画面`, 60_000);
+      const loaded = await roomState(page);
+      expect(loaded?.characters.map((c) => c.id).filter((id) => roleIds.includes(id)).sort()).toEqual(roleIds);
     }
     expect(errors).toEqual([]);
   } finally {
