@@ -124,12 +124,13 @@ def test_tool_categories_and_references_are_checked(tmp_path):
     _write(directory, "tools.json", tools)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
-    assert raised.value.issues[:2] == (
+    assert raised.value.issues[:3] == (
         ("roles.json", "engineering.tools[9]", "工具 run_command 没有定义"),
+        ("work_items.json", "kinds.change.departments.engineering.tools[9]", "工具 run_command 没有定义"),
         ("tools.json", "submit_delivery.proposal", "提案种类 engineering_plan 已经由 submit_plan 提交"),
     )
     # 工程部门的提案合同仍然说明 delivery_spec，与提交工具的种类不再相符
-    assert raised.value.issues[2][:2] == ("proposal_contracts.json", "roles.engineering.kinds")
+    assert raised.value.issues[3][:2] == ("proposal_contracts.json", "roles.engineering.kinds")
 
 
 def test_proposal_contracts_must_match_the_submit_tools_of_each_role(tmp_path):
@@ -265,7 +266,8 @@ def _without_quality(directory: Path) -> None:
     organization["departments"] = organization["departments"][:2]
     _write(directory, "organization.json", organization)
     for name, key in (("roles.json", None), ("proposal_contracts.json", "roles"),
-                      ("work_items.json", ("kinds", "onboarding", "departments"))):
+                      ("work_items.json", ("kinds", "onboarding", "departments")),
+                      ("work_items.json", ("kinds", "change", "departments"))):
         content = _read(directory, name)
         target = content
         steps = [] if key is None else ([key] if isinstance(key, str) else list(key))

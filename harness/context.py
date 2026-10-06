@@ -44,8 +44,9 @@ class AssembledContext:
 
 
 def department_work_text(pinned: AssembledContext) -> str:
-    static = {"intend", "project", "department_rules", "professional_completion", "collaboration_rules", "input_handling",
-              "proposal_contract", "allowed_tools", "department_history", "tool_schemas"}
+    static = {"intend", "project", "department_rules", "work_item_guidance", "professional_completion",
+              "collaboration_rules", "input_handling", "proposal_contract", "allowed_tools",
+              "department_history", "tool_schemas"}
     return "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
 
 
@@ -142,8 +143,11 @@ class ContextAssembler:
                     for item in guidance_items
                 ]),
             ))
+        work = DEFINITIONS.department_work(department, projection.kind)
+        work_text = work.prompt if work is not None else DEFINITIONS.role(department).prompt
         parts.extend([
             ContextPart("department_rules", str(prompt.version), prompt.text),
+            ContextPart("work_item_guidance", projection.kind, work_text),
             ContextPart("input_progress", str(projection.input_version), json_dumps({
                 "received": projection.input_version, "assigned_to_product": projection.product_work_input_version,
                 "accepted_in_requirements": projection.processed_input_version,

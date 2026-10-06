@@ -5,8 +5,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from harness.models import EventType, json_dumps
-from harness.observability import department_view
+from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
@@ -144,12 +143,14 @@ def _reasoning_items(history: list[dict]) -> list[dict]:
     return [record["item"] for record in history if record["item"].get("type") == "reasoning"]
 
 def _assert_reasoning_visible(system: LoopSystem, run_id: str, text: str) -> None:
-    # 推理内容写入部门历史并在事件中可以查看：部门工作间的对话记录里带上它
-    view = department_view(system.store, system.artifacts, run_id, "product")
-    reasoning_messages = [message for message in view["messages"]
-                          if message["type"] == EventType.MODEL_REASONING]
-    assert reasoning_messages
-    assert any(text in message["text"] for message in reasoning_messages)
+    # 推理内容写入部门历史并在事件中可以查看：本部门的 model_reasoning 事件带着保存它的工件，
+    # 工件里是这条推理内容的原文
+    events = [event for event in system.store.list_events(run_id)
+              if event.type == EventType.MODEL_REASONING and event.department == "product"]
+    assert events
+    items = [json.loads(system.artifacts.get_for_run(
+        run_id, ArtifactRef(**event.payload["reasoning_ref"])).decode("utf-8")) for event in events]
+    assert any(text in json_dumps(item) for item in items)
 
 def test_chat_reasoning_content_is_saved_and_replayed_on_the_same_model(tmp_path):
     result, requests, history, system, run_id = _run_product_activation(

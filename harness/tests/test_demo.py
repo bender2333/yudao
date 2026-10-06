@@ -1,5 +1,6 @@
+from harness.app.application import Application
+from harness.app.project_queries import DepartmentWorkspace, ProjectFlow, WorkItemMaterials
 from harness.demo import DEMO_CHANGE, DEMO_TASK, run_demo
-
 
 def test_demo_fills_four_views(data_dir):
     system, run_id = run_demo(data_dir)
@@ -25,13 +26,18 @@ def test_demo_fills_four_views(data_dir):
     assert projection.manifests
     assert any(event.type == "collaboration_requested" for event in system.store.list_events(run_id))
     assert any(event.type == "collaboration_responded" for event in system.store.list_events(run_id))
-    from harness.views import run_payload
-
-    payload = run_payload(system.store, run_id)
-    assert payload["board"]["phase"] == "DONE"
-    assert payload["timeline"]["requests"]
-    assert payload["timeline"]["responses"]
-    assert payload["evidence"]["reviews"]
-    assert payload["context"]["manifests"]
+    # demo 的四个界面内容经应用层查询取得：流转的咨询记录、材料里的质检、部门工作间的上下文清单
+    application = Application(system)
+    flow = application.query("project.flow", ProjectFlow(
+        project_id=projection.project_id, work_item=projection.work_item_id))
+    consultations = [record for record in flow.data.records if record.kind == "咨询"]
+    assert {record.status for record in consultations} == {"已回应", "已完成"}
+    assert {record.direction_from for record in consultations} == {"product", "engineering", "quality"}
+    materials = application.query("work_item.materials", WorkItemMaterials(
+        project_id=projection.project_id, work_item=projection.work_item_id))
+    assert materials.data.reviews
+    workspace = application.query("department.workspace", DepartmentWorkspace(
+        project_id=projection.project_id, department="product", work_item=projection.work_item_id))
+    assert workspace.data.context["manifests"]
     # 产品部门在 demo 改 Prompt 之前的激活用内置默认（版本 0），之后用项目部门设置（版本 1）
-    assert {item["prompt_version"] for item in payload["prompts"]["activations"] if item["department"] == "product"} == {0, 1}
+    assert workspace.data.department_setting.used_version == 1

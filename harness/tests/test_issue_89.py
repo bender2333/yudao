@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from typing import Any
 
@@ -14,6 +15,7 @@ from harness.app.application import Application
 from harness.models import DEPARTMENTS, EventType
 from harness.tests.api_helpers import running_api
 from harness.tests.protocol_helpers import serve, sse
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 KEY_A = "issue89-key-a"
 KEY_B = "issue89-key-b"
@@ -240,7 +242,7 @@ def test_setting_only_a_prompt_clears_the_project_model_choice(tmp_path):
             assert saved.status_code == 200, saved.text
             setting = _settings(client, project_id, "engineering")
             assert setting["model_id"] is None and setting["provider_id"] is None
-            assert setting["prompt_configured"] is True
+            assert setting["department_setting_configured"] is True
 
             started = _post(client, "work_item.create", project_id=project_id, text="echo")
             run_id = started.json()["refs"]["run_id"]
@@ -414,8 +416,7 @@ def test_a_project_setting_rejects_a_tier_outside_the_full_set_without_writing_a
 
 def _finish(system, run_id: str) -> None:
     # 事项的执行在接口进程的事件循环中作为任务运行；等这个任务结束（停在阻塞处或终止）
-    import time
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
     while time.monotonic() < deadline:
         task = system.orchestrator.work_item_execution(run_id)
         if task is None or task.done():

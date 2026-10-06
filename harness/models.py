@@ -282,6 +282,9 @@ class CollaborationResponse:
     result_event_ids: list[str]
     return_phase: str
     return_work_valid: bool
+    # 发问方与回答方：旧版本的保存投影没有这两个字段，缺省为 None（未知），读取时按 request_id 查找对应请求
+    requester: str | None = None
+    recipient: str | None = None
 
 
 @dataclass(frozen=True)

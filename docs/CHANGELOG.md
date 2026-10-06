@@ -458,6 +458,7 @@ qwen3.8 / 2026-10-02 16:45 / docs/architecture-issues.md 为 #82 登记两条：
 9router/ag/gemini-3.8-flash-high / 2026-10-02 13:50 / docs/architecture-issues.md 追加一条：#207 记录 `harness/tests/test_api.py` 的命令清单期望缺少 `catalog.model.remove`，该失败在 origin/main（e15b5d23）上就存在，与本工单改动无关 / 执行 #207 的模块层自测时发现并登记，交由 #90 或接口合同维护工单修
 claude-sonnet-5-5 / 2026-10-02 16:34 / docs/architecture-issues.md 追加 #207 登记的 test_api 命令清单失败的处理结论 / 该失败已由 #252 修复，按登记规则写处理行
 claude-sonnet-5-5 / 2026-10-02 17:07 / docs/architecture-issues.md 为 #82 登记的两条问题（录制场景数与固定时刻、决定板与卡片的归属）写处理结论 / 按登记规则写处理行；结论同时写入 #178、#179 的任务评论
+opus-4.6 / 2026-10-02 21:31 / README 启动方式与示例改为应用接口（无参启动即 `api`）、删除旧 Web 接口表；`docs/design/department-guidance.md` 状态行、`docs/design/README.md` 索引状态、`docs/requirements/department-guidance.md` D20 状态改为命令 `guidance.send` 与查询 `department.workspace`；`docs/research/web-frontend-technology.md` 第 6 节现状改为 FastAPI 接口层与桌面客户端；`docs/design/app-and-interface.md` 第 2.5、7.3、7.4、7.5、10 节改为删除已完成的口径；`docs/design/test-pyramid.md` 第 7 节记录旧控制台界面测试已删除；`docs/current-baseline.md` 与 `docs/requirements/department-providers.md` 同步；`AGENTS.md` 去掉 `web/` 与旧启动命令 / 工单 #78 删除旧 Web 控制台，文档跟随更新
 claude-sonnet-5-5 / 2026-10-02 20:19 / docs/architecture-issues.md 为 #94 登记的 catalog.change_impact 对结构非法文档返回 500 的问题写处理结论（422，沿用查询错误形状，#261 实施），并把与 #82 的条目挤在一起的位置补一个空行 / 按登记规则写处理行
 claude-sonnet-5-5 / 2026-10-02 21:24 / docs/architecture-issues.md 为 #95 登记的测试适配器整份重写目录的问题写处理结论（测试与演示启动方式的 fake 目录按合并方式安装） / 按登记规则写处理行
 claude-opus-4-5 / 2026-10-03 01:35 / docs/architecture-issues.md 追加一条：#88 记录真实模型 smoke 读不到准入文件（reload 不加载准入，仅 load_document 加载） / 执行 #88 的真实模型 smoke 时发现并登记，与推理内容的保存与回放无关，交架构师裁定
@@ -469,3 +470,15 @@ opus-4.5 / 2026-10-03 01:05 / docs/architecture-issues.md 追加两条 #179 的�
 claude-sonnet-5-5 / 2026-10-03 03:26 / docs/architecture-issues.md 为 #179 登记的两条问题写处理结论（楼层的决定分支改接真实事件，已随 #179 合并；决定选项增加 note_required，由 #136 实施） / 按登记规则写处理行
 执行者 / 2026-10-03 05:40 / docs/architecture-issues.md 追加一条 #180 的架构问题登记并写处理结论：关键事实的种类无法只由事件种类得出（qa_submitted 分放行与返工），ReportFact 增加 kind 字段 / 执行 #180 实现时间轴刻度着色时发现，按登记规则一并写处理行
 执行者 / 2026-10-03 06:20 / docs/design/app-and-interface.md 第 3.3 节的决定种类表增加「启动时 run 事件版本不同」一行；docs/design/recovery-contract-and-fault-matrix.md 第 1 节控制恢复的目标改为「版本不同时发出决定请求交给用户」，第 6 节故障矩阵第 10 行同步 / 执行 #232 把 run 事件版本不同的未结束 run 从「启动时按强制升级停止并重新开始」改为「启动时发出 definitions_changed 决定请求交给用户」，与 #16 的现有机制一致
+执行者 / 2026-10-03 10:31 / docs/architecture-issues.md 追加一条 #275 的登记并写处理结论：collaboration_responded 属于 run 流、不进入项目流字段清单，新增 requester/recipient 属于追加字段、RUN_EVENT_VERSION 不提高；事件序列基准 collaboration_request_answer 的逐条差异说明 / 执行 #275 时按登记规则记录新增字段与基准重写的依据
+qwen3.8 / 2026-10-03 08:55 / docs/architecture-issues.md 追加一条 #233 的架构问题登记并写处理结论：等待完整循环与事项结算的墙钟时限分散在多个测试文件、其中几处小于负载下正常用时，集中为 harness/tests/wait_limits.py 的 WAIT_FOR_HOST_WORK_SEC / 按登记规则记录并写明处置
+qwen3.8 / 2026-10-03 09:45 / docs/architecture-issues.md 的 #233 处理行补全引用 WAIT_FOR_HOST_WORK_SEC 的十四个文件与各自原值，并写明不改的业务断言界限 / 交付前核对改动范围与文档口径一致
+qwen3.8 / 2026-10-03 11:20 / docs/design/app-and-interface.md 把对外接口中的部门设置路由统一为部门设置名称：第 1 节现状表的 `/api/runs/{id}/prompts/{dept}`、第 3.2 与 3.4 节的命令行、第 4.3 节的 `project.settings` 现状、第 7.1 节的路由对照表改为 `department-settings/{dept}` / 工单 #234 把 #89 登记的架构问题（同一概念在对外接口用 prompt 字样、内部模型用部门设置）统一为部门设置的写法，文档与实现一致
+Leela / 2026-10-03 14:20 / AGENTS.md「自主推进模式」新增「aipro 板子环境（Leela，无独立审查者）」小节：仅限主机名 orangepiaipro、由 Leela 执行、没有另一个独立 agent 实例可接手审查时适用，流程改为本地提交、交付后立刻自我审查（走 REVIEW: PASS 与 review-passed）、推送、建 PR、CI 通过或本地测试通过后直接合并并关闭工单，不等待人工确认 / 用户要求在此环境下由 Leela 一人身兼执行者与审查者、自主完成到合并关闭，与原有「执行者只本地提交、审查者独立核对后才推送建 PR」的分离流程并存，按环境区分适用范围
+
+9router/my-small / 2026-10-06 10:24 / 新增 docs/evaluation/scenario-3-opencode.json 与 docs/evaluation/scenario-3-opencode.md：场景 3（北京地铁票价）OpenCode 一侧三次真实运行的结果与中文报告 / 评测场景设计第 6 节要求结果与报告提交到 docs/evaluation/，原始证据留在 .yudao/evals/ 不进入 Git
+
+9router/my-small / 2026-10-06 10:24 / evals/README.md 增加 runner/ 说明、运行一次评测的用法与运行器保证的条件 / 工单 189 建立了运行器，使用方式需要写清楚
+claude-sonnet-5-5 / 2026-10-06 08:30 / docs/architecture-issues.md 为 #78 登记的两处口径差异（project.usage 的用量汇总、department.workspace 的失败与取消尝试的部分输出）写处理结论：按旧控制台的口径改新接口，由 #269 实施，设计说明不修改 / 按登记规则写处理行；#78（PR #268）已合并
+exec-137 / 2026-10-06 10:32 / docs/architecture-issues.md 追加一条 #137 的登记：设计说明第 3.3 节把「阅读已有项目的动作」与「部门房间画面」写在同一节，房间画面由 #177 提供、等待确认初始 PRD 的项目流决定由 #136 实现，两者合并前这两处无法端到端验证 / 执行 #137 时发现动作与画面由不同工单承担，按登记规则记录依赖与复核建议
+claude-sonnet-5-5 / 2026-10-06 11:40 / docs/architecture-issues.md 为 #137 登记的两处问题（房间画面与页面区块的关系、等待确认初始 PRD 的标记依赖 #136）写处理结论：两处都不改设计与工单，房间画面按动作图鉴显示读取工具的动作、页面区块是同一批事件的文字列表，标记依据 decisions.list 推导，#136 合并以后由 #138、#139 核对 / 按登记规则写处理行；#137（PR #289）已合并

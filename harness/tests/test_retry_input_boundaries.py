@@ -12,11 +12,12 @@ from harness.models import EventType
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import after_event
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 等待一次激活收尾或等待对方线程到达会合点的墙钟界限只用来防止测试一直等待，按 #107 的裁定
-# （架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常用时的值，与 #112 实施方案的
-# 120 秒同一口径。收尾含一次版本存储写入，正常用时数秒。
-_WAIT_LIMIT = 120
+# （架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常用时的值。
+# 收尾含一次版本存储写入，正常用时数秒。
+_WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
 
 
 def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_path):

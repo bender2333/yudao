@@ -81,10 +81,10 @@ a16z 的开源虚拟小镇，AI 角色在其中生活与交谈（[架构说明](
 
 ## 6. Yudao 现状
 
-- 后端 `harness/web/server.py` 使用标准库 `ThreadingHTTPServer`，路由手写，返回 JSON，另有项目与 run 的 SSE 事件流（按 `Last-Event-ID` 续传）。
-- `server.py` 直接引用内部模块：`git_audit`、`models`、`observability`、`projection`、`replay_check`、`projects`、`runtime`、`tree_archive`、`views`。ADR-0007 第 5 条要求界面通过查询接口读取，目前的查询逻辑分散在这些模块与路由处理函数中，没有独立的查询与命令层，也没有接口的类型定义。
-- 当前界面 `harness/web/static/` 为原生 JavaScript，由 `server.py` 作为静态文件提供；界面测试 `harness/tests/test_web_ui.js` 用 Node 在简化的 DOM 上断言页面文字。
-- 依赖：`pyproject.toml` 只直接依赖 openai、httpx、anthropic；`pydantic` 2.13.5 已作为这些 SDK 的依赖安装（`uv.lock`），可以直接用来定义接口模型并生成 JSON Schema。
+- 后端接口层 `harness/api/` 使用 FastAPI，路由、OpenAPI 与能力清单都由应用层 `harness/app/` 的注册表生成，返回 JSON，另有统一事件流 `GET /api/events`（按 `Last-Event-ID` 续传）。
+- 接口层只导入应用层；应用层只导入控制核心的公开接口、知识层查询与 Provider 模块的管理接口。查询只读读取模型，命令经写入口修改。旧 Web 控制台（`harness/web/` 与它的一批旧路由）已经删除（[应用层与接口层设计说明](../design/app-and-interface.md)第 7.1、7.3 节）。
+- 界面由桌面客户端提供，后端不返回界面文件；客户端使用 React 19、TypeScript、Vite、PixiJS 8、XState 5 与 GSAP（[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)）。
+- 依赖：接口层使用 FastAPI 与 uvicorn，合同使用 pydantic 2；客户端接口类型由 OpenAPI 快照生成（`@hey-api/openapi-ts`）。
 
 ## 7. 对 Yudao 的建议
 

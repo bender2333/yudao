@@ -13,14 +13,14 @@ from typing import Any
 
 from harness.engine import StepLimits
 from harness.models import DEPARTMENTS, EventType
-from harness.observability import department_view
 from harness.proposals import engineering_plan, product_spec
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade
 from harness.providers.errors import CatalogValidationError
-from harness.runtime import LoopSystem
-from harness.tests.protocol_helpers import serve, sse
 from harness.event_store import Command
 from harness.projection import saved_decisions
+from harness.runtime import LoopSystem
+from harness.tests.protocol_helpers import serve, sse
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 MILLISECOND_RETRIES = StepLimits(retry_initial_delay_sec=0.001, retry_max_delay_sec=0.001)
 
@@ -163,11 +163,11 @@ def test_missing_credential_blocks_until_the_dotenv_file_is_fixed(tmp_path):
         assert [(event.payload["provider_config_id"], event.payload["credential_version"],
                  event.payload["selection_source"]) for event in requests] == [
             ("local", "dotenv", "department_default")]
-        # 界面显示的调用目标与请求事件记录的一致
-        view = department_view(system.store, system.artifacts, run_id, "product")["provider"]
-        assert (view["provider"], view["model"], view["protocol"], view["context_window"]) == (
+        # 请求事件记录的调用目标公开部分（界面经 department.workspace 与 run.attempt 读取，见 test_issue_92）
+        [request] = requests
+        assert (request.payload["provider_name"], request.payload["requested_model"],
+                request.payload["protocol"], request.payload["context_window"]) == (
             "Local", "m-local-target", "responses", 32000)
-        assert view["selection_source"] == "department_default"
         public = json.dumps([event.__dict__ for event in system.store.list_events(run_id)],
                             ensure_ascii=False, default=str)
         assert "dotenv-secret-1" not in public
@@ -229,7 +229,7 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
             except CatalogValidationError as exc:  # 目录校验失败时测试立即失败，不掩盖原因
                 raise AssertionError(f"binding update rejected: {exc}") from exc
             release.set()
-            result = future.result(timeout=30)
+            result = future.result(timeout=WAIT_FOR_HOST_WORK_SEC)
 
         assert result.phase == "ENGINEERING", result.error
         # 这一次逻辑调用的重试仍发往原目标
@@ -281,9 +281,6 @@ def test_request_event_records_requested_and_sent_tier(tmp_path):
                    if event.type == EventType.MODEL_REQUESTED][-1]
         assert request.payload["requested_tier"] == "medium"
         assert request.payload["sent_tier"] == "medium"
-        # 界面从请求事件读取发送的档位
-        view = department_view(system.store, system.artifacts, run_id, "product")["provider"]
-        assert view["sent_tier"] == "medium"
     finally:
         server.shutdown()
         server.server_close()

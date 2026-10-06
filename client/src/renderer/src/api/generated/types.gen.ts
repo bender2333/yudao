@@ -1451,40 +1451,6 @@ export type DeliveryFileResult = {
 };
 
 /**
- * DepartmentPromptState
- */
-export type DepartmentPromptState = {
-    /**
-     * Department
-     */
-    department: string;
-    /**
-     * Configured Version
-     */
-    configured_version: number;
-    /**
-     * Configured Text
-     */
-    configured_text: string;
-    /**
-     * Source
-     */
-    source: string;
-    /**
-     * Used Version
-     */
-    used_version: number | null;
-    /**
-     * Used Event Id
-     */
-    used_event_id: string | null;
-    /**
-     * Prompt Configured
-     */
-    prompt_configured?: boolean;
-};
-
-/**
  * DepartmentSetting
  */
 export type DepartmentSetting = {
@@ -1517,9 +1483,43 @@ export type DepartmentSetting = {
      */
     requested_tier?: string | null;
     /**
-     * Prompt Configured
+     * Department Setting Configured
      */
-    prompt_configured?: boolean;
+    department_setting_configured?: boolean;
+};
+
+/**
+ * DepartmentSettingState
+ */
+export type DepartmentSettingState = {
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Configured Version
+     */
+    configured_version: number;
+    /**
+     * Configured Text
+     */
+    configured_text: string;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Used Version
+     */
+    used_version: number | null;
+    /**
+     * Used Event Id
+     */
+    used_event_id: string | null;
+    /**
+     * Department Setting Configured
+     */
+    department_setting_configured?: boolean;
 };
 
 /**
@@ -1598,7 +1598,7 @@ export type DepartmentWorkspaceResult = {
      * Active
      */
     active: boolean;
-    prompt: DepartmentPromptState;
+    department_setting: DepartmentSettingState;
     setting: DepartmentSetting;
     effective: EffectiveModel;
     /**
@@ -5621,6 +5621,14 @@ export type CollaborationRespondedEvent = {
  * CollaborationRespondedPayload
  */
 export type CollaborationRespondedPayload = {
+    /**
+     * Requester
+     */
+    requester?: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Recipient
+     */
+    recipient?: 'product' | 'engineering' | 'quality' | null;
     /**
      * Request Id
      */

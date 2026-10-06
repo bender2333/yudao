@@ -47,7 +47,8 @@ class LoopSystem:
         step_limits: StepLimits = StepLimits(),
         resume_on_startup: bool = True,
     ) -> None:
-        self.data_dir = Path(data_dir)
+        # 数据目录可能以 8.3 短路径给出（工单 #250）：在这里解析一次，工作区根、材料根与其余由它派生的根都从解析后的路径派生
+        self.data_dir = Path(data_dir).absolute().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.store = EventStore(self.data_dir / "events.sqlite")
         # 输出片段通道：步骤驱动发布，应用层订阅并转发给 live=1 的连接（设计说明第 5.6 节）

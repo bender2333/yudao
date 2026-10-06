@@ -210,7 +210,7 @@ class Orchestrator:
         self.step_limits = step_limits
         self.deltas = deltas if deltas is not None else DeltaChannel()
         self.artifacts = artifacts
-        self.workspace_root = Path(workspace_root)
+        self.workspace_root = Path(workspace_root).absolute().resolve()
         self.materials_root = self.workspace_root.parent / "materials"
         self.git_versions = GitVersionStore(self.workspace_root.parent / "git")
         self.submissions = SubmissionWriter(artifacts, self.materials_root, self.git_versions)
@@ -280,8 +280,8 @@ class Orchestrator:
         )
         frozen_commands = _validate_frozen_commands(registered_commands, command_versions)
         run_id = run_id or new_id("run")
-        material_dir = (self.materials_root / run_id).resolve()
-        if material_dir == self.materials_root.resolve() or not material_dir.is_relative_to(self.materials_root.resolve()):
+        material_dir = self.materials_root / run_id
+        if material_dir == self.materials_root or not material_dir.is_relative_to(self.materials_root):
             raise ValueError("run_id must stay within the run materials directory")
         # 工作区先于其余材料落盘：从封存快照建立失败时不留下半个 run。
         environment = LocalEnvironment.establish(self.workspace_root / run_id, initial_tree)
@@ -822,14 +822,11 @@ class Orchestrator:
     # 3.4A 之前只有一个执行槽位：已有事项在执行时新建被拒绝（busy）
 
     def busy(self) -> bool:
-        # 有事项的 run 正在作为任务运行、有 run 正在激活、有 run 正在作为任务运行（start），
-        # 或有事项正在开始（run 还没有创建）时算作占用执行槽位
-        if self._tasks or self._work_item_tasks or self._running or self._active:
-            return True
+        # 执行槽位是否被占用只按事件日志与正在开始的事项判断（#202、#219 的结论），不看进程内的任务表：
+        # run_until_stop 读到终态事件就返回，执行任务从 self._tasks 摘除要等到事件循环的下一轮，
+        # 这个窗口内任务表仍非空，但事件日志已经没有未结束的 run，按任务表判断会把这个窗口误判为占用。
         if getattr(self.projects, "starting", lambda: False)():
             return True
-        # 任务表是进程内的瞬时状态：run 停在等待回答的决定请求上时执行任务已经结束、表中不再有它，
-        # 事项却仍是进行中的（回答以后接着执行）。执行槽位是否被占用以事件日志为准：有未结束的 run 就被占用
         unfinished = classify_startup_runs(self.store)
         return bool(unfinished.same_version or unfinished.other_version)
 
@@ -1042,10 +1039,9 @@ class Orchestrator:
         # Prompt 原文的工件在项目层写入项目作用域，这里只取它的引用与版本
         setting = self._project_department_setting(projection, department)
         if setting is None or not setting.configured_prompt or setting.prompt_ref is None:
-            # 没有项目部门设置的部门 Prompt 时，事项种类的部门说明优先于 roles.json 的角色说明（工单 #134）：
-            # 建档等种类在种类定义中写明本种类的角色说明，未写明的部门沿用自己的角色说明
-            work = DEFINITIONS.department_work(department, projection.kind)
-            text = work.prompt if work is not None else DEFINITIONS.role(department).prompt
+            # 没有项目部门设置的部门 Prompt 时，固定取内置默认 Prompt（roles.json 的角色说明）；
+            # 事项种类的工作说明是单独的请求材料，由上下文装配在部门 Prompt 之后放入（工单 #248）
+            text = DEFINITIONS.role(department).prompt
             ref = save_department_prompt(self.artifacts, projection.run_id, department, text)
             return DepartmentPrompt(department, 0, text, ref, "")
         return DepartmentPrompt(
