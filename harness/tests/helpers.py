@@ -141,7 +141,7 @@ def developer_text(call: ModelCall) -> str:
 
 def department_history(system: LoopSystem, run_id: str, department: str) -> list[dict]:
     # 部门历史，按事件由上下文装配（P）重建
-    return ContextAssembly(system.artifacts).department_history(system.store.list_events(run_id), department)
+    return ContextAssembly(system.artifacts, system.store).department_history(system.store.list_events(run_id), department)
 
 
 def after_event(system: LoopSystem, event_type: str, action: Callable[[Event], None]) -> None:

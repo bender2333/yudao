@@ -11,6 +11,7 @@ from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_result_summaries
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
+from .event_store import EventStore
 from .models import (
     ArtifactRef,
     ContextExclusion,
@@ -20,6 +21,7 @@ from .models import (
     DeliverySpec,
     DepartmentPrompt,
     ProductDecision,
+    ProjectEventType,
     RunProjection,
     canonical_hash,
     estimate_tokens,
@@ -51,8 +53,11 @@ def department_work_text(pinned: AssembledContext) -> str:
 
 
 class ContextAssembler:
-    def __init__(self, artifacts: ArtifactStore | None = None) -> None:
+    def __init__(self, artifacts: ArtifactStore | None = None, store: EventStore | None = None) -> None:
         self.artifacts = artifacts
+        # 修改轮的上一轮候选属于项目流，只能按事件编号取（设计第 4.7 节）
+        self.store = store
+
 
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
                  step_id: int = 1, history: list[dict[str, Any]] | None = None,
@@ -126,6 +131,7 @@ class ContextAssembler:
                     "revision": structure["revision"],
                 }),
             ))
+        parts.extend(self._prior_parts(projection, department))
         if guidance_items:
             parts.append(ContextPart(
                 "department_guidance",
@@ -323,6 +329,52 @@ class ContextAssembler:
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
+
+    def _prior_parts(self, projection: RunProjection, department: str) -> list[ContextPart]:
+        # 修改轮的常驻材料：产品看到上一轮的初始 PRD 与这一轮用户的修改意见，工程看到上一轮的结构说明，
+        # 质检只核验这一轮新写出的初始 PRD，上一轮的原文都不给它（设计第 4.7 节最后一段）
+        if department not in {"product", "engineering"} or self.store is None or self.artifacts is None:
+            return []
+        basis = projection.onboarding_basis
+        if basis is None:
+            return []
+        event = self.store.get_project_event(str(basis.get("candidate_event_id") or ""))
+        if event is None or event.type != ProjectEventType.INITIAL_PRD_PROPOSED:
+            return []
+        candidate = event.payload
+        prior_run_id, round_number = candidate["run_id"], candidate["round"]
+        prd = candidate["prd"]
+        parts: list[ContextPart] = []
+        if department == "product":
+            parts.append(ContextPart(
+                "prior_initial_prd",
+                prd["content_hash"].split(":", 1)[1][:12],
+                f"上一轮（第 {round_number} 轮）的初始 PRD 原文。修改意见由这一轮新的 ProductSpec 处理，"
+                f"这份 PRD 不直接沿用。\n\n"
+                + self.artifacts.get_for_run(prior_run_id, ArtifactRef(**prd["prd_ref"])).decode("utf-8"),
+            ))
+            note_ref = basis.get("note_ref")
+            if note_ref is not None:
+                # 修改意见的工件按这一轮 run 的目录存放，它同时是这一轮的第一项用户输入
+                parts.append(ContextPart(
+                    "revision_note",
+                    note_ref["content_hash"].split(":", 1)[1][:12],
+                    self.artifacts.get_for_run(projection.run_id, ArtifactRef(**note_ref)).decode("utf-8"),
+                ))
+            return parts
+        structure = candidate["structure"]
+        parts.append(ContextPart(
+            "prior_structure",
+            structure["content_hash"].split(":", 1)[1][:12],
+            self.artifacts.get_for_run(
+                prior_run_id, ArtifactRef(**structure["structure_ref"]),
+            ).decode("utf-8") + "\n\n" + json_dumps({
+                "round": round_number,
+                "code_tree_digest": structure["code_tree_digest"],
+                "product_spec_hash": prd["content_hash"],
+            }),
+        ))
+        return parts
 
     def assemble_compaction(self, pinned: AssembledContext, *, input_items: list[dict[str, Any]],
                             source_refs: list[dict[str, Any]], max_output_tokens: int,

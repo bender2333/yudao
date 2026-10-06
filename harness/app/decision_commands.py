@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..decisions import DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision
+from ..decisions import DecisionClosed, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision
 from ..event_store import Command
 from ..models import Event, ProjectEvent
 from .commands import Rejection
@@ -46,17 +46,21 @@ async def _answer_decision(application: Application, command: Command, request: 
     except InvalidOption as invalid:
         offered = "、".join(invalid.options)
         raise Rejection("option_invalid", f"所选选项不是这个决定请求给出的选项，可选的选项：{offered}") from invalid
+    except NoteRequired as missing_note:
+        raise Rejection("not_allowed", f"选择「{missing_note.option}」必须填写说明") from missing_note
     if run_id is not None:
         application.system.orchestrator.start(run_id)
 
 
 def _decision_refs(events: list[Event | ProjectEvent]) -> DecisionRefs:
-    # 回答首先写入，结束运行的事件跟在它后面
+    # 回答首先写入，结束运行的事件跟在它后面；项目流中的请求属于事项，所属的 run 取自载荷
     [answered] = events[:1]
-    return DecisionRefs(decision_id=answered.payload["decision_id"], run_id=answered.run_id)
+    return DecisionRefs(decision_id=answered.payload["decision_id"],
+                        run_id=answered.run_id if answered.project_id is None else answered.payload.get("run_id"))
 
 
 DECISION_ANSWER = CommandDefinition(
     name="decision.answer", request=DecisionAnswer, refs=DecisionRefs, handle=_answer_decision,
-    derive_refs=_decision_refs, reasons=("not_found", "decision_closed", "stale_base", "option_invalid"),
+    derive_refs=_decision_refs,
+    reasons=("not_found", "decision_closed", "stale_base", "option_invalid", "not_allowed"),
 )

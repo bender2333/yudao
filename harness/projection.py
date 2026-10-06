@@ -36,6 +36,7 @@ from .models import (
     EventType,
     GIT_VERSION_EVENTS,
     HeldCandidate,
+    InitialPrdCandidate,
     LessonCandidate,
     Material,
     ProductDecision,
@@ -219,6 +220,27 @@ def apply_decision_event(decisions: dict[str, DecisionRequest], event: Event | P
         decision.withdrawal = {"event_id": event.event_id, "reason": payload["reason"],
                                "withdrawn_at": event.created_at}
         return decision.decision_id
+    if event.type == ProjectEventType.PROJECT_DECISION_REQUESTED:
+        # 项目流中的决定请求（工单 #136）：与 run 流中的请求同字段，所属的事项与 run 写在载荷里
+        decisions[event.event_id] = DecisionRequest(
+            decision_id=event.event_id, stream=event.stream, run_id=payload.get("run_id"),
+            project_id=event.project_id, work_item_id=payload.get("work_item_id"),
+            requested_at=event.created_at, request=dict(payload),
+        )
+        return event.event_id
+    if event.type == ProjectEventType.PROJECT_DECISION_ANSWERED:
+        decision = decisions[payload["decision_id"]]
+        decision.status = "answered"
+        decision.answer = {"event_id": event.event_id, "option": payload["option"], "note": payload["note"],
+                           "base_version": payload["base_version"], "actor": event.actor,
+                           "command_id": event.command_id, "answered_at": event.created_at}
+        return decision.decision_id
+    if event.type == ProjectEventType.PROJECT_DECISION_WITHDRAWN:
+        decision = decisions[payload["decision_id"]]
+        decision.status = "withdrawn"
+        decision.withdrawal = {"event_id": event.event_id, "reason": payload["reason"],
+                               "withdrawn_at": event.created_at}
+        return decision.decision_id
     return None
 
 
@@ -312,6 +334,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
         # 事项种类与仓库概况：旧 run 的创建事件没有这两个字段，种类按普通事项理解（工单 #134）
         state.kind = str(payload.get("kind", "change"))
         state.overview_ref = payload.get("overview_ref")
+        # 建档修改轮的依据：旧事件没有这个字段，读取时按没有上一轮处理（工单 #136）
+        state.onboarding_basis = payload.get("onboarding_basis")
+        state.round = int(payload.get("round", 0))
         return
 
     if etype == EventType.USER_INPUT_RECEIVED:
@@ -1032,4 +1057,37 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         )
         state.source_directories[directory.name] = directory
         state.source_directory_history.append(directory)
+        return
+    if etype == ProjectEventType.INITIAL_PRD_PROPOSED:
+        # 建档候选（工单 #136）：记下这一轮的三份产物与快照，等待用户确认
+        state.initial_prd_candidates.append(InitialPrdCandidate(
+            work_item_id=payload["work_item_id"], run_id=payload["run_id"], round=int(payload["round"]),
+            prd=dict(payload["prd"]), structure=dict(payload["structure"]),
+            baseline_review=dict(payload["baseline_review"]), overview_ref=dict(payload["overview_ref"]),
+            snapshot=dict(payload["snapshot"]), revision_note_ref=payload.get("revision_note_ref"),
+            proposed_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
+        ))
+        return
+    if etype == ProjectEventType.ONBOARDING_REVISION_STARTED:
+        # 建档修改轮（工单 #136）：同一个建档事项开始新一轮 run，事项的 run 改为这一轮的 run
+        item = state.work_item(payload["work_item_id"])
+        if item is not None:
+            item.run_id = payload["run_id"]
+            item.status = "not_started"
+            item.start_error = None
+        return
+    if etype == ProjectEventType.BASELINE_ADOPTED:
+        # 采纳建档基线（工单 #136）：第一次采纳的成果是快照本身，与 deliverable_adopted 并列成为当前采纳成果
+        adoption = Adoption(
+            adoption_id=payload["adoption_id"], work_item_id=payload["work_item_id"], run_id=payload["run_id"],
+            delivery_event_id=payload["candidate_event_id"], qa_event_id=payload["candidate_event_id"],
+            tree_ref=payload["tree_ref"], code_tree_digest=payload["code_tree_digest"], summary=payload["summary"],
+            files=list(payload["files"]), check_names=list(payload["check_names"]),
+            known_risks=list(payload["known_risks"]), previous_adoption_id=payload["previous_adoption_id"],
+            adopted_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
+            prd_ref=payload["prd_ref"], product_spec_hash=payload["product_spec_hash"],
+            structure_ref=payload["structure_ref"], snapshot=payload.get("snapshot"),
+        )
+        state.adoptions.append(adoption)
+        state.current_adoption = adoption
         return

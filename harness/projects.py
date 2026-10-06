@@ -22,6 +22,7 @@ from .models import (
     Event,
     EventType,
     HeldCandidate,
+    InitialPrdCandidate,
     ProjectEvent,
     ProjectEventType,
     ProjectProjection,
@@ -38,6 +39,7 @@ from .providers.selection import ModelSelection
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
+from .decisions import INITIAL_PRD
 from .streams import PRIORITY_UPGRADE_RESTART, PRIORITY_USER
 from .tree_archive import load_tree
 
@@ -103,11 +105,26 @@ def _compose(store: EventStore, state: ProjectProjection, *, include_history: bo
     _default_settings(state)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
+    awaiting = _awaiting_decisions(store, state.project_id, through)
     for item in state.work_items:
         _derive_work_item(store, item, adopted, held, project_id, include_history=include_history,
-                          through=through)
+                          through=through, awaiting_initial_prd=item.work_item_id in awaiting)
     state.active_work_item_id = next((item.work_item_id for item in state.work_items if item.status == "in_progress"), None)
     return state
+
+
+def _awaiting_decisions(store: EventStore, project_id: str, through: int | None) -> set[str]:
+    # 等待用户确认初始 PRD 的建档事项（工单 #136，设计第 3.4 节）：项目流中还没有回答的
+    # initial_prd 请求所属的事项；确认以后请求不再是打开的，事项随之离开这个集合
+    events = store.list_project_events(project_id, through_position=through)
+    open_requests = {event.event_id: event for event in events
+                     if event.type == ProjectEventType.PROJECT_DECISION_REQUESTED}
+    for event in events:
+        if event.type in (ProjectEventType.PROJECT_DECISION_ANSWERED,
+                          ProjectEventType.PROJECT_DECISION_WITHDRAWN):
+            open_requests.pop(event.payload["decision_id"], None)
+    return {event.payload["work_item_id"] for event in open_requests.values()
+            if event.payload.get("kind") == INITIAL_PRD.name}
 
 
 def _default_settings(state: ProjectProjection) -> ProjectProjection:
@@ -121,7 +138,7 @@ def _default_settings(state: ProjectProjection) -> ProjectProjection:
 
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
                       held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True,
-                      through: int | None = None) -> None:
+                      through: int | None = None, awaiting_initial_prd: bool = False) -> None:
     try:
         run = project_run(store, item.run_id) if through is None else replay_run(store, item.run_id, through=through)
     except RunNotFoundError:
@@ -141,7 +158,8 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     elif run.run_id in held:
         item.status = "held"
     elif run.phase == "DONE":
-        item.status = "released_unsettled"
+        # 建档 run 结束以后等待用户确认初始 PRD：事项还没有采纳成果，状态是等待确认（工单 #136）
+        item.status = "awaiting_initial_prd" if awaiting_initial_prd else "released_unsettled"
     elif run.phase in TERMINAL_PHASES:
         item.status = "stopped"
     else:
@@ -156,7 +174,9 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
             for event in events
             if event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") in REWORK_VERDICTS
         ]
-    if run.pending_request is not None:
+    if awaiting_initial_prd:
+        item.pending_question = f"等待你确认第 {run.round} 轮的初始 PRD"
+    elif run.pending_request is not None:
         item.pending_question = run.pending_request.question
     elif run.phase in TERMINAL_PHASES:
         item.pending_question = run.human_action
@@ -236,6 +256,8 @@ def project_context_text(project: ProjectProjection, title: str,
     adoption = project.current_adoption
     if adoption is None:
         current = "无（这是项目的第一个事项）"
+    elif adoption.prd_ref is not None:
+        current = _onboarding_baseline(project, adoption)
     else:
         source = project.work_item(adoption.work_item_id)
         source_title = adoption.work_item_id if source is None else source.title
@@ -260,6 +282,24 @@ def project_context_text(project: ProjectProjection, title: str,
         adopted,
         _effective_decisions_section(adoption, source_run),
         f"本事项：{title}",
+    ])
+
+
+def _onboarding_baseline(project: ProjectProjection, adoption: Adoption) -> str:
+    # 建档采纳的基线（工单 #136，设计第 5 节）：已有项目的代码快照、文件数、git 提交、
+    # 基线检查与现有缺陷；不逐个列出快照中的文件
+    snapshot = adoption.snapshot or {}
+    provenance = snapshot.get("provenance") or {}
+    origin = f"git 提交 {provenance['commit']}（分支 {provenance.get('branch') or '未知'}"
+    origin += "，有未提交的修改" if provenance.get("dirty") else "）"
+    return "\n".join([
+        f"建档基线：已有项目的代码快照（run {adoption.run_id}，采纳 {adoption.adoption_id}）",
+        f"快照来源：{snapshot.get('source') or '未记录'}；{origin}",
+        f"文件数：{len(adoption.files)}；digest {adoption.code_tree_digest}",
+        f"基线检查：{_join(adoption.check_names)}",
+        f"现有缺陷：{_join(adoption.known_risks)}",
+        f"初始 PRD：{adoption.product_spec_hash}",
+        f"本 run 工作区已从该快照的完整封存恢复。",
     ])
 
 
@@ -590,6 +630,7 @@ class ProjectService:
                 initial_tree=initial_tree, code_snapshot=snapshot, project_context=context_text,
                 prompt_config_versions=prompt_config_versions,
                 registered_commands=frozen_commands, command_versions=command_versions, kind=kind,
+                round=1 if kind == "onboarding" else 0,
             ),
         )
 
@@ -714,12 +755,75 @@ class ProjectService:
             written.extend(self.settle_pending(project_id))
         return written
 
+    def create_missing_revision_runs_on_startup(self) -> list[str]:
+        # 启动时按 onboarding_revision_started 建立缺少的修改轮 run（工单 #136，设计第 6 节）。
+        # 修改轮事件在答案的同一个项目流事务中写入，run 在事务提交以后创建：
+        # 进程在两者之间中断时，这里按事件补建（run 流从版本 0 开始，重复创建被拒绝）
+        created: list[str] = []
+        for project_id in self.store.list_project_ids():
+            state = self.projection(project_id)
+            candidates = {entry.event_id: entry for entry in state.initial_prd_candidates}
+            for event in self.store.list_project_events(project_id):
+                if event.type != ProjectEventType.ONBOARDING_REVISION_STARTED:
+                    continue
+                run_id = event.payload["run_id"]
+                if self.store.stream_events(run_stream(run_id), after_version=0):
+                    continue
+                candidate = candidates.get(event.payload["candidate_event_id"])
+                item = state.work_item(event.payload["work_item_id"])
+                if candidate is None or item is None:
+                    continue
+                self.orchestrator.create_revision_run(
+                    project_id, candidate, item.text, run_id, int(event.payload["round"]),
+                    event.payload.get("note"))
+                created.append(run_id)
+        return created
+
+    def withdraw_waiting_initial_prd(self, work_item_id: str, *, command: Command | None = None) -> bool:
+        # 取消等待确认初始 PRD 的建档事项：撤销项目流中还没有回答的决定请求（工单 #136，设计第 3.1、6 节）。
+        # 返回是否撤销了一个请求；没有等待中的请求时返回假，调用方按事项已结束处理
+        found = self._waiting_initial_prd(work_item_id)
+        if found is None:
+            return False
+        project_id, request = found
+
+        def withdraw(transaction: Transaction) -> None:
+            transaction.append(NewProjectEvent(ProjectEventType.PROJECT_DECISION_WITHDRAWN, {
+                "decision_id": request["event_id"], "reason": "user_cancelled",
+                "work_item_id": work_item_id, "run_id": request["payload"].get("run_id"),
+            }, actor="user:local"))
+
+        self.writes.transact(project_stream(project_id), withdraw, command=command)
+        return True
+
+    def _waiting_initial_prd(self, work_item_id: str) -> tuple[str, ProjectEvent] | None:
+        # 这个事项还没有回答的 initial_prd 请求（最后提出的那一个）：没有时返回空
+        for project_id in self.store.list_project_ids():
+            events = self.store.list_project_events(project_id)
+            open_requests = {event.event_id: event for event in events
+                             if event.type == ProjectEventType.PROJECT_DECISION_REQUESTED}
+            for event in events:
+                if event.type in (ProjectEventType.PROJECT_DECISION_ANSWERED,
+                                  ProjectEventType.PROJECT_DECISION_WITHDRAWN):
+                    open_requests.pop(event.payload["decision_id"], None)
+            found = [event for event in open_requests.values()
+                     if event.payload.get("work_item_id") == work_item_id
+                     and event.payload.get("kind") == INITIAL_PRD.name]
+            if found:
+                return project_id, found[-1]
+        return None
+
     def starting(self) -> bool:
         # 有事项正在开始（已经登记、run 还没有创建）时占用执行槽位
         return any(items for items in self._starting.values())
 
-    @staticmethod
-    def _settle_run(transaction: Transaction, run: RunProjection) -> ProjectEvent | None:
+    def _accepted_event(self, run_id: str, event_type: EventType) -> Event | None:
+        # run 投影保存的结构说明与基线核验是事件的原始载荷，不含事件编号，编号按事件种类从 run 流中取。
+        # 编号由 run 自己写入：重放 run 流以前读不到，项目启动时补跑尚未写入的 run 的结算就走这一条
+        events = self.store.list_events(run_id)
+        return next((event for event in reversed(events) if event.type == event_type), None)
+
+    def _settle_run(self, transaction: Transaction, run: RunProjection) -> ProjectEvent | None:
         project = transaction.projection
         if run.phase != "DONE":
             return None
@@ -728,6 +832,10 @@ class ProjectService:
         item = project.work_item_for_run(run.run_id)
         if item is None or item.work_item_id != run.work_item_id:
             return None
+        if run.kind == "onboarding":
+            # 建档 run 以 baseline_verified 结束：提出初始 PRD 候选并请求用户确认（工单 #136，设计第 3.2、3.3 节）。
+            # 建档 run 没有交付与放行评审，因此在这一支判断，不走下面的普通结算
+            return self._propose_initial_prd(transaction, run, item)
         if not run.delivery_specs:
             return None
         delivery = run.delivery_specs[-1]
@@ -749,6 +857,60 @@ class ProjectService:
             "summary": delivery.summary, "files": list(delivery.files), "check_names": list(delivery.check_names),
             "known_risks": list(delivery.known_risks), "previous_adoption_id": current,
         }, actor="system"))[0]
+
+
+    def _propose_initial_prd(self, transaction: Transaction, run: RunProjection,
+                             item: WorkItem) -> ProjectEvent | None:
+        # 提出初始 PRD 候选并请求用户确认：候选与决定请求在一个事务中写入（工单 #136，设计第 4.7 节）。
+        # 幂等：这个 run 已经提出过候选时不再写入，也不会重复发出决定请求
+        project = transaction.projection
+        if any(entry.run_id == run.run_id for entry in project.initial_prd_candidates):
+            return None
+        if run.product_spec is None or run.structure is None or run.baseline_review is None:
+            return None
+        if run.stop_reason != "baseline_verified" or run.overview_ref is None:
+            return None
+        if run.effective_contract is None or run.effective_contract.prd_ref is None:
+            return None
+        snapshot = run.snapshot if run.snapshot is not None else item.snapshot
+        if snapshot is None:
+            return None
+        structure_event = self._accepted_event(run.run_id, EventType.STRUCTURE_ACCEPTED)
+        review_event = self._accepted_event(run.run_id, EventType.BASELINE_REVIEW_ACCEPTED)
+        structure = run.structure if structure_event is None else {
+            **run.structure, "event_id": structure_event.event_id}
+        review = run.baseline_review if review_event is None else {
+            **run.baseline_review, "event_id": review_event.event_id}
+        round_number = run.round
+        candidate = {
+            "work_item_id": item.work_item_id, "run_id": run.run_id, "round": round_number,
+            "prd": {"event_id": run.product_spec.created_event_id, "content_hash": run.product_spec.content_hash,
+                    "prd_ref": asdict(run.effective_contract.prd_ref)},
+            "structure": {"event_id": structure["event_id"], "content_hash": structure["content_hash"],
+                          "structure_ref": structure["structure_ref"],
+                          "code_tree_digest": structure["code_tree_digest"]},
+            "baseline_review": {"event_id": review["event_id"], "content_hash": review["content_hash"],
+                                "conclusions": list(review["conclusions"]), "omissions": list(review["omissions"]),
+                                "checks": _baseline_checks(review["checks"], structure["build_and_test"]),
+                                "other_failures": list(review["other_failures"])},
+            "overview_ref": run.overview_ref, "snapshot": snapshot,
+        }
+        if run.onboarding_basis is not None and run.onboarding_basis.get("note_ref") is not None:
+            candidate["revision_note_ref"] = run.onboarding_basis["note_ref"]
+        [proposed] = transaction.append(NewProjectEvent(
+            ProjectEventType.INITIAL_PRD_PROPOSED, candidate, actor="system"))
+        transaction.append(NewProjectEvent(ProjectEventType.PROJECT_DECISION_REQUESTED, {
+            "kind": INITIAL_PRD.name, "blocks": INITIAL_PRD.blocks,
+            "options": [{"id": option.id, "label": option.label, "note_required": option.note_required}
+                        for option in INITIAL_PRD.options],
+            "description": f"确认第 {round_number} 轮建档的初始 PRD", "facts": [], "department": "product",
+            "work_item_id": item.work_item_id, "run_id": run.run_id, "round": round_number,
+            "prd": candidate["prd"], "structure": candidate["structure"],
+            "baseline_review": candidate["baseline_review"], "overview_ref": run.overview_ref,
+            "snapshot": snapshot, "revision_note_ref": candidate.get("revision_note_ref"),
+        }, actor="system"))
+        return proposed
+
 
     # 部门 Prompt 项目配置
 
@@ -902,6 +1064,17 @@ class _NewWorkItem:
     text: str
     run_options: dict[str, Any]
 
+
+
+def _baseline_checks(receipts: list[dict[str, Any]], build_and_test: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # 基线核验里的检查回执（工单 #136，设计第 4.6 节）补上工程结构说明中同名的构建命令：
+    # 回执给出名称、退出状态、输出摘要与绑定的快照，argv 取自结构说明里同名的那一项
+    argvs = {item["name"]: list(item["argv"]) for item in build_and_test}
+    return [
+        {"name": receipt["name"], "argv": argvs.get(receipt["name"], []), "exit_code": int(receipt["exit_code"]),
+         "summary": receipt["summary"], "snapshot_hash": receipt["snapshot_hash"]}
+        for receipt in receipts
+    ]
 
 def _require_title(title: str | None) -> None:
     if title is not None and (not isinstance(title, str) or not title.strip()):

@@ -26,13 +26,14 @@ from .compaction import response_reserve
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
-    DEFINITIONS_CHANGED, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION, DecisionClosed, DecisionKind,
-    DecisionNotFound, InvalidOption, StaleDecision, blocks_activation, blocks_run,
+    DEFINITIONS_CHANGED, INITIAL_PRD, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION, DecisionClosed,
+    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_activation, blocks_run,
 )
 from .environment import LocalEnvironment
 from .deltas import DeltaChannel
-from .event_store import Command, EventStore, StreamVersionConflict, run_stream
-from .write_path import NewEvent, Snapshot, Transaction, WritePath
+from .event_store import Command, EventStore, StreamVersionConflict, is_run_stream, project_stream, run_stream
+from .write_path import NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
+from .tree_archive import load_tree
 from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .streams import (
     DECISION_REASON_RUN_EVENT_VERSION, RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
@@ -49,6 +50,7 @@ from .models import (
     DecisionRequest,
     DepartmentPrompt,
     EventType,
+    ProjectEventType,
     TERMINAL_PHASES,
     department_for_phase,
     json_dumps,
@@ -220,7 +222,7 @@ class Orchestrator:
         self.test_provider = test_provider
         self.test_adapter_name = test_adapter_name
         self.test_model = test_model
-        self.assembly = ContextAssembly(artifacts)
+        self.assembly = ContextAssembly(artifacts, store)
         self.sessions = sessions or SessionFactory()
         self._abort: dict[str, Event] = {}
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
@@ -255,6 +257,8 @@ class Orchestrator:
         registered_commands: dict[str, Any] | None = None,
         command_versions: dict[str, int] | None = None,
         kind: str = "change",
+        onboarding_basis: dict[str, Any] | None = None,
+        round: int = 0,
     ) -> str:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
@@ -330,6 +334,8 @@ class Orchestrator:
                 "command_versions": frozen_commands[1],
                 "definitions_version": DEFINITIONS.version,
                 "run_event_version": RUN_EVENT_VERSION,
+                "onboarding_basis": onboarding_basis,
+                "round": round,
             },
         )
         transition = NewEvent(
@@ -1461,35 +1467,152 @@ class Orchestrator:
                 raise StaleDecision(decision, base_version)
             if option not in [item["id"] for item in decision.request["options"]]:
                 raise InvalidOption(decision, option)
-            projection = transaction.projection
-            transaction.append(NewEvent(
-                EventType.DECISION_ANSWERED, department=decision.request["department"], parent_event_id=decision_id,
-                state_before=projection.phase, state_after=projection.phase,
-                payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
-            ))
-            transaction.on_commit(lambda: self._wake(projection.run_id))
-            if decision.kind in RESUMABLE_PAUSE_KINDS:
-                # 暂停以后继续（工单 #204）：继续时从暂停位置恢复阶段并让 run 接着执行；停止时 run 保持暂停，
-                # 停止原因就是暂停时的原因，什么都不改写。已用的激活次数、模型步数与运行时间不重新计算
-                if option == "continue":
-                    self._continue_paused_run(transaction, decision_id, decision)
-                    if blocks_run(transaction.decisions.values()):
-                        return None
-                    return transaction.projection.run_id
-                return None
-            if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name,
-                                                      UNKNOWN_ACTION.name):
-                self._fail(transaction, "cancelled", "run stopped by the user's decision")
-                return None
-            if decision.kind == UNKNOWN_ACTION.name and option == "continue":
-                # 工单 #17：用户选择按当前实际状态继续——写一条核实记录，不改写原来的观察；它让这个动作
-                # 得到处置，也进入部门历史，模型据此继续。选择重新执行时不写核实记录，由步骤驱动补执行
-                self._verify_unknown_action(transaction, decision, note)
-            if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):
-                return None
-            return projection.run_id
+            if is_run_stream(saved.stream):
+                return self._answer_run_decision(transaction, decision, option, note, base_version, decision_id)
+            return self._answer_project_decision(transaction, decision, option, note, base_version, decision_id)
 
         return self.writes.transact(saved.stream, answer, command=command)
+
+    def _answer_run_decision(self, transaction: Transaction, decision: DecisionRequest, option: str, note: str | None,
+                             base_version: int, decision_id: str) -> str | None:
+        # run 流中的决定请求：追加回答，并按回答解除阻塞
+        projection = transaction.projection
+        transaction.append(NewEvent(
+            EventType.DECISION_ANSWERED, department=decision.request["department"], parent_event_id=decision_id,
+            state_before=projection.phase, state_after=projection.phase,
+            payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
+        ))
+        transaction.on_commit(lambda: self._wake(projection.run_id))
+        if decision.kind in RESUMABLE_PAUSE_KINDS:
+            # 暂停以后继续（工单 #204）：继续时从暂停位置恢复阶段并让 run 接着执行；停止时 run 保持暂停，
+            # 停止原因就是暂停时的原因，什么都不改写。已用的激活次数、模型步数与运行时间不重新计算
+            if option == "continue":
+                self._continue_paused_run(transaction, decision_id, decision)
+                if blocks_run(transaction.decisions.values()):
+                    return None
+                return transaction.projection.run_id
+            return None
+        if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name,
+                                                  UNKNOWN_ACTION.name):
+            self._fail(transaction, "cancelled", "run stopped by the user's decision")
+            return None
+        if decision.kind == UNKNOWN_ACTION.name and option == "continue":
+            # 工单 #17：用户选择按当前实际状态继续——写一条核实记录，不改写原来的观察；它让这个动作
+            # 得到处置，也进入部门历史，模型据此继续。选择重新执行时不写核实记录，由步骤驱动补执行
+            self._verify_unknown_action(transaction, decision, note)
+        if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):
+            return None
+        return projection.run_id
+
+    def _answer_project_decision(self, transaction: Transaction, decision: DecisionRequest, option: str,
+                                 note: str | None, base_version: int, decision_id: str) -> str | None:
+        # 项目流中的决定请求（工单 #136）：确认初始 PRD 时在同一事务中追加回答与 baseline_adopted，
+        # 提出修改时追加回答与 onboarding_revision_started 并开始新一轮建档 run。
+        # 项目流中的请求不属于任何 run，返回空（没有 run 需要在这里继续）
+        if option == "revise" and not (note or "").strip():
+            raise NoteRequired(decision, option)
+        request = decision.request
+        work_item_id = request["work_item_id"]
+        run_id = request.get("run_id")
+        transaction.append(NewProjectEvent(ProjectEventType.PROJECT_DECISION_ANSWERED, {
+            "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
+            "work_item_id": work_item_id, "run_id": run_id,
+        }, actor="system"))
+        if decision.kind != INITIAL_PRD.name:
+            return None
+        candidate = next((item for item in transaction.projection.initial_prd_candidates
+                          if item.run_id == run_id), None)
+        if candidate is None:
+            return None
+        if option == "confirm":
+            self._adopt_baseline(transaction, candidate, decision_id)
+            return None
+        self._start_onboarding_revision(transaction, candidate, note, decision_id)
+        return None
+
+    def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
+        # 采纳建档基线（工单 #136，设计第 5 节）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
+        # 都取自建档候选；现有缺陷与其他失败记为采纳成果的已知风险
+        snapshot = candidate.snapshot
+        known_risks = [f'现有缺陷：{item["requirement"]}（{item["evidence"]}）'
+                       for item in candidate.baseline_review["conclusions"]
+                       if item["status"] == "existing_defect"]
+        known_risks += [f'检查 {item["check"]} 未通过：{item["reason"]}'
+                        for item in candidate.baseline_review["other_failures"]]
+        transaction.append(NewProjectEvent(ProjectEventType.BASELINE_ADOPTED, {
+            "adoption_id": new_id("adopt"), "work_item_id": candidate.work_item_id, "run_id": candidate.run_id,
+            "candidate_event_id": candidate.event_id, "tree_ref": snapshot["tree_ref"],
+            "code_tree_digest": snapshot["tree_digest"], "summary": _onboarding_summary(candidate),
+            "prd_ref": candidate.prd["prd_ref"], "product_spec_hash": candidate.prd["content_hash"],
+            "structure_ref": candidate.structure["structure_ref"], "files": list(snapshot.get("files") or []),
+            "check_names": [item["name"] for item in candidate.baseline_review["checks"]],
+            "checks": list(candidate.baseline_review["checks"]), "known_risks": known_risks,
+            "snapshot": snapshot, "previous_adoption_id": None,
+        }, actor="system"))
+
+    def _start_onboarding_revision(self, transaction: Transaction, candidate: Any, note: str | None,
+                                   decision_id: str) -> None:
+        # 建档修改轮（工单 #136，设计第 3.3、4.7 节）：同一个建档事项开始新一轮 run，从快照重新建立工作区。
+        # 修改轮事件在答案的同一个事务中写入，run 与修改意见的输入在事务提交以后创建：
+        # 进程在两者之间中断时，启动时按 onboarding_revision_started 补建（设计第 6 节）
+        round_number = candidate.round + 1
+        run_id = new_id("run")
+        item = transaction.projection.work_item(candidate.work_item_id)
+        text = "" if item is None else item.text
+        transaction.on_commit(lambda: self._create_revision_run(
+            transaction.projection.project_id, candidate, text, run_id, round_number, note))
+
+    def create_revision_run(self, project_id: str, candidate: Any, text: str, run_id: str, round_number: int,
+                            note: str | None) -> None:
+        # 建立修改轮的 run：从同一个快照建立工作区，run_created 的 onboarding_basis 记下这一轮的依据，
+        # 修改意见的工件按这一轮 run 的目录存放并作为它的第一项用户输入。
+        # 启动补做按同一条 onboarding_revision_started 事件再调一次，run 流从版本 0 开始，重复创建被拒绝
+        snapshot = candidate.snapshot
+        tree = load_tree(self.artifacts, candidate.run_id, ArtifactRef(**snapshot["tree_ref"]))
+        # 项目上下文、限额与部门 Prompt 版本取自同一个建档事项（这一轮仍是它）；
+        # 冻结的登记命令取自上一轮 run 的 run_created：事项创建时的副本，命令版本仍随项目后续变化
+        prior = project_run(self.store, candidate.run_id)
+        item = self.projects.projection(project_id).work_item(candidate.work_item_id)
+        if item is None or prior.project_context_ref is None:
+            raise ValueError(f"work item {candidate.work_item_id} is gone")
+        note_ref = None
+        if (note or "").strip():
+            ref = self.artifacts.put(run_id, "revision_note", note.strip(), media_type="text/markdown")
+            note_ref = asdict(ref)
+        self.create_run(
+            text, max_cycles=item.max_cycles, run_time_limit_sec=item.run_time_limit_sec,
+            context_window=item.context_window, run_id=run_id, kind="onboarding", initial_tree=tree,
+            code_snapshot=snapshot, project_id=project_id, work_item_id=candidate.work_item_id,
+            project_context=self.artifacts.get(ArtifactRef(**prior.project_context_ref)).decode("utf-8"),
+            prompt_config_versions=dict(item.prompt_config_versions),
+            registered_commands=dict(prior.registered_commands) or None,
+            command_versions=dict(prior.command_versions) or None,
+            round=round_number,
+            onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
+                              "note_ref": note_ref},
+        )
+        if note_ref is not None:
+            self.add_input(run_id, note.strip())
+
+    def _create_revision_run(self, project_id: str, candidate: Any, text: str, run_id: str, round_number: int,
+                             note: str | None) -> None:
+        # 先写入修改轮事件（run 已登记、run 还没有创建），再建立 run；建立失败时记下这个事项的失败原因
+        self.writes.transact(project_stream(project_id), lambda transaction: transaction.append(NewProjectEvent(
+            ProjectEventType.ONBOARDING_REVISION_STARTED, {
+                "work_item_id": candidate.work_item_id, "run_id": run_id,
+                "candidate_event_id": candidate.event_id, "round": round_number,
+                "note": None if note is None else note.strip(),
+            }, actor="system")))
+        try:
+            self.create_revision_run(project_id, candidate, text, run_id, round_number, note)
+        except Exception as exc:
+            self.writes.append(project_stream(project_id), NewProjectEvent(
+                ProjectEventType.WORK_ITEM_START_FAILED,
+                {"work_item_id": candidate.work_item_id, "run_id": run_id,
+                 "error": str(exc) or type(exc).__name__},
+                actor="system",
+            ))
+            raise
 
     def _continue_paused_run(self, transaction: Transaction, decision_id: str, decision: DecisionRequest) -> None:
         # 用户回答「处理以后继续执行」：把 run 从 PAUSED 恢复到暂停时的阶段，下一次激活由流程编排接着开始。
@@ -1643,3 +1766,10 @@ class Orchestrator:
         transaction.on_commit(lambda: self.sessions.close_run(projection.run_id))
         if reason != "cancelled":
             self._record_lesson_candidate(transaction, source_event, projection)
+
+
+def _onboarding_summary(candidate: Any) -> str:
+    # 建档基线的摘要（工单 #136）：把这一轮的轮次与三条产物的内容摘要写成一句话
+    return (f"第 {candidate.round} 轮建档的初始 PRD 已确认：PRD {candidate.prd['content_hash']}、"
+            f"现有结构说明 {candidate.structure['content_hash']}、"
+            f"基线核验 {candidate.baseline_review['content_hash']}")

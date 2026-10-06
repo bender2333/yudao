@@ -235,6 +235,14 @@ class ToolRecord(AttemptIdentity, WorkBasis, Versions, CallTarget):
 # run 事件
 
 
+class OnboardingBasis(Payload):
+    # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮建档候选的事件编号、这一轮的轮次与修改意见的工件引用。
+    # 产品据此以上一轮初始 PRD 与修改意见为依据写出新的 ProductSpec；修改意见为空时这一轮没有意见
+    candidate_event_id: str
+    round: int
+    note_ref: ArtifactRef | None = None
+
+
 class RunCreatedPayload(Payload):
     task: str
     # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
@@ -264,6 +272,11 @@ class RunCreatedPayload(Payload):
     definitions_version: str
     # 创建这个 run 时的 run 事件版本：run 流跟随应用版本，版本不同的未结束 run 按因升级停止处理（ADR-0019）
     run_event_version: int
+    # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮候选事件与修改意见的工件引用。
+    # 普通事项与建档第一轮没有这个字段，读取时按没有上一轮处理
+    onboarding_basis: OnboardingBasis | None = None
+    # 建档的轮次（工单 #136）：第一轮为 1；普通事项与旧事件没有这个字段，读取时按 0 处理
+    round: int = 0
 
 
 class UserInputReceivedPayload(InputRecord):
@@ -941,6 +954,45 @@ class RunFailedPayload(Payload):
 class DecisionOption(Payload):
     id: str
     label: str
+    # 说明必填的标记（原型选项的标记，工单 #136）：为真时选项必须附说明，
+    # 空说明的回答由服务端以 not_allowed 拒绝；旧事件没有这个字段时按不必填理解
+    note_required: bool = False
+
+
+class InitialPrdProposal(Payload):
+    # 候选中的初始 PRD：接纳它的事件编号、ProductSpec 的内容哈希与 PRD.md 的工件引用
+    event_id: str
+    content_hash: str
+    prd_ref: ArtifactRef
+
+
+class StructureProposal(Payload):
+    # 候选中的现有结构说明：接纳它的事件编号、内容哈希、STRUCTURE.md 的工件引用与它所描述的树摘要
+    event_id: str
+    content_hash: str
+    structure_ref: ArtifactRef
+    code_tree_digest: str
+
+
+class BaselineCheck(Payload):
+    # 基线检查（工单 #136，设计第 4.6 节）：质检在快照上运行的检查回执，随建档基线一起记入项目流，
+    # 以后的事项据此区分原有的失败与新引入的失败。argv 与 summary 取自工程结构说明中的同名构建检查与
+    # 检查回执的输出摘要；snapshot_hash 是它绑定的快照摘要
+    name: str
+    argv: list[str]
+    exit_code: int
+    summary: str
+    snapshot_hash: str
+
+
+class BaselineReviewProposal(Payload):
+    # 候选中的基线核验：接纳它的事件编号、内容哈希、逐条结论、遗漏的能力、失败的检查与其他失败
+    event_id: str
+    content_hash: str
+    conclusions: list[BaselineConclusion]
+    omissions: list[BaselineOmission]
+    checks: list[BaselineCheck]
+    other_failures: list[BaselineOtherFailure]
 
 
 class ModelUnavailableRequested(Payload):
@@ -989,8 +1041,32 @@ class UnknownActionRequested(Payload):
     repeatable: bool
 
 
+# 确认接入已有项目的初始 PRD（工单 #136，接入已有项目设计说明第 3.2 节）：请求写在项目流中，
+# 阻塞建档事项与同一项目中排在它后面的事项（blocks="work_item"），不属于任何 run。
+# round 是这一轮建档的轮次（第一次为 1，每次提出修改以后加一）；department 恒为 product。
+# prd、structure、baseline_review 是这一轮的三份产物，snapshot 与 overview_ref 是档案的来源与仓库概况；
+# revision_note_ref 是上一轮用户的修改意见（第二轮起）
+class InitialPrdRequested(Payload):
+    kind: Literal["initial_prd"]
+    blocks: Literal["work_item"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    work_item_id: str
+    run_id: str
+    round: int
+    prd: InitialPrdProposal
+    structure: StructureProposal
+    baseline_review: BaselineReviewProposal
+    overview_ref: ArtifactRef
+    snapshot: CodeSnapshot
+    revision_note_ref: ArtifactRef | None = None
+
+
 # 决定请求的载荷：以 kind 区分的各种决定请求
-DecisionRequestedPayload = ModelUnavailableRequested | UnknownActionRequested | PauseRequested
+DecisionRequestedPayload = (ModelUnavailableRequested | UnknownActionRequested | PauseRequested
+                            | InitialPrdRequested)
 
 
 class DecisionAnsweredPayload(Payload):
@@ -1147,6 +1223,75 @@ class SourceDirectoryConfiguredPayload(Payload):
     base_version: int
 
 
+class InitialPrdProposedPayload(Payload):
+    # 建档候选（工单 #136，接入已有项目设计说明第 3.2、3.3 节）：建档 run 以 baseline_verified 结束以后，
+    # 这一轮的三份产物与代码快照写进项目流，等待用户确认。round 是轮次（第一次为 1）；
+    # revision_note_ref 是上一轮用户的修改意见（第二轮起）；snapshot 是这一轮建档使用的代码快照
+    work_item_id: str
+    run_id: str
+    round: int
+    prd: InitialPrdProposal
+    structure: StructureProposal
+    baseline_review: BaselineReviewProposal
+    overview_ref: ArtifactRef
+    snapshot: CodeSnapshot
+    revision_note_ref: ArtifactRef | None = None
+
+
+class ProjectDecisionAnsweredPayload(Payload):
+    # 项目流中决定请求的回答（工单 #136）：与 run 流中的 decision_answered 同字段。
+    # work_item_id 与 run_id 是请求所属的事项与 run（ProjectEvent 的这两个字段从载荷取得）
+    decision_id: str
+    option: str
+    note: str | None
+    base_version: int
+    work_item_id: str
+    run_id: str | None
+
+
+class ProjectDecisionWithdrawnPayload(Payload):
+    # 项目流中决定请求的撤销（工单 #136）：reason 是撤销的原因（撤销建档事项时为 user_cancelled）
+    decision_id: str
+    reason: str
+    work_item_id: str
+    run_id: str | None
+
+
+class OnboardingRevisionStartedPayload(Payload):
+    # 建档修改轮（工单 #136，设计第 3.3 节）：用户提出修改以后开始新一轮建档 run。
+    # candidate_event_id 是被提出修改的建档候选事件编号；round 是新一轮的轮次；
+    # note 是修改意见原文，它按这一轮 run 的目录存成工件，引用记在 run_created 的 onboarding_basis 中，
+    # 原文随事件写入供启动补建这一轮的 run（设计第 6 节）
+    work_item_id: str
+    run_id: str
+    candidate_event_id: str
+    round: int
+    note: str
+
+
+class BaselineAdoptedPayload(Payload):
+    # 采纳建档基线（工单 #136，设计第 3.3、第 5 节）：确认初始 PRD 以后的采纳。第一次采纳的成果是快照本身，
+    # tree_ref 与 code_tree_digest 就是建档采集的快照，previous_adoption_id 恒为空；
+    # candidate_event_id 是被确认的建档候选事件编号；prd_ref 与 product_spec_hash 是被确认的初始 PRD；
+    # known_risks 是基线核验中的现有缺陷与其他失败；checks 与 snapshot 是基线检查与快照来源
+    adoption_id: str
+    work_item_id: str
+    run_id: str
+    candidate_event_id: str
+    tree_ref: ArtifactRef
+    code_tree_digest: str
+    summary: str
+    prd_ref: ArtifactRef
+    product_spec_hash: str
+    structure_ref: ArtifactRef
+    files: list[str] = []
+    check_names: list[str] = []
+    checks: list[BaselineCheck] = []
+    known_risks: list[str] = []
+    snapshot: CodeSnapshot | None = None
+    previous_adoption_id: str | None = None
+
+
 # 模型目录与凭据（应用层与接口层设计说明第 10 节第 1 项）：只含修订号、变化与结果，不含 Key
 
 class CatalogRevisedPayload(Payload):
@@ -1280,6 +1425,12 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.COMMAND_CONFIGURED: CommandConfiguredPayload,
     ProjectEventType.MATERIAL_RECORDED: MaterialRecordedPayload,
     ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: SourceDirectoryConfiguredPayload,
+    ProjectEventType.INITIAL_PRD_PROPOSED: InitialPrdProposedPayload,
+    ProjectEventType.PROJECT_DECISION_REQUESTED: DecisionRequestedPayload,
+    ProjectEventType.PROJECT_DECISION_ANSWERED: ProjectDecisionAnsweredPayload,
+    ProjectEventType.PROJECT_DECISION_WITHDRAWN: ProjectDecisionWithdrawnPayload,
+    ProjectEventType.ONBOARDING_REVISION_STARTED: OnboardingRevisionStartedPayload,
+    ProjectEventType.BASELINE_ADOPTED: BaselineAdoptedPayload,
     CatalogEventType.CATALOG_REVISED: CatalogRevisedPayload,
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,

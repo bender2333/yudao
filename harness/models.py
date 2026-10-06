@@ -108,6 +108,17 @@ class ProjectEventType:
     COMMAND_CONFIGURED = "command_configured"
     MATERIAL_RECORDED = "material_recorded"
     SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
+    # 建档 run 结束以后提出的初始 PRD 候选（工单 #136，设计第 3.2 节）：记下候选的引用与核验结论
+    INITIAL_PRD_PROPOSED = "initial_prd_proposed"
+    # 项目流中的决定请求、回答与撤回：确认初始 PRD 可能等待数天，run 已经结束，
+    # 请求与回答记在项目流（设计第 3.2 节），字段与 run 流的三种决定事件相同
+    PROJECT_DECISION_REQUESTED = "project_decision_requested"
+    PROJECT_DECISION_ANSWERED = "project_decision_answered"
+    PROJECT_DECISION_WITHDRAWN = "project_decision_withdrawn"
+    # 用户提出修改：项目流记下这一轮的依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
+    ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
+    # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
+    BASELINE_ADOPTED = "baseline_adopted"
 
 
 class CatalogEventType:
@@ -662,6 +673,11 @@ class RunProjection:
     overview_ref: dict[str, Any] | None = None
     structure: dict[str, Any] | None = None
     baseline_review: dict[str, Any] | None = None
+    # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮建档候选的事件编号与修改意见的工件引用；
+    # 建档第一轮与普通事项没有这个字段
+    onboarding_basis: dict[str, Any] | None = None
+    # 建档的轮次（工单 #136）：第一轮为 1，修改轮逐轮加一；普通事项与旧 run 为 0
+    round: int = 0
     sessions: dict[str, SessionRecord] = field(default_factory=dict)
     product_specs: list[ProductSpec] = field(default_factory=list)
     effective_contracts: list[EffectiveContract] = field(default_factory=list)
@@ -735,6 +751,36 @@ class Adoption:
     adopted_at: str
     stream_version: int
     event_id: str
+    # 建档基线特有的三项（工单 #136，设计第 5 节）：被确认的初始 PRD、现有结构说明与代码快照。
+    # 普通事项的交付采纳没有这三项，它们为空
+    prd_ref: dict[str, Any] | None = None
+    product_spec_hash: str | None = None
+    structure_ref: dict[str, Any] | None = None
+    snapshot: dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+
+@dataclass
+class InitialPrdCandidate:
+    # 一个建档候选（工单 #136，设计第 3.3 节）：建档 run 结束以后提出的初始 PRD 及其依据。
+    # prd、structure、baseline_review 是这一轮三份产物的事件编号、内容哈希与工件引用；
+    # overview_ref 是仓库概况的工件引用；snapshot 是这一轮建档使用的代码快照；
+    # revision_note_ref 是上一轮用户的修改意见（第二轮起）
+    work_item_id: str
+    run_id: str
+    round: int
+    prd: dict[str, Any]
+    structure: dict[str, Any]
+    baseline_review: dict[str, Any]
+    overview_ref: dict[str, Any]
+    snapshot: dict[str, Any]
+    proposed_at: str
+    stream_version: int
+    event_id: str
+    revision_note_ref: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return _plain(self)
@@ -878,6 +924,8 @@ class ProjectProjection:
     current_adoption: Adoption | None = None
     adoptions: list[Adoption] = field(default_factory=list)
     held: list[HeldCandidate] = field(default_factory=list)
+    # 各轮建档候选（工单 #136）：等待确认的与已被确认或提出修改的候选都在这里，按提出顺序
+    initial_prd_candidates: list[InitialPrdCandidate] = field(default_factory=list)
     department_settings: dict[str, DepartmentSetting] = field(default_factory=dict)
     department_setting_history: list[DepartmentSetting] = field(default_factory=list)
     commands: dict[str, RegisteredCommand] = field(default_factory=dict)

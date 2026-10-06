@@ -95,6 +95,9 @@ class LoopSystem:
         self.orchestrator.projects = self.projects
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
+        # 启动时补建缺少的建档修改轮 run（工单 #136，设计第 6 节）：回答「提出修改」以后
+        # 修改轮事件已经写入项目流，run 在事务提交以后创建，两者之间中断时在这里补建
+        self.recovered_revision_runs = self.projects.create_missing_revision_runs_on_startup()
         # 启动时核对 run 事件版本（ADR-0019，工单 #126、#232）：版本相同的未结束 run 交给 #16 自动继续；
         # 版本不同（含旧事件没有记录版本）的未结束 run 由 #16 发出 definitions_changed 决定请求交给用户，
         # 用户选择「按新版本继续」以后照常继续，「停止事项」则运行以 cancelled 结束。

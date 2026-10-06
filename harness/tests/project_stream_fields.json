@@ -1,5 +1,23 @@
 {
   "added_defaults": {
+    "baseline_adopted": {
+      "adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线出现之前项目没有采纳版本",
+      "candidate_event_id": "这个事件种类是新增的，旧版本的项目流中没有它：确认以前没有建档候选",
+      "check_names": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线不声明改动文件，基线检查按名称取自被确认的候选",
+      "checks": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的基线检查取自被确认候选中的检查回执",
+      "code_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码树摘要等于建档快照的摘要",
+      "files": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线不声明改动文件，代码以快照为准",
+      "known_risks": "这个事件种类是新增的，旧版本的项目流中没有它：已知风险取自基线核验中状态为 existing_defect 的结论与其他失败",
+      "prd_ref": "这个事件种类是新增的，旧版本的项目流中没有它：初始 PRD 的工件引用取自被确认的建档候选",
+      "previous_adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线是项目的第一个采纳版本，上一版为空",
+      "product_spec_hash": "这个事件种类是新增的，旧版本的项目流中没有它：初始 PRD 的内容哈希取自被确认的建档候选",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线来自建档 run",
+      "snapshot": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码快照取自建档 run 的快照",
+      "structure_ref": "这个事件种类是新增的，旧版本的项目流中没有它：现有结构说明的工件引用取自被确认的建档候选",
+      "summary": "这个事件种类是新增的，旧版本的项目流中没有它：采纳摘要取自建档 run 的现有结构说明",
+      "tree_ref": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码树取自建档快照",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线属于建档事项"
+    },
     "department_prompt_configured": {
       "department_prompt": "旧事件用 text 写部门 Prompt 原文；没有 text 与 department_prompt 时该部门没有写入 Prompt，读取时用内置默认 Prompt（版本 0）",
       "department_prompt_ref": "旧事件用 prompt_ref 写部门 Prompt 的工件引用；没有它时从 department_prompt（或 text）的原文计算内容哈希，没有原文时该部门没有写入 Prompt",
@@ -7,6 +25,38 @@
       "provider_id": "旧事件只做部门 Prompt 设置，没有模型选择；没有这个字段时按「跟随部门默认」处理",
       "reminders": "旧事件没有建议能力提醒（#146）；没有这个字段时接受结果不带提醒，一直显示的提醒由查询按当前目录重新计算",
       "requested_tier": "旧事件只做部门 Prompt 设置，没有请求档位；没有这个字段时按「跟随」处理"
+    },
+    "initial_prd_proposed": {
+      "baseline_review": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选出现之前的基线核验只留在 run 流中",
+      "overview_ref": "这个事件种类是新增的，旧版本的项目流中没有它：仓库概况的工件引用取自建档 run 的 run_created",
+      "prd": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选出现之前的初始 PRD 只留在 run 流中",
+      "revision_note_ref": "旧事件没有这个字段：第一轮建档没有上一轮的修改意见，读取时按没有修改意见处理",
+      "round": "这个事件种类是新增的，旧版本的项目流中没有它：第一次建档为第 1 轮",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选来自建档 run",
+      "snapshot": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选的代码快照取自建档 run 的快照",
+      "structure": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选出现之前的现有结构说明只留在 run 流中",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选属于建档事项"
+    },
+    "onboarding_revision_started": {
+      "candidate_event_id": "这个事件种类是新增的，旧版本的项目流中没有它：提出修改针对上一次建档候选",
+      "note": "这个事件种类是新增的，旧版本的项目流中没有它：修改意见原文随修改轮写入，启动补建这一轮的 run 时据此重建它的用户输入；提出修改必须附说明，因此不为空",
+      "round": "这个事件种类是新增的，旧版本的项目流中没有它：新一轮的轮次是上一轮加一",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：修改轮由新的建档 run 承担",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：修改轮属于同一个建档事项"
+    },
+    "project_decision_answered": {
+      "base_version": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求在此之前只写在 run 流中",
+      "decision_id": "这个事件种类是新增的，旧版本的项目流中没有它：所回答的请求在此之前只写在 run 流中",
+      "note": "这个事件种类是新增的，旧版本的项目流中没有它：说明可以为空",
+      "option": "这个事件种类是新增的，旧版本的项目流中没有它：所选的选项在此之前只写在 run 流中",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求不属于任何 run 时为空",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中决定请求所属的事项"
+    },
+    "project_decision_withdrawn": {
+      "decision_id": "这个事件种类是新增的，旧版本的项目流中没有它：被撤销的请求在此之前只写在 run 流中",
+      "reason": "这个事件种类是新增的，旧版本的项目流中没有它：撤销原因在此之前只写在 run 流中",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求不属于任何 run 时为空",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中决定请求所属的事项"
     },
     "project_goal_changed": {
       "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
@@ -114,6 +164,24 @@
       "run_id": "string",
       "work_item_id": "string"
     },
+    "baseline_adopted": {
+      "adoption_id": "string",
+      "candidate_event_id": "string",
+      "check_names": "array[string]",
+      "checks": "array[object]",
+      "code_tree_digest": "string",
+      "files": "array[string]",
+      "known_risks": "array[string]",
+      "prd_ref": "object",
+      "previous_adoption_id": "string?",
+      "product_spec_hash": "string",
+      "run_id": "string",
+      "snapshot": "object?",
+      "structure_ref": "object",
+      "summary": "string",
+      "tree_ref": "object",
+      "work_item_id": "string"
+    },
     "command_configured": {
       "args": "array[string]",
       "argv": "array[string]",
@@ -148,13 +216,46 @@
       "requested_tier": "string?",
       "version": "integer"
     },
+    "initial_prd_proposed": {
+      "baseline_review": "object",
+      "overview_ref": "object",
+      "prd": "object",
+      "revision_note_ref": "object?",
+      "round": "integer",
+      "run_id": "string",
+      "snapshot": "object",
+      "structure": "object",
+      "work_item_id": "string"
+    },
     "material_recorded": {
       "department": "enum string[engineering, product, quality]?",
       "material_id": "string",
       "material_ref": "object",
       "text": "string"
     },
+    "onboarding_revision_started": {
+      "candidate_event_id": "string",
+      "note": "string",
+      "round": "integer",
+      "run_id": "string",
+      "work_item_id": "string"
+    },
     "project_archived": {},
+    "project_decision_answered": {
+      "base_version": "integer",
+      "decision_id": "string",
+      "note": "string?",
+      "option": "string",
+      "run_id": "string?",
+      "work_item_id": "string"
+    },
+    "project_decision_requested": {},
+    "project_decision_withdrawn": {
+      "decision_id": "string",
+      "reason": "string",
+      "run_id": "string?",
+      "work_item_id": "string"
+    },
     "project_goal_changed": {
       "goal": "string",
       "goal_ref": "object"

@@ -33,7 +33,7 @@ from ..recovery import (
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
-from .payloads import Department
+from .payloads import BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure, Department
 from .read_models import AttemptStatus, ReadModels
 from .registry import QueryDefinition
 from .replay import ReplayRequest, check_position
@@ -66,6 +66,12 @@ class AdoptionView(Contract):
     code_tree_digest: str
     adopted_at: str
     event_id: str | None
+    # 建档基线特有的三项（工单 #136，设计第 3.4 节）：是否为建档采纳的基线、快照来源（采集的源目录与
+    # git 提交、分支、是否有未提交的修改）、现有缺陷数。普通事项的交付采纳：基线为假、来源为空、缺陷数为 0
+    onboarding_baseline: bool
+    snapshot_source: str | None
+    snapshot_provenance: dict[str, Any] | None
+    existing_defect_count: int
 
 
 class InputView(Contract):
@@ -109,7 +115,8 @@ class ProjectRow(Contract):
     last_activity_at: str
     active_work_item_id: str | None
     current_adoption: str | None
-    # 建档状态标记：项目由接入已有项目建立且还没有基线时，建档中为 onboarding，等待建档为 awaiting_onboarding；其余为空
+    # 建档状态标记：项目由接入已有项目建立且还没有基线时，建档中为 onboarding，等待确认初始 PRD 为
+    # awaiting_initial_prd，等待建档（建档停止、还没有基线）为 awaiting_onboarding；其余为空
     onboarding_status: str | None
     # 中断、待核实与待恢复的标记（工单 #18）：本项目里处于这些恢复观察状态的事项数；
     # 为零时仍是 0，不省略
@@ -159,11 +166,14 @@ def _last_activity(store: Any, state: Any, *, through: int | None) -> str:
     return max(times)
 
 def _onboarding_status(state: Any) -> str | None:
-    # 建档中的项目还没有基线采纳：有进行中的建档事项时为 onboarding，否则为 awaiting_onboarding
+    # 建档中的项目还没有基线采纳：建档事项进行中为 onboarding，已结束而决定请求仍打开为
+    # awaiting_initial_prd，其余（建档停止、还没有基线）为 awaiting_onboarding
     if state.source != "existing" or state.current_adoption is not None:
         return None
     if any(item.kind == "onboarding" and item.status == "in_progress" for item in state.work_items):
         return "onboarding"
+    if any(item.kind == "onboarding" and item.status == "awaiting_initial_prd" for item in state.work_items):
+        return "awaiting_initial_prd"
     return "awaiting_onboarding"
 
 # ---------------------------------------------------------------------------
@@ -250,12 +260,20 @@ def _work_item_stats(items: list[Any]) -> WorkItemStats:
 
 
 def _adoption(item: Any) -> AdoptionView | None:
+    # 建档基线（工单 #136，设计第 5 节）：prd_ref 有值说明这次采纳的成果是接入时采集的快照本身；
+    # 快照来源取它的 source 与 provenance，旧事件没有 provenance 时为空。现有缺陷数是基线核验里的
+    # existing_defect 与其他失败（写入采纳成果时就是全部已知风险）；普通交付采纳不是建档基线，为 0
     if item is None:
         return None
+    snapshot = item.snapshot or {}
+    baseline = item.prd_ref is not None
     return AdoptionView(
         adoption_id=item.adoption_id, work_item_id=item.work_item_id, run_id=item.run_id, summary=item.summary,
         files=list(item.files), check_names=list(item.check_names), known_risks=list(item.known_risks),
         code_tree_digest=item.code_tree_digest, adopted_at=item.adopted_at, event_id=item.event_id,
+        onboarding_baseline=baseline, snapshot_source=snapshot.get("source"),
+        snapshot_provenance=snapshot.get("provenance"),
+        existing_defect_count=len(item.known_risks) if baseline else 0,
     )
 
 
@@ -274,6 +292,7 @@ class WorkItemLoop(Contract):
     kind: str
     sign: str
     color_index: int
+    # 事项状态；建档事项结束而初始 PRD 仍待确认时为 awaiting_initial_prd（工单 #136）
     status: str
     department: str | None
     phase: str | None
@@ -920,6 +939,43 @@ class ReviewEntry(Contract):
     checks: list[dict[str, Any]]
 
 
+class BaselineReviewView(Contract):
+    # 某一轮基线核验的内容：逐条结论、遗漏的能力、基线检查与其他失败
+    event_id: str
+    content_hash: str
+    conclusions: list[BaselineConclusion]
+    omissions: list[BaselineOmission]
+    checks: list[BaselineCheck]
+    other_failures: list[BaselineOtherFailure]
+
+
+class OnboardingDecisionRecord(Contract):
+    # 某一轮的确认记录（工单 #136，设计第 4.7 节）：回答与撤销各自一条；请求本身仍是打开的不列在这里
+    event_id: str
+    decision_id: str
+    outcome: Literal["answered", "withdrawn"]
+    option: str | None
+    note: str | None
+    reason: str | None
+    decided_at: str
+
+
+class OnboardingRound(Contract):
+    # 一次建档候选（工单 #136，设计第 3.3、4.7 节）：轮次、这一轮 run、候选事件与提出时间，
+    # 三份产物与仓库概况的原文、上一轮的修改意见原文、基线核验与这一轮的决定记录。
+    # 工件按候选自己的 run 目录存放；提出修改以后开始的修改轮才有修改意见
+    round: int
+    run_id: str
+    candidate_event_id: str
+    proposed_at: str
+    prd: str
+    structure: str
+    overview: str
+    revision_note: str | None
+    baseline_review: BaselineReviewView
+    decisions: list[OnboardingDecisionRecord]
+
+
 class ProjectMaterial(Contract):
     material_id: str
     text: str
@@ -937,6 +993,9 @@ class WorkItemMaterialsResult(Contract):
     reviews: list[ReviewEntry]
     inputs: list[InputView]
     materials: list[ProjectMaterial]
+    # 建档各轮的材料（工单 #136，设计第 3.4 节）：按提出顺序列出这个建档事项的每一次候选与确认记录；
+    # 普通事项没有建档候选，为空
+    onboarding_rounds: list[OnboardingRound]
 
 
 def _work_item_materials(application: Application, request: WorkItemMaterials
@@ -975,8 +1034,84 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
                                 recorded_at=value.recorded_at, event_id=value.event_id)
                 for value in state.materials
             ],
+            onboarding_rounds=_onboarding_rounds(application, state, item.work_item_id),
         ),
     )
+
+def _onboarding_rounds(application: Application, state: Any,
+                       work_item_id: str) -> list[OnboardingRound]:
+    # 建档各轮的材料（工单 #136，设计第 3.3、4.7 节）：按提出顺序读项目投影里的候选，
+    # 工件按候选自己的 run 目录取得（每一轮的 run 各有目录），确认记录从项目流中回答与撤销的事件读出
+    candidates = [value for value in state.initial_prd_candidates if value.work_item_id == work_item_id]
+    decided = _onboarding_decision_records(application, state.project_id, work_item_id)
+    rounds: list[OnboardingRound] = []
+    for candidate in candidates:
+        review = candidate.baseline_review
+        rounds.append(OnboardingRound(
+            round=candidate.round, run_id=candidate.run_id, candidate_event_id=candidate.event_id,
+            proposed_at=candidate.proposed_at,
+            prd=_artifact_text(application, candidate.run_id, candidate.prd["prd_ref"]),
+            structure=_artifact_text(application, candidate.run_id, candidate.structure["structure_ref"]),
+            overview=_artifact_text(application, candidate.run_id, candidate.overview_ref),
+            revision_note=None if candidate.revision_note_ref is None else
+            _artifact_text(application, candidate.run_id, candidate.revision_note_ref),
+            baseline_review=BaselineReviewView(
+                event_id=review["event_id"], content_hash=review["content_hash"],
+                conclusions=[BaselineConclusion(**item) for item in review["conclusions"]],
+                omissions=[BaselineOmission(**item) for item in review["omissions"]],
+                checks=[BaselineCheck(**item) for item in review["checks"]],
+                other_failures=[BaselineOtherFailure(**item) for item in review["other_failures"]],
+            ),
+            decisions=decided.get(candidate.event_id, []),
+        ))
+    return rounds
+
+
+def _onboarding_decision_records(application: Application, project_id: str,
+                                 work_item_id: str) -> dict[str, list[OnboardingDecisionRecord]]:
+    # 每个建档候选的确认记录（工单 #136，设计第 4.7 节）：项目流中回答与撤销的事件所属的请求
+    # 记着提出它的那一轮 run，按它归到对应的候选；没有 run 的事件取它之前最近提出的一轮
+    events = application.system.store.list_project_events(project_id)
+    proposed = [(event.payload["run_id"], event.event_id, event.created_at) for event in events
+                if event.type == ProjectEventType.INITIAL_PRD_PROPOSED
+                and event.payload["work_item_id"] == work_item_id]
+    records: dict[str, list[OnboardingDecisionRecord]] = {}
+    for event in events:
+        if event.payload.get("work_item_id") != work_item_id:
+            continue
+        if event.type == ProjectEventType.PROJECT_DECISION_ANSWERED:
+            entry = OnboardingDecisionRecord(
+                event_id=event.event_id, decision_id=event.payload["decision_id"], outcome="answered",
+                option=event.payload["option"], note=event.payload["note"], reason=None,
+                decided_at=event.created_at,
+            )
+        elif event.type == ProjectEventType.PROJECT_DECISION_WITHDRAWN:
+            entry = OnboardingDecisionRecord(
+                event_id=event.event_id, decision_id=event.payload["decision_id"], outcome="withdrawn",
+                option=None, note=None, reason=event.payload["reason"], decided_at=event.created_at,
+            )
+        else:
+            continue
+        candidate_id = _candidate_of(proposed, event.payload.get("run_id"), event.created_at)
+        if candidate_id is not None:
+            records.setdefault(candidate_id, []).append(entry)
+    return records
+
+
+def _candidate_of(proposed: list[tuple[str, str, str]], run_id: str | None,
+                  at: str) -> str | None:
+    for proposed_run, candidate_id, _proposed_at in proposed:
+        if proposed_run == run_id:
+            return candidate_id
+    earlier = [candidate_id for proposed_run, candidate_id, proposed_at in proposed if proposed_at <= at]
+    return earlier[-1] if earlier else None
+
+
+def _artifact_text(application: Application, run_id: str, ref: dict[str, Any]) -> str:
+    try:
+        return application.system.artifacts.get_for_run(run_id, ArtifactRef(**ref)).decode("utf-8")
+    except (FileNotFoundError, KeyError):
+        return f"（工件已不在工件存储中：{ref.get('path')}）"
 
 
 def _version_entry(event_id: str, kind: str, status: str, revision: int, content_hash: str,
@@ -1547,6 +1682,9 @@ PROJECTS_LIST = QueryDefinition(
                 ProjectEventType.WORK_ITEM_START_FAILED, ProjectEventType.DELIVERABLE_ADOPTED,
                 ProjectEventType.ADOPTION_HELD, ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED,
                 ProjectEventType.COMMAND_CONFIGURED, ProjectEventType.MATERIAL_RECORDED,
+                ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
+                ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
+                ProjectEventType.BASELINE_ADOPTED,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.TOOL_STARTED, EventType.ACTION_VERIFIED,
                 EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
@@ -1561,6 +1699,9 @@ PROJECT_OVERVIEW = QueryDefinition(
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_CONTINUED,
                 EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED, EventType.COLLABORATION_REQUESTED,
+                ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
+                ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
+                ProjectEventType.BASELINE_ADOPTED,
                 EventType.COLLABORATION_RESPONDED, EventType.DECISION_REQUESTED),
 )
 
@@ -1572,7 +1713,10 @@ PROJECT_LOOP = QueryDefinition(
                 EventType.RUN_PAUSED, EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.DEPARTMENT_ACTIVATED,
                 EventType.COLLABORATION_REQUESTED, EventType.TOOL_STARTED, EventType.TOOL_CALLED,
                 EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED,
-                EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
+                EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN,
+                ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
+                ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
+                ProjectEventType.BASELINE_ADOPTED),
 )
 
 PROJECT_FLOW = QueryDefinition(
@@ -1614,7 +1758,9 @@ WORK_ITEM_MATERIALS = QueryDefinition(
     handle=_work_item_materials,
     changed_by=(EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.CONTRACT_ACCEPTED,
                 EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
-                ProjectEventType.MATERIAL_RECORDED),
+                ProjectEventType.MATERIAL_RECORDED, ProjectEventType.INITIAL_PRD_PROPOSED,
+                ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
+                ProjectEventType.PROJECT_DECISION_WITHDRAWN),
 )
 
 DELIVERY_FILE = QueryDefinition(
