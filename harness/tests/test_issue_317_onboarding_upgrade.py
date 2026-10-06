@@ -17,6 +17,7 @@ from harness.tests.api_helpers import running_api
 from harness.tests.test_issue_16_recovery import _reload_without_saved_projection
 from harness.tests.test_onboarding import REQUIREMENT, _source
 from harness.tests.test_onboarding_confirmation_queries import _Opened, _open_initial_prd, _post, _wait_for
+from harness.tests.test_runtime_drain import _wait_for as _wait_run
 
 GOAL = "把已有项目接入 Yudao，写出初始 PRD 并核验现有行为"
 NOTE = "现有 CLI 还没有 --help，初始 PRD 要把这个用法说明写进去"
