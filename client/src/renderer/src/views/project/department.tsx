@@ -17,6 +17,7 @@ import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section,
 import { DepartmentSettingsFields, DepartmentSettingsSave, useDepartmentDraft } from "./department-settings-form";
 import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
+import { ReadExisting } from "./read-existing";
 
 export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
@@ -57,6 +58,11 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
           <Section title="部门房间" note="房间画面与小人由工单 #177 填入，这里留出位置">
             <Empty text="部门房间的位置（第 8 节）" />
           </Section>
+          <ReadExisting
+            app={props.app}
+            runId={data.run_id}
+            item={items.find((item) => item.work_item_id === workItem) ?? null}
+          />
           <InspectArea app={props.app} data={data} />
           <MessagesAndGuidance app={props.app} data={data} command={command} />
           {settingsOpen ? <SettingsDialog app={props.app} data={data} onClose={() => setSettingsOpen(false)} /> : null}
