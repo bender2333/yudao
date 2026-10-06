@@ -850,7 +850,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：not_found, decision_closed, stale_base, option_invalid, command_id_reused",
+            "description": "命令被拒绝，可能的原因：not_found, decision_closed, stale_base, option_invalid, not_allowed, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -4001,6 +4001,48 @@
               }
             ],
             "title": "Event Id"
+          },
+          "previous_adoption_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Adoption Id"
+          },
+          "onboarding_baseline": {
+            "type": "boolean",
+            "title": "Onboarding Baseline"
+          },
+          "snapshot_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Source"
+          },
+          "snapshot_provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Provenance"
+          },
+          "existing_defect_count": {
+            "type": "integer",
+            "title": "Existing Defect Count"
           }
         },
         "additionalProperties": false,
@@ -4015,9 +4057,50 @@
           "known_risks",
           "code_tree_digest",
           "adopted_at",
-          "event_id"
+          "event_id",
+          "previous_adoption_id",
+          "onboarding_baseline",
+          "snapshot_source",
+          "snapshot_provenance",
+          "existing_defect_count"
         ],
         "title": "AdoptionView"
+      },
+      "ArtifactRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "content_hash",
+          "path",
+          "media_type"
+        ],
+        "title": "ArtifactRef"
       },
       "AttemptView": {
         "properties": {
@@ -4287,6 +4370,213 @@
           "facts"
         ],
         "title": "AwayReport"
+      },
+      "BaselineCheck": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "argv": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Argv"
+          },
+          "exit_code": {
+            "type": "integer",
+            "title": "Exit Code"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "snapshot_hash": {
+            "type": "string",
+            "title": "Snapshot Hash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "argv",
+          "exit_code",
+          "summary",
+          "snapshot_hash"
+        ],
+        "title": "BaselineCheck"
+      },
+      "BaselineConclusion": {
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "title": "Requirement"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "read_only",
+              "existing_defect",
+              "unsupported"
+            ],
+            "title": "Status"
+          },
+          "evidence": {
+            "type": "string",
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requirement",
+          "status",
+          "evidence"
+        ],
+        "title": "BaselineConclusion"
+      },
+      "BaselineOmission": {
+        "properties": {
+          "capability": {
+            "type": "string",
+            "title": "Capability"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "capability",
+          "location"
+        ],
+        "title": "BaselineOmission"
+      },
+      "BaselineOtherFailure": {
+        "properties": {
+          "check": {
+            "type": "string",
+            "title": "Check"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "check",
+          "reason"
+        ],
+        "title": "BaselineOtherFailure"
+      },
+      "BaselineReviewProposal": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineConclusion"
+            },
+            "type": "array",
+            "title": "Conclusions"
+          },
+          "omissions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOmission"
+            },
+            "type": "array",
+            "title": "Omissions"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "other_failures": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOtherFailure"
+            },
+            "type": "array",
+            "title": "Other Failures"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "content_hash",
+          "conclusions",
+          "omissions",
+          "checks",
+          "other_failures"
+        ],
+        "title": "BaselineReviewProposal"
+      },
+      "BaselineReviewView": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineConclusion"
+            },
+            "type": "array",
+            "title": "Conclusions"
+          },
+          "omissions": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOmission"
+            },
+            "type": "array",
+            "title": "Omissions"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "other_failures": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineOtherFailure"
+            },
+            "type": "array",
+            "title": "Other Failures"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "content_hash",
+          "conclusions",
+          "omissions",
+          "checks",
+          "other_failures"
+        ],
+        "title": "BaselineReviewView"
       },
       "BindingInput": {
         "properties": {
@@ -5541,6 +5831,68 @@
         ],
         "title": "ChangeImpact"
       },
+      "CodeSnapshot": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "tree_digest": {
+            "type": "string",
+            "title": "Tree Digest"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "directories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Directories"
+          },
+          "tree_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "tree_digest",
+          "files",
+          "directories",
+          "tree_ref"
+        ],
+        "title": "CodeSnapshot"
+      },
       "CommandCapability": {
         "properties": {
           "name": {
@@ -5920,6 +6272,11 @@
           "label": {
             "type": "string",
             "title": "Label"
+          },
+          "note_required": {
+            "type": "boolean",
+            "title": "Note Required",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -6041,6 +6398,9 @@
               },
               {
                 "$ref": "#/components/schemas/PauseRequested"
+              },
+              {
+                "$ref": "#/components/schemas/InitialPrdRequested"
               }
             ],
             "title": "Request"
@@ -7136,6 +7496,137 @@
         ],
         "title": "ImpactWorkItem"
       },
+      "InitialPrdProposal": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "prd_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "content_hash",
+          "prd_ref"
+        ],
+        "title": "InitialPrdProposal"
+      },
+      "InitialPrdRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "initial_prd",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "work_item",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "candidate_run_id": {
+            "type": "string",
+            "title": "Candidate Run Id"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "prd": {
+            "$ref": "#/components/schemas/InitialPrdProposal"
+          },
+          "structure": {
+            "$ref": "#/components/schemas/StructureProposal"
+          },
+          "baseline_review": {
+            "$ref": "#/components/schemas/BaselineReviewProposal"
+          },
+          "overview_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/CodeSnapshot"
+          },
+          "revision_note_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "work_item_id",
+          "candidate_run_id",
+          "round",
+          "prd",
+          "structure",
+          "baseline_review",
+          "overview_ref",
+          "snapshot"
+        ],
+        "title": "InitialPrdRequested"
+      },
       "InputView": {
         "properties": {
           "input_id": {
@@ -7544,6 +8035,75 @@
         ],
         "title": "OnboardRefs"
       },
+      "OnboardingDecisionRecord": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "answered",
+              "withdrawn"
+            ],
+            "title": "Outcome"
+          },
+          "option": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Option"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "decided_at": {
+            "type": "string",
+            "title": "Decided At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "decision_id",
+          "outcome",
+          "option",
+          "note",
+          "reason",
+          "decided_at"
+        ],
+        "title": "OnboardingDecisionRecord"
+      },
       "OnboardingRestart": {
         "properties": {
           "command_id": {
@@ -7573,6 +8133,74 @@
           "source_name"
         ],
         "title": "OnboardingRestart"
+      },
+      "OnboardingRound": {
+        "properties": {
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "candidate_event_id": {
+            "type": "string",
+            "title": "Candidate Event Id"
+          },
+          "proposed_at": {
+            "type": "string",
+            "title": "Proposed At"
+          },
+          "prd": {
+            "type": "string",
+            "title": "Prd"
+          },
+          "structure": {
+            "type": "string",
+            "title": "Structure"
+          },
+          "overview": {
+            "type": "string",
+            "title": "Overview"
+          },
+          "revision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Note"
+          },
+          "baseline_review": {
+            "$ref": "#/components/schemas/BaselineReviewView"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingDecisionRecord"
+            },
+            "type": "array",
+            "title": "Decisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "round",
+          "run_id",
+          "candidate_event_id",
+          "proposed_at",
+          "prd",
+          "structure",
+          "overview",
+          "revision_note",
+          "baseline_review",
+          "decisions"
+        ],
+        "title": "OnboardingRound"
       },
       "OverlayCapability": {
         "properties": {
@@ -9858,6 +10486,34 @@
         ],
         "title": "StreamCapability"
       },
+      "StructureProposal": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "structure_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "code_tree_digest": {
+            "type": "string",
+            "title": "Code Tree Digest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "content_hash",
+          "structure_ref",
+          "code_tree_digest"
+        ],
+        "title": "StructureProposal"
+      },
       "SystemStatus": {
         "properties": {
           "log_id": {
@@ -11013,6 +11669,13 @@
             },
             "type": "array",
             "title": "Materials"
+          },
+          "onboarding_rounds": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingRound"
+            },
+            "type": "array",
+            "title": "Onboarding Rounds"
           }
         },
         "additionalProperties": false,
@@ -11025,7 +11688,8 @@
           "deliveries",
           "reviews",
           "inputs",
-          "materials"
+          "materials",
+          "onboarding_rounds"
         ],
         "title": "WorkItemMaterialsResult"
       },
@@ -11536,7 +12200,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Error"
           },
           "resolution": {
@@ -11553,7 +12216,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Note"
           },
           "decision_id": {
@@ -11565,7 +12227,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Decision Id"
           }
         },
@@ -12015,42 +12676,6 @@
         "title": "AdoptionHeldPayload",
         "type": "object"
       },
-      "ArtifactRef": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "title": "Kind",
-            "type": "string"
-          },
-          "content_hash": {
-            "title": "Content Hash",
-            "type": "string"
-          },
-          "path": {
-            "title": "Path",
-            "type": "string"
-          },
-          "media_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Media Type"
-          }
-        },
-        "required": [
-          "kind",
-          "content_hash",
-          "path",
-          "media_type"
-        ],
-        "title": "ArtifactRef",
-        "type": "object"
-      },
       "Baseline": {
         "additionalProperties": false,
         "properties": {
@@ -12084,72 +12709,259 @@
         "title": "Baseline",
         "type": "object"
       },
-      "BaselineConclusion": {
+      "BaselineAdoptedEvent": {
         "additionalProperties": false,
         "properties": {
-          "requirement": {
-            "title": "Requirement",
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
             "type": "string"
           },
-          "status": {
-            "enum": [
-              "verified",
-              "read_only",
-              "existing_defect",
-              "unsupported"
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Status",
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
             "type": "string"
           },
-          "evidence": {
-            "title": "Evidence",
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
             "type": "string"
+          },
+          "type": {
+            "const": "baseline_adopted",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/BaselineAdoptedPayload"
           }
         },
         "required": [
-          "requirement",
-          "status",
-          "evidence"
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
         ],
-        "title": "BaselineConclusion",
+        "title": "BaselineAdoptedEvent",
         "type": "object"
       },
-      "BaselineOmission": {
+      "BaselineAdoptedPayload": {
         "additionalProperties": false,
         "properties": {
-          "capability": {
-            "title": "Capability",
+          "adoption_id": {
+            "title": "Adoption Id",
             "type": "string"
           },
-          "location": {
-            "title": "Location",
+          "work_item_id": {
+            "title": "Work Item Id",
             "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "candidate_event_id": {
+            "title": "Candidate Event Id",
+            "type": "string"
+          },
+          "tree_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "code_tree_digest": {
+            "title": "Code Tree Digest",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "prd_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "structure_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "files": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "check_names": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Check Names",
+            "type": "array"
+          },
+          "checks": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BaselineCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "known_risks": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Known Risks",
+            "type": "array"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "existing_defects": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Existing Defects",
+            "type": "array"
+          },
+          "previous_adoption_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Adoption Id"
           }
         },
         "required": [
-          "capability",
-          "location"
+          "adoption_id",
+          "work_item_id",
+          "run_id",
+          "candidate_event_id",
+          "tree_ref",
+          "code_tree_digest",
+          "summary",
+          "prd_ref",
+          "product_spec_hash",
+          "structure_ref"
         ],
-        "title": "BaselineOmission",
-        "type": "object"
-      },
-      "BaselineOtherFailure": {
-        "additionalProperties": false,
-        "properties": {
-          "check": {
-            "title": "Check",
-            "type": "string"
-          },
-          "reason": {
-            "title": "Reason",
-            "type": "string"
-          }
-        },
-        "required": [
-          "check",
-          "reason"
-        ],
-        "title": "BaselineOtherFailure",
+        "title": "BaselineAdoptedPayload",
         "type": "object"
       },
       "BaselineReviewAcceptedEvent": {
@@ -13194,58 +14006,6 @@
         "title": "CheckReceipt",
         "type": "object"
       },
-      "CodeSnapshot": {
-        "additionalProperties": false,
-        "properties": {
-          "source": {
-            "title": "Source",
-            "type": "string"
-          },
-          "tree_digest": {
-            "title": "Tree Digest",
-            "type": "string"
-          },
-          "files": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Files",
-            "type": "array"
-          },
-          "directories": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Directories",
-            "type": "array"
-          },
-          "tree_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
-          },
-          "provenance": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Provenance"
-          }
-        },
-        "required": [
-          "source",
-          "tree_digest",
-          "files",
-          "directories",
-          "tree_ref"
-        ],
-        "title": "CodeSnapshot",
-        "type": "object"
-      },
       "CollaborationBasis": {
         "additionalProperties": false,
         "properties": {
@@ -13910,7 +14670,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Requester"
           },
           "recipient": {
@@ -13927,7 +14686,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Recipient"
           },
           "request_id": {
@@ -16193,6 +16951,9 @@
               },
               {
                 "$ref": "#/components/schemas/PauseRequested"
+              },
+              {
+                "$ref": "#/components/schemas/InitialPrdRequested"
               }
             ],
             "title": "Payload"
@@ -17510,7 +18271,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Base Version"
           }
         },
@@ -18141,7 +18901,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Provider Id"
           },
           "model_id": {
@@ -18153,7 +18912,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Model Id"
           },
           "requested_tier": {
@@ -18165,7 +18923,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Requested Tier"
           },
           "department_prompt": {
@@ -18177,7 +18934,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Department Prompt"
           },
           "department_prompt_ref": {
@@ -18188,8 +18944,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           },
           "reminders": {
             "default": [],
@@ -18508,6 +19263,198 @@
         "title": "HomeSeenPayload",
         "type": "object"
       },
+      "InitialPrdProposedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "initial_prd_proposed",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/InitialPrdProposedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "InitialPrdProposedEvent",
+        "type": "object"
+      },
+      "InitialPrdProposedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "prd": {
+            "$ref": "#/components/schemas/InitialPrdProposal"
+          },
+          "structure": {
+            "$ref": "#/components/schemas/StructureProposal"
+          },
+          "baseline_review": {
+            "$ref": "#/components/schemas/BaselineReviewProposal"
+          },
+          "overview_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/CodeSnapshot"
+          },
+          "revision_note_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "work_item_id",
+          "run_id",
+          "round",
+          "prd",
+          "structure",
+          "baseline_review",
+          "overview_ref",
+          "snapshot"
+        ],
+        "title": "InitialPrdProposedPayload",
+        "type": "object"
+      },
       "InputRecord": {
         "additionalProperties": false,
         "properties": {
@@ -18557,7 +19504,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Base Version"
           }
         },
@@ -23101,6 +24047,207 @@
         "title": "ModelStreamProgressPayload",
         "type": "object"
       },
+      "OnboardingBasis": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_event_id": {
+            "title": "Candidate Event Id",
+            "type": "string"
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "note_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "candidate_event_id",
+          "round"
+        ],
+        "title": "OnboardingBasis",
+        "type": "object"
+      },
+      "OnboardingRevisionStartedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "onboarding_revision_started",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/OnboardingRevisionStartedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "OnboardingRevisionStartedEvent",
+        "type": "object"
+      },
+      "OnboardingRevisionStartedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "candidate_event_id": {
+            "title": "Candidate Event Id",
+            "type": "string"
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "work_item_id",
+          "run_id",
+          "candidate_event_id",
+          "round",
+          "note"
+        ],
+        "title": "OnboardingRevisionStartedPayload",
+        "type": "object"
+      },
       "PlanAcceptedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -23591,8 +24738,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           }
         },
         "required": [
@@ -23901,6 +25047,509 @@
         "additionalProperties": false,
         "properties": {},
         "title": "ProjectArchivedPayload",
+        "type": "object"
+      },
+      "ProjectDecisionAnsweredEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "project_decision_answered",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProjectDecisionAnsweredPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ProjectDecisionAnsweredEvent",
+        "type": "object"
+      },
+      "ProjectDecisionAnsweredPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "option": {
+            "title": "Option",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "base_version": {
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          }
+        },
+        "required": [
+          "decision_id",
+          "option",
+          "note",
+          "base_version",
+          "work_item_id",
+          "run_id"
+        ],
+        "title": "ProjectDecisionAnsweredPayload",
+        "type": "object"
+      },
+      "ProjectDecisionRequestedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "project_decision_requested",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/InitialPrdRequested"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ProjectDecisionRequestedEvent",
+        "type": "object"
+      },
+      "ProjectDecisionWithdrawnEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "project_decision_withdrawn",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProjectDecisionWithdrawnPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ProjectDecisionWithdrawnEvent",
+        "type": "object"
+      },
+      "ProjectDecisionWithdrawnPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "title": "Decision Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          }
+        },
+        "required": [
+          "decision_id",
+          "reason",
+          "work_item_id",
+          "run_id"
+        ],
+        "title": "ProjectDecisionWithdrawnPayload",
         "type": "object"
       },
       "ProjectGoalChangedEvent": {
@@ -25777,8 +27426,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           },
           "workspace_digest": {
             "title": "Workspace Digest",
@@ -25828,6 +27476,21 @@
           },
           "run_event_version": {
             "title": "Run Event Version",
+            "type": "integer"
+          },
+          "onboarding_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "round": {
+            "default": 0,
+            "title": "Round",
             "type": "integer"
           }
         },
@@ -26195,8 +27858,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           }
         },
         "required": [
@@ -26371,7 +28033,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Message"
           },
           "paused_at_phase": {
@@ -28480,8 +30141,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           },
           "after_snapshot_ref": {
             "anyOf": [
@@ -28491,8 +30151,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           }
         },
         "required": [
@@ -29434,7 +31093,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Registered Name"
           },
           "registered_argv": {
@@ -29449,7 +31107,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Registered Argv"
           },
           "snapshot_hash": {
@@ -29461,7 +31118,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Snapshot Hash"
           },
           "before_snapshot_ref": {
@@ -29472,8 +31128,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           }
         },
         "required": [
@@ -29685,7 +31340,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Yielded Work Resolved"
           },
           "yielded_work": {
@@ -29696,8 +31350,7 @@
               {
                 "type": "null"
               }
-            ],
-            "default": null
+            ]
           }
         },
         "required": [
@@ -30336,7 +31989,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Base Version"
           }
         },
@@ -30830,6 +32482,7 @@
             "action_verified": "#/components/schemas/ActionVerifiedEvent",
             "activation_finished": "#/components/schemas/ActivationFinishedEvent",
             "adoption_held": "#/components/schemas/AdoptionHeldEvent",
+            "baseline_adopted": "#/components/schemas/BaselineAdoptedEvent",
             "baseline_review_accepted": "#/components/schemas/BaselineReviewAcceptedEvent",
             "catalog_candidates_collected": "#/components/schemas/CatalogCandidatesCollectedEvent",
             "catalog_revised": "#/components/schemas/CatalogRevisedEvent",
@@ -30854,6 +32507,7 @@
             "department_input": "#/components/schemas/DepartmentInputEvent",
             "department_prompt_configured": "#/components/schemas/DepartmentPromptConfiguredEvent",
             "home_seen": "#/components/schemas/HomeSeenEvent",
+            "initial_prd_proposed": "#/components/schemas/InitialPrdProposedEvent",
             "lesson_candidate_recorded": "#/components/schemas/LessonCandidateRecordedEvent",
             "material_recorded": "#/components/schemas/MaterialRecordedEvent",
             "model_attempt_failed": "#/components/schemas/ModelAttemptFailedEvent",
@@ -30864,10 +32518,14 @@
             "model_requested": "#/components/schemas/ModelRequestedEvent",
             "model_retry_scheduled": "#/components/schemas/ModelRetryScheduledEvent",
             "model_stream_progress": "#/components/schemas/ModelStreamProgressEvent",
+            "onboarding_revision_started": "#/components/schemas/OnboardingRevisionStartedEvent",
             "plan_accepted": "#/components/schemas/PlanAcceptedEvent",
             "product_decision_accepted": "#/components/schemas/ProductDecisionAcceptedEvent",
             "product_input_assigned": "#/components/schemas/ProductInputAssignedEvent",
             "project_archived": "#/components/schemas/ProjectArchivedEvent",
+            "project_decision_answered": "#/components/schemas/ProjectDecisionAnsweredEvent",
+            "project_decision_requested": "#/components/schemas/ProjectDecisionRequestedEvent",
+            "project_decision_withdrawn": "#/components/schemas/ProjectDecisionWithdrawnEvent",
             "project_goal_changed": "#/components/schemas/ProjectGoalChangedEvent",
             "project_pinned": "#/components/schemas/ProjectPinnedEvent",
             "project_registered": "#/components/schemas/ProjectRegisteredEvent",
@@ -31085,6 +32743,24 @@
           },
           {
             "$ref": "#/components/schemas/SourceDirectoryConfiguredEvent"
+          },
+          {
+            "$ref": "#/components/schemas/InitialPrdProposedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectDecisionRequestedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectDecisionAnsweredEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectDecisionWithdrawnEvent"
+          },
+          {
+            "$ref": "#/components/schemas/OnboardingRevisionStartedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/BaselineAdoptedEvent"
           },
           {
             "$ref": "#/components/schemas/CatalogRevisedEvent"

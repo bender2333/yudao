@@ -209,11 +209,16 @@ def test_run_created_from_snapshot_has_files_before_activation(data_dir, tmp_pat
     assert created.payload["snapshot"]["source"] == str(source.absolute())
     assert created.payload["snapshot"]["files"] == [".hidden", "src/app.py", "src/data.bin"]
     assert created.payload["snapshot"]["directories"] == ["empty", "empty/nested", "src"]
-    # 建档 run 以 baseline_verified 结束；建档的结算（基线采纳）由 #136 实现，这里只核对 run 的结束
+    # 建档 run 以 baseline_verified 结束；结算按工单 #136 提出初始 PRD 候选并请求用户确认
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
     assert result.stop_reason == "baseline_verified"
-    assert system.projects.settle(run_id) is None
+    [proposed, requested] = [system.projects.settle(run_id), system.projects.settle(run_id)]
+    assert proposed is not None and requested is None
+    assert proposed.type == ProjectEventType.INITIAL_PRD_PROPOSED
+    assert proposed.payload["round"] == 1
+    assert proposed.payload["run_id"] == run_id
+    assert system.projects.projection(project_id).work_item(work_item_id).status == "awaiting_initial_prd"
     assert system.projects.projection(project_id).work_item(work_item_id).kind == "onboarding"
 
 

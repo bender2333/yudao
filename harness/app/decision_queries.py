@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import AwareDatetime, Field
 
-from ..models import DecisionRequest, EventType
+from ..models import DecisionRequest, EventType, ProjectEventType
 from ..projects import ProjectNotFoundError, project_projection
 from ..projection import saved_decisions
 from .contracts import CommandId, Contract, Snapshot
@@ -126,6 +126,8 @@ def _blocked(state: Any, decision: DecisionRequest) -> BlockedObjects | None:
 
 DECISIONS_LIST = QueryDefinition(
     name="decisions.list", request=DecisionsList, result=DecisionList, handle=_decisions_list,
-    changed_by=(EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
+    changed_by=(EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN,
+                ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
+                ProjectEventType.PROJECT_DECISION_WITHDRAWN),
     replayable=True,
 )

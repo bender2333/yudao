@@ -14,6 +14,8 @@ from .models import DecisionRequest
 class Option:
     id: str
     label: str
+    # 说明必填（工单 #136，设计第 3.2 节）：为真时这个选项必须附说明，空说明的回答由服务端拒绝
+    note_required: bool = False
 
 
 @dataclass(frozen=True)
@@ -52,8 +54,14 @@ UNKNOWN_ACTION = DecisionKind("unknown_action", "action",
                                Option("continue", "按当前实际状态继续"),
                                Option("stop", "停止事项")))
 
+# 确认接入已有项目的初始 PRD（工单 #136，接入已有项目设计说明第 3.2 节）：建档 run 已经结束，
+# 请求写在项目流中，阻塞建档事项与同一项目中排在它后面的事项，不属于任何 run。
+# 「提出修改」必须附说明：说明为空的回答由服务端以 not_allowed 拒绝
+INITIAL_PRD = DecisionKind("initial_prd", "work_item",
+                           (Option("confirm", "确认"), Option("revise", "提出修改", note_required=True)))
+
 DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED, UNKNOWN_ACTION,
-                                               NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE)}
+                                               NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE, INITIAL_PRD)}
 
 
 def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:
@@ -92,3 +100,11 @@ class InvalidOption(Exception):
     def __init__(self, decision: DecisionRequest, option: str) -> None:
         super().__init__(f"option {option} is not offered by decision request {decision.decision_id}")
         self.options = [item["id"] for item in decision.request["options"]]
+
+
+class NoteRequired(Exception):
+    # 所选的选项要求附说明而这次回答没有给说明（工单 #136）：请求不变，什么也不写
+    def __init__(self, decision: DecisionRequest, option: str) -> None:
+        super().__init__(f"option {option} of decision request {decision.decision_id} requires a note")
+        self.decision_id = decision.decision_id
+        self.option = option
