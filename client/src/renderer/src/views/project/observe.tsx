@@ -14,6 +14,7 @@ import type {
 } from "../../api/generated/types.gen";
 import type { Route } from "../../shell/routing";
 import { paths } from "../../shell/routing";
+import { failureRows } from "./attempt-failure";
 import { Empty, KeyValue, Loading, Section, Table, dict, formatNumberOr, list, numberValue, optionalText, pageKey, show, text } from "./common";
 import { ATTEMPT_STATUS, DEPARTMENTS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
@@ -296,6 +297,8 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
   const refs = dict(props.data.artifact_refs);
   // 调用目标的公开部分（不含 Key）、选择来源与请求/实际发送的档位（设计说明第 6 节）
   const callTarget = dict(attempt.call_target);
+  // 失败类型与结束原因（工单 #305）：取值规则抽在 attempt-failure.ts，便于单元测试核对
+  const failure = failureRows(attempt);
 
   return (
     <>
@@ -312,6 +315,7 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
           ["开始与结束", `${formatTime(optionalText(attempt.started_at))} → ${formatTime(optionalText(attempt.finished_at))}（${formatNumberOr(numberValue(attempt.duration_ms), " 毫秒")}）`],
           ["用量", text(attempt.usage) === "" ? "未上报" : JSON.stringify(attempt.usage)],
           ["运行限制", `收集范围 ${show(optionalText(scope.max_items) ?? optionalText(scope.mode), "未上报")}；输出条目 ${show(optionalText(attempt.output_item_count), "未上报")}`],
+          ...failure,
           ["错误", show(optionalText(attempt.error), "没有"),],
           ["是否可重试", attempt.retryable === true ? "是" : attempt.retryable === false ? "否" : "未上报"],
           ["引用", `请求 ${show(optionalText(refs.request))}，响应 ${show(optionalText(refs.response))}，原始流 ${show(optionalText(refs.events))}，用量 ${show(optionalText(refs.usage))}`],

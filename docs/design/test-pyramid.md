@@ -88,7 +88,8 @@
 ```bash
 uv run python -m pytest -m "unit or module"
 uv run python -m pytest harness/tests/<本次改动或新增的集成层文件>
-node --test --test-reporter=dot harness/tests/test_web_ui.js
+cd client && npm test
+cd client && npm run test:e2e
 uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
 uv run python -m pytest -m desktop   # 只在用户同意的时间运行
 ```
