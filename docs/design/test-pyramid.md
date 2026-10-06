@@ -140,8 +140,7 @@ flowchart TD
 
 ## 7. 前端与浏览器测试
 
-- `test_web_ui.js` 位置不变，属于单元层，由 `node --test --test-reporter=dot` 运行；删除 `test_web.py` 中经子进程重复运行它的测试项。
-- 删除 `test_b3_shell_browser.spec.js` 与 `test_s3_acceptance_browser.spec.js`：两者是 Stage 2 的验收证据脚本（固定日期、固定端口、写死的 Chromium 路径），没有接入任何运行入口。桌面客户端的浏览器测试随客户端设计（[D30](../requirements/web-game-frontend.md)、#71）。
+- 旧 Web 控制台的界面测试已随旧控制台删除：`test_web_ui.js`、`test_b3_shell_browser.spec.js` 与 `test_s3_acceptance_browser.spec.js`（后两者是 Stage 2 的验收证据脚本，固定日期、固定端口、写死的 Chromium 路径，没有接入任何运行入口）。桌面客户端的浏览器测试随客户端设计（[D30](../requirements/web-game-frontend.md)、#71）。
 
 ## 8. 模块交互
 

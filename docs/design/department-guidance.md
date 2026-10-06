@@ -1,6 +1,6 @@
 # 部门指导的处理设计
 
-日期：2026-09-06。对应 [D20](../requirements/department-guidance.md) 与 Web 计划 W0/W6。以下是本轮架构选择，不冒称用户已逐项指定。已实现：接口 `POST /api/runs/{run_id}/departments/{department}/guidance`（`harness/web/server.py`）接收指导，`harness/interactions.py` 的 `receive_guidance` 保存原文并写入接收事件（提交 `fe78667`，`fcb06ab` 把「已解释」与「已完成」分开）；测试与真实运行证据见 [D20](../requirements/department-guidance.md) 的「验收与状态」。
+日期：2026-09-06。对应 [D20](../requirements/department-guidance.md) 与 Web 计划 W0/W6。以下是本轮架构选择，不冒称用户已逐项指定。已实现：命令 `guidance.send` 接收指导，`harness/interactions.py` 的 `receive_guidance` 保存原文并写入接收事件（提交 `fe78667`，`fcb06ab` 把「已解释」与「已完成」分开）；指导记录由 `department.workspace` 查询读取（[应用层与接口层设计说明](app-and-interface.md)第 7.1 节）；测试与真实运行证据见 [D20](../requirements/department-guidance.md) 的「验收与状态」。
 
 ## 三类职责
 
