@@ -32,8 +32,12 @@
   - 需求：[D36](../requirements/network-and-mcp.md)。ADR：[0025](../adr/0025-network-and-mcp-run-on-control-host.md)。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../research/network-and-mcp-references.md)。
 - [接入已有项目](existing-project-onboarding.md)
   - 内容：建档事项（事项种类、命令、决定请求）；产品的初始 PRD、工程的结构说明、质检的基线核对；用户确认的往返与基线采纳；大仓库的仓库概况；失败与中断；含流程图、时序图与模块交互图。
-  - 状态：设计已确认，未实施（2026-09-29 用户确认第 12 节的决定：已有代码只经 `project.onboard` 进入、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）。工单：父工单 #124（#134 至 #139），属于里程碑 M2。
+  - 状态：设计已确认，未实施（2026-09-29 用户确认第 12 节的决定：已有项目的代码经 `project.onboard` 接入并建档、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）。工单：父工单 #124（#134 至 #139），属于里程碑 M2。
   - 需求：[D33](../requirements/existing-project-onboarding.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)。
+- [项目的起始文件夹](project-initial-files.md)
+  - 内容：新建项目时带的起始文件夹：项目的起点（采纳成果、起始文件夹快照、空树）与三处共用的求法、`project.create` 的可选参数与 `project_registered` 的 `initial_snapshot`、事项从快照开始、界面与评测、失败与中断；含流程图与时序图。
+  - 状态：2026-10-06 设计，用户同意，未实施。工单：挂在 #124 下，属于里程碑 M2。
+  - 需求：[D37](../requirements/project-initial-files.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)。
 - [Provider 层](provider-layer.md)
   - 内容：独立 Provider 模块的统一调用、服务方案、候选与准入、配置生效，含模块关系图。
   - 状态：Stage 2.7 已实现。「冻结目标」「协议归于模型访问定义」等部分由模型管理设计取代，模块边界、统一调用、取消与观测部分继续有效。

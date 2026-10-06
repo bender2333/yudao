@@ -11,14 +11,15 @@ import {
   PROTOCOL_LABELS,
   REASONING_MODE_LABELS,
   REASONING_LEVELS,
-  admissionOf,
   admissionLabel,
+  admissionOf,
+  capacityIssueText,
   defaultLevelOptions,
+  intFromInput,
   patchRowCapacity,
   presetBaseUrlFor,
   presetById,
   reasoningModeOptions,
-  rowSavable,
   type CandidateState,
   type FormRow,
   type FormState,
@@ -49,6 +50,8 @@ export type ProviderFormProps = {
   impact: string;
   busy: boolean;
   testing: Record<string, boolean>;
+  // 已完成的模型测试结果，按 model:<id> 存（工单 #294：行里要显示通过或原因）
+  tests: Record<string, string>;
   status: { kind: "ok" | "error"; message: string } | null;
   onSubmit: () => void;
   onCancel: () => void;
@@ -175,7 +178,7 @@ export function ProviderForm(props: ProviderFormProps) {
         <summary>高级选项</summary>
         <label className="mm-field">
           <span className="mm-label">超时（秒）</span>
-          <input type="number" min="1" value={state.timeout_sec}
+          <input type="number" min="1" value={state.timeout_sec} data-testid="provider-timeout"
                  onChange={(event) => props.onPatch({ timeout_sec: event.target.value })} />
         </label>
         <label className="mm-field">
@@ -266,6 +269,11 @@ export function ProviderForm(props: ProviderFormProps) {
           const levelChoices = defaultLevelOptions(row.reasoning_levels);
           const modeChoices = reasoningModeOptions(state.protocol);
           const rowKey = row.id || row.key;
+          // 容量的问题（缺少哪一项或哪一项的关系不成立）与目录文档校验同一份判断（工单 #294）
+          const capacityIssue = capacityIssueText({
+            context_window: intFromInput(row.context_window),
+            max_output_tokens: intFromInput(row.max_output_tokens),
+          });
           return (
             <fieldset className="mm-row" key={row.key} data-testid={`model-row-${rowKey}`}>
               <legend>{row.id || "新的定义"}</legend>
@@ -294,11 +302,16 @@ export function ProviderForm(props: ProviderFormProps) {
                   ? <span className="mm-ok" data-testid={`capacity-confirmed-${rowKey}`}>容量已确认</span>
                   : (
                     <button type="button" data-testid={`accept-capacity-${rowKey}`}
-                            disabled={!rowSavable({ ...row, capacity_confirmed: true })}
+                            disabled={capacityIssue !== ""}
                             onClick={() => props.onPatchRow(row.key, { capacity_confirmed: true })}>
                       接受容量
                     </button>
                   )}
+                {capacityIssue !== "" && (
+                  <span className="mm-warn" role="status" data-testid={`capacity-issue-${rowKey}`}>
+                    {capacityIssue}
+                  </span>
+                )}
                 <span className="spacer" />
                 {editing && row.id && (
                   <button type="button" data-testid={`test-model-${row.id}`}
@@ -306,6 +319,12 @@ export function ProviderForm(props: ProviderFormProps) {
                           onClick={() => props.onTestModel(row.id)}>
                     {props.testing[`model:${row.id}`] ? "测试中…" : "模型测试"}
                   </button>
+                )}
+                {/* 行内测试按钮旁边同样显示这一行的模型测试结果（工单 #294） */}
+                {editing && row.id && (props.testing[`model:${row.id}`] === true || props.tests[`model:${row.id}`] !== undefined) && (
+                  <span className="mm-meta" role="status" data-testid={`form-model-result-${row.id}`}>
+                    {props.testing[`model:${row.id}`] ? "模型测试中…" : props.tests[`model:${row.id}`]}
+                  </span>
                 )}
                 <button type="button" data-testid={`remove-model-${rowKey}`}
                         onClick={() => props.onRemoveRow(row.key)}>移除</button>

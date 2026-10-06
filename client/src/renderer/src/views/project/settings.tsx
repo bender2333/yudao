@@ -8,7 +8,7 @@ import type { ClientApp } from "../../contract/client-app";
 import type { Catalog, ProjectSettingsResult } from "../../api/generated/types.gen";
 import type { Route } from "../../shell/routing";
 import {
-  CommandFeedback, Empty, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea, TextInput,
+  Checkbox, CommandFeedback, Empty, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea, TextInput,
   formatNumberOr, hasCommand, list, pageKey, text, useDraft,
 } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, useDepartmentDraft } from "./department-settings-form";
@@ -239,13 +239,14 @@ function CommandRegistry(props: { app: ClientApp; data: ProjectSettingsResult })
     <Section title="登记命令" note="部门可以在房间里调用这些命令；固定参数与允许的额外参数由这里决定">
       {entries.length === 0 ? <Empty text="还没有登记命令" /> : (
         <Table
-          head={["登记名", "固定参数", "允许的额外参数", "时限", "输出上限", "版本", ""]}
+          head={["登记名", "固定参数", "允许的额外参数", "时限", "输出上限", "可以重新执行", "版本", ""]}
           rows={entries.map(([key, setting]) => [
             setting.name,
             setting.argv.length > 0 ? setting.argv.join(" ") : "（无）",
             setting.args.length > 0 ? setting.args.join(" ") : "（不允许）",
             formatNumberOr(setting.timeout_sec, " 秒"),
             formatNumberOr(setting.output_limit, " 字节"),
+            setting.repeatable ? "是" : "否",
             `第 ${setting.version} 版`,
             <button
               type="button"
@@ -291,7 +292,13 @@ function CommandForm(props: {
     `${scope}/output`,
     existing === undefined ? "" : String(existing.output_limit),
   );
-  const command = useCommand(props.app, pageKey([existing?.version, name, argv, args, timeoutText, outputText]));
+  // 可以重新执行（工单 #242）：新登记默认关闭；修改时取当前登记的声明
+  const [repeatableText, setRepeatableText] = useDraft(
+    `${scope}/repeatable`,
+    existing?.repeatable === true ? "yes" : "no",
+  );
+  const command = useCommand(props.app,
+    pageKey([existing?.version, name, argv, args, timeoutText, outputText, repeatableText]));
 
   // 时限与输出上限：留空表示不写入（服务端保留默认值），填写时需要是非负整数
   const timeout = timeoutText === "" ? null : Number(timeoutText);
@@ -309,6 +316,12 @@ function CommandForm(props: {
         <TextInput label="允许的额外参数" value={args} placeholder="留空表示不允许；多个用空格分开" onInput={setArgs} />
         <TextInput label="时限（秒）" value={timeoutText} placeholder="留空表示使用默认值" onInput={setTimeoutText} />
         <TextInput label="输出上限（字节）" value={outputText} placeholder="留空表示使用默认值" onInput={setOutputText} />
+        <Checkbox
+          label="可以重新执行"
+          checked={repeatableText === "yes"}
+          onChange={(checked) => setRepeatableText(checked ? "yes" : "no")}
+        />
+        <p className="note">登记时声明这个命令可以重新执行：动作结果未知时，核实请求按这个声明给出「重新执行一次」的选项。</p>
         {numbersInvalid ? <p className="error">时限与输出上限需要是非负整数</p> : null}
         <SubmitButton
           label="保存"
@@ -322,6 +335,7 @@ function CommandForm(props: {
             args: args === "" ? [] : args.split(" ").filter((part) => part !== ""),
             timeout_sec: timeout,
             output_limit: output,
+            repeatable: repeatableText === "yes",
           }).then((ok) => { if (ok) { props.onClose(); } })}
         />
         <button type="button" onClick={props.onClose}>取消</button>

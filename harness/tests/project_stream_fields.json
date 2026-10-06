@@ -1,5 +1,8 @@
 {
   "added_defaults": {
+    "command_configured": {
+      "repeatable": "旧事件没有登记「可以重新执行」这个声明（#242）；没有这个字段时按否处理，结果未知的动作不自动重新执行"
+    },
     "department_prompt_configured": {
       "department_prompt": "旧事件用 text 写部门 Prompt 原文；没有 text 与 department_prompt 时该部门没有写入 Prompt，读取时用内置默认 Prompt（版本 0）",
       "department_prompt_ref": "旧事件用 prompt_ref 写部门 Prompt 的工件引用；没有它时从 department_prompt（或 text）的原文计算内容哈希，没有原文时该部门没有写入 Prompt",
@@ -120,6 +123,7 @@
       "base_version": "integer",
       "name": "string",
       "output_limit": "integer",
+      "repeatable": "boolean",
       "timeout_sec": "integer",
       "version": "integer"
     },

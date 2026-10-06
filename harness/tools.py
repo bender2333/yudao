@@ -33,7 +33,12 @@ def validate_registered_command(name: str, config: dict[str, Any]) -> dict[str, 
     output_limit = config.get("output_limit", limits.tool_output_limit)
     if type(output_limit) is not int or output_limit < 1:
         raise ValueError(f"registered command {name} output_limit must be an integer >= 1")
-    return {"argv": list(argv), "args": list(extra_args), "timeout_sec": timeout_sec, "output_limit": output_limit}
+    # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）：缺省为否
+    repeatable = config.get("repeatable", False)
+    if type(repeatable) is not bool:
+        raise ValueError(f"registered command {name} repeatable must be a boolean")
+    return {"argv": list(argv), "args": list(extra_args), "timeout_sec": timeout_sec,
+            "output_limit": output_limit, "repeatable": repeatable}
 
 
 def normalize_registered_commands(registry: dict[str, Any] | None) -> dict[str, dict[str, Any]]:

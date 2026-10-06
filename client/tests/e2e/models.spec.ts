@@ -13,9 +13,9 @@ const KEY = "sk-e2e-opencode-go-8f3a1c";
 // 见 docs/architecture-issues.md），这里单独放宽每条用例的时限
 async function openModels(
   size: { width: number; height: number },
-  options: { admitAndBind?: boolean } = {},
+  options: { admitAndBind?: boolean; rejectUpstream?: boolean } = {},
 ): Promise<{ backend: Backend; client: ClientApp }> {
-  const backend = await startBackend(options.admitAndBind === true ? { admitAndBind: true } : {});
+  const backend = await startBackend({ admitAndBind: options.admitAndBind === true, rejectUpstream: options.rejectUpstream === true });
   const client = await startClient(backend, size);
   await expect(client.page.locator(".brand")).toHaveText("Yudao");
   // 宽度 390 时左侧栏收为抽屉，先打开抽屉再点入口（原型 v8 设计说明第 3.3 节）
@@ -138,15 +138,59 @@ for (const size of [
       await expect(candidates).toContainText("采集时间");
       await expect(candidates).toContainText("vision-model");
 
-      // 模型测试：测试中 → 通过，准入列显示测试时间与实际返回的模型
+      // 模型测试：测试中 → 通过，模型行显示通过与用时，准入列显示测试时间与实际返回的模型
       await client.page.getByTestId("row-test-glm-4.6").click();
+      await expect(client.page.getByTestId("model-result-glm-4.6")).toContainText("模型测试通过");
+      await expect(client.page.getByTestId("model-result-glm-4.6")).toContainText(/\d+ 毫秒/);
       await expect(client.page.getByTestId("model-glm-4.6")).toContainText("已准入：");
-      await expect(client.page.getByTestId("model-glm-4.6")).toContainText("glm-4.6");
       await expect(client.page.getByTestId("provider-opencode-go").locator(".mm-summary"))
         .toContainText("已准入 1 · 候选 0");
 
       // 准入列只读：模型表里没有可编辑准入的控件
       await expect(client.page.getByTestId("model-glm-4.6").locator("input")).toHaveCount(0);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  test(`${label}：模型测试的真实上游返回 401，模型行显示未通过与原因`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size, { rejectUpstream: true });
+    const errors = watchErrors(client);
+    try {
+      // 这条连接指向测试内的真实 HTTP 上游，那个上游对任何请求都返回 401
+      await client.page.getByTestId("provider-rejected-go").getByRole("button", { name: "展开" }).click();
+      await setKey(client, backend, "REJECTED_GO_KEY");
+      await client.page.getByTestId("row-test-glm-rejected").click();
+      // 失败时模型行写明未通过，并把上游给出的原因带上（工单 #294）
+      const line = client.page.getByTestId("model-result-glm-rejected");
+      await expect(line).toContainText("模型测试未通过");
+      await expect(line).toContainText("HTTP 401");
+      // 失败不写准入：这一行的准入列仍是候选
+      await expect(client.page.getByTestId("model-glm-rejected")).toContainText("候选");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  test(`${label}：新建连接表单的超时默认值与后端一致`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size);
+    const errors = watchErrors(client);
+    try {
+      // 目录合同的 default_timeout_sec：客户端的默认值取自它，不在客户端写死（工单 #294）
+      const listed = await client.page.evaluate(async (address: string) => {
+        const response = await fetch(`${address}/api/queries/catalog`);
+        return (await response.json()) as { data: { default_timeout_sec: number } };
+      }, backend.address);
+      await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+      await client.page.locator(".mm-form details.mm-advanced > summary").click();
+      await expect(client.page.getByTestId("provider-timeout"))
+        .toHaveValue(String(listed.data.default_timeout_sec));
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -185,7 +229,20 @@ for (const size of [
       await form.getByTestId("admit-candidate-vision-model").click();
       await expect(form.getByTestId("model-row-vision-model")).toContainText("窗口：上游模型列表");
       await expect(form.getByTestId("capacity-confirmed-vision-model")).toHaveCount(0);
-      // 提交时被拦下：保存按容量确认判定
+      // 手动添加的一行两项容量都空着：界面写明缺哪两项，「接受容量」不可用（工单 #294）
+      await form.getByTestId("add-model-row").click();
+      await expect(form.locator('[data-testid^="capacity-issue-"]').last()).toHaveText("缺少窗口与输出上限");
+      await expect(form.locator('button[data-testid^="accept-capacity-"]').last()).toBeDisabled();
+      // 已保存的行清空窗口：界面写明「缺少窗口」，提交按同一份判断被拦下（与目录文档校验一致）
+      await form.getByTestId("row-window-glm-4.6").fill("");
+      await expect(form.getByTestId("capacity-issue-glm-4.6")).toHaveText("缺少窗口");
+      // 去掉那一行空白的手工行：ID 与上游模型 ID 是必填项，原生校验会先拦下提交，与容量判断无关
+      await form.locator('button[data-testid^="remove-model-"]').last().click();
+      await form.getByTestId("submit-provider").click();
+      await expect(form.getByTestId("form-status")).toContainText("不能保存");
+      await form.getByTestId("row-window-glm-4.6").fill("200000");
+      await expect(form.getByTestId("capacity-issue-glm-4.6")).toHaveCount(0);
+      // 提交时被拦下：候选那一行还没有「接受」
       await form.getByTestId("submit-provider").click();
       await expect(form.getByTestId("form-status")).toContainText("没有「接受」或修改的行不能保存");
       await form.getByTestId("accept-capacity-vision-model").click();

@@ -1,6 +1,6 @@
 # 应用层与接口层设计说明
 
-更新：2026-10-02。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有代码只经 `project.onboard` 进入（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。2026-10-01 用户确认桌面客户端的安装、更新与发布（[设计说明](client-packaging-and-release.md)）：第 6.1、6.2、8、10 节与 `system.status`、`agent.package` 相应修改。同日用户确认网络取回与 MCP 工具（[设计说明](network-and-mcp.md)）：`tool_authorization.save` 的内容、新增 `tool_server.probe`、决定种类 `tool_approval`、`project.settings`、`tools.registry` 与 `run.actions` 相应修改。2026-10-02 用户确认 computer use 在控制主机的交互桌面上进行：增加命令 `trial.stop_desktop`、决定种类「使用本机桌面」与两个待恢复原因（第 3.2、3.3、10 节），命令共 43 个。
+更新：2026-10-06（`project.create` 增加可选的起始文件夹；启动时 run 事件版本不同的未结束 run 按强制升级处理，第 3.3 节决定种类表删去对应的一行）。状态：设计说明，依据用户确认的 ADR-0015 与总体架构编写，第 10 节的事项由架构师决定；未实施。2026-09-28 用户决定界面工作线提前到 Stage 3，并增加系统首页（待你决定、离开期间的报告）、机器页、托盘提醒、接口版本核对与局域网访问方式（第 3.2、4.3、5.7、6、7.5 节）；只在局域网内使用期间，令牌与 TLS 保留位置并标为 TODO（第 6.3 节）。2026-09-29 用户决定 Stage 3 的每个工作包连同界面一起验收，D24 模型管理（#83）属于 Stage 3（第 7.5 节）；同日用户确认[接入已有项目](existing-project-onboarding.md)（3.8）与[执行环境服务](execution-environment.md)（3.2C）的设计，命令清单加入 `project.onboard`、`onboarding.restart`、`execution_placement.save`，已有项目的代码经 `project.onboard` 接入并建档（第 3.2、4.3、10 节）。2026-09-30 原型设计结束，界面依据改为原型 v9（见下一段的依据）。2026-10-01 用户确认桌面客户端的安装、更新与发布（[设计说明](client-packaging-and-release.md)）：第 6.1、6.2、8、10 节与 `system.status`、`agent.package` 相应修改。同日用户确认网络取回与 MCP 工具（[设计说明](network-and-mcp.md)）：`tool_authorization.save` 的内容、新增 `tool_server.probe`、决定种类 `tool_approval`、`project.settings`、`tools.registry` 与 `run.actions` 相应修改。2026-10-02 用户确认 computer use 在控制主机的交互桌面上进行：增加命令 `trial.stop_desktop`、决定种类「使用本机桌面」与两个待恢复原因（第 3.2、3.3、10 节），命令共 43 个。
 
 依据：[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（桌面客户端与 HTTP 合同）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与全局位置）、[ADR-0011](../adr/0011-async-control-core.md)（异步）、[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 第 5 条、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../prototypes/v7/design.md)第 7 节、[构建约定](../prototypes/v7/BUILD.md)第 3.5、5、6 节；依据改为原型 v9（原型设计已结束，[v9 设计说明](../prototypes/v9/design.md)与[构建约定](../prototypes/v9/BUILD.md)，屏幕清单、页面导航与接口层沿用 [v8 设计说明](../prototypes/v8/design.md)与[构建约定](../prototypes/v8/BUILD.md)），系统首页、机器页与托盘提醒以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。
 
@@ -190,7 +190,7 @@ sequenceDiagram
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
-| `project.create` | 新建项目 | 名称、长期目标 | `project_registered` | 空 | 已有 `POST /api/projects` |
+| `project.create` | 新建项目；可以带起始文件夹，起始文件夹的快照是第一次采纳之前每个事项的起点（[项目的起始文件夹设计说明](project-initial-files.md)） | 名称、长期目标、起始文件夹（可选，控制主机上的路径） | `project_registered`（带起始文件夹时增加 `initial_snapshot`） | 空 | 已有 `POST /api/projects`，起始文件夹新增（D37） |
 | `project.rename` | 重命名 | 项目、名称 | `project_renamed` | 项目基本信息版本 | 已有 `POST /api/projects/{id}/rename` |
 | `project.set_goal` | 修改长期目标；之后开始的事项使用新目标，进行中的事项使用 `run_created` 记下的开始时的目标 | 项目、长期目标 | `project_goal_changed` | 项目基本信息版本 | 新增（#203） |
 | `project.pin` | 置顶或取消置顶 | 项目、是否置顶 | `project_pinned` | 项目基本信息版本 | 已有 `POST /api/projects/{id}/pin` |
@@ -199,7 +199,7 @@ sequenceDiagram
 | `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项 | 名称、长期目标、源目录名称、源目录路径（控制主机上的路径） | `project_registered`（`source` 为 `existing`）、源目录登记事件、`work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空 | 新增（3.8，[接入已有项目设计说明](existing-project-onboarding.md)第 3.1 节） |
 | `onboarding.restart` | 重新开始建档：从登记的源目录重新采集快照，开始新的建档事项；只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用 | 项目、源目录（登记名） | `work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空 | 新增（3.8） |
 
-已有代码只经 `project.onboard` 进入 Yudao；建档以后源目录的修改不进入项目，要在源目录的新代码上工作时接入为新项目（接入已有项目设计说明第 5、12 节）。取消建档使用 `work_item.cancel`。
+已有项目的代码经 `project.onboard` 接入并建档；建档以后源目录的修改不进入项目，要在源目录的新代码上工作时接入为新项目（接入已有项目设计说明第 5、12 节）。取消建档使用 `work_item.cancel`。
 
 **事项与输入（概览、部门工作间）**
 
@@ -309,7 +309,6 @@ sequenceDiagram
 | 模型引用无法使用时的待恢复 | 继续执行（修复配置以后）、停止事项 | run | 模型管理设计说明第 5.5 节 | #49 |
 | 暂停以后继续（停止原因 `no_tool_call`、`workspace_unrepresentable`） | 处理以后继续执行、停止事项 | run | [D09](../requirements/execution-limits.md) | #204 |
 | 继续旧事项时定义版本不同（`definitions_changed`） | 按新版本继续、停止事项 | run | 总体架构第 7.4 节，[ADR-0014](../adr/0014-versioned-definitions.md) | #16 |
-| 启动时 run 事件版本不同（同一 `definitions_changed` 种类） | 按新版本继续、停止事项 | run | [ADR-0019](../adr/0019-project-stream-across-versions.md) | #232 |
 | 核实结果未知的动作 | 重新执行（只对契约声明可以重复的动作提供）、按当前实际状态继续、停止事项；只在自动核实与自动重新执行一次都没有得到结果时发出，连续两次结果未知时材料写明 | 动作 | 恢复契约第 4 节，原型第 4.3 节 | #17；自动核实与自动重新执行 #242 |
 | 质检无法核验 | 重新核验、停止事项 | run | [浏览器与 computer use 设计说明](browser-and-computer-use.md)第 8.4 节 | #151 |
 | 使用本机桌面（桌面种类的试用会话开始之前） | 开始（本次会话）、本事项内都允许、拒绝；拒绝时 `trial_start` 的结果写明用户没有交出桌面 | 动作 | [浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5.1 节 | #246 |
@@ -752,7 +751,7 @@ sequenceDiagram
 3. **#44 与统一事件流。** #44 提供事件日志的订阅接口；统一事件流由本设计的事件流工单完成。冻结的旧控制台的两个事件流在删除之前改为按全局位置读取，保持现有的定时查询。
 4. **#44 的日志列与写入口接口。** 事件日志保存每条事件的项目、事项、run、部门与种类并建立索引；写入口提供同一事务内的「读取保存的投影、判断、追加」接口与命令身份的唯一约束。两项写进 #44。
 5. **流式进度事件的数量。** 输出片段加入以后，`model_stream_progress` 只在阶段变化时写入；这会改变 #43 的事件序列基准，在事件流工单中实施并有意识地更新基准。
-6. **接入已有项目的源目录。** 已有代码只经 `project.onboard` 进入（2026-09-29 用户决定，接入已有项目设计说明第 12 节第 1 项）；`work_item.create` 没有代码快照来源。`project.onboard` 填写的源目录路径是控制主机上的路径，同时成为这个项目的第一条源目录登记；以后在项目设置中用 `source_directory.save` 查看与修改，`onboarding.restart` 只能选择登记过的源目录。
+6. **接入已有项目的源目录。** 已有项目的代码经 `project.onboard` 接入并建档（2026-09-29 用户决定，接入已有项目设计说明第 12 节第 1 项；新建项目的起始文件夹见 2026-10-06 的补充，[项目的起始文件夹设计说明](project-initial-files.md)）；`work_item.create` 没有代码快照来源。`project.onboard` 填写的源目录路径是控制主机上的路径，同时成为这个项目的第一条源目录登记；以后在项目设置中用 `source_directory.save` 查看与修改，`onboarding.restart` 只能选择登记过的源目录。
 7. **Web 控制台的删除。** 按第 7.3 节：已由 #78 删除。
 8. **桌面客户端启动本机的 Yudao 服务。** 连接「本机」时，桌面客户端在 Yudao 服务没有运行时启动它（`yudao api`），启动为独立的后台进程；退出客户端不停止 Yudao 服务，托盘菜单有「停止 Yudao」，用第 6.2 节的本机停止请求停止；也可以按地址连接已经运行的本机或远端部署。2026-10-01 用户决定（[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)，[桌面客户端的安装、更新与发布设计说明](client-packaging-and-release.md)第 4.3 至 4.5 节）。
 9. **执行槽位数。** 执行槽位数是部署设置，经命令修改并写成事件；它取决于运行机器的能力，不属于随系统发布的定义。
