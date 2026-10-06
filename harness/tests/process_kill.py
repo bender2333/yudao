@@ -19,6 +19,9 @@
 # 两条都不给时子进程运行到结束，不终止。
 #
 # 子进程入口：python -m harness.tests.process_kill <数据目录> <脚本 JSON> <事项任务> [登记注册表 JSON]
+# 建档（工单 #317）的额外动作：--onboard 与 --onboard-source 接入已有项目并开始建档事项，取代 create_run；
+# --settle 在 run 结束以后结算；--answer-revise 在结算以后回答「提出修改」并写下修改意见。
+# --hold-after onboarding_revision_started 停在修改轮的事件提交以后、新 run 建立以前。
 
 import argparse
 import json
@@ -28,13 +31,16 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Sequence
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.project_queries import RunActions, RunRecovery
-from harness.models import EventType
+from harness.event_store import Command, EventStore
+from harness.models import EventType, ProjectEventType
+from harness.projection import saved_decisions
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import after_event
@@ -49,12 +55,16 @@ def build_script(items: Sequence[dict[str, Any]]) -> list[Any]:
     #   {"proposal": {...}}   提交一种提案（product_spec、engineering_plan 等）
     #   {"output": [...]}     一次回答的全部输出条目（自己写调用，例如指定编号的一次读取）
     #   其余字段              FakeTurn 的字段（checks、transcript、files 等）
+    # 提案与检查可以写在同一项里：建档的结构说明与基线核验要求检查回执绑定同一次激活（design 第 4.1 节）。
+    # 只有提案的项仍然直接给出提案对象，行为与 #307 建立时相同
     script: list[Any] = []
     for item in items:
-        if "proposal" in item:
-            script.append(dict(item["proposal"]))
-        elif "output" in item:
+        if "output" in item:
             script.append(ModelResponse(output=[dict(entry) for entry in item["output"]]))
+        elif "proposal" in item:
+            rest = {key: value for key, value in item.items() if key != "proposal"}
+            script.append(FakeTurn(proposal=dict(item["proposal"]), **rest) if rest
+                          else dict(item["proposal"]))
         else:
             script.append(FakeTurn(**item))
     return script
@@ -77,6 +87,20 @@ def _hold_after(system: LoopSystem, event_type: str, directory: Path, *,
             time.sleep(0.1)
 
     after_event(system, event_type, hold)
+
+
+# 子进程这一侧的辅助
+
+def _answer_revise(system: LoopSystem, project_id: str | None, note: str) -> str | None:
+    # 子进程里回答等待中的初始 PRD 请求「提出修改」：决定请求在项目流中，不属于任何 run。
+    # 返回新建的修改轮 run 编号（调用方一般在事件提交以后就停住，用不到它）
+    _position, open_decisions = saved_decisions(system.store, statuses=("open",))
+    candidates = [item for item in open_decisions if item.kind == "initial_prd"
+                  and (project_id is None or item.project_id == project_id)]
+    [decision] = candidates
+    command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:revise:{decision.version}", "user:local")
+    return system.orchestrator.answer_decision(
+        decision.decision_id, "revise", note, base_version=decision.version, command=command)
 
 
 def _await_file(directory: Path, path: str, content: str, pid: int) -> None:
@@ -133,6 +157,13 @@ def main() -> None:
                         help="只在这个调用编号的那次事件上停住")
     parser.add_argument("--workspace-files", type=Path, default=None,
                         help="工作区种子文件的 JSON（路径到内容），在事项开始以前写入")
+    parser.add_argument("--onboard", action="store_true",
+                        help="接入已有项目并开始建档事项（取代 create_run），源目录由 --onboard-source 给出")
+    parser.add_argument("--onboard-source", type=Path, default=None, help="建档的源目录")
+    parser.add_argument("--project-name", default="已有项目", help="建档项目的名称")
+    parser.add_argument("--settle", action="store_true", help="run 运行到停止以后结算这一次 run")
+    parser.add_argument("--answer-revise", default=None,
+                        help="结算以后回答等待中的初始 PRD 请求：给出修改意见")
     parser.add_argument("--await-file", type=str, default=None,
                         help="这个工作区文件变成下面的目标内容以后立刻终止进程（写入已落盘、回执未写）")
     parser.add_argument("--await-dir", type=Path, default=None,
@@ -157,9 +188,17 @@ def main() -> None:
         finally:
             system.close()
         return
-    run_id = system.create_run(args.task, registered_commands=registry,
-                               command_versions=None if registry is None
-                               else {name: 1 for name in registry})
+    project_id = None
+    if args.onboard:
+        if args.onboard_source is None:
+            parser.error("--onboard requires --onboard-source")
+        # 建档事项的 run 由接入时创建：目标就是事项的工作请求
+        project_id, _work_item_id, run_id = system.projects.onboard(
+            args.project_name, args.task, "src", str(args.onboard_source))
+    else:
+        run_id = system.create_run(args.task, registered_commands=registry,
+                                   command_versions=None if registry is None
+                                   else {name: 1 for name in registry})
     if args.await_file is not None:
         # 工单 #308：另起看门狗进程盯着工作区，看到目标内容落盘就终止本进程（回执来不及写）
         threading.Thread(target=_await_file,
@@ -173,6 +212,10 @@ def main() -> None:
         result = system.run_until_stop(run_id)
         print(json.dumps({"run_id": run_id, "phase": result.phase,
                           "stop_reason": result.stop_reason}, ensure_ascii=False), flush=True)
+        if args.settle:
+            system.projects.settle(run_id)
+        if args.answer_revise is not None:
+            _answer_revise(system, project_id, args.answer_revise)
     finally:
         system.close()
 
@@ -187,6 +230,8 @@ if __name__ == "__main__":
 def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: Path, *,
            hold_after: str | None = None, hold_dir: Path | None = None,
            hold_action: str | None = None, workspace_files: Path | None = None,
+           onboard: Path | None = None, settle: bool = False,
+           answer_revise: str | None = None,
            await_file: tuple[str, str] | None = None, await_dir: Path | None = None,
            resume_only: bool = False) -> subprocess.Popen:
     environment = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
@@ -204,6 +249,12 @@ def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: 
             argv.extend(["--hold-action", hold_action])
     if workspace_files is not None:
         argv.extend(["--workspace-files", str(workspace_files)])
+    if onboard is not None:
+        argv.extend(["--onboard", "--onboard-source", str(onboard)])
+    if settle:
+        argv.append("--settle")
+    if answer_revise is not None:
+        argv.extend(["--answer-revise", answer_revise])
     if await_file is not None:
         argv.extend(["--await-file", await_file[0], "--await-dir", str(await_dir),
                      "--await-content", await_file[1]])
@@ -240,16 +291,64 @@ def _wait_for_marker(marker: Path, process: subprocess.Popen, log: Path) -> None
     raise TimeoutError(f"the interrupt point was not reached: {_log_text(log)}")
 
 
+def _first_run_id(store: EventStore) -> str:
+    # 写入的第一个 run（run 的编号由 run_created 事件给出）
+    return next(item for item in store.list_run_ids()
+                if any(event.type == EventType.RUN_CREATED for event in store.list_events(item)))
+
+
+def _onboarding_run_id(store: EventStore, revision: bool) -> str:
+    # 建档场景的 run 编号：修改轮取 onboarding_revision_started 里的编号（最后一条），
+    # 第一轮取建档事项 work_item_created 里的编号
+    project_id = store.list_project_ids()[0]
+    events = store.list_project_events(project_id)
+    if revision:
+        started = [event for event in events
+                   if event.type == ProjectEventType.ONBOARDING_REVISION_STARTED]
+        assert started, "没有 onboarding_revision_started 事件"
+        return str(started[-1].payload["run_id"])
+    created = [event for event in events
+               if event.type == ProjectEventType.WORK_ITEM_CREATED
+               and event.payload.get("kind") == "onboarding"]
+    assert created, "没有建档事项的 work_item_created 事件"
+    return str(created[-1].payload["run_id"])
+
+
+def _observe(data_dir: Path, onboarding: bool, revision: bool) -> dict[str, Any]:
+    # 只读地读出终止以后、任何系统打开它以前的事件与决定请求：LoopSystem 打开数据目录时会补做结算与补建
+    # 缺少的 run，「补做之前」的状态只能这样取得。读出的是一份快照，连接随即关闭，之后回读它得到的
+    # 仍然是补做以后的状态
+    store = EventStore(Path(data_dir) / "events.sqlite", read_only=True)
+    try:
+        run_id = _onboarding_run_id(store, revision) if onboarding else _first_run_id(store)
+        project_ids = store.list_project_ids()
+        project_id = project_ids[0] if project_ids else None
+        return {
+            "run_id": run_id,
+            "project_id": project_id,
+            "events": store.list_events(run_id),
+            "first_round_events": (store.list_events(_onboarding_run_id(store, False))
+                                   if revision and project_id is not None else []),
+            "project_events": ([] if project_id is None
+                               else store.list_project_events(project_id)),
+            "open_decisions": ([] if project_id is None else saved_decisions(
+                store, projects=(project_id,), statuses=("open",))[1]),
+        }
+    finally:
+        store.close()
+
+
 class Interrupted:
-    # 一次真实的中断与重启。before 是终止前打开的系统，after 是重新打开的系统（启动恢复已经跑过）。
-    # 两个系统共享同一份事件日志：终止前的断言读 before_events（恢复之前读出的快照），
-    # 重启后的断言直接查 after
-    def __init__(self, before: LoopSystem, after: LoopSystem, run_id: str, log: Path) -> None:
+    # 一次真实的中断与重启。observed 是以只读连接读出的终止以后、任何系统打开数据目录以前的事件与决定请求
+    # （快照）；before 是终止后打开的系统，after 是重新打开的系统（启动恢复已经跑过）。
+    # 终止前的断言读 observed，重启后的断言直接查 after
+    def __init__(self, before: LoopSystem, after: LoopSystem, observed: dict[str, Any], log: Path) -> None:
         self.before = before
         self.after = after
-        self.run_id = run_id
         self.log = log
-        self.before_events: list[Any] = []
+        self.observed = observed
+        self.run_id = str(observed["run_id"])
+        self.before_events: list[Any] = observed["events"]
 
     def close(self) -> None:
         self.after.close()
@@ -271,11 +370,19 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
                 hold_after: str | None = None,
                 hold_action: str | None = None,
                 await_file: tuple[str, str] | None = None,
-                resume_after: bool = True) -> Interrupted:
+                onboard: Path | None = None,
+                settle: bool = False,
+                answer_revise: str | None = None,
+                resume_after: bool = True,
+                revision: bool = False) -> Interrupted:
     # resume_after 为假时 after 打开以后不走启动恢复（连续中断的场景用 restarted 的子进程恢复，
     # 父进程不再碰这份日志，避免重复恢复污染事件）
     # 在真实子进程里运行一个事项，在指定的时刻终止它，再用同一个数据目录重新打开系统走启动恢复。
     # tail 是重启以后模型继续用的脚本（中断前的脚本已经用完）
+    # 建档（工单 #317）给 onboard：子进程接入这个源目录并开始建档事项，取代 create_run；
+    # settle 让子进程在 run 结束以后结算，answer_revise 让它在结算以后回答「提出修改」；
+    # revision 为真时 run_id 取修改轮的 run（onboarding_revision_started 里的编号），
+    # 否则取建档事项的 run（work_item_created 里的编号）
     # await_file 是（路径，内容）：这个文件变成这个内容以后子进程自己终止（写入已落盘、回执未写，
     # 工单 #308 的自动核实路径）；父进程只等着进程自己退出
     data_dir = Path(data_dir)
@@ -298,6 +405,7 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
 
     process = _spawn(data_dir, script_file, task, registry_file, log, hold_after=hold_after,
                      hold_dir=hold_dir, hold_action=hold_action, workspace_files=files_file,
+                     onboard=onboard, settle=settle, answer_revise=answer_revise,
                      await_file=None if await_file is None else (await_file[0], await_file[1]),
                      await_dir=None if await_file is None else data_dir / "workspaces")
     try:
@@ -313,22 +421,19 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
         if process.poll() is None:
             _kill(process)
 
+    # 只读地观察终止以后、任何系统打开数据目录以前的事件
+    observed = _observe(data_dir, onboard is not None, revision)
     before = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
-    run_id = next(item for item in before.store.list_run_ids()
-                  if any(event.type == EventType.RUN_CREATED
-                         for event in before.store.list_events(item)))
-    before_events = before.store.list_events(run_id)
     after = LoopSystem.for_testing(data_dir, FakeAdapter(build_script(tail or [])),
                                    resume_on_startup=resume_after)
-    result = Interrupted(before, after, run_id, log)
-    result.before_events = before_events
-    return result
+    return Interrupted(before, after, observed, log)
 
 
 def restarted(data_dir: Path, script: Sequence[dict[str, Any]], *,
               started: Path | None = None,
               kill: bool = True,
               resume_after: bool = True,
+              revision: bool = False,
               restart_round: int = 2,
               hold_after: str | None = None,
               hold_action: str | None = None) -> Interrupted:
@@ -336,6 +441,7 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]], *,
     # 用于连续中断：一次自动重新执行以后再次中断，重启后观察有没有新的尝试或者决定请求。
     # script 是这一次重启以后模型继续用的脚本；kill 为假时让子进程运行到停止（不终止）。
     # resume_after 为假时 after 打开以后不走启动恢复（父进程不再碰这份日志，避免重复恢复污染事件）。
+    # revision 为真时 run_id 取修改轮的 run（建档场景，见 interrupted）。
     # hold_after 与 hold_action 让恢复途中（自动重新执行的那一次尝试）在指定事件上停住再被终止
     data_dir = Path(data_dir)
     work = data_dir.parent
@@ -358,15 +464,11 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]], *,
         if kill and process.poll() is None:
             _kill(process)
 
+    # revision 为真时 run_id 取修改轮的 run（建档场景，见 interrupted）
+    observed = _observe(data_dir, revision, revision)
     before = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
-    run_id = next(item for item in before.store.list_run_ids()
-                  if any(event.type == EventType.RUN_CREATED
-                         for event in before.store.list_events(item)))
-    before_events = before.store.list_events(run_id)
     after = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=resume_after)
-    result = Interrupted(before, after, run_id, log)
-    result.before_events = before_events
-    return result
+    return Interrupted(before, after, observed, log)
 
 
 # ---------------------------------------------------------------------------
