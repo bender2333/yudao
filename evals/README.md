@@ -19,6 +19,7 @@ flowchart TD
 - `scenarios/scenario-3/reference/`：参考实现，只由评分器用来确认检查本身没有写错。
 - `scorer/`：评分器，对一份交付运行隐藏检查并写出机器可读结果。
 - `runner/`：OpenCode 一侧的运行器、指标收集与报告（`run_eval.py` 是入口）。它把材料起点复制到仓库之外的运行目录，运行 `opencode run`，从 JSON 事件流收集指标，再用评分器评分，最后写出机器可读结果与中文报告。
+- `runner/yudao.py`、`yudao_metrics.py`、`yudao_report.py`：Yudao 一侧的运行器、指标收集与报告（`run_yudao_eval.py` 是入口）。运行器只经 HTTP 接口驱动 Yudao，只从 `run.export` 导出的事件日志观察它，不导入 `harness` 的任何模块。它在仓库之外新建数据目录启动被测的 Yudao，写入被测模型并经模型测试准入，建立项目、绑定三个部门、登记场景 3 的命令（`run_cli` 与 `check_data`，按接口约定第 5 节的命令行入口），以用户原始意图提交需求原文加接口约定，到时间上限时经 `work_item.cancel` 结束并标记超时；运行结束以后导出事件日志，取最后一次封存的交付交给评分器，并计算过程检查点与指标。
 - `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。
 
 ## 材料版本
@@ -57,6 +58,28 @@ uv run python evals/runner/run_eval.py \
     --result docs/evaluation/scenario-3-opencode.json \
     --report docs/evaluation/scenario-3-opencode.md
 ```
+
+Yudao 一侧用同一个模型、同一个环境变量：
+
+```bash
+uv run python evals/runner/run_yudao_eval.py \
+    --model <模型名> \
+    --runs 3 \
+    --runs-root <Yudao 仓库之外的目录> \
+    --result docs/evaluation/scenario-3-yudao.json \
+    --report docs/evaluation/scenario-3-yudao.md
+```
+
+Yudao 一侧的运行器保证下面这些：
+
+- 只经 HTTP 接口与导出的事件日志观察 Yudao，不导入 `harness` 的模块（`tests/test_no_harness_import.py` 检查这一点）。
+- 被测的 Yudao 在仓库之外的数据目录上启动，每次运行新建一个数据目录，用默认的执行位置（控制主机上的本机进程）。
+- 三个部门的部门默认绑定与项目部门设置都使用被测模型；模型先经 `catalog.model.test` 准入，报告记录模型服务实际服务的模型名。
+- 项目不登记取回的来源与 MCP 服务器，部门没有这两类工具。
+- 到墙钟上限时经 `work_item.cancel` 结束事项，标记超时，按最后一次封存的交付评分；没有交付时全部检查记为「没有做」。
+- 导出的事件日志里出现材料目录的路径时这次运行作废，写进报告。
+
+Yudao 一侧当前的起点缺口与模型行为记录在 `docs/architecture-issues.md`（本工单的登记）与报告的第八节：新建项目的空工作区没有放入题目数据文件的接口通道，题目提供的 `subway_data.json` 由被测工程按接口约定自行写出；被测模型在工程部门连续返回成功但没有输出项的调用，主机按 `no_tool_call` 暂停。
 
 运行器保证下面这些：
 
