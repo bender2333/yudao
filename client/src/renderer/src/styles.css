@@ -688,6 +688,9 @@ button.link {
 .floor-text-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; }
 .floor-text-list li { display: flex; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--line, #0002); }
 
+/* 部门工作间的部门房间（像素房间，工单 #177）：画布按整数倍最近邻缩放 */
+.room-canvas { line-height: 0; }
+.room-canvas canvas { image-rendering: pixelated; display: block; width: 100%; }
 /* 首页的楼（像素画面五，工单 #178）：每层一个项目，画布按整数倍最近邻缩放，楼层多时纵向滚动 */
 .building-canvas { line-height: 0; }
 .building-canvas canvas { image-rendering: pixelated; display: block; width: 100%; cursor: default; }
@@ -713,6 +716,10 @@ button.link {
 .gallery-value { font-size: 11px; color: #9fd6ff; word-break: break-all; }
 .gallery-count { font-size: 11px; color: #9fffb0; }
 .gallery-entries { list-style: none; margin: 0; padding: 0; font-size: 10px; color: #a8a4bb; max-height: 130px; overflow: auto; }
+.gallery-actions { width: 100%; border-collapse: collapse; font-size: 11px; margin: 6px 0 10px; }
+.gallery-actions th, .gallery-actions td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #ffffff14; vertical-align: top; }
+.gallery-actions th { color: #ffd66b; font-weight: 600; }
+.gallery-actions code { color: #9fd6ff; }
 
 /* 模型管理页（工单 #93）：卡片、表单、候选、模型访问定义表、部门默认与编辑 JSON 弹窗。
    宽度 390 时表格与网格改为单列，不出现横向滚动条。 */

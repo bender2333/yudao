@@ -465,7 +465,7 @@ export interface Actor {
   visible: boolean;
   seat: Seat | null;
   script: Script | null;
-  step: { st: Step; t0: number; fromX: number; fromY: number; dur: number; tween?: { kill: () => void }; done?: boolean } | null;
+  step: { st: Step; t0: number; fromX: number; fromY: number; fromAlpha?: number; dur: number; tween?: { kill: () => void }; done?: boolean } | null;
   icon: HeadIcon | null;
   sign: string | null;
   bubble: string | null;
@@ -481,9 +481,13 @@ export interface Step {
   y?: number;
   name?: string;
   ms?: number;
+  /** 关键步骤：减少动画时也保留一段停留时间（原型 engine.js 的 key）。 */
+  key?: boolean;
   seat?: Seat | null;
   facing?: number;
   item?: string | null;
+  /** 淡入淡出到给定透明度（0 表示离开画面）。 */
+  to?: number;
   icon?: { kind: string; text?: string | null } | null;
   gait?: string;
   speed?: number;
@@ -495,6 +499,8 @@ export interface Step {
 export interface Script {
   steps: Step[];
   i: number;
+  /** 可以被打断的部分的起点：关键步骤做完之后允许新动作接管（原型 engine.js 的 tail）。 */
+  tail: number;
   finalize?: () => void;
   onDone?: () => void;
 }
@@ -536,7 +542,9 @@ export interface SceneLike {
   removeActor: (a: Actor) => void;
   play: (a: Actor, animName: string, restart?: boolean) => void;
   cancel: (a: Actor) => void;
-  run: (a: Actor, steps: Step[], o?: { finalize?: () => void; onDone?: () => void }) => void;
+  run: (a: Actor, steps: Step[], o?: { tail?: number; finalize?: () => void; onDone?: () => void }) => void;
+  /** 角色是否已经进入可以被打断的收尾部分（原型 engine.js 的 inTail）。 */
+  inTail: (a: Actor) => boolean;
   after: (ms: number, fn: () => void) => void;
   setCharacterState: (ch: Character, state: string, at?: number) => void;
   characterState: (id: string) => StateRecord | null;

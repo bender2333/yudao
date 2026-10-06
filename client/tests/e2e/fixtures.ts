@@ -13,6 +13,8 @@ export type Backend = {
   port: number;
   address: string;
   dataDir: string;
+  /** 部门房间的端到端验收预置的项目标识（--room 模式）；其他模式为空。 */
+  roomProject: string | null;
   // 建档脚本模式下后端建好的真实源目录，接入已有项目的对话框填这个路径（工单 #137）
   sourceDir: string | null;
   stop: () => Promise<void>;
@@ -31,13 +33,17 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 // 启动真实后端：脚本在 client/tests/e2e/backend.py 中，用仓库项目的 Python 环境运行。
 // apiVersion 让服务报告一个不同的接口版本，用于核对更新页；releaseAssets 给出更新源目录
 // （工单 #208：服务从它提供 /client-update/latest.yml 与安装程序）；port 固定端口，
-// 更新地址里的端口要与它一致，客户端才会从同一个服务下载安装程序
+// 更新地址里的端口要与它一致，客户端才会从同一个服务下载安装程序；room 用流式慢模型跑
+// 一个项目，供部门房间在请求进行中观察（工单 #177）
 export async function startBackend(
-  options: { apiVersion?: number; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding" } = {},
+  options: { apiVersion?: number; room?: boolean; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding" } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {
     script.push("--api-version", String(options.apiVersion));
+  }
+  if (options.room) {
+    script.push("--room");
   }
   if (options.releaseAssets !== undefined) {
     script.push("--release-assets", options.releaseAssets);
@@ -54,12 +60,18 @@ export async function startBackend(
     shell: true,
   });
   const line = await readFirstLine(child);
-  const parsed = JSON.parse(line) as { port: number; data_dir: string; source_dir: string | null };
+  const parsed = JSON.parse(line) as {
+    port: number;
+    data_dir: string;
+    room_project?: string | null;
+    source_dir?: string | null;
+  };
   return {
     port: parsed.port,
     address: `http://127.0.0.1:${parsed.port}`,
     dataDir: parsed.data_dir,
-    sourceDir: parsed.source_dir,
+    roomProject: parsed.room_project ?? null,
+    sourceDir: parsed.source_dir ?? null,
     stop: () => stopProcess(child),
   };
 }
