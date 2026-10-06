@@ -7,7 +7,7 @@ import json
 from typing import TYPE_CHECKING, Any, Literal, Mapping
 
 from ..models import DEPARTMENTS, CatalogEventType
-from ..providers import capabilities
+from ..providers import DEFAULT_TIMEOUT_SEC, capabilities
 from ..providers.errors import CatalogValidationError
 from .contracts import Contract, Snapshot
 from .project_queries import NotFound
@@ -101,6 +101,9 @@ class Catalog(Contract):
     revision: int
     config_state: str
     reload_error: str | None
+    # 新建连接表单的默认请求时限，单位秒：与目录文件、目录命令的默认值同一份，
+    # 界面取它填表单，不在客户端另写一个数（工单 #294）
+    default_timeout_sec: float
     presets: CatalogPresets
     capability_table: CatalogCapabilityTable
     providers: list[CatalogProvider]
@@ -191,6 +194,7 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
         revision=revision,
         config_state=status["config_state"],
         reload_error=status["reload_error"],
+        default_timeout_sec=DEFAULT_TIMEOUT_SEC,
         presets=CatalogPresets(revision=presets["revision"], source=presets["source"],
                                presets=list(presets["presets"])),
         capability_table=CatalogCapabilityTable(

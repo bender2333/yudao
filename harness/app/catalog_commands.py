@@ -13,7 +13,7 @@ from pydantic import PositiveInt
 
 from ..event_store import Command, catalog_stream
 from ..models import CatalogEventType
-from ..providers import CatalogValidationError, ProviderError, SUPPORTED_PROTOCOLS, suggested
+from ..providers import CatalogValidationError, DEFAULT_TIMEOUT_SEC, ProviderError, SUPPORTED_PROTOCOLS, suggested
 from ..write_path import NewCatalogEvent
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Text
@@ -33,7 +33,7 @@ class ProviderInput(Contract):
     protocol: ProtocolName
     base_url: str = ""
     credential_ref: str = ""
-    timeout_sec: float = 600.0
+    timeout_sec: float = DEFAULT_TIMEOUT_SEC
     preset_id: str = ""
     models_url: str = ""
 
