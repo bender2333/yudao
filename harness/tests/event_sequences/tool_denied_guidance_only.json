@@ -2894,7 +2894,7 @@
     "input_modalities": [
      "text"
     ],
-    "input_token_estimate": 7212,
+    "input_token_estimate": 7211,
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "max_output_tokens": 4800,
@@ -2924,7 +2924,7 @@
     "snapshot_hash": "<sha256#50>",
     "source_event_id": null,
     "step_id": 1,
-    "token_estimate": 7218,
+    "token_estimate": 7217,
     "tokens_charged": 0,
     "truncated": false
    }
@@ -5199,7 +5199,7 @@
     ],
     "guidance_only": true,
     "injected": "<shared#4>",
-    "input_token_estimate": 7212,
+    "input_token_estimate": 7211,
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
@@ -5212,7 +5212,7 @@
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#52>",
     "step_id": 1,
-    "token_estimate": 7218,
+    "token_estimate": 7217,
     "truncated": false
    },
    {
