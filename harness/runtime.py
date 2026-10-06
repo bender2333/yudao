@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -101,26 +101,47 @@ class LoopSystem:
         # 启动时补建缺少的普通事项 run（工单 #321，设计第 7 节）：work_item_created 已提交而 run 还没有创建时
         # 进程中断，这里按事项记录（含起始文件夹快照）补建
         self.recovered_work_item_runs = self.projects.create_missing_work_item_runs_on_startup()
-        # 启动时核对 run 事件版本（ADR-0019，工单 #126、#232）：版本相同的未结束 run 交给 #16 自动继续；
-        # 版本不同（含旧事件没有记录版本）的未结束 run 由 #16 发出 definitions_changed 决定请求交给用户，
-        # 用户选择「按新版本继续」以后照常继续，「停止事项」则运行以 cancelled 结束。
-        # 强制升级只在排空期间由用户发起，启动时不自动停止正在进行的事项
+        # 启动时核对 run 事件版本（ADR-0019，工单 #126、#322）：版本不同的未结束 run 按强制升级处理，
+        # 停止并用项目的起点重新开始；处理完重新分类，新建的 run（当前版本）与版本相同的未结束 run
+        # 一起由 #16 自动继续
         self.startup_runs = classify_startup_runs(self.store)
+        self.upgrade_other_version_runs()
         # 启动的最后一步：自动继续未结束的 run（工单 #16）
         self.resumed_runs = self.resume_startup_runs() if resume_on_startup else {}
         # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明第 10 节第 1 项）
         self.facade.set_reload_listener(self.sync_catalog_revision)
 
+    def upgrade_other_version_runs(self) -> tuple[list[str], list[str]]:
+        # 启动时把 run 事件版本不同的未结束 run 按强制升级处理（ADR-0019，恢复契约第 1 节）：
+        # 与排空期间由用户发起的强制升级同样停止并重新开始，启动时不记目录事件；处理完重新分类
+        stopped, restarted = self.stop_and_restart_runs(self.startup_runs.other_version,
+                                                         reason="run event version differs from the current version")
+        self.startup_runs = classify_startup_runs(self.store)
+        return stopped, restarted
+
+    def stop_and_restart_runs(self, run_ids: Iterable[str], *, reason: str) -> tuple[list[str], list[str]]:
+        # 强制升级对一批 run 的处理：逐个记为因升级停止，对应的事项用项目的起点重新开始，
+        # 并记下「因升级重新开始」的优先级；找不到事项的 run 只停止
+        stopped, restarted = [], []
+        for run_id in run_ids:
+            self.orchestrator.stop_for_upgrade(run_id, reason=reason)
+            stopped.append(run_id)
+            started = self.projects.restart_work_item_for_upgrade(run_id)
+            if started is not None:
+                restarted.append(started[0])
+        return stopped, restarted
+
     def resume_startup_runs(self) -> dict[str, int]:
         # 启动时自动继续所有因进程中断而未结束的 run（工单 #16，恢复契约第 3、5.2 节）：
-        # 每个 run 由流程编排先核对 run 事件版本与定义版本（不同时发出决定请求，不取得执行权），
+        # run 事件版本与当前不同的 run 已在启动序列里按强制升级处理，这里只有版本相同的 run；
+        # 每个 run 由流程编排先核对事项记录的定义版本（不同时发出决定请求，不取得执行权），
         # 再原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
         # 3.1 保持单任务运行：取得执行权以后串行运行到停止，不并发推进两个 run。
         # 运行到停止与结算都经流程编排的 run_until_stop_and_settle（工单 #299）：这条入口与事项开始、
         # 回答决定以后继续共用同一处结算，不在这里各补一遍
         # 返回取得执行权的 run 与它这次取得的执行权编号
         resumed: dict[str, int] = {}
-        for run_id in (*self.startup_runs.same_version, *self.startup_runs.other_version):
+        for run_id in self.startup_runs.same_version:
             claimed = self.orchestrator.resume_incomplete_run(run_id)
             if claimed is None:
                 continue
@@ -193,13 +214,8 @@ class LoopSystem:
         # 强制升级：正在进行的 run 记为因升级停止，对应的事项用已采纳成果重新开始，
         # 并记下「因升级重新开始」的优先级；只在排空期间可用，由应用层的命令核对
         unfinished = classify_startup_runs(self.store)
-        stopped, restarted = [], []
-        for run_id in (*unfinished.same_version, *unfinished.other_version):
-            self.orchestrator.stop_for_upgrade(run_id, reason="force upgrade")
-            stopped.append(run_id)
-            started = self.projects.restart_work_item_for_upgrade(run_id)
-            if started is not None:
-                restarted.append(started[0])
+        stopped, restarted = self.stop_and_restart_runs(
+            (*unfinished.same_version, *unfinished.other_version), reason="force upgrade")
         version = self._drain_version() or 0
 
         def decide(transaction):
