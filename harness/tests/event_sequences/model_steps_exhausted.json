@@ -2480,7 +2480,7 @@
   "transitions": [
    "CREATED->PRODUCT_SPEC"
   ],
-  "waiting_reason": "paused:model_steps_exhausted",
+  "waiting_reason": "已暂停：部门步数已达上限",
   "work_item_id": null,
   "workspace_digest": "<sha256#1>",
   "yielded_work": null

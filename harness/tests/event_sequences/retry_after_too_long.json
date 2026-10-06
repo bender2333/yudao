@@ -934,7 +934,7 @@
   "transitions": [
    "CREATED->PRODUCT_SPEC"
   ],
-  "waiting_reason": "failed:retry_after_too_long",
+  "waiting_reason": "未能完成：要求等待的时间过长",
   "work_item_id": null,
   "workspace_digest": "<sha256#1>",
   "yielded_work": null

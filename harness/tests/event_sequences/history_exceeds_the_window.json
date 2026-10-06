@@ -371,7 +371,7 @@
   "transitions": [
    "CREATED->PRODUCT_SPEC"
   ],
-  "waiting_reason": "failed:compaction_failed",
+  "waiting_reason": "未能完成：上下文压缩失败",
   "work_item_id": null,
   "workspace_digest": "<sha256#1>",
   "yielded_work": null

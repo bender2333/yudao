@@ -967,7 +967,7 @@
    "error": "run cancelled by user command",
    "artifact_hashes": [],
    "payload": {
-    "human_action": "运行已被取消。如需继续，新建 run。",
+    "human_action": "运行已被取消。如需继续，作为新事项重新开始。",
     "message": "run cancelled by user command",
     "stop_reason": "cancelled"
    }
@@ -1069,7 +1069,7 @@
     "type": "user_input_received"
    }
   ],
-  "human_action": "运行已被取消。如需继续，新建 run。",
+  "human_action": "运行已被取消。如需继续，作为新事项重新开始。",
   "input_version": 2,
   "inputs": [
    {
@@ -1428,7 +1428,7 @@
    "CREATED->PRODUCT_SPEC",
    "PRODUCT_SPEC->ENGINEERING"
   ],
-  "waiting_reason": "failed:cancelled",
+  "waiting_reason": "未能完成：运行已被取消",
   "work_item_id": null,
   "workspace_digest": "<sha256#1>",
   "yielded_work": null

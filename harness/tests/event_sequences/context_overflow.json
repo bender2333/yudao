@@ -133,7 +133,7 @@
    "error": "the model request leaves no room for model output",
    "artifact_hashes": [],
    "payload": {
-    "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。",
+    "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高模型服务的上下文窗口后，作为新事项重新开始。",
     "message": "the model request leaves no room for model output",
     "stop_reason": "context_overflow"
    }
@@ -236,7 +236,7 @@
     "type": "run_created"
    }
   ],
-  "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高 context_window 后新建 run。",
+  "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高模型服务的上下文窗口后，作为新事项重新开始。",
   "input_version": 1,
   "inputs": [
    {
@@ -340,7 +340,7 @@
   "transitions": [
    "CREATED->PRODUCT_SPEC"
   ],
-  "waiting_reason": "failed:context_overflow",
+  "waiting_reason": "未能完成：上下文超过窗口",
   "work_item_id": null,
   "workspace_digest": "<sha256#1>",
   "yielded_work": null

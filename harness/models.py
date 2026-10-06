@@ -927,22 +927,58 @@ if list(DEPARTMENTS) != _PHASE_DEPARTMENTS:
                             "控制核心的阶段迁移按顺序支持部门 " + "、".join(_PHASE_DEPARTMENTS))])
 
 
+# 部门的中文名：等待说明与协作说明按部门写给用户看，机器标识不直接出现在说明里
+DEPARTMENT_LABELS = {"product": "产品", "engineering": "工程", "quality": "质检"}
+if set(DEPARTMENT_LABELS) != set(DEPARTMENTS):
+    raise DefinitionError([("organization.json", "departments",
+                            "部门的中文名必须与定义的部门相同：" + "、".join(DEPARTMENT_LABELS))])
+
+# 停止原因的中文名：等待说明与事件说明按中文写，机器标识不直接出现在给用户看的文字里
+STOP_REASON_LABELS = {
+    "released": "已完成并放行",
+    "baseline_verified": "已完成基线核验",
+    "max_cycles": "循环次数已达上限",
+    "model_steps_exhausted": "部门步数已达上限",
+    "no_tool_call": "部门连续多次没有调用工具",
+    "workspace_unrepresentable": "工作区有无法表示的条目",
+    "time_limit": "运行时间已达上限",
+    "cancelled": "运行已被取消",
+    "provider_error": "模型服务失败",
+    "provider_timeout": "模型服务请求超时",
+    "provider_protocol": "模型服务协议不符",
+    "unsupported_protocol": "不支持的协议",
+    "retry_after_too_long": "要求等待的时间过长",
+    "context_overflow": "上下文超过窗口",
+    "compaction_failed": "上下文压缩失败",
+    "host_commit_error": "主机保存失败",
+    "run_event_version_changed": "因 Yudao 升级停止",
+}
+if set(STOP_REASON_LABELS) != set(DEFINITIONS.stop_reasons):
+    raise DefinitionError([("stop_reasons.json", "stop_reasons",
+                            "停止原因的中文名必须与定义的停止原因相同：" + "、".join(STOP_REASON_LABELS))])
+
+
+def stop_reason_name(reason: str | None) -> str:
+    # 停止原因的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
+    return STOP_REASON_LABELS.get(reason or "", reason or "")
+
+
 def waiting_reason_for(phase: str, stop_reason: str | None = None) -> str | None:
     if phase == "DONE":
         return None
-    if phase == "PAUSED":
-        return f"paused:{stop_reason or 'unspecified'}"
-    if phase == "FAILED":
-        return f"failed:{stop_reason or 'unspecified'}"
+    if phase in TERMINAL_PHASES:
+        # 暂停与失败都带停止原因的中文名；没有停止原因时只写阶段，不猜具体原因
+        reason = {"PAUSED": "已暂停", "FAILED": "未能完成"}[phase]
+        return f"{reason}：{stop_reason_name(stop_reason)}" if stop_reason else reason
     return {
-        "CREATED": "waiting to start product spec",
-        "PRODUCT_SPEC": "product is drafting ProductSpec",
-        "ENGINEERING": "engineering is implementing against the current ProductSpec",
-        "DELIVERY": "delivery accepted; routing to quality",
-        "QUALITY": "quality is independently reviewing delivery",
-        "REWORK_PRODUCT": "quality returned work to product",
-        "REWORK_ENGINEERING": "quality returned work to engineering",
-    }.get(phase, phase)
+        "CREATED": "等待产品开始处理",
+        "PRODUCT_SPEC": "产品正在整理有效需求",
+        "ENGINEERING": "工程正在按有效需求实现",
+        "DELIVERY": "交付已被接受，正在送到质检",
+        "QUALITY": "质检正在独立核验交付",
+        "REWORK_PRODUCT": "质检已退回产品",
+        "REWORK_ENGINEERING": "质检已退回工程",
+    }[phase]
 
 
 def spec_content_hash(kind: str, payload: dict[str, Any], *, parent_hash: str | None, revision: int) -> str:

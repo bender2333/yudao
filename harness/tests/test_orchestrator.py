@@ -214,7 +214,7 @@ def test_max_cycles_pauses_with_human_action(data_dir):
     assert projection.phase == "PAUSED"
     assert projection.stop_reason == "max_cycles"
     assert projection.human_action
-    assert "max_cycles" in projection.waiting_reason
+    assert "循环次数已达上限" in projection.waiting_reason
 
 
 def test_cycle_limit_pauses_after_work_without_provider_usage(data_dir):

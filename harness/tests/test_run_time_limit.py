@@ -28,7 +28,7 @@ def test_time_limit_stops_run_with_failed_state(data_dir):
     assert result.phase == "FAILED"
     assert result.stop_reason == "time_limit"
     assert result.human_action is not None
-    assert "time_limit" in (result.waiting_reason or "")
+    assert "运行时间已达上限" in (result.waiting_reason or "")
 
 
 def test_time_limit_checked_between_activations(data_dir):
