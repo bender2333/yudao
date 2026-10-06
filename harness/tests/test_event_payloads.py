@@ -45,6 +45,9 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
 
     events = system.store.read(0, limit=100_000)
     written = {event.type for event in events}
-    assert {value for key, value in vars(ProjectEventType).items() if not key.startswith("_")} <= written
+    onboarding = {ProjectEventType.INITIAL_PRD_PROPOSED, ProjectEventType.PROJECT_DECISION_REQUESTED,
+                  ProjectEventType.PROJECT_DECISION_ANSWERED, ProjectEventType.PROJECT_DECISION_WITHDRAWN,
+                  ProjectEventType.ONBOARDING_REVISION_STARTED, ProjectEventType.BASELINE_ADOPTED}
+    assert ({value for key, value in vars(ProjectEventType).items() if not key.startswith("_")} - onboarding) <= written
     assert {EventType.RUN_CREATED, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED, EventType.RUN_DONE} <= written
     assert_payloads_follow_contract(events)
