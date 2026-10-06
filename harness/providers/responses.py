@@ -35,6 +35,7 @@ from .invoke import Emit, InvokeResult, ProviderInput
 from .presets import build_identity_headers
 from .reasoning import RESPONSES_REASONING_INCLUDE, ReasoningOutput, responses_reasoning
 from .resolve import FrozenTarget
+from .store import DEFAULT_TIMEOUT_SEC
 from .tls import certificate_verification_failed, service_address, ssl_context
 
 
@@ -74,7 +75,7 @@ class ResponsesConfig:
     api_key: str = field(default="", repr=False)
     provider: str = "openai"
     base_url: str = "https://api.openai.com/v1"
-    timeout_sec: float = 600.0
+    timeout_sec: float = DEFAULT_TIMEOUT_SEC
     # 跨协议统一请求身份（真实客户端 User-Agent、会话标识），不进日志与证据正文
     identity_headers: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
 

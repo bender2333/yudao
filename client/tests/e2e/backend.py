@@ -271,6 +271,13 @@ async def accept(application: Application, name: str, request) -> None:
         raise AssertionError(f"预置 {name} 被拒绝：{result.reason} {result.message}")
 
 
+def rejecting_responder(body: dict):
+    # 真实返回 HTTP 401 的上游：模型测试据此显示未通过与原因（工单 #294）
+    return 401, "application/json", [
+        json.dumps({"error": {"message": "invalid api key", "type": "authentication_error"}}).encode("utf-8"),
+    ]
+
+
 class ModelsServer:
     # 测试内启动的真实 HTTP 模型列表服务：GET /v1/models 返回 JSON，供候选采集与连接测试使用
     def __init__(self, payload):
@@ -298,7 +305,7 @@ class ModelsServer:
         self.server.server_close()
 
 async def seed_catalog(application: Application, upstream_base: str, models_url: str,
-                       *, admit_and_bind: bool = False) -> None:
+                       *, admit_and_bind: bool = False, reject_base: str | None = None) -> None:
     # 界面上的候选、连接测试与模型测试都发真实请求，不使用测试替身
     revision = application.system.facade.catalog_revision()
     saved = await application.command("catalog.connection.save", CatalogConnectionSave(
@@ -329,6 +336,24 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
     if not result.get("ok"):
         raise RuntimeError(f"catalog model test rejected: {result.get('error')} {result.get('message')}")
     facade.clear_credential_override("OPENCODE_GO_KEY")
+    # 一条指向「拒绝凭据」上游的连接：模型管理页的模型测试在它上面真实失败，
+    # 用来核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
+    if reject_base is not None:
+        rejected = await application.command("catalog.connection.save", CatalogConnectionSave(
+            command_id=str(uuid.uuid4()),
+            base_version=application.system.facade.catalog_revision(),
+            provider=ProviderInput(
+                id="rejected-go", name="拒绝的上游", protocol="responses",
+                base_url=f"{reject_base}/v1", credential_ref="REJECTED_GO_KEY",
+                timeout_sec=30, models_url=models_url,
+            ),
+            models=[ModelInput(
+                id="glm-rejected", model="glm-rejected", context_window=200000, max_output_tokens=32000,
+                capability_source="能力表", capacity_confirmed=True, input_modalities=["text"],
+            )],
+        ), actor="user:local")
+        if isinstance(rejected, Rejected):
+            raise RuntimeError(f"catalog seed rejected connection: {rejected.reason} {rejected.message}")
     if not admit_and_bind:
         return
     # 给这条定义写准入记录并让三个部门默认都绑定它：作废准入与删除引用方两类用例需要真实的引用方
@@ -378,6 +403,9 @@ def main() -> int:
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137），
     # 它需要的轮次与默认脚本的预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding"), default="default")
+    # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
+    # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
+    parser.add_argument("--reject-upstream", action="store_true")
     args = parser.parse_args()
 
     import tempfile
@@ -386,6 +414,11 @@ def main() -> int:
     # 「yudao api」模式不预置目录数据，但上游仍然要起：fixture 与 api 两种模式共用同一个
     # 收尾清理，api 模式的上游只在没有用例连接时空转
     upstream, _capture, upstream_base = serve(responses_responder)
+    # 第二个上游：始终返回 HTTP 401，让模型测试真实失败（工单 #294）
+    reject_upstream = None
+    reject_base = None
+    if args.reject_upstream:
+        reject_upstream, _reject_capture, reject_base = serve(rejecting_responder)
     models_server = ModelsServer({"data": [
         {"id": "glm-4.6", "limit": {"context": 200000, "output": 32000}},
         {"id": "vision-model", "limit": {"context": 128000, "output": 16000}},
@@ -440,7 +473,7 @@ def main() -> int:
         else:
             asyncio.run(seed(application, system))
     asyncio.run(seed_catalog(application, upstream_base, models_server.base,
-                             admit_and_bind=args.admit_and_bind))
+                             admit_and_bind=args.admit_and_bind, reject_base=reject_base))
 
     port = server.servers[0].sockets[0].getsockname()[1]
     print(json.dumps({"port": port, "data_dir": str(data_dir), "room_project": room_project,
@@ -460,6 +493,9 @@ def main() -> int:
         thread.join(10)
         upstream.shutdown()
         upstream.server_close()
+        if reject_upstream is not None:
+            reject_upstream.shutdown()
+            reject_upstream.server_close()
         models_server.close()
     return 0
 
