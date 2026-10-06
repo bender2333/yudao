@@ -134,6 +134,23 @@ async function triggerUpdate(client: ClientApp, installDir: string, expectedVers
   await waitForInstalledVersion(installDir, expectedVersion, 180_000);
 }
 
+// 服务报告的发布版本号：能力清单的 deployment.version 由包元数据给出，
+// 版本号提交以后会变，断言文字取自服务返回的值（工单 #315）
+async function serviceRelease(address: string): Promise<string> {
+  const response = await fetch(`${address}/api/capabilities`);
+  expect(response.status).toBe(200);
+  const capabilities: unknown = await response.json();
+  if (typeof capabilities !== "object" || capabilities === null || !("deployment" in capabilities)) {
+    throw new Error("能力清单里没有 deployment");
+  }
+  const deployment: unknown = capabilities.deployment;
+  if (typeof deployment !== "object" || deployment === null || !("version" in deployment)
+      || typeof deployment.version !== "string") {
+    throw new Error("能力清单的 deployment 没有版本号");
+  }
+  return deployment.version;
+}
+
 test.describe.configure({ mode: "serial", timeout: 900_000 });
 
 test.beforeAll(() => {
@@ -187,7 +204,9 @@ test("接口版本不同时出现更新页，更新以后客户端变为新版�
     // 更新页写明客户端与 Yudao 服务两边的发布版本号与接口版本
     await expect(client.page.getByRole("heading", { name: "请更新客户端" })).toBeVisible();
     await expect(client.page.locator("text=客户端发布版本：0.0.1")).toBeVisible();
-    await expect(client.page.locator("text=Yudao 服务发布版本：0.1.0")).toBeVisible();
+    await expect(
+      client.page.locator(`text=Yudao 服务发布版本：${await serviceRelease(backend.address)}`),
+    ).toBeVisible();
     await expect(client.page.locator("text=客户端接口版本：1")).toBeVisible();
     await expect(client.page.locator("text=Yudao 服务接口版本：2")).toBeVisible();
     // 更新页不打开其他页面

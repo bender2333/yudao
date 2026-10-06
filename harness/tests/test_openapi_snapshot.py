@@ -16,9 +16,14 @@ from harness.tests.client_types_check import check_client_types
 # 再在 harness/tests/openapi 中运行 npm run check，由快照生成 TypeScript 类型并编译。
 
 SNAPSHOT = Path(__file__).parent / "openapi" / "openapi.json"
+# 包版本号不属于接口合同：比较与重写都把两边的 info.version 取成这个固定值，
+# 因此发布只改版本号文件，不再需要重写快照与客户端类型
+SNAPSHOT_VERSION = "0.0.0"
 
 
 def _text(document) -> str:
+    document = json.loads(json.dumps(document))
+    document["info"]["version"] = SNAPSHOT_VERSION
     return json.dumps(document, ensure_ascii=False, indent=2) + "\n"
 
 

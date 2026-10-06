@@ -30,6 +30,12 @@ RELEASE_SCRIPT = REPO_ROOT / "scripts" / "release.py"
 _SKIP_NAMES = {".venv", ".tmp", "__pycache__", "node_modules", "release_assets", ".pytest_cache",
                "dist", "test-results", "playwright-report", ".git"}
 
+def _env() -> dict[str, str]:
+    # 运行 Python 子进程的环境：显式把输出编码设为 UTF-8。脚本与命令按控制台的编码写出，
+    # PowerShell 里设了 PYTHONIOENCODING=utf-8:surrogateescape，Git Bash 等没有设置的环境里
+    # 按 GBK 写出，读出来是乱码（#313 的合并验证遇到）。测试不依赖外部环境
+    return {**os.environ, "PYTHONIOENCODING": "utf-8"}
+
 def _ignore(directory: str, names: list[str]) -> set[str]:
     return {name for name in names if name in _SKIP_NAMES or name.endswith(".egg-info")}
 
@@ -62,7 +68,7 @@ def _run_release(source: Path, output_dir: Path, *extra: str) -> subprocess.Comp
     return subprocess.run(
         [str(_python()), str(source / "scripts" / "release.py"), "--repo-root", str(source),
          "--output-dir", str(output_dir), *extra],
-        cwd=source, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        cwd=source, capture_output=True, text=True, encoding="utf-8", errors="replace", env=_env())
 
 @pytest.fixture(scope="module")
 def release_build(tmp_path_factory):
@@ -350,7 +356,7 @@ def test_installed_wheel_passes_the_client_update_source_acceptance(release_buil
     assert command.is_file(), command
 
     released = subprocess.run([str(command), "--version"], check=True, capture_output=True,
-                              text=True, encoding="utf-8", errors="replace")
+                              text=True, encoding="utf-8", errors="replace", env=_env())
     assert released.stdout.strip() == version
 
     data_dir = tmp_path / "data"
@@ -380,7 +386,8 @@ def test_installed_wheel_passes_the_client_update_source_acceptance(release_buil
         second = subprocess.run(
             [str(command), "api", "--data-dir", str(data_dir), "--port", str(_free_port()),
              "--provider-config", ""],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+            env=_env())
         assert second.returncode != 0
         assert "data directory is in use by another service process" in second.stderr
         assert str(data_dir.resolve()) in second.stderr

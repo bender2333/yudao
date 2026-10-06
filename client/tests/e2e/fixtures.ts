@@ -4,7 +4,7 @@
 
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +29,32 @@ export type ClientApp = {
 };
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+
+// 端到端用例启动的是构建产物 client/out/main/index.js。它不存在或比 client/src 旧时，
+// 用例对着旧界面报错，看不出界面已经改过（工单 #303 的执行者、#177 的验证都遇到）：
+// 此时就地报错并写明先构建
+function assertClientBuildIsCurrent(): void {
+  const entry = join(repoRoot, "client", "out", "main", "index.js");
+  let built: number;
+  try {
+    built = statSync(entry).mtimeMs;
+  } catch {
+    throw new Error(`没有客户端构建产物 ${entry}，先运行 npm run build 再运行端到端用例`);
+  }
+  if (built < newestModification(join(repoRoot, "client", "src"))) {
+    throw new Error(`客户端构建产物 ${entry} 比 client/src 旧，先运行 npm run build 再运行端到端用例`);
+  }
+}
+
+function newestModification(directory: string): number {
+  let newest = 0;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    newest = Math.max(newest,
+                      entry.isDirectory() ? newestModification(path) : statSync(path).mtimeMs);
+  }
+  return newest;
+}
 
 // 启动真实后端：脚本在 client/tests/e2e/backend.py 中，用仓库项目的 Python 环境运行。
 // apiVersion 让服务报告一个不同的接口版本，用于核对更新页；releaseAssets 给出更新源目录
@@ -155,6 +181,7 @@ async function launchClient(options: {
   env?: Record<string, string>;
 }): Promise<ClientApp> {
   const local = options.address === null;
+  assertClientBuildIsCurrent();
   const app = await electron.launch({
     args: [join(repoRoot, "client", "out", "main", "index.js")],
     cwd: repoRoot,
