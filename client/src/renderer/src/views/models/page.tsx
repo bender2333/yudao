@@ -37,6 +37,7 @@ import {
   rowFromManual,
   rowToModelInput,
   rowsSavable,
+  saveSuccessText,
   testKeyOf,
   testText,
   tierOptions,
@@ -194,14 +195,17 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setForm({ mode: "add", state: emptyFormState(current.default_timeout_sec) });
   }, []);
 
-  const runSave = useCallback(async (body: Record<string, unknown>) => {
+  const runSave = useCallback(async (body: Record<string, unknown>, successMessage: string) => {
     setBusy(true);
     const result = await submit("catalog.connection.save", body);
     setBusy(false);
     setPendingSave(null);
-    setFormStatus({ kind: result.ok ? "ok" : "error", message: result.ok ? "已保存 Provider 配置。" : result.message });
+    // 表单保存成功以后收起，成功提示放在页面上：表单内的状态随表单一起消失（工单 #302）
+    setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? successMessage : result.message });
     if (result.ok) {
       setForm(null);
+    } else {
+      setFormStatus({ kind: "error", message: result.message });
     }
   }, [submit]);
 
@@ -220,7 +224,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       setPendingSave(body);
       return;
     }
-    await runSave(body);
+    await runSave(body, saveSuccessText(form.mode));
   }, [form, runSave, saveImpact]);
 
   const deleteProvider = useCallback(async (providerId: string) => {
@@ -630,7 +634,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             const model = catalog.models.find((item) => item.id === choice.modelId);
             const savedTier = savedAdmissionTier(catalog, choice.modelId);
             const tiers = tierOptions(model?.reasoning_levels ?? [], savedTier);
-            const reminders = catalog.department_reminders[department] ?? [];
+            // 提醒按下拉里当前选中的模型取：选中就显示，保存只负责保存（工单 #302）
+            const reminders = choice.modelId !== ""
+              ? catalog.model_reminders[choice.modelId]?.[department] ?? []
+              : catalog.department_reminders[department] ?? [];
             const unavailable = unavailableBindingLabel(catalog, choice.modelId);
             return (
               <div className="mm-default" key={department} data-testid={`default-${department}`}>
@@ -703,7 +710,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             <p className="mm-warn" data-testid="confirm-save-list">{confirmImpactText(saveImpact)}</p>
             <div className="mm-actions">
               <button type="button" className="primary" data-testid="confirm-save-yes" disabled={busy}
-                      onClick={() => void runSave(pendingSave)}>确认保存</button>
+                      onClick={() => void runSave(pendingSave, saveSuccessText(form?.mode ?? "edit"))}>确认保存</button>
               <button type="button" data-testid="confirm-save-no" onClick={() => setPendingSave(null)}>取消</button>
             </div>
           </div>

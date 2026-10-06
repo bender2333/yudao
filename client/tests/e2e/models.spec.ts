@@ -519,4 +519,98 @@ for (const size of [
       await backend.stop();
     }
   });
+
+  // 工单 #302 的验收：第一次配置「自定义」服务方案的完整路径。候选取自测试内的真实 HTTP 上游，
+  // 其中一条上游模型 ID 带「/」（走查里真实遇到的写法），上游只给窗口不给输出上限
+  test(`${label}：自定义方案添加连接、获取候选、预填的 ID 保存成功；缺一项容量不显示「容量已确认」；添加与保存都有成功提示`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size);
+    const errors = watchErrors(client);
+    try {
+      // 模型列表地址取自已保存连接的真实字段：测试内上游的端口由系统分配，不在测试里写死
+      const modelsUrl = await client.page.evaluate(async (address: string) => {
+        const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
+        const provider = (listed.data.providers as { id: string; models_url: string }[])
+          .find((item) => item.id === "opencode-go");
+        return provider!.models_url;
+      }, backend.address);
+      const baseUrl = modelsUrl.slice(0, -"/models".length);
+
+      // 新建表单默认就是「自定义」：没有预置地址时在高级选项旁写明怎么取得候选
+      await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+      const form = client.page.locator(".mm-form");
+      await expect(form.getByRole("button", { name: "自定义" })).toHaveAttribute("aria-pressed", "true");
+      await form.locator(".mm-advanced > summary").click();
+      await expect(form.getByTestId("models-url-hint")).toBeVisible();
+
+      // 填上模型列表地址：提示消失（设计规定地址由连接填写或取自服务方案，这条只改提示）
+      await form.getByTestId("provider-models-url").fill(modelsUrl);
+      await expect(form.getByTestId("models-url-hint")).toHaveCount(0);
+      await form.getByTestId("provider-base-url").fill(baseUrl);
+      await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("custom-go");
+      await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("自定义上游");
+      await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("CUSTOM_GO_KEY");
+
+      // 添加：表单收起的同时页面给出「已添加」
+      await form.getByTestId("submit-provider").click();
+      await expect(form).toHaveCount(0);
+      await expect(client.page.getByTestId("page-notice")).toHaveText("已添加 Provider 配置。");
+
+      // 配凭据：候选采集与连接测试都按真实凭据链请求测试内的上游
+      await setKey(client, backend, "CUSTOM_GO_KEY");
+
+      // 获取候选并建立访问定义：预填的 ID 是合法写法，上游模型 ID 保持带斜杠的原值，界面写明两者的区别。
+      // 连接保存以后才能取候选：后端按连接的标识取地址与凭据，表单里填的内容还没进目录
+      await client.page.getByTestId("provider-custom-go").getByRole("button", { name: "展开" }).click();
+      await client.page.getByTestId("collect-custom-go").click();
+      const candidates = client.page.getByTestId("candidates-custom-go");
+      await expect(candidates).toContainText("cbcn/deepseek-v4.1-flash");
+      await client.page.getByTestId("add-candidate-custom-go-cbcn/deepseek-v4.1-flash").click();
+      const rowKey = "cbcn-deepseek-v4.1-flash";
+      const row = client.page.locator(".mm-form");
+      await expect(row.getByTestId(`row-id-${rowKey}`)).toHaveValue(rowKey);
+      await expect(row.getByTestId(`row-model-${rowKey}`)).toHaveValue("cbcn/deepseek-v4.1-flash");
+      await expect(row.getByTestId(`id-differs-${rowKey}`))
+        .toHaveText(`发给上游的是「cbcn/deepseek-v4.1-flash」，ID「${rowKey}」只在本系统内使用。`);
+
+      // 只预填到窗口：显示「缺少输出上限」，没有「容量已确认」，「接受容量」不可用
+      await expect(row.getByTestId(`capacity-issue-${rowKey}`)).toHaveText("缺少输出上限");
+      await expect(row.getByTestId(`capacity-confirmed-${rowKey}`)).toHaveCount(0);
+      await expect(row.getByTestId(`accept-capacity-${rowKey}`)).toBeDisabled();
+
+      // 补上输出上限：修改容量即视为确认（设计说明第 4.3 节），此时才显示「容量已确认」
+      await row.getByTestId(`row-output-${rowKey}`).fill("16000");
+      await expect(row.getByTestId(`capacity-issue-${rowKey}`)).toHaveCount(0);
+      await expect(row.getByTestId(`capacity-confirmed-${rowKey}`)).toBeVisible();
+
+      // 保存：预填的 ID 被后端接受（带斜杠的写法会被拒为「必须是非空简单标识符」），
+      // 表单收起的同时页面给出「已保存」，模型表里出现这条定义
+      await row.getByTestId("submit-provider").click();
+      await expect(row).toHaveCount(0);
+      await expect(client.page.getByTestId("page-notice")).toHaveText("已保存 Provider 配置。");
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("cbcn/deepseek-v4.1-flash");
+
+      // 连接测试的结果文字写明读取的是哪个模型列表地址（工单 #302）：
+      // 后端只在连接下面有访问定义时才允许连接测试，因此这一步排在保存以后
+      await client.page.getByTestId("test-connection-custom-go").click();
+      await expect(client.page.getByTestId("connection-result-custom-go"))
+        .toContainText(`已读取模型列表地址 ${modelsUrl}：连接测试通过`);
+
+      // 质检的图像输入提醒跟上下拉里当前选中的定义，不必保存部门默认（工单 #302）。
+      // 预置的三部门默认绑定 fake-model：质检在选任何东西以前已有它的一条提醒；
+      // 改选已准入的纯文本定义 glm-4.6，提醒同时换成这条定义的文字
+      await expect(client.page.getByTestId("reminder-quality")).toContainText("当前模型 fake-model");
+      await client.page.getByTestId("default-model-quality").selectOption("glm-4.6");
+      await expect(client.page.getByTestId("reminder-quality")).toContainText("当前模型 glm-4.6");
+      await expect(client.page.getByTestId("reminder-quality")).not.toContainText("fake-model");
+      await expect(client.page.getByTestId("reminder-quality")).toContainText("图像输入");
+      // 产品与工程没有建议能力：选中同一条定义没有提醒
+      await client.page.getByTestId("default-model-product").selectOption("glm-4.6");
+      await expect(client.page.getByTestId("reminder-product")).toHaveCount(0);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
 }

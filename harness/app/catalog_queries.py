@@ -112,6 +112,9 @@ class Catalog(Contract):
     bindings: dict[str, CatalogBinding]
     # 部门默认当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）
     department_reminders: dict[str, list[str]]
+    # 目录中每条模型访问定义在各部门的建议能力提醒（模型 ID → 部门 → 提醒）：
+    # 部门默认的下拉选中一条定义时界面立即给出提醒，不等保存（设计说明第 5.6 节）
+    model_reminders: dict[str, dict[str, list[str]]]
 
 
 class CatalogDocument(Contract):
@@ -208,6 +211,8 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
         department_reminders={department: facade.model_reminders(
             None if bindings.get(department) is None else bindings[department].model_id, department)
             for department in DEPARTMENTS},
+        # 目录中每条定义在各部门的提醒：部门默认的下拉选中一条定义时立即给出提醒，不等保存
+        model_reminders=facade.model_reminders_by_department([item["id"] for item in view["models"]]),
     )
     return Snapshot[Catalog](position=position, data=data)
 

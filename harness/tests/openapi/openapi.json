@@ -4979,6 +4979,19 @@
             },
             "type": "object",
             "title": "Department Reminders"
+          },
+          "model_reminders": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Model Reminders"
           }
         },
         "additionalProperties": false,
@@ -4994,7 +5007,8 @@
           "models",
           "admissions",
           "bindings",
-          "department_reminders"
+          "department_reminders",
+          "model_reminders"
         ],
         "title": "Catalog"
       },
@@ -13842,6 +13856,17 @@
             ],
             "title": "Error"
           },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
           "actual_model": {
             "anyOf": [
               {
@@ -13877,6 +13902,7 @@
           "ok",
           "protocol",
           "error",
+          "source_url",
           "actual_model",
           "elapsed_ms",
           "admitted"

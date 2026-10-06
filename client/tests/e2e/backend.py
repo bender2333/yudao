@@ -422,6 +422,9 @@ def main() -> int:
     models_server = ModelsServer({"data": [
         {"id": "glm-4.6", "limit": {"context": 200000, "output": 32000}},
         {"id": "vision-model", "limit": {"context": 128000, "output": 16000}},
+        # 上游模型 ID 带「/」的候选（工单 #302 走查里真实遇到的写法）：上游只给窗口不给输出上限，
+        # 端到端据此核对预填的访问定义 ID 是合法写法、缺一项容量时不显示「容量已确认」
+        {"id": "cbcn/deepseek-v4.1-flash", "limit": {"context": 128000}},
     ]})
     if args.mode == "api":
         # 作为 `yudao api` 运行：不带 --data-dir 时用命令行的默认数据目录（客户端只运行 yudao api，
