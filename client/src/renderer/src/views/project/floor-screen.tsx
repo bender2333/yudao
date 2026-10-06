@@ -304,6 +304,7 @@ function FloorTextList(props: {
               <span>{item.department ?? "—"}</span>
               <span>第 {item.round} 轮</span>
               <span>{item.status}</span>
+              {item.kind === "onboarding" ? <span className="tag">建档</span> : null}
             </li>
           ))}
         </ul>

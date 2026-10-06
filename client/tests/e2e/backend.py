@@ -45,8 +45,12 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
 )
 from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.data_directory import default_data_dir  # noqa: E402
-from harness.models import Usage  # noqa: E402
-from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn  # noqa: E402
+from harness.models import Usage, json_dumps  # noqa: E402
+from harness.proposals import (  # noqa: E402
+    baseline_review_turn, collaboration_request, delivery_turn, plan_turn, product_spec, response_turn,
+    review_turn, structure_turn,
+)
+from harness.providers.call import ModelResponse  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
 from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E402
 
@@ -94,6 +98,42 @@ def script():
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ]
+
+
+def onboarding_script():
+    # 接入已有项目的建档脚本（工单 #137）：每轮产品写出初始 PRD、工程给出结构说明、质检核验基线；
+    # 三个部门各先调一次读取工具，让部门房间的「阅读已有项目」动作在事件流里真实出现。
+    # 四轮供接入与重新开始建档各走一遍
+    return [turn for index in range(4) for turn in _onboarding_round(index)]
+
+
+def _onboarding_round(index: int):
+    requirement = f"read the project layout at step {index}"
+    return [
+        read_turn(f"read-{index}", "read_file", {"path": "README.md"}),
+        FakeTurn(proposal=product_spec(requirements=[requirement], acceptance=["the README names the command to run"])),
+        read_turn(f"search-{index}", "search", {"pattern": "print"}),
+        structure_turn(requirement_locations=[{"requirement": requirement, "locations": ["src/echo.py"]}]),
+        read_turn(f"range-{index}", "read_range", {"path": "src/echo.py", "start_line": 1, "end_line": 2}),
+        baseline_review_turn(conclusions=[{"requirement": requirement, "status": "verified", "evidence": "smoke"}]),
+    ]
+
+
+def read_turn(identity: str, tool: str, arguments: dict):
+    # 脚本里的一项可以是接收模型调用合同的函数（harness/adapters/fake.py 的 TurnFactory），
+    # 函数返回带工具调用的回答；工具由原生循环真实执行
+    return lambda call: ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call",
+                                               "name": tool, "arguments": json_dumps(arguments)}])
+
+
+def source_directory(root: Path) -> Path:
+    # 一份最小的已有项目：源目录必须是真实目录，接入命令会真的采集它的代码快照
+    (root / "src").mkdir(parents=True)
+    (root / "src" / "echo.py").write_text("import sys\nprint(sys.argv[1])\n", encoding="utf-8")
+    (root / "README.md").write_text("# Echo\n\nPrint the given argument.\n", encoding="utf-8")
+    (root / "tests").mkdir()
+    (root / "tests" / "test_echo.py").write_text("def test_placeholder():\n    assert True\n", encoding="utf-8")
+    return root
 
 
 async def seed(application: Application, system: LoopSystem) -> None:
@@ -260,6 +300,9 @@ def main() -> int:
     parser.add_argument("mode", nargs="?", default="fixture", choices=("fixture", "api"))
     # 预置时给定义写准入并让三个部门默认绑定它：作废准入与删除引用方的用例需要真实的引用方（工单 #94）
     parser.add_argument("--admit-and-bind", action="store_true")
+    # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137），
+    # 它需要的轮次与默认脚本的预置事项不同，因此由用例选择
+    parser.add_argument("--script", choices=("default", "onboarding"), default="default")
     args = parser.parse_args()
 
     import tempfile
@@ -281,7 +324,7 @@ def main() -> int:
     else:
         data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
         port = args.port
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(onboarding_script() if args.script == "onboarding" else script()))
     application = VersionedApplication(system)
     if args.api_version is not None:
         application.reported_api_version = args.api_version
@@ -301,6 +344,10 @@ def main() -> int:
         if not thread.is_alive():
             raise RuntimeError("接口层在启动过程中结束")
 
+    # 接入已有项目需要一个真实的源目录：起服务前建好目录，把路径一并报给测试，
+    # 测试在对话框里填这个路径走完整的接入流程（工单 #137）
+    source_dir = source_directory(Path(tempfile.mkdtemp(prefix="yudao-e2e-source-"))) if args.script == "onboarding" else None
+
     # 先建示例项目与决定请求，再保存一份指向测试内上游的目录（工单 #93）。
     # 数据目录里已经有项目时不再预置：客户端「重新启动服务」会在同一个数据目录上再启动一次
     # （工单 #207 的验收），重复预置会让 work_item.create 被拒绝。真正的 `yudao api` 也不预置数据
@@ -311,7 +358,8 @@ def main() -> int:
                              admit_and_bind=args.admit_and_bind))
 
     port = server.servers[0].sockets[0].getsockname()[1]
-    print(json.dumps({"port": port, "data_dir": str(data_dir)}), flush=True)
+    print(json.dumps({"port": port, "data_dir": str(data_dir),
+                      "source_dir": None if source_dir is None else str(source_dir)}), flush=True)
     if args.mode == "api":
         # 进程一直服务到收到本机停止请求（数据目录的进程锁随退出释放）
         thread.join()

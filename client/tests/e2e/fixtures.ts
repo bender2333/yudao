@@ -13,6 +13,8 @@ export type Backend = {
   port: number;
   address: string;
   dataDir: string;
+  // 建档脚本模式下后端建好的真实源目录，接入已有项目的对话框填这个路径（工单 #137）
+  sourceDir: string | null;
   stop: () => Promise<void>;
 };
 
@@ -31,7 +33,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 // （工单 #208：服务从它提供 /client-update/latest.yml 与安装程序）；port 固定端口，
 // 更新地址里的端口要与它一致，客户端才会从同一个服务下载安装程序
 export async function startBackend(
-  options: { apiVersion?: number; admitAndBind?: boolean; releaseAssets?: string; port?: number } = {},
+  options: { apiVersion?: number; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding" } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {
@@ -43,17 +45,21 @@ export async function startBackend(
   if (options.admitAndBind === true) {
     script.push("--admit-and-bind");
   }
+  if (options.script !== undefined) {
+    script.push("--script", options.script);
+  }
   const child = spawn("uv", ["run", "python", ...script], {
     cwd: repoRoot,
     stdio: ["pipe", "pipe", "pipe"],
     shell: true,
   });
   const line = await readFirstLine(child);
-  const parsed = JSON.parse(line) as { port: number; data_dir: string };
+  const parsed = JSON.parse(line) as { port: number; data_dir: string; source_dir: string | null };
   return {
     port: parsed.port,
     address: `http://127.0.0.1:${parsed.port}`,
     dataDir: parsed.data_dir,
+    sourceDir: parsed.source_dir,
     stop: () => stopProcess(child),
   };
 }

@@ -8,12 +8,14 @@ import type {
   DecisionList,
   DecisionView,
   ProjectList,
+  ProjectRow,
   ProjectOverviewResult,
 } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { Loading, Section, hasCommand } from "../project/common";
 import { formatTime } from "../project/labels";
 import { useCommand, useSnapshot } from "../project/use-snapshot";
+import { projectOnboardingMark } from "../project/onboarding";
 import { DecisionCardList } from "../decisions/card";
 import { sortByRequested } from "../decisions/card-logic";
 import { statusItems, type StatusItem } from "./status-items";
@@ -158,6 +160,7 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
                           {project.name}
                         </button>
                         {project.source === "existing" ? <span className="tag">已有项目</span> : null}
+                        <OnboardingMark project={project} decisions={waiting} />
                       </td>
                       <td>{project.goal === "" ? "没有填写" : project.goal}</td>
                       <td>{project.current_adoption === null ? "尚未采纳" : project.current_adoption}</td>
@@ -175,6 +178,13 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
       </Section>
     </div>
   );
+}
+
+// 项目行上的建档状态标记（3.8 第 3.4 节）：来自 projects.list 与等待回答的初始 PRD 决定请求，
+// 项目没有建档状态时不显示标记
+function OnboardingMark(props: { project: ProjectRow; decisions: DecisionView[] }) {
+  const mark = projectOnboardingMark(props.project, props.decisions);
+  return mark === null ? null : <span className="tag">{mark}</span>;
 }
 
 // 待你决定：跨项目的决定卡片。事项标题由 project.overview 解析（决定请求只带标识），
