@@ -9,6 +9,7 @@ import {
   CUSTOM_PRESET_ID,
   STALE_ADMISSION_LABEL,
   admittedOptions,
+  capacityIssueText,
   collectImpact,
   confirmImpactText,
   connectionTestable,
@@ -24,13 +25,15 @@ import {
   presetBaseUrlFor,
   presetById,
   providerDeleteConfirmation,
+  providerInputFromForm,
   reasoningModeOptions,
   rowFromCandidate,
   rowFromManual,
   rowSavable,
   rowToModelInput,
   rowsSavable,
-  testKey,
+  testKeyOf,
+  testText,
   tierOptions,
   credentialStatusLabel,
   admissionSummary,
@@ -253,8 +256,8 @@ test("表单能否构成合法目录文档：必填项与容量关系（第 4.6 
     id: "m1", model: "glm", context_window: "1000", max_output_tokens: "100", capacity_confirmed: true,
   };
   assert.equal(formDocumentValid(provider, [row]), true);
-  // 窗口可以留空，只填输出上限
-  assert.equal(formDocumentValid(provider, [{ ...row, context_window: "" }]), true);
+  // 窗口必须与「接受容量」一致：留空时不构成合法文档（工单 #294，与 rowCapacityValid 同一规则）
+  assert.equal(formDocumentValid(provider, [{ ...row, context_window: "" }]), false);
   // 输出上限必须有值且为正，且不大于窗口
   assert.equal(formDocumentValid(provider, [{ ...row, max_output_tokens: "" }]), false);
   assert.equal(formDocumentValid(provider, [{ ...row, max_output_tokens: "0" }]), false);
@@ -277,10 +280,14 @@ test("表单的取舍值：空文本与非法数字都交回 null", () => {
 });
 
 test("添加时的表单为空，编辑时恢复服务方案、协议与已保存的定义（验收第 2 项）", () => {
-  const empty = emptyFormState();
+  // 新建表单的请求时限取后端目录合同给出的默认值，不在客户端写死（工单 #294）
+  const empty = emptyFormState(600);
   assert.equal(empty.rows.length, 0);
   assert.equal(empty.preset_id, CUSTOM_PRESET_ID);
   assert.equal(empty.protocol, "responses");
+  assert.equal(empty.timeout_sec, "600");
+  // 后端给出别的值时按该值填入
+  assert.equal(emptyFormState(45).timeout_sec, "45");
 
   const provider = {
     id: "p1", name: "OpenCode Go", protocol: "chat_completions", base_url: "https://open/zen/go/v1",
@@ -364,6 +371,14 @@ test("提交的形状：档位与输入方式按声明写入，默认档位不�
   assert.deepEqual(rowToModelInput({ ...row, image_input: false }).input_modalities, ["text"]);
 });
 
+test("连接提交的请求时限：填了取填的值，留空不提交该字段（工单 #294）", () => {
+  const state = emptyFormState(600);
+  assert.equal(providerInputFromForm(state).timeout_sec, 600);
+  assert.equal(providerInputFromForm({ ...state, timeout_sec: "45" }).timeout_sec, 45);
+  // 留空时整个字段不出现，后端 ProviderInput 的默认值生效，客户端不写第二个数
+  assert.equal("timeout_sec" in providerInputFromForm({ ...state, timeout_sec: "" }), false);
+});
+
 test("部门默认的选项只含已准入且未作废的定义，档位选项保留按模型限制的已存值（第 9.1 节）", () => {
   const providers = [
     { id: "p1", name: "OpenCode Go" },
@@ -393,9 +408,7 @@ test("部门默认的选项只含已准入且未作废的定义，档位选项�
   assert.match(kept[1].label, /按模型限制/);
 });
 
-test("测试标识与连接测试可用性：连接按连接，模型按定义；没有地址时不提供连接测试", () => {
-  assert.equal(testKey("connection", "p1", null), "connection:p1");
-  assert.equal(testKey("model", "p1", "m1"), "model:m1");
+test("连接测试可用性：没有地址时不提供连接测试", () => {
   assert.equal(connectionTestable({ models_url: "" }, PRESETS[0]), true);
   assert.equal(connectionTestable({ models_url: "https://x/models" }, null), true);
   assert.equal(connectionTestable({ models_url: "" }, null), false);
@@ -407,5 +420,33 @@ test("预填来源的文字标注", () => {
   assert.match(text, /窗口：上游模型列表/);
   assert.match(text, /输出上限：能力表/);
   assert.match(text, /输入方式：能力表/);
+});
+
+test("模型测试的结果显示在模型行：通过写用时，未通过写原因（工单 #294）", () => {
+  const passed = testText({
+    kind: "model", ok: true, elapsed_ms: 1234, actual_model: "glm-4.6", admitted: true, error: null,
+  });
+  assert.match(passed, /模型测试通过/);
+  assert.match(passed, /1234 毫秒/);
+  // 失败时写出上游给出的原因
+  const failed = testText({ kind: "model", ok: false, elapsed_ms: 12, error: "401 unauthorized", admitted: null });
+  assert.match(failed, /模型测试未通过/);
+  assert.match(failed, /401 unauthorized/);
+  // 事件按同一把键找回界面上的这一行
+  assert.equal(testKeyOf({ kind: "model", model_id: "m1" }), "model:m1");
+  assert.equal(testKeyOf({ kind: "connection", provider_id: "p1" }), "connection:p1");
+});
+
+test("容量的缺项与非法关系在界面写明（工单 #294）", () => {
+  const blank = { context_window: null, max_output_tokens: null };
+  assert.equal(capacityIssueText({ ...blank, max_output_tokens: 100 }), "缺少窗口");
+  assert.equal(capacityIssueText({ ...blank, context_window: 1000 }), "缺少输出上限");
+  assert.equal(capacityIssueText(blank), "缺少窗口与输出上限");
+  assert.equal(capacityIssueText({ context_window: 1000, max_output_tokens: 2000 }), "输出上限不能大于窗口");
+  assert.equal(capacityIssueText({ context_window: 1000, max_output_tokens: 100 }), "");
+  // 缺窗口与非法关系都写明缺的是哪一项，且与 rowCapacityValid 同一份判断
+  assert.equal(rowCapacityValid({ context_window: null, max_output_tokens: 100 }), false);
+  assert.equal(rowCapacityValid({ context_window: 1000, max_output_tokens: null }), false);
+  assert.equal(rowCapacityValid({ context_window: 1000, max_output_tokens: 100 }), true);
 });
 
