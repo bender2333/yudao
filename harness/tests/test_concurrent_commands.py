@@ -87,10 +87,9 @@ def test_a_cancellation_that_could_not_be_written_is_written_by_the_run_loop(tmp
 
 @pytest.mark.parametrize("operation", ["activate_once", "run_until_stop"])
 def test_a_run_cancelled_from_another_thread_during_a_model_call_returns_cancelled(tmp_path, monkeypatch, operation):
-    # 模型调用进行中另一个线程取消运行：取消的一方先中止运行、取消这次调用，激活随即结束；取消在激活读取结束时的
-    # 运行状态以后才写入。激活与运行循环交回的都是写入取消以后的运行状态
-    cancel_started, activation_read = threading.Event(), threading.Event()
-    finished, errors, cancellers = [], [], []
+    # 激活的模型调用已经返回时取消才提交：激活收尾等待取消写入，结束事件在取消之后
+    cancel_started, activation_returned, finish_committed = threading.Event(), threading.Event(), threading.Event()
+    errors, cancellers = [], []
 
     def cancel():
         try:
@@ -106,29 +105,37 @@ def test_a_run_cancelled_from_another_thread_during_a_model_call_returns_cancell
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([cancel_during_call]))
     run_id = system.create_run("original")
-    commit, project = system.store.commit, system.orchestrator.project
+    commit = system.store.commit
+    invoke = system.orchestrator._invoke_activation
 
-    def commit_cancellation_after_the_activation_read(stream, expected_version, events, *args, **kwargs):
-        if any(event.type == EventType.RUN_FAILED for event in events):
+    def commit_after_activation_returns(stream, expected_version, events, *args, **kwargs):
+        types = {event.type for event in events}
+        if EventType.RUN_FAILED in types:
             cancel_started.set()
-            assert activation_read.wait(10)
-        return commit(stream, expected_version, events, *args, **kwargs)
+            assert activation_returned.wait(10)
+            # 激活收尾不等待取消时，它的结束事件在这段时间内提交，取消排在它之后
+            finish_committed.wait(2)
+        committed = commit(stream, expected_version, events, *args, **kwargs)
+        if EventType.ACTIVATION_FINISHED in types:
+            finish_committed.set()
+        return committed
 
-    def project_after_finish(requested_run_id):
-        projection = project(requested_run_id)
-        if finished:
-            activation_read.set()
-        return projection
+    async def invoke_then_signal(activation):
+        await invoke(activation)
+        activation_returned.set()
 
-    after_event(system, EventType.ACTIVATION_FINISHED, finished.append)
-    monkeypatch.setattr(system.store, "commit", commit_cancellation_after_the_activation_read)
-    monkeypatch.setattr(system.orchestrator, "project", project_after_finish)
+    monkeypatch.setattr(system.store, "commit", commit_after_activation_returns)
+    monkeypatch.setattr(system.orchestrator, "_invoke_activation", invoke_then_signal)
 
     result = getattr(system, operation)(run_id)
     cancellers[0].join(10)
 
     assert not errors
+    assert not cancellers[0].is_alive()
     assert result.phase == "FAILED" and result.stop_reason == "cancelled"
+    events = system.store.list_events(run_id)
+    assert [event.type for event in events[-2:]] == [EventType.RUN_FAILED, EventType.ACTIVATION_FINISHED]
+    assert system.project(run_id).sessions["product"].status == "closed"
 
 
 def test_archiving_while_a_work_item_is_starting_is_rejected(tmp_path, monkeypatch):

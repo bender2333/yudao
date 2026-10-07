@@ -1,0 +1,21 @@
+/* 首页与机房画面的样式 */
+
+.y10-home { display: grid; gap: 16px; }
+.y10-home > .y10-block { margin: 0; }
+.y10-home-status .y10-block-body { padding-top: 0; }
+.y10-building-wrap { background: #9fd0ee; }
+.y10-building-scroll { max-height: 520px; overflow-y: auto; }
+.y10-machine-room { background: #2b2f38; }
+.y10-machine-room.is-large { border-radius: 10px; overflow: hidden; }
+
+.y10-report-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.y10-report-item { border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); min-width: 0; }
+.y10-report-item.is-open { grid-column: 1 / -1; }
+.y10-report-item.is-highlight { border-color: var(--violet); box-shadow: 0 0 0 2px var(--violet-bg); }
+.y10-report-head { width: 100%; border: 0; background: transparent; text-align: left; padding: 10px 12px; display: grid; gap: 2px; }
+.y10-report-label { color: var(--muted); font-size: 12.5px; }
+.y10-report-value { font-size: 20px; font-weight: 700; }
+.y10-report-value small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.y10-report-detail { font-size: 12px; color: var(--muted); }
+.y10-source-list { margin: 0; padding: 0 14px 12px 30px; display: grid; gap: 3px; font-size: 12.5px; }
+.y10-home-timeline { margin-top: 4px; }

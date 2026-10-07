@@ -490,24 +490,25 @@ class Orchestrator:
                 self._cancellers[run_id].discard(token)
                 self._cancellers_changed.notify_all()
 
-    def _settled(self, run_id: str) -> RunProjection:
-        # 激活与运行循环结束时交回的运行状态。有正在进行的取消（cancel 或 /stop），或者运行已经中止而取消还没有写入时，
-        # 等待正在进行的取消结束，交回它写入以后的状态；运行已经中止而没有正在进行的取消（例如它的写入失败了）时
-        # 在这里写入取消
-        def aborted() -> bool:
-            return bool(self._abort.get(run_id) and self._abort[run_id].is_set())
+    def _await_cancellers(self, run_id: str) -> None:
+        # 有正在进行的取消（cancel 或 /stop），等待它结束：等待时释放锁，取消线程可以在等待期间登记与结束。
+        # 激活收尾与运行循环用它等取消写入，取消一方从不等待激活收尾。
+        with self._cancellers_changed:
+            self._cancellers_changed.wait_for(lambda: not self._cancellers.get(run_id))
 
+    def _settled(self, run_id: str) -> RunProjection:
+        # 激活与运行循环结束时交回的运行状态。有正在进行的取消（cancel 或 /stop）时，等待它结束，
+        # 交回它写入以后的状态；运行已经中止而没有正在进行的取消（例如它的写入失败了）时在这里写入取消
         projection = self.project(run_id)
         if projection.phase in TERMINAL_PHASES:
             return projection
-        with self._cancellers_changed:
-            if not self._cancellers.get(run_id) and not aborted():
-                return projection
-            self._cancellers_changed.wait_for(lambda: not self._cancellers.get(run_id))
+        self._await_cancellers(run_id)
         projection = self.project(run_id)
-        if projection.phase in TERMINAL_PHASES or not aborted():
+        if projection.phase in TERMINAL_PHASES:
             return projection
-        return self.cancel(run_id)
+        if self._abort.get(run_id) is not None and self._abort[run_id].is_set():
+            return self.cancel(run_id)
+        return projection
 
     def add_guidance(self, run_id: str, department: str, text: str, *,
                      base_version: int | None = None, command: Command | None = None) -> RunProjection:
@@ -668,21 +669,24 @@ class Orchestrator:
                                    return_phase=phase, return_work_valid=False)
 
     def cancel(self, run_id: str, *, command: Command | None = None) -> RunProjection:
-        # 已经结束的运行不变；否则中止并取消正在进行的步骤，再写入取消。取消正在进行的步骤出错时，
-        # 取消照常写入，再通知一次，错误交给调用方
+        # 已经结束的运行不变；否则先中止运行（之后的核对都得到停止）并写入取消，再取消正在进行的步骤：
+        # 调用尝试因取消而失败的记录排在取消之后。写入出错时同样取消正在进行的步骤；取消步骤出错时再通知一次，
+        # 错误交给调用方
         with self._cancelling(run_id):
             if self.project(run_id).phase in TERMINAL_PHASES:
                 return self.project(run_id)
-            activation, cancel_error = self._abort_run(run_id)
+            self._abort.setdefault(run_id, Event()).set()
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
                     transaction, "cancelled", "run cancelled"), command=command)
             finally:
+                activation, cancel_error = self._abort_run(run_id)
                 if cancel_error is not None:
                     self._cancel_driver(activation)
         if cancel_error is not None:
             raise cancel_error
         return self.project(run_id)
+
     def stop_for_upgrade(self, run_id: str, *, reason: str) -> RunProjection:
         # 因升级停止（ADR-0019，工单 #126、#322）：强制升级处理到的未结束 run 记为因升级停止，
         # 停止原因写在带版本定义的停止原因清单中；已经结束的 run 不变
@@ -983,6 +987,7 @@ class Orchestrator:
                 # 累计保留在内存里，下次激活从事件恢复时继续
                 self._pause_run_clock(run_id)
                 return await asyncio.to_thread(self._settled, run_id)
+            self._active[run_id] = activation
             started = time.monotonic()
             try:
                 await self._invoke_activation(activation)
@@ -1015,6 +1020,9 @@ class Orchestrator:
                             "stop_reason": current.stop_reason,
                         },
                     ))
+
+                # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
+                await asyncio.to_thread(self._await_cancellers, run_id)
                 self.writes.transact(run_stream(run_id), finish)
                 self.sessions.get(run_id, scope.department).idle()
                 self._active.pop(run_id, None)

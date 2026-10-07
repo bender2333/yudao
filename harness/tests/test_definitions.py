@@ -115,6 +115,18 @@ def test_departments_and_roles_must_refer_to_each_other(tmp_path):
     )
 
 
+def test_department_without_label_fails_naming_the_department(tmp_path):
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    del organization["departments"][1]["label"]
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue == ("organization.json", "departments[1].label", "部门 engineering 缺少中文名")
+    assert DEFINITIONS.department_labels == {"product": "产品", "engineering": "工程", "quality": "质检"}
+
+
 def test_tool_categories_and_references_are_checked(tmp_path):
     directory = _copy(tmp_path)
     tools = _read(directory, "tools.json")

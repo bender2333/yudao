@@ -984,12 +984,6 @@ if list(DEPARTMENTS) != _PHASE_DEPARTMENTS:
                             "控制核心的阶段迁移按顺序支持部门 " + "、".join(_PHASE_DEPARTMENTS))])
 
 
-# 部门的中文名：等待说明与协作说明按部门写给用户看，机器标识不直接出现在说明里
-DEPARTMENT_LABELS = {"product": "产品", "engineering": "工程", "quality": "质检"}
-if set(DEPARTMENT_LABELS) != set(DEPARTMENTS):
-    raise DefinitionError([("organization.json", "departments",
-                            "部门的中文名必须与定义的部门相同：" + "、".join(DEPARTMENT_LABELS))])
-
 # 停止原因的中文名：等待说明与事件说明按中文写，机器标识不直接出现在给用户看的文字里
 STOP_REASON_LABELS = {
     "released": "已完成并放行",
