@@ -1,37 +1,31 @@
-# Yudao 版本的发布脚本（桌面客户端的安装、更新与发布设计说明第 6 节，ADR-0023）。
-# 架构师在里程碑交给用户之前运行：核对版本与工作区，构建客户端安装包，组装 Yudao 服务的 wheel，
+# Yudao 版本的发布脚本（网页界面的提供与发布设计说明第 6 节，ADR-0032）。
+# 架构师在里程碑交给用户之前运行：核对版本与工作区，构建页面文件，组装 Yudao 服务的 wheel，
 # 输出 wheel 的路径与 SHA-256；带 --publish 时另外打标签、推送并把 wheel 上传到私有仓库的 Release。
 #
 # 步骤（设计说明第 6.3 节）：
-#   1. 核对：工作区干净；当前提交在 main 上并已推送；版本号三处相同；Node 不低于 22.12，uv 可用。
-#   2. 构建客户端：npm ci，electron-builder 生成安装程序、blockmap 与 latest.yml。
-#   3. M3 起构建执行代理的 wheel（#144 加入），现在留出 release_assets/ 中的位置。
-#   4. 复制进 harness/release_assets/，删除仓库根下的 build/ 与 *.egg-info，uv build --wheel 生成
-#      Yudao 服务的 wheel；核对 wheel 内含这些文件，latest.yml 中的 SHA-512 与安装程序一致，
-#      wheel 的 harness/release_assets/ 中没有其他版本的文件。
+#   1. 核对：工作区干净；当前提交在 main 上并已推送；pyproject.toml 的版本号；Node 不低于 22.12，uv 可用。
+#   2. 构建页面：npm ci，Vite 把页面文件构建到 client/out/renderer。
+#   3. M3 起构建执行代理的 wheel（#144 加入）。
+#   4. 清空 harness/release_assets/，把页面文件复制进去，删除仓库根下的 build/ 与 *.egg-info，
+#      uv build --wheel 生成 wheel；核对 wheel 内的页面文件与页面构建输出逐个一致。
 #   5. 仅带 --publish 时：打标签 v<版本> 并推送，gh release create 把 wheel 上传到 Release。
 #   6. 输出 wheel 的路径与 SHA-256。
 #
-# 脚本只构建与上传，不安装、不升级这台电脑上已经安装的 Yudao 服务与客户端。
+# 脚本只构建与上传，不安装、不升级这台电脑上已经安装的 Yudao 服务。
 #
 # 用法：
 #   uv run python scripts/release.py            # 构建并输出 wheel，不发布
 #   uv run python scripts/release.py --publish  # 构建后打标签、推送并上传到 Release
 #
 # 测试与离线核对可以改写这些环境变量（默认值与设计说明一致）：
-#   YUDAO_RELEASE_APP_ID          客户端 appId（默认 com.yudao.client）
-#   YUDAO_RELEASE_PRODUCT_NAME    客户端产品名（默认 Yudao）
-#   YUDAO_RELEASE_SETUP_BASENAME  安装包文件名前缀（默认 Yudao-Setup）
-#   YUDAO_RELEASE_OUTPUT_DIR      wheel 的输出目录（默认仓库下的 dist/）
-#   YUDAO_RELEASE_BRANCH          发布所在的分支（默认 main）
-#   YUDAO_RELEASE_REMOTE          发布推送到的远端（默认 origin）
+#   YUDAO_RELEASE_OUTPUT_DIR  wheel 的输出目录（默认仓库下的 dist/）
+#   YUDAO_RELEASE_BRANCH      发布所在的分支（默认 main）
+#   YUDAO_RELEASE_REMOTE      发布推送到的远端（默认 origin）
 
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
-import json
 import os
 import shutil
 import subprocess
@@ -46,14 +40,19 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "dist"
 MIN_NODE = (22, 12)
 # 私有仓库的 Release 名称前缀
 TAG_PREFIX = "v"
+# 页面构建输出目录（vite.pages.config.ts 的 build.outDir）
+PAGES_OUTPUT = Path("out") / "renderer"
+# 发布资源目录：页面文件与执行代理的 wheel 随 wheel 一起发布（设计说明第 5.1、6.1 节）
+RELEASE_ASSETS = Path("harness") / "release_assets"
 
 class ReleaseError(Exception):
     # 核对不通过或构建结果不符合预期：写明原因，脚本以非零状态退出
     pass
 
-def _run(command: list[str], cwd: Path | None = None) -> None:
+def _run(command: list[str], cwd: Path | None = None,
+         environment: dict[str, str] | None = None) -> None:
     # 运行外部命令，失败时就地抛出（fast-fail），不吞掉错误
-    subprocess.run(command, cwd=cwd, check=True)
+    subprocess.run(command, cwd=cwd, check=True, env=environment)
 
 def _capture(command: list[str], cwd: Path | None = None) -> str:
     # 运行外部命令并取回标准输出的文本，失败时就地抛出。按 UTF-8 解码，非法字节替换，
@@ -74,7 +73,7 @@ def _tool_exists(name: str) -> bool:
     return shutil.which(name) is not None
 
 def _pyproject_version(path: Path) -> str:
-    # 从 pyproject.toml 读取 [project] 的 version。发布脚本只关心这一个字段，
+    # 从 pyproject.toml 读取 [project] 的 version。发布版本号只以这里为准（设计说明第 6.2 节），
     # 用标准库 tomllib 读取
     import tomllib
 
@@ -84,19 +83,11 @@ def _pyproject_version(path: Path) -> str:
         raise ReleaseError(f"{path} 的 [project] 缺少 version")
     return version
 
-def _client_version(path: Path) -> str:
-    parsed = json.loads(path.read_text(encoding="utf-8"))
-    version = parsed.get("version")
-    if not isinstance(version, str) or not version:
-        raise ReleaseError(f"{path} 缺少 version")
-    return version
-
 def _check_node_version() -> str:
     # Node 不低于 22.12（设计说明第 6.3 节）。取 node --version 的 vX.Y.Z
     raw = _capture([_tool("node"), "--version"]).lstrip("v")
-    parts = raw.split(".")
     try:
-        major, minor = int(parts[0]), int(parts[1])
+        major, minor = (int(part) for part in raw.split(".")[:2])
     except (IndexError, ValueError) as exc:
         raise ReleaseError(f"无法解析 Node 版本：{raw}") from exc
     if (major, minor) < MIN_NODE:
@@ -125,15 +116,13 @@ def _check_pushed(repo_root: Path, branch: str, remote: str) -> None:
     if pushed != head:
         raise ReleaseError(f"当前提交 {head[:12]} 还没有推送到 {remote}/{branch}")
 
-def _check_versions(repo_root: Path) -> str:
-    # 版本号三处相同：pyproject.toml 的 version、客户端 package.json 的 version 与标签 v<版本>。
-    # 标签在发布时由脚本建立，核对时先要求前两处相同
-    service = _pyproject_version(repo_root / "pyproject.toml")
-    client = _client_version(repo_root / "client" / "package.json")
-    if service != client:
-        raise ReleaseError(
-            f"版本号不一致：pyproject.toml 是 {service}，client/package.json 是 {client}")
-    return service
+def _check_tag_matches_version(repo_root: Path, version: str) -> None:
+    # 版本号核对 pyproject.toml 与标签（设计说明第 6.2 节）：标签 v<版本> 由发布步骤建立，
+    # 这个版本已经有标签时说明发布过，重复发布会覆盖上一次的记录
+    tag = f"{TAG_PREFIX}{version}"
+    existing = _capture(["git", "tag", "--list", tag], cwd=repo_root)
+    if existing:
+        raise ReleaseError(f"标签 {tag} 已经存在，这个版本发布过了")
 
 def _check_environment() -> None:
     if not _tool_exists("uv"):
@@ -145,18 +134,10 @@ def verify(repo_root: Path, *, branch: str, remote: str) -> str:
     _check_clean_worktree(repo_root)
     _check_on_publish_branch(repo_root, branch)
     _check_pushed(repo_root, branch, remote)
-    version = _check_versions(repo_root)
+    version = _pyproject_version(repo_root / "pyproject.toml")
+    _check_tag_matches_version(repo_root, version)
     _check_environment()
     return version
-
-def sha512_base64(path: Path) -> str:
-    # 文件 SHA-512 的 base64 值。electron-builder 的 latest.yml 用这个值作为 files[].sha512
-    # （builder-util-runtime 的 UpdateFileInfo；调研第 3.2 节）
-    digest = hashlib.sha512()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return base64.b64encode(digest.digest()).decode("ascii")
 
 def sha256_hex(path: Path) -> str:
     # 文件 SHA-256 的十六进制值，作为 wheel 的核对值输出
@@ -166,65 +147,38 @@ def sha256_hex(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-def build_client(repo_root: Path, *, version: str, app_id: str, product_name: str,
-                 setup_basename: str) -> dict[str, Path]:
-    # 第 2 步：构建客户端。npm ci 安装依赖，electron-builder 生成安装程序、blockmap 与 latest.yml。
-    # build-installer.mjs（#208）已经封装了这一步，并输出一行 JSON 写明三个文件的位置。
-    # 版本显式写成已核对的发布版本，环境里残留的 YUDAO_VERSION 不会让安装程序用错版本
+def page_files(directory: Path) -> dict[str, Path]:
+    # 目录下的全部文件（含 assets/ 等子目录），键是相对目录的路径，用 / 分隔
+    return {path.relative_to(directory).as_posix(): path
+            for path in sorted(directory.rglob("*")) if path.is_file()}
+
+def build_pages(repo_root: Path, *, version: str) -> Path:
+    # 第 2 步：构建页面。npm ci 安装依赖，Vite 按 vite.pages.config.ts 把页面文件构建到
+    # client/out/renderer。页面记录的版本写成已核对的发布版本，与服务同版本（设计说明第 5.1 节），
+    # package.json 的版本不同时页面会在每次连接时重新加载
     client_root = repo_root / "client"
-    environment = {**os.environ, "YUDAO_VERSION": version, "YUDAO_APP_ID": app_id,
-                   "YUDAO_PRODUCT_NAME": product_name, "YUDAO_SETUP_BASENAME": setup_basename}
-    subprocess.run([_tool("npm"), "ci"], cwd=client_root, check=True, env=environment)
-    result = subprocess.run([_tool("node"), "scripts/build-installer.mjs"], cwd=client_root,
-                            check=True, capture_output=True, text=True, encoding="utf-8",
-                            errors="replace", env=environment)
-    # build-installer.mjs 最后一行是 JSON；取最后一个 JSON 对象
-    parsed = json.loads(result.stdout.strip().splitlines()[-1])
-    installer = Path(parsed["setup"])
-    blockmap = Path(parsed["blockmap"])
-    manifest = Path(parsed["manifest"])
-    for path in (installer, blockmap, manifest):
-        if not path.is_file():
-            raise ReleaseError(f"客户端构建没有生成 {path}")
-    return {"installer": installer, "blockmap": blockmap, "manifest": manifest}
+    environment = {**os.environ, "YUDAO_RELEASE_VERSION": version}
+    npm = _tool("npm")
+    _run([npm, "ci"], cwd=client_root, environment=environment)
+    _run([npm, "run", "build:pages"], cwd=client_root, environment=environment)
+    output = client_root / PAGES_OUTPUT
+    if not (output / "index.html").is_file():
+        raise ReleaseError(f"页面构建没有生成 {output / 'index.html'}")
+    return output
 
-def verify_manifest_matches_installer(manifest: Path, installer: Path) -> None:
-    # 核对 latest.yml 中的 SHA-512 与安装程序一致（设计说明第 6.3 节第 4 步）。
-    # latest.yml 是 YAML；读取 files 中 url 与安装程序同名的项，比较 sha512
-    import yaml
-
-    document = yaml.safe_load(manifest.read_text(encoding="utf-8"))
-    files = document.get("files")
-    if not isinstance(files, list) or not files:
-        raise ReleaseError(f"{manifest} 的 files 为空")
-    expected = sha512_base64(installer)
-    name = installer.name
-    entry = next((item for item in files if isinstance(item, dict) and item.get("url") == name), None)
-    if entry is None:
-        raise ReleaseError(f"{manifest} 的 files 中没有 {name}")
-    recorded = entry.get("sha512")
-    if recorded != expected:
-        raise ReleaseError(
-            f"{manifest} 中 {name} 的 SHA-512 是 {recorded}，安装程序的实际值是 {expected}")
-
-def assemble_assets(repo_root: Path, client: dict[str, Path]) -> dict[str, Path]:
-    # 第 4 步前半：把客户端构建产物复制进发布资源目录（该目录被 git 忽略）。
-    # 先清空目录，避免上一次发布留下的旧文件混进 wheel
-    assets_dir = repo_root / "harness" / "release_assets"
+def assemble_assets(repo_root: Path, pages: Path) -> Path:
+    # 第 4 步前半：清空发布资源目录（该目录被 git 忽略），把页面文件整个复制进去。
+    # 先清空，避免上一次发布留下的文件混进 wheel；执行代理的 wheel 在 M3 由 #144 复制进来
+    assets_dir = repo_root / RELEASE_ASSETS
     if assets_dir.exists():
         shutil.rmtree(assets_dir)
-    assets_dir.mkdir(parents=True)
-    copied: dict[str, Path] = {}
-    for key in ("installer", "blockmap", "manifest"):
-        target = assets_dir / client[key].name
-        shutil.copy2(client[key], target)
-        copied[key] = target
-    return copied
+    shutil.copytree(pages, assets_dir)
+    return assets_dir
 
 def clean_build_artifacts(repo_root: Path) -> None:
     # 第 4 步：删除仓库根下的 build/ 与 *.egg-info 以后再构建。
     # setuptools 把 harness/release_assets/ 复制进 build/lib/harness/release_assets/ 以后不会清理它，
-    # 上一次构建留下的安装程序会跟着这次构建一起进 wheel（工单 #313）
+    # 上一次构建留下的文件会跟着这次构建一起进 wheel（工单 #313）
     build_dir = repo_root / "build"
     if build_dir.exists():
         shutil.rmtree(build_dir)
@@ -243,24 +197,25 @@ def build_wheel(repo_root: Path, version: str, output_dir: Path) -> Path:
         raise ReleaseError(f"uv build 没有生成 {expected}")
     return expected
 
-def verify_wheel_contents(wheel: Path, assets: dict[str, Path], version: str) -> None:
-    # 核对 wheel 内含客户端安装程序、blockmap 与 latest.yml（设计说明第 6.3 节第 4 步），
-    # 并且 harness/release_assets/ 里只有本次版本的文件：出现其他版本的文件时写明文件名。
-    # 允许的文件名取自本次构建刚复制进发布资源目录的文件，加上执行代理的 wheel（M3 起由 #144 加入）。
-    # wheel 是一个 ZIP 包，用标准库 zipfile 读取其中的文件名
-    allowed = {path.name for path in assets.values()} | {f"yudao_agent-{version}-py3-none-any.whl"}
-    prefix = "harness/release_assets/"
+def verify_wheel_contents(wheel: Path, built: Path) -> None:
+    # 核对 wheel 内的页面文件与页面构建输出逐个一致（设计说明第 6.3 节第 4 步）：缺少、多出
+    # 与内容不同都写明文件名退出。M3 起执行代理的 wheel 也放在发布资源目录里（#144 加入）
+    prefix = RELEASE_ASSETS.as_posix() + "/"
+    expected = page_files(built)
     with zipfile.ZipFile(wheel) as archive:
-        names = archive.namelist()
-    for key, path in assets.items():
-        member = f"{prefix}{path.name}"
-        if member not in names:
-            raise ReleaseError(f"wheel {wheel.name} 中缺少 {member}（{key}）")
-    foreign = sorted(name[len(prefix):] for name in names
-                     if name.startswith(prefix) and name[len(prefix):] not in allowed)
+        packaged = sorted(name[len(prefix):] for name in archive.namelist()
+                          if name.startswith(prefix) and not name.endswith("/"))
+        contents = {name: archive.read(prefix + name) for name in packaged}
+    missing = sorted(set(expected) - set(packaged))
+    if missing:
+        raise ReleaseError(f"wheel {wheel.name} 中缺少页面文件：" + "、".join(missing))
+    foreign = sorted(set(packaged) - set(expected))
     if foreign:
-        raise ReleaseError(f"wheel {wheel.name} 的 {prefix} 中有本次版本 {version} 以外的文件："
+        raise ReleaseError(f"wheel {wheel.name} 的 {prefix} 中有页面构建输出以外的文件："
                            + "、".join(foreign))
+    changed = [name for name, path in expected.items() if contents[name] != path.read_bytes()]
+    if changed:
+        raise ReleaseError(f"wheel {wheel.name} 中的页面文件与页面构建输出不同：" + "、".join(changed))
 
 def publish(repo_root: Path, version: str, wheel: Path, *, remote: str) -> None:
     # 第 5 步：仅带 --publish 时。打标签 v<版本> 并推送，
@@ -271,16 +226,14 @@ def publish(repo_root: Path, version: str, wheel: Path, *, remote: str) -> None:
     _run([_tool("gh"), "release", "create", tag, str(wheel), "--title", tag,
           "--notes", f"Yudao {version}"], cwd=repo_root)
 
-def release(repo_root: Path, *, publish_flag: bool, app_id: str, product_name: str,
-            setup_basename: str, output_dir: Path, branch: str, remote: str) -> dict[str, object]:
+def release(repo_root: Path, *, publish_flag: bool, output_dir: Path, branch: str,
+            remote: str) -> dict[str, object]:
     # 依设计说明第 6.3 节的顺序执行，返回 wheel 的路径与核对值
     version = verify(repo_root, branch=branch, remote=remote)
-    client = build_client(repo_root, version=version, app_id=app_id, product_name=product_name,
-                          setup_basename=setup_basename)
-    verify_manifest_matches_installer(client["manifest"], client["installer"])
-    assets = assemble_assets(repo_root, client)
+    pages = build_pages(repo_root, version=version)
+    assets = assemble_assets(repo_root, pages)
     wheel = build_wheel(repo_root, version, output_dir)
-    verify_wheel_contents(wheel, assets, version)
+    verify_wheel_contents(wheel, pages)
     if publish_flag:
         publish(repo_root, version, wheel, remote=remote)
     return {"version": version, "wheel": wheel, "sha256": sha256_hex(wheel)}
@@ -300,13 +253,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="wheel 的输出目录，默认仓库下的 dist/")
     args = parser.parse_args(argv)
 
-    app_id = os.environ.get("YUDAO_RELEASE_APP_ID", "com.yudao.client")
-    product_name = os.environ.get("YUDAO_RELEASE_PRODUCT_NAME", "Yudao")
-    setup_basename = os.environ.get("YUDAO_RELEASE_SETUP_BASENAME", "Yudao-Setup")
     try:
-        result = release(args.repo_root, publish_flag=args.publish, app_id=app_id,
-                         product_name=product_name, setup_basename=setup_basename,
-                         output_dir=args.output_dir, branch=args.branch, remote=args.remote)
+        result = release(args.repo_root, publish_flag=args.publish, output_dir=args.output_dir,
+                         branch=args.branch, remote=args.remote)
     except ReleaseError as exc:
         print(exc, file=sys.stderr)
         return 1
