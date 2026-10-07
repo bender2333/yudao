@@ -24,6 +24,22 @@ from .actions import TreeFacts
 from .definitions import DEFINITIONS
 from .projection import RunProjection
 
+# 建档初始 PRD 的边界条目用它标明「设计与需求文档描述而代码尚未实现」（设计第 4.2、4.3 节）。
+# 这样的条目不是现有行为：质检不把它记为现有缺陷。
+DESIGN_PENDING_MARK = "设计中，未实施"
+
+
+def marked_boundaries(spec: ProductSpec | None) -> list[str]:
+    # 带标记的边界条目（工单 #346）：条目文字含标记串
+    return [] if spec is None else [item for item in spec.boundaries if DESIGN_PENDING_MARK in item]
+
+
+def _covers_marked_boundary(requirement: str, spec: ProductSpec | None) -> bool:
+    # 结论指向的要求与某条带标记的边界条目是同一项能力：条目可以带说明文字，两者方向都可能是包含
+    return any(item == requirement or item in requirement or requirement in item
+               for item in marked_boundaries(spec))
+
+
 @dataclass
 class FieldError:
     field: str
@@ -332,6 +348,12 @@ def _baseline_conclusions(proposal: dict[str, Any], spec: ProductSpec, bound: di
             if not _location_known(evidence.replace("\\", "/"), facts):
                 errors.append(FieldError(field, "read_only requires evidence naming a location in the snapshot"))
         elif status == "existing_defect":
+            # 带标记的边界条目不是现有行为（设计第 4.3 节）：要求文档描述而代码尚未实现的能力不记为现有缺陷
+            if _covers_marked_boundary(requirement, spec):
+                errors.append(FieldError(f"conclusions[{index}].status",
+                                         f"a boundary entry marked {DESIGN_PENDING_MARK} is not existing behavior and cannot "
+                                         "be an existing_defect; write it into the initial PRD boundaries with that mark"))
+                continue
             errors.extend(_check_evidence_error(field, evidence, bound, expect_exit=None,
                                                 label="existing_defect requires evidence naming a failing baseline check"))
         elif status == "unsupported":
