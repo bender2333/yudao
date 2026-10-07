@@ -551,3 +551,4 @@ claude-opus-5-5 / 2026-10-07 21:56 / 测试分层恢复：测试分层设计说�
 claude-sonnet-5-5 / 2026-10-08 04:50 / 在 `docs/architecture-issues.md` 的 #374 条目下追加「处理：」行（已在 #374 内修正，设计无变化） / 执行者登记的问题需要架构师写结论
 
 9router/oro / 2026-10-08 12:05 / 测试之间的共用代码归位（测试分层设计说明第 3 节，工单 #159）：测试文件不再互相导入，共用零件移入 provider_replies.py、protocol_helpers.py、helpers.py、api_helpers.py、saved_rewrite.py 与新建的 onboarding_project.py、event_scenarios.py；新增单元层导入检查 test_test_imports.py 并登记进 layers.toml；README 的测试命令改为按层运行，单元层与模块层一条命令、集成层只跑改动的文件 / 互相导入会把一项检查绑到另一个测试文件的局部安排上，也让按单个文件运行不可用
+claude-sonnet-5-5 / 2026-10-08 07:25 / 在 `docs/architecture-issues.md` 的 #375 条目下追加「处理：」行，磁盘空间不足的阈值参数与事件归 Stage 4 的数据保留，#375 只含决定请求与等待模型服务两种通知 / 执行者登记的问题需要架构师写结论
