@@ -10,6 +10,8 @@ import { startBackend, startClient, type Backend, type ClientApp } from "./fixtu
 const SAMPLE = "示例项目";
 const BLOCKED = "文本工具";
 const LIVE = "实时项目";
+// room 脚本预置的项目（client/tests/e2e/backend.py 的 seed_room）
+const ROOM = "房间项目";
 
 const SAMPLE_GOAL = "实现一个回声工具";
 const SAMPLE_ITEM = "实现回声工具";
@@ -257,6 +259,59 @@ test.describe("项目页面（1440×900）", () => {
       expect(errors).toEqual([]);
     } finally {
       await client.close();
+    }
+  });
+
+  test("缺少部门默认时新事项被拒绝：提示是中文并带两个去处", async () => {
+    // 工单 #319 第 6 项：质检的部门默认没有选模型时「作为新事项开始」被拒绝，
+    // 页面给出中文说明与去模型管理页、在本项目设置页两个去处
+    test.setTimeout(300_000);
+    // 用 room 脚本：它只建一个项目并跑完它，没有停在等待回答决定请求的 run（那个 run 会占用执行槽位）
+    const own = await startBackend({ room: true, catalogDriven: true, bindDepartments: ["product", "engineering"] });
+    try {
+      const client = await startClient(own, { width: 1440, height: 900 });
+      const errors = watchErrors(client);
+      const page = client.page;
+      try {
+        const id = own.roomProject;
+        if (id === null) {
+          throw new Error("后端没有报出房间项目的标识");
+        }
+        await gotoView(page, id, "overview");
+        const block = await section(page, "当前事项");
+        await expect(block).toContainText("项目没有进行中的事项");
+        const stats = await (await section(page, "项目摘要")).getByText(/事项统计/).innerText();
+        await block.getByLabel("新的要求").fill("再做一个回声工具");
+        await block.getByRole("button", { name: "作为新事项开始" }).click();
+        const error = block.locator("p.error");
+        await expect(error).toContainText("质检部门还没有选择模型");
+        // 提示是中文句子：没有内部字段名、部门内部标识与英文原因词
+        await expect(error).not.toContainText("bindings.");
+        await expect(error).not.toContainText("quality");
+        await expect(error).not.toContainText("provider_unavailable");
+        // 两个去处按钮：去模型管理页、在本项目的设置页
+        const links = block.locator(".row-actions .link");
+        await expect(links).toHaveText(["去模型管理页设置部门默认", "在本项目的设置页选择模型"]);
+        // 第一个去处：去系统的模型管理页
+        await links.nth(0).click();
+        await expect(page.getByRole("heading", { name: "模型管理", exact: true })).toBeVisible();
+        // 回到概览重新提交一次，第二个去处去本项目的设置页
+        await gotoView(page, id, "overview");
+        const again = await section(page, "当前事项");
+        await again.getByLabel("新的要求").fill("再做一个回声工具");
+        await again.getByRole("button", { name: "作为新事项开始" }).click();
+        await again.locator(".row-actions .link").nth(1).click();
+        await expect(page.getByRole("heading", { name: "基本信息", exact: true })).toBeVisible();
+        expect(await pathText(page)).toBe(`${ROOM} / ${PATH_LABEL.settings}`);
+        // 被拒绝的事项没有创建：概览的事项统计与点击前逐字相同
+        await gotoView(page, id, "overview");
+        await expect((await section(page, "项目摘要")).getByText(/事项统计/)).toHaveText(stats);
+        expect(errors).toEqual([]);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await own.stop();
     }
   });
 

@@ -231,6 +231,8 @@ test("工具类与盖章类的说明：小人头顶说出目录里对应的那�
   test.setTimeout(600_000);
   // 工程房间里读文件、跑登记命令；质检房间里盖章。两处都从真实事件流里取事件，
   // 房间的读取入口给出小人头顶当前的话，采样收集这一轮里出现过的每一句。
+  // 工单 #319 第 3 项：房间脚本里工程先调用一次 list_files，工具类说明因此有真实来源，
+  // 断言核对的是具体那句话（含工具名与文件名），不只核对开头两个字
   const collected = async (department: string, pattern: RegExp, description: string): Promise<string[]> => {
     backend = await startBackend({ room: true });
     const client = await startClient(backend, { width: 1440, height: 900 });
@@ -262,13 +264,14 @@ test("工具类与盖章类的说明：小人头顶说出目录里对应的那�
     }
   };
 
-  // 工程房间：工具类的事件（读文件、跑命令）说出工具名
-  for (const line of await collected("engineering", /^现在(执行|阅读|编辑|翻找|检查)/, "工程房间的工具类说明")) {
-    expect(line).toMatch(/^现在/);
+  // 工程房间：工具类的事件（列出文件、读文件、跑命令）说出工具名
+  for (const line of await collected("engineering", /^现在(看看有什么文件|执行|阅读|编辑|翻找|检查)/,
+                                     "工程房间的工具类说明")) {
+    expect(line).toMatch(/^现在(看看有什么文件|执行|阅读|编辑|翻找|检查)/);
   }
   // 质检房间：盖章类的事件说出盖的是哪一章
   for (const line of await collected("quality", /^现在盖/, "质检房间的盖章类说明")) {
-    expect(line).toMatch(/^现在盖/);
+    expect(line).toMatch(/^现在盖(上有效章|放行章|返工章)/);
   }
 });
 
@@ -325,3 +328,4 @@ test("部门页签之间直接切换：每个页签的房间画面属于该部�
     await backend.stop();
   }
 });
+

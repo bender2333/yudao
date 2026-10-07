@@ -312,6 +312,24 @@ test.describe("系统首页（1440×900）", () => {
     }
   });
 
+  test("首页两个区块的说明与报告项不出现开发用语", async () => {
+    // 工单 #319 第 5 项：首页「项目」区块的说明与离开期间报告的说明原来写着接口名
+    const client = await openHome({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    try {
+      const projects = client.page.locator("section.card")
+        .filter({ has: client.page.getByRole("heading", { name: "项目", exact: true }) });
+      const report = client.page.locator("section.card")
+        .filter({ has: client.page.getByRole("heading", { name: "离开期间的报告", exact: true }) });
+      await expect(projects.locator(".note, header .note").first()).not.toContainText("数据来自");
+      await expectNoDeveloperText(projects, "首页项目区块");
+      await expectNoDeveloperText(report, "离开期间的报告");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
   test("项目列表的每个字段与 projects.list 一致", async () => {
     const client = await openHome({ width: 1440, height: 900 });
     const errors = watchErrors(client);
