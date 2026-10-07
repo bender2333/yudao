@@ -73,6 +73,14 @@ export function poseAnim(action: string): string {
   throw new Error(`roomModel.pose.action 无法对应到动作：${action}`);
 }
 
+// 真实系统有三个工具在原型里没有单独的动作：看目录、删文件、移动文件。
+// 它们的动作按同一类工作取：看目录是翻找，删文件是改，移动文件是改（画面上都是动手改文件）。
+const TOOL_ACTIONS: Record<string, string> = {
+  list_files: "search",
+  delete_file: "write",
+  move_file: "write",
+};
+
 /** 事件到动作（原型 engine.js 的 resolveAction）。 */
 export function resolveAction(ev: PixelFloorEvent): string | null {
   if (!ev || !ev.type) throw new Error("事件缺少 type");
@@ -80,10 +88,15 @@ export function resolveAction(ev: PixelFloorEvent): string | null {
   if (!entry) return null;
   if (typeof entry === "string") return entry;
   const pl = (ev.payload ?? {}) as Record<string, unknown>;
-  const key = entry.by === "tool" ? (ev.tool ?? (pl.tool as string))
+  // 真实系统把工具名写在载荷的 name 上（登记命令与读取工具都如此），没有映射字段时按它取
+  const tool = ev.tool ?? (pl.tool as string) ?? (pl.name as string);
+  const key = entry.by === "tool" ? tool
     : entry.by === "reason" ? ((pl.reason as string) ?? (pl.stopReason as string))
       : entry.by === "kind" ? (pl.kind as string)
         : (pl.verdict as string);
+  if (entry.by === "tool" && typeof tool === "string" && !(key in entry.map)) {
+    return TOOL_ACTIONS[tool] ?? entry.default ?? null;
+  }
   return entry.map[key as string] || entry.default || null;
 }
 

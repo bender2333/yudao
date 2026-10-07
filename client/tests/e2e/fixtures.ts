@@ -63,7 +63,7 @@ function newestModification(directory: string): number {
 // 更新地址里的端口要与它一致，客户端才会从同一个服务下载安装程序；room 用流式慢模型跑
 // 一个项目，供部门房间在请求进行中观察（工单 #177）
 export async function startBackend(
-  options: { apiVersion?: number; room?: boolean; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding" | "initial"; rejectUpstream?: boolean; dataDir?: string } = {},
+  options: { apiVersion?: number; room?: boolean; admitAndBind?: boolean; releaseAssets?: string; port?: number; script?: "default" | "onboarding" | "initial"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {
@@ -81,6 +81,15 @@ export async function startBackend(
   }
   if (options.admitAndBind === true) {
     script.push("--admit-and-bind");
+  }
+  // 工单 #319 第 6 项：只给这些部门默认绑定模型，其余部门保持「未设置」；
+  // 空数组表示一个部门都不绑定，用例据此核对缺少部门默认时新事项被拒绝的提示
+  if (options.bindDepartments !== undefined) {
+    script.push("--bind-departments", options.bindDepartments.join(","));
+  }
+  // 工单 #319 第 6 项：按工厂装配系统，让就绪检查走目录里的部门默认而不是 FakeAdapter 的可用性
+  if (options.catalogDriven === true) {
+    script.push("--catalog-driven");
   }
   if (options.script !== undefined) {
     script.push("--script", options.script);

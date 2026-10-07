@@ -156,6 +156,28 @@ test("说话气泡：没有专门动作的工具事件也说话", () => {
   assert.equal(qr.actor("q-test")?.say?.text, "现在试用网页");
 });
 
+test("说话气泡：盖章紧跟着完成时盖章说明先显示完，完成的话排在后面", () => {
+  const h = mountRoom("quality", QUA);
+  h.step(500);
+  h.driver.playEvent({ type: "qa_submitted", department: "quality", role: "q-test", work_item_id: "w1", label: "质检提交结论", payload: { verdict: "release" } });
+  h.driver.playEvent({ type: "run_done", department: "quality", role: "q-test", work_item_id: "w1", label: "事项完成", payload: {} });
+  h.step(200);
+  assert.equal(h.actor("q-test")?.say?.text, "现在盖放行章");
+  h.step(6000);
+  assert.equal(h.actor("q-test")?.say?.text, "完成了！");
+});
+
+test("说话气泡：盖章紧接着交接时盖章说明先显示完，交接的话排在后面", () => {
+  const h = mountRoom("quality", QUA);
+  h.step(500);
+  h.driver.playEvent({ type: "qa_submitted", department: "quality", role: "q-test", work_item_id: "w1", label: "质检提交结论", payload: { verdict: "release" } });
+  h.driver.playEvent({ type: "transition", department: "quality", payload: { from: "quality", to: "adopted", artifact: "release" } } as PixelFloorEvent);
+  h.step(200);
+  assert.equal(h.actor("q-test")?.say?.text, "现在盖放行章");
+  h.step(6000);
+  assert.equal(h.actor("q-test")?.say?.text, "现在把放行单送给成果库");
+});
+
 // ---------------------------------------------------------------------------
 // 询问与回答
 
@@ -255,14 +277,15 @@ test("事件成串到达时，队满挤掉的是普通动作，传信动作留�
   assert.ok(queued.includes("collaboration_requested"), `传信动作不应被挤掉，实际队列：${queued.join("、")}`);
 });
 
-test("收到交接的一方立刻说话：后一个交接事件替换脚本时上一句还在", () => {
+test("收到交接的一方先说话：后一句排在上一句后面，依次显示", () => {
   const q = mountRoom("quality", QUA);
   q.step(500);
   // 先收到工程送来的交付箱，紧接着质检把放行单送走；两步之间没有停顿
   q.driver.playEvent({ type: "transition", department: "engineering", payload: { from: "engineering", to: "quality", artifact: "box" } } as PixelFloorEvent);
-  const afterBox = q.actor("q-test")?.say?.text;
+  assert.equal(q.actor("q-test")?.say?.text, "收到交付箱，来自工程");
   q.driver.playEvent({ type: "transition", department: "quality", payload: { from: "quality", to: "adopted", artifact: "release" } } as PixelFloorEvent);
-  assert.equal(afterBox, "收到交付箱，来自工程");
+  assert.equal(q.actor("q-test")?.say?.text, "收到交付箱，来自工程");
+  q.step(6000);
   assert.equal(q.actor("q-test")?.say?.text, "现在把放行单送给成果库");
 });
 
@@ -297,5 +320,88 @@ test("说话气泡：一句话停留的时间读得完，最长 4.6 秒", () => 
 test("说话气泡：事件说明里「」括起的部分作为内容", () => {
   assert.equal(quoted("工程部门写「第 3 步」的说明"), "第 3 步");
   assert.equal(quoted(null), null);
+});
+
+// ---------------------------------------------------------------------------
+// 真实载荷形状（工单 #319 第 3 项）
+// 真实事件把工具名放在载荷的 name 上、参数放在 args 之下，工具结果只有 ok 与 error；
+// 下面按 harness/app/payloads.py 的合同构造事件，头顶的话里要有工具名、文件名、命令名与结论。
+
+const real = (over: Partial<PixelFloorEvent> & { payload: Record<string, unknown> }): PixelFloorEvent => ({
+  type: "tool_started", work_item_id: "w1", department: "engineering", role: "eng-architect", ...over,
+});
+test("工具类：真实载荷的名字与参数说出是哪件事", () => {
+  assert.equal(say(real({ payload: { name: "read_file", args: { path: "src/echo.py" } } })), "现在阅读 echo.py");
+  assert.equal(say(real({ payload: { name: "search", args: { pattern: "def main" } } })), "现在翻找资料：def main");
+  assert.equal(say(real({ payload: { name: "edit_range", args: { path: "src/echo.py" } } })), "现在编辑 echo.py");
+  assert.equal(say(real({ payload: { name: "delete_file", args: { path: "src/old.py" } } })), "现在删除 old.py");
+  assert.equal(say(real({ payload: { name: "move_file", args: { source: "src/a.py", destination: "src/b.py" } } })), "现在移动 a.py");
+  assert.equal(say(real({ payload: { name: "list_files", args: { prefix: "src/" } } })), "现在看看有什么文件：src/");
+  assert.equal(say(real({ payload: { name: "run_check", args: { name: "unit-tests" } } })), "现在检查交付：unit-tests");
+});
+test("工具类：交出类工具说出交的是哪一份，名称与提案事件一致", () => {
+  assert.equal(say(real({ payload: { name: "submit_plan", args: {} } })), "现在提交工程计划");
+  assert.equal(say(real({ payload: { name: "submit_delivery", args: {} } })), "现在提交交付说明");
+  assert.equal(say(real({ payload: { name: "submit_request", args: {} } })), "现在提交询问");
+});
+
+test("工具类：工具调用的发生时刻就说话，不等走位动作做完；事件成串时头顶依次显示到最后一句", () => {
+  const rm = mountRoom("engineering", ENG);
+  rm.step(500);
+  rm.driver.playEvent({ type: "transition", work_item_id: "w1", payload: { from: "product", to: "engineering", artifact: "prd" } });
+  assert.equal(rm.actor("eng-architect")?.say?.text, "收到PRD，来自产品");
+  rm.driver.playEvent(real({ payload: { name: "list_files", args: {} } }));
+  rm.driver.playEvent(real({ payload: { name: "submit_plan", args: {} } }));
+  rm.driver.playEvent({ type: "plan_accepted", department: "engineering", work_item_id: "w1", payload: {} });
+  assert.equal(rm.actor("eng-architect")?.say?.text, "收到PRD，来自产品");
+  rm.step(30000);
+  assert.equal(rm.actor("eng-architect")?.say?.text, "现在把计划贴上白板");
+});
+
+test("工具类：登记命令说出登记名而不是工具名", () => {
+  assert.equal(say(real({ payload: { name: "run_command", registered_name: "unit-tests", args: { name: "unit-tests" } } })),
+    "现在执行 unit-tests");
+});
+
+test("工具类：没有登记名的命令只说明在跑登记命令，不把工具名说出来", () => {
+  assert.equal(say(real({ payload: { name: "run_command", args: { name: "lint" } } })), "现在执行 lint");
+});
+
+test("工具类：登记命令的结论按 ok 说成功或失败", () => {
+  const done = (payload: Record<string, unknown>): PixelFloorEvent =>
+    ({ type: "tool_called", work_item_id: "w1", department: "engineering", tool: "run_command", payload });
+  assert.equal(say(done({ name: "run_command", ok: true })), "命令通过了");
+  assert.equal(say(done({ name: "run_command", ok: false, error: "命令不存在" })), "命令没有通过：命令不存在");
+});
+
+test("动作解析：原型没登记的三个工具也解析到动作", () => {
+  assert.equal(resolveAction(real({ payload: { name: "list_files" } })), "search");
+  assert.equal(resolveAction(real({ payload: { name: "delete_file" } })), "write");
+  assert.equal(resolveAction(real({ payload: { name: "move_file" } })), "write");
+  assert.equal(resolveAction(real({ payload: { name: "read_file" } })), "read");
+});
+
+test("协作：真实载荷用 requester 与 recipient，两端各说一句", () => {
+  const req: PixelFloorEvent = {
+    type: "collaboration_requested", department: "engineering", work_item_id: "w1",
+    payload: { requester: "engineering", recipient: "product", question: "线路偏好是否改变" },
+  };
+  assert.equal(say(req, { dept: "engineering" }), "现在向产品发出询问：线路偏好是否改变");
+  assert.equal(say(req, { dept: "product" }), "收到工程的询问：线路偏好是否改变");
+  const res: PixelFloorEvent = {
+    type: "collaboration_responded", department: "product", work_item_id: "w1",
+    payload: { requester: "engineering", recipient: "product", text: "不改变" },
+  };
+  assert.equal(say(res, { dept: "product" }), "现在回答工程的询问");
+  assert.equal(say(res, { dept: "engineering" }), "收到产品的回答：不改变");
+});
+
+test("工具类：真实载荷的事件在房间里说出那句话并播放动作", () => {
+  const rm = mountRoom("engineering", ENG);
+  rm.step(500);
+  rm.driver.playEvent(real({ payload: { name: "read_file", args: { path: "src/echo.py" } } }));
+  rm.step(300);
+  assert.equal(rm.actor("eng-architect")?.say?.text, "现在阅读 echo.py");
+  assert.equal(rm.actor("eng-architect")?.doing, "read");
 });
 

@@ -103,7 +103,7 @@ export function SettingsPage(props: SettingsPageProps) {
               placeholder="http://192.168.1.10:8765"
             />
           )}
-          <input id="token" value={token} disabled placeholder="访问令牌（保留位置，当前不发送）" />
+          <input id="token" value={token} disabled placeholder="当前版本不需要填写" />
           {(addressError ?? props.error) && <p className="error">{addressError ?? props.error}</p>}
           <button className="primary" type="submit" disabled={props.connecting}>
             {props.connecting ? "连接中…" : "连接"}

@@ -84,6 +84,8 @@ export function floorEventOf(event: EventObject, projectId: string): PixelFloorE
     event_id: event.event_id,
     department: event.department,
     role: event.role,
+    // 工具类事件的工具名写在载荷的 name 字段（真实系统的 tool_started/tool_called），说话目录按 tool 取
+    tool: (payload.tool as string | null) ?? (payload.name as string | null) ?? null,
     label: event.label,
     work_item_id: event.work_item_id,
     project_id: event.project_id,
