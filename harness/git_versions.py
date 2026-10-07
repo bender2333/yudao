@@ -14,7 +14,8 @@ from typing import Any
 import pygit2
 from pygit2.enums import FileMode, ObjectType, RepositoryInitFlag, RepositoryOpenFlag
 
-from .public_tree import CapturedFile, CapturedTree, TreeError, validate_public_path
+from .public_tree import CapturedFile, CapturedTree
+from .path_rules import TreeError, validate_public_path
 
 _OID = re.compile(r"[0-9a-f]{40}")
 _RUN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
