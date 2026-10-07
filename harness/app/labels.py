@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import (DEPARTMENT_LABELS, PHASES, STOP_REASON_LABELS, CatalogEventType, EventType,
-                     ProjectEventType, stop_reason_name)
+from ..definitions import DEFINITIONS
+from ..models import (PHASES, STOP_REASON_LABELS, CatalogEventType, EventType, ProjectEventType,
+                     stop_reason_name)
 
 
 # 阶段的中文名（harness/models.py 的 PHASES 是同一份取值）：事件说明里的阶段按中文写
@@ -50,7 +51,7 @@ def decision_kind_name(kind: Any) -> str:
 # 说明里出现的部门标识按中文写，机器标识不直接出现
 def department_name(department: Any) -> str:
     value = str(department or "")
-    return f"{DEPARTMENT_LABELS.get(value, value)}部门"
+    return f"{DEFINITIONS.department_labels.get(value, value)}部门"
 
 
 # 有两个字段的取值不在停止原因里（暂缓采纳、用户取消决定请求），单独给中文名
@@ -168,4 +169,5 @@ _LABELS: dict[str, str] = {
     CatalogEventType.RUNTIME_DRAIN_STARTED: "开始排空运行（目录第 {version} 号）：还有 {running_runs} 个运行未结束",
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: "请求强制升级（目录第 {version} 号）：停了 {stopped_runs} 个运行",
     CatalogEventType.HOME_SEEN: "记下用户查看的位置：{position}",
+    CatalogEventType.PARAMETER_SET: "把参数 {name} 从 {old_value} 改为 {new_value}：{reason}",
 }

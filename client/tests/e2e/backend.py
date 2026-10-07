@@ -1,15 +1,12 @@
 # 端到端测试使用的后端：真实运行的接口层、应用层与控制核心，模型回答由 FakeAdapter 脚本给出。
 # 不是测试替身：事件日志、工件、工作区都是真实实现（工单 #79 的验收要求）。
 #
-# 两种用法：
-#   1. python client/tests/e2e/backend.py --port 0：测试自己启动，端口由系统分配，
-#      输出一行 JSON {"port": <端口>, "data_dir": <数据目录>}，标准输入关闭时退出。
-#   2. python client/tests/e2e/backend.py api：作为 `yudao api` 命令运行（工单 #207）：
-#      客户端在 PATH 中找到 yudao 命令以后启动 `yudao api`，本脚本收到 api 这个子命令，
-#      监听默认端口，接受本机停止请求，收到以后进程退出。Provider 由 FakeAdapter 提供，
-#      因此空的数据目录就能创建事项。
+# 用法：python client/tests/e2e/backend.py --port 0：测试自己启动，端口由系统分配，
+# 输出一行 JSON {"port": <端口>, "data_dir": <数据目录>}，标准输入关闭时退出。
+# 服务同时提供构建好的页面文件 client/out/renderer（npm run build:pages 的产物），
+# 端到端测试用 Chromium 从服务地址打开页面。
 #
-# 数据目录由 --data-dir 给出；不给出时用临时目录（fixture）或命令行的默认数据目录（api）。
+# 数据目录由 --data-dir 给出；不给出时用临时目录。
 
 from __future__ import annotations
 
@@ -32,7 +29,6 @@ from harness.adapters.base import ProviderError  # noqa: E402
 from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
 from harness.app.application import Application  # noqa: E402
-from harness.app.client_update import ReleaseAssets  # noqa: E402
 from harness.app.catalog_commands import (  # noqa: E402
     BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, ModelInput, ProviderInput,
 )
@@ -45,7 +41,6 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
     WorkItemCreate,
 )
 from harness.app.project_queries import ProjectsList  # noqa: E402
-from harness.data_directory import default_data_dir  # noqa: E402
 from harness.models import Usage, json_dumps  # noqa: E402
 from harness.proposals import (  # noqa: E402
     baseline_review_turn, collaboration_request, delivery_turn, plan_turn, product_spec, response_turn,
@@ -83,10 +78,10 @@ def script():
         # 放行（qa_submitted 的结论为 release），随后由项目采纳（deliverable_adopted）
         review_turn("release", "checks passed on the current snapshot"),
         # 第三个项目：产品提交规格以后，工程部门的请求被提供方报告为不可用，
-        # run 停在这次请求之前并发出 model_unavailable 的决定请求（供托盘与待你决定的验收）
+        # run 停在这次请求之前并发出 model_unavailable 的决定请求（供顶栏待你决定的验收）
         FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        # 回答「继续执行」以后再次遇到不可用：发出第二个决定请求，供「窗口关闭后有新的决定请求」的验收
+        # 回答「继续执行」以后再次遇到不可用：发出第二个决定请求，供新的决定请求到达的验收
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
         # 再次回答「继续执行」以后走完剩下的三部门：端到端测试核对一个事项的全过程随事件流完成
         plan_turn(),
@@ -266,8 +261,7 @@ async def seed(application: Application, system: LoopSystem) -> None:
 async def seed_onboarding(application: Application) -> None:
     # 建档脚本的预置（工单 #332）：只建一个空项目，不跑事项。建档轮次全部留给接入已有项目用：
     # 接入的建档 run 要走过产品、工程与质检共六次模型调用，重新开始建档再来六次，
-    # 窄屏用例再一轮；预置事项消耗这些轮次会让接入的建档 run 在第一次模型请求就耗尽脚本
-    # （fake adapter script exhausted），事项以 provider_error 停下，读取动作一个也没有。
+    # 大屏用例再一轮；预置事项消耗这些轮次会让接入的建档 run 在第一次模型请求就耗尽脚本
     await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="预置项目", goal="接入前的空项目"),
         actor="user:local")
@@ -420,21 +414,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--data-dir", default=None)
-    # `yudao api --access lan --host 0.0.0.0`：客户端打开「允许局域网访问」时带的参数（工单 #207）。
-    # 与真正的命令行一致：访问方式是启动参数，局域网监听任意地址，本机只监听回环
-    parser.add_argument("--access", choices=("local", "lan"), default="local")
-    parser.add_argument("--host", default="127.0.0.1")
-    # 端到端测试核对「接口版本不同时只显示更新页」：让服务报告一个不同的接口版本，
+    # 端到端测试核对「接口版本不同」的提示：让服务报告一个不同的接口版本，
     # 就像一个已经升级或尚未升级的部署那样（真实 HTTP 响应，不改动被测代码）
     parser.add_argument("--api-version", type=int, default=None)
-    # 更新源（设计说明第 5.1 节，工单 #208）：把发布资源目录指到这里，服务从它提供
-    # /client-update/latest.yml 与安装程序。不给出时用 wheel 内的 harness/release_assets，
-    # 从源码运行没有这个目录，请求返回 404（更新页的「控制主机没有提供客户端安装包」）
-    parser.add_argument("--release-assets", default=None)
-    # api：以 `yudao api` 命令的方式运行（工单 #207）。命令行的替身把收到的参数原样交给本脚本，
-    # 因此这里接到的子命令与真正的 yudao 命令一致；端口固定为客户端连接的本机端口，
-    # 接受本机停止请求并在收到以后退出，与 harness.api.server 的行为一致
-    parser.add_argument("mode", nargs="?", default="fixture", choices=("fixture", "api"))
     # 部门房间的端到端验收（工单 #177）：用流式慢模型跑一个项目，供房间在请求进行中观察
     parser.add_argument("--room", action="store_true")
     # 预置时给定义写准入并让三个部门默认绑定它：作废准入与删除引用方的用例需要真实的引用方（工单 #94）
@@ -472,15 +454,8 @@ def main() -> int:
         # 端到端据此核对预填的访问定义 ID 是合法写法、缺一项容量时不显示「容量已确认」
         {"id": "cbcn/deepseek-v4.1-flash", "limit": {"context": 128000}},
     ]})
-    if args.mode == "api":
-        # 作为 `yudao api` 运行：不带 --data-dir 时用命令行的默认数据目录（客户端只运行 yudao api，
-        # 默认数据目录由 LOCALAPPDATA 算出，端到端测试把它指到自己的临时目录）
-        data_dir = Path(args.data_dir) if args.data_dir else default_data_dir()
-        # `yudao api` 的默认端口是 8765（客户端连接的本机地址），没有明确给端口时用它
-        port = args.port if args.port else 8765
-    else:
-        data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
-        port = args.port
+    data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
+    port = args.port
     if args.room:
         adapter_script = room_script()
     elif args.script == "onboarding":
@@ -502,13 +477,11 @@ def main() -> int:
     if args.api_version is not None:
         application.reported_api_version = args.api_version
 
-    # 本机停止请求：请求到达时让 uvicorn 优雅退出（harness/api/server.py 的 _request_stop）
-    assets = ReleaseAssets(Path(args.release_assets)) if args.release_assets else ReleaseAssets()
+    # 页面文件来自 client/out/renderer（npm run build:pages）：页面与接口同一来源
+    pages = Path(__file__).resolve().parents[2] / "out" / "renderer"
     server = uvicorn.Server(uvicorn.Config(
-        lambda: create_app(lambda: application, access=args.access,
-                            on_stop=lambda: setattr(server, "should_exit", True),
-                            release_assets=assets),
-        host=args.host, port=port,
+        lambda: create_app(lambda: application, pages=pages),
+        host="127.0.0.1", port=port,
         log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0))
 
     thread = threading.Thread(target=server.run, daemon=True)
@@ -522,8 +495,8 @@ def main() -> int:
     source_dir = source_directory(Path(tempfile.mkdtemp(prefix="yudao-e2e-source-"))) if args.script in ("onboarding", "initial") else None
 
     # 先建示例项目与决定请求，再保存一份指向测试内上游的目录（工单 #93）。
-    # 数据目录里已经有项目时不再预置：客户端「重新启动服务」会在同一个数据目录上再启动一次
-    # （工单 #207 的验收），重复预置会让 work_item.create 被拒绝。真正的 `yudao api` 也不预置数据
+    # 数据目录里已经有项目时不再预置（服务恢复的用例在同一个数据目录上再起一次服务），
+    # 重复预置会让 work_item.create 被拒绝
     already_seeded = bool(application.query("projects.list", ProjectsList(include_archived=True)).data.projects)
     room_project = None
     # 工单 #319 第 6 项：catalog_driven 模式先用三个部门都绑定好的目录跑完预置，
@@ -554,12 +527,7 @@ def main() -> int:
     port = server.servers[0].sockets[0].getsockname()[1]
     print(json.dumps({"port": port, "data_dir": str(data_dir), "room_project": room_project,
                       "source_dir": None if source_dir is None else str(source_dir)}), flush=True)
-    if args.mode == "api":
-        # 进程一直服务到收到本机停止请求（数据目录的进程锁随退出释放）
-        thread.join()
-        return 0
-
-    # fixture 模式：标准输入关闭时退出（由 Playwright 的 fixture 控制生命周期）
+    # 标准输入关闭时退出（由 Playwright 的 fixture 控制生命周期）
     try:
         sys.stdin.read()
     except KeyboardInterrupt:

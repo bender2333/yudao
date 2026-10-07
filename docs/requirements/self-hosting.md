@@ -1,6 +1,6 @@
 # D35 自举：用 Yudao 开发 Yudao
 
-确认时间：2026-09-29，2026-09-30 补充。状态：需求已记录，未实施。路线位置：路线图的自举工作线。第一层的试点在 M2 关闭并且五项前置条件完成以后开始，第二层排在 Stage 6。相关记录：[D26](department-roles.md)、[D27](operations-department.md)、[D16](git-change-management.md)、[D31](outsourced-agent-roles.md)、[D33](existing-project-onboarding.md)、[ADR-0014](../adr/0014-versioned-definitions.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)、[系统架构原理](../design/architecture/core-and-materials.md)第 8 节、[决策记录](../decision.md) 2026-09-29 与 2026-09-30 两条、[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)。
+确认时间：2026-09-29，2026-09-30 与 2026-10-07 补充。状态：需求已记录，未实施。路线位置：路线图的自举工作线。第一层的试点在 M2 关闭并且五项前置条件完成以后开始，第二层排在 Stage 6；圈复杂度与变异测试的研发工具在 Stage 4。相关记录：[D26](department-roles.md)、[D27](operations-department.md)、[D16](git-change-management.md)、[D31](outsourced-agent-roles.md)、[D33](existing-project-onboarding.md)、[ADR-0014](../adr/0014-versioned-definitions.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)、[系统架构原理](../design/architecture/core-and-materials.md)第 8 节、[决策记录](../decision.md) 2026-09-29、2026-09-30 与 2026-10-07「Stage 3 剩余的两个专题」三条、[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)。
 
 ## 用户原话
 
@@ -33,6 +33,7 @@
 6. 边界：已发布的实例把 Yudao 仓库当作普通项目，开发下一个版本；运行中的实例不修改自己的内核（ADR-0027）；需求来自用户；升级由用户决定；第二层（修改自己的组织与规则）建立在第一层之上，排在 Stage 6。
 7. 路线位置：自举是路线图的一条工作线。第一层的试点在 M2 关闭并且五项前置条件完成以后开始：已发布的实例使用单独的数据目录与端口；3.8 接入 Yudao 仓库；采纳写回（B8）；项目级的检查时限；omp 的基线数字（B6）。试点期间成果以合并请求交给现有的审查流程。
 8. 质检依据回执的比例由验证密度参数决定，Stage 3 保持现值 1.0，调节规则在 Stage 5。
+9. 跨平台（2026-09-30 用户说明，2026-10-07 讨论确定）：圈复杂度与变异测试做成稳定的跨平台工具库，现在与以后都要能在 Windows 上运行。用户原话：「变异测试和圈复杂度，我们需要一个稳定的工具库，即便是未来也要放到windows上的」「我的意思是我们做成一个稳定的跨平台工具库」。Stage 3 结束之前的手动检查在控制主机的 Windows 上进行，工具与步骤见[调研记录](../research/complexity-and-mutation-testing.md)第 2 节；研发工具在 Stage 4 建立，排在成果由 Yudao 直接采纳之前（[总体路线图](../program-roadmap.md)第 5.1 节）。
 
 ## 讨论中的分析
 
@@ -69,14 +70,13 @@
 | 外包开发者（omp、Claude Code 经 ACP 接入） | D31，在 Stage 5：主程的执行者种类增加外包，经 ACP 接入 |
 | 采纳的版本写回代码仓库；跨任务分支合并 | 采纳写回（B8）挂在 3.8，属于 M2；跨任务分支合并随多个写入者的放开条件 |
 | 同一项目多个写入者，以及采纳前对合并结果的验证 | 3.4B 已删除，需要以新的形式列回 |
-| 圈复杂度与变异测试工具 | 新增 |
+| 圈复杂度与变异测试工具 | Stage 4，在成果由 Yudao 直接采纳之前（路线图第 5.1 节） |
 | 测试分层 | #157（#158 至 #161），暂缓 |
-| 工作区写入文件的换行差异 | `harness/workspace.py` 第 71 行以文本模式写入文件，Windows 上把 `\n` 写成 `\r\n`，同一次写入在两个平台上得到不同的文件；事件序列基准在 Linux 上有 17 项不一致；待分诊 |
+| 工作区写入文件的换行差异 | 已由 #172 修正：整份写入文件不做换行转换，同一动作在任何执行位置写出相同的字节 |
 
 ## 设计中待用户确认的事项
 
-1. 研发工具的细节：圈复杂度的阈值（建议 10，与 mccabe、ruff 的默认值相同）；工具放在本仓库 `tools/` 下的独立包（与 `harness` 互不导入），还是单独的仓库。
-2. 跨平台（2026-09-30 用户说明，列为待讨论的专题，见[阶段需求概览](stage-requirements-overview.md)第 6 节第 3 项）：变异测试与圈复杂度做成稳定的跨平台工具库，现在与以后都要能在 Windows 上运行。用户原话：「变异测试和圈复杂度，我们需要一个稳定的工具库，即便是未来也要放到windows上的」「我的意思是我们做成一个稳定的跨平台工具库」。mutmut 3 依赖 fork，只能在 Linux 上运行，调研记录第 1.4 节列出了可以在 Windows 上运行的工具。
+1. 研发工具的细节，在设计 Stage 4 时讨论：圈复杂度的阈值（建议 10，与 mccabe、ruff 的默认值相同）；工具放在本仓库 `tools/` 下的独立包（与 `harness` 互不导入），还是单独的仓库；工具的形式。
 
 ## 实现状态
 

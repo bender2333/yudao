@@ -22,7 +22,6 @@ from .models import (
     CollaborationRequest,
     CollaborationResponse,
     DecisionRequest,
-    DEPARTMENT_LABELS,
     DepartmentGuidance,
     DepartmentSetting,
     ArtifactRef,
@@ -256,7 +255,8 @@ def _settle_run_state(state: RunProjection) -> None:
     # 由阶段、停止原因与待处理的协作请求得出的字段；可以重复计算，结果只取决于这些字段
     state.waiting_reason = waiting_reason_for(state.phase, state.stop_reason)
     if state.pending_request is not None:
-        state.waiting_reason = f"{DEPARTMENT_LABELS[state.pending_request.recipient]}部门正在处理来自{DEPARTMENT_LABELS[state.pending_request.requester]}部门的请求"
+        labels = DEFINITIONS.department_labels
+        state.waiting_reason = f"{labels[state.pending_request.recipient]}部门正在处理来自{labels[state.pending_request.requester]}部门的请求"
     if state.phase in TERMINAL_PHASES:
         state.outcome = {"DONE": "done", "PAUSED": "paused", "FAILED": "failed"}[state.phase]
         state.active_department = None
@@ -332,6 +332,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.run_event_version = int(payload.get("run_event_version", 0))
         # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（ADR-0014）
         state.definitions_version = str(payload.get("definitions_version", ""))
+        # 创建这个 run 时冻结的参数版本；旧 run 没有这个字段时为空（工单 #349）
+        state.parameters_version = str(payload.get("parameters_version", ""))
         # 事项种类与仓库概况：旧 run 的创建事件没有这两个字段，种类按普通事项理解（工单 #134）
         state.kind = str(payload.get("kind", "change"))
         state.overview_ref = payload.get("overview_ref")

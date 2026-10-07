@@ -1,6 +1,6 @@
 # 接入已有项目设计说明
 
-更新：2026-10-07（结构说明的可见范围改为角色定义中的参数，建档材料分为现有行为的材料与要求材料，新增采纳写回，见第 4.2、4.3、4.4、5、10、12 节）；2026-10-06（取消等待确认的建档事项只写 `project_decision_withdrawn`，当前 PRD 由 `baseline_adopted` 的字段引用，新建项目可以带起始文件夹，见第 3.1、3.3、5、12 节）。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定；2026-10-02 建档的读取顺序写在事项种类的工作说明中，用户写入部门 Prompt 以后仍然放入，见第 4.2 节，工单 #248），未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
+更新：2026-10-07（结构说明的可见范围改为角色定义中的参数，建档材料分为现有行为的材料与要求材料，新增采纳写回，见第 4.2、4.3、4.4、5、10、12 节）；2026-10-06（取消等待确认的建档事项只写 `project_decision_withdrawn`，当前 PRD 由 `baseline_adopted` 的字段引用，新建项目可以带起始文件夹，见第 3.1、3.3、5、12 节）。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定；2026-10-02 建档的读取顺序写在事项种类的工作说明中，用户写入部门 Prompt 以后仍然放入，见第 4.2 节，工单 #248），实施中：#134 至 #137 与 #346（建档材料的分类）已实施，#138、#139 与 #347（采纳写回）未实施。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。
 
 依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0014](../adr/0014-versioned-definitions.md)（带版本的定义）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../prototypes/v8/BUILD.md)第 5.2、8.3 节）。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
@@ -134,8 +134,6 @@ flowchart TB
 **读取顺序。** 建档事项种类的工作说明（定义中按事项种类给出，每次请求放在部门 Prompt 之后，用户写入项目部门设置的部门 Prompt 以后仍然放入，[模型管理设计说明](model-management.md)第 5.3 节第 5 项）规定读取顺序，做法参照 OpenCode 的 `/init`（第 9 节）：先读价值最高的来源，可执行的来源（配置、脚本、测试）与文字说明冲突时以可执行的来源为准。
 
 材料分两类。描述现有行为的材料：README、测试、可执行的配置与脚本、项目自己的当前状态说明（例如 Yudao 仓库的 `docs/current-baseline.md`）；描述要求的材料：项目的设计与需求文档。现有行为以第一类为准。第二类写入初始 PRD 时作为要求材料，其中代码尚未实现的部分不是现有行为，写进初始 PRD 的边界并标明「设计中，未实施」，不记为现有缺陷。
-
-已实施（工单 #346）：三类部门的工作说明（`harness/definitions/work_items.json` 的 `onboarding`）按下面的表写出两类材料与读取顺序，第一类在前。边界条目是 `ProductSpec.boundaries` 里的字符串，「设计中，未实施」这个标记串写进条目文字，不改成带字段的结构体：`boundaries` 的形状写在跨版本保存的项目流里（ADR-0019），改成结构体要改已有字段的含义。标记串由 `harness/validation.py` 的 `DESIGN_PENDING_MARK` 给出，`_baseline_conclusions` 核对 `existing_defect` 结论没有覆盖带标记的边界条目，命中时报字段级错误，提示该能力写进边界。
 
 | 部门 | 顺序 |
 | --- | --- |

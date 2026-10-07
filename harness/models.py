@@ -133,6 +133,8 @@ class CatalogEventType:
     RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
     # 用户查看过的全局位置（界面工作线，工单 #127）：控制主机上只有一个，随部署长期保存
     HOME_SEEN = "home_seen"
+    # 参数修改（迭代底座 B3，工单 #349）：参数是全局的，事件写进目录流，随部署长期保存
+    PARAMETER_SET = "parameter_set"
 
 
 GIT_VERSION_EVENTS = frozenset({
@@ -715,6 +717,8 @@ class RunProjection:
     run_event_version: int = 0
     # 创建这个 run 时记录的定义版本（ADR-0014）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
     definitions_version: str = ""
+    # 创建这个 run 时冻结的参数版本（工单 #349）：运行中不跟随参数修改
+    parameters_version: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return json.loads(json_dumps(self))
@@ -983,12 +987,6 @@ if list(DEPARTMENTS) != _PHASE_DEPARTMENTS:
     raise DefinitionError([("organization.json", "departments",
                             "控制核心的阶段迁移按顺序支持部门 " + "、".join(_PHASE_DEPARTMENTS))])
 
-
-# 部门的中文名：等待说明与协作说明按部门写给用户看，机器标识不直接出现在说明里
-DEPARTMENT_LABELS = {"product": "产品", "engineering": "工程", "quality": "质检"}
-if set(DEPARTMENT_LABELS) != set(DEPARTMENTS):
-    raise DefinitionError([("organization.json", "departments",
-                            "部门的中文名必须与定义的部门相同：" + "、".join(DEPARTMENT_LABELS))])
 
 # 停止原因的中文名：等待说明与事件说明按中文写，机器标识不直接出现在给用户看的文字里
 STOP_REASON_LABELS = {

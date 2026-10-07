@@ -1,6 +1,6 @@
 # 圈复杂度与变异测试调研
 
-日期：2026-09-29 至 2026-09-30。用途：Stage 3 结束之前用户与 Claude 手动进行圈复杂度与变异测试时的方法与依据（[D35](../requirements/self-hosting.md) 已确认第 5 条）；下一阶段研发工具的依据。
+日期：2026-09-29 至 2026-09-30；2026-10-07 补充 cosmic-ray 与 poodle 的实测（第 1.4 节），第 2 节改为在 Windows 上用 poodle。用途：Stage 3 结束之前用户与 Claude 手动进行圈复杂度与变异测试时的方法与依据（[D35](../requirements/self-hosting.md) 已确认第 5 条）；下一阶段研发工具的依据。
 
 ## 1. 本仓库的实测
 
@@ -39,31 +39,40 @@
     - 它按 POSIX 规则拆分测试命令（`shlex.split`），反斜杠会被当成转义字符；命令中只写 `python` 时，Windows 找到的是没有装 pytest 的基础解释器。
     - 测试命令要写成虚拟环境中 python 的绝对路径，并用正斜杠。
     - 命令启动失败的变异记为 incompetent，不计入存活，所以报告中「存活 0」要同时核对 incompetent 的数量。
-  - poodle 1.3.4（2026-04-05）：还没有试。
+    - 2026-10-07 在另一个小例子上按 `init`、`baseline`、`exec`、`cr-report` 四步运行，22 个变异，存活 4 个（`>=` 改成 `>`、数字、`//` 改成 `/`），原文件保持不变；`local` 分发器一次只运行一个变异。
+    - 内置的变异算子（2026-10-07 用 `cosmic-ray operators` 核对）没有替换字符串的一类，只有比较运算符、数字、二元与一元运算符、`and` 与 `or`、`True` 与 `False`、`break` 与 `continue`、异常类型、装饰器、变量、零次循环与加上 `not`。第 1.2 节存活的变异中改字符串的占一半到三分之二，其中有动作名这类真实的漏洞，cosmic-ray 找不出这一类。
+  - poodle 1.3.4（2026-04-05）：2026-10-07 在这台电脑上用一个小例子运行，14 个变异，两个进程并行，存活 6 个：改掉动作名的字符串变异（在字符串两边加上 `XX`）、没有测试的边界比较（`>=` 改成 `>`）、数字、`//` 改成 `/`、返回 `None`；原文件保持不变。
+    - 它把源文件夹复制到 `.poodle-temp` 下的工作目录，在那里运行测试。源文件夹要设成导入的根目录（本仓库是仓库根，`harness` 在它下面），并用 `file_copy_filters` 排除虚拟环境；只把包目录设为源文件夹时，测试导入的是原文件，全部变异都记为存活。
+    - 测试命令按 `shlex.split` 拆分。开始之前先在没有变异的副本上运行一次，失败就停止；之后退出码 0 记为存活，其余退出码都记为发现。
+    - 命令行参数里的通配符在 Windows 上会被展开，要变异的文件范围写在配置文件的 `only_files` 中。
   - mutatest 3.1.0（2022-02）与 MutPy 0.6.1（2019-11）已经停止维护。
 - 圈复杂度与认知复杂度的工具都能在 Windows 上安装（2026-09-30 核对 PyPI）：complexipy 8.0.1 与 ruff 0.16.9 提供 Windows 的安装包，radon 6.0.1 是不依赖平台的纯 Python 安装包。
-- Linux 上全量测试只有 17 项事件序列基准不一致，原因是 `harness/workspace.py` 第 71 行以文本模式写入文件，Windows 上把 `\n` 写成 `\r\n`；基准记录的是 Windows 的结果。它们属于集成层，不影响按模块进行的变异测试。
+- Linux 上全量测试只有 17 项事件序列基准不一致，原因是 `harness/workspace.py` 第 71 行以文本模式写入文件，Windows 上把 `\n` 写成 `\r\n`；基准记录的是 Windows 的结果。#172 已改为整份写入文件不做换行转换，同一动作在任何执行位置写出相同的字节。
 
 ## 2. 手动进行的方法
 
-在 Linux 或 WSL 中进行，工作目录放在仓库的 `.tmp/` 下（已被 git 忽略），不在仓库本身运行 mutmut（它会在当前目录建立 `mutants/`）。
+在控制主机的 Windows 上用 poodle 进行（[决策记录](../decision.md) 2026-10-07「Stage 3 剩余的两个专题」一条）。工作目录放在仓库的 `.tmp/` 下（已被 git 忽略），poodle 在其中的 `.poodle-temp/` 下建立工作副本。
 
-1. 取出要检查的提交，建立项目环境：`git archive <提交> harness pyproject.toml uv.lock | tar -x -C .tmp/mut`，在 `.tmp/mut` 中运行 `uv sync --frozen`，再用 `uv pip install mutmut` 安装 mutmut。
-2. 圈复杂度：`uvx --from radon radon cc harness -j --exclude "harness/tests/*"` 输出每个函数的值；与第 1.1 节比较，列出新超过 10 的函数与值变大的函数。
+1. 取出要检查的提交，建立项目环境：`git archive <提交> harness pyproject.toml uv.lock | tar -x -C .tmp/mut`，在 `.tmp/mut` 中运行 `uv sync --frozen`，再用 `uv pip install poodle==1.3.4` 安装 poodle。
+2. 圈复杂度：`uvx --from radon radon cc harness -j --exclude "harness/tests/*"` 输出每个函数的值；圈复杂度是静态分析，与平台无关，与第 1.1 节比较，列出新超过 10 的函数与值变大的函数。
 3. 选择模块：优先选择复杂度高、并且有快速单元测试的模块，例如 `compaction.py`、`collaboration.py`、`adjudication.py`、`validation.py`。
-4. 在 `.tmp/mut/pyproject.toml` 中加入 mutmut 的配置，只变异一个模块，只用它的测试：
+4. 在 `.tmp/mut/poodle.toml` 中写配置，只变异一个模块，只用它的测试。源文件夹是导入的根目录 `.`，复制时排除虚拟环境与工作目录；测试命令写虚拟环境中 python 的绝对路径，用正斜杠（第 1.4 节）：
 
    ```toml
-   [tool.mutmut]
-   source_paths = ["harness/"]
-   only_mutate = ["harness/compaction.py"]
-   do_not_mutate = ["harness/tests/*"]
-   pytest_add_cli_args_test_selection = ["harness/tests/test_compaction.py"]
+   [poodle]
+   source_folders = ["."]
+   only_files = ["harness/compaction.py"]
+   file_copy_filters = ["__pycache__/**", ".venv/**", ".poodle-temp/**"]
+   max_workers = 4
+
+   [poodle.runner_opts]
+   command_line = "<.tmp/mut 的绝对路径>/.venv/Scripts/python.exe -m pytest -x -q -p no:cacheprovider harness/tests/test_compaction.py"
    ```
 
-5. 运行 `mutmut run --max-children 4`；用 `mutmut results` 列出存活的变异，用 `mutmut show <名称>` 查看每个变异修改了什么。换一个模块时删除 `mutants/` 目录再运行。
-6. 处理每个存活的变异，三种之一：增加测试（这处行为是需求要的，测试名写明检查的规则）；删除代码（这处行为不是任何需求要的）；写明理由（改动以后行为确实不变，或者由集成层的测试核对）。不添加 `# pragma: no mutate`，不设分数目标。
-7. 复杂度标出的函数：拆分出有独立含义与名字的函数，或者减少分支；不为降低数字而拆分函数。
+5. 运行 `poodle -c poodle.toml --json <模块名>.json --html <模块名>-html`。poodle 先在没有变异的副本上运行一次测试，失败就停止；结束时列出存活的变异与每个变异的差异，JSON 中 `result.found` 为 `false` 的是存活的变异。全部变异都存活时先检查源文件夹的设置（第 1.4 节）。换一个模块时只改 `only_files` 与测试命令。
+6. 第一次正式检查之前，先对 `compaction.py` 运行一次，把存活变异的种类与第 1.2 节 mutmut 的结果比较：改字符串、边界比较、`and` 与 `or`、数字都应当出现。缺少某一类时先查明原因，再检查其他模块。
+7. 处理每个存活的变异，三种之一：增加测试（这处行为是需求要的，测试名写明检查的规则）；删除代码（这处行为不是任何需求要的）；写明理由（改动以后行为确实不变，或者由集成层的测试核对）。不添加排除标记（poodle 的 `# nomut`），不设分数目标。
+8. 复杂度标出的函数：拆分出有独立含义与名字的函数，或者减少分支；不为降低数字而拆分函数。
 
 ## 3. 工具的事实
 

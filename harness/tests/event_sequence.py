@@ -8,6 +8,9 @@ from typing import Any
 
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, EventType
+from harness.parameters import initial_version
+
+PARAMETERS_VERSION = initial_version()
 
 # 事件序列对照：把一次 run 的完整事件序列规整成与运行时刻、机器路径无关的形式，与 event_sequences/ 下的基准比较。
 # 基准记录的是行为：之后任何提交使基准改变，说明行为改变，必须修正代码，不能更新基准。
@@ -31,7 +34,7 @@ from harness.models import ArtifactRef, EventType
 #    Git 提交号编为 <git#N>。同一个值在各处得到同一个编号，保留相等关系。
 # 3. 工件按内容比较：工件引用（kind、content_hash、path、media_type）换成 <art#N>，内容放在 artifacts 中：
 #    JSON 工件解析后按同样规则规整，JSON Lines 逐行解析，文本按字符串规整，无法按 UTF-8 解码的内容记它的摘要编号。
-# 4. 随时间变化的数值：ISO 时间写成 <time>，duration_ms、latency_ms 写成 <duration>，
+# 4. 随时间变化的数值：ISO 时间写成 <time>，duration_ms、latency_ms、elapsed_ms 写成 <duration>，
 #    运行时间用完的错误文字中的实际用时写成 <elapsed>。
 # 5. 流式进度事件在同一次调用尝试中阶段不变时按时间间隔重复记录，只保留每个阶段第一次出现的一条。
 # 6. 机器相关的值：测试数据目录写成 <data>；主机 Python 解释器的路径写成 <python>，解释器的文件名
@@ -40,10 +43,12 @@ from harness.models import ArtifactRef, EventType
 # 7. 长度不少于 300 个字符的文字、序列化后不少于 1500 个字符的结构，出现两次及以上时移入 shared，原处写 <shared#N>。
 # 8. 定义的版本（definitions_version 字段）是全部定义文件内容的摘要，随定义的内容改变：等于当前加载的定义的版本时
 #    写成 <definitions>，其他值（缺少、空或旧的版本）原样保留，与基准不同。
+# 9. 参数的版本（parameters_version 字段）是全部参数现值的内容摘要：等于定义的初始参数版本时写成 <parameters>，
+#    参数被修改过的值按摘要编号，与基准不同。
 
 BASELINE_DIR = Path(__file__).parent / "event_sequences"
 
-_TIME_KEYS = frozenset({"duration_ms", "latency_ms"})
+_TIME_KEYS = frozenset({"duration_ms", "latency_ms", "elapsed_ms"})
 _ISO_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)")
 _ELAPSED = re.compile(r"run wall-clock time \d+s")
 _GENERATED_ID = re.compile(r"(?<![A-Za-z0-9_])([a-z]+(?:_[a-z]+)*)_([0-9a-f]{16})(?![0-9a-f])")
@@ -118,6 +123,8 @@ class _Normalizer:
             return "<duration>"
         if key == "definitions_version" and value == DEFINITIONS.version:
             return "<definitions>"
+        if key == "parameters_version" and value == PARAMETERS_VERSION:
+            return "<parameters>"
         if isinstance(value, dict):
             if set(value) == _ARTIFACT_KEYS and isinstance(value.get("content_hash"), str):
                 return self.artifact(value)

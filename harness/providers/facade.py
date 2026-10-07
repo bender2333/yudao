@@ -38,9 +38,9 @@ from .resolve import (
     resolve_call_target as _resolve_call_target,
     resolve_snapshot,
 )
+from ..definitions import DEFINITIONS
 from .responses import ProviderConnections
 from .selection import ModelSelection, SelectionResolution, merge_selection
-from ..models import DEPARTMENT_LABELS
 from .suggested import reminders as _suggested_reminders
 from .store import (
     REASONING_LEVELS,
@@ -582,7 +582,7 @@ class ProviderFacade:
                 if binding is None:
                     issues.append(ValidationIssue(
                         f"bindings.{department}",
-                        f"{DEPARTMENT_LABELS.get(department, department)}部门还没有选择模型"))
+                        f"{DEFINITIONS.department_labels.get(department, department)}部门还没有选择模型"))
                     continue
                 selections.append({"key": str(department), **binding})
             if issues:
@@ -1620,11 +1620,11 @@ def _readiness_message(exc: CatalogValidationError, store: ProviderStore,
                 provider = store.providers.get(binding.get("provider_id", ""))
                 reference = "" if provider is None else provider.credential_ref
             if reference:
-                parts.append(f"{DEPARTMENT_LABELS.get(department, department)}部门缺少凭据环境变量 {reference}，请补充后重试")
+                parts.append(f"{DEFINITIONS.department_labels.get(department, department)}部门缺少凭据环境变量 {reference}，请补充后重试")
                 continue
         if "还没有选择模型" in issue.message or "未绑定" in issue.message:
             department = location.rsplit(".", 1)[-1]
-            name = DEPARTMENT_LABELS.get(department, department)
+            name = DEFINITIONS.department_labels.get(department, department)
             parts.append(f"{name}部门还没有选择模型，"
                          f"到系统的模型管理页设置部门默认，或在本项目的设置页为这个项目选择")
             continue

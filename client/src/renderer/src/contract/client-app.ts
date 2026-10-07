@@ -1,12 +1,11 @@
-// 客户端的连接生命周期（应用层与接口层设计说明第 5.7、6.1 节，原型 v8 设计说明第 3.4 节）。
-// 状态：连接中 / 已连接 / 接口版本不同（更新页）/ 连接失败。
+// 页面的连接生命周期（应用层与接口层设计说明第 5.7、6.1 节，原型 v8 设计说明第 3.4 节）。
+// 状态：连接中 / 已连接 / 接口版本不同 / 连接失败。
 // 已连接以后：保持一条不按项目筛选的事件流连接；收到事件按视图同步规则重新查询；
 // 发现缺口或收到 resync 时重新查询已打开的视图，再按快照位置中最小的一个重新订阅；
 // 本次启动的身份改变（服务重启）时重新读取能力清单并重新同步。
 
 import type { Capabilities, DecisionList, EventObject, OutputDelta } from "../api/generated/types.gen";
 import { connect, interfaceFor, type Interface } from "./connection";
-import type { ConnectionSettings } from "./settings";
 import { EventStreamClient } from "./event-stream";
 import { callCommand, type CommandOutcome } from "./invoke";
 import { ViewSync } from "./view-sync";
@@ -21,9 +20,8 @@ export type ClientState =
 
 export type ClientListeners = {
   onState: (state: ClientState) => void;
-  // 待决定的数量（跨项目等待回答的决定请求）：托盘图标与顶栏共用
+  // 待决定的数量（跨项目等待回答的决定请求）：顶栏显示
   onPendingDecisions: (count: number) => void;
-  onEvent: (event: EventObject) => void;
 };
 
 // 把查询与命令交给生成的应用层接口；外壳提供它们，以便单元测试注入替身
@@ -31,7 +29,6 @@ export type QueryRunner = <T>(client: Interface["client"], name: string, params:
 
 export class ClientApp {
   private iface: Interface | null = null;
-  private settings: ConnectionSettings | null = null;
   private stream: EventStreamClient | null = null;
   private views: ViewSync | null = null;
   private boot: string | null = null;
@@ -76,11 +73,11 @@ export class ClientApp {
     return callCommand(this.iface.client, name, body);
   }
 
-  // 连接一个部署：读取能力清单并核对接口版本
-  async open(settings: ConnectionSettings): Promise<void> {
+  // 连接页面自己的来源：读取能力清单并核对接口版本
+  async open(address: string): Promise<void> {
     this.closeStream();
     this.listeners.onState({ kind: "connecting" });
-    const result = await connect(settings);
+    const result = await connect(address);
     if (result.state === "outdated") {
       this.listeners.onState({
         kind: "outdated", address: result.address, clientVersion: result.clientVersion,
@@ -92,7 +89,6 @@ export class ClientApp {
       this.listeners.onState({ kind: "failed", address: result.address, message: result.message });
       return;
     }
-    this.settings = settings;
     this.iface = interfaceFor(result.address);
     this.capabilities = result.capabilities;
     this.boot = result.capabilities.deployment.boot_id;
@@ -134,7 +130,7 @@ export class ClientApp {
           }
         }
       },
-    }, this.settings?.token ?? "");
+    });
     this.stream.start(after);
   }
 
@@ -149,7 +145,6 @@ export class ClientApp {
 
   private onEvent(event: EventObject): void {
     this.views?.applyEvent(event.type, event.position);
-    this.listeners.onEvent(event);
     for (const listener of [...this.pageListeners]) {
       listener(event);
     }
@@ -183,7 +178,7 @@ export class ClientApp {
     }
     try {
       const before = this.boot;
-      const result = await connect(this.settings!);
+      const result = await connect(this.iface.baseUrl);
       if (result.state !== "connected") {
         return;
       }

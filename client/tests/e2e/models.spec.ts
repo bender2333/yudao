@@ -1,6 +1,6 @@
-// 模型管理页的端到端测试（工单 #93 的验收）：Playwright 启动 Electron 客户端与控制主机上的真实后端
+// 模型管理页的端到端测试（工单 #93 的验收）：Playwright 打开 Chromium 页面，页面由真实后端提供
 // （client/tests/e2e/backend.py）。后端内启动真实的 HTTP 上游（Responses 协议的最小推理服务与模型列表服务），
-// 候选、连接测试与模型测试都发真实请求。窗口尺寸 1440×900 与 390×844，控制台错误为零。
+// 候选、连接测试与模型测试都发真实请求。窗口尺寸 1440×900 与 1920×1080，控制台错误为零。
 
 import { expect, test } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
@@ -18,10 +18,6 @@ async function openModels(
   const backend = await startBackend({ admitAndBind: options.admitAndBind === true, rejectUpstream: options.rejectUpstream === true });
   const client = await startClient(backend, size);
   await expect(client.page.locator(".brand")).toHaveText("Yudao");
-  // 宽度 390 时左侧栏收为抽屉，先打开抽屉再点入口（原型 v8 设计说明第 3.3 节）
-  if (size.width <= 700) {
-    await client.page.locator(".drawer-toggle").click();
-  }
   await client.page.getByRole("button", { name: "模型管理", exact: true }).click();
   await expect(client.page.locator(".path")).toHaveText("模型管理");
   return { backend, client };
@@ -75,7 +71,7 @@ function watchBodies(client: ClientApp): string[] {
 
 for (const size of [
   { width: 1440, height: 900 },
-  { width: 390, height: 844 },
+  { width: 1920, height: 1080 },
 ]) {
   const label = `${size.width}×${size.height}`;
 
@@ -108,7 +104,7 @@ for (const size of [
       await expect(client.page.getByTestId("default-engineering")).toBeVisible();
       await expect(client.page.getByTestId("default-quality")).toBeVisible();
 
-      // 宽度 390：不出现横向滚动
+      // 不出现横向滚动
       const overflow = await client.page.evaluate(() =>
         document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);

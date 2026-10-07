@@ -1,5 +1,5 @@
 // 顶栏与项目标签（原型 v8 设计说明第 3.2 节）：路径、事项选择框、状态项、连接状态、项目菜单。
-// 状态项取自 system.status 与 decisions.list 的等待数量，与托盘图标共用同一份数据（第 4.1 节）；
+// 状态项取自 system.status 与 decisions.list 的等待数量（第 4.1 节）；
 // 顶栏的状态项与标签栏的「待你决定」由 #175 扩展，这里保持 #79 的结构（工单 #80 留出位置）。
 // 事项选择框的选项来自 project.overview 的事项列表；所选事项写在路径参数 ?w={事项} 中。
 
@@ -43,6 +43,7 @@ export function Topbar(props: TopbarProps) {
         <WorkItemPicker app={props.app} projectId={props.projectId} workItemId={props.workItemId} onNavigate={props.onNavigate} />
       ) : null}
       <div className="spacer" />
+      <span className="note" title="页面版本">{import.meta.env.VITE_YUDAO_RELEASE}</span>
       {props.projectId && props.project && props.app ? (
         <ProjectMenu app={props.app} projectId={props.projectId} workItemId={props.workItemId} project={props.project} onNavigate={props.onNavigate} />
       ) : null}

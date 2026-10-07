@@ -1,5 +1,6 @@
 # 接口层：FastAPI 应用（设计说明第 2.2、7.1 节）。路由、OpenAPI 与能力清单由应用层的注册表生成；
 # 处理函数不含业务规则，只调用应用层。生命周期中在服务的事件循环里建立控制核心与应用层，关闭时释放。
+# 其余的 GET 路径提供页面文件（网页界面的提供与发布设计说明第 5.1 节）。
 
 from __future__ import annotations
 
@@ -11,11 +12,11 @@ import json
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import version
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import FastAPI, Header, Query, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
@@ -24,13 +25,14 @@ from starlette.responses import FileResponse, Response
 
 from ..app.application import DEFAULT_REGISTRY, Application
 from ..app.catalog_queries import CatalogQueryInvalid
-from ..app.client_update import NO_INSTALLER, ReleaseAssetNotFound, ReleaseAssets
+from ..app.client_update import NO_INSTALLER, RELEASE_ASSETS, ReleaseAssetNotFound, ReleaseAssets
 from ..app.contracts import AccessMode, Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
 from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
 from ..app.project_queries import NotFound
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
 from ..app.replay import ReplayOutOfRange
-from .access import CLIENT_ORIGINS, AccessMiddleware
+from .access import AccessMiddleware
+from .pages import PageFiles
 
 _COMPONENTS = "#/components/schemas/{model}"
 
@@ -38,7 +40,7 @@ _COMPONENTS = "#/components/schemas/{model}"
 def create_app(open_application: Callable[[], Application], *, registry: Registry = DEFAULT_REGISTRY,
                access: AccessMode = "local", keepalive_sec: float = 15.0,
                on_stop: Callable[[], None] | None = None,
-               release_assets: ReleaseAssets | None = None) -> FastAPI:
+               release_assets: ReleaseAssets | None = None, pages: Path = RELEASE_ASSETS) -> FastAPI:
     @asynccontextmanager
     async def lifespan(api: FastAPI) -> AsyncIterator[None]:
         application = open_application()
@@ -68,18 +70,16 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
     _add_stop(api, on_stop=on_stop)
     # 更新源（设计说明第 5.1 节）：不是查询与命令，从 wheel 内的发布资源目录读取
     _add_client_update(api, assets=release_assets)
-    # CORS 只允许客户端页面的来源（第 6.2 节）。中间件最后添加的最先执行：认证在 CORS 之前。
-    # 事件流续传时浏览器带 Last-Event-ID（第 5.5 节的续传位置），它不在 CORS 的默认允许头里，
-    # 预检会被拒；Accept 也一并在允许之列
-    api.add_middleware(CORSMiddleware, allow_origins=list(CLIENT_ORIGINS), allow_methods=["GET", "POST"],
-                       allow_headers=["Content-Type", "Accept", "Last-Event-ID"])
+    # 页面与接口同一来源（第 6.2 节）：Origin 由 AccessMiddleware 核对，不发送 CORS 响应头
     api.add_middleware(AccessMiddleware, access=access)
     api.openapi = lambda: _openapi(api)
     _add_events(api, keepalive_sec=keepalive_sec)
+    # 页面文件最后挂载：接口路径先匹配；挂载不进入 OpenAPI 与能力清单
+    api.mount("/", PageFiles(pages), name="pages")
     return api
 
 def _add_stop(api: FastAPI, *, on_stop: Callable[[], None] | None) -> None:
-    # POST /api/system/stop：两种访问方式下都接受来自回环地址的请求（带 Origin 时只接受客户端页面的
+    # POST /api/system/stop：两种访问方式下都接受来自回环地址的请求（带 Origin 时只接受服务自己的
     # 来源，由 AccessMiddleware 拒绝其他来源），来自其他地址的请求拒绝。设计说明第 4.4 节。
     # 服务收到以后停止接受新请求、关闭事件流连接、等待进行中的写入完成、释放进程锁并退出；
     # 进行中的 run 不等待结束，下次启动时按 3.1 自动继续
