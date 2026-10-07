@@ -10,12 +10,10 @@ from pygit2.enums import RepositoryOpenFlag
 
 from .artifacts import ArtifactStore
 from .models import ArtifactRef
+from .path_rules import TreeError, is_git_metadata, is_private_path
 from .public_tree import (
     CapturedTree,
-    TreeError,
     capture_public_tree,
-    is_git_metadata,
-    is_private_path,
     materialize_tree,
 )
 from .tree_archive import load_tree, store_tree

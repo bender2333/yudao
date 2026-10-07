@@ -1207,7 +1207,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：not_found, catalog_invalid, command_id_reused",
+            "description": "命令被拒绝，可能的原因：not_found, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -5414,18 +5414,6 @@
             "type": "string",
             "minLength": 1,
             "title": "Provider Id"
-          },
-          "model_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Id"
           }
         },
         "additionalProperties": false,

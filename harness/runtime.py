@@ -11,6 +11,7 @@ from .deltas import DeltaChannel
 from .definitions import DEFINITIONS
 from . import parameters
 from .engine import StepLimits
+from .environment import LocalEnvironment
 from .event_store import Command, EventStore, catalog_stream
 from .models import CatalogEventType, ProjectEventType
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError

@@ -12,7 +12,8 @@ from typing import Iterator
 
 from .actions import TreeFacts
 from .models import CheckReceipt, hash_bytes, json_dumps
-from .public_tree import CapturedTree, TreeError, capture_public_tree, excluded_by_ignore_rules, materialize_tree, resolve_public_path, validate_public_path
+from .public_tree import CapturedTree, capture_public_tree, excluded_by_ignore_rules, materialize_tree, resolve_public_path
+from .path_rules import TreeError, validate_public_path
 
 CHECKS_DIR = ".checks"
 

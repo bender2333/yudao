@@ -13,7 +13,8 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from ..models import QA_VERDICTS
-from ..public_tree import CapturedTree, TreeError, capture_public_tree, materialize_tree
+from ..path_rules import TreeError
+from ..public_tree import CapturedTree, capture_public_tree, materialize_tree
 from ..redact import sanitized_env
 from .pack import write_evidence_pack
 from .records import (

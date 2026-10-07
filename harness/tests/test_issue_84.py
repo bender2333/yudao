@@ -158,8 +158,7 @@ def test_opencode_go_three_protocols_paths_and_identity_headers():
 
         for provider_id, model_id, protocol, _upstream, expected_path in connections:
             # 连接测试经公开接口证明地址与凭据可用（三种协议同一套缺失项检查）
-            connection = facade.test_connection(
-                {"key": "c", "provider_id": provider_id, "model_id": model_id})
+            connection = facade.test_connection(provider_id)
             assert connection["ok"] is True, connection
             assert connection["protocol"] == protocol
 

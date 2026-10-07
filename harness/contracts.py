@@ -6,7 +6,7 @@ import os
 from typing import Any
 
 from .models import RunProjection, canonical_hash
-from .public_tree import validate_public_path
+from .path_rules import validate_public_path
 
 
 def contract_payload(projection: RunProjection) -> dict[str, Any]:

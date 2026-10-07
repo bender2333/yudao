@@ -7,7 +7,8 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .models import ArtifactRef, canonical_hash, json_dumps
-from .public_tree import CapturedFile, CapturedTree, TreeError, validate_manifest, validate_public_path
+from .public_tree import CapturedFile, CapturedTree, validate_manifest
+from .path_rules import TreeError, validate_public_path
 
 
 ARCHIVE_FORMAT = "yudao-tree-archive-v1"

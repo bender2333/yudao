@@ -82,7 +82,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   // 由应用层查询 catalog.change_impact 算出，界面按它弹确认框与列出引用方
   const [saveImpact, setSaveImpact] = useState<ModelImpact | null>(null);
   const [deleteImpact, setDeleteImpact] = useState<ModelImpact | null>(null);
-  const [pendingSave, setPendingSave] = useState<Record<string, unknown> | null>(null);
+  const [pendingSave, setPendingSave] = useState<{ body: Record<string, unknown>; state: FormState; secret: string; persist: boolean } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const views = props.views;
@@ -196,36 +196,42 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setForm({ mode: "add", state: emptyFormState(current.default_timeout_sec) });
   }, []);
 
-  const runSave = useCallback(async (body: Record<string, unknown>, successMessage: string) => {
+  const runSave = useCallback(async (body: Record<string, unknown>, successMessage: string,
+    state: FormState, secret: string, persist: boolean) => {
     setBusy(true);
-    const result = await submit("catalog.connection.save", body);
+    const saved = await submit("catalog.connection.save", body);
+    let result = saved;
+    if (saved.ok && secret.trim()) {
+      const credential = catalogRef.current?.providers.find((item) => item.id === state.id)?.credential;
+      const outcome = await props.command("credential.set", {
+        command_id: crypto.randomUUID(), base_version: credential?.version ?? 0,
+        ref: state.credential_ref, secret, persist,
+      });
+      result = interpret(outcome);
+    }
     setBusy(false);
     setPendingSave(null);
-    // 表单保存成功以后收起，成功提示放在页面上：表单内的状态随表单一起消失（工单 #302）
     setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? successMessage : result.message });
     if (result.ok) {
       setForm(null);
     } else {
       setFormStatus({ kind: "error", message: result.message });
     }
-  }, [submit]);
+  }, [submit, props]);
 
-  const submitForm = useCallback(async () => {
-    if (!form) {
-      return;
-    }
+  const submitForm = useCallback(async (secret: string, persist: boolean) => {
+    if (!form) return;
     const rows = form.state.rows;
     if (!rowsSavable(rows)) {
       setFormStatus({ kind: "error", message: "窗口与输出上限没有「接受」或修改的行不能保存。" });
       return;
     }
-    // 保存会作废准入时先弹确认框：影响列表由 catalog.change_impact 算出（设计说明第 4.4 节）
     const body = { provider: providerInputFromForm(form.state), models: rows.map(rowToModelInput) };
     if (confirmImpactText(saveImpact) !== "") {
-      setPendingSave(body);
+      setPendingSave({ body, state: form.state, secret, persist });
       return;
     }
-    await runSave(body, saveSuccessText(form.mode));
+    await runSave(body, saveSuccessText(form.mode), form.state, secret, persist);
   }, [form, runSave, saveImpact]);
 
   const deleteProvider = useCallback(async (providerId: string) => {
@@ -609,7 +615,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           testing={testing}
           tests={tests}
           status={formStatus}
-          onSubmit={() => void submitForm()}
+          onSubmit={(secret, persist) => void submitForm(secret, persist)}
           onCancel={() => setForm(null)}
           onDelete={() => void deleteProvider(form.state.id)}
           onTestConnection={() => void testConnection(form.state.id)}
@@ -711,7 +717,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             <p className="mm-warn" data-testid="confirm-save-list">{confirmImpactText(saveImpact)}</p>
             <div className="mm-actions">
               <button type="button" className="primary" data-testid="confirm-save-yes" disabled={busy}
-                      onClick={() => void runSave(pendingSave, saveSuccessText(form?.mode ?? "edit"))}>确认保存</button>
+                      onClick={() => void runSave(pendingSave.body, saveSuccessText(form?.mode ?? "edit"),
+                        pendingSave.state, pendingSave.secret, pendingSave.persist)}>确认保存</button>
               <button type="button" data-testid="confirm-save-no" onClick={() => setPendingSave(null)}>取消</button>
             </div>
           </div>

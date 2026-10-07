@@ -25,8 +25,9 @@ from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .models import hash_bytes, json_dumps
-from .public_tree import CapturedTree, TreeError, UnrepresentableWorkspace, capture_public_tree, is_private_path, materialize_tree
+from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
+from .path_rules import TreeError, is_private_path
 from .redact import redact_text, sanitized_env
 from .tools import normalize_registered_commands
 from .workspace import Workspace, WorkspaceSnapshot
