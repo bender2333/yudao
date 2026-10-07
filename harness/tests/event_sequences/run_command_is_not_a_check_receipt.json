@@ -51,6 +51,7 @@
     "max_cycles": 999999,
     "onboarding_basis": null,
     "overview_ref": null,
+    "parameters_version": "<parameters>",
     "project_context_ref": null,
     "project_id": null,
     "prompt_config_versions": {},
@@ -395,6 +396,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "parameters_version": "<parameters>",
     "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
     "protocol": "fake",
@@ -783,6 +785,7 @@
     "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "product_spec",
+    "parameters_version": "<parameters>",
     "raw_keys": [
      "acceptance_criteria",
      "boundaries",
@@ -1234,6 +1237,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "parameters_version": "<parameters>",
     "prompt_hash": "<sha256#25>",
     "prompt_version": 0,
     "protocol": "fake",
@@ -1612,6 +1616,7 @@
     "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "engineering_plan",
+    "parameters_version": "<parameters>",
     "raw_keys": [
      "assumptions",
      "kind",
@@ -1906,6 +1911,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "parameters_version": "<parameters>",
     "prompt_hash": "<sha256#25>",
     "prompt_version": 0,
     "protocol": "fake",
@@ -2611,6 +2617,7 @@
     "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "delivery_spec",
+    "parameters_version": "<parameters>",
     "raw_keys": [
      "check_names",
      "files",
@@ -2646,6 +2653,7 @@
     ],
     "input_version": 1,
     "kind": "delivery_spec",
+    "parameters_version": "<parameters>",
     "transcript_ref": "<art#25>"
    }
   },
@@ -2879,6 +2887,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "parameters_version": "<parameters>",
     "prompt_hash": "<sha256#25>",
     "prompt_version": 0,
     "protocol": "fake",
@@ -3587,6 +3596,7 @@
     "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "delivery_spec",
+    "parameters_version": "<parameters>",
     "raw_keys": [
      "check_names",
      "files",
@@ -3622,6 +3632,7 @@
     ],
     "input_version": 1,
     "kind": "delivery_spec",
+    "parameters_version": "<parameters>",
     "transcript_ref": "<art#25>"
    }
   },
@@ -3855,6 +3866,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "parameters_version": "<parameters>",
     "prompt_hash": "<sha256#25>",
     "prompt_version": 0,
     "protocol": "fake",
@@ -4393,6 +4405,7 @@
     "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "delivery_spec",
+    "parameters_version": "<parameters>",
     "raw_keys": [
      "check_names",
      "files",
@@ -4735,6 +4748,7 @@
     "max_attempts": 3,
     "max_output_tokens": 4800,
     "model_id": "fake-model",
+    "parameters_version": "<parameters>",
     "prompt_hash": "<sha256#66>",
     "prompt_version": 0,
     "protocol": "fake",
@@ -5273,6 +5287,7 @@
     "definitions_version": "<definitions>",
     "input_version": 1,
     "kind": "qa_review",
+    "parameters_version": "<parameters>",
     "raw_keys": [
      "checks",
      "defects",
@@ -6616,6 +6631,7 @@
   "onboarding_basis": null,
   "outcome": "done",
   "overview_ref": null,
+  "parameters_version": "<parameters>",
   "pending_feedback": {},
   "pending_request": null,
   "phase": "DONE",

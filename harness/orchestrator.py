@@ -45,6 +45,7 @@ from .interactions import CancelledInputSaveError, InteractionWriter, RunTermina
 from .definitions import DEFINITIONS
 from .department_prompts import save_department_prompt
 from .overview import repository_overview
+from . import parameters as parameter_values
 from .models import (
     ArtifactRef,
     Event as RunEvent,
@@ -343,6 +344,7 @@ class Orchestrator:
                 "registered_commands": frozen_commands[0],
                 "command_versions": frozen_commands[1],
                 "definitions_version": DEFINITIONS.version,
+                "parameters_version": parameter_values.current_version(self.store),
                 "run_event_version": RUN_EVENT_VERSION,
                 "onboarding_basis": onboarding_basis,
                 "round": round,
@@ -1346,7 +1348,8 @@ class Orchestrator:
                 session_id=session_id, provider=provider, model=model,
                 payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
                          "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version,
-                         "definitions_version": DEFINITIONS.version},
+                         "definitions_version": DEFINITIONS.version,
+                         "parameters_version": current.parameters_version},
             ))
         if not judged.accepted:
             transaction.append(NewEvent(
@@ -1360,6 +1363,7 @@ class Orchestrator:
                     "kind": None if proposal is None else proposal.get("kind"),
                     "input_version": basis.input_version,
                     "definitions_version": DEFINITIONS.version,
+                    "parameters_version": current.parameters_version,
                 },
             ))
             return

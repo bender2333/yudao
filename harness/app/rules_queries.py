@@ -6,12 +6,26 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from ..definitions import DEFINITIONS
+from ..models import CatalogEventType
+from ..parameters import current_values, history
 from .contracts import Contract, Snapshot
 from .registry import QueryDefinition
 from .replay import ReplayRequest, check_position
 
 if TYPE_CHECKING:
     from .application import Application
+
+
+class ParameterChangeEntry(Contract):
+    # 参数的一次修改：原值、新值、理由、修改者与修改以后的参数版本，时间与事件编号按目录流事件给出
+    old_value: Any
+    new_value: Any
+    reason: str
+    modified_by: str
+    parameters_version: str
+    event_id: str
+    created_at: str
+    stream_version: int
 
 
 class RuleEntry(Contract):
@@ -28,6 +42,9 @@ class RuleEntry(Contract):
     tighten_when: str
     # 来源：这条数值与它的理由写在哪一份文档或哪一条需求里
     origin: str
+    # 参数现值被修改过时，这里的 value 是参数事件折叠的现值，changes 是它的全部修改记录；
+    # structure 条目与从未修改的参数没有修改记录
+    changes: list[ParameterChangeEntry] = []
 
 
 class RuleRegistry(Contract):
@@ -44,15 +61,25 @@ class RulesRegistryRequest(ReplayRequest):
 
 def _rules_registry(application: Application, request: RulesRegistryRequest) -> Snapshot[RuleRegistry]:
     store = application.system.store
-    # 规则登记是事件日志之外的状态：参数事件记录修改历史属于参数事件的工单（#349）。
-    # 现在按位置读取只核对 at 不超过日志末尾，返回的登记是当前这一版定义的内容
+    # 参数现值与修改历史由参数事件折叠（工单 #349）：登记里的 value 是参数的现值（目录流事件折叠的结果），
+    # changes 是它的全部修改记录；structure 条目与从未修改的参数没有修改记录。
+    # 按位置读取只核对 at 不超过日志末尾，返回的登记是当前这一版定义与当前参数事件的内容
     check_position(application, request.at)
+
+    values = current_values(store)
+    by_name: dict[str, list[ParameterChangeEntry]] = {}
+    for change in history(store):
+        by_name.setdefault(change.name, []).append(ParameterChangeEntry(
+            old_value=change.old_value, new_value=change.new_value, reason=change.reason,
+            modified_by=change.modified_by, parameters_version=change.parameters_version,
+            event_id=change.event_id, created_at=change.created_at, stream_version=change.stream_version,
+        ))
     definitions = DEFINITIONS
     entries = [
         RuleEntry(
-            name=name, value=rule.value, bounds=list(rule.bounds), kind=rule.kind, form=rule.form,
-            guards=rule.guards, cost=rule.cost, relax_when=rule.relax_when,
-            tighten_when=rule.tighten_when, origin=rule.origin,
+            name=name, value=values.get(name, rule.value), bounds=list(rule.bounds), kind=rule.kind,
+            form=rule.form, guards=rule.guards, cost=rule.cost, relax_when=rule.relax_when,
+            tighten_when=rule.tighten_when, origin=rule.origin, changes=by_name.get(name, []),
         )
         for name, rule in sorted(definitions.rules.items())
     ]
@@ -64,5 +91,5 @@ def _rules_registry(application: Application, request: RulesRegistryRequest) -> 
 
 RULES_REGISTRY = QueryDefinition(
     name="rules.registry", request=RulesRegistryRequest, result=RuleRegistry,
-    handle=_rules_registry, changed_by=(), replayable=True,
+    handle=_rules_registry, changed_by=(CatalogEventType.PARAMETER_SET,), replayable=True,
 )
