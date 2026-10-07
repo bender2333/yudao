@@ -168,7 +168,7 @@ export function ProviderForm(props: ProviderFormProps) {
       <label className="y9-field mm-field">
         <span className="mm-label">地址</span>
         <input className="y9-input" value={state.base_url} required placeholder="https://.../v1" data-testid="provider-base-url"
-               readOnly={preset !== null}
+               readOnly={mode === "add" && preset !== null}
                onChange={(event) => props.onPatch(mode === "add"
                  ? formPatchForBaseUrl(state, event.target.value) : { base_url: event.target.value })}
                onBlur={() => { if (!preset) props.onPatch(mode === "add"
