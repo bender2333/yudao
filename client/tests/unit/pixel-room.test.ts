@@ -277,14 +277,15 @@ test("事件成串到达时，队满挤掉的是普通动作，传信动作留�
   assert.ok(queued.includes("collaboration_requested"), `传信动作不应被挤掉，实际队列：${queued.join("、")}`);
 });
 
-test("收到交接的一方立刻说话：后一个交接事件替换脚本时上一句还在", () => {
+test("收到交接的一方先说话：后一句排在上一句后面，依次显示", () => {
   const q = mountRoom("quality", QUA);
   q.step(500);
   // 先收到工程送来的交付箱，紧接着质检把放行单送走；两步之间没有停顿
   q.driver.playEvent({ type: "transition", department: "engineering", payload: { from: "engineering", to: "quality", artifact: "box" } } as PixelFloorEvent);
-  const afterBox = q.actor("q-test")?.say?.text;
+  assert.equal(q.actor("q-test")?.say?.text, "收到交付箱，来自工程");
   q.driver.playEvent({ type: "transition", department: "quality", payload: { from: "quality", to: "adopted", artifact: "release" } } as PixelFloorEvent);
-  assert.equal(afterBox, "收到交付箱，来自工程");
+  assert.equal(q.actor("q-test")?.say?.text, "收到交付箱，来自工程");
+  q.step(6000);
   assert.equal(q.actor("q-test")?.say?.text, "现在把放行单送给成果库");
 });
 
@@ -344,15 +345,16 @@ test("工具类：交出类工具说出交的是哪一份，名称与提案事�
   assert.equal(say(real({ payload: { name: "submit_request", args: {} } })), "现在提交询问");
 });
 
-test("工具类：工具调用的发生时刻就说话，不等走位动作做完；盖章类事件随后照样说出", () => {
+test("工具类：工具调用的发生时刻就说话，不等走位动作做完；事件成串时头顶依次显示到最后一句", () => {
   const rm = mountRoom("engineering", ENG);
   rm.step(500);
   rm.driver.playEvent({ type: "transition", work_item_id: "w1", payload: { from: "product", to: "engineering", artifact: "prd" } });
+  assert.equal(rm.actor("eng-architect")?.say?.text, "收到PRD，来自产品");
   rm.driver.playEvent(real({ payload: { name: "list_files", args: {} } }));
-  assert.equal(rm.actor("eng-architect")?.say?.text, "现在看看有什么文件");
   rm.driver.playEvent(real({ payload: { name: "submit_plan", args: {} } }));
-  assert.equal(rm.actor("eng-architect")?.say?.text, "现在提交工程计划");
   rm.driver.playEvent({ type: "plan_accepted", department: "engineering", work_item_id: "w1", payload: {} });
+  assert.equal(rm.actor("eng-architect")?.say?.text, "收到PRD，来自产品");
+  rm.step(30000);
   assert.equal(rm.actor("eng-architect")?.say?.text, "现在把计划贴上白板");
 });
 

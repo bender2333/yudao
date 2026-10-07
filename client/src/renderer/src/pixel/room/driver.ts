@@ -28,7 +28,7 @@ export interface RoomActor {
   desk: RoomSeat;
   doing: string | null;
   persist: { anim: string; icon?: { kind: string; text?: string } | null; hold?: string | null; write?: boolean; until?: number } | null;
-  say: { text: string; until: number; stamp?: boolean } | null;
+  say: { text: string; until: number } | null;
   /** 排队的动作：`from` 是产生它的真实事件类型，事项进入停止态时据此决定保留或清除。 */
   queue: { fn: () => void; at: number; from: string }[];
   formSign: string | null;
@@ -186,8 +186,7 @@ const IMMEDIATE = new Set(["paused", "failed", "done", "cancelled", "puzzled", "
  *  真实系统的 FakeAdapter 让一个事项在 1 秒左右跑到 done，传信事件排队后不到 900 毫秒就被清除，
  *  两端因此从不说话；这些动作已经由事件排入，继续执行到结束。 */
 const KEEP_ON_STOP: Record<string, true> = { collaboration_requested: true, collaboration_responded: true, transition: true };
-/** 停止态动作的话排在正在显示的话后面：事项结束前盖章紧跟着完成，完成的话立即覆盖会让盖章说明只停留毫秒级。 */
-const STOP_SPEECH_LATE: Record<string, true> = { paused: true, failed: true, done: true, cancelled: true };
+ 
 
 /** 建立部门房间的驱动。 */
 export function createRoomDriver(opts: { department: string; sceneOptions: SceneOptions }): RoomDriver {
@@ -243,19 +242,14 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     if (!a) return;
     const text = sayCatalog(ev, { dept, side, roleName: nameOfRole });
     if (!text) return;
-    const action = resolveAction(ev);
-    const stamp = STAMP_EVENT.has(ev.type);
-    // 盖章的话正在头顶显示时后续的话排在后面，停止态动作的话也排在正在显示的话后面：
-    // 事项结束前盖章紧接着交接与完成，立即覆盖会让盖章的说明只停留毫秒级，看不见。
-    // 其他事件的话保持立即覆盖（交接与工具类已有单测锁定）。
-    // 排后的回调到期后重新走同一套规则，多句话按到达顺序依次显示。
-    if (a.say && scene.realT < a.say.until
-        && (a.say.stamp === true || (action !== null && STOP_SPEECH_LATE[action] === true))) {
+    // 头顶的话还没显示完时新话排在后面：事项在 1 秒左右连续走完阶段，
+    // 立即覆盖会让前一句话只停留毫秒级，看不见。排后的回调到期后重新走同一套规则，多句话按到达顺序依次显示。
+    if (a.say && scene.realT < a.say.until) {
       if (a.say.text === text) return;
       scene.after(a.say.until - scene.realT, () => say(ev, a, side));
       return;
     }
-    a.say = { text, until: scene.realT + sayMs(text), stamp };
+    a.say = { text, until: scene.realT + sayMs(text) };
   }
   function plan(a: RoomActor): PlanApi {
     return makePlan(scene, a, actorOf(a.id)!, blocks);
