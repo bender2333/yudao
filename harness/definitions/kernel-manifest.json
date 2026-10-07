@@ -1,0 +1,49 @@
+{
+  "owner": "user",
+  "updated": "2026-10-07",
+  "kinds": {
+    "module": "控制核心的裁决模块：接受导入方向与行数的两项检查",
+    "material": "评价材料与守卫自身：路径守卫保护它们，导入方向与行数不适用（测试要导入 pytest，评分器按场景运行，文档与发布脚本不是 Python 模块）"
+  },
+  "paths": [
+    {"path": "harness/write_path.py", "kind": "module", "why": "写入口：事实只从这里进入事件日志（ADR-0013）"},
+    {"path": "harness/event_store.py", "kind": "module", "why": "事件日志的追加与投影替换，事实唯一的落盘面"},
+    {"path": "harness/projection.py", "kind": "module", "why": "裁决读取的运行状态投影，由事件折叠而成"},
+    {"path": "harness/models.py", "kind": "module", "why": "事件与投影的数据结构、序列化与哈希，裁决与事件日志共用"},
+    {"path": "harness/adjudication.py", "kind": "module", "why": "裁决规则：工具许可、提案校验与提交前复核；生成者不裁决自己"},
+    {"path": "harness/validation.py", "kind": "module", "why": "提案校验：按投影、工作区事实与事件判断提案能否接纳"},
+    {"path": "harness/contracts.py", "kind": "module", "why": "有效合同身份与工程计划范围；越界写入在这里判定"},
+    {"path": "harness/collaboration.py", "kind": "module", "why": "协作规则：未结协作的工作依据与回应范围"},
+    {"path": "harness/path_rules.py", "kind": "module", "why": "公开路径规则：可移植相对路径与主机私有路径，裁决与执行层共用"},
+    {"path": "harness/actions.py", "kind": "module", "why": "裁决读取的工作区事实合同（不读取，只表达要查询什么）"},
+    {"path": "harness/bounds.py", "kind": "module", "why": "边界的核对：时间与循环上限，一定会停"},
+    {"path": "harness/tools.py", "kind": "module", "why": "工具登记表与部门可用工具集合，工具许可的依据之一"},
+    {"path": "harness/definitions/__init__.py", "kind": "module", "why": "定义的加载与结构校验，含组织候选的三条权威关系校验（ADR-0014、ADR-0020）"},
+    {"path": "harness/definitions/kernel-manifest.json", "kind": "material", "why": "内核清单本身，守卫自身；只由用户修改"},
+    {"path": "harness/tests/kernel/**", "kind": "material", "why": "内核的不变式测试，它们评价控制核心的其余部分"},
+    {"path": "evals/scenarios/*/checks/**", "kind": "material", "why": "评测场景的隐藏检查，被评价者改不了评价标准"},
+    {"path": "evals/scenarios/*/reference/**", "kind": "material", "why": "参考解法，与隐藏检查一起构成评价材料"},
+    {"path": "evals/scorer/**", "kind": "material", "why": "评分器，决定一个版本好不好"},
+    {"path": "scripts/release.py", "kind": "material", "why": "发布脚本：它产出的发布包就是下一个实例，构建过程被修改时发布包可能与经过检查的提交不一致"},
+    {"path": "docs/foundation-rules.md", "kind": "material", "why": "六条基础规则的原文，高于任何具体设计；守卫自身，只由用户修改"}
+  ],
+  "python_lines_max": 5905,
+  "allowed_imports": ["内核文件", "标准库", "pydantic"],
+  "rules": [
+    {"rule": "事实只经写入口写入", "test": "kernel/test_single_write_path.py", "added_by": "工单 #352", "ready": true},
+    {"rule": "每个工具开始事件之前有一条允许的许可记录", "test": "kernel/test_tool_needs_permission.py", "added_by": "工单 #352", "ready": true},
+    {"rule": "每个 run 以封闭清单里的原因结束或进入等待", "test": "kernel/test_every_stop_has_reason.py", "added_by": "工单 #352", "ready": true},
+    {"rule": "已用的时间与次数跨重启连续", "test": "kernel/test_limits_survive_restart.py", "added_by": "工单 #352", "ready": true},
+    {"rule": "验证者提交独立判断之前看不到作者的解释", "test": "kernel/test_judge_before_explanation.py", "added_by": "工单 #358（先判断后看解释）"},
+    {"rule": "未校准的判定点不改变事实事件", "test": "kernel/test_uncalibrated_point_is_inert.py", "added_by": "Stage 5 的判定点工单"}
+  ],
+  "probes": [
+    {"name": "reference_passes_all", "expect": "参考解法通过全部隐藏检查"},
+    {"name": "seeded_defect_fails", "expect": "植入缺陷的交付被评分器判为失败"},
+    {"name": "out_of_scope_write_denied", "expect": "带越界写入的事件序列被工具许可拒绝"},
+    {"name": "false_release_reported", "expect": "质检放行一份隐藏检查失败的交付时，过程检查点报出质检误放行"}
+  ],
+  "added_later": [
+    {"path": "harness/release_check.py", "why": "发布检查：内核差异、行数、导入方向、探针与回归场景", "added_by": "工单 #355、#356（发布检查的四个探针）"}
+  ]
+}
