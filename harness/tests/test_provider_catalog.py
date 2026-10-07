@@ -345,6 +345,34 @@ def test_missing_credentials_reported_per_item():
     assert any("quality" in location for location in locations)
 
 
+def test_a_department_without_a_model_is_named_in_chinese_with_where_to_set_it():
+    # 工单 #319 第 6 项：质检的部门默认没有选模型时，用户看到的是中文说明与两个去处，
+    # 里面没有部门标识（quality）与英文的内部提示
+    facade = ProviderFacade()
+    facade.store_document(_document(bindings={
+        "product": {"provider_id": "provider-a", "model_id": "model-a"},
+        "engineering": {"provider_id": "provider-b", "model_id": "model-b"},
+    }))
+    readiness = facade.describe_readiness()
+    assert readiness["available"] is False
+    assert readiness["reason"] == "provider_unavailable"
+    assert readiness["message"] == (
+        "质检部门还没有选择模型，到系统的模型管理页设置部门默认，或在本项目的设置页为这个项目选择")
+    assert "quality" not in readiness["message"]
+    assert readiness["issues"] == [{"location": "bindings.quality", "message": "质检部门还没有选择模型"}]
+
+
+def test_every_department_without_a_model_is_named_in_one_message():
+    facade = ProviderFacade()
+    facade.store_document(_document(bindings={}))
+    readiness = facade.describe_readiness()
+    assert readiness["available"] is False
+    for name in ("产品", "工程", "质检"):
+        assert f"{name}部门还没有选择模型" in readiness["message"]
+    for identifier in ("product", "engineering", "quality"):
+        assert identifier not in readiness["message"]
+
+
 def test_dangling_binding_references_are_rejected():
     facade = ProviderFacade()
     with pytest.raises(CatalogValidationError):

@@ -24,6 +24,7 @@ export const BUILDING_STATUS: Record<string, { text: string; color: string }> = 
   waiting_resume: { text: "待恢复", color: PAL.yellow2 },
   waiting_decision: { text: "等待你的决定", color: PAL.yellow2 },
   interrupted: { text: "中断", color: PAL.grey4 },
+  stopped: { text: "已停止", color: PAL.grey4 },
   idle: { text: "空闲", color: PAL.grey2 },
 };
 

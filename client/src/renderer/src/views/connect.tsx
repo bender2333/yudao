@@ -73,7 +73,7 @@ export function ConnectPage(props: ConnectPageProps) {
         <div className="field">
           <label htmlFor="token">访问令牌</label>
           <input id="token" value={token} disabled placeholder="局域网内使用期间不需要" />
-          <span className="note">令牌与 TLS 保留位置，当前不发送（设计说明第 6.3 节 TODO）。</span>
+          <span className="note">访问令牌：当前版本不需要填写，以后需要时再启用。</span>
         </div>
         {(localError ?? props.error) && <p className="error">{localError ?? props.error}</p>}
         <button className="primary" type="submit" disabled={props.connecting}>

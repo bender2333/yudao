@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 import threading
 import uuid
@@ -159,6 +160,10 @@ def room_script():
         # 端到端测试开始的事项：产品分三段流式请求（思考气泡），工程写计划后向质检发出一次询问
         # （传信的两端），质检回答，工程交付（交接的两端）、质检放行
         product_stream,
+        # 工单 #319 第 3 项：工程先列出工作区里的文件再写计划，房间事件流里因此有 tool_started
+        # （工具类说明「现在看看有什么文件」）。盖章类的 spec_accepted、plan_accepted、qa_started
+        # 与 qa_submitted 由这一轮本身产生
+        read_turn("list-workspace", "list_files", {}),
         plan_turn(),
         collaboration_request("quality", "交付前需要确认哪一条验收条件"),
         answer_turn(pending_request_id),
@@ -377,14 +382,25 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
         ), actor="user:local")
         if isinstance(rejected, Rejected):
             raise RuntimeError(f"catalog seed rejected connection: {rejected.reason} {rejected.message}")
+    # 给这条定义写准入记录并让部门默认绑定它（工单 #94）
     if not admit_and_bind:
         return
-    # 给这条定义写准入记录并让三个部门默认都绑定它：作废准入与删除引用方两类用例需要真实的引用方
     facade.record_admission("opencode-go", "glm-4.6", admitted_model="glm-4.6")
     await accept(application, "catalog.department_defaults.save", CatalogDepartmentDefaultsSave(
         command_id=str(uuid.uuid4()), base_version=facade.catalog_revision(),
         bindings={department: BindingInput(provider_id="opencode-go", model_id="glm-4.6", requested_tier=None)
                   for department in ("product", "engineering", "quality")}))
+
+
+async def clear_department_defaults(application: Application, keep: str) -> None:
+    # 工单 #319 第 6 项：预置的事项跑完之后，把 --bind-departments 没有列出的部门解开。
+    # 用例随后在界面上开始新事项，核对缺少部门默认时的中文提示与两个去处
+    wanted = {item for item in keep.split(",") if item}
+    facade = application.system.facade
+    await accept(application, "catalog.department_defaults.save", CatalogDepartmentDefaultsSave(
+        command_id=str(uuid.uuid4()), base_version=facade.catalog_revision(),
+        bindings={department: BindingInput(provider_id="opencode-go", model_id="glm-4.6", requested_tier=None)
+                  for department in wanted}))
 
 
 class VersionedApplication(Application):
@@ -423,6 +439,12 @@ def main() -> int:
     parser.add_argument("--room", action="store_true")
     # 预置时给定义写准入并让三个部门默认绑定它：作废准入与删除引用方的用例需要真实的引用方（工单 #94）
     parser.add_argument("--admit-and-bind", action="store_true")
+    # 工单 #319 第 6 项：只给这些部门默认绑定模型，其余部门保持「未设置」，
+    # 用例据此核对缺少部门默认时新事项被拒绝的提示与去处。给空串表示一个部门都不绑定
+    parser.add_argument("--bind-departments", default="product,engineering,quality")
+    # 按工厂装配系统（工单 #319 第 6 项）：就绪检查走目录里的部门默认，
+    # 目录缺哪个部门就在界面上被拒绝哪个部门；模型回答仍由同一份 FakeAdapter 脚本给出
+    parser.add_argument("--catalog-driven", action="store_true")
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
     # initial 是从想法新建带起始文件夹用的脚本（工单 #323）。它们需要的轮次与默认脚本的预置事项不同，
     # 因此由用例选择
@@ -467,7 +489,15 @@ def main() -> int:
         adapter_script = initial_script()
     else:
         adapter_script = script()
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=2.5 if args.room else 0.0))
+    if args.catalog_driven:
+        # 工单 #319 第 6 项：用例要在界面上核对「缺少部门默认」的真实拒绝。
+        # 就绪检查只按目录里的部门默认判断（LoopSystem.provider_status），单适配器方式直接返回
+        # FakeAdapter 的可用性，因此这个模式按工厂装配：模型回答仍来自同一份脚本，目录缺哪个部门就拒绝哪个。
+        # 工厂给出同一个适配器实例：每次新建会把脚本的读取位置重置到开头
+        adapter = FakeAdapter(adapter_script)
+        system = LoopSystem(data_dir, test_adapter_factory=lambda _department: adapter)
+    else:
+        system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=2.5 if args.room else 0.0))
     application = VersionedApplication(system)
     if args.api_version is not None:
         application.reported_api_version = args.api_version
@@ -496,6 +526,16 @@ def main() -> int:
     # （工单 #207 的验收），重复预置会让 work_item.create 被拒绝。真正的 `yudao api` 也不预置数据
     already_seeded = bool(application.query("projects.list", ProjectsList(include_archived=True)).data.projects)
     room_project = None
+    # 工单 #319 第 6 项：catalog_driven 模式先用三个部门都绑定好的目录跑完预置，
+    # 再把 --bind-departments 里没有的部门解开。预置的事项本身需要模型可用，
+    # 用例要核对的是预置之后新事项被拒绝的那一步
+    if args.catalog_driven:
+        # catalog_driven 模式的就绪检查按目录里的部门默认走真实路径，目录里的连接需要凭据；
+        # 预置的模型测试自己清掉了凭据，这里按界面上补凭据的做法再设一次，
+        # 预置跑完以后用例要核对缺少部门默认时的拒绝，不涉及凭据
+        os.environ["OPENCODE_GO_KEY"] = "seed-only-key"
+        asyncio.run(seed_catalog(application, upstream_base, models_server.base,
+                                 admit_and_bind=True, reject_base=reject_base))
     if not already_seeded:
         if args.room:
             room_project = asyncio.run(seed_room(application, system))
@@ -504,8 +544,12 @@ def main() -> int:
         elif args.script != "initial":
             # 起始文件夹的用例自己在界面上建项目并开始事项，不需要预置的项目与事项（工单 #323）
             asyncio.run(seed(application, system))
-    asyncio.run(seed_catalog(application, upstream_base, models_server.base,
-                             admit_and_bind=args.admit_and_bind, reject_base=reject_base))
+    if args.catalog_driven:
+        os.environ.pop("OPENCODE_GO_KEY", None)
+        asyncio.run(clear_department_defaults(application, args.bind_departments))
+    else:
+        asyncio.run(seed_catalog(application, upstream_base, models_server.base,
+                                 admit_and_bind=args.admit_and_bind, reject_base=reject_base))
 
     port = server.servers[0].sockets[0].getsockname()[1]
     print(json.dumps({"port": port, "data_dir": str(data_dir), "room_project": room_project,

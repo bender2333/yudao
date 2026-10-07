@@ -23,7 +23,7 @@ import { ticksOf } from "../timeline/logic";
 import { INPUT_KIND, PHASE_LABELS, STOP_REASON, WORK_ITEM_STATUS, departmentName, formatTime, label } from "./labels";
 import { RestartOnboarding } from "./restart-onboarding";
 import { BOARD_TITLES, boardColumns } from "./board";
-import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
+import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
 
 export function OverviewPage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
@@ -174,6 +174,18 @@ function CurrentItem(props: {
           ) : <p className="note">这台主机没有提供新建事项的操作</p>}
           <p className="note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
           <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
+          {(() => {
+            const links = rejectionLinks(props.command.rejection, props.projectId);
+            return links.length > 0 ? (
+              <div className="row-actions">
+                {links.map((link) => (
+                  <button key={link.hash} type="button" className="link" onClick={() => { window.location.hash = link.hash; }}>
+                    {link.label}
+                  </button>
+                ))}
+              </div>
+            ) : null;
+          })()}
         </div>
       </Section>
     );

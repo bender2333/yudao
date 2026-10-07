@@ -6758,6 +6758,28 @@
             ],
             "title": "Phase"
           },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
           "active": {
             "type": "boolean",
             "title": "Active"
@@ -6822,6 +6844,8 @@
           "work_item_id",
           "run_id",
           "phase",
+          "status",
+          "stop_reason",
           "active",
           "department_setting",
           "setting",

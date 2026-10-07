@@ -116,7 +116,8 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
   return { busy, submitted, rejection, accepted, submit };
 }
 
-// 命令被拒绝时的说明：基准版本过期时提示重新读取（工单验收第 3 条）
+// 命令被拒绝时的说明：基准版本过期时提示重新读取（工单验收第 3 条）。
+// 原因标识是内部词，不写进页面（工单 #319 第 5 项）；服务端的消息本身已经是中文说明
 export function rejectionLabel(rejection: Rejected): string {
   if (rejection.reason === "stale_base") {
     const version = rejection.current_version === null || rejection.current_version === undefined
@@ -124,5 +125,17 @@ export function rejectionLabel(rejection: Rejected): string {
       : rejection.current_version;
     return `${rejection.message}（服务端当前版本 ${version}），请重新读取以后提交`;
   }
-  return `${rejection.message}（原因 ${rejection.reason}）`;
+  return rejection.message;
+}
+
+// 被拒绝以后给用户的去处（工单 #319 第 6 项）：部门没有选模型时给两个地方，
+// 一处是全系统的部门默认，一处是这个项目的部门设置；其余拒绝原因不给去处
+export function rejectionLinks(rejection: Rejected | null, projectId: string): { label: string; hash: string }[] {
+  if (rejection === null || rejection.reason !== "provider_unavailable") {
+    return [];
+  }
+  return [
+    { label: "去模型管理页设置部门默认", hash: "/sys/models" },
+    { label: "在本项目的设置页选择模型", hash: `/p/${projectId}/settings` },
+  ];
 }

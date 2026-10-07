@@ -29,7 +29,7 @@ export interface BuildingItemRow {
 }
 
 const DEPARTMENTS = ["product", "engineering", "quality", "operations"] as const;
-/** 会待在房间里的状态（原型 scenes.js 的 IN_ROOM）。 */
+/** 会待在房间里的状态（原型 scenes.js 的 IN_ROOM）：用户停止的事项不再待在房间里。 */
 const IN_ROOM = ["running", "asking", "waiting_provider", "paused", "failed", "done", "cancelled", "interrupted", "pending_verification", "waiting_resume", "waiting_decision", "stopped_for_upgrade"];
 /** 亮灯对应的活跃状态（原型 scenes.js 的 ROOM_STATUS）。 */
 const ACTIVE = ["running", "asking", "pending_verification"];
@@ -55,8 +55,9 @@ export function sceneStatus(item: BuildingItemRow): string | null {
       return item.pending_question ? "waiting_decision" : "waiting_slot";
     case "not_started":
       return "queued";
+    // 用户停止的事项写「已停止」；恢复观察里的中断是另一回事（工单 #319）
     case "stopped":
-      return "interrupted";
+      return "stopped";
     case "adopted":
     case "released_unsettled":
       return "done";
@@ -65,13 +66,14 @@ export function sceneStatus(item: BuildingItemRow): string | null {
   }
 }
 
-/** 楼层的状态灯：按原型 markerOf 的优先级取第一个命中（等待恢复、待核实、中断、等待你的决定、等待模型服务、等待执行槽位、运行中、排队中，否则空闲）。 */
+/** 楼层的状态灯：按原型 markerOf 的优先级取第一个命中（等待恢复、待核实、中断、已停止、等待你的决定、等待模型服务、等待执行槽位、运行中、排队中，否则空闲）。 */
 export function floorStatus(items: BuildingItemRow[]): string {
   const statuses = items.map((it) => sceneStatus(it));
   const has = (s: string): boolean => statuses.includes(s);
   if (has("waiting_resume")) return "waiting_resume";
   if (has("pending_verification")) return "pending_verification";
   if (has("interrupted")) return "interrupted";
+  if (has("stopped")) return "stopped";
   if (has("waiting_decision")) return "waiting_decision";
   if (has("waiting_provider")) return "waiting_provider";
   if (has("waiting_slot")) return "waiting_slot";
