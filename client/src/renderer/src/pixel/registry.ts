@@ -181,9 +181,9 @@ export const CHAR_H = registry.charH;
 /** 原型正文用的字体栈。 */
 export const PROTOTYPE_FONT = registry.font;
 
-/** Fusion Pixel 像素字体的字体族与完整回退栈（工单 #176 的像素字体要求）。 */
-export const PIXEL_FONT_FAMILY = "'Fusion Pixel 10px Proportional SC'";
-export const PIXEL_FONT_STACK = `${PIXEL_FONT_FAMILY}, "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif`;
+/** 画面文字的字体栈（ADR-0021 第 4 条：微软雅黑，与原型 v9 engine.js 的 P.FONT 相同）。 */
+export const PIXEL_FONT_FAMILY = '"Microsoft YaHei UI"';
+export const PIXEL_FONT_STACK = '"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Source Han Sans SC", sans-serif';
 
 /** 档位顺序与标签（原型 y9.js）。 */
 export const LEVELS = registry.levels;

@@ -1,5 +1,6 @@
 // 小人绘制、头顶图标、气泡、牌子、印章、箭头、沙漏、像素圆角框与像素文字：
-// 由原型 v9 engine.js 第 7 节（1159-1464 行）改写为 TypeScript。画法与原型逐行一致，字体改用 Fusion Pixel 像素字体。
+// 由原型 v9 engine.js 第 7 节（1159-1464 行）改写为 TypeScript。画法与原型逐行一致。
+// 文字按屏幕的实际分辨率绘制（画布先乘整数倍并设缩放），字体为微软雅黑（ADR-0021 第 4 条）。
 
 import { animFrameAt } from "./anims.ts";
 import { bitmapDef, charFrame, flipGrid, type CharFrame } from "./char.ts";
@@ -178,7 +179,7 @@ export function itemRect(scene: SceneLike, a: ActorLike): [number, number, numbe
 }
 
 // ---------------------------------------------------------------------------
-// 文字：像素字体（Fusion Pixel），量宽、收缩、描边与发光
+// 文字：微软雅黑，量宽、收缩、描边与发光
 
 function textFont(size: number, weight?: number): string {
   return `${weight || 500} ${size}px ${PIXEL_FONT_STACK}`;

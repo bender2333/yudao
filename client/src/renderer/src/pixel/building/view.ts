@@ -1,13 +1,13 @@
-// 首页楼的画面对象：PixiJS 挂在宿主元素上，提供 setModel、playEvent、resize、destroy
+// 首页楼的画面对象：画布挂在宿主元素上，提供 setModel、playEvent、resize、destroy
 // （原型 v9 building.js 的对外接口，工单 #178）。
 //
-// 世界的推进（world/building.ts）与绘制（building/render.ts）都不依赖 PixiJS；这里只把画好的画布贴到舞台，
-// 缩放用最近邻（layoutFor 的整数倍），每帧由共用的时钟驱动。楼层数变化时逻辑高度随之改变，重排画布与纹理。
+// 世界的推进（world/building.ts）与绘制（building/render.ts）都不依赖画布与 WebGL；这里只把画好的画布挂到页面上，
+// 画布按设备分辨率绘制（surface.ts：像素尺寸为逻辑尺寸乘整数倍 k，先设缩放再按逻辑坐标绘制，工单 #365）。
+// 楼层数变化时逻辑高度随之改变，重排画布。
 
-import { Application, Sprite, Texture } from "pixi.js";
 import type { Clock } from "../clock.ts";
-import { layoutFor } from "../scale.ts";
-import { buildCatalog } from "../world/floor-decl.ts";
+import { createPixelSurface } from "../surface.ts";
+import { buildCatalog } from "./../world/floor-decl.ts";
 import { createScene } from "../world/scene.ts";
 import { BUILDING_GEO, buildingWalkerState, createBuildingDriver, type BuildingDriver, type BuildingModel } from "../world/building.ts";
 import { BuildingRenderer } from "./render.ts";
@@ -34,24 +34,13 @@ export interface BuildingViewOptions {
   onFloorClick?: (projectId: string) => void;
 }
 
-/** 建立首页的楼画面：画好的画布贴到 PixiJS 的舞台上，整数倍最近邻缩放到容器宽度。 */
+/** 建立首页的楼画面：画布按设备分辨率绘制，整数倍铺满容器宽度。 */
 export async function createBuildingView(opts: BuildingViewOptions): Promise<BuildingView> {
-  const app = new Application();
-  await app.init({ background: "#12101c", antialias: false, autoDensity: false, resolution: 1 });
-  const canvas = app.canvas;
-  canvas.style.imageRendering = "pixelated";
-  canvas.style.display = "block";
-  opts.host.appendChild(canvas);
-
   let width = BUILDING_GEO.W;
   let height = BUILDING_GEO.ROOF + BUILDING_GEO.FH + BUILDING_GEO.BASE;
-  // 离屏画布：世界与楼层的画法都画在这里，再作为纹理贴到舞台
-  let surface = document.createElement("canvas");
-  let ctx = surface.getContext("2d")!;
-  ctx.imageSmoothingEnabled = false;
-  let texture = Texture.from(surface);
-  const sprite = new Sprite(texture);
-  app.stage.addChild(sprite);
+  // 画布按设备分辨率绘制：像素尺寸为逻辑尺寸乘整数倍 k，图形与文字都按设备分辨率光栅化
+  const surface = createPixelSurface({ host: opts.host, W: width, H: height });
+  const canvas = surface.canvas;
 
   const catalog = buildCatalog({});
   const scene = createScene({
@@ -68,41 +57,21 @@ export async function createBuildingView(opts: BuildingViewOptions): Promise<Bui
 
   let last = 0;
 
-  function applyLayout(): void {
-    const rect = opts.host.getBoundingClientRect();
-    const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
-    const lay = layoutFor(width, height, rect.width || width, rect.height || height, dpr);
-    app.renderer.resize(lay.bufferW, lay.bufferH);
-    canvas.style.width = `${lay.cssW}px`;
-    canvas.style.height = `${lay.cssH}px`;
-    sprite.scale.set(lay.k);
-  }
-
   function draw(): void {
-    ctx.clearRect(0, 0, width, height);
-    renderer.draw(ctx);
-    texture.source.update();
-    app.renderer.render(app.stage);
+    renderer.draw(surface.frame());
   }
 
-  /** 楼层数变化时逻辑高度随之改变：重排画布、场景尺寸与纹理。 */
+  /** 楼层数变化时逻辑高度随之改变：重排画布与场景尺寸。 */
   function applySize(): void {
     const next = renderer.height();
     if (next === height) return;
     height = next;
-    surface = document.createElement("canvas");
-    surface.width = width;
-    surface.height = height;
-    ctx = surface.getContext("2d")!;
-    ctx.imageSmoothingEnabled = false;
     scene.H = height;
-    sprite.texture = Texture.from(surface);
-    texture.destroy(true);
-    texture = sprite.texture;
-    applyLayout();
+    surface.resizeTo(width, height);
+    surface.resize();
   }
 
-  applyLayout();
+  surface.resize();
   draw();
   const offTick = opts.clock.onTick((elapsed) => {
     const delta = Math.max(0, elapsed - last);
@@ -114,7 +83,7 @@ export async function createBuildingView(opts: BuildingViewOptions): Promise<Bui
   });
 
   const onResize = (): void => {
-    applyLayout();
+    surface.resize();
     draw();
   };
   window.addEventListener("resize", onResize);
@@ -151,7 +120,7 @@ export async function createBuildingView(opts: BuildingViewOptions): Promise<Bui
       draw();
     },
     resize() {
-      applyLayout();
+      surface.resize();
       draw();
     },
     destroy() {
@@ -160,8 +129,6 @@ export async function createBuildingView(opts: BuildingViewOptions): Promise<Bui
       canvas.removeEventListener("click", onClick);
       canvas.removeEventListener("mousemove", onMove);
       if (canvas.parentNode === opts.host) opts.host.removeChild(canvas);
-      texture.destroy(true);
-      app.destroy(false, { children: true });
     },
     inspect: () => ({ driver, scene, renderer }),
   };
