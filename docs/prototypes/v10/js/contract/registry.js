@@ -25,7 +25,7 @@
     'run.recovery': q('3.1', '恢复与动作核实'),
     'run.trials': q('3.2D', '试用记录'),
     'evidence.screenshot': q('3.2D', '截图证据'),
-    'acceptance.coverage': q('3.2D', '检验覆盖与开环', { replay: true }),
+    'acceptance.coverage': q('pilot', '检验覆盖与开环', { replay: true }),
     'run.loops': q('pilot', '循环实例与收敛状态', { replay: true }),
     'work_item.materials': q('ui', '资料'),
     'delivery.file': q('ui', '交付文件'),

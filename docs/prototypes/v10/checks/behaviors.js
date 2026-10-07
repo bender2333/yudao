@@ -586,7 +586,7 @@ async function pilotChecks(ctx) {
     const NEW = ['loops', 'sources', 'coverage'];
     push('覆盖层：3.2D 档没有「循环」「来源」「检验」', NEW.every((id) => !d.ov.includes(id)), d.ov.join());
     push('覆盖层：自举试点起列出「循环」「来源」「检验」', NEW.every((id) => pl.ov.includes(id)), pl.ov.join());
-    push('查询：acceptance.coverage 在 3.2D 档出现，run.loops 在自举试点出现', d.q.includes('acceptance.coverage') && !d.q.includes('run.loops') && pl.q.includes('run.loops'));
+    push('查询：acceptance.coverage 与 run.loops 在自举试点出现，3.2D 档没有', !d.q.includes('acceptance.coverage') && !d.q.includes('run.loops') && pl.q.includes('acceptance.coverage') && pl.q.includes('run.loops'));
     const src = await p.evaluate(() => {
       const Y = window.Y10;
       Y.level.set('3.2D');
