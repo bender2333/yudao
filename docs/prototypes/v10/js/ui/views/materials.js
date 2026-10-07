@@ -127,13 +127,45 @@
     });
   }
 
+  // 质检的逐条结论表（3.2D，#154）：每条验收条件一行；表头写交付快照的摘要与检验覆盖比例；开环的条件带「开环」标记
+  const RESULT = { pass: ['succeeded', '通过'], fail: ['failed', '未通过'], not_run: ['idle', '没有运行'] };
+
+  function criteriaTable(doc) {
+    const methods = Y10.registry.CHECK_METHODS;
+    const rows = doc.criteria;
+    const counts = {
+      covered: rows.filter((c) => methods[c.method].executable && c.result !== 'not_run').length,
+      total: rows.length,
+      model_read: rows.filter((c) => methods[c.method].model).length,
+      open_count: rows.filter((c) => !methods[c.method].executable).length
+    };
+    const head = '<p class="y10-mt-criteria-head">交付快照 ' + Y10.ui.code(doc.snapshot || '—') + ' · ' + esc(Y10.coverageText(counts)) + '</p>';
+    const table = Y10.ui.table({
+      className: 'y10-mt-criteria',
+      columns: [
+        { label: '验收条件', render: (c) => '<strong>' + esc(c.criterion) + '</strong> ' + esc(c.text) + (methods[c.method].executable ? '' : ' ' + Y10.ui.tag('开环', 'open')) },
+        { label: '检验方式', render: (c) => esc(methods[c.method].label) },
+        { label: '结果', render: (c) => Y10.ui.status(RESULT[c.result][0], RESULT[c.result][1]) + (c.note ? '<small class="y10-muted y10-block-line">' + esc(c.note) + '</small>' : '') },
+        { label: '证据', render: (c) => (c.checks || []).concat((c.trial_cases || []).map((t) => t.name)).map((s) => '<span class="y10-block-line">' + esc(s) + '</span>').join('') },
+        {
+          label: '截图', render: (c) => (c.trial_cases || []).filter((t) => t.screenshot).map((t) =>
+            '<button type="button" class="y10-mt-shot is-thumb" data-act="mt.shot" data-path="' + esc(shotSrc(t.screenshot)) + '" data-title="' + esc(doc.title + ' · ' + c.criterion) + '">' +
+            '<img src="' + esc(shotSrc(t.screenshot)) + '" alt="' + esc(c.criterion + ' 的截图') + '" loading="lazy"></button>').join('')
+        }
+      ],
+      rows,
+      rowAttrs: (c) => 'data-criterion="' + esc(c.criterion) + '"' + (methods[c.method].executable ? '' : ' data-open="1"')
+    });
+    return head + table;
+  }
+
   function qaBlock(m) {
     if (!m.qa) return '';
     const body = m.qa.length
       ? '<ol class="y10-mt-list">' + m.qa.slice().reverse().map((doc) => {
         const verdict = VERDICT[doc.verdict];
         if (!verdict) throw new Error('未知的质检结论：' + doc.verdict);
-        const checks = (doc.checks || []).map((check) =>
+        const checks = doc.criteria ? '' : (doc.checks || []).map((check) =>
           '<li class="' + (check.ok ? 'is-ok' : 'is-fail') + '">' + Y10.ui.icon(check.ok ? 'succeeded' : 'failed') +
           '<span>' + esc(check.label) + '</span><small class="y10-muted">' + (check.ok ? '通过' : '不通过') + '</small></li>').join('');
         const receipts = (doc.receipt_actions || []).map((action) =>
@@ -142,11 +174,13 @@
           '<span>' + esc(action.summary || '') + '</span>' +
           (action.machine_id ? '<span class="y10-muted">机器 ' + esc(action.machine_id) + '</span>' : '') +
           (action.receipt ? '<span class="y10-muted">退出状态 ' + esc(action.receipt.exit_code) + '</span>' : '') + '</li>').join('');
-        const shots = (doc.screenshots || []).map((path) =>
+        // 有逐条结论时截图在表里每一行的试用用例旁
+        const shots = doc.criteria ? '' : (doc.screenshots || []).map((path) =>
           '<button type="button" class="y10-mt-shot" data-act="mt.shot" data-path="' + esc(shotSrc(path)) + '" data-title="' + esc(doc.title) + '">' +
           '<img src="' + esc(shotSrc(path)) + '" alt="' + esc(doc.title) + ' 的截图" loading="lazy"></button>').join('');
         return '<li class="y10-mt-doc ' + verdict.cls + '">' + docHead(doc, Y10.ui.status(verdict.kind, verdict.label)) +
           '<p>' + esc(doc.text) + '</p>' +
+          (doc.criteria ? criteriaTable(doc) : '') +
           (checks ? '<ul class="y10-mt-checks">' + checks + '</ul>' : '') +
           (receipts ? '<div class="y10-pp-sub">检查回执</div><ul class="y10-mt-receipts">' + receipts + '</ul>' : '') +
           (shots ? '<div class="y10-pp-sub">试用截图</div><div class="y10-mt-shots">' + shots + '</div>' : '') + '</li>';

@@ -39,6 +39,17 @@
   };
   const TUBE = '#7fc3e8', TUBE_D = '#3f86b0';
 
+  // 五种收敛状态与「不判定」：颜色与文字一起表示状态，覆盖层「循环」的图例、观测页与离开期间的报告共用这一组（design.md 第 3 节）
+  P.LOOP_STATES = {
+    converging: { label: '收敛中', color: PAL.green2, fg: PAL.white },
+    stalled: { label: '停滞', color: PAL.yellow2, fg: PAL.ink },
+    oscillating: { label: '震荡', color: PAL.orange2, fg: PAL.ink },
+    drifting: { label: '漂移', color: '#8f5fcf', fg: PAL.white },
+    at_bound: { label: '达到边界', color: PAL.red2, fg: PAL.white },
+    not_judged: { label: '不判定', color: PAL.grey2, fg: PAL.ink }
+  };
+  const RESULT_TEXT = { pass: '通过', fail: '未通过', not_run: '还没有在当前快照上运行' };
+
   // 画面状态与事实的对照：动作图鉴列出（设计说明第 5.4 节）
   P.FLOOR_VIEWS = [
     { id: 'working', fact: '部门正在工作', source: '事项的当前部门与 department_activated', picture: '该房间亮灯，房间里的小人在工位工作', level: 'ui', events: ['department_activated'] },
@@ -63,7 +74,10 @@
     { id: 'terminal', fact: '终止', source: 'run_done、run_failed、run_paused、取消', picture: '门口立完成、失败（停止原因）、暂停或已取消的牌子', level: 'ui', events: ['run_done', 'run_failed', 'run_paused'] },
     { id: 'decision', fact: '等待回答的决定请求', source: '决定请求（decisions.list）与 x_decision_issued', picture: '提出决定的部门的经理走到门口送出决定单，飞到大厅墙上的板子；点板子，卡片在画面里摊开，点章回答；回答过的决定单飞回部门门口，经理收下', level: 'ui', events: ['x_decision_issued', 'x_decision_answered', 'project_decision_requested', 'project_decision_answered'] },
     { id: 'roles', fact: '部门内的分派与交回', source: '角色任务事件（x_role_task_assigned、x_role_result_returned）、审查与探索者事件', picture: '经理走到角色的工位旁递任务卡，角色走到经理身旁交回结果，审查者盖章，探索者走到文件柜；房间里有几个角色就有几个小人', level: 'S5', events: ['x_role_task_assigned', 'x_role_result_returned', 'x_review_recorded', 'x_explorer_fetch'] },
-    { id: 'idle', fact: '空闲', source: '部门没有事项，角色没有任务', picture: '坐着喝茶的小人隔几秒自己挑一件事：伸懒腰、走动、翻文件柜、门口抬头看、两个空闲的小人碰头说话；管道停止时光点留在管道里', level: 'ui', events: [] }
+    { id: 'idle', fact: '空闲', source: '部门没有事项，角色没有任务', picture: '坐着喝茶的小人隔几秒自己挑一件事：伸懒腰、走动、翻文件柜、门口抬头看、两个空闲的小人碰头说话；管道停止时光点留在管道里', level: 'ui', events: [] },
+    { id: 'loops', fact: '循环实例与收敛状态', source: 'run.loops：由事件按规则算出的收敛状态与判定依据', picture: '覆盖层「循环」：信息条写 run 的收敛状态，部门房间写这次激活的已用时间与上限，正在工作的角色头顶写步骤循环；颜色与文字一起表示状态，右上角有图例', level: 'pilot', events: ['qa_submitted', 'tool_started', 'transition', 'run_failed'] },
+    { id: 'sources', fact: '事实来源', source: 'project.loop 按「事件加字段」给出每个事实元素的来源（已用时间这类测量值为主机测量）', picture: '覆盖层「来源」：画面其余部分调暗，事实元素按确定规则、决策模型、角色陈述、主机测量、用户描边，角色陈述与决策模型用加粗的虚线；点元素打开来源卡片', level: 'pilot', events: [] },
+    { id: 'coverage', fact: '检验覆盖与开环', source: 'acceptance.coverage：每条验收条件的检验方式、最近的结果与是否开环', picture: '覆盖层「检验」：质检房间写检验覆盖比例、模型阅读与开环的条件数，开环时黄底；点开是逐条清单；放行的盖章旁写这次放行的覆盖比例', level: 'pilot', events: ['qa_submitted', 'x_evidence_checked'] }
   ];
 
   // ---------------------------------------------------------------------------
@@ -89,7 +103,8 @@
     const out = Object.values(world.links).find((l) => l.from === hall.id && l.linkKind === 'handoff');
     return {
       hall, lib: rooms.find((r) => r.roomKind === 'shelf'), depts: rooms.filter((r) => r.roomKind === 'dept'),
-      out, gate: world.rooms[out.to], door: world.machineDoor
+      out, gate: world.rooms[out.to], door: world.machineDoor,
+      verify: rooms.find((r) => r.def.verifies) || null
     };
   }
 
@@ -104,12 +119,43 @@
     let focusId = null;
     let overlay = { id: null, data: null };
     const st = {
-      clock: 15.5 * 3600000, flash: {}, pipeFlash: {}, arrows: [], hidden: {}, remoteDots: [], queueX: {}, n: 0, said: {}
+      clock: 15.5 * 3600000, flash: {}, pipeFlash: {}, arrows: [], hidden: {}, remoteDots: [], queueX: {}, n: 0, said: {},
+      facts: [], labels: [], barX: 0, wantFact: null
     };
     const scene = P.createScene(canvas, { W, H, draw, update });
     // 世界里的决定卡片：决定单贴在大厅的板上，点开在画面里回答（decision-card.js）
     const card = P.createDecisionCard(scene, canvas, { onDecide: o.onDecide, onGo: o.onGo });
+    // 来源卡片：点事实元素打开，写给出这条事实的事件与来源种类（source-card.js）
+    const sourceCard = P.createSourceCard(scene, canvas, { onSeek: o.onSeek, fetchEvent: o.fetchEvent });
     let bg = null, bgKey = '';
+
+    // -------------------------------------------------------------------------
+    // 事实元素（design.md 第 5 节）：每帧画的时候收集 { kind, rect, position, field, source }，供覆盖层「来源」、点击与验收脚本使用。
+    // 来源按「事件加字段」由读取模型给出（refs 写成 { position, field, source }）；覆盖层的标签只有事件位置时按事件种类。
+    // 快照里没有来源（自举试点以前的档位）时，画面照旧，元素不是事实元素
+
+    const sourceCache = new Map();
+    function sourceOf(position) {
+      if (!position || !o.fetchEvent) return null;
+      if (!sourceCache.has(position)) {
+        const ev = o.fetchEvent(position);
+        sourceCache.set(position, ev && ev.source ? ev.source : null);
+      }
+      return sourceCache.get(position);
+    }
+
+    function fact(kind, rect, ref, extra) {
+      const r = ref && typeof ref === 'object' ? ref : { position: ref || null, field: null, source: sourceOf(ref) };
+      const f = Object.assign({
+        kind, rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.w), h: Math.round(rect.h) },
+        position: r.position || null, field: r.field || null, source: r.source || null
+      }, extra || {});
+      st.facts.push(f);
+      return f;
+    }
+
+    // 快照带着来源时，没有来源的元素不画
+    const noSource = (refs, key) => Boolean(refs) && !refs[key];
 
     const itemById = (id) => model.items.find((it) => it.id === id) || null;
     const dimFor = (itemId) => (focusId && itemId && itemId !== focusId ? 0.3 : 1);
@@ -210,7 +256,7 @@
       }
       const id = 'pk-' + (++packageSeq);
       const pk = ECS.spawnPackage(world, id, option.itemId || null, null, option.artifact || null, null);
-      Object.assign(pk, { bmp, color: option.color, small: option.small });
+      Object.assign(pk, { bmp, color: option.color, small: option.small, fact: option.fact || null });
       ECS.sendPackage(world, id, option.linkKey || null, pts, option.ms, () => {
         ECS.removePackage(world, id);
         if (option.onDone) option.onDone();
@@ -223,17 +269,25 @@
         if (!pos) return;
         const [x, y] = pos;
         c.globalAlpha = dimFor(pk.workItemId);
+        let rect;
         if (pk.small) {
           RB(c, Math.round(x) - 2, Math.round(y) - 1, 5, 3, PAL.white);
           R(c, Math.round(x) - 1, Math.round(y), 3, 1, pk.color || PAL.blue2);
+          rect = { x: x - 4, y: y - 3, w: 8, h: 7 };
         } else {
           const b = P.bitmap(pk.bmp);
           P.drawBitmap(c, pk.bmp, Math.round(x - b.w / 2), Math.round(y - b.h / 2));
           if (pk.color) R(c, Math.round(x - b.w / 2), Math.round(y + b.h / 2), b.w, 2, pk.color);
+          rect = { x: x - b.w / 2, y: y - b.h / 2, w: b.w, h: b.h + 2 };
         }
         c.globalAlpha = 1;
+        // 管道中的包裹：来源是引起这次交接或传信的事件（事件对象带 source）
+        if (pk.fact) fact('package', rect, pk.fact, { title: pk.fact.title });
       });
     }
+
+    // 管道中的包裹：来源是引起这次移动的事件，按事件种类
+    const transitFact = (ev) => (ev.source && ev.position ? { position: ev.position, field: null, source: ev.source, title: '管道中的包裹：' + (ev.label || ev.type) } : null);
 
     // -------------------------------------------------------------------------
     // 事件
@@ -248,7 +302,7 @@
         const link = world.links[f.send.link];
         if (!link) return;
         send(f.send.reverse ? link.pts.slice().reverse() : link.pts, f.send.bmp, {
-          color: f.send.color ? PAL[f.send.color] : null, linkKey: link.id,
+          color: f.send.color ? PAL[f.send.color] : null, linkKey: link.id, fact: transitFact(ev),
           onDone: () => (f.send.then || []).forEach((g) => applyFx(g, ev, ch))
         });
       }
@@ -296,7 +350,7 @@
           const bmp = ART_BMP[pl.artifact] || 'box_sealed';
           // 交出方走到管道口放下包裹，包裹沿管道移动，接收方走到管道口取出：两端各是一个任务
           const arrive = () => { flash(to, PAL.white, 500); trip(to, rework ? 'package_return_in' : 'package_handoff_in', null, sayOf(ev, to, 'to')); };
-          const leg = (i) => send(hops[i].pts, bmp, { itemId: wid, color, linkKey: hops[i].key, onDone: () => (i + 1 < hops.length ? leg(i + 1) : arrive()) });
+          const leg = (i) => send(hops[i].pts, bmp, { itemId: wid, color, linkKey: hops[i].key, fact: transitFact(ev), onDone: () => (i + 1 < hops.length ? leg(i + 1) : arrive()) });
           trip(from, rework ? 'package_return_out' : 'package_handoff_out', () => leg(0), sayOf(ev, from, 'from'));
           return;
         }
@@ -309,7 +363,7 @@
           const pts = tubeFor(pl.from, pl.to);
           const forward = order.indexOf(pl.to) > order.indexOf(pl.from);
           trip(pl.from, forward ? 'letter_out' : 'letter_in', () => send(pts, 'letter', {
-            small: true, itemId: wid, color: PAL.blue2, linkKey: tubeKeyOf(pl.from, pl.to),
+            small: true, itemId: wid, color: PAL.blue2, linkKey: tubeKeyOf(pl.from, pl.to), fact: transitFact(ev),
             onDone: () => trip(pl.to, forward ? 'letter_arrive_in' : 'letter_arrive_out', null, sayOf(ev, pl.to, 'to'))
           }), sayOf(ev, pl.from, 'from'));
           return;
@@ -321,7 +375,7 @@
           const pts = tubeFor(answerer, asker);
           const forward = order.indexOf(asker) > order.indexOf(answerer);
           trip(answerer, forward ? 'letter_out' : 'letter_in', () => send(pts, 'letter', {
-            small: true, itemId: wid, color: PAL.green2, linkKey: tubeKeyOf(answerer, asker),
+            small: true, itemId: wid, color: PAL.green2, linkKey: tubeKeyOf(answerer, asker), fact: transitFact(ev),
             onDone: () => trip(asker, forward ? 'letter_arrive_in' : 'letter_arrive_out', null, sayOf(ev, asker, 'to'))
           }), sayOf(ev, answerer, 'from'));
           return;
@@ -337,7 +391,7 @@
           return;
         case 'x_slot_acquired': {
           st.flash[lay.hall.id] = { color: PAL.green2, until: scene.realT + 900 };
-          send(lay.out.pts, 'box', { itemId: wid, color, linkKey: lay.out.id, onDone: () => trip(lay.out.to, 'package_handoff_in') });
+          send(lay.out.pts, 'box', { itemId: wid, color, linkKey: lay.out.id, fact: transitFact(ev), onDone: () => trip(lay.out.to, 'package_handoff_in') });
           return;
         }
         case 'x_queue_reordered':
@@ -615,13 +669,14 @@
       const slotWait = q.some((it) => it.status === 'waiting_slot');
       q.forEach((it, i) => {
         const px = Math.round(st.queueX[it.id] === undefined ? queueSlotX(i) : st.queueX[it.id]);
-        if (px < x + 24) return;
+        if (px < x + 24 || noSource(it.refs, 'parcel')) return;
         c.globalAlpha = dimFor(it.id);
         P.drawBitmap(c, 'box', px - 6, PIPE_Y - 16);
         R(c, px - 6, PIPE_Y - 4, 12, 2, P.ITEM_COLORS[it.color_index % P.ITEM_COLORS.length]);
         if (it.kind === 'repair') { R(c, px - 1, PIPE_Y - 14, 2, 6, PAL.red2); R(c, px - 3, PIPE_Y - 12, 6, 2, PAL.red2); }
         if (it.queue_pos) P.pixText(c, String(it.queue_pos), px, PIPE_Y - 24, PAL.ink, 'center');
         c.globalAlpha = 1;
+        if (it.refs) fact('parcel', { x: px - 7, y: PIPE_Y - 25, w: 14, h: 23 }, it.refs.parcel, { title: '大厅里排队的包裹：' + it.title, itemId: it.id });
       });
       // 入口阀门：等待执行槽位时关闭
       const vx = lay.gate.inPort - 8;
@@ -747,12 +802,17 @@
       P.text(c, '已采纳', r.x + 20, TOP + 32, { size: 6, weight: 700, color: PAL.green3 });
       paint.shelf(c, r.x + 18, FLOOR_LINE - 24, r.w - 24);
       const per = Math.max(1, Math.floor((r.w - 26) / 18));
+      // 自举试点起每只箱子带着采纳它的事件（shelves.boxes）
+      const boxes = model.shelves && model.shelves.boxes ? model.shelves.boxes.slice(-per) : null;
       adopted.slice(-per).forEach((v, i, arr) => {
+        const box = boxes ? boxes[i] : null;
+        if (boxes && !(box && box.ref)) return;
         const bx = r.x + 20 + i * 18;
         P.drawBitmap(c, 'box_sealed', bx, FLOOR_LINE - 33);
         RB(c, bx + 1, FLOOR_LINE - 20, 13, 7, PAL.white);
         P.text(c, v, bx + 7.5, FLOOR_LINE - 16.2, { size: 6, weight: 800, align: 'center', color: PAL.green3, max: 13 });
         if (i === arr.length - 1 && sig('shelf')) paint.blinkFrame(c, bx - 1, FLOOR_LINE - 35, 15, 23);
+        if (box) fact('box', { x: bx, y: FLOOR_LINE - 33, w: 15, h: 21 }, box.ref, { title: '成果库的箱子：采纳 ' + v });
       });
       if (!adopted.length) P.text(c, '尚未采纳', r.x + r.w / 2, FLOOR_LINE - 30, { size: 6, align: 'center', color: PAL.grey3 });
       drawDoor(c, r);
@@ -796,7 +856,13 @@
     // 覆盖层（设计说明第 5.6 节）
 
     function drawOverlay(c) {
+      st.labels = [];
       if (!overlay.id || !overlay.data) return;
+      // 来源的标记要等全部事实元素（包括信息条）画完再画，见 drawOverlayTop
+      if (overlay.id === 'sources') {
+        drawStamp(c, null);
+        return;
+      }
       c.fillStyle = 'rgba(12,14,30,0.35)';
       c.fillRect(0, BAR, W, H - BAR);
       const label = (x, y, text, bg) => P.sign(c, x, y, text, { size: 6, bg: bg || PAL.white, stripe: PAL.blue2, maxW: 150 });
@@ -837,7 +903,186 @@
           if (!r) return;
           label(r.x + r.w / 2, TOP + 44, '有效 ' + e.valid + ' · 冲突 ' + e.conflicts, e.conflicts ? PAL.orange1 : PAL.white);
         });
+      } else if (overlay.id === 'loops') {
+        drawLoops(c, data);
+      } else if (overlay.id === 'coverage') {
+        drawCoverage(c, data);
       }
+    }
+
+    // -------------------------------------------------------------------------
+    // 覆盖层「循环」（design.md 第 3 节）：取值只来自 run.loops 的结果
+
+    function usedText(u) {
+      const fmt = (v) => (u.unit === '秒' ? Y10.time.duration(v) : v + ' ' + u.unit);
+      return u.limit === null || u.limit === undefined ? fmt(u.value) : fmt(u.value) + ' / ' + fmt(u.limit);
+    }
+
+    // 标签也是事实元素：判定过的写给出状态的事件，「不判定」写缺少的事实。
+    // 状态由进展度量的某一轮给出时，来源是这一轮数值的来源（按事件加字段，例如检查结果是主机测量）
+    function loopFact(inst, rect) {
+      const title = inst.label + '：' + P.LOOP_STATES[inst.state].label;
+      if (inst.state === 'not_judged') return fact('missing', rect, null, { title, missing: inst.missing, instanceId: inst.id });
+      const notes = [inst.basis].concat(inst.stop_reason ? ['停止原因：' + inst.stop_reason] : []).filter(Boolean);
+      const point = inst.measure && inst.measure.series.find((p) => p.position === inst.position);
+      const ref = point ? { position: inst.position, field: inst.measure.field, source: point.source } : inst.position;
+      return fact('loop', rect, ref, { title, notes, instanceId: inst.id });
+    }
+
+    function stateSign(c, x, bottom, text, state, maxW) {
+      const s = P.LOOP_STATES[state];
+      return P.sign(c, x, bottom, text, { size: 6, bg: s.color, fg: s.fg, stripe: PAL.ink, maxW });
+    }
+
+    function drawLoops(c, data) {
+      const it = infoItem();
+      const entry = it && (data.items || []).find((x) => x.work_item_id === it.id);
+      if (entry) {
+        // 部门房间的中央：这个 run 里本部门最近的一次激活
+        lay.depts.forEach((r) => {
+          const act = entry.instances.filter((x) => x.layer === 'activation' && x.department === r.id).pop();
+          if (!act) return;
+          const text = act.label + '\n' + usedText(act.used[0]) + (act.used[0].at_bound ? '（到上限）' : '') + '\n' + P.LOOP_STATES[act.state].label;
+          loopFact(act, stateSign(c, r.x + r.w / 2, TOP + 62, text, act.state, r.w - 4));
+          st.labels.push({ layer: 'activation', id: act.id, state: act.state, text });
+        });
+        // 正在工作的角色头顶：还没有结束的激活里的步骤循环
+        const open = entry.instances.filter((x) => x.layer === 'activation' && !x.stop_reason).pop();
+        const step = open && entry.instances.find((x) => x.layer === 'step' && x.parent === open.id);
+        const ch = step && ((step.role && world.characters[step.role]) || ECS.primaryOf(world, step.department));
+        const a = ch && workerOf(ch);
+        if (step && a && a.visible) {
+          const text = '步骤 ' + step.used[0].value + '/' + step.used[0].limit + ' · ' + P.LOOP_STATES[step.state].label;
+          loopFact(step, stateSign(c, Math.round(a.x), Math.round(a.y) - 36, text, step.state, 120));
+          st.labels.push({ layer: 'step', id: step.id, state: step.state, text });
+        }
+      }
+      drawLegend(c, Object.keys(P.LOOP_STATES).map((k) => ({ color: P.LOOP_STATES[k].color, text: P.LOOP_STATES[k].label })));
+    }
+
+    // 信息条：紧接「第 N 轮」与时间进度条写 run 的收敛状态；run 已经停止时写停止原因
+    function drawLoopsBar(c, data) {
+      const it = infoItem();
+      const entry = it && (data.items || []).find((x) => x.work_item_id === it.id);
+      const run = entry && entry.instances.find((x) => x.layer === 'run');
+      if (!run) return;
+      const s = P.LOOP_STATES[run.state];
+      const text = 'run：' + s.label + (run.stop_reason ? ' · ' + run.stop_reason : '');
+      c.font = '700 6.5px ' + P.FONT;
+      const w = Math.min(150, c.measureText(text).width + 8);
+      R(c, st.barX, 4, w, 10, PAL.ink);
+      R(c, st.barX + 1, 5, w - 2, 8, s.color);
+      P.text(c, text, st.barX + w / 2, 9, { size: 6.5, weight: 700, align: 'center', color: s.fg, max: w - 4 });
+      loopFact(run, { x: st.barX, y: 4, w, h: 10 });
+      st.labels.push({ layer: 'run', id: run.id, state: run.state, text });
+    }
+
+    // 右上角的图例
+    // 来源的一行：图标、画面上的描边样式、名称与个数
+    function drawLegend(c, rows) {
+      const sources = rows.some((row) => row.source);
+      const rh = sources ? 14 : 9;
+      const w = sources ? 106 : 92, h = rows.length * rh + 6;
+      const x = W - w - 4, y = BAR + 4;
+      RB(c, x, y, w, h, PAL.paper);
+      rows.forEach((row, i) => {
+        const cy = y + 3 + i * rh + rh / 2;
+        let tx = x + 15;
+        if (row.source) {
+          P.drawSourceIcon(c, row.source, x + 5, cy - 5.5);
+          R(c, x + 21, cy - 3, 11, 6, PAL.grey4);
+          strokeSource(c, row.source, x + 20.5, cy - 3.5, 12, 7);
+          tx = x + 37;
+        } else {
+          RB(c, x + 4, cy - 3.5, 7, 7, row.color);
+        }
+        P.text(c, row.text, tx, cy, { size: 6, weight: 600, color: PAL.ink, max: x + w - tx - 2 });
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // 覆盖层「检验」（design.md 第 6.1 节）：取值只来自 acceptance.coverage 的结果
+
+    // 质检房间写哪一个事项：信息条上的事项有逐条结论时写它，否则写最近有逐条结论的事项
+    function coverageSubject(data) {
+      const items = data.items || [];
+      const it = infoItem();
+      const latest = (x) => Math.max.apply(null, x.criteria.map((cr) => cr.position));
+      return (it && items.find((x) => x.work_item_id === it.id)) || items.slice().sort((a, b) => latest(b) - latest(a))[0] || null;
+    }
+
+    function drawCoverage(c, data) {
+      const r = lay.verify;
+      const subject = coverageSubject(data);
+      if (r && subject) {
+        const title = (itemById(subject.work_item_id) || { title: subject.work_item_id }).title;
+        const text = title + '\n' + Y10.coverageText(subject);
+        const rect = P.sign(c, r.x + r.w / 2, TOP + 60, text, { size: 6, bg: subject.open_count > 0 ? PAL.yellow1 : PAL.white, stripe: PAL.blue2, maxW: r.w + 40 });
+        const pos = Math.max.apply(null, subject.criteria.map((cr) => cr.position));
+        fact('coverage', rect, pos, { title: title + '：' + Y10.coverageText(subject), subject });
+        st.labels.push({ kind: 'coverage', work_item_id: subject.work_item_id, covered: subject.covered, total: subject.total, model_read: subject.model_read, open_count: subject.open_count, text });
+      }
+      drawStamp(c, data);
+    }
+
+    // 质检房间里放行的盖章（本项目最近一次放行，project.loop 的 stamp），覆盖层「检验」打开时旁边写这次放行的覆盖比例
+    function drawStamp(c, data) {
+      const r = lay.verify;
+      const stamp = model.stamp;
+      if (!r || !stamp || !stamp.ref) return;
+      // 盖章贴在墙的下半截，房间中央的标签下面
+      const sx = r.x + 22, sy = TUBE_Y + 18;
+      RB(c, sx - 15, sy - 9, 30, 18, PAL.paper);
+      P.stampMark(c, sx, sy, '放行', PAL.green3, { size: 7 });
+      fact('stamp', { x: sx - 15, y: sy - 9, w: 30, h: 18 }, stamp.ref, { title: '质检的盖章：「' + ((itemById(stamp.work_item_id) || {}).title || stamp.work_item_id) + '」放行' });
+      const cov = data && (data.items || []).find((x) => x.release && x.release.position === stamp.ref.position);
+      if (cov) {
+        // 写在盖章下方：第一行覆盖比例，第二行开环（放不下一行）
+        const full = '放行时 ' + Y10.coverageText(cov.release.ratio);
+        const text = full.replace(' · ', '\n');
+        const rect = P.sign(c, r.x + r.w / 2, FLOOR_LINE + 8, text, { size: 6, bg: PAL.white, stripe: PAL.green3, maxW: r.w - 4 });
+        fact('release', rect, cov.release.position, { title: full });
+        st.labels.push({ kind: 'release', work_item_id: cov.work_item_id, covered: cov.release.ratio.covered, total: cov.release.ratio.total, text });
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 画在信息条之后的覆盖层内容：信息条上的循环状态、来源的着色与图例
+
+    function drawOverlayTop(c) {
+      if (!overlay.id || !overlay.data) return;
+      if (overlay.id === 'loops') drawLoopsBar(c, overlay.data);
+      if (overlay.id === 'sources') drawSourceMarks(c);
+    }
+
+    // 覆盖层「来源」（design.md 第 5.2 节）：画面其余部分调暗，事实元素按自己的来源描边（确定规则灰、主机测量蓝、用户绿，
+    // 角色陈述与决策模型用加粗的虚线）；右上角的图例写每种来源在画面上有几个元素
+    let dimMask = null;
+    function strokeSource(c, source, x, y, w, h) {
+      const s = P.SOURCE_STYLE[source];
+      c.save();
+      c.strokeStyle = s.line;
+      c.lineWidth = s.dash ? 2 : 1;
+      c.setLineDash(s.dash ? [3, 2] : []);
+      c.strokeRect(x, y, w, h);
+      c.restore();
+    }
+
+    function drawSourceMarks(c) {
+      const facts = st.facts.filter((f) => f.source);
+      // 在一张遮罩上挖掉事实元素所在的位置，再盖到画面上
+      if (!dimMask) dimMask = P.makeCanvas(W, H);
+      const m = dimMask.getContext('2d');
+      m.clearRect(0, 0, W, H);
+      m.fillStyle = 'rgba(12,14,30,0.6)';
+      m.fillRect(0, BAR, W, H - BAR);
+      facts.forEach((f) => m.clearRect(f.rect.x - 1, f.rect.y - 1, f.rect.w + 2, f.rect.h + 2));
+      c.drawImage(dimMask, 0, 0);
+      facts.forEach((f) => strokeSource(c, f.source, f.rect.x - 1.5, f.rect.y - 1.5, f.rect.w + 3, f.rect.h + 3));
+      const counts = {};
+      facts.forEach((f) => { counts[f.source] = (counts[f.source] || 0) + 1; });
+      drawLegend(c, Object.keys(Y10.registry.SOURCE_KINDS).map((k) => ({ source: k, text: Y10.registry.SOURCE_KINDS[k].label + ' ' + (counts[k] || 0) })));
+      st.labels.push({ kind: 'sources', counts });
     }
 
     // -------------------------------------------------------------------------
@@ -859,6 +1104,7 @@
 
     function draw(sc, c) {
       const t = sc.animT;
+      st.facts = [];
       c.drawImage(buildBackground(), 0, 0);
       drawHall(c, t);
       lay.depts.forEach((r) => drawDeptRoom(c, r, t));
@@ -897,19 +1143,26 @@
         P.sign(c, r.x + r.w / 2, TOP + 4, D.name, { size: 7, bg: D.main, fg: PAL.white, hi: D.light, lo: D.shade, minW: 30 });
         const here = itemsIn(r.id);
         here.forEach((it, i) => {
+          if (noSource(it.refs, 'parcel')) return;
           c.globalAlpha = dimFor(it.id);
-          P.drawBitmap(c, (Math.floor(t / 320) + i) % 2 && !sc.reduced ? 'flag2' : 'flag', r.door - 22 - i * 9, ROOM_B + 4, { recolor: { X: P.ITEM_COLORS[it.color_index % 6], x: P.ITEM_SHADES[it.color_index % 6] } });
+          const fx = r.door - 22 - i * 9;
+          P.drawBitmap(c, (Math.floor(t / 320) + i) % 2 && !sc.reduced ? 'flag2' : 'flag', fx, ROOM_B + 4, { recolor: { X: P.ITEM_COLORS[it.color_index % 6], x: P.ITEM_SHADES[it.color_index % 6] } });
           c.globalAlpha = 1;
+          if (it.refs) {
+            const b = P.bitmap('flag');
+            fact('parcel', { x: fx, y: ROOM_B + 4, w: b.w, h: b.h }, it.refs.parcel, { title: '停放在' + r.label + '门口的包裹：' + it.title, itemId: it.id });
+          }
         });
         let row = 0;
         here.forEach((it) => {
-          if (!it.sign) return;
+          if (!it.sign || noSource(it.refs, 'sign')) return;
           const ss = P.signStyle(it.sign);
           const maxW = r.w - 6;
           const w = Math.min(maxW, Math.max(18, P.measure(c, it.sign, 6, 600) + 8));
           c.globalAlpha = dimFor(it.id);
-          P.sign(c, r.door + 12 + w / 2 - 20, ROOM_B + 18 + row * 12, it.sign, { size: 6, bg: ss.bg, fg: ss.fg, stripe: ss.stripe, maxW, nail: row === 0 ? ROOM_B + 3 : undefined });
+          const rect = P.sign(c, r.door + 12 + w / 2 - 20, ROOM_B + 18 + row * 12, it.sign, { size: 6, bg: ss.bg, fg: ss.fg, stripe: ss.stripe, maxW, nail: row === 0 ? ROOM_B + 3 : undefined });
           c.globalAlpha = 1;
+          if (it.refs) fact('sign', rect, it.refs.sign, { title: '门口的牌子：' + it.sign, itemId: it.id });
           row += 1;
         });
       });
@@ -928,13 +1181,25 @@
 
       drawOverlay(c);
       drawInfoBar(c);
+      drawOverlayTop(c);
       card.draw(c);
+      sourceCard.draw(c);
+      // 场景要求点开某一种事实元素（scene.fact）：等这种元素画出来再打开
+      if (st.wantFact) {
+        const f = st.facts.find((x) => x.kind === st.wantFact);
+        if (f) { st.wantFact = null; openFact(f); }
+      }
+    }
+
+    // 信息条上写的事项：聚焦的事项，否则是正在进行的事项
+    function infoItem() {
+      return (focusId && itemById(focusId)) || model.items.find((x) => ACTIVE.includes(x.status) || x.status === 'waiting_provider') || model.items.find((x) => IN_ROOM.includes(x.status)) || null;
     }
 
     function drawInfoBar(c) {
       R(c, 0, 0, W, BAR, '#1f2230');
       R(c, 0, BAR - 1, W, 1, '#3a3f52');
-      const it = (focusId && itemById(focusId)) || model.items.find((x) => ACTIVE.includes(x.status) || x.status === 'waiting_provider') || model.items.find((x) => IN_ROOM.includes(x.status)) || null;
+      const it = infoItem();
       if (!it) { P.text(c, '没有进行中的事项', 8, 9, { size: 7, color: PAL.grey1 }); return; }
       R(c, 6, 5, 8, 8, PAL.ink); R(c, 7, 6, 6, 6, P.ITEM_COLORS[it.color_index % 6]);
       let x = 18;
@@ -944,18 +1209,29 @@
         const w = c.measureText(text).width + 8;
         R(c, x, 4, w, 10, bg);
         P.text(c, text, x + w / 2, 9, { size: 6.5, weight: 700, align: 'center', color: fg || PAL.ink });
+        const rect = { x, y: 4, w, h: 10 };
         x += w + 4;
+        return rect;
       };
-      if (it.cycle) chip('第 ' + it.cycle + ' 轮', PAL.paper);
-      if (it.department && P.DEPTS[it.department]) chip('当前部门：' + P.DEPTS[it.department].name, P.DEPTS[it.department].light);
-      chip(STATUS_TEXT[it.status] || it.status, STATUS_CHIP[it.status] || PAL.grey2, ['running', 'failed', 'adopted', 'asking'].includes(it.status) ? PAL.white : PAL.ink);
+      if (it.cycle) {
+        const rect = chip('第 ' + it.cycle + ' 轮', PAL.paper);
+        if (it.refs) fact('round', rect, it.refs.round, { title: '信息条：' + it.title + ' 第 ' + it.cycle + ' 轮', itemId: it.id });
+      }
+      if (it.department && P.DEPTS[it.department]) {
+        const rect = chip('当前部门：' + P.DEPTS[it.department].name, P.DEPTS[it.department].light);
+        if (it.refs) fact('department', rect, it.refs.department, { title: '信息条：当前部门 ' + P.DEPTS[it.department].name, itemId: it.id });
+      }
+      const statusRect = chip(STATUS_TEXT[it.status] || it.status, STATUS_CHIP[it.status] || PAL.grey2, ['running', 'failed', 'adopted', 'asking'].includes(it.status) ? PAL.white : PAL.ink);
+      if (it.refs) fact('status', statusRect, it.refs.sign, { title: '信息条：' + (STATUS_TEXT[it.status] || it.status), itemId: it.id });
+      st.barX = x;
       if (it.limit_sec) {
         const k = Math.min(1, (it.elapsed_sec || 0) / it.limit_sec);
         const wk = Math.min(1 - k, (it.waiting_provider_sec || 0) / it.limit_sec);
         const bw = 110, bx = W - bw - 8;
         const col = k >= 0.95 ? PAL.red2 : k >= 0.8 ? PAL.orange2 : PAL.green2;
-        P.text(c, '已用 ' + Math.round((it.elapsed_sec || 0) / 60) + ' 分 / 上限 ' + Math.round(it.limit_sec / 60) + ' 分' + (it.waiting_provider_sec ? ' · 等待 ' + Math.round(it.waiting_provider_sec / 60) + ' 分不计入' : ''),
-          bx - 6, 9, { size: 6.5, weight: 600, align: 'right', color: k >= 0.8 ? PAL.orange1 : PAL.grey1 });
+        const timeText = '已用 ' + Math.round((it.elapsed_sec || 0) / 60) + ' 分 / 上限 ' + Math.round(it.limit_sec / 60) + ' 分' + (it.waiting_provider_sec ? ' · 等待 ' + Math.round(it.waiting_provider_sec / 60) + ' 分不计入' : '');
+        const tw = P.text(c, timeText, bx - 6, 9, { size: 6.5, weight: 600, align: 'right', color: k >= 0.8 ? PAL.orange1 : PAL.grey1 });
+        if (it.refs) fact('time', { x: bx - 6 - tw, y: 4, w: tw + 6 + bw, h: 10 }, it.refs.time, { title: '信息条：' + timeText, itemId: it.id });
         R(c, bx, 5, bw, 8, PAL.ink); R(c, bx + 1, 6, bw - 2, 6, '#383d50');
         const ew = Math.round((bw - 2) * k);
         R(c, bx + 1, 6, ew, 6, col);
@@ -980,15 +1256,43 @@
       return Boolean(model.machines) && x >= d.x - 80 && x <= d.x + d.w && y >= d.y && y <= d.y + d.h;
     };
 
+    // 事实元素：后画的在上面
+    function factAt(x, y) {
+      for (let i = st.facts.length - 1; i >= 0; i--) {
+        const r = st.facts[i].rect;
+        if (x >= r.x - 1 && x <= r.x + r.w + 1 && y >= r.y - 1 && y <= r.y + r.h + 1) return st.facts[i];
+      }
+      return null;
+    }
+
+    // 点开事实元素：覆盖层「检验」的标签打开逐条清单，其余打开来源卡片
+    function openFact(f) {
+      if (f.kind !== 'coverage') { sourceCard.open(f); return; }
+      const methods = Y10.registry.CHECK_METHODS;
+      const rows = f.subject.criteria.map((cr) => ({
+        label: cr.id + ' ' + cr.text, method: methods[cr.method].label, result: cr.result, resultText: RESULT_TEXT[cr.result], open: cr.open,
+        fact: {
+          kind: 'criterion', rect: f.rect, position: cr.position, field: cr.field, source: cr.source, title: cr.id + ' ' + cr.text,
+          notes: ['检验方式：' + methods[cr.method].label + ' · 最近一次结果：' + RESULT_TEXT[cr.result]].concat(cr.open ? ['开环：没有可执行的检验'] : [])
+        }
+      }));
+      sourceCard.openList(f.title + ' · 逐条清单', rows, f.rect);
+    }
+
+    // 点击的顺序：打开着的决定卡片与来源卡片、决定板、通往机房的门、事实元素
     canvas.addEventListener('click', (ev) => {
       const [x, y] = worldXY(ev);
       if (card.click(x, y)) return;
+      if (sourceCard.click(x, y)) return;
       if (overBoard(x, y)) { card.open(); return; }
-      if (overDoor(x, y) && o.onDoorClick) o.onDoorClick(model.machines.map((m) => m.id));
+      if (overDoor(x, y) && o.onDoorClick) { o.onDoorClick(model.machines.map((m) => m.id)); return; }
+      const f = factAt(x, y);
+      if (f) openFact(f);
     });
     canvas.addEventListener('mousemove', (ev) => {
       const [x, y] = worldXY(ev);
-      canvas.style.cursor = card.cursor(x, y) || (!card.isOpen() && (overBoard(x, y) || (overDoor(x, y) && o.onDoorClick)) ? 'pointer' : 'default');
+      const free = !card.isOpen() && !sourceCard.isOpen();
+      canvas.style.cursor = card.cursor(x, y) || sourceCard.cursor(x, y) || (free && (overBoard(x, y) || (overDoor(x, y) && o.onDoorClick) || factAt(x, y)) ? 'pointer' : 'default');
     });
 
     // -------------------------------------------------------------------------
@@ -1020,14 +1324,19 @@
 
     return {
       scene,
-      // 验收脚本读取世界的当前状态与决定卡片
-      inspect: () => ({ world, model, card }),
+      // 验收脚本读取世界的当前状态、决定卡片与来源卡片、这一帧的事实元素与覆盖层上写出的标签
+      inspect: () => ({ world, model, card, sourceCard, facts: st.facts.slice(), overlay: { id: overlay.id, data: overlay.data, labels: st.labels.slice() } }),
       setModel,
       playEvent,
       focus(id) { focusId = id || null; },
-      setOverlay(id, data) { overlay = { id: id || null, data: data || null }; },
+      setOverlay(id, data) {
+        if (id !== overlay.id) sourceCard.close();
+        overlay = { id: id || null, data: data || null };
+      },
+      // 点开某一种事实元素（场景的一步）：下一帧画出来以后打开
+      openFact(kind) { st.wantFact = kind; },
       resize: () => scene.resize(),
-      destroy: () => { card.destroy(); scene.destroy(); }
+      destroy: () => { card.destroy(); sourceCard.destroy(); scene.destroy(); }
     };
   };
 })();

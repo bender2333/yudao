@@ -1,9 +1,9 @@
-// 部门房间的端到端测试（工单 #177 验收标准 4）：Playwright 启动 Electron，连接由 FakeAdapter
+// 部门房间的端到端测试（工单 #177 验收标准 4）：Playwright 打开 Chromium 页面，连接由 FakeAdapter
 // 驱动的真实服务；先打开部门房间，再经由命令开始事项，让产品的模型请求在房间打开期间分三段
 // 流式返回。核对思考气泡里的文字与 attempt.live 及随后的片段拼接一致；交接与询问时两端的小人各说一句。
 //
 // 观测方式：从查询与事件流取真实数据，从画面读取入口（__roomViewForTest）取房间的当前状态；
-// 不做伪造。渲染进程用构建产物（与 shell.spec.ts 相同）。
+// 不做伪造。页面用后端提供的构建产物（与 shell.spec.ts 相同）。
 
 import { expect, test, type Page } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";

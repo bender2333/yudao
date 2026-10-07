@@ -294,7 +294,8 @@ class StepRecorder:
                      "effective_context_window": request.context.manifest.budget,
                      "max_output_tokens": request.max_output_tokens,
                      "tool_choice": request.tool_choice,
-                     "definitions_version": DEFINITIONS.version}))
+                     "definitions_version": DEFINITIONS.version,
+                     "parameters_version": transaction.projection.parameters_version}))
         self._record_in(transaction, *drafts)
 
     def stream(self, request: ModelRequest, event: ModelStreamEvent) -> None:

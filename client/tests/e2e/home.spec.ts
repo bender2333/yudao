@@ -1,5 +1,6 @@
-// 系统首页与决定卡片的端到端测试（工单 #175 的验收）：在 1440×900 与 390×844 两种窗口尺寸下运行，
-// 后端是 FakeAdapter 驱动的真实服务（tests/e2e/backend.py），模型回答由 FakeAdapter 给出，不使用 mock。
+// 系统首页与决定卡片的端到端测试（工单 #175 的验收）：在 1440×900 与 1920×1080 两种窗口尺寸下运行，
+// 后端是 FakeAdapter 驱动的真实服务（tests/e2e/backend.py），页面文件也由该服务提供，模型回答由
+// FakeAdapter 给出，不使用 mock。
 // 覆盖：状态项「待你决定」与 decisions.list 数量一致、首页与标签栏的决定卡片、提问被回答或撤销时显示原因、
 // 离开期间的报告三种范围与「已看过」、项目列表字段与 projects.list 一致；控制台错误为零。
 
@@ -149,7 +150,7 @@ test.describe("系统首页（1440×900）", () => {
       expect(waiting.length).toBeGreaterThan(0);
       const stat = client.page.locator(".status-row .status-item").filter({ hasText: "待你决定" });
       await expect(stat).toHaveText(`待你决定${waiting.length}`);
-      // 顶栏与托盘使用同一份数据
+      // 顶栏的状态项与页面上的状态行使用同一份数据
       await expect(client.page.locator(".topbar .status-item").filter({ hasText: "待你决定：" })).toHaveText(`待你决定：${waiting.length}`);
       expect(errors).toEqual([]);
     } finally {
@@ -390,16 +391,23 @@ test.describe("系统首页（1440×900）", () => {
   });
 });
 
-test.describe("系统首页（390×844）", () => {
-  test("窄屏：首页各区块单列，不出现横向滚动；控制台错误为零", async () => {
+test.describe("系统首页（1920×1080）", () => {
+  test("1920×1080：离开期间的报告横向排成多列，不出现横向滚动；控制台错误为零", async () => {
     test.setTimeout(120_000);
-    const client = await openHome({ width: 390, height: 844 });
+    const client = await openHome({ width: 1920, height: 1080 });
     const errors = watchErrors(client);
     try {
       await expect(client.page.getByRole("heading", { name: "待你决定", exact: true })).toBeVisible();
-      await expect(client.page.getByRole("heading", { name: "离开期间的报告", exact: true })).toBeVisible();
+      const report = client.page.locator("section.card")
+        .filter({ has: client.page.getByRole("heading", { name: "离开期间的报告", exact: true }) });
+      // 报告项排成网格：范围「最近 7 天」时至少有完成与放行与用量两项，宽屏下并排而不是叠成一列
+      await report.getByRole("button", { name: "最近 7 天", exact: true }).click();
+      await expect.poll(async () => report.locator(".report-item").count()).toBeGreaterThan(1);
+      const columns = await report.locator(".report-item")
+        .evaluateAll((nodes) => new Set(nodes.map((node) => Math.round(node.getBoundingClientRect().left))).size);
+      expect(columns, "1920×1080 下报告项应当并排成多列").toBeGreaterThan(1);
       await expect(client.page.getByRole("heading", { name: "项目", exact: true })).toBeVisible();
-      expect(await overflowReport(client.page), "首页：窄屏不应出现横向溢出").toEqual([]);
+      expect(await overflowReport(client.page), "首页：1920×1080 不应出现横向溢出").toEqual([]);
       expect(errors).toEqual([]);
     } finally {
       await client.close();

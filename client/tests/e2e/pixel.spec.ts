@@ -1,68 +1,38 @@
 // 像素画面与动作图鉴的端到端测试（工单 #176 验收标准 1、3、4）。
-// Playwright 启动 Electron，两种窗口尺寸（1440×900 与 390×844）各开一次：
+// Playwright Chromium 在两种视口尺寸（1440×900 与 1920×1080）下打开 Vite 开发页面：
 // 画面按整数倍最近邻缩放、控制台错误为零；图鉴页只在开发构建里有入口。
-//
-// 图鉴页只在开发构建里（import.meta.env.DEV）出现。electron-vite build 把 NODE_ENV 固定为
-// production，构建产物里图鉴分支被整体消掉，因此这里用 Vite 开发服务器提供渲染进程
-// （主进程经 ELECTRON_RENDERER_URL 加载它），图鉴页在其中可见；主进程与预加载脚本用
-// 已构建的产物。其余用例沿用 tests/e2e/fixtures.ts 的真实后端（FakeAdapter 驱动）。
+// 图鉴页只在开发构建里（import.meta.env.DEV）出现；正式构建不含图鉴分支，
+// 因此这些用例从 Vite 开发服务器打开页面，其他用例使用真实后端（FakeAdapter 驱动）。
 
-import { expect, test } from "@playwright/test";
-import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { expect, test, type Page } from "@playwright/test";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { createServer, type ViteDevServer } from "vite";
+import { openPage, startBackend } from "./fixtures";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const rendererRoot = join(repoRoot, "client", "src", "renderer");
 
-// 渲染进程的开发服务器：与 electron-vite dev 用同一套配置，import.meta.env.DEV 为真
-async function startRendererServer(): Promise<ViteDevServer> {
+// 渲染页面的开发服务器：import.meta.env.DEV 为真。给 api 时把 /api 代理到真实后端，
+// 页面从开发服务器的地址打开，接口与页面同一来源（不需要时省略，页面不请求接口）
+async function startRendererServer(api?: string): Promise<ViteDevServer> {
   const server = await createServer({
     root: rendererRoot,
     configFile: false,
     plugins: [react()],
-    server: { host: "127.0.0.1", port: 0 },
+    server: { host: "127.0.0.1", port: 0, ...(api === undefined ? {} : { proxy: { "/api": api } }) },
     logLevel: "error",
   });
   await server.listen();
   return server;
 }
 
-// 开发构建的客户端：图鉴页在其中可见
-async function startDevClient(
-  server: ViteDevServer,
-  size: { width: number; height: number },
-): Promise<{ app: ElectronApplication; page: Page }> {
-  const userData = mkdtempSync(join(tmpdir(), "yudao-pixel-"));
-  const address = server.resolvedUrls?.local[0];
-  if (!address) {
-    throw new Error("渲染进程的开发服务器没有给出地址");
-  }
-  const app = await electron.launch({
-    args: [join(repoRoot, "client", "out", "main", "index.js")],
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      YUDAO_E2E_USER_DATA: userData,
-      YUDAO_E2E_WIDTH: String(size.width),
-      YUDAO_E2E_HEIGHT: String(size.height),
-      ELECTRON_RENDERER_URL: address,
-    },
-  });
-  const page = await app.firstWindow();
-  await page.waitForLoadState("domcontentloaded");
-  return { app, page };
-}
-
 function watchErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (m) => {
-    // 开发构建的客户端连不上后端时，浏览器自己对失败的请求记一条控制台消息（跨源策略、ERR_FAILED）；
-    // 那不是图鉴或像素画面自己的错误，这里只记录应用自身的错误与未捕获的异常
+    // 图鉴用例不请求接口；开发服务器的请求失败只是浏览器记录的网络噪音，
+    // 这里只记录应用自身的错误与未捕获的异常
     const text = m.text();
     const connectionNoise = text.includes("blocked by CORS policy") || text.includes("net::ERR_FAILED");
     if (m.type() === "error" && !connectionNoise) errors.push(text);
@@ -73,15 +43,15 @@ function watchErrors(page: Page): string[] {
 
 for (const size of [
   { width: 1440, height: 900 },
-  { width: 390, height: 844 },
+  { width: 1920, height: 1080 },
 ]) {
   test(`动作图鉴在 ${size.width}×${size.height} 下列出全部公开画法，控制台错误为零`, async () => {
     const server = await startRendererServer();
     try {
-      const { app, page } = await startDevClient(server, size);
+      const client = await openPage(`${server.resolvedUrls?.local[0]}index.html#/gallery`, size);
+      const { page } = client;
       const errors = watchErrors(page);
       try {
-        await page.goto(`${server.resolvedUrls?.local[0]}index.html#/gallery`);
         await expect(page.locator(".gallery-page")).toBeVisible();
         // 图鉴列出全部 64 项公开画法，一项不少
         await expect(page.locator(".gallery-item")).toHaveCount(64);
@@ -113,7 +83,7 @@ for (const size of [
         }
         expect(errors).toEqual([]);
       } finally {
-        await app.close();
+        await client.close();
       }
     } finally {
       await server.close();
@@ -124,10 +94,10 @@ for (const size of [
 test("像素画面按容器宽度取整数倍缩放，缓冲区是逻辑尺寸的整数倍", async () => {
   const server = await startRendererServer();
   try {
-    const { app, page } = await startDevClient(server, { width: 390, height: 844 });
+    const client = await openPage(`${server.resolvedUrls?.local[0]}index.html#/gallery`, { width: 1920, height: 1080 });
+    const { page } = client;
     const errors = watchErrors(page);
     try {
-      await page.goto(`${server.resolvedUrls?.local[0]}index.html#/gallery`);
       await expect(page.locator(".gallery-page")).toBeVisible();
       // 页面里点阵预览的画布宽高都是各自逻辑尺寸的整数倍
       const sizes = await page.locator(".gallery-grid").evaluateAll((nodes) =>
@@ -145,7 +115,7 @@ test("像素画面按容器宽度取整数倍缩放，缓冲区是逻辑尺寸�
       }
       expect(errors).toEqual([]);
     } finally {
-      await app.close();
+      await client.close();
     }
   } finally {
     await server.close();
@@ -153,9 +123,11 @@ test("像素画面按容器宽度取整数倍缩放，缓冲区是逻辑尺寸�
 });
 
 test("正式的页面入口里没有图鉴：页签与侧栏都取不到它", async () => {
-  const server = await startRendererServer();
+  const backend = await startBackend();
+  const server = await startRendererServer(backend.address);
   try {
-    const { app, page } = await startDevClient(server, { width: 1440, height: 900 });
+    const client = await openPage(`${server.resolvedUrls?.local[0]}index.html`, { width: 1440, height: 900 });
+    const { page } = client;
     const errors = watchErrors(page);
     try {
       // 图鉴只在开发时可用；正式入口（页签）里没有它的链接
@@ -163,10 +135,11 @@ test("正式的页面入口里没有图鉴：页签与侧栏都取不到它", as
       expect(text.includes("#/gallery")).toBe(false);
       expect(errors).toEqual([]);
     } finally {
-      await app.close();
+      await client.close();
     }
   } finally {
     await server.close();
+    await backend.stop();
   }
 });
 
@@ -176,15 +149,15 @@ test("正式的页面入口里没有图鉴：页签与侧栏都取不到它", as
 // 两种窗口尺寸各跑一遍，控制台错误为零（验收标准 4）。
 for (const size of [
   { width: 1440, height: 900 },
-  { width: 390, height: 844 },
+  { width: 1920, height: 1080 },
 ]) {
   test(`世界里的决定卡片在 ${size.width}×${size.height} 下：点板子打开、点选项回答、需要说明不提交、被拒显示原因、盖章与翻页关闭`, async () => {
     const server = await startRendererServer();
     try {
-      const { app, page } = await startDevClient(server, size);
+      const client = await openPage(`${server.resolvedUrls?.local[0]}index.html#/gallery`, size);
+      const { page } = client;
       const errors = watchErrors(page);
       try {
-        await page.goto(`${server.resolvedUrls?.local[0]}index.html#/gallery`);
         await expect(page.locator(".gallery-page")).toBeVisible();
 
       const result = await page.evaluate(async () => {
@@ -317,7 +290,7 @@ for (const size of [
       expect(result.closeButton).toBe(true);
       expect(errors).toEqual([]);
     } finally {
-      await app.close();
+      await client.close();
     }
   } finally {
     await server.close();

@@ -39,6 +39,7 @@ from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
 from .event_stream import EventScope, EventStream
 from .home import HOME_AWAY_REPORT, HOME_MARK_SEEN
+from .parameter_commands import PARAMETER_SET
 from .project_commands import ONBOARDING_RESTART, PROJECT_CREATE, PROJECT_ONBOARD
 from .project_and_work_item_commands import (
     COMMAND_REGISTRATION_SAVE,
@@ -56,6 +57,7 @@ from .project_and_work_item_commands import (
     WORK_ITEM_CREATE,
 )
 from .runtime_commands import RUNTIME_FORCE_UPGRADE, RUNTIME_START_DRAIN
+
 from .system_queries import ATTEMPT_LIVE, SYSTEM_STATUS
 from .project_queries import PROJECT_QUERIES
 from .read_models import ReadModels
@@ -112,7 +114,8 @@ DEFAULT_REGISTRY = Registry(
               CATALOG_MODEL_REMOVE, CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT,
               CATALOG_CONNECTION_TEST,
               CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
-              CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE, HOME_MARK_SEEN],
+              CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE, HOME_MARK_SEEN,
+              PARAMETER_SET],
     queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, CATALOG_QUERY,
              CATALOG_DOCUMENT_QUERY, CATALOG_CHANGE_IMPACT_QUERY, HOME_AWAY_REPORT, RULES_REGISTRY],
     decisions=tuple(DECISION_KINDS))

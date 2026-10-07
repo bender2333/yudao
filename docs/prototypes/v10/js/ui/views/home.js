@@ -24,14 +24,38 @@
     });
   }
 
+  // 来源事件：自举试点起每条事件旁写来源种类
   function sourceEvents(item, facts) {
     if (!item.refs.length) return '<p class="y10-muted y10-small">' + esc(item.detail || '') + '（来源：范围内的调用尝试记录）</p>';
     const rows = item.refs.map((pos) => {
       const f = facts.find((x) => x.position === pos);
       const ev = f ? f.event : Y10.api.query('event.detail', { position: pos }).data.event;
-      return '<li><span class="y10-muted">' + esc(Y10.ui.time(ev.at)) + '</span> ' + esc(ev.label) + ' <code class="y10-code">' + esc(ev.type) + '</code></li>';
+      const kind = ev.source ? ' <span class="y10-source-kind is-' + esc(ev.source) + '">' + esc(Y10.registry.SOURCE_KINDS[ev.source].label) + '</span>' : '';
+      return '<li><span class="y10-muted">' + esc(Y10.ui.time(ev.at)) + '</span> ' + esc(ev.label) + ' <code class="y10-code">' + esc(ev.type) + '</code>' + kind + '</li>';
     }).join('');
     return '<ul class="y10-source-list">' + rows + '</ul>';
+  }
+
+  // 两个汇总项的明细（自举试点）：收敛状态的变化逐条写事项、层与前后两种状态；带开环条件的放行先列开环的条件，每条可以跳到资料页的逐条结论表
+  const LAYER_TEXT = { run: 'run', project: '项目循环', activation: '激活', step: '步骤循环' };
+
+  function stateChip(state) {
+    const s = Y10.pixel.LOOP_STATES[state];
+    return '<span class="y10-loop-state" style="--loop:' + s.color + ';--loop-fg:' + s.fg + '">' + esc(s.label) + '</span>';
+  }
+
+  function itemDetail(item) {
+    if (item.changes) {
+      return '<ul class="y10-report-detail-list">' + item.changes.map((ch) =>
+        '<li><span>' + esc(ch.title + ' · ' + LAYER_TEXT[ch.layer]) + '：</span>' + stateChip(ch.from) + '<span aria-hidden="true">→</span>' + stateChip(ch.to) + '</li>').join('') + '</ul>';
+    }
+    if (item.releases) {
+      return '<ul class="y10-report-detail-list">' + item.releases.map((r) =>
+        '<li><span>' + esc(r.title + ' 放行时' + Y10.coverageText(r.ratio)) + '。开环的条件：</span>' + r.open.map((c) =>
+          '<button type="button" class="y10-link" data-go="' + esc(Y10.paths.materials(r.project_id, r.work_item_id)) + '">' + esc(c.id + ' ' + c.text) + '</button>' + Y10.ui.tag('开环')).join('') +
+        '</li>').join('') + '</ul>';
+    }
+    return '';
   }
 
   function reportBlock() {
@@ -46,7 +70,7 @@
             '<span class="y10-report-label">' + esc(item.label) + '</span>' +
             '<span class="y10-report-value">' + esc(Y10.num(item.value)) + '<small>' + esc(item.unit) + '</small></span>' +
             (item.detail ? '<span class="y10-report-detail">' + esc(item.detail) + '</span>' : '') +
-          '</button>' + (open ? sourceEvents(item, report.facts) : '') + '</div>';
+          '</button>' + (open ? itemDetail(item) + sourceEvents(item, report.facts) : '') + '</div>';
       }).join('') + '</div>'
       : Y10.ui.empty('这段时间没有完成、放行或其他需要报告的事');
     const lastSeen = '上次查看：' + esc(Y10.ui.time(report.last_seen.at)) + '（' + esc(Y10.ui.duration(Y10.ui.since(report.last_seen.at))) + '以前）';

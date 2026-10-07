@@ -1378,7 +1378,7 @@ export type CommandCapability = {
     /**
      * Reasons
      */
-    reasons: Array<'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid'>;
+    reasons: Array<'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid' | 'out_of_bounds'>;
 };
 
 /**
@@ -2740,6 +2740,74 @@ export type OverlayCapability = {
 };
 
 /**
+ * ParameterChangeEntry
+ */
+export type ParameterChangeEntry = {
+    /**
+     * Old Value
+     */
+    old_value: unknown;
+    /**
+     * New Value
+     */
+    new_value: unknown;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Modified By
+     */
+    modified_by: string;
+    /**
+     * Parameters Version
+     */
+    parameters_version: string;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+};
+
+/**
+ * ParameterSet
+ */
+export type ParameterSet = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version?: number | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Value
+     */
+    value: unknown;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Modified By
+     */
+    modified_by: string;
+};
+
+/**
  * PauseRequested
  */
 export type PauseRequested = {
@@ -3342,7 +3410,7 @@ export type Rejected = {
     /**
      * Reason
      */
-    reason: 'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid';
+    reason: 'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid' | 'out_of_bounds';
     /**
      * Message
      */
@@ -3671,6 +3739,10 @@ export type RuleEntry = {
      * Origin
      */
     origin: string;
+    /**
+     * Changes
+     */
+    changes?: Array<ParameterChangeEntry>;
 };
 
 /**
@@ -5265,6 +5337,18 @@ export type ActivationFinishedPayload = {
      * Latency Ms
      */
     latency_ms: number;
+    /**
+     * Elapsed Ms
+     */
+    elapsed_ms: number;
+    /**
+     * Activations
+     */
+    activations: number;
+    /**
+     * Model Steps
+     */
+    model_steps: number;
     /**
      * Stop Reason
      */
@@ -10533,6 +10617,10 @@ export type ModelRequestedPayload = {
      * Definitions Version
      */
     definitions_version: string;
+    /**
+     * Parameters Version
+     */
+    parameters_version: string;
 };
 
 /**
@@ -11051,6 +11139,107 @@ export type OnboardingRevisionStartedPayload = {
      * Note
      */
     note: string;
+};
+
+/**
+ * ParameterSetEvent
+ */
+export type ParameterSetEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'parameter_set';
+    payload: ParameterSetPayload;
+};
+
+/**
+ * ParameterSetPayload
+ */
+export type ParameterSetPayload = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Old Value
+     */
+    old_value: unknown;
+    /**
+     * New Value
+     */
+    new_value: unknown;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Modified By
+     */
+    modified_by: string;
+    /**
+     * Bounds
+     */
+    bounds: Array<unknown>;
+    /**
+     * Parameters Version
+     */
+    parameters_version: string;
 };
 
 /**
@@ -12207,6 +12396,10 @@ export type ProposalRejectedPayload = {
      * Definitions Version
      */
     definitions_version: string;
+    /**
+     * Parameters Version
+     */
+    parameters_version: string;
 };
 
 /**
@@ -12297,6 +12490,10 @@ export type ProposalSubmittedPayload = {
      * Definitions Version
      */
     definitions_version: string;
+    /**
+     * Parameters Version
+     */
+    parameters_version: string;
 };
 
 /**
@@ -12698,6 +12895,10 @@ export type RunCreatedPayload = {
      * Definitions Version
      */
     definitions_version: string;
+    /**
+     * Parameters Version
+     */
+    parameters_version: string;
     /**
      * Run Event Version
      */
@@ -15324,7 +15525,9 @@ export type EventObject = ({
     type: 'runtime_force_upgrade_requested';
 } & RuntimeForceUpgradeRequestedEvent) | ({
     type: 'home_seen';
-} & HomeSeenEvent);
+} & HomeSeenEvent) | ({
+    type: 'parameter_set';
+} & ParameterSetEvent);
 
 /**
  * OutputDelta
@@ -16299,6 +16502,35 @@ export type CommandHomeMarkSeenResponses = {
 };
 
 export type CommandHomeMarkSeenResponse = CommandHomeMarkSeenResponses[keyof CommandHomeMarkSeenResponses];
+
+export type CommandParameterSetData = {
+    body: ParameterSet;
+    path?: never;
+    query?: never;
+    url: '/api/commands/parameter.set';
+};
+
+export type CommandParameterSetErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, out_of_bounds, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandParameterSetError = CommandParameterSetErrors[keyof CommandParameterSetErrors];
+
+export type CommandParameterSetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandParameterSetResponse = CommandParameterSetResponses[keyof CommandParameterSetResponses];
 
 export type QuerySystemStatusData = {
     body?: never;

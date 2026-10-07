@@ -157,6 +157,8 @@
     ['position', 'event_id', 'type', 'at', 'project_id', 'work_item_id', 'run_id', 'department', 'role', 'actor', 'command_id', 'label', 'payload']
       .forEach((key) => { out[key] = key in ev ? Y10.clone(ev[key]) : null; });
     if (!out.payload) out.payload = {};
+    // 事实来源：自举试点起由登记表按事件种类给出，日志条目上不写
+    if (Y10.level.atLeast('pilot')) out.source = Y10.registry.sourceOf(ev);
     return out;
   }
 
@@ -194,9 +196,37 @@
           .filter((ev) => ev.position <= position && reached(ev) && !ev.silent && (timeMs === null || Y10.time.ms(ev.at) <= timeMs))
           .filter((ev) => eventMatches(ev, filter))
           .map(strip);
+      },
+      // 改过某个字段的事件：按位置排列的 [{ position, value }]（value 只在补丁直接写值时有）。
+      // 读取模型用它找出给出某条事实的事件
+      trace(paths) {
+        if (!traceIndex) traceIndex = indexPatches(position, time);
+        const out = [];
+        [].concat(paths).forEach((p) => (traceIndex.get(p) || []).forEach((entry) => out.push(entry)));
+        return out.sort((a, b) => a.position - b.position);
+      },
+      // 按全局位置取一条事件（这个视图看得到的）
+      event(pos) {
+        if (!eventIndex) eventIndex = new Map(db.log().map((ev) => [ev.position, ev]));
+        return eventIndex.get(pos) || null;
       }
     };
+    let traceIndex = null;
+    let eventIndex = null;
     return db;
+  }
+
+  function indexPatches(position, time) {
+    const timeMs = time ? Y10.time.ms(time) : null;
+    const index = new Map();
+    log.forEach((ev) => {
+      if (ev.position > position || !reached(ev) || ev.silent || (timeMs !== null && Y10.time.ms(ev.at) > timeMs)) return;
+      (ev.patch || []).forEach((p) => {
+        if (!index.has(p.path)) index.set(p.path, []);
+        index.get(p.path).push({ position: ev.position, value: 'value' in p ? p.value : undefined });
+      });
+    });
+    return index;
   }
 
   function currentView() {
@@ -416,6 +446,9 @@
     appear('runs', ['run_created', 'work_item_created', 'x_repair_created', 'onboarding_revision_started'], (ev) => ev.run_id);
     appear('decisions', ['x_decision_issued', 'project_decision_requested'], (ev) => ev.payload && ev.payload.decision_id);
     // 场景
+    // 每个已登记的事件种类都有来源种类，来源表里没有多出来的种类
+    Object.keys(Y10.registry.events).forEach((type) => need(type in Y10.registry.SOURCES, '事件种类没有登记来源：' + type));
+    Object.keys(Y10.registry.SOURCES).forEach((type) => need(Y10.registry.has('event', type), '来源表中的事件种类没有登记：' + type));
     const nos = new Set();
     scenarioList.forEach((sc) => {
       need(sc.id && sc.name && Number.isInteger(sc.no), '场景缺少 id、name 或 no');
