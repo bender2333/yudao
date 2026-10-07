@@ -311,7 +311,7 @@ sequenceDiagram
 - JEV 请求失败时按 D17 的规则有界重试，仍然失败时写入核对失败事件并附原因，该事实显示为「未核对」。
 - 组装时只读取记录的结果，每次请求不调用 JEV。
 
-**接入**：JEV 的 systemone 接口作为 Provider 模块的一种协议接入（[ADR-0001](../adr/0001-endpoints-by-protocol-not-vendor.md)、[ADR-0004](../adr/0004-one-protocol-per-connection.md)），在 Stage 5 完成；准入以判定点为单位，依靠校准。
+**接入**：JEV 的 systemone 接口作为 Provider 模块的一种协议接入（[ADR-0001](../adr/0001-endpoints-by-protocol-not-vendor.md)、[ADR-0033](../adr/0033-protocol-belongs-to-model-access.md)），在 Stage 5 完成；准入以判定点为单位，依靠校准。
 
 **校准**（D28 的规则）：
 

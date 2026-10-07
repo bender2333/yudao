@@ -32,7 +32,7 @@
 | D20 | [部门定向追加指导](department-guidance.md) | 已实现（`fe78667`、`fcb06ab`）；接收、进入模型输入与部门回应分别记录，处理时机与放行关系按[处理设计](../design/department-guidance.md)；3.0B 场景 B 的真实运行中指导完成处理 |
 | D21 | [模型请求、原始数据与用量观测](request-observability.md) | 原型已确定；复用已有事件；查询 `project.attempts`、`project.usage`、`run.attempt` 已由应用层提供，界面的观测页（请求记录、用量统计、请求详情）由 #80 实现，属于 Stage 3 的里程碑 M1 |
 | D22 | [启动与 Provider 热生效](startup-provider-reload.md) | Stage 2.7 已实现；无参空态启动、统一模块重载、页面 Key 与独立 .env 来源均通过本地验收，真实 Go 侧已用用户指定模型完成模型测试与三部门任务；现有实现只对新任务生效，按每次模型请求生效由 #45 实施 |
-| D24 | [模型管理与部门模型选择](model-management.md) | 需求与[设计说明](../design/model-management.md)已确认，实施中：调用目标每次请求解析（#45）、Provider 配置声明一种协议（#84）、获取模型列表带凭据与连接测试（#85）已完成，其余在 #83 下，属于 Stage 3 的里程碑 M1；部门默认加项目部门设置、按请求解析调用目标、推理档位，取代 D02/D18/D22/D23 中的任务冻结与事项内 Prompt 编辑 |
+| D24 | [模型管理与部门模型选择](model-management.md) | 需求与[设计说明](../design/model-management.md)已确认，实施中：调用目标每次请求解析（#45）、获取模型列表带凭据与连接测试（#85）已完成，其余在 #83 下，属于 Stage 3 的里程碑 M1；2026-10-07 M1 试用以后，调用协议属于模型访问定义（[ADR-0033](../adr/0033-protocol-belongs-to-model-access.md)），自定义服务的模型列表地址默认取「地址/models」，加入模型时直接采用预填的容量并自动进行模型测试；部门默认加项目部门设置、按请求解析调用目标、推理档位，取代 D02/D18/D22/D23 中的任务冻结与事项内 Prompt 编辑 |
 | D23 | [统一 Provider 层与 OpenCode Go](provider-layer.md) | 已实现；独立模块、三协议适配、预置表、候选与准入贯通；真实 Go 覆盖 Responses 与 Chat Completions 并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制，见 [执行报告](../archive/stage-2-7-provider-report.md)；按每次模型请求解析调用目标由 #45 实施 |
 | D25 | [语义系统](semantic-system.md) | 需求已确认；[设计说明](../design/semantic-system.md)已按需求记录写成（2026-09-26），未实施；路线位置 Stage 5 |
 | D26 | [部门内多角色与多循环](department-roles.md) | 需求已记录，规则已由用户确认；[设计说明](../design/department-roles.md)已按 2026-09-25 与 2026-09-26 的决定修改，未实施；对产品、工程、质检、运维四个部门一起引入；路线位置 Stage 5 |
