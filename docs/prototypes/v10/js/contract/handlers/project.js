@@ -205,6 +205,11 @@
       if (material[key] != null) out[key] = material[key];
     });
     if (db.atLeast('3.2D') && material.screenshots) out.screenshots = material.screenshots;
+    // 质检的逐条结论（3.2D，#151）：每条验收条件的检验方式、结果、证据，以及判定所依据的交付快照
+    if (db.atLeast('3.2D') && material.criteria) {
+      out.criteria = material.criteria;
+      if (material.snapshot) out.snapshot = material.snapshot;
+    }
     return out;
   }
 
@@ -441,6 +446,420 @@
       content: file.content == null ? null : file.content
     };
   });
+
+  // ---------------------------------------------------------------------------
+  // 循环实例与收敛状态（循环与收敛设计说明第 5 节、原型 v10 design.md 第 8.1 节）：只由事件计算，状态、判定依据与缺少的事实都在这里按规则算出。
+  // 下面几个数是规则登记里的参数，这里取当前的默认值
+  const ROUNDS = 3;          // 判定用的轮数
+  const STEP_WINDOW = 8;     // 步骤循环：连续这么多步没有被接纳的记录为停滞；也是数重复工具调用的范围
+  const STEP_REPEAT = 3;     // 步骤循环：范围内名称与参数摘要相同的工具调用出现这么多次为震荡
+  const STEP_LIMIT = 40;     // 步骤循环的步数上限
+  const LIMIT_CODES = ['time_limit', 'cycle_limit', 'step_limit'];   // 属于限额类的停止原因
+  const ACCEPTED = ['spec_accepted', 'contract_accepted', 'plan_accepted', 'delivery_accepted', 'structure_accepted', 'baseline_review_accepted'];
+  const STOPS = ['run_done', 'run_failed', 'run_paused', 'x_run_stopped_for_upgrade'];
+  const METHODS = Y10.registry.CHECK_METHODS;
+
+  const materialOf = (db, id) => (db.data.materials || []).find((m) => m.id === id) || null;
+  const passText = (ok) => (ok ? '通过' : '不通过');
+  const pct = (v) => Math.round(v * 100) + '%';
+
+  // run 的每一轮：带逐条结论的质检结论。进展只算有主机证据的条件：未满足数与每条的结论只计有可执行检验的条件
+  // （命令检查、试用用例、主机测量），按这一轮所依据的交付快照上的结果；判定点、人、开环的条件只记开环数，不进入判定
+  function qaRounds(db, events) {
+    return events.filter((ev) => ev.type === 'qa_submitted' && ev.payload.material_id).map((ev) => {
+      const m = materialOf(db, ev.payload.material_id);
+      if (!m || !Array.isArray(m.criteria)) return null;
+      const executable = m.criteria.filter((c) => METHODS[c.method].executable);
+      const verdicts = {};
+      executable.forEach((c) => { verdicts[c.criterion] = c.result === 'pass'; });
+      return {
+        position: ev.position, snapshot: m.snapshot || null, verdicts,
+        unmet: executable.filter((c) => c.result !== 'pass').length,
+        open: m.criteria.length - executable.length,
+        source: Y10.registry.sourceOf(ev, 'unmet')
+      };
+    }).filter(Boolean);
+  }
+
+  const ONLY_EXECUTABLE = '只计有可执行检验的条件：';
+
+  function flipsIn(seq) {
+    let flips = 0;
+    for (let i = 1; i < seq.length; i++) if (seq[i] !== seq[i - 1]) flips += 1;
+    return flips;
+  }
+
+  // 最近几轮里结论翻转 2 次以上的验收条件；有几条时取翻转最多的一条
+  function flipOf(rounds) {
+    const win = rounds.slice(-ROUNDS);
+    let found = null;
+    Object.keys(win[win.length - 1].verdicts).forEach((ac) => {
+      const seq = rounds.map((r) => r.verdicts[ac]).filter((v) => v !== undefined);
+      const recent = flipsIn(win.map((r) => r.verdicts[ac]).filter((v) => v !== undefined));
+      const all = flipsIn(seq);
+      if (recent >= 2 && (!found || recent > found.recent || (recent === found.recent && all > found.all))) found = { ac, seq, recent, all };
+    });
+    return found;
+  }
+
+  // run 层：进展度量是未满足的验收条件数（取自质检的逐条结论）
+  function judgeRun(rounds, stop) {
+    if (stop && LIMIT_CODES.includes(stop.code)) return { state: 'at_bound', basis: '停止原因「' + stop.text + '」属于限额：达到边界' };
+    if (!rounds.length) return { state: 'not_judged', missing: '还没有质检的逐条结论（第 1 轮质检之后判定）' };
+    const flip = flipOf(rounds);
+    if (flip) return { state: 'oscillating', basis: ONLY_EXECUTABLE + flip.ac + ' 的结论 ' + flip.seq.map(passText).join(' → ') + '，最近 ' + ROUNDS + ' 轮翻转 ' + flip.recent + ' 次：震荡' };
+    const last = rounds[rounds.length - 1];
+    const prev = rounds[rounds.length - 2];
+    if (last.snapshot && prev && last.snapshot !== prev.snapshot && rounds.slice(0, -2).some((r) => r.snapshot === last.snapshot)) {
+      return { state: 'oscillating', basis: '交付的树摘要回到出现过的 ' + last.snapshot + '：震荡' };
+    }
+    const values = rounds.map((r) => r.unmet);
+    if (last.unmet === 0) return { state: 'converging', basis: ONLY_EXECUTABLE + '未满足的验收条件数 ' + values.join(' → ') + '，已经为 0：收敛中' };
+    const win = values.slice(-ROUNDS);
+    if (last.unmet < win[0]) return { state: 'converging', basis: ONLY_EXECUTABLE + '最近 ' + win.length + ' 轮未满足数 ' + win.join(' → ') + '，比 ' + win.length + ' 轮前少：收敛中' };
+    if (values.length >= ROUNDS) {
+      const moving = new Set(rounds.slice(-ROUNDS).map((r) => r.snapshot)).size > 1;
+      return {
+        state: 'stalled',
+        basis: ONLY_EXECUTABLE + '最近 ' + ROUNDS + ' 轮未满足数 ' + win.join(' → ') + (last.unmet === win[0] ? ' 不变' : ' 没有减少') + '，' + (moving ? '交付的树摘要在变' : '没有新的交付') + '：停滞'
+      };
+    }
+    return { state: 'not_judged', missing: '质检的逐条结论只有 ' + values.length + ' 轮，满 ' + ROUNDS + ' 轮开始判定' };
+  }
+
+  const STOP_TEXT = { run_done: '完成', run_paused: '暂停', x_run_stopped_for_upgrade: '因升级停止' };
+  const REASON_TEXT = { cancelled: '用户取消', time_limit: '运行时间上限', cycle_limit: '轮次上限', step_limit: '步数上限', stopped_by_user: '用户停止' };
+
+  function stopTextOf(ev) {
+    const pl = ev.payload || {};
+    return STOP_TEXT[ev.type] || REASON_TEXT[pl.reason] || (pl.stop_reason && pl.stop_reason.text) || '失败';
+  }
+
+  function runStop(run, events) {
+    if (!run.stop_reason) return null;
+    const ev = events.filter((e) => STOPS.includes(e.type)).pop();
+    return { code: run.stop_reason.code, text: run.stop_reason.text || run.stop_reason.code, position: ev ? ev.position : null };
+  }
+
+  // 激活：一个部门在 run 里的一次工作，从交接进来（或开始工作、自动继续）到交出去（或 run 停止、中断）
+  function activationsOf(events) {
+    const acts = [];
+    const count = {};
+    let open = null;
+    let lastDept = null;
+    const start = (dept, ev) => {
+      count[dept] = (count[dept] || 0) + 1;
+      open = { department: dept, index: count[dept], start: ev, end: null, endText: null, steps: [], accepted: [], reviews: [] };
+      acts.push(open);
+      lastDept = dept;
+    };
+    const close = (ev, text) => {
+      if (!open) return;
+      open.end = ev;
+      open.endText = text;
+      open = null;
+    };
+    events.forEach((ev) => {
+      const pl = ev.payload || {};
+      if (ev.type === 'transition') {
+        if (open && (open.department === pl.from || DEPT[pl.to])) close(ev, '交给' + (PLACE[pl.to] || pl.to));
+        if (DEPT[pl.to]) start(pl.to, ev);
+      } else if (ev.type === 'department_activated') {
+        if (ev.department && (!open || open.department !== ev.department)) {
+          close(ev, DEPT[ev.department] + '开始工作');
+          start(ev.department, ev);
+        }
+      } else if (ev.type === 'x_run_interrupted') {
+        close(ev, '控制主机中断');
+      } else if (ev.type === 'x_run_auto_resumed') {
+        if (!open && lastDept) start(lastDept, ev);
+      } else if (STOPS.includes(ev.type)) {
+        close(ev, 'run 停止：' + stopTextOf(ev));
+      } else if (open && ev.type === 'tool_started') {
+        open.steps.push(ev);
+      } else if (open && ACCEPTED.includes(ev.type)) {
+        open.accepted.push(ev);
+      } else if (open && ev.type === 'x_review_recorded') {
+        open.reviews.push(ev);
+      }
+    });
+    return acts;
+  }
+
+  function elapsedAt(trace, position) {
+    let v = 0;
+    trace.forEach((t) => { if (t.position <= position && typeof t.value === 'number') v = t.value; });
+    return v;
+  }
+
+  const stepTool = (ev) => String((ev.payload && ev.payload.tool) || '');
+  const stepDigest = (ev) => (stepTool(ev) + ' ' + ((ev.payload && (ev.payload.args || ev.payload.path)) || '')).trim();
+
+  // 激活层（Stage 5 起判定）：漂移看写入的路径中不属于任何计划条目的比例，其余看审查通过的计划条目数
+  function judgeActivation(act) {
+    const writes = act.steps.filter((ev) => /write|edit/.test(stepTool(ev)));
+    let outside = 0;
+    const drift = writes.map((ev, i) => {
+      if (!ev.payload.plan_item) outside += 1;
+      return { round: i + 1, value: Math.round((outside / (i + 1)) * 100) / 100, position: ev.position, source: Y10.registry.sourceOf(ev, 'write_path') };
+    });
+    const dwin = drift.slice(-ROUNDS).map((p) => p.value);
+    if (dwin.length >= ROUNDS && dwin.every((v, i) => i === 0 || v > dwin[i - 1])) {
+      return {
+        state: 'drifting', measure: { name: '写入不属于任何计划条目的路径的比例', field: 'write_path', series: drift },
+        basis: '最近 ' + ROUNDS + ' 次写入，计划条目以外的比例 ' + dwin.map(pct).join(' → ') + ' 在上升：漂移', position: drift[drift.length - 1].position
+      };
+    }
+    const done = new Set();
+    const series = act.reviews.filter((ev) => ev.payload.plan_item).map((ev, i) => {
+      if (ev.payload.verdict === 'passed') done.add(ev.payload.plan_item);
+      return { round: i + 1, value: done.size, position: ev.position, source: Y10.registry.sourceOf(ev, 'review') };
+    });
+    if (!series.length) return { state: 'not_judged', missing: '这次激活还没有计划条目的审查记录' };
+    const measure = { name: '审查通过的计划条目数', field: 'review', series };
+    const values = series.map((p) => p.value);
+    const win = values.slice(-ROUNDS);
+    const position = series[series.length - 1].position;
+    if (win[win.length - 1] > win[0]) return { state: 'converging', measure, position, basis: '审查通过的计划条目 ' + win.join(' → ') + '，在增加：收敛中' };
+    if (values.length >= ROUNDS) return { state: 'stalled', measure, position, basis: '最近 ' + ROUNDS + ' 次审查，通过的计划条目 ' + win.join(' → ') + ' 没有增加：停滞' };
+    return { state: 'not_judged', measure, position, missing: '计划条目的审查只有 ' + values.length + ' 次，满 ' + ROUNDS + ' 次开始判定' };
+  }
+
+  function activationInstance(db, run, act, trace) {
+    const startAt = elapsedAt(trace, act.start.position);
+    const endAt = act.end ? elapsedAt(trace, act.end.position) : run.elapsed_sec;
+    const limit = Math.max(0, run.limit_sec - startAt);
+    const value = Math.max(0, endAt - startAt);
+    const j = db.atLeast('S5') ? judgeActivation(act) : { state: 'not_judged', missing: '计划条目没有主机记录的完成事实（Stage 5 起判定）' };
+    return {
+      id: 'act:' + run.id + ':' + act.department + ':' + act.index, parent: 'run:' + run.id, layer: 'activation',
+      label: DEPT[act.department] + ' · 第 ' + act.index + ' 次激活', department: act.department, role: null, round: act.index,
+      // Stage 3 没有为激活单独声明时间上限：上限取激活开始时 run 剩下的时间（上一层的剩余量）
+      used: [{ name: '已用时间', value, limit, unit: '秒', at_bound: limit > 0 && value >= limit }],
+      state: j.state, missing: j.missing || null, stop_reason: act.end ? act.endText : null,
+      measure: j.measure || null, basis: j.basis || null, position: j.position || act.start.position
+    };
+  }
+
+  // 角色的步骤循环：进展度量是连续没有被接纳记录的步数，另看名称与参数摘要相同的工具调用的重复次数
+  function stepInstance(act, parentId) {
+    const steps = act.steps;
+    if (!steps.length) return null;
+    let since = 0;
+    const series = steps.map((ev, i) => {
+      const prevPos = i ? steps[i - 1].position : act.start.position;
+      if (act.accepted.some((a) => a.position > prevPos && a.position < ev.position)) since = 0;
+      since += 1;
+      return { round: i + 1, value: since, position: ev.position, source: Y10.registry.sourceOf(ev, 'steps') };
+    });
+    const last = steps[steps.length - 1];
+    const tail = act.accepted.some((a) => a.position > last.position) ? 0 : since;
+    const counts = {};
+    steps.slice(-STEP_WINDOW).forEach((ev) => { const k = stepDigest(ev); counts[k] = (counts[k] || 0) + 1; });
+    const repeated = Object.keys(counts).find((k) => counts[k] >= STEP_REPEAT);
+    let state;
+    let basis;
+    if (steps.length >= STEP_LIMIT) {
+      state = 'at_bound';
+      basis = '步数用完（' + steps.length + '/' + STEP_LIMIT + '）：达到边界';
+    } else if (repeated) {
+      state = 'oscillating';
+      basis = '最近 ' + Math.min(STEP_WINDOW, steps.length) + ' 步中「' + repeated + '」出现 ' + counts[repeated] + ' 次（阈值 ' + STEP_REPEAT + ' 次）：震荡';
+    } else if (tail >= STEP_WINDOW) {
+      state = 'stalled';
+      basis = '连续 ' + tail + ' 步没有被接纳的记录（阈值 ' + STEP_WINDOW + ' 步）：停滞';
+    } else {
+      state = 'converging';
+      basis = tail ? '距激活开始或上一条被接纳的记录 ' + tail + ' 步，不到 ' + STEP_WINDOW + ' 步：收敛中' : '最近一步之后有被接纳的记录：收敛中';
+    }
+    return {
+      id: parentId + ':step', parent: parentId, layer: 'step', label: DEPT[act.department] + ' · 步骤循环',
+      department: act.department, role: last.role || null, round: steps.length,
+      used: [{ name: '步数', value: steps.length, limit: STEP_LIMIT, unit: '步', at_bound: steps.length >= STEP_LIMIT }],
+      state, missing: null, stop_reason: act.end ? '激活结束：' + act.endText : null,
+      measure: { name: '连续没有被接纳记录的步数', field: 'steps', series }, basis, position: last.position
+    };
+  }
+
+  function runInstance(item, run, events, rounds, stop) {
+    const j = judgeRun(rounds, stop);
+    let stopText = stop ? stop.text : null;
+    if (!stopText && ['released', 'adopted'].includes(item.status)) stopText = '质检放行';
+    const lastRound = rounds[rounds.length - 1];
+    return {
+      id: 'run:' + run.id, parent: 'project:' + item.project_id, layer: 'run', label: 'run · ' + item.title,
+      department: null, role: null, round: run.cycle,
+      used: [{ name: '运行时间', value: run.elapsed_sec, limit: run.limit_sec, unit: '秒', at_bound: run.elapsed_sec >= run.limit_sec }],
+      state: j.state, missing: j.missing || null, stop_reason: stopText,
+      // 每一轮另带这一轮的开环数；数值由主机运行的检查得出，来源为主机测量，事件仍是给出这一轮结论的那条事件
+      measure: rounds.length ? {
+        name: '未满足的验收条件数（只计有可执行检验的条件）', field: 'unmet',
+        series: rounds.map((r, i) => ({ round: i + 1, value: r.unmet, open: r.open, position: r.position, source: r.source }))
+      } : null,
+      basis: j.basis || null,
+      position: j.state === 'at_bound' && stop.position ? stop.position : (lastRound ? lastRound.position : (events[0] ? events[0].position : null))
+    };
+  }
+
+  // 项目层（Stage 4 起判定）：进展度量是同一故障的重复出现
+  function judgeProject(db, projectId, faults) {
+    if (!db.atLeast('S4')) return { state: 'not_judged', missing: '运维还没有故障记录（Stage 4 起判定）' };
+    if (!(db.data.ops && db.data.ops[projectId])) return { state: 'not_judged', missing: '这个项目没有运行环境，运维不记录故障' };
+    const seen = {};
+    const series = faults.map((ev, i) => {
+      const id = ev.payload.fault_id;
+      seen[id] = (seen[id] || 0) + 1;
+      return { round: i + 1, value: seen[id], position: ev.position, fault: id, source: Y10.registry.sourceOf(ev, 'fault') };
+    });
+    const measure = { name: '同一故障的出现次数', field: 'fault', series: series.map((p) => ({ round: p.round, value: p.value, position: p.position, source: p.source })) };
+    if (!series.length) return { state: 'converging', measure, basis: '没有记录过故障：收敛中' };
+    const win = series.slice(-ROUNDS);
+    const again = win.filter((p) => p.value >= 2).pop();
+    const position = series[series.length - 1].position;
+    if (again) return { state: 'oscillating', measure, position, basis: '故障 ' + again.fault + ' 在修复以后再次出现（第 ' + again.value + ' 次）：震荡' };
+    return { state: 'converging', measure, position, basis: '最近 ' + win.length + ' 次故障记录都是第一次出现：收敛中' };
+  }
+
+  function projectInstance(db, projectId, faults, started) {
+    const j = judgeProject(db, projectId, faults);
+    return {
+      id: 'project:' + projectId, parent: null, layer: 'project', label: '项目循环', department: null, role: null, round: started,
+      used: [{ name: '事项', value: started, limit: null, unit: '项', at_bound: false }],
+      state: j.state, missing: j.missing || null, stop_reason: null, measure: j.measure || null, basis: j.basis || null, position: j.position || null
+    };
+  }
+
+  function startedItems(db, projectId) {
+    return db.workItemsOf(projectId).filter((item) => item.status !== 'not_started' && item.run_id && db.run(item.run_id));
+  }
+
+  function loopsOf(db, projectId) {
+    const items = startedItems(db, projectId).map((item) => {
+      const run = db.run(item.run_id);
+      const events = db.log({ work_item: item.id });
+      const trace = db.trace('runs[id=' + run.id + '].elapsed_sec');
+      const instances = [runInstance(item, run, events, qaRounds(db, events), runStop(run, events))];
+      activationsOf(events).forEach((act) => {
+        const a = activationInstance(db, run, act, trace);
+        instances.push(a);
+        const step = stepInstance(act, a.id);
+        if (step) instances.push(step);
+      });
+      return { work_item_id: item.id, title: item.title, color_index: item.color_index, instances };
+    });
+    const faults = db.log({ project: projectId, types: ['x_fault_recorded'] });
+    return { project: projectInstance(db, projectId, faults, items.length), items };
+  }
+
+  B.query('run.loops', (params, db) => loopsOf(db, H.requireProject(db, params.project_id).id));
+
+  // 收敛状态的变化（离开期间的报告）：run 层在每一轮质检与停止时的状态，项目层在每一次故障记录时的状态；
+  // 从「不判定」开始判定不算变化
+  function changesOf(db, projectId, fromPosition) {
+    const out = [];
+    const diff = (hist, make) => {
+      let prev = null;
+      hist.forEach((h) => {
+        if (prev && prev !== 'not_judged' && prev !== h.state) out.push(make(prev, h.state, h.position));
+        prev = h.state;
+      });
+    };
+    const projects = projectId ? [projectId] : (db.data.projects || []).map((p) => p.id);
+    projects.forEach((pid) => {
+      startedItems(db, pid).forEach((item) => {
+        const run = db.run(item.run_id);
+        const events = db.log({ work_item: item.id });
+        const rounds = qaRounds(db, events);
+        const stop = runStop(run, events);
+        const hist = rounds.map((r, i) => ({ position: r.position, state: judgeRun(rounds.slice(0, i + 1), null).state }));
+        if (stop && stop.position) hist.push({ position: stop.position, state: judgeRun(rounds, stop).state });
+        diff(hist, (from, to, position) => ({ project_id: pid, work_item_id: item.id, title: item.title, layer: 'run', from, to, position }));
+      });
+      if (db.atLeast('S4')) {
+        const faults = db.log({ project: pid, types: ['x_fault_recorded'] });
+        const hist = faults.map((ev, i) => ({ position: ev.position, state: judgeProject(db, pid, faults.slice(0, i + 1)).state }));
+        diff(hist, (from, to, position) => ({ project_id: pid, work_item_id: null, title: db.project(pid).name, layer: 'project', from, to, position }));
+      }
+    });
+    return out.filter((c) => c.position > fromPosition).sort((a, b) => a.position - b.position);
+  }
+
+  B.loops = { of: loopsOf, changes: changesOf };
+
+  // ---------------------------------------------------------------------------
+  // 检验覆盖与开环（验证的独立性设计说明第 7 节）：每条验收条件的检验方式、最近的结果、是否开环；
+  // 检验覆盖比例 = 有可执行的检验并且已经在当前交付快照上运行的条件数 / 条件总数
+
+  function countsOf(criteria) {
+    return {
+      covered: criteria.filter((c) => METHODS[c.method].executable && c.result !== 'not_run').length,
+      total: criteria.length,
+      model_read: criteria.filter((c) => METHODS[c.method].model).length,
+      open_count: criteria.filter((c) => !METHODS[c.method].executable).length
+    };
+  }
+
+  // 当前交付快照：最近一次封存的交付
+  function currentSnapshot(db, events) {
+    const ev = events.filter((e) => e.type === 'delivery_accepted').pop();
+    if (!ev) return null;
+    if (ev.payload.snapshot) return ev.payload.snapshot;
+    const m = ev.payload.material_id ? materialOf(db, ev.payload.material_id) : null;
+    return m && m.git ? m.git.commit : null;
+  }
+
+  function coverageOfItem(db, item) {
+    const events = db.log({ work_item: item.id });
+    const qa = events.filter((ev) => ev.type === 'qa_submitted' && ev.payload.material_id)
+      .map((ev) => ({ ev, m: materialOf(db, ev.payload.material_id) }))
+      .filter((x) => x.m && Array.isArray(x.m.criteria));
+    if (!qa.length) return null;
+    const latest = qa[qa.length - 1];
+    const snapshot = currentSnapshot(db, events) || latest.m.snapshot;
+    const same = latest.m.snapshot === snapshot;
+    const criteria = latest.m.criteria.map((c) => {
+      if (!METHODS[c.method]) throw new Error('未知的检验方式：' + c.method);
+      // Stage 5：带参照材料的判定点由决策模型核对，结论来自那条事件（载荷带概率）
+      const check = events.filter((ev) => ev.type === 'x_evidence_checked' && ev.payload.criterion === c.criterion && ev.position <= latest.ev.position).pop();
+      // 结论的来源按「事件加字段」：可执行检验的结果是检查回执（主机测量），其余是质检的陈述或判定点的结论
+      const ev = check || latest.ev;
+      const field = METHODS[c.method].executable ? 'receipt' : 'verdict';
+      return {
+        id: c.criterion, text: c.text, method: c.method,
+        result: same ? (check ? check.payload.result : c.result) : 'not_run',
+        open: !METHODS[c.method].executable,
+        position: ev.position, field, source: Y10.registry.sourceOf(ev, field)
+      };
+    });
+    // 最近一次放行与它的覆盖比例（连同开环与其中靠模型阅读的条件数）
+    const release = qa.filter((x) => x.ev.payload.verdict === 'release').pop();
+    return Object.assign({
+      work_item_id: item.id, snapshot, criteria,
+      release: release ? { position: release.ev.position, ratio: countsOf(release.m.criteria) } : null
+    }, countsOf(criteria));
+  }
+
+  B.query('acceptance.coverage', (params, db) => {
+    const project = H.requireProject(db, params.project_id);
+    return {
+      items: db.workItemsOf(project.id).filter((item) => !params.work_item_id || item.id === params.work_item_id)
+        .map((item) => coverageOfItem(db, item)).filter(Boolean)
+    };
+  });
+
+  // 一次放行里开环的条件（离开期间的报告）
+  function openOfRelease(db, ev) {
+    const m = ev.payload.material_id ? materialOf(db, ev.payload.material_id) : null;
+    if (!m || !Array.isArray(m.criteria)) return null;
+    const item = db.workItem(ev.work_item_id);
+    return {
+      project_id: ev.project_id, work_item_id: ev.work_item_id, title: item ? item.title : ev.work_item_id, position: ev.position,
+      ratio: countsOf(m.criteria),
+      open: m.criteria.filter((c) => !METHODS[c.method].executable).map((c) => ({ id: c.criterion, text: c.text }))
+    };
+  }
+
+  B.coverage = { of: coverageOfItem, openOfRelease };
 
   // ---------------------------------------------------------------------------
   // 命令

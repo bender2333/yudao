@@ -62,8 +62,10 @@ Y10.LEVEL_TAGS.pilot = '试点';
   state: 'converging' | 'stalled' | 'oscillating' | 'drifting' | 'at_bound' | 'not_judged',
   missing,                                 // state 为 not_judged 时：缺少的事实与开始判定的阶段，其余为 null
   stop_reason,                             // 已停止时的停止原因，其余为 null
-  measure: { name, series: [{ round, value, open, position }] } | null,   // 进展度量每一轮的数值、run 层这一轮的开环数与给出它的事件位置
-  basis                                    // 判定依据的一句话，例如「最近 3 轮未满足数 2 → 2 → 2 不变，交付的树摘要在变」
+  measure: { name, field, series: [{ round, value, open, position, source }] } | null,
+                                           // 进展度量每一轮的数值、run 层这一轮的开环数、给出它的事件位置与按「事件加字段」的来源
+  basis,                                   // 判定依据的一句话，例如「只计有可执行检验的条件：最近 3 轮未满足数 2 → 2 → 2 不变，交付的树摘要在变：停滞」
+  position                                 // 给出当前状态的事件位置
 }
 ```
 
@@ -72,19 +74,20 @@ Y10.LEVEL_TAGS.pilot = '试点';
 ```js
 { items: [{
   work_item_id, snapshot,                  // 当前交付快照的摘要
-  criteria: [{ id, text, method, result, open, position }],
+  criteria: [{ id, text, method, result, open, position, field, source }],
   // method：command_check | trial_case | host_measurement | judgement | human | open
-  // result：pass | fail | not_run；open 为 true 表示没有可执行的检验
+  // result：pass | fail | not_run；open 为 true 表示没有可执行的检验（模型阅读的条件包含在内）
+  // 可执行检验的结论按字段 receipt 取来源（主机测量），其余为质检的陈述
   covered, total, model_read, open_count,
-  release: { position, ratio } | null      // 最近一次放行与它的覆盖比例
+  release: { position, ratio: { covered, total, model_read, open_count } } | null   // 最近一次放行与它的计数
 }] }
 ```
 
-`project.loop`（`pilot` 档起）：事项增加 `refs: { round, time, sign, parcel }`，质检的盖章、成果库的箱子各带 `ref`；每个引用是 `{ position, source }`，`position` 是给出这条事实的事件位置，`source` 按「事件加字段」取（第 2.1 节）。
+`project.loop`（`pilot` 档起）：事项增加 `refs: { round, time, sign, department, parcel }`，质检的盖章与成果库的箱子各带 `ref`；每个引用是 `{ position, field, source }`，`position` 是给出这条事实的事件位置，`source` 按「事件加字段」取（第 2.1 节），例如 `time` 的字段是 `elapsed_sec`，来源为主机测量。
 
 `home.away_report`（`pilot` 档起）：汇总项增加两项，形状与现有汇总项相同（`label`、`count`、`refs`），另带明细：收敛状态的变化 `changes: [{ work_item_id, title, layer, from, to, position }]`；带开环条件的放行 `releases: [{ work_item_id, title, open: [{ id, text }], position }]`。
 
-质检材料（`3.2D` 档起）：QAReview 增加 `criteria: [{ criterion, text, method, result, checks, trial_cases, note }]`，`copyMaterial` 透传。
+质检材料（`3.2D` 档起）：QAReview 增加 `snapshot` 与 `criteria: [{ criterion, text, method, result, checks, trial_cases: [{ name, screenshot }], note }]`，`copyMaterial` 透传。
 
 ### 2.4 处理函数
 

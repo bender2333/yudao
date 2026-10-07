@@ -12,7 +12,7 @@
   // ---------------------------------------------------------------------------
   // 房间：roomKind 决定画法（hall 大厅、shelf 成果库、dept 部门房间），w 是宽度，when 是出现的条件名（取自 floorModel 的同名字段），
   // agentKind 是没有角色设置时那个唯一角色的种类，ports 是墙上画哪几个管道口（in、out 交接管道，tubeIn、tubeOut 传信管），
-  // spots 把任务的位置对到房间里已有的陈设上，rest 是这个房间的持续状态，props 画陈设
+  // spots 把任务的位置对到房间里已有的陈设上，rest 是这个房间的持续状态，props 画陈设，verifies 标出出具放行结论的房间
 
   const DEPT_PORTS = ['in', 'out', 'tubeIn', 'tubeOut'];
 
@@ -35,7 +35,8 @@
       }
     },
     {
-      id: 'quality', label: '质检', roomKind: 'dept', w: 110, agentKind: 'agent', ports: DEPT_PORTS,
+      // verifies：这个房间出具放行结论，覆盖层「检验」的数与放行的盖章画在这里
+      id: 'quality', label: '质检', roomKind: 'dept', w: 110, agentKind: 'agent', ports: DEPT_PORTS, verifies: true,
       spots: { cabinet: (r) => r.x + r.w - 25, terminal: (r) => r.x + r.w - 25 },
       props(c, r) {
         RB(c, r.x + r.w - 36, G.FLOOR_LINE + 24, 22, 12, PAL.white2);

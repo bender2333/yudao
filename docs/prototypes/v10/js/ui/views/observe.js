@@ -199,6 +199,93 @@
       ui.tabPanels('y10-obs', active, { records: recordsPanel(ctx, data), usage: usagePanel(ctx, f) });
   }
 
+  // ---------------------------------------------------------------------------
+  // 循环（design.md 第 4 节）：每个事项一棵树，项目循环 → run → 各部门的激活 → 每次激活中的步骤循环；取值只来自 run.loops
+
+  let openLoop = null;
+  const LAYER_TEXT = { project: '项目循环', run: 'run', activation: '部门激活', step: '步骤循环' };
+  const DEPTH = { project: 0, run: 1, activation: 2, step: 3 };
+  const LOOP_COLUMNS = ['层', '实例', '轮次', '已用量与上限', '收敛状态', '停止原因'];
+
+  function loopState(state) {
+    const s = Y10.pixel.LOOP_STATES[state];
+    return '<span class="y10-loop-state" style="--loop:' + s.color + ';--loop-fg:' + s.fg + '">' + esc(s.label) + '</span>';
+  }
+
+  function sourceKind(source) {
+    return source ? '<span class="y10-source-kind is-' + esc(source) + '">' + esc(Y10.registry.SOURCE_KINDS[source].label) + '</span>' : '';
+  }
+
+  const measureValue = (v) => (Number.isInteger(v) ? String(v) : Math.round(v * 100) + '%');
+
+  function usedHtml(used) {
+    return used.map((u) => {
+      const fmt = (v) => (u.unit === '秒' ? Y10.ui.duration(v) : v + ' ' + u.unit);
+      const text = u.limit === null || u.limit === undefined ? fmt(u.value) : fmt(u.value) + ' / ' + fmt(u.limit);
+      return '<span class="y10-loop-used' + (u.at_bound ? ' is-bound' : '') + '">' + esc(u.name + ' ' + text) + (u.at_bound ? '<b>达到上限</b>' : '') + '</span>';
+    }).join('');
+  }
+
+  // 展开以后：进展度量每一轮的数值（一排小柱，点开是来源），判定依据；「不判定」写缺少的事实与开始判定的阶段
+  function loopDetail(inst) {
+    const m = inst.measure;
+    let bars = '';
+    if (m && m.series.length) {
+      const max = Math.max.apply(null, m.series.map((p) => p.value).concat([1]));
+      bars = '<div class="y10-loop-measure"><div class="y10-loop-measure-name">' + esc(m.name) + '：' + esc(m.series.map((p) => measureValue(p.value)).join(' → ')) + '</div>' +
+        '<div class="y10-loop-bars">' + m.series.map((p) => {
+          const ev = Y10.api.query('event.detail', { position: p.position }).data.event;
+          // 来源按「事件加字段」，由 run.loops 给出；run 一行另写这一轮的开环数（不计入判定）
+          return '<button type="button" class="y10-loop-bar" data-act="obs.source" data-position="' + p.position + '" data-source="' + esc(p.source) + '" title="' + esc('第 ' + p.round + ' 轮：' + ev.label) + '">' +
+            '<span class="y10-loop-bar-track"><span style="height:' + Math.max(4, Math.round((p.value / max) * 100)) + '%"></span></span>' +
+            '<b>' + esc(measureValue(p.value)) + '</b><small>第 ' + p.round + ' 轮</small>' +
+            (p.open !== undefined ? '<small class="y10-loop-open' + (p.open ? ' is-open' : '') + '">开环 ' + p.open + '</small>' : '') +
+            sourceKind(p.source) + '</button>';
+        }).join('') + '</div></div>';
+    }
+    const basis = inst.basis ? '<p class="y10-loop-basis"><b>判定依据</b>' + esc(inst.basis) + '</p>' : '';
+    const missing = inst.missing && !bars ? '<p class="y10-loop-missing"><b>缺少的事实</b>' + esc(inst.missing) + '</p>' : '';
+    return bars + basis + missing;
+  }
+
+  function loopRow(inst) {
+    const open = openLoop === inst.id;
+    const cells = [
+      esc(LAYER_TEXT[inst.layer]),
+      '<span class="y10-loop-name" style="--depth:' + DEPTH[inst.layer] + '">' + esc(inst.label) + '</span>',
+      esc(inst.round),
+      usedHtml(inst.used),
+      // 「不判定」的行写明缺少的事实与开始判定的阶段
+      loopState(inst.state) + (inst.state === 'not_judged' && inst.missing ? '<small class="y10-muted y10-block-line">缺少：' + esc(inst.missing) + '</small>' : ''),
+      inst.stop_reason ? esc(inst.stop_reason) : ''
+    ];
+    const tds = cells.map((html, i) => '<td data-label="' + LOOP_COLUMNS[i] + '"><div class="y10-td">' + (html === '' ? '<span class="y10-muted">—</span>' : html) + '</div></td>').join('');
+    return '<tr class="y10-loop-row' + (open ? ' is-open' : '') + '" data-act="obs.loop" data-id="' + esc(inst.id) + '" aria-expanded="' + open + '">' + tds + '</tr>' +
+      (open ? '<tr class="y10-loop-detail"><td colspan="6">' + loopDetail(inst) + '</td></tr>' : '');
+  }
+
+  function loopsBlock(ctx) {
+    if (!Y10.cap.query('run.loops')) return '';
+    const data = Y10.api.query('run.loops', { project_id: ctx.projectId }).data;
+    const items = data.items.filter((it) => !ctx.workItemId || it.work_item_id === ctx.workItemId);
+    const head = '<thead><tr>' + LOOP_COLUMNS.map((h) => '<th>' + h + '</th>').join('') + '</tr></thead>';
+    const groups = items.map((it) => '<tbody class="y10-loop-group"><tr class="y10-loop-item"><th colspan="6"><span class="y10-dot-color" style="--c:' + Y10.pixel.ITEM_COLORS[it.color_index % 6] + '"></span>' + esc(it.title) + '</th></tr>' +
+      it.instances.map(loopRow).join('') + '</tbody>').join('');
+    return ui.block({
+      id: 'obs-loop', title: '循环', query: 'run.loops',
+      subtitle: '每个事项一棵树：项目循环、run、各部门的激活、每次激活中的步骤循环。收敛状态由事件按规则算出；点一行看判定依据与每一轮的数值。',
+      body: '<div class="y10-table-wrap"><table class="y10-table y10-loop-table">' + head + '<tbody>' + loopRow(data.project) + '</tbody>' + groups + '</table></div>'
+    });
+  }
+
+  function refreshLoops(root, ctx) {
+    const el = root.querySelector('#obs-loop');
+    if (!el) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = loopsBlock(ctx);
+    if (tmp.firstElementChild) el.replaceWith(tmp.firstElementChild);
+  }
+
   function render(ctx) {
     applyPreset(ctx);
     const data = attemptsQuery(ctx, filtersOf(ctx.projectId), limitOf(ctx.projectId));
@@ -209,7 +296,7 @@
       title: '请求记录与用量', query: ['project.attempts', 'project.usage'],
       subtitle: '按部门、状态、Provider 与模型筛选；两个页签使用同一组筛选。',
       body: filterBar(ctx, data) + '<div data-obs-results>' + resultsHtml(ctx) + '</div>'
-    }) + '</div>';
+    }) + loopsBlock(ctx) + '</div>';
   }
 
   function refresh() {
@@ -233,7 +320,38 @@
     update(ctx, root) {
       const results = root.querySelector('[data-obs-results]');
       if (results) results.innerHTML = resultsHtml(ctx);
+      refreshLoops(root, ctx);
     }
+  });
+
+  // 点一行展开判定依据；场景的一步也用它（data-id 为实例）
+  Y10.actions.register('obs.loop', (el) => {
+    openLoop = openLoop === el.dataset.id ? null : el.dataset.id;
+    refreshLoops(Y10.app.dom.content, Y10.app.ctx());
+  });
+
+  // 每一轮的数值点开来源卡片：这个数的来源种类（按事件加字段）与给出它的事件，「在时间轴上查看」跳到概览的时间轴
+  Y10.actions.register('obs.source', (el) => {
+    const ev = Y10.api.query('event.detail', { position: Number(el.dataset.position) }).data.event;
+    const source = el.dataset.source || ev.source;
+    const ctx = Y10.app.ctx();
+    const base = Y10.paths.overview(ctx.projectId, ctx.workItemId);
+    const pairs = [
+      ['来源种类', sourceKind(source) + (source !== ev.source ? '<small class="y10-muted y10-block-line">这个数是主机测出的；事件本身的来源是' + esc(Y10.registry.SOURCE_KINDS[ev.source].label) + '</small>' : '')],
+      ['事件', esc(ev.label)],
+      ['事件种类', ui.code(ev.type)],
+      ['时间', esc(Y10.ui.time(ev.at))],
+      ['提出者', ui.code(ev.actor)],
+      ['全局位置', esc(ev.position)]
+    ];
+    if (source === 'decision_model' && ev.payload && ev.payload.probability !== undefined) pairs.push(['概率', esc(ev.payload.probability)]);
+    ui.modal({
+      title: '事实来源', body: ui.kv(pairs),
+      actions: [
+        { label: '在时间轴上查看', kind: 'primary', go: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'at=' + ev.position, close: true },
+        { label: '关闭', close: true }
+      ]
+    });
   });
 
   Y10.actions.register('obs.filter', (el) => {

@@ -67,7 +67,8 @@
         player.last = Y10.backend.emit(spec);
       } else if (st.act) {
         player.last = { type: st.act, label: st.label || st.act };
-        Y10.actions.run(st.act, null, null);
+        // 界面动作的参数照页面元素的 data-* 给出
+        Y10.actions.run(st.act, { dataset: Object.assign({}, st.data || {}) }, null);
       } else {
         player.last = { type: '跳转', label: st.label };
       }

@@ -9,6 +9,52 @@
 
   const INTEND_TEXT = 'Please implement an advanced to-do list web application where users can create, edit, and delete to-do items. The application should have functionalities for adding new tasks, marking tasks as completed, deleting tasks, filtering tasks, and searching tasks. Users should be able to browse all to-do items, create new tasks, edit existing tasks, and delete unnecessary tasks. Set all pages to have a lavender background and indigo components.';
 
+  // 质检的逐条结论（3.2D 起出现在资料里，#151）：[验收条件, 说明, 检验方式, 检查, 试用用例]；
+  // results 按验收条件给出 [结果, 说明]，没有写的为通过
+  function criteriaOf(list, results) {
+    return list.map(([criterion, text, method, checks, trials]) => {
+      const r = results[criterion] || [method === 'open' ? 'not_run' : 'pass', null];
+      return { criterion, text, method, result: r[0], checks, trial_cases: trials, note: r[1] };
+    });
+  }
+
+  const BASE_AC = [
+    ['AC-1', '新建：填写「新增任务」表单并提交，新任务出现在列表中', 'trial_case', [], [{ name: '试用第 2 步：新增任务「预约体检」', screenshot: 'todo-trial-2.png' }]],
+    ['AC-2', '编辑：修改已有任务的说明并保存，列表中的内容随之更新', 'command_check', ['npm_test：编辑后保存'], []],
+    ['AC-3', '完成：标记任务为已完成，任务有可见的完成标记', 'command_check', ['npm_test：完成标记'], []],
+    ['AC-4', '删除：选择任务旁的删除，任务从列表中移除', 'command_check', ['npm_test：删除任务'], []],
+    ['AC-5', '筛选：按全部、未完成、已完成筛选，列表只显示符合条件的任务', 'trial_case', ['npm_test：按状态筛选'], [{ name: '试用第 3 步：点击「已完成」筛选', screenshot: 'todo-trial-3.png' }]],
+    ['AC-6', '搜索：按标题或说明搜索，结果只包含匹配的任务', 'command_check', ['npm_test：按标题与说明搜索'], []],
+    ['AC-7', '导航：页面内的导航可以切换到「全部待办」与「关于」', 'trial_case', [], [{ name: '试用第 1 步：打开页面，切换导航', screenshot: 'todo-trial-1.png' }]],
+    ['AC-8', '配色：背景为淡紫色，按钮、卡片与标题栏为靛蓝色', 'judgement', [], [{ name: '截图与参照色板对照（模型阅读）', screenshot: 'todo-trial-1.png' }]]
+  ];
+  const baseCriteria = (over) => criteriaOf(BASE_AC, Object.assign({ 'AC-8': ['pass', '只由模型阅读截图判断配色，没有可执行的检验'] }, over));
+
+  // 「导入 CSV」（自举试点的示例数据，design.md 第 8.1 节）：有可执行检验的条件中未满足的 3 → 2 → 2，第 4 轮在场景 20 到达以后停滞；
+  // AC-6 没有可执行的检验（开环）；第 4 次工程激活里连续 9 步没有被接纳的记录（步骤循环停滞），Stage 5 起写入计划以外路径的比例上升（漂移）
+  const CSV_AC = [
+    ['AC-1', '选择 CSV 文件导入，文件中的任务出现在列表中', 'trial_case', [], [{ name: '试用：导入 tasks.csv（20 行）', screenshot: 'todo-trial-2.png' }]],
+    ['AC-2', '标题、说明、截止日期三列按表头对应，列的顺序不同也能导入', 'command_check', ['npm_test：csv-columns.test.js'], []],
+    ['AC-3', 'UTF-8 与 GBK 编码的文件都能正确显示中文', 'command_check', ['npm_test：csv-encoding.test.js'], []],
+    ['AC-4', '标题与截止日期都相同的任务不重复导入，导入后提示跳过了几条', 'trial_case', ['npm_test：csv-dedupe.test.js'], [{ name: '试用：同一个文件导入两次', screenshot: 'todo-trial-5.png' }]],
+    ['AC-5', '格式错误的行跳过，并列出行号', 'command_check', ['npm_test：csv-bad-rows.test.js'], []],
+    ['AC-6', '导入大文件（1 万行）时界面不卡顿', 'open', [], []]
+  ];
+  const CSV_OPEN = ['not_run', '没有可执行的检验：界面是否卡顿只能由人或模型阅读判断'];
+  const csvCriteria = (over) => criteriaOf(CSV_AC, Object.assign({ 'AC-6': CSV_OPEN }, over));
+  const CSV_BASE = { project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', level: 'pilot' };
+  const csv = (fields) => Object.assign({ department: null, payload: {}, patch: [] }, CSV_BASE, fields);
+  const csvRun = (field, value) => ({ path: 'runs[id=r-todo-csv].' + field, value });
+  const csvTo = (from, to, artifact, at, label, extra) => csv({
+    at, type: 'transition', label, payload: { from, to, artifact },
+    patch: [csvRun('department', to), csvRun('last_department', from)].concat(extra || [])
+  });
+  const csvStep = (at, tool, target, planItem, label, extra) => csv({
+    at, type: 'tool_started', department: 'engineering', label,
+    payload: Object.assign({ tool }, /run_command/.test(tool) ? { args: target } : { path: target }, planItem === undefined ? {} : { plan_item: planItem }),
+    patch: extra || []
+  });
+
   Y10.data.define({
     seed: {
       projects: [
@@ -31,6 +77,11 @@
           id: 'w-todo-due', project_id: 'p-todo', title: '增加截止日期与逾期提醒', color_index: 3, kind: 'change',
           status: 'not_started', queue_reason: null, run_id: 'r-todo-due', queue_pos: null, version: 1,
           created_at: '2026-09-28T10:00:00+08:00', born_at: '2026-09-28T10:00:00+08:00'
+        },
+        {
+          id: 'w-todo-csv', project_id: 'p-todo', title: '导入 CSV', color_index: 2, kind: 'change',
+          status: 'not_started', queue_reason: null, run_id: 'r-todo-csv', queue_pos: null, version: 1,
+          created_at: '2026-09-29T06:00:00+08:00', born_at: '2026-09-29T06:00:00+08:00', level: 'pilot'
         }
       ],
       runs: [
@@ -532,6 +583,55 @@
             }
           ],
           source: null
+        },
+        {
+          id: 'r-todo-csv', work_item_id: 'w-todo-csv', project_id: 'p-todo', yudao_version: '0.8.0',
+          phase: 'PRODUCT_SPEC', department: 'product', last_department: null, cycle: 1,
+          started_at: '2026-09-29T06:00:00+08:00', elapsed_sec: 0, limit_sec: 28800,
+          waiting_provider_sec: 0, waiting_provider: null, stop_reason: null,
+          recovery: {
+            state: 'running', reason: null, unusable: null,
+            last_confirmed: { seq: 0, text: '事项已登记，等待产品开始' },
+            owner: { id: '工程部门', since: '2026-09-29T10:02:00+08:00' },
+            late_results: [], verifications: [], unfinished: [],
+            limits: { activations: 9, model_steps: 31, retries: 0 }, auto_resumed_at: null
+          },
+          born_at: '2026-09-29T06:00:00+08:00', level: 'pilot',
+          inputs: [{
+            version: 1, kind: 'user', text: '给待办清单增加从 CSV 文件导入任务：标题、说明、截止日期三列，重复的任务不要再导入一遍。',
+            at: '2026-09-29T06:00:00+08:00', progress: 'accepted', bytes: [0, 96]
+          }],
+          flow: [
+            { seq: 30, at: '2026-09-29T06:32:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: 'PRD r1：导入 CSV（AC-1 至 AC-6）', status: '已接收', event_position: null },
+            { seq: 31, at: '2026-09-29T07:31:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r1：csv-import.js 与 4 条测试', status: '已验收', event_position: null },
+            { seq: 32, at: '2026-09-29T07:52:00+08:00', from: 'quality', to: 'engineering', kind: 'rework', content: '返工：列顺序不同导入错位（AC-2），GBK 文件乱码（AC-3），重复任务再次导入（AC-4）', status: '已处理', event_position: null },
+            { seq: 33, at: '2026-09-29T08:31:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r2：按表头对应列', status: '已验收', event_position: null },
+            { seq: 34, at: '2026-09-29T08:52:00+08:00', from: 'quality', to: 'engineering', kind: 'rework', content: '返工：截止日期不同的任务也被当成重复跳过（AC-4），格式错误的行没有列出行号（AC-5）', status: '已处理', event_position: null },
+            { seq: 35, at: '2026-09-29T09:41:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r3：去重按标题与截止日期比较', status: '已验收', event_position: null },
+            { seq: 36, at: '2026-09-29T10:02:00+08:00', from: 'quality', to: 'engineering', kind: 'rework', content: '返工：导入以后没有提示跳过了几条（AC-4），行号差 1（AC-5）', status: '处理中', event_position: null }
+          ],
+          requests: [], guidance: [],
+          messages: { product: [], engineering: [], quality: [], operations: [] },
+          actions: [], trials: [],
+          contexts: { product: [], engineering: [], quality: [] },
+          prompts: {
+            product: { config_version: 0, request_version: 0, text: PRODUCT_PROMPT },
+            engineering: { config_version: 0, request_version: 0, text: ENGINEERING_PROMPT },
+            quality: { config_version: 0, request_version: 0, text: QUALITY_PROMPT }
+          },
+          compactions: [],
+          effective_model: {
+            product: { definition: 'opencode-go-responses/kimi-k2.6', connection: 'opencode-go-responses', protocol: 'Responses', source: '部门默认', level: null, sent_level: 'medium', unusable: null },
+            engineering: { definition: 'opencode-go-responses/kimi-k2.6', connection: 'opencode-go-responses', protocol: 'Responses', source: '部门默认', level: 'high', sent_level: 'high', unusable: null },
+            quality: { definition: 'opencode-go-responses/mimo-v2.5', connection: 'opencode-go-responses', protocol: 'Responses', source: '部门默认', level: null, sent_level: 'medium', unusable: null }
+          },
+          roles: { level: 'S5', product: [], engineering: [], quality: [] },
+          ledger: {
+            level: 'S5',
+            engineering: { items: [], facts: [], questions: [], progress: [] },
+            quality: { items: [], facts: [], questions: [], progress: [] }
+          },
+          attempts: [], source: null
         }
       ],
       materials: [
@@ -573,7 +673,9 @@
           ],
           receipts: ['a-todo-base-2'],
           screenshots: ['todo-trial-3.png'],
-          files: null
+          files: null,
+          snapshot: '3f1c20',
+          criteria: baseCriteria({ 'AC-5': ['fail', '点击「已完成」后列表没有按状态过滤（D-1）'] })
         },
         {
           id: 'm-todo-base-q2', project_id: 'p-todo', work_item_id: 'w-todo-base', kind: 'qa', version: 2,
@@ -582,7 +684,9 @@
           checks: [{ label: 'AC-1 至 AC-8', ok: true }],
           receipts: ['a-todo-base-4'],
           screenshots: ['todo-trial-1.png', 'todo-trial-2.png'],
-          files: null
+          files: null,
+          snapshot: 'a1c3f20',
+          criteria: baseCriteria({})
         },
         {
           id: 'm-todo-due-i1', project_id: 'p-todo', work_item_id: 'w-todo-due', kind: 'intend', version: 1,
@@ -612,6 +716,53 @@
           ],
           git: { commit: 'b7e91d4', parent: 'a1c3f20', stat: '4 个文件 · +96 −18' },
           diff: '修改 app.js：日期输入、列表截止日期、逾期标记与本地日期比较\n修改 tests/todo.test.js：新增 2 条跨午夜用例'
+        },
+        {
+          id: 'm-todo-csv-i1', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'intend', version: 1, level: 'pilot',
+          title: '用户原文 v3', at: '2026-09-29T06:00:00+08:00', files: null, verdict: null,
+          text: '给待办清单增加从 CSV 文件导入任务：标题、说明、截止日期三列，重复的任务不要再导入一遍。'
+        },
+        {
+          id: 'm-todo-csv-p1', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'prd', version: 1, level: 'pilot',
+          title: 'PRD r1（导入 CSV）', at: '2026-09-29T06:30:00+08:00', files: null, verdict: null, accepted_from: '用户输入 v1',
+          text: '# 目标\n从 CSV 文件导入任务，不改变现有的新增、编辑、删除、完成、筛选与搜索行为。\n\n# 要求与验收条件\n' +
+            CSV_AC.map((ac) => '- ' + ac[0] + ' ' + ac[1]).join('\n') +
+            '\n\n# 边界\n只导入标题、说明、截止日期三列；不做导出与同步。\n\n# 验收\nnpm_test 覆盖列对应、编码、去重与格式错误；在 m-study 上试用导入。AC-6 目前没有可执行的检验。'
+        },
+        {
+          id: 'm-todo-csv-l1', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'plan', version: 1, level: 'pilot',
+          title: 'PLAN r1（导入 CSV）', at: '2026-09-29T06:50:00+08:00', files: null, verdict: null, goal: '实现 CSV 导入与去重',
+          text: 'P-1 按表头解析三列，识别 UTF-8 与 GBK\nP-2 去重：标题与截止日期都相同的任务跳过，导入后提示跳过的条数\nP-3 格式错误的行跳过并列出行号\nP-4 tests/csv-*.test.js 与登记命令 npm_test'
+        },
+        ...[['d1', 1, '07:30', 'c41a0e2', 'b7e91d4', '新增 src/csv-import.js 与 4 条测试'], ['d2', 2, '08:30', 'd2b7f31', 'c41a0e2', '按表头对应列'], ['d3', 3, '09:40', 'e5c9a04', 'd2b7f31', '去重按标题与截止日期比较']]
+          .map(([key, n, time, commit, parent, summary]) => ({
+            id: 'm-todo-csv-' + key, project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'delivery', version: n, level: 'pilot',
+            title: '交付 r' + n + '（导入 CSV）', at: '2026-09-29T' + time + ':00+08:00', verdict: null, summary,
+            text: '交付 r' + n + '：' + summary + '。',
+            files: [{ path: 'src/csv-import.js', bytes: 3200 + n * 260 }, { path: 'tests/csv-import.test.js', bytes: 1800 + n * 140 }],
+            git: { commit, parent, stat: '2 个文件 · +' + (60 + n * 12) },
+            diff: '修改 src/csv-import.js：' + summary
+          })),
+        {
+          id: 'm-todo-csv-q1', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'qa', version: 1, level: 'pilot',
+          title: '质检结论 r1（导入 CSV）', at: '2026-09-29T07:50:00+08:00', verdict: 'rework_engineering',
+          text: '列顺序不同的文件导入以后说明与截止日期错位（AC-2）；GBK 编码的文件中文乱码（AC-3）；同一个文件导入两次，任务全部重复出现（AC-4）。AC-6 没有可执行的检验。',
+          receipts: [], screenshots: ['todo-trial-5.png'], files: null, snapshot: 'c41a0e2',
+          criteria: csvCriteria({ 'AC-2': ['fail', '列顺序为 截止日期,标题,说明 时导入错位'], 'AC-3': ['fail', 'GBK 编码的文件中文乱码'], 'AC-4': ['fail', '同一个文件导入两次，任务全部重复'] })
+        },
+        {
+          id: 'm-todo-csv-q2', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'qa', version: 2, level: 'pilot',
+          title: '质检结论 r2（导入 CSV）', at: '2026-09-29T08:50:00+08:00', verdict: 'rework_engineering',
+          text: '列对应与编码已修好；去重只比较标题，截止日期不同的任务也被跳过（AC-4）；格式错误的行被整批跳过，没有列出行号（AC-5）。',
+          receipts: [], screenshots: ['todo-trial-5.png'], files: null, snapshot: 'd2b7f31',
+          criteria: csvCriteria({ 'AC-4': ['fail', '只按标题去重，截止日期不同的任务也被跳过'], 'AC-5': ['fail', '格式错误的行被整批跳过，没有列出行号'] })
+        },
+        {
+          id: 'm-todo-csv-q3', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'qa', version: 3, level: 'pilot',
+          title: '质检结论 r3（导入 CSV）', at: '2026-09-29T10:00:00+08:00', verdict: 'rework_engineering',
+          text: '去重按标题与截止日期比较，结果正确，但导入以后没有提示跳过了几条（AC-4）；列出的行号从 0 开始，与文件的行号差 1（AC-5）。',
+          receipts: [], screenshots: ['todo-trial-5.png'], files: null, snapshot: 'e5c9a04',
+          criteria: csvCriteria({ 'AC-4': ['fail', '去重正确，但没有提示跳过了几条'], 'AC-5': ['fail', '列出的行号从 0 开始，与文件的行号差 1'] })
         }
       ],
       project_settings: {
@@ -989,7 +1140,7 @@
       },
       {
         at: '2026-09-28T14:30:00+08:00', type: 'x_review_recorded', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-reviewer',
-        label: '工程审查者退回 P-1（第 1 次）：逾期判定用 UTC 毫秒比较', payload: { verdict: 'returned', text: '逾期判定用 UTC 毫秒比较，跨午夜后当天到期的任务会提前显示逾期；改为按本地日历日期比较。' },
+        label: '工程审查者退回 P-1（第 1 次）：逾期判定用 UTC 毫秒比较', payload: { verdict: 'returned', plan_item: 'P-1', text: '逾期判定用 UTC 毫秒比较，跨午夜后当天到期的任务会提前显示逾期；改为按本地日历日期比较。' },
         patch: [
           { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].status', value: 'returned' },
           { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].task', value: 'P-1 退回 1 次' }
@@ -1010,7 +1161,7 @@
       },
       {
         at: '2026-09-28T16:08:00+08:00', type: 'x_review_recorded', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-reviewer',
-        label: '工程审查者退回 P-1（第 2 次）：缺少当天到期的样例', payload: { verdict: 'returned', text: '跨午夜的用例只覆盖了次日，缺少当天到期的样例；补样例。' },
+        label: '工程审查者退回 P-1（第 2 次）：缺少当天到期的样例', payload: { verdict: 'returned', plan_item: 'P-1', text: '跨午夜的用例只覆盖了次日，缺少当天到期的样例；补样例。' },
         patch: [
           { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].task', value: 'P-1 退回 2 次' }
         ]
@@ -1060,7 +1211,7 @@
       },
       {
         at: '2026-09-29T11:48:00+08:00', type: 'x_review_recorded', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-reviewer',
-        label: '工程审查者退回 P-1（第 3 次）：提醒文案不完整', payload: { verdict: 'returned', text: '样例通过，但文案仍写「已超过截止日期」；写明截止日期与超期天数。' },
+        label: '工程审查者退回 P-1（第 3 次）：提醒文案不完整', payload: { verdict: 'returned', plan_item: 'P-1', text: '样例通过，但文案仍写「已超过截止日期」；写明截止日期与超期天数。' },
         patch: [{ path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].task', value: 'P-1 退回 3 次' }]
       },
       {
@@ -1086,7 +1237,7 @@
       },
       {
         at: '2026-09-29T12:30:00+08:00', type: 'x_review_recorded', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-reviewer',
-        label: '工程审查者审查 P-1：通过', payload: { verdict: 'passed', text: '本地日期比较、跨午夜用例与文案都符合 PRD。' },
+        label: '工程审查者审查 P-1：通过', payload: { verdict: 'passed', plan_item: 'P-1', text: '本地日期比较、跨午夜用例与文案都符合 PRD。' },
         patch: [
           { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].task', value: 'P-1 退回 3 次后通过' },
           { path: 'runs[id=r-todo-due].roles.engineering[id=eng-lead].task', value: 'P-1 至 P-3 已交回，审查退回 3 次后通过' }
@@ -1148,7 +1299,69 @@
           { path: 'decisions[id=d-todo-mdn].status', value: 'waiting' },
           { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T14:20:00+08:00' }
         ]
-      }
+      },
+      // Stage 5：带参照材料的判定点由决策模型核对配色，结论带概率
+      {
+        at: '2026-09-27T18:34:00+08:00', type: 'x_evidence_checked', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'quality',
+        label: '判定点核对 AC-8 配色：截图与参照色板一致，判为通过（概率 0.86）',
+        payload: { criterion: 'AC-8', result: 'pass', probability: 0.86, reference: '参照色板：背景 #E6E6FA，组件 #4B0082', material_id: 'm-todo-base-q2' },
+        patch: []
+      },
+      // 「导入 CSV」：三轮质检，未满足数 3 → 2 → 2；第 4 次工程激活连续 9 步没有被接纳的记录
+      csv({
+        at: '2026-09-29T06:00:00+08:00', type: 'work_item_created', label: '事项「导入 CSV」从大厅信箱进入', payload: { kind: 'change' },
+        patch: [{ path: 'work_items[id=w-todo-csv].status', value: 'in_progress' }, { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T06:00:00+08:00' }]
+      }),
+      csv({ at: '2026-09-29T06:00:00+08:00', type: 'run_created', label: '导入 CSV 的 run 创建，产品部门开始' }),
+      csv({ at: '2026-09-29T06:00:00+08:00', type: 'department_activated', department: 'product', label: '产品部门整理导入 CSV 的要求' }),
+      csv({
+        at: '2026-09-29T06:30:00+08:00', type: 'spec_accepted', department: 'product', label: '产品提交 PRD r1（导入 CSV，6 条验收条件），主机接纳',
+        payload: { material_id: 'm-todo-csv-p1' }, patch: [csvRun('elapsed_sec', 1800)]
+      }),
+      csvTo('product', 'engineering', 'prd', '2026-09-29T06:32:00+08:00', 'PRD r1 交付给工程部门', [csvRun('elapsed_sec', 1920)]),
+      csv({
+        at: '2026-09-29T06:50:00+08:00', type: 'plan_accepted', department: 'engineering', label: '工程提交 PLAN r1（导入 CSV），主机接纳',
+        payload: { material_id: 'm-todo-csv-l1' }, patch: [csvRun('elapsed_sec', 3000)]
+      }),
+      csv({
+        at: '2026-09-29T07:30:00+08:00', type: 'delivery_accepted', department: 'engineering', label: '工程封存交付 r1：csv-import.js 与 4 条测试',
+        payload: { material_id: 'm-todo-csv-d1', snapshot: 'c41a0e2' }, patch: [csvRun('elapsed_sec', 5400)]
+      }),
+      csvTo('engineering', 'quality', 'box', '2026-09-29T07:31:00+08:00', '交付 r1 送到质检部门', [csvRun('elapsed_sec', 5460)]),
+      csv({
+        at: '2026-09-29T07:50:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r1：返工——列顺序不同导入错位，GBK 文件乱码，重复任务再次导入（3 条未满足）',
+        payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q1' }, patch: [csvRun('cycle', 2), csvRun('elapsed_sec', 6600)]
+      }),
+      csvTo('quality', 'engineering', 'defect', '2026-09-29T07:52:00+08:00', '交付 r1 退回工程部门'),
+      csv({
+        at: '2026-09-29T08:30:00+08:00', type: 'delivery_accepted', department: 'engineering', label: '工程封存交付 r2：按表头对应列',
+        payload: { material_id: 'm-todo-csv-d2', snapshot: 'd2b7f31' }, patch: [csvRun('elapsed_sec', 8880)]
+      }),
+      csvTo('engineering', 'quality', 'box', '2026-09-29T08:31:00+08:00', '交付 r2 送到质检部门'),
+      csv({
+        at: '2026-09-29T08:50:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r2：返工——截止日期不同的任务也被当成重复，格式错误的行没有列出行号（2 条未满足）',
+        payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q2' }, patch: [csvRun('cycle', 3), csvRun('elapsed_sec', 10200)]
+      }),
+      csvTo('quality', 'engineering', 'defect', '2026-09-29T08:52:00+08:00', '交付 r2 退回工程部门'),
+      csv({
+        at: '2026-09-29T09:40:00+08:00', type: 'delivery_accepted', department: 'engineering', label: '工程封存交付 r3：去重按标题与截止日期比较',
+        payload: { material_id: 'm-todo-csv-d3', snapshot: 'e5c9a04' }, patch: [csvRun('elapsed_sec', 13200)]
+      }),
+      csvTo('engineering', 'quality', 'box', '2026-09-29T09:41:00+08:00', '交付 r3 送到质检部门'),
+      csv({
+        at: '2026-09-29T10:00:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r3：返工——导入以后没有提示跳过了几条，行号差 1（2 条未满足）',
+        payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q3' }, patch: [csvRun('cycle', 4), csvRun('elapsed_sec', 14400)]
+      }),
+      csvTo('quality', 'engineering', 'defect', '2026-09-29T10:02:00+08:00', '交付 r3 退回工程部门'),
+      csvStep('2026-09-29T13:10:00+08:00', 'read_range', 'app.js', 'P-2', '工程部门阅读 app.js 的导入入口'),
+      csvStep('2026-09-29T13:22:00+08:00', 'edit_range', 'src/csv-import.js', 'P-2', '工程部门按区间编辑 src/csv-import.js：跳过重复行时计数'),
+      csvStep('2026-09-29T13:35:00+08:00', 'run_command', 'npm test -- csv-import', undefined, '工程部门执行登记命令 npm_test（只跑导入用例）', [csvRun('elapsed_sec', 16200)]),
+      csvStep('2026-09-29T13:50:00+08:00', 'edit_range', 'src/csv-import.js', 'P-2', '工程部门按区间编辑 src/csv-import.js：导入完成后弹出提示'),
+      csvStep('2026-09-29T14:05:00+08:00', 'write_file', 'vendor/papaparse.min.js', null, '工程部门写入 vendor/papaparse.min.js：换用第三方解析库'),
+      csvStep('2026-09-29T14:20:00+08:00', 'run_command', 'npm test -- import', undefined, '工程部门执行登记命令 npm_test（导入相关用例）', [csvRun('elapsed_sec', 18000)]),
+      csvStep('2026-09-29T14:40:00+08:00', 'edit_range', 'styles.css', null, '工程部门按区间编辑 styles.css：导入进度条的样式'),
+      csvStep('2026-09-29T15:00:00+08:00', 'write_file', 'src/legacy-import.js', null, '工程部门写入 src/legacy-import.js：保留旧的解析代码'),
+      csvStep('2026-09-29T15:20:00+08:00', 'run_command', 'npm test', undefined, '工程部门执行登记命令 npm_test', [csvRun('elapsed_sec', 19800)])
     ],
     scenarios: [
       {
@@ -1930,6 +2143,106 @@
               { path: 'runs[id=r-todo-due].elapsed_sec', value: 100000 }
             ]
           }
+        ]
+      },
+      {
+        no: 20, id: 'sc-todo-loops', name: '循环与收敛', level: 'pilot', go: '#/p/p-todo/overview?w=w-todo-csv',
+        setup: [],
+        steps: [
+          { delay: 1400, act: 'scene.overlay', data: { overlay: 'loops' }, label: '打开覆盖层「循环」：信息条写 run 的收敛状态，房间写激活，工程角色头顶写步骤循环' },
+          {
+            delay: 1400,
+            event: {
+              type: 'delivery_accepted', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'engineering',
+              label: '工程封存交付 r4：导入以后提示跳过的条数', payload: { material_id: 'm-todo-csv-d4', snapshot: 'f08d6b3' }
+            },
+            patch: [
+              {
+                path: 'materials', push: {
+                  id: 'm-todo-csv-d4', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'delivery', version: 4, level: 'pilot',
+                  title: '交付 r4（导入 CSV）', at: '2026-09-29T15:30:00+08:00', verdict: null, summary: '导入以后提示跳过的条数',
+                  text: '交付 r4：导入以后提示跳过的条数。', files: [{ path: 'src/csv-import.js', bytes: 4240 }, { path: 'vendor/papaparse.min.js', bytes: 19800 }],
+                  git: { commit: 'f08d6b3', parent: 'e5c9a04', stat: '5 个文件 · +412' }, diff: '修改 src/csv-import.js：提示跳过的条数\n新增 vendor/papaparse.min.js\n新增 src/legacy-import.js'
+                }
+              },
+              { path: 'runs[id=r-todo-csv].elapsed_sec', value: 21000 }
+            ]
+          },
+          {
+            delay: 1200,
+            event: {
+              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv',
+              label: '交付 r4 送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' }
+            },
+            patch: [
+              { path: 'runs[id=r-todo-csv].department', value: 'quality' },
+              { path: 'runs[id=r-todo-csv].last_department', value: 'engineering' }
+            ]
+          },
+          {
+            delay: 1200,
+            event: {
+              type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'quality',
+              label: '质检部门开始核验交付 r4', payload: {}
+            },
+            patch: []
+          },
+          {
+            delay: 1400,
+            event: {
+              type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'quality',
+              label: '质检在 m-study 上把同一个文件导入两次', payload: { tool: 'browser', args: '同一个文件导入两次' }
+            },
+            patch: []
+          },
+          {
+            delay: 1600,
+            event: {
+              type: 'qa_submitted', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'quality',
+              label: '质检结论 r4：返工——提示的跳过条数比实际多 1，标题为空的行没有列出（仍有 2 条未满足）', payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q4' }
+            },
+            patch: [
+              {
+                path: 'materials', push: {
+                  id: 'm-todo-csv-q4', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'qa', version: 4, level: 'pilot',
+                  title: '质检结论 r4（导入 CSV）', at: '2026-09-29T15:30:00+08:00', verdict: 'rework_engineering',
+                  text: '导入以后有了提示，但提示的跳过条数比实际多 1（AC-4）；标题为空的行没有列出行号（AC-5）。AC-6 仍然没有可执行的检验。',
+                  receipts: [], screenshots: ['todo-trial-5.png'], files: null, snapshot: 'f08d6b3',
+                  criteria: csvCriteria({ 'AC-4': ['fail', '提示「跳过 4 条」，实际跳过 3 条'], 'AC-5': ['fail', '标题为空的行没有列出行号'] })
+                }
+              },
+              { path: 'runs[id=r-todo-csv].cycle', value: 5 },
+              { path: 'runs[id=r-todo-csv].elapsed_sec', value: 22200 }
+            ]
+          },
+          {
+            delay: 1400,
+            event: {
+              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv',
+              label: '交付 r4 退回工程部门', payload: { from: 'quality', to: 'engineering', artifact: 'defect' }
+            },
+            patch: [
+              { path: 'runs[id=r-todo-csv].department', value: 'engineering' },
+              { path: 'runs[id=r-todo-csv].last_department', value: 'quality' }
+            ]
+          },
+          { delay: 1600, go: '#/p/p-todo/observe?w=w-todo-csv', label: '转到观测页的「循环」区块' },
+          { delay: 1400, act: 'obs.loop', data: { id: 'run:r-todo-csv' }, label: '展开「导入 CSV」的 run：每一轮未满足的验收条件数 3 → 2 → 2 → 2，停滞' }
+        ]
+      },
+      {
+        no: 21, id: 'sc-todo-sources', name: '来源与检验', level: 'pilot', go: '#/p/p-todo/overview',
+        setup: [],
+        steps: [
+          { delay: 1400, act: 'scene.overlay', data: { overlay: 'sources' }, label: '打开覆盖层「来源」：其余部分调暗，事实元素按五种来源描边' },
+          { delay: 1600, act: 'scene.fact', data: { kind: 'parcel' }, label: '点停放的包裹：来源卡片写出给出它的事件与来源种类' },
+          { delay: 1600, act: 'scene.fact', data: { kind: 'time' }, label: '点信息条上的已用时间：一条事件里的测量值，来源是主机测量' },
+          { delay: 1400, act: 'scene.overlay', data: { overlay: 'coverage' }, label: '打开覆盖层「检验」：质检房间写检验覆盖比例与开环的条件数' },
+          { delay: 1600, act: 'scene.fact', data: { kind: 'coverage' }, label: '点质检房间的标签：每条验收条件的检验方式与最近一次结果' },
+          { delay: 1600, act: 'scene.fact', data: { kind: 'stamp' }, label: '点放行的盖章：「建立待办清单页面」带一条开环条件放行' },
+          { delay: 1600, go: '#/p/p-todo/materials?w=w-todo-base', label: '资料页的逐条结论表：AC-8 配色只由模型阅读截图判断，带「开环」标记' },
+          { delay: 1600, go: '#/home', label: '回到首页' },
+          { delay: 1400, act: 'home.item', data: { item: 'open_releases' }, label: '展开「带开环条件的放行」：先列开环的条件，再列来源事件' }
         ]
       }
     ]

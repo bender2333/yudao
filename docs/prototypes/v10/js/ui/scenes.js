@@ -167,8 +167,17 @@
       const data = Y10.api.query('semantic.records', { project: projectId }).data;
       return { entries: data.summary || [] };
     }
+    if (id === 'loops') return Y10.api.query('run.loops', { project_id: projectId }).data;
+    // 事实元素与它们的来源由 project.loop 给出，楼层已经拿到
+    if (id === 'sources') return {};
+    if (id === 'coverage') return Y10.api.query('acceptance.coverage', { project_id: projectId }).data;
     throw new Error('未知的覆盖层：' + id);
   }
+
+  // 场景的一步要打开覆盖层或点开事实元素：页面正在跳转时，等新的楼层挂载以后再做
+  let activeFloor = null;
+  const pending = { overlay: null, fact: null };
+  const routeSettled = () => location.hash === Y10.route().hash;
 
   // Stage 5：部门里有几个角色，各自的状态（空闲、被分派、工作、交回、外出）；低档位没有角色，画面按一个部门一个小人画。
   // 回放到过去的时间点时也没有角色（部门工作间的查询不能回放），画面同样按一个部门一个小人画
@@ -217,7 +226,10 @@
       },
       // 决定请求在画面里回答：命令与提示跟页面上的卡片一样
       onDecide: (payload) => Y10.run('decision.answer', payload),
-      onGo: (href) => Y10.go(href)
+      onGo: (href) => Y10.go(href),
+      // 来源卡片：读给出这条事实的事件；「在时间轴上查看」让时间轴跳到这条事件
+      fetchEvent: (position) => Y10.api.query('event.detail', { position }).data.event,
+      onSeek: (position) => replay.seekPosition(position)
     });
     function refresh() {
       const loop = q('project.loop', { project: o.projectId }, at);
@@ -229,25 +241,48 @@
       floor.setOverlay(overlay, overlay && at === null ? overlayData(overlay, o.projectId, loop) : null);
       el.querySelector('.y10-scene-text').innerHTML = floorList(loop, o.projectId);
     }
-    el.querySelectorAll('[data-overlay]').forEach((btn) => btn.addEventListener('click', () => {
-      overlay = overlay === btn.dataset.overlay ? null : btn.dataset.overlay;
+    function setOverlay(id) {
+      overlay = id || null;
       el.querySelectorAll('[data-overlay]').forEach((b) => b.classList.toggle('is-on', b.dataset.overlay === overlay));
       refresh();
-    }));
+    }
+    el.querySelectorAll('[data-overlay]').forEach((btn) => btn.addEventListener('click', () => setOverlay(overlay === btn.dataset.overlay ? null : btn.dataset.overlay)));
     refresh();
     const replay = Y10.replay.create({
       el: el.querySelector('.y10-floor-timeline'), project: o.projectId,
       onPosition(pos) { at = pos; refresh(); el.classList.toggle('is-replay', pos !== null); },
       onFact(f) { floor.playEvent(f.event); }
     });
-    return {
+    const panel = {
       floor,
       replay,
+      setOverlay,
       update() { if (at === null) refresh(); replay.reload(); },
       onEvent(ev) { if (at === null && ev.project_id === o.projectId) floor.playEvent(ev); },
-      destroy() { floor.destroy(); replay.destroy(); }
+      destroy() {
+        if (activeFloor === panel) activeFloor = null;
+        floor.destroy();
+        replay.destroy();
+      }
     };
+    activeFloor = panel;
+    if (pending.overlay && overlays.some((ov) => ov.id === pending.overlay)) setOverlay(pending.overlay);
+    if (pending.fact) floor.openFact(pending.fact);
+    pending.overlay = null;
+    pending.fact = null;
+    return panel;
   }
 
-  Y10.scenes = { mountBuilding, mountMachineRoom, mountFloor, buildingModels };
+  // 场景的一步：打开某个覆盖层（data-overlay）、点开某一种事实元素（data-kind）
+  Y10.actions.register('scene.overlay', (el) => {
+    if (activeFloor && routeSettled()) activeFloor.setOverlay(el.dataset.overlay);
+    else pending.overlay = el.dataset.overlay;
+  });
+  Y10.actions.register('scene.fact', (el) => {
+    if (activeFloor && routeSettled()) activeFloor.floor.openFact(el.dataset.kind);
+    else pending.fact = el.dataset.kind;
+  });
+
+  // activeFloor：当前挂载的项目楼层面板（验收脚本读取它的画面）
+  Y10.scenes = { mountBuilding, mountMachineRoom, mountFloor, buildingModels, activeFloor: () => activeFloor };
 })();
