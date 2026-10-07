@@ -132,7 +132,7 @@ def test_capability_lookup_by_preset_and_model():
 
 def _copy_definitions(target: Path) -> Path:
     for name in ("organization.json", "roles.json", "tools.json", "proposal_contracts.json",
-                 "limits.json", "stop_reasons.json", "service_presets.json",
+                 "rules.json", "stop_reasons.json", "service_presets.json",
                  "model_capabilities.json", "work_items.json"):
         (target / name).write_bytes((DEFINITIONS_DIR / name).read_bytes())
     return target

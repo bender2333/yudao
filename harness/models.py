@@ -637,8 +637,8 @@ class RunProjection:
     phase: str = "CREATED"
     active_department: str | None = None
     waiting_reason: str | None = None
-    max_cycles: int = DEFINITIONS.limits.max_cycles
-    run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec
+    max_cycles: int = DEFINITIONS.rule_value("max_cycles")
+    run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec")
     context_window: int = 32_000
     cycle_count: int = 0
     token_used: int = 0

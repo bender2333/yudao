@@ -313,8 +313,9 @@ def test_registry_freezes_at_work_item_creation(data_dir):
     first = system.projects.configure_command(project_id, "itest", ["python", "-c", "print(1)"], base_version=0)
     assert first["version"] == 1 and first["unchanged"] is False
     assert first["repeatable"] is False
-    limits = DEFINITIONS.limits
-    assert first["timeout_sec"] == limits.check_timeout_sec and first["output_limit"] == limits.tool_output_limit
+    check_timeout_sec = DEFINITIONS.rule_value("check_timeout_sec")
+    tool_output_limit = DEFINITIONS.rule_value("tool_output_limit")
+    assert first["timeout_sec"] == check_timeout_sec and first["output_limit"] == tool_output_limit
     with pytest.raises(CommandConfigConflict):
         system.projects.configure_command(project_id, "itest", ["python", "-c", "print(9)"], base_version=0)
     with pytest.raises(ValueError):
@@ -325,7 +326,7 @@ def test_registry_freezes_at_work_item_creation(data_dir):
     run = system.project(run_id)
     assert run.registered_commands == {
         "itest": {"argv": ["python", "-c", "print(1)"], "args": [],
-                  "timeout_sec": limits.check_timeout_sec, "output_limit": limits.tool_output_limit,
+                  "timeout_sec": check_timeout_sec, "output_limit": tool_output_limit,
                   "repeatable": False},
     }
     assert run.command_versions == {"itest": 1}

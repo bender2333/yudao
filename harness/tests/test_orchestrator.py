@@ -194,7 +194,8 @@ def test_natural_language_completion_does_not_finish(data_dir):
         product_spec(),
         plan_turn(),
         delivery_turn(),
-        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。") for _ in range(DEFINITIONS.limits.tool_call_required_limit + 1)],
+        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。")
+          for _ in range(DEFINITIONS.rule_value("tool_call_required_limit") + 1)],
     ]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")

@@ -33,6 +33,7 @@ from harness.app.project_queries import (
     WorkItemMaterials,
 )
 from harness.app.registry import Registry
+from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
@@ -145,6 +146,7 @@ def _all_requests(system, project_id, work_item_id, run_id):
         ("project.settings", ProjectSettings(project_id=project_id)),
         ("run.export", RunExport(run_id=run_id)),
         ("replay.check", ReplayCheck(run_id=run_id)),
+        ("rules.registry", RulesRegistryRequest()),
     ]
 
 

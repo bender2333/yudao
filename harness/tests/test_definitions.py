@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
@@ -47,36 +46,44 @@ def test_shipped_definitions_are_loaded_once_at_import():
 
 def test_version_is_the_digest_of_the_content_and_ignores_the_format(tmp_path):
     directory = _copy(tmp_path)
-    limits = _read(directory, "limits.json")
-    (directory / "limits.json").write_text(json.dumps(limits, indent=8), encoding="utf-8")
+    rules = _read(directory, "rules.json")
+    (directory / "rules.json").write_text(json.dumps(rules, indent=8), encoding="utf-8")
     assert load_definitions(directory).version == DEFINITIONS.version
 
-    _write(directory, "limits.json", {**limits, "max_cycles": limits["max_cycles"] - 1})
+    # 改一个现值：版本跟着变，现值读出来是新的
+    _write(directory, "rules.json",
+           {**rules, "max_cycles": {**rules["max_cycles"], "value": rules["max_cycles"]["value"] - 1}})
     changed = load_definitions(directory)
     assert changed.version != DEFINITIONS.version
-    assert changed.limits.max_cycles == DEFINITIONS.limits.max_cycles - 1
+    assert changed.rule_value("max_cycles") == DEFINITIONS.rule_value("max_cycles") - 1
+
+    # 改一项记录：版本同样跟着变，现值不变
+    _write(directory, "rules.json",
+           {**rules, "stall.rounds": {**rules["stall.rounds"], "cost": "换一种代价"}})
+    noted = load_definitions(directory)
+    assert noted.version != DEFINITIONS.version
+    assert noted.rule_value("stall.rounds") == DEFINITIONS.rule_value("stall.rounds")
 
     # 键的顺序属于内容（工具参数的顺序会进入请求）
-    _write(directory, "limits.json", dict(reversed(list(limits.items()))))
+    _write(directory, "rules.json", dict(reversed(list(rules.items()))))
     assert load_definitions(directory).version != DEFINITIONS.version
 
 
-@pytest.mark.parametrize(("change", "field", "message"), [
-    (lambda limits: {**limits, "max_cycles": "many"}, "max_cycles", "valid integer"),
-    (lambda limits: {**limits, "max_cycles": 0}, "max_cycles", "greater than 0"),
-    (lambda limits: {**limits, "retry_max_delay_sec": True}, "retry_max_delay_sec", "valid number"),
-    (lambda limits: {key: value for key, value in limits.items() if key != "run_time_limit_sec"},
-     "run_time_limit_sec", "Field required"),
-    (lambda limits: {**limits, "max_cycle": 3}, "max_cycle", "Extra inputs"),
+@pytest.mark.parametrize(("change", "message"), [
+    (lambda rules: {**rules, "max_cycles": "many"}, "Input should be an object"),
+    (lambda rules: {**rules, "Max_Cycles": rules["max_cycles"]}, "String should match pattern"),
+    (lambda rules: {**rules, "wait model service": rules["max_cycles"]}, "String should match pattern"),
 ])
-def test_invalid_definition_names_the_file_and_the_field(tmp_path, change, field, message):
+def test_invalid_definition_names_the_file_and_the_entry(tmp_path, change, message):
     directory = _copy(tmp_path)
-    _write(directory, "limits.json", change(_read(directory, "limits.json")))
+    _write(directory, "rules.json", change(_read(directory, "rules.json")))
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     [issue] = raised.value.issues
-    assert issue[0] == "limits.json" and issue[1] == field and message in issue[2]
-    assert f"limits.json {field}：" in str(raised.value)
+    assert issue[0] == "rules.json" and message in issue[2]
+    assert f"rules.json {issue[1]}：" in str(raised.value)
+
+
 
 
 def test_invalid_stop_reason_names_the_file_and_the_field(tmp_path):
@@ -183,18 +190,42 @@ def test_loaded_definitions_are_read_only_and_hand_out_plain_copies(tmp_path):
     assert load_definitions() == DEFINITIONS
 
 
-@pytest.mark.parametrize(("change", "field", "message"), [
-    (lambda limits: {**limits, "retry_max_delay_sec": float("inf")}, "retry_max_delay_sec", "finite number"),
-    (lambda limits: {**limits, "retry_initial_delay_sec": 90.0}, "（整个文件）", "retry_initial_delay_sec cannot exceed"),
-    (lambda limits: {**limits, "check_timeout_sec": 900}, "（整个文件）", "check_timeout_sec cannot exceed"),
+@pytest.mark.parametrize(("change", "message"), [
+    # 缺四项记录里的任意一项、缺界限、缺种类、缺形式、缺来源都拒绝，写明文件与条目
+    (lambda rule: {key: value for key, value in rule.items() if key != "guards"}, "Field required"),
+    (lambda rule: {key: value for key, value in rule.items() if key != "cost"}, "Field required"),
+    (lambda rule: {key: value for key, value in rule.items() if key != "relax_when"}, "Field required"),
+    (lambda rule: {key: value for key, value in rule.items() if key != "tighten_when"}, "Field required"),
+    (lambda rule: {key: value for key, value in rule.items() if key != "origin"}, "Field required"),
+    (lambda rule: {key: value for key, value in rule.items() if key != "bounds"}, "Field required"),
+    (lambda rule: {key: value for key, value in rule.items() if key != "kind"}, "Field required"),
+    (lambda rule: {key: value for key, value in rule.items() if key != "form"}, "Field required"),
+    # 形式不在三种之内，种类不在两种之内
+    (lambda rule: {**rule, "form": "ordering"}, "'permission', 'boundary' or 'admission'"),
+    (lambda rule: {**rule, "kind": "policy"}, "'parameter' or 'structure'"),
+    # 四项记录写了空串等于没有记录
+    (lambda rule: {**rule, "guards": ""}, "at least 1 character"),
+    (lambda rule: {**rule, "origin": ""}, "at least 1 character"),
+    (lambda rule: {**rule, "relax_when": ""}, "at least 1 character"),
+    # 现值落在界限以外，或者界限本身不成立
+    (lambda rule: {**rule, "value": 90_000}, "outside the bounds"),
+    (lambda rule: {**rule, "value": 1}, "outside the bounds"),
+    (lambda rule: {**rule, "value": float("inf")}, "must be finite"),
+    (lambda rule: {**rule, "value": ["a", "b", "c"]}, "outside the bounds"),
+    (lambda rule: {**rule, "bounds": [86400, 600]}, "increasing order"),
+    (lambda rule: {**rule, "bounds": [600]}, "Field required"),
+    (lambda rule: {**rule, "bounds": [600, float("inf")]}, "must be finite"),
 ])
-def test_limits_are_finite_and_consistent(tmp_path, change, field, message):
+def test_a_rule_must_record_all_four_notes_the_bounds_the_kind_the_form_and_the_origin(tmp_path, change, message):
     directory = _copy(tmp_path)
-    _write(directory, "limits.json", change(_read(directory, "limits.json")))
+    rules = _read(directory, "rules.json")
+    _write(directory, "rules.json", {**rules, "run_time_limit_sec": change(rules["run_time_limit_sec"])})
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     [issue] = raised.value.issues
-    assert issue[0] == "limits.json" and issue[1] == field and message in issue[2]
+    # 写明文件与条目：条目名出现在报错的字段路径里
+    assert issue[0] == "rules.json" and issue[1].startswith("run_time_limit_sec") and message in issue[2]
+    assert "rules.json run_time_limit_sec" in str(raised.value)
 
 
 def test_a_definition_file_that_is_not_utf8_names_the_file(tmp_path):
@@ -244,21 +275,21 @@ def test_role_visibility_is_a_closed_list(tmp_path):
 
 def test_malformed_json_duplicate_keys_and_missing_files_are_reported(tmp_path):
     directory = _copy(tmp_path)
-    (directory / "limits.json").write_text('{\n  "max_cycles": 3,\n  "max_cycles": 4\n}', encoding="utf-8")
+    (directory / "rules.json").write_text('{\n  "max_cycles": 3,\n  "max_cycles": 4\n}', encoding="utf-8")
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
-    assert raised.value.issues == (("limits.json", "max_cycles", "重复的键"),)
+    assert raised.value.issues == (("rules.json", "max_cycles", "重复的键"),)
 
-    (directory / "limits.json").write_text('{\n  "max_cycles":\n}', encoding="utf-8")
+    (directory / "rules.json").write_text('{\n  "max_cycles":\n}', encoding="utf-8")
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     [issue] = raised.value.issues
-    assert issue[0] == "limits.json" and issue[1] == "第 3 行第 1 列" and "不是合法的 JSON" in issue[2]
+    assert issue[0] == "rules.json" and issue[1] == "第 3 行第 1 列" and "不是合法的 JSON" in issue[2]
 
-    (directory / "limits.json").unlink()
+    (directory / "rules.json").unlink()
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
-    assert raised.value.issues == (("limits.json", "（整个文件）", "定义文件不存在"),)
+    assert raised.value.issues == (("rules.json", "（整个文件）", "定义文件不存在"),)
 
 
 def _without_quality(directory: Path) -> None:
@@ -275,6 +306,10 @@ def _without_quality(directory: Path) -> None:
             target = target[step]
         del target["quality"]
         _write(directory, name, content)
+    # 规则登记里的可见范围条目同样要去掉这个部门
+    rules = _read(directory, "rules.json")
+    del rules["roles.quality.visibility"]
+    _write(directory, "rules.json", rules)
 
 
 
@@ -288,8 +323,11 @@ def _with_unimplemented_tool(directory: Path) -> None:
 
 
 @pytest.mark.parametrize(("change", "expected"), [
-    (lambda directory: _write(directory, "limits.json", {**_read(directory, "limits.json"), "max_cycles": -1}),
-     "limits.json max_cycles："),
+    (lambda directory: _write(directory, "rules.json",
+                              {**_read(directory, "rules.json"),
+                               "max_cycles": {**_read(directory, "rules.json")["max_cycles"],
+                                              "value": -1}}),
+     "rules.json max_cycles："),
     # 控制核心的阶段迁移只为产品、工程、质检写了阶段
     (_without_quality, "organization.json departments：控制核心的阶段迁移按顺序支持部门 product、engineering、quality"),
     # 执行环境没有实现的环境工具
@@ -382,8 +420,8 @@ def test_no_code_path_changes_the_loaded_definitions(tmp_path, names):
         system, _run_id, _ = SCENARIOS[name].run(tmp_path / name)
         system.close()
     assert DEFINITIONS == load_definitions()
-    with pytest.raises(ValidationError):
-        DEFINITIONS.limits.max_cycles = 1
+    with pytest.raises(TypeError):
+        DEFINITIONS.rules["max_cycles"] = DEFINITIONS.rules["max_cycles"]
 
 
 def test_a_run_stopping_for_an_unlisted_reason_fails_to_record_the_stop(tmp_path):
