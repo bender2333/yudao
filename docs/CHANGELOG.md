@@ -516,3 +516,4 @@ claude-opus-5-5 / 2026-10-07 05:30 / `docs/program-roadmap.md` 按意图校准�
 claude-opus-5-5 / 2026-10-07 06:10 / `docs/design/loops-and-convergence.md` 第 3 节写明等待超过时长上限以后选择继续等待时重新计时 / 改写 #143、#246 的工单正文时发现设计没有写这一点
 claude-opus-5-5 / 2026-10-07 09:10 / `docs/stage-3-plan.md` 第 3 节与第 9 节写入迭代底座的父工单 #342 与子工单 #343 至 #358 的编号，M2 一行的「用一条命令修改参数并撤回」放回「用户能试用的」一栏；`docs/program-roadmap.md` 第 2 节第 14 条写入父工单 #342 / 用户经 /to-spec 与 /to-tickets 建立迭代底座的工单
 claude-sonnet-5-5 / 2026-10-07 09:40 / AGENTS.md「常用操作命令」新增一条：较长的评论先写成文件，文件用绝对路径写在工单工作区的 `.tmp\` 下并带工单号，`--body-file` 也给这个绝对路径，发出以前核对 PR 链接、工单号与测试计数行 / 审查者发评论时读到主工作区里其他工单遗留的同名文件（#317 的 REVIEW: PASS 评论的 PR 链接与计数行张冠李戴），用户 2026-10-07 确认写入
+claude-opus-5-5 / 2026-10-07 10:25 / `docs/requirements/stage-requirements-overview.md` 第 6 节新增第 7 项「界面的形式：桌面客户端，还是由 Yudao 服务提供的网页」；`docs/decision.md` 新增「M1 试用的第一批反馈；界面的形式列为专题」 / M1 试用中用户反馈界面问题，并认为客户端形式过重
