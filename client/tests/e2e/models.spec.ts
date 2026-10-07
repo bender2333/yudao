@@ -616,3 +616,25 @@ for (const size of [
     }
   });
 }
+
+// 从系统页返回时回到进入前的页面（设计说明第 3.3 节第 108 行，工单 #296）
+test("从项目页进入模型管理，点「返回原界面」回到项目页", async () => {
+  test.setTimeout(300_000);
+  const { backend, client } = await openModels({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  try {
+    await client.page.locator(".sidebar .nav-item", { hasText: "交付历史" }).first().click();
+    await expect(client.page.locator(".path")).toContainText("交付历史");
+
+    // 打开左侧栏进模型管理（宽屏下左侧栏常驻，直接点入口）
+    await client.page.getByRole("button", { name: "模型管理", exact: true }).click();
+    await expect(client.page.locator(".path")).toHaveText("模型管理");
+
+    await client.page.getByRole("button", { name: "返回原界面" }).click();
+    await expect(client.page.locator(".path")).toContainText("交付历史");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+    await backend.stop();
+  }
+});

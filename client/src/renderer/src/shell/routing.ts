@@ -9,6 +9,9 @@ export type Route = {
   systemPage: string | null;
   attemptId: string | null;
   runId: string | null;
+  // 回放位置（全局位置，设计说明第 3.3 节写在 ?at= 中）：刷新、后退与分享链接都回到同一位置；
+  // 为 null 时是实时画面
+  at: number | null;
 };
 
 const SYSTEM_PAGES: Record<string, string> = {
@@ -23,7 +26,7 @@ export function parseRoute(hash: string): Route {
   const [pathPart, queryPart] = text.split("?", 2);
   const query = new URLSearchParams(queryPart ?? "");
   const segments = pathPart.split("/").filter(Boolean);
-  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, systemPage: null, attemptId: null, runId: null };
+  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, systemPage: null, attemptId: null, runId: null, at: replayPosition(query) };
   if (segments.length === 0 || segments[0] === "home") {
     route.name = "home";
     return route;
@@ -75,10 +78,21 @@ export function parseRoute(hash: string): Route {
   return route;
 }
 
+// 路径参数里的回放位置：非负整数才认，否则按实时画面处理（手改地址栏的输入不当作位置）
+function replayPosition(query: URLSearchParams): number | null {
+  const text = query.get("at");
+  if (text === null || !/^\d+$/.test(text)) {
+    return null;
+  }
+  return Number(text);
+}
+
 // 每个页面的路径（原型 v8 设计说明第 3.3 节）
 export const paths = {
   home: () => "#/home",
   connect: () => "#/connect",
+  // 首页的回放位置写在 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
+  homeAt: (at: number | null) => (at === null ? "#/home" : `#/home?at=${at}`),
   overview: (projectId: string) => `#/p/${projectId}/overview`,
   dept: (projectId: string, department: string) => `#/p/${projectId}/dept/${department}`,
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
@@ -96,6 +110,9 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/observe/${attemptId}${suffix ? `?${suffix}` : ""}`;
   },
+  // 概览页的回放位置写在 ?at= 中，与首页共用同一个参数名；回到现在时路径不带 at
+  overviewAt: (projectId: string, at: number | null) =>
+    at === null ? `#/p/${projectId}/overview` : `#/p/${projectId}/overview?at=${at}`,
   settings: (projectId: string) => `#/p/${projectId}/settings`,
   sys: (page: string) => `#/sys/${page}`,
   // 客户端自己的设置页（与项目设置不同：连接设置、本机服务与登录时启动）

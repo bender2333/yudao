@@ -509,3 +509,12 @@
   10. 新增设计说明 `trusted-kernel.md`、`rules-and-parameters.md`、`loops-and-convergence.md`、`independent-verification.md`；总体架构、应用层与接口层、评测场景、接入已有项目等设计说明各自吸收有关的部分；自举试点的做法写进路线图与 Stage 3 计划。
   11. 整理在架构师工作区按 `CONTEXT.md` 与 ADR、`CLAUDE.md`、需求记录、设计说明、路线图与基线、工单的顺序进行，每一批先列修改清单经用户确认；三份校准稿并入以后，在 Obsidian 中把 status 改为已并入仓库。
 - 影响：`CONTEXT.md`、`docs/adr/`、`CLAUDE.md`、`docs/requirements/`、`docs/design/`、`docs/program-roadmap.md`、`docs/stage-3-plan.md`、`docs/current-baseline.md`；GitHub 工单。
+
+## 2026-10-07 - M1 试用的第一批反馈；界面的形式列为专题
+
+- 背景：用户安装 0.1.1 试用 M1，反馈模型管理无法完成配置（OpenCode Go 填 Key 后获取模型列表失败，自定义服务显示「候选未知」，要手填 ID 与名称），界面样式与原型 v9 差距大，窗口放大后内容不变大，像素画面文字模糊；随后提出做成客户端以后很重，体现不出客户端应用的优势。
+- 决策：
+  1. 两种界面形式都需要的修正直接建工单：#364（新建连接时 Key 随连接保存，ID、名称、凭据引用按服务方案自动填写，没有模型访问定义时也能做连接测试，地址补全 `https://`）、#365（像素画面按设备分辨率绘制、最近邻采样，与原型 v9 截图对照）、#366（「流转」覆盖层显示项目的流转）。
+  2. 界面的形式列为待讨论的专题（[需求概览](requirements/stage-requirements-overview.md)第 6 节第 7 项）；讨论之前不新建只与界面外观、页面布局有关的工单。
+- 待用户决定：OpenCode Go 的模型分属三种协议（models.dev 记录 34 个模型中 22 个 Chat Completions、7 个 Responses、5 个 Messages），按 [ADR-0004](adr/0004-one-protocol-per-connection.md) 一个 Key 要建三份连接，协议是否改到模型访问定义上；自定义服务的模型列表地址是否默认取「地址/models」（[模型管理设计说明](design/model-management.md)第 4.3 节）；像素画面的字体与「与原型的核对不比较像素」（[ADR-0021](adr/0021-client-pixel-view-follows-v9-structure.md)）；大窗口时的页面布局。
+- 影响：GitHub 工单 #364、#365、#366；需求概览第 6 节。

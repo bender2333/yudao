@@ -40,34 +40,75 @@ const PROPOSAL: Record<string, string> = {
 };
 const DEFAULT_PROPOSAL: Record<string, string> = { product: "产品规格", engineering: "交付说明", quality: "质检结论", operations: "运维记录" };
 const ARTIFACT: Record<string, string> = { prd: "PRD", box: "交付箱", defect: "返工单", release: "放行单", letter: "信件" };
-
+// 交出类工具的说话：真实系统的 submit_* 与提案事件的 kind 共用一套名字（harness 的提案合同）
+const SUBMIT_NAME: Record<string, string> = {
+  submit_product_spec: "产品规格", submit_product_decision: "产品决定", submit_plan: "工程计划",
+  submit_delivery: "交付说明", submit_review: "质检结论", submit_request: "询问",
+  submit_response: "回答", submit_guidance_response: "指导回复",
+};
 function proposalName(ev: PixelFloorEvent, pl: Record<string, unknown>): string {
   if (PROPOSAL[pl.kind as string]) return PROPOSAL[pl.kind as string];
   const m = /提交(.+?)(?:[，。：:（(]|$)/.exec(String(ev.label || ""));
   return (m && m[1]) || DEFAULT_PROPOSAL[ev.department ?? ""] || "提案";
 }
 
+// 真实系统把工具名与参数放在载荷里：工具名是 name，参数在 args 之下（harness/app/payloads.py 的 ToolStartedPayload）。
+// args 以下的键按工具各自的要求取：读取与修改类用 path，翻找用 pattern，登记命令用 name。
+const argsOf = (pl: Record<string, unknown>): Record<string, unknown> =>
+  (pl.args as Record<string, unknown> | undefined) ?? {};
+
+const argOf = (pl: Record<string, unknown>, key: string): string | null => {
+  const value = argsOf(pl)[key] ?? pl[key];
+  return typeof value === "string" && value !== "" ? value : null;
+};
+
+// 登记命令名：真实载荷给 registered_name（工具名在 name，登记名在 registered_name）；
+// 原型事件把命令名写在说明的末尾，按它取
+const commandOf = (ev: PixelFloorEvent, pl: Record<string, unknown>): string | null =>
+  (typeof pl.registered_name === "string" && pl.registered_name !== "" ? pl.registered_name : null)
+  ?? argOf(pl, "command")
+  ?? argOf(pl, "name")
+  ?? (/([A-Za-z][\w.\-]*)\s*$/.exec(String(ev.label || "")) || [])[1]
+  ?? null;
+
+// 文件名：真实载荷里在 args.path（移动取 args.source）；原型事件的说明里带文件名，按它取
 const FILE_RE = /([\w\-./]+\.[A-Za-z0-9]{1,5})(?![A-Za-z0-9])/;
 const fileOf = (ev: PixelFloorEvent, pl: Record<string, unknown>): string | null =>
-  (pl.path as string) || (pl.file as string) || (FILE_RE.exec(String(ev.label || "")) || [])[1] || null;
-const commandOf = (ev: PixelFloorEvent, pl: Record<string, unknown>): string | null =>
-  (pl.command as string) || (pl.name as string) || (/([A-Za-z][\w.\-]*)\s*$/.exec(String(ev.label || "")) || [])[1] || null;
+  argOf(pl, "path") ?? argOf(pl, "source") ?? (pl.file as string) ?? (FILE_RE.exec(String(ev.label || "")) || [])[1] ?? null;
 
 function toolText(ev: PixelFloorEvent, pl: Record<string, unknown>): string | null {
-  const tool = String(ev.tool ?? pl.tool ?? "");
+  const tool = String(ev.tool ?? pl.tool ?? pl.name ?? "");
   const file = fileOf(ev, pl);
-  if (tool === "search") return `现在翻找资料${pl.query ? `：${cut(pl.query, 12)}` : ""}`;
-  if (/^read/.test(tool)) return `现在阅读${file ? ` ${cut(baseName(file), 16)}` : "资料"}`;
-  if (/^(edit|write)/.test(tool)) return `现在编辑${file ? ` ${cut(baseName(file), 16)}` : "文件"}`;
+  const named = (prefix: string, fallback: string): string =>
+    `现在${prefix}${file ? ` ${cut(baseName(file), 16)}` : ` ${fallback}`}`;
+  if (tool === "search") return `现在翻找资料${argOf(pl, "pattern") ? `：${cut(argOf(pl, "pattern"), 12)}` : ""}`;
+  if (/^read/.test(tool)) return named("阅读", "资料");
+  if (/^(edit|write)/.test(tool)) return named("编辑", "文件");
+  if (tool === "delete_file") return `现在删除${file ? ` ${cut(baseName(file), 16)}` : "文件"}`;
+  if (tool === "move_file") return `现在移动${file ? ` ${cut(baseName(file), 16)}` : "文件"}`;
+  if (tool === "list_files") return `现在看看有什么文件${argOf(pl, "prefix") ? `：${cut(argOf(pl, "prefix"), 12)}` : ""}`;
+  // 交出类工具（真实系统的 submit_*）：提案事件随后还会说一次提交了什么，这里先说正在交出哪一份
+  const submit = SUBMIT_NAME[tool];
+  if (submit !== undefined) return `现在提交${submit}`;
+  if (/^submit_/.test(tool)) return "现在提交";
   if (tool === "run_command") {
     const name = commandOf(ev, pl);
     return `现在执行${name ? ` ${cut(name, 14)}` : "登记命令"}`;
   }
-  if (tool === "run_check") return "现在检查交付";
+  if (tool === "run_check") {
+    const name = argOf(pl, "name");
+    return `现在检查交付${name ? `：${cut(name, 12)}` : ""}`;
+  }
   if (/^browser/.test(tool)) return ev.department === "quality" ? "现在试用网页" : "现在自测网页";
   if (/^(fetch|http|net|url)/.test(tool)) return "现在取回网络资料";
   if (/^mcp/.test(tool)) return "现在调用工具";
   return null;
+}
+
+/** 工具执行的结果：载荷上的 ok 决定这句话（退出码只出现在工件里，事件上读不到）。 */
+function commandResultText(pl: Record<string, unknown>): string {
+  if (pl.ok === false) return pl.error ? `命令没有通过：${cut(pl.error, 12)}` : "命令没有通过";
+  return "命令通过了";
 }
 
 /** 没有登记在目录里的事件：拿事件说明去掉开头的主语。 */
@@ -96,8 +137,9 @@ export const SAY_CATALOG: Record<string, SayRule> = {
   model_attempt_failed: () => "请求失败了",
   tool_started: toolText,
   tool_called: (ev, pl) => {
-    if (String(ev.tool ?? pl.tool ?? "") !== "run_command") return null;
-    return pl.timed_out ? "命令超时了" : pl.exit_code === 0 ? "命令通过了" : "命令没有通过";
+    // 真实载荷只有 ok 与 error：退出码在工件里，事件上读不到（harness/app/payloads.py 的 ToolCallResult）
+    if (String(ev.tool ?? pl.tool ?? pl.name ?? "") !== "run_command") return null;
+    return commandResultText(pl);
   },
   tool_skipped: () => "这个工具没有获准，换个办法",
   proposal_submitted: (ev, pl) => `现在提交${proposalName(ev, pl)}`,
@@ -109,17 +151,19 @@ export const SAY_CATALOG: Record<string, SayRule> = {
   qa_started: () => "现在开始检查",
   qa_submitted: (_ev, pl) => (pl.verdict === "release" ? "现在盖放行章" : "现在盖返工章"),
   collaboration_requested: (ev, pl, x) => {
-    const asker = (pl.from as string) || ev.department;
+    // 真实载荷的发问方是 requester、收方是 recipient（harness/app/payloads.py 的 CollaborationRequestedPayload）
+    const asker = (pl.requester as string) || (pl.from as string) || ev.department;
     const q = (pl.question as string) || afterColon(ev.label);
     const tail = q ? `：${cut(q, 14)}` : "";
     if (x.side === "to" || (x.dept && x.dept !== asker)) return `收到${deptName(asker)}的询问${tail}`;
-    return `现在向${deptName(pl.to as string)}发出询问${tail}`;
+    return `现在向${deptName((pl.recipient as string) ?? (pl.to as string))}发出询问${tail}`;
   },
   collaboration_responded: (ev, pl, x) => {
-    // 回答方是事件所在的部门（示例数据里 from 是回答方，v8 构建约定里 to 是回答方），另一头是发问方
-    const answerer = ev.department || (pl.to as string);
-    const asker = pl.from === answerer ? (pl.to as string) : (pl.from as string);
-    const a = (pl.answer as string) || afterColon(ev.label);
+    // 真实载荷给出 requester（发问方）与 recipient（回答方）；原型载荷用 from 与 to，从是回答方
+    const answerer = ev.department || (pl.recipient as string) || (pl.from as string);
+    const asker = (pl.requester as string)
+      ?? ((pl.from as string) === answerer ? (pl.to as string) : (pl.from as string));
+    const a = (pl.text as string) || (pl.answer as string) || afterColon(ev.label);
     const tail = a ? `：${cut(a, 14)}` : "";
     if (x.side === "to" || (x.dept && x.dept !== answerer)) return `收到${deptName(answerer)}的回答${tail}`;
     return `现在回答${deptName(asker)}的询问`;

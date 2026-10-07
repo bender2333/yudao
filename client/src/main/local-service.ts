@@ -5,7 +5,8 @@
 
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { appendFileSync, closeSync, existsSync, openSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, openSync, readFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { app, dialog } from "electron";
 import { DEFAULT_LOCAL_ADDRESS } from "./settings";
@@ -14,7 +15,7 @@ import { DEFAULT_LOCAL_ADDRESS } from "./settings";
 
 // 找不到 yudao 命令时界面显示的安装命令（设计说明第 4.3 节）
 export const INSTALL_COMMAND = "uv tool install --python 3.12";
-
+const NO_COMMAND_MESSAGE = "没有找到 yudao 命令，用下面的命令安装 Yudao 服务：";
 // 启动以后等待服务可用的上限与轮询间隔（设计说明第 4.3 节：最多等待 30 秒）
 const WAIT_LIMIT_MS = 30_000;
 const POLL_INTERVAL_MS = 200;
@@ -97,19 +98,33 @@ export function findYudaoCommand(): YudaoCommand | null {
   return null;
 }
 
+// 启动结果的三种情况：服务可用、没有找到 yudao 命令、命令找到了但服务 30 秒内没有起来。
+// 两种失败的原因不同，界面分别给出安装命令与服务日志的位置（设计说明第 4.3 节、工单 #296）
+export type LocalServiceStart = {
+  kind: "started" | "no-command" | "failed";
+  // no-command 时是安装命令；failed 时是失败的原因（端口被占、数据目录被占用、30 秒没有应答）
+  reason: string;
+  // 服务日志的位置：命令找到了以后无论成功失败都给出，用户据此查看
+  logPath: string;
+};
+
 // 启动 `yudao api`：独立的后台进程，没有窗口，输出写入日志，不随客户端退出。
-// 打开「允许局域网访问」时带上 `--access lan --host 0.0.0.0`（设计说明第 4.3 节）；
-// 服务已经在运行时直接返回 true；找到不到命令时返回 false，由界面显示安装命令
-export async function startYudaoService(allowLan: boolean): Promise<boolean> {
+// 打开「允许局域网访问」时带上 `--access lan --host 0.0.0.0`（设计说明第 4.3 节）；服务已经在运行
+// 时直接返回可用；没有找到命令时返回 no-command；端口被别的程序占用时立即返回 failed；
+// 其余情况启动后最多等待 30 秒，两次都没有可用时按服务日志给出原因
+export async function startYudaoService(allowLan: boolean): Promise<LocalServiceStart> {
+  const logPath = serviceLogPath();
   if (await probeService()) {
-    return true;
+    return { kind: "started", reason: "", logPath };
   }
   const found = findYudaoCommand();
   if (found === null) {
-    return false;
+    return { kind: "no-command", reason: NO_COMMAND_MESSAGE, logPath };
+  }
+  if (await portBusy()) {
+    return { kind: "failed", reason: `端口 ${LOCAL_PORT} 已经被另一个程序占用，Yudao 服务起不来。`, logPath };
   }
   const args = allowLan ? ["api", "--access", "lan", "--host", "0.0.0.0"] : ["api"];
-  const logPath = serviceLogPath();
   const env = { ...process.env, PATH: [...found.extraPaths, process.env.PATH ?? ""].join(";") };
   const launch = async (): Promise<boolean> => {
     // 服务刚停止时（重新启动的场景）旧进程对日志文件的句柄在 Windows 上释放得比进程退出晚，
@@ -160,16 +175,52 @@ export async function startYudaoService(allowLan: boolean): Promise<boolean> {
     }
     return false;
   };
-  // 刚被停止的服务对日志文件的句柄释放得比进程退出晚：子进程用 shell 重定向打开日志时可能失败而
-  // 立刻退出，这次启动就没有服务可用。等一小段再整体重试一次；两次都起不来才返回 false
+  // 刚被停止的服务对日志文件的句柄释放得比进程退出晚：子进程打开日志失败而立刻退出时，
+  // 这次启动就没有服务可用。等一小段再整体重试一次；两次都起不来按服务日志报告原因
   if (await launch()) {
-    return true;
+    return { kind: "started", reason: "", logPath };
   }
   const { promise, resolve } = Promise.withResolvers<void>();
   setTimeout(resolve, POLL_INTERVAL_MS);
   await promise;
-  return launch();
+  if (await launch()) {
+    return { kind: "started", reason: "", logPath };
+  }
+  let logTail = "";
+  try {
+    logTail = readFileSync(logPath, "utf8").slice(-LOG_TAIL_CHARS);
+  } catch {
+    // 服务进程还在运行时日志文件的句柄锁住文件：读不到时按没有应答处理
+  }
+  return { kind: "failed", reason: startFailureReason(logTail), logPath };
 }
+
+// 启动失败时给用户看的原因：按服务写进日志的内容判断数据目录被占用（harness/__main__.py 的
+// 进程锁），其余情况是命令找到了但服务 30 秒内没有应答
+export function startFailureReason(logTail: string): string {
+  if (logTail.includes(DATA_DIR_BUSY)) {
+    return "Yudao 的数据目录正在被另一个服务进程占用，停掉那个服务以后再试一次。";
+  }
+  return "找到 yudao 命令，但它启动的服务 30 秒内没有应答。";
+}
+
+// 探测本机服务端口有没有被占用：尝试绑定一次，成功立即关闭。端口占用是启动失败最常见的原因，
+// 启动前先说明原因，省去 30 秒等待（占用者不是本机服务，服务可用时上面已经返回 started）
+async function portBusy(): Promise<boolean> {
+  const { hostname, port } = new URL(DEFAULT_LOCAL_ADDRESS);
+  const server = createServer();
+  const free = await new Promise<boolean>((resolve) => {
+    server.once("error", () => resolve(false));
+    server.listen(Number(port), hostname, () => server.close(() => resolve(true)));
+  });
+  return !free;
+}
+
+// 数据目录被占用时服务写进日志的标记（harness/__main__.py 的进程锁）
+const DATA_DIR_BUSY = "data directory is in use by another service process";
+const LOCAL_PORT = Number(new URL(DEFAULT_LOCAL_ADDRESS).port);
+// 判断失败原因只看服务写出的最后几行
+const LOG_TAIL_CHARS = 4000;
 
 // 读取 system.status 的正在运行的 run 数（设计说明第 4.4 节：客户端在停止之前用它显示确认）。
 // 查询接口是 GET /api/queries/{名称}（应用层与接口层设计说明第 7.1 节）；回答的形状按快照
@@ -249,10 +300,16 @@ export async function restartLocalServiceConfirming(allowLan: boolean): Promise<
     setTimeout(resolve, POLL_INTERVAL_MS);
     await promise;
   }
-  const started = await startYudaoService(allowLan);
-  return started
-    ? { stopped: true, runningRuns, message: "已重新启动 Yudao 服务。" }
-    : { stopped: true, runningRuns, message: "Yudao 服务已经停止，没有找到 yudao 命令。" };
+  const start = await startYudaoService(allowLan);
+  if (start.kind === "started") {
+    return { stopped: true, runningRuns, message: "已重新启动 Yudao 服务。" };
+  }
+  return {
+    stopped: true,
+    runningRuns,
+    message: start.kind === "no-command" ? "Yudao 服务已经停止，没有找到 yudao 命令。"
+      : `Yudao 服务已经停止，重新启动没有成功：${start.reason}服务日志在 ${start.logPath}。`,
+  };
 }
 
 // 确认用的系统对话框：默认按钮是「继续运行」，避免误按就停掉服务

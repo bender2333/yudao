@@ -22,16 +22,25 @@ export type UpdateProgress = {
   message?: string;
 };
 
+// 本机服务的启动结果（设计说明第 4.3 节、工单 #296）：三种情况分开，界面分别给安装命令、
+// 失败原因与服务日志的位置
+export type LocalServiceStart = {
+  kind: "started" | "no-command" | "failed";
+  reason: string;
+  logPath: string;
+};
+
 const api = {
   getSettings: (): Promise<ConnectionSettings> => ipcRenderer.invoke("yudao:settings:get"),
   saveSettings: (value: ConnectionSettings): Promise<boolean> => ipcRenderer.invoke("yudao:settings:set", value),
-  notify: (title: string, body: string): Promise<boolean> => ipcRenderer.invoke("yudao:notify", title, body),
+  notify: (title: string, body: string, decisionId?: string | null): Promise<boolean> =>
+    ipcRenderer.invoke("yudao:notify", title, body, decisionId ?? null),
   setTrayCount: (count: number): Promise<boolean> => ipcRenderer.invoke("yudao:tray-count", count),
   setConnectedLocal: (local: boolean): Promise<boolean> => ipcRenderer.invoke("yudao:connected-local", local),
   // 本机服务管理（设计说明第 4.3 节）：没有运行时启动它，最多等待 30 秒；allowLan 为真时带上
-  // `--access lan --host 0.0.0.0`。返回 started 为 true 表示服务可用，false 表示没有找到
-  // yudao 命令，界面显示安装命令
-  startLocalService: (allowLan: boolean): Promise<{ started: boolean; message: string }> =>
+  // `--access lan --host 0.0.0.0`。kind 为 started 表示服务可用；no-command 表示没有找到 yudao 命令，
+  // 界面显示安装命令；failed 表示命令找到了但服务没有起来，界面显示原因与服务日志的位置
+  startLocalService: (allowLan: boolean): Promise<LocalServiceStart> =>
     ipcRenderer.invoke("yudao:local-service:start", allowLan),
   stopLocalService: (): Promise<{ stopped: boolean; runningRuns: number; message: string }> =>
     ipcRenderer.invoke("yudao:local-service:stop"),
@@ -51,6 +60,13 @@ const api = {
     const handler = (_event: unknown, progress: UpdateProgress): void => listener(progress);
     ipcRenderer.on("yudao:update:progress", handler);
     return () => ipcRenderer.removeListener("yudao:update:progress", handler);
+  },
+  // 系统通知被点击：主进程恢复窗口后发出。决定标识不为空时界面跳到首页并定位到对应的决定卡片
+  // （设计说明第 5.7 节、工单 #296）
+  onNotifyClick: (listener: (decisionId: string | null) => void): (() => void) => {
+    const handler = (_event: unknown, decisionId: string | null): void => listener(decisionId);
+    ipcRenderer.on("yudao:notify-click", handler);
+    return () => ipcRenderer.removeListener("yudao:notify-click", handler);
   },
 };
 

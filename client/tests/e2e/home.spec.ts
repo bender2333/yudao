@@ -192,16 +192,21 @@ test.describe("系统首页（1440×900）", () => {
         const target = before[0];
         const card = client.page.locator(`#decision-${target.decision_id}`);
         await expect(card).toBeVisible();
-        // 按卡片给出的选项回答（继续执行），提交以后显示「已提交」（事件很快到达时卡片会先移出列表）
+        // 按卡片给出的选项回答（继续执行）。提交以后只显示一条「已提交」提示（工单 #319：
+        // 提交提示重复过一次）；事件很快到达时卡片先移出列表，这两种情况都算通过
         await card.getByRole("button", { name: "继续执行" }).click();
         await expect
           .poll(async () => {
-            const hint = await card.locator("span.hint").count();
-            if (hint > 0) {
+            const hints = await card.locator("span.hint").allInnerTexts();
+            const submitted = hints.filter((line) => line.includes("已提交"));
+            if (submitted.length > 1) {
+              return `重复：${submitted.join(" / ")}`;
+            }
+            if (submitted.length === 1) {
               return "已提交";
             }
             return (await card.count()) === 0 ? "已提交" : "";
-          }, { message: "提交以后显示「已提交」" })
+          }, { message: "提交以后显示一条「已提交」" })
           .toBe("已提交");
         // 事件到达以后这张卡片移出等待列表
         await waitUntil(
@@ -305,6 +310,24 @@ test.describe("系统首页（1440×900）", () => {
       client = await openHome({ width: 1440, height: 900 });
       const after = await fetchQuery<{ range: { from_position: number } }>(client.page, "home.away_report", { range: "since_seen" });
       expect(after.range.from_position).toBeGreaterThanOrEqual(before.range.to_position);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("首页两个区块的说明与报告项不出现开发用语", async () => {
+    // 工单 #319 第 5 项：首页「项目」区块的说明与离开期间报告的说明原来写着接口名
+    const client = await openHome({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    try {
+      const projects = client.page.locator("section.card")
+        .filter({ has: client.page.getByRole("heading", { name: "项目", exact: true }) });
+      const report = client.page.locator("section.card")
+        .filter({ has: client.page.getByRole("heading", { name: "离开期间的报告", exact: true }) });
+      await expect(projects.locator(".note, header .note").first()).not.toContainText("数据来自");
+      await expectNoDeveloperText(projects, "首页项目区块");
+      await expectNoDeveloperText(report, "离开期间的报告");
       expect(errors).toEqual([]);
     } finally {
       await client.close();

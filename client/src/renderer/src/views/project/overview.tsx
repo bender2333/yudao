@@ -14,6 +14,7 @@ import type {
   WorkItemCard,
   WorkItemInputsResult,
 } from "../../api/generated/types.gen";
+import { paths } from "../../shell/routing";
 import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, SubmitButton, Table, TextArea,
   TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
@@ -23,13 +24,13 @@ import { ticksOf } from "../timeline/logic";
 import { INPUT_KIND, PHASE_LABELS, STOP_REASON, WORK_ITEM_STATUS, departmentName, formatTime, label } from "./labels";
 import { RestartOnboarding } from "./restart-onboarding";
 import { BOARD_TITLES, boardColumns } from "./board";
-import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
+import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
 
-export function OverviewPage(props: { app: ClientApp; route: Route }) {
+export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: (hash: string) => void }) {
   const projectId = props.route.projectId ?? "";
   const workItem = props.route.workItemId;
-  // 回放位置（全局位置）：为 null 时是实时画面（设计说明第 5.5 节）
-  const [at, setAt] = useState<number | null>(null);
+  // 回放位置（全局位置）写在路径的 ?at= 中（设计说明第 3.3 节）；为 null 时是实时画面
+  const at = props.route.at;
   const overview = useSnapshot<ProjectOverviewResult>(props.app, "page.overview", "project.overview", {
     project_id: projectId,
     work_item: workItem,
@@ -68,7 +69,8 @@ export function OverviewPage(props: { app: ClientApp; route: Route }) {
                 fromPosition={report.data.range.from_position}
                 fromAt={report.data.range.from_at}
                 project={projectId}
-                onPosition={setAt}
+                at={at}
+                onPosition={(next) => props.onNavigate(paths.overviewAt(projectId, next))}
                 onSelect={() => undefined}
                 highlight={[]}
                 liveNote={`实时画面 · ${ticksOf(report.data.facts, projectId).length} 条关键事实`}
@@ -174,6 +176,18 @@ function CurrentItem(props: {
           ) : <p className="note">这台主机没有提供新建事项的操作</p>}
           <p className="note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
           <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
+          {(() => {
+            const links = rejectionLinks(props.command.rejection, props.projectId);
+            return links.length > 0 ? (
+              <div className="row-actions">
+                {links.map((link) => (
+                  <button key={link.hash} type="button" className="link" onClick={() => { window.location.hash = link.hash; }}>
+                    {link.label}
+                  </button>
+                ))}
+              </div>
+            ) : null;
+          })()}
         </div>
       </Section>
     );

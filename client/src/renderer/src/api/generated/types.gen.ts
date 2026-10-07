@@ -1836,6 +1836,14 @@ export type DepartmentWorkspaceResult = {
      */
     phase: string | null;
     /**
+     * Status
+     */
+    status: string | null;
+    /**
+     * Stop Reason
+     */
+    stop_reason: string | null;
+    /**
      * Active
      */
     active: boolean;

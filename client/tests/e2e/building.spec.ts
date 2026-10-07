@@ -84,6 +84,7 @@ async function floors(page: Page): Promise<{ name: string; status: string; lit: 
 }
 
 /** 等某个条件成立（页面按事件流自动重查询，不刷新页面）。 */
+
 async function waitUntil(check: () => Promise<boolean>, description: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -94,6 +95,54 @@ async function waitUntil(check: () => Promise<boolean>, description: string, tim
     await promise;
   }
 }
+// 用户主动停止的事项要在楼层写「已停止」。停止会改变服务端状态（run 以 cancelled 结束），
+// 因此这条用例用自己的一份后端，结束以后停掉，共用的那份不受影响
+async function withOwnBackend<T>(run: () => Promise<T>): Promise<T> {
+  const previous = backend;
+  const own = await startBackend();
+  backend = own;
+  try {
+    return await run();
+  } finally {
+    backend = previous;
+    await own.stop();
+  }
+}
+
+test("用户停止的事项：楼层与部门页都写「已停止」，不含「执行失败」「中断」", async () => {
+  test.setTimeout(300_000);
+  await withOwnBackend(async () => {
+    const client = await startClient(backend, { width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      // 共用种子里「文本工具」的事项停在模型不可用，有一个等待回答的决定请求；选「停止事项」以后运行结束
+      const [decision] = (await query<{ decisions: { decision_id: string; version: number }[] }>(
+        "decisions.list", { status: ["open"] })).decisions;
+      if (!decision) throw new Error("没有等待回答的决定请求，停止不了事项");
+      await command("decision.answer", {
+        decision_id: decision.decision_id, option: "stop", base_version: decision.version,
+      });
+      const stopped = (await projectRow(RUNNING)).project_id;
+      // 部门页：被停止的事项所在部门的「部门状态」
+      await page.evaluate((id) => { window.location.hash = `/p/${id}/dept/engineering`; }, stopped);
+      const status = page.locator(".line").filter({ hasText: "部门状态" }).first();
+      await expect(status).toContainText("已停止");
+      await expect(status).not.toContainText("执行失败");
+      await expect(status).not.toContainText("中断");
+      // 首页楼层：这一层的状态灯写「已停止」
+      await page.evaluate(() => { window.location.hash = "#/home"; });
+      await expect(page.getByRole("heading", { name: "全部项目与机器", exact: true })).toBeVisible();
+      await waitUntil(
+        async () => (await floors(page)).find((f) => f.name === RUNNING)?.status === "已停止",
+        "这一层的状态灯显示「已停止」",
+      );
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+});
 
 test("楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });

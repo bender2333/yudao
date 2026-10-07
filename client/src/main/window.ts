@@ -24,6 +24,8 @@ export const LOGIN_ITEM_SET = "yudao:login-item:set";
 export const UPDATE_START = "yudao:update:start";
 export const UPDATE_PROGRESS = "yudao:update:progress";
 export const CLIENT_VERSION = "yudao:client-version";
+// 系统通知被点击：渲染进程据此跳到首页并定位到对应的决定卡片（工单 #296）
+export const NOTIFY_CLICK = "yudao:notify-click";
 
 export function createMainWindow(size: { width: number; height: number }): BrowserWindow {
   const window = new BrowserWindow({
@@ -52,6 +54,20 @@ export function createMainWindow(size: { width: number; height: number }): Brows
   return window;
 }
 
+// 通知点击：恢复窗口并把决定标识告诉渲染进程。通知在窗口隐藏时发出，点击就是回到那一件事
+export function focusDecision(decisionId: string | null): void {
+  const target = BrowserWindow.getAllWindows()[0];
+  if (target === undefined) {
+    return;
+  }
+  if (target.isMinimized()) {
+    target.restore();
+  }
+  target.show();
+  target.focus();
+  target.webContents.send(NOTIFY_CLICK, decisionId);
+}
+
 // 渲染进程与主进程之间的接口：连接设置、本机服务的启动与停止、系统通知、托盘图标的数量
 // 与登录时启动（设计说明第 4.3、4.5、5.7 节）
 export function registerIpc(): void {
@@ -60,8 +76,8 @@ export function registerIpc(): void {
     saveSettings(value ?? defaultSettings());
     return true;
   });
-  ipcMain.handle(NOTIFY, (_event, title: string, body: string) => {
-    notify(title, body);
+  ipcMain.handle(NOTIFY, (_event, title: string, body: string, decisionId: string | null) => {
+    notify(title, body, decisionId ?? null);
     return true;
   });
   ipcMain.handle(TRAY_COUNT, (_event, count: number) => {
@@ -72,12 +88,7 @@ export function registerIpc(): void {
     setTrayConnectedLocal(local === true);
     return true;
   });
-  ipcMain.handle(LOCAL_SERVICE_START, async (_event, allowLan: boolean) => {
-    const started = await startYudaoService(allowLan === true);
-    return started
-      ? { started: true, message: "" }
-      : { started: false, message: "没有找到 yudao 命令，用下面的命令安装 Yudao 服务：" };
-  });
+  ipcMain.handle(LOCAL_SERVICE_START, async (_event, allowLan: boolean) => startYudaoService(allowLan === true));
   // 界面里的「停止 Yudao」与托盘菜单的「停止 Yudao」走同一段代码：读运行中的事项数，
   // 大于 0 时先确认，再发本机停止请求（设计说明第 4.4、4.5 节）
   ipcMain.handle(LOCAL_SERVICE_STOP, () => stopLocalServiceConfirming());
