@@ -117,6 +117,9 @@ class Rule(_Definition):
 
 class Department(_Definition):
     id: Identifier
+    # 部门的中文名：等待说明、协作说明与模型提示按部门写给用户看，机器标识不直接出现在说明里。
+    # 缺少或为空时由引用检查报错并写明部门（字段路径里只有序号）
+    label: str = ""
     # 部门的角色：现在每个部门一个角色，角色编号与部门编号相同（事件的 role 字段记录部门）
     roles: tuple[Identifier, ...] = Field(min_length=1)
     # 本部门模型的建议能力（设计说明第 5.6 节）：取值来自模型访问定义的输入方式。
@@ -328,6 +331,11 @@ class Definitions(_Definition):
     def departments(self) -> tuple[str, ...]:
         return tuple(department.id for department in self.organization.departments)
 
+    @property
+    def department_labels(self) -> dict[str, str]:
+        # 部门编号到中文名
+        return {department.id: department.label for department in self.organization.departments}
+
     def role(self, department: str) -> Role:
         # 部门的角色（现在每个部门一个角色，编号与部门相同）
         return self.roles[department]
@@ -482,6 +490,8 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         if department.roles != (department.id,):
             issues.append(("organization.json", f"departments[{index}].roles",
                            "每个部门现在只有一个角色，角色编号与部门编号相同"))
+        if not department.label:
+            issues.append(("organization.json", f"departments[{index}].label", f"部门 {department.id} 缺少中文名"))
     members = {role for department in organization.departments for role in department.roles}
     for role in sorted(members - set(roles)):
         issues.append(("roles.json", role, "组织中的角色没有定义"))
