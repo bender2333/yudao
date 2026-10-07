@@ -5266,6 +5266,18 @@ export type ActivationFinishedPayload = {
      */
     latency_ms: number;
     /**
+     * Elapsed Ms
+     */
+    elapsed_ms: number;
+    /**
+     * Activations
+     */
+    activations: number;
+    /**
+     * Model Steps
+     */
+    model_steps: number;
+    /**
      * Stop Reason
      */
     stop_reason: string | null;
