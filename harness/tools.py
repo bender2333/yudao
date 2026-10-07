@@ -15,8 +15,10 @@ _COMMAND_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
 
 
 def validate_registered_command(name: str, config: dict[str, Any]) -> dict[str, Any]:
-    # 校验一条项目登记命令，返回冻结用的规范形态；任一非法直接报错。时限与输出上限的默认值、时限的最大值取自定义
-    limits = DEFINITIONS.limits
+    # 校验一条项目登记命令，返回冻结用的规范形态；任一非法直接报错。时限与输出上限的默认值、时限的最大值取规则登记中的现值
+    check_timeout_sec = DEFINITIONS.rule_value("check_timeout_sec")
+    command_timeout_max_sec = DEFINITIONS.rule_value("command_timeout_max_sec")
+    tool_output_limit = DEFINITIONS.rule_value("tool_output_limit")
     if not isinstance(name, str) or not _COMMAND_NAME_PATTERN.fullmatch(name):
         raise ValueError("command name must match [A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
     if not isinstance(config, dict):
@@ -27,10 +29,10 @@ def validate_registered_command(name: str, config: dict[str, Any]) -> dict[str, 
     extra_args = config.get("args", [])
     if not isinstance(extra_args, list) or any(not isinstance(item, str) or not item for item in extra_args):
         raise ValueError(f"registered command {name} allowlist args must be a list of non-empty strings")
-    timeout_sec = config.get("timeout_sec", limits.check_timeout_sec)
-    if type(timeout_sec) is not int or not 1 <= timeout_sec <= limits.command_timeout_max_sec:
-        raise ValueError(f"registered command {name} timeout_sec must be an integer in 1..{limits.command_timeout_max_sec}")
-    output_limit = config.get("output_limit", limits.tool_output_limit)
+    timeout_sec = config.get("timeout_sec", check_timeout_sec)
+    if type(timeout_sec) is not int or not 1 <= timeout_sec <= command_timeout_max_sec:
+        raise ValueError(f"registered command {name} timeout_sec must be an integer in 1..{command_timeout_max_sec}")
+    output_limit = config.get("output_limit", tool_output_limit)
     if type(output_limit) is not int or output_limit < 1:
         raise ValueError(f"registered command {name} output_limit must be an integer >= 1")
     # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）：缺省为否

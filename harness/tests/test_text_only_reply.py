@@ -16,8 +16,8 @@ from harness.smoke import isolation_fields
 from harness.tests.helpers import department_history, list_files_turn
 from harness.tests.test_event_sequence import HTTP_REPLIES
 
-# 连续没有调用工具的回复最多追加说明的次数，取自定义
-LIMIT = DEFINITIONS.limits.tool_call_required_limit
+# 连续没有调用工具的回复最多追加说明的次数，取规则登记中的现值
+LIMIT = DEFINITIONS.rule_value("tool_call_required_limit")
 from harness.tests.protocol_helpers import (
     ScriptedProvider,
     bound_adapter,

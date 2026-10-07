@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -21,6 +22,11 @@ DEFINITIONS_DIR = Path(__file__).parent
 
 # 定义中的编号：小写字母开头，由小写字母、数字与下划线组成
 Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$")]
+
+# 规则登记中的条目名：由点号连接的小写标识，每一段与 Identifier 相同（设计说明第 2、8 节）。
+# 前一段是领域，最后一段是条目；等待的时长上限与栏目上限因此写作 wait.desktop.max_sec、
+# context.column_limit.catalog
+RuleName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")]
 
 
 def _freeze(value: Any) -> Any:
@@ -65,32 +71,47 @@ def _frozen(*fields: str) -> Any:
     return field_validator(*fields, mode="after")(lambda cls, value: _freeze(value))
 
 
-class Limits(_Definition):
-    # 运行时间上限（秒）：达到时运行失败（time_limit）
-    run_time_limit_sec: int = Field(gt=0)
-    # 部门激活次数上限：达到时运行暂停（max_cycles）
-    max_cycles: int = Field(gt=0)
-    # 一次激活的模型步数上限，重试同样计入：达到时运行暂停（model_steps_exhausted）
-    max_model_steps: int = Field(gt=0)
-    # 一次模型调用的最多尝试次数，与重试的初始间隔、最大间隔（秒）
-    max_provider_attempts: int = Field(gt=0)
-    retry_initial_delay_sec: float = Field(gt=0, allow_inf_nan=False)
-    retry_max_delay_sec: float = Field(gt=0, allow_inf_nan=False)
-    # 连续没有调用工具的回复最多追加说明的次数，再出现一次运行暂停（no_tool_call）
-    tool_call_required_limit: int = Field(gt=0)
-    # 检查的时限（秒），也是登记命令没有写明时限时的默认值
-    check_timeout_sec: int = Field(gt=0)
-    # 一次工具结果的输出上限（字符），也是登记命令没有写明输出上限时的默认值
-    tool_output_limit: int = Field(gt=0)
-    # 登记命令时限的最大值（秒）
-    command_timeout_max_sec: int = Field(gt=0)
+class Rule(_Definition):
+    # 规则登记的一个条目（设计说明第 2 节）：在现值之外带四项记录与取值界限，
+    # 全部条目合起来就是规则登记，不另建系统
+    # 现值的类型：数值（int 或 float，取值与界限都是有限的数）、开关（bool）、
+    # 可见范围（字符串列表，界限约束条目数）、档位名（字符串，界限给的是档位表的长度）
+    value: int | float | bool | list[str] | str
+    # 取值界限：上下界一对，value 必须落在界限之内；界限以内才是可调整的范围。
+    # 数值与开关的比界限写法把值转成数来比，档位名按档位表的下标比较
+    bounds: tuple[int | float, int | float]
+    # kind：parameter 在界限以内由用户直接修改；structure 走候选、结构校验与用户批准
+    kind: Literal["parameter", "structure"]
+    # form：规则只能写成这三种形式之一，表达顺序的规则没有对应的形式
+    form: Literal["permission", "boundary", "admission"]
+    # 四项记录：拦截什么、花费多少、放松的证据、收紧的证据；缺任何一项都不算登记
+    guards: str = Field(min_length=1)
+    cost: str = Field(min_length=1)
+    relax_when: str = Field(min_length=1)
+    tighten_when: str = Field(min_length=1)
+    # 来源：这条数值与它的理由写在哪一份文档或哪一条需求里
+    origin: str = Field(min_length=1)
 
     @model_validator(mode="after")
-    def _ordered(self) -> Limits:
-        if self.retry_initial_delay_sec > self.retry_max_delay_sec:
-            raise ValueError("retry_initial_delay_sec cannot exceed retry_max_delay_sec")
-        if self.check_timeout_sec > self.command_timeout_max_sec:
-            raise ValueError("check_timeout_sec cannot exceed command_timeout_max_sec")
+    def _within_bounds(self) -> "Rule":
+        # 现值与界限的类型不对由字段声明拒绝；这里核对现值落在界限之内
+        low, high = self.bounds
+        if low > high:
+            raise ValueError(f"bounds {self.bounds!r} are not in increasing order")
+        if isinstance(self.value, list):
+            # 可见范围：界限约束的是条目数
+            if not low <= len(self.value) <= high:
+                raise ValueError(f"{len(self.value)} items are outside the bounds {self.bounds!r}")
+            return self
+        # 开关与档位名：界限给出的是所属类别的规模（0..1 表示开关，1..N 表示第 N 档）；
+        # 数值约束实际数值。数值与界限都必须有限
+        if not all(math.isfinite(number) for number in (low, high)):
+            raise ValueError(f"bounds {self.bounds!r} must be finite")
+        if isinstance(self.value, (int, float)) and not isinstance(self.value, bool):
+            if not math.isfinite(self.value):
+                raise ValueError(f"value {self.value!r} must be finite")
+            if not low <= self.value <= high:
+                raise ValueError(f"value {self.value!r} is outside the bounds {self.bounds!r}")
         return self
 
 
@@ -291,7 +312,8 @@ class Definitions(_Definition):
     # 工具定义，键是工具名称
     tools: Mapping[Identifier, Tool]
     proposal_contracts: ProposalContracts
-    limits: Limits
+    # 规则登记（设计说明第 2 节）：键是条目名，全部条目合起来就是登记，不另建系统
+    rules: Mapping[RuleName, Rule]
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: Mapping[Identifier, StopReason]
     service_presets: ServicePresets
@@ -300,7 +322,7 @@ class Definitions(_Definition):
     # 事项种类与仓库概况的模式表，来自 work_items.json
     work_items: WorkItems
 
-    freeze_collections = _frozen("roles", "tools", "stop_reasons", "work_items")
+    freeze_collections = _frozen("roles", "tools", "stop_reasons", "work_items", "rules")
 
     @property
     def departments(self) -> tuple[str, ...]:
@@ -359,6 +381,17 @@ class Definitions(_Definition):
             raise UnknownStopReason(reason)
         return definition
 
+    def rule(self, name: str) -> Rule:
+        # 规则登记中的一个条目；条目不在登记里直接报错，调用方不留回退取值
+        definition = self.rules.get(name)
+        if definition is None:
+            raise ValueError(f"rule {name!r} is not in the rule registry (rules.json)")
+        return definition
+
+    def rule_value(self, name: str) -> Any:
+        # 规则登记中一个条目的现值；条目不在登记里直接报错
+        return self.rule(name).value
+
 
 # 定义文件与它在 Definitions 中的字段、类型
 _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
@@ -366,7 +399,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "roles.json": ("roles", TypeAdapter(dict[Identifier, Role])),
     "tools.json": ("tools", TypeAdapter(dict[Identifier, Tool])),
     "proposal_contracts.json": ("proposal_contracts", TypeAdapter(ProposalContracts)),
-    "limits.json": ("limits", TypeAdapter(Limits)),
+    "rules.json": ("rules", TypeAdapter(dict[RuleName, Rule])),
     "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
     "service_presets.json": ("service_presets", TypeAdapter(ServicePresets)),
     "model_capabilities.json": ("model_capabilities", TypeAdapter(ModelCapabilities)),
@@ -462,6 +495,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
             if tool not in tools:
                 issues.append(("roles.json", f"{name}.tools[{index}]", f"工具 {tool} 没有定义"))
     issues.extend(_work_item_references(parts["work_items"], organization, tools, parts["stop_reasons"]))
+    issues.extend(_rule_references(parts["rules"], roles))
     submitters: dict[str, str] = {}
     for name, tool in tools.items():
         if tool.proposal is not None and tool.proposal in submitters:
@@ -491,6 +525,20 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         if preset.models_dev_id and preset.id not in capabilities.presets:
             issues.append(("model_capabilities.json", f"presets.{preset.id}",
                            f"预置表第 {index + 1} 项（{preset.id}）记录了 models_dev_id，能力表却缺少这个服务方案"))
+    return issues
+
+
+def _rule_references(rules: dict[str, Rule], roles: dict[str, Role]) -> list[tuple[str, str, str]]:
+    # 规则登记：可见范围的条目与 roles.json 的现值相同，条目引用的部门都有角色定义
+    issues: list[tuple[str, str, str]] = []
+    file = "rules.json"
+    for name in sorted(name for name in rules if name.startswith("roles.")):
+        department = name.split(".")[1]
+        if department not in roles:
+            issues.append((file, name, "可见范围条目引用的部门没有角色定义"))
+            continue
+        if list(rules[name].value) != list(roles[department].visibility):
+            issues.append((file, f"{name}.value", "可见范围的现值与 roles.json 不相同"))
     return issues
 
 

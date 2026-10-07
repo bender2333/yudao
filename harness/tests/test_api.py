@@ -125,6 +125,48 @@ def test_system_status_returns_a_snapshot_with_its_position_and_writes_nothing(d
         assert status["boot_id"] != first_boot
 
 
+def test_rules_registry_returns_every_entry_with_its_four_notes_bounds_kind_form_and_origin(data_dir):
+    from harness.definitions import DEFINITIONS
+
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        _create(client, str(uuid.uuid4()))
+        end = opened.store.end_position()
+        response = client.get("/api/queries/rules.registry")
+        assert response.status_code == 200
+        body = response.json()
+        # 查询不写入
+        assert body["position"] == end and opened.store.end_position() == end
+        # 按位置读取：历史位置返回同一份登记
+        assert client.get("/api/queries/rules.registry", params={"at": 0}).json() == body
+
+    data = body["data"]
+    assert data["definitions_version"] == DEFINITIONS.version
+    entries = data["rules"]
+    # 全部条目都在，按名称排列，每条给全四项记录、界限、种类、形式与来源
+    assert [item["name"] for item in entries] == sorted(DEFINITIONS.rules)
+    assert len(entries) == len(DEFINITIONS.rules)
+    assert {frozenset(item) for item in entries} == {frozenset({
+        "name", "value", "bounds", "kind", "form", "guards", "cost", "relax_when", "tighten_when", "origin"})}
+    for item in entries:
+        rule = DEFINITIONS.rules[item["name"]]
+        assert item["value"] == rule.value
+        assert item["bounds"] == list(rule.bounds)
+        assert item["kind"] == rule.kind and item["form"] == rule.form
+        assert item["guards"] == rule.guards and item["cost"] == rule.cost
+        assert item["relax_when"] == rule.relax_when and item["tighten_when"] == rule.tighten_when
+        assert item["origin"] == rule.origin
+        assert item["form"] in {"permission", "boundary", "admission"}
+        assert item["kind"] in {"parameter", "structure"}
+        assert all(item[note] for note in ("guards", "cost", "relax_when", "tighten_when", "origin"))
+    # 第 8 节表里的数值保持现值
+    values = {item["name"]: item["value"] for item in entries}
+    assert values["run_time_limit_sec"] == 7200 and values["max_cycles"] == 999999
+    assert values["tool_call_required_limit"] == 3 and values["check_timeout_sec"] == 600
+    assert values["stall.rounds"] == 3 and values["loop.nesting_max"] == 2
+    assert values["wait.model_service.max_sec"] == 86400 and values["wait.desktop.max_sec"] == 28800
+
+
 def _digest(document):
     text = json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -194,13 +236,14 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     ]
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]
+    catalog_queries = ("catalog", "catalog.document", "catalog.change_impact")
     assert [{"name": item["name"], "changed_by": item["changed_by"], "replayable": item["replayable"]}
-            for item in capabilities["queries"][-4:-1]] == [
+            for item in capabilities["queries"] if item["name"] in catalog_queries] == [
         {"name": "catalog", "changed_by": catalog_changed_by, "replayable": False},
         {"name": "catalog.document", "changed_by": catalog_changed_by, "replayable": False},
         {"name": "catalog.change_impact", "changed_by": catalog_changed_by, "replayable": False},
     ]
-    assert capabilities["queries"][-1] == {
+    assert capabilities["queries"][-2] == {
         "name": "home.away_report", "replayable": False,
         "changed_by": sorted([
             "transition", "collaboration_requested", "collaboration_responded", "collaboration_closed",
@@ -208,17 +251,21 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
             "deliverable_adopted", "work_item_created",
         ]) + ["model_attempt_finished", "home_seen"],
     }
+    # 规则登记：现值来自定义，参数事件记录修改历史由参数事件的工单加入，所以没有会改变它结果的事件种类
+    assert capabilities["queries"][-1] == {
+        "name": "rules.registry", "changed_by": [], "replayable": True,
+    }
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
         "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions",
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "run.export", "replay.check", "run.recovery", "catalog", "catalog.document",
-        "catalog.change_impact", "home.away_report",
+        "catalog.change_impact", "home.away_report", "rules.registry",
     }
     # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {
-        "system.status", "projects.list", "decisions.list", "project.loop",
+        "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry",
     }
     # 覆盖层只列出依赖的查询都已登记的：flow、waiting 与 recovery 的依赖已登记，其余依赖的查询尚未加入
     assert capabilities["overlays"] == [

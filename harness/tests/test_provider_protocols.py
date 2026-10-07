@@ -825,7 +825,7 @@ def test_empty_output_is_retried_and_the_run_continues(protocol, data_dir):
 def test_repeated_empty_output_stops_the_run_as_a_provider_failure_without_pausing(protocol, data_dir):
     # 空输出一直重试用完：沿用已有的模型服务故障处理，运行失败而不是以 no_tool_call 暂停
     # 停止原因清单（D09）不新增取值，empty_output 在重试用完之后按 provider_error 记
-    provider = ScriptedProvider([empty_reply(protocol) for _ in range(DEFINITIONS.limits.max_provider_attempts)])
+    provider = ScriptedProvider([empty_reply(protocol) for _ in range(DEFINITIONS.rule_value("max_provider_attempts"))])
     try:
         system, run_id = provider_system(data_dir, provider.base, protocol,
                                          step_limits=StepLimits(max_provider_attempts=1))
