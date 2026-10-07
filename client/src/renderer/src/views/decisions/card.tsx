@@ -4,7 +4,7 @@
 // 提交以后显示「已提交」，事件到达以后按事件显示结果并移出等待列表；已经被回答或撤销时显示原因；
 // 「在项目中查看」跳到项目中的对应页面。界面只解释已经存在的事实，不自行推进状态。
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DecisionView } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { CommandFeedback, KeyValue, TextArea, hasCommand } from "../project/common";
@@ -20,6 +20,8 @@ export type DecisionCardProps = {
   // 所属的项目名与事项标题：由调用处的快照解析（决定请求只带标识）
   projectName: string;
   workItemTitle: string;
+  // 系统通知点击后要打开并标出的决定卡片（工单 #375，设计说明第 5.3 节）
+  targetDecision?: string | null;
   onNavigate: (hash: string) => void;
 };
 
@@ -36,6 +38,15 @@ export function DecisionCard(props: DecisionCardProps) {
   const answered = decision.status !== "open";
   const waiting = decision.status === "open";
   const isSubmitted = waiting && submitted.has(decision.decision_id);
+
+  // 系统通知点进来的这张卡片：滚到视口里并描边标出（styles.css 的 .decision-card.is-targeted）
+  const cardRef = useRef<HTMLElement | null>(null);
+  const targeted = props.targetDecision === decision.decision_id;
+  useEffect(() => {
+    if (targeted) {
+      cardRef.current?.scrollIntoView({ block: "center" });
+    }
+  }, [targeted]);
 
   // 事件到达以后卡片按新状态显示结果；已经被回答或撤销时把「已提交」清除
   useEffect(() => {
@@ -78,7 +89,7 @@ export function DecisionCard(props: DecisionCardProps) {
   };
 
   return (
-    <article className={`decision-card${answered ? " answered" : ""}${isSubmitted ? " submitted" : ""}`} id={`decision-${decision.decision_id}`}>
+    <article ref={cardRef} className={`decision-card${answered ? " answered" : ""}${isSubmitted ? " submitted" : ""}${targeted ? " is-targeted" : ""}`} id={`decision-${decision.decision_id}`}>
       <header className="decision-head">
         <div className="decision-title">
           <strong>{label(DECISION_KIND, decision.kind)}</strong>
@@ -170,6 +181,8 @@ export function DecisionCardList(props: {
   now: number;
   names: (decision: DecisionView) => { projectName: string; workItemTitle: string };
   onNavigate: (hash: string) => void;
+  // 系统通知点击后要打开并标出的决定卡片（工单 #375，设计说明第 5.3 节）
+  targetDecision?: string | null;
   emptyText: string;
 }) {
   if (props.decisions.length === 0) {
@@ -187,6 +200,7 @@ export function DecisionCardList(props: {
             now={props.now}
             projectName={resolved.projectName}
             workItemTitle={resolved.workItemTitle}
+            targetDecision={props.targetDecision}
             onNavigate={props.onNavigate}
           />
         );
