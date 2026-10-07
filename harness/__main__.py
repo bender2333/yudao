@@ -3,6 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import signal
+import webbrowser
+from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, get_args
@@ -45,6 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
     # 访问方式（设计说明第 6.2 节）：本机只能监听回环地址；局域网监听任意地址
     parser.add_argument("--access", choices=get_args(AccessMode), default="local")
     parser.add_argument("--provider-config", default=None)
+    # 服务就绪以后打开页面的浏览器（设计说明第 4.2 节）：默认打开，带 --no-browser 时不打开
+    parser.add_argument("--no-browser", action="store_true", default=False)
     sub = parser.add_subparsers(dest="command")
     demo = sub.add_parser("demo", help="run a fake end-to-end sample")
     demo.add_argument("--data-dir", default=argparse.SUPPRESS)
@@ -55,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     api.add_argument("--port", type=int, default=argparse.SUPPRESS)
     api.add_argument("--access", choices=get_args(AccessMode), default=argparse.SUPPRESS)
     api.add_argument("--provider-config", default=argparse.SUPPRESS)
+    api.add_argument("--no-browser", action="store_true", default=argparse.SUPPRESS)
     replay = sub.add_parser("replay", help="rebuild a run or project projection from the event store")
     replay.add_argument("run_id", nargs="?")
     replay.add_argument("--project", dest="project_id", help="rebuild a project projection twice and compare")
@@ -73,6 +79,19 @@ def build_parser() -> argparse.ArgumentParser:
     project_show.add_argument("project_id")
     project_show.add_argument("--data-dir", default=argparse.SUPPRESS)
     return parser
+
+def _stop_on_ctrl_c() -> None:
+    # Ctrl+C 是停止服务的方式（设计说明第 4.2 节）。uvicorn 在服务停止以后把收到的停止信号重新抛出
+    # （capture_signals），默认处置在这里结束进程：SIGINT 抛出 KeyboardInterrupt，
+    # Windows 的 Ctrl+Break（SIGBREAK）按默认处置直接结束进程并给出非零状态。
+    # 服务此时已经完成关闭（停止接受请求、关闭事件流连接、释放数据目录），重新抛出的信号对它
+    # 就是停止本身，因此改为安静地以状态 0 退出
+    def stop(sig: int, frame: Any) -> None:
+        sys.exit(0)
+    signal.signal(signal.SIGINT, stop)
+    if sys.platform == "win32":
+        signal.signal(signal.SIGBREAK, stop)
+
 
 def _data_dir(args: argparse.Namespace, command: str) -> str:
     # 生效的数据目录：命令行给出时以它为准（写在子命令之前或之后都生效）；
@@ -111,8 +130,10 @@ def main(argv: list[str] | None = None) -> int:
         log_path = configure_logging(args.data_dir)
         print(f"logs: {log_path}")
         config, dotenv = _provider_paths(args.data_dir, args.provider_config)
+        _stop_on_ctrl_c()
         serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv),
-                  access=args.access, host=args.host, port=args.port)
+                  access=args.access, host=args.host, port=args.port,
+                  on_ready=None if args.no_browser else _open_page(args.port))
         return 0
     if command == "replay":
         if (args.run_id is None) == (args.project_id is None):
@@ -178,6 +199,21 @@ def _provider_paths(data_dir: str | Path, provider_config: str | Path | None) ->
     config = (default_provider_config_path(Path(data_dir).resolve()) if provider_config is None else
               (None if provider_config == "" else Path(provider_config).resolve()))
     return config, default_dotenv_path(data_dir).resolve()
+
+
+def page_address(port: int) -> str:
+    # 页面的本机地址（网页界面的提供与发布设计说明第 4.2、5.2 节）：在控制主机的浏览器上打开它。
+    # 局域网访问方式下打开的同样是这个本机地址：系统通知与「安装此站点为应用」在浏览器上按地址保留设置
+    return f"http://127.0.0.1:{port}/"
+
+
+def _open_page(port: int) -> Callable[[], None]:
+    # 服务就绪以后的打开方式：在命令行输出页面地址，用标准库的 webbrowser 打开同一个地址
+    def open_page() -> None:
+        address = page_address(port)
+        print(f"web: {address}", flush=True)
+        webbrowser.open(address)
+    return open_page
 
 
 

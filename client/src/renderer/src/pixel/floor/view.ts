@@ -1,12 +1,12 @@
-// 项目楼层的画面对象：PixiJS 挂在宿主元素上，提供 setModel、playEvent、focus、setOverlay、resize、destroy
+// 项目楼层的画面对象：画布挂在宿主元素上，提供 setModel、playEvent、focus、setOverlay、resize、destroy
 // （原型 v9 floor.js 的对外接口与设计说明第 5.2 至 5.7 节，工单 #82）。
 //
-// 世界的推进（floor.ts）与绘制（render.ts）都不依赖 PixiJS；这里只把画好的画布贴到舞台，
-// 缩放用最近邻（layoutFor 的整数倍），每帧由共用的时钟驱动。
+// 世界的推进（floor.ts）与绘制（render.ts）都不依赖画布与 WebGL；这里只把画好的画布挂到页面上，
+// 画布按设备分辨率绘制（surface.ts：像素尺寸为逻辑尺寸乘整数倍 k，先设缩放再按逻辑坐标绘制，
+// 工单 #365），每帧由共用的时钟驱动。
 
-import { Application, Sprite, Texture } from "pixi.js";
 import type { Clock } from "../clock.ts";
-import { layoutFor } from "../scale.ts";
+import { createPixelSurface } from "../surface.ts";
 import { buildCatalog } from "./../world/floor-decl.ts";
 import { createFloorDriver, createFloorState, type FloorDriver, type FloorState } from "./../world/floor.ts";
 import { createScene } from "./../world/scene.ts";
@@ -129,24 +129,11 @@ export interface FloorViewOptions {
   onGo?: (target: string) => void;
 }
 
-/** 建立一个项目楼层画面：画好的画布贴到 PixiJS 的舞台上，整数倍最近邻缩放到容器宽度。 */
+/** 建立一个项目楼层画面：画布按设备分辨率绘制，整数倍铺满容器宽度。 */
 export async function createFloorView(opts: FloorViewOptions): Promise<FloorView> {
-  const app = new Application();
-  await app.init({ background: "#12101c", antialias: false, autoDensity: false, resolution: 1 });
-  const canvas = app.canvas;
-  canvas.style.imageRendering = "pixelated";
-  canvas.style.display = "block";
-  opts.host.appendChild(canvas);
-
-  // 离屏画布：世界与画法都画在这里，再作为纹理贴到舞台
-  const surface = document.createElement("canvas");
-  surface.width = W;
-  surface.height = H;
-  const ctx = surface.getContext("2d")!;
-  ctx.imageSmoothingEnabled = false;
-  const texture = Texture.from(surface);
-  const sprite = new Sprite(texture);
-  app.stage.addChild(sprite);
+  // 画布按设备分辨率绘制：像素尺寸为 W×H 的整数倍，图形与文字都按设备分辨率光栅化
+  const surface = createPixelSurface({ host: opts.host, W, H });
+  const canvas = surface.canvas;
 
   const catalog = buildCatalog(ROOM_VISUALS);
   const scene = createScene({
@@ -179,25 +166,11 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
 
   let last = 0;
 
-  function applyLayout(): void {
-    const rect = opts.host.getBoundingClientRect();
-    const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
-    const lay = layoutFor(W, H, rect.width || W, rect.height || H, dpr);
-    app.renderer.resize(lay.bufferW, lay.bufferH);
-    canvas.style.width = `${lay.cssW}px`;
-    canvas.style.height = `${lay.cssH}px`;
-    sprite.scale.set(lay.k);
-  }
-
   function draw(): void {
-    ctx.clearRect(0, 0, W, H);
-    renderer.draw(ctx);
-    texture.source.update();
-    // 画面自己渲染：PixiJS 的共享 ticker 被时钟停掉了（时间全部由共用时钟给出），这里主动画一帧
-    app.renderer.render(app.stage);
+    renderer.draw(surface.frame());
   }
 
-  /** 画布上的坐标换成画面逻辑坐标（画面按整数倍缩放贴到舞台上）。 */
+  /** 画布上的坐标换成画面逻辑坐标（画布按整数倍缩放显示）。 */
   function worldXY(ev: MouseEvent): [number, number] {
     const rect = canvas.getBoundingClientRect();
     return [((ev.clientX - rect.left) / rect.width) * W, ((ev.clientY - rect.top) / rect.height) * H];
@@ -222,7 +195,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   canvas.addEventListener("click", onClick);
   canvas.addEventListener("mousemove", onMove);
 
-  applyLayout();
+  surface.resize();
   draw();
   const offTick = opts.clock.onTick((elapsed) => {
     // 缓动与行走由 GSAP 的补间按共用时钟的位置计算，这里只把时钟的经过时间交给场景
@@ -236,7 +209,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   });
 
   const onResize = (): void => {
-    applyLayout();
+    surface.resize();
     draw();
   };
   window.addEventListener("resize", onResize);
@@ -261,7 +234,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
       draw();
     },
     resize() {
-      applyLayout();
+      surface.resize();
       draw();
     },
     destroy() {
@@ -271,8 +244,6 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
       canvas.removeEventListener("mousemove", onMove);
       card.destroy();
       if (canvas.parentNode === opts.host) opts.host.removeChild(canvas);
-      texture.destroy(true);
-      app.destroy(false, { children: true });
     },
     inspect: () => ({ driver, scene, state: driver.state, renderer, card }),
     boardRect: () => driver.boardRect(),

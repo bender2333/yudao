@@ -5,6 +5,7 @@
 import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
 import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
+import { PAGE_RELEASE } from "../contract/page-release";
 import { useCommand, useSnapshot } from "../views/project/use-snapshot";
 import { Icon } from "./kit";
 import { useTheme, type ThemeChoice } from "./theme";
@@ -70,7 +71,7 @@ export function Topbar(props: TopbarProps) {
             <span className="y9-stat-value">{`待你决定：${props.pending > 0 ? props.pending : "无"}`}</span>
           </button>
           <ThemeSwitch />
-          <span className="y9-service note" title="页面版本">{import.meta.env.VITE_YUDAO_RELEASE}</span>
+          <span className="y9-service note" title="页面版本">{PAGE_RELEASE}</span>
           <span className={`y9-service connection${props.streamConnected ? "" : " interrupted"}`} role="status">
             <span className="y9-dot" />
             {props.streamConnected ? "已连接" : `连接中断 · ${props.disconnectedAt === null ? "刚刚" : formatTime(props.disconnectedAt)}断开，正在重新连接`}
