@@ -63,6 +63,8 @@ export interface FloorTestHooks {
     reduced: boolean;
     canvasWidth: number;
   };
+  /** 当前画在画布上的覆盖层，供真实系统端到端测试核对查询结果。 */
+  overlay: () => { id: string | null; data: Record<string, unknown> | null };
   /** 决定板与决定卡片的状态（工单 #179 的端到端核对）。 */
   decisions: () => {
     board: { x: number; y: number; w: number; h: number };
@@ -79,6 +81,7 @@ export interface FloorTestHooks {
 /** 建立给端到端测试用的读取入口：读的是画面里世界的当前状态。 */
 export function floorTestHooks(view: FloorView, onResync: () => void): FloorTestHooks {
   return {
+    overlay: () => view.inspect().renderer.overlay,
     state: () => {
       const { driver, scene } = view.inspect();
       const world = driver.world;
