@@ -1,0 +1,4 @@
+(node:19516) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+WARNING:  ASGI app factory detected. Using it, but please consider setting the --factory flag explicitly.
+home · light · 6 行 · 45869 毫秒 · 1.00 MB · C:\project\yudao-worktrees\issue-377\docs\stage-3\contact-sheets\377\home-light.png

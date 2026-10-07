@@ -1,0 +1,16 @@
+
+Running 4 tests using 1 worker
+
+(node:18784) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/4] tests\e2e\models.spec.ts:412:3 › 1920×1080：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废
+tests\e2e\models.spec.ts:412:3 › 1920×1080：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废
+(node:18784) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+
+[2/4] tests\e2e\models.spec.ts:617:1 › 新建表单选择 OpenCode Go 与无协议头自定义地址自动填写字段
+[3/4] tests\e2e\models.spec.ts:641:1 › 新建自定义连接保存 Key 后直接获取模型列表并测试空连接
+[4/4] tests\e2e\models.spec.ts:678:1 › 从项目页进入模型管理，点「返回原界面」回到项目页
+  4 passed (2.0m)
+exit=0
