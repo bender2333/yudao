@@ -589,6 +589,8 @@ for (const size of [
       await expect(row).toHaveCount(0);
       await expect(client.page.getByTestId("page-notice")).toHaveText("已保存 Provider 配置。");
       await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("cbcn/deepseek-v4.1-flash");
+      // 工单 #301：保存成功以后页头显示中文的已加载，不再是英文的 deleted
+      await expect(client.page.locator(".mm-meta").first()).toContainText("配置状态 已加载");
 
       // 连接测试的结果文字写明读取的是哪个模型列表地址（工单 #302）：
       // 后端只在连接下面有访问定义时才允许连接测试，因此这一步排在保存以后

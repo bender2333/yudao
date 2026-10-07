@@ -39,6 +39,10 @@ export async function callQuery<T>(
     throw new Error(`能力清单中的查询 ${name} 没有生成的调用函数`);
   }
   const response = await (fn as QueryFunction)({ client, query: params });
+  if (response.data === undefined) {
+    // 服务不可达或查询失败时生成客户端返回空 data：直接抛出，不把 undefined 当快照用
+    throw new Error(`查询 ${name} 没有返回数据`);
+  }
   return response.data as { position: number; data: T };
 }
 

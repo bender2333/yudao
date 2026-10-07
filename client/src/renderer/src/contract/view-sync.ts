@@ -28,7 +28,7 @@ export class ViewSync {
   private readonly entries = new Map<string, Entry>();
   private readonly changedByQuery: Record<string, Set<string>> = {};
   private pending = new Set<string>();
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private timer: NodeJS.Timeout | null = null;
   private readonly runner: QueryRunner;
 
   constructor(runner: QueryRunner, capabilities: { queries: { name: string; changed_by: string[] }[] }) {
@@ -39,7 +39,10 @@ export class ViewSync {
   }
 
   // 打开一个视图：立即查询一次并交给 listener，之后相关事件到达时重新查询。Data 由调用方的查询合同给出
-  async open<Data>(viewId: string, request: ViewRequest, listener: (value: Data) => void): Promise<void> {
+  // 查询失败时（例如服务不可达）不通知、不抛出：调用处继续显示旧的或空的状态，由连接状态提示过时；
+  // useSnapshot 另传 onError 把读取状态结束，避免「正在读取数据」一直不消失
+  async open<Data>(viewId: string, request: ViewRequest, listener: (value: Data) => void,
+                   onError?: () => void): Promise<void> {
     this.close(viewId);
     const entry: Entry = {
       query: request.query,
@@ -50,9 +53,18 @@ export class ViewSync {
       active: true,
     };
     this.entries.set(viewId, entry);
-    const snapshot = await this.runner<Data>(request.query, request.params);
+    let snapshot: { position: number; data: Data } | null = null;
+    try {
+      snapshot = await this.runner<Data>(request.query, request.params);
+    } catch {
+      snapshot = null;
+    }
     if (!entry.active || this.entries.get(viewId) !== entry) {
       // 迟到的结果：这个视图已经关闭或换了对象，丢弃（可观测性设计第 5 节）
+      return;
+    }
+    if (snapshot === null) {
+      onError?.();
       return;
     }
     entry.position = snapshot.position;
@@ -96,13 +108,19 @@ export class ViewSync {
     }
   }
 
-  // 重新查询一个视图；视图期间关闭或换对象时丢弃迟到的结果
+  // 重新查询一个视图；视图期间关闭或换对象时丢弃迟到的结果。
+  // 查询失败时保留旧快照与旧位置（服务恢复以后的事件会再触发重查），不抛出
   async refresh(viewId: string): Promise<void> {
     const entry = this.entries.get(viewId);
     if (!entry || !entry.active) {
       return;
     }
-    const snapshot = await this.runner(entry.query, entry.params);
+    let snapshot: { position: number; data: unknown } | null = null;
+    try {
+      snapshot = await this.runner(entry.query, entry.params);
+    } catch {
+      return;
+    }
     if (!entry.active || this.entries.get(viewId) !== entry) {
       return;
     }

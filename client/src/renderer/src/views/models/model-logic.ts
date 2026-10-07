@@ -54,6 +54,15 @@ export const DEPARTMENT_LABELS: Record<string, string> = {
   quality: "质检",
 };
 
+// 配置状态（Provider 目录文件的读取状态）：保存成功以后显示已加载，不出现英文（工单 #301）
+export const CONFIG_STATE_LABELS: Record<string, string> = {
+  loaded: "已加载",
+  empty: "空目录",
+  missing: "没有文件",
+  invalid: "文件无法解析",
+  deleted: "文件已删除",
+};
+
 // 「自定义」表示不使用预置表（设计说明第 4.1 节），连接保存空的 preset_id
 export const CUSTOM_PRESET_ID = "";
 

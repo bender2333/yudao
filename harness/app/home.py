@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import AwareDatetime, Field
 
 from ..event_store import Command
-from ..models import Event, EventType, ProjectEvent, ProjectEventType, utc_now
+from ..models import CatalogEventType, Event, EventType, ProjectEvent, ProjectEventType, utc_now
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Snapshot
 from .labels import event_label
@@ -200,7 +200,8 @@ async def _mark_seen(application: Application, command: Command, request: MarkSe
 
 HOME_AWAY_REPORT = QueryDefinition(
     name="home.away_report", request=AwayReportRequest, result=AwayReport, handle=_away_report,
-    changed_by=tuple(sorted(FACT_TYPES)) + (EventType.MODEL_ATTEMPT_FINISHED,),
+    # 已看过也触发重查：点「已看过」以后同一页面立即显示新的上次查看（工单 #301）
+    changed_by=tuple(sorted(FACT_TYPES)) + (EventType.MODEL_ATTEMPT_FINISHED, CatalogEventType.HOME_SEEN),
 )
 
 HOME_MARK_SEEN = CommandDefinition(
