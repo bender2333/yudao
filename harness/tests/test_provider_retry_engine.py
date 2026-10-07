@@ -255,7 +255,7 @@ def test_invalid_response_is_rejected_before_recording_and_never_retried(tmp_pat
 
 
 def test_compaction_uses_the_same_retry_path(tmp_path):
-    from harness.tests.test_compaction_engine import _message, _read
+    from harness.tests.helpers import read_file_call as _read, summary_message as _message
 
     work_count = 0
     compaction_count = 0
