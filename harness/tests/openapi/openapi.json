@@ -12918,6 +12918,18 @@
             "title": "Latency Ms",
             "type": "integer"
           },
+          "elapsed_ms": {
+            "title": "Elapsed Ms",
+            "type": "integer"
+          },
+          "activations": {
+            "title": "Activations",
+            "type": "integer"
+          },
+          "model_steps": {
+            "title": "Model Steps",
+            "type": "integer"
+          },
           "stop_reason": {
             "anyOf": [
               {
@@ -12938,6 +12950,9 @@
           "guidance_only",
           "activation_id",
           "latency_ms",
+          "elapsed_ms",
+          "activations",
+          "model_steps",
           "stop_reason"
         ],
         "title": "ActivationFinishedPayload",

@@ -5,17 +5,18 @@
 //   机房      远程动作、部署、回滚的包裹沿项目通往设备的管线走
 //   决定卡片  决定单贴在大厅的板上，点开在画面里回答；提出决定时小人送单
 //   声明      去掉一个房间、加一个房间，都只改声明，ecs.js 与 floor.js 没有任何具体的部门名
+//   自举试点  覆盖层的档位、H1、H4、H5、覆盖层「来源」的着色、run 层只计有可执行检验的条件、两个新场景（pilotChecks）
 // 用法：node docs/prototypes/v10/checks/behaviors.js
 const fs = require('fs');
 const path = require('path');
 const { chromium, EXE, v10Url } = require('./env');
 
 // ---------------------------------------------------------------------------
-// 声明与引擎的分离：去掉注释以后，ecs.js、floor.js、decision-card.js 里不能出现具体的部门名
+// 声明与引擎的分离：去掉注释以后，ecs.js、floor.js、decision-card.js、source-card.js 里不能出现具体的部门名
 function staticChecks() {
   const out = [];
   const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
-  ['ecs.js', 'floor.js', 'decision-card.js'].forEach((f) => {
+  ['ecs.js', 'floor.js', 'decision-card.js', 'source-card.js'].forEach((f) => {
     const src = strip(fs.readFileSync(path.join(__dirname, '../js/pixel', f), 'utf8'));
     const hits = src.match(/['"`](product|engineering|quality|operations)['"`]/g) || [];
     out.push({ name: f + ' 里没有具体的部门名', ok: hits.length === 0, detail: hits.join(' ') });
@@ -541,6 +542,290 @@ const DRIVER = async () => {
   return results;
 };
 
+// ---------------------------------------------------------------------------
+// 自举试点的行为检查（design.md 第 9 节）：覆盖层的档位、H1（覆盖层的取值等于查询的结果）、
+// H4（事实元素都有来源，来源等于来源表按「事件加字段」给出的结果）、H5（开环的条件带开环标记）、覆盖层「来源」的着色、两个新场景
+async function pilotChecks(ctx) {
+  const out = [];
+  const push = (name, ok, detail) => out.push({ name, ok: Boolean(ok), detail: detail === undefined ? '' : String(detail).slice(0, 400) });
+  const open = async (level, hash) => {
+    const p = await ctx.newPage();
+    const errs = [];
+    p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    p.on('pageerror', (e) => errs.push(String(e)));
+    await p.addInitScript((lv) => sessionStorage.setItem('y10.level', JSON.stringify(lv)), level);
+    await p.goto(v10Url + hash);
+    await p.waitForTimeout(1200);
+    return { p, errs };
+  };
+  // 在页面里用到的小工具：当前楼层、按事实元素的位置点击画布
+  const helpers = () => {
+    window.__fl = () => window.Y10.scenes.activeFloor().floor;
+    window.__click = (f) => {
+      const cv = window.__fl().scene.canvas;
+      const b = cv.getBoundingClientRect();
+      cv.dispatchEvent(new MouseEvent('click', { clientX: b.left + ((f.rect.x + f.rect.w / 2) * b.width) / 640, clientY: b.top + ((f.rect.y + f.rect.h / 2) * b.height) / 320, bubbles: true }));
+    };
+    window.__texts = () => {
+      const P = window.Y10.pixel;
+      const orig = P.text;
+      const seen = [];
+      P.text = function (c, str) { seen.push(String(str)); return orig.apply(this, arguments); };
+      try { window.__fl().scene.drawNow(); } finally { P.text = orig; }
+      return seen;
+    };
+    window.__wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  };
+
+  // 覆盖层与查询的档位；事件对象的 source
+  {
+    const { p, errs } = await open('3.2D', '#/sys/machines');
+    const capsAt = (lv) => p.evaluate((l) => { window.Y10.level.set(l); const c = window.Y10.cap.get(); return { ov: c.overlays.map((o) => o.id), q: c.queries.map((x) => x.name) }; }, lv);
+    const d = await capsAt('3.2D');
+    const pl = await capsAt('pilot');
+    const NEW = ['loops', 'sources', 'coverage'];
+    push('覆盖层：3.2D 档没有「循环」「来源」「检验」', NEW.every((id) => !d.ov.includes(id)), d.ov.join());
+    push('覆盖层：自举试点起列出「循环」「来源」「检验」', NEW.every((id) => pl.ov.includes(id)), pl.ov.join());
+    push('查询：acceptance.coverage 在 3.2D 档出现，run.loops 在自举试点出现', d.q.includes('acceptance.coverage') && !d.q.includes('run.loops') && pl.q.includes('run.loops'));
+    const src = await p.evaluate(() => {
+      const Y = window.Y10;
+      Y.level.set('3.2D');
+      const a = Y.api.query('event.detail', { position: 5 }).data.event;
+      Y.level.set('pilot');
+      const b = Y.api.query('event.detail', { position: 5 }).data.event;
+      const kinds = Object.keys(Y.registry.SOURCE_KINDS);
+      return { a: 'source' in a, b: b.source, every: Y.api.query('home.away_report', { range: '7d' }).data.facts.every((f) => kinds.includes(f.event.source)) };
+    });
+    push('事件对象：3.2D 档没有 source，自举试点起每条事件都带五种来源之一', !src.a && src.b && src.every, JSON.stringify(src));
+    push('档位与来源的检查没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // H1：覆盖层「循环」「检验」上的取值等于对应查询的结果；H5：逐条清单里开环的条件带开环标记
+  {
+    const { p, errs } = await open('pilot', '#/p/p-todo/overview?w=w-todo-csv');
+    await p.evaluate(helpers);
+    await p.click('[data-overlay="loops"]');
+    await p.waitForTimeout(500);
+    const loops = await p.evaluate(() => {
+      const ins = window.__fl().inspect();
+      const q = window.Y10.api.query('run.loops', { project_id: 'p-todo' }).data;
+      const byId = {};
+      [q.project].concat(...q.items.map((i) => i.instances)).forEach((x) => { byId[x.id] = x; });
+      const labels = ins.overlay.labels.filter((l) => l.id);
+      const bad = labels.filter((l) => !byId[l.id] || byId[l.id].state !== l.state || l.text.indexOf(window.Y10.pixel.LOOP_STATES[l.state].label) < 0);
+      const missing = ins.facts.filter((f) => f.kind === 'missing');
+      return { n: labels.length, layers: Array.from(new Set(labels.map((l) => l.layer))), bad, missing: missing.length, missingText: missing.every((f) => f.missing && !f.position) };
+    });
+    push('H1 覆盖层「循环」：信息条、房间、角色头顶的状态等于 run.loops 的结果', loops.n >= 3 && !loops.bad.length && ['run', 'activation', 'step'].every((l) => loops.layers.includes(l)), JSON.stringify(loops));
+    push('覆盖层「循环」：「不判定」的标签点开写缺少的事实', loops.missing > 0 && loops.missingText);
+    await p.click('[data-overlay="coverage"]');
+    await p.waitForTimeout(500);
+    const cov = await p.evaluate(async () => {
+      const fl = window.__fl();
+      const ins = fl.inspect();
+      const q = window.Y10.api.query('acceptance.coverage', { project_id: 'p-todo' }).data.items;
+      const l = ins.overlay.labels.find((x) => x.kind === 'coverage');
+      const it = l && q.find((x) => x.work_item_id === l.work_item_id);
+      const rel = ins.overlay.labels.find((x) => x.kind === 'release');
+      const relIt = rel && q.find((x) => x.work_item_id === rel.work_item_id);
+      fl.openFact('coverage');
+      await window.__wait(300);
+      const s = fl.inspect().sourceCard.state();
+      const openRows = s && s.rows ? s.rows.filter((r) => r.open).map((r) => r.label.split(' ')[0]) : null;
+      const drawn = window.__texts().filter((t) => t === '开环').length;
+      return {
+        same: Boolean(it) && ['covered', 'total', 'model_read', 'open_count'].every((k) => it[k] === l[k]) && l.text.indexOf(window.Y10.coverageText(it)) >= 0 &&
+          s && s.title.indexOf(window.Y10.coverageText(it)) >= 0,
+        rel: Boolean(relIt) && relIt.release.ratio.covered === rel.covered && relIt.release.ratio.total === rel.total,
+        list: s && s.mode, openRows, openIds: it ? it.criteria.filter((c) => c.open).map((c) => c.id) : null, drawn, label: l
+      };
+    });
+    push('H1 覆盖层「检验」：质检房间与逐条清单的标题写「覆盖 · 开环（其中模型阅读）」，取值等于 acceptance.coverage', cov.same, JSON.stringify(cov.label));
+    push('H1 覆盖层「检验」：放行盖章旁的覆盖比例等于这次放行的结果', cov.rel);
+    push('H5 覆盖层「检验」：逐条清单里开环的条件都带「开环」标记', cov.list === 'list' && cov.openRows && cov.openRows.join() === cov.openIds.join() && cov.openIds.length > 0 && cov.drawn >= cov.openIds.length, JSON.stringify(cov));
+    push('覆盖层「循环」「检验」没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // H5：资料页的逐条结论表里，开环的条件带「开环」标记，且与 acceptance.coverage 一致
+  for (const wid of ['w-todo-base', 'w-todo-csv']) {
+    const { p, errs } = await open('pilot', '#/p/p-todo/materials?w=' + wid);
+    const r = await p.evaluate((w) => {
+      const rows = Array.from(document.querySelectorAll('#mt-qa tr[data-criterion]'));
+      const openRows = rows.filter((tr) => tr.dataset.open === '1');
+      const tagged = openRows.every((tr) => tr.querySelector('.y10-tag.is-open') && tr.querySelector('.y10-tag.is-open').textContent === '开环');
+      const untagged = rows.filter((tr) => tr.dataset.open !== '1').every((tr) => !tr.querySelector('.y10-tag.is-open'));
+      const cov = window.Y10.api.query('acceptance.coverage', { project_id: 'p-todo', work_item_id: w }).data.items[0];
+      const ids = new Set(openRows.map((tr) => tr.dataset.criterion));
+      return { rows: rows.length, open: openRows.length, tagged, untagged, covOpen: cov.criteria.filter((c) => c.open).map((c) => c.id), inTable: cov.criteria.filter((c) => c.open).every((c) => ids.has(c.id)) };
+    }, wid);
+    push('H5 资料页「' + wid + '」：逐条结论表里开环的条件带「开环」标记，与 acceptance.coverage 一致', r.rows > 0 && r.open > 0 && r.tagged && r.untagged && r.inTable && errs.length === 0, JSON.stringify(r));
+    await p.close();
+  }
+
+  // H4：每个项目的楼层上，事实元素都有来源事件，来源等于来源表按「事件加字段」给出的结果；
+  // 信息条上的已用时间是事件里的测量值（主机测量），轮次按事件种类；点开的来源卡片写同一条事件与同一种来源
+  for (const pid of ['p-todo', 'p-metro', 'p-sensor', 'p-agents']) {
+    for (const level of ['pilot', 'S5']) {
+      const { p, errs } = await open(level, '#/p/' + pid + '/overview');
+      await p.evaluate(helpers);
+      const r = await p.evaluate(async () => {
+        const Y = window.Y10;
+        const fl = window.__fl();
+        fl.scene.drawNow();
+        const ins = fl.inspect();
+        const evOf = (f) => Y.api.query('event.detail', { position: f.position }).data.event;
+        const bad = ins.facts.filter((f) => !f.position || !f.source || Y.registry.sourceOf(evOf(f), f.field) !== f.source);
+        const time = ins.facts.filter((f) => f.kind === 'time');
+        const round = ins.facts.filter((f) => f.kind === 'round');
+        const noRef = ins.model.items.filter((it) => !it.refs || ['round', 'time', 'sign', 'department', 'parcel'].some((k) => !it.refs[k])).map((it) => it.id);
+        const noBox = (ins.model.shelves.boxes || []).filter((b) => !b.ref).length;
+        const target = ins.facts.find((f) => f.kind === 'time') || ins.facts[0];
+        window.__click(target);
+        await window.__wait(100);
+        const s = fl.inspect().sourceCard.state();
+        return {
+          n: ins.facts.length, kinds: Array.from(new Set(ins.facts.map((f) => f.kind))), bad: bad.map((f) => f.kind + '@' + f.position + ':' + f.source), noRef, noBox,
+          time: time.every((f) => f.source === 'host_measurement') && time.length > 0,
+          round: round.every((f) => f.source === evOf(f).source),
+          card: s && s.event ? { pos: s.event.position, source: s.fact.source } : null, want: { pos: target.position, source: target.source }
+        };
+      });
+      push('H4 ' + pid + '（' + level + '）：每个事实元素都有来源事件，来源等于来源表按「事件加字段」给出的结果', r.n > 0 && !r.bad.length, JSON.stringify(r));
+      push('H4 ' + pid + '（' + level + '）：信息条上的已用时间是主机测量，轮次按事件种类', r.time && r.round, JSON.stringify({ time: r.time, round: r.round }));
+      push('H4 ' + pid + '（' + level + '）：牌子、包裹、箱子与信息条都有来源事件，没有因为缺少来源而不画的元素', !r.noRef.length && !r.noBox, JSON.stringify({ noRef: r.noRef, noBox: r.noBox }));
+      push('H4 ' + pid + '（' + level + '）：点事实元素打开的来源卡片写给出它的事件与这个元素的来源', r.card && r.card.pos === r.want.pos && r.card.source === r.want.source && errs.length === 0, JSON.stringify(r.card) + ' ' + errs.slice(0, 2).join(' | '));
+      await p.close();
+    }
+  }
+
+  // 决策模型给出的事实（Stage 5）：带参照材料的判定点的结论来自决策模型，来源卡片写概率
+  {
+    const { p, errs } = await open('S5', '#/p/p-todo/overview?w=w-todo-base');
+    await p.evaluate(helpers);
+    await p.click('[data-overlay="coverage"]');
+    await p.waitForTimeout(500);
+    const r = await p.evaluate(async () => {
+      const fl = window.__fl();
+      const it = window.Y10.api.query('acceptance.coverage', { project_id: 'p-todo', work_item_id: 'w-todo-base' }).data.items[0];
+      const ac8 = it.criteria.find((c) => c.id === 'AC-8');
+      const ev = window.Y10.api.query('event.detail', { position: ac8.position }).data.event;
+      fl.openFact('coverage');
+      await window.__wait(300);
+      const row = fl.inspect().sourceCard.state().rows.find((x) => x.label.indexOf('AC-8') === 0);
+      fl.inspect().sourceCard.open(row.fact);
+      const texts = window.__texts();
+      return { source: ac8.source, probability: ev.payload.probability, card: fl.inspect().sourceCard.state().fact.source, drawn: texts.some((t) => t.indexOf('概率 0.86') === 0) };
+    });
+    push('S5：判定点的结论来自决策模型，来源卡片写概率', r.source === 'decision_model' && r.probability === 0.86 && r.card === 'decision_model' && r.drawn && errs.length === 0, JSON.stringify(r));
+    await p.close();
+  }
+
+  // 覆盖层「来源」的着色：画面其余部分调暗，事实元素本身不调暗，四周按自己的来源描边；图例的个数等于画面上各种来源的元素数
+  {
+    const { p, errs } = await open('pilot', '#/p/p-todo/overview');
+    await p.evaluate(helpers);
+    // 在画面上取一个像素（逻辑坐标），返回 RGB
+    const pixelsAt = (pts) => p.evaluate((list) => {
+      const fl = window.__fl();
+      fl.scene.drawNow();
+      const cv = fl.scene.canvas;
+      const k = cv.width / 640;
+      const c = cv.getContext('2d');
+      return list.map(([x, y]) => Array.from(c.getImageData(Math.floor(x * k), Math.floor(y * k), 1, 1).data.slice(0, 3)));
+    }, pts);
+    const facts = await p.evaluate(() => { window.__fl().scene.drawNow(); return window.__fl().inspect().facts.map((f) => ({ kind: f.kind, rect: f.rect, source: f.source })); });
+    const inside = facts.find((f) => f.kind === 'box') || facts[0];
+    const spotIn = [inside.rect.x + inside.rect.w / 2, inside.rect.y + inside.rect.h / 2];
+    const spotOut = [320, 250];    // 走廊的地面，不是事实元素
+    const before = await pixelsAt([spotIn, spotOut]);
+    await p.click('[data-overlay="sources"]');
+    await p.waitForTimeout(500);
+    const after = await pixelsAt([spotIn, spotOut, [inside.rect.x - 1.5, inside.rect.y + inside.rect.h / 2]]);
+    const r = await p.evaluate((src) => {
+      const P = window.Y10.pixel;
+      const ins = window.__fl().inspect();
+      const label = ins.overlay.labels.find((l) => l.kind === 'sources');
+      const tally = {};
+      ins.facts.filter((f) => f.source).forEach((f) => { tally[f.source] = (tally[f.source] || 0) + 1; });
+      const hex = P.SOURCE_STYLE[src].line;
+      return { counts: label && label.counts, tally, line: [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) };
+    }, inside.source);
+    const sum = (c) => c[0] + c[1] + c[2];
+    push('覆盖层「来源」：画面其余部分调暗，事实元素本身不调暗', sum(after[1]) < sum(before[1]) * 0.6 && sum(after[0]) === sum(before[0]), JSON.stringify({ before, after }));
+    push('覆盖层「来源」：事实元素按来源描边', after[2].every((v, i) => Math.abs(v - r.line[i]) <= 8), JSON.stringify({ edge: after[2], line: r.line, source: inside.source }));
+    push('覆盖层「来源」：图例写的个数等于画面上各种来源的元素数', JSON.stringify(r.counts) === JSON.stringify(r.tally), JSON.stringify(r));
+    push('覆盖层「来源」没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // 两个新场景播完以后的画面与数据
+  {
+    const { p, errs } = await open('pilot', '#/home');
+    const r = await p.evaluate(async () => {
+      const Y = window.Y10;
+      const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+      const ids = Y.api.query('home.away_report', {}).data.summary.map((s) => s.id);
+      const play = async (id, probe) => {
+        Y.scenario.select(id);
+        await wait(600);
+        const seen = {};
+        const total = Y.scenario.current().steps.length;
+        while (Y.scenario.state().step < total) {
+          Y.scenario.step();
+          await wait(450);
+          if (probe) probe(Y.scenario.state().step, seen);
+        }
+        return seen;
+      };
+      const s20 = await play('sc-todo-loops', (n, seen) => {
+        const f = Y.scenes.activeFloor();
+        if (n === 1) seen.overlay = f && f.floor.inspect().overlay.id;
+        if (n === 6) seen.runLabel = f && f.floor.inspect().overlay.labels.find((l) => l.layer === 'run');
+      });
+      const csv = Y.api.query('run.loops', { project_id: 'p-todo' }).data.items.find((i) => i.work_item_id === 'w-todo-csv').instances.find((x) => x.layer === 'run');
+      const change = Y.api.query('home.away_report', {}).data.summary.find((s) => s.id === 'loop_changes').changes.find((c) => c.work_item_id === 'w-todo-csv');
+      const openRow = document.querySelector('#obs-loop .y10-loop-row.is-open');
+      const bars = document.querySelectorAll('#obs-loop .y10-loop-detail .y10-loop-bar').length;
+      const kinds = Array.from(document.querySelectorAll('#obs-loop .y10-loop-detail .y10-loop-bar .y10-source-kind')).map((el) => el.textContent);
+      const opens = Array.from(document.querySelectorAll('#obs-loop .y10-loop-detail .y10-loop-open')).map((el) => el.textContent);
+      const s21 = await play('sc-todo-sources', (n, seen) => {
+        const f = Y.scenes.activeFloor();
+        const st = f && f.floor.inspect().sourceCard.state();
+        if (n === 1) seen.overlay = f && f.floor.inspect().overlay.id;
+        if (n === 2) seen.parcel = st && st.fact && st.fact.kind;
+        if (n === 3) seen.time = st && st.fact && st.fact.kind + ':' + st.fact.source;
+        if (n === 5) seen.list = st && st.mode;
+        if (n === 6) seen.stamp = st && st.fact && st.fact.kind;
+        if (n === 7) seen.materials = document.querySelectorAll('#mt-qa tr[data-open="1"]').length;
+      });
+      await wait(400);
+      const item = document.querySelector('.y10-report-item.is-open');
+      return {
+        ids, s20, state: csv.state, values: csv.measure.series.map((x) => x.value), sources: csv.measure.series.map((x) => x.source), opensData: csv.measure.series.map((x) => x.open),
+        basis: csv.basis, change, open: openRow && openRow.dataset.id, bars, kinds, opens, s21, report: item ? item.textContent : null
+      };
+    });
+    push('离开期间的报告：自举试点起有「收敛状态的变化」与「带开环条件的放行」', r.ids.includes('loop_changes') && r.ids.includes('open_releases'), r.ids.join());
+    push('场景「循环与收敛」：打开覆盖层「循环」，第 4 轮质检结论到达以后信息条写 run 停滞', r.s20.overlay === 'loops' && r.s20.runLabel && r.s20.runLabel.state === 'stalled', JSON.stringify(r.s20));
+    push('场景「循环与收敛」：「导入 CSV」的未满足数 3 → 2 → 2 → 2，run 停滞', r.state === 'stalled' && r.values.join() === '3,2,2,2', r.state + ' ' + r.values.join());
+    push('场景「循环与收敛」：报告里有「导入 CSV · run：收敛中 → 停滞」', r.change && r.change.from === 'converging' && r.change.to === 'stalled', JSON.stringify(r.change));
+    push('场景「循环与收敛」：观测页的「循环」区块展开 run 一行，显示 4 轮数值', r.open === 'run:r-todo-csv' && r.bars === 4, r.open + ' ' + r.bars);
+    push('run 层只计有可执行检验的条件：判定依据写明，每一轮另写开环数（开环 1）',
+      r.basis.indexOf('只计有可执行检验的条件') === 0 && r.opensData.join() === '1,1,1,1' && r.opens.join() === '开环 1,开环 1,开环 1,开环 1', JSON.stringify({ basis: r.basis, opens: r.opens }));
+    push('run 层每一轮数值的来源是主机测量（观测页的来源标签也写「主机测量」）',
+      r.sources.every((s) => s === 'host_measurement') && r.kinds.length === 4 && r.kinds.every((k) => k === '主机测量'), JSON.stringify({ sources: r.sources, kinds: r.kinds }));
+    push('场景「来源与检验」：着色、包裹与已用时间的来源卡片、逐条清单、放行盖章、资料页的开环标记依次出现',
+      r.s21.overlay === 'sources' && r.s21.parcel === 'parcel' && r.s21.time === 'time:host_measurement' && r.s21.list === 'list' && r.s21.stamp === 'stamp' && r.s21.materials > 0, JSON.stringify(r.s21));
+    push('场景「来源与检验」：首页展开「带开环条件的放行」，写「覆盖 7/8 · 开环 1（其中模型阅读 1）」并列出开环的条件',
+      r.report && r.report.indexOf('带开环条件的放行') >= 0 && r.report.indexOf('覆盖 7/8 · 开环 1（其中模型阅读 1）') >= 0 && r.report.indexOf('AC-8') >= 0, r.report);
+    push('两个新场景播放没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+  return out;
+}
+
 (async () => {
   const results = staticChecks();
   const browser = await chromium.launch({ executablePath: EXE });
@@ -583,6 +868,7 @@ const DRIVER = async () => {
   // 点刻度以后地址里带着回放位置：用这个地址重新打开
   const loadAt = await replayPage(seek.hashAfter.includes('at=') ? seek.hashAfter : '#/p/p-todo/overview?at=40', async () => 0);
   results.push({ name: '回放：带回放位置的地址直接打开概览页能装载楼层画面', ok: loadAt.errs.length === 0 && loadAt.canvas === 1, detail: loadAt.canvas + ' 个画布；' + loadAt.errs.slice(0, 2).join(' | ') });
+  results.push(...await pilotChecks(ctx));
   await browser.close();
   results.forEach((r) => console.log((r.ok ? 'PASS ' : 'FAIL ') + r.name + (r.ok || !r.detail ? '' : '  ← ' + r.detail)));
   const bad = results.filter((r) => !r.ok);

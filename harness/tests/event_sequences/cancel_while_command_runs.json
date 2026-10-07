@@ -71,7 +71,7 @@
      }
     },
     "round": 0,
-    "run_event_version": 2,
+    "run_event_version": 3,
     "run_time_limit_sec": 7200,
     "sessions": {
      "engineering": "<ses_eng#1>",
@@ -928,10 +928,13 @@
    "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
+    "activations": 1,
+    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
     "latency_ms": "<duration>",
+    "model_steps": 1,
     "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
     "stop_reason": null
@@ -1696,10 +1699,13 @@
    "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#2>",
+    "activations": 2,
+    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
     "latency_ms": "<duration>",
+    "model_steps": 2,
     "prompt_hash": "<sha256#25>",
     "prompt_version": 0,
     "stop_reason": null
@@ -2408,10 +2414,13 @@
    "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#3>",
+    "activations": 3,
+    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
     "latency_ms": "<duration>",
+    "model_steps": 3,
     "prompt_hash": "<sha256#25>",
     "prompt_version": 0,
     "stop_reason": "cancelled"
@@ -3226,7 +3235,7 @@
   "reviews": [],
   "rework_count": 0,
   "round": 0,
-  "run_event_version": 2,
+  "run_event_version": 3,
   "run_id": "<run#1>",
   "run_time_limit_sec": 7200,
   "sessions": {

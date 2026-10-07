@@ -34,6 +34,8 @@ Y10.LEVEL_TAGS.pilot = '试点';
 - `user`：用户的命令——新要求、决定的回答、指导、设置的修改。
 - `decision_model`：判定点（`S5` 档的证据核对），载荷带 `probability`。
 
+按字段的覆盖：事件中的测量值（已用时间、已用次数与步数、检查回执的结果）来源固定为 `host_measurement`。事件对象的 `source` 按事件种类；`project.loop` 给出的事实元素按「事件加字段」取来源。
+
 `backend.js` 的 `validate` 增加一项：每个已登记的事件种类都有来源种类。
 
 ### 2.2 事件对象
@@ -60,8 +62,10 @@ Y10.LEVEL_TAGS.pilot = '试点';
   state: 'converging' | 'stalled' | 'oscillating' | 'drifting' | 'at_bound' | 'not_judged',
   missing,                                 // state 为 not_judged 时：缺少的事实与开始判定的阶段，其余为 null
   stop_reason,                             // 已停止时的停止原因，其余为 null
-  measure: { name, series: [{ round, value, position }] } | null,   // 进展度量每一轮的数值与给出它的事件位置
-  basis                                    // 判定依据的一句话，例如「最近 3 轮未满足数 2 → 2 → 2 不变，交付的树摘要在变」
+  measure: { name, field, series: [{ round, value, open, position, source }] } | null,
+                                           // 进展度量每一轮的数值、run 层这一轮的开环数、给出它的事件位置与按「事件加字段」的来源
+  basis,                                   // 判定依据的一句话，例如「只计有可执行检验的条件：最近 3 轮未满足数 2 → 2 → 2 不变，交付的树摘要在变：停滞」
+  position                                 // 给出当前状态的事件位置
 }
 ```
 
@@ -70,19 +74,20 @@ Y10.LEVEL_TAGS.pilot = '试点';
 ```js
 { items: [{
   work_item_id, snapshot,                  // 当前交付快照的摘要
-  criteria: [{ id, text, method, result, open, position }],
+  criteria: [{ id, text, method, result, open, position, field, source }],
   // method：command_check | trial_case | host_measurement | judgement | human | open
-  // result：pass | fail | not_run；open 为 true 表示没有可执行的检验
+  // result：pass | fail | not_run；open 为 true 表示没有可执行的检验（模型阅读的条件包含在内）
+  // 可执行检验的结论按字段 receipt 取来源（主机测量），其余为质检的陈述
   covered, total, model_read, open_count,
-  release: { position, ratio } | null      // 最近一次放行与它的覆盖比例
+  release: { position, ratio: { covered, total, model_read, open_count } } | null   // 最近一次放行与它的计数
 }] }
 ```
 
-`project.loop`（`pilot` 档起）：事项增加 `refs: { round, time, sign }`，停放的包裹、质检的盖章、成果库的箱子各带 `ref`，值是给出这条事实的事件位置。
+`project.loop`（`pilot` 档起）：事项增加 `refs: { round, time, sign, department, parcel }`，质检的盖章与成果库的箱子各带 `ref`；每个引用是 `{ position, field, source }`，`position` 是给出这条事实的事件位置，`source` 按「事件加字段」取（第 2.1 节），例如 `time` 的字段是 `elapsed_sec`，来源为主机测量。
 
 `home.away_report`（`pilot` 档起）：汇总项增加两项，形状与现有汇总项相同（`label`、`count`、`refs`），另带明细：收敛状态的变化 `changes: [{ work_item_id, title, layer, from, to, position }]`；带开环条件的放行 `releases: [{ work_item_id, title, open: [{ id, text }], position }]`。
 
-质检材料（`3.2D` 档起）：QAReview 增加 `criteria: [{ criterion, text, method, result, checks, trial_cases, note }]`，`copyMaterial` 透传。
+质检材料（`3.2D` 档起）：QAReview 增加 `snapshot` 与 `criteria: [{ criterion, text, method, result, checks, trial_cases: [{ name, screenshot }], note }]`，`copyMaterial` 透传。
 
 ### 2.4 处理函数
 
@@ -95,12 +100,11 @@ Y10.LEVEL_TAGS.pilot = '试点';
 | `js/ui/scenes.js` | `overlayData` 增加 `loops`、`sources`、`coverage` 三支；楼层的点击回调增加 `onSeek(position)`（时间轴跳到这条事件） |
 | `js/pixel/floor.js` | `drawOverlay` 增加三个覆盖层的画法（design.md 第 3、5.2、6.1 节）；每帧收集事实元素 `facts: [{ kind, rect, position, source }]`，供覆盖层「来源」、点击与验收脚本（`inspect()`）使用；点击顺序为决定卡片、决定板、通往机房的门、事实元素 |
 | `js/pixel/source-card.js` | 新增：来源卡片，写法照 `decision-card.js`（`P.createSourceCard(scene, canvas, { onSeek, fetchEvent })`，`open(fact)`、`openList(title, rows)`、`close`、`isOpen`、`draw`、`click`、`cursor`）；覆盖层「检验」的逐条清单用 `openList` |
-| `js/ui/variant-bar.js` | 新增：页面底部中央的切换条，读写地址的 `?variant=`，左右方向键切换（输入框、文本框与可编辑元素获得焦点时不处理）；只在覆盖层「来源」打开时显示；`Y10.variant()` 返回当前的形式 |
 | `js/ui/views/observe.js` | 「请求记录与用量」区块之后新增「循环」区块（`ui.block({ id: 'obs-loop', title: '循环', query: 'run.loops', body })`，不写进页面的 `needs`）；`update` 时按 id 替换这个区块 |
 | `js/ui/views/home.js` | 两个新汇总项展开时先列明细再列来源事件；来源事件每条旁写来源种类 |
 | `js/ui/views/materials.js` | `qaBlock`：有 `criteria` 时画逐条结论表（`Y10.ui.table`），列为验收条件、检验方式、结果、证据、截图；表头写快照摘要与覆盖比例；开环的行带「开环」标记 |
 | `js/ui/views/gallery.js` 用到的 `P.FLOOR_VIEWS`（`floor.js`） | 三个覆盖层各加一行，档位 `pilot` |
-| `index.html` | `pixel/decision-card.js` 之后加载 `pixel/source-card.js`；`ui/` 的脚本里加载 `ui/variant-bar.js` |
+| `index.html` | `pixel/decision-card.js` 之后加载 `pixel/source-card.js` |
 
 画面上的标签沿用 `P.sign` 与现有覆盖层的位置算法（房间中央、角色工位上方、信息条）。颜色取自 `engine.js` 的调色板，六种状态的颜色在 `floor.js` 里定义一张表，覆盖层「循环」的图例、观测页与报告共用同一组文字。
 
@@ -119,7 +123,7 @@ Y10.LEVEL_TAGS.pilot = '试点';
 | `matrix-home.js`、`matrix-floor.js` | 十档；其余同 v9 |
 | `scenarios.js` | 二十一个场景全部按步骤播到最后一步，零错误 |
 | `identity-building.js`、`record.js`、`replay.js` | 同 v9，对照页面为 v9：覆盖层不打开时，楼、机房与项目楼层的静止画面与 v9 逐像素相同 |
-| `behaviors.js` | v9 的全部检查，加上 design.md 第 9 节的行为检查（覆盖层的档位、H1、H4、H5、`?variant=`） |
+| `behaviors.js` | v9 的全部检查，加上 design.md 第 9 节的行为检查（覆盖层的档位、H1、H4、H5、覆盖层「来源」的着色与图例计数） |
 | `sheets.js` | 新增：按 design.md 第 9 节的清单截图，两种宽度（1440、1920）与两种主题，存进 `.tmp/v10-checks/sheets/`，并拼成每个画面一张的联系表 |
 
 运行需要 Playwright：`PLAYWRIGHT_PATH` 指向一个已安装的 Playwright（例如 `C:/project/yudao-worktrees/integration/client/node_modules/playwright`）。

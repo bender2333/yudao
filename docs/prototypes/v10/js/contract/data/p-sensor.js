@@ -684,6 +684,13 @@
       }
     },
     history: [
+      // 窗口开始以前的采纳：r1 已经在初始数据里，这条事件是成果库里 r1 这只箱子的来源，不再修改数据
+      ev({
+        at: '2026-09-12T15:30:00+08:00', type: 'deliverable_adopted', work_item_id: 'w-sensor-base', run_id: 'r-sensor-base', actor: 'user',
+        label: '用户采纳采集与网页展示的 r1',
+        payload: { version: 'r1' },
+        patch: []
+      }),
       ev({
         at: '2026-09-24T09:00:00+08:00', type: 'department_activated', work_item_id: 'w-sensor-base', run_id: 'r-sensor-base', department: 'engineering',
         label: '工程按增量的 r2 要求调整重试与日志',
