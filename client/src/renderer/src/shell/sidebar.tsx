@@ -173,12 +173,6 @@ export function Sidebar(props: SidebarProps) {
           </button>
         ))}
       </div>
-      <button className="nav-item" onClick={() => props.onNavigate("#/connect")}>
-        连接设置
-      </button>
-      <button className="nav-item" onClick={() => props.onNavigate("#/settings")}>
-        设置
-      </button>
     </aside>
   );
 }

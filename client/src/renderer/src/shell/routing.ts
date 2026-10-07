@@ -31,16 +31,6 @@ export function parseRoute(hash: string): Route {
     route.name = "home";
     return route;
   }
-  if (segments[0] === "connect") {
-    route.name = "connect";
-    return route;
-  }
-  // 客户端自己的设置页：连接设置、本机服务与登录时启动（设计说明第 4.3、4.5 节）。
-  // 名字与项目设置页（#/p/<项目>/settings）分开，两个页面不互相顶替
-  if (segments[0] === "settings") {
-    route.name = "client-settings";
-    return route;
-  }
   // 动作图鉴：只在开发时使用，不进入正式的页面入口（页签、侧栏与 paths 里都没有它）
   if (segments[0] === "gallery") {
     route.name = "gallery";
@@ -90,7 +80,6 @@ function replayPosition(query: URLSearchParams): number | null {
 // 每个页面的路径（原型 v8 设计说明第 3.3 节）
 export const paths = {
   home: () => "#/home",
-  connect: () => "#/connect",
   // 首页的回放位置写在 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
   homeAt: (at: number | null) => (at === null ? "#/home" : `#/home?at=${at}`),
   overview: (projectId: string) => `#/p/${projectId}/overview`,
@@ -115,6 +104,4 @@ export const paths = {
     at === null ? `#/p/${projectId}/overview` : `#/p/${projectId}/overview?at=${at}`,
   settings: (projectId: string) => `#/p/${projectId}/settings`,
   sys: (page: string) => `#/sys/${page}`,
-  // 客户端自己的设置页（与项目设置不同：连接设置、本机服务与登录时启动）
-  clientSettings: () => "#/settings",
 };

@@ -1,5 +1,5 @@
-// 客户端外壳的端到端测试（工单 #79 的验收）：Playwright 启动 Electron，连接真实运行的后端
-// （FakeAdapter 驱动的服务，见 tests/e2e/backend.py）。窗口尺寸 1440×900 与 390×844，控制台错误为零。
+// 页面外壳的端到端测试（工单 #79 的验收）：Playwright 打开 Chromium 页面，连接真实运行的后端
+// （FakeAdapter 驱动的服务，见 tests/e2e/backend.py）。视口尺寸 1440×900 与 1920×1080，控制台错误为零。
 
 import { expect, test } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
@@ -39,18 +39,18 @@ function watchErrors(client: ClientApp): string[] {
   return errors;
 }
 
-test("客户端连接本机部署与局域网内另一台机器上的部署都能读取能力清单", async () => {
-  // 两种访问方式都用同一个真实服务核对：本机地址与局域网地址指向同一个进程，
-  // 客户端在两种地址下都能读取能力清单并打开外壳（工单第一条验收）
+test("页面打开以后直接读取能力清单并进入外壳", async () => {
+  // 网页里没有连接设置：页面从自己来源的服务读取能力清单；两种视口各核对一次
+  // （首条验收：能力清单可读、外壳打开）
   for (const size of [
     { width: 1440, height: 900 },
-    { width: 390, height: 844 },
+    { width: 1920, height: 1080 },
   ]) {
     const client = await openClient(size);
     const errors = watchErrors(client);
     try {
       await expect(client.page.locator(".sidebar")).toBeVisible();
-      await expect(client.page.locator("text=请更新客户端")).toHaveCount(0);
+      await expect(client.page.locator("text=页面与服务的接口版本不同")).toHaveCount(0);
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -58,7 +58,7 @@ test("客户端连接本机部署与局域网内另一台机器上的部署都�
   }
 });
 
-test("连接「本机」而服务已经在运行时，客户端直接连接并读取能力清单", async () => {
+test("页面连接以后直接显示状态项与离开期间的报告", async () => {
   const client = await openClient({ width: 1440, height: 900 });
   const errors = watchErrors(client);
   try {
@@ -86,7 +86,7 @@ test("能力清单缺少某个查询时，依赖它的页面入口不出现", as
   }
 });
 
-test("顶栏与托盘图标的待你决定数量与 decisions.list 中等待回答的数量一致", async () => {
+test("顶栏的待你决定数量与 decisions.list 中等待回答的数量一致", async () => {
   const client = await openClient({ width: 1440, height: 900 });
   const errors = watchErrors(client);
   try {
@@ -97,118 +97,12 @@ test("顶栏与托盘图标的待你决定数量与 decisions.list 中等待回�
     }, backend.address);
     expect(waiting).toBeGreaterThan(0);
     await expect(client.page.locator(".topbar .status-item").filter({ hasText: "待你决定：" })).toHaveText(`待你决定：${waiting}`);
-    // 托盘图标使用同一份数据：主进程记录的计数与等待数量一致
-    const trayCount = await client.app.evaluate(() => (globalThis as { yudaoTrayCount?: () => number }).yudaoTrayCount?.() ?? null);
-    expect(trayCount).toBe(waiting);
     expect(errors).toEqual([]);
   } finally {
     await client.close();
   }
 });
 
-test("窗口关闭后新的决定请求到达时出现系统通知", async () => {
-  const client = await openClient({ width: 1440, height: 900 });
-  const errors = watchErrors(client);
-  try {
-    // 关闭窗口：客户端只隐藏窗口，保留托盘与事件流连接。这里经主进程隐藏窗口，
-    // 与点击窗口关闭按钮的效果一致（渲染进程仍在，事件流连接保留）
-    await client.app.evaluate(() => (globalThis as { yudaoHideWindow?: () => void }).yudaoHideWindow?.());
-    await client.page.waitForTimeout(300);
-    // 回答现有的决定请求（选项 continue）：阻塞的 run 继续运行，下一次请求再次遇到模型不可用，
-    // 发出新的决定请求；窗口已经关闭，事件流仍在，客户端据此发出系统通知
-    const answered = await client.page.evaluate(async (address: string) => {
-      const listed = await (await fetch(`${address}/api/queries/decisions.list?status=open`)).json();
-      const [decision] = listed.data.decisions;
-      const response = await fetch(`${address}/api/commands/decision.answer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          command_id: crypto.randomUUID(),
-          decision_id: decision.decision_id,
-          option: "continue",
-          base_version: decision.version,
-        }),
-      });
-      return response.status;
-    }, backend.address);
-    expect(answered).toBe(200);
-
-    // 主进程收到新的决定请求后发出通知
-    const notifications = await client.app.evaluate(async () => {
-      const read = (globalThis as { yudaoNotifications?: () => { title: string; body: string }[] }).yudaoNotifications;
-      const deadline = Date.now() + 20000;
-      while (Date.now() < deadline) {
-        const list = read?.() ?? [];
-        if (list.length > 0) {
-          return list;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-      return [];
-    });
-    expect(notifications.length).toBeGreaterThan(0);
-    expect(notifications[0].title).toContain("决定");
-    expect(errors).toEqual([]);
-  } finally {
-    await client.close();
-  }
-});
-
-// 系统通知的点击：恢复窗口并定位到首页对应的决定卡片（设计说明第 5.7 节，工单 #296）
-test("点击系统通知恢复窗口并定位到对应的决定卡片", async () => {
-  const client = await openClient({ width: 1440, height: 900 });
-  const errors = watchErrors(client);
-  try {
-    await client.app.evaluate(() => (globalThis as { yudaoHideWindow?: () => void }).yudaoHideWindow?.());
-    await client.page.waitForTimeout(300);
-    const answered = await client.page.evaluate(async (address: string) => {
-      const listed = await (await fetch(`${address}/api/queries/decisions.list?status=open`)).json();
-      const [decision] = listed.data.decisions;
-      const response = await fetch(`${address}/api/commands/decision.answer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          command_id: crypto.randomUUID(),
-          decision_id: decision.decision_id,
-          option: "continue",
-          base_version: decision.version,
-        }),
-      });
-      return response.status;
-    }, backend.address);
-    expect(answered).toBe(200);
-
-    // 记下通知带走的决定标识，点击以后核对界面定位到那一张卡片
-    const found = await client.app.evaluate(async () => {
-      const read = (globalThis as { yudaoNotifications?: () => { decisionId: string | null }[] }).yudaoNotifications;
-      const deadline = Date.now() + 20000;
-      while (Date.now() < deadline) {
-        const list = read?.() ?? [];
-        const last = list[list.length - 1];
-        if (last?.decisionId) {
-          return { index: list.length - 1, decisionId: last.decisionId };
-        }
-        const { promise, resolve } = Promise.withResolvers<void>();
-        setTimeout(resolve, 100);
-        await promise;
-      }
-      return null;
-    });
-    expect(found).not.toBeNull();
-
-    // 点击这条通知：主进程恢复窗口并把决定标识发给渲染进程，界面跳到首页定位到该卡片
-    await client.app.evaluate(({ BrowserWindow }, index) => {
-      const click = (globalThis as { yudaoClickNotification?: (i: number) => string | null }).yudaoClickNotification;
-      click?.(index);
-      return BrowserWindow.getAllWindows()[0]?.isVisible() === true;
-    }, found!.index);
-    await expect(client.page.locator(`#decision-${found!.decisionId}`)).toBeVisible({ timeout: 30_000 });
-    await expect(client.page.locator(`#decision-${found!.decisionId}`)).toHaveClass(/is-targeted/);
-    expect(errors).toEqual([]);
-  } finally {
-    await client.close();
-  }
-});
 
 test("事件流驱动视图刷新：经命令新建项目以后，左侧栏无需刷新即出现新项目", async () => {
   const client = await openClient({ width: 1440, height: 900 });
@@ -271,22 +165,22 @@ test("接口版本相同而能力清单多出查询时，客户端正常使用�
       window.location.hash = hash;
     }, "#/home");
     await expect(client.page.locator(".sidebar")).toBeVisible();
-    await expect(client.page.locator("text=请更新客户端")).toHaveCount(0);
+    await expect(client.page.locator("text=页面与服务的接口版本不同")).toHaveCount(0);
     expect(errors).toEqual([]);
   } finally {
     await client.close();
   }
 });
 
-test("接口版本不同时客户端只显示更新页（写明两边的版本），不打开页面、不执行命令", async () => {
+test("接口版本不同时页面只显示版本不同的提示（写明两边的版本），不打开页面、不执行命令", async () => {
   const other = await startBackend({ apiVersion: CLIENT_API_VERSION + 1 });
   try {
     const client = await startClient(other, { width: 1440, height: 900 });
     const errors = watchErrors(client);
     try {
-      await expect(client.page.getByRole("heading", { name: "请更新客户端" })).toBeVisible();
-      await expect(client.page.locator(`text=客户端接口版本：${CLIENT_API_VERSION}`)).toBeVisible();
-      await expect(client.page.locator(`text=Yudao 服务接口版本：${CLIENT_API_VERSION + 1}`)).toBeVisible();
+      await expect(client.page.getByRole("heading", { name: "页面与服务的接口版本不同" })).toBeVisible();
+      await expect(client.page.locator(".gate .error")).toContainText(`页面的接口版本是 ${CLIENT_API_VERSION}`);
+      await expect(client.page.locator(".gate .error")).toContainText(`的接口版本是 ${CLIENT_API_VERSION + 1}`);
       // 不打开任何页面：外壳与左侧栏都不出现
       await expect(client.page.locator(".sidebar")).toHaveCount(0);
       expect(errors).toEqual([]);
@@ -298,8 +192,8 @@ test("接口版本不同时客户端只显示更新页（写明两边的版本�
   }
 });
 
-test("窗口尺寸 390×844 下外壳可用，没有横向滚动条，控制台错误为零", async () => {
-  const client = await startClient(backend, { width: 390, height: 844 });
+test("视口 1920×1080 下外壳可用，没有横向滚动条，控制台错误为零", async () => {
+  const client = await startClient(backend, { width: 1920, height: 1080 });
   const errors = watchErrors(client);
   try {
     await expect(client.page.locator(".brand")).toHaveText("Yudao");

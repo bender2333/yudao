@@ -15,10 +15,10 @@ test("动作图鉴只在开发路径上可达：#/gallery 解析为 gallery，�
   assert.ok(!Object.values(paths).some((p) => String(p).includes("gallery")), "正式路径不应指向图鉴");
 });
 
-test("图鉴不影响既有路由：home、connect、sys、项目页面照旧解析", () => {
+test("图鉴不影响既有路由：home、sys、项目页面照旧解析，已删除的连接页回到未找到", () => {
   assert.equal(parseRoute("").name, "home");
   assert.equal(parseRoute("#/home").name, "home");
-  assert.equal(parseRoute("#/connect").name, "connect");
+  assert.equal(parseRoute("#/connect").name, "not-found");
   assert.equal(parseRoute("#/sys/machines").name, "sys-machines");
   assert.equal(parseRoute("#/p/demo/overview").name, "overview");
   assert.equal(parseRoute("#/p/demo/dept/product").name, "dept");

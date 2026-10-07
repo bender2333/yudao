@@ -15,9 +15,9 @@ LOCAL_ACTOR = "user:local"
 # 本机访问方式的 Host 只能是本机名称，防止 DNS 重新绑定（第 6.2 节）
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
-# 桌面客户端页面的来源（第 6.2 节）：Electron 用注册过的自定义协议加载界面，跨来源请求带这个 Origin。
-# 来源字符串见 docs/architecture-issues.md 中 #76 的登记
-CLIENT_ORIGINS = ("yudao://app",)
+# 页面与接口同一来源（第 6.2 节）：带 Origin 的请求只接受 http:// 加本次请求的 Host
+def same_origin(headers: Headers) -> str:
+    return f"http://{headers.get('host', '')}"
 
 # 命令只接受 application/json（第 6.2 节）
 COMMAND_MEDIA_TYPE = "application/json"
@@ -35,7 +35,7 @@ def rejection(*, access: AccessMode, method: str, path: str, headers: Headers) -
     if access == "local" and host_name(headers.get("host", "")) not in LOCAL_HOSTS:
         return 403
     origin = headers.get("origin")
-    if origin is not None and origin not in CLIENT_ORIGINS:
+    if origin is not None and origin != same_origin(headers):
         return 403
     if method == "POST" and path.startswith("/api/commands/"):
         media_type = headers.get("content-type", "").partition(";")[0].strip().lower()
