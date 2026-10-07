@@ -2297,7 +2297,7 @@
     "id": "command-1",
     "input_item": {
      "call_id": "command-1",
-     "output": "{\"error\":null,\"ok\":true,\"output\":{\"argv\":[\"<python>\",\"-c\",\"import pathlib, sys, time; print('command started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\",\"<data>/command-running\"],\"attempt\":1,\"executor\":\"host\",\"exit_code\":124,\"name\":\"serve\",\"output\":\"command started\\ncommand timed out after 60s; the process tree was stopped\",\"snapshot_hash\":\"<sha256#1>\",\"status\":\"timeout\",\"truncated\":false}}",
+     "output": "{\"error\":null,\"ok\":true,\"output\":{\"argv\":[\"<python>\",\"-c\",\"import pathlib, sys, time; print('command started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\",\"<data>/command-running\"],\"attempt\":1,\"executor\":\"host\",\"exit_code\":130,\"name\":\"serve\",\"output\":\"command started\\ncommand cancelled; the process tree was stopped\",\"snapshot_hash\":\"<sha256#1>\",\"status\":\"cancelled\",\"truncated\":false}}",
      "type": "function_call_output"
     },
     "input_modalities": [
@@ -4091,11 +4091,11 @@
     ],
     "attempt": 1,
     "executor": "host",
-    "exit_code": 124,
+    "exit_code": 130,
     "name": "serve",
-    "output": "command started\ncommand timed out after 60s; the process tree was stopped",
+    "output": "command started\ncommand cancelled; the process tree was stopped",
     "snapshot_hash": "<sha256#1>",
-    "status": "timeout",
+    "status": "cancelled",
     "truncated": false
    }
   }

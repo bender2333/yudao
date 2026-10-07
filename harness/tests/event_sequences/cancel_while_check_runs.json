@@ -2456,7 +2456,7 @@
     "id": "check-1",
     "input_item": {
      "call_id": "check-1",
-     "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#3>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#23>\",\"engineering_plan_hash\":\"<sha256#41>\",\"executor\":\"host\",\"exit_code\":0,\"name\":\"smoke\",\"product_spec_hash\":\"<sha256#22>\",\"snapshot_hash\":\"<sha256#50>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"-c\\\",\\\"import pathlib, sys, time; print('check started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\\\",\\\"<data>/check-running\\\"] exit=0\\ncheck started\",\"tree_changed\":false}}",
+     "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#3>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#23>\",\"engineering_plan_hash\":\"<sha256#41>\",\"executor\":\"host\",\"exit_code\":130,\"name\":\"smoke\",\"product_spec_hash\":\"<sha256#22>\",\"snapshot_hash\":\"<sha256#50>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"-c\\\",\\\"import pathlib, sys, time; print('check started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\\\",\\\"<data>/check-running\\\"] exit=130\\ncheck cancelled; the process tree was stopped\\ncheck started\",\"tree_changed\":false}}",
      "type": "function_call_output"
     },
     "input_modalities": [
@@ -4261,11 +4261,11 @@
     "effective_contract_hash": "<sha256#23>",
     "engineering_plan_hash": "<sha256#41>",
     "executor": "host",
-    "exit_code": 0,
+    "exit_code": 130,
     "name": "smoke",
     "product_spec_hash": "<sha256#22>",
     "snapshot_hash": "<sha256#50>",
-    "summary": "host-executed argv=[\"<python>\",\"-c\",\"import pathlib, sys, time; print('check started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\",\"<data>/check-running\"] exit=0\ncheck started",
+    "summary": "host-executed argv=[\"<python>\",\"-c\",\"import pathlib, sys, time; print('check started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\",\"<data>/check-running\"] exit=130\ncheck cancelled; the process tree was stopped\ncheck started",
     "tree_changed": false
    }
   }
