@@ -2,14 +2,17 @@
   "departments": [
     {
       "id": "product",
+      "label": "产品",
       "roles": ["product"]
     },
     {
       "id": "engineering",
+      "label": "工程",
       "roles": ["engineering"]
     },
     {
       "id": "quality",
+      "label": "质检",
       "roles": ["quality"],
       "suggested_capabilities": ["image"]
     }

@@ -11,8 +11,8 @@ from harness.app.labels import (DECISION_KIND_NAMES, PHASE_NAMES, STOP_REASON_NA
                                 event_label, phase_name, stop_reason_name)
 from harness.app.payloads import PAYLOADS
 from harness.definitions import DEFINITIONS
-from harness.models import (DEPARTMENT_LABELS, PHASES, TERMINAL_PHASES, EventType, ProjectEventType,
-                           stop_reason_name as core_name, waiting_reason_for)
+from harness.models import (PHASES, TERMINAL_PHASES, EventType, ProjectEventType, stop_reason_name as core_name,
+                           waiting_reason_for)
 from harness.tests.project_stream_fields import load_manifest
 
 LATIN = re.compile(r"[A-Za-z]")
@@ -61,10 +61,6 @@ def test_terminal_waiting_reason_names_the_stop_reason_in_chinese(phase):
     reason = waiting_reason_for(phase, "provider_timeout")
     assert reason is not None and "模型服务请求超时" in reason
     assert LATIN.search(reason) is None, reason
-
-
-def test_department_labels_cover_the_organizations_departments():
-    assert set(DEPARTMENT_LABELS) == set(DEFINITIONS.departments)
 
 
 @pytest.mark.parametrize("reason", _human_action_stop_reasons())
