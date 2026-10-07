@@ -14,6 +14,7 @@ import type {
   WorkItemCard,
   WorkItemInputsResult,
 } from "../../api/generated/types.gen";
+import { paths } from "../../shell/routing";
 import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, SubmitButton, Table, TextArea,
   TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
@@ -25,11 +26,11 @@ import { RestartOnboarding } from "./restart-onboarding";
 import { BOARD_TITLES, boardColumns } from "./board";
 import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
 
-export function OverviewPage(props: { app: ClientApp; route: Route }) {
+export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: (hash: string) => void }) {
   const projectId = props.route.projectId ?? "";
   const workItem = props.route.workItemId;
-  // 回放位置（全局位置）：为 null 时是实时画面（设计说明第 5.5 节）
-  const [at, setAt] = useState<number | null>(null);
+  // 回放位置（全局位置）写在路径的 ?at= 中（设计说明第 3.3 节）；为 null 时是实时画面
+  const at = props.route.at;
   const overview = useSnapshot<ProjectOverviewResult>(props.app, "page.overview", "project.overview", {
     project_id: projectId,
     work_item: workItem,
@@ -68,7 +69,8 @@ export function OverviewPage(props: { app: ClientApp; route: Route }) {
                 fromPosition={report.data.range.from_position}
                 fromAt={report.data.range.from_at}
                 project={projectId}
-                onPosition={setAt}
+                at={at}
+                onPosition={(next) => props.onNavigate(paths.overviewAt(projectId, next))}
                 onSelect={() => undefined}
                 highlight={[]}
                 liveNote={`实时画面 · ${ticksOf(report.data.facts, projectId).length} 条关键事实`}

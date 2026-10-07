@@ -34,7 +34,7 @@ export function setTrayCount(count: number): void {
   tray.setImage(iconFor(count));
 }
 
-export type NotificationRecord = { title: string; body: string; at: number };
+export type NotificationRecord = { title: string; body: string; at: number; decisionId: string | null };
 
 const notifications: NotificationRecord[] = [];
 
@@ -42,12 +42,28 @@ export function notificationLog(): NotificationRecord[] {
   return notifications;
 }
 
-export function notify(title: string, body: string): void {
-  notifications.push({ title, body, at: Date.now() });
+// 系统通知（设计说明第 5.7 节）：决定请求带决定标识，点击通知时恢复窗口并定位到首页的
+// 对应决定卡片（工单 #296）；其它通知只恢复窗口。动作由 index.ts 装入（与托盘菜单同一做法）
+export function notify(title: string, body: string, decisionId: string | null = null): void {
+  notifications.push({ title, body, at: Date.now(), decisionId });
   if (!Notification.isSupported()) {
     return;
   }
-  new Notification({ title, body }).show();
+  const notification = new Notification({ title, body });
+  notification.on("click", () => menuActions.onNotificationClick(decisionId));
+  notification.show();
+}
+
+
+// 端到端测试点击系统通知：与用户点击走同一条路径（恢复窗口、定位决定卡片）。
+// 系统通知在测试环境里可能不可显示，通知记录仍然保留
+export function clickNotification(index: number): string | null {
+  const record = notifications[index];
+  if (record === undefined) {
+    return null;
+  }
+  menuActions.onNotificationClick(record.decisionId);
+  return record.decisionId;
 }
 
 // 连接本机与否由渲染进程连接后经 IPC 告知，切换连接时重新构建菜单（设计说明第 4.5 节）
@@ -96,17 +112,24 @@ export function clickTrayMenu(label: string): boolean {
   return true;
 }
 
-// 菜单项的动作由 index.ts 装入：托盘模块只管菜单的构成与显示
-const menuActions: { onOpen: () => void; onStop: () => void; onQuit: () => void } = {
-  onOpen: () => undefined,
-  onStop: () => undefined,
-  onQuit: () => undefined,
-};
+// 托盘与通知的动作由 index.ts 装入：托盘模块只管菜单与通知本身，不直接操作窗口
+const menuActions: {
+  onOpen: () => void;
+  onStop: () => void;
+  onQuit: () => void;
+  onNotificationClick: (decisionId: string | null) => void;
+} = { onOpen: () => undefined, onStop: () => undefined, onQuit: () => undefined, onNotificationClick: () => undefined };
 
-export function createTray(actions: { onOpen: () => void; onStop: () => void; onQuit: () => void }): TrayController {
+export function createTray(actions: {
+  onOpen: () => void;
+  onStop: () => void;
+  onQuit: () => void;
+  onNotificationClick: (decisionId: string | null) => void;
+}): TrayController {
   menuActions.onOpen = actions.onOpen;
   menuActions.onStop = actions.onStop;
   menuActions.onQuit = actions.onQuit;
+  menuActions.onNotificationClick = actions.onNotificationClick;
   return {
     start: () => {
       tray = new Tray(iconFor(0));

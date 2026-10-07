@@ -253,6 +253,38 @@ test("回放期间到达的事件没有丢失：回到现在以后画面与实�
   }
 });
 
+// 回放位置写在路径的 ?at= 中（设计说明第 3.3 节，工单 #296）：刷新与后退都回到同一位置
+test("回放位置写在路径的 at 参数里：刷新以后回到同一位置，回到现在清除参数", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    await page.evaluate(() => { window.location.hash = "#/home"; });
+    await expect(page.getByRole("heading", { name: "离开期间的报告", exact: true })).toBeVisible();
+    await waitUntil(async () => (await ticks(page, ".timeline")).length > 0, "首页时间轴有刻度");
+
+    const tick = (await ticks(page, ".timeline"))[0];
+    await page.locator(`.timeline .tick[data-position="${tick.position}"]`).click();
+    await expect(page.locator(".replay-banner")).toContainText("回放中");
+    expect(new URLSearchParams(page.url().split("?")[1] ?? "").get("at")).toBe(String(tick.position));
+
+    // 刷新：路径上的 at 让界面回到同一位置
+    await page.reload();
+    await expect(page.locator(".replay-banner")).toContainText("回放中", { timeout: 60_000 });
+    await waitUntil(async () =>
+      (await page.locator(`.timeline .tick[data-position="${tick.position}"].current`).count()) > 0,
+    "刷新以后时间轴上的位置仍然是同一个刻度", 60_000);
+
+    // 回到现在：路径上的 at 清除
+    await page.getByRole("button", { name: "回到现在" }).click();
+    await expect(page.locator(".replay-banner")).toHaveCount(0);
+    expect(new URLSearchParams(page.url().split("?")[1] ?? "").get("at")).toBeNull();
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
 test.describe("窄屏", () => {
   test("390×844 下时间轴不溢出、控制台错误为零", async () => {
     const client = await startClient(backend, { width: 390, height: 844 });

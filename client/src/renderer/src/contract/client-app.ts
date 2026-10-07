@@ -15,7 +15,9 @@ export type ClientState =
   | { kind: "connecting" }
   | { kind: "outdated"; address: string; clientVersion: number; serverVersion: number; serverRelease: string }
   | { kind: "failed"; address: string; message: string }
-  | { kind: "connected"; address: string; capabilities: Capabilities; streamConnected: boolean };
+  // disconnectedAt 是事件流断开的时间（ISO）：断开时窗口整体变灰、顶栏写明断开的时间（工单 #296）；
+  // 重新连上以后清空
+  | { kind: "connected"; address: string; capabilities: Capabilities; streamConnected: boolean; disconnectedAt: string | null };
 
 export type ClientListeners = {
   onState: (state: ClientState) => void;
@@ -96,7 +98,8 @@ export class ClientApp {
     this.boot = result.capabilities.deployment.boot_id;
     this.views = new ViewSync((name, params) => this.query(name, params), result.capabilities);
     this.listeners.onState({
-      kind: "connected", address: result.address, capabilities: result.capabilities, streamConnected: false,
+      kind: "connected", address: result.address, capabilities: result.capabilities,
+      streamConnected: false, disconnectedAt: null,
     });
     await this.refreshPendingDecisions();
     this.startStream(0);
@@ -139,6 +142,7 @@ export class ClientApp {
     if (this.capabilities) {
       this.listeners.onState({
         kind: "connected", address: this.iface!.baseUrl, capabilities: this.capabilities, streamConnected: connected,
+        disconnectedAt: connected ? null : new Date().toISOString(),
       });
     }
   }

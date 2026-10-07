@@ -6,8 +6,8 @@ import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
 import { stopLocalServiceConfirming } from "./local-service";
 import { serveRendererProtocol } from "./protocol";
-import { createMainWindow, registerIpc } from "./window";
-import { clickTrayMenu, createTray, notificationLog, trayMenuLabels, trayCount, type TrayController } from "./tray";
+import { createMainWindow, focusDecision, registerIpc } from "./window";
+import { clickNotification, clickTrayMenu, createTray, notificationLog, trayMenuLabels, trayCount, type TrayController } from "./tray";
 
 // 端到端测试读取托盘数量与已发出的通知（与 decisions.list 中等待回答的数量核对）；
 // 主进程把这两个只读入口挂到全局，不参与界面逻辑
@@ -71,12 +71,15 @@ if (!app.requestSingleInstanceLock()) {
   // 因此停止流程的读数量、确认与发停止请求都按真实代码运行
   (globalThis as { yudaoTrayClick?: (label: string) => unknown }).yudaoTrayClick = (label: string) => clickTrayMenu(label);
   (globalThis as { yudaoTrayMenuLabels?: () => { label: string; visible: boolean }[] }).yudaoTrayMenuLabels = trayMenuLabels;
+  // 端到端测试点击系统通知：与用户点击同一条路径（恢复窗口、通知渲染进程定位决定卡片）
+  (globalThis as { yudaoClickNotification?: (index: number) => string | null }).yudaoClickNotification = clickNotification;
 
   void app.whenReady().then(() => {
     serveRendererProtocol();
     registerIpc();
     show();
     tray = createTray({
+      onNotificationClick: (decisionId) => focusDecision(decisionId),
       onOpen: show,
       onStop: () => void stopLocalServiceConfirming(),
       // 退出客户端不停止 Yudao 服务（ADR-0023）

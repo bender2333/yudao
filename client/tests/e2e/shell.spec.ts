@@ -154,6 +154,62 @@ test("窗口关闭后新的决定请求到达时出现系统通知", async () =>
   }
 });
 
+// 系统通知的点击：恢复窗口并定位到首页对应的决定卡片（设计说明第 5.7 节，工单 #296）
+test("点击系统通知恢复窗口并定位到对应的决定卡片", async () => {
+  const client = await openClient({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  try {
+    await client.app.evaluate(() => (globalThis as { yudaoHideWindow?: () => void }).yudaoHideWindow?.());
+    await client.page.waitForTimeout(300);
+    const answered = await client.page.evaluate(async (address: string) => {
+      const listed = await (await fetch(`${address}/api/queries/decisions.list?status=open`)).json();
+      const [decision] = listed.data.decisions;
+      const response = await fetch(`${address}/api/commands/decision.answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command_id: crypto.randomUUID(),
+          decision_id: decision.decision_id,
+          option: "continue",
+          base_version: decision.version,
+        }),
+      });
+      return response.status;
+    }, backend.address);
+    expect(answered).toBe(200);
+
+    // 记下通知带走的决定标识，点击以后核对界面定位到那一张卡片
+    const found = await client.app.evaluate(async () => {
+      const read = (globalThis as { yudaoNotifications?: () => { decisionId: string | null }[] }).yudaoNotifications;
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        const list = read?.() ?? [];
+        const last = list[list.length - 1];
+        if (last?.decisionId) {
+          return { index: list.length - 1, decisionId: last.decisionId };
+        }
+        const { promise, resolve } = Promise.withResolvers<void>();
+        setTimeout(resolve, 100);
+        await promise;
+      }
+      return null;
+    });
+    expect(found).not.toBeNull();
+
+    // 点击这条通知：主进程恢复窗口并把决定标识发给渲染进程，界面跳到首页定位到该卡片
+    await client.app.evaluate(({ BrowserWindow }, index) => {
+      const click = (globalThis as { yudaoClickNotification?: (i: number) => string | null }).yudaoClickNotification;
+      click?.(index);
+      return BrowserWindow.getAllWindows()[0]?.isVisible() === true;
+    }, found!.index);
+    await expect(client.page.locator(`#decision-${found!.decisionId}`)).toBeVisible({ timeout: 30_000 });
+    await expect(client.page.locator(`#decision-${found!.decisionId}`)).toHaveClass(/is-targeted/);
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
 test("事件流驱动视图刷新：经命令新建项目以后，左侧栏无需刷新即出现新项目", async () => {
   const client = await openClient({ width: 1440, height: 900 });
   const errors = watchErrors(client);
@@ -254,6 +310,37 @@ test("窗口尺寸 390×844 下外壳可用，没有横向滚动条，控制台�
     expect(errors).toEqual([]);
   } finally {
     await client.close();
+  }
+});
+
+// 连接断开时窗口整体变灰、顶栏写明断开的时间，重新连上以后恢复（设计说明第 3.4 节，工单 #296）
+test("事件流断开时窗口整体变灰并写明断开的时间，重新连上以后恢复", async () => {
+  test.setTimeout(240_000);
+  // 这个用例自己起服务：断线要真的停掉它，再用同一端口与数据目录起回来
+  const own = await startBackend();
+  const client = await startClient(own, { width: 1440, height: 900 });
+  try {
+    await expect(client.page.locator(".connection")).toHaveText("已连接", { timeout: 90_000 });
+
+    await own.stop();
+    await expect(client.page.locator(".app")).toHaveClass(/is-disconnected/, { timeout: 60_000 });
+    // 顶栏写明断开的时间与正在重新连接（不是「连接中断，数据可能过时」这一句旧文案）
+    await expect(client.page.locator(".connection.interrupted")).toContainText("断开，正在重新连接");
+    const stamp = await client.page.locator(".connection.interrupted").innerText();
+    expect(stamp).toMatch(/\d{2}:\d{2}/);
+    // 数据保留最后一次的：首页仍然显示
+    await expect(client.page.locator(".page.home")).toBeVisible();
+
+    const again = await startBackend({ port: own.port, dataDir: own.dataDir });
+    try {
+      await expect(client.page.locator(".connection")).toHaveText("已连接", { timeout: 90_000 });
+      await expect(client.page.locator(".app")).not.toHaveClass(/is-disconnected/);
+    } finally {
+      await again.stop();
+    }
+  } finally {
+    await client.close();
+    await own.stop();
   }
 });
 

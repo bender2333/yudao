@@ -1,6 +1,7 @@
 // 设置页（设计说明第 4.3、4.5 节，工单 #207）：连接设置（访问方式、地址）、本机服务的
 // 停止，以及「登录时启动客户端」。连接「本机」时由 app.tsx 的 connectTo 启动服务；
-// 找到不到 yudao 命令时显示安装命令与「重新检测」。
+// 没有找到 yudao 命令时显示安装命令，命令找到了但服务没有起来时显示原因与服务日志的位置
+// （工单 #296）。
 
 import { useEffect, useState } from "react";
 import type { ConnectionSettings } from "../contract/settings";
@@ -9,8 +10,10 @@ import { DEFAULT_LOCAL_ADDRESS, normalizeAddress } from "../contract/settings";
 export type SettingsPageProps = {
   settings: ConnectionSettings;
   loginAtStartup: boolean;
+  // 本机服务没有可用的两种情况：no-command 时 reason 是安装命令，failed 时 reason 是失败原因，
+  // logPath 是服务日志的位置（设计说明第 4.3 节、工单 #296）
+  localIssue: { kind: "no-command" | "failed"; reason: string; logPath: string } | null;
   localConnected: boolean;
-  localMessage: string | null;
   // 服务正在运行且访问方式与「允许局域网访问」开关不同：显示「重新启动服务后生效」（设计说明第 4.3 节）
   lanRestartNeeded: boolean;
   onChange: (settings: ConnectionSettings) => void;
@@ -110,10 +113,14 @@ export function SettingsPage(props: SettingsPageProps) {
         {kind === "local" && (
           <fieldset className="field">
             <legend>本机的 Yudao 服务</legend>
-            {props.localMessage ? (
+            {props.localIssue ? (
               <>
-                <p className="note">{props.localMessage}</p>
-                <code className="install">uv tool install --python 3.12 &lt;wheel&gt;</code>
+                <p className="note">{props.localIssue.reason}</p>
+                {props.localIssue.kind === "no-command" ? (
+                  <code className="install">uv tool install --python 3.12 &lt;wheel&gt;</code>
+                ) : (
+                  <code className="install">服务日志：{props.localIssue.logPath}</code>
+                )}
                 <button type="button" onClick={submit}>
                   重新检测
                 </button>
