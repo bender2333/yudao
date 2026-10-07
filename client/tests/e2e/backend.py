@@ -410,16 +410,26 @@ async def clear_department_defaults(application: Application, keep: str) -> None
 
 
 class VersionedApplication(Application):
-    # 让能力清单报告一个不同的接口版本：像一个接口版本不同的部署那样（不改动被测代码或接口层）
+    # 让能力清单报告一个不同的接口版本或发布版本：像一个接口版本不同的部署、或刚升级完的服务那样
+    # （不改动被测代码或接口层）。reported_release_once 只在第一次被读取时生效，
+    # 用来模拟「页面连接的是一个刚升级的服务，随后读到的是同一个版本」
     reported_api_version: int | None = None
+    reported_release: str | None = None
+    reported_release_once: str | None = None
 
     def capabilities(self, contract_digest: str, *, access):
         capabilities = super().capabilities(contract_digest, access=access)
+        deployment = capabilities.deployment
         if self.reported_api_version is not None:
-            return capabilities.model_copy(
-                update={"deployment": capabilities.deployment.model_copy(
-                    update={"api_version": self.reported_api_version})})
-        return capabilities
+            deployment = deployment.model_copy(update={"api_version": self.reported_api_version})
+        if self.reported_release is not None:
+            deployment = deployment.model_copy(update={"version": self.reported_release})
+        if self.reported_release_once is not None:
+            deployment = deployment.model_copy(update={"version": self.reported_release_once})
+            self.reported_release_once = None
+        if deployment is capabilities.deployment:
+            return capabilities
+        return capabilities.model_copy(update={"deployment": deployment})
 
 
 def main() -> int:
@@ -429,6 +439,12 @@ def main() -> int:
     # 端到端测试核对「接口版本不同」的提示：让服务报告一个不同的接口版本，
     # 就像一个已经升级或尚未升级的部署那样（真实 HTTP 响应，不改动被测代码）
     parser.add_argument("--api-version", type=int, default=None)
+    # 页面与服务同出一个发布（网页界面的提供与发布设计说明第 5.1 节）：让服务报告一个与页面构建时不同的
+    # 发布版本，页面据此自动重新加载，就像升级以后服务重启而浏览器里还是上一次的页面文件
+    parser.add_argument("--release-version", default=None)
+    # 只在第一次读取能力清单时报告这个版本：页面重新加载以后读到的是服务自己的版本，
+    # 一次自动重新加载因此是可观察的（一直报告不同版本会让页面反复重新加载）
+    parser.add_argument("--release-version-once", default=None)
     # 部门房间的端到端验收（工单 #177）：用流式慢模型跑一个项目，供房间在请求进行中观察
     parser.add_argument("--room", action="store_true")
     # 预置时给定义写准入并让三个部门默认绑定它：作废准入与删除引用方的用例需要真实的引用方（工单 #94）
@@ -490,6 +506,10 @@ def main() -> int:
     application = VersionedApplication(system)
     if args.api_version is not None:
         application.reported_api_version = args.api_version
+    if args.release_version is not None:
+        application.reported_release = args.release_version
+    if args.release_version_once is not None:
+        application.reported_release_once = args.release_version_once
 
     # 页面文件来自 client/out/renderer（npm run build:pages）：页面与接口同一来源
     pages = Path(__file__).resolve().parents[2] / "out" / "renderer"

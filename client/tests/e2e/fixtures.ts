@@ -65,15 +65,24 @@ function newestModification(directory: string): number {
 }
 
 // 启动真实后端：脚本在 client/tests/e2e/backend.py 中，用仓库项目的 Python 环境运行；
-// 后端提供 client/out/renderer 里的页面文件。apiVersion 让服务报告一个不同的接口版本；
+// 后端提供 client/out/renderer 里的页面文件。apiVersion 让服务报告一个不同的接口版本，
+// releaseVersion 让服务一直报告一个与页面构建时不同的发布版本，releaseVersionOnce 只在第一次
+// 读取能力清单时报告（页面重新加载以后读到服务自己的版本，一次重新加载因此可观察），
 // port 固定端口（断线恢复的用例在同一端口再起一次）；room 用流式慢模型跑
 // 一个项目，供部门房间在请求进行中观察（工单 #177）
 export async function startBackend(
-  options: { apiVersion?: number; room?: boolean; admitAndBind?: boolean; port?: number; script?: "default" | "onboarding" | "initial" | "waiting"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean } = {},
+  options: { apiVersion?: number; releaseVersion?: string; releaseVersionOnce?: string; room?: boolean; admitAndBind?: boolean; port?: number; script?: "default" | "onboarding" | "initial" | "waiting"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {
     script.push("--api-version", String(options.apiVersion));
+  }
+  // 页面与服务同出一个发布：报告一个与页面构建时不同的版本，页面据此自动重新加载（工单 #374）
+  if (options.releaseVersion !== undefined) {
+    script.push("--release-version", options.releaseVersion);
+  }
+  if (options.releaseVersionOnce !== undefined) {
+    script.push("--release-version-once", options.releaseVersionOnce);
   }
   // 固定数据目录：断线以后用同一端口与数据目录再起一次服务（设计说明第 3.4 节的恢复）
   if (options.dataDir !== undefined) {
