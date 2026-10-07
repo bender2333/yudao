@@ -17410,62 +17410,6 @@ export type CapabilitiesResponses = {
 
 export type CapabilitiesResponse = CapabilitiesResponses[keyof CapabilitiesResponses];
 
-export type SystemStopData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/system/stop';
-};
-
-export type SystemStopResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type ClientUpdateManifestData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/client-update/latest.yml';
-};
-
-export type ClientUpdateManifestResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type ClientUpdateFileData = {
-    body?: never;
-    path: {
-        /**
-         * Filename
-         */
-        filename: string;
-    };
-    query?: never;
-    url: '/client-update/{filename}';
-};
-
-export type ClientUpdateFileErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ClientUpdateFileError = ClientUpdateFileErrors[keyof ClientUpdateFileErrors];
-
-export type ClientUpdateFileResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
 export type EventsData = {
     body?: never;
     headers?: {
