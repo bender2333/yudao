@@ -1,0 +1,22 @@
+(node:20024) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+WARNING:  ASGI app factory detected. Using it, but please consider setting the --factory flag explicitly.
+overview · light · 6 行 · 63961 毫秒 · 1.29 MB · C:\project\yudao-worktrees\issue-377\docs\stage-3\contact-sheets\377\overview-light.png
+overview · dark · 6 行 · 62926 毫秒 · 1.29 MB · C:\project\yudao-worktrees\issue-377\docs\stage-3\contact-sheets\377\overview-dark.png
+dept · light · 6 行 · 62593 毫秒 · 1.18 MB · C:\project\yudao-worktrees\issue-377\docs\stage-3\contact-sheets\377\dept-light.png
+dept · dark · 6 行 · 64804 毫秒 · 1.18 MB · C:\project\yudao-worktrees\issue-377\docs\stage-3\contact-sheets\377\dept-dark.png
+Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\BA_H3C_Pad\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\events.py", line 94, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BA_H3C_Pad\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 166, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+materials · light · 6 行 · 18556 毫秒 · 0.95 MB · C:\project\yudao-worktrees\issue-377\docs\stage-3\contact-sheets\377\materials-light.png
+materials · dark · 6 行 · 16987 毫秒 · 0.94 MB · C:\project\yudao-worktrees\issue-377\docs\stage-3\contact-sheets\377\materials-dark.png
+索引：C:\project\yudao-worktrees\issue-377\docs\stage-3\contact-sheets\377\index.md
+共 6 张联系表、36 行，用时 289.8 秒，合计 6.84 MB；原始截图在 C:\project\yudao-worktrees\issue-377\.tmp\contact-sheet-raw\377
+exit=0

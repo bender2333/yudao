@@ -1,0 +1,19 @@
+
+Running 7 tests using 1 worker
+
+(node:5216) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/7] tests\e2e\floor.spec.ts:99:1 › 循环画面在概览页出现，画布画出内容且随事项的推进变化
+tests\e2e\floor.spec.ts:99:1 › 循环画面在概览页出现，画布画出内容且随事项的推进变化
+(node:5216) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+
+[2/7] tests\e2e\floor.spec.ts:124:1 › 画面的状态来自查询：事项的每个状态都对应事件日志里的一条真实事件
+[3/7] tests\e2e\floor.spec.ts:149:1 › 断线重连（重新订阅）以后画面回到查询给出的状态
+[4/7] tests\e2e\floor.spec.ts:169:1 › 系统设置为减少动画时，小人少走动、头顶的气泡照样显示
+[5/7] tests\e2e\floor.spec.ts:187:1 › 两种窗口尺寸下楼层画面都可用，控制台错误为零
+[6/7] tests\e2e\floor.spec.ts:214:1 › 流转覆盖层：画面的 segments 与 project.flow 查询的 records 聚合结果一致
+[7/7] tests\e2e\floor.spec.ts:301:1 › 真实系统上的决定请求：点板子打开卡片盖章回答，文字列表里的同一个决定请求也能回答
+  7 passed (1.2m)
+exit=0

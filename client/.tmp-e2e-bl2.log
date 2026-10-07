@@ -1,0 +1,42 @@
+
+Running 1 test using 1 worker
+
+(node:8444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] tests\e2e\building.spec.ts:147:1 › 楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作
+tests\e2e\building.spec.ts:147:1 › 楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作
+(node:8444) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+
+  1) tests\e2e\building.spec.ts:147:1 › 楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作 ─────────────────────────
+
+    Error: expect(received).not.toBe(expected) // Object.is equality
+
+    Expected: not "空闲"
+
+      167 |     // 运行中的一层：状态不是空闲，至少有一个部门在工作（灯的部门来自事项的所在部门）
+      168 |     const running = list.find((f) => f.name === RUNNING);
+    > 169 |     expect(running?.status).not.toBe("空闲");
+          |                                 ^
+      170 |     expect(running?.lit).toMatch(/在工作$/);
+      171 |
+      172 |     expect(errors).toEqual([]);
+        at C:\project\yudao-worktrees\issue-377\client\tests\e2e\building.spec.ts:169:33
+
+    Error Context: test-results\building-楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作\error-context.md
+
+    Error Context: test-results\building-楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\building-楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\building-楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  1 failed
+    tests\e2e\building.spec.ts:147:1 › 楼里每个项目一层，运行中的一层亮起工作部门，空闲的一层没有部门在工作 ──────────────────────────
+exit=1
