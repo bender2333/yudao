@@ -17,10 +17,16 @@ export type StreamHandlers = {
   onInterrupted: () => void;
 };
 
+// 重连的递增间隔（工单 #301）：第一次 1 秒，以后每次翻倍，30 秒封顶
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
+
 export class EventStreamClient {
   private source: EventSource | null = null;
   private lastPosition = 0;
   private closed = false;
+  private failures = 0;
+  private timer: NodeJS.Timeout | null = null;
   private readonly baseUrl: string;
   private readonly scope: StreamScope;
   private readonly handlers: StreamHandlers;
@@ -36,33 +42,64 @@ export class EventStreamClient {
   // 从 after 之后订阅；after 是客户端已经收到的最大位置（快照位置或最后收到的事件位置）
   start(after: number): void {
     this.stop();
-    const source = new EventSource(streamUrl(this.baseUrl, this.scope, after), {
+    this.closed = false;
+    this.failures = 0;
+    this.lastPosition = after;
+    this.connect();
+  }
+
+  // 建一条连接：npm eventsource 自带的重连是固定 3 秒，服务停掉以后会连续报错；
+  // 这里出错就关掉这一条，按 1、2、4……秒递增的间隔自己重建（30 秒封顶），中断只报告一次
+  private connect(): void {
+    if (this.closed) {
+      return;
+    }
+    const source = new EventSource(streamUrl(this.baseUrl, this.scope, this.lastPosition), {
       fetch: (input: RequestInfo | URL, init?: RequestInit) =>
         fetch(input, {
           ...init,
           headers: { ...(init?.headers ?? {}), ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) },
         }),
     });
-    this.closed = false;
-    this.lastPosition = after;
     this.source = source;
-    source.addEventListener("open", () => this.handlers.onConnected());
+    source.addEventListener("open", () => {
+      if (this.source !== source || this.closed) {
+        return;
+      }
+      this.failures = 0;
+      this.handlers.onConnected();
+    });
     for (const name of ["event", "checkpoint", "delta", "resync"]) {
       source.addEventListener(name, (message) => this.onFrame(name, message as MessageEvent));
     }
     source.addEventListener("error", () => {
-      // eventsource 会自动重连（带 Last-Event-ID）；这里只报告连接中断
-      if (!this.closed) {
+      if (this.closed || this.source !== source) {
+        return;
+      }
+      source.close();
+      this.source = null;
+      if (this.failures === 0) {
         this.handlers.onInterrupted();
       }
+      this.failures += 1;
+      const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** (this.failures - 1));
+      this.timer = setTimeout(() => {
+        this.timer = null;
+        this.connect();
+      }, delay);
     });
   }
 
   stop(): void {
     this.closed = true;
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
     this.source?.close();
     this.source = null;
   }
+
 
   get position(): number {
     return this.lastPosition;

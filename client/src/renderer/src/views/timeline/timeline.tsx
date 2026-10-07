@@ -91,8 +91,14 @@ export function Timeline(props: TimelineProps) {
       return false;
     }
     const next = index + 1;
+    const tick = ticks[next];
+    if (tick === undefined) {
+      // 数据变化使刻度收缩：回到现在，不读不存在的刻度
+      live();
+      return false;
+    }
     setIndex(next);
-    move(ticks[next].position);
+    move(tick.position);
     return true;
   };
 
@@ -128,10 +134,14 @@ export function Timeline(props: TimelineProps) {
   };
 
   const seek = (nextIndex: number) => {
+    const tick = ticks[nextIndex];
+    if (tick === undefined) {
+      return;
+    }
     stopTimer();
     setIndex(nextIndex);
-    move(ticks[nextIndex].position);
-    props.onSelect(ticks[nextIndex].position);
+    move(tick.position);
+    props.onSelect(tick.position);
   };
 
   const live = () => {

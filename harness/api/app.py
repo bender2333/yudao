@@ -90,6 +90,8 @@ def _add_stop(api: FastAPI, *, on_stop: Callable[[], None] | None) -> None:
                                                                     "from a loopback address"})
         if on_stop is None:
             return JSONResponse(status_code=503, content={"error": "this service does not accept a stop request"})
+        # 先结束事件流连接：等待中的 SSE 连接干净关闭，不等优雅退出的超时，也不写回溯（工单 #301）
+        _application(request).close_event_streams()
         on_stop()
         return JSONResponse(status_code=202, content={"stopping": True})
 

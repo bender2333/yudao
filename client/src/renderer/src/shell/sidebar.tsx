@@ -145,9 +145,12 @@ export function Sidebar(props: SidebarProps) {
               </button>
               {marks.length > 0 ? (
                 <div className="project-marks">
-                  {marks.map((mark) => (
-                    <span key={mark} className={`mark${mark === "已归档" ? " muted" : ""}`}>
-                      {mark}
+                  {marks.map((mark, index) => (
+                    <span key={mark}>
+                      {index > 0 ? <span className="mark-sep" aria-hidden="true"> · </span> : null}
+                      <span className={`mark${mark === "已归档" ? " muted" : ""}`}>
+                        {mark}
+                      </span>
                     </span>
                   ))}
                 </div>
