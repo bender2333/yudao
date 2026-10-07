@@ -28,7 +28,7 @@ export interface RoomActor {
   desk: RoomSeat;
   doing: string | null;
   persist: { anim: string; icon?: { kind: string; text?: string } | null; hold?: string | null; write?: boolean; until?: number } | null;
-  say: { text: string; until: number } | null;
+  say: { text: string; until: number; stamp?: boolean } | null;
   /** 排队的动作：`from` 是产生它的真实事件类型，事项进入停止态时据此决定保留或清除。 */
   queue: { fn: () => void; at: number; from: string }[];
   formSign: string | null;
@@ -243,17 +243,19 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     if (!a) return;
     const text = sayCatalog(ev, { dept, side, roleName: nameOfRole });
     if (!text) return;
-    // 事项结束前盖章紧跟着完成，完成的话（「完成了！」）立即覆盖会让盖章的说明只停留毫秒级，看不见；
-    // 停止态动作的话排在正在显示的话后面，其他事件的话保持立即覆盖（交接与工具类已有单测锁定）。
     const action = resolveAction(ev);
-    if (a.say && scene.realT < a.say.until && action !== null && STOP_SPEECH_LATE[action] === true) {
+    const stamp = STAMP_EVENT.has(ev.type);
+    // 盖章的话正在头顶显示时后续的话排在后面，停止态动作的话也排在正在显示的话后面：
+    // 事项结束前盖章紧接着交接与完成，立即覆盖会让盖章的说明只停留毫秒级，看不见。
+    // 其他事件的话保持立即覆盖（交接与工具类已有单测锁定）。
+    // 排后的回调到期后重新走同一套规则，多句话按到达顺序依次显示。
+    if (a.say && scene.realT < a.say.until
+        && (a.say.stamp === true || (action !== null && STOP_SPEECH_LATE[action] === true))) {
       if (a.say.text === text) return;
-      scene.after(a.say.until - scene.realT, () => {
-        a.say = { text, until: scene.realT + sayMs(text) };
-      });
+      scene.after(a.say.until - scene.realT, () => say(ev, a, side));
       return;
     }
-    a.say = { text, until: scene.realT + sayMs(text) };
+    a.say = { text, until: scene.realT + sayMs(text), stamp };
   }
   function plan(a: RoomActor): PlanApi {
     return makePlan(scene, a, actorOf(a.id)!, blocks);
