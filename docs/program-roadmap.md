@@ -64,7 +64,7 @@ flowchart LR
 11. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。B8 加入采纳写回：以写回时代码仓库 main 的当前提交为基线，把被采纳的成果生成分支与合并请求；建档材料分类，现有行为以 README、测试与验收基线为准，设计与需求文档作为要求材料。
 12. **D24 模型管理**（[#83](https://github.com/bender2333/yudao/issues/83)，[模型管理设计说明](design/model-management.md)）：依赖 #45 与应用层的目录命令（#77）。统一的模型目录与准入、模型能力表、推理档位、每个项目单独选择各部门的模型、部门的建议能力提醒；#96 用真实 Provider 验收三种协议。评测时给质检换用视觉模型、3.2D 的建议能力提醒都依赖本项。增加服务方案按预置表与自定义连接进行（[ADR-0003](adr/0003-versioned-preset-table-no-remote-refresh.md)），不另设工作包。
 13. **3.9 组合验收与对照实验**：在 3.8 接入的 openai-agents-python 上对 Stage 3 的各项能力逐项给出结论，浏览器与 computer use 的结论引用 3.2D 的真实验收；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）；增加共享上下文的一组（[验证的独立性设计说明](design/independent-verification.md)第 6 节）；自举第一层的配对验收并入本项（第 6.1 节）。所有工作包父工单关闭以后进行。
-14. **迭代底座**（[D38](requirements/system-intent.md)）：五条判据中度量、可撤回的改动与锚点的基础，与其余工作包没有阻塞关系。
+14. **迭代底座**（[D38](requirements/system-intent.md)，父工单 #342）：五条判据中度量、可撤回的改动与锚点的基础，与其余工作包没有阻塞关系。
     - M2：B3 规则登记的四项记录与界限、参数事件与 `parameter.set`、检查时限与建档的单轮上限成为项目级参数（[规则登记与参数设计说明](design/rules-and-parameters.md)）；B6 omp 流程的基线数字（每个工单的审查轮数、合并以后归因到它的集成层失败、搁置的原因、耗时与用量）；B2 已用时间写入事件、边界的核对从流程编排中分出来，挂在 3.1 下（[循环与收敛设计说明](design/loops-and-convergence.md)）；B8 采纳写回与建档材料的分类，挂在 3.8 下。
     - M3：B1 内核清单、六条不变式测试、导入方向与行数的检查；B7 接口的访问令牌、由已安装的实例提供的发布检查（[可信内核设计说明](design/trusted-kernel.md)）。
     - M4（3.9 之前）：B5 可见范围词表的扩充、交付说明分为事实与解释、先判断后看解释（[验证的独立性设计说明](design/independent-verification.md)）。
