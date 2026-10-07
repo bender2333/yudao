@@ -286,3 +286,70 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
                                  projection=projection, facts=changed)
     assert not decision.accepted
     assert any("no longer matches the snapshot" in error.message for error in decision.errors)
+
+DESIGN_CAPABILITY = "导出 PDF 报告"
+MARKED_BOUNDARY = "导出 PDF 报告（设计中，未实施）：docs/design/export.md 描述，代码尚未实现"
+
+def _design_doc_source(root: Path) -> Path:
+    # 设计文档描述而代码没有实现的能力：设计稿里有导出 PDF，代码里没有
+    _source(root)
+    (root / "docs" / "design").mkdir(parents=True)
+    (root / "docs" / "design" / "export.md").write_text("# 导出\n\n导出 PDF 报告。\n", encoding="utf-8")
+    return root
+
+def test_design_only_capability_goes_to_boundary_with_mark(tmp_path):
+    # 工单 #346：设计文档描述而代码没有实现的能力出现在初始 PRD 的边界里并带标记，没有出现在现有缺陷里
+    system, run_id = _onboarding_run(tmp_path, [
+        FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"],
+                                      boundaries=[MARKED_BOUNDARY])),
+        _structure_turn(),
+        _review_turn(),
+    ], source=_design_doc_source(tmp_path / "source"))
+    result = system.run_until_stop(run_id)
+    assert result.phase == "DONE", result.error
+    spec = system.project(run_id).product_spec
+    assert any("设计中，未实施" in entry for entry in spec.boundaries)
+    assert any(DESIGN_CAPABILITY in entry for entry in spec.boundaries)
+    review = result.baseline_review
+    assert review["verdict"] == "consistent"
+    assert all(item["status"] != "existing_defect" for item in review["conclusions"])
+    assert all(DESIGN_CAPABILITY not in item["requirement"] for item in review["conclusions"])
+
+def test_onboarding_prompts_state_the_two_material_kinds():
+    # 工单 #346：建档的工作说明写明两类材料与读取顺序，现有行为的材料在前
+    product = DEFINITIONS.department_work("product", "onboarding")
+    assert "描述现有行为" in product.prompt
+    assert "描述要求" in product.prompt
+    assert "设计中，未实施" in product.prompt
+    assert "设计中，未实施" in DEFINITIONS.department_work("quality", "onboarding").prompt
+
+def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
+    # 工单 #346：带标记的边界条目不记为现有缺陷，基线核验按此核对
+    from harness.models import CheckReceipt
+    from harness.validation import evaluate_proposal
+
+    marked = "导出 PDF 报告（设计中，未实施）：设计文档描述，代码尚未实现"
+    system, run_id = _onboarding_run(tmp_path, [
+        FakeTurn(proposal=product_spec(requirements=[DESIGN_CAPABILITY], acceptance=["run the CLI with a word"],
+                                      boundaries=[marked])),
+        structure_turn(requirement_locations=[{"requirement": DESIGN_CAPABILITY, "locations": ["src/echo.py"]}]),
+    ])
+    system.activate_once(run_id)
+    result = system.activate_once(run_id)
+    assert result.phase == "QUALITY", result.phase
+    projection = system.project(run_id)
+    facts = system.workspace(run_id).snapshot().facts
+    spec = projection.product_spec
+    receipt = CheckReceipt(name="smoke", department="quality", exit_code=1,
+                           summary="not implemented", snapshot_hash=facts.digest,
+                           product_spec_hash=spec.content_hash, activation_id=projection.last_activations.get("quality"))
+    facts = facts.model_copy(update={"checks": (*facts.checks, receipt)})
+    proposal = {
+        "kind": "baseline_review", "verdict": "consistent",
+        "conclusions": [{"requirement": DESIGN_CAPABILITY, "status": "existing_defect", "evidence": "smoke"}],
+        "omissions": [], "checks": ["smoke"], "other_failures": [],
+    }
+    decision = evaluate_proposal(phase="QUALITY", department="quality", proposal=proposal,
+                                 projection=projection, facts=facts)
+    assert not decision.accepted
+    assert any("设计中，未实施" in error.message for error in decision.errors)
