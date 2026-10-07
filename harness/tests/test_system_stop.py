@@ -51,8 +51,8 @@ def test_stop_request_with_an_open_event_stream_exits_without_waiting_for_the_gr
             started = time.monotonic()
             response = handle.client.post("/api/system/stop")
             assert response.status_code == 202
-            assert handle.wait_stopped(timeout=2.5)
-            assert time.monotonic() - started < 2.5
+            assert handle.wait_stopped(timeout=1.0)
+            assert time.monotonic() - started < 1.0
     assert "CancelledError" not in caplog.text
 
 def loopback_status(client: httpx.Client) -> dict:
