@@ -37,7 +37,7 @@ from .write_path import NewEvent, NewProjectEvent, Snapshot, Transaction, WriteP
 from .tree_archive import artifact_run, load_tree
 from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .streams import (
-    DECISION_REASON_RUN_EVENT_VERSION, RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
+    RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
 )
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
@@ -643,7 +643,7 @@ class Orchestrator:
             raise cancel_error
         return self.project(run_id)
     def stop_for_upgrade(self, run_id: str, *, reason: str) -> RunProjection:
-        # 因升级停止（ADR-0019，工单 #126）：run 事件版本与当前版本不同的未结束 run 记为因升级停止，
+        # 因升级停止（ADR-0019，工单 #126、#322）：强制升级处理到的未结束 run 记为因升级停止，
         # 停止原因写在带版本定义的停止原因清单中；已经结束的 run 不变
         message = f"run event version differs from the current version: {reason}"
         self.writes.transact(run_stream(run_id), lambda transaction: self._fail(transaction, STOP_REASON_UPGRADE, message))
@@ -651,9 +651,9 @@ class Orchestrator:
 
     def resume_incomplete_run(self, run_id: str) -> tuple[int, RunProjection] | None:
         # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约第 5.2 节）：
-        # 先核对 run 事件版本与事项记录的定义版本，只要有一项与当前不同就发出决定请求交给用户
-        # （ADR-0019、ADR-0014，总体架构第 7.4 节），用户选择「按新版本继续」以前不取得执行权；
-        # 用户已经回答过「按新版本继续」时不再发请求，接着核对下一项。核对通过以后原子取得这个 run 的执行权，
+        # run 事件版本与当前不同的 run 在启动序列里已经按强制升级处理（工单 #322），这里核对事项记录的
+        # 定义版本，与当前不同就发出 definitions_changed 决定请求交给用户（ADR-0014，总体架构第 7.4 节），
+        # 用户选择「按新版本继续」以前不取得执行权；核对通过以后原子取得这个 run 的执行权，
         # 记下中断位置与继续的依据，再从已提交的状态继续运行到终态。
         # 已经结束的 run 不取得执行权、不写事件；有未回答、阻塞整个 run 的决定请求时不继续，交给用户回答
         projection = self.project(run_id)
@@ -662,68 +662,40 @@ class Orchestrator:
         decisions = self.writes.read(run_stream(run_id)).decisions.values()
         if blocks_run(decisions):
             return None
-        if projection.run_event_version != RUN_EVENT_VERSION:
-            if not self._resolved_version_change(decisions, DECISION_REASON_RUN_EVENT_VERSION):
-                self._await_version_change(run_id, projection)
-                return None
-            projection = self.project(run_id)
-            decisions = self.writes.read(run_stream(run_id)).decisions.values()
         if projection.definitions_version != DEFINITIONS.version:
-            if not self._resolved_version_change(decisions, "definitions_version_changed"):
-                self._await_version_change(run_id, projection, definitions=True)
-                return None
+            self._await_definitions(run_id)
+            return None
         # 工单 #17：检查是否有未确认的动作，为 unknown 动作发出决定请求
         self._await_unknown_actions(run_id)
         return self._claim_and_resume(run_id)
 
-    @staticmethod
-    def _resolved_version_change(decisions: Iterable[DecisionRequest], reason: str) -> bool:
-        # 用户已经回答过「按新版本继续」：同类请求已经存在且回答为 continue 时不再发请求，直接取得执行权继续。
-        # 没有请求或选择「停止事项」时不继续（停止已由回答结束运行）
-        return any(decision.request.get("kind") == DEFINITIONS_CHANGED.name
-                   and decision.request.get("reason") == reason
-                   and decision.answer is not None and decision.answer.get("option") == "continue"
-                   for decision in decisions)
-
-    def _await_version_change(self, run_id: str, projection: RunProjection, *,
-                              definitions: bool = False) -> None:
-        # run 事件版本或事项记录的定义版本与当前不同（ADR-0019、ADR-0014，#48 登记的架构问题的处理）：
-        # 发出一个阻塞整个 run 的决定请求，选项为「按新版本继续」与「停止」；选择写入事件。
+    def _await_definitions(self, run_id: str) -> None:
+        # 事项记录的定义版本与当前加载的版本不同（ADR-0014，#48 登记的架构问题的处理）：
+        # 发出一个阻塞整个 run 的决定请求，选项为「按新版本继续」与「停止事项」；选择写入事件。
         # 选择「按新版本继续」以后，这个 run 照常取得执行权并继续运行，后续事件记录新版本；
-        # 请求只发一次：已经有过一个同类的请求时不重复。
-        # definitions=True 时核对的是事项记录的定义版本，否则是 run 事件版本
-        reason = "definitions_version_changed" if definitions else DECISION_REASON_RUN_EVENT_VERSION
-
+        # 请求只发一次：已经有过一个定义版本不同的请求时不重复
         def request(transaction: Transaction) -> None:
             current = transaction.projection
             if current.phase in TERMINAL_PHASES or blocks_run(transaction.decisions.values()):
                 return
             if any(decision.request.get("kind") == DEFINITIONS_CHANGED.name
-                   and decision.request.get("reason") == reason
                    for decision in transaction.decisions.values()):
                 return
-            payload = {
-                "kind": DEFINITIONS_CHANGED.name, "blocks": DEFINITIONS_CHANGED.blocks,
-                "options": [{"id": option.id, "label": option.label} for option in DEFINITIONS_CHANGED.options],
-                "facts": [], "department": current.active_department,
-                "reason": reason,
-                "recorded_run_event_version": current.run_event_version,
-                "current_run_event_version": RUN_EVENT_VERSION,
-                "recorded_definitions_version": current.definitions_version,
-                "current_definitions_version": DEFINITIONS.version,
-            }
-            if definitions:
-                payload["description"] = (
-                    f"事项使用的定义版本 {current.definitions_version or '（未记录）'} 与当前加载的版本 "
-                    f"{DEFINITIONS.version} 不同。按新版本继续以后，后续的模型请求与裁决记录新版本；"
-                    "选择停止事项则运行结束。")
-            else:
-                payload["description"] = (
-                    f"这个 run 记录的 run 事件版本 {current.run_event_version} 与当前版本 {RUN_EVENT_VERSION} 不同。"
-                    "按新版本继续以后，后续事件按新版本记录；选择停止事项则运行结束。")
             transaction.append(NewEvent(
                 EventType.DECISION_REQUESTED, actor="system", department=current.active_department,
-                state_before=current.phase, state_after=current.phase, payload=payload,
+                state_before=current.phase, state_after=current.phase,
+                payload={
+                    "kind": DEFINITIONS_CHANGED.name, "blocks": DEFINITIONS_CHANGED.blocks,
+                    "options": [{"id": option.id, "label": option.label} for option in DEFINITIONS_CHANGED.options],
+                    "facts": [], "department": current.active_department,
+                    "reason": "definitions_version_changed",
+                    "recorded_definitions_version": current.definitions_version,
+                    "current_definitions_version": DEFINITIONS.version,
+                    "description": (
+                        f"事项使用的定义版本 {current.definitions_version or '（未记录）'} 与当前加载的版本 "
+                        f"{DEFINITIONS.version} 不同。按新版本继续以后，后续的模型请求与裁决记录新版本；"
+                        "选择停止事项则运行结束。"),
+                },
             ))
             transaction.on_commit(lambda: self._wake(run_id))
 

@@ -2,7 +2,7 @@
 // 拒绝原因、建档状态标记，以及由 tool_started 事件驱动的「阅读已有项目」动作。取值全部来自应用层的
 // 命令结果与查询，没有对应数据时没有标记，界面不猜。
 
-import type { DecisionView, EventObject, ProjectRow, Rejected } from "../../api/generated/types.gen";
+import type { ActionView, DecisionView, EventObject, ProjectRow, Rejected } from "../../api/generated/types.gen";
 
 // 源目录无效时服务端把各条相对路径与处理方法写进 message，用分号连接（harness/public_tree.py 的
 // UnrepresentableWorkspace、harness/snapshot.py 的 TreeError）。界面按分号分行显示，路径原样给出。
@@ -60,3 +60,27 @@ export function readExistingAction(event: EventObject): string | null {
     ? event.payload.name
     : null;
 }
+
+/** 已结束的读取动作（run.actions 的动作行）：返回最近一次读取的工具、部门与开始时间，不是读取工具时为空。
+ *
+ * 部门房间的页面可能在读取发生以后才打开，事件订阅只收到订阅之后的事件，
+ * 已发生的读取按 run.actions 的动作列表读出（设计第 3.4 节：状态以查询为准）。
+ */
+export function lastReadExistingAction(
+  actions: readonly Pick<ActionView, "tool" | "department" | "created_at">[],
+): ReadAction | null {
+  let latest: ReadAction | null = null;
+  for (const action of actions) {
+    if (!(READ_EXISTING_TOOLS as readonly string[]).includes(action.tool)) continue;
+    if (latest !== null && action.created_at <= latest.at) continue;
+    latest = { tool: action.tool, department: action.department, at: action.created_at };
+  }
+  return latest;
+}
+
+/** 一次读取动作的观察：工具、部门与开始时间（事件与动作列表两种来源给出同一个形状）。 */
+export type ReadAction = {
+  tool: string;
+  department: string | null;
+  at: string;
+};
