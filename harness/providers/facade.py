@@ -178,8 +178,13 @@ class ProviderFacade:
             self._note_config_written(target)
             return target
 
-    def _publish(self) -> int:
-        # 任一有效发布推进实际生效修订，单调递增
+    def _publish(self, *, refresh_state: bool = True) -> int:
+        # 任一有效发布推进实际生效修订，单调递增；成功发布以后配置状态按内存内容重算
+        # （工单 #301：保存成功页头不再停留旧的删除或缺失）。删除与缺失是文件层面的状态，
+        # 由各自的入口显式传入 refresh_state=False 保留
+        if refresh_state:
+            self._config_state = ("loaded" if (self._store.providers or self._store.models
+                                               or self._bindings) else "empty")
         self._revision += 1
         return self._revision
 
@@ -313,7 +318,7 @@ class ProviderFacade:
                 self._reload_error = None
                 self._disk_config_hash = None
                 self._disk_config_seen = True
-                self._publish()
+                self._publish(refresh_state=False)
                 return self._revision
             try:
                 raw = json.loads(data.decode("utf-8"))
@@ -1233,7 +1238,7 @@ class ProviderFacade:
             self._reload_error = None
             self._disk_config_hash = None
             self._disk_config_seen = True
-            self._publish()
+            self._publish(refresh_state=False)
             return True
         digest = hashlib.sha256(data).digest()
         if self._disk_config_seen and digest == self._disk_config_hash:
@@ -1306,6 +1311,9 @@ class ProviderFacade:
         self._disk_config_seen = True
         if self._config_path is not None and target == self._config_path:
             self._reload_error = None
+            # 落盘成功以后状态不再是删除或缺失：按内存里的内容重算（工单 #301）
+            self._config_state = ("loaded" if (self._store.providers or self._store.models or self._bindings)
+                                  else "empty")
 
     def _note_dotenv_written(self, target: Path, data: Mapping[str, str]) -> None:
         _ = data

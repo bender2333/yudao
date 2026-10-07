@@ -296,11 +296,15 @@ test.describe("系统首页（1440×900）", () => {
       }
       // 记录当前「自上次查看」的起点，点击「已看过」以后它更新为当前位置
       const before = await fetchQuery<{ range: { from_position: number; to_position: number } }>(client.page, "home.away_report", { range: "since_seen" });
+      const note = report.locator(".section-head .note").first();
+      const noteBefore = await note.textContent();
       await report.getByRole("button", { name: "已看过", exact: true }).click();
       await waitUntil(async () => {
         const now = await fetchQuery<{ range: { from_position: number } }>(client.page, "home.away_report", { range: "since_seen" });
         return now.range.from_position >= before.range.to_position;
       }, client.page, "已看过更新上次查看的位置");
+      // 同一页面立即显示新的上次查看（工单 #301）：说明文字变化，不用离开再回来
+      await expect.poll(async () => note.textContent()).not.toBe(noteBefore);
       // 重新启动客户端以后上次查看的位置仍然保留（控制主机只记录一个位置）
       await client.close();
       client = await openHome({ width: 1440, height: 900 });

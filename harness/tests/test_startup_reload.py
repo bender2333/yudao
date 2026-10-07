@@ -355,6 +355,29 @@ def test_clear_withdraw(tmp_path):
     assert facade.revision > saved_rev
 
 
+def test_save_after_delete_refreshes_the_config_state_to_loaded(tmp_path):
+    # 工单 #301：文件删除以后保存成功，配置状态刷新为已加载，不再停留删除
+    config_path = tmp_path / "providers.json"
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
+    facade.configure_paths(config_path)
+    _write_json(config_path, _fake_doc())
+    facade.load_document(config_path)
+    config_path.unlink()
+    assert facade.reload()["ok"] is True
+    assert facade.config_status()["config_state"] == "deleted"
+    previous = facade.to_document()
+    facade.save_provider_entry({"id": "pf", "name": "测试服务", "protocol": "fake"})
+    assert facade.persist_catalog(previous) is None
+    assert facade.config_status()["config_state"] == "loaded"
+
+
+def test_memory_save_without_config_path_refreshes_the_config_state_to_loaded():
+    # 工单 #301：没有配置文件路径时保存只改内存，配置状态同样按内存重算为已加载
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
+    facade.store_document(_fake_doc())
+    assert facade.config_status()["config_state"] == "loaded"
+
+
 # ---------------------------------------------------------------------------
 # 7. 同尺寸改写检测（内容哈希，非 mtime/size）
 # ---------------------------------------------------------------------------

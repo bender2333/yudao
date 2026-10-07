@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import queue
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Literal, Union
 
 from pydantic import BaseModel, TypeAdapter
@@ -86,7 +86,8 @@ class EventStream:
     def __init__(self, store: EventStore, scope: EventScope, *, after: int, live: bool = False,
                  pump: DeltaPump | None = None, batch_size: int = BATCH_SIZE, queue_limit: int = QUEUE_LIMIT,
                  checkpoint_idle_sec: float = CHECKPOINT_IDLE_SEC,
-                 checkpoint_skipped: int = CHECKPOINT_SKIPPED) -> None:
+                 checkpoint_skipped: int = CHECKPOINT_SKIPPED,
+                 on_close: Callable[[EventStream], None] | None = None) -> None:
         self._store = store
         self._scope = scope
         self._after = max(after, 0)
@@ -103,6 +104,14 @@ class EventStream:
         # 本连接在片段泵上的待发队列（第 5.6 节）：连接建立时登记，连接结束时取消
         self._delta_queue: deque[DeltaFragment] | None = None
         self._unsubscribe_deltas: Callable[[], None] | None = None
+        # 停止请求到达时置位（工单 #301）：等待中的连接干净结束，不等优雅退出的超时
+        self._closed = asyncio.Event()
+        # 连接结束时调用（应用层用它从登记中移除，连接对象不长期堆积）
+        self._on_close = on_close
+
+    def close(self) -> None:
+        # 停止请求到达时由应用层调用：等待中的连接在下一个时间片干净结束
+        self._closed.set()
 
     def matches(self, event: StoredEvent) -> bool:
         # 一条事件是否在范围内（第 5.3 节）：省略的范围不限制，给出的范围取并集；
@@ -137,6 +146,8 @@ class EventStream:
                 self._unsubscribe_deltas()
                 self._unsubscribe_deltas = None
                 self._delta_queue = None
+            if self._on_close is not None:
+                self._on_close(self)
 
     async def _backfill(self, subscriber: _Subscriber) -> AsyncIterator[StreamMessage]:
         store = self._store
@@ -187,7 +198,12 @@ class EventStream:
                 yield self._checkpoint()
                 idle_since = None
                 continue
-            await asyncio.sleep(POLL_SEC)
+            try:
+                await asyncio.wait_for(self._closed.wait(), timeout=POLL_SEC)
+            except TimeoutError:
+                continue
+            # 停止请求已经到达：生成器正常结束，接口层关闭这个 SSE 连接（工单 #301）
+            return
 
     def _checkpoint(self) -> StreamCheckpoint:
         # 检查点的位置是已经扫描到的位置：历史读完以后为日志末尾，队列推进以后为处理过的最大位置

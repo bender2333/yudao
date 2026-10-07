@@ -209,3 +209,6 @@ def test_capabilities_mark_replayable_queries_and_expose_the_interface_version(d
     assert "home.away_report" in {item["name"] for item in capabilities["queries"]}
     assert "home.mark_seen" in {item["name"] for item in capabilities["commands"]}
     assert CatalogEventType.HOME_SEEN in capabilities["event_types"]
+    # 工单 #301：已看过事件触发报告重查，点「已看过」以后页面刷新
+    report_query = next(item for item in capabilities["queries"] if item["name"] == "home.away_report")
+    assert CatalogEventType.HOME_SEEN in report_query["changed_by"]

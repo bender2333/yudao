@@ -28,11 +28,24 @@ if set(PHASE_NAMES) != set(PHASES):
     raise KeyError("阶段的中文名必须与控制核心的阶段取值相同：" + "、".join(PHASES))
 
 STOP_REASON_NAMES = STOP_REASON_LABELS
+DECISION_KIND_NAMES: dict[str, str] = {
+    "model_unavailable": "模型引用无法使用，等待恢复",
+    "no_tool_call": "已暂停（模型没有调用工具），等待继续",
+    "workspace_unrepresentable": "已暂停（工作区无法表示），等待继续",
+    "definitions_changed": "定义版本不同，等待选择",
+    "unknown_action": "动作结果未知，等待核实",
+    "initial_prd": "接入已有项目的初始需求文档等待确认",
+}
 
 
 def phase_name(phase: Any) -> str:
     # 阶段的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
     return PHASE_NAMES.get(str(phase or ""), str(phase or ""))
+
+def decision_kind_name(kind: Any) -> str:
+    # 决定种类的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
+    return DECISION_KIND_NAMES.get(str(kind or ""), str(kind or ""))
+
 
 # 说明里出现的部门标识按中文写，机器标识不直接出现
 def department_name(department: Any) -> str:
@@ -70,6 +83,7 @@ class _Translated(dict):
         "department": department_name, "requester": department_name, "recipient": department_name,
         "guidance_ids": item_count, "candidate_ids": item_count, "running_runs": item_count,
         "stopped_runs": item_count, "restarted_work_items": item_count,
+        "kind": decision_kind_name, "from_phase": phase_name, "to_phase": phase_name,
     }
 
     def __getitem__(self, key: str) -> Any:

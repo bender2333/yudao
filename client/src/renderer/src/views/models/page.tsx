@@ -16,6 +16,7 @@ import type {
 import { JsonDialog } from "./json-dialog";
 import { ProviderForm } from "./form";
 import {
+  CONFIG_STATE_LABELS,
   DEPARTMENT_LABELS,
   PROTOCOL_LABELS,
   STALE_ADMISSION_LABEL,
@@ -416,7 +417,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       <div className="mm-head">
         <h1>模型管理</h1>
         <p className="mm-meta">
-          目录修订 {catalog.revision} · 配置状态 {catalog.config_state}
+          目录修订 {catalog.revision} · 配置状态 {CONFIG_STATE_LABELS[catalog.config_state] ?? catalog.config_state}
           {catalog.reload_error && <span className="mm-warn"> · 文件更新未生效：{catalog.reload_error}</span>}
         </p>
         <div className="mm-actions">

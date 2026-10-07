@@ -136,6 +136,8 @@ class Application:
             self.deltas.start()
         # 需要以后以事件出现结果的命令（获取模型列表与两种测试）作为任务运行
         self._tasks: set[asyncio.Task[Any]] = set()
+        # 打开的事件流连接：停止请求到达时先让它们干净结束，再退出（工单 #301）
+        self._streams: set[EventStream] = set()
 
     @classmethod
     def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path) -> Application:
@@ -192,8 +194,15 @@ class Application:
     def open_event_stream(self, scope: EventScope, *, after: int, live: bool, **options: Any) -> EventStream:
         # 一个事件流连接（第 5 节）。带 live=1 时连接接收模型输出片段（订阅在应用层建立时已登记）。
         # options 透传批次大小、队列长度与检查点参数（默认值见 event_stream 模块）
-        return EventStream(self.system.store, scope, after=after, live=live and self.deltas is not None,
-                           pump=self.deltas, **options)
+        stream = EventStream(self.system.store, scope, after=after, live=live and self.deltas is not None,
+                             pump=self.deltas, on_close=self._streams.discard, **options)
+        self._streams.add(stream)
+        return stream
+
+    def close_event_streams(self) -> None:
+        # 停止请求已经到达：让全部等待中的事件流连接干净结束；连接结束时从登记中移除
+        for stream in list(self._streams):
+            stream.close()
 
     def live_attempt(self, attempt_id: str) -> dict[str, str]:
         # 一个进行中调用尝试各通道已收到的文字（第 5.6 节）；没有进行中的尝试时为空

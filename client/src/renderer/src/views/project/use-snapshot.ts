@@ -52,6 +52,9 @@ export function useSnapshot<T>(
     setState({ data: null, loading: true, key });
     void views.open<T>(viewId, { query, params: JSON.parse(key) as Record<string, unknown> }, (data) => {
       setState({ data, loading: false, key });
+    }, () => {
+      // 查询失败（例如服务不可达）：读取结束，调用处显示空态，不一直显示「正在读取数据」
+      setState({ data: null, loading: false, key });
     });
     return () => {
       views.close(viewId);
