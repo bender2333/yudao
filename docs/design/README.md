@@ -20,7 +20,7 @@
   - 需求：[D38](../requirements/system-intent.md)。ADR：[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [循环与收敛](loops-and-convergence.md)
   - 内容：循环层的声明、一定会停、子循环、收敛的检测、防止滑向静态编排的五条判据、容纳变化的判据。
-  - 状态：2026-10-07 设计，用户已确认，未实施。工单：B2（M2）、#143、#246、Stage 4、Stage 5。
+  - 状态：2026-10-07 设计，用户已确认，未实施；同日第 5 节写明 Stage 3 判定步骤循环与 run 两层、run 层只计有可执行检验的条件、步骤循环取 8 步与 3 次。工单：B2（M2）、#143、#246、自举试点的首批工单（收敛状态投影与 `run.loops`）、Stage 4、Stage 5。
   - 需求：[D38](../requirements/system-intent.md)。ADR：[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。
 - [验证的独立性](independent-verification.md)
   - 内容：共享的与隔开的内容、可见范围作为参数、先判断后看解释、验证密度、共享上下文的一组对照、检验覆盖与开环、边界的一致。
@@ -41,7 +41,7 @@
   - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)、[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。调研：[执行环境服务调研](../research/execution-environment.md)。
 - [浏览器与 computer use](browser-and-computer-use.md)
   - 内容：试用会话与执行位置上的程序；交付说明中的启动方式；Playwright MCP 浏览器工具；computer use（控制主机的交互桌面、真实输入、用户同意与独占，ADR-0026）；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
-  - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。Stage 3 实施浏览器的部分：父工单 #123（#147 至 #149、#151 至 #155），属于里程碑 M4；computer use 的部分（第 5 节等，见该文件更新行）是以后阶段的专题（[各阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节），工单 #150、#246、#247 不属于 M4。2026-10-07 按意图校准整理，修改内容见该文件更新行。
+  - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。Stage 3 实施浏览器的部分：父工单 #123（#147 至 #149、#151 至 #155），属于里程碑 M4；computer use 的部分（第 5 节等，见该文件更新行）是以后阶段的专题（[各阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节），工单 #150、#246、#247 不属于 M4。2026-10-07 按意图校准整理，资料页的逐条结论表增加检验方式与开环标记，修改内容见该文件更新行。
   - 需求：[D34](../requirements/browser-and-computer-use.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0026](../adr/0026-desktop-trials-on-control-host-desktop.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
 - [网络取回与 MCP 工具](network-and-mcp.md)
   - 内容：取回与登记的 MCP 服务器的放置（固定在控制主机）；项目的登记（取回的来源、MCP 服务器、工具清单快照与处理方式、版本与固定、凭据）；授权与一次性批准；网络取回（地址规则、重定向、内容与保存）；MCP 服务器（官方 SDK、运行规则、结果）；恢复契约；外部来源工件与证据；应用层接口；界面；含模块图与时序图。
@@ -49,7 +49,7 @@
   - 需求：[D36](../requirements/network-and-mcp.md)。ADR：[0025](../adr/0025-network-and-mcp-run-on-control-host.md)。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../research/network-and-mcp-references.md)。
 - [接入已有项目](existing-project-onboarding.md)
   - 内容：建档事项（事项种类、命令、决定请求）；产品的初始 PRD、工程的结构说明、质检的基线核对；用户确认的往返与基线采纳；大仓库的仓库概况；失败与中断；含流程图、时序图与模块交互图。
-  - 状态：设计已确认，未实施（2026-09-29 用户确认第 12 节的决定：已有项目的代码经 `project.onboard` 接入并建档、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）。工单：父工单 #124（#134 至 #139），属于里程碑 M2。2026-10-07 结构说明的可见范围改为参数，建档材料分类，新增采纳写回（B8，挂在 3.8 下，M2）。
+  - 状态：设计已确认（2026-09-29 用户确认第 12 节的决定：已有项目的代码经 `project.onboard` 接入并建档、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）；实施中：#134 至 #137 与 #346 已实施，#138、#139、#347 未实施。工单：父工单 #124（#134 至 #139），属于里程碑 M2。2026-10-07 结构说明的可见范围改为参数，建档材料分类，新增采纳写回（B8，挂在 3.8 下，M2）。
   - 需求：[D33](../requirements/existing-project-onboarding.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)、[0024](../adr/0024-git-in-process-with-pygit2.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)。
 - [项目的起始文件夹](project-initial-files.md)
   - 内容：新建项目时带的起始文件夹：项目的起点（采纳成果、起始文件夹快照、空树）与三处共用的求法、`project.create` 的可选参数与 `project_registered` 的 `initial_snapshot`、事项从快照开始、界面与评测、失败与中断；含流程图与时序图。
@@ -61,7 +61,7 @@
   - 需求：[D22](../requirements/startup-provider-reload.md)、[D23](../requirements/provider-layer.md)。ADR：0001 至 0003、[0033](../adr/0033-protocol-belongs-to-model-access.md)。
 - [应用层与接口层](app-and-interface.md)
   - 内容：应用层（合同、注册表、命令处理、查询处理、读取模型、事件流订阅、输出片段转发）与接口层（FastAPI 路由、OpenAPI、认证）；命令合同（身份、基准版本、结果）与命令清单；查询与读取模型；事件流（范围筛选、按位置补齐、缺口检测与重新同步、模型输出片段）；能力清单与接口版本核对；本机与局域网两种访问方式（局域网访问方式的令牌随自举加入，TLS 在离开局域网之前加入）；系统首页（待你决定、离开期间的报告）、机器查询与托盘提醒；规则、参数与对照命令、循环实例与收敛状态等读取模型、画面诚实性的不变式；与现有 Web 的对照与迁移。
-  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；2026-09-28 界面工作线提前到 Stage 3，与 #49、#45、3.1 同时进行，每个工作包连同界面一起验收，界面工单挂在所属工作包的父工单下。应用层、接口层与界面随里程碑 M1 交付；2026-10-07 界面改为 Yudao 服务提供的网页（ADR-0032），修改内容见该文件更新行。工单：父工单 #70（子工单 #73 至 #78、#127），界面 #71（#79、#80、#175 与像素画面 #176、#82、#177 至 #180，依据原型 v9 与 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)），属于里程碑 M1；各工作包的界面工单挂在所属父工单下：模型管理页 #93 至 #95（#83）、3.1 #181（#119）、3.4A #182（#121）、机器页面 #117（#120）、3.8 #137、#138（#124）、3.2D #153、#154（#123）。2026-10-07 新增规则、参数与对照命令、六个读取模型、画面诚实性的七条不变式，命令共 48 个、查询共 41 个。
+  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；2026-09-28 界面工作线提前到 Stage 3，与 #49、#45、3.1 同时进行，每个工作包连同界面一起验收，界面工单挂在所属工作包的父工单下。应用层、接口层与界面随里程碑 M1 交付；2026-10-07 界面改为 Yudao 服务提供的网页（ADR-0032），修改内容见该文件更新行。工单：父工单 #70（子工单 #73 至 #78、#127），界面 #71（#79、#80、#175 与像素画面 #176、#82、#177 至 #180，依据原型 v9 与 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)），属于里程碑 M1；各工作包的界面工单挂在所属父工单下：模型管理页 #93 至 #95（#83）、3.1 #181（#119）、3.4A #182（#121）、机器页面 #117（#120）、3.8 #137、#138（#124）、3.2D #153、#154（#123）。2026-10-07 新增规则、参数与对照命令、六个读取模型、画面诚实性的七条不变式，命令共 48 个、查询共 41 个；同日覆盖层增加「循环」「来源」「检验」，离开期间的报告增加收敛状态的变化与带开环条件的放行（自举试点的首批工单）；事件的来源对应表增加按字段的覆盖，`project.loop` 的事实元素带来源。
   - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0015](../adr/0015-desktop-client-and-http-contracts.md)、[0032](../adr/0032-interface-served-as-web-pages.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0021](../adr/0021-client-pixel-view-follows-v9-structure.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [网页界面的提供与发布](web-interface-and-release.md)
   - 内容：控制主机上 Yudao 服务的安装、命令行入口、数据目录与手动启动；接口层提供界面的页面文件，启动以后打开默认浏览器，局域网访问方式；浏览器的系统通知与「安装此站点为应用」的条件；一次发布的构成、版本号、发布脚本、架构师的走查；含模块图、验收与遗留事项。

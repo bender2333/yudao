@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -234,7 +234,10 @@ class Orchestrator:
         # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 只能有一次激活），_active 是激活本身
         self._running: dict[str, object] = {}
         self._active: dict[str, _Activation] = {}
-        self._run_start_times: dict[str, float] = {}
+        # 每个 run 累计的已用运行时间（毫秒，重启时从事件恢复）与当前运行段的起点（单调时钟）：
+        # 等待期间段计时暂停，等待的时间不计入（工单 #350）
+        self._run_elapsed_ms: dict[str, int] = {}
+        self._run_segment_start: dict[str, float] = {}
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
         # 事项的执行任务与结算：run_id -> 任务；由 start_work_item 建立，任务结束时移除
@@ -487,24 +490,25 @@ class Orchestrator:
                 self._cancellers[run_id].discard(token)
                 self._cancellers_changed.notify_all()
 
-    def _settled(self, run_id: str) -> RunProjection:
-        # 激活与运行循环结束时交回的运行状态。有正在进行的取消（cancel 或 /stop），或者运行已经中止而取消还没有写入时，
-        # 等待正在进行的取消结束，交回它写入以后的状态；运行已经中止而没有正在进行的取消（例如它的写入失败了）时
-        # 在这里写入取消
-        def aborted() -> bool:
-            return bool(self._abort.get(run_id) and self._abort[run_id].is_set())
+    def _await_cancellers(self, run_id: str) -> None:
+        # 有正在进行的取消（cancel 或 /stop），等待它结束：等待时释放锁，取消线程可以在等待期间登记与结束。
+        # 激活收尾与运行循环用它等取消写入，取消一方从不等待激活收尾。
+        with self._cancellers_changed:
+            self._cancellers_changed.wait_for(lambda: not self._cancellers.get(run_id))
 
+    def _settled(self, run_id: str) -> RunProjection:
+        # 激活与运行循环结束时交回的运行状态。有正在进行的取消（cancel 或 /stop）时，等待它结束，
+        # 交回它写入以后的状态；运行已经中止而没有正在进行的取消（例如它的写入失败了）时在这里写入取消
         projection = self.project(run_id)
         if projection.phase in TERMINAL_PHASES:
             return projection
-        with self._cancellers_changed:
-            if not self._cancellers.get(run_id) and not aborted():
-                return projection
-            self._cancellers_changed.wait_for(lambda: not self._cancellers.get(run_id))
+        self._await_cancellers(run_id)
         projection = self.project(run_id)
-        if projection.phase in TERMINAL_PHASES or not aborted():
+        if projection.phase in TERMINAL_PHASES:
             return projection
-        return self.cancel(run_id)
+        if self._abort.get(run_id) is not None and self._abort[run_id].is_set():
+            return self.cancel(run_id)
+        return projection
 
     def add_guidance(self, run_id: str, department: str, text: str, *,
                      base_version: int | None = None, command: Command | None = None) -> RunProjection:
@@ -564,8 +568,40 @@ class Orchestrator:
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _elapsed_sec(self, run_id: str) -> float:
-        # 这个 run 已经用的运行时间（秒）：起点在进程内存里，#350 改为从事件恢复
-        return time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
+        # 这个 run 已经用的运行时间（秒）：已持久化的累计加上当前运行段。等待（重试退避、
+        # 用户决定阻塞等）期间段计时暂停，不计入（工单 #350）
+        total_ms = self._run_elapsed_ms.get(run_id, 0)
+        started = self._run_segment_start.get(run_id)
+        if started is not None:
+            total_ms += max(0, int((time.monotonic() - started) * 1000))
+        return total_ms / 1000.0
+
+    def _pause_run_clock(self, run_id: str) -> None:
+        # 暂停这个 run 的段计时：进入等待时调用，等待的时间不计入运行时间
+        started = self._run_segment_start.pop(run_id, None)
+        if started is not None:
+            self._run_elapsed_ms[run_id] = self._run_elapsed_ms.get(run_id, 0) + max(
+                0, int((time.monotonic() - started) * 1000))
+
+    def _resume_run_clock(self, run_id: str) -> None:
+        # 等待结束以后重新开始段计时
+        self._run_segment_start.setdefault(run_id, time.monotonic())
+
+    def _settle_run_segment(self, run_id: str) -> int:
+        # 激活结束：结算当前段，返回累计的已用毫秒
+        self._pause_run_clock(run_id)
+        return self._run_elapsed_ms.get(run_id, 0)
+
+    def _recover_run_usage(self, run_id: str, events: Sequence[Any]) -> None:
+        # 从事件恢复累计已用量：最后一个 activation_finished 记下的累计值；
+        # 这个版本以前的旧事件没有这些字段，按 0 处理（语义变更先提高 run 事件版本，ADR-0019）
+        if run_id in self._run_elapsed_ms:
+            return
+        elapsed_ms = 0
+        for event in events:
+            if event.type == EventType.ACTIVATION_FINISHED:
+                elapsed_ms = int((event.payload or {}).get("elapsed_ms", 0) or 0)
+        self._run_elapsed_ms[run_id] = elapsed_ms
 
     def _time_left(self, run_id: str, projection: RunProjection) -> float:
         return time_left_sec(projection, self._elapsed_sec(run_id))
@@ -585,10 +621,13 @@ class Orchestrator:
                 remaining = deadline - loop.time()
                 if remaining <= 0:
                     return judgment
+                self._pause_run_clock(activation.run_id)
                 try:
                     await asyncio.wait_for(changed.wait(), max(0.0, min(remaining, time_left)))
                 except TimeoutError:
                     pass
+                finally:
+                    self._resume_run_clock(activation.run_id)
         finally:
             activation.wakeup = None
 
@@ -630,21 +669,24 @@ class Orchestrator:
                                    return_phase=phase, return_work_valid=False)
 
     def cancel(self, run_id: str, *, command: Command | None = None) -> RunProjection:
-        # 已经结束的运行不变；否则中止并取消正在进行的步骤，再写入取消。取消正在进行的步骤出错时，
-        # 取消照常写入，再通知一次，错误交给调用方
+        # 已经结束的运行不变；否则先中止运行（之后的核对都得到停止）并写入取消，再取消正在进行的步骤：
+        # 调用尝试因取消而失败的记录排在取消之后。写入出错时同样取消正在进行的步骤；取消步骤出错时再通知一次，
+        # 错误交给调用方
         with self._cancelling(run_id):
             if self.project(run_id).phase in TERMINAL_PHASES:
                 return self.project(run_id)
-            activation, cancel_error = self._abort_run(run_id)
+            self._abort.setdefault(run_id, Event()).set()
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
                     transaction, "cancelled", "run cancelled"), command=command)
             finally:
+                activation, cancel_error = self._abort_run(run_id)
                 if cancel_error is not None:
                     self._cancel_driver(activation)
         if cancel_error is not None:
             raise cancel_error
         return self.project(run_id)
+
     def stop_for_upgrade(self, run_id: str, *, reason: str) -> RunProjection:
         # 因升级停止（ADR-0019，工单 #126、#322）：强制升级处理到的未结束 run 记为因升级停止，
         # 停止原因写在带版本定义的停止原因清单中；已经结束的 run 不变
@@ -941,6 +983,9 @@ class Orchestrator:
             activation = self.writes.transact(
                 run_stream(run_id), lambda transaction: self._prepare_activation(run_id, transaction, connections))
             if activation is None:
+                # 没有开始新的激活（等待用户回答、已经结束或达到上限）：这段不计入运行时间，
+                # 累计保留在内存里，下次激活从事件恢复时继续
+                self._pause_run_clock(run_id)
                 return await asyncio.to_thread(self._settled, run_id)
             self._active[run_id] = activation
             started = time.monotonic()
@@ -951,6 +996,12 @@ class Orchestrator:
 
                 def finish(transaction: Transaction) -> None:
                     current = transaction.projection
+                    elapsed_ms = self._settle_run_segment(run_id)
+                    happened = transaction.events()
+                    activations = len([event for event in happened
+                                       if event.type == EventType.DEPARTMENT_ACTIVATED])
+                    model_steps = len([event for event in happened
+                                       if event.type == EventType.MODEL_REQUESTED])
                     transaction.append(NewEvent(
                         EventType.ACTIVATION_FINISHED,
                         actor="system",
@@ -963,10 +1014,15 @@ class Orchestrator:
                             "activation_id": scope.activation_id,
                             **scope.versions(),
                             "latency_ms": int((time.monotonic() - started) * 1000),
+                            "elapsed_ms": elapsed_ms,
+                            "activations": activations,
+                            "model_steps": model_steps,
                             "stop_reason": current.stop_reason,
                         },
                     ))
 
+                # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
+                await asyncio.to_thread(self._await_cancellers, run_id)
                 self.writes.transact(run_stream(run_id), finish)
                 self.sessions.get(run_id, scope.department).idle()
                 self._active.pop(run_id, None)
@@ -979,8 +1035,8 @@ class Orchestrator:
         projection = transaction.projection
         if not projection.run_id:
             raise RunNotFoundError(run_id)
-        if run_id not in self._run_start_times:
-            self._run_start_times[run_id] = time.monotonic()
+        self._recover_run_usage(run_id, transaction.events())
+        self._resume_run_clock(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
         if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):

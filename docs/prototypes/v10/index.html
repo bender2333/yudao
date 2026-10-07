@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yudao 界面原型 v10</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/home.css">
+  <link rel="stylesheet" href="styles/project.css">
+  <link rel="stylesheet" href="styles/department.css">
+  <link rel="stylesheet" href="styles/system.css">
+  <link rel="stylesheet" href="styles/gallery.css">
+</head>
+<body>
+  <div class="y10-banner" role="note">
+    <strong>原型示例数据</strong>
+    <span class="y10-banner-text">界面内容全部为示例数据，不连接控制主机；底部工具条切换档位、标注、场景与模拟</span>
+  </div>
+
+  <div id="y10-window-note" class="y10-window-note" hidden></div>
+
+  <div class="y10-app">
+    <aside id="y10-sidebar" class="y10-sidebar" aria-label="首页、项目与系统"></aside>
+    <div class="y10-scrim" data-act="shell.drawer" aria-hidden="true"></div>
+    <div class="y10-main">
+      <header id="y10-topbar" class="y10-topbar"></header>
+      <nav id="y10-tabs" class="y10-tabbar" aria-label="项目页面" hidden></nav>
+      <main id="y10-content" class="y10-content"></main>
+    </div>
+  </div>
+
+  <div id="y10-toolbar" class="y10-toolbar" aria-label="原型工具条"></div>
+  <div id="y10-modal-root"></div>
+  <div id="y10-toast-root" class="y10-toast-root" aria-live="polite"></div>
+
+  <script src="js/y10.js"></script>
+  <script src="js/contract/registry.js"></script>
+  <script src="js/contract/backend.js"></script>
+  <script src="js/contract/handlers/core.js"></script>
+  <script src="js/contract/handlers/project.js"></script>
+  <script src="js/contract/handlers/department.js"></script>
+  <script src="js/contract/handlers/system.js"></script>
+  <script src="js/contract/data/system.js"></script>
+  <script src="js/contract/data/p-todo.js"></script>
+  <script src="js/contract/data/p-agents.js"></script>
+  <script src="js/contract/data/p-metro.js"></script>
+  <script src="js/contract/data/p-sensor.js"></script>
+  <script src="js/pixel/sprites.js"></script>
+  <script src="js/pixel/engine.js"></script>
+  <script src="js/pixel/ecs.js"></script>
+  <script src="js/pixel/say.js"></script>
+  <script src="js/pixel/floor-decl.js"></script>
+  <script src="js/pixel/decision-card.js"></script>
+  <script src="js/pixel/source-card.js"></script>
+  <script src="js/pixel/room.js"></script>
+  <script src="js/pixel/floor.js"></script>
+  <script src="js/pixel/building.js"></script>
+  <script src="js/ui/kit.js"></script>
+  <script src="js/ui/app.js"></script>
+  <script src="js/ui/shell.js"></script>
+  <script src="js/ui/cards.js"></script>
+  <script src="js/ui/replay.js"></script>
+  <script src="js/ui/scenes.js"></script>
+  <script src="js/ui/toolbar.js"></script>
+  <script src="js/ui/views/home.js"></script>
+  <script src="js/ui/views/overview.js"></script>
+  <script src="js/ui/views/recovery.js"></script>
+  <script src="js/ui/views/materials.js"></script>
+  <script src="js/ui/views/department.js"></script>
+  <script src="js/ui/views/observe.js"></script>
+  <script src="js/ui/views/settings.js"></script>
+  <script src="js/ui/views/sys-models.js"></script>
+  <script src="js/ui/views/sys-machines.js"></script>
+  <script src="js/ui/views/sys-runtime.js"></script>
+  <script src="js/ui/views/sys-tools.js"></script>
+  <script src="js/ui/views/sys-reserved.js"></script>
+  <script src="js/ui/views/connect.js"></script>
+  <script src="js/ui/views/gallery.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

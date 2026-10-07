@@ -349,6 +349,10 @@ class ToolCallRequiredPayload(Versions, WorkBasis):
 class ActivationFinishedPayload(Versions):
     activation_id: str
     latency_ms: int
+    # 这次激活结束时这个 run 累计的已用量（工单 #350）：重启时从事件恢复，连续累计
+    elapsed_ms: int
+    activations: int
+    model_steps: int
     stop_reason: str | None
 
 
