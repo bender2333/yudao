@@ -99,6 +99,7 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 - 认领工单：`gh issue edit <编号> --add-assignee @me`
 - 筛选已就绪工单：`gh issue list --state open --label "ready-for-agent"`
 - 追加进展评论：`gh issue comment <编号> --body "<进展说明与测试证据>"`
+- 较长的评论先写成文件，再用 `--body-file` 发出：文件写在 `C:\project\yudao-worktrees\issue-<编号>\.tmp\` 下，文件名带工单号，`--body-file` 也给这个绝对路径；发出以前读一遍文件，核对 PR 链接、工单号与测试计数行属于本工单。相对路径按命令所在的目录解析，目录是主工作区时会读到其他工单遗留的同名文件。
 - 切换流程标签：`gh issue edit <编号> --remove-label "<原标签>" --add-label "<新标签>"`，标签含义见 `docs/agents/triage-labels.md`。
 
 # 执行者
