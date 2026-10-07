@@ -28,7 +28,7 @@
   - 需求：[D38](../requirements/system-intent.md)、[D32](../requirements/comparison-experiment.md)。ADR：[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0028](../adr/0028-three-means-of-adjudication.md)。
 - [模型管理](model-management.md)
   - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。
-  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前，已完成），Stage 3 的工作包父工单 #83（子工单 #84 至 #96、#146），属于里程碑 M1。实施中：#84、#85 已完成。2026-10-07 按意图校准整理；同日 M1 试用以后，调用协议移到模型访问定义上（ADR-0033），自定义服务的模型列表地址默认取「地址/models」，加入模型时直接采用预填的容量并自动进行模型测试，修改内容见该文件更新行，工单经 `/to-tickets` 建立。
+  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前，已完成），Stage 3 的工作包父工单 #83（子工单 #84 至 #96、#146），属于里程碑 M1。实施中：#84、#85 已完成。2026-10-07 按意图校准整理；同日 M1 试用以后，调用协议移到模型访问定义上（ADR-0033），自定义服务的模型列表地址默认取「地址/models」，加入模型时直接采用预填的容量并自动进行模型测试，修改内容见该文件更新行；工单为父工单 #371（#83 下）与子工单 #382 至 #386，属于里程碑 M1。
   - 需求：[D24](../requirements/model-management.md)。ADR：0002、0003、0005、0006、[0033](../adr/0033-protocol-belongs-to-model-access.md)、[0017](../adr/0017-role-settings-override-department.md)、[0028](../adr/0028-three-means-of-adjudication.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [本地通用工具](local-tools.md)
   - 内容：代码快照接入的使用过程；公开树、搜索、区间阅读与编辑、本地命令、动作回执、独立质检的边界与验收反例；使用的依赖与成熟实现，含模块交互图。
@@ -65,7 +65,7 @@
   - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0015](../adr/0015-desktop-client-and-http-contracts.md)、[0032](../adr/0032-interface-served-as-web-pages.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0021](../adr/0021-client-pixel-view-follows-v9-structure.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [网页界面的提供与发布](web-interface-and-release.md)
   - 内容：控制主机上 Yudao 服务的安装、命令行入口、数据目录与手动启动；接口层提供界面的页面文件，启动以后打开默认浏览器，局域网访问方式；浏览器的系统通知与「安装此站点为应用」的条件；一次发布的构成、版本号、发布脚本、架构师的走查；含模块图、验收与遗留事项。
-  - 状态：2026-10-01 设计（当时为桌面客户端的安装、更新与发布），2026-10-07 按 ADR-0032 改写为网页界面，未实施。已完成的工单：#206（Yudao 服务的命令行入口）、#209（发布脚本），#144 的执行代理安装包加入发布脚本；改为网页的工单经 `/to-tickets` 建立，属于里程碑 M1。
+  - 状态：2026-10-01 设计（当时为桌面客户端的安装、更新与发布），2026-10-07 按 ADR-0032 改写为网页界面，未实施。已完成的工单：#206（Yudao 服务的命令行入口）、#209（发布脚本），#144 的执行代理安装包加入发布脚本；改为网页的工单为父工单 #370（#71 下）与子工单 #372 至 #381，属于里程碑 M1。
   - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0032](../adr/0032-interface-served-as-web-pages.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)。
 - [部门定向指导](department-guidance.md)
   - 内容：部门指导的处理时机、原文范围与放行关系。
