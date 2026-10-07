@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -234,7 +234,10 @@ class Orchestrator:
         # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 只能有一次激活），_active 是激活本身
         self._running: dict[str, object] = {}
         self._active: dict[str, _Activation] = {}
-        self._run_start_times: dict[str, float] = {}
+        # 每个 run 累计的已用运行时间（毫秒，重启时从事件恢复）与当前运行段的起点（单调时钟）：
+        # 等待期间段计时暂停，等待的时间不计入（工单 #350）
+        self._run_elapsed_ms: dict[str, int] = {}
+        self._run_segment_start: dict[str, float] = {}
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
         # 事项的执行任务与结算：run_id -> 任务；由 start_work_item 建立，任务结束时移除
@@ -564,8 +567,40 @@ class Orchestrator:
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
     def _elapsed_sec(self, run_id: str) -> float:
-        # 这个 run 已经用的运行时间（秒）：起点在进程内存里，#350 改为从事件恢复
-        return time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
+        # 这个 run 已经用的运行时间（秒）：已持久化的累计加上当前运行段。等待（重试退避、
+        # 用户决定阻塞等）期间段计时暂停，不计入（工单 #350）
+        total_ms = self._run_elapsed_ms.get(run_id, 0)
+        started = self._run_segment_start.get(run_id)
+        if started is not None:
+            total_ms += max(0, int((time.monotonic() - started) * 1000))
+        return total_ms / 1000.0
+
+    def _pause_run_clock(self, run_id: str) -> None:
+        # 暂停这个 run 的段计时：进入等待时调用，等待的时间不计入运行时间
+        started = self._run_segment_start.pop(run_id, None)
+        if started is not None:
+            self._run_elapsed_ms[run_id] = self._run_elapsed_ms.get(run_id, 0) + max(
+                0, int((time.monotonic() - started) * 1000))
+
+    def _resume_run_clock(self, run_id: str) -> None:
+        # 等待结束以后重新开始段计时
+        self._run_segment_start.setdefault(run_id, time.monotonic())
+
+    def _settle_run_segment(self, run_id: str) -> int:
+        # 激活结束：结算当前段，返回累计的已用毫秒
+        self._pause_run_clock(run_id)
+        return self._run_elapsed_ms.get(run_id, 0)
+
+    def _recover_run_usage(self, run_id: str, events: Sequence[Any]) -> None:
+        # 从事件恢复累计已用量：最后一个 activation_finished 记下的累计值；
+        # 这个版本以前的旧事件没有这些字段，按 0 处理（语义变更先提高 run 事件版本，ADR-0019）
+        if run_id in self._run_elapsed_ms:
+            return
+        elapsed_ms = 0
+        for event in events:
+            if event.type == EventType.ACTIVATION_FINISHED:
+                elapsed_ms = int((event.payload or {}).get("elapsed_ms", 0) or 0)
+        self._run_elapsed_ms[run_id] = elapsed_ms
 
     def _time_left(self, run_id: str, projection: RunProjection) -> float:
         return time_left_sec(projection, self._elapsed_sec(run_id))
@@ -585,10 +620,13 @@ class Orchestrator:
                 remaining = deadline - loop.time()
                 if remaining <= 0:
                     return judgment
+                self._pause_run_clock(activation.run_id)
                 try:
                     await asyncio.wait_for(changed.wait(), max(0.0, min(remaining, time_left)))
                 except TimeoutError:
                     pass
+                finally:
+                    self._resume_run_clock(activation.run_id)
         finally:
             activation.wakeup = None
 
@@ -941,8 +979,10 @@ class Orchestrator:
             activation = self.writes.transact(
                 run_stream(run_id), lambda transaction: self._prepare_activation(run_id, transaction, connections))
             if activation is None:
+                # 没有开始新的激活（等待用户回答、已经结束或达到上限）：这段不计入运行时间，
+                # 累计保留在内存里，下次激活从事件恢复时继续
+                self._pause_run_clock(run_id)
                 return await asyncio.to_thread(self._settled, run_id)
-            self._active[run_id] = activation
             started = time.monotonic()
             try:
                 await self._invoke_activation(activation)
@@ -951,6 +991,12 @@ class Orchestrator:
 
                 def finish(transaction: Transaction) -> None:
                     current = transaction.projection
+                    elapsed_ms = self._settle_run_segment(run_id)
+                    happened = transaction.events()
+                    activations = len([event for event in happened
+                                       if event.type == EventType.DEPARTMENT_ACTIVATED])
+                    model_steps = len([event for event in happened
+                                       if event.type == EventType.MODEL_REQUESTED])
                     transaction.append(NewEvent(
                         EventType.ACTIVATION_FINISHED,
                         actor="system",
@@ -963,10 +1009,12 @@ class Orchestrator:
                             "activation_id": scope.activation_id,
                             **scope.versions(),
                             "latency_ms": int((time.monotonic() - started) * 1000),
+                            "elapsed_ms": elapsed_ms,
+                            "activations": activations,
+                            "model_steps": model_steps,
                             "stop_reason": current.stop_reason,
                         },
                     ))
-
                 self.writes.transact(run_stream(run_id), finish)
                 self.sessions.get(run_id, scope.department).idle()
                 self._active.pop(run_id, None)
@@ -979,8 +1027,8 @@ class Orchestrator:
         projection = transaction.projection
         if not projection.run_id:
             raise RunNotFoundError(run_id)
-        if run_id not in self._run_start_times:
-            self._run_start_times[run_id] = time.monotonic()
+        self._recover_run_usage(run_id, transaction.events())
+        self._resume_run_clock(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
         if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):

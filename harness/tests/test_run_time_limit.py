@@ -36,14 +36,14 @@ def test_time_limit_checked_between_activations(data_dir):
               review_turn("release", "ok")]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1)
-    # 第一次激活正常完成；运行时间从第一次激活开始计算
+    # 第一次激活正常完成；两次激活之间的等待不计入运行时间（工单 #350），
+    # 第二次激活开始时累计还没有达到上限，照常进行
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING"
     time.sleep(1.1)
     result = system.activate_once(run_id)
-    assert result.phase == "FAILED"
-    assert result.stop_reason == "time_limit"
-    assert len(system.test_adapter.invocations) == 1
+    assert result.phase == "ENGINEERING"
+    assert len(system.test_adapter.invocations) == 2
 
 
 def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):

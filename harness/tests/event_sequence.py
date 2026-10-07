@@ -31,7 +31,7 @@ from harness.models import ArtifactRef, EventType
 #    Git 提交号编为 <git#N>。同一个值在各处得到同一个编号，保留相等关系。
 # 3. 工件按内容比较：工件引用（kind、content_hash、path、media_type）换成 <art#N>，内容放在 artifacts 中：
 #    JSON 工件解析后按同样规则规整，JSON Lines 逐行解析，文本按字符串规整，无法按 UTF-8 解码的内容记它的摘要编号。
-# 4. 随时间变化的数值：ISO 时间写成 <time>，duration_ms、latency_ms 写成 <duration>，
+# 4. 随时间变化的数值：ISO 时间写成 <time>，duration_ms、latency_ms、elapsed_ms 写成 <duration>，
 #    运行时间用完的错误文字中的实际用时写成 <elapsed>。
 # 5. 流式进度事件在同一次调用尝试中阶段不变时按时间间隔重复记录，只保留每个阶段第一次出现的一条。
 # 6. 机器相关的值：测试数据目录写成 <data>；主机 Python 解释器的路径写成 <python>，解释器的文件名
@@ -43,7 +43,7 @@ from harness.models import ArtifactRef, EventType
 
 BASELINE_DIR = Path(__file__).parent / "event_sequences"
 
-_TIME_KEYS = frozenset({"duration_ms", "latency_ms"})
+_TIME_KEYS = frozenset({"duration_ms", "latency_ms", "elapsed_ms"})
 _ISO_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)")
 _ELAPSED = re.compile(r"run wall-clock time \d+s")
 _GENERATED_ID = re.compile(r"(?<![A-Za-z0-9_])([a-z]+(?:_[a-z]+)*)_([0-9a-f]{16})(?![0-9a-f])")

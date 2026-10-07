@@ -55,7 +55,7 @@
     "provider": "fake",
     "registered_commands": {},
     "round": 0,
-    "run_event_version": 2,
+    "run_event_version": 3,
     "run_time_limit_sec": 7200,
     "sessions": {
      "engineering": "<ses_eng#1>",
@@ -910,10 +910,13 @@
    "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
+    "activations": 1,
+    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
     "latency_ms": "<duration>",
+    "model_steps": 1,
     "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
     "stop_reason": null
@@ -1676,10 +1679,13 @@
    "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#2>",
+    "activations": 2,
+    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
     "latency_ms": "<duration>",
+    "model_steps": 2,
     "prompt_hash": "<sha256#25>",
     "prompt_version": 0,
     "stop_reason": null
@@ -2450,7 +2456,7 @@
     "id": "check-1",
     "input_item": {
      "call_id": "check-1",
-     "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#3>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#23>\",\"engineering_plan_hash\":\"<sha256#41>\",\"executor\":\"host\",\"exit_code\":130,\"name\":\"smoke\",\"product_spec_hash\":\"<sha256#22>\",\"snapshot_hash\":\"<sha256#50>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"-c\\\",\\\"import pathlib, sys, time; print('check started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\\\",\\\"<data>/check-running\\\"] exit=130\\ncheck cancelled; the process tree was stopped\\ncheck started\",\"tree_changed\":false}}",
+     "output": "{\"error\":null,\"ok\":true,\"output\":{\"activation_id\":\"<act#3>\",\"delivery_spec_hash\":null,\"effective_contract_hash\":\"<sha256#23>\",\"engineering_plan_hash\":\"<sha256#41>\",\"executor\":\"host\",\"exit_code\":0,\"name\":\"smoke\",\"product_spec_hash\":\"<sha256#22>\",\"snapshot_hash\":\"<sha256#50>\",\"summary\":\"host-executed argv=[\\\"<python>\\\",\\\"-c\\\",\\\"import pathlib, sys, time; print('check started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\\\",\\\"<data>/check-running\\\"] exit=0\\ncheck started\",\"tree_changed\":false}}",
      "type": "function_call_output"
     },
     "input_modalities": [
@@ -2561,10 +2567,13 @@
    "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#3>",
+    "activations": 3,
+    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
     "latency_ms": "<duration>",
+    "model_steps": 3,
     "prompt_hash": "<sha256#25>",
     "prompt_version": 0,
     "stop_reason": "cancelled"
@@ -3363,7 +3372,7 @@
   "reviews": [],
   "rework_count": 0,
   "round": 0,
-  "run_event_version": 2,
+  "run_event_version": 3,
   "run_id": "<run#1>",
   "run_time_limit_sec": 7200,
   "sessions": {
@@ -4252,11 +4261,11 @@
     "effective_contract_hash": "<sha256#23>",
     "engineering_plan_hash": "<sha256#41>",
     "executor": "host",
-    "exit_code": 130,
+    "exit_code": 0,
     "name": "smoke",
     "product_spec_hash": "<sha256#22>",
     "snapshot_hash": "<sha256#50>",
-    "summary": "host-executed argv=[\"<python>\",\"-c\",\"import pathlib, sys, time; print('check started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\",\"<data>/check-running\"] exit=130\ncheck cancelled; the process tree was stopped\ncheck started",
+    "summary": "host-executed argv=[\"<python>\",\"-c\",\"import pathlib, sys, time; print('check started', flush=True); pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)\",\"<data>/check-running\"] exit=0\ncheck started",
     "tree_changed": false
    }
   }

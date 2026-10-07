@@ -150,6 +150,8 @@ def main() -> None:
                         help="登记注册表的 JSON 文件，没有时省略")
     parser.add_argument("--resume-only", action="store_true",
                         help="不创建事项，只让启动恢复继续已有的 run（重启已有的数据目录）")
+    parser.add_argument("--run-time-limit", type=int, default=None,
+                        help="run 的运行时间上限（秒），给出时按这个上限创建 run（工单 #350）")
     parser.add_argument("--hold-after", type=str, default=None,
                         help="该事件提交以后进程停在这个位置（写下 hold 标记以后等待被终止）")
     parser.add_argument("--hold-dir", type=Path, default=None, help="hold 标记所在的目录")
@@ -196,9 +198,10 @@ def main() -> None:
         project_id, _work_item_id, run_id = system.projects.onboard(
             args.project_name, args.task, "src", str(args.onboard_source))
     else:
+        options = {} if args.run_time_limit is None else {"run_time_limit_sec": args.run_time_limit}
         run_id = system.create_run(args.task, registered_commands=registry,
                                    command_versions=None if registry is None
-                                   else {name: 1 for name in registry})
+                                   else {name: 1 for name in registry}, **options)
     if args.await_file is not None:
         # 工单 #308：另起看门狗进程盯着工作区，看到目标内容落盘就终止本进程（回执来不及写）
         threading.Thread(target=_await_file,
@@ -233,7 +236,7 @@ def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: 
            onboard: Path | None = None, settle: bool = False,
            answer_revise: str | None = None,
            await_file: tuple[str, str] | None = None, await_dir: Path | None = None,
-           resume_only: bool = False) -> subprocess.Popen:
+           resume_only: bool = False, run_time_limit_sec: int | None = None) -> subprocess.Popen:
     environment = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
     spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
              else {"start_new_session": True})
@@ -251,6 +254,8 @@ def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: 
         argv.extend(["--workspace-files", str(workspace_files)])
     if onboard is not None:
         argv.extend(["--onboard", "--onboard-source", str(onboard)])
+    if run_time_limit_sec is not None:
+        argv.extend(["--run-time-limit", str(run_time_limit_sec)])
     if settle:
         argv.append("--settle")
     if answer_revise is not None:
@@ -374,7 +379,8 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
                 settle: bool = False,
                 answer_revise: str | None = None,
                 resume_after: bool = True,
-                revision: bool = False) -> Interrupted:
+                revision: bool = False,
+                run_time_limit_sec: int | None = None) -> Interrupted:
     # resume_after 为假时 after 打开以后不走启动恢复（连续中断的场景用 restarted 的子进程恢复，
     # 父进程不再碰这份日志，避免重复恢复污染事件）
     # 在真实子进程里运行一个事项，在指定的时刻终止它，再用同一个数据目录重新打开系统走启动恢复。
@@ -407,7 +413,8 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
                      hold_dir=hold_dir, hold_action=hold_action, workspace_files=files_file,
                      onboard=onboard, settle=settle, answer_revise=answer_revise,
                      await_file=None if await_file is None else (await_file[0], await_file[1]),
-                     await_dir=None if await_file is None else data_dir / "workspaces")
+                     await_dir=None if await_file is None else data_dir / "workspaces",
+                     run_time_limit_sec=run_time_limit_sec)
     try:
         if await_file is not None:
             process.wait(STARTUP_TIMEOUT_SEC)
