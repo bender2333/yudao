@@ -19,7 +19,14 @@ yudao = "harness.__main__:main"
 # uv sync 默认安装 dev 组，测试在按锁文件安装的项目环境中运行
 [dependency-groups]
 # PyYAML 供发布脚本 scripts/release.py 读取 electron-builder 生成的更新清单 latest.yml
-dev = ["pytest>=8", "pytest-xdist>=3.8", "import-linter>=2.15,<3", "trustme>=1.2,<2", "pyyaml>=6,<7"]
+dev = [
+    "pytest>=8",
+    "pytest-xdist>=3.8",
+    "import-linter>=2.15,<3",
+    "trustme>=1.2,<2",
+    "pyyaml>=6,<7",
+    "pytest-timeout>=2.4.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["harness*"]
@@ -49,4 +56,6 @@ allowed_importers = ["harness.api", "harness.__main__", "harness.demo", "harness
 [tool.pytest.ini_options]
 testpaths = ["harness/tests"]
 pythonpath = ["."]
-addopts = "-q"
+addopts = "-q --tb=line -rfE -p no:warnings"
+markers = ["unit: 内存数据与纯规则的测试", "module: 单个模块连同真实依赖的测试", "integration: 完整循环与服务进程的测试"]
+strict_markers = true
