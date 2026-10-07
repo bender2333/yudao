@@ -102,6 +102,7 @@ CATALOG_EVENT_TYPES = frozenset({
     "runtime_drain_started",
     "runtime_force_upgrade_requested",
     "home_seen",
+    "parameter_set",
 })
 
 # 全部声明过分类的事件种类

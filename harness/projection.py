@@ -332,6 +332,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.run_event_version = int(payload.get("run_event_version", 0))
         # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（ADR-0014）
         state.definitions_version = str(payload.get("definitions_version", ""))
+        # 创建这个 run 时冻结的参数版本；旧 run 没有这个字段时为空（工单 #349）
+        state.parameters_version = str(payload.get("parameters_version", ""))
         # 事项种类与仓库概况：旧 run 的创建事件没有这两个字段，种类按普通事项理解（工单 #134）
         state.kind = str(payload.get("kind", "change"))
         state.overview_ref = payload.get("overview_ref")
