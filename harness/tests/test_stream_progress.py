@@ -10,9 +10,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 
-from harness.tests.protocol_helpers import ResponsesAdapter
+from harness.tests.protocol_helpers import (
+    STUB_KEY as KEY,
+    ResponsesAdapter,
+    stub_event as _event,
+    stub_server as _server,
+    stub_submit_stream as _submit_stream,
+)
 from harness.models import ArtifactRef, EventType
-from harness.tests.test_responses import KEY, _event, _server, _submit_stream
 from harness.providers.responses import ResponsesConfig
 from harness.runtime import LoopSystem
 

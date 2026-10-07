@@ -8,9 +8,12 @@ from harness.projection import saved_decisions
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import recorded_context
-from harness.tests.test_onboarding import REQUIREMENT, _source
+from harness.tests.onboarding_project import (
+    ONBOARDING_GOAL as GOAL,
+    ONBOARDING_REQUIREMENT as REQUIREMENT,
+    onboarding_source as _source,
+)
 
-GOAL = "把已有项目接入 Yudao，写出初始 PRD 并核验现有行为"
 NOTE = "现有 CLI 还没有 --help，初始 PRD 要把这个用法说明写进去"
 NEW_REQUIREMENT = "the CLI explains its usage when started with --help"
 

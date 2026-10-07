@@ -8,17 +8,12 @@ from harness.runtime import LoopSystem
 from harness.snapshot import ingest_snapshot
 from harness.tools import tools_for
 
-GOAL = "把已有项目接入 Yudao，写出初始 PRD 并核验现有行为"
-REQUIREMENT = "print the given argument to stdout"
+from harness.tests.onboarding_project import (
+    ONBOARDING_GOAL as GOAL,
+    ONBOARDING_REQUIREMENT as REQUIREMENT,
+    onboarding_source as _source,
+)
 
-def _source(root: Path) -> Path:
-    # 一份最小的已有项目：一个可运行的脚本、一个说明文件与一个通过的测试
-    (root / "src").mkdir(parents=True)
-    (root / "src" / "echo.py").write_text("import sys\nprint(sys.argv[1])\n", encoding="utf-8")
-    (root / "README.md").write_text("# Echo\n\nPrint the given argument.\n", encoding="utf-8")
-    (root / "tests").mkdir()
-    (root / "tests" / "test_echo.py").write_text("def test_placeholder():\n    assert True\n", encoding="utf-8")
-    return root
 
 def _onboarding_run(tmp_path: Path, script, *, source: Path | None = None) -> tuple[LoopSystem, str]:
     # 建档 run 由控制系统从快照创建：没有采纳成果，工作区从快照建立。

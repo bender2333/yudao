@@ -315,7 +315,7 @@ def test_model_input_audit_rejects_forged_injected_source_metadata(native_run):
 
 
 def test_model_input_audit_rebuilds_summary_scope_after_contract_changes(tmp_path):
-    from harness.tests.test_compaction_engine import _runner
+    from harness.tests.helpers import compacted_runner as _runner
 
     system, adapter, run_id, _ = _runner(tmp_path)
     first = system.activate_once(run_id)
@@ -470,7 +470,7 @@ def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_
 
 @pytest.fixture
 def compacted_run(tmp_path):
-    from harness.tests.test_compaction_engine import _runner
+    from harness.tests.helpers import compacted_runner as _runner
 
     system, _, run_id, _ = _runner(tmp_path)
     result = system.activate_once(run_id)

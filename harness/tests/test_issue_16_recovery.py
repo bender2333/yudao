@@ -17,6 +17,7 @@ from harness.runtime import LoopSystem
 from harness.streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from harness.tests.helpers import delivery_turn, plan_turn, review_turn
 from harness.tests.protocol_helpers import serve, sse
+from harness.tests.saved_rewrite import reload_without_saved_projection as _reload_without_saved_projection
 from harness.write_path import NewEvent
 
 def _plain_reply():
@@ -73,14 +74,6 @@ def _older_run_event_version(data_dir):
         connection.close()
     _reload_without_saved_projection(data_dir)
 
-def _reload_without_saved_projection(data_dir):
-    # 保存的投影位于事件日志的同一个文件里，改写事件以后要从事件重放补建，才与升级以后的数据目录一致
-    connection = sqlite3.connect(data_dir / "events.sqlite")
-    try:
-        connection.execute("DELETE FROM projections")
-        connection.commit()
-    finally:
-        connection.close()
 
 def _older_definitions_version(data_dir, version="sha256:定义版本在升级之前的内容"):
     # 模拟一次升级：把 run_created 记录的定义版本改成另一个版本。ADR-0014 的定义版本只有发布新版本时改变，

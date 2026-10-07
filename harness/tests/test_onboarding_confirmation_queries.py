@@ -3,7 +3,6 @@
 # work_item.materials 按轮列出的建档材料。系统整体运行：真实启动 FastAPI 应用（uvicorn），经 HTTP 读取查询与
 # 提交 decision.answer；控制核心在服务生命周期中建立，事件日志是真实的 SQLite 文件，模型回答由 FakeAdapter 给出。
 
-import time
 import uuid
 from pathlib import Path
 
@@ -14,24 +13,20 @@ from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import happy_script
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.onboarding_project import (
+    ONBOARDING_GOAL as GOAL,
+    ONBOARDING_REQUIREMENT as REQUIREMENT,
+    OpenedFake as _Opened,
+    onboarding_source,
+    open_initial_prd as _open_initial_prd,
+    post_command as _post,
+    wait_until as _wait_for,
+)
 
-GOAL = "把已有项目接入 Yudao，写出初始 PRD 并核验现有行为"
-REQUIREMENT = "print the given argument to stdout"
 
-# 等待一次建档 run 结束的墙钟界限只用来防止测试一直等待（#107）；run 是否按预期结束由等待之后的断言核对
-_WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
-
-
-def _source(root: Path) -> Path:
-    # 一份最小的已有项目：一个脚本、一个说明文件、一个通过的测试与一个失败的测试
-    (root / "src").mkdir(parents=True)
-    (root / "src" / "echo.py").write_text("import sys\nprint(sys.argv[1])\n", encoding="utf-8")
-    (root / "README.md").write_text("# Echo\n\nPrint the given argument.\n", encoding="utf-8")
-    (root / "tests").mkdir()
-    (root / "tests" / "test_echo.py").write_text("def test_placeholder():\n    assert True\n", encoding="utf-8")
-    (root / "tests" / "test_broken.py").write_text("def test_broken():\n    assert False\n", encoding="utf-8")
-    return root
+def _source(root) -> Path:
+    # 这份已有项目里有一个失败的测试：核验把它记为现有缺陷，采纳成果的已知风险与现有缺陷数才有内容
+    return onboarding_source(root, with_failing_test=True)
 
 
 def _script():
@@ -44,40 +39,6 @@ def _script():
                                            "evidence": "broken"}],
                              checks={"smoke": 0, "broken": 1}),
     ]
-
-
-class _Opened:
-    def __init__(self, data_dir, turns=None) -> None:
-        self.data_dir = data_dir
-        self.adapter = FakeAdapter(_script() if turns is None else turns)
-        self.applications: list[Application] = []
-
-    def __call__(self) -> Application:
-        application = Application(LoopSystem.for_testing(self.data_dir, self.adapter))
-        self.applications.append(application)
-        return application
-
-    @property
-    def system(self) -> LoopSystem:
-        return self.applications[-1].system
-
-
-def _post(client, command, **body):
-    return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})
-
-
-def _wait_for(predicate, timeout=_WAIT_LIMIT):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if predicate():
-            return True
-        time.sleep(0.05)
-    return False
-
-
-def _open_initial_prd(client, project_id) -> dict | None:
-    decisions = client.get(f"/api/queries/decisions.list?project_id={project_id}").json()["data"]["decisions"]
-    return next((item for item in decisions if item["kind"] == "initial_prd" and item["status"] == "open"), None)
 
 
 def _onboard(client, opened, tmp_path):
@@ -102,7 +63,7 @@ def _row(client, project_id):
 def test_projects_list_marks_the_item_awaiting_initial_prd_confirmation(data_dir, tmp_path):
     # 验收（3.4 节）：建档 run 结束并发出确认请求以后，projects.list 的建档状态标记为 awaiting_initial_prd；
     # project.loop 里建档事项的种类为 onboarding、状态为 awaiting_initial_prd
-    opened = _Opened(data_dir)
+    opened = _Opened(data_dir, turns=_script())
     with running_api(opened) as client:
         _source_dir, refs = _onboard(client, opened, tmp_path)
         assert _row(client, refs["project_id"])["onboarding_status"] == "awaiting_initial_prd"
@@ -114,7 +75,7 @@ def test_projects_list_marks_the_item_awaiting_initial_prd_confirmation(data_dir
 def test_materials_list_the_onboarding_round_by_round(data_dir, tmp_path):
     # 验收（3.4 节）：work_item.materials 按轮列出初始 PRD 原文、现有结构说明原文、基线核验结论与基线检查、
     # 仓库概况原文；还没有回答时这一轮没有确认记录
-    opened = _Opened(data_dir)
+    opened = _Opened(data_dir, turns=_script())
     with running_api(opened) as client:
         _source_dir, refs = _onboard(client, opened, tmp_path)
         materials = client.get(f"/api/queries/work_item.materials?project_id={refs['project_id']}"
@@ -141,7 +102,7 @@ def test_materials_list_the_onboarding_round_by_round(data_dir, tmp_path):
 def test_confirming_the_initial_prd_adopts_the_baseline_and_clears_the_marks(data_dir, tmp_path):
     # 验收（3.4、5 节）：回答「确认」以后 project.overview 的当前成果是建档基线，带快照来源与现有缺陷数；
     # projects.list 不再带建档状态标记，project.loop 里事项状态为 adopted，该轮的确认记录列出这次回答
-    opened = _Opened(data_dir)
+    opened = _Opened(data_dir, turns=_script())
     with running_api(opened) as client:
         source, refs = _onboard(client, opened, tmp_path)
         project_id, work_item_id = refs["project_id"], refs["work_item_id"]
