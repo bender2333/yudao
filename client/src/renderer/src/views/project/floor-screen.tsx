@@ -164,10 +164,8 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
         viewRef.current = view;
         // 画面建立以后立刻用当前的数据配置它：查询可能早于画面就绪，之后数据不再变化时不会再有 setModel
         if (modelRef.current) view.setModel(modelRef.current);
-        // 端到端测试经这个入口读取画面的当前状态；只在开发构建里暴露
-        if (import.meta.env.DEV) {
-          (window as unknown as { __floorViewForTest?: FloorTestHooks }).__floorViewForTest = floorTestHooks(view, () => resyncRef.current?.());
-        }
+        // 端到端测试经这个入口读取画面的当前状态（只读的检查入口）
+        (window as unknown as { __floorViewForTest?: FloorTestHooks }).__floorViewForTest = floorTestHooks(view, () => resyncRef.current?.());
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -227,15 +225,16 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     viewRef.current?.focus(props.workItemId);
   }, [props.workItemId]);
 
-  useEffect(() => {
-    viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data));
-  }, [overlay, loop.data, decisions.data]);
-
-  const overlays = (capabilities?.overlays ?? []).map((o) => o.name);
+  // 流转查询：覆盖层按其 segments 渲染，画面与下方文字列表共用同一份查询结果
   const flow = useSnapshot<ProjectFlowResult>(props.app, "page.loop.flow", "project.flow", {
     project_id: props.projectId,
   });
-  void flow;
+  const flowSegments = useMemo(() => flowSegmentsOf(flow.data), [flow.data]);
+  useEffect(() => {
+    viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data, flowSegments));
+  }, [overlay, loop.data, decisions.data, flowSegments]);
+
+  const overlays = (capabilities?.overlays ?? []).map((o) => o.name);
   // 文字列表里的决定请求：与画面同源的查询结果，按发出时间排列
   const openDecisions = useMemo(
     () => sortByRequested((decisions.data?.decisions ?? []).filter((d) => d.status === "open")),
@@ -263,11 +262,36 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   );
 }
 
+/** 流转覆盖层的段：按起点、终点与是否返工分组，统计次数与最后时间（原型 v9 scenes.js overlayData）。 */
+export function flowSegmentsOf(flow: ProjectFlowResult | null): { from: string; to: string; count: number; last_at: string; kind: string }[] {
+  const groups: Record<string, { from: string; to: string; count: number; last_at: string; kind: string }> = {};
+  for (const record of flow?.records ?? []) {
+    if (!record.direction_from || !record.direction_to) continue;
+    const rework = record.kind === "返工";
+    const key = `${record.direction_from}>${record.direction_to}>${rework ? "rework" : record.kind}`;
+    const group = groups[key];
+    if (group) {
+      group.count += 1;
+      if (record.created_at > group.last_at) group.last_at = record.created_at;
+    } else {
+      groups[key] = {
+        from: record.direction_from,
+        to: record.direction_to,
+        count: 1,
+        last_at: record.created_at,
+        kind: rework ? "rework" : record.kind,
+      };
+    }
+  }
+  return Object.values(groups);
+}
+
 /** 覆盖层的数据：按能力清单里的覆盖层名称取对应查询的结果；没有登记时不给数据。 */
 function overlayData(
   name: string,
   loop: ProjectLoopResult | null,
   decisions: DecisionList | null,
+  flowSegments: { from: string; to: string; count: number; last_at: string; kind: string }[],
 ): Record<string, unknown> | null {
   if (name === "waiting") {
     const entries = (loop?.work_items ?? [])
@@ -283,7 +307,7 @@ function overlayData(
     }
     return { entries };
   }
-  if (name === "flow") return { segments: [] };
+  if (name === "flow") return { segments: flowSegments };
   return null;
 }
 

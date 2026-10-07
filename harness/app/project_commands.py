@@ -13,7 +13,7 @@ from ..projects import (
     SourceDirectoryNotFoundError,
     WorkItemInProgressError,
 )
-from ..public_tree import TreeError
+from ..path_rules import TreeError
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, Text
 from .registry import CommandDefinition

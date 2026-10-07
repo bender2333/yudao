@@ -9,12 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from ..models import QA_VERDICTS, canonical_hash, json_dumps
+from ..path_rules import TreeError, validate_public_path
 from ..public_tree import (
     CapturedTree,
-    TreeError,
     capture_public_tree,
     materialize_tree,
-    validate_public_path,
     verify_public_tree,
 )
 from .records import (

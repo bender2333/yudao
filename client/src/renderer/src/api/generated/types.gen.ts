@@ -988,10 +988,6 @@ export type CatalogConnectionTest = {
      * Provider Id
      */
     provider_id: string;
-    /**
-     * Model Id
-     */
-    model_id?: string | null;
 };
 
 /**
@@ -16251,7 +16247,7 @@ export type CommandCatalogConnectionTestData = {
 
 export type CommandCatalogConnectionTestErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, catalog_invalid, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, command_id_reused
      */
     409: Rejected;
     /**

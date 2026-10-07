@@ -1,12 +1,5 @@
-"""Capture and reproduce a complete public workspace without following links.
-
-The public tree holds every workspace entry except the host-private paths and the
-paths the project's ignore rules (its .gitignore files and Git exclude files)
-exclude. The ignore rules are decided in process by libgit2; see
-`excluded_by_ignore_rules`. Entries the public tree cannot represent (links, reparse
-points, hard links, special files) raise `UnrepresentableWorkspace` naming only
-the workspace-relative path.
-"""
+# 公开工作区的采集与还原。公开路径的规则（可移植相对路径、主机私有路径）由 path_rules.py
+# 提供，裁决的计划范围与这里共用同一套规则；忽略规则的判断需要 libgit2，因此放在本模块。
 
 from __future__ import annotations
 
@@ -22,17 +15,15 @@ import pygit2
 from pygit2.enums import RepositoryInitFlag, RepositoryOpenFlag
 
 from .models import canonical_hash, hash_bytes
+from .path_rules import TreeError, is_git_metadata, is_private_path, validate_public_path
+
 
 TREE_FORMAT = "yudao-public-tree-v1"
 _HASH = re.compile(r"sha256:[0-9a-f]{64}")
-_DEVICE = re.compile(r"(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3]|conin\$|conout\$)", re.IGNORECASE)
 # 工作区忽略规则探测用的 Git 目录：放在工作区自身之外，避免它成为公开树的条目
 IGNORE_PROBE_DIR = ".yudao-ignore-probe.git"
 _GIT_DIR_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
-
-class TreeError(ValueError):
-    """A tree is incomplete, changed, or cannot be represented without ambiguity."""
 
 class UnrepresentableWorkspace(TreeError):
     """The workspace holds entries the public tree cannot represent.
@@ -81,31 +72,6 @@ class CapturedTree:
     def digest(self) -> str:
         return canonical_hash(self.manifest)
 
-def is_private_path(relative: str) -> bool:
-    parts = relative.replace("\\", "/").casefold().split("/")
-    return parts[0] == ".checks" or ".git" in parts
-
-def is_git_metadata(relative: str) -> bool:
-    # 仓库自身的 Git 元数据：公开树排除它（设计第 4.2 节），快照接入不因为它拒绝源目录
-    return ".git" in relative.replace("\\", "/").casefold().split("/")
-
-def validate_public_path(relative: str) -> None:
-    """Accept an unambiguous portable relative path, never silently normalize it."""
-    if not isinstance(relative, str) or not relative or "\\" in relative:
-        raise TreeError(f"Invalid public path: {relative!r}")
-    if PurePosixPath(relative).is_absolute() or PureWindowsPath(relative).drive:
-        raise TreeError(f"Public path must be relative: {relative!r}")
-    for part in relative.split("/"):
-        if not part or part in {".", ".."} or part.endswith((".", " ")):
-            raise TreeError(f"Ambiguous public path: {relative!r}")
-        if any(ord(character) < 32 or character in '<>:"|?*' for character in part) or _DEVICE.fullmatch(part.split(".", 1)[0].rstrip(" ")):
-            raise TreeError(f"Public path has a reserved component: {relative!r}")
-        try:
-            part.encode("utf-8", errors="strict")
-        except UnicodeEncodeError as exc:
-            raise TreeError(f"Public path is not valid UTF-8: {relative!r}") from exc
-    if is_private_path(relative):
-        raise TreeError(f"Host-private path is not part of a public tree: {relative!r}")
 
 def validate_manifest(manifest: dict[str, Any]) -> None:
     """Check the complete directory and file set before any destination is written."""
@@ -379,6 +345,5 @@ def _identity(observed: os.stat_result, *, change_time: bool = True) -> tuple[in
 __all__ = [
     "CapturedFile", "CapturedTree", "TreeError", "UnrepresentableWorkspace",
     "capture_public_tree", "excluded_by_ignore_rules", "has_ignore_rules", "ignore_probe_directory",
-    "is_git_metadata", "is_private_path", "materialize_tree", "resolve_public_path", "unrepresentable_reason",
-    "validate_manifest", "validate_public_path", "verify_public_tree",
+    "materialize_tree", "resolve_public_path", "unrepresentable_reason", "verify_public_tree",
 ]

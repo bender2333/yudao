@@ -100,12 +100,14 @@ def _auth_headers(protocol: str, api_key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {api_key}"}
 
 def effective_models_url(provider: ProviderDefinition, override: str | None = None) -> str:
-    # 模型列表地址的来源：先取本次填写的覆盖值，其次连接自己填的地址，最后服务方案预置的地址（设计说明第 4.3 节）
+    # 用户写入的模型列表地址优先；自定义服务随连接地址计算默认值。
     if isinstance(override, str) and override.strip():
         return override.strip()
     if provider.models_url:
         return provider.models_url
-    return preset_models_url(provider.preset_id)
+    if provider.preset_id:
+        return preset_models_url(provider.preset_id)
+    return provider.base_url.rstrip("/") + "/models"
 
 
 def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:

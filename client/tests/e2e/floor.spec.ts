@@ -210,6 +210,90 @@ test("两种窗口尺寸下楼层画面都可用，控制台错误为零", async
     }
   }
 });
+// 流转覆盖层（工单 #366 验收标准 2）：项目跑过部门之间的交接后，切到「流转」覆盖层，
+test("流转覆盖层：画面的 segments 与 project.flow 查询的 records 聚合结果一致", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    const id = await projectId(SAMPLE);
+    const records = await query<{ records: { direction_from: string | null; direction_to: string | null; kind: string; created_at: string }[] }>(
+      "project.flow", { project_id: id });
+    expect(records.records.some((row) => row.direction_from && row.direction_to)).toBe(true);
+    await openFloor(page, id);
+    await page.locator(".floor-overlay-tabs button", { hasText: "流转" }).click();
+    await waitUntil(async () => (await readOverlay(page)).segments.length > 0, "画面写入流转覆盖层的 segments");
+    const overlay = await readOverlay(page);
+    expect(overlay.id).toBe("flow");
+    const expected = aggregateFlowSegments(records.records);
+    expect(overlay.segments).toHaveLength(expected.length);
+    for (const seg of overlay.segments) {
+      const same = expected.find((row) => row.from === seg.from && row.to === seg.to && row.kind === seg.kind);
+      expect(same).toEqual(seg);
+    }
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
+type FlowSegment = { from: string; to: string; count: number; last_at: string; kind: string };
+
+/** 把 project.flow 的行按起点、终点与是否返工聚合，与前端覆盖层 segments 同形（floor-screen.tsx flowSegmentsOf）。 */
+function aggregateFlowSegments(records: { direction_from: string | null; direction_to: string | null; kind: string; created_at: string }[]): FlowSegment[] {
+  const groups: Record<string, FlowSegment> = {};
+  for (const row of records) {
+    if (!row.direction_from || !row.direction_to) continue;
+    const rework = row.kind === "返工";
+    const key = `${row.direction_from}>${row.direction_to}>${rework ? "rework" : row.kind}`;
+    const prev = groups[key];
+    if (prev) {
+      prev.count += 1;
+      if (row.created_at > prev.last_at) prev.last_at = row.created_at;
+    } else {
+      groups[key] = {
+        from: row.direction_from,
+        to: row.direction_to,
+        count: 1,
+        last_at: row.created_at,
+        kind: rework ? "rework" : row.kind,
+      };
+    }
+  }
+  return Object.values(groups);
+}
+
+/** 在页面里读出当前画面的覆盖层；逐字段检查再返回。 */
+async function readOverlay(page: Page): Promise<{ id: string | null; segments: FlowSegment[] }> {
+  return page.evaluate(() => {
+    const win: unknown = window;
+    if (!win || typeof win !== "object" || !("__floorViewForTest" in win)) return { id: null, segments: [] };
+    const hooks = win.__floorViewForTest;
+    if (!hooks || typeof hooks !== "object" || !("overlay" in hooks)) return { id: null, segments: [] };
+    const overlayFn = hooks.overlay;
+    if (typeof overlayFn !== "function") return { id: null, segments: [] };
+    const overlay: unknown = overlayFn();
+    if (!overlay || typeof overlay !== "object" || !("id" in overlay) || !("data" in overlay)) {
+      return { id: null, segments: [] };
+    }
+    const id = typeof overlay.id === "string" ? overlay.id : null;
+    const data: unknown = overlay.data;
+    if (!data || typeof data !== "object" || !("segments" in data) || !Array.isArray(data.segments)) {
+      return { id, segments: [] };
+    }
+    const segments: FlowSegment[] = [];
+    for (const raw of data.segments) {
+      if (!raw || typeof raw !== "object") continue;
+      if (!("from" in raw) || !("to" in raw) || !("count" in raw) || !("last_at" in raw) || !("kind" in raw)) continue;
+      if (typeof raw.from === "string" && typeof raw.to === "string"
+        && typeof raw.count === "number" && typeof raw.last_at === "string" && typeof raw.kind === "string") {
+        segments.push({ from: raw.from, to: raw.to, count: raw.count, last_at: raw.last_at, kind: raw.kind });
+      }
+    }
+    return { id, segments };
+  });
+}
+
 
 // 世界里的决定卡片（工单 #179 验收标准 2）：在真实运行的系统上，文本工具项目产生一个待恢复的决定请求。
 // 点大厅的板子打开卡片，点选项盖章回答；事件到达以后这个决定移出等待列表，画面上的纸收起。
