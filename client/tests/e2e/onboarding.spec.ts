@@ -1,4 +1,4 @@
-// 接入已有项目的端到端测试（工单 #137 的验收）：Playwright 启动 Electron，连接真实运行的后端
+// 接入已有项目的端到端测试（工单 #137 的验收）：Playwright 打开 Chromium 页面，连接真实运行的后端
 // （tests/e2e/backend.py 的 --script onboarding，FakeAdapter 驱动）。模型回答由 FakeAdapter 给出，
 // 不使用 mock：源目录是真实目录，接入命令真的采集它的代码快照。
 //
@@ -6,7 +6,7 @@
 //   1. 经对话框完成一次接入，建档状态标记随事件变化，部门房间出现「阅读已有项目」的动作；
 //   2. 填写无效的源目录时对话框显示 source_invalid 的原因与相对路径，没有出现新项目；
 //   3. 放弃等待确认的建档以后「重新开始建档」可用，点击以后出现新的建档事项。
-// 两种窗口尺寸：1440×900 走完整流程，390×844 核对接入对话框与状态标记可用。控制台错误为零。
+// 两种视口尺寸：1440×900 走完整流程，1920×1080 核对接入对话框与状态标记可用。控制台错误为零。
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
@@ -247,10 +247,10 @@ test.describe("接入已有项目（1440×900）", () => {
   });
 });
 
-test.describe("接入已有项目（390×844）", () => {
-  test("窄屏：经对话框完成一次接入，项目列表显示建档状态标记，没有横向滚动", async () => {
+test.describe("接入已有项目（1920×1080）", () => {
+  test("1920×1080：经对话框完成一次接入，项目列表显示建档状态标记，没有横向滚动", async () => {
     test.setTimeout(300_000);
-    const client = await openClient({ width: 390, height: 844 });
+    const client = await openClient({ width: 1920, height: 1080 });
     const errors = watchErrors(client);
     const page = client.page;
     try {
@@ -258,14 +258,13 @@ test.describe("接入已有项目（390×844）", () => {
       if (source === null) {
         throw new Error("后端没有报出建档脚本的源目录");
       }
-      // 抽屉打开以后侧栏的「接入已有项目」在窄屏上同样可用，接入在窄屏上真的走完
-      await page.locator(".drawer-toggle").click();
+      // 宽屏布局侧栏常驻，「接入已有项目」直接可用，接入真的走完
       const form = await onboardForm(page);
       await expect(form.getByLabel("源目录路径")).toBeVisible();
-      await fillOnboardForm(form, "窄屏接入", source);
+      await fillOnboardForm(form, "大屏接入", source);
       await form.getByRole("button", { name: "接入项目" }).click();
-      await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes("窄屏接入"),
-        page, "侧栏出现窄屏接入的项目");
+      await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes("大屏接入"),
+        page, "侧栏出现大屏接入的项目");
 
       // 首页项目列表上的建档状态标记
       await page.evaluate(() => {

@@ -26,7 +26,8 @@ flowchart TD
 - `scorer/`：评分器，对一份交付运行隐藏检查并写出机器可读结果。
 - `runner/`：OpenCode 一侧的运行器、指标收集与报告（`run_eval.py` 是入口）。它把材料起点复制到仓库之外的运行目录，运行 `opencode run`，从 JSON 事件流收集指标，再用评分器评分，最后写出机器可读结果与中文报告。
 - `runner/yudao.py`、`yudao_metrics.py`、`yudao_report.py`：Yudao 一侧的运行器、指标收集与报告（`run_yudao_eval.py` 是入口）。运行器只经 HTTP 接口驱动 Yudao，只从 `run.export` 导出的事件日志观察它，不导入 `harness` 的任何模块。它在仓库之外新建数据目录启动被测的 Yudao，写入被测模型并经模型测试准入，建立项目、绑定三个部门、登记场景 3 的命令（`run_cli` 与 `check_data`，按接口约定第 5 节的命令行入口），以用户原始意图提交需求原文加接口约定，到时间上限时经 `work_item.cancel` 结束并标记超时；运行结束以后导出事件日志，取最后一次封存的交付交给评分器，并计算过程检查点与指标。
-- `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。
+- `baseline/`：omp 流程开发 Yudao 的基线数字。`collect.py` 抓取 Stage 3 里程碑下的工单、标签时间线与评论、合并请求、阶段父工单 #9 的集成层记录与运行目录里的运行输出，合成一个数据文件；`compute.py` 只读这个数据文件，算出每个工单的审查轮数、集成层失败归因、搁置原因、耗时与用量，写出中文报告。
+- `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。基线工具的测试读录制的数据文件，同样不使用 mock。
 
 ## 材料版本
 
@@ -110,6 +111,18 @@ uv run python -m pytest evals/tests/test_opencode_runner.py
 
 
 其中三项标记 `needs_model`，真实运行模型（每次数分钟），凭据不在环境变量里时跳过。
+
+
+## omp 基线数字
+
+`baseline/` 建立 omp 流程开发 Yudao 的基线数字，分抓取与计算两步。抓取经 `gh` 导出 Stage 3 里程碑下的工单、标签时间线与评论、合并请求、阶段父工单 #9 的集成层记录，再读运行目录里 `omp-` 与 `rv-` 开头的运行输出，合成一个数据文件；计算只读这个数据文件，写出逐个工单的数字与中文报告。
+
+```bash
+uv run python evals/baseline/collect.py --stage-parent 9 --runs-root C:/project/yudao-worktrees/autopilot/runs --data docs/evaluation/baseline-omp-stage3.json
+uv run python evals/baseline/compute.py --data docs/evaluation/baseline-omp-stage3.json --report docs/evaluation/baseline-omp-stage3.md
+```
+
+抓取一次约 15 分钟（大量 `gh` 调用），中断以后重跑按工单编号续抓。基线数据文件与报告在 `docs/evaluation/`，测试读录制的数据文件，不调用 `gh`。
 
 ## 运行环境
 

@@ -1,20 +1,18 @@
-# 发布脚本的验收（工单 #209、#313，设计说明第 6.3、9 节）：把仓库复制到临时目录，建立 main 分支
-# 与一个本地 bare 远端，运行 scripts/release.py（不带 --publish），核对 wheel 的路径、SHA-256、
-# wheel 内含的客户端安装程序、blockmap 与 latest.yml，latest.yml 中的 SHA-512 与安装程序一致，
-# 以及 wheel 的发布资源目录里只有本次版本的文件（#313）。
-# 同时核对工作区不干净、版本号不一致、当前提交不在 main 上时脚本拒绝。
+# 发布脚本的验收（工单 #373，网页界面的提供与发布设计说明第 6.3 节）：把仓库复制到临时目录，
+# 建立 main 分支与一个本地 bare 远端，运行 scripts/release.py（不带 --publish），核对 wheel 的路径、
+# SHA-256、wheel 内含页面文件且与页面构建输出逐个一致、不含客户端安装程序与更新清单，
+# 以及 wheel 的发布资源目录里只有本次构建的文件（#313 的清理逻辑沿用）。
+# 同时核对工作区不干净、发布标签已存在、当前提交不在 main 上时脚本拒绝。
 #
-# 构建走真实流程：npm ci、electron-builder 生成安装程序与 latest.yml、uv build 生成 wheel。
-# 不使用任何 mock；构建一次约三分钟，用 module 作用域的夹具只做一次。
+# 构建走真实流程：npm ci、Vite 构建页面文件、uv build 生成 wheel。不使用任何 mock；
+# 构建一次约几分钟，用 module 作用域的夹具只做一次。
 #
 # --publish 的步骤写在脚本里，自动测试不推送真实标签、也不创建真实的 Release：本文件用一个
 # 放在 PATH 前面的假 gh（只记录被调用的命令）核对 publish 发出的命令；打标签与推送到一个
 # 本地 bare 远端，是真实的 git 命令。
 
-import base64
 import hashlib
 import importlib.util
-import json
 import os
 import shutil
 import subprocess
@@ -28,7 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_SCRIPT = REPO_ROOT / "scripts" / "release.py"
 # 构建与复制跳过的东西：虚拟环境、临时目录、依赖、已有的构建产物与发布资源
 _SKIP_NAMES = {".venv", ".tmp", "__pycache__", "node_modules", "release_assets", ".pytest_cache",
-               "dist", "test-results", "playwright-report", ".git"}
+               "dist", "test-results", "playwright-report", ".git", "out"}
 
 def _env() -> dict[str, str]:
     # 运行 Python 子进程的环境：显式把输出编码设为 UTF-8。脚本与命令按控制台的编码写出，
@@ -61,7 +59,7 @@ def _prepare_checkout(workdir: Path) -> tuple[Path, Path]:
     return source, remote
 
 def _python() -> Path:
-    # 项目环境中的 Python：与测试进程同一个解释器，含 PyYAML（发布脚本读 latest.yml 需要）
+    # 项目环境中的 Python：与测试进程同一个解释器
     return Path(sys.executable)
 
 def _run_release(source: Path, output_dir: Path, *extra: str) -> subprocess.CompletedProcess:
@@ -97,18 +95,45 @@ def _version(path: Path) -> str:
 def _wheel_path(output_dir: Path, version: str) -> Path:
     return output_dir / f"yudao_harness-{version}-py3-none-any.whl"
 
-def test_build_produces_a_wheel_with_the_client_assets(release_build):
-    # 验收第 1 项：不带 --publish 时得到 wheel，wheel 内含安装程序、blockmap 与 latest.yml
+def _wheel_members(wheel: Path) -> set[str]:
+    with zipfile.ZipFile(wheel) as archive:
+        return set(archive.namelist())
+
+def test_build_produces_a_wheel_with_the_page_files(release_build):
+    # 验收第 1 项：不带 --publish 时得到 wheel，wheel 内含入口页面与它引用的文件
     version = _version(REPO_ROOT / "pyproject.toml")
     wheel = _wheel_path(release_build["output_dir"], version)
     assert wheel.is_file(), release_build["result"].stdout + release_build["result"].stderr
+    members = _wheel_members(wheel)
+    assert "harness/release_assets/index.html" in members
+    hashed = [name for name in members
+              if name.startswith("harness/release_assets/assets/") and not name.endswith("/")]
+    assert hashed, "wheel 内的页面文件没有带内容摘要的引用文件"
+
+def test_the_wheel_carries_no_installer_or_update_manifest(release_build):
+    # 工单验收：wheel 不含客户端安装程序与更新清单
+    version = _version(REPO_ROOT / "pyproject.toml")
+    wheel = _wheel_path(release_build["output_dir"], version)
+    members = _wheel_members(wheel)
+    assert not [name for name in members if name.endswith((".exe", ".blockmap", ".yml"))], \
+        [name for name in members if name.endswith((".exe", ".blockmap", ".yml"))]
+
+def test_wheel_page_files_match_the_build_output(release_build):
+    # 验收第 1 项：wheel 内的页面文件与页面构建输出目录中的文件逐个一致
+    version = _version(REPO_ROOT / "pyproject.toml")
+    wheel = _wheel_path(release_build["output_dir"], version)
+    built = release_build["source"] / "client" / "out" / "renderer"
+    expected = {path.relative_to(built).as_posix(): path.read_bytes()
+                for path in sorted(built.rglob("*")) if path.is_file()}
+    assert "index.html" in expected, "页面构建没有生成入口页面"
+    prefix = "harness/release_assets/"
     with zipfile.ZipFile(wheel) as archive:
-        members = set(archive.namelist())
-    installer_name = f"Yudao-Setup-{version}.exe"
-    for member in (f"harness/release_assets/{installer_name}",
-                   f"harness/release_assets/{installer_name}.blockmap",
-                   "harness/release_assets/latest.yml"):
-        assert member in members, member
+        packaged = {name[len(prefix):]: archive.read(name) for name in archive.namelist()
+                    if name.startswith(prefix) and not name.endswith("/")}
+    assert set(packaged) == set(expected), \
+        set(packaged) ^ set(expected)
+    changed = [name for name, content in expected.items() if packaged[name] != content]
+    assert not changed, changed
 
 def _checkout_copy(workdir: Path) -> Path:
     # 仓库的一份副本，只用来构建 wheel：核对 build/ 的清理与 wheel 内容的核对，不需要 git 环境
@@ -116,44 +141,42 @@ def _checkout_copy(workdir: Path) -> Path:
     shutil.copytree(REPO_ROOT, source, ignore=_ignore)
     return source
 
-def test_the_wheel_carries_no_installer_from_an_earlier_build_and_rejects_other_versions(tmp_path):
-    # 工单 #313：setuptools 不清理 build/lib，上一次构建的安装程序会跟着这次构建进 wheel；
-    # 发布脚本先删除 build/ 再构建，wheel 的发布资源目录里不留下一次构建的文件。
-    # 发布资源目录里另放一个其他版本的安装程序时，脚本的核对以非零状态退出并写明文件名。
+def test_the_wheel_carries_no_stale_file_and_rejects_foreign_files(tmp_path):
+    # 工单 #313 的清理逻辑沿用：setuptools 不清理 build/lib，上一次构建的文件会跟着这次构建进 wheel；
+    # 发布脚本先删除 build/ 再构建，wheel 里不留下一次构建的文件。
+    # 发布资源目录里另放一个与页面构建输出无关的文件时，脚本的核对以非零状态退出并写明文件名
     source = _checkout_copy(tmp_path)
     version = _version(source / "pyproject.toml")
-    assets = source / "harness" / "release_assets"
-    assets.mkdir()
-    installer = f"Yudao-Setup-{version}.exe"
-    (assets / installer).write_bytes(b"current-installer")
-    (assets / f"{installer}.blockmap").write_bytes(b"current-blockmap")
-    (assets / "latest.yml").write_bytes(f"version: {version}\n".encode("utf-8"))
-    previous_in_build = "Yudao-Setup-0.0.9.exe"
-    previous_in_assets = "Yudao-Setup-0.0.8.exe"
-    # 上一次构建留在 build/lib 里的安装程序，与本次组装到发布资源目录里的其他版本安装程序
+    built = source / "client" / "out" / "renderer"
+    built.mkdir(parents=True)
+    (built / "index.html").write_bytes(b"<html></html>")
+    previous_in_build = "stale-from-the-previous-build.html"
+    foreign = "yudao_agent-99.99.99-py3-none-any.whl"
+    # 上一次构建留在 build/lib 里的文件；本次额外放进发布资源目录的执行代理 wheel（M3 起由 #144 加入），
+    # 但版本号不对，因此脚本的核对应当拒绝并写明文件名
     stale = source / "build" / "lib" / "harness" / "release_assets"
     stale.mkdir(parents=True)
-    (stale / previous_in_build).write_bytes(b"installer-from-the-previous-build")
-    (assets / previous_in_assets).write_bytes(b"installer-from-another-version")
+    (stale / previous_in_build).write_bytes(b"stale-bytes")
+    assets = source / "harness" / "release_assets"
+    assets.mkdir()
+    shutil.copytree(built, assets, dirs_exist_ok=True)
+    (assets / foreign).write_bytes(b"foreign-bytes")
 
     module = _load_release_module()
     wheel = module.build_wheel(source, version, tmp_path / "dist")
-    with zipfile.ZipFile(wheel) as archive:
-        members = set(archive.namelist())
-    assert f"harness/release_assets/{installer}" in members, installer
+    members = _wheel_members(wheel)
+    assert "harness/release_assets/index.html" in members
     assert f"harness/release_assets/{previous_in_build}" not in members, previous_in_build
     assert not (source / "build" / "lib" / "harness" / "release_assets"
                 / previous_in_build).exists()
-    # 其他版本的安装程序确实进了 wheel，核对步骤据此写明文件名退出
-    assert f"harness/release_assets/{previous_in_assets}" in members, previous_in_assets
+    # 与页面构建输出无关的文件确实进了 wheel，核对步骤据此写明文件名退出
+    assert f"harness/release_assets/{foreign}" in members, foreign
     try:
-        module.verify_wheel_contents(
-            wheel, {"installer": assets / installer, "blockmap": assets / f"{installer}.blockmap",
-                    "manifest": assets / "latest.yml"}, version)
+        module.verify_wheel_contents(wheel, built)
     except module.ReleaseError as error:
-        assert previous_in_assets in str(error)
+        assert foreign in str(error)
     else:
-        raise AssertionError("verify_wheel_contents accepted an installer from another version")
+        raise AssertionError("verify_wheel_contents accepted a file outside the page output")
 
 def test_script_prints_the_wheel_path_and_a_matching_sha256(release_build):
     # 验收第 1 项：脚本输出 wheel 的路径与 SHA-256，SHA-256 与文件的实际值一致
@@ -165,26 +188,12 @@ def test_script_prints_the_wheel_path_and_a_matching_sha256(release_build):
     assert Path(printed_path.removeprefix("wheel: ")) == wheel
     assert printed_sha.removeprefix("sha256: ") == hashlib.sha256(wheel.read_bytes()).hexdigest()
 
-def test_manifest_sha512_matches_the_installer(release_build):
-    # 验收第 1 项：latest.yml 中的 SHA-512 与安装程序一致。
-    # 从 wheel 中取出两者，按 electron-builder 的取值口径（SHA-512 的 base64）比较
-    import yaml
-
-    version = _version(REPO_ROOT / "pyproject.toml")
-    wheel = _wheel_path(release_build["output_dir"], version)
-    with zipfile.ZipFile(wheel) as archive:
-        manifest = yaml.safe_load(archive.read("harness/release_assets/latest.yml").decode("utf-8"))
-        installer = archive.read(f"harness/release_assets/Yudao-Setup-{version}.exe")
-    expected = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
-    entry = next(item for item in manifest["files"] if item["url"] == f"Yudao-Setup-{version}.exe")
-    assert entry["sha512"] == expected
-
 def test_worktree_stays_clean_after_the_build(release_build):
-    # 验收第 2 项：构建完成以后工作区仍然干净（发布资源与客户端构建输出被 git 忽略）
+    # 验收：构建完成以后工作区仍然干净（发布资源、页面构建输出与 wheel 输出目录被 git 忽略）
     assert _git(["status", "--porcelain"], release_build["source"]) == ""
 
 def test_script_rejects_a_dirty_worktree(release_build, tmp_path):
-    # 验收第 3 项：工作区不干净时脚本拒绝并写明原因
+    # 验收：工作区不干净时脚本拒绝并写明原因
     source = release_build["source"]
     stray = source / "stray.txt"
     stray.write_text("dirty", encoding="utf-8")
@@ -195,24 +204,19 @@ def test_script_rejects_a_dirty_worktree(release_build, tmp_path):
     assert result.returncode != 0
     assert "工作区不干净" in result.stderr
 
-def test_script_rejects_a_version_mismatch(tmp_path):
-    # 验收第 3 项：版本号不一致时脚本拒绝并写明原因。在一个独立的工作副本上把客户端
-    # package.json 的 version 改成另一个值并提交、推送，工作区保持干净，改写的只有版本号
+def test_script_rejects_an_already_released_version(tmp_path):
+    # 版本号只核对 pyproject.toml 与标签（设计说明第 6.2 节）：这个版本已经打过标签时脚本拒绝，
+    # 避免重复发布覆盖上一次的记录
     source, _remote = _prepare_checkout(tmp_path)
-    package = source / "client" / "package.json"
-    document = json.loads(package.read_text(encoding="utf-8"))
-    document["version"] = "9.9.9"
-    package.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    _git(["add", "-A"], source)
-    _git(["commit", "-q", "-m", "mismatched version"], source)
-    _git(["push", "-q", "origin", "main"], source)
-    _git(["fetch", "-q", "origin"], source)
-    result = _run_release(source, tmp_path / "dist-version")
+    version = _version(source / "pyproject.toml")
+    _git(["tag", f"v{version}"], source)
+    _git(["push", "-q", "origin", f"v{version}"], source)
+    result = _run_release(source, tmp_path / "dist-tagged")
     assert result.returncode != 0
-    assert "版本号不一致" in result.stderr
+    assert f"v{version}" in result.stderr and "已经存在" in result.stderr
 
 def test_script_rejects_a_commit_outside_main(release_build, tmp_path):
-    # 验收第 3 项：当前提交不在 main 上时脚本拒绝并写明原因。切到另一个分支
+    # 验收：当前提交不在 main 上时脚本拒绝并写明原因。切到另一个分支
     source = release_build["source"]
     _git(["checkout", "-q", "-b", "feature"], source)
     try:
@@ -223,7 +227,7 @@ def test_script_rejects_a_commit_outside_main(release_build, tmp_path):
     assert "发布要求当前提交在 main 上" in result.stderr
 
 def test_script_rejects_an_unpushed_commit(tmp_path):
-    # 验收第 3 项：当前提交还没有推送时脚本拒绝。在一个独立的工作副本上追加提交但不推送，
+    # 验收：当前提交还没有推送时脚本拒绝。在一个独立的工作副本上追加提交但不推送，
     # 不动 module 作用域的夹具
     source, _remote = _prepare_checkout(tmp_path)
     marker = source / "unpushed.txt"
@@ -235,7 +239,7 @@ def test_script_rejects_an_unpushed_commit(tmp_path):
     assert "还没有推送" in result.stderr
 
 def test_publish_tags_pushes_and_uploads_without_a_real_release(tmp_path):
-    # 验收第 6 项：publish 的步骤（打标签、推送、上传到 Release）写在脚本中。
+    # 验收：publish 的步骤（打标签、推送、上传到 Release）写在脚本中。
     # 标签与推送到一个本地 bare 远端（真实的 git 命令，不是真实发布）；
     # gh 用放在 PATH 最前面的假命令（只记录参数）代替，不创建真实的 Release
     module = _load_release_module()
@@ -283,18 +287,15 @@ def _write_fake_gh(directory: Path, record: Path) -> Path:
         script.chmod(0o755)
     return directory
 
-def _installed_tooling_state() -> dict[str, object]:
-    # 本机安装状态的快照：uv tool list 的输出，以及默认客户端安装目录是否存在及其中的文件清单。
-    # 发布脚本只构建与上传，不运行 uv tool install，也不运行安装程序，两次快照应当相同
+def _installed_tooling_state() -> str:
+    # 本机安装状态的快照：uv tool list 的输出。
+    # 发布脚本只构建与上传，不运行 uv tool install，两次快照应当相同
     tools = subprocess.run(["uv", "tool", "list"], capture_output=True, text=True,
                            encoding="utf-8", errors="replace")
-    client_dir = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Yudao"
-    listing = sorted(str(path.relative_to(client_dir)) for path in client_dir.rglob("*")) \
-        if client_dir.is_dir() else None
-    return {"tools": tools.stdout, "client_listing": listing}
+    return tools.stdout
 
 def test_installed_tooling_is_unchanged(release_build):
-    # 验收第 5 项：运行脚本前后这台电脑上已经安装的 yudao 命令与桌面客户端不变。
+    # 验收：运行脚本前后这台电脑上已经安装的 yudao 命令不变。
     # 比较运行发布脚本前后两次本机安装状态的快照
     assert release_build["installed_after"] == release_build["installed_before"]
 
@@ -329,22 +330,16 @@ def _stop(process: subprocess.Popen) -> None:
         os.killpg(process.pid, signal.SIGKILL)
     process.wait(300)
 
-def test_installed_wheel_passes_the_client_update_source_acceptance(release_build, tmp_path):
-    # 验收第 4 项：脚本生成的 wheel 安装进临时虚拟环境后，#206 的各项验收通过。
-    # 建立临时虚拟环境、安装 wheel、用临时数据目录与端口启动 yudao api，核对：
-    # yudao --version 输出发布版本号；更新源返回的 latest.yml 与安装程序与 wheel 内的字节相同，
-    # 安装程序的 Range 请求返回正确片段；同一数据目录第二次启动失败并写明原因；
-    # 数据目录内有默认的 Provider 目录文件与 .env；发布资源随 wheel 提供
-    import time
-
+def test_installed_wheel_serves_the_pages(release_build, tmp_path):
+    # 工单验收第 2 项：脚本生成的 wheel 安装进临时虚拟环境后，用临时数据目录与端口启动 yudao api：
+    # yudao --version 输出发布版本号；请求 / 得到入口页面；/api/capabilities 给出与 yudao --version
+    # 相同的服务版本；同一数据目录第二次启动失败并写明原因
     import httpx
-    import yaml
 
     version = _version(REPO_ROOT / "pyproject.toml")
     wheel = _wheel_path(release_build["output_dir"], version)
     with zipfile.ZipFile(wheel) as archive:
-        packaged_manifest = archive.read("harness/release_assets/latest.yml")
-        packaged_installer = archive.read(f"harness/release_assets/Yudao-Setup-{version}.exe")
+        packaged_index = archive.read("harness/release_assets/index.html")
 
     venv = tmp_path / "venv"
     subprocess.run(["uv", "venv", str(venv), "--python", "3.12"], check=True, capture_output=True)
@@ -370,17 +365,11 @@ def test_installed_wheel_passes_the_client_update_source_acceptance(release_buil
                                stdout=output, stderr=subprocess.STDOUT, **spawn)
     try:
         _wait_until_serving(api, f"http://127.0.0.1:{port}/api/queries/system.status", log)
-        latest = httpx.get(f"http://127.0.0.1:{port}/client-update/latest.yml", timeout=10)
-        assert latest.status_code == 200 and latest.content == packaged_manifest
-        installer = httpx.get(
-            f"http://127.0.0.1:{port}/client-update/Yudao-Setup-{version}.exe", timeout=60)
-        assert installer.status_code == 200 and installer.content == packaged_installer
-        partial = httpx.get(f"http://127.0.0.1:{port}/client-update/Yudao-Setup-{version}.exe",
-                            headers={"Range": "bytes=4-7"}, timeout=30)
-        assert partial.status_code == 206 and partial.content == packaged_installer[4:8]
-
-        # 数据目录内有服务的日志（设计说明第 3.4、4.2 节）
-        assert (data_dir / "logs" / "yudao.log").is_file()
+        index = httpx.get(f"http://127.0.0.1:{port}/", timeout=10)
+        assert index.status_code == 200 and index.content == packaged_index
+        capabilities = httpx.get(f"http://127.0.0.1:{port}/api/capabilities", timeout=10)
+        assert capabilities.status_code == 200
+        assert capabilities.json()["deployment"]["version"] == version
 
         # 同一数据目录第二次启动失败并写明原因（服务进程锁）
         second = subprocess.run(

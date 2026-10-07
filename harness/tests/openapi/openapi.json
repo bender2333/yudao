@@ -1207,7 +1207,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：not_found, catalog_invalid, command_id_reused",
+            "description": "命令被拒绝，可能的原因：not_found, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -1616,6 +1616,57 @@
           },
           "409": {
             "description": "命令被拒绝，可能的原因：not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commands/parameter.set": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "parameter.set",
+        "operationId": "command_parameter_set",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParameterSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, out_of_bounds, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -5363,18 +5414,6 @@
             "type": "string",
             "minLength": 1,
             "title": "Provider Id"
-          },
-          "model_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Id"
           }
         },
         "additionalProperties": false,
@@ -5989,7 +6028,8 @@
                 "option_invalid",
                 "not_allowed",
                 "command_id_reused",
-                "source_invalid"
+                "source_invalid",
+                "out_of_bounds"
               ]
             },
             "type": "array",
@@ -8361,6 +8401,101 @@
         ],
         "title": "OverlayCapability"
       },
+      "ParameterChangeEntry": {
+        "properties": {
+          "old_value": {
+            "title": "Old Value"
+          },
+          "new_value": {
+            "title": "New Value"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "modified_by": {
+            "type": "string",
+            "title": "Modified By"
+          },
+          "parameters_version": {
+            "type": "string",
+            "title": "Parameters Version"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "stream_version": {
+            "type": "integer",
+            "title": "Stream Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "old_value",
+          "new_value",
+          "reason",
+          "modified_by",
+          "parameters_version",
+          "event_id",
+          "created_at",
+          "stream_version"
+        ],
+        "title": "ParameterChangeEntry"
+      },
+      "ParameterSet": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "modified_by": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Modified By"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "name",
+          "value",
+          "reason",
+          "modified_by"
+        ],
+        "title": "ParameterSet"
+      },
       "PauseRequested": {
         "properties": {
           "kind": {
@@ -9299,7 +9434,8 @@
               "option_invalid",
               "not_allowed",
               "command_id_reused",
-              "source_invalid"
+              "source_invalid",
+              "out_of_bounds"
             ],
             "title": "Reason"
           },
@@ -9846,6 +9982,14 @@
           "origin": {
             "type": "string",
             "title": "Origin"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterChangeEntry"
+            },
+            "type": "array",
+            "title": "Changes",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -23497,6 +23641,10 @@
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
+          },
+          "parameters_version": {
+            "title": "Parameters Version",
+            "type": "string"
           }
         },
         "required": [
@@ -23544,7 +23692,8 @@
           "effective_context_window",
           "max_output_tokens",
           "tool_choice",
-          "definitions_version"
+          "definitions_version",
+          "parameters_version"
         ],
         "title": "ModelRequestedPayload",
         "type": "object"
@@ -24569,6 +24718,187 @@
           "note"
         ],
         "title": "OnboardingRevisionStartedPayload",
+        "type": "object"
+      },
+      "ParameterSetEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "parameter_set",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ParameterSetPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ParameterSetEvent",
+        "type": "object"
+      },
+      "ParameterSetPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "old_value": {
+            "title": "Old Value"
+          },
+          "new_value": {
+            "title": "New Value"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "modified_by": {
+            "title": "Modified By",
+            "type": "string"
+          },
+          "bounds": {
+            "items": {},
+            "title": "Bounds",
+            "type": "array"
+          },
+          "parameters_version": {
+            "title": "Parameters Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "old_value",
+          "new_value",
+          "reason",
+          "modified_by",
+          "bounds",
+          "parameters_version"
+        ],
+        "title": "ParameterSetPayload",
         "type": "object"
       },
       "PlanAcceptedEvent": {
@@ -26835,6 +27165,10 @@
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
+          },
+          "parameters_version": {
+            "title": "Parameters Version",
+            "type": "string"
           }
         },
         "required": [
@@ -26842,7 +27176,8 @@
           "transcript_ref",
           "kind",
           "input_version",
-          "definitions_version"
+          "definitions_version",
+          "parameters_version"
         ],
         "title": "ProposalRejectedPayload",
         "type": "object"
@@ -27023,6 +27358,10 @@
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
+          },
+          "parameters_version": {
+            "title": "Parameters Version",
+            "type": "string"
           }
         },
         "required": [
@@ -27030,7 +27369,8 @@
           "transcript_ref",
           "raw_keys",
           "input_version",
-          "definitions_version"
+          "definitions_version",
+          "parameters_version"
         ],
         "title": "ProposalSubmittedPayload",
         "type": "object"
@@ -27807,6 +28147,10 @@
             "title": "Definitions Version",
             "type": "string"
           },
+          "parameters_version": {
+            "title": "Parameters Version",
+            "type": "string"
+          },
           "run_event_version": {
             "title": "Run Event Version",
             "type": "integer"
@@ -27849,6 +28193,7 @@
           "registered_commands",
           "command_versions",
           "definitions_version",
+          "parameters_version",
           "run_event_version"
         ],
         "title": "RunCreatedPayload",
@@ -32875,6 +33220,7 @@
             "model_retry_scheduled": "#/components/schemas/ModelRetryScheduledEvent",
             "model_stream_progress": "#/components/schemas/ModelStreamProgressEvent",
             "onboarding_revision_started": "#/components/schemas/OnboardingRevisionStartedEvent",
+            "parameter_set": "#/components/schemas/ParameterSetEvent",
             "plan_accepted": "#/components/schemas/PlanAcceptedEvent",
             "product_decision_accepted": "#/components/schemas/ProductDecisionAcceptedEvent",
             "product_input_assigned": "#/components/schemas/ProductInputAssignedEvent",
@@ -33138,6 +33484,9 @@
           },
           {
             "$ref": "#/components/schemas/HomeSeenEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ParameterSetEvent"
           }
         ]
       },

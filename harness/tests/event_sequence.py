@@ -8,6 +8,9 @@ from typing import Any
 
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, EventType
+from harness.parameters import initial_version
+
+PARAMETERS_VERSION = initial_version()
 
 # 事件序列对照：把一次 run 的完整事件序列规整成与运行时刻、机器路径无关的形式，与 event_sequences/ 下的基准比较。
 # 基准记录的是行为：之后任何提交使基准改变，说明行为改变，必须修正代码，不能更新基准。
@@ -40,6 +43,8 @@ from harness.models import ArtifactRef, EventType
 # 7. 长度不少于 300 个字符的文字、序列化后不少于 1500 个字符的结构，出现两次及以上时移入 shared，原处写 <shared#N>。
 # 8. 定义的版本（definitions_version 字段）是全部定义文件内容的摘要，随定义的内容改变：等于当前加载的定义的版本时
 #    写成 <definitions>，其他值（缺少、空或旧的版本）原样保留，与基准不同。
+# 9. 参数的版本（parameters_version 字段）是全部参数现值的内容摘要：等于定义的初始参数版本时写成 <parameters>，
+#    参数被修改过的值按摘要编号，与基准不同。
 
 BASELINE_DIR = Path(__file__).parent / "event_sequences"
 
@@ -118,6 +123,8 @@ class _Normalizer:
             return "<duration>"
         if key == "definitions_version" and value == DEFINITIONS.version:
             return "<definitions>"
+        if key == "parameters_version" and value == PARAMETERS_VERSION:
+            return "<parameters>"
         if isinstance(value, dict):
             if set(value) == _ARTIFACT_KEYS and isinstance(value.get("content_hash"), str):
                 return self.artifact(value)

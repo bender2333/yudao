@@ -147,7 +147,8 @@ def test_rules_registry_returns_every_entry_with_its_four_notes_bounds_kind_form
     assert [item["name"] for item in entries] == sorted(DEFINITIONS.rules)
     assert len(entries) == len(DEFINITIONS.rules)
     assert {frozenset(item) for item in entries} == {frozenset({
-        "name", "value", "bounds", "kind", "form", "guards", "cost", "relax_when", "tighten_when", "origin"})}
+        "name", "value", "bounds", "kind", "form", "guards", "cost", "relax_when", "tighten_when", "origin",
+        "changes"})}
     for item in entries:
         rule = DEFINITIONS.rules[item["name"]]
         assert item["value"] == rule.value
@@ -156,6 +157,7 @@ def test_rules_registry_returns_every_entry_with_its_four_notes_bounds_kind_form
         assert item["guards"] == rule.guards and item["cost"] == rule.cost
         assert item["relax_when"] == rule.relax_when and item["tighten_when"] == rule.tighten_when
         assert item["origin"] == rule.origin
+        assert item["changes"] == []
         assert item["form"] in {"permission", "boundary", "admission"}
         assert item["kind"] in {"parameter", "structure"}
         assert all(item[note] for note in ("guards", "cost", "relax_when", "tighten_when", "origin"))
@@ -223,7 +225,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
          "reasons": ["stale_base", "catalog_invalid", "in_use", "command_id_reused"]},
         {"name": "catalog.reload", "reasons": ["command_id_reused"]},
         {"name": "catalog.candidates.collect", "reasons": ["not_found", "command_id_reused"]},
-        {"name": "catalog.connection.test", "reasons": ["not_found", "catalog_invalid", "command_id_reused"]},
+        {"name": "catalog.connection.test", "reasons": ["not_found", "command_id_reused"]},
         {"name": "catalog.model.test", "reasons": ["not_found", "command_id_reused"]},
         {"name": "catalog.department_defaults.save",
          "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
@@ -233,6 +235,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "runtime.start_drain", "reasons": ["not_allowed", "command_id_reused"]},
         {"name": "runtime.force_upgrade", "reasons": ["not_allowed", "command_id_reused"]},
         {"name": "home.mark_seen", "reasons": ["not_allowed", "command_id_reused"]},
+        {"name": "parameter.set", "reasons": ["not_found", "out_of_bounds", "command_id_reused"]},
     ]
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]
@@ -251,9 +254,9 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
             "deliverable_adopted", "work_item_created",
         ]) + ["model_attempt_finished", "home_seen"],
     }
-    # 规则登记：现值来自定义，参数事件记录修改历史由参数事件的工单加入，所以没有会改变它结果的事件种类
+    # 规则登记：现值是参数事件折叠的结果，参数修改触发重查（工单 #349）
     assert capabilities["queries"][-1] == {
-        "name": "rules.registry", "changed_by": [], "replayable": True,
+        "name": "rules.registry", "changed_by": ["parameter_set"], "replayable": True,
     }
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {

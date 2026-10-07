@@ -20,7 +20,7 @@ Y10.LEVEL_TAGS.pilot = '试点';
 
 | 种类 | 名称 | 档位 | 说明 |
 | --- | --- | --- | --- |
-| 查询 | `acceptance.coverage` | `3.2D` | 可回放 |
+| 查询 | `acceptance.coverage` | `pilot` | 可回放 |
 | 查询 | `run.loops` | `pilot` | 可回放 |
 | 覆盖层 | `loops` | `pilot` | 依赖 `run.loops` |
 | 覆盖层 | `sources` | `pilot` | 依赖 `project.loop`（事实元素的来源事件由它给出） |

@@ -17,6 +17,8 @@ import {
   emptyFormState,
   formDocumentValid,
   formStateFromProvider,
+  formPatchForBaseUrl,
+  formPatchForPreset,
   intFromInput,
   modelRemoveReferrers,
   patchRowCapacity,
@@ -24,6 +26,7 @@ import {
   prefillSourceText,
   presetBaseUrlFor,
   presetById,
+  normalizeBaseUrl,
   providerDeleteConfirmation,
   providerInputFromForm,
   reasoningModeOptions,
@@ -100,6 +103,26 @@ test("协议清单与预置表的请求基址：三种协议都能取到基址",
   // 自定义方案（没有预置条目）取不到基址，地址由用户填写
   assert.equal(presetById(PRESETS, CUSTOM_PRESET_ID), null);
   assert.equal(presetBaseUrlFor(null, "responses"), "");
+});
+
+test("新建连接按服务方案与地址填写标识、名称和凭据引用，保留用户修改", () => {
+  const initial = emptyFormState(600);
+  assert.deepEqual(formPatchForPreset(initial, PRESETS[0]), {
+    preset_id: "opencode-go", base_url: "https://opencode.ai/zen/go/v1", models_url: "",
+    id: "opencode-go", name: "OpenCode Go", credential_ref: "OPENCODE_GO_KEY",
+  });
+  const address = "9router.huiju.asia/v1";
+  assert.equal(normalizeBaseUrl(address), "https://9router.huiju.asia/v1");
+  const custom = formPatchForBaseUrl(initial, normalizeBaseUrl(address));
+  assert.deepEqual(custom, {
+    base_url: "https://9router.huiju.asia/v1", id: "9router.huiju.asia",
+    name: "9router.huiju.asia", credential_ref: "HOST_9ROUTER_HUIJU_ASIA_KEY",
+  });
+  const edited = { ...initial, ...custom, name: "我的服务" };
+  assert.deepEqual({ ...edited, ...formPatchForBaseUrl(edited, "https://elsewhere.test/v1") }, {
+    ...edited, base_url: "https://elsewhere.test/v1", id: "elsewhere.test",
+    name: "我的服务", credential_ref: "ELSEWHERE_TEST_KEY",
+  });
 });
 
 test("凭据状态用词（设计说明第 9.1 节）：缺失、内存、环境、.env", () => {
@@ -381,6 +404,13 @@ test("连接提交的请求时限：填了取填的值，留空不提交该字�
   // 留空时整个字段不出现，后端 ProviderInput 的默认值生效，客户端不写第二个数
   assert.equal("timeout_sec" in providerInputFromForm({ ...state, timeout_sec: "" }), false);
 });
+test("提交时地址补全协议头：粘贴后直接点添加也能保存（设计说明第 4.2 节）", () => {
+  const state = emptyFormState(600);
+  assert.equal(providerInputFromForm({ ...state, base_url: "9router.huiju.asia/v1" }).base_url,
+    "https://9router.huiju.asia/v1");
+  assert.equal(providerInputFromForm({ ...state, base_url: "http://127.0.0.1:9/v1" }).base_url,
+    "http://127.0.0.1:9/v1");
+});
 
 test("部门默认的选项只含已准入且未作废的定义，档位选项保留按模型限制的已存值（第 9.1 节）", () => {
   const providers = [
@@ -411,10 +441,10 @@ test("部门默认的选项只含已准入且未作废的定义，档位选项�
   assert.match(kept[1].label, /按模型限制/);
 });
 
-test("连接测试可用性：没有地址时不提供连接测试", () => {
-  assert.equal(connectionTestable({ models_url: "" }, PRESETS[0]), true);
-  assert.equal(connectionTestable({ models_url: "https://x/models" }, null), true);
-  assert.equal(connectionTestable({ models_url: "" }, null), false);
+test("连接测试使用自定义服务地址推导的模型列表地址", () => {
+  assert.equal(connectionTestable({ base_url: "", models_url: "" }, PRESETS[0]), true);
+  assert.equal(connectionTestable({ base_url: "https://x/v1", models_url: "" }, null), true);
+  assert.equal(connectionTestable({ base_url: "", models_url: "" }, null), false);
 });
 
 test("预填来源的文字标注", () => {

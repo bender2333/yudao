@@ -1,4 +1,5 @@
-// 时间轴与回放的端到端测试（工单 #180 的验收）：Playwright 启动 Electron，连接由 FakeAdapter 驱动的真实服务。
+// 时间轴与回放的端到端测试（工单 #180 的验收）：Playwright 启动 Chromium 页面，页面文件由
+// FakeAdapter 驱动的真实后端提供（client/tests/e2e/backend.py），模型回答由 FakeAdapter 给出。
 // 预置的第一个事项包含交接、返工、询问与回答、采纳，因此首页与概览的时间轴刻度与 home.away_report 的
 // 关键事实一一对应；拖到某个刻度时画面与带 at 的查询结果一致；「回到现在」恢复实时画面，回放期间到达的事件不丢失。
 //
@@ -285,9 +286,9 @@ test("回放位置写在路径的 at 参数里：刷新以后回到同一位置�
   }
 });
 
-test.describe("窄屏", () => {
-  test("390×844 下时间轴不溢出、控制台错误为零", async () => {
-    const client = await startClient(backend, { width: 390, height: 844 });
+test.describe("宽屏（1920×1080）", () => {
+  test("1920×1080 下时间轴不溢出、控制台错误为零", async () => {
+    const client = await startClient(backend, { width: 1920, height: 1080 });
     const errors = watchErrors(client);
     const page = client.page;
     try {

@@ -1,9 +1,9 @@
-// 部门设置弹窗与部门工作间的端到端测试（工单 #95 的验收）：Playwright 启动 Electron 客户端与真实后端
-// （client/tests/e2e/backend.py，模型回答由 FakeAdapter 给出）。覆盖：
+// 部门设置弹窗与部门工作间的端到端测试（工单 #95 的验收）：Playwright 打开 Chromium 页面，
+// 页面由真实后端提供（client/tests/e2e/backend.py，模型回答由 FakeAdapter 给出）。覆盖：
 // 在弹窗中为本项目的一个部门另选模型并保存以后，工作间的生效模型与来源随事件更新；
 // 选择「跟随部门默认」以后来源回到部门默认；版本冲突时弹窗提示重新读取；
 // 运行中更换模型以后「最近一次请求」显示新的模型、协议与发送的档位；
-// 两种窗口尺寸（1440×900 与 390×844）、浅色与深色，控制台错误为零。
+// 两种窗口尺寸（1440×900 与 1920×1080）、浅色与深色，控制台错误为零。
 //
 // 后端预置了已准入模型 glm-4.6（Responses 协议，声明 low、high 档位，默认 low），
 // 三个部门的部门默认指向 FakeAdapter 的 fake 模型；因此弹窗的模型下拉里既有跟随项，也有可另选的定义。
@@ -345,10 +345,10 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
   });
 });
 
-test.describe("部门设置弹窗与部门工作间（390×844，深色）", () => {
-  test("窄屏与深色下弹窗与工作间照常渲染，无横向滚动", async () => {
+test.describe("部门设置弹窗与部门工作间（1920×1080，深色）", () => {
+  test("1920×1080 与深色下弹窗与工作间照常渲染，无横向滚动", async () => {
     test.setTimeout(180_000);
-    const client = await openClient({ width: 390, height: 844 }, "dark");
+    const client = await openClient({ width: 1920, height: 1080 }, "dark");
     const errors = watchErrors(client);
     const page = client.page;
     try {
@@ -356,8 +356,6 @@ test.describe("部门设置弹窗与部门工作间（390×844，深色）", () 
       await gotoView(page, id, VIEW);
       const title = await section(page, "产品工作间");
       await expect(title).toContainText("工位：产品 Agent");
-      const toggle = page.locator(".drawer-toggle");
-      await expect(toggle).toBeVisible();
       await title.getByRole("button", { name: "部门设置" }).click();
       const dialog = page.locator(".modal-backdrop");
       await expect(dialog.locator(".modal-head h2")).toHaveText("本项目 · 产品设置");

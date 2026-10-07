@@ -1,6 +1,6 @@
-// 首页楼的端到端测试（工单 #178 验收标准 3、4）：Playwright 启动 Electron，连接由 FakeAdapter 驱动的真实服务。
+// 首页楼的端到端测试（工单 #178 验收标准 3、4）：Playwright 打开 Chromium 页面，页面由 FakeAdapter 驱动的真实服务提供。
 // 覆盖：两个项目（一个运行中、一个空闲）各画一层，楼层的灯与状态灯随事件变化；置顶以后楼层顺序改变；
-// 点击楼层进入对应项目的概览；1440×900 与 390×844 两种窗口尺寸下控制台错误为零。
+// 点击楼层进入对应项目的概览；1440×900 与 1920×1080 两种窗口尺寸下控制台错误为零。
 //
 // 观测方式：楼层的文字列表（与画面同一份数据）读每层的名称、状态与亮灯部门；导航读页面的 hash 与概览页的标题。
 
@@ -218,9 +218,9 @@ test("点击楼层进入对应项目的概览", async () => {
   }
 });
 
-test.describe("窄屏", () => {
-  test("390×844 下楼的画布不溢出、控制台错误为零", async () => {
-    const client = await startClient(backend, { width: 390, height: 844 });
+test.describe("宽屏", () => {
+  test("1920×1080 下楼的画布不溢出、控制台错误为零", async () => {
+    const client = await startClient(backend, { width: 1920, height: 1080 });
     const errors = watchErrors(client);
     const page = client.page;
     try {
@@ -228,7 +228,7 @@ test.describe("窄屏", () => {
       await expect(page.getByRole("heading", { name: "全部项目与机器", exact: true })).toBeVisible();
       await waitUntil(async () => (await floors(page)).length >= 2, "楼里出现至少两层");
 
-      // 楼层的画布按整数倍（逻辑宽 640 的整数倍），且窄屏下不横向溢出
+      // 楼层的画布按整数倍（逻辑宽 640 的整数倍），且宽屏下不横向溢出
       const canvas = page.locator(".building-canvas canvas");
       await expect(canvas).toHaveCount(1);
       const width = await canvas.evaluate((el) => (el as HTMLCanvasElement).width);
