@@ -206,7 +206,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
             "transition", "collaboration_requested", "collaboration_responded", "collaboration_closed",
             "qa_submitted", "run_done", "run_paused", "run_failed", "decision_requested", "decision_answered",
             "deliverable_adopted", "work_item_created",
-        ]) + ["model_attempt_finished"],
+        ]) + ["model_attempt_finished", "home_seen"],
     }
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
