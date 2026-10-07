@@ -66,7 +66,7 @@ async function openFloor(page: Page, id: string): Promise<void> {
 
 /**
  * 画布的内容签名：把画布导出成一张缩小的图，取它的数据摘要。
- * PixiJS 的画面用 WebGL 渲染，没有 2D 上下文；导出以后画到离屏的 2D 画布上再取像素。
+ * 画布按设备分辨率绘制（工单 #365），导出的图随之变小；画面每帧都在动，签名只用来核对「画出了内容」。
  */
 async function canvasSignature(page: Page): Promise<string> {
   return page.locator(".floor-screen canvas").evaluate(async (el) => {
@@ -82,6 +82,20 @@ async function canvasSignature(page: Page): Promise<string> {
     for (let i = 0; i < data.length; i += 7) hash = (hash * 31 + data[i]) >>> 0;
     return String(hash);
   });
+}
+
+/** 画面里世界的当前状态（经页面上给端到端测试的只读入口）：角色的任务与事项的状态。 */
+async function floorState(page: Page): Promise<FloorWorldState> {
+  return page.evaluate(() => {
+    const hooks = (window as unknown as { __floorViewForTest?: { state: () => FloorWorldState } }).__floorViewForTest;
+    if (!hooks) throw new Error("页面没有画面的读取入口");
+    return hooks.state();
+  });
+}
+
+interface FloorWorldState {
+  characters: { id: string; department: string | null; task: string | null; bubble: string | null; pose: string | null }[];
+  items: { id: string; status: string; department: string | null }[];
 }
 
 /** 等某个条件成立（页面按事件流自动重查询，不刷新页面）。 */
@@ -153,13 +167,25 @@ test("断线重连（重新订阅）以后画面回到查询给出的状态", as
   try {
     const id = await projectId(SAMPLE);
     await openFloor(page, id);
-    const before = await canvasSignature(page);
+    // 画面里配置的事项状态与 project.loop 一致：状态来自查询
+    const loop = await query<{ work_items: { work_item_id: string; status: string }[] }>(
+      "project.loop", { project_id: id });
+    expect(loop.work_items.length).toBeGreaterThan(0);
+    const fromQuery = JSON.stringify(loop.work_items.map((it) => [it.work_item_id, it.status]));
+    await waitUntil(async () => {
+      const now = await floorState(page);
+      return JSON.stringify(now.items.map((it) => [it.id, it.status])) === fromQuery;
+    }, "画面里的事项状态与查询一致");
     // 断线：停掉事件流连接（主进程的窗口关闭再打开时由客户端自己重连；这里用重新连接设置模拟）
     await page.evaluate(() => { window.location.hash = "#/home"; });
     await expect(page.locator(".floor-screen canvas")).toHaveCount(0);
     await openFloor(page, id);
-    // 重新打开以后画面按查询给出的状态配置：像素签名与断开前一致（状态来自查询而不是重放事件）
-    await waitUntil(async () => (await canvasSignature(page)) === before, "画面回到查询给出的状态");
+    // 重新打开以后画面按查询给出的状态配置：事项的状态逐项与 project.loop 一致
+    // （动作不补播，事项状态才由查询给出）
+    await waitUntil(async () => {
+      const now = await floorState(page);
+      return JSON.stringify(now.items.map((it) => [it.id, it.status])) === fromQuery;
+    }, "画面回到查询给出的状态");
     expect(errors).toEqual([]);
   } finally {
     await client.close();
