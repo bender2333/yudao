@@ -261,6 +261,26 @@ def test_connection_test_sends_a_real_request_for_each_protocol(tmp_path):
                     f"Bearer {SECRET}" if expected_header == "authorization" else SECRET)
 
 
+def test_connection_test_without_models_uses_saved_address_and_credential(tmp_path):
+    server = _ModelsServer()
+    with server as models_url:
+        document = _document(models_url=models_url)
+        document["models"] = []
+        opened = _Opened(tmp_path, document)
+        with running_api(opened) as client:
+            before = _catalog(client)
+            assert before["models"] == []
+            tested = _command(client, "catalog.connection.test", base_version=before["revision"], provider_id="p1")
+            assert tested.status_code == 200, tested.text
+            [event] = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
+                                description="empty connection test")
+            assert event.payload["ok"] is True
+            assert event.payload["source_url"] == models_url
+            assert len(server.requests) == 1
+            assert server.requests[0]["authorization"] == f"Bearer {SECRET}"
+            assert _catalog(client)["admissions"] == []
+
+
 def test_connection_test_fails_when_the_credential_is_wrong(tmp_path):
     server = _ModelsServer()
     with server as models_url:

@@ -221,7 +221,7 @@ def test_secret_never_in_public_view_or_logs():
 def test_connection_and_model_tests_on_fake():
     facade = ProviderFacade()
     facade.store(_fake_catalog())
-    connection = facade.test_connection({"key": "k", "provider_id": "pf", "model_id": "mf"})
+    connection = facade.test_connection("pf")
     assert connection["ok"] is True
     assert connection["kind"] == "connection"
     model = facade.model_test("pf", "mf")

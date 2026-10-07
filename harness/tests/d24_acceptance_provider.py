@@ -119,8 +119,7 @@ def build_system_facade(data_dir: Path):
     facade.configure_paths(data_dir / "providers.json", None)
     facade.persist_document(data_dir / "providers.json")
     for protocol in PROTOCOLS:
-        facade.test_connection({"key": f"claude-{protocol}", "provider_id": f"eval-{protocol}",
-                                "model_id": f"claude-{protocol}"})
+        facade.test_connection(f"eval-{protocol}")
         facade.model_test(f"eval-{protocol}", f"claude-{protocol}")
         facade.model_test(f"eval-{protocol}", f"deepseek-{protocol}")
     facade.save_bindings({department: {"provider_id": "eval-messages", "model_id": "claude-messages",

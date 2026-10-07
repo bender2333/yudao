@@ -15,11 +15,14 @@ import {
   admissionOf,
   capacityIssueText,
   connectionTestable,
+  formPatchForBaseUrl,
+  formPatchForPreset,
   defaultLevelOptions,
   intFromInput,
   patchRowCapacity,
   presetBaseUrlFor,
   presetById,
+  normalizeBaseUrl,
   reasoningModeOptions,
   type CandidateState,
   type FormRow,
@@ -54,7 +57,7 @@ export type ProviderFormProps = {
   // 已完成的模型测试结果，按 model:<id> 存（工单 #294：行里要显示通过或原因）
   tests: Record<string, string>;
   status: { kind: "ok" | "error"; message: string } | null;
-  onSubmit: () => void;
+  onSubmit: (secret: string, persist: boolean) => void;
   onCancel: () => void;
   onDelete: () => void;
   onTestConnection: () => void;
@@ -75,11 +78,9 @@ export function ProviderForm(props: ProviderFormProps) {
 
   const choosePreset = (presetId: string) => {
     const next = presetById(props.presets, presetId);
-    const patch: Partial<FormState> = { preset_id: presetId };
-    if (next) {
-      patch.base_url = presetBaseUrlFor(next, state.protocol);
-      patch.models_url = "";
-    }
+    const patch: Partial<FormState> = mode === "add"
+      ? formPatchForPreset(state, next)
+      : { preset_id: presetId, base_url: next ? presetBaseUrlFor(next, state.protocol) : state.base_url, models_url: "" };
     props.onPatch(patch);
   };
 
@@ -117,7 +118,7 @@ export function ProviderForm(props: ProviderFormProps) {
   return (
     <form className="mm-form" onSubmit={(event) => {
       event.preventDefault();
-      props.onSubmit();
+      props.onSubmit(secret, persist);
     }}>
       <h3>{editing ? "编辑 Provider 配置" : "添加 Provider 配置"}</h3>
 
@@ -167,7 +168,12 @@ export function ProviderForm(props: ProviderFormProps) {
       <label className="mm-field">
         <span className="mm-label">地址</span>
         <input value={state.base_url} required placeholder="https://.../v1" data-testid="provider-base-url"
-               onChange={(event) => props.onPatch({ base_url: event.target.value })} />
+               readOnly={preset !== null}
+               onChange={(event) => props.onPatch(mode === "add"
+                 ? formPatchForBaseUrl(state, event.target.value) : { base_url: event.target.value })}
+               onBlur={() => { if (!preset) props.onPatch(mode === "add"
+                 ? formPatchForBaseUrl(state, normalizeBaseUrl(state.base_url))
+                 : { base_url: normalizeBaseUrl(state.base_url) }); }} />
       </label>
       <label className="mm-field">
         <span className="mm-label">凭据引用</span>
@@ -184,19 +190,18 @@ export function ProviderForm(props: ProviderFormProps) {
         </label>
         <label className="mm-field">
           <span className="mm-label">模型列表地址</span>
-          <input value={state.models_url} placeholder="留空时使用服务方案的地址"
-                 data-testid="provider-models-url"
+          <input value={state.models_url || (!preset && state.base_url ? `${state.base_url.replace(/\/$/, "")}/models` : "")}
+                 placeholder="留空时使用服务方案的地址" data-testid="provider-models-url"
                  onChange={(event) => props.onPatch({ models_url: event.target.value })} />
         </label>
-        {/* 自定义方案没有预置地址：不填就取不到候选，这里写明两种取得候选的方式（设计说明第 4.3 节） */}
         {!connectionTestable(state, preset) && (
           <p className="mm-hint" role="status" data-testid="models-url-hint">
-            自定义方案没有预置的模型列表地址：填写后点「获取模型列表」才能取得候选（常见写法是请求地址加 /models），也可以「手动添加一行」。
+            填写连接地址后，模型列表地址默认使用连接地址加 /models。
           </p>
         )}
       </details>
 
-      <p className="mm-hint">一份连接声明一种协议，地址是该协议的请求基址；模型访问定义不声明协议。表单不保存 API Key。</p>
+      <p className="mm-hint">Key 在添加连接时保存；编辑连接时也可单独保存 Key。</p>
       {props.impact && <p className="mm-warn" role="status" data-testid="impact-notice">{props.impact}</p>}
 
       <section className="mm-credential" data-testid="credential-section">
