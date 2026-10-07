@@ -14,6 +14,7 @@
 "kernel/test_tool_needs_permission.py" = "unit"
 "test_a4_compare.py" = "integration"
 "test_access.py" = "integration"
+"test_access_tokens.py" = "integration"
 "test_activation_accounting.py" = "integration"
 "test_activation_responses.py" = "integration"
 "test_adjudication.py" = "integration"

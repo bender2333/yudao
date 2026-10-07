@@ -21,6 +21,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import TypeAdapter
 
+from ..app.access_tokens import AccessTokenStore
 from ..app.application import DEFAULT_REGISTRY, Application
 from ..app.catalog_queries import CatalogQueryInvalid
 from ..app.contracts import AccessMode, Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
@@ -36,7 +37,7 @@ _COMPONENTS = "#/components/schemas/{model}"
 
 def create_app(open_application: Callable[[], Application], *, registry: Registry = DEFAULT_REGISTRY,
                access: AccessMode = "local", keepalive_sec: float = 15.0,
-               pages: Path = RELEASE_ASSETS) -> FastAPI:
+               pages: Path = RELEASE_ASSETS, tokens: AccessTokenStore | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(api: FastAPI) -> AsyncIterator[None]:
         application = open_application()
@@ -63,7 +64,7 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
     api.add_api_route("/api/capabilities", capabilities, methods=["GET"], response_model=Capabilities,
                       operation_id="capabilities", tags=["capabilities"])
     # 页面与接口同一来源（第 6.2 节）：Origin 由 AccessMiddleware 核对，不发送 CORS 响应头
-    api.add_middleware(AccessMiddleware, access=access)
+    api.add_middleware(AccessMiddleware, access=access, tokens=tokens)
     api.openapi = lambda: _openapi(api)
     _add_events(api, keepalive_sec=keepalive_sec)
     # 页面文件最后挂载：接口路径先匹配；挂载不进入 OpenAPI 与能力清单

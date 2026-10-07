@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import sys
+import socket
 import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -28,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from harness.adapters.base import ProviderError  # noqa: E402
 from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
+from harness.app.access_tokens import AccessTokenStore  # noqa: E402
 from harness.app.application import Application  # noqa: E402
 from harness.app.catalog_commands import (  # noqa: E402
     BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, ModelInput, ProviderInput,
@@ -41,7 +43,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
     WorkItemCreate,
 )
 from harness.app.project_queries import ProjectsList  # noqa: E402
-from harness.models import Usage, json_dumps  # noqa: E402
+from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
     baseline_review_turn, collaboration_request, delivery_turn, plan_turn, product_spec, response_turn,
     review_turn, structure_turn,
@@ -51,6 +53,15 @@ from harness.runtime import LoopSystem  # noqa: E402
 from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E402
 
 UNAVAILABLE = "Missing configuration: provider credential"
+
+
+def lan_address() -> str:
+    # 本机的局域网地址：从另一台机器访问控制主机时用的就是它；没有时用回环
+    for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+        address = info[4][0]
+        if not address.startswith("127."):
+            return address
+    return "127.0.0.1"
 
 
 def script():
@@ -450,6 +461,9 @@ def main() -> int:
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
     parser.add_argument("--reject-upstream", action="store_true")
+    # 局域网访问方式（工单 #348）：给出令牌名称时以局域网访问方式起服务，并在数据目录里建立一个
+    # 访问令牌，把令牌明文报给测试，测试在页面上填写它
+    parser.add_argument("--token-name", default=None)
     args = parser.parse_args()
 
     import tempfile
@@ -499,9 +513,16 @@ def main() -> int:
 
     # 页面文件来自 client/out/renderer（npm run build:pages）：页面与接口同一来源
     pages = Path(__file__).resolve().parents[2] / "out" / "renderer"
+    # 局域网访问方式（工单 #348）：监听本机所有地址并按数据目录里的令牌文件校验访问令牌，
+    # 令牌由 --token-name 建立后把明文报给测试，测试在页面中填写它
+    access = "lan" if args.token_name is not None else "local"
+    host = "0.0.0.0" if access == "lan" else "127.0.0.1"
+    token = (AccessTokenStore(data_dir).create(args.token_name, now=utc_now())[1]
+             if args.token_name is not None else None)
     server = uvicorn.Server(uvicorn.Config(
-        lambda: create_app(lambda: application, pages=pages),
-        host="127.0.0.1", port=port,
+        lambda: create_app(lambda: application, pages=pages, access=access,
+                           tokens=AccessTokenStore(data_dir)),
+        host=host, port=port,
         log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0))
 
     thread = threading.Thread(target=server.run, daemon=True)
@@ -545,8 +566,12 @@ def main() -> int:
                                  admit_and_bind=args.admit_and_bind, reject_base=reject_base))
 
     port = server.servers[0].sockets[0].getsockname()[1]
+    # 局域网访问方式下把局域网地址与令牌明文一并报给测试（工单 #348）：
+    # 测试经局域网地址打开页面，填写这个令牌
     print(json.dumps({"port": port, "data_dir": str(data_dir), "room_project": room_project,
-                      "source_dir": None if source_dir is None else str(source_dir)}), flush=True)
+                      "source_dir": None if source_dir is None else str(source_dir),
+                      "access": access, "address": None if token is None else f"http://{lan_address()}:{port}",
+                      "token": token}), flush=True)
     # 标准输入关闭时退出（由 Playwright 的 fixture 控制生命周期）
     try:
         sys.stdin.read()
