@@ -92,9 +92,11 @@ def test_repository_overview_is_generated(tmp_path):
     # 概况只列路径与数量，不含文件内容
     assert "print(sys.argv[1])" not in overview
 
-def test_check_timeout_is_six_hundred(tmp_path):
-    assert DEFINITIONS.limits.check_timeout_sec == 600
-    assert DEFINITIONS.limits.command_timeout_max_sec == 600
+def test_check_timeout_is_six_hundred():
+    # 登记里的现值与 bounds 一致；由 rules.registry 读出
+    rule = DEFINITIONS.rule("check_timeout_sec")
+    assert rule.value == 600 and list(rule.bounds) == [1, 86400]
+    assert DEFINITIONS.rule_value("command_timeout_max_sec") == 600
 
 def test_quality_cannot_see_existing_structure(tmp_path):
     # 第一轮工程提交结构说明；退回产品以后，新一轮里工程能看到上一轮的结构说明，产品与质检看不到

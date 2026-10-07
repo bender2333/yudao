@@ -436,8 +436,8 @@ class ProjectService:
         return project_id
 
     def onboard(self, name: str, goal: str, source_name: str, source_path: str, *,
-                max_cycles: int = DEFINITIONS.limits.max_cycles,
-                run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
+               max_cycles: int = DEFINITIONS.rule_value("max_cycles"),
+               run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec"),
                 context_window: int = 32_000,
                 command: Command | None = None) -> tuple[str, str, str]:
         # 接入已有项目（3.8 第 3.1 节）：同一个项目流事务中登记项目（source 为 existing）、登记源目录、
@@ -472,8 +472,8 @@ class ProjectService:
         return project_id, item.work_item_id, item.run_id
 
     def restart_onboarding(self, project_id: str, source_name: str, *,
-                           max_cycles: int = DEFINITIONS.limits.max_cycles,
-                           run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
+                          max_cycles: int = DEFINITIONS.rule_value("max_cycles"),
+                          run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec"),
                            context_window: int = 32_000,
                            command: Command | None = None) -> tuple[str, str]:
         # 重新开始建档（3.8 第 3.1 节）：从登记的源目录重新采集快照，开始新的建档事项。
@@ -581,8 +581,8 @@ class ProjectService:
     # 事项
 
     def start_work_item(self, project_id: str, text: str, *, title: str | None = None,
-                        max_cycles: int = DEFINITIONS.limits.max_cycles,
-                        run_time_limit_sec: int = DEFINITIONS.limits.run_time_limit_sec,
+                        max_cycles: int = DEFINITIONS.rule_value("max_cycles"),
+                        run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec"),
                         context_window: int = 32_000, command: Command | None = None) -> tuple[str, str]:
         _require_text("text", text)
         _require_title(title)
@@ -760,8 +760,8 @@ class ProjectService:
             project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
             point = self._work_item_start_point(project)
             self._work_item_created(
-                transaction, project, text, title=title, max_cycles=DEFINITIONS.limits.max_cycles,
-                run_time_limit_sec=DEFINITIONS.limits.run_time_limit_sec, context_window=32_000,
+                transaction, project, text, title=title, max_cycles=DEFINITIONS.rule_value("max_cycles"),
+                run_time_limit_sec=DEFINITIONS.rule_value("run_time_limit_sec"), context_window=32_000,
                 baseline=point.baseline, initial_tree=point.initial_tree, snapshot=point.snapshot,
                 source_run=point.source_run, work_item_id=work_item_id, run_id=run_id, priority=PRIORITY_USER,
             )

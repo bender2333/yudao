@@ -903,7 +903,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     # 主机只在工作步骤没有调用工具时追加这条消息，计数连续且不超过上限
                     count = replies_without_tool_call.get(activation, 0) + 1
                     item = _read_artifact(artifacts, run_id, payload["input_ref"])
-                    limit = DEFINITIONS.limits.tool_call_required_limit
+                    limit = DEFINITIONS.rule_value("tool_call_required_limit")
                     if (purposes[activation] != "work" or (activation, steps[activation]) in tool_steps
                             or payload.get("count") != count or count > limit
                             or payload.get("limit") != limit

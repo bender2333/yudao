@@ -31,8 +31,8 @@ from .redact import redact_text, sanitized_env
 from .tools import normalize_registered_commands
 from .workspace import Workspace, WorkspaceSnapshot
 
-# 一次工具结果的输出上限，取自定义中的限额
-_OUTPUT_LIMIT = DEFINITIONS.limits.tool_output_limit
+# 一次工具结果的输出上限，取规则登记中的现值
+_OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
 # 单页默认命中数；单页输出同样受 _OUTPUT_LIMIT 约束
 SEARCH_DEFAULT_PAGE = 50
 # 单行过长时保留的片段长度，避免一行占满整页输出
@@ -74,7 +74,7 @@ class _Finished:
 
 class LocalEnvironment:
     def __init__(self, workspace: Workspace, *, registered_commands: dict[str, Any] | None = None,
-                 check_timeout_sec: int = DEFINITIONS.limits.check_timeout_sec) -> None:
+                 check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> None:
         self.workspace = workspace
         self._registered_commands = normalize_registered_commands(registered_commands)
         self._check_timeout_sec = check_timeout_sec
@@ -91,7 +91,7 @@ class LocalEnvironment:
     @classmethod
     def establish(cls, root: str | Path, tree: CapturedTree | None, *,
                   registered_commands: dict[str, Any] | None = None,
-                  check_timeout_sec: int = DEFINITIONS.limits.check_timeout_sec) -> LocalEnvironment:
+                  check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
             Path(root).parent.mkdir(parents=True, exist_ok=True)
@@ -100,7 +100,7 @@ class LocalEnvironment:
 
     @classmethod
     def open(cls, root: str | Path, *, registered_commands: dict[str, Any] | None = None,
-             check_timeout_sec: int = DEFINITIONS.limits.check_timeout_sec) -> LocalEnvironment:
+                  check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> LocalEnvironment:
         # 打开已经建立的工作区
         return cls(Workspace(root), registered_commands=registered_commands, check_timeout_sec=check_timeout_sec)
 

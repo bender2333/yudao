@@ -3186,6 +3186,55 @@
         }
       }
     },
+    "/api/queries/rules.registry": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "rules.registry",
+        "operationId": "query_rules_registry",
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_RuleRegistry_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/capabilities": {
       "get": {
         "tags": [
@@ -9723,6 +9772,96 @@
         ],
         "title": "RoomView"
       },
+      "RuleEntry": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "bounds": {
+            "items": {},
+            "type": "array",
+            "title": "Bounds"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "parameter",
+              "structure"
+            ],
+            "title": "Kind"
+          },
+          "form": {
+            "type": "string",
+            "enum": [
+              "permission",
+              "boundary",
+              "admission"
+            ],
+            "title": "Form"
+          },
+          "guards": {
+            "type": "string",
+            "title": "Guards"
+          },
+          "cost": {
+            "type": "string",
+            "title": "Cost"
+          },
+          "relax_when": {
+            "type": "string",
+            "title": "Relax When"
+          },
+          "tighten_when": {
+            "type": "string",
+            "title": "Tighten When"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "value",
+          "bounds",
+          "kind",
+          "form",
+          "guards",
+          "cost",
+          "relax_when",
+          "tighten_when",
+          "origin"
+        ],
+        "title": "RuleEntry"
+      },
+      "RuleRegistry": {
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleEntry"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "definitions_version": {
+            "type": "string",
+            "title": "Definitions Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rules",
+          "definitions_version"
+        ],
+        "title": "RuleRegistry"
+      },
       "RunActionsResult": {
         "properties": {
           "actions": {
@@ -10345,6 +10484,24 @@
           "data"
         ],
         "title": "Snapshot[ReplayCheckResult]"
+      },
+      "Snapshot_RuleRegistry_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RuleRegistry"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[RuleRegistry]"
       },
       "Snapshot_RunActionsResult_": {
         "properties": {

@@ -3620,6 +3620,66 @@ export type RoomView = {
 };
 
 /**
+ * RuleEntry
+ */
+export type RuleEntry = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Value
+     */
+    value: unknown;
+    /**
+     * Bounds
+     */
+    bounds: Array<unknown>;
+    /**
+     * Kind
+     */
+    kind: 'parameter' | 'structure';
+    /**
+     * Form
+     */
+    form: 'permission' | 'boundary' | 'admission';
+    /**
+     * Guards
+     */
+    guards: string;
+    /**
+     * Cost
+     */
+    cost: string;
+    /**
+     * Relax When
+     */
+    relax_when: string;
+    /**
+     * Tighten When
+     */
+    tighten_when: string;
+    /**
+     * Origin
+     */
+    origin: string;
+};
+
+/**
+ * RuleRegistry
+ */
+export type RuleRegistry = {
+    /**
+     * Rules
+     */
+    rules: Array<RuleEntry>;
+    /**
+     * Definitions Version
+     */
+    definitions_version: string;
+};
+
+/**
  * RunActionsResult
  */
 export type RunActionsResult = {
@@ -3984,6 +4044,17 @@ export type SnapshotReplayCheckResult = {
      */
     position: number;
     data: ReplayCheckResult;
+};
+
+/**
+ * Snapshot[RuleRegistry]
+ */
+export type SnapshotRuleRegistry = {
+    /**
+     * Position
+     */
+    position: number;
+    data: RuleRegistry;
 };
 
 /**
@@ -17052,6 +17123,36 @@ export type QueryHomeAwayReportResponses = {
 };
 
 export type QueryHomeAwayReportResponse = QueryHomeAwayReportResponses[keyof QueryHomeAwayReportResponses];
+
+export type QueryRulesRegistryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * At
+         */
+        at?: number | null;
+    };
+    url: '/api/queries/rules.registry';
+};
+
+export type QueryRulesRegistryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryRulesRegistryError = QueryRulesRegistryErrors[keyof QueryRulesRegistryErrors];
+
+export type QueryRulesRegistryResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotRuleRegistry;
+};
+
+export type QueryRulesRegistryResponse = QueryRulesRegistryResponses[keyof QueryRulesRegistryResponses];
 
 export type CapabilitiesData = {
     body?: never;

@@ -58,10 +58,10 @@ def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
     ]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo")
-    # 默认的激活次数上限与运行时间上限取自定义
+    # 默认的激活次数上限与运行时间上限取规则登记中的现值
     projection = system.project(run_id)
-    assert projection.max_cycles == DEFINITIONS.limits.max_cycles
-    assert projection.run_time_limit_sec == DEFINITIONS.limits.run_time_limit_sec
+    assert projection.max_cycles == DEFINITIONS.rule_value("max_cycles")
+    assert projection.run_time_limit_sec == DEFINITIONS.rule_value("run_time_limit_sec")
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
 

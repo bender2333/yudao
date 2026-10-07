@@ -198,8 +198,8 @@ def test_capabilities_mark_replayable_queries_and_expose_the_interface_version(d
         capabilities = client.get("/api/capabilities").json()
         document = client.get("/openapi.json").json()
     assert {item["name"] for item in capabilities["queries"] if item["replayable"]} == {
-        "system.status", "projects.list", "decisions.list", "project.loop"}
-    for name in ("system.status", "projects.list", "decisions.list", "project.loop"):
+        "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry"}
+    for name in ("system.status", "projects.list", "decisions.list", "project.loop", "rules.registry"):
         parameters = document["paths"][f"/api/queries/{name}"]["get"]["parameters"]
         assert any(item["name"] == "at" for item in parameters), name
     deployment = capabilities["deployment"]

@@ -87,15 +87,15 @@ class SafeNode(Protocol):
 
 @dataclass(frozen=True)
 class StepLimits:
-    # 步骤驱动的重试与步数参数；默认值取自定义中的限额，正式运行使用默认值
-    retry_initial_delay_sec: float = DEFINITIONS.limits.retry_initial_delay_sec
-    retry_max_delay_sec: float = DEFINITIONS.limits.retry_max_delay_sec
-    max_provider_attempts: int = DEFINITIONS.limits.max_provider_attempts
-    max_model_steps: int = DEFINITIONS.limits.max_model_steps
+    # 步骤驱动的重试与步数参数；默认值取规则登记中的现值，正式运行使用默认值
+    retry_initial_delay_sec: float = DEFINITIONS.rule_value("retry_initial_delay_sec")
+    retry_max_delay_sec: float = DEFINITIONS.rule_value("retry_max_delay_sec")
+    max_provider_attempts: int = DEFINITIONS.rule_value("max_provider_attempts")
+    max_model_steps: int = DEFINITIONS.rule_value("max_model_steps")
 
 
 def tool_call_required_text(count: int) -> str:
-    limit = DEFINITIONS.limits.tool_call_required_limit
+    limit = DEFINITIONS.rule_value("tool_call_required_limit")
     return (
         f"上一次回复没有调用工具（连续第 {count} 次，最多 {limit} 次）。"
         "只回复文字不会推进工作，也不会结束本次激活。"
@@ -446,7 +446,7 @@ class StepDriver:
             if not any(item.get("type") == "function_call" for item in response.output):
                 # 回复已记入历史；追加一条 user 消息，下一次请求不以助手消息结尾
                 replies_without_tool_call += 1
-                if replies_without_tool_call > DEFINITIONS.limits.tool_call_required_limit:
+                if replies_without_tool_call > DEFINITIONS.rule_value("tool_call_required_limit"):
                     raise ProviderError(
                         f"department replied {replies_without_tool_call} times in a row without calling a tool",
                         reason="no_tool_call",
@@ -455,7 +455,7 @@ class StepDriver:
                     request,
                     {"role": "user", "content": tool_call_required_text(replies_without_tool_call)},
                     replies_without_tool_call,
-                    DEFINITIONS.limits.tool_call_required_limit,
+                    DEFINITIONS.rule_value("tool_call_required_limit"),
                 )
                 continue
             replies_without_tool_call = 0
@@ -676,7 +676,7 @@ class StepDriver:
         # 最后一次主机提示之后的工作请求要求调用工具；调用目标声明不接受时照常为自动（#102）
         declaration = (self._call_public or {}).get("accepts_required_tool_call", True)
         if (purpose == "work" and tools
-                and replies_without_tool_call >= DEFINITIONS.limits.tool_call_required_limit
+                and replies_without_tool_call >= DEFINITIONS.rule_value("tool_call_required_limit")
                 and declaration is not False):
             return "required"
         return "auto"
