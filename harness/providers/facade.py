@@ -1101,31 +1101,24 @@ class ProviderFacade:
         # 只作用于正在进行的这次调用尝试，返回是否找到；尝试不在进行时不留下记录
         return self._cancels.cancel(attempt_id)
 
-    def test_connection(self, selection: Mapping[str, Any]) -> dict[str, Any]:
-        # 连接测试读取模型列表地址，按该连接协议的认证方式带上凭据，证明地址与凭据可用；
-        # 不证明具体模型可调，不改变任何准入。fake 没有上游，只做同一套缺失项检查
-        snapshot = resolve_snapshot(self._store, [selection], self._credentials)
-        key = str(selection.get("key", selection.get("target_key", selection.get("department", "target"))))
-        frozen_target = snapshot.target(key)
-        protocol = frozen_target.protocol
+    def test_connection(self, provider_id: str) -> dict[str, Any]:
+        # 连接测试只依赖已保存的连接与凭据，读取模型列表地址，不改变准入。
+        with self._lock:
+            provider = self._store.providers[provider_id]
+            revision = self._revision
+            material = self._credentials.resolve(provider.credential_ref)
+        protocol = provider.protocol
         if protocol not in SUPPORTED_PROTOCOLS:
-            raise ProviderError(f"unsupported provider protocol: {protocol}",
-                                reason="unsupported_protocol")
-        availability = check_target_availability(frozen_target)
-        if not availability["available"]:
-            return {"ok": False, "kind": "connection", "target_key": key,
-                    "revision": snapshot.revision, "protocol": protocol,
-                    "source_url": effective_models_url(self._store.providers[frozen_target.provider_id]),
-                    "reason": availability["reason"], "message": availability["message"]}
+            raise ProviderError(f"unsupported provider protocol: {protocol}", reason="unsupported_protocol")
+        result = {"kind": "connection", "revision": revision, "protocol": protocol,
+                  "source_url": effective_models_url(provider)}
         if protocol == "fake":
-            return {"ok": True, "kind": "connection", "target_key": key,
-                    "revision": snapshot.revision, "protocol": protocol, "source_url": "",
-                    "reason": "", "message": ""}
-        probed = _probe_connection(self._store.providers[frozen_target.provider_id],
-                                   api_key=frozen_target.api_key, timeout_sec=frozen_target.timeout_sec)
-        return {"ok": probed["ok"], "kind": "connection", "target_key": key,
-                "revision": snapshot.revision, "protocol": protocol, "source_url": probed["source_url"],
-                "reason": probed["reason"], "message": probed["message"]}
+            return {**result, "ok": True, "reason": "", "message": ""}
+        if material is None:
+            return {**result, "ok": False, "reason": "provider_unavailable",
+                    "message": "Missing configuration: provider credential"}
+        probed = _probe_connection(provider, api_key=material.secret, timeout_sec=provider.timeout_sec)
+        return {**result, **probed}
 
     def configure_paths(self, config_path: str | Path | None,
                         dotenv_path: str | Path | None = None) -> None:

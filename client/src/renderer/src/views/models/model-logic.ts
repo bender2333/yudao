@@ -545,6 +545,37 @@ export function emptyFormState(defaultTimeoutSec: number): FormState {
   };
 }
 
+export function normalizeBaseUrl(value: string): string {
+  const address = value.trim();
+  return address === "" || /^[a-z][a-z\d+.-]*:\/\//i.test(address) ? address : `https://${address}`;
+}
+
+function hostDefaults(address: string): Pick<FormState, "id" | "name" | "credential_ref"> | null {
+  if (!address || !URL.canParse(normalizeBaseUrl(address))) return null;
+  const host = new URL(normalizeBaseUrl(address)).hostname;
+  const id = host.toLowerCase();
+  const ref = id.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  return { id, name: id, credential_ref: `${/^[A-Z]/.test(ref) ? "" : "HOST_"}${ref}_KEY` };
+}
+
+export function formPatchForPreset(state: FormState, preset: ServicePreset | null): Partial<FormState> {
+  const defaults = preset ? { id: preset.id, name: preset.name,
+    credential_ref: `${preset.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_KEY` } : null;
+  return { preset_id: preset?.id ?? CUSTOM_PRESET_ID, base_url: presetBaseUrlFor(preset, state.protocol),
+    models_url: "", ...(defaults ?? { id: "", name: "", credential_ref: "" }) };
+}
+
+export function formPatchForBaseUrl(state: FormState, address: string): Partial<FormState> {
+  const previous = hostDefaults(state.base_url);
+  const next = hostDefaults(address);
+  const patch: Partial<FormState> = { base_url: address };
+  if (!next) return patch;
+  for (const key of ["id", "name", "credential_ref"] as const) {
+    if (!state[key] || state[key] === previous?.[key]) patch[key] = next[key];
+  }
+  return patch;
+}
+
 // 编辑已有连接：按连接保存的服务方案恢复选中项，协议与地址取保存值（设计说明第 9.1 节）
 export function formStateFromProvider(provider: CatalogProvider): FormState {
   return {
@@ -634,9 +665,9 @@ export function providerInputFromForm(state: FormState): Record<string, unknown>
   };
 }
 
-// 连接测试的可用性：连接与服务方案都没有模型列表地址时不提供连接测试（第 4.3 节）
-export function connectionTestable(state: { models_url: string }, preset: ServicePreset | null): boolean {
-  return state.models_url.trim() !== "" || preset !== null;
+// 自定义服务使用连接地址加 /models；内置方案取预置的模型列表地址。
+export function connectionTestable(state: { base_url: string; models_url: string }, preset: ServicePreset | null): boolean {
+  return state.models_url.trim() !== "" || state.base_url.trim() !== "" || preset !== null;
 }
 
 // 部门默认与项目设置的模型选项：按连接分组的已准入定义（第 9.1 节）

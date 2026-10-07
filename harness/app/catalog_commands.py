@@ -439,24 +439,15 @@ def _test_payload(base_revision: int, kind: str, provider_id: str, model_id: str
 
 async def _test_connection(application: Application, command: Command, request: CatalogConnectionTest) -> None:
     facade = application.system.facade
-    view = facade.providers_view()
     if _provider_view(facade, request.provider_id) is None:
         raise Rejection("not_found", f"Provider 配置不存在：{request.provider_id}")
-    models = [item for item in view["models"] if item["provider_id"] == request.provider_id]
-    if request.model_id is not None:
-        models = [item for item in models if item["id"] == request.model_id]
-        if not models:
-            raise Rejection("not_found", f"模型访问定义不存在：{request.model_id}")
-    if not models:
-        raise Rejection("catalog_invalid", "Provider 还没有模型访问定义，请先保存以后测试连接")
-    model_id = models[0]["id"]
+    model_id = ""
     _register(application, command)
 
     async def run() -> None:
         started = time.monotonic()
-        selection = {"key": model_id, "provider_id": request.provider_id, "model_id": model_id}
         try:
-            result = await asyncio.to_thread(facade.test_connection, selection)
+            result = await asyncio.to_thread(facade.test_connection, request.provider_id)
         except (CatalogValidationError, ProviderError) as exc:
             _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
                     _test_payload(request.base_version, "connection", request.provider_id, model_id, started,

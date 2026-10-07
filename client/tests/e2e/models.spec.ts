@@ -3,6 +3,8 @@
 // 候选、连接测试与模型测试都发真实请求。窗口尺寸 1440×900 与 390×844，控制台错误为零。
 
 import { expect, test } from "@playwright/test";
+import { createServer } from "node:http";
+import { once } from "node:events";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
 // 上游凭据：测试经命令设置在内存里，页面与网络响应都不应出现它
@@ -616,6 +618,66 @@ for (const size of [
     }
   });
 }
+
+test("新建表单选择 OpenCode Go 与无协议头自定义地址自动填写字段", async () => {
+  test.setTimeout(300_000);
+  const { backend, client } = await openModels({ width: 1440, height: 900 });
+  try {
+    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+    const form = client.page.locator(".mm-form");
+    await form.getByRole("button", { name: "OpenCode Go" }).click();
+    await expect(form.getByLabel("ID", { exact: true })).toHaveValue("opencode-go");
+    await expect(form.getByLabel("名称", { exact: true })).toHaveValue("OpenCode Go");
+    await expect(form.getByLabel("凭据引用")).toHaveValue("OPENCODE_GO_KEY");
+    await form.getByRole("button", { name: "自定义" }).click();
+    await form.getByTestId("provider-base-url").fill("9router.huiju.asia/v1");
+    await form.getByLabel("名称", { exact: true }).click();
+    await expect(form.getByTestId("provider-base-url")).toHaveValue("https://9router.huiju.asia/v1");
+    await expect(form.getByLabel("ID", { exact: true })).toHaveValue("9router.huiju.asia");
+    await expect(form.getByLabel("凭据引用")).toHaveValue("HOST_9ROUTER_HUIJU_ASIA_KEY");
+    await form.locator(".mm-advanced > summary").click();
+    await expect(form.getByTestId("provider-models-url")).toHaveValue("https://9router.huiju.asia/v1/models");
+  } finally {
+    await client.close();
+    await backend.stop();
+  }
+});
+
+test("新建自定义连接保存 Key 后直接获取模型列表并测试空连接", async () => {
+  test.setTimeout(300_000);
+  const received: string[] = [];
+  const upstream = createServer((request, response) => {
+    received.push(request.headers.authorization ?? "");
+    response.writeHead(request.headers.authorization === `Bearer ${KEY}` ? 200 : 401,
+      { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ data: [{ id: "new-model" }] }));
+  });
+  upstream.listen(0, "127.0.0.1");
+  await once(upstream, "listening");
+  const address = upstream.address();
+  if (address === null || typeof address === "string") throw new Error("HTTP 上游未启动");
+  const { backend, client } = await openModels({ width: 1440, height: 900 });
+  try {
+    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+    const form = client.page.locator(".mm-form");
+    const base = `http://127.0.0.1:${address.port}/v1`;
+    await form.getByTestId("provider-base-url").fill(base);
+    await form.getByTestId("credential-secret").fill(KEY);
+    await form.getByTestId("submit-provider").click();
+    await expect(form).toHaveCount(0);
+    const provider = client.page.getByTestId("provider-127.0.0.1");
+    await provider.getByRole("button", { name: "展开" }).click();
+    await provider.getByTestId("collect-127.0.0.1").click();
+    await expect(provider.getByTestId("candidates-127.0.0.1")).toContainText("new-model");
+    await provider.getByTestId("test-connection-127.0.0.1").click();
+    await expect(provider.getByTestId("connection-result-127.0.0.1")).toContainText("连接测试通过");
+    expect(received).toEqual([`Bearer ${KEY}`, `Bearer ${KEY}`]);
+  } finally {
+    await client.close();
+    await backend.stop();
+    upstream.close();
+  }
+});
 
 // 从系统页返回时回到进入前的页面（设计说明第 3.3 节第 108 行，工单 #296）
 test("从项目页进入模型管理，点「返回原界面」回到项目页", async () => {
