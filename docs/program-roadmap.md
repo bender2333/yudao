@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | Stage 1：可信交付 | 产品、工程、质检围绕有效要求完成可核验交付；失败与取消可追溯 | 按原生循环验收记录完成 | [MVP 验收](archive/mvp-acceptance.md)，以及 Stage 2 的 F 收口记录 |
 | Stage 2：三部门 Harness 基线及 Provider 补充 | 原日常路径基础上，补无配置启动、统一 Provider 模块和 Go 订阅接入 | 2.1–2.6 按原合同关闭；2.7 于 2026-09-20 关闭 | [历史进度](archive/stage-2-progress.md)、[2.7 计划](archive/stage-2-provider-plan.md)、[2.7 执行报告](archive/stage-2-7-provider-report.md) |
-| Stage 3：通用工具、可靠恢复与执行环境 | 能处理实际代码项目，接入已有项目，中断后自动接续；代码在控制主机或登记的远程机器上执行；网络与 MCP 工具、浏览器与 computer use；不同项目并行；模型管理；桌面客户端与系统首页；与单个 agent 对照；规则与参数可以不发布新版本修改与撤回，内核有清单；Yudao 在自己的仓库上试点完成真实工单 | 进行中：里程碑 M1 以 0.1.1 交给用户试用（#183），M2 至 M4 推进中；进度见 GitHub 里程碑与[当前验收基线](current-baseline.md) | [Stage 3 计划](stage-3-plan.md) 的工作包与独立验收 |
+| Stage 3：通用工具、可靠恢复与执行环境 | 能处理实际代码项目，接入已有项目，中断后自动接续；代码在控制主机或登记的远程机器上执行；网络与 MCP 工具、浏览器；不同项目并行；模型管理；桌面客户端与系统首页；与单个 agent 对照；规则与参数可以不发布新版本修改与撤回，内核有清单；Yudao 在自己的仓库上试点完成真实工单 | 进行中：里程碑 M1 以 0.1.1 交给用户试用（#183），M2 至 M4 推进中；进度见 GitHub 里程碑与[当前验收基线](current-baseline.md) | [Stage 3 计划](stage-3-plan.md) 的工作包与独立验收 |
 | Stage 4：运维部门与长时间运行 | 运维部门在登记的运行环境中部署并观察交付的软件，发现的问题自动进入修复；Yudao 在进程重启、模型服务中断后自动继续；Yudao 自己的工单默认由 Yudao 实例执行；流转由定义驱动 | 后续规划；需求已确认 | 本文第 5.1 节 |
 | Stage 5：部门内协作、上下文与界面 | 部门在连续多个事项中只使用当前有效的信息，部门内部围绕中心角色分工，判定点经校准后参与裁决，用户能看清部门内外的运行过程 | 后续规划；语义系统、部门内多角色有设计与工单 | 本文第 5.2 节 |
 | Stage 6：受治理的系统演化 | 自举第二层：根据运行证据提出组织或规则变更，独立验证、限定采用并可撤销；部门之间的流转有独立的流程审查 | 后续规划；前置条件见第 6.2 节 | 本文第 5.3 节 |
@@ -32,7 +32,7 @@ flowchart LR
     R --> P["3.4A 不同项目并行 #121"]
     ENV -->|"合同 #128"| X["3.2B 网络与 MCP #122"]
     R --> ONB["3.8 接入已有项目 #124"]
-    X --> BCU["3.2D 浏览器与 computer use #123"]
+    X --> BCU["3.2D 浏览器 #123"]
     ENV -->|"合同 #128"| BCU
     D24 --> BCU
     BCU --> EVL
@@ -54,16 +54,16 @@ flowchart LR
 1. **已完成的前置工作**：3.2A 本地通用工具；提示词审计补丁与请求结构（#46、#47、#101、#103、#106）；控制核心重构（[#43](https://github.com/bender2333/yudao/issues/43)，[ADR-0010](adr/0010-control-core-drives-role-steps.md)、[ADR-0011](adr/0011-async-control-core.md)）；一份事件日志（[#44](https://github.com/bender2333/yudao/issues/44)，[ADR-0013](adr/0013-event-log-and-single-write-path.md)）；带版本的定义（[#48](https://github.com/bender2333/yudao/issues/48)，[ADR-0014](adr/0014-versioned-definitions.md)）；应用层与接口层的骨架（[#72](https://github.com/bender2333/yudao/issues/72)，[应用层与接口层设计说明](design/app-and-interface.md)）。
 2. **用户决定**（[#49](https://github.com/bender2333/yudao/issues/49)）：所有等待用户的事项使用同一种机制（[总体架构](design/architecture/overall-architecture.md)第 7.4 节），第一种是模型引用无法使用时的待恢复；3.1 的核实未知动作与 Stage 4 运维清单以外的动作按同一机制加入。
 3. **调用目标每次请求解析**（[#45](https://github.com/bender2333/yudao/issues/45)，2026-09-29 完成）：[ADR-0005](adr/0005-resolve-call-target-per-request.md) 的部分提前到 3.1 之前；控制核心不持有明文凭据，进程重启后按当时的设置与凭据来源继续。
-4. **界面工作线**（[D30](requirements/web-game-frontend.md)、[ADR-0015](adr/0015-desktop-client-and-http-contracts.md)、[应用层与接口层设计说明](design/app-and-interface.md)）：与 #49、#45、3.1 同时进行。#70 剩下的子工单排在 3.1 之前，然后是客户端外壳（#79）与当前档页面（#71），当前档页面通过验收以后删除旧 Web 控制台（#78）。客户端有系统首页（待你决定、离开期间的报告、项目列表）与托盘提醒，只在局域网内连接控制主机，认证与加密保留位置并标为 TODO，连接时核对接口版本。此后每个工作包（3.1、3.2C、3.4A、3.2B、3.2D、3.8、D24 与 Stage 4 运维）连同界面一起验收，界面工单挂在所属工作包的父工单下。原型依据为 v9（原型设计已结束，[docs/prototypes/v9/design.md](prototypes/v9/design.md)，屏幕清单、页面与决定卡片沿用 [v8 设计说明](prototypes/v8/design.md)）；像素画面按 [ADR-0021](adr/0021-client-pixel-view-follows-v9-structure.md) 用 PixiJS、XState、GSAP 实现 v9 的实体—组件—系统结构。#79 以后是项目页面（#80）、首页页面与决定卡片（#175）和六张像素画面工单（#176、#82、#177、#179、#178、#180）。
+4. **界面工作线**（[D30](requirements/web-game-frontend.md)、[ADR-0015](adr/0015-desktop-client-and-http-contracts.md)、[ADR-0032](adr/0032-interface-served-as-web-pages.md)、[应用层与接口层设计说明](design/app-and-interface.md)）：与 #49、#45、3.1 同时进行。#70 剩下的子工单排在 3.1 之前，然后是界面外壳（#79）与当前档页面（#71），当前档页面通过验收以后删除旧 Web 控制台（#78）。界面由 Yudao 服务以网页提供，有系统首页（待你决定、离开期间的报告、项目列表），在本机打开时用浏览器的系统通知提示新的决定；只在局域网内访问控制主机，认证与加密保留位置并标为 TODO。此后每个工作包（3.1、3.2C、3.4A、3.2B、3.2D、3.8、D24 与 Stage 4 运维）连同界面一起验收，界面工单挂在所属工作包的父工单下。原型依据为 v9（原型设计已结束，[docs/prototypes/v9/design.md](prototypes/v9/design.md)，屏幕清单、页面与决定卡片沿用 [v8 设计说明](prototypes/v8/design.md)）；像素画面按 [ADR-0021](adr/0021-client-pixel-view-follows-v9-structure.md) 用 PixiJS、XState、GSAP 实现 v9 的实体—组件—系统结构。#79 以后是项目页面（#80）、首页页面与决定卡片（#175）和六张像素画面工单（#176、#82、#177、#179、#178、#180）。
 5. **评测工作线**（[D32](requirements/comparison-experiment.md)、[评测场景设计](design/evaluation-scenarios.md)）：与界面工作线和后端工单并行进行，不要求排在其他工作之前。按评测场景设计第 10 节建立场景材料、评分器与 OpenCode 运行器，运行 OpenCode 基础分；再建立 Yudao 运行器，在前提满足时运行 Yudao 一侧。设计已由用户逐项审阅（2026-09-30）：评测工具、OpenCode 基础分与场景 2、3 的 Yudao 一侧属于里程碑 M2，场景 1 的 Yudao 一侧属于 M4；版本回归在每个里程碑交给用户试用之前运行。版本比较使用噪声范围，结论是改进、无差别、退化之一；评测结果带费用（用量乘以用户填写的单价）与检验覆盖比例（[规则登记与参数设计说明](design/rules-and-parameters.md)第 4 节）。三个场景是回归场景；不参与调整的留出场景另设，第一次运行在 Stage 4 结束时。Stage 3 结束之前必须完成，没有完成时 Stage 3 不能关闭。
 6. **3.1 可靠恢复**：先核对执行权和未完成动作，再继续同一 run。Yudao 启动时自动继续所有中断的 run，只有结果未知的外部动作通过用户决定交给用户。恢复与 replay 分开，恢复不能重置限额或复活已取消任务。进行中的角色任务由步骤驱动从已提交的状态重新装配后继续。执行权在写入口与领域写入一起核对（[ADR-0012](adr/0012-single-control-core-scalable-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）。
 7. **3.2C 执行环境服务**（[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）：执行环境的合同经过 HTTP 加 JSON，提供远程执行代理这种新实现，代码在执行位置上直接运行（[ADR-0022](adr/0022-run-directly-without-containers.md)）；用户在系统中登记机器，在项目中授权使用。依赖 3.1 的动作核实与 #110。
 8. **3.4A 不同项目并行**：恢复验收通过后，不同项目、隔离目录中的事项并行执行，执行槽位控制并发数量。同一项目的事项按优先级排队，一次只进行一个。
 9. **3.2B 网络与 MCP**（[D36](requirements/network-and-mcp.md)、[设计说明](design/network-and-mcp.md)）：取回与登记的 MCP 服务器固定在控制主机上运行；依赖执行环境的合同（#128），每个新工具单独验收。
-10. **3.2D 浏览器与 computer use**（[D34](requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](design/browser-and-computer-use.md)，#123）：依赖 3.2B 的 MCP 接入与执行环境的合同（#128）。浏览器工具使用 Playwright MCP，每一步把页面的可访问性结构交给模型，模型能看图时附上截图；computer use 通过截图、点击与输入在控制主机的交互桌面上操作桌面程序（[ADR-0026](adr/0026-desktop-trials-on-control-host-desktop.md)）。质检两个工具都可以使用，工程可以使用浏览器做研发自测。质检部门的模型应当能看图：所选模型不支持图像时照常保存并提醒，这时不提供 computer use，浏览器只给可访问性结构。试用会话的浏览器使用与网络取回相同的拒绝规则，拒绝 Yudao 服务自己的地址，其余按普通浏览器 MCP 的默认做法。质检的逐条结论写明每条验收条件的检验方式，放行附检验覆盖比例与开环的条件（[验证的独立性设计说明](design/independent-verification.md)第 7 节）。评测场景 1 的 Yudao 一侧依赖本项。
+10. **3.2D 浏览器**（[D34](requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](design/browser-and-computer-use.md)，#123）：依赖 3.2B 的 MCP 接入与执行环境的合同（#128）。浏览器工具使用 Playwright MCP，每一步把页面的可访问性结构交给模型，模型能看图时附上截图。质检用浏览器操作交付的网页，工程可以使用浏览器做研发自测。质检部门的模型应当能看图：所选模型不支持图像时照常保存并提醒，这时浏览器只给可访问性结构。试用会话的浏览器使用与网络取回相同的拒绝规则，拒绝 Yudao 服务自己的地址，其余按普通浏览器 MCP 的默认做法。质检的逐条结论写明每条验收条件的检验方式，放行附检验覆盖比例与开环的条件（[验证的独立性设计说明](design/independent-verification.md)第 7 节）。评测场景 1 的 Yudao 一侧依赖本项。computer use 是以后阶段的专题（第 5 节）。
 11. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。B8 加入采纳写回：以写回时代码仓库 main 的当前提交为基线，把被采纳的成果生成分支与合并请求；建档材料分类，现有行为以 README、测试与验收基线为准，设计与需求文档作为要求材料。
 12. **D24 模型管理**（[#83](https://github.com/bender2333/yudao/issues/83)，[模型管理设计说明](design/model-management.md)）：依赖 #45 与应用层的目录命令（#77）。统一的模型目录与准入、模型能力表、推理档位、每个项目单独选择各部门的模型、部门的建议能力提醒；#96 用真实 Provider 验收三种协议。评测时给质检换用视觉模型、3.2D 的建议能力提醒都依赖本项。增加服务方案按预置表与自定义连接进行（[ADR-0003](adr/0003-versioned-preset-table-no-remote-refresh.md)），不另设工作包。
-13. **3.9 组合验收与对照实验**：在 3.8 接入的 openai-agents-python 上对 Stage 3 的各项能力逐项给出结论，浏览器与 computer use 的结论引用 3.2D 的真实验收；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）；增加共享上下文的一组（[验证的独立性设计说明](design/independent-verification.md)第 6 节）；自举第一层的配对验收并入本项（第 6.1 节）。所有工作包父工单关闭以后进行。
+13. **3.9 组合验收与对照实验**：在 3.8 接入的 openai-agents-python 上对 Stage 3 的各项能力逐项给出结论，浏览器的结论引用 3.2D 的真实验收；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）；增加共享上下文的一组（[验证的独立性设计说明](design/independent-verification.md)第 6 节）；自举第一层的配对验收并入本项（第 6.1 节）。所有工作包父工单关闭以后进行。
 14. **迭代底座**（[D38](requirements/system-intent.md)，父工单 #342）：五条判据中度量、可撤回的改动与锚点的基础，与其余工作包没有阻塞关系。
     - M2：B3 规则登记的四项记录与界限、参数事件与 `parameter.set`、检查时限与建档的单轮上限成为项目级参数（[规则登记与参数设计说明](design/rules-and-parameters.md)）；B6 omp 流程的基线数字（每个工单的审查轮数、合并以后归因到它的集成层失败、搁置的原因、耗时与用量）；B2 已用时间写入事件、边界的核对从流程编排中分出来，挂在 3.1 下（[循环与收敛设计说明](design/loops-and-convergence.md)）；B8 采纳写回与建档材料的分类，挂在 3.8 下。
     - M3：B1 内核清单、六条不变式测试、导入方向与行数的检查；B7 接口的访问令牌、由已安装的实例提供的发布检查（[可信内核设计说明](design/trusted-kernel.md)）。
@@ -71,11 +71,11 @@ flowchart LR
     - 评测结果的费用、覆盖比例与噪声范围并入评测工作线的 #194、#196、#198；试用浏览器的拒绝规则并入 #149；机器的上线与离线写入机器流并入 #140。
 15. **自举工作线**：Yudao 实例把 Yudao 仓库当作普通项目开发，前置条件、试点与验收见第 6.1 节。试点的首批工单是新增的可视化内容：循环实例、收敛状态、事实来源与检验覆盖。
 
-Stage 3 的工单按四个试用里程碑推进，每个里程碑完成以后由用户试用与核对（[Stage 3 计划](stage-3-plan.md)第 9 节）：M1 桌面客户端与模型管理；M2 中断后自动继续、接入已有项目；M3 远程执行、外部工具、多项目并行；M4 质检操作交付与收尾。
+Stage 3 的工单按四个试用里程碑推进，每个里程碑完成以后由用户试用与核对（[Stage 3 计划](stage-3-plan.md)第 9 节）：M1 网页界面与模型管理；M2 中断后自动继续、接入已有项目；M3 远程执行、外部工具、多项目并行；M4 质检操作交付与收尾。
 
 ## 3. 跨阶段架构与约束
 
-分层、各层的职责与边界、长期决定、合同与使用的技术见[总体架构：职责分层](design/architecture/overall-architecture.md)：客户端、接口层、应用层、控制核心（流程编排、步骤驱动、上下文装配、裁决规则、写入口、事件日志）、定义、知识层、观察层、观察者、执行层（Provider、执行环境、外包 agent 的运行进程）。各阶段的新能力都放进这个结构，不建立第二套事件事实源。
+分层、各层的职责与边界、长期决定、合同与使用的技术见[总体架构：职责分层](design/architecture/overall-architecture.md)：界面、接口层、应用层、控制核心（流程编排、步骤驱动、上下文装配、裁决规则、写入口、事件日志）、定义、知识层、观察层、观察者、执行层（Provider、执行环境、外包 agent 的运行进程）。各阶段的新能力都放进这个结构，不建立第二套事件事实源。
 
 部署形态按 [ADR-0018](adr/0018-single-control-host-remote-execution.md) 与 [ADR-0022](adr/0022-run-directly-without-containers.md)：控制核心、事件日志、工件存储、Provider 模块与观察者在一台控制主机上运行，事件日志使用 SQLite；执行环境可以是本机进程或远程机器上的执行代理，代码在执行位置上直接运行。[ADR-0007](adr/0007-boundaries-for-distributed-deployment.md) 的边界作为执行环境服务的合同继续遵守；同时遵守 [ADR-0010](adr/0010-control-core-drives-role-steps.md) 至 [ADR-0015](adr/0015-desktop-client-and-http-contracts.md)：每次模型请求在控制核心装配；控制核心在一个异步事件循环中运行；控制核心持有执行权；一份事件日志与唯一写入口；组织、角色、动作、本体与规则作为带版本的定义；桌面客户端、FastAPI 接口层，服务之间使用 HTTP 加 JSON。并且遵守 [ADR-0027](adr/0027-trusted-kernel-outside-self-modification.md) 至 [ADR-0031](adr/0031-declared-loop-layers-and-sub-loops.md)：可信内核在自我修改之外，下一个版本由当前运行的已发布版本检查；裁决有三种手段，控制核心的决定只依据已记录的事实；部门由信息的内聚形成，需要独立的是判断；规则是带理由的暂定默认值，参数在界限以内直接修改；循环层写在定义里，角色可以发起子循环，每一层都有边界。
 
@@ -104,6 +104,8 @@ Stage 3 的工单按四个试用里程碑推进，每个里程碑完成以后由
 ## 5. 后续阶段
 
 每个后续阶段在进入时细化工作包、设计与验收；本节规定产品结果、内容、边界与依赖。
+
+computer use（部门在控制主机的交互桌面上操作交付的桌面程序：屏幕工具、桌面会话的同意、独占与等待、提示框与停止、桌面种类的启动方式）是以后阶段的单独专题，放在哪个阶段在专题讨论时确定（[各阶段需求概览](requirements/stage-requirements-overview.md)第 6 节）；讨论的材料是[浏览器与 computer use 设计说明](design/browser-and-computer-use.md)第 5 节与 [ADR-0026](adr/0026-desktop-trials-on-control-host-desktop.md)，工单 #150、#246、#247。
 
 ~~~mermaid
 flowchart LR
@@ -138,7 +140,7 @@ flowchart LR
 - Yudao 由操作系统的服务管理在崩溃后重新启动，进程卡住时由服务管理的看门狗重新启动，启动时按 3.1 自动继续中断的 run。
 - Yudao 定时向外部的报到服务（healthchecks.io）报到；控制主机断电、断网或 Yudao 停止工作时，超过时限没有报到，由该服务通知用户。这项检查不运行在控制主机上。
 - 数据保留：事件日志永久保留；事项结束后删除它的工作区与尝试文件；交付快照保留最近 3 个放行版本，以及放行历史中仍被回滚引用的版本；磁盘剩余空间低于设定值时在界面提示。
-- 通知与决定请求只在 Yudao 的客户端中显示，客户端常驻托盘时发出系统通知。
+- 通知与决定请求只在 Yudao 的界面中显示，在本机打开界面时用浏览器的系统通知提示。
 - 模型服务中断（[D17](requirements/provider-retries.md)）：按 D17 重试用完以后仍然是连接失败、服务端错误、过载或限流，以及凭据失效、证书校验失败时，run 暂停并进入「等待模型服务」，按间隔重试，服务恢复后自动继续；进入等待时通知用户一次，用户可以取消；等待时间不计入运行时间上限，超过等待的时长上限时发出决定请求。请求内容错误与上下文过长不进入等待，按原有规则处理。
 
 **自举第一层成为常态**
@@ -172,7 +174,7 @@ flowchart LR
 - **观察者**：观察者的订阅与提案接口（#98）；教训发现模块作为第一个观察者，只提出提案。
 - **规则与参数的界面**：参数的查看与界内修改（`parameter.set`），组织图（部门、角色、观察者、判定点与许可关系）。
 - **可观测性**：Yudao 自身的观察视图，包括部门内外的运行过程、角色任务、上下文来源与用量，见 [可观测性详细设计](research/observability-design.md)；数据来自应用层的查询与事件流。
-- **界面**：应用层、接口层与桌面客户端已在 Stage 3 的界面工作线建立（第 2 节）。本阶段在客户端中加入部门内多角色、部门账本与语义记录的界面，以及可观测性的深入视图，随对应的后端工单一起验收。
+- **界面**：应用层、接口层与网页界面已在 Stage 3 的界面工作线建立（第 2 节）。本阶段在界面中加入部门内多角色、部门账本与语义记录的界面，以及可观测性的深入视图，随对应的后端工单一起验收。
 
 ### 5.3 Stage 6：受治理的系统演化
 

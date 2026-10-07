@@ -30,7 +30,7 @@
 | 选项 | 默认值 | 规则 |
 | --- | --- | --- |
 | 子命令 | serve | 无参和省略 serve 的服务选项使用同一解析路径；显式 demo/smoke/replay/project 保留 |
-| data-dir | 用户数据目录（Windows 为 `%LOCALAPPDATA%\Yudao`，Linux 为 `~/.local/share/yudao`） | 桌面客户端的安装、更新与发布设计说明第 3.4 节 |
+| data-dir | 用户数据目录（Windows 为 `%LOCALAPPDATA%\Yudao`，Linux 为 `~/.local/share/yudao`） | [网页界面的提供与发布设计说明](../design/web-interface-and-release.md)第 3.3 节 |
 | provider-config | `<data-dir>/providers.json` | 显式路径优先；没有明确给出时按生效的 data-dir 求出；路径在启动时解析为固定绝对路径 |
 | host / port | 127.0.0.1 / 8765 | 占用时报错，不静默改端口 |
 | 凭据文件 | `<data-dir>/.env` | 固定单路径，按生效的 data-dir 求出；不搜索用户主目录或其他项目 |
