@@ -117,7 +117,7 @@ def test_the_service_serves_the_page_files(data_dir, tmp_path):
     assert capabilities.status_code == 200
     assert unknown_api.status_code == 404 and "root" not in unknown_api.text
     assert escape.status_code == 404 and missing.status_code == 404
-    assert all(path.startswith(("/api/", "/client-update/")) for path in paths)
+    assert all(path.startswith("/api/") for path in paths)
 
 
 def test_without_page_files_the_root_explains_why(data_dir, tmp_path):

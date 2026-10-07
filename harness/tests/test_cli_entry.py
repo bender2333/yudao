@@ -1,8 +1,10 @@
-# 命令行入口（工单 #206，设计说明第 4.1 节）：yudao --version 输出发布版本号；
-# 从源码运行时 yudao client install 说明没有随包的安装程序并以非零状态退出。
-# 模型目录与凭据文件的默认位置（工单 #298，设计说明第 3.4 节）：按生效的 --data-dir 求出
+# 命令行入口（工单 #206、#373，设计说明第 4.1 节）：yudao --version 输出发布版本号。
+# 模型目录与凭据文件的默认位置（工单 #298，设计说明第 3.4 节）：按生效的 --data-dir 求出。
 # --data-dir 与 --provider-config 写在子命令之前或之后都生效（工单 #315）：解析器自身不给默认值，
-# 生效值由 _data_dir 按子命令求出
+# 生效值由 _data_dir 按子命令求出。
+#
+# 工单 #373 以后 yudao client install 子命令不再提供，界面改为服务提供的网页。
+
 
 import sys
 from importlib.metadata import version
@@ -26,14 +28,6 @@ def test_default_data_dir_follows_the_user_data_root(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     assert default_data_dir() == tmp_path / "Yudao"
-
-def test_client_install_without_a_bundled_installer_exits_nonzero(tmp_path, monkeypatch, capsys):
-    # 从源码运行没有发布资源目录：说明原因并以非零状态退出。把发布资源指向一个不存在的目录，保证确定
-    from harness.app.client_update import ReleaseAssets
-    monkeypatch.setattr(cli, "ReleaseAssets", lambda: ReleaseAssets(tmp_path / "absent"))
-    assert main(["client", "install"]) == 1
-    error = capsys.readouterr().err
-    assert "no client installer" in error and "没有客户端安装包" in error
 
 def test_the_catalog_and_credentials_default_to_the_data_directory(tmp_path):
     # 没有明确给 --provider-config 时目录文件在 --data-dir 内，admissions.json 由门面按同目录派生

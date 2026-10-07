@@ -35,7 +35,7 @@ evals/scenarios/scenario-3/checks/_work/
 .remember/
 .yudao/
 
-# --- 发布资源：客户端安装包、更新清单与执行代理的 wheel，随 wheel 发布（设计说明第 5.1、6.1 节） ---
+# --- 发布资源：页面文件与执行代理的 wheel，随 wheel 发布（设计说明第 5.1、6.1 节） ---
 harness/release_assets/
 
 # --- python ---
