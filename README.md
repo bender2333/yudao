@@ -14,12 +14,12 @@
 ## 分层
 
 ```text
-任务与观察层  桌面客户端 / 应用接口 / REST / 事件流（SSE）
+任务与观察层  网页界面 / 应用接口 / REST / 事件流（SSE）
 三部门循环核  Orchestrator、逐步上下文装配、合同校验、循环次数与停止判定
 基础能力层    单次 Responses 模型请求、宿主工具、工作区、事件、工件与 Git 版本存储
 ```
 
-Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并返回输出，不执行工具、不管理部门历史、不决定循环。内核消费模型输出，调用工具或校验提交，再装配下一步输入。每一步的部门指令、当前合同、本部门历史与工具 schema 都保存为可核对摘要的工件。界面由桌面客户端提供，后端不返回界面文件。
+Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并返回输出，不执行工具、不管理部门历史、不决定循环。内核消费模型输出，调用工具或校验提交，再装配下一步输入。每一步的部门指令、当前合同、本部门历史与工具 schema 都保存为可核对摘要的工件。界面由服务提供的网页（client/ 构建的页面文件）提供，停止服务就是结束这个进程（Ctrl+C）。
 
 ## 快速开始
 
@@ -92,19 +92,17 @@ Yudao 服务用 `yudao` 命令启动（安装发布 wheel 以后；从源码运�
 yudao api
 ```
 
-`yudao api` 的参数与 `python -m harness api` 相同：`--data-dir`、`--host`、`--port`、`--access`、`--provider-config`。`yudao --version` 输出发布版本号；`yudao client install` 运行随 wheel 发布的桌面客户端安装程序。
+`yudao api` 的参数与 `python -m harness api` 相同：`--data-dir`、`--host`、`--port`、`--access`、`--provider-config`。`yudao --version` 输出发布版本号。停止服务就是结束这个进程（Ctrl+C）。
 
 默认数据目录是用户数据目录：Windows 为 `%LOCALAPPDATA%\Yudao`，Linux 为 `~/.local/share/yudao`（遵守 `XDG_DATA_HOME`）。事件日志、工件、进程锁 `service.lock`、`providers.json`、`.env` 与日志目录 `logs/` 都在其中；日志按大小轮换。开发、评测与走查用 `--data-dir` 指向其他目录。`--provider-config` 没有给出时目录文件为 `<--data-dir>/providers.json`，准入记录 `admissions.json` 与它同目录；明确给出时以该路径为准。
 
-不写子命令时启动的就是应用接口（与 `api` 子命令相同）；旧 Web 控制台与 `serve` 子命令已删除，观察与操作走桌面客户端。
+不写子命令时启动的就是应用接口（与 `api` 子命令相同），同时提供网页界面；用浏览器打开服务地址即可，`--access lan` 时局域网内的另一台电脑也能打开。
 
-服务提供桌面客户端使用的应用接口（命令、查询、能力清单与 OpenAPI，见[应用层与接口层设计说明](docs/design/app-and-interface.md)）与客户端的更新源：
+服务提供网页界面与应用接口（命令、查询、能力清单与 OpenAPI，见[应用层与接口层设计说明](docs/design/app-and-interface.md)）：
 
 - `POST /api/commands/{名称}`（命令带 `command_id`，接受返回位置，拒绝返回 409 与原因）
 - `GET /api/queries/{名称}`（快照与位置）
 - `GET /api/capabilities`、`GET /openapi.json`
-- `GET /client-update/latest.yml` 与 `GET /client-update/<文件名>`（客户端的更新清单与安装程序，支持 Range）
-- `POST /api/system/stop`（本机停止请求：只在本机访问方式下接受且请求来自回环地址，服务停止接受新请求并退出）
 
 同一个数据目录只允许一个服务进程：启动时取得数据目录的进程锁，另一个服务进程正在使用这个数据目录时以非零状态退出并写明占用的数据目录。
 
@@ -126,9 +124,9 @@ yudao replay <run_id>
 
 ## 安装与启动
 
-上面「快速开始」是从源码运行的开发方式。按发布版本安装时，Yudao 服务与桌面客户端分开安装，两者出自同一个发布，版本号相同（[桌面客户端的安装、更新与发布设计说明](docs/design/client-packaging-and-release.md)，[ADR-0023](docs/adr/0023-client-installed-apart-release-is-one-wheel.md)）。
+上面「快速开始」是从源码运行的开发方式。按发布版本安装时，一次发布只含一个 wheel `yudao_harness-<版本>-py3-none-any.whl`：Yudao 服务的代码、页面文件与执行代理的 wheel。
 
-一次发布是一个 wheel `yudao_harness-<版本>-py3-none-any.whl`，其中包含 Yudao 服务的代码、桌面客户端的安装程序与更新清单。
+一次发布是一个 wheel `yudao_harness-<版本>-py3-none-any.whl`，其中包含 Yudao 服务的代码、页面文件与执行代理的 wheel。停止服务就是结束这个进程（Ctrl+C）。
 
 ### 控制主机上的 Yudao 服务
 
@@ -162,26 +160,9 @@ yudao api
 gh release download v<版本> --pattern 'yudao_harness-*.whl'
 ```
 
-### 桌面客户端
+### 网页界面
 
-客户端是 Windows x64 程序，与控制主机在同一台电脑上或局域网内的另一台电脑上都可以运行。
-
-与控制主机在同一台电脑上：
-
-```bash
-yudao client install
-```
-
-它运行 wheel 附带的客户端安装程序，安装到 `%LOCALAPPDATA%\Programs\Yudao`，按用户安装，不需要管理员权限。
-
-在另一台电脑上：从更新源下载安装程序后运行（要求 Yudao 服务以局域网访问方式运行）：
-
-```powershell
-Invoke-WebRequest http://<控制主机地址>:<端口>/client-update/Yudao-Setup-<版本>.exe -OutFile Yudao-Setup-<版本>.exe
-.\Yudao-Setup-<版本>.exe
-```
-
-用浏览器下载会写入「来自网络」标记，出现 SmartScreen 警告，点「仍要运行」可以继续。客户端连接本机地址 `http://127.0.0.1:8765` 时，服务没有运行则由客户端启动它。
+启动服务以后，用浏览器打开服务地址即可使用（默认 `http://127.0.0.1:8765`）。`--access lan` 时局域网内的另一台电脑也能打开同一地址。页面文件由服务随 wheel 一起提供，不需要单独安装客户端。
 
 ### 升级
 
@@ -196,7 +177,7 @@ uv tool install --reinstall --python 3.12 <新的 wheel 的路径>
 yudao api
 ```
 
-同一个地址上的文件被替换以后，没有 `--reinstall` 的再次安装按「已经安装」结束，所以升级要带 `--reinstall`。客户端在连接时读取服务的能力清单，接口版本不同时显示更新页，一键更新到与服务相同的版本。
+同一个地址上的文件被替换以后，没有 `--reinstall` 的再次安装按「已经安装」结束，所以升级要带 `--reinstall`。页面文件随 wheel 一起提供，每次部署都是同一版本。
 
 ## 测试
 
@@ -226,7 +207,7 @@ uv run python -m harness smoke --provider-config .yudao/providers.json --scenari
 
 ## 如何使用
 
-界面由桌面客户端提供，命令与查询经应用接口提交与读取。下面的例子用 `curl` 直接调用接口；每条命令都带客户端生成的 `command_id`（重试使用同一个值）。
+界面由服务提供的网页提供，命令与查询经应用接口提交与读取。下面的例子用 `curl` 直接调用接口；每条命令都带客户端生成的 `command_id`（重试使用同一个值）。
 
 ### 1. 创建项目与任务
 

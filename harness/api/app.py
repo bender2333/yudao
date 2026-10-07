@@ -7,7 +7,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
-import ipaddress
 import json
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -16,31 +15,28 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import FastAPI, Header, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import TypeAdapter
-from starlette.responses import FileResponse, Response
 
 from ..app.application import DEFAULT_REGISTRY, Application
 from ..app.catalog_queries import CatalogQueryInvalid
-from ..app.client_update import NO_INSTALLER, RELEASE_ASSETS, ReleaseAssetNotFound, ReleaseAssets
 from ..app.contracts import AccessMode, Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
 from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
 from ..app.project_queries import NotFound
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
 from ..app.replay import ReplayOutOfRange
 from .access import AccessMiddleware
-from .pages import PageFiles
+from .pages import PageFiles, RELEASE_ASSETS
 
 _COMPONENTS = "#/components/schemas/{model}"
 
 
 def create_app(open_application: Callable[[], Application], *, registry: Registry = DEFAULT_REGISTRY,
                access: AccessMode = "local", keepalive_sec: float = 15.0,
-               on_stop: Callable[[], None] | None = None,
-               release_assets: ReleaseAssets | None = None, pages: Path = RELEASE_ASSETS) -> FastAPI:
+               pages: Path = RELEASE_ASSETS) -> FastAPI:
     @asynccontextmanager
     async def lifespan(api: FastAPI) -> AsyncIterator[None]:
         application = open_application()
@@ -66,10 +62,6 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
 
     api.add_api_route("/api/capabilities", capabilities, methods=["GET"], response_model=Capabilities,
                       operation_id="capabilities", tags=["capabilities"])
-    # 本机停止请求（设计说明第 4.4 节）：不是命令，不产生领域事件，不经过命令注册表
-    _add_stop(api, on_stop=on_stop)
-    # 更新源（设计说明第 5.1 节）：不是查询与命令，从 wheel 内的发布资源目录读取
-    _add_client_update(api, assets=release_assets)
     # 页面与接口同一来源（第 6.2 节）：Origin 由 AccessMiddleware 核对，不发送 CORS 响应头
     api.add_middleware(AccessMiddleware, access=access)
     api.openapi = lambda: _openapi(api)
@@ -77,57 +69,6 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
     # 页面文件最后挂载：接口路径先匹配；挂载不进入 OpenAPI 与能力清单
     api.mount("/", PageFiles(pages), name="pages")
     return api
-
-def _add_stop(api: FastAPI, *, on_stop: Callable[[], None] | None) -> None:
-    # POST /api/system/stop：两种访问方式下都接受来自回环地址的请求（带 Origin 时只接受服务自己的
-    # 来源，由 AccessMiddleware 拒绝其他来源），来自其他地址的请求拒绝。设计说明第 4.4 节。
-    # 服务收到以后停止接受新请求、关闭事件流连接、等待进行中的写入完成、释放进程锁并退出；
-    # 进行中的 run 不等待结束，下次启动时按 3.1 自动继续
-    async def stop(request: Request) -> Response:
-        peer = request.client.host if request.client is not None else ""
-        if not _is_loopback(peer):
-            return JSONResponse(status_code=403, content={"error": "the stop request is only accepted "
-                                                                    "from a loopback address"})
-        if on_stop is None:
-            return JSONResponse(status_code=503, content={"error": "this service does not accept a stop request"})
-        # 先结束事件流连接：等待中的 SSE 连接干净关闭，不等优雅退出的超时，也不写回溯（工单 #301）
-        _application(request).close_event_streams()
-        on_stop()
-        return JSONResponse(status_code=202, content={"stopping": True})
-
-    api.add_api_route("/api/system/stop", stop, methods=["POST"], operation_id="system_stop", tags=["system"])
-
-def _is_loopback(host: str) -> bool:
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
-
-def _add_client_update(api: FastAPI, *, assets: ReleaseAssets | None = None) -> None:
-    # GET /client-update/latest.yml 与 GET /client-update/<文件名>（安装程序与 blockmap），支持 Range。
-    # 文件来自 wheel 内的发布资源目录；没有这个目录（从源码运行）时返回 404，响应写明「没有客户端安装包」
-    assets = ReleaseAssets() if assets is None else assets
-
-    def release_file(name: str) -> Response:
-        try:
-            path = assets.latest_manifest() if name == "latest.yml" else assets.installer(name)
-        except ReleaseAssetNotFound:
-            return JSONResponse(status_code=404, content={"error": NO_INSTALLER})
-        # FileResponse 按 Range 请求返回 206 与请求的片段，供 electron-updater 差分下载
-        return FileResponse(path)
-
-    async def latest_manifest() -> Response:
-        return release_file("latest.yml")
-
-    async def installer(filename: str) -> Response:
-        return release_file(filename)
-
-    api.add_api_route("/client-update/latest.yml", latest_manifest, methods=["GET"],
-                      operation_id="client_update_manifest", tags=["client-update"])
-    api.add_api_route("/client-update/{filename}", installer, methods=["GET"],
-                      operation_id="client_update_file", tags=["client-update"])
-
-
 def contract_digest(api: FastAPI) -> str:
     # 合同摘要：OpenAPI 文档的摘要，客户端据此判断生成类型时的合同与服务是否一致
     document = json.dumps(api.openapi(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))

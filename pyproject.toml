@@ -18,7 +18,7 @@ yudao = "harness.__main__:main"
 
 # uv sync 默认安装 dev 组，测试在按锁文件安装的项目环境中运行
 [dependency-groups]
-# PyYAML 供发布脚本 scripts/release.py 读取 electron-builder 生成的更新清单 latest.yml
+# PyYAML 供测试读取 YAML 固件，也供发布脚本 scripts/release.py 读取 latest.yml
 dev = [
     "pytest>=8",
     "pytest-xdist>=3.8",
