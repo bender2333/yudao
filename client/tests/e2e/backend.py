@@ -186,6 +186,18 @@ def _onboarding_round(index: int):
     ]
 
 
+def waiting_script():
+    # 等待模型服务的端到端验收（工单 #375）：工程部门的第一次请求模型服务不可用，按 D17 重试
+    # （model_retry_scheduled，页面据此发出「等待模型服务」的系统通知），重试这一次仍然不可用且
+    # 不再重试：run 进入待恢复并发出 model_unavailable 的决定请求（页面据此发出决定请求的系统通知）
+    # 这个脚本不预置项目与事项：用例在页面打开以后自己建项目并开始事项，让事件在页面开着的时候发生
+    return [
+        product_spec(),
+        ProviderError(UNAVAILABLE, reason="provider_unavailable", retryable=True),
+        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
+    ]
+
+
 def read_turn(identity: str, tool: str, arguments: dict):
     # 脚本里的一项可以是接收模型调用合同的函数（harness/adapters/fake.py 的 TurnFactory），
     # 函数返回带工具调用的回答；工具由原生循环真实执行
@@ -444,9 +456,9 @@ def main() -> int:
     # 目录缺哪个部门就在界面上被拒绝哪个部门；模型回答仍由同一份 FakeAdapter 脚本给出
     parser.add_argument("--catalog-driven", action="store_true")
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
-    # initial 是从想法新建带起始文件夹用的脚本（工单 #323）。它们需要的轮次与默认脚本的预置事项不同，
-    # 因此由用例选择
-    parser.add_argument("--script", choices=("default", "onboarding", "initial"), default="default")
+    # initial 是从想法新建带起始文件夹用的脚本（工单 #323）；waiting 是等待模型服务用的脚本（工单 #375，
+    # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）。它们需要的轮次与预置事项不同，因此由用例选择
+    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting"), default="default")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
     parser.add_argument("--reject-upstream", action="store_true")
@@ -478,6 +490,8 @@ def main() -> int:
         adapter_script = onboarding_script()
     elif args.script == "initial":
         adapter_script = initial_script()
+    elif args.script == "waiting":
+        adapter_script = waiting_script()
     else:
         adapter_script = script()
     if args.catalog_driven:
@@ -534,8 +548,9 @@ def main() -> int:
             room_project = asyncio.run(seed_room(application, system))
         elif args.script == "onboarding":
             asyncio.run(seed_onboarding(application))
-        elif args.script != "initial":
-            # 起始文件夹的用例自己在界面上建项目并开始事项，不需要预置的项目与事项（工单 #323）
+        elif args.script not in ("initial", "waiting"):
+            # 起始文件夹的用例（工单 #323）与等待模型服务的用例（工单 #375）自己在界面上建项目并开始事项，
+            # 不需要预置的项目与事项
             asyncio.run(seed(application, system))
     if args.catalog_driven:
         os.environ.pop("OPENCODE_GO_KEY", None)

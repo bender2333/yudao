@@ -544,6 +544,7 @@ claude-opus-5-5 / 2026-10-07 21:56 / 测试分层恢复：测试分层设计说�
 9router/my-small / 2026-10-08 02:40 / 楼层、部门房间与首页的楼三张画布改为按设备分辨率绘制：新增 pixel/surface.ts（画布像素尺寸为逻辑尺寸乘整数倍 k，每帧 setTransform(k) 后按逻辑坐标绘制、关掉插值、接通发光半径的 setCurrentScale），三个 view.ts 删掉 PixiJS 的 1 倍纹理放大改为直接挂画布（building 的 applySize 原来从未给画布赋像素尺寸的缺陷一并修掉）；画面文字整栈换成微软雅黑（ADR-0021 第 4 条），删除 @fontsource/fusion-pixel-10px-proportional-sc；新增 pixel-device-resolution 单元测试与 device-resolution 端到端用例（画布宽度为逻辑宽的整数倍、铺满容器、最近邻采样、文字有灰阶层次）；floor.spec.ts 断线重连用例改为核对画面里的事项状态与 project.loop 一致（原像素签名核对在 WebGL 画布下读回单色，没有核对到内容）/ 工单 #365
 
 9router/my-small / 2026-10-08 12:40 / 测试分层登记表 `harness/tests/layers.toml` 逐个文件降层：12 个文件降为 `unit`、17 个降为 `module`（连同已有的 `test_layer_boundaries.py` 共 18 个），其余 107 个留在 `integration`，表头注释写明这一步由 #406 完成 / 测试分层设计说明第 9 节第 2 步的降层做法
+9router/my-small / 2026-10-08 13:42 / `docs/architecture-issues.md` 追加工单 #375 的一条：工单要求磁盘空间不足时发出浏览器通知，但 `harness/definitions/rules.json` 没有磁盘阈值参数，事件种类里没有磁盘事件，事件流上不存在这个事实，页面无法由事件判断 / 登记问题，由架构师在 Stage 4 的系统故障处理里定下阈值参数与事件
 
 9router/my-small / 2026-10-08 13:40 / `docs/architecture-issues.md` 登记工单 #374 执行中发现的一处既有缺陷：`harness/runtime.py` 的 `resume_startup_runs` 对每个未终态 run 调用 `asyncio.run`，服务进程的控制核心运行在接口层事件循环中（ADR-0011），启动阶段因此报 `RuntimeError: asyncio.run() cannot be called from a running event loop` 并使服务起不来，凡带未终态 run 的数据目录都会复现 / 工单 #374
 
