@@ -140,7 +140,7 @@ class LoopSystem:
         # 再原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
         # 3.1 保持单任务运行：取得执行权以后串行运行到停止，不并发推进两个 run。
         # 运行到停止与结算都经流程编排的 run_until_stop_and_settle（工单 #299）：这条入口与事项开始、
-        # 回答决定以后继续共用同一处结算，不在这里各补一遍
+        # 回答决定以后继续共用同一处结算，不在这里各补一遍；服务进程里它是事件循环中的任务（_continue_run）
         # 返回取得执行权的 run 与它这次取得的执行权编号
         resumed: dict[str, int] = {}
         for run_id in self.startup_runs.same_version:
@@ -149,8 +149,19 @@ class LoopSystem:
                 continue
             epoch, _ = claimed
             resumed[run_id] = epoch
-            asyncio.run(self.orchestrator.run_until_stop_and_settle(run_id))
+            self._continue_run(run_id)
         return resumed
+
+    def _continue_run(self, run_id: str) -> None:
+        # 取得执行权以后运行到停止并结算：服务进程里控制核心在接口层的事件循环中运行（ADR-0011），
+        # 这次运行是那个循环里的任务（与事项开始、回答决定以后继续同一条路径）；
+        # 打开数据目录时还没有事件循环（测试、演示、命令行）时由 asyncio.run 运行到停止
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(self.orchestrator.run_until_stop_and_settle(run_id))
+        else:
+            self.orchestrator.start(run_id)
 
     @classmethod
     def _resume(cls, data_dir: str | Path, adapter: ModelAdapter) -> dict[str, int]:

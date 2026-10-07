@@ -5,6 +5,7 @@ import { type Client, type ClientOptions, createClient, createConfig } from "../
 import { capabilities as fetchCapabilities } from "../api/generated/sdk.gen";
 import type { Capabilities } from "../api/generated/types.gen";
 import { CLIENT_API_VERSION } from "../api/interface-version";
+import { PAGE_RELEASE } from "./page-release";
 
 export type Connection =
   | { state: "connected"; address: string; capabilities: Capabilities }
@@ -40,6 +41,11 @@ export async function connect(address: string): Promise<Connection> {
       || typeof deployment.version !== "string") {
     return { state: "failed", address, message: "没有取到能力清单" };
   }
+  // 页面与服务同出一个发布（网页界面的提供与发布设计说明第 5.1 节）：服务的发布版本与页面构建时的
+  // 版本不同时重新加载页面，取到与服务同一个版本的页面文件。每次连接都核对，包括服务重启以后的重新连接
+  if (deployment.version !== PAGE_RELEASE) {
+    window.location.reload();
+  }
   // 进入已连接只用了 deployment 的两个字段（上面已核对类型）；完整合同由服务端保证
   const capabilities = raw as Capabilities;
   const serverVersion = deployment.api_version;
@@ -49,3 +55,5 @@ export async function connect(address: string): Promise<Connection> {
   }
   return { state: "connected", address, capabilities };
 }
+
+
