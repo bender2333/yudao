@@ -1,6 +1,8 @@
 # 桌面客户端与 Yudao 服务分开安装，一次发布是一个 wheel
 
-桌面客户端按 [ADR-0015](0015-desktop-client-and-http-contracts.md) 是 Electron 程序，连接一个 Yudao 服务；控制主机是一台常开的机器，客户端通常运行在用户日常使用的电脑上（[ADR-0018](0018-single-control-host-remote-execution.md)）。M1 要交给用户试用，需要确定两者怎样安装、升级与发布。开发阶段后端在代码目录里用 `uv run python -m harness api` 启动，版本随执行者的合并随时变化。2026-10-01 用户逐轮采纳推荐，决定（[设计说明](../design/client-packaging-and-release.md)）：
+Status: 2026-10-07 整篇由 [ADR-0032](0032-interface-served-as-web-pages.md) 取代。界面改为 Yudao 服务提供的网页，没有客户端安装程序与更新页；一次发布仍是一个 wheel，包含构建好的页面文件与执行代理的安装包。
+
+桌面客户端按 [ADR-0015](0015-desktop-client-and-http-contracts.md) 是 Electron 程序，连接一个 Yudao 服务；控制主机是一台常开的机器，客户端通常运行在用户日常使用的电脑上（[ADR-0018](0018-single-control-host-remote-execution.md)）。M1 要交给用户试用，需要确定两者怎样安装、升级与发布。开发阶段后端在代码目录里用 `uv run python -m harness api` 启动，版本随执行者的合并随时变化。2026-10-01 用户逐轮采纳推荐，决定（设计说明现为[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)）：
 
 - Yudao 服务与桌面客户端分开安装：Yudao 服务用 `uv tool install` 安装成 `yudao` 命令，客户端用 Windows 安装程序（NSIS，按用户安装，不需要管理员权限）。两者出自同一个发布，版本号相同。
 - 退出客户端不停止 Yudao 服务：客户端只在本机的服务没有运行时启动它，启动为独立的后台进程；托盘菜单有「停止 Yudao」，用来自本机（回环地址）的专用请求停止。

@@ -10,7 +10,7 @@
 
 | 编号 | 细节 | 状态 |
 | --- | --- | --- |
-| D01 | [客户端持续输入任务与命令](web-continuous-input.md) | 产品入口为桌面客户端（[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)），客户端随 D30 实施；现有浏览器页面已实现持续输入，1440/390 宽度的追加、命令与终态新任务通过 |
+| D01 | [Web 持续输入任务与命令](web-continuous-input.md) | 产品入口为 Yudao 服务提供的网页界面（[ADR-0032](../adr/0032-interface-served-as-web-pages.md)），界面随 D30 实施；现有浏览器页面已实现持续输入，1440/390 宽度的追加、命令与终态新任务通过 |
 | D02 | [三部门 prompt 展示与修改](department-prompts.md) | 已实现；编辑、实际采用与版本审计通过 |
 | D03 | [intend.md 原文保存](intend-original.md) | 首次及逐次原文已验证；首批文本，附件未支持 |
 | D04 | [产品维护 PRD.md](product-prd.md) | 同源 PRD 与持续变更已实现并验证 |
@@ -30,7 +30,7 @@
 | D18 | [统一 Provider 管理与部门绑定](department-providers.md) | 底层目录、三部门绑定与原生循环已接入，本地多连接回归通过；配置 UI 已随 D22/D23 实现；真实跨 Provider 完整验收未完成；按每次模型请求解析由 #45 实施 |
 | D19 | [按原型建设 Web 工作台](web-workspace-prototype.md) | 原型已归档、任务已规划；Provider 等配置原型预留 |
 | D20 | [部门定向追加指导](department-guidance.md) | 已实现（`fe78667`、`fcb06ab`）；接收、进入模型输入与部门回应分别记录，处理时机与放行关系按[处理设计](../design/department-guidance.md)；3.0B 场景 B 的真实运行中指导完成处理 |
-| D21 | [模型请求、原始数据与用量观测](request-observability.md) | 原型已确定；复用已有事件；查询 `project.attempts`、`project.usage`、`run.attempt` 已由应用层提供，桌面客户端的观测页（请求记录、用量统计、请求详情）由 #80 实现，属于 Stage 3 的里程碑 M1 |
+| D21 | [模型请求、原始数据与用量观测](request-observability.md) | 原型已确定；复用已有事件；查询 `project.attempts`、`project.usage`、`run.attempt` 已由应用层提供，界面的观测页（请求记录、用量统计、请求详情）由 #80 实现，属于 Stage 3 的里程碑 M1 |
 | D22 | [启动与 Provider 热生效](startup-provider-reload.md) | Stage 2.7 已实现；无参空态启动、统一模块重载、页面 Key 与独立 .env 来源均通过本地验收，真实 Go 侧已用用户指定模型完成模型测试与三部门任务；现有实现只对新任务生效，按每次模型请求生效由 #45 实施 |
 | D24 | [模型管理与部门模型选择](model-management.md) | 需求与[设计说明](../design/model-management.md)已确认，实施中：调用目标每次请求解析（#45）、Provider 配置声明一种协议（#84）、获取模型列表带凭据与连接测试（#85）已完成，其余在 #83 下，属于 Stage 3 的里程碑 M1；部门默认加项目部门设置、按请求解析调用目标、推理档位，取代 D02/D18/D22/D23 中的任务冻结与事项内 Prompt 编辑 |
 | D23 | [统一 Provider 层与 OpenCode Go](provider-layer.md) | 已实现；独立模块、三协议适配、预置表、候选与准入贯通；真实 Go 覆盖 Responses 与 Chat Completions 并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制，见 [执行报告](../archive/stage-2-7-provider-report.md)；按每次模型请求解析调用目标由 #45 实施 |
@@ -39,7 +39,7 @@
 | D27 | [运维部门](operations-department.md) | 需求已确认，规则于 2026-09-28 两次补充（常设授权、修复事项自动开始、同一项目按优先级排队；故障记录与修复次数上限、部署前备份与回滚、密钥、外部内容、默认运行要求、未回答的决定），未实施；路线位置 Stage 4 |
 | D28 | [元观察与规则检查部门](meta-observer.md) | 需求已记录，未实施；路线位置 Stage 6（自举第二层），排在最后，前置条件见[总体路线图](../program-roadmap.md)；调研见 [JEV 决策模型](../research/jev-decision-model.md) |
 | D29 | [远程执行环境](remote-execution.md) | 需求已确认；部署形态见 [ADR-0018](../adr/0018-single-control-host-remote-execution.md)，代码在执行位置上直接运行（[ADR-0022](../adr/0022-run-directly-without-containers.md)），执行环境服务的合同沿用 [ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 的边界；工作区的建立与交付的封存经过执行环境（#110）已完成，其余未实施；路线位置 Stage 3 的 3.2C 执行环境服务（#120），属于里程碑 M3；远程执行代理的真实验收使用 Orange Pi AIpro 开发板，开发板已经到位 |
-| D30 | [游戏化的桌面客户端界面与界面实现](web-game-frontend.md) | 需求已记录；客户端为 Electron 桌面程序（[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)）；2026-09-28 补充系统首页、机房、托盘提醒、局域网访问（认证与加密为 TODO）与接口版本核对；原型设计以 [v9](../prototypes/v9/design.md) 结束（2026-09-30，屏幕清单、页面与决定卡片沿用 [v8](../prototypes/v8/design.md)），像素画面按 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md) 实现；2026-10-01 确定客户端与 Yudao 服务分开安装、客户端版本跟随服务、一次发布是一个 wheel（[ADR-0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)，[设计说明](../design/client-packaging-and-release.md)）；应用层、接口层与桌面客户端随里程碑 M1 交付，0.1.1 在用户试用中（#183），各工作包的界面随所属里程碑；画面分事实层与表演层，动画属于表演层（[D38](system-intent.md)） |
+| D30 | [游戏化的 Web 界面与界面实现](web-game-frontend.md) | 需求已记录；界面是 Yudao 服务提供的网页，一次发布是一个 wheel，包含构建好的页面文件与执行代理的安装包，服务手动启动，局域网访问用 `--access lan`（2026-10-07，[ADR-0032](../adr/0032-interface-served-as-web-pages.md)，[设计说明](../design/web-interface-and-release.md)）；2026-09-28 补充系统首页、机房、局域网访问（认证与加密为 TODO）；原型设计以 [v9](../prototypes/v9/design.md) 结束（2026-09-30，屏幕清单、页面与决定卡片沿用 [v8](../prototypes/v8/design.md)），像素画面按 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md) 实现；2026-10-07 确定外观以原型 v9 为准、验收用截图与原型 v9 同一场景并排对照，画面文字使用微软雅黑并按屏幕的实际分辨率绘制，页面内容区最宽 1280 像素居中；应用层、接口层与界面随里程碑 M1 交付，0.1.1 在用户试用中（#183），各工作包的界面随所属里程碑；画面分事实层与表演层，动画属于表演层（[D38](system-intent.md)） |
 | D31 | [部门内的外包角色](outsourced-agent-roles.md) | 需求已记录，未实施；路线位置 Stage 5：主程的执行者种类增加外包，经 ACP 接入，在自举的配对工单上对照自有主程与外包主程 |
 | D32 | [与单个 agent 的对照实验](comparison-experiment.md) | 需求、三个场景与评分方法已确认，未实施；版本回归与 OpenCode 对照共用三个场景（[评测场景设计](../design/evaluation-scenarios.md)）；作为 Stage 3 的评测工作线与界面工作线并行，Stage 3 结束之前必须完成，之后每个阶段结束时重复；两边使用用户提供的、有视觉能力的同一个模型；场景 1 的 Yudao 一侧依赖 3.2D；设计已由用户逐项审阅（2026-09-30），工单为 #118 的子工单 #188 至 #198；评测工具、OpenCode 基础分与场景 2、3 的 Yudao 一侧属于里程碑 M2，场景 1 属于 M4；评测在控制主机上直接运行；版本回归在每个里程碑交给用户试用之前运行；版本比较使用噪声范围，给出改进、无差别、退化之一，报告带费用与检验覆盖比例；3.9 增加共享上下文一组（DeepSeek V4.1 Flash，隔离组复用 3.9 的运行）；三个场景是回归场景，另设留出场景，第一次运行在 Stage 4 结束时 |
 | D33 | [接入已有项目](existing-project-onboarding.md) | 需求已确认，未实施；路线位置 Stage 3 的 3.8（#124，子工单 #134–#139），属于里程碑 M2 |
