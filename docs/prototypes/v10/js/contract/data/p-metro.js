@@ -81,6 +81,60 @@
     }, fields);
   }
 
+  // 质检的逐条结论（3.2D 起出现在资料里）：[验收条件, 说明, 检验方式, 检查]；results 按验收条件给出 [结果, 说明]，没有写的为通过
+  function criteriaOf(list, results) {
+    return list.map(([criterion, text, method, checks]) => {
+      const r = results[criterion] || ['pass', null];
+      return { criterion, text, method, result: r[0], checks, trial_cases: [], note: r[1] };
+    });
+  }
+
+  const FARE_AC = [
+    ['AC-1', '分段票价：6000 米 3 元，12000 米 4 元，12001 米 5 元', 'command_check', ['pytest：tests/test_fare.py']],
+    ['AC-2', '行程时间：每公里 2 分钟，每次换乘另加 5 分钟', 'command_check', ['pytest：tests/test_time.py']],
+    ['AC-3', '命令行连续查询两次后退出码 0', 'command_check', ['fare_cli：连续查询']],
+    ['AC-4', 'JSON 字段名与接口约定一致', 'command_check', ['pytest：tests/test_export.py']],
+    ['AC-5', '数据文件缺少终点站时完整性检查拒绝加载', 'command_check', ['pytest：tests/test_loader.py']]
+  ];
+
+  // 「夜间票价」（自举试点的示例数据，design.md 第 8.1 节）：AC-2 的结论通过、不通过、通过、不通过（run 层震荡），
+  // run 用完运行时间（7200/7200 秒）停止（达到边界）；最后一次工程激活里同名同参数的工具调用重复 3 次（步骤循环震荡）
+  const NIGHT_AC = [
+    ['AC-1', '23:00 至次日 5:00 进站的行程按夜间票价计算', 'command_check', ['unit_tests：test_night_fare.py::test_window']],
+    ['AC-2', '夜间票价在分段票价上加 1 元；跨过 5:00 出站的行程仍按进站时间判定', 'command_check', ['unit_tests：test_night_fare.py::test_cross_dawn']],
+    ['AC-3', '夜间行程在文本与 JSON 导出中标出「夜间」', 'command_check', ['unit_tests：test_export.py::test_night_flag']],
+    ['AC-4', '22:59 与 23:00 两个边界时刻各有一条断言', 'command_check', ['unit_tests：test_night_fare.py::test_edges']]
+  ];
+  const NIGHT = { work_item_id: 'w-metro-night', run_id: 'r-metro-night', level: 'pilot' };
+  const night = (fields) => ev(Object.assign({}, NIGHT, fields));
+  const nightRun = (field, value) => ({ path: 'runs[id=r-metro-night].' + field, value });
+  const nightTo = (from, to, artifact, at, label, extra) => night({
+    at, type: 'transition', label, payload: { from, to, artifact },
+    patch: [nightRun('department', to), nightRun('last_department', from)].concat(extra || [])
+  });
+  // 一轮：封存交付、送到质检、质检结论、退回工程
+  const nightRound = (n, times, snapshot, elapsed, label) => [
+    night({
+      at: '2026-09-28T' + times[0] + ':00+08:00', type: 'delivery_accepted', department: 'engineering',
+      label: '工程封存交付 r' + n + '（夜间票价）', payload: { snapshot }, patch: [nightRun('elapsed_sec', elapsed[0])]
+    }),
+    nightTo('engineering', 'quality', 'box', '2026-09-28T' + times[1] + ':00+08:00', '交付 r' + n + ' 送到质检部门'),
+    night({
+      at: '2026-09-28T' + times[2] + ':00+08:00', type: 'qa_submitted', department: 'quality', label,
+      payload: { verdict: 'rework_engineering', material_id: 'm-metro-night-q' + n }, patch: [nightRun('cycle', n + 1), nightRun('elapsed_sec', elapsed[1])]
+    }),
+    nightTo('quality', 'engineering', 'defect', '2026-09-28T' + times[3] + ':00+08:00', '交付 r' + n + ' 退回工程部门')
+  ];
+  const nightStep = (time, tool, target, label, extra) => night({
+    at: '2026-09-28T' + time + ':00+08:00', type: 'tool_started', department: 'engineering', label,
+    payload: Object.assign({ tool }, tool === 'run_command' ? { args: target } : { path: target, plan_item: 'P-2' }), patch: extra || []
+  });
+  const nightQa = (n, snapshot, results, text) => ({
+    id: 'm-metro-night-q' + n, project_id: P, work_item_id: 'w-metro-night', kind: 'qa', version: n, level: 'pilot',
+    title: '质检结论 r' + n + '（夜间票价）', at: '2026-09-28T12:00:00+08:00', verdict: 'rework_engineering',
+    text, snapshot, criteria: criteriaOf(NIGHT_AC, results)
+  });
+
   const fareAsk = '12 公里整是否按 6 元？分段表里 12 公里是 4 元档的上界，还是已经进入 6 元档？';
   const fareAnswer = '12 公里整按 4 元。分段按左开右闭：6 公里及以内 3 元，超过 6 公里至 12 公里（含）4 元，超过 12 公里至 22 公里 5 元，超过 22 公里至 32 公里 6 元。12 公里整不进入 6 元档。Sum_money 的输入单位是米，12000 米对应 4 元。';
 
@@ -115,6 +169,11 @@
           id: 'w-metro-report', project_id: P, title: '导出月度出行统计', color_index: 3, kind: 'request',
           status: 'queued', queue_reason: 'project', queue_pos: 2, run_id: 'r-metro-report', version: 1,
           created_at: '2026-09-28T16:10:00+08:00', born_at: '2026-09-28T16:10:00+08:00', level: '3.4A'
+        },
+        {
+          id: 'w-metro-night', project_id: P, title: '夜间票价', color_index: 4, kind: 'request',
+          status: 'not_started', queue_reason: null, queue_pos: null, run_id: 'r-metro-night', version: 1,
+          created_at: '2026-09-28T10:58:00+08:00', born_at: '2026-09-28T10:58:00+08:00', level: 'pilot'
         }
       ],
       runs: [
@@ -311,6 +370,24 @@
           roles: { level: 'S5', product: [], engineering: [], quality: [] },
           ledger: ledger({}),
           attempts: [], source: null
+        },
+        {
+          id: 'r-metro-night', work_item_id: 'w-metro-night', project_id: P, yudao_version: '0.8.0',
+          phase: 'PRODUCT_SPEC', department: 'product', last_department: null, cycle: 1,
+          started_at: '2026-09-28T10:58:00+08:00', elapsed_sec: 0, limit_sec: 7200,
+          waiting_provider_sec: 0, waiting_provider: null, stop_reason: null,
+          recovery: { state: 'running', reason: '运行中', unusable: null, last_confirmed: null, owner: null, late_results: [], verifications: [], unfinished: [], limits: { elapsed_sec: 0, limit_sec: 7200, activations: 10, model_steps: 27, retries: 0 }, auto_resumed_at: null },
+          born_at: '2026-09-28T10:58:00+08:00', level: 'pilot',
+          inputs: [{ version: 1, kind: 'user', progress: 'accepted', at: '2026-09-28T10:58:00+08:00', bytes: 150, text: '夜间票价：23:00 到次日 5:00 进站的行程在分段票价上加 1 元，导出里标出夜间。' }],
+          flow: [], requests: [], guidance: [],
+          messages: { product: [], engineering: [], quality: [], operations: [] },
+          actions: [], contexts: { product: [], engineering: [], quality: [] },
+          prompts: { product: { config_version: 1, request_version: 1, text: '' }, engineering: { config_version: 1, request_version: 1, text: '' }, quality: { config_version: 1, request_version: 1, text: '' } },
+          compactions: [],
+          effective_model: { product: modelOf('opencode-go-responses/kimi-k2.6', '部门默认', null), engineering: modelOf('opencode-go-responses/kimi-k2.6', '部门默认', null), quality: modelOf('opencode-go-responses/mimo-v2.5', '部门默认', null) },
+          roles: { level: 'S5', product: [], engineering: [], quality: [] },
+          ledger: ledger({}),
+          attempts: [], source: null
         }
       ],
       decisions: [{
@@ -400,8 +477,18 @@
         {
           id: 'm-metro-qa', project_id: P, work_item_id: 'w-metro-fare', kind: 'qa', version: 1,
           title: '质检结论 r1', at: '2026-09-28T11:20:00+08:00', verdict: 'release',
-          text: '放行。检查了分段边界：6000 米 3 元，12000 米 4 元，12001 米 5 元。命令行连续查询两次后退出码 0。JSON 字段名与接口约定一致。数据文件缺少终点站时完整性检查拒绝加载。三种路径模式不在本事项验收范围内。'
+          text: '放行。检查了分段边界：6000 米 3 元，12000 米 4 元，12001 米 5 元。命令行连续查询两次后退出码 0。JSON 字段名与接口约定一致。数据文件缺少终点站时完整性检查拒绝加载。三种路径模式不在本事项验收范围内。',
+          snapshot: '7d2e915', criteria: criteriaOf(FARE_AC, {})
         },
+        {
+          id: 'm-metro-night-prd', project_id: P, work_item_id: 'w-metro-night', kind: 'prd', version: 1, level: 'pilot',
+          title: 'PRD r1 夜间票价', at: '2026-09-28T11:06:00+08:00',
+          text: '夜间票价。\n' + NIGHT_AC.map((ac) => ac[0] + ' ' + ac[1]).join('\n') + '\n验收：登记命令 unit_tests 覆盖每条验收条件。'
+        },
+        nightQa(1, 'n1a7c02', { 'AC-3': ['fail', 'JSON 导出没有 night 字段'], 'AC-4': ['fail', '缺少 22:59 的断言'] }, '导出没有标出夜间（AC-3），缺少 22:59 的边界断言（AC-4）。'),
+        nightQa(2, 'n2b3e15', { 'AC-2': ['fail', '跨过 5:00 出站时按出站时间判定，少收 1 元'] }, '跨过 5:00 出站的行程按出站时间判定，少收 1 元（AC-2）。'),
+        nightQa(3, 'n3c9d40', { 'AC-1': ['fail', '23:00 整进站被算成日间'] }, 'AC-2 改回按进站时间判定；23:00 整进站被算成日间（AC-1）。'),
+        nightQa(4, 'n4d1f88', { 'AC-2': ['fail', '又改成按出站时间判定，跨过 5:00 少收 1 元'] }, '修 AC-1 时又把判定改回出站时间，跨过 5:00 的行程少收 1 元（AC-2）。'),
         {
           id: 'm-metro-note', project_id: P, work_item_id: 'w-metro-transfer', kind: 'note', version: 1,
           title: '换乘站处理', at: '2026-09-28T13:36:00+08:00',
@@ -572,7 +659,7 @@
       ev({
         at: '2026-09-28T11:20:00+08:00', type: 'qa_submitted', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'quality',
         label: '质检放行按里程计算票价',
-        payload: { verdict: 'release' },
+        payload: { verdict: 'release', material_id: 'm-metro-qa' },
         patch: [
           { path: 'work_items[id=w-metro-fare].status', value: 'released' },
           { path: 'runs[id=r-metro-fare].elapsed_sec', value: 5400 },
@@ -762,6 +849,38 @@
         label: '发出决定请求：核实结果未知的登记命令 unit_tests',
         payload: { decision_id: 'd-metro-unknown', kind: 'unknown_action' },
         patch: [{ path: 'decisions[id=d-metro-unknown].status', value: 'waiting' }]
+      }),
+      // 「夜间票价」：四轮质检 AC-2 来回翻转，run 在 12:58 用完运行时间
+      night({
+        at: '2026-09-28T10:58:00+08:00', type: 'work_item_created', actor: 'user', label: '用户提出事项「夜间票价」', payload: { kind: 'request' },
+        patch: [{ path: 'work_items[id=w-metro-night].status', value: 'in_progress' }]
+      }),
+      night({ at: '2026-09-28T10:58:00+08:00', type: 'run_created', label: '夜间票价的 run 创建，产品部门开始' }),
+      night({ at: '2026-09-28T10:58:00+08:00', type: 'department_activated', department: 'product', label: '产品部门整理夜间票价的要求' }),
+      night({
+        at: '2026-09-28T11:06:00+08:00', type: 'spec_accepted', department: 'product', label: '产品提交 PRD r1（夜间票价，4 条验收条件），主机接纳',
+        payload: { material_id: 'm-metro-night-prd' }, patch: [nightRun('elapsed_sec', 480)]
+      }),
+      nightTo('product', 'engineering', 'prd', '2026-09-28T11:07:00+08:00', 'PRD r1 交付给工程部门', [nightRun('elapsed_sec', 540)]),
+      night({ at: '2026-09-28T11:16:00+08:00', type: 'plan_accepted', department: 'engineering', label: '工程提交 PLAN r1（夜间票价），主机接纳', patch: [nightRun('elapsed_sec', 1080)] }),
+      ...nightRound(1, ['11:24', '11:25', '11:30', '11:31'], 'n1a7c02', [1560, 1920], '质检结论 r1：返工——导出没有标出夜间，缺少 22:59 的断言（2 条未满足）'),
+      ...nightRound(2, ['11:40', '11:41', '11:46', '11:47'], 'n2b3e15', [2700, 3300], '质检结论 r2：返工——跨过 5:00 出站时按出站时间判定（1 条未满足）'),
+      ...nightRound(3, ['11:56', '11:57', '12:02', '12:03'], 'n3c9d40', [3900, 4500], '质检结论 r3：返工——23:00 整进站被算成日间（1 条未满足）'),
+      ...nightRound(4, ['12:12', '12:13', '12:18', '12:19'], 'n4d1f88', [5100, 5700], '质检结论 r4：返工——跨过 5:00 又按出站时间判定（1 条未满足）'),
+      nightStep('12:24', 'edit_range', 'src/fare_calculator.py', '工程部门按区间编辑 src/fare_calculator.py：夜间判定按进站时间'),
+      nightStep('12:32', 'run_command', 'python -m pytest tests/test_night_fare.py', '工程部门执行登记命令 unit_tests（夜间票价用例）', [nightRun('elapsed_sec', 6300)]),
+      nightStep('12:40', 'edit_range', 'src/fare_calculator.py', '工程部门按区间编辑 src/fare_calculator.py：23:00 整算作夜间'),
+      nightStep('12:48', 'run_command', 'python -m pytest tests/test_night_fare.py', '工程部门再次执行同一条 unit_tests', [nightRun('elapsed_sec', 6720)]),
+      nightStep('12:54', 'run_command', 'python -m pytest tests/test_night_fare.py', '工程部门第三次执行同一条 unit_tests', [nightRun('elapsed_sec', 6960)]),
+      night({
+        at: '2026-09-28T12:58:00+08:00', type: 'run_failed', department: 'engineering', label: '夜间票价的 run 用完运行时间（7200/7200 秒），停止',
+        payload: { reason: 'time_limit' },
+        patch: [
+          { path: 'work_items[id=w-metro-night].status', value: 'stopped' },
+          nightRun('phase', 'FAILED'), nightRun('department', null), nightRun('last_department', 'engineering'),
+          nightRun('stop_reason', { code: 'time_limit', text: '运行时间上限' }), nightRun('elapsed_sec', 7200),
+          nightRun('recovery.state', 'terminated'), nightRun('recovery.reason', '用完运行时间')
+        ]
       })
     ],
     scenarios: [

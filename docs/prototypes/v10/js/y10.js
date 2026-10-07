@@ -6,16 +6,16 @@
   window.Y10 = Y10;
 
   // ---------------------------------------------------------------------------
-  // 档位：表示控制主机上已经部署了哪些工作包（BUILD.md 第 4 节）
+  // 档位：表示控制主机上已经部署了哪些工作包（v8 BUILD.md 第 4 节；pilot 为自举试点，v10 BUILD.md 第 1 节）
 
-  Y10.LEVELS = ['ui', '3.1', '3.2C', '3.4A', '3.8', '3.2B', '3.2D', 'S4', 'S5'];
+  Y10.LEVELS = ['ui', '3.1', '3.2C', '3.4A', '3.8', '3.2B', '3.2D', 'pilot', 'S4', 'S5'];
   Y10.LEVEL_LABELS = {
     ui: '界面工作线', '3.1': '3.1 可靠恢复', '3.2C': '3.2C 执行环境服务', '3.4A': '3.4A 不同项目并行',
     '3.8': '3.8 接入已有项目', '3.2B': '3.2B 网络与 MCP', '3.2D': '3.2D 浏览器与 computer use',
-    S4: 'Stage 4', S5: 'Stage 5'
+    pilot: '自举试点', S4: 'Stage 4', S5: 'Stage 5'
   };
   // 界面上的档位标签：界面工作线不显示标签
-  Y10.LEVEL_TAGS = { ui: null, '3.1': '3.1', '3.2C': '3.2C', '3.4A': '3.4A', '3.8': '3.8', '3.2B': '3.2B', '3.2D': '3.2D', S4: 'Stage 4', S5: 'Stage 5' };
+  Y10.LEVEL_TAGS = { ui: null, '3.1': '3.1', '3.2C': '3.2C', '3.4A': '3.4A', '3.8': '3.8', '3.2B': '3.2B', '3.2D': '3.2D', pilot: '试点', S4: 'Stage 4', S5: 'Stage 5' };
 
   const session = window.sessionStorage;
   const local = window.localStorage;
@@ -233,4 +233,8 @@
   };
 
   Y10.num = (value) => (value === null || value === undefined ? '未上报' : numberFormat.format(value));
+
+  // 检验覆盖的写法（CONTEXT.md「开环」：靠模型阅读判断的条件包含在开环之内）：「覆盖 7/8 · 开环 1（其中模型阅读 1）」，开环为 0 时只写覆盖比例
+  Y10.coverageText = (c) => '覆盖 ' + c.covered + '/' + c.total +
+    (c.open_count ? ' · 开环 ' + c.open_count + (c.model_read ? '（其中模型阅读 ' + c.model_read + '）' : '') : '');
 })();

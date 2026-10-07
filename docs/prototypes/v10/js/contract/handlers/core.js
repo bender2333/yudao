@@ -74,8 +74,46 @@
     return Array.isArray(project.adoptions) ? project.adoptions : [];
   }
 
+  // ---------------------------------------------------------------------------
+  // 事实元素的来源（自举试点起，应用层与接口层设计说明第 5.8 节 H4）：给出这条事实的事件是最后一次改动对应字段的事件，
+  // 字段在出现以后没有被改动过时是事项出现的事件；来源按「事件加字段」由登记表给出（已用时间这类测量值固定为主机测量）。
+  // 每个来源写成 { position, field, source }，没有给出它的事件时为 null
+
+  function lastTrace(db, paths) {
+    const list = db.trace(paths);
+    return list.length ? list[list.length - 1].position : null;
+  }
+
+  function refOf(db, position, field) {
+    const ev = position ? db.event(position) : null;
+    return ev ? { position, field, source: Y10.registry.sourceOf(ev, field) } : null;
+  }
+
+  function itemRefs(db, item, run, status) {
+    const born = db.log({ work_item: item.id }).find((ev) => ['work_item_created', 'x_repair_created', 'run_created'].includes(ev.type));
+    const first = born ? born.position : null;
+    const or = (pos) => (pos === null ? first : pos);
+    const w = 'work_items[id=' + item.id + ']';
+    const r = run ? 'runs[id=' + run.id + ']' : null;
+    const signPaths = [w + '.status', w + '.queue_reason'].concat(r ? [r + '.phase', r + '.stop_reason', r + '.recovery.state', r + '.waiting_provider'] : []);
+    if (status === 'waiting_decision') {
+      (db.data.decisions || []).filter((d) => d.blocks && d.blocks.work_item_id === item.id).forEach((d) => signPaths.push('decisions[id=' + d.id + '].status'));
+    }
+    return {
+      round: refOf(db, r ? or(lastTrace(db, r + '.cycle')) : first, 'cycle'),
+      time: refOf(db, r ? or(lastTrace(db, r + '.elapsed_sec')) : first, 'elapsed_sec'),
+      // 门口的牌子与信息条上的状态：最后一次改动事项状态的事件
+      sign: refOf(db, or(lastTrace(db, signPaths)), 'status'),
+      // 信息条上的当前部门：把 run 交到这个部门的事件
+      department: refOf(db, r ? or(lastTrace(db, r + '.department')) : first, 'department'),
+      // 停放的包裹：大厅队列里的包裹与部门门口的小旗，来源是把事项放到这里的事件
+      parcel: refOf(db, or(lastTrace(db, [w + '.status', w + '.queue_pos'].concat(r ? [r + '.department'] : []))), 'location')
+    };
+  }
+
   function loopOf(db, projectId) {
     requireProject(db, projectId);
+    const withRefs = db.atLeast('pilot');
     const items = db.workItemsOf(projectId).map((item) => {
       const run = item.run_id ? db.run(item.run_id) : null;
       const status = sceneStatus(db, item, run);
@@ -91,6 +129,7 @@
       };
       if (db.atLeast('3.4A')) out.queue_pos = status === 'waiting_decision' ? null : item.queue_pos || null;
       if (db.atLeast('S4')) out.waiting_provider_sec = run ? run.waiting_provider_sec || 0 : 0;
+      if (withRefs) out.refs = itemRefs(db, item, run, status);
       return out;
     }).filter(Boolean);
     const runs = db.workItemsOf(projectId).map((item) => (item.run_id ? db.run(item.run_id) : null)).filter(Boolean);
@@ -106,6 +145,16 @@
       shelves: { adopted: adoptions(project).map((a) => a.version) },
       interrupted: items.some((it) => it.status === 'interrupted')
     };
+    if (withRefs) {
+      // 成果库的箱子：采纳这个版本的事件；质检的盖章：本项目最近一次放行
+      const adopted = db.log({ project: projectId, types: ['deliverable_adopted', 'baseline_adopted'] });
+      out.shelves.boxes = adoptions(project).map((a) => {
+        const ev = adopted.filter((e) => e.payload && e.payload.version === a.version).pop();
+        return { version: a.version, ref: ev ? refOf(db, ev.position, 'adoption') : null };
+      });
+      const release = db.log({ project: projectId, types: ['qa_submitted'] }).filter((e) => e.payload.verdict === 'release').pop();
+      out.stamp = release ? { work_item_id: release.work_item_id, ref: refOf(db, release.position, 'verdict') } : null;
+    }
     if (db.atLeast('3.4A') && db.data.runtime) {
       out.slots = { total: db.data.runtime.slots.total, used: db.data.runtime.slots.used.length };
     }
@@ -356,6 +405,15 @@
       const checks = events.filter((ev) => ev.type === 'x_check_in');
       const s = db.data.system;
       add('health', '磁盘与报到', checks, s.disk.free_gb, 'GB 可用', { detail: s.check_in && s.check_in.ok ? '报到正常' : '报到中断' });
+    }
+    if (db.atLeast('pilot')) {
+      // 收敛状态的变化：来源事件是引起变化的那一轮事件（handlers/project.js 的 B.loops）
+      const changes = B.loops.changes(db, params.project || null, fromPosition);
+      add('loop_changes', '收敛状态的变化', changes, changes.length, '条', { changes });
+      // 带开环条件的放行：范围内的放行中带开环条件的（handlers/project.js 的 B.coverage）
+      const releases = events.filter((ev) => ev.type === 'qa_submitted' && ev.payload.verdict === 'release')
+        .map((ev) => B.coverage.openOfRelease(db, ev)).filter((r) => r && r.open.length);
+      add('open_releases', '带开环条件的放行', releases, releases.length, '次', { releases });
     }
     return {
       last_seen: { at: home.last_seen_at, position: home.last_seen_position },

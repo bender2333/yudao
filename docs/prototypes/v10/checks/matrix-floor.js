@@ -1,9 +1,9 @@
 // 用法：node docs/prototypes/v10/checks/matrix-floor.js
-// 项目概览页（挂载项目楼层画面）：九档 × 四个项目 × (1440、390) × (浅色、深色) 共 144 组，
+// 项目概览页（挂载项目楼层画面）：十档 × 四个项目 × (1440、390) × (浅色、深色) 共 160 组，
 // 每组要求控制台错误与页面异常为零，页面没有横向溢出，且楼层画面确实画出了内容
 const { chromium, EXE, v10Url } = require('./env.js');
 
-const LEVELS = ['ui', '3.1', '3.2C', '3.4A', '3.8', '3.2B', '3.2D', 'S4', 'S5'];
+const LEVELS = ['ui', '3.1', '3.2C', '3.4A', '3.8', '3.2B', '3.2D', 'pilot', 'S4', 'S5'];
 const PROJECTS = ['p-todo', 'p-metro', 'p-sensor', 'p-agents'];
 const WIDTHS = [1440, 390];
 const THEMES = ['light', 'dark'];

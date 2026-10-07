@@ -78,6 +78,14 @@
         setPosition(ctl.facts[index].position, null);
         if (opts.onSelect) opts.onSelect(ctl.facts[index].position);
       },
+      // 跳到任意一条事件（来源卡片的「在时间轴上查看」）：画面回到这条事件的位置，当前刻度是它之前最近的关键事实
+      seekPosition(position) {
+        stopTimer();
+        ctl.index = -1;
+        ctl.facts.forEach((f, i) => { if (f.position <= position) ctl.index = i; });
+        ctl.highlight = new Set([position]);
+        setPosition(position, null);
+      },
       live() {
         stopTimer();
         ctl.index = -1;

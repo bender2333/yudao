@@ -25,6 +25,8 @@
     'run.recovery': q('3.1', '恢复与动作核实'),
     'run.trials': q('3.2D', '试用记录'),
     'evidence.screenshot': q('3.2D', '截图证据'),
+    'acceptance.coverage': q('3.2D', '检验覆盖与开环', { replay: true }),
+    'run.loops': q('pilot', '循环实例与收敛状态', { replay: true }),
     'work_item.materials': q('ui', '资料'),
     'delivery.file': q('ui', '交付文件'),
     'project.attempts': q('ui', '请求记录'),
@@ -106,7 +108,11 @@
     waiting: { level: 'ui', label: '等待', queries: ['project.loop', 'decisions.list'] },
     recovery: { level: '3.1', label: '恢复', queries: ['run.recovery'] },
     context_usage: { level: 'S5', label: '上下文用量', queries: ['overlay.context_usage'] },
-    semantic_records: { level: 'S5', label: '语义记录', queries: ['semantic.records'] }
+    semantic_records: { level: 'S5', label: '语义记录', queries: ['semantic.records'] },
+    loops: { level: 'pilot', label: '循环', queries: ['run.loops'] },
+    // 事实元素的来源事件由 project.loop 给出，事件对象带 source
+    sources: { level: 'pilot', label: '来源', queries: ['project.loop'] },
+    coverage: { level: 'pilot', label: '检验', queries: ['acceptance.coverage'] }
   };
 
   // 事件种类；key 为关键事实的种类（时间轴刻度与离开期间的报告使用）
@@ -145,7 +151,77 @@
     x_fault_recorded: e('S4', 'fault'), x_repair_created: e('S4', 'repair'), x_repair_failed: e('S4', 'repair'),
     x_auto_repair_stopped: e('S4', 'repair'), x_check_in: e('S4'),
     x_role_task_assigned: e('S5'), x_role_result_returned: e('S5'), x_review_recorded: e('S5'), x_explorer_fetch: e('S5'),
-    x_replanned: e('S5'), x_semantic_recorded: e('S5'), x_role_settings_saved: e('S5')
+    x_replanned: e('S5'), x_semantic_recorded: e('S5'), x_role_settings_saved: e('S5'),
+    x_evidence_checked: e('S5')
+  };
+
+  // 事实来源（应用层与接口层设计说明第 5.2 节）：每个事件种类由谁给出。确定规则是控制核心与流程编排的判断，
+  // 主机测量是主机执行与测量得到的，角色陈述是部门提交与说出的，用户是用户的命令，决策模型是判定点（载荷带 probability）。
+  // 按载荷或提出者区分的种类写成函数
+  const RULE = 'rule', HOST = 'host_measurement', ROLE = 'role_statement', USER = 'user', MODEL = 'decision_model';
+  const byUser = (ev) => (String(ev.actor || '').indexOf('user') === 0 ? USER : RULE);
+  const SOURCES = {
+    project_registered: USER, project_renamed: USER, project_pinned: USER, project_archived: USER, project_restored: USER,
+    material_recorded: USER, user_input_received: USER, work_item_created: USER, run_created: RULE,
+    department_activated: RULE, context_assembled: RULE, model_requested: HOST, model_request_serialized: HOST,
+    model_stream_progress: ROLE, model_attempt_finished: HOST, model_retry_scheduled: RULE, model_attempt_failed: HOST,
+    tool_started: HOST, tool_called: HOST, tool_skipped: RULE, proposal_submitted: ROLE, proposal_rejected: RULE,
+    spec_accepted: RULE, contract_accepted: RULE, plan_accepted: RULE, delivery_accepted: RULE,
+    qa_submitted: ROLE,
+    collaboration_requested: ROLE, collaboration_responded: ROLE, collaboration_closed: RULE,
+    department_guidance_received: USER, department_guidance_applied: ROLE, department_guidance_responded: ROLE,
+    compaction_recorded: ROLE, compaction_failed: HOST,
+    transition: RULE, run_paused: RULE, run_done: RULE,
+    // 取消事项是用户的命令，其余的失败是控制核心的结算
+    run_failed: (ev) => (ev.payload && ev.payload.reason === 'cancelled' ? USER : RULE),
+    deliverable_adopted: byUser,
+    department_prompt_configured: USER, command_configured: USER,
+    catalog_revised: USER, catalog_candidates_collected: HOST, catalog_test_finished: HOST, credential_changed: USER,
+    x_decision_issued: RULE, x_decision_answered: USER, x_decision_withdrawn: RULE,
+    x_home_seen: USER, x_department_settings_saved: USER, x_scenario_setup: RULE, x_source_directory_saved: USER,
+    x_run_interrupted: HOST, x_run_auto_resumed: RULE, x_action_unknown: HOST,
+    x_drain_started: USER, x_upgrade_forced: USER, x_run_stopped_for_upgrade: RULE,
+    x_machine_saved: USER, x_machine_offline: HOST, x_machine_online: HOST,
+    x_remote_action_started: HOST, x_remote_action_finished: HOST, x_late_receipt: HOST,
+    x_machine_authorization_saved: USER,
+    x_queued: RULE, x_slot_acquired: RULE, x_queue_cancelled: RULE, x_queue_reordered: USER, x_slots_set: USER,
+    initial_prd_proposed: ROLE, onboarding_revision_started: USER, baseline_adopted: RULE,
+    structure_accepted: RULE, baseline_review_accepted: RULE, execution_placement_configured: USER,
+    project_decision_requested: RULE, project_decision_answered: USER, project_decision_withdrawn: RULE,
+    x_network_fetch: HOST, x_mcp_called: HOST, x_tool_authorization_saved: USER,
+    x_trial_step: HOST,
+    x_provider_wait_entered: HOST, x_provider_wait_left: HOST,
+    x_backup_taken: HOST, x_deployed: HOST, x_rolled_back: HOST,
+    x_fault_recorded: HOST, x_repair_created: RULE, x_repair_failed: HOST, x_auto_repair_stopped: RULE, x_check_in: HOST,
+    x_role_task_assigned: ROLE, x_role_result_returned: ROLE, x_review_recorded: ROLE, x_explorer_fetch: HOST,
+    x_replanned: ROLE, x_semantic_recorded: ROLE, x_role_settings_saved: USER,
+    x_evidence_checked: MODEL
+  };
+
+  // 按字段覆盖：一条事件里的测量值由主机测出，来源固定为主机测量，不论这条事件的种类。
+  // elapsed_sec 已用时间；steps 步数；activations、model_steps、retries 已用次数；receipt 检查回执的结果；
+  // unmet 由检查结果算出的未满足的验收条件数（只计有可执行检验的条件）
+  const FIELD_SOURCES = {
+    elapsed_sec: HOST, steps: HOST, activations: HOST, model_steps: HOST, retries: HOST, receipt: HOST, unmet: HOST
+  };
+
+  // 来源种类的名称；unverified 为没有经过主机核实的来源，画面上的标记要醒目
+  const SOURCE_KINDS = {
+    rule: { label: '确定规则', unverified: false },
+    decision_model: { label: '决策模型', unverified: true },
+    role_statement: { label: '角色陈述', unverified: true },
+    host_measurement: { label: '主机测量', unverified: false },
+    user: { label: '用户', unverified: false }
+  };
+
+  // 检验方式（验证的独立性设计说明第 7 节）：executable 为可执行的检验，其余的条件开环；model 为靠模型阅读作出判断
+  const CHECK_METHODS = {
+    command_check: { label: '命令检查', executable: true },
+    trial_case: { label: '试用用例', executable: true },
+    host_measurement: { label: '主机测量', executable: true },
+    judgement: { label: '带参照材料的判定点', executable: false, model: true },
+    human: { label: '人', executable: false },
+    open: { label: '开环', executable: false }
   };
 
   // 关键事实的种类名称与刻度颜色
@@ -170,7 +246,14 @@
   }
 
   Y10.registry = {
-    queries, commands, decisions, overlays, events, KEY_KINDS,
+    queries, commands, decisions, overlays, events, KEY_KINDS, SOURCES, FIELD_SOURCES, SOURCE_KINDS, CHECK_METHODS,
+    // 一条事实的来源：事件加字段。字段在覆盖表里时按字段，否则按事件种类（事件对象的 source 只按事件种类，不带字段）
+    sourceOf(event, field) {
+      if (field && FIELD_SOURCES[field]) return FIELD_SOURCES[field];
+      const s = SOURCES[event.type];
+      if (!s) throw new Error('事件种类没有登记来源：' + event.type);
+      return typeof s === 'function' ? s(event) : s;
+    },
     has(kind, name) {
       return Object.prototype.hasOwnProperty.call(table(kind), name);
     },

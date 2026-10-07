@@ -1,11 +1,11 @@
 // 用法：node docs/prototypes/v10/checks/matrix-home.js
-// 首页与机器页的验收矩阵：九档 × (#/home、#/sys/machines) × (1440、390) × (浅色、深色) 共 72 组
+// 首页与机器页的验收矩阵：十档 × (#/home、#/sys/machines) × (1440、390) × (浅色、深色) 共 80 组
 // 每组要求控制台错误与页面异常为零，且页面没有横向溢出
 const path = require('path');
 const { chromium, EXE, v10Url } = require('./env.js');
 
 const ROOT = v10Url;
-const LEVELS = ['ui', '3.1', '3.2C', '3.4A', '3.8', '3.2B', '3.2D', 'S4', 'S5'];
+const LEVELS = ['ui', '3.1', '3.2C', '3.4A', '3.8', '3.2B', '3.2D', 'pilot', 'S4', 'S5'];
 const ROUTES = ['#/home', '#/sys/machines'];
 const WIDTHS = [1440, 390];
 const THEMES = ['light', 'dark'];
