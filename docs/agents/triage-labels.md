@@ -18,6 +18,11 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 
 All five labels exist in `bender2333/yudao`. `wontfix` predates this setup (GitHub's default label); the other four were created alongside it. GitHub's default `bug` / `enhancement` / `question` labels are orthogonal — they describe *what* an issue is, the five above describe *where it sits in triage*.
 
+## 等待条件的工单
+
+- 试用工单（每个试用里程碑一张，见 `CLAUDE.md`「工作流程」第 7 步）在里程碑达到之前标 `needs-triage`；里程碑的工单全部关闭、集成层通过、架构师按试用指南走查以后，改为 `ready-for-human` 交给用户。
+- 等待前提条件的其他工单同样标 `needs-triage`：阶段收尾的手动检查（全部工作包父工单关闭以后进行）、暂缓阶段的工单、试点开始之前的自举试点工单。前提条件满足时改为 `ready-for-agent` 或 `ready-for-human`。
+
 ## 自主推进模式的流程标签
 
 自主推进模式（见 `CLAUDE.md` 与 `AGENTS.md`）另用四个标签表示工单在执行与审查之间的位置。同一时间一个工单只带其中一个，切换时去掉原标签。
