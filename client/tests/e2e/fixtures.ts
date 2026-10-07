@@ -145,7 +145,7 @@ async function stopProcess(child: ChildProcessWithoutNullStreams): Promise<void>
 export async function startClient(
   backend: Backend,
   size: { width: number; height: number },
-  options: { colorScheme?: "light" | "dark" } = {},
+  options: { colorScheme?: "light" | "dark"; deviceScaleFactor?: number } = {},
 ): Promise<ClientApp> {
   assertPagesBuildIsCurrent();
   return openPage(`${backend.address}/`, size, options);
@@ -155,10 +155,14 @@ export async function startClient(
 export async function openPage(
   url: string,
   size: { width: number; height: number },
-  options: { colorScheme?: "light" | "dark" } = {},
+  options: { colorScheme?: "light" | "dark"; deviceScaleFactor?: number } = {},
 ): Promise<ClientApp> {
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: size, colorScheme: options.colorScheme ?? "light" });
+  const context = await browser.newContext({
+    viewport: size,
+    colorScheme: options.colorScheme ?? "light",
+    deviceScaleFactor: options.deviceScaleFactor ?? 1,
+  });
   const page = await context.newPage();
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");

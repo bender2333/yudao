@@ -1,0 +1,25 @@
+
+Running 1 test using 1 worker
+
+(node:19124) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] tests\e2e\models.spec.ts:412:3 › 1440×900：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废
+tests\e2e\models.spec.ts:412:3 › 1440×900：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废
+(node:19124) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+
+  1) tests\e2e\models.spec.ts:412:3 › 1440×900：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废 ──────────────────────
+
+    Test timeout of 300000ms exceeded.
+
+    Error: apiRequestContext._wrapApiCall: ENOENT: no such file or directory, copyfile 'C:\project\yudao-worktrees\issue-377\client\test-results\.playwright-artifacts-0\traces\af584f329435f7cf0183-b6f6f2ad76dfe90e32bb-recording1.network' -> 'C:\project\yudao-worktrees\issue-377\client\test-results\.playwright-artifacts-0\traces\af584f329435f7cf0183-b6f6f2ad76dfe90e32bb-recording1-pwnetcopy-1.network'
+
+    Error: ENOENT: no such file or directory, open 'C:\project\yudao-worktrees\issue-377\client\test-results\.playwright-artifacts-0\fddef7d8d5b8442e377c279cadfb5a67.zip'
+
+
+  Slow test file: tests\e2e\models.spec.ts (5.0m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 failed
+    tests\e2e\models.spec.ts:412:3 › 1440×900：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废 ───────────────────────
+exit=1

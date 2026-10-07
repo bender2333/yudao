@@ -16,6 +16,10 @@
   background: none;
 }
 
+/* 顶栏的路径：原型里每一段是可点的按钮（inline-block），真实系统里是不参与交互的一段文字 span；
+   max-width 与 overflow 只对非 inline 的盒子生效，这里补上 inline-block，超长路径才截断成省略号 */
+.y9-crumb { display: inline-block; vertical-align: middle; max-width: 40ch; }
+
 /* 像素画布与动作图鉴（工单 #176）：画布按整数倍最近邻放大 */
 .pixel-canvas { line-height: 0; }
 .pixel-canvas canvas { image-rendering: pixelated; display: block; }

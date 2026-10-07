@@ -1,0 +1,29 @@
+
+> yudao-client@0.1.1 build:pages
+> vite build --config vite.pages.config.ts
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 804 modules transformed.
+rendering chunks...
+computing gzip size...
+../../out/renderer/index.html                                                                  0.40 kB │ gzip:   0.28 kB
+../../out/renderer/assets/fusion-pixel-10px-proportional-sc-latin-400-normal-BN7MI4Gs.woff2  413.58 kB
+../../out/renderer/assets/fusion-pixel-10px-proportional-sc-latin-400-normal-DP0eZJVa.woff   928.04 kB
+../../out/renderer/assets/index-BDSww7Ul.css                                                  94.92 kB │ gzip:  17.40 kB
+../../out/renderer/assets/CanvasPool-BL_e_Yop.js                                               1.13 kB │ gzip:   0.63 kB
+../../out/renderer/assets/gallery-D6h3Aj5q.js                                                 18.51 kB │ gzip:   7.29 kB
+../../out/renderer/assets/WebGPURenderer-XG-HhNNu.js                                          37.54 kB │ gzip:  10.33 kB
+../../out/renderer/assets/colorToUniform-Dr1NiQgB.js                                          37.95 kB │ gzip:  11.94 kB
+../../out/renderer/assets/browserAll-B2MyQHKP.js                                              42.59 kB │ gzip:  11.15 kB
+../../out/renderer/assets/SharedSystems-Hk10xuv4.js                                           51.88 kB │ gzip:  14.10 kB
+../../out/renderer/assets/WebGLRenderer-BmCo0lOi.js                                           63.26 kB │ gzip:  17.32 kB
+../../out/renderer/assets/webworkerAll-fniNZwgd.js                                           151.62 kB │ gzip:  46.08 kB
+../../out/renderer/assets/index-CXbB6OSy.js                                                  905.53 kB │ gzip: 289.73 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 27.05s
+exit=0

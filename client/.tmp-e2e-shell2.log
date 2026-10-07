@@ -1,0 +1,23 @@
+
+Running 11 tests using 1 worker
+
+(node:16976) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/11] tests\e2e\shell.spec.ts:42:1 › 页面打开以后直接读取能力清单并进入外壳
+tests\e2e\shell.spec.ts:42:1 › 页面打开以后直接读取能力清单并进入外壳
+(node:16976) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+
+[2/11] tests\e2e\shell.spec.ts:61:1 › 页面连接以后直接显示状态项与离开期间的报告
+[3/11] tests\e2e\shell.spec.ts:75:1 › 能力清单缺少某个查询时，依赖它的页面入口不出现
+[4/11] tests\e2e\shell.spec.ts:89:1 › 顶栏的待你决定数量与 decisions.list 中等待回答的数量一致
+[5/11] tests\e2e\shell.spec.ts:107:1 › 事件流驱动视图刷新：经命令新建项目以后，左侧栏无需刷新即出现新项目
+[6/11] tests\e2e\shell.spec.ts:131:1 › 从想法新建：提交成功、项目出现在列表以后表单关闭，重新打开时字段为空
+[7/11] tests\e2e\shell.spec.ts:158:1 › 接口版本相同而能力清单多出查询时，客户端正常使用（新增查询不要求更新客户端）
+[8/11] tests\e2e\shell.spec.ts:175:1 › 接口版本不同时页面只显示版本不同的提示（写明两边的版本），不打开页面、不执行命令
+[9/11] tests\e2e\shell.spec.ts:195:1 › 视口 1920×1080 下外壳可用，没有横向滚动条，控制台错误为零
+[10/11] tests\e2e\shell.spec.ts:211:1 › 事件流断开时窗口整体变灰并写明断开的时间，重新连上以后恢复
+[11/11] tests\e2e\shell.spec.ts:241:1 › 订阅位置超过日志末尾时服务端发送 resync，客户端据此重新同步快照
+  11 passed (2.2m)
+exit=0
