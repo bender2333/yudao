@@ -69,6 +69,15 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
     # 页面文件最后挂载：接口路径先匹配；挂载不进入 OpenAPI 与能力清单
     api.mount("/", PageFiles(pages), name="pages")
     return api
+
+
+def close_event_streams(api: FastAPI) -> None:
+    # 停止服务的第一步：让等待中的事件流连接干净结束（设计说明第 4.2 节）。
+    # lifespan 的关闭阶段太晚（uvicorn 先等这些连接关闭再关闭应用），
+    # 因此由服务进程在关闭开始时调用，打开着的事件流连接不阻止进程退出
+    api.state.application.close_event_streams()
+
+
 def contract_digest(api: FastAPI) -> str:
     # 合同摘要：OpenAPI 文档的摘要，客户端据此判断生成类型时的合同与服务是否一致
     document = json.dumps(api.openapi(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
