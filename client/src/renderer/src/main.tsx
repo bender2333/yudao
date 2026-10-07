@@ -3,8 +3,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
 import { installDevMount } from "./pixel/floor/dev-mount";
-// 像素字体：Fusion Pixel 是自带中文字形的像素字体（OFL），像素画面与图鉴统一用它
-import "@fontsource/fusion-pixel-10px-proportional-sc/400.css";
 import "./styles.css";
 
 const container = document.getElementById("root");

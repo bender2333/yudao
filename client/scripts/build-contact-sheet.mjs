@@ -36,9 +36,9 @@ try {
   const galleryUrl = `http://127.0.0.1:${port}/index.html#/gallery`;
   await page.goto(galleryUrl);
   await page.waitForSelector(".gallery-item");
-  // 等像素字体就位，联系表里的中文才不会缺字
+  // 等画面字体就位，联系表里的中文才不会缺字
   await page.evaluate(async () => {
-    await document.fonts.load("10px 'Fusion Pixel 10px Proportional SC'");
+    await document.fonts.load('10px "Microsoft YaHei UI"');
     await document.fonts.ready;
   });
 
@@ -56,7 +56,7 @@ try {
   const height = rows * CELL + HEADER + PAD * 2;
   const sheetPage = await browser.newPage({ viewport: { width, height } });
   await sheetPage.setContent(`
-    <html><body style="margin:0;background:#14161e;color:#e8e6f0;font:11px/1.3 'Fusion Pixel 10px Proportional SC',sans-serif">
+    <html><body style="margin:0;background:#14161e;color:#e8e6f0;font:11px/1.3 'Microsoft YaHei UI',sans-serif">
     <div style="padding:8px 8px 0"><b>动作图鉴 · 联系表</b> · 共 ${shots.length} 项公开画法（原型 sprites.js 与 engine.js）</div>
     <div style="display:grid;grid-template-columns:repeat(${COLUMNS},${CELL}px);gap:0;padding:8px">
       ${shots

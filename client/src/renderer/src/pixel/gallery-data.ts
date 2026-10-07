@@ -100,7 +100,7 @@ export const GALLERY_MEMBERS: GalleryMember[] = [
   { name: "levelAtLeast", kind: "function", note: "判断动作的档位是否达到给定档位（ui ≤ S4 ≤ S5）", sample: valueSample("ui ≤ S4 ≤ S5", "档位比较") },
   { name: "linePts", kind: "function", note: "Bresenham 直线上的整数点（腿与手臂按它逐像素画）", sample: valueSample(`${linePts(13, 32, 15, 36).length} 个点`, "直线取点") },
   { name: "makeCanvas", kind: "function", note: "建一张离屏画布（位图先画在上面再贴）", sample: valueSample("离屏画布", "离屏画布") },
-  { name: "measure", kind: "function", note: "量一段文字的像素宽（Fusion Pixel 像素字体）", sample: valueSample("像素字体量宽", "量文字") },
+  { name: "measure", kind: "function", note: "量一段文字的像素宽（画面文字用微软雅黑）", sample: valueSample("像素字体量宽", "量文字") },
   { name: "mix", kind: "function", note: "两色按比例混合（阴影、渐层、面板暗色）", sample: valueSample(mix(PAL.white, PAL.ink, 0.5), "white → ink 0.5") },
   { name: "parseSpriteKey", kind: "function", note: "解析小人标识（部门.种类:事项颜色，ops 是 operations 的简写）", sample: valueSample(JSON.stringify(resolveSpriteKey("engineering.lead:2")), "engineering.lead:2") },
   { name: "pixText", kind: "function", sampler: "pixText", note: "3×5 像素字模画数字与符号（信箱未读数、设备计数）", sample: valueSample("3×5 字模逐像素", "3×5 字模") },
@@ -113,7 +113,7 @@ export const GALLERY_MEMBERS: GalleryMember[] = [
   { name: "sign", kind: "function", sampler: "sign", note: "牌子：cx 为中心、bottom 为下沿；可带挂绳钉子、手柄与侧边色条", sample: valueSample("边框框 + 文字 + 挂绳 + 手柄", "门口立牌") },
   { name: "signStyle", kind: "function", note: "牌子配色：按牌上的文字决定（中断、待恢复、暂停、失败、完成、取消）", sample: valueSample("按文字匹配颜色", "牌子样式") },
   { name: "stampMark", kind: "function", sampler: "stampMark", note: "印章印记：双线方框加文字（有效、放行、返工、封存）", sample: bitmapSample("stamp", "印章位图") },
-  { name: "text", kind: "function", note: "用 Fusion Pixel 像素字体画一段文字，支持描边与发光", sample: valueSample("像素字体 + 描边 + 发光", "像素文字") },
+  { name: "text", kind: "function", note: "用微软雅黑画一段文字，支持描边与发光", sample: valueSample("微软雅黑 + 描边 + 发光", "像素文字") },
 
   // ---- engine.js 与 sprites.js 的数据（25 个） ----
   { name: "ACTIONS", kind: "data", note: "事实与动作的对照表：什么事实对应哪个动作、在哪个画面里", sample: dataSample(Object.keys(ACTIONS).length, Object.entries(ACTIONS).slice(0, 8).map(([k, v]) => `${k}：${v.label}`), "事实 → 动作") },
@@ -125,7 +125,7 @@ export const GALLERY_MEMBERS: GalleryMember[] = [
   { name: "CHAR_W", kind: "data", note: "小人帧缓冲宽：32 像素", sample: valueSample(`${CHAR_W} 像素`, "帧宽") },
   { name: "DEPTS", kind: "data", note: "部门：衣服颜色、墙面、地面与地毯颜色", sample: dataSample(Object.keys(DEPTS).length, Object.entries(DEPTS).map(([k, v]) => `${k}：${v.name} ${v.main}`), "部门") },
   { name: "EVENT_ACTIONS", kind: "data", note: "事件名到动作的映射（工具调用、提案、交付、恢复）", sample: dataSample(Object.keys(EVENT_ACTIONS).length, Object.keys(EVENT_ACTIONS).slice(0, 12), "事件 → 动作") },
-  { name: "FONT", kind: "data", note: "字体栈：客户端改成 Fusion Pixel 像素字体优先", sample: valueSample("Fusion Pixel 10px Proportional SC", "像素字体栈") },
+  { name: "FONT", kind: "data", note: "字体栈：画面文字用微软雅黑（ADR-0021 第 4 条）", sample: valueSample("Microsoft YaHei UI", "画面字体栈") },
   { name: "FONT3", kind: "data", note: "3×5 像素字模：数字与符号", sample: dataSample(Object.keys(FONT3).length, Object.keys(FONT3), "3×5 字模") },
   { name: "HAIRS", kind: "data", note: "发色表（每种两个色：主色与暗色）", sample: dataSample(Object.keys(HAIRS).length, Object.entries(HAIRS).map(([k, v]) => `${k} ${v[0]}`), "发色") },
   { name: "ITEM_COLORS", kind: "data", note: "事项颜色 0-5：门口小旗、包裹与看板卡片同一种颜色", sample: dataSample(ITEM_COLORS.length, ITEM_COLORS, "事项颜色") },
