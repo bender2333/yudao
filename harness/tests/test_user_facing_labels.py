@@ -5,7 +5,8 @@ import re
 
 import pytest
 
-from harness.app.labels import PHASE_NAMES, STOP_REASON_NAMES, event_label, phase_name, stop_reason_name
+from harness.app.labels import (DECISION_KIND_NAMES, PHASE_NAMES, STOP_REASON_NAMES, decision_kind_name,
+                                event_label, phase_name, stop_reason_name)
 from harness.definitions import DEFINITIONS
 from harness.models import (DEPARTMENT_LABELS, PHASES, TERMINAL_PHASES, EventType, stop_reason_name as core_name,
                            waiting_reason_for)
@@ -78,3 +79,19 @@ def test_transition_and_stop_events_name_phases_and_stop_reasons_in_chinese():
         "运行暂停，等待用户处理：循环次数已达上限"
     assert event_label(EventType.RUN_CONTINUED, {"resumed_at_phase": "QUALITY"}) == \
         "运行从暂停位置继续：质检处理中"
+
+def test_decision_kind_names_cover_all_decision_kinds():
+    from harness.decisions import DECISION_KINDS
+    assert set(DECISION_KIND_NAMES) == set(DECISION_KINDS)
+    assert all(LATIN.search(name) is None for name in DECISION_KIND_NAMES.values())
+    assert decision_kind_name("not_a_kind") == "not_a_kind"
+
+
+# 决定请求事件的载荷从没有 question 字段（工单 #301）：说明用 description，正文不出现英文种类名
+@pytest.mark.parametrize("kind", ["model_unavailable", "definitions_changed", "unknown_action",
+                                  "no_tool_call", "workspace_unrepresentable"])
+def test_decision_requested_names_the_kind_in_chinese_with_description(kind):
+    text = event_label(EventType.DECISION_REQUESTED, {"kind": kind, "description": "需要人工处理"})
+    assert DECISION_KIND_NAMES[kind] in text
+    assert "需要人工处理" in text
+    assert LATIN.search(_without_brand(text)) is None, text

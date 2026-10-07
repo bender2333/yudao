@@ -171,34 +171,43 @@ export class ClientApp {
     };
   }
 
-  // 缺口或 resync：把视图标为「数据可能过时」，重新查询它们的快照，再从快照位置中最小的一个重新订阅
+  // 缺口或 resync：把视图标为「数据可能过时」，重新查询它们的快照，再从快照位置中最小的一个重新订阅。
+  // 查询失败（服务不可达）时保留旧流：流自身的退避重连会继续尝试，服务恢复以后自动恢复
   private async resync(): Promise<void> {
     if (!this.iface) {
       return;
     }
-    const before = this.boot;
-    const result = await connect(this.settings!);
-    if (result.state !== "connected") {
+    try {
+      const before = this.boot;
+      const result = await connect(this.settings!);
+      if (result.state !== "connected") {
+        return;
+      }
+      // 本次启动的身份改变：重新读取能力清单（设计说明第 6.1 节）
+      if (result.capabilities.deployment.boot_id !== before) {
+        this.boot = result.capabilities.deployment.boot_id;
+        this.capabilities = result.capabilities;
+      }
+      const position = await this.views!.refreshAll();
+      this.closeStream();
+      this.startStream(position);
+      // 画面回到查询给出的状态，不补播已经播放过的动作
+      for (const fn of [...this.resyncSubscribers]) fn();
+    } catch {
       return;
     }
-    // 本次启动的身份改变：重新读取能力清单（设计说明第 6.1 节）
-    if (result.capabilities.deployment.boot_id !== before) {
-      this.boot = result.capabilities.deployment.boot_id;
-      this.capabilities = result.capabilities;
-    }
-    const position = await this.views!.refreshAll();
-    this.closeStream();
-    this.startStream(position);
-    // 画面回到查询给出的状态，不补播已经播放过的动作
-    for (const fn of [...this.resyncSubscribers]) fn();
   }
 
   async refreshPendingDecisions(): Promise<void> {
     if (!this.iface) {
       return;
     }
-    const snapshot = await this.query<DecisionList>("decisions.list", { status: ["open"] });
-    this.listeners.onPendingDecisions(snapshot.data.decisions.length);
+    try {
+      const snapshot = await this.query<DecisionList>("decisions.list", { status: ["open"] });
+      this.listeners.onPendingDecisions(snapshot.data.decisions.length);
+    } catch {
+      // 服务不可达：保留旧的数量，不写控制台错误
+    }
   }
 
   private closeStream(): void {

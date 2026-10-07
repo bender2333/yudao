@@ -18,6 +18,7 @@ import { failureRows } from "./attempt-failure";
 import { Empty, KeyValue, Loading, Section, Table, dict, formatNumberOr, list, numberValue, optionalText, pageKey, show, text } from "./common";
 import { ATTEMPT_STATUS, DEPARTMENTS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
+import { usageText } from "./usage-text";
 
 const PAGE_SIZE = 50;
 
@@ -64,6 +65,7 @@ function selectionSourceName(value: string | null): string {
   return show(value);
 }
 
+// 用量的显示见 usage-text.ts：表格列与详情行同一口径（工单 #301）
 // 调用目标的显示（设计说明第 7.4 节）：连接、协议、地址、上游模型、容量、凭据引用与版本。
 // 字段取自请求事件的调用目标公开部分（不含 Key）；解析尚未确定的项写成「未上报」
 function callTargetText(target: Record<string, unknown>): string {
@@ -161,7 +163,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
               show(item.requested_model),
               show(item.actual_model),
               formatNumberOr(item.duration_ms, " 毫秒"),
-              usageBrief(dict(item.usage)),
+              usageText(dict(item.usage)),
               <button
                 type="button"
                 className="link"
@@ -184,14 +186,6 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
     </div>
   );
 
-  function usageBrief(usage: Record<string, unknown>): string {
-    const total = numberValue(usage.total_tokens);
-    const reported = usage.reported === true;
-    if (!reported && total === null) {
-      return "未上报";
-    }
-    return `${formatNumberOr(total, " token")}，输入 ${formatNumberOr(numberValue(usage.input_tokens))}，输出 ${formatNumberOr(numberValue(usage.output_tokens))}`;
-  }
 }
 
 function UsageSection(props: { usage: { data: UsageReport | null; loading: boolean } }) {
@@ -313,7 +307,7 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
           ["部门设置版本", attempt.prompt_version === null || attempt.prompt_version === undefined ? "未上报" : `第 ${String(attempt.prompt_version)} 版`],
           ["第几步 / 第几次尝试", `${show(optionalText(attempt.step))} / ${show(optionalText(attempt.attempt))}`],
           ["开始与结束", `${formatTime(optionalText(attempt.started_at))} → ${formatTime(optionalText(attempt.finished_at))}（${formatNumberOr(numberValue(attempt.duration_ms), " 毫秒")}）`],
-          ["用量", text(attempt.usage) === "" ? "未上报" : JSON.stringify(attempt.usage)],
+          ["用量", usageText(dict(attempt.usage))],
           ["运行限制", `收集范围 ${show(optionalText(scope.max_items) ?? optionalText(scope.mode), "未上报")}；输出条目 ${show(optionalText(attempt.output_item_count), "未上报")}`],
           ...failure,
           ["错误", show(optionalText(attempt.error), "没有"),],

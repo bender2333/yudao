@@ -40,6 +40,21 @@ def test_stop_request_makes_a_local_service_exit(tmp_path):
         with running_server(lambda: _open(data_dir)) as again:
             assert loopback_status(again.client)["position"] == before["position"]
 
+def test_stop_request_with_an_open_event_stream_exits_without_waiting_for_the_graceful_timeout(tmp_path, caplog):
+    # 工单 #301：有客户端事件流连接时发出停止请求，服务先结束事件流连接再退出，
+    # 不等 3 秒的优雅退出超时，日志没有 CancelledError 回溯
+    data_dir = tmp_path / "stream-stop"
+    with running_server(lambda: _open(data_dir), keepalive_sec=0.2) as handle:
+        with handle.client.stream("GET", "/api/events", params={"after": 0}) as stream:
+            first = next(stream.iter_raw())
+            assert first
+            started = time.monotonic()
+            response = handle.client.post("/api/system/stop")
+            assert response.status_code == 202
+            assert handle.wait_stopped(timeout=2.5)
+            assert time.monotonic() - started < 2.5
+    assert "CancelledError" not in caplog.text
+
 def loopback_status(client: httpx.Client) -> dict:
     response = client.get("/api/queries/system.status")
     assert response.status_code == 200

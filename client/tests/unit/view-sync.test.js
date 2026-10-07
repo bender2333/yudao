@@ -117,3 +117,35 @@ test("resync 时重新查询快照（refreshAll），视图补齐", async () => 
   assert.equal(position, 22);
   assert.deepEqual(seen.map((item) => item.value), [1, 2]);
 });
+
+test("打开时查询失败不通知、不抛出，错误回调结束读取状态", async () => {
+  // 工单 #301：服务不可达时查询失败，open 不把失败当快照用；调用处用 onError 结束「正在读取数据」
+  const views = new ViewSync(async () => {
+    throw new Error("查询 projects.list 没有返回数据");
+  }, CAPABILITIES);
+  const seen = [];
+  let errored = 0;
+  await views.open("v", { query: "projects.list" }, (data) => seen.push(data), () => {
+    errored += 1;
+  });
+  assert.deepEqual(seen, []);
+  assert.equal(errored, 1);
+});
+
+test("重查失败保留旧快照与旧位置，不抛出", async () => {
+  // 工单 #301：服务不可达时 refresh 保留旧数据，位置不变，服务恢复以后的事件再触发重查
+  let fail = false;
+  const views = new ViewSync(async () => {
+    if (fail) {
+      throw new Error("查询 projects.list 没有返回数据");
+    }
+    return { position: 5, data: { value: "ok" } };
+  }, CAPABILITIES);
+  const seen = [];
+  await views.open("v", { query: "projects.list" }, (data) => seen.push(data));
+  fail = true;
+  views.applyEvent("project_registered", 6);
+  await delay(300);
+  assert.deepEqual(seen.map((item) => item.value), ["ok"]);
+  assert.equal(await views.refreshAll(), 5);
+});

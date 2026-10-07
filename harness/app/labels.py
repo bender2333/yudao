@@ -27,11 +27,23 @@ if set(PHASE_NAMES) != set(PHASES):
     raise KeyError("阶段的中文名必须与控制核心的阶段取值相同：" + "、".join(PHASES))
 
 STOP_REASON_NAMES = STOP_REASON_LABELS
+DECISION_KIND_NAMES: dict[str, str] = {
+    "model_unavailable": "模型引用无法使用，等待恢复",
+    "no_tool_call": "已暂停（模型没有调用工具），等待继续",
+    "workspace_unrepresentable": "已暂停（工作区无法表示），等待继续",
+    "definitions_changed": "定义版本不同，等待选择",
+    "unknown_action": "动作结果未知，等待核实",
+    "initial_prd": "接入已有项目的初始需求文档等待确认",
+}
 
 
 def phase_name(phase: Any) -> str:
     # 阶段的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
     return PHASE_NAMES.get(str(phase or ""), str(phase or ""))
+
+def decision_kind_name(kind: Any) -> str:
+    # 决定种类的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
+    return DECISION_KIND_NAMES.get(str(kind or ""), str(kind or ""))
 
 
 def event_label(event_type: str, payload: dict[str, Any]) -> str:
@@ -44,12 +56,11 @@ def event_label(event_type: str, payload: dict[str, Any]) -> str:
 
 
 class _Translated(dict):
-    # 载荷里的阶段与停止原因取中文名，其余字段原样；载荷没有的字段填入空串，说明仍然生成
+    # 载荷里的阶段、停止原因与决定种类取中文名，其余字段原样；载荷没有的字段填入空串，说明仍然生成
     _NAMES = {
         "from_phase": phase_name, "to_phase": phase_name, "stop_reason": stop_reason_name,
-        "resumed_at_phase": phase_name, "paused_at_phase": phase_name,
+        "resumed_at_phase": phase_name, "paused_at_phase": phase_name, "kind": decision_kind_name,
     }
-
     def __missing__(self, key: str) -> str:
         return ""
 
@@ -100,7 +111,7 @@ _LABELS: dict[str, str] = {
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
     EventType.RUN_CONTINUED: "运行从暂停位置继续：{resumed_at_phase}",
     EventType.RUN_FAILED: "运行失败：{stop_reason}",
-    EventType.DECISION_REQUESTED: "提出等待回答的决定（{kind}）：{question}",
+    EventType.DECISION_REQUESTED: "提出等待回答的决定（{kind}）：{description}",
     EventType.DECISION_ANSWERED: "回答了一个决定（{kind}）",
     EventType.DECISION_WITHDRAWN: "撤回了一个决定（{kind}）",
     ProjectEventType.PROJECT_REGISTERED: "建立了项目：{name}",
