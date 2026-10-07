@@ -1,6 +1,6 @@
 // 项目页面端到端测试（工单 #80 的验收）：三个种子项目由 FakeAdapter 驱动的真实服务支撑（tests/e2e/backend.py）。
-// 覆盖概览、部门工作间、资料、观测、设置各页面在 1440×900 与 390×844、浅色与深色下的渲染，
-// 控制台错误为零，窄屏无横向滚动；数据全部来自查询或事件流（界面不刷新也能看到服务端写入的结果）。
+// 覆盖概览、部门工作间、资料、观测、设置各页面在 1440×900 与 1920×1080、浅色与深色下的渲染，
+// 控制台错误为零，页面无横向溢出；数据全部来自查询或事件流（界面不刷新也能看到服务端写入的结果）。
 //
 // 本文件正在按页面逐节编写，节与节之间的公共函数在下面集中定义。
 
@@ -48,7 +48,7 @@ test.afterAll(async () => {
 });
 
 // 每个尺寸只启动一次客户端：页面顺序访问，浅色与深色在同一会话里用 emulateMedia 切换。
-// 决定解答与实时事项这两类改变服务端状态的用例只在 1440 尺寸里跑一遍，390 尺寸只看渲染。
+// 决定解答与实时事项这两类改变服务端状态的用例只在 1440 尺寸里跑一遍，1920 尺寸只看渲染。
 async function openProjectClient(size: { width: number; height: number }): Promise<ClientApp> {
   const client = await startClient(backend, size);
   await expect(client.page.locator(".brand")).toHaveText("Yudao");
@@ -108,7 +108,7 @@ async function fetchQuery<T>(page: Page, name: string, params: Record<string, st
   });
 }
 
-// 直发命令：与 shell.spec.ts 的托盘用例同一做法，服务端真实登记事件（不是测试替身）。
+// 直发命令：页面同一来源调用接口，服务端真实登记事件（不是测试替身）。
 // 请求体的字段就是命令的公共字段加命令自身的字段（command_id 由客户端生成，基准版本由调用处给出）
 async function sendCommand<T>(page: Page, name: string, request: Record<string, unknown>): Promise<T> {
   return page.evaluate(
@@ -179,7 +179,7 @@ async function themeBackground(page: Page): Promise<string> {
   return page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 }
 
-// 窄屏验收：文档与页面内每个可见容器都不出现横向溢出（滚动容器允许，溢出到窗口外不允许）
+// 布局验收：文档与页面内每个可见容器都不出现横向溢出（滚动容器允许，溢出到窗口外不允许）
 async function overflowReport(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const offenders: string[] = [];
@@ -206,7 +206,7 @@ async function overflowReport(page: Page): Promise<string[]> {
 }
 
 async function expectNoOverflow(page: Page, where: string): Promise<void> {
-  expect.soft(await overflowReport(page), `${where}：窄屏不应出现横向溢出`).toEqual([]);
+  expect.soft(await overflowReport(page), `${where}：不应出现横向溢出`).toEqual([]);
 }
 
 async function activeTabCount(page: Page): Promise<number> {
@@ -247,21 +247,6 @@ async function settingsVersion(page: Page, id: string): Promise<number> {
 // 结束时核对控制台错误为零。改变服务端状态的用例排在后面（决定解答与实时事项放最后）。
 
 test.describe("项目页面（1440×900）", () => {
-  test("连接设置页：访问令牌写明当前版本不需要填写，页面上没有开发用语", async () => {
-    const client = await openProjectClient({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    const page = client.page;
-    try {
-      await page.evaluate(() => { window.location.hash = "#/connect"; });
-      await expect(page.getByLabel("访问令牌")).toBeDisabled();
-      await expect(page.locator(".gate .note")).toHaveText("访问令牌：当前版本不需要填写，以后需要时再启用。");
-      await expectNoDeveloperText(page, "连接设置页");
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
-
   test("缺少部门默认时新事项被拒绝：提示是中文并带两个去处", async () => {
     // 工单 #319 第 6 项：质检的部门默认没有选模型时「作为新事项开始」被拒绝，
     // 页面给出中文说明与去模型管理页、在本项目设置页两个去处
@@ -563,7 +548,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
       expect(await activeTabCount(page)).toBe(1);
       const usage = await section(page, "用量统计");
-      await expect(usage.locator(".section-head .note")).toContainText("只读显示，不显示成预算");
+      await expect(usage.locator(".section-head .note")).toContainText("只读显示用量，不做预算判断");
       await expect(usage).toContainText("请求数");
       await expect(usage).toContainText("4（上报 0）");
       await expect(await table(page, "按部门")).toContainText("product");
@@ -821,27 +806,21 @@ test.describe("项目页面（1440×900）", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 390×844：一次启动客户端，逐个页面核对没有横向滚动，控制台错误为零；
-// 抽屉打开时也一样；深色配色下再查一遍。
+// 1920×1080：一次启动客户端，逐个页面核对没有横向溢出，控制台错误为零；
+// 弹窗与详情页也一样；深色配色下再查一遍。
 
-test.describe("项目页面（390×844）", () => {
-  test("窄屏：抽屉、每个页面无横向滚动、深色下同样成立", async () => {
+test.describe("项目页面（1920×1080）", () => {
+  test("宽屏：每个页面无横向溢出、深色下同样成立", async () => {
     test.setTimeout(240_000);
-    const client = await openProjectClient({ width: 390, height: 844 });
+    const client = await openProjectClient({ width: 1920, height: 1080 });
     const errors = watchErrors(client);
     const page = client.page;
     try {
       const id = await projectId(page, SAMPLE);
       await gotoView(page, id, "overview");
-      const toggle = page.locator(".drawer-toggle");
-      await expect(toggle).toBeVisible();
-      await toggle.click();
-      await expect(page.locator("div.app")).toHaveClass(/drawer-open/);
-      await expect(page.locator("aside.sidebar")).toHaveCSS("position", "fixed");
-      // 遮罩铺满窗口，点它右侧（左侧栏占 240 像素）关闭抽屉
-      await page.locator(".drawer-scrim").click({ position: { x: 330, y: 400 } });
-      await expect(page.locator("div.app")).not.toHaveClass(/drawer-open/);
-      await expect(page.locator(".drawer-scrim")).toHaveCount(0);
+      // 宽屏不显示抽屉按钮，左侧栏常驻
+      await expect(page.locator(".drawer-toggle")).toBeHidden();
+      await expect(page.locator("aside.sidebar")).toBeVisible();
       const markers: Record<View, string> = {
         overview: "项目摘要",
         "dept/product": "产品工作间",

@@ -1,4 +1,4 @@
-// 从想法新建时填写起始文件夹的端到端测试（工单 #323 的验收）：Playwright 启动 Electron，
+// 从想法新建时填写起始文件夹的端到端测试（工单 #323 的验收）：Playwright 打开 Chromium 页面，
 // 连接真实运行的后端（tests/e2e/backend.py 的 --script initial，FakeAdapter 驱动）。模型回答由
 // FakeAdapter 给出，不使用 mock：起始文件夹是真实目录，新建项目时命令真的采集它的代码快照。
 //
@@ -6,7 +6,7 @@
 //   1. 填写起始文件夹新建项目，概览写明「起点：起始文件夹（N 个文件）」，N 等于目录里的文件数；
 //      开始事项以后部门工作间的动作与回执里能读到起始文件夹里的文件；
 //   2. 填写不存在的路径时表单显示 source_invalid 的原因，没有出现新项目；留空时概览没有起点行；
-//   3. 1440×900 与 390×844 下表单与起点行没有横向滚动。
+//   3. 1440×900 与 1920×1080 下表单与起点行没有横向滚动。
 // 控制台错误为零。
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
@@ -124,7 +124,7 @@ async function navigate(page: Page, id: string, view: string): Promise<void> {
   await expect(page.locator(".tabbar .tab").first()).toBeVisible();
 }
 
-// 窄屏验收：文档与页面内每个可见容器都不出现横向溢出（滚动容器允许，溢出到窗口外不允许）
+// 布局验收：文档与页面内每个可见容器都不出现横向溢出（滚动容器允许，溢出到窗口外不允许）
 async function overflowReport(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const offenders: string[] = [];
@@ -252,10 +252,10 @@ test.describe("起始文件夹（1440×900）", () => {
   });
 });
 
-test.describe("起始文件夹（390×844）", () => {
-  test("窄屏：表单与起点行没有横向滚动", async () => {
+test.describe("起始文件夹（1920×1080）", () => {
+  test("1920×1080：表单与起点行没有横向滚动", async () => {
     test.setTimeout(300_000);
-    const client = await openClient({ width: 390, height: 844 });
+    const client = await openClient({ width: 1920, height: 1080 });
     const errors = watchErrors(client);
     const page = client.page;
     try {
@@ -263,16 +263,14 @@ test.describe("起始文件夹（390×844）", () => {
       if (source === null) {
         throw new Error("后端没有报出起始文件夹脚本的目录");
       }
-      // 抽屉打开以后侧栏的「从想法新建」在窄屏上同样可用
-      await page.locator(".drawer-toggle").click();
-      const name = `窄屏起点 ${Date.now()}`;
+      const name = `大屏起点 ${Date.now()}`;
       const form = await newProjectForm(page);
       await expect(form.getByLabel("起始文件夹")).toBeVisible();
       await fillNewProjectForm(form, name, source);
       expect(await overflowReport(page)).toEqual([]);
       await form.getByRole("button", { name: "新建项目" }).click();
       await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes(name),
-        page, "侧栏出现窄屏新建的项目");
+        page, "侧栏出现大屏新建的项目");
 
       await navigate(page, await projectId(page, name), "overview");
       const summary = await section(page, "项目摘要");

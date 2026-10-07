@@ -56,10 +56,10 @@ async function driver(input: { steps: { department: string; data: RoomWorkspaceF
   const ReactDOMClient = (await import(/* @vite-ignore */ "/@id/react-dom/client" as string)).default as typeof import("react-dom/client");
   const { RoomScreen } = await import(/* @vite-ignore */ "/src/views/project/room-screen.tsx" as string) as typeof import("../../src/renderer/src/views/project/room-screen.tsx");
   const { ClientApp } = await import(/* @vite-ignore */ "/src/contract/client-app.ts" as string) as typeof import("../../src/renderer/src/contract/client-app.ts");
-  // 真实的 ClientApp：它自己收下组件的三个订阅；这个测试不发命令也不查询
+  // 真实的 ClientApp：它自己收下组件的订阅；这个测试不发命令也不查询
   const app = new ClientApp(async () => {
     throw new Error("部门切换的单元测试不查询");
-  }, { onState() {}, onPendingDecisions() {}, onEvent() {} });
+  }, { onState() {}, onPendingDecisions() {} });
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:0;top:0;width:480px;height:240px;z-index:9999";
   document.body.appendChild(host);

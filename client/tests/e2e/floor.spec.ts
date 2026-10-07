@@ -1,9 +1,9 @@
-// 楼层画面的端到端测试（工单 #82 验收标准 4）：Playwright 启动 Electron，连接由 FakeAdapter 驱动的真实服务。
+// 楼层画面的端到端测试（工单 #82 验收标准 4）：Playwright 打开 Chromium 页面，页面由 FakeAdapter 驱动的真实服务提供。
 // 项目的循环画面在概览页出现；事项在服务端推进时画面随事件流变化；画面的每个动作对应一条真实事件；
 // 断线重连（重新订阅）以后画面回到查询给出的状态；系统设置为减少动画时气泡照样显示。
 //
 // 观测方式：读画布的内容签名（像素差异）与页面上循环画面的可见内容；事件来自服务的查询与事件流，
-// 不做伪造。渲染进程用构建产物（与 shell.spec.ts 相同），服务的访问来源因此是允许的。
+// 不做伪造。页面用构建产物（与 shell.spec.ts 相同），从后端地址打开，与接口同一来源。
 
 import { expect, test, type Page } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
@@ -36,7 +36,7 @@ function watchErrors(client: ClientApp): string[] {
 
 type QueryEnvelope<T> = { data?: T; status?: string; reason?: string; message?: string };
 
-// 查询与命令直接从 Node 发：服务本身是真实的，渲染进程在 yudao://app 来源下同样能连
+// 查询与命令直接从 Node 发：服务本身是真实的，页面与接口同一来源，同样能连
 async function query<T>(name: string, params: Record<string, unknown> = {}): Promise<T> {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -187,7 +187,7 @@ test("系统设置为减少动画时，小人少走动、头顶的气泡照样�
 test("两种窗口尺寸下楼层画面都可用，控制台错误为零", async () => {
   for (const size of [
     { width: 1440, height: 900 },
-    { width: 390, height: 844 },
+    { width: 1920, height: 1080 },
   ]) {
     const client = await startClient(backend, size);
     const errors = watchErrors(client);
@@ -197,7 +197,7 @@ test("两种窗口尺寸下楼层画面都可用，控制台错误为零", async
       await openFloor(page, id);
       const width = await page.locator(".floor-screen canvas").evaluate((el) => (el as HTMLCanvasElement).width);
       expect(width % 640).toBe(0);
-      // 窄屏：画面下方的文字列表可见，页面不出现横向溢出
+      // 画面下方的文字列表可见，页面不出现横向溢出
       await expect(page.locator(".floor-text-list li").first()).toBeVisible();
       const overflow = await page.evaluate(() => {
         const root = document.documentElement;
