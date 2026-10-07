@@ -6,7 +6,7 @@ import math
 import ssl
 import threading
 from collections.abc import AsyncIterator, Callable
-from contextlib import aclosing
+from contextlib import aclosing, contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -27,6 +27,7 @@ from harness.providers import (
     ResponsesConfig,
     check_availability,
 )
+from harness.proposals import product_spec
 
 
 class ConnectionLoop:
@@ -187,6 +188,117 @@ def send_reply(handler: BaseHTTPRequestHandler, status: int, content_type: str, 
     handler.end_headers()
     handler.wfile.write(body)
     handler.wfile.flush()
+
+
+# 测试内的本机 Responses 桩服务：起服务、发字节、拼 SSE 帧与构造桩回复的零件，
+# 多个检查 Provider 模块行为的测试文件共用（原先分散在各自的测试文件中）。
+STUB_KEY = "local-sdk-test-key"
+STUB_TEXT = {"id": "msg-one", "type": "message", "role": "assistant", "status": "completed",
+             "content": [{"type": "output_text", "text": "Local model output", "annotations": []}]}
+STUB_CALL = {"id": "fc-one", "type": "function_call", "name": "read_file", "call_id": "call-one",
+             "arguments": '{"path":"proof.txt"}', "status": "completed"}
+STUB_REASONING = {"id": "rs-one", "type": "reasoning", "summary": [],
+                  "encrypted_content": "opaque-causal-reasoning"}
+STUB_USAGE = {"input_tokens": 100, "output_tokens": 30, "total_tokens": 130,
+              "input_tokens_details": {"cached_tokens": 80}, "output_tokens_details": {"reasoning_tokens": 12}}
+STUB_TOOLS = [{"type": "function", "name": "read_file", "description": "Read a file",
+               "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+               "strict": False}]
+
+
+def stub_event(kind, **body):
+    return f"event: {kind}\ndata: {json.dumps({'type': kind, **body})}\n\n".encode()
+
+
+def stub_response(output=None, *, status="completed", usage=STUB_USAGE, response_id="resp-one", error=None):
+    return {"id": response_id, "object": "response", "created_at": 1, "status": status, "model": "local-model",
+            "output": [STUB_TEXT] if output is None else output, "usage": usage, "error": error,
+            "incomplete_details": {"reason": "max_output_tokens"} if status == "incomplete" else None}
+
+
+def stub_stream(output=None, *, status="completed", usage=STUB_USAGE, response_id="resp-one", duplicate=False,
+                terminal=True):
+    response = stub_response(output, status=status, usage=usage, response_id=response_id)
+    frames = [stub_event("response.created",
+                         response={**response, "status": "in_progress", "output": [], "usage": None},
+                         sequence_number=0)]
+    for index, item in enumerate(response["output"]):
+        frame = stub_event("response.output_item.done", item=item, output_index=index, sequence_number=index + 1)
+        frames.append(frame)
+        if duplicate:
+            frames.append(frame)
+    if terminal:
+        frames.append(stub_event(f"response.{status}", response=response, sequence_number=len(frames)))
+    return b"".join(frames)
+
+
+def write_stub_reply(handler, body, *, status=200, content_type="text/event-stream", headers=None):
+    handler.send_response(status)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Length", str(len(body)))
+    for name, value in (headers or {}).items():
+        handler.send_header(name, value)
+    handler.end_headers()
+    handler.wfile.write(body)
+    handler.wfile.flush()
+
+
+@contextmanager
+def stub_server(replies):
+    # 起一个按请求顺序回放桩回复的本机 Responses 服务，yield 出已经写好的桩配置、收到的请求、路径、
+    # 凭据是否正确的清单与「已收到请求」事件
+    captures, paths, authorization = [], [], []
+    received = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            captures.append(body)
+            paths.append(self.path)
+            authorization.append(self.headers.get("Authorization") == f"Bearer {STUB_KEY}")
+            received.set()
+            if len(captures) > len(replies):
+                write_stub_reply(self, b'{"error":{"message":"unexpected retry"}}', status=500,
+                                 content_type="application/json")
+                return
+            reply = replies[len(captures) - 1]
+            try:
+                if callable(reply):
+                    reply(self, body)
+                else:
+                    write_stub_reply(self, reply)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
+    worker.start()
+    config = ResponsesConfig(model="local-model", api_key=STUB_KEY, provider="local-stub",
+                             base_url=f"http://127.0.0.1:{server.server_port}/v1", timeout_sec=5)
+    try:
+        yield config, captures, paths, authorization, received
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=2)
+
+
+def stub_submit_stream(response_id="resp-submit"):
+    # 一条包含产品部门完整提交的桩流式回复
+    proposal = product_spec()
+    proposal.pop("kind")
+    call = {
+        "id": "fc-submit",
+        "type": "function_call",
+        "name": "submit_product_spec",
+        "call_id": "call-submit",
+        "arguments": json.dumps(proposal),
+        "status": "completed",
+    }
+    return stub_stream([call], response_id=response_id)
 
 
 def serve(responder) -> tuple[ThreadingHTTPServer, Capture, str]:
@@ -431,6 +543,12 @@ __all__ = [
     "HandleAdapter",
     "ResponsesAdapter",
     "ScriptedProvider",
+    "STUB_CALL",
+    "STUB_KEY",
+    "STUB_REASONING",
+    "STUB_TEXT",
+    "STUB_TOOLS",
+    "STUB_USAGE",
     "bound_adapter",
     "bound_target",
     "chat_responder",
@@ -444,4 +562,10 @@ __all__ = [
     "send_reply",
     "serve",
     "sse",
+    "stub_event",
+    "stub_response",
+    "stub_server",
+    "stub_stream",
+    "stub_submit_stream",
+    "write_stub_reply",
 ]

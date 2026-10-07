@@ -2,49 +2,20 @@
 # 经 HTTP 提交命令与读取查询；控制核心在服务生命周期中建立，模型回答由 FakeAdapter 给出。
 # 排空期间新建的事项排队不开始，正在进行的 run 照常结束；强制升级只在排空期间可用。
 
-import time
 import uuid
 
 from harness.adapters.fake import FakeAdapter
-from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.models import EventType, ProjectEventType
 from harness.projection import project_run
 from harness.proposals import product_spec
-from harness.runtime import LoopSystem
 from harness.streams import PRIORITY_UPGRADE_RESTART, STOP_REASON_UPGRADE
 from harness.tests.api_helpers import running_api
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.onboarding_project import (
+    OpenedFake as _Opened,
+    post_command as _post,
+    wait_until as _wait_for,
+)
 
-def _post(client, command, **body):
-    return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})
-
-def _wait_for(predicate, timeout=WAIT_FOR_HOST_WORK_SEC):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if predicate():
-            return True
-        time.sleep(0.05)
-    return False
-
-class _Opened:
-    def __init__(self, data_dir, adapter=None) -> None:
-        self.data_dir = data_dir
-        self.adapter = FakeAdapter([]) if adapter is None else adapter
-        self.applications = []
-
-    def __call__(self) -> Application:
-        system = LoopSystem.for_testing(self.data_dir, self.adapter)
-        application = Application(system, registry=DEFAULT_REGISTRY)
-        self.applications.append(application)
-        return application
-
-    @property
-    def store(self):
-        return self.applications[-1].system.store
-
-    @property
-    def system(self):
-        return self.applications[-1].system
 
 def _blocked_script():
     # 产品提交规格以后工程部门的请求失败：run 停在非终态（ENGINEERING），可以用来检查排空与强制升级

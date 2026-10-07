@@ -181,10 +181,12 @@ yudao api
 
 ## 测试
 
-Python 测试在项目环境中运行：
+Python 测试按三层分批运行（分层见 `docs/design/test-pyramid.md`）：单元层与模块层一起跑，
+集成层只跑本次改动或新增的文件，全量集成层由架构师按批运行。
 
 ```bash
-uv run python -m pytest harness/tests -q
+uv run python -m pytest -m "unit or module"
+uv run python -m pytest harness/tests/<本次改动或新增的集成层文件>
 ```
 
 客户端的检查在 `client/` 中运行：单元用 `cd client && npm test`，端到端用 `cd client && npm run test:e2e`。

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import sys
 import threading
 import time
 import uuid
@@ -11,12 +12,13 @@ from pathlib import Path
 from typing import Any
 
 from harness.actions import Action, ActionReceipt, Preconditions
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, pending_request_id
 from harness.assembly import ContextAssembly
 from harness.context import ContextPart
+from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, ContextManifest, Event, json_dumps
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
 from harness.environment import LocalEnvironment
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
@@ -24,6 +26,26 @@ from harness.tools import tool_action
 
 # 测试中的重试间隔缩短到毫秒级，其余参数与正式运行相同
 FAST_RETRIES = StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.02)
+
+# 连续只回复文字、没有调用工具时最多追加说明的次数，取规则登记中的现值
+TOOL_CALL_REQUIRED_LIMIT = DEFINITIONS.rule_value("tool_call_required_limit")
+
+
+def calls_during(function, operation) -> int:
+    # 用 sys.setprofile 记录 function 在 operation 期间（当前线程中）被调用的次数；只观察，不替换
+    code, calls = function.__code__, []
+
+    def profile(frame, event, _arg):
+        if event == "call" and frame.f_code is code:
+            calls.append(1)
+
+    previous = sys.getprofile()
+    sys.setprofile(profile)
+    try:
+        operation()
+    finally:
+        sys.setprofile(previous)
+    return len(calls)
 
 
 def action(name: str, args: dict[str, Any], *, department: str = "engineering",
@@ -176,3 +198,46 @@ class OtherThreadOperation:
 def from_another_thread(operation: Callable[[], Any]) -> OtherThreadOperation:
     # 在 after_event 的 action 中调用：操作在另一个线程中完成以后，写入方才继续
     return OtherThreadOperation(operation)
+
+
+def summary_message(request, text="Product memory: prior evidence was read; keep the original requirements."):
+    # 一次压缩请求的输出项：文字形式的记忆摘要
+    return {"id": f"summary-{request.activation_id}-{request.step_id}", "type": "message", "role": "assistant",
+            "content": [{"type": "output_text", "text": text}]}
+
+
+def read_file_call(request, path) -> ModelResponse:
+    # 只读工具 read_file 的调用结果（ModelResponse），用来构造触发压缩的工作步骤
+    identity = f"read-{request.activation_id}-{request.step_id}"
+    return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call", "name": "read_file",
+                                  "arguments": json_dumps({"path": path})}])
+
+
+def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False, step_limits=StepLimits()):
+    # 一个上下文窗口只有 6000、工作区里放着大文件的运行：按请求目的与部门给出剧本，第一次读取以后压缩
+    work_counts = {}
+    rejected_spec = False
+
+    def respond(request):
+        nonlocal rejected_spec
+        if request.purpose == "compaction":
+            if cancelled_summary is not None:
+                return cancelled_summary(request)
+            return ModelResponse(output=[summary_message(request)])
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        if request.department == "engineering":
+            return collaboration_request()
+        if count == 0:
+            return read_file_call(request, "large.txt")
+        if reject_first_spec and not rejected_spec:
+            rejected_spec = True
+            return product_spec() | {"acceptance_criteria": []}
+        return product_spec() if pending_request_id(request) is None else response_turn("answered", "The original requirements remain applicable.")(request)
+
+    adapter = FakeAdapter([respond] * 100)
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
+    original = "  Original intent\r\nDo not rewrite this. \n"
+    run_id = system.create_run(original, context_window=6000)
+    system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
+    return system, adapter, run_id, original

@@ -6,18 +6,18 @@ from http.server import BaseHTTPRequestHandler
 import pytest
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.definitions import DEFINITIONS
 from harness.engine import tool_call_required_text
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
-from harness.tests.helpers import department_history, list_files_turn
-from harness.tests.test_event_sequence import HTTP_REPLIES
-
-# 连续没有调用工具的回复最多追加说明的次数，取规则登记中的现值
-LIMIT = DEFINITIONS.rule_value("tool_call_required_limit")
+from harness.tests.helpers import (
+    FAST_RETRIES,
+    TOOL_CALL_REQUIRED_LIMIT as LIMIT,
+    department_history,
+    list_files_turn,
+)
 from harness.tests.protocol_helpers import (
     ScriptedProvider,
     bound_adapter,
@@ -30,7 +30,7 @@ from harness.tests.protocol_helpers import (
     send_reply,
     serve,
 )
-from harness.tests.helpers import FAST_RETRIES
+from harness.tests.provider_replies import HTTP_REPLIES
 
 REPLY = "我先整理一下需求，稍后提交。"
 

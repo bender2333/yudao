@@ -1,54 +1,20 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
-
-from harness.adapters.fake import FakeAdapter, pending_request_id
+from harness.adapters.fake import FakeAdapter
 from harness.engine import StepLimits
 from harness.models import EventType, canonical_hash, json_dumps
-from harness.proposals import collaboration_request, product_spec, response_turn
+from harness.proposals import collaboration_request, product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, department_history, recorded_context
-
-
-def _message(request, text="Product memory: prior evidence was read; keep the original requirements."):
-    return {"id": f"summary-{request.activation_id}-{request.step_id}", "type": "message", "role": "assistant",
-            "content": [{"type": "output_text", "text": text}]}
-
-
-def _read(request, path):
-    identity = f"read-{request.activation_id}-{request.step_id}"
-    return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call", "name": "read_file",
-                                  "arguments": json_dumps({"path": path})}])
-
-
-def _runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False, step_limits=StepLimits()):
-    work_counts = {}
-    rejected_spec = False
-
-    def respond(request):
-        nonlocal rejected_spec
-        if request.purpose == "compaction":
-            if cancelled_summary is not None:
-                return cancelled_summary(request)
-            return ModelResponse(output=[_message(request)])
-        count = work_counts.get(request.activation_id, 0)
-        work_counts[request.activation_id] = count + 1
-        if request.department == "engineering":
-            return collaboration_request()
-        if count == 0:
-            return _read(request, "large.txt")
-        if reject_first_spec and not rejected_spec:
-            rejected_spec = True
-            return product_spec() | {"acceptance_criteria": []}
-        return product_spec() if pending_request_id(request) is None else response_turn("answered", "The original requirements remain applicable.")(request)
-
-    adapter = FakeAdapter([respond] * 100)
-    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
-    original = "  Original intent\r\nDo not rewrite this. \n"
-    run_id = system.create_run(original, context_window=6000)
-    system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
-    return system, adapter, run_id, original
+from harness.tests.helpers import (
+    FAST_RETRIES,
+    compacted_runner as _runner,
+    department_history,
+    read_file_call as _read,
+    recorded_context,
+    summary_message as _message,
+)
 
 
 def test_compaction_preserves_originals_then_resumes_work_with_summary(tmp_path):
