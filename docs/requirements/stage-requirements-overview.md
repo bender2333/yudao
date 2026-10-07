@@ -126,7 +126,7 @@
 Stage 3 待讨论的专题（TODO，2026-09-30 记录；背景见[决策记录](../decision.md)同日「不使用容器」一条）：
 
 1. **不使用容器以后的执行环境**：2026-09-30 已确定，见[决策记录](../decision.md)同日「不使用容器以后的执行环境」一条与 [ADR-0022](../adr/0022-run-directly-without-containers.md)。
-2. **computer use**（3.2D）：2026-10-02 已确定，见[决策记录](../decision.md)同日「computer use 在控制主机的交互桌面上进行」一条、[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)与[设计说明](../design/browser-and-computer-use.md)第 5 节：现阶段只考虑 Windows，桌面程序在控制主机上、用户的交互桌面上用真实输入试用，开始前经用户同意，整台控制主机同一时刻只有一个桌面会话；启动命令按执行位置的系统给出（第 3.3 节）。调研见 [computer use 调研](../research/computer-use-without-containers.md)。
+2. **computer use**（3.2D）：2026-10-07 移出 Stage 3，见下面「以后阶段的讨论」第 4 项；3.2D 在 Stage 3 实施浏览器的部分。
 3. **变异测试与圈复杂度的跨平台工具库**（[D35](self-hosting.md)，专题讨论）：
    - 用户要求做成稳定的跨平台工具库，现在与以后都要能在 Windows 上运行。
    - Stage 3 末手动检查（#173）的方法随之确定。
@@ -141,3 +141,7 @@ Stage 3 待讨论的专题（TODO，2026-09-30 记录；背景见[决策记录](
 1. 运维部门（D27）设计中待确定的规则。
 2. 部门内部循环（D26）、语义系统（D25）与技能：先后由 D32 对照实验的结果决定。
 3. 元观察与判定阀门（D28）、准入钩子与完整命令行、Stage 6 与持续改进工作线。
+4. **computer use**（[D34](browser-and-computer-use.md)，专题讨论，2026-10-07 用户决定移出 Stage 3，放在哪个阶段在专题中确定）：
+   - 已有的设计：2026-10-02 的决定（[决策记录](../decision.md)同日「computer use 在控制主机的交互桌面上进行」一条、[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)、[设计说明](../design/browser-and-computer-use.md)中 computer use 的部分）：只考虑 Windows，桌面程序在控制主机上、用户的交互桌面上用真实输入试用，开始前经用户同意，整台控制主机同一时刻只有一个桌面会话。调研见 [computer use 调研](../research/computer-use-without-containers.md)。
+   - 要重新确定的事项：界面改为网页以后（[ADR-0032](../adr/0032-interface-served-as-web-pages.md)），桌面会话期间的提示框（置顶、不出现在截图中）与「停止使用桌面」由谁提供；Stage 4 把 Yudao 服务做成系统服务以后，系统服务看不到用户的交互桌面。
+   - 工单 #150、#246、#247 不属于任何里程碑，标为 needs-triage，专题讨论以后按结论重写或关闭。

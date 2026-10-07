@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | Stage 1：可信交付 | 产品、工程、质检围绕有效要求完成可核验交付；失败与取消可追溯 | 按原生循环验收记录完成 | [MVP 验收](archive/mvp-acceptance.md)，以及 Stage 2 的 F 收口记录 |
 | Stage 2：三部门 Harness 基线及 Provider 补充 | 原日常路径基础上，补无配置启动、统一 Provider 模块和 Go 订阅接入 | 2.1–2.6 按原合同关闭；2.7 于 2026-09-20 关闭 | [历史进度](archive/stage-2-progress.md)、[2.7 计划](archive/stage-2-provider-plan.md)、[2.7 执行报告](archive/stage-2-7-provider-report.md) |
-| Stage 3：通用工具、可靠恢复与执行环境 | 能处理实际代码项目，接入已有项目，中断后自动接续；代码在控制主机或登记的远程机器上执行；网络与 MCP 工具、浏览器与 computer use；不同项目并行；模型管理；桌面客户端与系统首页；与单个 agent 对照；规则与参数可以不发布新版本修改与撤回，内核有清单；Yudao 在自己的仓库上试点完成真实工单 | 进行中：里程碑 M1 以 0.1.1 交给用户试用（#183），M2 至 M4 推进中；进度见 GitHub 里程碑与[当前验收基线](current-baseline.md) | [Stage 3 计划](stage-3-plan.md) 的工作包与独立验收 |
+| Stage 3：通用工具、可靠恢复与执行环境 | 能处理实际代码项目，接入已有项目，中断后自动接续；代码在控制主机或登记的远程机器上执行；网络与 MCP 工具、浏览器；不同项目并行；模型管理；桌面客户端与系统首页；与单个 agent 对照；规则与参数可以不发布新版本修改与撤回，内核有清单；Yudao 在自己的仓库上试点完成真实工单 | 进行中：里程碑 M1 以 0.1.1 交给用户试用（#183），M2 至 M4 推进中；进度见 GitHub 里程碑与[当前验收基线](current-baseline.md) | [Stage 3 计划](stage-3-plan.md) 的工作包与独立验收 |
 | Stage 4：运维部门与长时间运行 | 运维部门在登记的运行环境中部署并观察交付的软件，发现的问题自动进入修复；Yudao 在进程重启、模型服务中断后自动继续；Yudao 自己的工单默认由 Yudao 实例执行；流转由定义驱动 | 后续规划；需求已确认 | 本文第 5.1 节 |
 | Stage 5：部门内协作、上下文与界面 | 部门在连续多个事项中只使用当前有效的信息，部门内部围绕中心角色分工，判定点经校准后参与裁决，用户能看清部门内外的运行过程 | 后续规划；语义系统、部门内多角色有设计与工单 | 本文第 5.2 节 |
 | Stage 6：受治理的系统演化 | 自举第二层：根据运行证据提出组织或规则变更，独立验证、限定采用并可撤销；部门之间的流转有独立的流程审查 | 后续规划；前置条件见第 6.2 节 | 本文第 5.3 节 |
@@ -32,7 +32,7 @@ flowchart LR
     R --> P["3.4A 不同项目并行 #121"]
     ENV -->|"合同 #128"| X["3.2B 网络与 MCP #122"]
     R --> ONB["3.8 接入已有项目 #124"]
-    X --> BCU["3.2D 浏览器与 computer use #123"]
+    X --> BCU["3.2D 浏览器 #123"]
     ENV -->|"合同 #128"| BCU
     D24 --> BCU
     BCU --> EVL
@@ -60,10 +60,10 @@ flowchart LR
 7. **3.2C 执行环境服务**（[D29](requirements/remote-execution.md)、[ADR-0018](adr/0018-single-control-host-remote-execution.md)）：执行环境的合同经过 HTTP 加 JSON，提供远程执行代理这种新实现，代码在执行位置上直接运行（[ADR-0022](adr/0022-run-directly-without-containers.md)）；用户在系统中登记机器，在项目中授权使用。依赖 3.1 的动作核实与 #110。
 8. **3.4A 不同项目并行**：恢复验收通过后，不同项目、隔离目录中的事项并行执行，执行槽位控制并发数量。同一项目的事项按优先级排队，一次只进行一个。
 9. **3.2B 网络与 MCP**（[D36](requirements/network-and-mcp.md)、[设计说明](design/network-and-mcp.md)）：取回与登记的 MCP 服务器固定在控制主机上运行；依赖执行环境的合同（#128），每个新工具单独验收。
-10. **3.2D 浏览器与 computer use**（[D34](requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](design/browser-and-computer-use.md)，#123）：依赖 3.2B 的 MCP 接入与执行环境的合同（#128）。浏览器工具使用 Playwright MCP，每一步把页面的可访问性结构交给模型，模型能看图时附上截图；computer use 通过截图、点击与输入在控制主机的交互桌面上操作桌面程序（[ADR-0026](adr/0026-desktop-trials-on-control-host-desktop.md)）。质检两个工具都可以使用，工程可以使用浏览器做研发自测。质检部门的模型应当能看图：所选模型不支持图像时照常保存并提醒，这时不提供 computer use，浏览器只给可访问性结构。试用会话的浏览器使用与网络取回相同的拒绝规则，拒绝 Yudao 服务自己的地址，其余按普通浏览器 MCP 的默认做法。质检的逐条结论写明每条验收条件的检验方式，放行附检验覆盖比例与开环的条件（[验证的独立性设计说明](design/independent-verification.md)第 7 节）。评测场景 1 的 Yudao 一侧依赖本项。
+10. **3.2D 浏览器**（[D34](requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](design/browser-and-computer-use.md)，#123）：依赖 3.2B 的 MCP 接入与执行环境的合同（#128）。浏览器工具使用 Playwright MCP，每一步把页面的可访问性结构交给模型，模型能看图时附上截图。质检用浏览器操作交付的网页，工程可以使用浏览器做研发自测。质检部门的模型应当能看图：所选模型不支持图像时照常保存并提醒，这时浏览器只给可访问性结构。试用会话的浏览器使用与网络取回相同的拒绝规则，拒绝 Yudao 服务自己的地址，其余按普通浏览器 MCP 的默认做法。质检的逐条结论写明每条验收条件的检验方式，放行附检验覆盖比例与开环的条件（[验证的独立性设计说明](design/independent-verification.md)第 7 节）。评测场景 1 的 Yudao 一侧依赖本项。computer use 是以后阶段的专题（第 5 节）。
 11. **3.8 接入已有项目**（[D33](requirements/existing-project-onboarding.md)）：依赖 3.1。产品读取已有代码与文档，写出描述现有行为的初始 PRD；工程写出现有结构的说明；用户确认初始 PRD 以后，它成为当前有效的要求，之后的事项在它的基础上修改。B8 加入采纳写回：以写回时代码仓库 main 的当前提交为基线，把被采纳的成果生成分支与合并请求；建档材料分类，现有行为以 README、测试与验收基线为准，设计与需求文档作为要求材料。
 12. **D24 模型管理**（[#83](https://github.com/bender2333/yudao/issues/83)，[模型管理设计说明](design/model-management.md)）：依赖 #45 与应用层的目录命令（#77）。统一的模型目录与准入、模型能力表、推理档位、每个项目单独选择各部门的模型、部门的建议能力提醒；#96 用真实 Provider 验收三种协议。评测时给质检换用视觉模型、3.2D 的建议能力提醒都依赖本项。增加服务方案按预置表与自定义连接进行（[ADR-0003](adr/0003-versioned-preset-table-no-remote-refresh.md)），不另设工作包。
-13. **3.9 组合验收与对照实验**：在 3.8 接入的 openai-agents-python 上对 Stage 3 的各项能力逐项给出结论，浏览器与 computer use 的结论引用 3.2D 的真实验收；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）；增加共享上下文的一组（[验证的独立性设计说明](design/independent-verification.md)第 6 节）；自举第一层的配对验收并入本项（第 6.1 节）。所有工作包父工单关闭以后进行。
+13. **3.9 组合验收与对照实验**：在 3.8 接入的 openai-agents-python 上对 Stage 3 的各项能力逐项给出结论，浏览器的结论引用 3.2D 的真实验收；在 D32 的三个评测场景上重复与 OpenCode 的对照实验（[D32](requirements/comparison-experiment.md)）；增加共享上下文的一组（[验证的独立性设计说明](design/independent-verification.md)第 6 节）；自举第一层的配对验收并入本项（第 6.1 节）。所有工作包父工单关闭以后进行。
 14. **迭代底座**（[D38](requirements/system-intent.md)，父工单 #342）：五条判据中度量、可撤回的改动与锚点的基础，与其余工作包没有阻塞关系。
     - M2：B3 规则登记的四项记录与界限、参数事件与 `parameter.set`、检查时限与建档的单轮上限成为项目级参数（[规则登记与参数设计说明](design/rules-and-parameters.md)）；B6 omp 流程的基线数字（每个工单的审查轮数、合并以后归因到它的集成层失败、搁置的原因、耗时与用量）；B2 已用时间写入事件、边界的核对从流程编排中分出来，挂在 3.1 下（[循环与收敛设计说明](design/loops-and-convergence.md)）；B8 采纳写回与建档材料的分类，挂在 3.8 下。
     - M3：B1 内核清单、六条不变式测试、导入方向与行数的检查；B7 接口的访问令牌、由已安装的实例提供的发布检查（[可信内核设计说明](design/trusted-kernel.md)）。
@@ -104,6 +104,8 @@ Stage 3 的工单按四个试用里程碑推进，每个里程碑完成以后由
 ## 5. 后续阶段
 
 每个后续阶段在进入时细化工作包、设计与验收；本节规定产品结果、内容、边界与依赖。
+
+computer use（部门在控制主机的交互桌面上操作交付的桌面程序：屏幕工具、桌面会话的同意、独占与等待、提示框与停止、桌面种类的启动方式）是以后阶段的单独专题，放在哪个阶段在专题讨论时确定（[各阶段需求概览](requirements/stage-requirements-overview.md)第 6 节）；讨论的材料是[浏览器与 computer use 设计说明](design/browser-and-computer-use.md)第 5 节与 [ADR-0026](adr/0026-desktop-trials-on-control-host-desktop.md)，工单 #150、#246、#247。
 
 ~~~mermaid
 flowchart LR

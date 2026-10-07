@@ -1,5 +1,7 @@
 # 桌面程序在控制主机的交互桌面上用真实输入试用
 
+Status: 2026-10-07 用户决定 computer use 移出 Stage 3，作为以后阶段的单独专题讨论（[需求概览](../requirements/stage-requirements-overview.md)第 6 节「以后阶段的讨论」第 4 项）；本决定在专题讨论时重新审视。其中「提示框」与「托盘菜单可以停止」依赖的桌面客户端已由 [ADR-0032](0032-interface-served-as-web-pages.md) 删除。
+
 3.2D 的 computer use 让部门通过截图、点击与输入操作交付的桌面程序（[D34](../requirements/browser-and-computer-use.md)）。原设计在容器的虚拟屏幕中运行被测程序；2026-09-30 用户决定不使用容器与 WSL（[ADR-0022](0022-run-directly-without-containers.md)），屏幕从哪里来留给专题 2。控制主机是 Windows 11 家庭中文版，用户同时在使用它的桌面；家庭版不能安装 Hyper-V，没有 Windows 沙盒，也不能作为远程桌面的被连接端。2026-10-02 用户决定 computer use 现阶段只考虑 Windows，参照 Codex、OMP 等第三方 agent 的做法，并逐项采纳建议（[设计说明](../design/browser-and-computer-use.md)第 5 节、第 16 节第 7 至 12 项）。决定：
 
 - 桌面种类的试用会话只在控制主机上、在用户已经登录的交互桌面上进行。控制主机以外的执行位置不提供桌面种类。
