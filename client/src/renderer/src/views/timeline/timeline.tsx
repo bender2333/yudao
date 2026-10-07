@@ -34,6 +34,8 @@ export interface TimelineProps {
   fromAt: string;
   // 概览按项目筛选刻度；首页为 null
   project?: string | null;
+  // 当前的回放位置（外部状态）：刻度的选中跟着它；点击刻度与「回到现在」经 onPosition 交回外部
+  at: number | null;
   // 回放位置变化（null 表示回到现在）
   onPosition: (position: number | null) => void;
   // 点击刻度（与 onPosition 一起发出，供报告高亮）
@@ -53,18 +55,33 @@ export function Timeline(props: TimelineProps) {
   const [speed, setSpeed] = useState<Speed>(1);
   const timer = useRef<TimerHandle | null>(null);
 
-  // 位置一起发出：宿主按位置带 at 重新查询；null 表示回到现在
-  const move = (nextPosition: number | null) => {
-    setPosition(nextPosition);
-    props.onPosition(nextPosition);
-  };
+  // 路径里带 at 进来时（刷新、分享链接）回到同一刻度：只在 at 变化时同步，不干扰播放中的内部推进
+  useEffect(() => {
+    if (props.at === null) {
+      setIndex(-1);
+      setPosition(null);
+      return;
+    }
+    const found = ticks.findIndex((tick) => tick.position === props.at);
+    if (found >= 0) {
+      setIndex(found);
+      setPosition(props.at);
+    }
+  }, [props.at, ticks]);
 
+  // 播放由定时器推进：每一步走外部的回放位置（at 写进路径，刻度选中跟着它）
   const stopTimer = () => {
     if (timer.current !== null) {
       clearTimeout(timer.current);
       timer.current = null;
     }
     setPlaying(false);
+  };
+
+  // 位置一起发出：宿主按位置带 at 重新查询；null 表示回到现在
+  const move = (nextPosition: number | null) => {
+    setPosition(nextPosition);
+    props.onPosition(nextPosition);
   };
 
   const step = (): boolean => {

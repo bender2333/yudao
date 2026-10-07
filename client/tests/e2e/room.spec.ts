@@ -227,6 +227,54 @@ test("询问与回答：两端的小人各说一句", async () => {
   }
 });
 
+test("工具类与盖章类的说明：小人头顶说出目录里对应的那句话", async () => {
+  test.setTimeout(600_000);
+  // 工程房间里读文件、跑登记命令；质检房间里盖章。两处都从真实事件流里取事件，
+  // 房间的读取入口给出小人头顶当前的话，采样收集这一轮里出现过的每一句。
+  // 工单 #319 第 3 项：房间脚本里工程先调用一次 list_files，工具类说明因此有真实来源，
+  // 断言核对的是具体那句话（含工具名与文件名），不只核对开头两个字
+  const collected = async (department: string, pattern: RegExp, description: string): Promise<string[]> => {
+    backend = await startBackend({ room: true });
+    const client = await startClient(backend, { width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      const projectId = backend.roomProject;
+      expect(projectId).not.toBeNull();
+      await openRoom(page, projectId!, department);
+      const seen = new Set<string>();
+      await command("work_item.create", { project_id: projectId, text: "为待办清单增加截止日期" });
+      const deadline = Date.now() + 240_000;
+      while (Date.now() < deadline) {
+        for (const c of (await roomState(page))?.characters ?? []) {
+          if (c.say) seen.add(c.say);
+        }
+        if ([...seen].some((line) => pattern.test(line))) break;
+        await page.waitForTimeout(200);
+      }
+      expect(errors).toEqual([]);
+      const hits = [...seen].filter((line) => pattern.test(line));
+      if (hits.length === 0) {
+        throw new Error(`${description}：房间里出现过的说明是 ${[...seen].join(" / ") || "（一句也没有）"}`);
+      }
+      return hits;
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  };
+
+  // 工程房间：工具类的事件（列出文件、读文件、跑命令）说出工具名
+  for (const line of await collected("engineering", /^现在(看看有什么文件|执行|阅读|编辑|翻找|检查)/,
+                                     "工程房间的工具类说明")) {
+    expect(line).toMatch(/^现在(看看有什么文件|执行|阅读|编辑|翻找|检查)/);
+  }
+  // 质检房间：盖章类的事件说出盖的是哪一章
+  for (const line of await collected("quality", /^现在盖/, "质检房间的盖章类说明")) {
+    expect(line).toMatch(/^现在盖(上有效章|放行章|返工章)/);
+  }
+});
+
 test("部门页签之间直接切换：每个页签的房间画面属于该部门，页面不出现加载失败", async () => {
   test.setTimeout(600_000);
   backend = await startBackend({ room: true });
@@ -280,3 +328,4 @@ test("部门页签之间直接切换：每个页签的房间画面属于该部�
     await backend.stop();
   }
 });
+

@@ -1,4 +1,4 @@
-// 页面占位（工单 #79）：外壳建立以后，首页、项目页面与像素画面由各自的工单实现。
+// 页面占位：外壳与路由已建立，某个路径还没有对应的页面内容。
 // 这里显示当前路径与已读取的外壳数据，不假装已经实现页面内容。
 
 import type { SystemStatus } from "../api/generated/types.gen";
@@ -15,9 +15,7 @@ export function PlaceholderPage(props: PlaceholderPageProps) {
   return (
     <div className="card">
       <h1>{titleOf(route)}</h1>
-      <p className="note">
-        外壳已建立。这个页面的内容由所属工单实现：首页与决定卡片 #175、项目页面 #80、像素画面 #176 至 #180。
-      </p>
+      <p className="note">这个页面还没有内容。</p>
       <dl>
         <dt>路径</dt>
         <dd>{window.location.hash || "#/home"}</dd>

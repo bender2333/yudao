@@ -8,10 +8,15 @@ export type ConnectionSettings = {
   allowLan: boolean;
 };
 
-export type LocalServiceStart = {
-  started: boolean;
-  message: string;
-};
+// 本机服务的启动结果（设计说明第 4.3 节、工单 #296）：started 服务可用；no-command 没有找到
+// yudao 命令，reason 是安装命令；failed 命令找到了但服务没有起来，reason 是原因、logPath 是日志
+export type LocalServiceStart =
+  | { kind: "started" }
+  | { kind: "no-command"; reason: string; logPath: string }
+  | { kind: "failed"; reason: string; logPath: string };
+
+// 设置页显示的本机服务问题：只包含服务没有起来的两种情况
+export type LocalServiceIssue = { kind: "no-command" | "failed"; reason: string; logPath: string };
 
 export type LocalServiceStop = {
   stopped: boolean;
@@ -40,7 +45,7 @@ export type UpdateRun = {
 export type DesktopApi = {
   getSettings: () => Promise<ConnectionSettings>;
   saveSettings: (settings: ConnectionSettings) => Promise<boolean>;
-  notify: (title: string, body: string) => Promise<boolean>;
+  notify: (title: string, body: string, decisionId?: string | null) => Promise<boolean>;
   setTrayCount: (count: number) => Promise<boolean>;
   // 托盘「停止 Yudao」只在连接本机时出现：连接状态由渲染进程告知主进程
   setConnectedLocal: (local: boolean) => Promise<boolean>;
@@ -54,6 +59,8 @@ export type DesktopApi = {
   // 更新（设计说明第 5.2 节）：地址为更新页当前连接的地址，每一步经 onUpdateProgress 回调报告
   startUpdate: (address: string) => Promise<UpdateRun>;
   onUpdateProgress: (listener: (progress: UpdateProgress) => void) => () => void;
+  // 系统通知被点击：主进程恢复窗口后发出，决定标识不为空时界面定位到对应的决定卡片（工单 #296）
+  onNotifyClick: (listener: (decisionId: string | null) => void) => () => void;
 };
 
 import type { FloorTestHooks } from "./pixel/floor/view";

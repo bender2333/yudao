@@ -178,12 +178,15 @@ const SIDE_ONLY = new Set(["guidance_in", "semantic", "freeze"]);
 const OWN_SPEECH = new Set(["hand_back"]);
 /** 打字思考类动作：头顶已有思考气泡，不再重复说话（原型 THINK_ACTIONS）。 */
 const THINK_ACTIONS = new Set(["type_think", "stream_text"]);
+/** 盖章类事件：说出盖的是哪一个（plan/delivery/review 的接纳与提交），在排队前先说 */
+const STAMP_EVENT = new Set(["proposal_submitted", "spec_accepted", "plan_accepted", "delivery_accepted", "qa_submitted"]);
 /** 状态类动作立即执行（原型 IMMEDIATE）。 */
 const IMMEDIATE = new Set(["paused", "failed", "done", "cancelled", "puzzled", "hold_card", "resume"]);
 /** 事项进入停止态时保留的排队动作：传信与交接的说话与送信不因事项很快结束而丢失。
  *  真实系统的 FakeAdapter 让一个事项在 1 秒左右跑到 done，传信事件排队后不到 900 毫秒就被清除，
  *  两端因此从不说话；这些动作已经由事件排入，继续执行到结束。 */
 const KEEP_ON_STOP: Record<string, true> = { collaboration_requested: true, collaboration_responded: true, transition: true };
+ 
 
 /** 建立部门房间的驱动。 */
 export function createRoomDriver(opts: { department: string; sceneOptions: SceneOptions }): RoomDriver {
@@ -238,7 +241,15 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   function say(ev: PixelFloorEvent, a: RoomActor | null, side?: "to" | "from"): void {
     if (!a) return;
     const text = sayCatalog(ev, { dept, side, roleName: nameOfRole });
-    if (text) a.say = { text, until: scene.realT + sayMs(text) };
+    if (!text) return;
+    // 头顶的话还没显示完时新话排在后面：事项在 1 秒左右连续走完阶段，
+    // 立即覆盖会让前一句话只停留毫秒级，看不见。排后的回调到期后重新走同一套规则，多句话按到达顺序依次显示。
+    if (a.say && scene.realT < a.say.until) {
+      if (a.say.text === text) return;
+      scene.after(a.say.until - scene.realT, () => say(ev, a, side));
+      return;
+    }
+    a.say = { text, until: scene.realT + sayMs(text) };
   }
   function plan(a: RoomActor): PlanApi {
     return makePlan(scene, a, actorOf(a.id)!, blocks);
@@ -1347,13 +1358,14 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
 
   function commandDone(ev: PixelFloorEvent, a: RoomActor): void {
     const pl = (ev.payload ?? {}) as Record<string, unknown>;
-    const code = pl.exit_code as number;
+    // 真实事件的工具结果只有 ok 与 error，退出码在工件里事件上读不到（harness/app/payloads.py 的 ToolCallResult）；
+    // 原型事件带 exit_code 与 timed_out，按它们判定
     const timedOut = Boolean(pl.timed_out);
+    const ok = typeof pl.exit_code === "number" ? pl.exit_code === 0 && !timedOut : pl.ok !== false;
     state.termRun = false;
-    state.exit = timedOut ? "red" : code === 0 ? "green" : "red";
+    state.exit = ok ? "green" : "red";
     if (timedOut) state.smokeUntil = scene.realT + 4200;
     state.lever = 0;
-    const ok = state.exit === "green";
     const p = plan(a);
     p.spot("terminal");
     p.add(S.icon({ kind: timedOut ? "exclaim" : ok ? "check" : "cross" }), S.anim(ok ? "idle_happy" : "stand_sad", 1200, true), S.icon(null));
@@ -1410,6 +1422,8 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       if (ev.type === "tool_started") {
         setPersist(a, { anim: "type" });
         if (!scene.frozen) say(ev, a);
+      } else if (ev.type === "qa_started") {
+        say(ev, a);
       }
       return;
     }
@@ -1430,6 +1444,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       if (!OWN_SPEECH.has(action) && !THINK_ACTIONS.has(action)) say(ev, a);
       fn(ev, a);
     };
+    // 工具与盖章类事件的发生时刻就说话：排队只排走位动作，头顶的说明不跟着等（工单 #319 第 3 项）。
+    // 交接与传信仍按原来的节奏说话：它们的排队条目靠头顶的话判断是否可以执行，提前说了会卡住自己
+    if ((ev.type === "tool_started" || STAMP_EVENT.has(ev.type)) && !SIDE_ONLY.has(action)
+        && !OWN_SPEECH.has(action) && !THINK_ACTIONS.has(action)) say(ev, a);
     if (IMMEDIATE.has(action) || (actor && scene.inTail(actor))) {
       // 立即执行时清掉排队的普通动作；传信与交接的条目留下，它们继续执行到结束
       a.queue = a.queue.filter((entry) => KEEP_ON_STOP[entry.from]);

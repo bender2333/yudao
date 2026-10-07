@@ -125,7 +125,7 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
   const models = catalog.data?.models ?? [];
 
   return (
-    <Section title="部门设置" note="本项目各部门的项目部门设置：模型、推理档位与部门 Prompt（第 9.2 节）">
+    <Section title="部门设置" note="本项目各部门的项目部门设置：模型、推理档位与部门 Prompt">
       {entries.length === 0 ? <Empty text="没有登记部门设置" /> : null}
       {entries.map(([key, setting]) => {
         const effectiveId = mergedModelId(setting.model_id, key, bindings);

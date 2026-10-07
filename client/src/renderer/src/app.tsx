@@ -5,6 +5,7 @@
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, ProjectList, ProjectRow, SystemStatus } from "./api/generated/types.gen";
+import type { LocalServiceIssue } from "./desktop";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
 import type { ConnectionSettings } from "./contract/settings";
@@ -44,7 +45,11 @@ export function App() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [loginAtStartup, setLoginAtStartup] = useState(false);
-  const [localServiceMessage, setLocalServiceMessage] = useState<string | null>(null);
+  // 本机服务没有可用的两种情况（设计说明第 4.3 节、工单 #296）：没有找到 yudao 命令时设置页给
+  // 安装命令，命令找到了但服务没有起来时给原因与服务日志的位置
+  const [localIssue, setLocalIssue] = useState<LocalServiceIssue | null>(null);
+  // 系统通知被点击后要定位的决定标识：跳到首页再滚动高亮对应的卡片（设计说明第 5.7 节）
+  const [focusDecisionId, setFocusDecisionId] = useState<string | null>(null);
 
   // 客户端应用：查询经生成的调用发出，事件到达时更新状态与待决定数量
   const app = useMemo(() => {
@@ -54,10 +59,11 @@ export function App() {
         setPending(count);
         void window.yudao?.setTrayCount(count);
       },
-      // 出现新的决定请求时发出系统通知（设计说明第 5.7 节）；窗口关闭时事件流仍在，通知照常发出
+      // 出现新的决定请求时发出系统通知（设计说明第 5.7 节）；通知带决定标识，点击时定位到
+      // 首页的对应决定卡片（工单 #296）。窗口关闭时事件流仍在，通知照常发出
       onEvent: (event) => {
         if (event.type === "decision_requested") {
-          void window.yudao?.notify("Yudao：有新的决定请求", event.label);
+          void window.yudao?.notify("Yudao：有新的决定请求", event.label, event.event_id);
         }
       },
     });
@@ -83,22 +89,24 @@ export function App() {
       }
       setSettings(stored);
       if (stored.kind === "local") {
-        const started = await window.yudao?.startLocalService(stored.allowLan);
+        const start = await window.yudao?.startLocalService(stored.allowLan);
         if (cancelled) {
           return;
         }
-        if (started && !started.started) {
-          // 找不到 yudao 命令：显示安装命令与「重新检测」，不尝试连接（设计说明第 4.3 节第 3 步）。
-          // 只在还停在默认首页时切到设置页；用户或测试已经打开了别的页面（例如开发时的动作图鉴）
-          // 就不抢走他们的导航
-          setLocalServiceMessage(started.message);
-          setConnectError("本机没有运行 Yudao 服务，也没有找到 yudao 命令。");
+        if (start && start.kind !== "started") {
+          // 没有找到 yudao 命令，或者命令找到了但服务 30 秒内没有起来：不尝试连接，设置页
+          // 分别给安装命令或原因与服务日志的位置（设计说明第 4.3 节）。只在还停在默认首页时
+          // 切到设置页；用户或测试已经打开了别的页面就不抢走他们的导航
+          setLocalIssue(start);
+          setConnectError(start.kind === "no-command"
+            ? "本机没有运行 Yudao 服务，也没有找到 yudao 命令。"
+            : "本机没有运行 Yudao 服务。");
           if (parseRoute(window.location.hash).name === "home") {
             window.location.hash = paths.clientSettings();
           }
           return;
         }
-        setLocalServiceMessage(null);
+        setLocalIssue(null);
       }
       await app.open(stored);
     })();
@@ -132,6 +140,22 @@ export function App() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+
+  // 系统通知点击后定位到对应的决定卡片：滚动过去并加高亮标记，等待列表到达以后再试一次
+  useEffect(() => {
+    if (focusDecisionId === null) {
+      return;
+    }
+    const card = document.getElementById(`decision-${focusDecisionId}`);
+    if (card === null) {
+      return;
+    }
+    card.scrollIntoView({ block: "center" });
+    // 高亮由样式给出（.decision-card.is-targeted），事件到达重画以后卡片会换掉，标记随之消失
+    card.classList.add("is-targeted");
+    setFocusDecisionId(null);
+  }, [focusDecisionId, decisions]);
 
   // 已连接以后读取项目列表与系统状态；这些视图按事件种类重新查询
   const connected = state.kind === "connected" ? state : null;
@@ -187,6 +211,36 @@ export function App() {
     window.location.hash = hash;
   }, []);
 
+  // 进入模型管理（系统页）之前的路径：点「返回原界面」时回到进入前的页面（设计说明第 3.3 节
+  // 第 108 行、工单 #296）。只有从别的页面进入模型管理时才记录；直接输入地址进来没有记录，
+  // 回落首页
+  const beforeModelsRef = useRef<string | null>(null);
+  const prevRouteRef = useRef<string>(window.location.hash);
+  useEffect(() => {
+    if (route.name === "sys-models" && parseRoute(prevRouteRef.current).name !== "sys-models") {
+      beforeModelsRef.current = prevRouteRef.current;
+    }
+    prevRouteRef.current = window.location.hash;
+  }, [route]);
+
+  const backHash = useCallback(() => {
+    const back = beforeModelsRef.current;
+    return back === null || back === "" ? paths.home() : back;
+  }, []);
+
+  // 系统通知被点击：主进程恢复窗口后发出决定标识，跳到首页并定位到对应的决定卡片
+  // （设计说明第 5.7 节、工单 #296）
+  useEffect(() => {
+    const off = window.yudao?.onNotifyClick((decisionId) => {
+      if (decisionId === null) {
+        return;
+      }
+      setFocusDecisionId(decisionId);
+      navigate(paths.home());
+    });
+    return () => off?.();
+  }, [navigate]);
+
   const reconnect = useCallback(async () => {
     if (!settings) {
       return;
@@ -196,19 +250,21 @@ export function App() {
   }, [app, settings]);
 
   // 连接「本机」时（设计说明第 4.3 节）：先请求服务，没有运行就启动它，最多等待 30 秒。
-  // 找到不到 yudao 命令时把安装命令提示显示在设置页，用户可以「重新检测」
+  // 没有找到 yudao 命令时设置页给安装命令，命令找到了但服务没有起来时给原因与服务日志的位置
   const connectTo = useCallback(
     async (next: ConnectionSettings) => {
       if (next.kind === "local") {
-        const started = await window.yudao?.startLocalService(next.allowLan);
-        if (started && !started.started) {
-          setLocalServiceMessage(started.message);
+        const start = await window.yudao?.startLocalService(next.allowLan);
+        if (start && start.kind !== "started") {
+          setLocalIssue(start);
           setSettings(next);
           await window.yudao?.saveSettings(next);
-          setConnectError("本机没有安装 Yudao 服务，用设置页里的命令安装以后再连接。");
+          setConnectError(start.kind === "no-command"
+            ? "本机没有安装 Yudao 服务，用设置页里的命令安装以后再连接。"
+            : "本机没有运行 Yudao 服务，设置页里写明了原因与服务日志的位置。");
           return;
         }
-        setLocalServiceMessage(null);
+        setLocalIssue(null);
       }
       setSettings(next);
       await window.yudao?.saveSettings(next);
@@ -255,7 +311,7 @@ export function App() {
       return;
     }
     if (result.stopped) {
-      setLocalServiceMessage(result.message);
+      setLocalIssue(null);
       setConnectError("Yudao 服务已经停止。连接它时客户端会重新启动。");
     } else {
       setConnectError(result.message);
@@ -295,7 +351,7 @@ export function App() {
         settings={settings ?? defaultSettings()}
         loginAtStartup={loginAtStartup}
         localConnected={localConnected}
-        localMessage={localServiceMessage}
+        localIssue={localIssue}
         lanRestartNeeded={lanRestartNeeded}
         onChange={(next) => void onSaveSettings(next)}
         onConnect={(next) => void connectTo(next)}
@@ -343,8 +399,10 @@ export function App() {
   const capabilities = state.capabilities;
   const tabs = buildTabs(route, capabilities);
   const project = projects.find((item) => item.project_id === route.projectId) ?? null;
+  // 连接断开时窗口整体变灰（设计说明第 3.4 节）：根节点带 is-disconnected，数据保留最后一次的
+  const disconnected = state.streamConnected === false;
   return (
-    <div className={`app${drawerOpen ? " drawer-open" : ""}`}>
+    <div className={`app${drawerOpen ? " drawer-open" : ""}${disconnected ? " is-disconnected" : ""}`}>
       <Sidebar
         app={app}
         capabilities={capabilities}
@@ -368,6 +426,7 @@ export function App() {
           pending={pending}
           projectDecisions={projectDecisions}
           streamConnected={state.streamConnected}
+          disconnectedAt={state.disconnectedAt}
           onPendingClick={() => navigate(paths.home())}
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
           onNavigate={navigate}
@@ -375,13 +434,13 @@ export function App() {
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="content">
           {route.name === "home" ? (
-            <HomePage app={app} onNavigate={navigate} />
+            <HomePage app={app} onNavigate={navigate} at={route.at} />
           ) : route.name === "client-settings" ? (
             <ClientSettingsPage
               settings={settings ?? defaultSettings()}
               loginAtStartup={loginAtStartup}
               localConnected={localConnected}
-              localMessage={localServiceMessage}
+              localIssue={localIssue}
               lanRestartNeeded={lanRestartNeeded}
               onChange={(next) => void onSaveSettings(next)}
               onConnect={(next) => void connectTo(next)}
@@ -398,10 +457,12 @@ export function App() {
               query={(name, params) => app.queryOne(name, params)}
               command={(name, body) => app.command(name, body)}
               subscribeEvents={(listener) => app.subscribeEvents(listener)}
-              onBack={() => navigate(paths.home())}
+              // 从系统页返回时回到进入前的页面（设计说明第 3.3 节第 108 行）：进入模型管理前
+              // 的路径记在 ref 里，无记录（直接输入地址进来）才回落到首页
+              onBack={() => navigate(backHash())}
             />
           ) : (
-            <ProjectRouter app={app} route={route} systemStatus={systemStatus} />
+            <ProjectRouter app={app} route={route} systemStatus={systemStatus} onNavigate={navigate} />
           )}
         </main>
       </div>
@@ -412,14 +473,14 @@ export function App() {
 // 项目页面（原型 v8 设计说明第 3.3 节的路径，工单 #80）：按路径分派到具体页面。
 // 概览、部门工作间、资料、观测与设置由本工单实现；恢复页（3.1）与系统页由所属工单实现，
 // 未实现时显示占位，写明由哪个工单填入。
-function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null }) {
+function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null; onNavigate: (hash: string) => void }) {
   const { route } = props;
   if (route.projectId === null) {
     return <PlaceholderPage route={route} systemStatus={props.systemStatus} />;
   }
   switch (route.name) {
     case "overview":
-      return <OverviewPage app={props.app} route={route} />;
+      return <OverviewPage app={props.app} route={route} onNavigate={props.onNavigate} />;
     case "dept":
       return <DepartmentPage app={props.app} route={route} />;
     case "materials":
