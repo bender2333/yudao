@@ -92,6 +92,10 @@ function departmentStatus(data: DepartmentWorkspaceResult): string {
   if (data.run_id === null) {
     return "空闲（这个范围里没有运行）";
   }
+  // 用户停止的事项写「已停止」，与概览看板一致（工单 #319）
+  if (data.status === "stopped") {
+    return "已停止";
+  }
   if (data.active) {
     return `正在工作 · ${label(PHASE_LABELS, data.phase)}`;
   }

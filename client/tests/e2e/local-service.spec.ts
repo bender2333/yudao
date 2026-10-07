@@ -10,6 +10,7 @@
 import { expect, test } from "@playwright/test";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, type Socket } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -288,6 +289,50 @@ test("找不到 yudao 命令时显示安装命令与重新检测按钮", async (
   } finally {
     await client.close();
     await stopService();
+  }
+});
+
+// 命令找到了但服务起不来：端口被占时立刻说明原因与服务日志的位置，不显示安装命令
+// （设计说明第 4.3 节、工单 #296）
+test("端口被别的程序占用时给出原因与服务日志的位置，不显示安装命令", async () => {
+  const workspace = makeWorkspace();
+  workspaces.push(workspace);
+  writeYudaoCommand(workspace, repositoryPython());
+  // 占住本机服务端口：客户端探测到端口不可用就不必等 30 秒，直接说明原因
+  // （探测与存活性检查连过来的旧连接要记下：释放端口时先销毁它们，否则 close 等它们结束）
+  const blocker = createServer();
+  const held = new Set<Socket>();
+  blocker.on("connection", (socket) => {
+    held.add(socket);
+    socket.on("close", () => {
+      held.delete(socket);
+    });
+  });
+  const bound = Promise.withResolvers<void>();
+  blocker.listen(8765, "127.0.0.1", () => bound.resolve());
+  await bound.promise;
+  const client = await startLocalClient({ ...workspace, size: { width: 1440, height: 900 } });
+  try {
+    await expect(client.page.getByRole("button", { name: "重新检测" })).toBeVisible({ timeout: 60_000 });
+    await expect(client.page.getByText("端口 8765 已经被另一个程序占用，Yudao 服务起不来。")).toBeVisible();
+    await expect(client.page.locator("code.install")).toHaveText(`服务日志：${serviceLog(workspace.userData)}`);
+    expect(await serviceAnswers()).toBe(false);
+
+    // 释放端口以后点「重新检测」：客户端找到命令、启动服务并连接
+    // （探测与存活性检查在占用期间连过占位端口：先断开这些旧连接再关监听，否则 close 等它们结束）
+    for (const socket of held) {
+      socket.destroy();
+    }
+    held.clear();
+    const released = Promise.withResolvers<void>();
+    blocker.close(() => released.resolve());
+    await released.promise;
+    await client.page.getByRole("button", { name: "重新检测" }).click();
+    await expect(client.page.locator(".connection")).toHaveText("已连接", { timeout: SERVICE_WAIT_MS });
+  } finally {
+    await client.close();
+    await stopService();
+    blocker.close();
   }
 });
 

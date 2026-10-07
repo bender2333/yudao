@@ -1,6 +1,6 @@
 # D34 浏览器与 computer use
 
-确认时间：2026-09-28。状态：需求已确认，设计已确认，未实施；2026-09-30 按 [ADR-0022](../adr/0022-run-directly-without-containers.md) 修改：试用在 run 的执行位置上直接进行；2026-10-02 专题 2 决定 computer use 在控制主机的交互桌面上用真实输入进行（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)），启动命令按系统给出。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。工单：父工单 [#123](https://github.com/bender2333/yudao/issues/123)，子工单 #147 至 #155。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与执行环境的合同（#128），排在 3.9 之前。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)。
+确认时间：2026-09-28。状态：需求已确认，设计已确认，未实施；2026-09-30 按 [ADR-0022](../adr/0022-run-directly-without-containers.md) 修改：试用在 run 的执行位置上直接进行；2026-10-02 专题 2 决定 computer use 在控制主机的交互桌面上用真实输入进行（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)），启动命令按系统给出；2026-10-07 用户决定：Stage 3 实施浏览器的部分，computer use 的部分作为以后阶段的专题，放在哪个阶段在专题讨论时确定（[各阶段需求概览](stage-requirements-overview.md)第 6 节「以后阶段的讨论」）。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。工单：父工单 [#123](https://github.com/bender2333/yudao/issues/123)「[3.2D] 浏览器：质检操作交付的网页」，子工单 #147 至 #149、#151 至 #155；computer use 的工单 #150、#246、#247 属于以后阶段的专题。路线位置：浏览器的部分在[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与执行环境的合同（#128），排在 3.9 之前。调研：[浏览器与 computer use 调研](../research/browser-and-computer-use.md)。
 
 ## 用户原话
 
@@ -34,7 +34,7 @@
 - 质检两个工具都可以使用；工程可以使用浏览器做研发自测，模型能看图时也可以使用 computer use；运维是否使用在 Stage 4 设计运维部门时决定。
 - 质检部门的模型应当有视觉能力，设置时只提醒，不强制。部门定义写明建议能力，质检的建议能力是图像输入；保存项目部门设置或部门默认时，所选模型不支持图像，照常保存并提醒用户缺少的能力与影响；请求时按模型实际具备的能力提供工具，不支持图像时不提供 computer use，浏览器只给可访问性结构（[模型管理设计说明](../design/model-management.md)第 5.6 节）。质检没有核验的条目按已有规则如实报告，不能放行。
 - 评测使用的模型由用户单独提供，有视觉能力，Yudao 与 OpenCode 两边相同（[D32](comparison-experiment.md)）。
-- 3.2D 在 Stage 3 中，两个工具在这个工作包里一起验收；评测场景 1 的 Yudao 一侧依赖它。
+- 3.2D 在 Stage 3 中，浏览器在这个工作包里验收；computer use 是以后阶段的专题（2026-10-07）；评测场景 1 的 Yudao 一侧依赖 3.2D 的浏览器。
 
 ## 设计确定的内容
 
@@ -55,4 +55,4 @@
 
 ## 实现状态
 
-未实施。前置依赖：执行环境的合同（#128）、3.2B 的 MCP 接入（#69）、D24 的输入方式与建议能力（#146）。工单：#147 至 #155、#246、#247，挂在 #123 下。
+未实施。前置依赖：执行环境的合同（#128）、3.2B 的 MCP 接入（#69）、D24 的输入方式与建议能力（#146）。浏览器的工单：#147 至 #149、#151 至 #155，挂在 #123 下；computer use 的工单 #150、#246、#247 属于以后阶段的专题。

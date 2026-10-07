@@ -22,25 +22,26 @@ import { statusItems, type StatusItem } from "./status-items";
 import { BuildingSection } from "./building-section";
 import { Timeline } from "../timeline/timeline";
 import { ticksInRefs, ticksOf } from "../timeline/logic";
+import { paths } from "../../shell/routing";
 
 const RANGE_LABELS: Record<string, string> = { since_seen: "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天" };
 
 export type AwayRangeId = "since_seen" | "24h" | "7d";
 
-export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => void }) {
+export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => void; at: number | null }) {
   const [range, setRange] = useState<AwayRangeId>("since_seen");
   const [openItem, setOpenItem] = useState<string | null>(null);
-  // 回放位置（全局位置）：为 null 时是实时画面；不为 null 时楼与项目列表按位置带 at 读取
-  const [at, setAt] = useState<number | null>(null);
+  // 回放位置（全局位置）写在路径的 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
+  const at = props.at;
   // 时间轴上选中的刻度：报告项与刻度互相高亮（设计说明第 5.4 节）
   const [selected, setSelected] = useState<number | null>(null);
 
+  // 换范围以后回到现在：起点状态由新的范围给出，路径上的回放位置也跟着清掉
   const changeRange = (next: AwayRangeId) => {
     setRange(next);
     setOpenItem(null);
     setSelected(null);
-    // 换范围以后回到现在：起点状态由新的范围给出
-    setAt(null);
+    props.onNavigate(paths.home());
   };
 
   const decisions = useSnapshot<DecisionList>(
@@ -124,7 +125,7 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
         openItem={openItem}
         onToggleItem={(id) => setOpenItem(openItem === id ? null : id)}
         at={at}
-        onPosition={setAt}
+        onPosition={(next) => props.onNavigate(paths.homeAt(next))}
         selected={selected}
         onSelect={setSelected}
         highlights={highlights}
@@ -380,6 +381,7 @@ function AwayReportSection(props: {
           fromPosition={data.range.from_position}
           fromAt={data.range.from_at}
           project={null}
+          at={props.at}
           onPosition={props.onPosition}
           onSelect={props.onSelect}
           highlight={props.highlights}

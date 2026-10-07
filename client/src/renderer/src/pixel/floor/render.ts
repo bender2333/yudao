@@ -27,13 +27,13 @@ const TUBE_D = "#3f86b0";
 const STATUS_TEXT: Record<string, string> = {
   queued: "排队中", waiting_slot: "等待执行槽位", running: "运行中", asking: "询问中", waiting_provider: "等待模型服务", paused: "已暂停",
   failed: "失败", done: "已完成", cancelled: "已取消", interrupted: "中断", pending_verification: "待核实", waiting_resume: "待恢复",
-  stopped_for_upgrade: "因升级停止", adopted: "已采纳", waiting_decision: "等待你的决定", released_unsettled: "已放行",
+  stopped: "已停止", stopped_for_upgrade: "因升级停止", adopted: "已采纳", waiting_decision: "等待你的决定", released_unsettled: "已放行",
 };
 const STATUS_CHIP: Record<string, string> = {
   waiting_decision: PAL.yellow2,
   running: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, waiting_slot: PAL.grey2, waiting_provider: PAL.grey3, paused: PAL.blue1,
   failed: PAL.red2, done: PAL.green1, cancelled: PAL.grey2, interrupted: PAL.grey3, pending_verification: PAL.yellow2,
-  waiting_resume: PAL.yellow2, stopped_for_upgrade: PAL.orange2, adopted: PAL.green3, released_unsettled: PAL.green3,
+  stopped: PAL.grey3, waiting_resume: PAL.yellow2, stopped_for_upgrade: PAL.orange2, adopted: PAL.green3, released_unsettled: PAL.green3,
 };
 
 /** 房间外壳的画法配色（部门配色取 DEPTS 的子集）。 */

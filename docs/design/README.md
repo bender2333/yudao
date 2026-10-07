@@ -4,7 +4,7 @@
 
 - 总体架构设计（`architecture/`）
   - [总体架构：职责分层](architecture/overall-architecture.md)
-    - 内容：分层图（客户端、接口层、应用层、控制核心、定义、知识层、观察层、观察者、执行层）、固定的结构与内核的位置、判定点的校准与记录、事实的来源、各层职责与边界、十项长期决定、语义系统在各层中的位置、依赖方向、控制核心内部的模块与一步的顺序、两类工具、合同（身份、五种合同、动作契约、用户决定）、路线图对照、使用的技术、近期实施顺序、待讨论的事项。
+    - 内容：分层图（界面与命令行、接口层、应用层、控制核心、定义、知识层、观察层、观察者、执行层）、固定的结构与内核的位置、判定点的校准与记录、事实的来源、各层职责与边界、十项长期决定、语义系统在各层中的位置、依赖方向、控制核心内部的模块与一步的顺序、两类工具、合同（身份、五种合同、动作契约、用户决定）、路线图对照、使用的技术、近期实施顺序、待讨论的事项。
     - 状态：2026-09-26 设计，用户已确认（ADR-0010 至 ADR-0015 与十项长期决定）；2026-09-28 按 ADR-0018 修改部署形态与执行环境服务；2026-09-30 按 ADR-0022 修改执行环境的实现；2026-10-07 按 ADR-0027 至 ADR-0031 新增第 1.1、1.2 节与第 7.5 至 7.7 节，修改第 2、3、5、6.1、7.2、7.4、8、10、11 节；第 11 节的事项继续讨论。
   - [系统架构原理：控制核心与可替换的材料](architecture/core-and-materials.md)
     - 内容：出发点、核心公式与部门的身份、三个控制层次、确定性流程能消除什么、循环系统（Ralph 与 GPT-6 Astra）与控制的位置、与 2026 年 loop 工程、graph 工程、AI-native SDLC 的对照、原生核心与材料、分布式部署（一台控制主机，执行环境分布到多台机器）、外包角色、界面与后端的技术方向、项目的意义，含两张架构图。
@@ -28,8 +28,8 @@
   - 需求：[D38](../requirements/system-intent.md)、[D32](../requirements/comparison-experiment.md)。ADR：[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0028](../adr/0028-three-means-of-adjudication.md)。
 - [模型管理](model-management.md)
   - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。
-  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前，已完成），Stage 3 的工作包父工单 #83（子工单 #84 至 #96、#146），属于里程碑 M1。实施中：#84、#85 已完成。2026-10-07 按意图校准整理，修改内容见该文件更新行。
-  - 需求：[D24](../requirements/model-management.md)。ADR：0002 至 0006、[0017](../adr/0017-role-settings-override-department.md)、[0028](../adr/0028-three-means-of-adjudication.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
+  - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前，已完成），Stage 3 的工作包父工单 #83（子工单 #84 至 #96、#146），属于里程碑 M1。实施中：#84、#85 已完成。2026-10-07 按意图校准整理；同日 M1 试用以后，调用协议移到模型访问定义上（ADR-0033），自定义服务的模型列表地址默认取「地址/models」，加入模型时直接采用预填的容量并自动进行模型测试，修改内容见该文件更新行，工单经 `/to-tickets` 建立。
+  - 需求：[D24](../requirements/model-management.md)。ADR：0002、0003、0005、0006、[0033](../adr/0033-protocol-belongs-to-model-access.md)、[0017](../adr/0017-role-settings-override-department.md)、[0028](../adr/0028-three-means-of-adjudication.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [本地通用工具](local-tools.md)
   - 内容：代码快照接入的使用过程；公开树、搜索、区间阅读与编辑、本地命令、动作回执、独立质检的边界与验收反例；使用的依赖与成熟实现，含模块交互图。
   - 状态：2026-09-26 随 3.2A 验收（#12 至 #15）；2026-09-29 由 Stage 3 计划第 4 节移出成为设计说明，3.2B、3.2C、3.2D 新增的工具同样遵守。
@@ -41,7 +41,7 @@
   - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)、[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。调研：[执行环境服务调研](../research/execution-environment.md)。
 - [浏览器与 computer use](browser-and-computer-use.md)
   - 内容：试用会话与执行位置上的程序；交付说明中的启动方式；Playwright MCP 浏览器工具；computer use（控制主机的交互桌面、真实输入、用户同意与独占，ADR-0026）；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
-  - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。工单：父工单 #123（#147 至 #155），属于里程碑 M4。2026-10-07 按意图校准整理，修改内容见该文件更新行。
+  - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。Stage 3 实施浏览器的部分：父工单 #123（#147 至 #149、#151 至 #155），属于里程碑 M4；computer use 的部分（第 5 节等，见该文件更新行）是以后阶段的专题（[各阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节），工单 #150、#246、#247 不属于 M4。2026-10-07 按意图校准整理，修改内容见该文件更新行。
   - 需求：[D34](../requirements/browser-and-computer-use.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0026](../adr/0026-desktop-trials-on-control-host-desktop.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
 - [网络取回与 MCP 工具](network-and-mcp.md)
   - 内容：取回与登记的 MCP 服务器的放置（固定在控制主机）；项目的登记（取回的来源、MCP 服务器、工具清单快照与处理方式、版本与固定、凭据）；授权与一次性批准；网络取回（地址规则、重定向、内容与保存）；MCP 服务器（官方 SDK、运行规则、结果）；恢复契约；外部来源工件与证据；应用层接口；界面；含模块图与时序图。
@@ -57,16 +57,16 @@
   - 需求：[D37](../requirements/project-initial-files.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)。
 - [Provider 层](provider-layer.md)
   - 内容：独立 Provider 模块的统一调用、服务方案、候选与准入、配置生效，含模块关系图。
-  - 状态：Stage 2.7 已实现。「冻结目标」「协议归于模型访问定义」等部分由模型管理设计取代，模块边界、统一调用、取消与观测部分继续有效。
-  - 需求：[D22](../requirements/startup-provider-reload.md)、[D23](../requirements/provider-layer.md)。ADR：0001 至 0004。
+  - 状态：Stage 2.7 已实现。「冻结目标」等部分由模型管理设计取代，模块边界、统一调用、取消与观测部分继续有效；调用协议属于模型访问定义（ADR-0033）。
+  - 需求：[D22](../requirements/startup-provider-reload.md)、[D23](../requirements/provider-layer.md)。ADR：0001 至 0003、[0033](../adr/0033-protocol-belongs-to-model-access.md)。
 - [应用层与接口层](app-and-interface.md)
   - 内容：应用层（合同、注册表、命令处理、查询处理、读取模型、事件流订阅、输出片段转发）与接口层（FastAPI 路由、OpenAPI、认证）；命令合同（身份、基准版本、结果）与命令清单；查询与读取模型；事件流（范围筛选、按位置补齐、缺口检测与重新同步、模型输出片段）；能力清单与接口版本核对；本机与局域网两种访问方式（局域网访问方式的令牌随自举加入，TLS 在离开局域网之前加入）；系统首页（待你决定、离开期间的报告）、机器查询与托盘提醒；规则、参数与对照命令、循环实例与收敛状态等读取模型、画面诚实性的不变式；与现有 Web 的对照与迁移。
-  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；2026-09-28 界面工作线提前到 Stage 3，与 #49、#45、3.1 同时进行，每个工作包连同界面一起验收，界面工单挂在所属工作包的父工单下。应用层、接口层与桌面客户端随里程碑 M1 交付，0.1.1 在用户试用中（#183）。工单：父工单 #70（子工单 #73 至 #78、#127），桌面客户端 #71（#79、#80、#175 与像素画面 #176、#82、#177 至 #180，依据原型 v9 与 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)），属于里程碑 M1；各工作包的界面工单挂在所属父工单下：模型管理页 #93 至 #95（#83）、3.1 #181（#119）、3.4A #182（#121）、机器页面 #117（#120）、3.8 #137、#138（#124）、3.2D #153、#154（#123）。2026-10-07 新增规则、参数与对照命令、六个读取模型、画面诚实性的七条不变式，命令共 48 个、查询共 41 个。
-  - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0015](../adr/0015-desktop-client-and-http-contracts.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0021](../adr/0021-client-pixel-view-follows-v9-structure.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
-- [桌面客户端的安装、更新与发布](client-packaging-and-release.md)
-  - 内容：控制主机上 Yudao 服务的安装、命令行入口与数据目录；桌面客户端的安装包、本机服务的启动与停止、托盘菜单、更新页与更新源；一次发布的构成、版本号、发布脚本、架构师的走查；签名（TODO）；含模块图、验收、遗留事项与工单拆分。
-  - 状态：2026-10-01 设计，用户逐轮采纳推荐，未实施。工单：#206（Yudao 服务的命令行入口与更新源，#70 下）、#207（本机服务管理与托盘）、#208（安装包与更新页）、#209（发布脚本），后三张在 #71 下，都属于里程碑 M1；#144 的执行代理安装包加入发布脚本。遗留：局域网访问方式怎样启用，M3 试用之前确定。2026-10-07 按意图校准整理，修改内容见该文件更新行。
-  - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0023](../adr/0023-client-installed-apart-release-is-one-wheel.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)。调研：[客户端打包与更新](../research/client-packaging-and-update.md)。
+  - 状态：2026-09-26 设计说明，依据 ADR-0015 与总体架构编写，第 10 节由架构师决定；2026-09-28 界面工作线提前到 Stage 3，与 #49、#45、3.1 同时进行，每个工作包连同界面一起验收，界面工单挂在所属工作包的父工单下。应用层、接口层与界面随里程碑 M1 交付；2026-10-07 界面改为 Yudao 服务提供的网页（ADR-0032），修改内容见该文件更新行。工单：父工单 #70（子工单 #73 至 #78、#127），界面 #71（#79、#80、#175 与像素画面 #176、#82、#177 至 #180，依据原型 v9 与 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)），属于里程碑 M1；各工作包的界面工单挂在所属父工单下：模型管理页 #93 至 #95（#83）、3.1 #181（#119）、3.4A #182（#121）、机器页面 #117（#120）、3.8 #137、#138（#124）、3.2D #153、#154（#123）。2026-10-07 新增规则、参数与对照命令、六个读取模型、画面诚实性的七条不变式，命令共 48 个、查询共 41 个。
+  - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0015](../adr/0015-desktop-client-and-http-contracts.md)、[0032](../adr/0032-interface-served-as-web-pages.md)、[0013](../adr/0013-event-log-and-single-write-path.md)、[0021](../adr/0021-client-pixel-view-follows-v9-structure.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
+- [网页界面的提供与发布](web-interface-and-release.md)
+  - 内容：控制主机上 Yudao 服务的安装、命令行入口、数据目录与手动启动；接口层提供界面的页面文件，启动以后打开默认浏览器，局域网访问方式；浏览器的系统通知与「安装此站点为应用」的条件；一次发布的构成、版本号、发布脚本、架构师的走查；含模块图、验收与遗留事项。
+  - 状态：2026-10-01 设计（当时为桌面客户端的安装、更新与发布），2026-10-07 按 ADR-0032 改写为网页界面，未实施。已完成的工单：#206（Yudao 服务的命令行入口）、#209（发布脚本），#144 的执行代理安装包加入发布脚本；改为网页的工单经 `/to-tickets` 建立，属于里程碑 M1。
+  - 需求：[D30](../requirements/web-game-frontend.md)。ADR：[0032](../adr/0032-interface-served-as-web-pages.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)。
 - [部门定向指导](department-guidance.md)
   - 内容：部门指导的处理时机、原文范围与放行关系。
   - 状态：2026-09-06 设计；指导经 `guidance.send` 命令接收，`department.workspace` 查询读取。
@@ -81,7 +81,7 @@
   - 需求：[D26](../requirements/department-roles.md)。前置设计：总体架构、语义系统、模型管理。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。
 - [评测场景：版本回归与 OpenCode 对照](evaluation-scenarios.md)
   - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），回归场景与留出场景、噪声范围与三种结论，含模块交互图。
-  - 状态：2026-09-28 设计，场景与评分方法经用户确认；2026-09-30 用户逐项审阅完毕（各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分），未实施，工单为 #118 的子工单 #188 至 #198（评测工具、OpenCode 基础分与场景 2、3 的 Yudao 一侧属于里程碑 M2，场景 1 的 Yudao 一侧属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器与 computer use 由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。2026-10-07 版本比较增加噪声范围与三种结论，报告增加费用与检验覆盖比例，三个场景作为回归场景、另设留出场景。
+  - 状态：2026-09-28 设计，场景与评分方法经用户确认；2026-09-30 用户逐项审阅完毕（各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分），未实施，工单为 #118 的子工单 #188 至 #198（评测工具、OpenCode 基础分与场景 2、3 的 Yudao 一侧属于里程碑 M2，场景 1 的 Yudao 一侧属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。2026-10-07 版本比较增加噪声范围与三种结论，报告增加费用与检验覆盖比例，三个场景作为回归场景、另设留出场景。
   - 需求：[D32](../requirements/comparison-experiment.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。
 - [测试分层](test-pyramid.md)
   - 内容：单元、功能与模块、集成三层的定义与登记表 `layers.toml`（测试文件原地不动），审计钩子检查边界、单项时间上限、多进程只用于集成层；共用的辅助函数放在已有的辅助文件中，测试文件之间不互相导入；执行者、审查者与架构师各自运行的层；集成层每 5 个 PR 批量运行、失败时暂停合并并用 `git bisect` 找出问题 PR；测试往下层移的规则；输出每项失败一行；含流程图与模块交互图。

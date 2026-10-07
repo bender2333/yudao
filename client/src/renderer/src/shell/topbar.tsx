@@ -7,7 +7,7 @@ import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
 import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
 import { useCommand, useSnapshot } from "../views/project/use-snapshot";
-import { WORK_ITEM_STATUS, label } from "../views/project/labels";
+import { WORK_ITEM_STATUS, formatTime, label } from "../views/project/labels";
 import { list, text } from "../views/project/common";
 import { DecisionCardList } from "../views/decisions/card";
 import { sortByRequested } from "../views/decisions/card-logic";
@@ -22,6 +22,8 @@ export type TopbarProps = {
   // 本项目的等待回答的决定请求（标签栏右侧的「待你决定」，v8 第 3.2 节）
   projectDecisions: DecisionView[];
   streamConnected: boolean;
+  // 事件流断开的时间（ISO）：断开时顶栏写明断开的时间与正在重新连接（设计说明第 3.4 节、工单 #296）
+  disconnectedAt: string | null;
   onPendingClick: () => void;
   onToggleDrawer: () => void;
   onNavigate: (hash: string) => void;
@@ -63,7 +65,7 @@ export function Topbar(props: TopbarProps) {
         待你决定：{props.pending > 0 ? props.pending : "无"}
       </button>
       <span className={`connection${props.streamConnected ? "" : " interrupted"}`} role="status">
-        {props.streamConnected ? "已连接" : "连接中断，数据可能过时"}
+        {props.streamConnected ? "已连接" : `连接中断 · ${props.disconnectedAt === null ? "刚刚" : formatTime(props.disconnectedAt)}断开，正在重新连接`}
       </span>
       {decisionsOpen ? (
         <div className="dropdown decisions-dropdown">

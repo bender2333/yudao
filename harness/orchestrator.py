@@ -23,6 +23,7 @@ from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
 from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
+from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
@@ -543,7 +544,8 @@ class Orchestrator:
         # 安全节点：激活没有中止、运行时间没有用完时先分派新输入，再作停止判断；回答是否继续与判断时的流版本
         def judge(transaction: Transaction) -> Judgment:
             projection = transaction.projection
-            if not (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)):
+            if not (activation.abort_flag.is_set()
+                    or time_used_up(projection, self._elapsed_sec(activation.run_id))):
                 projection = self._assign_new_inputs(transaction)
             stop = self._stop_requested(activation, projection, transaction.decisions.values())
             return Judgment(not stop, projection.stream_version)
@@ -555,17 +557,18 @@ class Orchestrator:
         # 停止判断：中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求、输入版本改变或有新的指导；
         # 只读取，不写入
         basis = activation.scope.basis
-        return (activation.abort_flag.is_set() or self._time_used_up(activation.run_id, projection)
+        return (activation.abort_flag.is_set()
+                or time_used_up(projection, self._elapsed_sec(activation.run_id))
                 or projection.phase in TERMINAL_PHASES or blocks_run(decisions)
                 or projection.input_version != basis.input_version
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
-    def _time_used_up(self, run_id: str, projection: RunProjection) -> bool:
-        return self._time_left(run_id, projection) <= 0
+    def _elapsed_sec(self, run_id: str) -> float:
+        # 这个 run 已经用的运行时间（秒）：起点在进程内存里，#350 改为从事件恢复
+        return time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
 
     def _time_left(self, run_id: str, projection: RunProjection) -> float:
-        return projection.run_time_limit_sec - (time.monotonic() - self._run_start_times.get(run_id, time.monotonic()))
-
+        return time_left_sec(projection, self._elapsed_sec(run_id))
     async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> Judgment:
         # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
         # 醒来以后回到安全节点判断。唤醒在判断之前登记：判断之后才提交的改变，提交方调用 _wake 时一定看到这次登记
@@ -986,13 +989,12 @@ class Orchestrator:
         projection = self._close_obsolete_request(transaction)
         if projection.phase in TERMINAL_PHASES:
             return None
-        if projection.cycle_count >= projection.max_cycles:
-            self._pause(transaction, "max_cycles")
-            return None
-        elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
-        if elapsed >= projection.run_time_limit_sec:
-            self._fail(transaction, "time_limit",
-                       f"run wall-clock time {int(elapsed)}s exceeded limit of {projection.run_time_limit_sec}s")
+        bound = activation_bound(projection, self._elapsed_sec(run_id))
+        if bound is not None:
+            if bound == TIME_BOUND:
+                self._fail(transaction, bound, time_limit_message(projection, self._elapsed_sec(run_id)))
+            else:
+                self._pause(transaction, bound)
             return None
         normal_department = projection.pending_request.recipient if projection.pending_request else department_for_phase(projection.phase)
         waiting_guidance = [item for item in projection.department_guidance if item.status in PENDING_GUIDANCE]
@@ -1186,11 +1188,9 @@ class Orchestrator:
         if current.phase in TERMINAL_PHASES:
             return
         if isinstance(result, Stopped):
-            elapsed = time.monotonic() - self._run_start_times.get(run_id, time.monotonic())
-            if elapsed >= current.run_time_limit_sec:
-                self._end_run(activation, "time_limit",
-                              f"run wall-clock time {int(elapsed)}s exceeded limit of {current.run_time_limit_sec}s",
-                              result.version)
+            elapsed = self._elapsed_sec(run_id)
+            if time_used_up(current, elapsed):
+                self._end_run(activation, TIME_BOUND, time_limit_message(current, elapsed), result.version)
             return
         submission = result
 
@@ -1453,7 +1453,7 @@ class Orchestrator:
         # 新的输入或指导。运行时间用完不因此改变；已经结束（例如已经取消）的运行不再写入。
         # target 是这次失败对应的调用目标公开部分，写进待恢复的请求
         def end(transaction: Transaction) -> None:
-            if version is not None and reason != "time_limit" and self._superseded(transaction, activation, version):
+            if version is not None and reason != TIME_BOUND and self._superseded(transaction, activation, version):
                 return
             if reason == "provider_unavailable":
                 scope = activation.scope

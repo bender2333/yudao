@@ -1,6 +1,6 @@
 # 系统架构原理：控制核心与可替换的材料
 
-更新：2026-10-07 按 [ADR-0027](../../adr/0027-trusted-kernel-outside-self-modification.md) 至 [ADR-0031](../../adr/0031-declared-loop-layers-and-sub-loops.md) 修改第 2、3、4.1、4.3、5、6、7.2 节；2026-09-30，第 2、3 节按 [ADR-0020](../../adr/0020-block-only-when-no-downstream-check.md)（权威拓扑与目标层的治理形状、阻塞与否的判据）修改；第 7 节按 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）与 [ADR-0022](../../adr/0022-run-directly-without-containers.md)（代码在执行位置上直接运行）修改。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节；同日确认的 [ADR-0011](../../adr/0011-async-control-core.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 写入第 7、9、11 节。
+更新：2026-10-07 按 [ADR-0027](../../adr/0027-trusted-kernel-outside-self-modification.md) 至 [ADR-0031](../../adr/0031-declared-loop-layers-and-sub-loops.md) 修改第 2、3、4.1、4.3、5、6、7.2 节；2026-09-30，第 2、3 节按 [ADR-0020](../../adr/0020-block-only-when-no-downstream-check.md)（权威拓扑与目标层的治理形状、阻塞与否的判据）修改；第 7 节按 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）与 [ADR-0022](../../adr/0022-run-directly-without-containers.md)（代码在执行位置上直接运行）修改。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节；同日确认的 [ADR-0011](../../adr/0011-async-control-core.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 写入第 7、9、11 节；2026-10-07 按 [ADR-0032](../../adr/0032-interface-served-as-web-pages.md) 与 [ADR-0021](../../adr/0021-client-pixel-view-follows-v9-structure.md) 修改第 7.3、7.4、9 节的界面形式与画面文字。
 
 依据：[Loop System 原理](../../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md)、[D29 远程执行环境](../../requirements/remote-execution.md)、[D31 部门内的外包角色](../../requirements/outsourced-agent-roles.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../../research/loop-engineering-2026.md)、[Graph engineering](../../research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../../research/anthropic-ai-native-sdlc-sources.md)。分层与模块见 [总体架构：职责分层](overall-architecture.md)。
 
@@ -205,7 +205,7 @@ Yudao 与三条动向的区别在关口。业界把关口交给人，或交给�
 
 ```mermaid
 flowchart LR
-  Desktop["桌面客户端"] -->|"HTTP、OpenAPI、SSE"| Gateway["接口服务"]
+  Desktop["界面：浏览器中的网页"] -->|"HTTP、OpenAPI、SSE"| Gateway["接口服务"]
   Gateway --> Core["控制核心：编排器、步骤驱动、上下文装配器、裁决规则"]
   Core --> Events[("事件库：事实、派发记录、执行权编号")]
   Core -->|"模型调用"| Provider["Provider 模块"]
@@ -217,11 +217,11 @@ flowchart LR
 
 ### 7.4 协议
 
-2026-09-26 用户确认（[ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md)）：
+2026-09-26 用户确认（[ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md)），界面的形式 2026-10-07 由 [ADR-0032](../../adr/0032-interface-served-as-web-pages.md) 确定：
 
-- 桌面客户端与接口服务之间：HTTP、由 pydantic 类型经 FastAPI 生成的 OpenAPI、按全局位置推送的 SSE 事件流，断线按位置补齐。
+- 界面与接口服务之间：HTTP、由 pydantic 类型经 FastAPI 生成的 OpenAPI、按全局位置推送的 SSE 事件流，断线按位置补齐。
 - 服务之间的请求与应答（控制核心调用 Provider 与执行环境，外包 agent 的适配程序与控制核心往来，观察者订阅与提案）：HTTP 加 JSON，流式结果使用 SSE 或分块传输；合同只有 pydantic 一种来源。
-- 单机部署运行同一套服务，桌面客户端按地址连接本机或局域网内的部署；只在局域网内使用期间认证保留位置并标为 TODO。
+- 单机部署运行同一套服务，接口服务同时提供界面的页面文件，在浏览器中打开本机或局域网内部署的地址就是界面；只在局域网内使用期间认证保留位置并标为 TODO。
 
 ## 8. 外包角色
 
@@ -243,13 +243,13 @@ flowchart LR
 
 用户的陈述（2026-09-25）：前端与 UI 解耦，前端技术可以单独选型；项目一直处于演示与探索阶段，所以使用 Web 加 Python；Web 不方便，桌面程序能更好地保持画面与展示信息；后端希望更加分层，考虑未来的分布式部署与微服务化，这样对测试、单元测试与功能实现都更好。
 
-已确认的界面技术（2026-09-25）：React 19、TypeScript、Vite；画面渲染 PixiJS v8，画面对象命令式编写，React 只负责挂载与传入模型；角色行为 XState v5；补间动画 GSAP；中文像素字体 Fusion Pixel Font；网格寻路自己实现广度优先搜索。
+已确认的界面技术（2026-09-25）：React 19、TypeScript、Vite；画面渲染 PixiJS v8，画面对象命令式编写，React 只负责挂载与传入模型；角色行为 XState v5；补间动画 GSAP；画面中的文字使用微软雅黑，按屏幕的实际分辨率绘制（2026-10-07，[ADR-0021](../../adr/0021-client-pixel-view-follows-v9-structure.md)）；网格寻路自己实现广度优先搜索。
 
-2026-09-26 用户确认（[ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md)、[ADR-0011](../../adr/0011-async-control-core.md)）：
+2026-09-26 用户确认（[ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md)、[ADR-0011](../../adr/0011-async-control-core.md)），界面的形式 2026-10-07 由 [ADR-0032](../../adr/0032-interface-served-as-web-pages.md) 确定：
 
-- 桌面外壳使用 Electron：各平台同一个 Chromium 内核，PixiJS 的 WebGL 与 WebGPU 表现一致；外壳进程同样使用 TypeScript。桌面程序提供独立窗口（循环画面可以放在第二块屏幕）、托盘、窗口被遮挡时照常刷新、系统通知定位、窗口布局记忆，并能连接本机或远端的部署。
-- 后端不再提供界面文件。界面代码只通过一层很薄的外壳接口使用桌面功能，其余部分可以在普通测试环境中运行；端到端测试用 Playwright 启动 Electron 应用。
-- 后端继续使用 Python 与 asyncio，按职责分层：接口层（FastAPI，路由、合同、事件流）、应用层（命令处理与查询处理，所有客户端唯一的入口）、控制核心（编排器、步骤驱动、上下文装配器、裁决规则、写入口、事件日志）、知识层（语义系统的投影与查询）、执行层（Provider、执行环境、外包 agent 的运行进程）与工件存储。分层与合同见[总体架构](overall-architecture.md)。控制核心不直接读写文件与网络，给定事件序列即可验证状态与决定，是单元测试的主要对象；基础设施通过接口隔开，测试使用真实实现（例如临时目录中的 SQLite），不使用 mock。
+- 界面是 Yudao 服务提供的网页（ADR-0032）：构建好的页面文件随 wheel 发布，接口层在提供接口的同时提供这些文件；在浏览器里打开服务的地址就是界面，局域网中的其他电脑打开同一个地址；需要单独的窗口时用 Edge 或 Chrome 的「安装此站点为应用」。以 Windows 上的 Edge 与 Chrome 为准。
+- 界面代码只通过 HTTP 接口工作，可以在普通测试环境中运行；端到端测试用 Playwright 驱动浏览器（ADR-0032）。
+- 后端继续使用 Python 与 asyncio，按职责分层：接口层（FastAPI，路由、合同、事件流、界面的页面文件）、应用层（命令处理与查询处理，界面、命令行与其他调用方唯一的入口）、控制核心（编排器、步骤驱动、上下文装配器、裁决规则、写入口、事件日志）、知识层（语义系统的投影与查询）、执行层（Provider、执行环境、外包 agent 的运行进程）与工件存储。分层与合同见[总体架构](overall-architecture.md)。控制核心不直接读写文件与网络，给定事件序列即可验证状态与决定，是单元测试的主要对象；基础设施通过接口隔开，测试使用真实实现（例如临时目录中的 SQLite），不使用 mock。
 
 ## 10. 项目的意义
 
