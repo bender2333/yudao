@@ -51,7 +51,7 @@ test.afterAll(async () => {
 // 决定解答与实时事项这两类改变服务端状态的用例只在 1440 尺寸里跑一遍，1920 尺寸只看渲染。
 async function openProjectClient(size: { width: number; height: number }): Promise<ClientApp> {
   const client = await startClient(backend, size);
-  await expect(client.page.locator(".brand")).toHaveText("Yudao");
+  await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
   await waitUntil(
     async () => (await client.page.locator(".project-entry").count()) >= 3,
     client.page,
@@ -727,12 +727,12 @@ test.describe("项目页面（1440×900）", () => {
       const id = await projectId(page, SAMPLE);
       await gotoView(page, id, "settings");
       await page.emulateMedia({ colorScheme: "light" });
-      expect(await themeBackground(page)).toBe("rgb(245, 246, 248)");
+      expect(await themeBackground(page)).toBe("rgb(247, 248, 247)");
       await page.emulateMedia({ colorScheme: "dark" });
-      await expect.poll(async () => themeBackground(page)).toBe("rgb(22, 24, 29)");
+      await expect.poll(async () => themeBackground(page)).toBe("rgb(23, 25, 24)");
       await expect(await section(page, "基本信息")).toContainText(SAMPLE);
       await page.emulateMedia({ colorScheme: "light" });
-      await expect.poll(async () => themeBackground(page)).toBe("rgb(245, 246, 248)");
+      await expect.poll(async () => themeBackground(page)).toBe("rgb(247, 248, 247)");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -853,7 +853,7 @@ test.describe("项目页面（1920×1080）", () => {
       await expectNoOverflow(page, "请求详情页面");
       // 深色配色下再查一遍
       await page.emulateMedia({ colorScheme: "dark" });
-      await expect.poll(async () => themeBackground(page)).toBe("rgb(22, 24, 29)");
+      await expect.poll(async () => themeBackground(page)).toBe("rgb(23, 25, 24)");
       for (const view of VIEWS) {
         await gotoView(page, id, view);
         await expectNoOverflow(page, `${view} 页面（深色）`);

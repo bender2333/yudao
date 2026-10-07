@@ -23,7 +23,7 @@ test.afterAll(async () => {
 
 async function openClient(size: { width: number; height: number }): Promise<ClientApp> {
   const client = await startClient(backend, size);
-  await expect(client.page.locator(".brand")).toHaveText("Yudao");
+  await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
   return client;
 }
 
@@ -196,7 +196,7 @@ test("视口 1920×1080 下外壳可用，没有横向滚动条，控制台错�
   const client = await startClient(backend, { width: 1920, height: 1080 });
   const errors = watchErrors(client);
   try {
-    await expect(client.page.locator(".brand")).toHaveText("Yudao");
+    await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
     const overflow = await client.page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
@@ -217,7 +217,7 @@ test("事件流断开时窗口整体变灰并写明断开的时间，重新连�
     await expect(client.page.locator(".connection")).toHaveText("已连接", { timeout: 90_000 });
 
     await own.stop();
-    await expect(client.page.locator(".app")).toHaveClass(/is-disconnected/, { timeout: 60_000 });
+    await expect(client.page.locator("body")).toHaveClass(/is-disconnected/, { timeout: 60_000 });
     // 顶栏写明断开的时间与正在重新连接（不是「连接中断，数据可能过时」这一句旧文案）
     await expect(client.page.locator(".connection.interrupted")).toContainText("断开，正在重新连接");
     const stamp = await client.page.locator(".connection.interrupted").innerText();
@@ -228,7 +228,7 @@ test("事件流断开时窗口整体变灰并写明断开的时间，重新连�
     const again = await startBackend({ port: own.port, dataDir: own.dataDir });
     try {
       await expect(client.page.locator(".connection")).toHaveText("已连接", { timeout: 90_000 });
-      await expect(client.page.locator(".app")).not.toHaveClass(/is-disconnected/);
+      await expect(client.page.locator("body")).not.toHaveClass(/is-disconnected/);
     } finally {
       await again.stop();
     }

@@ -157,40 +157,40 @@ export function Timeline(props: TimelineProps) {
   const legend = legendKinds(ticks);
 
   return (
-    <div className="timeline">
-      <div className="timeline-bar">
-        <button type="button" className="small" disabled={ticks.length === 0} onClick={() => (playing ? pause() : play())}>
+    <div className="y9-replay timeline">
+      <div className="y9-replay-bar timeline-bar">
+        <button type="button" className="y9-btn small" disabled={ticks.length === 0} onClick={() => (playing ? pause() : play())}>
           {playing ? "暂停" : "播放"}
         </button>
-        <button type="button" className="small" disabled={ticks.length === 0} onClick={() => step()}>
+        <button type="button" className="y9-btn small" disabled={ticks.length === 0} onClick={() => step()}>
           单步
         </button>
-        <span className="speed-seg" role="group" aria-label="播放速度">
+        <span className="y9-seg speed-seg" role="group" aria-label="播放速度">
           {SPEEDS.map((option) => (
-            <button key={option} type="button" className={option === speed ? "active" : ""} onClick={() => setSpeed(option)}>
+            <button key={option} type="button" className={`y9-seg-btn${option === speed ? " is-on active" : ""}`} onClick={() => setSpeed(option)}>
               {option}×
             </button>
           ))}
         </span>
-        <button type="button" className="small" disabled={position === null} onClick={live}>
+        <button type="button" className="y9-btn small" disabled={position === null} onClick={live}>
           回到现在
         </button>
         {position !== null ? (
-          <span className="replay-status">
+          <span className="y9-replay-on replay-status">
             回放中 · {formatTime(current ? current.at : props.fromAt)}
           </span>
         ) : (
-          <span className="note">{props.liveNote}</span>
+          <span className="y9-note note">{props.liveNote}</span>
         )}
       </div>
-      <div className="ticks" role="list" aria-label="关键事实的时间轴">
+      <div className="y9-ticks ticks" role="list" aria-label="关键事实的时间轴">
         {parts.length === 0 ? (
-          <span className="note">所选范围内没有关键事实</span>
+          <span className="y9-note note">所选范围内没有关键事实</span>
         ) : (
           parts.map((part, partIndex) => {
             if (part.kind === "break") {
               return (
-                <span key={`break-${part.gapSec}-${partIndex}`} className="tick-break" title={`跳过 ${durationText(part.gapSec)}`}>
+                <span key={`break-${part.gapSec}-${partIndex}`} className="y9-tick-break tick-break" title={`跳过 ${durationText(part.gapSec)}`}>
                   ⫽<small>{durationText(part.gapSec)}</small>
                 </span>
               );
@@ -203,7 +203,7 @@ export function Timeline(props: TimelineProps) {
               <button
                 key={tick.position}
                 type="button"
-                className={`tick${current ? " current" : ""}${past ? " past" : ""}${highlighted ? " highlight" : ""}`}
+                className={`y9-tick tick${current ? " is-current current" : ""}${past ? " is-past past" : ""}${highlighted ? " is-highlight highlight" : ""}`}
                 style={{ ["--tick" as string]: KEY_KINDS[tick.kind].color }}
                 data-position={tick.position}
                 data-kind={tick.kind}
@@ -217,9 +217,9 @@ export function Timeline(props: TimelineProps) {
         )}
       </div>
       {legend.length > 0 ? (
-        <div className="timeline-legends">
+        <div className="y9-legends timeline-legends">
           {legend.map((kind) => (
-            <span key={kind} className="legend" style={{ ["--tick" as string]: KEY_KINDS[kind].color }}>
+            <span key={kind} className="y9-legend legend" style={{ ["--tick" as string]: KEY_KINDS[kind].color }}>
               <i />
               {KEY_KINDS[kind].label}
             </span>

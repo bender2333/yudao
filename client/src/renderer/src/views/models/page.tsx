@@ -415,32 +415,32 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   }, [views, formImpactParams]);
 
   if (catalog === null) {
-    return <div className="card"><h1>模型管理</h1><p className="note">正在读取目录…</p></div>;
+    return <div className="y9-block card"><h1>模型管理</h1><p className="y9-muted note">正在读取目录…</p></div>;
   }
 
   return (
-    <div className="mm-page">
-      <div className="mm-head">
+    <div className="y9-content mm-page">
+      <div className="y9-page-head mm-head">
         <h1>模型管理</h1>
-        <p className="mm-meta">
+        <p className="y9-small y9-muted mm-meta">
           目录修订 {catalog.revision} · 配置状态 {CONFIG_STATE_LABELS[catalog.config_state] ?? catalog.config_state}
-          {catalog.reload_error && <span className="mm-warn"> · 文件更新未生效：{catalog.reload_error}</span>}
+          {catalog.reload_error && <span className="y9-warn-text mm-warn"> · 文件更新未生效：{catalog.reload_error}</span>}
         </p>
-        <div className="mm-actions">
-          <button type="button" className="primary" onClick={openAdd}>添加 Provider 配置</button>
-          <button type="button" data-testid="reload" disabled={busy} onClick={() => void reload()}>重新读取</button>
-          <button type="button" data-testid="edit-json" onClick={() => setJsonOpen(true)}>编辑 JSON</button>
-          <button type="button" onClick={props.onBack}>返回原界面</button>
+        <div className="y9-row mm-actions">
+          <button type="button" className="y9-btn primary" onClick={openAdd}>添加 Provider 配置</button>
+          <button type="button" className="y9-btn" data-testid="reload" disabled={busy} onClick={() => void reload()}>重新读取</button>
+          <button type="button" className="y9-btn" data-testid="edit-json" onClick={() => setJsonOpen(true)}>编辑 JSON</button>
+          <button type="button" className="y9-btn" onClick={props.onBack}>返回原界面</button>
         </div>
         {notice && (
-          <p className={notice.kind === "ok" ? "mm-ok" : "mm-warn"} role="status" data-testid="page-notice">
+          <p className={notice.kind === "ok" ? "y9-small mm-ok" : "y9-warn-text mm-warn"} role="status" data-testid="page-notice">
             {notice.message}
           </p>
         )}
       </div>
 
       {catalog.providers.length === 0 && (
-        <p className="mm-hint">还没有 Provider 配置。添加一份连接，选择服务方案与协议，保存以后再获取模型列表。</p>
+        <p className="y9-small y9-muted mm-hint">还没有 Provider 配置。添加一份连接，选择服务方案与协议，保存以后再获取模型列表。</p>
       )}
 
       {catalog.providers.map((provider) => {
@@ -448,58 +448,58 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         const preset = presetById(presets, provider.preset_id);
         const open = expanded[provider.id] === true;
         return (
-          <section className="mm-card" key={provider.id} data-testid={`provider-${provider.id}`}>
-            <div className="mm-summary">
-              <button type="button" className="mm-toggle" aria-expanded={open}
+          <section className="y9-conn-card mm-card" key={provider.id} data-testid={`provider-${provider.id}`}>
+            <div className="y9-conn-summary mm-summary">
+              <button type="button" className="y9-btn small mm-toggle" aria-expanded={open}
                       onClick={() => setExpanded((current) => ({ ...current, [provider.id]: !open }))}>
                 {open ? "收起" : "展开"}
               </button>
-              <span className="mm-name">{provider.name}</span>
-              <span className="mm-meta">
+              <span className="y9-conn-name mm-name">{provider.name}</span>
+              <span className="y9-small y9-muted mm-meta">
                 服务方案 {preset?.name ?? "自定义"} · 协议 {PROTOCOL_LABELS[provider.protocol] ?? provider.protocol}
                 {" · "}{provider.base_url || "（没有地址）"}
               </span>
-              <span className="mm-meta">凭据：{credentialStatusLabel(provider.credential)}</span>
-              <span className="mm-count">已准入 {summary.admitted} · 候选 {summary.candidates}</span>
+              <span className="y9-conn-cred y9-small y9-muted mm-meta">凭据：{credentialStatusLabel(provider.credential)}</span>
+              <span className="y9-conn-count mm-count">已准入 {summary.admitted} · 候选 {summary.candidates}</span>
             </div>
 
             {open && (
-              <div className="mm-body">
-                <div className="mm-actions">
-                  <button type="button" onClick={() => openEdit(provider.id)}>编辑</button>
-                  <button type="button" data-testid={`test-connection-${provider.id}`}
+              <div className="y9-def-table mm-body">
+                <div className="y9-row mm-actions">
+                  <button type="button" className="y9-btn small" onClick={() => openEdit(provider.id)}>编辑</button>
+                  <button type="button" className="y9-btn small" data-testid={`test-connection-${provider.id}`}
                           disabled={testing[`connection:${provider.id}`] === true}
                           onClick={() => void testConnection(provider.id)}>
                     {testing[`connection:${provider.id}`] ? "测试中…" : "测试连接"}
                   </button>
-                  <button type="button" data-testid={`collect-${provider.id}`}
+                  <button type="button" className="y9-btn small" data-testid={`collect-${provider.id}`}
                           disabled={collecting === provider.id}
                           onClick={() => void collectCandidates(provider.id, provider.models_url)}>
                     {collecting === provider.id ? "候选获取中…" : "获取模型列表"}
                   </button>
-                  <button type="button" data-testid={`delete-${provider.id}`}
+                  <button type="button" className="y9-btn small danger" data-testid={`delete-${provider.id}`}
                           onClick={() => void deleteProvider(provider.id)}>删除</button>
                 </div>
                 {(tests[`connection:${provider.id}`] || testing[`connection:${provider.id}`]) && (
-                  <p className="mm-meta" data-testid={`connection-result-${provider.id}`}>
+                  <p className="y9-test-line mm-meta" data-testid={`connection-result-${provider.id}`}>
                     连接测试：{testing[`connection:${provider.id}`] ? "测试中…" : tests[`connection:${provider.id}`]}
                   </p>
                 )}
 
                 {candidates[provider.id] && (
-                  <div className="mm-candidates" data-testid={`candidates-${provider.id}`}>
+                  <div className="y9-candidates mm-candidates" data-testid={`candidates-${provider.id}`}>
                     {candidates[provider.id].status === "unknown" ? (
-                      <p className="mm-warn" role="status">候选未知：{candidates[provider.id].error || "上游模型列表不可用"}</p>
+                      <p className="y9-warn-text mm-warn" role="status">候选未知：{candidates[provider.id].error || "上游模型列表不可用"}</p>
                     ) : (
                       <>
-                        <p className="mm-meta">
+                        <p className="y9-small y9-muted mm-meta">
                           来源 {candidates[provider.id].source_url} · 采集时间 {candidates[provider.id].fetched_at}
                         </p>
-                        <ul>
+                        <ul className="y9-chip-row">
                           {candidates[provider.id].candidates.map((item) => (
                             <li key={item.id}>
                               <code>{item.id}</code>
-                              <button type="button" data-testid={`add-candidate-${provider.id}-${item.id}`}
+                              <button type="button" className="y9-chip" data-testid={`add-candidate-${provider.id}-${item.id}`}
                                       onClick={() => {
                                         setFormStatus(null);
                                         setForm((current) => {
@@ -521,7 +521,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                   </div>
                 )}
 
-                <table className="mm-table">
+                <table className="y9-table y9-table-defs mm-table">
                   <thead>
                     <tr>
                       <th>上游模型 ID</th>
@@ -543,22 +543,22 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                           <td>{model.model}</td>
                           <td>{model.context_window ?? "—"}</td>
                           <td>{model.max_output_tokens ?? "—"}</td>
-                          <td>{model.reasoning_levels.length === 0 ? "未声明" : model.reasoning_levels.join("、")}</td>
+                          <td className="y9-cell-stack">{model.reasoning_levels.length === 0 ? "未声明" : model.reasoning_levels.join("、")}</td>
                           <td>{model.input_modalities.includes("image") ? "文本与图像" : "文本"}</td>
                           <td>{admissionLabel(admission)}</td>
-                          <td>
-                            <button type="button" data-testid={`row-test-${model.id}`}
+                          <td className="y9-col-actions">
+                            <button type="button" className="y9-btn small" data-testid={`row-test-${model.id}`}
                                     disabled={running}
                                     onClick={() => void testModel(provider.id, model.id)}>
                               {running ? "测试中…" : "模型测试"}
                             </button>
-                            <button type="button" data-testid={`row-remove-${model.id}`}
+                            <button type="button" className="y9-btn small" data-testid={`row-remove-${model.id}`}
                                     onClick={() => void removeModel(provider.id, model.id)}>
                               移除
                             </button>
                             {/* 模型测试的结果写在这一行里：通过写用时，失败写原因（工单 #294） */}
                             {(running || result !== undefined) && (
-                              <p className="mm-meta" role="status" data-testid={`model-result-${model.id}`}>
+                              <p className="y9-test-mini mm-meta" role="status" data-testid={`model-result-${model.id}`}>
                                 {running ? "模型测试中…" : result}
                               </p>
                             )}
@@ -568,7 +568,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                     })}
                   </tbody>
                 </table>
-                {provider.models.length === 0 && <p className="mm-hint">还没有模型访问定义。</p>}
+                {provider.models.length === 0 && <p className="y9-empty y9-small y9-muted mm-hint">还没有模型访问定义。</p>}
               </div>
             )}
           </section>
@@ -631,10 +631,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         />
       )}
 
-      <section className="mm-defaults" data-testid="department-defaults">
-        <h2>部门默认</h2>
-        <p className="mm-hint">从各部门下一次模型请求起生效，没有另选模型的项目同样生效，包括进行中的事项。</p>
-        <div className="mm-defaults-grid">
+      <section className="y9-block mm-defaults" data-testid="department-defaults">
+        <h2 className="y9-block-title">部门默认</h2>
+        <p className="y9-small y9-muted mm-hint">从各部门下一次模型请求起生效，没有另选模型的项目同样生效，包括进行中的事项。</p>
+        <div className="y9-dept-grid mm-defaults-grid">
           {DEPARTMENTS.map((department) => {
             const choice = editingDefaults[department] ?? { modelId: "", tier: "" };
             // 所选模型的声明取自目录中的定义，档位选项与「未声明」提示都按它判断（设计说明第 9.1 节）
@@ -647,11 +647,11 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
               : catalog.department_reminders[department] ?? [];
             const unavailable = unavailableBindingLabel(catalog, choice.modelId);
             return (
-              <div className="mm-default" key={department} data-testid={`default-${department}`}>
-                <h3>{DEPARTMENT_LABELS[department]}</h3>
-                <label className="mm-field">
+              <div className="y9-dept-card mm-default" key={department} data-testid={`default-${department}`}>
+                <h3 className="y9-h3">{DEPARTMENT_LABELS[department]}</h3>
+                <label className="y9-field mm-field">
                   <span className="mm-label">模型</span>
-                  <select value={choice.modelId}
+                  <select className="y9-select" value={choice.modelId}
                           data-testid={`default-model-${department}`}
                           onChange={(event) => setEditingDefaults((current) => ({
                             ...current,
@@ -671,9 +671,9 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                     )}
                   </select>
                 </label>
-                <label className="mm-field">
+                <label className="y9-field mm-field">
                   <span className="mm-label">推理档位</span>
-                  <select value={choice.tier} data-testid={`default-tier-${department}`}
+                  <select className="y9-select" value={choice.tier} data-testid={`default-tier-${department}`}
                           disabled={(model?.reasoning_levels ?? []).length === 0 && choice.tier === ""}
                           onChange={(event) => setEditingDefaults((current) => ({
                             ...current,
@@ -684,59 +684,59 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                   </select>
                 </label>
                 {(model?.reasoning_levels ?? []).length === 0 && !choice.tier && (
-                  <p className="mm-hint" data-testid={`tier-hint-${department}`}>
+                  <p className="y9-small y9-muted mm-hint" data-testid={`tier-hint-${department}`}>
                     该模型未声明推理档位，请求不带推理参数。
                   </p>
                 )}
                 {unavailable !== "" && (
-                  <p className="mm-warn" data-testid={`unavailable-${department}`}>{unavailable}</p>
+                  <p className="y9-warn-text mm-warn" data-testid={`unavailable-${department}`}>{unavailable}</p>
                 )}
-                {reminders.map((text) => <p className="mm-warn" key={text} data-testid={`reminder-${department}`}>{text}</p>)}
+                {reminders.map((text) => <p className="y9-warn-text mm-warn" key={text} data-testid={`reminder-${department}`}>{text}</p>)}
               </div>
             );
           })}
         </div>
-        <div className="mm-actions">
-          <button type="button" className="primary" data-testid="save-defaults" disabled={busy}
+        <div className="y9-row mm-actions">
+          <button type="button" className="y9-btn primary" data-testid="save-defaults" disabled={busy}
                   onClick={() => void saveDefaults()}>
             保存部门默认
           </button>
         </div>
         {defaultsStatus && (
-          <p className={defaultsStatus.kind === "ok" ? "mm-ok" : "mm-warn"} role="status" data-testid="defaults-status">
+          <p className={defaultsStatus.kind === "ok" ? "y9-small mm-ok" : "y9-warn-text mm-warn"} role="status" data-testid="defaults-status">
             {defaultsStatus.message}
           </p>
         )}
       </section>
 
       {pendingSave && (
-        <div className="modal-backdrop" role="presentation" onClick={() => setPendingSave(null)}>
-          <div className="modal" role="dialog" aria-modal="true" aria-label="确认保存" data-testid="confirm-save"
+        <div className="y9-modal-backdrop modal-backdrop" role="presentation" onClick={() => setPendingSave(null)}>
+          <div className="y9-modal modal" role="dialog" aria-modal="true" aria-label="确认保存" data-testid="confirm-save"
                onClick={(event) => event.stopPropagation()}>
             <h2>确认保存</h2>
-            <p className="mm-warn" data-testid="confirm-save-list">{confirmImpactText(saveImpact)}</p>
-            <div className="mm-actions">
-              <button type="button" className="primary" data-testid="confirm-save-yes" disabled={busy}
+            <p className="y9-warn-text mm-warn" data-testid="confirm-save-list">{confirmImpactText(saveImpact)}</p>
+            <div className="y9-row mm-actions">
+              <button type="button" className="y9-btn primary danger" data-testid="confirm-save-yes" disabled={busy}
                       onClick={() => void runSave(pendingSave.body, saveSuccessText(form?.mode ?? "edit"),
                         pendingSave.state, pendingSave.secret, pendingSave.persist)}>确认保存</button>
-              <button type="button" data-testid="confirm-save-no" onClick={() => setPendingSave(null)}>取消</button>
+              <button type="button" className="y9-btn" data-testid="confirm-save-no" onClick={() => setPendingSave(null)}>取消</button>
             </div>
           </div>
         </div>
       )}
 
       {pendingDelete !== null && (
-        <div className="modal-backdrop" role="presentation" onClick={() => setPendingDelete(null)}>
-          <div className="modal" role="dialog" aria-modal="true" aria-label="确认删除" data-testid="confirm-delete"
+        <div className="y9-modal-backdrop modal-backdrop" role="presentation" onClick={() => setPendingDelete(null)}>
+          <div className="y9-modal modal" role="dialog" aria-modal="true" aria-label="确认删除" data-testid="confirm-delete"
                onClick={(event) => event.stopPropagation()}>
             <h2>确认删除</h2>
-            <p className={deleteImpact !== null && deleteImpact.references.length > 0 ? "mm-warn" : "mm-hint"}
+            <p className={deleteImpact !== null && deleteImpact.references.length > 0 ? "y9-warn-text mm-warn" : "y9-small y9-muted mm-hint"}
                data-testid="confirm-delete-list">{providerDeleteConfirmation(deleteImpact)}</p>
-            <div className="mm-actions">
-              <button type="button" className="primary" data-testid="confirm-delete-yes"
+            <div className="y9-row mm-actions">
+              <button type="button" className="y9-btn primary danger" data-testid="confirm-delete-yes"
                       disabled={busy || (deleteImpact !== null && deleteImpact.references.length > 0)}
                       onClick={() => void runDelete(pendingDelete)}>确认删除</button>
-              <button type="button" data-testid="confirm-delete-no" onClick={() => setPendingDelete(null)}>取消</button>
+              <button type="button" className="y9-btn" data-testid="confirm-delete-no" onClick={() => setPendingDelete(null)}>取消</button>
             </div>
           </div>
         </div>

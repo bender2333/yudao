@@ -1,12 +1,13 @@
-// 顶栏与项目标签（原型 v8 设计说明第 3.2 节）：路径、事项选择框、状态项、连接状态、项目菜单。
-// 状态项取自 system.status 与 decisions.list 的等待数量（第 4.1 节）；
-// 顶栏的状态项与标签栏的「待你决定」由 #175 扩展，这里保持 #79 的结构（工单 #80 留出位置）。
-// 事项选择框的选项来自 project.overview 的事项列表；所选事项写在路径参数 ?w={事项} 中。
+// 顶栏与项目标签（原型 v9 外壳，工单 #377）：面包屑路径、事项范围、亮起的状态项、
+// 版本与连接状态、项目菜单与主题切换。状态项取自 system.status 与 decisions.list 的等待数量；
+// 事项范围的选择写在路径参数 ?w={事项} 中。
 
 import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
 import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
 import { useCommand, useSnapshot } from "../views/project/use-snapshot";
+import { Icon } from "./kit";
+import { useTheme, type ThemeChoice } from "./theme";
 import { WORK_ITEM_STATUS, formatTime, label } from "../views/project/labels";
 import { list, text } from "../views/project/common";
 import { DecisionCardList } from "../views/decisions/card";
@@ -19,10 +20,10 @@ export type TopbarProps = {
   project: ProjectRow | null;
   path: string;
   pending: number;
-  // 本项目的等待回答的决定请求（标签栏右侧的「待你决定」，v8 第 3.2 节）
+  // 本项目的等待回答的决定请求（标签栏右侧的「待你决定」）
   projectDecisions: DecisionView[];
   streamConnected: boolean;
-  // 事件流断开的时间（ISO）：断开时顶栏写明断开的时间与正在重新连接（设计说明第 3.4 节、工单 #296）
+  // 事件流断开的时间（ISO）：断开时顶栏写明断开的时间与正在重新连接（工单 #296）
   disconnectedAt: string | null;
   onPendingClick: () => void;
   onToggleDrawer: () => void;
@@ -34,40 +35,51 @@ export function Topbar(props: TopbarProps) {
   const waiting = sortByRequested(props.projectDecisions);
   const now = Date.now();
   return (
-    <header className="topbar">
-      <button className="nav-item drawer-toggle" onClick={props.onToggleDrawer} aria-label="打开左侧栏">
-        菜单
+    <header className="y9-topbar topbar">
+      <button type="button" className="y9-icon-btn y9-drawer-open drawer-toggle" onClick={props.onToggleDrawer} aria-label="打开左侧栏">
+        <Icon name="menu" />
       </button>
-      <span className="path">{props.path}</span>
-      {props.projectId ? (
-        <WorkItemPicker app={props.app} projectId={props.projectId} workItemId={props.workItemId} onNavigate={props.onNavigate} />
-      ) : null}
-      <div className="spacer" />
-      <span className="note" title="页面版本">{import.meta.env.VITE_YUDAO_RELEASE}</span>
+      <nav className="y9-crumbs" aria-label="路径">
+        <span className="y9-crumb path">{props.path}</span>
+      </nav>
+      <div className="y9-top-actions">
+        {props.projectId ? (
+          <WorkItemPicker app={props.app} projectId={props.projectId} workItemId={props.workItemId} onNavigate={props.onNavigate} />
+        ) : null}
+        {/* 顶栏的状态项：跨项目与本项目的等待回答的决定请求，亮起时可以直接点开 */}
+        <div className="y9-top-stats">
+          {props.projectId !== null && waiting.length > 0 ? (
+            <button
+              type="button"
+              className="y9-stat is-compact is-lit is-decisions status-item lit"
+              aria-expanded={decisionsOpen}
+              onClick={() => setDecisionsOpen(!decisionsOpen)}
+              title="本项目等待回答的决定请求"
+            >
+              <Icon name="decide" className="y9-icon y9-stat-icon" />
+              <span className="y9-stat-value">{`待你决定 · ${waiting.length}`}</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={`y9-stat is-compact${props.pending > 0 ? " is-lit is-decisions" : ""} status-item${props.pending > 0 ? " lit" : ""}`}
+            onClick={props.onPendingClick}
+            title="跨项目等待回答的决定请求"
+          >
+            <Icon name="bell" className="y9-icon y9-stat-icon" />
+            <span className="y9-stat-value">{`待你决定：${props.pending > 0 ? props.pending : "无"}`}</span>
+          </button>
+          <ThemeSwitch />
+          <span className="y9-service note" title="页面版本">{import.meta.env.VITE_YUDAO_RELEASE}</span>
+          <span className={`y9-service connection${props.streamConnected ? "" : " interrupted"}`} role="status">
+            <span className="y9-dot" />
+            {props.streamConnected ? "已连接" : `连接中断 · ${props.disconnectedAt === null ? "刚刚" : formatTime(props.disconnectedAt)}断开，正在重新连接`}
+          </span>
+        </div>
+      </div>
       {props.projectId && props.project && props.app ? (
         <ProjectMenu app={props.app} projectId={props.projectId} workItemId={props.workItemId} project={props.project} onNavigate={props.onNavigate} />
       ) : null}
-      {/* 标签栏右侧的「待你决定」：只列出本项目的请求，点击展开决定卡片（第 3.2 节） */}
-      {props.projectId !== null && waiting.length > 0 ? (
-        <button
-          className="status-item lit"
-          aria-expanded={decisionsOpen}
-          onClick={() => setDecisionsOpen(!decisionsOpen)}
-          title="本项目等待回答的决定请求"
-        >
-          待你决定 · {waiting.length}
-        </button>
-      ) : null}
-      <button
-        className={`status-item${props.pending > 0 ? " lit" : ""}`}
-        onClick={props.onPendingClick}
-        title="跨项目等待回答的决定请求"
-      >
-        待你决定：{props.pending > 0 ? props.pending : "无"}
-      </button>
-      <span className={`connection${props.streamConnected ? "" : " interrupted"}`} role="status">
-        {props.streamConnected ? "已连接" : `连接中断 · ${props.disconnectedAt === null ? "刚刚" : formatTime(props.disconnectedAt)}断开，正在重新连接`}
-      </span>
       {decisionsOpen ? (
         <div className="dropdown decisions-dropdown">
           <DecisionCardList
@@ -87,6 +99,28 @@ export function Topbar(props: TopbarProps) {
   );
 }
 
+// 主题切换：浅色、深色、跟随系统（工单 #377 验收第 2 条）。选择记在浏览器里，刷新以后保持
+const THEME_LABELS: Record<ThemeChoice, string> = { system: "跟随系统", light: "浅色", dark: "深色" };
+
+function ThemeSwitch() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <span className="y9-seg" role="group" aria-label="主题">
+      {(Object.keys(THEME_LABELS) as ThemeChoice[]).map((choice) => (
+        <button
+          key={choice}
+          type="button"
+          className={`y9-seg-btn${theme === choice ? " is-on" : ""}`}
+          aria-pressed={theme === choice}
+          onClick={() => setTheme(choice)}
+        >
+          {THEME_LABELS[choice]}
+        </button>
+      ))}
+    </span>
+  );
+}
+
 // 事项选择框：「整个项目」或某个事项（标题与状态）；概览、部门工作间、资料、观测按所选范围显示
 function WorkItemPicker(props: {
   app: ClientApp | null;
@@ -100,10 +134,12 @@ function WorkItemPicker(props: {
   const items = snapshot.data === null ? [] : list(snapshot.data.work_items);
 
   return (
-    <label className="field picker">
-      <span>事项</span>
+    <label className="y9-scope field picker">
+      <span className="y9-scope-label">范围</span>
       <select
+        className="y9-select"
         value={props.workItemId ?? ""}
+        aria-label="事项范围"
         onChange={(event) => {
           const base = `#/p/${props.projectId}/overview`;
           const chosen = event.target.value;
@@ -141,24 +177,24 @@ function ProjectMenu(props: {
   const scope = props.workItemId ? `?w=${props.workItemId}` : "";
 
   return (
-    <div className="project-menu-wrap">
-      <button type="button" className="status-item" aria-expanded={open} onClick={() => setOpen(!open)}>
-        项目菜单
+    <div className="y9-menu-wrap y9-top-menu project-menu-wrap">
+      <button type="button" className="y9-icon-btn status-item" aria-haspopup="menu" aria-expanded={open} aria-label="项目菜单" onClick={() => setOpen(!open)}>
+        <Icon name="more" />
       </button>
       {open ? (
-        <div className="dropdown">
-          <button type="button" onClick={() => { props.onNavigate(`#/p/${props.projectId}/settings${scope}`); setOpen(false); }}>
+        <div className="y9-menu dropdown" role="menu">
+          <button type="button" role="menuitem" onClick={() => { props.onNavigate(`#/p/${props.projectId}/settings${scope}`); setOpen(false); }}>
             项目设置
           </button>
-          <button type="button" onClick={() => send("project.pin", { project_id: props.projectId, pinned: !props.project.pinned, base_version: props.project.version })}>
+          <button type="button" role="menuitem" onClick={() => send("project.pin", { project_id: props.projectId, pinned: !props.project.pinned, base_version: props.project.version })}>
             {props.project.pinned ? "取消置顶" : "置顶"}
           </button>
           {props.project.archived ? (
-            <button type="button" onClick={() => send("project.restore", { project_id: props.projectId, base_version: props.project.version })}>
+            <button type="button" role="menuitem" onClick={() => send("project.restore", { project_id: props.projectId, base_version: props.project.version })}>
               恢复项目
             </button>
           ) : (
-            <button type="button" onClick={() => send("project.archive", { project_id: props.projectId, base_version: props.project.version })}>
+            <button type="button" role="menuitem" onClick={() => send("project.archive", { project_id: props.projectId, base_version: props.project.version })}>
               归档项目
             </button>
           )}
@@ -196,17 +232,19 @@ export function Tabbar(props: { tabs: Tab[]; activeHash: string; onNavigate: (ha
   }
   const activePath = props.activeHash.split("?")[0];
   return (
-    <nav className="tabbar" aria-label="项目页面">
-      {props.tabs.map((tab) => (
-        <button
-          key={tab.hash}
-          className="tab"
-          aria-current={tab.hash === activePath ? "page" : undefined}
-          onClick={() => props.onNavigate(tab.hash)}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <nav className="y9-tabbar tabbar" aria-label="项目页面">
+      <div className="y9-ptabs">
+        {props.tabs.map((tab) => (
+          <button
+            key={tab.hash}
+            className={`y9-ptab tab${tab.hash === activePath ? " is-active" : ""}`}
+            aria-current={tab.hash === activePath ? "page" : undefined}
+            onClick={() => props.onNavigate(tab.hash)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
     </nav>
   );
 }

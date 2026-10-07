@@ -62,6 +62,22 @@ export function App() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+  // 抽屉打开与否写 body.is-drawer-open：窄屏时左侧栏由原型样式挪进抽屉，遮罩也由它控制
+  useEffect(() => {
+    document.body.classList.toggle("is-drawer-open", drawerOpen);
+    return () => {
+      document.body.classList.remove("is-drawer-open");
+    };
+  }, [drawerOpen]);
+  // 连接断开时窗口整体变灰（工单 #296）：原型样式按 body.is-disconnected 给 .y9-app 加灰度，
+  // 数据保留最后一次的
+  const disconnected = state.kind === "connected" && state.streamConnected === false;
+  useEffect(() => {
+    document.body.classList.toggle("is-disconnected", disconnected);
+    return () => {
+      document.body.classList.remove("is-disconnected");
+    };
+  }, [disconnected]);
   // 已连接以后读取项目列表与系统状态；这些视图按事件种类重新查询
   const connected = state.kind === "connected" ? state : null;
   useEffect(() => {
@@ -136,30 +152,30 @@ export function App() {
   // 用动态导入：正式构建里这段分支被整体消掉，图鉴的代码不进正式包，也就没有正式的页面入口。
   if (import.meta.env.DEV && route.name === "gallery") {
     return (
-      <Suspense fallback={<div className="gate"><div className="card"><h1>正在载入图鉴…</h1></div></div>}>
+      <Suspense fallback={<div className="y9-gate gate"><div className="y9-gate-card card"><h1>正在载入图鉴…</h1></div></div>}>
         <LazyGallery />
       </Suspense>
     );
   }
   if (state.kind === "connecting") {
-    return <div className="gate"><div className="card"><h1>连接中…</h1></div></div>;
+    return <div className="y9-gate gate"><div className="y9-gate-card card"><h1>连接中…</h1></div></div>;
   }
   if (state.kind === "outdated") {
     // 页面与服务出自同一个发布，接口版本不同时页面不能使用这个服务
     return (
-      <div className="gate"><div className="card">
+      <div className="y9-gate gate"><div className="y9-gate-card card">
         <h1>页面与服务的接口版本不同</h1>
         <p className="error">页面的接口版本是 {state.clientVersion}，服务 {state.serverRelease} 的接口版本是 {state.serverVersion}。重新加载页面以取得同一版本的页面文件。</p>
-        <button className="primary" type="button" onClick={() => window.location.reload()}>重新加载</button>
+        <button className="y9-btn primary" type="button" onClick={() => window.location.reload()}>重新加载</button>
       </div></div>
     );
   }
   if (state.kind === "failed") {
     return (
-      <div className="gate"><div className="card">
+      <div className="y9-gate gate"><div className="y9-gate-card card">
         <h1>没有连上 Yudao 服务</h1>
         <p className="error">连接失败：{state.message}</p>
-        <button className="primary" type="button" onClick={() => void app.open(window.location.origin)}>重新连接</button>
+        <button className="y9-btn primary" type="button" onClick={() => void app.open(window.location.origin)}>重新连接</button>
       </div></div>
     );
   }
@@ -167,10 +183,9 @@ export function App() {
   const capabilities = state.capabilities;
   const tabs = buildTabs(route, capabilities);
   const project = projects.find((item) => item.project_id === route.projectId) ?? null;
-  // 连接断开时窗口整体变灰（设计说明第 3.4 节）：根节点带 is-disconnected，数据保留最后一次的
-  const disconnected = state.streamConnected === false;
+
   return (
-    <div className={`app${drawerOpen ? " drawer-open" : ""}${disconnected ? " is-disconnected" : ""}`}>
+    <div className="y9-app app">
       <Sidebar
         app={app}
         capabilities={capabilities}
@@ -182,9 +197,9 @@ export function App() {
         onNavigate={navigate}
       />
       {drawerOpen ? (
-        <button type="button" className="drawer-scrim" aria-label="关闭左侧栏" onClick={() => setDrawerOpen(false)} />
+        <button type="button" className="y9-scrim drawer-scrim" aria-label="关闭左侧栏" onClick={() => setDrawerOpen(false)} />
       ) : null}
-      <div className="main">
+      <div className="y9-main main">
         <Topbar
           app={app}
           projectId={route.projectId}
@@ -200,7 +215,7 @@ export function App() {
           onNavigate={navigate}
         />
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
-        <main className="content">
+        <main className="y9-content content">
           {route.name === "home" ? (
             <HomePage app={app} onNavigate={navigate} at={route.at} />
           ) : route.name === "sys-models" ? (

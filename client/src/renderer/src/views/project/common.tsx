@@ -85,12 +85,14 @@ export function formatNumberOr(value: number | null | undefined, suffix = ""): s
 
 export function Section(props: { title: string; note?: string; children: React.ReactNode }) {
   return (
-    <section className="card">
-      <div className="section-head">
-        <h2>{props.title}</h2>
-        {props.note ? <p className="note">{props.note}</p> : null}
+    <section className="y9-block card">
+      <div className="y9-block-head section-head">
+        <div className="y9-block-titles">
+          <h2 className="y9-block-title">{props.title}</h2>
+          {props.note ? <p className="y9-block-sub note">{props.note}</p> : null}
+        </div>
       </div>
-      {props.children}
+      <div className="y9-block-body">{props.children}</div>
     </section>
   );
 }
@@ -105,19 +107,19 @@ export function Line(props: { term: string; value: React.ReactNode }) {
 }
 
 export function Tag(props: { tone?: "ok" | "warn" | "danger" | "muted"; children: React.ReactNode }) {
-  return <span className={`tag${props.tone ? ` ${props.tone}` : ""}`}>{props.children}</span>;
+  return <span className={`y9-tag tag${props.tone ? ` ${props.tone}` : ""}`}>{props.children}</span>;
 }
 
 export function Tabs(props: { items: { id: string; label: string }[]; active: string; onPick: (id: string) => void }) {
   return (
-    <div className="tabs" role="tablist">
+    <div className="y9-tabs tabs" role="tablist">
       {props.items.map((item) => (
         <button
           key={item.id}
           type="button"
           role="tab"
           aria-selected={props.active === item.id}
-          className={props.active === item.id ? "active" : ""}
+          className={`y9-tab${props.active === item.id ? " is-active active" : ""}`}
           onClick={() => props.onPick(item.id)}
         >
           {item.label}
@@ -148,13 +150,13 @@ export function CommandFeedback(props: { submitted: boolean; rejection: Rejected
 
 export function Loading(props: { state: { loading: boolean; data: unknown } }) {
   if (props.state.loading && props.state.data === null) {
-    return <p className="note">正在读取数据</p>;
+    return <p className="y9-note note">正在读取数据</p>;
   }
   return null;
 }
 
 export function Empty(props: { text: string }) {
-  return <p className="note">{props.text}</p>;
+  return <p className="y9-note note">{props.text}</p>;
 }
 
 export function Modal(props: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -171,15 +173,15 @@ export function Modal(props: { title: string; onClose: () => void; children: Rea
   }, [props]);
 
   return (
-    <div className="modal-backdrop" onClick={props.onClose}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
-        <div className="modal-head">
+    <div className="y9-modal-backdrop modal-backdrop" onClick={props.onClose}>
+      <div className="y9-modal modal" onClick={(event) => event.stopPropagation()}>
+        <div className="y9-modal-head modal-head">
           <h2>{props.title}</h2>
-          <button type="button" onClick={props.onClose}>
+          <button type="button" className="y9-btn small" onClick={props.onClose}>
             关闭
           </button>
         </div>
-        <div className="modal-body">{props.children}</div>
+        <div className="y9-modal-body modal-body">{props.children}</div>
       </div>
     </div>
   );
@@ -190,8 +192,8 @@ export function EventDetail(props: { eventId: string; onClose: () => void; snaps
   const raw = props.snapshot.data === null ? null : JSON.stringify(props.snapshot.data, null, 2);
   return (
     <Modal title={`事件 ${props.eventId}`} onClose={props.onClose}>
-      {props.snapshot.loading && raw === null ? <p className="note">正在读取事件</p> : null}
-      {raw !== null ? <pre className="raw">{raw}</pre> : null}
+      {props.snapshot.loading && raw === null ? <p className="y9-note note">正在读取事件</p> : null}
+      {raw !== null ? <pre className="y9-pre raw">{raw}</pre> : null}
     </Modal>
   );
 }
@@ -204,9 +206,10 @@ export function TextInput(props: {
   onInput: (value: string) => void;
 }) {
   return (
-    <label className="field">
+    <label className="y9-field field">
       <span>{props.label}</span>
       <input
+        className="y9-input"
         type="text"
         value={props.value}
         placeholder={props.placeholder}
@@ -225,9 +228,10 @@ export function TextArea(props: {
   onInput: (value: string) => void;
 }) {
   return (
-    <label className="field">
+    <label className="y9-field field">
       <span>{props.label}</span>
       <textarea
+        className="y9-textarea"
         value={props.value}
         rows={props.rows ?? 4}
         disabled={props.disabled}
@@ -245,7 +249,7 @@ export function Checkbox(props: {
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label className="field choice">
+    <label className="y9-field is-inline field choice">
       <input
         type="checkbox"
         checked={props.checked}
@@ -264,7 +268,7 @@ export function SubmitButton(props: {
   onClick: () => void;
 }) {
   return (
-    <button type="button" className="primary" disabled={props.busy || props.disabled} onClick={props.onClick}>
+    <button type="button" className="y9-btn primary" disabled={props.busy || props.disabled} onClick={props.onClick}>
       {props.busy ? "正在提交" : props.label}
     </button>
   );
@@ -273,8 +277,8 @@ export function SubmitButton(props: {
 // 表格：窄屏时整行横向滚动容器由样式给出，列宽用 minmax 收缩
 export function Table(props: { head: string[]; rows: React.ReactNode[][]; caption?: string }) {
   return (
-    <div className="table-scroll">
-      <table>
+    <div className="y9-table-wrap table-scroll">
+      <table className="y9-table">
         {props.caption ? <caption>{props.caption}</caption> : null}
         <thead>
           <tr>
@@ -289,7 +293,9 @@ export function Table(props: { head: string[]; rows: React.ReactNode[][]; captio
           {props.rows.map((cells, index) => (
             <tr key={index}>
               {cells.map((cell, position) => (
-                <td key={position}>{cell}</td>
+                <td key={position} data-label={props.head[position] ?? ""}>
+                  {cell}
+                </td>
               ))}
             </tr>
           ))}
@@ -301,7 +307,7 @@ export function Table(props: { head: string[]; rows: React.ReactNode[][]; captio
 
 export function KeyValue(props: { items: [string, React.ReactNode][] }) {
   return (
-    <div className="kv">
+    <div className="y9-kv is-rows kv">
       {props.items.map(([term, value]) => (
         <Line key={term} term={term} value={value} />
       ))}

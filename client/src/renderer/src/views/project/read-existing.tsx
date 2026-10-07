@@ -61,9 +61,9 @@ export function ReadExisting(props: { app: ClientApp; runId: string | null; item
       note="建档事项里部门读取代码快照的动作"
     >
       {current === null ? (
-        <p className="note">这个部门还没有开始读取代码快照。</p>
+        <p className="y9-note note">这个部门还没有开始读取代码快照。</p>
       ) : (
-        <p className="room-action" role="status">
+        <p className="y9-note room-action" role="status">
           {departmentName(current.department)}正在阅读已有项目：工具 {current.tool}，开始于 {formatTime(current.at)}
         </p>
       )}

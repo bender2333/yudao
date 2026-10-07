@@ -39,9 +39,13 @@ export function BuildingSection(props: BuildingSectionProps): React.JSX.Element 
 
   return (
     <Section title="全部项目与机器" note={at !== null ? "回放中：每个项目一层，按所选位置的快照显示" : "每个项目一层；点击楼层进入项目概览"}>
-      <BuildingCanvas app={props.app} model={model} onNavigate={props.onNavigate} live={at === null} />
+      <div className="y9-building-wrap">
+        <div className="y9-building-scroll">
+          <BuildingCanvas app={props.app} model={model} onNavigate={props.onNavigate} live={at === null} />
+        </div>
+      </div>
       {model.floors.length === 0 ? (
-        <p className="note">还没有项目</p>
+        <p className="y9-note note">还没有项目</p>
       ) : (
         <ul className="building-list">
           {model.floors.map((floor) => (
@@ -50,7 +54,7 @@ export function BuildingSection(props: BuildingSectionProps): React.JSX.Element 
                 {floor.name}
               </button>
               <span>{BUILDING_STATUS[floor.status]?.text ?? floor.status}</span>
-              <span className="note">{litText(floor.lit)}</span>
+              <span className="y9-note note">{litText(floor.lit)}</span>
               {floor.decisions > 0 ? <span className="count">待你决定 {floor.decisions}</span> : null}
             </li>
           ))}
