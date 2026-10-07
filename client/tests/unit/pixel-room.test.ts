@@ -156,6 +156,17 @@ test("说话气泡：没有专门动作的工具事件也说话", () => {
   assert.equal(qr.actor("q-test")?.say?.text, "现在试用网页");
 });
 
+test("说话气泡：盖章紧跟着完成时盖章说明先显示完，完成的话排在后面", () => {
+  const h = mountRoom("quality", QUA);
+  h.step(500);
+  h.driver.playEvent({ type: "qa_submitted", department: "quality", role: "q-test", work_item_id: "w1", label: "质检提交结论", payload: { verdict: "release" } });
+  h.driver.playEvent({ type: "run_done", department: "quality", role: "q-test", work_item_id: "w1", label: "事项完成", payload: {} });
+  h.step(200);
+  assert.equal(h.actor("q-test")?.say?.text, "现在盖放行章");
+  h.step(6000);
+  assert.equal(h.actor("q-test")?.say?.text, "完成了！");
+});
+
 // ---------------------------------------------------------------------------
 // 询问与回答
 

@@ -186,6 +186,8 @@ const IMMEDIATE = new Set(["paused", "failed", "done", "cancelled", "puzzled", "
  *  真实系统的 FakeAdapter 让一个事项在 1 秒左右跑到 done，传信事件排队后不到 900 毫秒就被清除，
  *  两端因此从不说话；这些动作已经由事件排入，继续执行到结束。 */
 const KEEP_ON_STOP: Record<string, true> = { collaboration_requested: true, collaboration_responded: true, transition: true };
+/** 停止态动作的话排在正在显示的话后面：事项结束前盖章紧跟着完成，完成的话立即覆盖会让盖章说明只停留毫秒级。 */
+const STOP_SPEECH_LATE: Record<string, true> = { paused: true, failed: true, done: true, cancelled: true };
 
 /** 建立部门房间的驱动。 */
 export function createRoomDriver(opts: { department: string; sceneOptions: SceneOptions }): RoomDriver {
@@ -240,7 +242,18 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   function say(ev: PixelFloorEvent, a: RoomActor | null, side?: "to" | "from"): void {
     if (!a) return;
     const text = sayCatalog(ev, { dept, side, roleName: nameOfRole });
-    if (text) a.say = { text, until: scene.realT + sayMs(text) };
+    if (!text) return;
+    // 事项结束前盖章紧跟着完成，完成的话（「完成了！」）立即覆盖会让盖章的说明只停留毫秒级，看不见；
+    // 停止态动作的话排在正在显示的话后面，其他事件的话保持立即覆盖（交接与工具类已有单测锁定）。
+    const action = resolveAction(ev);
+    if (a.say && scene.realT < a.say.until && action !== null && STOP_SPEECH_LATE[action] === true) {
+      if (a.say.text === text) return;
+      scene.after(a.say.until - scene.realT, () => {
+        a.say = { text, until: scene.realT + sayMs(text) };
+      });
+      return;
+    }
+    a.say = { text, until: scene.realT + sayMs(text) };
   }
   function plan(a: RoomActor): PlanApi {
     return makePlan(scene, a, actorOf(a.id)!, blocks);
