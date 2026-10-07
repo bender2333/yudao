@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -13,7 +12,6 @@ from filelock import FileLock, Timeout
 from .api.server import listen_error
 from .api.server import serve as serve_api
 from .app.application import Application
-from .app.client_update import NO_INSTALLER, ReleaseAssetNotFound, ReleaseAssets
 from .app.contracts import AccessMode
 from .app.project_queries import NotFound, ProjectOverview, ProjectsList, ReplayCheck
 from .data_directory import DISTRIBUTION, configure_logging, default_data_dir
@@ -57,9 +55,6 @@ def build_parser() -> argparse.ArgumentParser:
     api.add_argument("--port", type=int, default=argparse.SUPPRESS)
     api.add_argument("--access", choices=get_args(AccessMode), default=argparse.SUPPRESS)
     api.add_argument("--provider-config", default=argparse.SUPPRESS)
-    client = sub.add_parser("client", help="manage the desktop client installed on this computer")
-    client_sub = client.add_subparsers(dest="client_command", required=True)
-    client_sub.add_parser("install", help="run the desktop client installer bundled with this wheel")
     replay = sub.add_parser("replay", help="rebuild a run or project projection from the event store")
     replay.add_argument("run_id", nargs="?")
     replay.add_argument("--project", dest="project_id", help="rebuild a project projection twice and compare")
@@ -119,8 +114,6 @@ def main(argv: list[str] | None = None) -> int:
         serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv),
                   access=args.access, host=args.host, port=args.port)
         return 0
-    if command == "client":
-        return _client_install()
     if command == "replay":
         if (args.run_id is None) == (args.project_id is None):
             parser.error("replay needs exactly one of: run_id or --project <project_id>")
@@ -164,17 +157,6 @@ def _print_query(data_dir: str | Path, name: str, request: Any) -> int:
     return 0
 
 
-def _client_install() -> int:
-    # 运行随包的客户端安装程序（设计说明第 3.3、4.1 节）。安装程序随 wheel 发布在发布资源目录中，
-    # 名字是 Yudao-Setup-<发布版本号>.exe；从源码运行没有这个目录，说明原因并返回非零状态
-    assets = ReleaseAssets()
-    try:
-        installer = assets.installer(f"Yudao-Setup-{release_version()}.exe")
-    except ReleaseAssetNotFound:
-        print(f"this Yudao service was not installed from a release wheel, so it carries no client installer: "
-              f"{NO_INSTALLER}", file=sys.stderr)
-        return 1
-    return subprocess.run([str(installer)]).returncode
 
 def _lock_data_dir(data_dir: str | Path) -> FileLock | None:
     # 取得数据目录的进程锁；另一个服务进程持有时说明原因并返回空，调用方以非零状态退出。

@@ -19,9 +19,11 @@ from harness.tests import process_kill as killed
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
 CHECKS = {"smoke": {"argv": [sys.executable, "-c", "print('smoke ok')"]}}
-# 真实检查进程的耗时：第一次激活约 2 秒，短的运行时间上限取 3 秒，中断时累计没有达到上限，
-# 重启后第二次耗时与累计一起达到上限
-SLOW_CHECK = {"slow": {"argv": [sys.executable, "-c", "import time; time.sleep(2)"]}}
+# 短的运行时间上限与跨过上限的那次检查：中断以前那次激活不跑检查，累计只有这一次的激活时间，
+# 离上限足够远；上限取 10 秒，重启以后的检查睡满 12 秒，这一次检查本身就越过上限，
+# 因此「达到上限」由这一次检查保证，与中断前经过了多长时间、机器快慢都无关（工单 #410）
+TIME_LIMIT_SEC = 10
+SLOW_CHECK = {"slow": {"argv": [sys.executable, "-c", "import time; time.sleep(12)"]}}
 
 
 def _call(identity, name, arguments):
@@ -82,24 +84,31 @@ def test_restart_keeps_accumulated_time_and_counts(tmp_path):
 
 
 def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
-    # 验收二：短的运行时间上限，进程终止并重启以后按累计的已用时间达到上限，以运行时间上限的停止原因停止
+    # 验收二：短的运行时间上限，进程终止并重启以后按累计的已用时间达到上限，以运行时间上限的停止原因停止。
+    # 断言只核对事件推出的关系：中断时 run 还没有以运行时间上限停止；重启以后的累计不小于终止前
+    # 记录的累计（累计在进程终止与重启之间连续）并且达到上限
     data_dir = tmp_path / "data"
-    script = [{"proposal": product_spec(), "checks": SLOW_CHECK}]
+    script = [{"proposal": product_spec()}]
     tail = [{"proposal": engineering_plan(), "checks": SLOW_CHECK}]
 
-    with killed.interrupted(data_dir, script, tail=tail, run_time_limit_sec=3,
+    with killed.interrupted(data_dir, script, tail=tail, run_time_limit_sec=TIME_LIMIT_SEC,
                             hold_after="activation_finished") as run:
         before_usage = _usage(run.before_events)
-        assert before_usage is not None
+        assert before_usage is not None, "中断以前至少完成过一次激活，累计已用量已经写入事件"
         before_elapsed = before_usage[0]
-        assert before_elapsed < 3000, f"中断时累计 {before_elapsed}ms，还没有达到 3 秒的上限"
+        stops = [(event.payload or {}).get("stop_reason") for event in run.before_events]
+        assert "time_limit" not in stops, f"中断时 run 已经以运行时间上限停止，停止原因 {stops}"
 
         finished = run.after.project(run.run_id)
         assert (finished.phase, finished.stop_reason) == ("FAILED", "time_limit")
 
         after = run.after.store.list_events(run.run_id)
         after_usage = _usage(after)
-        assert after_usage[0] >= 3000, f"重启后累计 {after_usage[0]}ms，达到运行时间上限"
+        assert after_usage is not None, "重启以后的激活结束事件记下了累计已用量"
+        assert after_usage[0] >= before_elapsed, \
+            f"重启后累计 {after_usage[0]}ms 不小于终止前记录的 {before_elapsed}ms，重启没有重新计数"
+        assert after_usage[0] >= TIME_LIMIT_SEC * 1000, \
+            f"重启后累计 {after_usage[0]}ms，达到 {TIME_LIMIT_SEC} 秒的运行时间上限"
         assert after_usage[1:] == _event_counts(after), "累计次数与事件数一致"
 
 
@@ -113,10 +122,13 @@ def test_waiting_for_a_decision_is_excluded_from_run_time(tmp_path):
     data_dir = tmp_path / "data"
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     try:
+        wall_started = time.monotonic()
         run_id = system.create_run("build an echo CLI")
         blocked = system.run_until_stop(run_id)
         assert blocked.outcome == "running", "模型引用不可用时等待用户决定"
 
+        # 等待 5 秒就够：累计只记录不含等待的那几段，整段墙钟比累计至少多出这一段等待，
+        # 与机器快慢无关（工单 #410）
         waited_sec = 5
         time.sleep(waited_sec)
 
@@ -128,8 +140,12 @@ def test_waiting_for_a_decision_is_excluded_from_run_time(tmp_path):
                                             command=command)
         assert system.run_until_stop(run_id).phase == "DONE"
 
+        # 核对等待没有计入运行时间：累计的已用时间小于这一整段过程实际经过的墙钟时间。
+        # 这条关系与机器快慢无关，负载重时墙钟变长而累计不计入等待，两边的差距只会更大
+        wall_ms = int((time.monotonic() - wall_started) * 1000)
         elapsed_ms, _activations, _steps = _usage(system.store.list_events(run_id))
         assert elapsed_ms is not None
-        assert elapsed_ms < waited_sec * 1000, f"{waited_sec} 秒的等待不计入运行时间，累计只有 {elapsed_ms}ms"
+        assert elapsed_ms < wall_ms, \
+            f"整段经过 {wall_ms}ms，其中等待 {waited_sec} 秒，累计运行时间只有 {elapsed_ms}ms"
     finally:
         system.close()

@@ -10,9 +10,9 @@ import uvicorn
 
 from harness.api.app import create_app
 from harness.app.application import DEFAULT_REGISTRY, Application
-from harness.app.client_update import ReleaseAssets
 from harness.app.contracts import AccessMode
 from harness.app.registry import Registry
+from harness.api.pages import RELEASE_ASSETS
 
 # 接口测试使用真实运行的服务：uvicorn 在测试进程的一个线程中运行 FastAPI 应用，监听本机的空闲端口，
 # 测试经 HTTP 请求它；控制核心在服务的生命周期中建立，模型回答由调用方交给 LoopSystem 的 FakeAdapter 给出。
@@ -37,14 +37,12 @@ def running_server(open_application: Callable[[], Application], *,
                    registry: Registry = DEFAULT_REGISTRY, access: AccessMode = "local",
                    host: str = "127.0.0.1", connect: str | None = None,
                    keepalive_sec: float = 15.0,
-                   release_assets: ReleaseAssets | None = None,
                    pages: Path | None = None) -> Iterator[RunningServer]:
-    # 与 running_api 相同的启动方式，另外把服务句柄交给调用方，并接受本机停止请求。
+    # 与 running_api 相同的启动方式，另外把服务句柄交给调用方。
     # pages 是页面文件目录；不给出时用一个不存在的目录，页面请求按「没有页面文件」回答
     server = uvicorn.Server(uvicorn.Config(
         create_app(open_application, registry=registry, access=access, keepalive_sec=keepalive_sec,
-                   on_stop=lambda: setattr(server, "should_exit", True), release_assets=release_assets,
-                   pages=Path("__absent_pages__") if pages is None else pages),
+                   pages=RELEASE_ASSETS if pages is None else pages),
         host=host, port=0, log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
