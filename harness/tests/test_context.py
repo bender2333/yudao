@@ -13,7 +13,7 @@ from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
 from harness.tests.helpers import developer_text, happy_script, recorded_context, run_scripted
 from harness.tests.protocol_helpers import serve
-from harness.tests.test_event_sequence import HTTP_REPLIES, HTTP_SCRIPT
+from harness.tests.provider_replies import HTTP_REPLIES, HTTP_SCRIPT
 from harness.tools import tool_action
 
 

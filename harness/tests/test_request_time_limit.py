@@ -11,8 +11,9 @@ import pytest
 from harness.engine import StepLimits
 from harness.models import EventType
 from harness.providers import ProviderError
+from harness.tests.helpers import calls_during as _calls_during
 from harness.tests.protocol_helpers import bound_target, facade_with, invoke, model_call, provider_system, serve
-from harness.tests.test_event_sequence import HTTP_REPLIES, HTTP_SCRIPT
+from harness.tests.provider_replies import HTTP_REPLIES, HTTP_SCRIPT
 
 # 单次模型请求的时限只计算等待模型提供方的时间（D09）：从请求发出开始，到收到最后一段输出为止；
 # SDK 的一次性初始化、请求发出前的记录与输出片段的记录都不计入。三种协议相同。
@@ -65,29 +66,12 @@ def test_sdk_stream_models_are_built_when_the_provider_module_is_imported():
     assert built and all(built.values()), built
 
 
-def _calls_during(function, operation) -> int:
-    # 用 sys.setprofile 记录 function 在 operation 期间（当前线程中）被调用的次数；只观察，不替换
-    code, calls = function.__code__, []
-
-    def profile(frame, event, _arg):
-        if event == "call" and frame.f_code is code:
-            calls.append(1)
-
-    previous = sys.getprofile()
-    sys.setprofile(profile)
-    try:
-        operation()
-    finally:
-        sys.setprofile(previous)
-    return len(calls)
-
-
 # 新进程中只导入 Provider 模块（服务启动），再按两个 SDK 的方式识别平台（platform.system 与 platform.platform），
 # 打印识别期间查询系统版本（platform.win32_ver）的次数
 PLATFORM_IDENTIFIED = """
 import platform
 import harness.providers
-from harness.tests.test_request_time_limit import _calls_during
+from harness.tests.helpers import calls_during as _calls_during
 print(_calls_during(platform.win32_ver, lambda: (platform.system(), platform.platform())))
 """
 

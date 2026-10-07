@@ -33,7 +33,7 @@ from harness.tests.protocol_helpers import (
     serve,
     sse,
 )
-from harness.tests.test_event_sequence import BROKEN_STREAMS, PARTIAL_OUTPUT, empty_reply, product_spec_reply
+from harness.tests.provider_replies import BROKEN_STREAMS, PARTIAL_OUTPUT, empty_reply, product_spec_reply
 
 HI = [{"role": "user", "content": "hi"}]
 

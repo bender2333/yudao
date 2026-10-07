@@ -136,6 +136,7 @@
 "test_stream_progress.py" = "integration"
 "test_system_stop.py" = "integration"
 "test_terminal_checks.py" = "integration"
+"test_test_imports.py" = "unit"
 "test_text_only_reply.py" = "integration"
 "test_tools.py" = "integration"
 "test_tree_archive.py" = "integration"

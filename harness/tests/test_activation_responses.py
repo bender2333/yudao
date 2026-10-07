@@ -3,12 +3,20 @@
 import json
 
 from harness.tests.helpers import FAST_RETRIES
-from harness.tests.protocol_helpers import ResponsesAdapter
 from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
-from harness.tests.test_responses import (
-    CALL, RAW_USAGE, REASONING, TEXT, _event, _response, _send, _server, _stream,
+from harness.tests.protocol_helpers import (
+    STUB_CALL as CALL,
+    STUB_REASONING as REASONING,
+    STUB_TEXT as TEXT,
+    STUB_USAGE as RAW_USAGE,
+    ResponsesAdapter,
+    stub_event as _event,
+    stub_response as _response,
+    stub_server as _server,
+    stub_stream as _stream,
+    write_stub_reply as _send,
 )
 
 

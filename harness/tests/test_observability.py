@@ -28,13 +28,20 @@ from harness.artifacts import ArtifactStore
 from harness.adapters.base import Availability, ProviderError
 from harness.event_store import EventStore
 from harness.providers.call import ModelResponse, ModelStreamEvent
-from harness.tests.protocol_helpers import ResponsesAdapter
+from harness.tests.protocol_helpers import (
+    ResponsesAdapter,
+    stub_event as _event,
+    stub_response as _response,
+    stub_server as _server,
+    stub_stream as _stream,
+    stub_submit_stream as _submit_stream,
+    write_stub_reply as _send,
+)
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, Usage
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tests.saved_rewrite import rewrite_saved_event
-from harness.tests.test_responses import _event, _response, _send, _server, _stream, _submit_stream
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.proposals import product_spec
 

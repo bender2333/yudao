@@ -8,7 +8,7 @@ from harness.models import EventType
 from harness.providers import ProviderDefinition, refresh_candidates, ssl_context
 from harness.tests.helpers import FAST_RETRIES
 from harness.tests.protocol_helpers import ScriptedProvider, facade_with, provider_system, send_reply
-from harness.tests.test_event_sequence import product_spec_reply
+from harness.tests.provider_replies import product_spec_reply
 
 # Provider 的连接信任操作系统的证书库（D17，truststore）。测试内启动使用测试 CA 签发证书的真实 HTTPS 服务：
 # 没有加入信任来源的 CA 签发的证书校验失败；加入信任来源的 CA 用 truststore 支持的方式（SSLContext.load_verify_locations）
