@@ -650,14 +650,15 @@ export function rowToModelInput(row: FormRow): Record<string, unknown> {
   };
 }
 
-// 表单的一份连接内容：请求时限留空时不提交这个字段，由后端 ProviderInput 的默认值决定（工单 #294）
+// 表单的一份连接内容：请求时限留空时不提交这个字段，由后端 ProviderInput 的默认值决定（工单 #294）；
+// 地址提交前补全协议头，粘贴后直接点「添加」也能保存（设计说明第 4.2 节）
 export function providerInputFromForm(state: FormState): Record<string, unknown> {
   const timeout = intFromInput(state.timeout_sec);
   return {
     id: state.id,
     name: state.name,
     protocol: state.protocol,
-    base_url: state.base_url,
+    base_url: normalizeBaseUrl(state.base_url),
     credential_ref: state.credential_ref,
     ...(timeout === null ? {} : { timeout_sec: timeout }),
     preset_id: state.preset_id,

@@ -404,6 +404,13 @@ test("连接提交的请求时限：填了取填的值，留空不提交该字�
   // 留空时整个字段不出现，后端 ProviderInput 的默认值生效，客户端不写第二个数
   assert.equal("timeout_sec" in providerInputFromForm({ ...state, timeout_sec: "" }), false);
 });
+test("提交时地址补全协议头：粘贴后直接点添加也能保存（设计说明第 4.2 节）", () => {
+  const state = emptyFormState(600);
+  assert.equal(providerInputFromForm({ ...state, base_url: "9router.huiju.asia/v1" }).base_url,
+    "https://9router.huiju.asia/v1");
+  assert.equal(providerInputFromForm({ ...state, base_url: "http://127.0.0.1:9/v1" }).base_url,
+    "http://127.0.0.1:9/v1");
+});
 
 test("部门默认的选项只含已准入且未作废的定义，档位选项保留按模型限制的已存值（第 9.1 节）", () => {
   const providers = [

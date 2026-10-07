@@ -121,7 +121,6 @@ class CatalogCandidatesCollect(CommandRequest):
 class CatalogConnectionTest(CommandRequest):
     base_version: int
     provider_id: Text
-    model_id: Text | None = None
 
 
 class CatalogModelTest(CommandRequest):
@@ -576,7 +575,7 @@ CATALOG_CANDIDATES_COLLECT = CommandDefinition(
 )
 CATALOG_CONNECTION_TEST = CommandDefinition(
     name="catalog.connection.test", request=CatalogConnectionTest, refs=NoRefs, handle=_test_connection,
-    derive_refs=lambda _events: NoRefs(), reasons=("not_found", "catalog_invalid"),
+    derive_refs=lambda _events: NoRefs(), reasons=("not_found",),
 )
 CATALOG_MODEL_TEST = CommandDefinition(
     name="catalog.model.test", request=CatalogModelTest, refs=NoRefs, handle=_test_model,
