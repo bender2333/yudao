@@ -2,6 +2,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from dataclasses import dataclass
 
 import httpx
@@ -36,11 +37,14 @@ def running_server(open_application: Callable[[], Application], *,
                    registry: Registry = DEFAULT_REGISTRY, access: AccessMode = "local",
                    host: str = "127.0.0.1", connect: str | None = None,
                    keepalive_sec: float = 15.0,
-                   release_assets: ReleaseAssets | None = None) -> Iterator[RunningServer]:
-    # 与 running_api 相同的启动方式，另外把服务句柄交给调用方，并接受本机停止请求
+                   release_assets: ReleaseAssets | None = None,
+                   pages: Path | None = None) -> Iterator[RunningServer]:
+    # 与 running_api 相同的启动方式，另外把服务句柄交给调用方，并接受本机停止请求。
+    # pages 是页面文件目录；不给出时用一个不存在的目录，页面请求按「没有页面文件」回答
     server = uvicorn.Server(uvicorn.Config(
         create_app(open_application, registry=registry, access=access, keepalive_sec=keepalive_sec,
-                   on_stop=lambda: setattr(server, "should_exit", True), release_assets=release_assets),
+                   on_stop=lambda: setattr(server, "should_exit", True), release_assets=release_assets,
+                   pages=Path("__absent_pages__") if pages is None else pages),
         host=host, port=0, log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -65,7 +69,7 @@ def running_server(open_application: Callable[[], Application], *,
 def running_api(open_application: Callable[[], Application], *,
                 registry: Registry = DEFAULT_REGISTRY, access: AccessMode = "local",
                 host: str = "127.0.0.1", connect: str | None = None,
-                keepalive_sec: float = 15.0) -> Iterator[httpx.Client]:
+                keepalive_sec: float = 15.0, pages: Path | None = None) -> Iterator[httpx.Client]:
     with running_server(open_application, registry=registry, access=access, host=host, connect=connect,
-                        keepalive_sec=keepalive_sec) as handle:
+                        keepalive_sec=keepalive_sec, pages=pages) as handle:
         yield handle.client

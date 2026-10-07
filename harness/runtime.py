@@ -8,9 +8,10 @@ from typing import Any
 from .adapters.base import ModelAdapter
 from .artifacts import ArtifactStore
 from .deltas import DeltaChannel
+from .definitions import DEFINITIONS
+from . import parameters
 from .engine import StepLimits
-from .environment import LocalEnvironment
-from .event_store import EventStore, catalog_stream
+from .event_store import Command, EventStore, catalog_stream
 from .models import CatalogEventType, ProjectEventType
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .write_path import NewCatalogEvent, WritePath
@@ -256,6 +257,39 @@ class LoopSystem:
 
         self.writes.transact(catalog_stream(), decide, command=command)
         return position
+
+    def set_parameter(self, name: str, value: Any, *, reason: str, modified_by: str,
+                      command: Command | None = None) -> str:
+        # 界内修改一次全局参数现值：先核对条目与界限，通过后在目录流写一条 parameter_set。
+        # run 已经在创建时冻结参数版本，运行中修改不影响已经创建的 run。返回修改以后的参数版本
+        new_value = parameters.check_bounds(name, value)
+        values = parameters.current_values(self.store)
+        old_value = values[name]
+        after = {**values, name: new_value}
+        version = parameters.parameters_version(after)
+        bounds = list(DEFINITIONS.rule(name).bounds)
+
+        def decide(transaction):
+            transaction.append(NewCatalogEvent(CatalogEventType.PARAMETER_SET, {
+                "name": name, "old_value": old_value, "new_value": new_value,
+                "reason": reason, "modified_by": modified_by,
+                "bounds": bounds, "parameters_version": version,
+            }, actor=modified_by))
+
+        self.writes.transact(catalog_stream(), decide, command=command)
+        return version
+
+    def parameters(self) -> dict[str, Any]:
+        # 参数现值：目录流事件折叠的结果
+        return parameters.current_values(self.store)
+
+    def parameters_version(self) -> str:
+        # 参数现值的版本摘要：全部参数条目当前取值的内容摘要
+        return parameters.current_version(self.store)
+
+    def parameter_history(self) -> list[parameters.ParameterChange]:
+        # 参数修改历史：按事件顺序，包含修改者、原值、新值与理由
+        return parameters.history(self.store)
 
     @property
     def home_seen(self) -> tuple[int, str] | None:

@@ -274,6 +274,8 @@ class RunCreatedPayload(Payload):
     command_versions: dict[str, int]
     # 事项所用定义的版本（全部定义文件内容的摘要）
     definitions_version: str
+    # 创建这个 run 时冻结的参数版本（全部参数现值的内容摘要，工单 #349）
+    parameters_version: str
     # 创建这个 run 时的 run 事件版本：run 流跟随应用版本，版本不同的未结束 run 按因升级停止处理（ADR-0019）
     run_event_version: int
     # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮候选事件与修改意见的工件引用。
@@ -349,6 +351,10 @@ class ToolCallRequiredPayload(Versions, WorkBasis):
 class ActivationFinishedPayload(Versions):
     activation_id: str
     latency_ms: int
+    # 这次激活结束时这个 run 累计的已用量（工单 #350）：重启时从事件恢复，连续累计
+    elapsed_ms: int
+    activations: int
+    model_steps: int
     stop_reason: str | None
 
 
@@ -443,6 +449,7 @@ class ModelRequestedPayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
     # 是否要求调用工具：最后一次主机提示之后的工作请求为 required；声明不接受时为 auto（#102）
     tool_choice: Literal["auto", "required"]
     definitions_version: str
+    parameters_version: str
 
 
 class ModelStreamProgressPayload(AttemptIdentity, Versions):
@@ -620,6 +627,7 @@ class ProposalSubmittedPayload(Payload):
     raw_keys: list[str]
     input_version: int
     definitions_version: str
+    parameters_version: str
 
 
 class FieldError(Payload):
@@ -633,6 +641,7 @@ class ProposalRejectedPayload(Payload):
     kind: str | None
     input_version: int
     definitions_version: str
+    parameters_version: str
 
 
 class SpecSupersededPayload(Payload):
@@ -1406,6 +1415,19 @@ class HomeSeenPayload(Payload):
     position: int
 
 
+class ParameterSetPayload(Payload):
+    # 参数修改（工单 #349，设计第 3、5 节）：界内修改一次全局参数的现值。
+    # old_value 与 new_value 是修改前后按定义界限核对过的取值；parameters_version 是修改以后的参数版本摘要
+    name: str
+    old_value: Any
+    new_value: Any
+    reason: str
+    modified_by: str
+    # 这次修改所依据的界限：修改以后界面仍能显示可调整范围
+    bounds: list[Any]
+    parameters_version: str
+
+
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
     EventType.RUN_CREATED: RunCreatedPayload,
@@ -1483,4 +1505,5 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.RUNTIME_DRAIN_STARTED: RuntimeDrainStartedPayload,
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: RuntimeForceUpgradeRequestedPayload,
     CatalogEventType.HOME_SEEN: HomeSeenPayload,
+    CatalogEventType.PARAMETER_SET: ParameterSetPayload,
 }

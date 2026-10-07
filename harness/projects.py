@@ -369,6 +369,15 @@ class ProjectService:
         # 归档与记录材料按这里判断有事项进行中
         self._starting: dict[str, set[object]] = {}
 
+    def _limit_values(self, max_cycles: int | None, run_time_limit_sec: int | None) -> tuple[int, int]:
+        # 事项的两个限额：调用方显式给出时按给出值，否则取参数现值（工单 #349）。
+        # 运行中的 run 已经按创建时的限额冻结，之后改参数不影响它
+        from . import parameters as parameter_values
+
+        values = parameter_values.current_values(self.store)
+        return (values["max_cycles"] if max_cycles is None else max_cycles,
+                values["run_time_limit_sec"] if run_time_limit_sec is None else run_time_limit_sec)
+
     # 读
 
     def projection(self, project_id: str) -> ProjectProjection:
@@ -436,8 +445,8 @@ class ProjectService:
         return project_id
 
     def onboard(self, name: str, goal: str, source_name: str, source_path: str, *,
-               max_cycles: int = DEFINITIONS.rule_value("max_cycles"),
-               run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec"),
+               max_cycles: int | None = None,
+               run_time_limit_sec: int | None = None,
                 context_window: int = 32_000,
                 command: Command | None = None) -> tuple[str, str, str]:
         # 接入已有项目（3.8 第 3.1 节）：同一个项目流事务中登记项目（source 为 existing）、登记源目录、
@@ -448,6 +457,7 @@ class ProjectService:
         _require_text("goal", goal)
         _require_text("source_name", source_name)
         _require_text("source_path", source_path)
+        max_cycles, run_time_limit_sec = self._limit_values(max_cycles, run_time_limit_sec)
         project_id = new_id("proj")
         work_item_id, run_id = new_id("wi"), new_id("run")
         tree, snapshot = ingest_snapshot(source_path, self.artifacts, run_id)
@@ -472,8 +482,8 @@ class ProjectService:
         return project_id, item.work_item_id, item.run_id
 
     def restart_onboarding(self, project_id: str, source_name: str, *,
-                          max_cycles: int = DEFINITIONS.rule_value("max_cycles"),
-                          run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec"),
+                          max_cycles: int | None = None,
+                          run_time_limit_sec: int | None = None,
                            context_window: int = 32_000,
                            command: Command | None = None) -> tuple[str, str]:
         # 重新开始建档（3.8 第 3.1 节）：从登记的源目录重新采集快照，开始新的建档事项。
@@ -490,6 +500,7 @@ class ProjectService:
         directory = project.source_directories.get(source_name)
         if directory is None:
             raise SourceDirectoryNotFoundError(f"unknown source directory: {source_name}")
+        max_cycles, run_time_limit_sec = self._limit_values(max_cycles, run_time_limit_sec)
         work_item_id, run_id = new_id("wi"), new_id("run")
         tree, snapshot = ingest_snapshot(directory.path, self.artifacts, run_id)
 
@@ -581,13 +592,17 @@ class ProjectService:
     # 事项
 
     def start_work_item(self, project_id: str, text: str, *, title: str | None = None,
-                        max_cycles: int = DEFINITIONS.rule_value("max_cycles"),
-                        run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec"),
+                        max_cycles: int | None = None,
+                        run_time_limit_sec: int | None = None,
                         context_window: int = 32_000, command: Command | None = None) -> tuple[str, str]:
+        # 限额不给时取参数现值（工单 #349）：新事项按当前参数建立，调用方显式给出时按给出值
         _require_text("text", text)
         _require_title(title)
         self._writable(project_id)
         self.settle_pending(project_id)
+        values = self._limit_values(max_cycles, run_time_limit_sec)
+        max_cycles, run_time_limit_sec = values
+
         work_item_id, run_id = new_id("wi"), new_id("run")
 
         def create(transaction: Transaction) -> _NewWorkItem:
@@ -754,14 +769,15 @@ class ProjectService:
         _require_text("text", text)
         _require_title(title)
         self._writable(project_id)
+        max_cycles, run_time_limit_sec = self._limit_values(None, None)
         work_item_id, run_id = new_id("wi"), new_id("run")
 
         def queue(transaction: Transaction) -> str:
             project = _default_settings(deepcopy(self._writable_in(transaction, project_id)))
             point = self._work_item_start_point(project)
             self._work_item_created(
-                transaction, project, text, title=title, max_cycles=DEFINITIONS.rule_value("max_cycles"),
-                run_time_limit_sec=DEFINITIONS.rule_value("run_time_limit_sec"), context_window=32_000,
+                transaction, project, text, title=title, max_cycles=max_cycles,
+                run_time_limit_sec=run_time_limit_sec, context_window=32_000,
                 baseline=point.baseline, initial_tree=point.initial_tree, snapshot=point.snapshot,
                 source_run=point.source_run, work_item_id=work_item_id, run_id=run_id, priority=PRIORITY_USER,
             )
