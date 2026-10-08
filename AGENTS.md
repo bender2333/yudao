@@ -33,6 +33,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 
 ## 常用命令
 - 安装依赖（Python 3.11 或更新版本）：`uv sync --frozen`，按锁文件在仓库内建立项目环境 `.venv`，包含测试依赖。
+- Windows PowerShell 的测试终端先设置 `$env:PYTHONUTF8='1'`，让 Python 及其测试子进程统一输出 UTF-8；pytester 的子进程输出按 UTF-8 读取。
 - 启动服务：`uv run python -m harness api`（无参 `uv run python -m harness` 相同，默认端口 8765）；无需凭据的演示：`uv run python -m harness demo`
 - 测试：开发中运行与本次改动相关的文件；交付前和审查时运行 `uv run python -m pytest -m "unit or module"`，再运行本次改动涉及的集成文件。#158、#406 已合并，分层定义见 `docs/design/test-pyramid.md`；新增文件必须登记。
   - 前端测试：`cd client && npm test`（客户端单元）；端到端为 `cd client && npm run test:e2e`。只在本次改动涉及 `client/` 或接口合同时运行，并且只运行相关的测试文件；客户端单元里的逐场景回放测试单独运行。

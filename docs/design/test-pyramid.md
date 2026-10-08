@@ -95,7 +95,7 @@ uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integra
 uv run python -m pytest -m desktop   # 只在用户同意的时间运行
 ```
 
-最后一条只由架构师在集成层的批量运行中使用。
+集成层的多进程命令只由架构师的批量流程使用；桌面命令只在用户同意的时间使用。
 
 ### 4.2 集成层的批量运行
 
