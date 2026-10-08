@@ -21,7 +21,7 @@ from harness.proposals import delivery_turn, plan_turn, product_spec, review_tur
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
-from harness.tests.test_text_only_reply import LIMIT
+from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT
 
 REGISTRY = {"make-link": {"argv": ["python", "make_link.py"], "args": ["nested", "linked"],
                           "timeout_sec": 30, "output_limit": 4000}}

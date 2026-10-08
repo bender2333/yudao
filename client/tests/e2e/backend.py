@@ -186,6 +186,18 @@ def _onboarding_round(index: int):
     ]
 
 
+def waiting_script():
+    # 等待模型服务的端到端验收（工单 #375）：工程部门的第一次请求模型服务不可用，按 D17 重试
+    # （model_retry_scheduled，页面据此发出「等待模型服务」的系统通知），重试这一次仍然不可用且
+    # 不再重试：run 进入待恢复并发出 model_unavailable 的决定请求（页面据此发出决定请求的系统通知）
+    # 这个脚本不预置项目与事项：用例在页面打开以后自己建项目并开始事项，让事件在页面开着的时候发生
+    return [
+        product_spec(),
+        ProviderError(UNAVAILABLE, reason="provider_unavailable", retryable=True),
+        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
+    ]
+
+
 def read_turn(identity: str, tool: str, arguments: dict):
     # 脚本里的一项可以是接收模型调用合同的函数（harness/adapters/fake.py 的 TurnFactory），
     # 函数返回带工具调用的回答；工具由原生循环真实执行
@@ -398,16 +410,26 @@ async def clear_department_defaults(application: Application, keep: str) -> None
 
 
 class VersionedApplication(Application):
-    # 让能力清单报告一个不同的接口版本：像一个接口版本不同的部署那样（不改动被测代码或接口层）
+    # 让能力清单报告一个不同的接口版本或发布版本：像一个接口版本不同的部署、或刚升级完的服务那样
+    # （不改动被测代码或接口层）。reported_release_once 只在第一次被读取时生效，
+    # 用来模拟「页面连接的是一个刚升级的服务，随后读到的是同一个版本」
     reported_api_version: int | None = None
+    reported_release: str | None = None
+    reported_release_once: str | None = None
 
     def capabilities(self, contract_digest: str, *, access):
         capabilities = super().capabilities(contract_digest, access=access)
+        deployment = capabilities.deployment
         if self.reported_api_version is not None:
-            return capabilities.model_copy(
-                update={"deployment": capabilities.deployment.model_copy(
-                    update={"api_version": self.reported_api_version})})
-        return capabilities
+            deployment = deployment.model_copy(update={"api_version": self.reported_api_version})
+        if self.reported_release is not None:
+            deployment = deployment.model_copy(update={"version": self.reported_release})
+        if self.reported_release_once is not None:
+            deployment = deployment.model_copy(update={"version": self.reported_release_once})
+            self.reported_release_once = None
+        if deployment is capabilities.deployment:
+            return capabilities
+        return capabilities.model_copy(update={"deployment": deployment})
 
 
 def main() -> int:
@@ -417,6 +439,12 @@ def main() -> int:
     # 端到端测试核对「接口版本不同」的提示：让服务报告一个不同的接口版本，
     # 就像一个已经升级或尚未升级的部署那样（真实 HTTP 响应，不改动被测代码）
     parser.add_argument("--api-version", type=int, default=None)
+    # 页面与服务同出一个发布（网页界面的提供与发布设计说明第 5.1 节）：让服务报告一个与页面构建时不同的
+    # 发布版本，页面据此自动重新加载，就像升级以后服务重启而浏览器里还是上一次的页面文件
+    parser.add_argument("--release-version", default=None)
+    # 只在第一次读取能力清单时报告这个版本：页面重新加载以后读到的是服务自己的版本，
+    # 一次自动重新加载因此是可观察的（一直报告不同版本会让页面反复重新加载）
+    parser.add_argument("--release-version-once", default=None)
     # 部门房间的端到端验收（工单 #177）：用流式慢模型跑一个项目，供房间在请求进行中观察
     parser.add_argument("--room", action="store_true")
     # 预置时给定义写准入并让三个部门默认绑定它：作废准入与删除引用方的用例需要真实的引用方（工单 #94）
@@ -428,9 +456,9 @@ def main() -> int:
     # 目录缺哪个部门就在界面上被拒绝哪个部门；模型回答仍由同一份 FakeAdapter 脚本给出
     parser.add_argument("--catalog-driven", action="store_true")
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
-    # initial 是从想法新建带起始文件夹用的脚本（工单 #323）。它们需要的轮次与默认脚本的预置事项不同，
-    # 因此由用例选择
-    parser.add_argument("--script", choices=("default", "onboarding", "initial"), default="default")
+    # initial 是从想法新建带起始文件夹用的脚本（工单 #323）；waiting 是等待模型服务用的脚本（工单 #375，
+    # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）。它们需要的轮次与预置事项不同，因此由用例选择
+    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting"), default="default")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
     parser.add_argument("--reject-upstream", action="store_true")
@@ -462,6 +490,8 @@ def main() -> int:
         adapter_script = onboarding_script()
     elif args.script == "initial":
         adapter_script = initial_script()
+    elif args.script == "waiting":
+        adapter_script = waiting_script()
     else:
         adapter_script = script()
     if args.catalog_driven:
@@ -476,6 +506,10 @@ def main() -> int:
     application = VersionedApplication(system)
     if args.api_version is not None:
         application.reported_api_version = args.api_version
+    if args.release_version is not None:
+        application.reported_release = args.release_version
+    if args.release_version_once is not None:
+        application.reported_release_once = args.release_version_once
 
     # 页面文件来自 client/out/renderer（npm run build:pages）：页面与接口同一来源
     pages = Path(__file__).resolve().parents[2] / "out" / "renderer"
@@ -514,8 +548,9 @@ def main() -> int:
             room_project = asyncio.run(seed_room(application, system))
         elif args.script == "onboarding":
             asyncio.run(seed_onboarding(application))
-        elif args.script != "initial":
-            # 起始文件夹的用例自己在界面上建项目并开始事项，不需要预置的项目与事项（工单 #323）
+        elif args.script not in ("initial", "waiting"):
+            # 起始文件夹的用例（工单 #323）与等待模型服务的用例（工单 #375）自己在界面上建项目并开始事项，
+            # 不需要预置的项目与事项
             asyncio.run(seed(application, system))
     if args.catalog_driven:
         os.environ.pop("OPENCODE_GO_KEY", None)

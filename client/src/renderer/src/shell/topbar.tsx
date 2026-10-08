@@ -6,6 +6,7 @@
 import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
 import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
+import { PAGE_RELEASE } from "../contract/page-release";
 import { useCommand, useSnapshot } from "../views/project/use-snapshot";
 import { WORK_ITEM_STATUS, formatTime, label } from "../views/project/labels";
 import { list, text } from "../views/project/common";
@@ -43,7 +44,7 @@ export function Topbar(props: TopbarProps) {
         <WorkItemPicker app={props.app} projectId={props.projectId} workItemId={props.workItemId} onNavigate={props.onNavigate} />
       ) : null}
       <div className="spacer" />
-      <span className="note" title="页面版本">{import.meta.env.VITE_YUDAO_RELEASE}</span>
+      <span className="note" title="页面版本">{PAGE_RELEASE}</span>
       {props.projectId && props.project && props.app ? (
         <ProjectMenu app={props.app} projectId={props.projectId} workItemId={props.workItemId} project={props.project} onNavigate={props.onNavigate} />
       ) : null}

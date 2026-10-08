@@ -8,8 +8,7 @@ from harness.models import ArtifactRef, DepartmentPrompt, EventType, RunProjecti
 from harness.projection import apply_event
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
-from harness.tests.helpers import list_files_turn
-from harness.tests.test_compaction_engine import _runner
+from harness.tests.helpers import compacted_runner as _runner, list_files_turn
 
 
 def test_model_limits_use_the_call_target_window_and_reserve_half_of_a_narrow_one():
