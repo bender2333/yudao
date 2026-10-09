@@ -1,11 +1,17 @@
 # 测试之间的导入（测试分层设计说明第 3 节）：测试文件只从辅助模块取共用代码，不互相导入。
 # 互相导入会把一项检查绑到另一个测试文件里的局部安排上，也让按单个文件运行不可用。
-# 检查只用标准库 ast 读源文件，不起子进程、不读数据目录。
+# 两项检查都只读源文件，不起子进程、不读数据目录。
 
 import ast
+import io
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
+from pyflakes import api as pyflakes
+
 TESTS = Path(__file__).resolve().parent
+# 未定义名称的检查覆盖整个包：搬走共用代码时删掉的 import 行在实现文件里同样发生过
+SOURCES = TESTS.parent
 
 
 def _test_module(path: Path) -> str:
@@ -24,6 +30,14 @@ def _imported_modules(source: str) -> list[tuple[str, str]]:
     return imported
 
 
+def _undefined_names(source: str, name: str) -> list[str]:
+    # pyflakes 的 F821（未定义名称）按文件报告，信息里带文件名与行列
+    out = io.StringIO()
+    with redirect_stdout(out), redirect_stderr(out):
+        pyflakes.check(source, name)
+    return [line for line in out.getvalue().splitlines() if "undefined name" in line]
+
+
 def test_no_test_file_imports_another_test():
     files = sorted(TESTS.rglob("test_*.py"))
     test_modules = {_test_module(path) for path in files}
@@ -40,3 +54,19 @@ def test_the_check_rejects_a_cross_import():
     module = _test_module(sorted(TESTS.rglob("test_*.py"))[0])
     imported = _imported_modules(f"from {module} import anything\n")
     assert (module, f"{module}.anything") in imported, imported
+
+
+def test_no_module_has_an_undefined_name():
+    # 搬移共用代码时删掉同一文件里仍在使用的 import 行，测试要跑到那一行才报 NameError；
+    # 这里在单元层就查出来。#160（PR #428）删掉 helpers.py 的 import time 就是这个漏法，
+    # 四项取消运行中命令的集成层用例因此必然失败。
+    offenders = []
+    for path in sorted(SOURCES.rglob("*.py")):
+        offenders.extend(_undefined_names(path.read_text(encoding="utf-8"), str(path)))
+    assert not offenders, "不应有未定义名称：\n" + "\n".join(offenders)
+
+
+def test_the_check_rejects_an_undefined_name():
+    # 证明上面的检查会抓住未定义名称，而不是因为当前恰好没有缺 import 的文件
+    found = _undefined_names("import time\nprint(time.time(), missing_name)\n", "probe.py")
+    assert any("undefined name 'missing_name'" in line for line in found), found

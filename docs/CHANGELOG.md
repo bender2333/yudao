@@ -564,3 +564,4 @@ gpt-6 / 2026-10-08 09:48 / 当前验收基线补齐应用接口和迭代底座�
 
 9router/ag/gemini-3.8-flash-high / 2026-10-09 22:45 / 在 `docs/architecture-issues.md` 追加 #160 条目：`harness/tests/test_issue_374.py::test_the_lan_access_mode_opens_the_address_of_this_machine` 的就绪判定（轮询 `/api/capabilities` 只接受 200）与 #423（`1adea0ef`）加入的局域网令牌校验冲突，该项测试必然超时；已用 HEAD 上的同一文件副本复跑确认失败先于本次改动存在，建议给这次请求带令牌而不是放宽就绪判定 / 这条缺陷属于其他工单新增的接口测试，执行者在 #160 内不越界改动，按规则登记待架构师处置
 claude-sonnet-5-5 / 2026-10-09 23:58 / 在 `docs/architecture-issues.md` 的 #160 条目下追加「处理：」行，指向 #427（PR #429）已修正 / 按架构问题的处理流程写明结论与位置
+9router/oro / 2026-10-10 11:20 / 工单 #430：`harness/tests/helpers.py` 补回 `import time`（PR #428 搬移共用代码时删掉，四项取消运行中命令的集成层用例必然失败）；`harness/tests/test_test_imports.py` 新增一项单元层测试，用 `pyflakes` 检查 `harness/` 下全部源文件的未定义名称（F821），`pyflakes` 加入 dev 依赖组；顺带修掉 `harness/app/event_stream.py` 的 `deque` 与 `harness/orchestrator.py` 的 `ProjectEvent` 两处未定义名称；测试分层设计说明第 3 节记录这项检查 / 缺 import 的漏法只在集成层跑完整用例才暴露，需要在单元层查出
