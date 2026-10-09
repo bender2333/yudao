@@ -561,3 +561,5 @@ claude-sonnet-5-5 / 2026-10-08 07:25 / 在 `docs/architecture-issues.md` 的 #37
 gpt-6 / 2026-10-08 09:48 / 当前验收基线补齐应用接口和迭代底座已有实现；验收证据规则引用 aipro 单人流程的既有适用条件 / 工单状态与角色条件在同一文档中保持一致。
 
 9router/oro / 2026-10-09 18:55 / 工单 #377 第 5 轮合入 origin/main（1adea0ef，#348 的局域网访问令牌）：`client/src/renderer/src/app.tsx` 唯一一处冲突两侧保留——重新连接按钮取本分支的 `y9-btn` 类名与 main 的带令牌重连（第二个参数 token），不另建连接；`views/models/page.tsx`、`views/project/floor-screen.tsx` 的 `newCommandId()` 替换与 `client/tests/e2e/fixtures.ts` 的 `lanAddress`、`token`、`--token-name` 自动合并成功；`TokenGate` 表单按原型 v9 的类名显示（`y9-gate` / `y9-gate-card` / `y9-form` / `y9-field` / `y9-input` / `y9-btn primary`），不新增旧主题变量，令牌门显示时不渲染侧栏与顶栏；`access-token.spec.ts` 两处 `.brand` 的 `toHaveText("Yudao")` 改为 `.brand .y9-brand-name` 的 `toContainText("Yudao")`，与其余九个端到端文件同一口径 / 工单 #377 第 5 轮
+
+9router/ag/gemini-3.8-flash-high / 2026-10-09 22:45 / 在 `docs/architecture-issues.md` 追加 #160 条目：`harness/tests/test_issue_374.py::test_the_lan_access_mode_opens_the_address_of_this_machine` 的就绪判定（轮询 `/api/capabilities` 只接受 200）与 #423（`1adea0ef`）加入的局域网令牌校验冲突，该项测试必然超时；已用 HEAD 上的同一文件副本复跑确认失败先于本次改动存在，建议给这次请求带令牌而不是放宽就绪判定 / 这条缺陷属于其他工单新增的接口测试，执行者在 #160 内不越界改动，按规则登记待架构师处置

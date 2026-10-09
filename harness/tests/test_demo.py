@@ -1,10 +1,30 @@
+import pytest
+
 from harness.__main__ import main
 from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace, ProjectFlow, WorkItemMaterials
 from harness.demo import DEMO_CHANGE, DEMO_TASK, run_demo
+from harness.tests.helpers import system_on_copy
 
-def test_demo_fills_four_views(data_dir):
-    system, run_id = run_demo(data_dir)
+# demo 的一次运行：module 作用域的夹具跑一次并保存数据目录，每项测试在自己的副本上读取与检查。
+# 数据来自真实运行，登记为集成层。
+
+
+@pytest.fixture(scope="module")
+def saved_demo(tmp_path_factory):
+    system, run_id = run_demo(tmp_path_factory.mktemp("demo"))
+    system.close()
+    return system.data_dir, run_id
+
+
+@pytest.fixture
+def demo_run(saved_demo, tmp_path):
+    saved, run_id = saved_demo
+    return system_on_copy(saved, tmp_path / "demo"), run_id
+
+
+def test_demo_fills_four_views(demo_run):
+    system, run_id = demo_run
     projection = system.project(run_id)
     assert projection.phase == "DONE"
     assert projection.request_count == 3

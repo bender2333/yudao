@@ -9,24 +9,54 @@ from harness.models import ArtifactRef, EventType
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.public_tree import CapturedFile, CapturedTree, capture_public_tree, materialize_tree
+from harness.tests.helpers import system_on_copy
 from harness.tests.saved_rewrite import rewrite_saved_projection
 from harness.tree_archive import load_tree
 
+# 需要一份真实运行记录的文件：module 作用域的夹具各跑一次停在等质检让步的运行并保存数据目录，
+# 每项测试复制一份数据目录，在自己的副本上放行交付与检查。数据来自真实运行，登记为集成层。
 
-def _quality_ready(tmp_path, *, runs=1):
+REVIEW_TURN = review_turn("release", "Checks passed")
+
+
+def _saved_quality_ready(tmp_path, *, runs=1):
+    # runs 个事项各激活三次，停在等待质检让步：放行发生在每项测试自己的副本上
     script = []
     for _ in range(runs):
         script.extend([product_spec(), plan_turn(), delivery_turn()])
     script.extend(review_turn("release", "Checks passed") for _ in range(runs))
     system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter(script))
     run_ids = [system.create_run(f"Build echo {index}") for index in range(runs)]
-    ready = []
     for run_id in run_ids:
         for _ in range(3):
             result = system.activate_once(run_id)
         assert result.phase == "QUALITY", result.error
-        ready.append(result)
-    return system, run_ids, ready
+    saved = system.data_dir
+    system.close()
+    return saved, run_ids
+
+
+@pytest.fixture(scope="module")
+def quality_ready(tmp_path_factory):
+    return _saved_quality_ready(tmp_path_factory.mktemp("ready"))
+
+
+@pytest.fixture
+def ready_run(quality_ready, tmp_path):
+    saved, run_ids = quality_ready
+    # 保存的运行停在等待质检放行：重新打开的系统要能回答这一步，脚本里补上这次放行
+    return system_on_copy(saved, tmp_path / "ready", [REVIEW_TURN]), run_ids
+
+
+@pytest.fixture(scope="module")
+def quality_ready_two_runs(tmp_path_factory):
+    return _saved_quality_ready(tmp_path_factory.mktemp("ready-two"), runs=2)
+
+
+@pytest.fixture
+def two_ready_runs(quality_ready_two_runs, tmp_path):
+    saved, run_ids = quality_ready_two_runs
+    return system_on_copy(saved, tmp_path / "ready-two", [REVIEW_TURN] * len(run_ids)), run_ids
 
 
 def _events(system, run_id):
@@ -48,10 +78,10 @@ def _accept_with(monkeypatch, system, run_id, change_delivery):
 
 
 @pytest.mark.parametrize("damage", ["manifest_missing", "manifest_corrupt", "blob_missing", "blob_corrupt"])
-def test_release_rejects_missing_or_corrupt_persisted_delivery_tree(tmp_path, damage):
-    system, run_ids, ready = _quality_ready(tmp_path)
+def test_release_rejects_missing_or_corrupt_persisted_delivery_tree(ready_run, damage):
+    system, run_ids = ready_run
     run_id = run_ids[0]
-    delivery = ready[0].delivery_spec
+    delivery = system.project(run_id).delivery_spec
     manifest_path = system.artifacts.root / delivery.tree_ref.path
     archive = json.loads(system.artifacts.get_for_run(run_id, delivery.tree_ref))
     blob_path = system.artifacts.root / archive["blobs"][0]["artifact"]["path"]
@@ -74,8 +104,8 @@ def test_release_rejects_missing_or_corrupt_persisted_delivery_tree(tmp_path, da
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in _events(system, run_id))
 
 
-def test_release_verifies_the_persisted_tree_before_marking_done(tmp_path):
-    system, run_ids, ready = _quality_ready(tmp_path)
+def test_release_verifies_the_persisted_tree_before_marking_done(ready_run):
+    system, run_ids = ready_run
     run_id = run_ids[0]
 
     result = system.activate_once(run_id)
@@ -88,10 +118,10 @@ def test_release_verifies_the_persisted_tree_before_marking_done(tmp_path):
     assert any(event.type == EventType.RUN_DONE for event in _events(system, run_id))
 
 
-def test_release_rejects_a_delivery_archive_bound_to_another_run(tmp_path, monkeypatch):
-    system, run_ids, ready = _quality_ready(tmp_path, runs=2)
+def test_release_rejects_a_delivery_archive_bound_to_another_run(two_ready_runs, monkeypatch):
+    system, run_ids = two_ready_runs
     first_run, second_run = run_ids
-    other_tree_ref = ready[1].delivery_spec.tree_ref
+    other_tree_ref = system.project(second_run).delivery_spec.tree_ref
     _accept_with(monkeypatch, system, first_run, lambda delivery: replace(delivery, tree_ref=other_tree_ref))
     result = system.activate_once(first_run)
 
@@ -102,10 +132,10 @@ def test_release_rejects_a_delivery_archive_bound_to_another_run(tmp_path, monke
     assert system.project(second_run).phase == "QUALITY"
 
 
-def test_release_rejects_a_same_run_reference_that_is_not_a_tree_manifest(tmp_path, monkeypatch):
-    system, run_ids, ready = _quality_ready(tmp_path)
+def test_release_rejects_a_same_run_reference_that_is_not_a_tree_manifest(ready_run, monkeypatch):
+    system, run_ids = ready_run
     run_id = run_ids[0]
-    delivery = ready[0].delivery_spec
+    delivery = system.project(run_id).delivery_spec
     archive = json.loads(system.artifacts.get_for_run(run_id, delivery.tree_ref))
     wrong_ref = ArtifactRef(**archive["blobs"][0]["artifact"])
     _accept_with(monkeypatch, system, run_id, lambda delivery: replace(delivery, tree_ref=wrong_ref))
@@ -117,8 +147,8 @@ def test_release_rejects_a_same_run_reference_that_is_not_a_tree_manifest(tmp_pa
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in _events(system, run_id))
 
 
-def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(tmp_path):
-    system, run_ids, ready = _quality_ready(tmp_path)
+def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(ready_run):
+    system, run_ids = ready_run
     run_id = run_ids[0]
     projection = system.project(run_id)
     delivery = replace(projection.delivery_spec, code_tree_digest="sha256:" + "0" * 64)
@@ -134,8 +164,8 @@ def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(tm
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in _events(system, run_id))
 
 
-def test_release_rejects_a_snapshot_that_differs_before_submission_commit(tmp_path, monkeypatch):
-    system, run_ids, ready = _quality_ready(tmp_path)
+def test_release_rejects_a_snapshot_that_differs_before_submission_commit(ready_run, monkeypatch):
+    system, run_ids = ready_run
     run_id = run_ids[0]
     original_prepare = system.orchestrator.submissions.prepare
 
@@ -158,8 +188,8 @@ def test_release_rejects_a_snapshot_that_differs_before_submission_commit(tmp_pa
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in _events(system, run_id))
 
 
-def test_persisted_delivery_tree_restores_independently_of_workspace(tmp_path):
-    system, run_ids, ready = _quality_ready(tmp_path)
+def test_persisted_delivery_tree_restores_independently_of_workspace(ready_run, tmp_path):
+    system, run_ids = ready_run
     run_id = run_ids[0]
     result = system.activate_once(run_id)
     assert result.phase == "DONE", result.error
