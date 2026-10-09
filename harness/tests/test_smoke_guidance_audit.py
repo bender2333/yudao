@@ -14,7 +14,7 @@ from harness.proposals import (
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
-from harness.tests.helpers import recorded_context
+from harness.tests.helpers import recorded_context, system_on_copy
 from harness.tests.saved_rewrite import rewrite_saved_event, rewrite_saved_events
 
 INPUT_V2 = "Also print a status column in the export.\r\n"
@@ -30,9 +30,14 @@ def _list_files(request):
         "name": "list_files", "arguments": "{}",
     }])
 
+# 需要一份真实运行记录的文件：module 作用域的夹具跑一次完整循环并保存数据目录，
+# 每项测试复制一份数据目录，在自己的副本上改写与检查。数据来自真实运行，登记为集成层。
 
-@pytest.fixture
-def combined_run(tmp_path):
+
+@pytest.fixture(scope="module")
+def saved_combined(tmp_path_factory):
+    # 一次走完的组合 run：连续输入 v2 + 部门指导 + 专家协作 + 质检放行。
+    # 这项检查要读回请求的顺序：请求本身在调用清单里，清单随数据目录保存
     holder = {}
 
     def in_flight_changes(request):
@@ -79,15 +84,25 @@ def combined_run(tmp_path):
         delivery_turn(files={"src/echo.py": "# export-format: csv\nimport sys\nprint(sys.argv[1])\n"}),
         review_turn("release", "Independent quality check passed on the current delivery."),
     ])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path_factory.mktemp("combined"), adapter)
     holder["system"] = system
     run_id = system.create_run("build an export CLI", max_cycles=20)
     projection = system.run_until_stop(run_id)
-    return system, adapter, run_id, projection
+    assert projection.phase == "DONE"
+    invocations = list(adapter.invocations)
+    system.close()
+    return system.data_dir, run_id, projection, invocations
+
+
+@pytest.fixture
+def combined_run(saved_combined, tmp_path):
+    # 每项测试在自己的数据目录副本上改写与检查
+    saved, run_id, projection, invocations = saved_combined
+    return system_on_copy(saved, tmp_path / "combined"), run_id, projection, invocations
 
 
 def test_combined_run_shape(combined_run):
-    system, adapter, run_id, projection = combined_run
+    system, run_id, projection, invocations = combined_run
     assert projection.phase == "DONE" and projection.stop_reason == "released", (projection.stop_reason, projection.error)
     assert projection.input_version == projection.processed_input_version == 2
     assert projection.product_spec.revision == 2
@@ -95,7 +110,7 @@ def test_combined_run_shape(combined_run):
     assert [item.status for item in projection.responses] == ["answered"]
     events = system.store.list_events(run_id)
     assert any(event.type == EventType.TOOL_SKIPPED for event in events)
-    guidance_only = [request for request in adapter.invocations
+    guidance_only = [request for request in invocations
                      if recorded_context(system, request).manifest.guidance_only]
     assert {request.department for request in guidance_only} == {"engineering"}
     assert len({request.activation_id for request in guidance_only}) == 2
@@ -106,7 +121,7 @@ def test_combined_run_shape(combined_run):
 
 
 def test_model_input_audit_verifies_combined_run(combined_run):
-    system, _, run_id, _ = combined_run
+    system, run_id, _projection, _invocations = combined_run
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["model_input_audit"]["status"] == "verified", fields["model_input_audit"]["notes"]
     assert fields["context_isolated"] is True
@@ -156,7 +171,7 @@ def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_pa
     ("missing_snapshot", "does not record the workspace snapshot"),
 ])
 def test_model_input_audit_rejects_tampered_or_missing_snapshot_record(combined_run, mutation, expected):
-    system, _, run_id, _ = combined_run
+    system, run_id, _projection, _invocations = combined_run
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     events = _saved_events(system, run_id)
     assembled = next(
@@ -196,7 +211,7 @@ def _rehash_request(system, events, assembled, request):
     ("full_tools_in_guidance_only", "guidance_only does not match"),
 ])
 def test_model_input_audit_rejects_tampered_guidance_request(combined_run, mutation, expected):
-    system, _, run_id, _ = combined_run
+    system, run_id, _projection, _invocations = combined_run
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     events = _saved_events(system, run_id)
     activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED

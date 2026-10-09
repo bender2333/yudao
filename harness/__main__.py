@@ -146,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
         _stop_on_ctrl_c()
         serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv),
                   access=args.access, host=args.host, port=args.port, data_dir=args.data_dir,
-                  on_ready=None if args.no_browser else _open_page(args.port))
+                  on_ready=_ready if args.no_browser else _open_page())
         return 0
     if command == "token":
         return _token_command(args)
@@ -249,9 +249,17 @@ def page_address(port: int) -> str:
     return f"http://127.0.0.1:{port}/"
 
 
-def _open_page(port: int) -> Callable[[], None]:
-    # 服务就绪以后的打开方式：在命令行输出页面地址，用标准库的 webbrowser 打开同一个地址
-    def open_page() -> None:
+def _ready(port: int) -> None:
+    # 服务开始接受请求以后（设计说明第 4.2 节）：报告实际监听的端口。
+    # 端口一律报告：--port 0 时实际端口由操作系统分配，启动方（测试、脚本）只能从这行得知它；
+    # 带 --no-browser 时不打开浏览器，也不输出页面地址
+    print(f"port: {port}", flush=True)
+
+
+def _open_page() -> Callable[[int], None]:
+    # 打开浏览器的就绪动作：在命令行输出页面地址，用标准库的 webbrowser 打开同一个地址
+    def open_page(port: int) -> None:
+        _ready(port)
         address = page_address(port)
         print(f"web: {address}", flush=True)
         webbrowser.open(address)
