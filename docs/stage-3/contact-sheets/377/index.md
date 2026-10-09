@@ -15,7 +15,7 @@
 
 - 原型 v9 路由：`#/home`（档位 `ui`，用原型自带的示例数据）
 - 真实系统路由：`#/home`（系统页，不选项目）
-- 行数：6 · 图片体积：1.00 MB
+- 行数：6 · 图片体积：1.08 MB
 
 ### 机器（machines）
 
@@ -47,7 +47,7 @@
 
 - 原型 v9 路由：`#/p/p-metro/overview?w=w-metro-transfer`（档位 `ui`，用原型自带的示例数据）
 - 真实系统路由：`#/p/{project}/overview` · 预置项目「交付历史」
-- 行数：6 · 图片体积：1.29 MB
+- 行数：6 · 图片体积：1.28 MB
 
 ### 部门工作间（dept）
 
@@ -55,7 +55,7 @@
 
 - 原型 v9 路由：`#/p/p-metro/dept/engineering?w=w-metro-transfer`（档位 `ui`，用原型自带的示例数据）
 - 真实系统路由：`#/p/{project}/dept/engineering` · 预置项目「文本工具」
-- 行数：6 · 图片体积：1.18 MB
+- 行数：6 · 图片体积：1.17 MB
 
 ### 资料（materials）
 
@@ -70,7 +70,7 @@
 ![观测 · light](observe-light.png)
 
 - 原型 v9 路由：`#/p/p-metro/observe?w=w-metro-transfer`（档位 `ui`，用原型自带的示例数据）
-- 真实系统路由：`#/p/proj_33b55093785d438d/observe` · 预置项目「交付历史」
+- 真实系统路由：`#/p/proj_a9e623baf4304e65/observe` · 预置项目「交付历史」
 - 行数：6 · 图片体积：0.79 MB
 
 ### 项目设置（settings）
@@ -78,7 +78,7 @@
 ![项目设置 · light](settings-light.png)
 
 - 原型 v9 路由：`#/p/p-sensor/settings`（档位 `ui`，用原型自带的示例数据）
-- 真实系统路由：`#/p/proj_67d243ec4cd440ed/settings` · 预置项目「示例项目」
+- 真实系统路由：`#/p/proj_9a9bb2727e554ffb/settings` · 预置项目「示例项目」
 - 行数：6 · 图片体积：1.02 MB
 
 ### 恢复（recovery）
@@ -86,7 +86,7 @@
 ![恢复 · light](recovery-light.png)
 
 - 原型 v9 路由：`#/p/p-sensor/w/w-sensor-chart/recovery`（档位 `3.1`，用原型自带的示例数据）
-- 真实系统路由：`#/p/proj_9d7acefeefe3488b/w/wi_8a5c69e796a34343/recovery` · 预置项目「文本工具」
+- 真实系统路由：`#/p/proj_548d74b0e0754ad5/w/wi_aee6fef7b39340c9/recovery` · 预置项目「文本工具」
 - 行数：6 · 图片体积：0.71 MB
 
 ### 模型管理（models）
@@ -105,7 +105,7 @@
 
 - 原型 v9 路由：`#/home`（档位 `ui`，用原型自带的示例数据）
 - 真实系统路由：`#/home`（系统页，不选项目）
-- 行数：6 · 图片体积：1.01 MB
+- 行数：6 · 图片体积：1.08 MB
 
 ### 机器（machines）
 
@@ -137,7 +137,7 @@
 
 - 原型 v9 路由：`#/p/p-metro/overview?w=w-metro-transfer`（档位 `ui`，用原型自带的示例数据）
 - 真实系统路由：`#/p/{project}/overview` · 预置项目「交付历史」
-- 行数：6 · 图片体积：1.29 MB
+- 行数：6 · 图片体积：1.27 MB
 
 ### 部门工作间（dept）
 
@@ -145,7 +145,7 @@
 
 - 原型 v9 路由：`#/p/p-metro/dept/engineering?w=w-metro-transfer`（档位 `ui`，用原型自带的示例数据）
 - 真实系统路由：`#/p/{project}/dept/engineering` · 预置项目「文本工具」
-- 行数：6 · 图片体积：1.18 MB
+- 行数：6 · 图片体积：1.17 MB
 
 ### 资料（materials）
 
@@ -153,14 +153,14 @@
 
 - 原型 v9 路由：`#/p/p-todo/materials?w=w-todo-due`（档位 `ui`，用原型自带的示例数据）
 - 真实系统路由：`#/p/{project}/materials` · 预置项目「示例项目」
-- 行数：6 · 图片体积：0.94 MB
+- 行数：6 · 图片体积：0.95 MB
 
 ### 观测（observe）
 
 ![观测 · dark](observe-dark.png)
 
 - 原型 v9 路由：`#/p/p-metro/observe?w=w-metro-transfer`（档位 `ui`，用原型自带的示例数据）
-- 真实系统路由：`#/p/proj_33b55093785d438d/observe` · 预置项目「交付历史」
+- 真实系统路由：`#/p/proj_a9e623baf4304e65/observe` · 预置项目「交付历史」
 - 行数：6 · 图片体积：0.79 MB
 
 ### 项目设置（settings）
@@ -168,7 +168,7 @@
 ![项目设置 · dark](settings-dark.png)
 
 - 原型 v9 路由：`#/p/p-sensor/settings`（档位 `ui`，用原型自带的示例数据）
-- 真实系统路由：`#/p/proj_67d243ec4cd440ed/settings` · 预置项目「示例项目」
+- 真实系统路由：`#/p/proj_9a9bb2727e554ffb/settings` · 预置项目「示例项目」
 - 行数：6 · 图片体积：1.02 MB
 
 ### 恢复（recovery）
@@ -176,7 +176,7 @@
 ![恢复 · dark](recovery-dark.png)
 
 - 原型 v9 路由：`#/p/p-sensor/w/w-sensor-chart/recovery`（档位 `3.1`，用原型自带的示例数据）
-- 真实系统路由：`#/p/proj_9d7acefeefe3488b/w/wi_8a5c69e796a34343/recovery` · 预置项目「文本工具」
+- 真实系统路由：`#/p/proj_548d74b0e0754ad5/w/wi_aee6fef7b39340c9/recovery` · 预置项目「文本工具」
 - 行数：6 · 图片体积：0.70 MB
 
 ### 模型管理（models）
