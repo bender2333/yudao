@@ -25,6 +25,12 @@ LOGGING_CONFIG = uvicorn.config.LOGGING_CONFIG
 # host 是监听地址，connect 是测试连接的地址（默认回环）
 STARTUP_TIMEOUT_SEC = 30
 
+
+def bearer(token: str) -> dict[str, str]:
+    # 请求头里的访问令牌（应用层与接口层设计说明第 6.3 节）：令牌只放在请求头中，不出现在地址里
+    return {"Authorization": f"Bearer {token}"}
+
+
 @dataclass
 class RunningServer:
     # 一个运行中的接口服务：客户端、服务句柄、端口与宿主线程。停止请求的测试用它核对服务是否真的退出

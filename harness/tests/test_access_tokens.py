@@ -13,7 +13,7 @@ from harness.app.access_tokens import AccessTokenStore, TokenNameTaken, UnknownT
 from harness.app.application import Application
 from harness.models import utc_now
 from harness.runtime import LoopSystem
-from harness.tests.api_helpers import running_api
+from harness.tests.api_helpers import bearer, running_api
 
 
 class _Opened:
@@ -35,9 +35,6 @@ def _lan_address() -> str:
             return address
     return "127.0.0.1"
 
-
-def _bearer(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
 
 
 def _lan(opened, data_dir, **options):
@@ -135,10 +132,10 @@ def test_lan_access_requires_a_token_for_every_interface_path(data_dir, tmp_path
                                    json={"command_id": str(uuid.uuid4()), "name": "无令牌", "goal": "整理需求"}),
             "events": client.get("/api/events?after=999999"),
         }
-        invalid = client.get("/api/queries/system.status", headers=_bearer("0" * 64))
+        invalid = client.get("/api/queries/system.status", headers=bearer("0" * 64))
         no_scheme = client.get("/api/queries/system.status", headers={"Authorization": token})
-        allowed = client.get("/api/queries/system.status", headers=_bearer(token))
-        openapi_allowed = client.get("/openapi.json", headers=_bearer(token))
+        allowed = client.get("/api/queries/system.status", headers=bearer(token))
+        openapi_allowed = client.get("/openapi.json", headers=bearer(token))
     assert page.status_code == 200
     assert all(response.status_code == 401 and response.content == b"" for response in denied.values())
     assert invalid.status_code == 401 and invalid.content == b""
@@ -168,8 +165,8 @@ def test_the_actor_is_the_token_name_and_the_token_stays_out_of_events(data_dir)
     with _lan(opened, data_dir) as client:
         accepted = client.post("/api/commands/project.create",
                                json={"command_id": str(uuid.uuid4()), "name": "接入已有项目", "goal": "整理需求"},
-                               headers=_bearer(token))
-        stream = client.get("/api/events?after=999999", headers=_bearer(token))
+                               headers=bearer(token))
+        stream = client.get("/api/events?after=999999", headers=bearer(token))
         project_id = accepted.json()["refs"]["project_id"]
         events = opened.applications[0].system.store.list_project_events(project_id)
     assert accepted.status_code == 200
@@ -185,8 +182,8 @@ def test_revoking_a_token_takes_effect_on_a_running_service(data_dir):
     opened = _Opened(data_dir)
     _entry, token = AccessTokenStore(data_dir).create("客厅的电脑", now=utc_now())
     with _lan(opened, data_dir) as client:
-        before = client.get("/api/queries/system.status", headers=_bearer(token))
+        before = client.get("/api/queries/system.status", headers=bearer(token))
         AccessTokenStore(data_dir).revoke("客厅的电脑", now=utc_now())
-        after = client.get("/api/queries/system.status", headers=_bearer(token))
+        after = client.get("/api/queries/system.status", headers=bearer(token))
     assert before.status_code == 200
     assert after.status_code == 401 and after.content == b""
