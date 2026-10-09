@@ -378,6 +378,16 @@ class ProjectService:
         return (values["max_cycles"] if max_cycles is None else max_cycles,
                 values["run_time_limit_sec"] if run_time_limit_sec is None else run_time_limit_sec)
 
+    def onboarding_round_limit(self, project_id: str | None, run_time_limit_sec: int | None = None) -> int:
+        # 建档事项的单轮上限（迭代底座 B3，工单 #351）：项目设置过时用它，否则用全局现值；
+        # 调用方显式给出时按给出值
+        from . import parameters as parameter_values
+
+        if run_time_limit_sec is not None:
+            return run_time_limit_sec
+        return parameter_values.value_for_project(
+            self.store, project_id, "onboarding.round_time_limit_sec")
+
     # 读
 
     def projection(self, project_id: str) -> ProjectProjection:
@@ -457,7 +467,8 @@ class ProjectService:
         _require_text("goal", goal)
         _require_text("source_name", source_name)
         _require_text("source_path", source_path)
-        max_cycles, run_time_limit_sec = self._limit_values(max_cycles, run_time_limit_sec)
+        max_cycles, _default_limit = self._limit_values(max_cycles, None)
+        run_time_limit_sec = self.onboarding_round_limit(None, run_time_limit_sec)
         project_id = new_id("proj")
         work_item_id, run_id = new_id("wi"), new_id("run")
         tree, snapshot = ingest_snapshot(source_path, self.artifacts, run_id)
@@ -500,7 +511,8 @@ class ProjectService:
         directory = project.source_directories.get(source_name)
         if directory is None:
             raise SourceDirectoryNotFoundError(f"unknown source directory: {source_name}")
-        max_cycles, run_time_limit_sec = self._limit_values(max_cycles, run_time_limit_sec)
+        max_cycles, _default_limit = self._limit_values(max_cycles, None)
+        run_time_limit_sec = self.onboarding_round_limit(project_id, run_time_limit_sec)
         work_item_id, run_id = new_id("wi"), new_id("run")
         tree, snapshot = ingest_snapshot(directory.path, self.artifacts, run_id)
 
@@ -539,6 +551,27 @@ class ProjectService:
         finally:
             self._starting[project_id].discard(token)
         return item
+
+    def set_parameter(self, project_id: str, name: str, value: Any, *, reason: str, modified_by: str,
+                      command: Command | None = None) -> None:
+        # 设置项目级参数（迭代底座 B3，工单 #351）：只有检查时限与建档单轮上限可以按项目设置，
+        # 取值按全局的界限核对；事件写进项目流，只作用于之后创建的 run
+        from . import parameters as parameter_values
+
+        _require_text("reason", reason)
+        _require_text("modified_by", modified_by)
+        new_value = parameter_values.check_project_parameter(name, value)
+        old_value = parameter_values.value_for_project(self.store, project_id, name)
+
+        def set_parameter(transaction: Transaction) -> None:
+            self._writable_in(transaction, project_id)
+            transaction.append(NewProjectEvent(ProjectEventType.PARAMETER_SET, {
+                "name": name, "old_value": old_value, "new_value": new_value,
+                "reason": reason, "modified_by": modified_by,
+                "bounds": list(DEFINITIONS.rule(name).bounds),
+            }, actor=modified_by))
+
+        self.writes.transact(project_stream(project_id), set_parameter, command=command)
 
     def rename(self, project_id: str, name: str, *, command: Command | None = None) -> None:
         _require_text("name", name)

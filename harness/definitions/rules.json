@@ -54,6 +54,17 @@
     "tighten_when": "同一项目的检查用时分布长期低于现值的四分之一",
     "origin": "规则登记第 8 节表格，检查的时限；D17 单次请求等待的暂定默认值 600 秒"
   },
+  "onboarding.round_time_limit_sec": {
+    "value": 7200,
+    "bounds": [600, 86400],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "一轮建档读不完整个仓库，run 因时间上限失败",
+    "cost": "一轮建档占用的时间过长，用户等待修改意见的时间变长",
+    "relax_when": "按项目记录的一轮建档用时分布设定（项目级参数，迭代底座 B3）",
+    "tighten_when": "同一项目的一轮建档用时分布长期低于现值的四分之一",
+    "origin": "接入已有项目设计说明第 4.2 节：建档每一轮是一个新的 run，单独计算运行时间，上限与普通事项相同"
+  },
   "command_timeout_max_sec": {
     "value": 600,
     "bounds": [1, 86400],

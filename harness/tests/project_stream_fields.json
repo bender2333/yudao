@@ -86,6 +86,14 @@
     "project_registered": {
       "initial_snapshot": "旧事件没有这个字段（#321）：没有这个字段的项目没有起始文件夹，事项从空树开始"
     },
+    "project_parameter_set": {
+      "bounds": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有修改所依据的界限，读取时按规则登记中该条目的界限",
+      "modified_by": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有按项目修改参数的记录",
+      "name": "这个事件种类是新增的，旧版本的项目流中没有它：参数名取自目录流的 parameter_set 事件",
+      "new_value": "这个事件种类是新增的，旧版本的项目流中没有它：没有项目级取值时这个参数按全局的当前值生效",
+      "old_value": "这个事件种类是新增的，旧版本的项目流中没有它：没有项目级取值时按全局的当前值作为修改前的取值",
+      "reason": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有按项目修改参数的记录"
+    },
     "work_item_created": {
       "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
       "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的"
@@ -301,6 +309,14 @@
     "project_goal_changed": {
       "goal": "string",
       "goal_ref": "object"
+    },
+    "project_parameter_set": {
+      "bounds": "array[any]",
+      "modified_by": "string",
+      "name": "string",
+      "new_value": "any",
+      "old_value": "any",
+      "reason": "string"
     },
     "project_pinned": {
       "pinned": "boolean"

@@ -258,6 +258,9 @@ class RunCreatedPayload(Payload):
     max_cycles: int
     run_time_limit_sec: int
     context_window: int
+    # 这个 run 中检查的时限（迭代底座 B3，工单 #351）：创建时按项目级取值与全局现值冻结；
+    # 旧事件没有这个字段时按当时的全局现值处理
+    check_timeout_sec: int = 600
     provider: str
     adapter: str
     sessions: dict[Department, str]
@@ -1428,6 +1431,18 @@ class ParameterSetPayload(Payload):
     parameters_version: str
 
 
+class ProjectParameterSetPayload(Payload):
+    # 项目级参数的修改（迭代底座 B3，工单 #351）：检查时限与建档单轮上限可以按项目设置。
+    # old_value 是修改前这个项目的生效取值（没有设置过时是当时的全局现值），new_value 是界内核对过的新值
+    name: str
+    old_value: Any
+    new_value: Any
+    reason: str
+    modified_by: str
+    # 这次修改所依据的界限：修改以后界面仍能显示可调整范围
+    bounds: list[Any]
+
+
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
     EventType.RUN_CREATED: RunCreatedPayload,
@@ -1498,6 +1513,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.PROJECT_DECISION_WITHDRAWN: ProjectDecisionWithdrawnPayload,
     ProjectEventType.ONBOARDING_REVISION_STARTED: OnboardingRevisionStartedPayload,
     ProjectEventType.BASELINE_ADOPTED: BaselineAdoptedPayload,
+    ProjectEventType.PARAMETER_SET: ProjectParameterSetPayload,
     CatalogEventType.CATALOG_REVISED: CatalogRevisedPayload,
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,

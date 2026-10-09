@@ -20,6 +20,7 @@
    "payload": {
     "adapter": "fake",
     "baseline": null,
+    "check_timeout_sec": 600,
     "command_versions": {},
     "context_window": 6000,
     "definitions_version": "<definitions>",
@@ -3455,6 +3456,7 @@
   "baseline": null,
   "baseline_review": null,
   "baseline_reviews": [],
+  "check_timeout_sec": 600,
   "command_versions": {},
   "compactions": [
    {

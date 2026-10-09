@@ -20,6 +20,7 @@
    "payload": {
     "adapter": "fake",
     "baseline": null,
+    "check_timeout_sec": 600,
     "command_versions": {
      "serve": 1
     },
@@ -2435,6 +2436,7 @@
   "baseline": null,
   "baseline_review": null,
   "baseline_reviews": [],
+  "check_timeout_sec": 600,
   "command_versions": {
    "serve": 1
   },

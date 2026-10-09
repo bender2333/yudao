@@ -313,6 +313,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.max_cycles = int(payload["max_cycles"])
         state.run_time_limit_sec = int(payload["run_time_limit_sec"])
         state.context_window = int(payload.get("context_window", 32_000))
+        # 这个 run 中检查的时限：旧事件没有这个字段时按当时的全局现值处理（迭代底座 B3，工单 #351）
+        state.check_timeout_sec = int(payload.get("check_timeout_sec", DEFINITIONS.rule_value("check_timeout_sec")))
         state.provider = payload.get("provider", "fake")
         state.adapter = payload["adapter"]
         state.sessions = {
