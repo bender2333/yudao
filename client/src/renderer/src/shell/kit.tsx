@@ -105,14 +105,17 @@ export function PageHead(props: { eyebrow?: string; title: string; subtitle?: st
 }
 
 export function Block(props: {
+  // 区块标识：状态项点击以后按它滚到对应区块（原型 shell.js 的 anchor）
+  id?: string;
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
+  className?: string;
   compact?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className={`y9-block${props.compact ? " is-compact" : ""}`}>
+    <section id={props.id} className={`y9-block${props.className ? ` ${props.className}` : ""}${props.compact ? " is-compact" : ""}`}>
       {props.title || props.actions ? (
         <header className="y9-block-head">
           <div className="y9-block-titles">

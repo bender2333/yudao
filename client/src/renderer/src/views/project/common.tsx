@@ -83,9 +83,9 @@ export function formatNumberOr(value: number | null | undefined, suffix = ""): s
   return `${value.toLocaleString("zh-CN")}${suffix}`;
 }
 
-export function Section(props: { title: string; note?: string; children: React.ReactNode }) {
+export function Section(props: { id?: string; title: string; note?: string; className?: string; children: React.ReactNode }) {
   return (
-    <section className="y9-block card">
+    <section id={props.id} className={`y9-block ${props.className ?? "card"}`}>
       <div className="y9-block-head section-head">
         <div className="y9-block-titles">
           <h2 className="y9-block-title">{props.title}</h2>

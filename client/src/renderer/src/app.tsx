@@ -14,6 +14,10 @@ import { parseRoute, paths, type Route } from "./shell/routing";
 import { HomePage } from "./views/home/page";
 import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
+import { MachinesPage } from "./views/system/machines";
+import { ReservedPage } from "./views/system/reserved";
+import { RuntimePage } from "./views/system/runtime";
+import { ToolsPage } from "./views/system/tools";
 import { DepartmentPage } from "./views/project/department";
 import { MaterialsPage } from "./views/project/materials";
 import { ObserveDetailPage, ObservePage } from "./views/project/observe";
@@ -310,6 +314,14 @@ export function App() {
               // 的路径记在 ref 里，无记录（直接输入地址进来）才回落到首页
               onBack={() => navigate(backHash())}
             />
+          ) : route.name === "sys-machines" ? (
+            <MachinesPage capabilities={capabilities} />
+          ) : route.name === "sys-runtime" ? (
+            <RuntimePage app={app} systemStatus={systemStatus} />
+          ) : route.name === "sys-tools" ? (
+            <ToolsPage capabilities={capabilities} />
+          ) : route.name === "sys-reserved" ? (
+            <ReservedPage which={route.systemPage} />
           ) : (
             <ProjectRouter app={app} route={route} systemStatus={systemStatus} onNavigate={navigate} />
           )}

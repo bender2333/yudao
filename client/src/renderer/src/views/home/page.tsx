@@ -10,6 +10,7 @@ import type {
   ProjectList,
   ProjectRow,
   ProjectOverviewResult,
+  SystemStatus,
 } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { Loading, Section, hasCommand } from "../project/common";
@@ -23,11 +24,7 @@ import { BuildingSection } from "./building-section";
 import { Timeline } from "../timeline/timeline";
 import { ticksInRefs, ticksOf } from "../timeline/logic";
 import { paths } from "../../shell/routing";
-import { Icon } from "../../shell/kit";
-
-// 状态项的图标（原型 v9 的 ui/shell.js 的 statusItems）：每项一个字形，「待你决定」用 decide，
-// 与决定卡片同一个字形；kit.tsx 的 GLYPHS 里有它（不在 StatusMark 的状态名单中）
-const STAT_ICONS: Record<string, string> = { decisions: "decide" };
+import { Block, Icon } from "../../shell/kit";
 
 const RANGE_LABELS: Record<string, string> = { since_seen: "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天" };
 
@@ -81,10 +78,11 @@ export function HomePage(props: {
     return names;
   }, [projects.data]);
 
+  const status = useSnapshot<SystemStatus>(props.app, "page.home.status", "system.status", {});
   // 现在的时间只在读取快照后取一次，等待时长按发出时间到这个时刻算（卡片不自行计时）
   const now = Date.now();
   const waiting = useMemo(() => sortByRequested(decisions.data?.decisions ?? []), [decisions.data]);
-  const items = statusItems(waiting.length);
+  const items = statusItems(status.data, waiting);
 
   // 报告项展开时高亮的刻度：报告的来源事件位置与刻度位置相同即高亮
   const highlights = useMemo(() => {
@@ -103,7 +101,7 @@ export function HomePage(props: {
   return (
     <div className={`y9-home page home${replaying ? " is-replay" : ""}`}>
       <Loading state={decisions} />
-      <StatusRow items={items} onNavigate={props.onNavigate} />
+      <StatusBlock items={items} onNavigate={props.onNavigate} />
 
       <BuildingSection
         app={props.app}
@@ -118,7 +116,7 @@ export function HomePage(props: {
         </p>
       ) : null}
 
-      <Section title="待你决定" note="跨项目，按发出时间排列">
+      <Section id="home-decisions" title="待你决定" className="card" note="跨项目，按发出时间排列">
         <DecisionNames
           app={props.app}
           decisions={waiting}
@@ -130,6 +128,7 @@ export function HomePage(props: {
       </Section>
 
       <AwayReportSection
+        id="home-report"
         app={props.app}
         report={report}
         range={range}
@@ -143,7 +142,7 @@ export function HomePage(props: {
         highlights={highlights}
       />
 
-      <Section title="项目" note="按项目列出长期目标、当前成果与等待数量">
+      <Section id="home-projects" title="项目" className="card" note="按项目列出长期目标、当前成果与等待数量">
         {(replaying ? replayProjects.data : projects.data) === null ? (
           <Loading state={replaying ? replayProjects : projects} />
         ) : (
@@ -266,33 +265,39 @@ function useWorkItemTitles(app: ClientApp, decisions: DecisionView[]): Record<st
   return titles;
 }
 
-// 状态项的一排：正常时灰色「无」，异常时亮起并显示数量，点击进入对应的页面
-function StatusRow(props: { items: StatusItem[]; onNavigate: (hash: string) => void }) {
+// 状态项的区块（原型 ui/views/home.js 的 statusRow）：一个没有标题的区块里放一排状态项，
+// 正常时灰色「无」，异常时亮起并显示数量；点击跳到对应的页面，同页的区块滚到该区块
+function StatusBlock(props: { items: StatusItem[]; onNavigate: (hash: string) => void }) {
   return (
-    <div className="y9-stats status-row" aria-label="状态项">
-      {props.items.map((item) => {
-        const value = item.lit ? (item.count !== null ? String(item.count) : item.text) : "无";
-        return (
-          <button
-            key={item.id}
-            className={`y9-stat status-item is-${item.id}${item.lit ? " is-lit lit" : ""}${
-              item.lit && STAT_ICONS[item.id] === "decide" ? " is-decide" : ""
-            }`}
-            disabled={!item.lit || item.href === null}
-            onClick={() => {
-              if (item.href !== null) {
-                props.onNavigate(item.href);
-              }
-            }}
-            title={`${item.label}：${value}${item.lit && item.href !== null ? "，点击查看" : ""}`}
-          >
-            <Icon name={STAT_ICONS[item.id] ?? "unknown"} className="y9-stat-icon" />
-            <span className="y9-stat-label status-label">{item.label}</span>
-            <span className="y9-stat-value status-value">{value}</span>
-          </button>
-        );
-      })}
-    </div>
+    <Block className="y9-home-status card">
+      <div className="y9-stats status-row" aria-label="状态项">
+        {props.items.map((item) => {
+          const value = item.lit ? (item.count !== null ? String(item.count) : item.text) : "无";
+          return (
+            <button
+              key={item.id}
+              className={`y9-stat status-item is-${item.id}${item.lit ? " is-lit lit" : ""}${
+                item.lit && item.icon === "decide" ? " is-decide" : ""
+              }`}
+              disabled={!item.lit || item.href === null}
+              onClick={() => {
+                if (item.href !== null) {
+                  props.onNavigate(item.href);
+                }
+                if (item.anchor !== null) {
+                  document.getElementById(item.anchor)?.scrollIntoView({ block: "start" });
+                }
+              }}
+              title={`${item.label}：${value}${item.lit && item.href !== null ? "，点击查看" : ""}`}
+            >
+              <Icon name={item.icon} className="y9-stat-icon" />
+              <span className="y9-stat-label status-label">{item.label}</span>
+              <span className="y9-stat-value status-value">{value}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Block>
   );
 }
 
@@ -300,6 +305,7 @@ function StatusRow(props: { items: StatusItem[]; onNavigate: (hash: string) => v
 // 汇总项取自 home.away_report，每项数字可以点击，展开来源事件；没有来源事件的项不显示。
 // 时间轴放在报告下方（第 5.5 节）：刻度取关键事实，与楼联动回放；报告项与刻度互相高亮。
 function AwayReportSection(props: {
+  id: string;
   app: ClientApp;
   report: { data: AwayReport | null; loading: boolean };
   range: AwayRangeId;
@@ -319,6 +325,7 @@ function AwayReportSection(props: {
 
   return (
     <Section
+      id={props.id}
       title="离开期间的报告"
       note={
         data === null

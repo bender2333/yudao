@@ -91,7 +91,7 @@ export function DecisionCard(props: DecisionCardProps) {
 
   return (
     <article ref={cardRef} className={`y9-card decision-card${answered ? " answered" : ""}${isSubmitted ? " submitted" : ""}${targeted ? " is-targeted" : ""}`} id={`decision-${decision.decision_id}`}>
-      <header className="decision-head">
+      <header className="y9-card-head decision-head">
         <div className="y9-card-title decision-title">
           <Icon name="decide" />
           <strong>{label(DECISION_KIND, decision.kind)}</strong>
@@ -122,7 +122,6 @@ export function DecisionCard(props: DecisionCardProps) {
           ) : null}
         </details>
       ) : null}
-
       {answered ? (
         <p className="y9-card-result decision-result" role="status">
           {decision.status === "answered"
@@ -137,13 +136,15 @@ export function DecisionCard(props: DecisionCardProps) {
               <button
                 key={option.id}
                 type="button"
-                className="y9-btn primary"
+                className="y9-btn small primary"
                 disabled={command.busy || isSubmitted || !hasCommand(props.app, "decision.answer")}
+                title={option.note_required ? "需要在说明中写明修改意见" : undefined}
                 onClick={() => answer(option.id)}
               >
                 {option.label}
               </button>
             ))}
+            {isSubmitted ? <span className="y9-card-submitted">已提交，等待控制主机确认</span> : null}
           </div>
           {noteMissing === "" ? null : (
             <span className="hint" role="status">
@@ -152,7 +153,6 @@ export function DecisionCard(props: DecisionCardProps) {
           )}
           {/* 已提交提示挂在选项行末尾（原型 v9 卡片同样位置）。命令反馈在卡片里只留拒绝提示：
               两条「已提交」同时出现会让提示重复（工单 #319） */}
-          {isSubmitted ? <span className="y9-card-submitted">已提交，等待控制主机确认</span> : null}
           <CommandFeedback submitted={command.submitted && !isSubmitted} rejection={command.rejection} />
         </div>
       )}
@@ -190,7 +190,7 @@ export function DecisionCardList(props: {
   emptyText: string;
 }) {
   if (props.decisions.length === 0) {
-    return <p className="y9-note note">{props.emptyText}</p>;
+    return <p className="y9-empty note">{props.emptyText}</p>;
   }
   return (
     <div className="y9-cards decision-cards">
