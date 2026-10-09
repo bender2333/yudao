@@ -152,6 +152,11 @@ test("楼里每个项目一层，运行中的一层亮起工作部门，空闲�
     await page.evaluate(() => { window.location.hash = "#/home"; });
     await expect(page.getByRole("heading", { name: "全部项目与机器", exact: true })).toBeVisible();
     await waitUntil(async () => (await floors(page)).length >= 2, "楼里出现至少两层");
+    // 楼层状态来自每个项目的 project.loop：查询到达以前每层都是「空闲」，先等状态到位再核对
+    await waitUntil(
+      async () => (await floors(page)).find((f) => f.name === RUNNING)?.status !== "空闲",
+      "「文本工具」这一层的状态灯不是空闲",
+    );
 
     // 至少两层，且每层的项目名来自 projects.list 的项目集合
     const list = await floors(page);

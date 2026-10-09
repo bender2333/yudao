@@ -237,7 +237,7 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
 
   return (
     <>
-      <div className="room-canvas" ref={hostRef} />
+      <div className="y9-scene room-canvas" ref={hostRef} />
       {error !== null ? <p className="pixel-canvas-error">部门房间加载失败：{error}</p> : null}
     </>
   );

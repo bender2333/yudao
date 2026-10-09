@@ -34,6 +34,8 @@ export type ClientApp = {
 // 浏览器上下文的设置
 export type PageOptions = {
   colorScheme?: "light" | "dark";
+  // 浏览器缩放（工单 #377）：deviceScaleFactor 大于 1 时按倍率放大，用于核对缩放后没有横向滚动条
+  deviceScaleFactor?: number;
   // 系统通知的端到端核对（工单 #375）：permissions 授予浏览器通知权限；
   // initScript 在页面装载前包装 window.Notification 以记录调用（包装仍然调用真实构造函数）
   permissions?: string[];
@@ -191,7 +193,11 @@ export async function openPage(
   // 授予浏览器权限的用例用 Chromium 的新无头模式（channel: "chromium"）：旧的无头模式里
   // Notification.permission 恒为 denied，grantPermissions 改不了它，通知的用例无法核对（工单 #375）
   const browser = await chromium.launch(options.permissions === undefined ? {} : { channel: "chromium" });
-  const context = await browser.newContext({ viewport: size, colorScheme: options.colorScheme ?? "light" });
+  const context = await browser.newContext({
+    viewport: size,
+    colorScheme: options.colorScheme ?? "light",
+    deviceScaleFactor: options.deviceScaleFactor ?? 1,
+  });
   if (options.initScript !== undefined) {
     await context.addInitScript(options.initScript);
   }

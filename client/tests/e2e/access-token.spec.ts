@@ -44,7 +44,7 @@ test("局域网访问方式：填写令牌以后查询、命令与事件流照�
     // 填对令牌：页面按接口合同照常工作
     await page.locator("#access-token").fill(backend.token);
     await page.locator("button[type=submit]").click();
-    await expect(page.locator(".brand")).toHaveText("Yudao");
+    await expect(page.locator(".brand .y9-brand-name")).toContainText("Yudao");
     await expect(page.locator(".connection")).toHaveText("已连接");
     await expect(page.locator("#access-token")).toHaveCount(0);
 
@@ -68,7 +68,7 @@ test("局域网访问方式：填写令牌以后查询、命令与事件流照�
 
     // 令牌保存在这个浏览器里：刷新页面不再要令牌，也不显示表单
     await page.reload();
-    await expect(page.locator(".brand")).toHaveText("Yudao");
+    await expect(page.locator(".brand .y9-brand-name")).toContainText("Yudao");
     await expect(page.locator("#access-token")).toHaveCount(0);
     expect(await page.evaluate(() => window.localStorage.getItem("yudao.access-token"))).toBe(backend.token);
     expect(pageerrors).toEqual([]);

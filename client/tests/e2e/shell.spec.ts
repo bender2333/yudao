@@ -23,7 +23,7 @@ test.afterAll(async () => {
 
 async function openClient(size: { width: number; height: number }): Promise<ClientApp> {
   const client = await startClient(backend, size);
-  await expect(client.page.locator(".brand")).toHaveText("Yudao");
+  await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
   return client;
 }
 
@@ -196,7 +196,7 @@ test("视口 1920×1080 下外壳可用，没有横向滚动条，控制台错�
   const client = await startClient(backend, { width: 1920, height: 1080 });
   const errors = watchErrors(client);
   try {
-    await expect(client.page.locator(".brand")).toHaveText("Yudao");
+    await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
     const overflow = await client.page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
@@ -217,7 +217,7 @@ test("事件流断开时窗口整体变灰并写明断开的时间，重新连�
     await expect(client.page.locator(".connection")).toHaveText("已连接", { timeout: 90_000 });
 
     await own.stop();
-    await expect(client.page.locator(".app")).toHaveClass(/is-disconnected/, { timeout: 60_000 });
+    await expect(client.page.locator("body")).toHaveClass(/is-disconnected/, { timeout: 60_000 });
     // 顶栏写明断开的时间与正在重新连接（不是「连接中断，数据可能过时」这一句旧文案）
     await expect(client.page.locator(".connection.interrupted")).toContainText("断开，正在重新连接");
     const stamp = await client.page.locator(".connection.interrupted").innerText();
@@ -228,7 +228,7 @@ test("事件流断开时窗口整体变灰并写明断开的时间，重新连�
     const again = await startBackend({ port: own.port, dataDir: own.dataDir });
     try {
       await expect(client.page.locator(".connection")).toHaveText("已连接", { timeout: 90_000 });
-      await expect(client.page.locator(".app")).not.toHaveClass(/is-disconnected/);
+      await expect(client.page.locator("body")).not.toHaveClass(/is-disconnected/);
     } finally {
       await again.stop();
     }
@@ -269,6 +269,69 @@ test("订阅位置超过日志末尾时服务端发送 resync，客户端据此�
     }, backend.address);
     expect(frame).toContain("event: resync");
     expect(frame).toContain("position_unknown");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
+// 内容区最宽 1280 像素并在主区居中（工单 #377 验收第 2 条）：窗口 1920 时主区比 1280 宽，
+// 左右留白相同；窗口再大时也不再变宽，多出来的宽度留在两侧
+test("1920×1080 下内容区宽 1280 并在主区居中", async () => {
+  const client = await openClient({ width: 1920, height: 1080 });
+  const errors = watchErrors(client);
+  try {
+    const box = await client.page.evaluate(() => {
+      const mainEl = document.querySelector<HTMLElement>(".y9-main");
+      const content = document.querySelector<HTMLElement>(".y9-content");
+      if (mainEl === null || content === null) throw new Error("找不到内容区");
+      const main = mainEl.getBoundingClientRect();
+      const box = content.getBoundingClientRect();
+      return { mainWidth: main.width, width: box.width, left: box.left - main.left, right: main.right - box.right };
+    });
+    expect(box.mainWidth).toBeGreaterThan(1280);
+    expect(Math.round(box.width)).toBe(1280);
+    expect(Math.abs(box.left - box.right)).toBeLessThanOrEqual(1);
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
+// 缩放 150%（工单 #377 验收第 2 条）：浏览器整体放大以后按缩放后的尺寸排布，
+// 1920 的物理窗口在 150% 下给页面 1280×720 的排版尺寸，页面仍不出现横向滚动条
+test("浏览器缩放 150% 时页面没有横向滚动条", async () => {
+  const client = await startClient(backend, { width: 1280, height: 720 }, { deviceScaleFactor: 1.5 });
+  const errors = watchErrors(client);
+  try {
+    await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+    await expect(client.page.locator(".sidebar")).toBeVisible();
+    const overflow = await client.page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
+// 主题的选择记在浏览器里（工单 #377 验收第 2 条）：手动选择浅色或深色以后刷新页面，
+// 选择保持；顶栏的三档按钮里选中的那一档带 aria-pressed
+test("切换浅色与深色主题以后刷新页面，主题保持", async () => {
+  const client = await openClient({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  try {
+    const themeOf = () => client.page.evaluate(() => document.documentElement.dataset.theme ?? "system");
+    expect(await themeOf()).toBe("system");
+    for (const choice of ["浅色", "深色"]) {
+      await client.page.getByRole("button", { name: choice }).click();
+      await expect.poll(themeOf).toBe(choice === "浅色" ? "light" : "dark");
+      await client.page.reload();
+      await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+      expect(await themeOf()).toBe(choice === "浅色" ? "light" : "dark");
+      await expect(client.page.getByRole("button", { name: choice })).toHaveAttribute("aria-pressed", "true");
+    }
     expect(errors).toEqual([]);
   } finally {
     await client.close();

@@ -131,20 +131,20 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
       />
       {/* 当前生效模型不具备本部门建议能力的角色，提醒显示在该角色的当前模型旁（第 5.6 节） */}
       {data.reminders.length > 0 ? (
-        <p className="warn" role="status" data-testid={`workshop-reminder-${data.department}`}>
+        <p className="y9-note is-warn warn" role="status" data-testid={`workshop-reminder-${data.department}`}>
           {data.reminders.join("；")}
         </p>
       ) : null}
-      <p className="note">
+      <p className="y9-note note">
         工位：{departmentName(data.department)} Agent
       </p>
-      <p className="note">
+      <p className="y9-note note">
         {data.work_item_id === null
           ? "这个范围没有事项"
           : `所选事项 ${data.work_item_id}`}
         {props.scopeNote}
       </p>
-      <div className="composer">
+      <div className="y9-ws-composer composer">
         <SubmitButton label="部门设置" busy={false} onClick={props.onOpenSettings} />
       </div>
     </Section>
@@ -163,15 +163,15 @@ function InspectArea(props: { app: ClientApp; data: DepartmentWorkspaceResult })
   const data = props.data;
 
   return (
-    <section className="card">
-      <div className="tabs" role="tablist">
+    <section className="y9-block card">
+      <div className="y9-tabs tabs" role="tablist">
         {INSPECT_TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             role="tab"
             aria-selected={tab === item.id}
-            className={tab === item.id ? "active" : ""}
+            className={`y9-tab${tab === item.id ? " is-active active" : ""}`}
             onClick={() => setTab(item.id)}
           >
             {item.label}
@@ -203,7 +203,7 @@ function Actions(props: { app: ClientApp; runId: string | null }) {
     return <Empty text="这个范围没有运行，动作列表为空" />;
   }
   if (actions.loading && actions.data === null) {
-    return <p className="note">正在读取动作列表</p>;
+    return <p className="y9-note note">正在读取动作列表</p>;
   }
   const rows = actions.data?.actions ?? [];
 
@@ -226,7 +226,7 @@ function Actions(props: { app: ClientApp; runId: string | null }) {
               receipt?.output_ref ? "有（见原始事件）" : "无",
               <button
                 type="button"
-                className="link"
+                className="y9-link link"
                 key={action.action_id}
                 disabled={eventId === null || eventId === ""}
                 onClick={() => setOpenEvent(eventId)}
@@ -254,7 +254,7 @@ function ContextPanel(props: { data: DepartmentWorkspaceResult }) {
 
   return (
     <>
-      <h3 className="sub">上下文清单（{manifests.length} 条）</h3>
+      <h3 className="y9-h3 sub">上下文清单（{manifests.length} 条）</h3>
       {manifests.length === 0 ? <Empty text="没有清单" /> : (
         <Table
           head={["第几步", "激活", "估算用量", "工作上限", "截断", "放入的来源"]}
@@ -268,7 +268,7 @@ function ContextPanel(props: { data: DepartmentWorkspaceResult }) {
           ])}
         />
       )}
-      <h3 className="sub">压缩记录（{compactions.length} 条）</h3>
+      <h3 className="y9-h3 sub">压缩记录（{compactions.length} 条）</h3>
       {compactions.length === 0 ? <Empty text="没有压缩记录" /> : (
         <Table
           head={["来源事件", "部门", "第几步", "激活", "摘要上限"]}
@@ -298,8 +298,8 @@ function DepartmentSettingState(props: { data: DepartmentWorkspaceResult }) {
             : `第 ${setting.used_version} 版（事件 ${show(setting.used_event_id)}）`],
         ]}
       />
-      <h3 className="sub">配置的内容</h3>
-      <pre className="raw">{setting.configured_text === "" ? "（空）" : setting.configured_text}</pre>
+      <h3 className="y9-h3 sub">配置的内容</h3>
+      <pre className="y9-pre raw">{setting.configured_text === "" ? "（空）" : setting.configured_text}</pre>
     </>
   );
 }
@@ -322,16 +322,16 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
     <>
       <Section title="部门消息" note="按日志位置取最近的一批；点击时间打开原始事件">
         {messages.length === 0 ? <Empty text="这个部门还没有消息" /> : (
-          <ul className="message-list">
+          <ul className="y9-ws-log message-list">
             {messages.map((message) => (
               <li key={text(message.event_id)}>
-                <div className="input-head">
-                  <button type="button" className="link" onClick={() => setOpenEvent(text(message.event_id))}>
+                <div className="y9-ws-log-meta input-head">
+                  <button type="button" className="y9-link link" onClick={() => setOpenEvent(text(message.event_id))}>
                     {formatTime(optionalText(message.created_at))}
                   </button>
-                  <span className="msg-type">{text(message.type)}</span>
+                  <span className="y9-ws-src msg-type">{text(message.type)}</span>
                 </div>
-                <p className="msg-text">{show(text(message.text), "（这条事件没有文字摘要）")}</p>
+                <p className="y9-ws-log p msg-text">{show(text(message.text), "（这条事件没有文字摘要）")}</p>
               </li>
             ))}
           </ul>
@@ -339,23 +339,23 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
       </Section>
       <Section title="部门指导" note="已接收的指导在下一次安全激活进入模型输入">
         {data.guidance.length === 0 ? <Empty text="这个部门还没有指导记录" /> : (
-          <ul className="guidance-list">
+          <ul className="y9-ws-guidance guidance-list">
             {data.guidance.map((record) => (
               <li key={record.guidance_id}>
-                <div className="input-head">
+                <div className="y9-ws-log-meta input-head">
                   <strong>{label(GUIDANCE_STATUS, record.status)}</strong>
-                  <span className="byte-range">第 {record.version} 版</span>
-                  {record.applied_activation_id ? <span className="byte-range">已用于激活 {record.applied_activation_id}</span> : null}
-                  <button type="button" className="link" onClick={() => setOpenEvent(record.created_event_id)}>查看原始事件</button>
+                  <span className="y9-code byte-range">第 {record.version} 版</span>
+                  {record.applied_activation_id ? <span className="y9-code byte-range">已用于激活 {record.applied_activation_id}</span> : null}
+                  <button type="button" className="y9-link link" onClick={() => setOpenEvent(record.created_event_id)}>查看原始事件</button>
                 </div>
-                <p className="msg-text">{record.text}</p>
-                {record.response_status ? <p className="card-note">部门的回应：{show(record.response_text, record.response_status)}</p> : null}
+                <p className="y9-ws-guidance p msg-text">{record.text}</p>
+                {record.response_status ? <p className="y9-muted card-note">部门的回应：{show(record.response_text, record.response_status)}</p> : null}
               </li>
             ))}
           </ul>
         )}
         {data.work_item_id && hasCommand(props.app, "guidance.send") ? (
-          <div className="composer">
+          <div className="y9-ws-composer composer">
             <TextArea label={`向${departmentName(data.department)}下达指导`} value={draft} onInput={setDraft} />
             <SubmitButton
               label="发送指导"
@@ -372,7 +372,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
             <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
           </div>
         ) : (
-          <p className="note">
+          <p className="y9-note note">
             {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "这台主机没有提供发送指导的操作"}
           </p>
         )}
@@ -397,7 +397,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
 
   return (
     <Modal title={`本项目 · ${departmentName(data.department)}设置`} onClose={props.onClose}>
-      <p className="note">基准版本：第 {data.setting.version} 版；写入本项目的项目部门设置，不修改部门默认。</p>
+      <p className="y9-note note">基准版本：第 {data.setting.version} 版；写入本项目的项目部门设置，不修改部门默认。</p>
       <DepartmentSettingsFields
         app={props.app}
         projectId={data.project_id}
@@ -407,7 +407,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
         effective={data.effective}
         reminders={reminders}
       />
-      <div className="row-actions">
+      <div className="y9-row row-actions">
         <button type="button" onClick={() => setDraft({ ...draft, text: data.setting.text })}>恢复默认</button>
       </div>
       {canSave ? (
@@ -420,7 +420,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
           onSaved={props.onClose}
         />
       ) : (
-        <p className="note">这台主机没有提供保存部门设置的操作</p>
+        <p className="y9-note note">这台主机没有提供保存部门设置的操作</p>
       )}
       <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
     </Modal>

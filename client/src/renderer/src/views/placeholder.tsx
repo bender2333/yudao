@@ -13,9 +13,9 @@ export function PlaceholderPage(props: PlaceholderPageProps) {
   const { route } = props;
   const version = props.systemStatus?.log_id ?? null;
   return (
-    <div className="card">
+    <div className="y9-block card">
       <h1>{titleOf(route)}</h1>
-      <p className="note">这个页面还没有内容。</p>
+      <p className="y9-note note">这个页面还没有内容。</p>
       <dl>
         <dt>路径</dt>
         <dd>{window.location.hash || "#/home"}</dd>
