@@ -291,4 +291,5 @@ exec-137 / 2026-10-06 10:30 / #137 界面：接入入口与建档状态 / 设计
 处理：已在 #374（PR #420）内修正并有真实服务进程的测试覆盖，设计无变化（启动补做沿用 ADR-0011 的异步控制核心，事项开始与回答决定后继续走同一条路径）。
 
 执行者 9router/ag/gemini-3.8-flash-high / 2026-10-09 22:45 / #160 / `harness/tests/test_issue_374.py::test_the_lan_access_mode_opens_the_address_of_this_machine` 的就绪判定不接受 #423 加入的局域网令牌校验，测试必然超时 / 该测试用 `--access lan --host 0.0.0.0` 启动真实子进程，随后由 `_ready`（同文件第 97 行）轮询 `http://127.0.0.1:{port}/api/capabilities`，只接受状态码 200。`1adea0ef`（#423）给局域网访问方式加了访问令牌校验以后，不带令牌的这次请求返回 401，`_ready` 轮询到 STARTUP_TIMEOUT_SEC（300 秒）后抛 TimeoutError。 / 影响：这一项测试在 `1adea0ef` 之后必然失败，与本工单 #160 无关；把 HEAD 上的同一文件另存为副本单独复跑，同样超时，确认失败先于本次改动存在。处置建议：不在 #160 内修改其他工单新增的接口测试；由拥有该测试的工单给这次请求带上用 `AccessTokenStore` 建立的数据目录令牌（或改用本机访问方式验证就绪），而不是把就绪判定放宽到接受 401。 #160 的 `test_service_lock.py` 已按这种方式带上令牌并通过。
+处理：已由 #427（PR #429）修正：该用例先在数据目录建立令牌，就绪探测与读取能力清单的请求都带 `Authorization: Bearer`，并加了「不带令牌得 401」的断言；共用的 `bearer(token)` 放在 `harness/tests/api_helpers.py`。就绪判定仍只接受 200，设计无变化。
 
