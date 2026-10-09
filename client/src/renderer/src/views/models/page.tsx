@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CommandOutcome } from "../../contract/invoke";
+import { newCommandId } from "../../contract/command-id.ts";
 import type { Rejected } from "../../api/generated/types.gen";
 import type { ViewSync } from "../../contract/view-sync";
 import type {
@@ -156,7 +157,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       return { ok: false, message: "尚未读取目录，请稍后再试" };
     }
     const outcome = await props.command(name, {
-      command_id: crypto.randomUUID(),
+      command_id: newCommandId(),
       base_version: current.revision,
       ...body,
     });
@@ -204,7 +205,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     if (saved.ok && secret.trim()) {
       const credential = catalogRef.current?.providers.find((item) => item.id === state.id)?.credential;
       const outcome = await props.command("credential.set", {
-        command_id: crypto.randomUUID(), base_version: credential?.version ?? 0,
+        command_id: newCommandId(), base_version: credential?.version ?? 0,
         ref: state.credential_ref, secret, persist,
       });
       result = interpret(outcome);
@@ -311,7 +312,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const saveCredential = useCallback(async (ref: string, secret: string, persist: boolean, baseVersion: number) => {
     setBusy(true);
     const outcome = await props.command("credential.set", {
-      command_id: crypto.randomUUID(),
+      command_id: newCommandId(),
       base_version: baseVersion,
       ref,
       secret,
@@ -330,7 +331,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setBusy(true);
     const name = action === "clear_override" ? "credential.clear_override" : "credential.remove_persisted";
     const outcome = await props.command(name, {
-      command_id: crypto.randomUUID(), base_version: baseVersion, ref,
+      command_id: newCommandId(), base_version: baseVersion, ref,
     });
     setBusy(false);
     const result = interpret(outcome);

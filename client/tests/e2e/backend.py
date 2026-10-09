@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import sys
+import socket
 import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -28,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from harness.adapters.base import ProviderError  # noqa: E402
 from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
+from harness.app.access_tokens import AccessTokenStore  # noqa: E402
 from harness.app.application import Application  # noqa: E402
 from harness.app.catalog_commands import (  # noqa: E402
     BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, ModelInput, ProviderInput,
@@ -41,7 +43,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
     WorkItemCreate,
 )
 from harness.app.project_queries import ProjectsList  # noqa: E402
-from harness.models import Usage, json_dumps  # noqa: E402
+from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
     baseline_review_turn, collaboration_request, delivery_turn, plan_turn, product_spec, response_turn,
     review_turn, structure_turn,
@@ -51,6 +53,15 @@ from harness.runtime import LoopSystem  # noqa: E402
 from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E402
 
 UNAVAILABLE = "Missing configuration: provider credential"
+
+
+def lan_address() -> str:
+    # 本机的局域网地址：从另一台机器访问控制主机时用的就是它；没有时用回环
+    for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+        address = info[4][0]
+        if not address.startswith("127."):
+            return address
+    return "127.0.0.1"
 
 
 def script():
@@ -183,6 +194,18 @@ def _onboarding_round(index: int):
         structure_turn(requirement_locations=[{"requirement": requirement, "locations": ["src/echo.py"]}]),
         read_turn(f"range-{index}", "read_range", {"path": "src/echo.py", "start_line": 1, "end_line": 2}),
         baseline_review_turn(conclusions=[{"requirement": requirement, "status": "verified", "evidence": "smoke"}]),
+    ]
+
+
+def waiting_script():
+    # 等待模型服务的端到端验收（工单 #375）：工程部门的第一次请求模型服务不可用，按 D17 重试
+    # （model_retry_scheduled，页面据此发出「等待模型服务」的系统通知），重试这一次仍然不可用且
+    # 不再重试：run 进入待恢复并发出 model_unavailable 的决定请求（页面据此发出决定请求的系统通知）
+    # 这个脚本不预置项目与事项：用例在页面打开以后自己建项目并开始事项，让事件在页面开着的时候发生
+    return [
+        product_spec(),
+        ProviderError(UNAVAILABLE, reason="provider_unavailable", retryable=True),
+        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
     ]
 
 
@@ -444,12 +467,15 @@ def main() -> int:
     # 目录缺哪个部门就在界面上被拒绝哪个部门；模型回答仍由同一份 FakeAdapter 脚本给出
     parser.add_argument("--catalog-driven", action="store_true")
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
-    # initial 是从想法新建带起始文件夹用的脚本（工单 #323）。它们需要的轮次与默认脚本的预置事项不同，
-    # 因此由用例选择
-    parser.add_argument("--script", choices=("default", "onboarding", "initial"), default="default")
+    # initial 是从想法新建带起始文件夹用的脚本（工单 #323）；waiting 是等待模型服务用的脚本（工单 #375，
+    # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）。它们需要的轮次与预置事项不同，因此由用例选择
+    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting"), default="default")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
     parser.add_argument("--reject-upstream", action="store_true")
+    # 局域网访问方式（工单 #348）：给出令牌名称时以局域网访问方式起服务，并在数据目录里建立一个
+    # 访问令牌，把令牌明文报给测试，测试在页面上填写它
+    parser.add_argument("--token-name", default=None)
     args = parser.parse_args()
 
     import tempfile
@@ -478,6 +504,8 @@ def main() -> int:
         adapter_script = onboarding_script()
     elif args.script == "initial":
         adapter_script = initial_script()
+    elif args.script == "waiting":
+        adapter_script = waiting_script()
     else:
         adapter_script = script()
     if args.catalog_driven:
@@ -499,9 +527,16 @@ def main() -> int:
 
     # 页面文件来自 client/out/renderer（npm run build:pages）：页面与接口同一来源
     pages = Path(__file__).resolve().parents[2] / "out" / "renderer"
+    # 局域网访问方式（工单 #348）：监听本机所有地址并按数据目录里的令牌文件校验访问令牌，
+    # 令牌由 --token-name 建立后把明文报给测试，测试在页面中填写它
+    access = "lan" if args.token_name is not None else "local"
+    host = "0.0.0.0" if access == "lan" else "127.0.0.1"
+    token = (AccessTokenStore(data_dir).create(args.token_name, now=utc_now())[1]
+             if args.token_name is not None else None)
     server = uvicorn.Server(uvicorn.Config(
-        lambda: create_app(lambda: application, pages=pages),
-        host="127.0.0.1", port=port,
+        lambda: create_app(lambda: application, pages=pages, access=access,
+                           tokens=AccessTokenStore(data_dir)),
+        host=host, port=port,
         log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0))
 
     thread = threading.Thread(target=server.run, daemon=True)
@@ -534,8 +569,9 @@ def main() -> int:
             room_project = asyncio.run(seed_room(application, system))
         elif args.script == "onboarding":
             asyncio.run(seed_onboarding(application))
-        elif args.script != "initial":
-            # 起始文件夹的用例自己在界面上建项目并开始事项，不需要预置的项目与事项（工单 #323）
+        elif args.script not in ("initial", "waiting"):
+            # 起始文件夹的用例（工单 #323）与等待模型服务的用例（工单 #375）自己在界面上建项目并开始事项，
+            # 不需要预置的项目与事项
             asyncio.run(seed(application, system))
     if args.catalog_driven:
         os.environ.pop("OPENCODE_GO_KEY", None)
@@ -545,8 +581,12 @@ def main() -> int:
                                  admit_and_bind=args.admit_and_bind, reject_base=reject_base))
 
     port = server.servers[0].sockets[0].getsockname()[1]
+    # 局域网访问方式下把局域网地址与令牌明文一并报给测试（工单 #348）：
+    # 测试经局域网地址打开页面，填写这个令牌
     print(json.dumps({"port": port, "data_dir": str(data_dir), "room_project": room_project,
-                      "source_dir": None if source_dir is None else str(source_dir)}), flush=True)
+                      "source_dir": None if source_dir is None else str(source_dir),
+                      "access": access, "address": None if token is None else f"http://{lan_address()}:{port}",
+                      "token": token}), flush=True)
     # 标准输入关闭时退出（由 Playwright 的 fixture 控制生命周期）
     try:
         sys.stdin.read()

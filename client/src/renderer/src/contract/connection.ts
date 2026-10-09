@@ -10,6 +10,7 @@ import { PAGE_RELEASE } from "./page-release";
 export type Connection =
   | { state: "connected"; address: string; capabilities: Capabilities }
   | { state: "outdated"; address: string; clientVersion: number; serverVersion: number; serverRelease: string }
+  | { state: "unauthorized"; address: string }
   | { state: "failed"; address: string; message: string };
 
 // 一次连接建立的接口访问对象：所有查询与命令都经它发出请求，baseUrl 由地址决定
@@ -18,17 +19,30 @@ export type Interface = {
   client: Client;
 };
 
-export function interfaceFor(address: string): Interface {
-  return { baseUrl: address, client: createClient(createConfig<ClientOptions>({ baseUrl: address })) };
+export function interfaceFor(address: string, token = ""): Interface {
+  // 局域网访问方式下每个请求都在请求头里带令牌（第 6.3 节）；令牌不出现在地址里
+  const client = createClient(createConfig<ClientOptions>({
+    baseUrl: address,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  }));
+  return { baseUrl: address, client };
 }
 
-export async function connect(address: string): Promise<Connection> {
-  const { client } = interfaceFor(address);
+export async function connect(address: string, token = ""): Promise<Connection> {
+  const { client } = interfaceFor(address, token);
   let raw: unknown;
+  let response: Response | undefined;
   try {
-    raw = (await fetchCapabilities({ client })).data;
+    const fetched = await fetchCapabilities({ client });
+    raw = fetched.data;
+    response = fetched.response;
   } catch (error) {
     return { state: "failed", address, message: error instanceof Error ? error.message : String(error) };
+  }
+  // 局域网访问方式下没有令牌或令牌无效：服务按第 6.3 节回答 401，不附原因。
+  // 页面据此显示填写令牌的表单；本机访问方式不会走到这里
+  if (response !== undefined && response.status === 401) {
+    return { state: "unauthorized", address };
   }
   if (raw === undefined || typeof raw !== "object" || raw === null || !("deployment" in raw)) {
     // 请求没有得到能力清单（地址不通、被跨源策略拦下、或应答不是能力清单）：

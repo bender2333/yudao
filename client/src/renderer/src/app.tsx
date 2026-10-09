@@ -3,9 +3,11 @@
 // （网页界面的提供与发布设计说明第 5.1 节）。
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Capabilities, DecisionList, DecisionView, ProjectList, ProjectRow, SystemStatus } from "./api/generated/types.gen";
+import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
+import { rememberToken, storedToken } from "./contract/access-token";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
+import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { parseRoute, paths, type Route } from "./shell/routing";
@@ -34,6 +36,10 @@ export function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  // 局域网访问方式的访问令牌（第 6.3 节）：在这个浏览器里保存，刷新以后不用再次填写
+  const [token, setToken] = useState<string>(() => storedToken());
+  // 系统通知点击后要打开的决定卡片（工单 #375，设计说明第 5.3 节）
+  const [targetDecision, setTargetDecision] = useState<string | null>(null);
 
   // 页面应用：查询经生成的调用发出，事件到达时更新状态与待决定数量
   const app = useMemo(() => {
@@ -49,9 +55,22 @@ export function App() {
 
   useEffect(() => {
     if (galleryOnly) return;
-    void app.open(window.location.origin);
+    void app.open(window.location.origin, token);
     return () => app.close();
-  }, [app, galleryOnly]);
+  }, [app, galleryOnly, token]);
+
+  // 用户在页面上填写令牌：先按它连接，服务接受以后才写进这个浏览器（第 6.3 节）。
+  // 被拒绝的令牌不保存，否则刷新以后浏览器里留着服务已经拒绝的令牌
+  const submitToken = useCallback((value: string) => {
+    setToken(value.trim());
+  }, []);
+
+  // 服务接受以后才保存：刷新页面不用再次填写，令牌也不进入查询参数
+  useEffect(() => {
+    if (state.kind === "connected" && token !== "") {
+      rememberToken(token);
+    }
+  }, [state.kind, token]);
 
   // 路由：监听 hash 变化
   useEffect(() => {
@@ -116,6 +135,57 @@ export function App() {
     window.location.hash = hash;
   }, []);
 
+  // 系统通知与标签页标题（工单 #375，网页界面的提供与发布设计说明第 5.3 节）：
+  // 页面打开期间由不按项目筛选的事件流连接给出决定请求与等待模型服务（提醒只依据事件流与查询，
+  // 不另设通知接口，应用层与接口层设计说明第 5.7 节）
+  const notifier = useMemo(() => new SystemNotifier(), []);
+  // 标签页的标题：待决定的数量，没有待决定的事时不显示数字（标题的基础部分是页面自己的标题）
+  const baseTitle = useRef(document.title);
+  useEffect(() => {
+    document.title = pageTitle(pending, baseTitle.current);
+  }, [pending]);
+  // 点击决定请求的通知：回到首页并打开对应的决定卡片
+  const openDecision = useCallback((decisionId: string) => {
+    window.focus();
+    navigate(paths.home());
+    setTargetDecision(decisionId);
+  }, [navigate]);
+  // 通知的正文需要项目名与事项标题：项目名取自 shell.projects，事项标题按项目经 project.overview 解析
+  // （与首页的决定卡片同一份解析，views/home/page.tsx 的 useWorkItemTitles）
+  const namesRef = useRef<NoticeNames>({ projectName: () => "", workItemTitle: () => "" });
+  const itemsRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    namesRef.current = {
+      projectName: (id) => projects.find((row) => row.project_id === id)?.name ?? id ?? "",
+      workItemTitle: (id) => (id === null ? "" : (itemsRef.current.get(id) ?? id)),
+    };
+  }, [projects]);
+  useEffect(() => {
+    const views = app.viewSync;
+    if (!connected || !views) {
+      return;
+    }
+    return app.subscribeEvents((event: EventObject) => {
+      const notice = noticeForEvent(event, namesRef.current);
+      if (notice === null) {
+        return;
+      }
+      // 事项标题还没有取到：先取到再发通知，正文写明的是哪件事
+      const projectId = event.project_id;
+      const workItemId = event.work_item_id;
+      if (projectId !== null && workItemId !== null && !itemsRef.current.has(workItemId)) {
+        void app.queryOne<ProjectOverviewResult>("project.overview", { project_id: projectId }).then((snapshot) => {
+          for (const item of snapshot.data.work_items) {
+            itemsRef.current.set(item.work_item_id, item.title);
+          }
+          notifier.notify(noticeForEvent(event, namesRef.current) ?? notice, openDecision);
+        });
+        return;
+      }
+      notifier.notify(notice, openDecision);
+    });
+  }, [app, connected, notifier, openDecision]);
+
   // 进入模型管理（系统页）之前的路径：点「返回原界面」时回到进入前的页面（设计说明第 3.3 节
   // 第 108 行、工单 #296）。只有从别的页面进入模型管理时才记录；直接输入地址进来没有记录，
   // 回落首页
@@ -154,12 +224,17 @@ export function App() {
       </div></div>
     );
   }
+  if (state.kind === "unauthorized") {
+    // 局域网访问方式：服务按第 6.3 节要求访问令牌，页面文件不需要令牌，所以这里能打开页面。
+    // 用户在这个浏览器里填写一次，令牌随后保存在这个浏览器里
+    return <TokenGate onSubmit={submitToken} />;
+  }
   if (state.kind === "failed") {
     return (
       <div className="gate"><div className="card">
         <h1>没有连上 Yudao 服务</h1>
         <p className="error">连接失败：{state.message}</p>
-        <button className="primary" type="button" onClick={() => void app.open(window.location.origin)}>重新连接</button>
+        <button className="primary" type="button" onClick={() => void app.open(window.location.origin, token)}>重新连接</button>
       </div></div>
     );
   }
@@ -202,7 +277,7 @@ export function App() {
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="content">
           {route.name === "home" ? (
-            <HomePage app={app} onNavigate={navigate} at={route.at} />
+            <HomePage app={app} onNavigate={navigate} at={route.at} targetDecision={targetDecision} />
           ) : route.name === "sys-models" ? (
             <ModelManagementPage
               views={app.viewSync}
@@ -219,6 +294,40 @@ export function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+// 填写访问令牌的表单（应用层与接口层设计说明第 6.3 节）：局域网访问方式下服务对全部接口路径
+// 要求 Authorization: Bearer <令牌>，页面文件不需要令牌，因此页面能打开而接口返回 401。
+// 令牌由用户在控制主机上用 token create 建立，在这里的浏览器中填写一次并保存在这个浏览器里；
+// 输入框用密码类型，页面不回显填过的令牌。
+function TokenGate(props: { onSubmit: (token: string) => void }) {
+  const [value, setValue] = useState("");
+  return (
+    <div className="gate"><div className="card">
+      <h1>填写访问令牌</h1>
+      <p>Yudao 服务以局域网访问方式运行，接口需要访问令牌。在控制主机上用 token create 建立令牌并复制它。</p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const token = value.trim();
+          if (token !== "") {
+            props.onSubmit(token);
+          }
+        }}
+      >
+        <label htmlFor="access-token">访问令牌</label>
+        <input
+          id="access-token"
+          data-testid="access-token"
+          type="password"
+          autoComplete="off"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+        />
+        <button className="primary" type="submit">连接</button>
+      </form>
+    </div></div>
   );
 }
 

@@ -13,6 +13,10 @@ export type Backend = {
   port: number;
   address: string;
   dataDir: string;
+  // 局域网访问方式（工单 #348）下的局域网地址；本机访问方式时为空串
+  lanAddress: string;
+  // 局域网访问方式下后端建立的访问令牌明文；本机访问方式时为空串。页面在令牌表单里填写它
+  token: string;
   /** 部门房间的端到端验收预置的项目标识（--room 模式）；其他模式为空。 */
   roomProject: string | null;
   // 建档脚本（工单 #137）与起始文件夹脚本（工单 #323）下后端建好的真实目录：
@@ -27,7 +31,16 @@ export type ClientApp = {
   close: () => Promise<void>;
 };
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+// 浏览器上下文的设置
+export type PageOptions = {
+  colorScheme?: "light" | "dark";
+  // 系统通知的端到端核对（工单 #375）：permissions 授予浏览器通知权限；
+  // initScript 在页面装载前包装 window.Notification 以记录调用（包装仍然调用真实构造函数）
+  permissions?: string[];
+  initScript?: () => void;
+};
+
+export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 // 端到端用例打开的是后端提供的页面构建产物 client/out/renderer。它不存在或比渲染进程源码旧时，
 // 用例对着旧界面报错，看不出界面已经改过（工单 #303 的执行者、#177 的验证都遇到）：
@@ -62,7 +75,7 @@ function newestModification(directory: string): number {
 // port 固定端口（断线恢复的用例在同一端口再起一次）；room 用流式慢模型跑
 // 一个项目，供部门房间在请求进行中观察（工单 #177）
 export async function startBackend(
-  options: { apiVersion?: number; releaseVersion?: string; releaseVersionOnce?: string; room?: boolean; admitAndBind?: boolean; port?: number; script?: "default" | "onboarding" | "initial"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean } = {},
+  options: { apiVersion?: number; releaseVersion?: string; releaseVersionOnce?: string; room?: boolean; admitAndBind?: boolean; port?: number; script?: "default" | "onboarding" | "initial" | "waiting"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean; tokenName?: string } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {
@@ -100,6 +113,10 @@ export async function startBackend(
   if (options.rejectUpstream === true) {
     script.push("--reject-upstream");
   }
+  // 局域网访问方式（工单 #348）：以 lan 方式起服务，后端建立一个访问令牌并把明文报回来
+  if (options.tokenName !== undefined) {
+    script.push("--token-name", options.tokenName);
+  }
   const child = spawn("uv", ["run", "python", ...script], {
     cwd: repoRoot,
     stdio: ["pipe", "pipe", "pipe"],
@@ -111,10 +128,15 @@ export async function startBackend(
     data_dir: string;
     room_project?: string | null;
     source_dir?: string | null;
+    access?: string;
+    address?: string | null;
+    token?: string | null;
   };
   return {
     port: parsed.port,
     address: `http://127.0.0.1:${parsed.port}`,
+    lanAddress: parsed.address ?? "",
+    token: parsed.token ?? "",
     dataDir: parsed.data_dir,
     roomProject: parsed.room_project ?? null,
     sourceDir: parsed.source_dir ?? null,
@@ -154,7 +176,7 @@ async function stopProcess(child: ChildProcessWithoutNullStreams): Promise<void>
 export async function startClient(
   backend: Backend,
   size: { width: number; height: number },
-  options: { colorScheme?: "light" | "dark" } = {},
+  options: PageOptions = {},
 ): Promise<ClientApp> {
   assertPagesBuildIsCurrent();
   return openPage(`${backend.address}/`, size, options);
@@ -164,10 +186,18 @@ export async function startClient(
 export async function openPage(
   url: string,
   size: { width: number; height: number },
-  options: { colorScheme?: "light" | "dark" } = {},
+  options: PageOptions = {},
 ): Promise<ClientApp> {
-  const browser = await chromium.launch();
+  // 授予浏览器权限的用例用 Chromium 的新无头模式（channel: "chromium"）：旧的无头模式里
+  // Notification.permission 恒为 denied，grantPermissions 改不了它，通知的用例无法核对（工单 #375）
+  const browser = await chromium.launch(options.permissions === undefined ? {} : { channel: "chromium" });
   const context = await browser.newContext({ viewport: size, colorScheme: options.colorScheme ?? "light" });
+  if (options.initScript !== undefined) {
+    await context.addInitScript(options.initScript);
+  }
+  if (options.permissions !== undefined) {
+    await context.grantPermissions(options.permissions, { origin: new URL(url).origin });
+  }
   const page = await context.newPage();
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");

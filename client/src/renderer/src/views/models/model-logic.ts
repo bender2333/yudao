@@ -9,6 +9,7 @@ import type {
   CatalogModel,
   CatalogProvider,
 } from "../../api/generated/types.gen";
+import { newCommandId } from "../../contract/command-id.ts";
 
 // 服务方案预置表里的一项（查询 catalog 的 presets.presets 交回；合同是开放字典，这里声明界面用到的字段）
 export type ServicePreset = {
@@ -501,7 +502,7 @@ export function prefillSourceText(prefill: PrefillValue): string {
 export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCapabilityTable, presetId: string): FormRow {
   const prefill = prefillModel(candidate.id, candidate, table, presetId);
   return {
-    key: crypto.randomUUID(),
+    key: newCommandId(),
     id: sanitizeModelId(candidate.id) || candidate.id,
     model: candidate.id,
     context_window: numberToText(prefill.context_window),
@@ -520,7 +521,7 @@ export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCap
 // 手动添加的一行：没有预填，容量留空，来源标为手动
 export function rowFromManual(index: number): FormRow {
   return {
-    key: crypto.randomUUID(),
+    key: newCommandId(),
     id: `model-${index + 1}`,
     model: "",
     context_window: "",

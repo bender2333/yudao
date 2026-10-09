@@ -14,6 +14,7 @@ from filelock import FileLock, Timeout
 
 from .api.server import listen_error
 from .api.server import serve as serve_api
+from .app.access_tokens import AccessTokenStore, TokenNameTaken, UnknownToken
 from .app.application import Application
 from .app.contracts import AccessMode
 from .app.project_queries import NotFound, ProjectOverview, ProjectsList, ReplayCheck
@@ -21,6 +22,7 @@ from .data_directory import DISTRIBUTION, configure_logging, default_data_dir
 from .data_directory import default_dotenv as default_dotenv_path
 from .data_directory import default_provider_config as default_provider_config_path
 from .demo import run_demo
+from .models import utc_now
 from .smoke import DEFAULT_DIR as SMOKE_DIR
 from .smoke import run_smoke, smoke_exit_code
 
@@ -78,6 +80,17 @@ def build_parser() -> argparse.ArgumentParser:
     project_show = project_sub.add_parser("show", help="print one project projection")
     project_show.add_argument("project_id")
     project_show.add_argument("--data-dir", default=argparse.SUPPRESS)
+    # 访问令牌（设计说明第 6.3 节）：只在服务所在机器的命令行进行，不提供命令
+    token = sub.add_parser("token", help="manage access tokens for the lan access mode")
+    token_sub = token.add_subparsers(dest="token_command", required=True)
+    token_create = token_sub.add_parser("create", help="create a token and print it once")
+    token_create.add_argument("--name", required=True)
+    token_create.add_argument("--data-dir", default=argparse.SUPPRESS)
+    token_list = token_sub.add_parser("list", help="list token names and creation times")
+    token_list.add_argument("--data-dir", default=argparse.SUPPRESS)
+    token_revoke = token_sub.add_parser("revoke", help="revoke a token by name")
+    token_revoke.add_argument("name")
+    token_revoke.add_argument("--data-dir", default=argparse.SUPPRESS)
     return parser
 
 def _stop_on_ctrl_c() -> None:
@@ -132,9 +145,11 @@ def main(argv: list[str] | None = None) -> int:
         config, dotenv = _provider_paths(args.data_dir, args.provider_config)
         _stop_on_ctrl_c()
         serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv),
-                  access=args.access, host=args.host, port=args.port,
+                  access=args.access, host=args.host, port=args.port, data_dir=args.data_dir,
                   on_ready=None if args.no_browser else _open_page(args.port))
         return 0
+    if command == "token":
+        return _token_command(args)
     if command == "replay":
         if (args.run_id is None) == (args.project_id is None):
             parser.error("replay needs exactly one of: run_id or --project <project_id>")
@@ -161,6 +176,33 @@ def main(argv: list[str] | None = None) -> int:
         return smoke_exit_code(report)
     return 1
 
+
+def _token_command(args: argparse.Namespace) -> int:
+    # 访问令牌的建立、列表与撤销（设计说明第 6.3 节）：只操作数据目录里的令牌文件，
+    # 不打开控制核心，因此不需要进程锁，服务运行时也能建立与撤销
+    store = AccessTokenStore(args.data_dir)
+    now = utc_now()
+    if args.token_command == "create":
+        try:
+            entry, token = store.create(args.name, now=now)
+        except TokenNameTaken as exc:
+            print(f"令牌名称 {exc.name} 已经存在", file=sys.stderr)
+            return 1
+        print(token)
+        print(f"令牌 {entry.name} 已建立；只显示这一次，令牌本身不落盘", file=sys.stderr)
+        return 0
+    if args.token_command == "list":
+        for entry in store.list():
+            state = "已撤销" if entry.revoked_at is not None else "有效"
+            print(f"{entry.name}\t{entry.created_at}\t{state}")
+        return 0
+    try:
+        entry = store.revoke(args.name, now=now)
+    except UnknownToken as exc:
+        print(f"没有名为 {exc.name} 的令牌", file=sys.stderr)
+        return 1
+    print(f"令牌 {entry.name} 已撤销", file=sys.stderr)
+    return 0
 
 def _print_query(data_dir: str | Path, name: str, request: Any) -> int:
     # 只读的子命令：经应用层的查询以只读方式打开数据目录，不写保存的投影，不需要进程锁
