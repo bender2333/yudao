@@ -15,19 +15,20 @@ import time
 import uuid
 from typing import Any
 
-from harness.app.application import Application
 from harness.app.payloads import CatalogRevisedPayload
 from harness.event_store import catalog_stream
 from harness.models import DEPARTMENTS, CatalogEventType
-from harness.tests.api_helpers import running_api
+from harness.tests.api_helpers import (
+    OpenedCatalog as _Opened,
+    catalog_provider as _provider,
+    running_api,
+)
 from harness.tests.protocol_helpers import serve, sse
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
-KEY_A = "issue90-key-a"
-KEY_B = "issue90-key-b"
-
 def _event(kind: str, **payload: Any) -> str:
     return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload}, ensure_ascii=False)}\n\n"
+
 
 def _text_reply(*, response_id: str, model: str, text: str) -> tuple[int, str, list[bytes]]:
     # 不要求调用工具的回答：要让运行停下来，必须让事项处在进行中，因此这里给一个普通回答
@@ -102,57 +103,6 @@ def _department_aware(model: str = "upstream-a", *, on_product=None):
         return _text_reply(response_id="idle", model=chosen, text="按当前计划继续。")
     return responder
 
-def _provider(provider_id: str, base_url: str, ref: str) -> dict[str, Any]:
-    return {"id": provider_id, "name": provider_id, "protocol": "responses", "base_url": base_url,
-            "credential_ref": ref, "timeout_sec": 20, "preset_id": "", "models_url": ""}
-
-def _model(model_id: str, provider_id: str, upstream: str) -> dict[str, Any]:
-    return {"id": model_id, "provider_id": provider_id, "model": upstream,
-            "context_window": 32000, "max_output_tokens": 2048, "capability_source": ""}
-
-class _Opened:
-    # 与 issue89 相同的整体启动方式：真实目录文件、真实 .env、真实数据目录；base_url 指向测试内启动的本机模型服务
-    def __init__(self, tmp_path, *, base_url: str = "http://127.0.0.1:1/v1"):
-        self.data_dir = tmp_path / "data"
-        self.config = tmp_path / "providers.json"
-        self.dotenv = tmp_path / ".env"
-        self._base_url = base_url
-        self.applications: list[Application] = []
-        self.write_document()
-
-    def write_document(self) -> None:
-        providers = [_provider("provider-a", self._base_url, "KEY_A"),
-                     _provider("provider-b", self._base_url, "KEY_B")]
-        models = [_model("model-a", "provider-a", "upstream-a"),
-                  _model("model-a2", "provider-a", "upstream-a2"),
-                  _model("model-b", "provider-b", "upstream-b")]
-        document = {
-            "providers": providers,
-            "models": models,
-            # 所有部门默认都指向 model-a：这样 model-a 被部门默认引用（移除/导入移除它被拒绝），
-            # model-a2 与 model-b 没有被任何部门默认引用（移除它们成功，删除 provider-b 也成功）
-            "bindings": {department: {"provider_id": "provider-a", "model_id": "model-a"}
-                         for department in DEPARTMENTS},
-        }
-        self.config.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
-
-    def __call__(self) -> Application:
-        self.dotenv.write_text(f"KEY_A={KEY_A}\nKEY_B={KEY_B}\n", encoding="utf-8")
-        application = Application.open(self.data_dir, provider_config=self.config, dotenv=self.dotenv)
-        self.applications.append(application)
-        return application
-
-    @property
-    def application(self) -> Application:
-        return self.applications[-1]
-
-    @property
-    def system(self):
-        return self.application.system
-
-    def admit(self, *pairs: tuple[str, str]) -> None:
-        for provider_id, model_id in pairs:
-            self.system.facade.record_admission(provider_id, model_id, admitted_model=model_id)
 
 def _post(client, command: str, **body: Any):
     return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})

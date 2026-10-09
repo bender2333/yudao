@@ -90,6 +90,17 @@ def insert_saved_event_after(store, source_event_id, after_event_id) -> str:
     return event_id
 
 
+
+def reload_without_saved_projection(data_dir) -> None:
+    # 保存的投影位于事件日志的同一个文件里，改写事件以后要从事件重放补建，才与升级以后的数据目录一致
+    connection = sqlite3.connect(data_dir / "events.sqlite")
+    try:
+        connection.execute("DELETE FROM projections")
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def _connection(store) -> sqlite3.Connection:
     connection = sqlite3.connect(store.path, timeout=30)
     connection.row_factory = sqlite3.Row

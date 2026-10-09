@@ -17,41 +17,29 @@ from openai import APIConnectionError, AsyncOpenAI
 
 from harness.adapters.base import ProviderError
 from harness.providers import ProviderConnections, ResponsesConfig
-from harness.tests.protocol_helpers import ConnectionLoop, ResponsesAdapter, model_call
+from harness.tests.protocol_helpers import (
+    STUB_CALL as CALL,
+    STUB_KEY as KEY,
+    STUB_REASONING as REASONING,
+    STUB_TEXT as TEXT,
+    STUB_TOOLS as TOOLS,
+    STUB_USAGE as RAW_USAGE,
+    ConnectionLoop,
+    ResponsesAdapter,
+    model_call,
+    stub_event as _event,
+    stub_response as _response,
+    stub_server as _server,
+    stub_stream as _stream,
+    stub_submit_stream as _submit_stream,
+    write_stub_reply as _send,
+)
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
-from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import FAST_RETRIES
 from harness.tools import tool_definitions, tools_for
-
-
-KEY = "local-sdk-test-key"
-TEXT = {"id": "msg-one", "type": "message", "role": "assistant", "status": "completed",
-        "content": [{"type": "output_text", "text": "Local model output", "annotations": []}]}
-CALL = {"id": "fc-one", "type": "function_call", "name": "read_file", "call_id": "call-one",
-        "arguments": '{"path":"proof.txt"}', "status": "completed"}
-REASONING = {"id": "rs-one", "type": "reasoning", "summary": [], "encrypted_content": "opaque-causal-reasoning"}
-RAW_USAGE = {"input_tokens": 100, "output_tokens": 30, "total_tokens": 130,
-             "input_tokens_details": {"cached_tokens": 80}, "output_tokens_details": {"reasoning_tokens": 12}}
-TOOLS = [{"type": "function", "name": "read_file", "description": "Read a file",
-          "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
-          "strict": False}]
-
-
-def _submit_stream(response_id="resp-submit"):
-    proposal = product_spec()
-    proposal.pop("kind")
-    call = {
-        "id": "fc-submit",
-        "type": "function_call",
-        "name": "submit_product_spec",
-        "call_id": "call-submit",
-        "arguments": json.dumps(proposal),
-        "status": "completed",
-    }
-    return _stream([call], response_id=response_id)
 
 
 def _request(*, session_id="session", history=None, max_output_tokens=None, attempt_id="activation:1:attempt-1"):
@@ -70,80 +58,6 @@ def _request(*, session_id="session", history=None, max_output_tokens=None, atte
 def _decoded(observations):
     # 请求、输出条目与用量；解码后的流事件与完整响应对象是原始证据，不在这里核对
     return [event for event in observations if event.kind not in {"stream_event", "response"}]
-
-
-def _event(kind, **body):
-    return f"event: {kind}\ndata: {json.dumps({'type': kind, **body})}\n\n".encode()
-
-
-def _response(output=None, *, status="completed", usage=RAW_USAGE, response_id="resp-one", error=None):
-    return {"id": response_id, "object": "response", "created_at": 1, "status": status, "model": "local-model",
-            "output": [TEXT] if output is None else output, "usage": usage, "error": error,
-            "incomplete_details": {"reason": "max_output_tokens"} if status == "incomplete" else None}
-
-
-def _stream(output=None, *, status="completed", usage=RAW_USAGE, response_id="resp-one", duplicate=False, terminal=True):
-    response = _response(output, status=status, usage=usage, response_id=response_id)
-    frames = [_event("response.created", response={**response, "status": "in_progress", "output": [], "usage": None}, sequence_number=0)]
-    for index, item in enumerate(response["output"]):
-        frame = _event("response.output_item.done", item=item, output_index=index, sequence_number=index + 1)
-        frames.append(frame)
-        if duplicate:
-            frames.append(frame)
-    if terminal:
-        frames.append(_event(f"response.{status}", response=response, sequence_number=len(frames)))
-    return b"".join(frames)
-
-
-def _send(handler, body, *, status=200, content_type="text/event-stream", headers=None):
-    handler.send_response(status)
-    handler.send_header("Content-Type", content_type)
-    handler.send_header("Content-Length", str(len(body)))
-    for name, value in (headers or {}).items():
-        handler.send_header(name, value)
-    handler.end_headers()
-    handler.wfile.write(body)
-    handler.wfile.flush()
-
-
-@contextmanager
-def _server(replies):
-    captures, paths, authorization = [], [], []
-    received = Event()
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
-            pass
-
-        def do_POST(self):
-            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            captures.append(body)
-            paths.append(self.path)
-            authorization.append(self.headers.get("Authorization") == f"Bearer {KEY}")
-            received.set()
-            if len(captures) > len(replies):
-                _send(self, b'{"error":{"message":"unexpected retry"}}', status=500, content_type="application/json")
-                return
-            reply = replies[len(captures) - 1]
-            try:
-                if callable(reply):
-                    reply(self, body)
-                else:
-                    _send(self, reply)
-            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-                pass
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    worker = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
-    worker.start()
-    config = ResponsesConfig(model="local-model", api_key=KEY, provider="local-stub",
-                             base_url=f"http://127.0.0.1:{server.server_port}/v1", timeout_sec=5)
-    try:
-        yield config, captures, paths, authorization, received
-    finally:
-        server.shutdown()
-        server.server_close()
-        worker.join(timeout=2)
 
 
 @contextmanager

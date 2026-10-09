@@ -479,7 +479,7 @@ def test_event_detail_rejects_an_artifact_of_another_run(data_dir, monkeypatch):
 
 
 def test_event_detail_includes_compaction_summary_and_its_sources(tmp_path):
-    from harness.tests.test_compaction_engine import _runner
+    from harness.tests.helpers import compacted_runner as _runner
 
     system, _, run_id, _ = _runner(tmp_path)
     system.activate_once(run_id)

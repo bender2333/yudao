@@ -33,7 +33,13 @@ const RANGE_LABELS: Record<string, string> = { since_seen: "自上次查看", "2
 
 export type AwayRangeId = "since_seen" | "24h" | "7d";
 
-export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => void; at: number | null }) {
+export function HomePage(props: {
+  app: ClientApp;
+  onNavigate: (hash: string) => void;
+  at: number | null;
+  // 系统通知点击后要打开并标出的决定卡片（工单 #375，设计说明第 5.3 节）
+  targetDecision: string | null;
+}) {
   const [range, setRange] = useState<AwayRangeId>("since_seen");
   const [openItem, setOpenItem] = useState<string | null>(null);
   // 回放位置（全局位置）写在路径的 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
@@ -119,6 +125,7 @@ export function HomePage(props: { app: ClientApp; onNavigate: (hash: string) => 
           now={now}
           projectNames={projectNames}
           onNavigate={props.onNavigate}
+          targetDecision={props.targetDecision}
         />
       </Section>
 
@@ -201,6 +208,8 @@ function DecisionNames(props: {
   now: number;
   projectNames: Record<string, string>;
   onNavigate: (hash: string) => void;
+  // 系统通知点击后要打开并标出的决定卡片（工单 #375，设计说明第 5.3 节）
+  targetDecision: string | null;
 }) {
   const titles = useWorkItemTitles(props.app, props.decisions);
   return (
@@ -213,6 +222,7 @@ function DecisionNames(props: {
         workItemTitle: titles[decision.work_item_id ?? ""] ?? decision.work_item_id ?? "",
       })}
       onNavigate={props.onNavigate}
+      targetDecision={props.targetDecision}
       emptyText="没有等待回答的决定"
     />
   );

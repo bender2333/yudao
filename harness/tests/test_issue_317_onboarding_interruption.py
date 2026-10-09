@@ -13,7 +13,11 @@ from harness.projection import saved_decisions
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.tests import process_kill as killed
 from harness.tests.helpers import WAIT_FOR_RELEASE
-from harness.tests.test_onboarding import GOAL, REQUIREMENT, _source
+from harness.tests.onboarding_project import (
+    ONBOARDING_GOAL as GOAL,
+    ONBOARDING_REQUIREMENT as REQUIREMENT,
+    onboarding_source as _source,
+)
 
 NOTE = "现有 CLI 还没有 --help，初始 PRD 要把这个用法说明写进去"
 

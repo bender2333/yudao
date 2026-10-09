@@ -426,7 +426,7 @@ def test_work_item_creation_model_requests_and_proposal_decisions_record_the_def
 ])
 def test_no_code_path_changes_the_loaded_definitions(tmp_path, names):
     # 走完交接、退回、协作请求、指导、压缩与三种协议的真实请求以后，已加载的定义与重新读取文件的结果相同
-    from harness.tests.test_event_sequence import SCENARIOS
+    from harness.tests.event_scenarios import SCENARIOS
 
     for name in names:
         system, _run_id, _ = SCENARIOS[name].run(tmp_path / name)

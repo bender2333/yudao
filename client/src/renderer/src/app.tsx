@@ -3,9 +3,10 @@
 // （网页界面的提供与发布设计说明第 5.1 节）。
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Capabilities, DecisionList, DecisionView, ProjectList, ProjectRow, SystemStatus } from "./api/generated/types.gen";
+import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
+import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { parseRoute, paths, type Route } from "./shell/routing";
@@ -34,6 +35,8 @@ export function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  // 系统通知点击后要打开的决定卡片（工单 #375，设计说明第 5.3 节）
+  const [targetDecision, setTargetDecision] = useState<string | null>(null);
 
   // 页面应用：查询经生成的调用发出，事件到达时更新状态与待决定数量
   const app = useMemo(() => {
@@ -132,6 +135,64 @@ export function App() {
     window.location.hash = hash;
   }, []);
 
+  // 系统通知与标签页标题（工单 #375，网页界面的提供与发布设计说明第 5.3 节）：
+  // 页面打开期间由不按项目筛选的事件流连接给出决定请求与等待模型服务（提醒只依据事件流与查询，
+  // 不另设通知接口，应用层与接口层设计说明第 5.7 节）
+  const notifier = useMemo(() => new SystemNotifier(), []);
+  // 标签页的标题：待决定的数量，没有待决定的事时不显示数字（标题的基础部分是页面自己的标题）
+  const baseTitle = useRef(document.title);
+  useEffect(() => {
+    document.title = pageTitle(pending, baseTitle.current);
+  }, [pending]);
+  // 点击决定请求的通知：回到首页并打开对应的决定卡片
+  const openDecision = useCallback((decisionId: string) => {
+    window.focus();
+    navigate(paths.home());
+    setTargetDecision(decisionId);
+  }, [navigate]);
+  // 通知的正文需要项目名与事项标题：项目名来自 projects.list 或 project.overview，事项标题来自
+  // project.overview（与首页的决定卡片同一份解析，views/home/page.tsx 的 useWorkItemTitles）
+  // 事件常常先于 projects.list 的重新查询到达，名称还没取到时先取到再发通知
+  const namesRef = useRef<NoticeNames>({ projectName: () => "", workItemTitle: () => "" });
+  const projectNamesRef = useRef<Map<string, string>>(new Map());
+  const itemsRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    namesRef.current = {
+      projectName: (id) => (id === null ? "" : (projectNamesRef.current.get(id)
+        ?? projects.find((row) => row.project_id === id)?.name ?? id)),
+      workItemTitle: (id) => (id === null ? "" : (itemsRef.current.get(id) ?? id)),
+    };
+  }, [projects]);
+  useEffect(() => {
+    const views = app.viewSync;
+    if (!connected || !views) {
+      return;
+    }
+    return app.subscribeEvents((event: EventObject) => {
+      const notice = noticeForEvent(event, namesRef.current);
+      if (notice === null) {
+        return;
+      }
+      // 名称还没有取到：先取到再发通知，正文写明的是哪个项目、哪件事
+      const projectId = event.project_id;
+      const workItemId = event.work_item_id;
+      const known = (projectId === null || projectNamesRef.current.has(projectId)
+        || projects.some((row) => row.project_id === projectId))
+        && (workItemId === null || itemsRef.current.has(workItemId));
+      if (projectId !== null && workItemId !== null && !known) {
+        void app.queryOne<ProjectOverviewResult>("project.overview", { project_id: projectId }).then((snapshot) => {
+          projectNamesRef.current.set(projectId, snapshot.data.name);
+          for (const item of snapshot.data.work_items) {
+            itemsRef.current.set(item.work_item_id, item.title);
+          }
+          notifier.notify(noticeForEvent(event, namesRef.current) ?? notice, openDecision);
+        });
+        return;
+      }
+      notifier.notify(notice, openDecision);
+    });
+  }, [app, connected, notifier, openDecision]);
+
   // 进入模型管理（系统页）之前的路径：点「返回原界面」时回到进入前的页面（设计说明第 3.3 节
   // 第 108 行、工单 #296）。只有从别的页面进入模型管理时才记录；直接输入地址进来没有记录，
   // 回落首页
@@ -217,7 +278,7 @@ export function App() {
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="y9-content content">
           {route.name === "home" ? (
-            <HomePage app={app} onNavigate={navigate} at={route.at} />
+            <HomePage app={app} onNavigate={navigate} at={route.at} targetDecision={targetDecision} />
           ) : route.name === "sys-models" ? (
             <ModelManagementPage
               views={app.viewSync}

@@ -10,8 +10,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from harness.tests.api_helpers import running_api
-from harness.tests.test_issue_90 import _Opened, _document, _provider
+from harness.tests.api_helpers import (
+    OpenedCatalog as _Opened,
+    catalog_document as _document,
+    catalog_provider as _provider,
+    running_api,
+)
 
 DEPARTMENTS = ("product", "engineering", "quality")
 

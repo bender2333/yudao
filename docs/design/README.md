@@ -50,7 +50,7 @@
 - [接入已有项目](existing-project-onboarding.md)
   - 内容：建档事项（事项种类、命令、决定请求）；产品的初始 PRD、工程的结构说明、质检的基线核对；用户确认的往返与基线采纳；大仓库的仓库概况；失败与中断；含流程图、时序图与模块交互图。
   - 状态：设计已确认（2026-09-29 用户确认第 12 节的决定：已有项目的代码经 `project.onboard` 接入并建档、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）；实施中：#134 至 #137 与 #346 已实施，#138、#139、#347 未实施。工单：父工单 #124（#134 至 #139），属于里程碑 M2。2026-10-07 结构说明的可见范围改为参数，建档材料分类，新增采纳写回（B8，挂在 3.8 下，M2）。
-  - 需求：[D33](../requirements/existing-project-onboarding.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)、[0024](../adr/0024-git-in-process-with-pygit2.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)。
+  - 需求：[D33](../requirements/existing-project-onboarding.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)、[0024](../adr/0024-git-in-process-with-pygit2.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0034](../adr/0034-adopted-change-writeback-three-tree-merge.md)（三份代码树合并、冲突与最终树核验，2026-10-08）。
 - [项目的起始文件夹](project-initial-files.md)
   - 内容：新建项目时带的起始文件夹：项目的起点（采纳成果、起始文件夹快照、空树）与三处共用的求法、`project.create` 的可选参数与 `project_registered` 的 `initial_snapshot`、事项从快照开始、界面与评测、失败与中断；含流程图与时序图。
   - 状态：2026-10-06 设计，用户同意，未实施。工单：挂在 #124 下，属于里程碑 M2。
@@ -80,12 +80,13 @@
   - 状态：2026-09-25 设计草案，2026-09-26 按总体架构（各角色的步骤由控制核心驱动）与反复退回时提醒用户的决定修改，同日补全计划的更新、执行槽位的计数、停滞时的历史、交出检查的审查记录与自测、专家请求期间的角色任务、验收对照与角色任务的恢复这几项规则；规则已由用户确认，未实施；路线位置为 Stage 5（部门内协作、上下文与界面），对产品、工程、质检、运维四个部门一起引入。2026-10-07 按意图校准整理，修改内容见该文件更新行。
   - 需求：[D26](../requirements/department-roles.md)。前置设计：总体架构、语义系统、模型管理。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。
 - [评测场景：版本回归与 OpenCode 对照](evaluation-scenarios.md)
-  - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），回归场景与留出场景、噪声范围与三种结论，含模块交互图。
+  - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；结束状态与放行状态的独立核对；未知用量、费用和有效样本数；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），回归场景与留出场景、噪声范围与三种结论，含模块交互图。
   - 状态：2026-09-28 设计，场景与评分方法经用户确认；2026-09-30 用户逐项审阅完毕（各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分），未实施，工单为 #118 的子工单 #188 至 #198（评测工具、OpenCode 基础分与场景 2、3 的 Yudao 一侧属于里程碑 M2，场景 1 的 Yudao 一侧属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。2026-10-07 版本比较增加噪声范围与三种结论，报告增加费用与检验覆盖比例，三个场景作为回归场景、另设留出场景。
-  - 需求：[D32](../requirements/comparison-experiment.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。
+  - 需求：[D32](../requirements/comparison-experiment.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。共同报告合同见 [Stage 3 试用与自举准备验收合同](../stage-3/trial-acceptance-contract.md)。
 - [测试分层](test-pyramid.md)
+  - 证据与角色流程：[验收证据规则](../agents/acceptance-evidence.md)。
   - 内容：单元、功能与模块、集成三层的定义与登记表 `layers.toml`（测试文件原地不动），审计钩子检查边界、单项时间上限、多进程只用于集成层；共用的辅助函数放在已有的辅助文件中，测试文件之间不互相导入；执行者、审查者与架构师各自运行的层；集成层每 5 个 PR 批量运行、失败时暂停合并并用 `git bisect` 找出问题 PR；测试往下层移的规则；输出每项失败一行；含流程图与模块交互图。
-  - 状态：2026-09-29 设计，用户已确认各角色运行的层、批量运行的规则与规则文件的修改，同日暂缓；2026-10-07 恢复，放进 M2；未实施。工单：父工单 #157（#158、#406、#159 至 #161）。
+  - 状态：2026-09-29 设计，用户已确认各角色运行的层、批量运行的规则与规则文件的修改；2026-10-07 恢复并放进 M2。#158、#406、#159 已合并，按层全部检查生效；#160、#161 待完成。工单：父工单 #157。
 - [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)
   - 内容：3.1 单机可靠恢复的恢复契约、角色任务的恢复、故障矩阵与产品边界。
   - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），2026-09-28 写明启动时自动继续与执行权没有期限（第 3 节）；项目流与 run 流（#126）已完成，其余未实现；对应工单 #16、#17、#18，界面 #181，属于里程碑 M2。2026-10-07 按意图校准整理，修改内容见该文件更新行。
