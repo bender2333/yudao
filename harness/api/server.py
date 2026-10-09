@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import socket
 from collections.abc import Callable
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
 
+from ..app.access_tokens import AccessTokenStore
 from ..app.application import Application
 from ..app.contracts import AccessMode
 from .app import close_event_streams, create_app
@@ -48,15 +50,18 @@ def listen_error(access: AccessMode, host: str) -> str | None:
     return None
 
 def serve(open_application: Callable[[], Application], *, access: AccessMode = "local",
-          host: str, port: int, on_ready: Callable[[], None] | None = None) -> None:
+          host: str, port: int, on_ready: Callable[[], None] | None = None,
+          data_dir: str | Path | None = None) -> None:
     # 服务进程持有 uvicorn 的 Server：停止服务就是结束这个进程（Ctrl+C，设计说明第 4.2 节）；
     # 进程退出以后由启动处释放数据目录的进程锁。
-    # on_ready 在服务开始接受请求以后调用一次（第 4.2 节：此时输出页面地址并打开浏览器）
+    # on_ready 在服务开始接受请求以后调用一次（第 4.2 节：此时输出页面地址并打开浏览器）。
+    # 局域网访问方式按数据目录里的令牌文件校验（第 6.3 节）
     error = listen_error(access, host)
     if error is not None:
         raise ValueError(error)
     # 页面文件与接口由同一个应用提供，服务进程持有这个应用：关闭开始时由它关闭事件流连接
-    api = create_app(open_application, access=access)
+    api = create_app(open_application, access=access,
+                     tokens=None if data_dir is None else AccessTokenStore(data_dir))
     server = _ReadyServer(uvicorn.Config(
         api,
         host=host, port=port, timeout_graceful_shutdown=GRACEFUL_TIMEOUT_SEC,

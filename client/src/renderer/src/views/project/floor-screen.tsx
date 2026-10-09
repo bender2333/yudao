@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, WorkItemLoop } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
+import { newCommandId } from "../../contract/command-id.ts";
 import { createRafClock, type Clock } from "../../pixel/clock";
 import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
 import type { DecisionAnswer, DecisionResult } from "../../pixel/floor/card";
@@ -120,7 +121,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   // 画面内的回答：走与页面卡片同一条命令 decision.answer，带上决定的版本与说明；拒绝时把原因交给卡片
   decideRef.current = async (payload) => {
     const outcome = await props.app.command("decision.answer", {
-      command_id: globalThis.crypto.randomUUID(),
+      command_id: newCommandId(),
       decision_id: payload.decision_id,
       option: payload.option,
       ...(payload.note === "" ? {} : { note: payload.note }),

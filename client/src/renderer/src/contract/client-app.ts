@@ -16,7 +16,9 @@ export type ClientState =
   | { kind: "failed"; address: string; message: string }
   // disconnectedAt 是事件流断开的时间（ISO）：断开时窗口整体变灰、顶栏写明断开的时间（工单 #296）；
   // 重新连上以后清空
-  | { kind: "connected"; address: string; capabilities: Capabilities; streamConnected: boolean; disconnectedAt: string | null };
+  | { kind: "connected"; address: string; capabilities: Capabilities; streamConnected: boolean; disconnectedAt: string | null }
+  // unauthorized 是局域网访问方式下没有令牌或令牌无效（第 6.3 节）：页面显示填写令牌的表单
+  | { kind: "unauthorized"; address: string };
 
 export type ClientListeners = {
   onState: (state: ClientState) => void;
@@ -33,6 +35,8 @@ export class ClientApp {
   private views: ViewSync | null = null;
   private boot: string | null = null;
   private capabilities: Capabilities | null = null;
+  // 局域网访问方式的访问令牌（第 6.3 节）：查询、命令与事件流都在请求头里带上它
+  private token = "";
   // 页面级的事件订阅：视图同步之外，页面还需要测试与候选等事件的结果内容（工单 #93），
   // 项目楼层这类按事件播放动作的画面也用它（工单 #82）
   private readonly pageListeners = new Set<(event: EventObject) => void>();
@@ -73,11 +77,13 @@ export class ClientApp {
     return callCommand(this.iface.client, name, body);
   }
 
-  // 连接页面自己的来源：读取能力清单并核对接口版本
-  async open(address: string): Promise<void> {
+  // 连接页面自己的来源：读取能力清单并核对接口版本。
+  // token 是局域网访问方式的访问令牌（第 6.3 节）：本机访问方式为空串
+  async open(address: string, token = ""): Promise<void> {
     this.closeStream();
+    this.token = token;
     this.listeners.onState({ kind: "connecting" });
-    const result = await connect(address);
+    const result = await connect(address, token);
     if (result.state === "outdated") {
       this.listeners.onState({
         kind: "outdated", address: result.address, clientVersion: result.clientVersion,
@@ -85,11 +91,15 @@ export class ClientApp {
       });
       return;
     }
+    if (result.state === "unauthorized") {
+      this.listeners.onState({ kind: "unauthorized", address: result.address });
+      return;
+    }
     if (result.state === "failed") {
       this.listeners.onState({ kind: "failed", address: result.address, message: result.message });
       return;
     }
-    this.iface = interfaceFor(result.address);
+    this.iface = interfaceFor(result.address, token);
     this.capabilities = result.capabilities;
     this.boot = result.capabilities.deployment.boot_id;
     this.views = new ViewSync((name, params) => this.query(name, params), result.capabilities);
@@ -130,7 +140,7 @@ export class ClientApp {
           }
         }
       },
-    });
+    }, this.token);
     this.stream.start(after);
   }
 
@@ -178,7 +188,7 @@ export class ClientApp {
     }
     try {
       const before = this.boot;
-      const result = await connect(this.iface.baseUrl);
+      const result = await connect(this.iface.baseUrl, this.token);
       if (result.state !== "connected") {
         return;
       }

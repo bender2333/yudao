@@ -10,11 +10,15 @@ import httpx
 import uvicorn
 
 from harness.api.app import create_app
+from harness.api.pages import RELEASE_ASSETS
+from harness.app.access_tokens import AccessTokenStore
 from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.app.contracts import AccessMode
 from harness.app.registry import Registry
-from harness.api.pages import RELEASE_ASSETS
 from harness.models import DEPARTMENTS
+
+# uvicorn 自带的日志配置；核对服务日志内容的检查让它自己写日志文件，与命令行启动的方式相同
+LOGGING_CONFIG = uvicorn.config.LOGGING_CONFIG
 
 # 接口测试使用真实运行的服务：uvicorn 在测试进程的一个线程中运行 FastAPI 应用，监听本机的空闲端口，
 # 测试经 HTTP 请求它；控制核心在服务的生命周期中建立，模型回答由调用方交给 LoopSystem 的 FakeAdapter 给出。
@@ -39,13 +43,19 @@ def running_server(open_application: Callable[[], Application], *,
                    registry: Registry = DEFAULT_REGISTRY, access: AccessMode = "local",
                    host: str = "127.0.0.1", connect: str | None = None,
                    keepalive_sec: float = 15.0,
-                   pages: Path | None = None) -> Iterator[RunningServer]:
+                   pages: Path | None = None,
+                   data_dir: Path | str | None = None,
+                   disable_uvicorn_logging: bool = False) -> Iterator[RunningServer]:
     # 与 running_api 相同的启动方式，另外把服务句柄交给调用方。
-    # pages 是页面文件目录；不给出时用一个不存在的目录，页面请求按「没有页面文件」回答
+    # pages 是页面文件目录；不给出时用一个不存在的目录，页面请求按「没有页面文件」回答。
+    # data_dir 是令牌文件所在的数据目录，局域网访问方式按它校验访问令牌（第 6.3 节）。
+    # disable_uvicorn_logging 交给真实的服务日志处理时用：日志写进数据目录里的日志文件
     server = uvicorn.Server(uvicorn.Config(
         create_app(open_application, registry=registry, access=access, keepalive_sec=keepalive_sec,
-                   pages=RELEASE_ASSETS if pages is None else pages),
-        host=host, port=0, log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0))
+                   pages=RELEASE_ASSETS if pages is None else pages,
+                   tokens=None if data_dir is None else AccessTokenStore(data_dir)),
+        host=host, port=0, log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0,
+        log_config=None if disable_uvicorn_logging else LOGGING_CONFIG))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
@@ -69,9 +79,12 @@ def running_server(open_application: Callable[[], Application], *,
 def running_api(open_application: Callable[[], Application], *,
                 registry: Registry = DEFAULT_REGISTRY, access: AccessMode = "local",
                 host: str = "127.0.0.1", connect: str | None = None,
-                keepalive_sec: float = 15.0, pages: Path | None = None) -> Iterator[httpx.Client]:
+                keepalive_sec: float = 15.0, pages: Path | None = None,
+                data_dir: Path | str | None = None,
+                disable_uvicorn_logging: bool = False) -> Iterator[httpx.Client]:
     with running_server(open_application, registry=registry, access=access, host=host, connect=connect,
-                        keepalive_sec=keepalive_sec, pages=pages) as handle:
+                        keepalive_sec=keepalive_sec, pages=pages, data_dir=data_dir,
+                        disable_uvicorn_logging=disable_uvicorn_logging) as handle:
         yield handle.client
 
 
