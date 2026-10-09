@@ -11,7 +11,7 @@ from harness.app.access_tokens import AccessTokenStore
 from harness.app.application import Application
 from harness.models import utc_now
 from harness.runtime import LoopSystem
-from harness.tests.api_helpers import running_api
+from harness.tests.api_helpers import bearer, running_api
 
 
 class _Opened:
@@ -33,10 +33,6 @@ def _lan_address() -> str:
             return address
     return "127.0.0.1"
 
-
-def _bearer(token: str) -> dict[str, str]:
-    # 请求头里的访问令牌（第 6.3 节）：令牌只放在请求头中，不出现在地址里
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_local_access_rejects_a_host_that_is_not_a_local_name(data_dir):
@@ -151,7 +147,7 @@ def test_capabilities_list_the_access_mode(data_dir):
         local = client.get("/api/capabilities").json()["deployment"]["access"]
     _entry, token = AccessTokenStore(data_dir).create("capabilities", now=utc_now())
     with running_api(_Opened(data_dir), access="lan", data_dir=data_dir) as client:
-        lan = client.get("/api/capabilities", headers=_bearer(token)).json()["deployment"]["access"]
+        lan = client.get("/api/capabilities", headers=bearer(token)).json()["deployment"]["access"]
     assert (local, lan) == ("local", "lan")
 
 
@@ -168,7 +164,7 @@ def test_lan_access_serves_the_local_network_and_checks_only_the_origin(data_dir
     # 请求被拒绝
     opened = _Opened(data_dir)
     _entry, token = AccessTokenStore(data_dir).create("客厅的电脑", now=utc_now())
-    headers = _bearer(token)
+    headers = bearer(token)
     with running_api(opened, access="lan", host="0.0.0.0", connect=_lan_address(),
                      pages=_pages(tmp_path / "pages"), data_dir=data_dir) as client:
         origin = str(client.base_url).rstrip("/")
