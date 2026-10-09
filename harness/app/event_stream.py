@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import queue
+from collections import deque
 from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Literal, Union
 
