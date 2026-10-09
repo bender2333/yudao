@@ -35,24 +35,24 @@ export function RestartOnboarding(props: { app: ClientApp; projectId: string }) 
       note="建档已经停下，还没有基线采纳。从登记的源目录重新采集代码快照，开始新的建档事项"
     >
       {sources.length === 0 ? (
-        <p className="note">这个项目还没有登记源目录，先在项目设置里登记。</p>
+        <p className="y9-note note">这个项目还没有登记源目录，先在项目设置里登记。</p>
       ) : (
-        <div className="row-actions">
+        <div className="y9-row row-actions">
           {sources.length > 1 ? (
-            <label className="field">
+            <label className="y9-field field">
               <span>源目录</span>
-              <select value={chosen ?? ""} onChange={(event) => setPicked(event.target.value)}>
+              <select className="y9-select" value={chosen ?? ""} onChange={(event) => setPicked(event.target.value)}>
                 {sources.map((source) => (
                   <option key={source.name} value={source.name}>{source.name}（{source.path}）</option>
                 ))}
               </select>
             </label>
           ) : (
-            <span className="note">源目录：{sources[0].name}（{sources[0].path}）</span>
+            <span className="y9-note note">源目录：{sources[0].name}（{sources[0].path}）</span>
           )}
           <button
             type="button"
-            className="primary"
+            className="y9-btn primary"
             disabled={command.busy || chosen === null}
             onClick={() => chosen !== null
               && void command.submit("onboarding.restart", { project_id: props.projectId, source_name: chosen })}

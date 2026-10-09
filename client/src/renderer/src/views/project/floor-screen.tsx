@@ -243,13 +243,13 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   );
 
   return (
-    <div className="floor-screen">
-      <div className="floor-overlay-tabs">
+    <div className="y9-scene floor-screen">
+      <div className="y9-overlay-bar floor-overlay-tabs">
         {OVERLAY_LABELS.filter(([name]) => overlays.includes(name)).map(([name, labelText]) => (
           <button
             key={name}
             type="button"
-            className={overlay === name ? "active" : ""}
+            className={`y9-seg-btn${overlay === name ? " is-on active" : ""}`}
             onClick={() => setOverlay(overlay === name ? null : name)}
           >
             {labelText}
@@ -323,15 +323,15 @@ function FloorTextList(props: {
     workItemId ? props.items.find((it) => it.work_item_id === workItemId)?.sign ?? workItemId : "";
   return (
     <>
-      {props.items.length === 0 ? <p className="note">项目还没有事项</p> : (
-        <ul className="floor-text-list">
+      {props.items.length === 0 ? <p className="y9-note note">项目还没有事项</p> : (
+        <ul className="y9-scene-list floor-text-list">
           {props.items.map((item) => (
             <li key={item.work_item_id}>
               <strong>{item.sign}</strong>
               <span>{item.department ?? "—"}</span>
               <span>第 {item.round} 轮</span>
               <span>{item.status}</span>
-              {item.kind === "onboarding" ? <span className="tag">建档</span> : null}
+              {item.kind === "onboarding" ? <span className="y9-tag tag">建档</span> : null}
             </li>
           ))}
         </ul>
