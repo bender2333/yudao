@@ -4,6 +4,7 @@
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
+import { rememberToken, storedToken } from "./contract/access-token";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
 import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
@@ -35,6 +36,8 @@ export function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  // 局域网访问方式的访问令牌（第 6.3 节）：在这个浏览器里保存，刷新以后不用再次填写
+  const [token, setToken] = useState<string>(() => storedToken());
   // 系统通知点击后要打开的决定卡片（工单 #375，设计说明第 5.3 节）
   const [targetDecision, setTargetDecision] = useState<string | null>(null);
 
@@ -52,9 +55,22 @@ export function App() {
 
   useEffect(() => {
     if (galleryOnly) return;
-    void app.open(window.location.origin);
+    void app.open(window.location.origin, token);
     return () => app.close();
-  }, [app, galleryOnly]);
+  }, [app, galleryOnly, token]);
+
+  // 用户在页面上填写令牌：先按它连接，服务接受以后才写进这个浏览器（第 6.3 节）。
+  // 被拒绝的令牌不保存，否则刷新以后浏览器里留着服务已经拒绝的令牌
+  const submitToken = useCallback((value: string) => {
+    setToken(value.trim());
+  }, []);
+
+  // 服务接受以后才保存：刷新页面不用再次填写，令牌也不进入查询参数
+  useEffect(() => {
+    if (state.kind === "connected" && token !== "") {
+      rememberToken(token);
+    }
+  }, [state.kind, token]);
 
   // 路由：监听 hash 变化
   useEffect(() => {
@@ -231,12 +247,17 @@ export function App() {
       </div></div>
     );
   }
+  if (state.kind === "unauthorized") {
+    // 局域网访问方式：服务按第 6.3 节要求访问令牌，页面文件不需要令牌，所以这里能打开页面。
+    // 用户在这个浏览器里填写一次，令牌随后保存在这个浏览器里
+    return <TokenGate onSubmit={submitToken} />;
+  }
   if (state.kind === "failed") {
     return (
       <div className="y9-gate gate"><div className="y9-gate-card card">
         <h1>没有连上 Yudao 服务</h1>
         <p className="error">连接失败：{state.message}</p>
-        <button className="y9-btn primary" type="button" onClick={() => void app.open(window.location.origin)}>重新连接</button>
+        <button className="y9-btn primary" type="button" onClick={() => void app.open(window.location.origin, token)}>重新连接</button>
       </div></div>
     );
   }
@@ -295,6 +316,46 @@ export function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+// 填写访问令牌的表单（应用层与接口层设计说明第 6.3 节）：局域网访问方式下服务对全部接口路径
+// 要求 Authorization: Bearer <令牌>，页面文件不需要令牌，因此页面能打开而接口返回 401。
+// 令牌由用户在控制主机上用 token create 建立，在这里的浏览器中填写一次并保存在这个浏览器里；
+// 输入框用密码类型，页面不回显填过的令牌。
+function TokenGate(props: { onSubmit: (token: string) => void }) {
+  const [value, setValue] = useState("");
+  return (
+    <div className="y9-gate"><div className="y9-gate-card">
+      <h1>填写访问令牌</h1>
+      <p>Yudao 服务以局域网访问方式运行，接口需要访问令牌。在控制主机上用 token create 建立令牌并复制它。</p>
+      <form
+        className="y9-form y9-gate-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const token = value.trim();
+          if (token !== "") {
+            props.onSubmit(token);
+          }
+        }}
+      >
+        <label className="y9-field" htmlFor="access-token">
+          <span>访问令牌</span>
+          <input
+            id="access-token"
+            data-testid="access-token"
+            className="y9-input"
+            type="password"
+            autoComplete="off"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+          />
+        </label>
+        <div className="y9-row">
+          <button className="y9-btn primary" type="submit">连接</button>
+        </div>
+      </form>
+    </div></div>
   );
 }
 

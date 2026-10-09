@@ -20,6 +20,10 @@
    max-width 与 overflow 只对非 inline 的盒子生效，这里补上 inline-block，超长路径才截断成省略号 */
 .y9-crumb { display: inline-block; vertical-align: middle; max-width: 40ch; }
 
+/* 令牌表单（工单 #348 的令牌门）：原型没有这张表单，这里沿用原型的 y9-form / y9-field / y9-btn；
+   卡片是 grid 且居中，表单要撑满卡片宽度，输入框才不至于缩成最小宽度 */
+.y9-gate-form { width: 100%; text-align: left; }
+
 /* 像素画布与动作图鉴（工单 #176）：画布按整数倍最近邻放大 */
 .pixel-canvas { line-height: 0; }
 .pixel-canvas canvas { image-rendering: pixelated; display: block; }
