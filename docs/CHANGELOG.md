@@ -558,3 +558,5 @@ claude-sonnet-5-5 / 2026-10-08 07:25 / 在 `docs/architecture-issues.md` 的 #37
 9router/my-small / 2026-10-08 16:30 / 工单 #348 第 2 轮合入 origin/main（73e7a518）后的记录整理：#159 的共用代码归位记录与本分支的 #348 记录按时间顺序并列保留，追加冲突两侧都留；`harness/tests/api_helpers.py` 的导入块冲突两侧都留（本分支的 `LOGGING_CONFIG` 与 main 的 `DEPARTMENTS`，main 侧重复的 `RELEASE_ASSETS` 导入已在前一行，取一次），`running_server` 与 `running_api` 的 `data_dir` 形参与 main 侧新增的 `CREDENTIAL_A/B`、`catalog_provider`、`catalog_model`、`catalog_document`、`OpenedCatalog` 并存；`test_access_tokens.py` 在登记表里保持 integration，未拆单元层 / 工单 #348 第 2 轮
 
 gpt-6 / 2026-10-08 09:48 / 当前验收基线补齐应用接口和迭代底座已有实现；验收证据规则引用 aipro 单人流程的既有适用条件 / 工单状态与角色条件在同一文档中保持一致。
+
+9router/ag/gemini-3.8-flash-high / 2026-10-09 22:45 / 在 `docs/architecture-issues.md` 追加 #160 条目：`harness/tests/test_issue_374.py::test_the_lan_access_mode_opens_the_address_of_this_machine` 的就绪判定（轮询 `/api/capabilities` 只接受 200）与 #423（`1adea0ef`）加入的局域网令牌校验冲突，该项测试必然超时；已用 HEAD 上的同一文件副本复跑确认失败先于本次改动存在，建议给这次请求带令牌而不是放宽就绪判定 / 这条缺陷属于其他工单新增的接口测试，执行者在 #160 内不越界改动，按规则登记待架构师处置
