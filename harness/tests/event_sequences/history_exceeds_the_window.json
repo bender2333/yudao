@@ -20,6 +20,7 @@
    "payload": {
     "adapter": "fake",
     "baseline": null,
+    "check_timeout_sec": 600,
     "command_versions": {},
     "context_window": 10000,
     "definitions_version": "<definitions>",

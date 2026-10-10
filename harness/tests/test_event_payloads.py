@@ -34,6 +34,7 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     projects.configure_source_directory(project_id, "src", "C:/repo/src", base_version=0)
     projects.archive(project_id)
     projects.restore(project_id)
+    projects.set_parameter(project_id, "check_timeout_sec", 300, reason="核对载荷", modified_by="user:test")
     with pytest.raises(ValueError, match="max_cycles"):
         projects.start_work_item(project_id, "开始失败的事项", max_cycles=0)
     _work_item_a, run_a = projects.start_work_item(project_id, "事项 A")

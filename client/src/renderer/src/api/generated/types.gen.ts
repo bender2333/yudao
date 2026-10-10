@@ -2801,6 +2801,10 @@ export type ParameterSet = {
      * Modified By
      */
     modified_by: string;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
 };
 
 /**
@@ -11990,6 +11994,103 @@ export type ProjectGoalChangedPayload = {
 };
 
 /**
+ * ProjectParameterSetEvent
+ */
+export type ProjectParameterSetEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'project_parameter_set';
+    payload: ProjectParameterSetPayload;
+};
+
+/**
+ * ProjectParameterSetPayload
+ */
+export type ProjectParameterSetPayload = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Old Value
+     */
+    old_value: unknown;
+    /**
+     * New Value
+     */
+    new_value: unknown;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Modified By
+     */
+    modified_by: string;
+    /**
+     * Bounds
+     */
+    bounds: Array<unknown>;
+};
+
+/**
  * ProjectPinnedEvent
  */
 export type ProjectPinnedEvent = {
@@ -12839,6 +12940,10 @@ export type RunCreatedPayload = {
      * Context Window
      */
     context_window: number;
+    /**
+     * Check Timeout Sec
+     */
+    check_timeout_sec?: number;
     /**
      * Provider
      */
@@ -15508,6 +15613,8 @@ export type EventObject = ({
 } & OnboardingRevisionStartedEvent) | ({
     type: 'baseline_adopted';
 } & BaselineAdoptedEvent) | ({
+    type: 'project_parameter_set';
+} & ProjectParameterSetEvent) | ({
     type: 'catalog_revised';
 } & CatalogRevisedEvent) | ({
     type: 'catalog_candidates_collected';

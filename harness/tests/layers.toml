@@ -102,6 +102,7 @@
 "test_project_and_work_item_commands.py" = "integration"
 "test_project_queries.py" = "integration"
 "test_project_stream_fields.py" = "module"
+"test_project_parameters.py" = "integration"
 "test_projects.py" = "integration"
 "test_proposal_version_check.py" = "integration"
 "test_protocol_history_replay.py" = "integration"

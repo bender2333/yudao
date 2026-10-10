@@ -91,6 +91,8 @@ PROJECT_EVENT_TYPES = frozenset({
     "project_decision_withdrawn",
     "onboarding_revision_started",
     "baseline_adopted",
+    # 项目级参数（迭代底座 B3，工单 #351）：按项目设置的检查时限与建档单轮上限
+    "project_parameter_set",
 })
 
 # 目录流：模型目录与凭据的修订记录，以及排空与强制升级、用户查看过的位置。

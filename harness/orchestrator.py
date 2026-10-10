@@ -254,6 +254,8 @@ class Orchestrator:
         max_cycles: int = DEFINITIONS.rule_value("max_cycles"),
         run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec"),
         context_window: int = 32_000,
+        # 检查的时限（迭代底座 B3，工单 #351）：不给时按项目级取值与全局现值取一次，随 run 冻结
+        check_timeout_sec: int | None = None,
         run_id: str | None = None,
         project_id: str | None = None,
         work_item_id: str | None = None,
@@ -278,6 +280,10 @@ class Orchestrator:
             raise ValueError("run_time_limit_sec must be positive")
         if context_window < 1:
             raise ValueError("context_window must be positive")
+        check_timeout_sec = (parameter_values.value_for_project(self.store, project_id, "check_timeout_sec")
+                             if check_timeout_sec is None else check_timeout_sec)
+        if check_timeout_sec < 1:
+            raise ValueError("check_timeout_sec must be positive")
         if self.facade is None and self.test_adapter_factory is None:
             raise ValueError("provider facade is required for production runs")
         if kind not in DEFINITIONS.work_items.kinds:
@@ -298,7 +304,8 @@ class Orchestrator:
         if material_dir == self.materials_root or not material_dir.is_relative_to(self.materials_root):
             raise ValueError("run_id must stay within the run materials directory")
         # 工作区先于其余材料落盘：从封存快照建立失败时不留下半个 run。
-        environment = LocalEnvironment.establish(self.workspace_root / run_id, initial_tree)
+        environment = LocalEnvironment.establish(
+            self.workspace_root / run_id, initial_tree, check_timeout_sec=check_timeout_sec)
         workspace_digest = environment.snapshot().digest
         # 部门 Prompt 不在 run 内留副本（工单 #89）：每次模型请求按事项种类与项目部门设置读取
         initial = self.interactions.initial(run_id, task)
@@ -331,6 +338,7 @@ class Orchestrator:
                 "max_cycles": max_cycles,
                 "run_time_limit_sec": run_time_limit_sec,
                 "context_window": context_window,
+                "check_timeout_sec": check_timeout_sec,
                 "provider": self.test_provider if self.test_adapter_factory is not None else "directory",
                 "adapter": self.test_adapter_name if self.test_adapter_factory is not None else "directory",
                 "sessions": {name: session.session_id for name, session in sessions.items()},
@@ -406,7 +414,9 @@ class Orchestrator:
         self.facade.store_document({"providers": providers, "models": models, "bindings": bindings})
 
     def _environment(self, run_id: str) -> LocalEnvironment:
-        return LocalEnvironment.open(self.workspace_root / run_id)
+        # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351），不跟随之后的修改
+        return LocalEnvironment.open(self.workspace_root / run_id,
+                                     check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
 
     def add_input(self, run_id: str, text: str, *, base_version: int | None = None,
                   command: Command | None = None) -> RunProjection:
@@ -1708,14 +1718,18 @@ class Orchestrator:
         item = self.projects.projection(project_id).work_item(candidate.work_item_id)
         if item is None or prior.project_context_ref is None:
             raise ValueError(f"work item {candidate.work_item_id} is gone")
+        round_limit = self.projects.onboarding_round_limit(project_id)
         note_ref = None
         if (note or "").strip():
             ref = self.artifacts.put(run_id, "revision_note", note.strip(), media_type="text/markdown")
             note_ref = asdict(ref)
         self.create_run(
-            item.text, max_cycles=item.max_cycles, run_time_limit_sec=item.run_time_limit_sec,
-            context_window=item.context_window, run_id=run_id, kind="onboarding", initial_tree=tree,
-            code_snapshot=snapshot, project_id=project_id, work_item_id=candidate.work_item_id,
+            item.text, max_cycles=item.max_cycles,
+            run_time_limit_sec=round_limit,
+            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, candidate.run_id),
+            context_window=item.context_window, run_id=run_id,
+            kind="onboarding", initial_tree=tree, code_snapshot=snapshot,
+            project_id=project_id, work_item_id=candidate.work_item_id,
             project_context=self.artifacts.get(ArtifactRef(**prior.project_context_ref)).decode("utf-8"),
             prompt_config_versions=dict(item.prompt_config_versions),
             registered_commands=dict(prior.registered_commands) or None,

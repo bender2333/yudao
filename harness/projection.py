@@ -64,8 +64,6 @@ _PROJECT_STATE = TypeAdapter(ProjectProjection)
 _CATALOG_STATE = TypeAdapter(CatalogProjection)
 _DECISION_STATE = TypeAdapter(DecisionRequest)
 
-DECISION_EVENTS = frozenset({EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN})
-
 
 class RunNotFoundError(KeyError):
     pass

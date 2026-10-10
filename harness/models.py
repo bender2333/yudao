@@ -119,6 +119,8 @@ class ProjectEventType:
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
     # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
     BASELINE_ADOPTED = "baseline_adopted"
+    # 项目级参数（迭代底座 B3，工单 #351）：种类字符串是 project_parameter_set，与目录流的 parameter_set 是两个不同流的种类
+    PARAMETER_SET = "project_parameter_set"
 
 
 class CatalogEventType:

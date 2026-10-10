@@ -20,6 +20,7 @@
    "payload": {
     "adapter": "fake",
     "baseline": null,
+    "check_timeout_sec": 600,
     "command_versions": {
      "unit-tests": 1
     },

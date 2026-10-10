@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .definitions import DEFINITIONS
-from .models import CatalogEvent, CatalogEventType, json_dumps
+from .models import CatalogEvent, CatalogEventType, ProjectEventType, json_dumps
 
 
 @dataclass(frozen=True)
@@ -105,6 +105,57 @@ def history(store: Any) -> list[ParameterChange]:
     _, changes = fold_parameters([event for event in store.stream_events(catalog_stream())
                                   if isinstance(event, CatalogEvent)])
     return changes
+
+
+# 按项目设置的参数只有这两项：其余参数按项目设置没有意义，项目级取值也只在这两项上生效。
+# 事件种类字符串是 project_parameter_set：目录流已有同名种类 parameter_set，载荷类型表按字符串索引，
+# 同名的两种事件会取到同一种载荷类型，流的分类也分不开（ADR-0019 只约束已存在的种类不变，新增种类属于新增）
+PROJECT_PARAMETERS = ("check_timeout_sec", "onboarding.round_time_limit_sec")
+
+
+def check_project_parameter(name: str, value: Any) -> Any:
+    # 项目级参数的新值核对：条目必须是可按项目设置的那两项，取值按全局的界限核对
+    if name not in PROJECT_PARAMETERS:
+        raise ParameterNotFoundError(f"参数 {name} 不能按项目设置")
+    return check_bounds(name, value)
+
+
+def project_values(store: Any, project_id: str) -> dict[str, Any]:
+    # 项目的参数取值：项目流事件折叠的结果；没有设置过的项目为空
+    from .event_store import project_stream
+
+    events = store.stream_events(project_stream(project_id))
+    return fold_project_parameters(events)
+
+
+def fold_project_parameters(events: list[Any]) -> dict[str, Any]:
+    # 按事件顺序折叠项目流的参数事件：现值是最后一次修改的新值
+    values: dict[str, Any] = {}
+    for event in events:
+        if event.type != ProjectEventType.PARAMETER_SET:
+            continue
+        values[event.payload["name"]] = event.payload["new_value"]
+    return values
+
+
+def value_for_project(store: Any, project_id: str | None, name: str) -> Any:
+    # 一个参数的生效取值：项目设置过用项目值，否则用全局现值（工单 #351 验收第 1、2 条）
+    if project_id is not None:
+        project = project_values(store, project_id)
+        if name in project:
+            return project[name]
+    return current_values(store)[name]
+
+def frozen_check_timeout(store: Any, run_id: str) -> int:
+    # 一个 run 中检查的时限（迭代底座 B3，工单 #351）：run_created 事件里冻结的取值，运行中不再跟随修改。
+    # 旧事件没有这个字段时按当时的全局现值。取值不进运行投影：投影是内核模块，行数受内核清单上限约束
+    from .event_store import run_stream
+    from .models import EventType
+
+    for event in store.stream_events(run_stream(run_id), through_version=1):
+        if event.type == EventType.RUN_CREATED:
+            return int(event.payload.get("check_timeout_sec", DEFINITIONS.rule_value("check_timeout_sec")))
+    raise KeyError(run_id)
 
 
 def check_bounds(name: str, value: Any) -> Any:
