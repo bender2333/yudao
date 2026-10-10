@@ -1,16 +1,16 @@
-// 联系表的页面清单与截图矩阵（工单 #376）：每一项写明页面名称、原型 v9 中的路由与档位、
+// 联系表的页面清单与截图矩阵（工单 #376）：每一项写明页面名称、原型 v10 中的路由与档位、
 // 真实系统中的路由模板，以及真实系统一侧用哪个预置项目准备数据。
 // 脚本与单元测试都从这里取数据，页面清单只有一份。
 
-// 原型 v9 的档位：低于页面所读查询的档位时页面打不开（docs/prototypes/v9/js/contract/registry.js）
-export const LEVELS = ["ui", "3.1", "3.2C", "3.4A", "3.8", "3.2B", "3.2D", "S4", "S5"];
+// 原型 v10 的档位：低于页面所读查询的档位时页面打不开（docs/prototypes/v10/js/contract/registry.js）
+export const LEVELS = ["ui", "3.1", "3.2C", "3.4A", "3.8", "3.2B", "3.2D", "pilot", "S4", "S5"];
 
 export type PageEntry = {
   slug: string;
   name: string;
-  /** 原型 v9 的路由，用原型自带的示例数据 */
+  /** 原型 v10 的路由，用原型自带的示例数据 */
   prototypeHash: string;
-  /** 原型 v9 的档位：页面所读查询的最低档位 */
+  /** 原型 v10 的档位：页面所读查询的最低档位 */
   prototypeLevel: string;
   /** 真实系统的路由模板，{project} 与 {workItem} 由脚本按项目名替换 */
   systemHash: string;
@@ -24,7 +24,7 @@ export type PageEntry = {
   settle: number;
 };
 
-// 真实系统的机器、运行、工具页面按原型 v9 排布（工单 #378），明细等待所属工作包登记查询；
+// 真实系统的机器、运行、工具页面按原型 v10 排布（工单 #378），明细等待所属工作包登记查询；
 // 恢复页还没有内容（工单 #380），联系表照拍占位画面。
 export const PAGES: PageEntry[] = [
   {

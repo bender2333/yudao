@@ -1,6 +1,6 @@
 // 动作图鉴联系表（工单 #176 验收标准 1）：把全部公开画法渲染成一张对照图，交给用户查看画风。
 // 用 Playwright 的 Chromium 加载客户端的图鉴页（开发构建），逐项截取预览，拼成一张大图。
-// 原型侧的对应画法用原型自带的图鉴页（docs/prototypes/v9/index.html#/gallery）截取，两列并排。
+// 原型侧的对应画法用原型自带的图鉴页（docs/prototypes/v10/index.html#/gallery）截取，两列并排。
 //
 // 用法：node scripts/build-contact-sheet.mjs [输出目录]
 // 依赖：@playwright/test 自带的 Chromium（npx playwright install chromium）。

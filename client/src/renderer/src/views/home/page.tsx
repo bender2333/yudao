@@ -99,7 +99,7 @@ export function HomePage(props: {
   const replaying = at !== null;
 
   return (
-    <div className={`y9-home page home${replaying ? " is-replay" : ""}`}>
+    <div className={`y10-home page home${replaying ? " is-replay" : ""}`}>
       <Loading state={decisions} />
       <StatusBlock items={items} onNavigate={props.onNavigate} />
 
@@ -269,14 +269,14 @@ function useWorkItemTitles(app: ClientApp, decisions: DecisionView[]): Record<st
 // 正常时灰色「无」，异常时亮起并显示数量；点击跳到对应的页面，同页的区块滚到该区块
 function StatusBlock(props: { items: StatusItem[]; onNavigate: (hash: string) => void }) {
   return (
-    <Block className="y9-home-status card">
-      <div className="y9-stats status-row" aria-label="状态项">
+    <Block className="y10-home-status card">
+      <div className="y10-stats status-row" aria-label="状态项">
         {props.items.map((item) => {
           const value = item.lit ? (item.count !== null ? String(item.count) : item.text) : "无";
           return (
             <button
               key={item.id}
-              className={`y9-stat status-item is-${item.id}${item.lit ? " is-lit lit" : ""}${
+              className={`y10-stat status-item is-${item.id}${item.lit ? " is-lit lit" : ""}${
                 item.lit && item.icon === "decide" ? " is-decide" : ""
               }`}
               disabled={!item.lit || item.href === null}
@@ -290,9 +290,9 @@ function StatusBlock(props: { items: StatusItem[]; onNavigate: (hash: string) =>
               }}
               title={`${item.label}：${value}${item.lit && item.href !== null ? "，点击查看" : ""}`}
             >
-              <Icon name={item.icon} className="y9-stat-icon" />
-              <span className="y9-stat-label status-label">{item.label}</span>
-              <span className="y9-stat-value status-value">{value}</span>
+              <Icon name={item.icon} className="y10-stat-icon" />
+              <span className="y10-stat-label status-label">{item.label}</span>
+              <span className="y10-stat-value status-value">{value}</span>
             </button>
           );
         })}
@@ -333,14 +333,14 @@ function AwayReportSection(props: {
           : `上次查看：${formatTime(data.last_seen.at)}`
       }
     >
-      <div className="y9-row row-actions">
+      <div className="y10-row row-actions">
         {/* 范围切换（原型 ui/views/home.js 的 reportBlock）：三个按钮一组，选中的一项高亮 */}
-        <span className="y9-seg">
+        <span className="y10-seg">
           {ranges.map((option) => (
             <button
               key={option.id}
               type="button"
-              className={`y9-seg-btn${option.id === props.range ? " is-on primary" : ""}`}
+              className={`y10-seg-btn${option.id === props.range ? " is-on primary" : ""}`}
               onClick={() => props.onRange(option.id as AwayRangeId)}
             >
               {option.label}
@@ -350,7 +350,7 @@ function AwayReportSection(props: {
         {hasCommand(props.app, "home.mark_seen") && data !== null ? (
           <button
             type="button"
-            className="y9-btn small primary"
+            className="y10-btn small primary"
             disabled={command.busy}
             onClick={() => void command.submit("home.mark_seen", { position: data.range.to_position })}
           >
@@ -361,33 +361,33 @@ function AwayReportSection(props: {
       {data === null ? (
         <Loading state={props.report} />
       ) : data.summary.length === 0 ? (
-        <p className="y9-note note">这段时间没有完成、放行或其他需要报告的事（范围：{rangeLabel}）</p>
+        <p className="y10-note note">这段时间没有完成、放行或其他需要报告的事（范围：{rangeLabel}）</p>
       ) : (
         <>
-          <div className="y9-report-items report-items">
+          <div className="y10-report-items report-items">
             {data.summary.map((item) => {
               // 刻度选中时高亮对应的报告项（点击刻度，报告中的项高亮）
               const lit = props.selected !== null && item.refs.includes(props.selected);
               return (
-                <div key={item.id} className={`y9-report-item report-item${props.openItem === item.id ? " is-open open" : ""}${lit ? " is-highlight highlight" : ""}`}>
-                  <button type="button" className="y9-report-head report-head" onClick={() => props.onToggleItem(item.id)}>
-                    <span className="y9-report-label report-label">{item.label}</span>
-                    <span className="y9-report-value report-value">
+                <div key={item.id} className={`y10-report-item report-item${props.openItem === item.id ? " is-open open" : ""}${lit ? " is-highlight highlight" : ""}`}>
+                  <button type="button" className="y10-report-head report-head" onClick={() => props.onToggleItem(item.id)}>
+                    <span className="y10-report-label report-label">{item.label}</span>
+                    <span className="y10-report-value report-value">
                       {item.value}
                       <small>{item.unit}</small>
                     </span>
-                    {item.detail ? <span className="y9-report-detail report-detail">{item.detail}</span> : null}
+                    {item.detail ? <span className="y10-report-detail report-detail">{item.detail}</span> : null}
                   </button>
                   {props.openItem === item.id ? (
                     item.refs.length === 0 ? (
-                      <p className="y9-note note">{item.detail ?? ""}（来源：范围内的调用尝试记录）</p>
+                      <p className="y10-note note">{item.detail ?? ""}（来源：范围内的调用尝试记录）</p>
                     ) : (
-                      <ul className="y9-source-list source-list">
+                      <ul className="y10-source-list source-list">
                         {item.refs.map((position) => {
                           const fact = data.facts.find((row) => row.position === position);
                           return (
                             <li key={position}>
-                              <span className="y9-note note">{formatTime(fact?.at ?? null)}</span>{" "}
+                              <span className="y10-note note">{formatTime(fact?.at ?? null)}</span>{" "}
                               {fact?.label ?? "来源事件"}{" "}
                               <code>{fact?.type ?? `事件 ${position}`}</code>
                             </li>

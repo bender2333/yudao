@@ -42,7 +42,7 @@ test("服务报告的发布版本与页面不同时，页面重新加载并取�
     page.on("pageerror", (error) => pageerrors.push(error.message));
     await page.goto(`${backend.address}/`);
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.locator(".brand .y9-brand-name")).toContainText("Yudao", { timeout: 60_000 });
+    await expect(page.locator(".brand .y10-brand-name")).toContainText("Yudao", { timeout: 60_000 });
     // 入口页面文件被取过两次：页面读到不同的服务版本以后重新加载了一次
     expect(served).toBe(2);
     expect(pageerrors).toEqual([]);
@@ -71,7 +71,7 @@ test("服务报告同一个发布版本：页面不重新加载", async () => {
     });
     const page = await context.newPage();
     await page.goto(`${backend.address}/`);
-    await expect(page.locator(".brand .y9-brand-name")).toContainText("Yudao", { timeout: 60_000 });
+    await expect(page.locator(".brand .y10-brand-name")).toContainText("Yudao", { timeout: 60_000 });
     await page.waitForTimeout(15_000);
     // 入口页面文件只取过一次：版本相同时不重新加载
     expect(documents).toBe(1);

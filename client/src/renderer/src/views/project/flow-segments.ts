@@ -1,7 +1,7 @@
 // 流转覆盖层的分段（工单 #379，来自 #366 的审查）：楼层画面的「流转」覆盖层把 project.flow 的行
 // 聚成段，一段一条路径，段落上的「N 次」标签落在这条路径的中点。
 // 分组键只含起点、终点与是否返工：同一对部门的全部非返工行并入同一段，否则同一条路径上的
-// 多个标签互相遮挡（原型 v9 js/ui/scenes.js 的 overlayData）。
+// 多个标签互相遮挡（原型 v10 js/ui/scenes.js 的 overlayData）。
 
 import type { FlowRecord } from "../../api/generated/types.gen";
 

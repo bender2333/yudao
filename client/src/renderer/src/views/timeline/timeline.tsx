@@ -1,4 +1,4 @@
-// 时间轴（原型 v8 设计说明第 5.5 节、原型 v9 的 ui/replay.js，工单 #180）：
+// 时间轴（原型 v8 设计说明第 5.5 节、原型 v10 的 ui/replay.js，工单 #180）：
 // 首页放在离开期间的报告下方，概览放在循环画面下方。刻度只取关键事实（首页取 home.away_report 的
 // 关键事实列表，概览按项目筛选），按种类着色；刻度之间相隔超过阈值时画折断符号。
 //
@@ -157,43 +157,43 @@ export function Timeline(props: TimelineProps) {
   const legend = legendKinds(ticks);
 
   return (
-    <div className="y9-replay timeline">
-      <div className="y9-replay-bar timeline-bar">
-        <button type="button" className="y9-btn small" disabled={ticks.length === 0} onClick={() => (playing ? pause() : play())}>
+    <div className="y10-replay timeline">
+      <div className="y10-replay-bar timeline-bar">
+        <button type="button" className="y10-btn small" disabled={ticks.length === 0} onClick={() => (playing ? pause() : play())}>
           {playing ? "暂停" : "播放"}
         </button>
-        <button type="button" className="y9-btn small" disabled={ticks.length === 0} onClick={() => step()}>
+        <button type="button" className="y10-btn small" disabled={ticks.length === 0} onClick={() => step()}>
           单步
         </button>
-        <span className="y9-seg speed-seg" role="group" aria-label="播放速度">
+        <span className="y10-seg speed-seg" role="group" aria-label="播放速度">
           {SPEEDS.map((option) => (
-            <button key={option} type="button" className={`y9-seg-btn${option === speed ? " is-on active" : ""}`} onClick={() => setSpeed(option)}>
+            <button key={option} type="button" className={`y10-seg-btn${option === speed ? " is-on active" : ""}`} onClick={() => setSpeed(option)}>
               {option}×
             </button>
           ))}
         </span>
-        <button type="button" className="y9-btn small" disabled={position === null} onClick={live}>
+        <button type="button" className="y10-btn small" disabled={position === null} onClick={live}>
           回到现在
         </button>
         {position !== null ? (
-          <span className="y9-replay-on replay-status">
+          <span className="y10-replay-on replay-status">
             回放中 · {formatTime(current ? current.at : props.fromAt)}
           </span>
         ) : (
-          <span className="y9-note note">{props.liveNote}</span>
+          <span className="y10-note note">{props.liveNote}</span>
         )}
         {position !== null ? (
-          <span className="y9-replay-fact">{current ? current.label : "范围的起点"}</span>
+          <span className="y10-replay-fact">{current ? current.label : "范围的起点"}</span>
         ) : null}
       </div>
-      <div className="y9-ticks ticks" role="list" aria-label="关键事实的时间轴">
+      <div className="y10-ticks ticks" role="list" aria-label="关键事实的时间轴">
         {parts.length === 0 ? (
-          <span className="y9-note note">所选范围内没有关键事实</span>
+          <span className="y10-note note">所选范围内没有关键事实</span>
         ) : (
           parts.map((part, partIndex) => {
             if (part.kind === "break") {
               return (
-                <span key={`break-${part.gapSec}-${partIndex}`} className="y9-tick-break tick-break" title={`跳过 ${durationText(part.gapSec)}`}>
+                <span key={`break-${part.gapSec}-${partIndex}`} className="y10-tick-break tick-break" title={`跳过 ${durationText(part.gapSec)}`}>
                   ⫽<small>{durationText(part.gapSec)}</small>
                 </span>
               );
@@ -206,7 +206,7 @@ export function Timeline(props: TimelineProps) {
               <button
                 key={tick.position}
                 type="button"
-                className={`y9-tick tick${current ? " is-current current" : ""}${past ? " is-past past" : ""}${highlighted ? " is-highlight highlight" : ""}`}
+                className={`y10-tick tick${current ? " is-current current" : ""}${past ? " is-past past" : ""}${highlighted ? " is-highlight highlight" : ""}`}
                 style={{ ["--tick" as string]: KEY_KINDS[tick.kind].color }}
                 data-position={tick.position}
                 data-kind={tick.kind}
@@ -220,9 +220,9 @@ export function Timeline(props: TimelineProps) {
         )}
       </div>
       {legend.length > 0 ? (
-        <div className="y9-legends timeline-legends">
+        <div className="y10-legends timeline-legends">
           {legend.map((kind) => (
-            <span key={kind} className="y9-legend legend" style={{ ["--tick" as string]: KEY_KINDS[kind].color }}>
+            <span key={kind} className="y10-legend legend" style={{ ["--tick" as string]: KEY_KINDS[kind].color }}>
               <i />
               {KEY_KINDS[kind].label}
             </span>

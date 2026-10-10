@@ -1,4 +1,4 @@
-// 项目楼层声明的陈设画法（原型 v9 floor-decl.js 的房间 props、lit、tint，工单 #82）。
+// 项目楼层声明的陈设画法（原型 v10 floor-decl.js 的房间 props、lit、tint，工单 #82）。
 //
 // 这些函数需要画布原语，因此放在渲染层；世界与系统只读声明里的数据与规则。
 // 每个函数按房间 id 与 floor-decl.js 逐行对应。

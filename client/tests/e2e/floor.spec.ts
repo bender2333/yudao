@@ -151,7 +151,7 @@ test("循环画面在概览页出现，画布画出内容且随事项的推进�
   }
 });
 
-// 楼层周围的结构按原型 v9（工单 #379 验收）：覆盖层按钮条是画面上方一条独立的条，不压在画面上；
+// 楼层周围的结构按原型 v10（工单 #379 验收）：覆盖层按钮条是画面上方一条独立的条，不压在画面上；
 // 文字列表默认折叠，展开以后每行给中文部门名与中文状态。
 test("覆盖层按钮条在画面上方不与画面重叠，文字列表默认折叠且展开后写中文部门与中文状态", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });
@@ -165,7 +165,7 @@ test("覆盖层按钮条在画面上方不与画面重叠，文字列表默认�
     // 按钮条在画面所在的面板里、画布上方，底边不越过画布的顶边
     const bar = page.locator(".floor-overlay-tabs");
     await expect(bar).toHaveCount(1);
-    await expect(page.locator(".y9-scene.y9-floor-wrap .floor-overlay-tabs")).toHaveCount(1);
+    await expect(page.locator(".y10-scene.y10-floor-wrap .floor-overlay-tabs")).toHaveCount(1);
     const box = await page.evaluate(() => {
       const bar = document.querySelector(".floor-overlay-tabs")!.getBoundingClientRect();
       const canvas = document.querySelector(".floor-screen canvas")!.getBoundingClientRect();

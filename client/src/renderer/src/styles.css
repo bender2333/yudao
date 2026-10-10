@@ -1,15 +1,15 @@
-/* 客户端样式（工单 #377）：外观以原型 v9 为准，色板、字体、通用组件与外壳样式全部来自原型，
+/* 客户端样式（工单 #377）：外观以原型 v10 为准，色板、字体、通用组件与外壳样式全部来自原型，
    逐张搬进来；这里只写原型没有的、真实系统自己才有的结构（抽屉遮罩的挂载点、像素画布的缩放）。 */
 
-@import "./styles/v9-base.css";
-@import "./styles/v9-home.css";
-@import "./styles/v9-project.css";
-@import "./styles/v9-department.css";
-@import "./styles/v9-system.css";
-@import "./styles/v9-gallery.css";
+@import "./styles/v10-base.css";
+@import "./styles/v10-home.css";
+@import "./styles/v10-project.css";
+@import "./styles/v10-department.css";
+@import "./styles/v10-system.css";
+@import "./styles/v10-gallery.css";
 
 /* 抽屉遮罩在 prototypes 里是常驻元素，真实系统按抽屉打开与否挂载；display 由 base.css 的
-   .y9-scrim 在窄屏给出 */
+   .y10-scrim 在窄屏给出 */
 .drawer-scrim {
   border: 0;
   padding: 0;
@@ -18,11 +18,11 @@
 
 /* 顶栏的路径：原型里每一段是可点的按钮（inline-block），真实系统里是不参与交互的一段文字 span；
    max-width 与 overflow 只对非 inline 的盒子生效，这里补上 inline-block，超长路径才截断成省略号 */
-.y9-crumb { display: inline-block; vertical-align: middle; max-width: 40ch; }
+.y10-crumb { display: inline-block; vertical-align: middle; max-width: 40ch; }
 
-/* 令牌表单（工单 #348 的令牌门）：原型没有这张表单，这里沿用原型的 y9-form / y9-field / y9-btn；
+/* 令牌表单（工单 #348 的令牌门）：原型没有这张表单，这里沿用原型的 y10-form / y10-field / y10-btn；
    卡片是 grid 且居中，表单要撑满卡片宽度，输入框才不至于缩成最小宽度 */
-.y9-gate-form { width: 100%; text-align: left; }
+.y10-gate-form { width: 100%; text-align: left; }
 
 /* 像素画布与动作图鉴（工单 #176）：画布按整数倍最近邻放大 */
 .pixel-canvas { line-height: 0; }

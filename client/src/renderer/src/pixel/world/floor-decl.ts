@@ -1,4 +1,4 @@
-// 项目楼层的声明（原型 v9 floor-decl.js，设计说明第 3 节，工单 #82）。
+// 项目楼层的声明（原型 v10 floor-decl.js，设计说明第 3 节，工单 #82）。
 //
 // 世界与系统只用数据与规则：房间与管道的结构、任务目录、待机活动由构建期脚本从原型导出
 // （generated/floor-decl.json）；持续状态的规则（deptRest、roleRest）与事件到任务的解析（keyOf）

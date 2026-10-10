@@ -1,4 +1,4 @@
-// 由原型 v9 的 floor-decl.js 与 say.js 导出项目楼层的声明数据（工单 #82）。
+// 由原型 v10 的 floor-decl.js 与 say.js 导出项目楼层的声明数据（工单 #82）。
 // 原型代码自定稿起不再修改（ADR-0021）；这里只读取，把「数据与规则」导出为 JSON：
 // 房间与管道的声明、任务目录、待机活动、事件到任务的解析（keyOf）、持续状态表、说话目录。
 // 输出：src/renderer/src/pixel/generated/floor-decl.json
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientRoot = path.resolve(__dirname, '..');
-const v9Root = path.resolve(clientRoot, '..', 'docs', 'prototypes', 'v9', 'js');
+const v10Root = path.resolve(clientRoot, '..', 'docs', 'prototypes', 'v10', 'js');
 
 // 最小的浏览器环境：与 generate-pixel-registry.mjs 同一做法，原型代码不改。
 function makeCtx2d() {
@@ -110,19 +110,19 @@ sandbox.self = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
-// 按 index.html 的脚本顺序执行：y9.js → sprites.js → engine.js → ecs.js → say.js → floor-decl.js
+// 按 index.html 的脚本顺序执行：y10.js → sprites.js → engine.js → ecs.js → say.js → floor-decl.js
 for (const [label, file] of [
-  ['y9.js', path.join(v9Root, 'y9.js')],
-  ['sprites.js', path.join(v9Root, 'pixel', 'sprites.js')],
-  ['engine.js', path.join(v9Root, 'pixel', 'engine.js')],
-  ['ecs.js', path.join(v9Root, 'pixel', 'ecs.js')],
-  ['say.js', path.join(v9Root, 'pixel', 'say.js')],
-  ['floor-decl.js', path.join(v9Root, 'pixel', 'floor-decl.js')],
+  ['y10.js', path.join(v10Root, 'y10.js')],
+  ['sprites.js', path.join(v10Root, 'pixel', 'sprites.js')],
+  ['engine.js', path.join(v10Root, 'pixel', 'engine.js')],
+  ['ecs.js', path.join(v10Root, 'pixel', 'ecs.js')],
+  ['say.js', path.join(v10Root, 'pixel', 'say.js')],
+  ['floor-decl.js', path.join(v10Root, 'pixel', 'floor-decl.js')],
 ]) {
   vm.runInContext(readFileSync(file, 'utf8'), sandbox, { filename: label });
 }
 
-const P = sandbox.window.Y9.pixel;
+const P = sandbox.window.Y10.pixel;
 if (!P.floorDecl || !P.say) throw new Error('原型没有导出 floorDecl 或 say');
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ const links = D.links.map((d) => ({
 }));
 
 const out = {
-  generatedFrom: 'docs/prototypes/v9/js/pixel/{floor-decl.js,say.js,ecs.js}',
+  generatedFrom: 'docs/prototypes/v10/js/pixel/{floor-decl.js,say.js,ecs.js}',
   // 房间与管道的声明：函数字段（props、lit、tint、rest）在 TS 一侧改写，这里只记录结构。
   rooms,
   links,

@@ -107,7 +107,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     work_item: props.workItemId,
     ...(at === null ? {} : { at }),
   });
-  // 回放到过去的时间点时不显示决定请求（设计说明第 5.5 节、原型 v9 第 8 节）
+  // 回放到过去的时间点时不显示决定请求（设计说明第 5.5 节、原型 v10 第 8 节）
   const decisions = useSnapshot<DecisionList>(props.app, "page.decisions", "decisions.list", {
     project_id: props.projectId, status: ["open"],
   }, replaying);
@@ -246,15 +246,15 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   );
 
   return (
-    // 覆盖层按钮条是画面上方一条独立的深色条（原型 v9 scenes.js mountFloor）：不压在画面上
+    // 覆盖层按钮条是画面上方一条独立的深色条（原型 v10 scenes.js mountFloor）：不压在画面上
     <div className="floor-screen">
-      <div className="y9-scene y9-floor-wrap">
-        <div className="y9-overlay-bar floor-overlay-tabs" role="group" aria-label="覆盖层">
+      <div className="y10-scene y10-floor-wrap">
+        <div className="y10-overlay-bar floor-overlay-tabs" role="group" aria-label="覆盖层">
           {OVERLAY_LABELS.filter(([name]) => overlays.includes(name)).map(([name, labelText]) => (
             <button
               key={name}
               type="button"
-              className={`y9-seg-btn${overlay === name ? " is-on active" : ""}`}
+              className={`y10-seg-btn${overlay === name ? " is-on active" : ""}`}
               onClick={() => setOverlay(overlay === name ? null : name)}
             >
               {labelText}
@@ -294,7 +294,7 @@ function overlayData(
   return null;
 }
 
-/** 画面下方的文字列表：默认折叠（原型 v9 scenes.js floorList），每一行是事项的色点、
+/** 画面下方的文字列表：默认折叠（原型 v10 scenes.js floorList），每一行是事项的色点、
  *  标题、中文部门名、轮次与中文状态；等待回答的决定请求在列表里用页面卡片回答。 */
 function FloorTextList(props: {
   items: LoopItem[];
@@ -306,18 +306,18 @@ function FloorTextList(props: {
     workItemId ? props.items.find((it) => it.work_item_id === workItemId)?.sign ?? workItemId : "";
   return (
     <>
-      <details className="y9-scene-list floor-text-list">
+      <details className="y10-scene-list floor-text-list">
         <summary>文字列表</summary>
-        {props.items.length === 0 ? <p className="y9-note note">项目还没有事项</p> : (
+        {props.items.length === 0 ? <p className="y10-note note">项目还没有事项</p> : (
           <ul>
             {props.items.map((item) => (
               <li key={item.work_item_id}>
-                <span className="y9-dot-color" style={{ "--c": itemColor(item) } as React.CSSProperties} />
+                <span className="y10-dot-color" style={{ "--c": itemColor(item) } as React.CSSProperties} />
                 <strong>{item.sign}</strong>
                 <span>{item.department === null || item.department === "" ? "大厅" : departmentName(item.department)}</span>
                 <span>第 {item.round} 轮</span>
                 <span>{label(WORK_ITEM_STATUS, item.status)}</span>
-                {item.kind === "onboarding" ? <span className="y9-tag tag">建档</span> : null}
+                {item.kind === "onboarding" ? <span className="y10-tag tag">建档</span> : null}
               </li>
             ))}
           </ul>

@@ -1,5 +1,5 @@
 // 像素画面对象：PixiJS 8 的 Application 挂在宿主元素上，提供 setModel、playEvent、focus、resize、destroy
-// 五个方法，接口与原型 v9 的 floor.js、room.js 一致（工单 #176 验收标准）。
+// 五个方法，接口与原型 v10 的 floor.js、room.js 一致（工单 #176 验收标准）。
 // 状态与入参校验在 view-state.ts 里（可在 node --test 下验证）；这里只做渲染：
 // 把每个小人的帧取成纹理贴到舞台上，缩放按 layoutFor 取整数倍、采样 nearest。
 

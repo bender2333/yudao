@@ -1,6 +1,6 @@
-// 原型 v9 的图标与通用组件（工单 #377）：16×16 SVG 图标、状态标记、按钮、区块、
-// 表格、页签、弹窗与页面标题。图标路径直接取自原型 docs/prototypes/v9/js/ui/kit.js，
-// 用 React 组件画出来；样式类名沿用原型的 y9- 前缀。
+// 原型 v10 的图标与通用组件（工单 #377）：16×16 SVG 图标、状态标记、按钮、区块、
+// 表格、页签、弹窗与页面标题。图标路径直接取自原型 docs/prototypes/v10/js/ui/kit.js，
+// 用 React 组件画出来；样式类名沿用原型的 y10- 前缀。
 
 import type { ReactNode } from "react";
 
@@ -69,7 +69,7 @@ export function Icon(props: { name: string; className?: string }) {
   }
   return (
     <svg
-      className={props.className ?? "y9-icon"}
+      className={props.className ?? "y10-icon"}
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
@@ -84,8 +84,8 @@ export function Icon(props: { name: string; className?: string }) {
 
 export function StatusMark(props: { kind: string; text: string }) {
   return (
-    <span className={`y9-status is-${props.kind}`}>
-      <Icon name={props.kind} className="y9-status-icon" />
+    <span className={`y10-status is-${props.kind}`}>
+      <Icon name={props.kind} className="y10-status-icon" />
       <span>{props.text}</span>
     </span>
   );
@@ -93,13 +93,13 @@ export function StatusMark(props: { kind: string; text: string }) {
 
 export function PageHead(props: { eyebrow?: string; title: string; subtitle?: string; actions?: ReactNode }) {
   return (
-    <div className="y9-page-head">
-      <div className="y9-page-titles">
-        {props.eyebrow ? <div className="y9-eyebrow">{props.eyebrow}</div> : null}
+    <div className="y10-page-head">
+      <div className="y10-page-titles">
+        {props.eyebrow ? <div className="y10-eyebrow">{props.eyebrow}</div> : null}
         <h1>{props.title}</h1>
-        {props.subtitle ? <p className="y9-subtitle">{props.subtitle}</p> : null}
+        {props.subtitle ? <p className="y10-subtitle">{props.subtitle}</p> : null}
       </div>
-      {props.actions ? <div className="y9-page-actions">{props.actions}</div> : null}
+      {props.actions ? <div className="y10-page-actions">{props.actions}</div> : null}
     </div>
   );
 }
@@ -115,17 +115,17 @@ export function Block(props: {
   children: ReactNode;
 }) {
   return (
-    <section id={props.id} className={`y9-block${props.className ? ` ${props.className}` : ""}${props.compact ? " is-compact" : ""}`}>
+    <section id={props.id} className={`y10-block${props.className ? ` ${props.className}` : ""}${props.compact ? " is-compact" : ""}`}>
       {props.title || props.actions ? (
-        <header className="y9-block-head">
-          <div className="y9-block-titles">
-            {props.title ? <h2 className="y9-block-title">{props.title}</h2> : null}
-            {props.subtitle ? <p className="y9-block-sub">{props.subtitle}</p> : null}
+        <header className="y10-block-head">
+          <div className="y10-block-titles">
+            {props.title ? <h2 className="y10-block-title">{props.title}</h2> : null}
+            {props.subtitle ? <p className="y10-block-sub">{props.subtitle}</p> : null}
           </div>
-          {props.actions ? <div className="y9-block-actions">{props.actions}</div> : null}
+          {props.actions ? <div className="y10-block-actions">{props.actions}</div> : null}
         </header>
       ) : null}
-      <div className="y9-block-body">{props.children}</div>
+      <div className="y10-block-body">{props.children}</div>
     </section>
   );
 }

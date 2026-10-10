@@ -1,4 +1,4 @@
-// 左侧栏（原型 v9 外壳，工单 #377）：品牌、首页、「从想法新建」、「接入已有项目」、
+// 左侧栏（原型 v10 外壳，工单 #377）：品牌、首页、「从想法新建」、「接入已有项目」、
 // 项目搜索、项目列表（名称、状态标记、待回答的决定数）与每项的重命名、置顶、归档、恢复；
 // 底部「系统」分组的入口按能力清单显示。新建项目用命令 project.create / project.onboard，
 // 项目列表本身由外壳的视图同步给出，命令被接受以后由事件到达时重新查询。
@@ -21,7 +21,7 @@ export type SidebarProps = {
   onNavigate: (hash: string) => void;
 };
 
-// 系统分组的入口与图标（原型 v9 shell.js 的 SYSTEM_LINKS）；查询不在能力清单里时不出现
+// 系统分组的入口与图标（原型 v10 shell.js 的 SYSTEM_LINKS）；查询不在能力清单里时不出现
 const SYSTEM_ENTRIES: { page: string; label: string; query: string; icon: string }[] = [
   { page: "models", label: "模型管理", query: "catalog", icon: "models" },
   { page: "machines", label: "机器", query: "machines.list", icon: "machines" },
@@ -29,7 +29,7 @@ const SYSTEM_ENTRIES: { page: string; label: string; query: string; icon: string
   { page: "tools", label: "工具与扩展", query: "tools.registry", icon: "tools" },
 ];
 
-// 项目状态标记（原型 v9 左侧栏的项目行）：每种自带图标与颜色，计数取自项目列表，
+// 项目状态标记（原型 v10 左侧栏的项目行）：每种自带图标与颜色，计数取自项目列表，
 // 取值不为真的不显示。kind 取自 kit.tsx 的图标名单，写错会在画图标时就地报错。
 function statusMarks(project: ProjectRow, decisions: DecisionView[]): { kind: string; text: string }[] {
   const marks: { kind: string; text: string }[] = [];
@@ -88,30 +88,30 @@ export function Sidebar(props: SidebarProps) {
   };
 
   return (
-    <aside className="y9-sidebar sidebar" aria-label="首页、项目与系统">
-      <div className="y9-side-top">
-        <div className="y9-brand brand">
-          <Icon name="brand" className="y9-icon y9-brand-icon" />
-          <span className="y9-brand-name">Yudao<small>枢道</small></span>
+    <aside className="y10-sidebar sidebar" aria-label="首页、项目与系统">
+      <div className="y10-side-top">
+        <div className="y10-brand brand">
+          <Icon name="brand" className="y10-icon y10-brand-icon" />
+          <span className="y10-brand-name">Yudao<small>枢道</small></span>
         </div>
         <button
           type="button"
-          className={`y9-side-link y9-home-link nav-item${props.activeName === "home" ? " is-active" : ""}`}
+          className={`y10-side-link y10-home-link nav-item${props.activeName === "home" ? " is-active" : ""}`}
           aria-current={props.activeName === "home" ? "page" : undefined}
           onClick={() => props.onNavigate("#/home")}
         >
           <Icon name="home" />
           <span>首页</span>
         </button>
-        <div className="y9-side-actions">
+        <div className="y10-side-actions">
           {can("project.create") ? (
-            <button type="button" className="y9-btn primary y9-new-project nav-item" onClick={() => setCreating(creating === "idea" ? null : "idea")}>
+            <button type="button" className="y10-btn primary y10-new-project nav-item" onClick={() => setCreating(creating === "idea" ? null : "idea")}>
               <Icon name="plus" />
               <span>从想法新建</span>
             </button>
           ) : null}
           {can("project.onboard") ? (
-            <button type="button" className="y9-btn y9-onboard nav-item" onClick={() => setCreating(creating === "existing" ? null : "existing")}>
+            <button type="button" className="y10-btn y10-onboard nav-item" onClick={() => setCreating(creating === "existing" ? null : "existing")}>
               <Icon name="import" />
               <span>接入已有项目</span>
             </button>
@@ -127,7 +127,7 @@ export function Sidebar(props: SidebarProps) {
             onSubmit={(name, body) => command.submit(name, body)}
           />
         ) : null}
-        <label className="y9-search">
+        <label className="y10-search">
           <Icon name="search" />
           <input
             type="search"
@@ -137,11 +137,11 @@ export function Sidebar(props: SidebarProps) {
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
-        <div className="y9-side-label nav-title">
+        <div className="y10-side-label nav-title">
           <span>项目</span>
-          <span className="y9-count count">{props.projects.length}</span>
+          <span className="y10-count count">{props.projects.length}</span>
         </div>
-        <ul className="y9-project-list nav-group">
+        <ul className="y10-project-list nav-group">
           {visible.map((project) => {
             const marks = statusMarks(project, props.decisions);
             const pending = props.pendingByProject[project.project_id] ?? 0;
@@ -150,13 +150,13 @@ export function Sidebar(props: SidebarProps) {
               <li key={project.project_id} className="project-entry">
                 <button
                   type="button"
-                  className={`y9-project nav-item${selected ? " is-selected" : ""}${project.archived ? " is-archived" : ""}`}
+                  className={`y10-project nav-item${selected ? " is-selected" : ""}${project.archived ? " is-archived" : ""}`}
                   aria-current={selected ? "page" : undefined}
                   onClick={() => props.onNavigate(`#/p/${project.project_id}/overview`)}
                 >
-                  <span className="y9-project-name project-name">{project.name}</span>
-                  <span className="y9-project-marker">
-                    {pending > 0 ? <span className="y9-count is-decide count">{pending}</span> : null}
+                  <span className="y10-project-name project-name">{project.name}</span>
+                  <span className="y10-project-marker">
+                    {pending > 0 ? <span className="y10-count is-decide count">{pending}</span> : null}
                     {marks.map((mark) => (
                       <StatusMark key={mark.kind} kind={mark.kind} text={mark.text} />
                     ))}
@@ -164,7 +164,7 @@ export function Sidebar(props: SidebarProps) {
                 </button>
                 <button
                   type="button"
-                  className="y9-btn small menu-toggle"
+                  className="y10-btn small menu-toggle"
                   aria-label={`${project.name} 的项目操作`}
                   onClick={() => setMenuFor(menuFor === project.project_id ? null : project.project_id)}
                 >
@@ -177,25 +177,25 @@ export function Sidebar(props: SidebarProps) {
             );
           })}
         </ul>
-        {visible.length === 0 ? <p className="y9-note note" role="status">没有符合的项目</p> : null}
-        <label className="y9-check checkbox">
+        {visible.length === 0 ? <p className="y10-note note" role="status">没有符合的项目</p> : null}
+        <label className="y10-check checkbox">
           <input type="checkbox" checked={includeArchived} onChange={(event) => setIncludeArchived(event.target.checked)} />
           <span>显示归档的项目</span>
         </label>
-        <p className="y9-note note" role="status">
+        <p className="y10-note note" role="status">
           {includeArchived ? "正在显示归档的项目" : "已归档的项目不列出，可用「恢复项目」取回"}
         </p>
       </div>
-      <div className="y9-side-bottom nav-group">
-        <div className="y9-side-label nav-title">
+      <div className="y10-side-bottom nav-group">
+        <div className="y10-side-label nav-title">
           <span>系统</span>
         </div>
-        <ul className="y9-side-links">
+        <ul className="y10-side-links">
           {SYSTEM_ENTRIES.filter((entry) => has(entry.query)).map((entry) => (
             <li key={entry.page}>
               <button
                 type="button"
-                className="y9-side-link nav-item"
+                className="y10-side-link nav-item"
                 onClick={() => props.onNavigate(`#/sys/${entry.page}`)}
               >
                 <Icon name={entry.icon} />
@@ -240,7 +240,7 @@ function NewProject(props: {
 
   return (
     <form
-      className="y9-block is-compact card inline-form"
+      className="y10-block is-compact card inline-form"
       onSubmit={(event) => {
         event.preventDefault();
         if (!ready) {
@@ -253,30 +253,30 @@ function NewProject(props: {
           .then((ok) => setWaitingWrite(ok));
       }}
     >
-      <header className="y9-block-head form-head">
-        <div className="y9-block-titles">
-          <h2 className="y9-block-title">{props.mode === "idea" ? "从想法新建项目" : "接入已有项目"}</h2>
+      <header className="y10-block-head form-head">
+        <div className="y10-block-titles">
+          <h2 className="y10-block-title">{props.mode === "idea" ? "从想法新建项目" : "接入已有项目"}</h2>
         </div>
-        <div className="y9-block-actions">
-          <button type="button" className="y9-btn small" onClick={props.onClose}>
+        <div className="y10-block-actions">
+          <button type="button" className="y10-btn small" onClick={props.onClose}>
             取消
           </button>
         </div>
       </header>
-      <div className="y9-block-body form">
-        <label className="y9-field field">
+      <div className="y10-block-body form">
+        <label className="y10-field field">
           <span>项目名称</span>
-          <input className="y9-input" type="text" value={name} onChange={(event) => setName(event.target.value)} required />
+          <input className="y10-input" type="text" value={name} onChange={(event) => setName(event.target.value)} required />
         </label>
-        <label className="y9-field field">
+        <label className="y10-field field">
           <span>长期目标</span>
-          <textarea className="y9-textarea" rows={3} value={goal} onChange={(event) => setGoal(event.target.value)} required />
+          <textarea className="y10-textarea" rows={3} value={goal} onChange={(event) => setGoal(event.target.value)} required />
         </label>
         {props.mode === "idea" ? (
-          <label className="y9-field field">
+          <label className="y10-field field">
             <span>起始文件夹</span>
             <input
-              className="y9-input"
+              className="y10-input"
               type="text"
               value={initialDirectory}
               placeholder="控制主机上的文件夹路径，留空则从空项目开始"
@@ -286,19 +286,19 @@ function NewProject(props: {
         ) : null}
         {props.mode === "existing" ? (
           <>
-            <label className="y9-field field">
+            <label className="y10-field field">
               <span>源目录名称</span>
-              <input className="y9-input" type="text" value={sourceName} onChange={(event) => setSourceName(event.target.value)} required />
+              <input className="y10-input" type="text" value={sourceName} onChange={(event) => setSourceName(event.target.value)} required />
             </label>
-            <label className="y9-field field">
+            <label className="y10-field field">
               <span>源目录路径</span>
-              <input className="y9-input" type="text" value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} required />
+              <input className="y10-input" type="text" value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} required />
             </label>
-            <p className="y9-note note">接入以后会登记源目录、采集代码快照并开始建档事项（3.8）。</p>
+            <p className="y10-note note">接入以后会登记源目录、采集代码快照并开始建档事项（3.8）。</p>
           </>
         ) : null}
-        <div className="y9-row">
-          <button type="submit" className="y9-btn primary" disabled={props.busy || !ready}>
+        <div className="y10-row">
+          <button type="submit" className="y10-btn primary" disabled={props.busy || !ready}>
             {props.busy ? "正在提交" : props.mode === "idea" ? "新建项目" : "接入项目"}
           </button>
         </div>
@@ -308,12 +308,12 @@ function NewProject(props: {
               {ONBOARDING_REJECTION_REASONS[props.rejection.reason] ?? "命令被拒绝"}
               （原因 {props.rejection.reason}）
             </p>
-            <ul className="rejection-paths y9-list">
+            <ul className="rejection-paths y10-list">
               {sourceInvalidLines(props.rejection).map((line) => <li key={line}>{line}</li>)}
             </ul>
           </div>
         ) : null}
-        {props.submitted ? <p className="y9-muted hint" role="status">已提交，等待写入结果</p> : null}
+        {props.submitted ? <p className="y10-muted hint" role="status">已提交，等待写入结果</p> : null}
       </div>
     </form>
   );
@@ -332,7 +332,7 @@ function ProjectMenu(props: {
   const [nextName, setNextName] = useState(project.name);
 
   return (
-    <div className="y9-menu project-menu">
+    <div className="y10-menu project-menu">
       {renaming ? (
         <form
           className="rename-form"
@@ -345,11 +345,11 @@ function ProjectMenu(props: {
             setRenaming(false);
           }}
         >
-          <label className="y9-field field">
+          <label className="y10-field field">
             <span>新的项目名称</span>
-            <input className="y9-input" type="text" value={nextName} onChange={(event) => setNextName(event.target.value)} />
+            <input className="y10-input" type="text" value={nextName} onChange={(event) => setNextName(event.target.value)} />
           </label>
-          <button type="submit" className="y9-btn small primary" disabled={props.busy}>
+          <button type="submit" className="y10-btn small primary" disabled={props.busy}>
             保存名称
           </button>
         </form>
