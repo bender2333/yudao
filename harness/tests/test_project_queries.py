@@ -37,7 +37,9 @@ from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
-from harness.proposals import product_spec, plan_turn, delivery_turn, review_turn, collaboration_request
+from harness.proposals import (
+    product_spec, plan_turn, delivery_turn, review_turn, collaboration_request, response_turn,
+)
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
@@ -435,6 +437,39 @@ def test_flow_records_cover_handoff_delivery_problem_and_rework(data_dir):
     positions = [record.position for record in flow.data.records]
     assert positions == sorted(positions)
     assert flow.position >= positions[-1]
+
+
+
+def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(data_dir):
+    # 工单 #415 的场景：质检在工程退回事项的结论之前向工程提出询问并得到回答，
+    # engineering 一侧与 quality 一侧因此在 quality→engineering 上留下「咨询」「问题反馈」与「返工」。
+    # 期望直接写出应有的记录条数与种类，不复用画面侧的分组公式：分组若改变，这段断言照样成立
+    system = _system(data_dir, [
+        product_spec(), plan_turn(), delivery_turn(),
+        collaboration_request("engineering", "Which acceptance line governs the rework?",
+                              background="Quality is preparing its verdict.",
+                              expected_result="Name the acceptance line to follow."),
+        response_turn("answered", "Follow the acceptance line recorded in the requirement."),
+        review_turn("rework_engineering", "质检退回",
+                    defects=[{"severity": "minor", "summary": "空输入需要处理"}]),
+        plan_turn(reason="处理质检退回"),
+        delivery_turn(summary="处理空输入"),
+        review_turn("release", "revised delivery checked"),
+    ])
+    project_id = system.projects.register("同对部门", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+    application = _application(system)
+    flow = application.query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
+
+    rows = [record for record in flow.data.records
+            if record.direction_from == "quality" and record.direction_to == "engineering"]
+    assert len(rows) == 3
+    assert sorted(record.kind for record in rows) == ["咨询", "返工", "问题反馈"]
+    by_kind = {record.kind: record for record in rows}
+    assert by_kind["咨询"].status == "已回应"
+    assert by_kind["问题反馈"].status == "已退回"
+    assert by_kind["返工"].status == "已退回"
 
 
 def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
