@@ -85,7 +85,7 @@ export function formatNumberOr(value: number | null | undefined, suffix = ""): s
 
 export function Section(props: { id?: string; title: string; note?: string; className?: string; children: React.ReactNode }) {
   return (
-    <section id={props.id} className={`y9-block ${props.className ?? "card"}`}>
+    <section id={props.id} className={`y9-block card ${props.className ?? ""}`}>
       <div className="y9-block-head section-head">
         <div className="y9-block-titles">
           <h2 className="y9-block-title">{props.title}</h2>

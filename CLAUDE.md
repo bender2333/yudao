@@ -116,7 +116,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 ## 工作流程
 需求从讨论到交付经过以下步骤。工单相关的技能来自 Matt Pocock 技能集，多数只能由用户输入命令调用，架构师在合适的时机提醒用户调用哪一个。
 
-1. 讨论：`/grill-with-docs` 逐项追问需求与边界，同时更新 `CONTEXT.md`，需要时新增 ADR。需要查证的问题用 `/research`，需要看到效果才能判断的界面或逻辑问题用 `/prototype`。
+1. 讨论：`/grill-with-docs` 逐项追问需求与边界，同时更新 `CONTEXT.md`，需要时新增 ADR。需要查证的问题用 `/research`，需要看到效果才能判断的界面或逻辑问题用 `/prototype`。原型定稿时，修改 `docs/prototypes/CHANGELOG.md` 开头的「当前定稿」一行，并把开放的工单中引用旧版本代码的路径改为新版本。
 2. 设计：在 `docs/design/` 编写设计文档，并更新 `docs/design/README.md` 索引；有成熟做法可以参照时，先查阅 OMP 与 OpenCode 的实现（见「参考实现与链接」）。
 3. 规格：`/to-spec` 把讨论结果整理成父工单。
 4. 拆分：`/to-tickets` 把父工单拆成可以独立验证的子工单，写明阻塞关系，添加 `ready-for-agent` 标签。

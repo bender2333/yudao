@@ -74,7 +74,11 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
       {data ? (
         <>
           <Summary data={data} />
-          <Section title="循环画面" note="项目楼层与管道；下方时间轴回放本项目的关键事实">
+          <Section
+            id="ov-loop"
+            title="循环画面"
+            note="三部门循环、包裹与管道；等待回答的决定贴在大厅的板上，点开就在画面里回答；右上角切换覆盖层，下方时间轴回放本项目的关键事实"
+          >
             {at !== null ? (
               <p className="replay-banner" role="status">
                 回放中 · {formatTime(atTimeOf(report.data, at))}
@@ -114,7 +118,7 @@ function atTimeOf(report: AwayReport | null, at: number): string | null {
 function Summary(props: { data: ProjectOverviewResult }) {
   const adoption = props.data.current_adoption;
   return (
-    <Section title="项目摘要" note={`当前读取的是项目版本 ${props.data.version}`}>
+    <Section id="ov-summary" className="y9-ov-summary" title="项目摘要" note={`当前读取的是项目版本 ${props.data.version}`}>
       <KeyValue
         items={[
           ["名称", props.data.name],
@@ -220,7 +224,7 @@ function CurrentItem(props: {
   const department = departmentName(item.department);
   const note = `${item.title}（事项标识 ${item.work_item_id}，第 ${item.round} 轮${department === "" ? "" : `，部门 ${department}`}）`;
   return (
-    <Section title="当前事项" note={note}>
+    <Section id="ov-current" title="当前事项" note={note}>
       <KeyValue
         items={[
           ["状态", <span key="status" className="y9-row">{itemStatus(item.status)}{item.phase ? <span className="y9-muted"> · {label(PHASE_LABELS, item.phase)}</span> : null}</span>],
@@ -305,7 +309,7 @@ function Board(props: { items: WorkItemCard[] }) {
   const columns = boardColumns(props.items);
 
   return (
-    <Section title="事项看板" note="排队中一列的顺序就是执行顺序">
+    <Section id="ov-board" title="事项看板" note="卡片显示标题、状态、所在部门与轮次；排队中的顺序就是执行顺序">
       {props.items.length === 0 ? <Empty text="项目还没有事项" /> : (
         <div className="y9-ov-board board">
           {BOARD_TITLES.map(([key, title]) => (
@@ -346,14 +350,14 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
 
   if (props.flow.loading && props.flow.data === null) {
     return (
-      <Section title="流转记录">
+      <Section id="ov-flow" title="流转记录">
         <p className="y9-note note">正在读取流转记录</p>
       </Section>
     );
   }
 
   return (
-    <Section title="流转记录" note="点击时间打开原始事件">
+    <Section id="ov-flow" title="流转记录" note="点击时间打开原始事件；返工行用醒目的颜色标出">
       {records.length === 0 ? <Empty text="项目还没有流转记录" /> : (
         <Table
           head={["时间", "方向", "类型", "内容", "状态"]}

@@ -7,6 +7,8 @@
 
 import { expect, test, type Page } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
+import { flowSegmentsOf, type FlowSegment } from "../../src/renderer/src/views/project/flow-segments.ts";
+import type { FlowRecord } from "../../src/renderer/src/api/generated/types.gen";
 
 const SAMPLE = "示例项目";
 const SAMPLE_ITEM = "实现回声工具";
@@ -58,12 +60,24 @@ async function projectId(name: string): Promise<string> {
   return row.project_id;
 }
 
-/** 打开一个项目的概览页，等循环画面的画布出现。 */
+/**
+ * 打开一个项目的概览页，等循环画面的画布出现。
+ * 文字列表默认折叠（工单 #379 验收：展开以后每行显示中文部门名与中文状态），
+ * 读行数的用例在这里展开它。
+ */
 async function openFloor(page: Page, id: string): Promise<void> {
   await page.evaluate((hash) => { window.location.hash = hash; }, `#/p/${id}/overview`);
   await expect(page.locator(".floor-screen canvas")).toHaveCount(1);
+  await openTextList(page);
 }
 
+/** 展开画面下方的文字列表（决定卡片里还有自己的折叠块，只点这一层的标题）。 */
+async function openTextList(page: Page): Promise<void> {
+  const details = page.locator("details.floor-text-list");
+  await expect(details).toHaveCount(1);
+  await details.locator("> summary").click();
+  await expect(details).toHaveJSProperty("open", true);
+}
 /**
  * 画布的内容签名：把画布导出成一张缩小的图，取它的数据摘要。
  * 画布按设备分辨率绘制（工单 #365），导出的图随之变小；画面每帧都在动，签名只用来核对「画出了内容」。
@@ -135,6 +149,49 @@ test("循环画面在概览页出现，画布画出内容且随事项的推进�
   }
 });
 
+// 楼层周围的结构按原型 v9（工单 #379 验收）：覆盖层按钮条是画面上方一条独立的条，不压在画面上；
+// 文字列表默认折叠，展开以后每行给中文部门名与中文状态。
+test("覆盖层按钮条在画面上方不与画面重叠，文字列表默认折叠且展开后写中文部门与中文状态", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    const id = await projectId(SAMPLE);
+    await page.evaluate((hash) => { window.location.hash = hash; }, `#/p/${id}/overview`);
+    await expect(page.locator(".floor-screen canvas")).toHaveCount(1);
+
+    // 按钮条在画面所在的面板里、画布上方，底边不越过画布的顶边
+    const bar = page.locator(".floor-overlay-tabs");
+    await expect(bar).toHaveCount(1);
+    await expect(page.locator(".y9-scene.y9-floor-wrap .floor-overlay-tabs")).toHaveCount(1);
+    const box = await page.evaluate(() => {
+      const bar = document.querySelector(".floor-overlay-tabs")!.getBoundingClientRect();
+      const canvas = document.querySelector(".floor-screen canvas")!.getBoundingClientRect();
+      return { barBottom: bar.bottom, canvasTop: canvas.top, barHeight: bar.height };
+    });
+    expect(box.barHeight).toBeGreaterThan(0);
+    expect(box.barBottom).toBeLessThanOrEqual(box.canvasTop + 1);
+
+    // 文字列表默认折叠：折叠时行不可见，展开以后每行给出中文部门名与中文状态
+    const details = page.locator("details.floor-text-list");
+    await expect(details).toHaveCount(1);
+    await expect(details.locator("li").first()).toBeHidden();
+    await openTextList(page);
+    const loop = await query<{ work_items: { work_item_id: string; department: string | null; status: string }[] }>(
+      "project.loop", { project_id: id });
+    const texts = await details.locator("li").evaluateAll((nodes) => nodes.map((node) => node.textContent ?? ""));
+    expect(texts.length).toBe(loop.work_items.length);
+    for (const text of texts) {
+      expect(text).not.toMatch(/[A-Z][A-Z_]{3,}/);
+      expect(text).toMatch(/(大厅|产品|工程|质检|运维)/);
+      expect(text).toMatch(/(未开始|进行中|已采纳|已放行|等待确认初始 PRD|已停止|排队中)/);
+    }
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
 test("画面的状态来自查询：事项的每个状态都对应事件日志里的一条真实事件", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = watchErrors(client);
@@ -153,6 +210,7 @@ test("画面的状态来自查询：事项的每个状态都对应事件日志�
     // 聚焦某个事项（?w=）时画面照常工作，控制台没有错误
     await page.evaluate((hash) => { window.location.hash = hash; }, `#/p/${id}/overview?w=${loop.work_items[0].work_item_id}`);
     await expect(page.locator(".floor-screen canvas")).toHaveCount(1);
+    await openTextList(page);
     await expect(page.locator(".floor-text-list li").first()).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
@@ -243,16 +301,14 @@ test("流转覆盖层：画面的 segments 与 project.flow 查询的 records �
   const page = client.page;
   try {
     const id = await projectId(SAMPLE);
-    const records = await query<{ records: { direction_from: string | null; direction_to: string | null; kind: string; created_at: string }[] }>(
-      "project.flow", { project_id: id });
-    expect(records.records.some((row) => row.direction_from && row.direction_to)).toBe(true);
+    const flow = await query<{ records: FlowRecord[] }>("project.flow", { project_id: id });
+    expect(flow.records.some((row) => row.direction_from && row.direction_to)).toBe(true);
     await openFloor(page, id);
     await page.locator(".floor-overlay-tabs button", { hasText: "流转" }).click();
     await waitUntil(async () => (await readOverlay(page)).segments.length > 0, "画面写入流转覆盖层的 segments");
     const overlay = await readOverlay(page);
     expect(overlay.id).toBe("flow");
-    const expected = aggregateFlowSegments(records.records);
-    expect(overlay.segments).toHaveLength(expected.length);
+    const expected = flowSegmentsOf(flow.records);
     for (const seg of overlay.segments) {
       const same = expected.find((row) => row.from === seg.from && row.to === seg.to && row.kind === seg.kind);
       expect(same).toEqual(seg);
@@ -262,32 +318,6 @@ test("流转覆盖层：画面的 segments 与 project.flow 查询的 records �
     await client.close();
   }
 });
-
-type FlowSegment = { from: string; to: string; count: number; last_at: string; kind: string };
-
-/** 把 project.flow 的行按起点、终点与是否返工聚合，与前端覆盖层 segments 同形（floor-screen.tsx flowSegmentsOf）。 */
-function aggregateFlowSegments(records: { direction_from: string | null; direction_to: string | null; kind: string; created_at: string }[]): FlowSegment[] {
-  const groups: Record<string, FlowSegment> = {};
-  for (const row of records) {
-    if (!row.direction_from || !row.direction_to) continue;
-    const rework = row.kind === "返工";
-    const key = `${row.direction_from}>${row.direction_to}>${rework ? "rework" : row.kind}`;
-    const prev = groups[key];
-    if (prev) {
-      prev.count += 1;
-      if (row.created_at > prev.last_at) prev.last_at = row.created_at;
-    } else {
-      groups[key] = {
-        from: row.direction_from,
-        to: row.direction_to,
-        count: 1,
-        last_at: row.created_at,
-        kind: rework ? "rework" : row.kind,
-      };
-    }
-  }
-  return Object.values(groups);
-}
 
 /** 在页面里读出当前画面的覆盖层；逐字段检查再返回。 */
 async function readOverlay(page: Page): Promise<{ id: string | null; segments: FlowSegment[] }> {

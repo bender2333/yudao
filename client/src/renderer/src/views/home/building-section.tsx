@@ -38,7 +38,7 @@ export function BuildingSection(props: BuildingSectionProps): React.JSX.Element 
   ), [props.projects, items]);
 
   return (
-    <Section className="card y9-home-building" title="全部项目与机器" note={at !== null ? "回放中：每个项目一层，按所选位置的快照显示" : "每个项目一层；点击楼层进入项目概览"}>
+    <Section className="y9-home-building" title="全部项目与机器" note={at !== null ? "回放中：每个项目一层，按所选位置的快照显示" : "每个项目一层；点击楼层进入项目概览"}>
       <div className="y9-building-wrap">
         <div className="y9-building-scroll">
           <BuildingCanvas app={props.app} model={model} onNavigate={props.onNavigate} live={at === null} />
