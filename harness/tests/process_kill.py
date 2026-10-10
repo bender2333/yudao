@@ -12,11 +12,14 @@
 #   {"output": [...]}        一次回答的全部输出条目（自己写调用，例如指定编号的一次读取）
 #   其余字段                  FakeTurn 的字段（checks、transcript、files 等）
 #
-# 终止位置有两条：
+# 终止位置有三条：
 #   started=标记路径     检查与登记命令的真实进程写下 started 以后终止（工具执行到一半）
 #   hold_after=事件种类  该事件提交以后进程停住（读取这类同步执行的工具只能停在这里），
 #                        给出 hold_action 时只在那一个调用编号的事件上停
-# 两条都不给时子进程运行到结束，不终止。
+#   await_file=（路径，内容） 工作区文件变成这个内容、回执还没有写入的那一刻进程停住（工单 #308）
+# 三条都不给时子进程运行到结束，不终止。
+# 终止时先停 Yudao 进程本身、等它退出，再收掉它留下的子进程（工单 #338）：子进程是另起进程组启动的，
+# 与 Yudao 进程不同组，同时终止时谁先死不确定，子进程先死会让这次动作的回执被写下来
 #
 # 子进程入口：python -m harness.tests.process_kill <数据目录> <脚本 JSON> <事项任务> [登记注册表 JSON]
 # 建档（工单 #317）的额外动作：--onboard 与 --onboard-source 接入已有项目并开始建档事项，取代 create_run；
@@ -29,7 +32,6 @@ import os
 import signal
 import subprocess
 import sys
-import threading
 import time
 import uuid
 from pathlib import Path
@@ -103,39 +105,42 @@ def _answer_revise(system: LoopSystem, project_id: str | None, note: str) -> str
         decision.decision_id, "revise", note, base_version=decision.version, command=command)
 
 
-def _await_file(directory: Path, path: str, content: str, pid: int) -> None:
-    # 工单 #308：这个文件的内容变成指定内容以后立刻终止进程（写入已经落盘、回执还没有写），
-    # 用来观察自动核实按动作前快照确认动作已经完成的那一条路径。
-    # 终止由一个另起的看门狗进程做：写入与回执写在同一个进程里，同进程的另一个线程
-    # 抢不到这段窗口，因此看门狗盯住文件系统，看到内容就终止本进程
+def _hold_before_receipt(data_dir: Path, directory: Path, path: str, content: str,
+                         *, action_id: str | None = None) -> None:
+    # 工单 #308：在这个工作区文件变成指定内容、回执还没有写入的那一刻停住。
+    # 文件写入与回执写在同一个进程的同一个调用栈上（engine.py：执行动作以后立刻写回执），
+    # 由外部进程盯着文件系统来制造这个时刻是抢不到的，因此用 sys.setprofile 在本线程内
+    # 拦住回执的写入动作：写入回执的函数刚开始执行的那一刻，文件已经在磁盘上，回执还没有写。
+    # 拦住以后本线程一直等待，由父进程终止本进程（工单 #338）
+    from harness.recording import StepRecorder
+
+    code = StepRecorder.tool_called.__code__
     marker = directory / "await-file"
-    script = (
-        "import os,signal,sys,time\n"
-        "from pathlib import Path\n"
-        "root=Path(sys.argv[1]); path=sys.argv[2]; content=sys.argv[3]\n"
-        "marker=Path(sys.argv[4]); pid=int(sys.argv[5])\n"
-        "deadline=time.time()+120\n"
-        "while time.time()<deadline:\n"
-        "    hit=False\n"
-        "    for workspace in sorted(root.glob('*')):\n"
-        "        try:\n"
-        "            hit=(workspace/path).read_text(encoding='utf-8')==content\n"
-        "        except OSError:\n"
-        "            continue\n"
-        "        if hit:\n"
-        "            break\n"
-        "    if hit:\n"
-        "        marker.write_text('awaited',encoding='utf-8')\n"
-        "        os.kill(pid,signal.SIGKILL if os.name!='nt' else signal.SIGTERM)\n"
-        "        os._exit(0)\n"
-        "    time.sleep(0.002)\n"
-    )
-    subprocess.Popen([sys.executable, "-c", script, str(directory), path, content, str(marker), str(pid)],
-                     cwd=REPO_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-                        if os.name == "nt" else {"start_new_session": True}))
-    while True:
-        time.sleep(0.05)
+
+    def profile(frame: Any, event: str, _arg: Any) -> None:
+        if event != "call" or frame.f_code is not code:
+            return
+        call = frame.f_locals.get("call")
+        if action_id is not None and str((call or {}).get("id")) != action_id:
+            return
+        workspace = _workspace_of(data_dir, frame, path)
+        if workspace is None or workspace.read_text(encoding="utf-8") != content:
+            return
+        marker.write_text("awaited", encoding="utf-8")
+        sys.setprofile(None)
+        while True:
+            time.sleep(0.1)
+
+    sys.setprofile(profile)
+
+
+def _workspace_of(data_dir: Path, frame: Any, path: str) -> Path | None:
+    # 回执写入点上的 request 带着 run 编号，工作区就在这个数据目录下的 workspaces/<run 编号>
+    run_id = getattr(frame.f_locals.get("request"), "run_id", None)
+    if run_id is None:
+        return None
+    candidate = data_dir / "workspaces" / str(run_id) / path
+    return candidate if candidate.exists() else None
 
 
 # ---------------------------------------------------------------------------
@@ -203,10 +208,9 @@ def main() -> None:
                                    command_versions=None if registry is None
                                    else {name: 1 for name in registry}, **options)
     if args.await_file is not None:
-        # 工单 #308：另起看门狗进程盯着工作区，看到目标内容落盘就终止本进程（回执来不及写）
-        threading.Thread(target=_await_file,
-                         args=(args.await_dir, args.await_file, args.await_content, os.getpid()),
-                         daemon=True).start()
+        # 工单 #308、#338：在回执写入的那一刻自己停住，等父进程来终止
+        _hold_before_receipt(args.data_dir, args.await_dir, args.await_file, args.await_content,
+                             action_id=args.hold_action)
     if args.workspace_files is not None:
         workspace = system.workspace(run_id)
         for path, content in json.loads(args.workspace_files.read_text(encoding="utf-8")).items():
@@ -268,16 +272,41 @@ def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: 
                                 stderr=subprocess.STDOUT, **spawn)
 
 
-def _kill(process: subprocess.Popen) -> None:
-    # 终止整个进程树：Windows 用 taskkill /T /F，其他系统给进程组发 SIGKILL（与 test_system_stop.py 相同）
+def _kill(process: subprocess.Popen, signals: Path | None = None) -> None:
+    # 先终止 Yudao 进程本身、等它退出，再收掉它留下的子进程（工单 #338）。
+    # 检查与登记命令的子进程由执行环境另起进程组启动，与 Yudao 进程不同组：一次性按进程树
+    # 终止时谁先死是不确定的，子进程先死会让 Yudao 进程活着走完执行后的路径，把这一次动作的
+    # 回执写下来，测试就看不到「结果未知」。先终止 Yudao 进程并等它退出，再收掉子进程，
+    # 两者之间就不再有竞争
     if process.poll() is not None:
         return
+    child = _child_pid(signals)
     if os.name == "nt":
-        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+        subprocess.run(["taskkill", "/PID", str(process.pid), "/F"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     else:
-        os.killpg(process.pid, signal.SIGKILL)
+        os.kill(process.pid, signal.SIGKILL)
     process.wait(STARTUP_TIMEOUT_SEC)
+    if child is None:
+        return
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/PID", str(child), "/F"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    else:
+        try:
+            os.kill(child, signal.SIGKILL)
+        except OSError:
+            pass
+
+
+def _child_pid(signals: Path | None) -> int | None:
+    # 检查与登记命令的子进程自己写下的进程号（helpers.WAIT_FOR_RELEASE）
+    if signals is None:
+        return None
+    try:
+        return int((signals / "child.pid").read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
 
 
 def _log_text(log: Path) -> str:
@@ -389,8 +418,9 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
     # settle 让子进程在 run 结束以后结算，answer_revise 让它在结算以后回答「提出修改」；
     # revision 为真时 run_id 取修改轮的 run（onboarding_revision_started 里的编号），
     # 否则取建档事项的 run（work_item_created 里的编号）
-    # await_file 是（路径，内容）：这个文件变成这个内容以后子进程自己终止（写入已落盘、回执未写，
-    # 工单 #308 的自动核实路径）；父进程只等着进程自己退出
+    # await_file 是（路径，内容）：工作区文件变成这个内容、回执还没有写入的那一刻子进程停住
+    # （工单 #308 的自动核实路径，工单 #338 起在回执写入点上拦住，不再靠外部进程抢这一刻）；
+    # 父进程见到标记以后终止它
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     work = data_dir.parent
@@ -409,15 +439,15 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
         files_file = work / "workspace-files.json"
         files_file.write_text(json.dumps(workspace_files, ensure_ascii=False), encoding="utf-8")
 
+    await_dir = None if await_file is None else data_dir / "workspaces"
     process = _spawn(data_dir, script_file, task, registry_file, log, hold_after=hold_after,
                      hold_dir=hold_dir, hold_action=hold_action, workspace_files=files_file,
                      onboard=onboard, settle=settle, answer_revise=answer_revise,
                      await_file=None if await_file is None else (await_file[0], await_file[1]),
-                     await_dir=None if await_file is None else data_dir / "workspaces",
-                     run_time_limit_sec=run_time_limit_sec)
+                     await_dir=await_dir, run_time_limit_sec=run_time_limit_sec)
     try:
         if await_file is not None:
-            process.wait(STARTUP_TIMEOUT_SEC)
+            _wait_for_marker(await_dir / "await-file", process, log)
         elif started is not None:
             _wait_for_marker(Path(started), process, log)
         elif hold_after is not None:
@@ -425,8 +455,7 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
         else:
             process.wait(STARTUP_TIMEOUT_SEC)
     finally:
-        if process.poll() is None:
-            _kill(process)
+        _kill(process, None if started is None else Path(started).parent)
 
     # 只读地观察终止以后、任何系统打开数据目录以前的事件
     observed = _observe(data_dir, onboard is not None, revision)
@@ -468,8 +497,8 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]], *,
         else:
             process.wait(STARTUP_TIMEOUT_SEC)
     finally:
-        if kill and process.poll() is None:
-            _kill(process)
+        if kill:
+            _kill(process, None if started is None else Path(started).parent)
 
     # revision 为真时 run_id 取修改轮的 run（建档场景，见 interrupted）
     observed = _observe(data_dir, revision, revision)

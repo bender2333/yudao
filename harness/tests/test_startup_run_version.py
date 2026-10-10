@@ -9,7 +9,8 @@ import sqlite3
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
-from harness.projection import project_run, saved_project
+from harness.project_projection import saved_project
+from harness.projection import project_run
 from harness.providers.selection import ModelSelection
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem

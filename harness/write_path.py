@@ -19,8 +19,7 @@ from .models import (
     DEPARTMENTS, CatalogEvent, DecisionRequest, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now,
 )
 from .projection import (
-    Projection, apply_decision_event, dump_decision, dump_projection, empty_projection, fold, load_decisions,
-    load_projection, replay, replay_decisions,
+    StreamHandler, apply_decision_event, dump_decision, load_decisions, replay_decisions,
 )
 
 T = TypeVar("T")
@@ -72,11 +71,13 @@ class NewCatalogEvent:
 
 class Snapshot:
     # 一个流在某个版本的只读视图：保存的投影与它的流版本、这个流中的决定请求（按身份），以及到这个版本为止的事件
-    def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None) -> None:
+    def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None,
+                 handler: StreamHandler) -> None:
         self.stream = stream
         self.version = 0 if saved is None else saved.version
-        self.projection: Projection = empty_projection(stream) if saved is None else load_projection(saved, stream)
+        self.projection: Any = handler.empty() if saved is None else handler.load(saved)
         self.decisions: dict[str, DecisionRequest] = load_decisions(saved)
+        self.handler = handler
         self._store = store
         self._committed: list[Any] | None = None
 
@@ -98,8 +99,8 @@ class Transaction(Snapshot):
     # 判断可能因为版本冲突重新进行，判断中只做可以重复的事；只应在提交以后发生的进程内效果用 on_commit 登记，
     # 没有提交（判断出错、版本冲突或存储失败）时要撤回的外部效果用 on_abort 登记
     def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None,
-                 command: Command | None = None) -> None:
-        super().__init__(store, stream, saved)
+                 handler: StreamHandler, command: Command | None = None) -> None:
+        super().__init__(store, stream, saved, handler)
         self.appended: list[Any] = []
         self._command = command
         self._changed_decisions: list[str] = []
@@ -112,7 +113,7 @@ class Transaction(Snapshot):
         first = self.version + len(self.appended) + 1
         events = [_event(self.stream, entry, first + offset, self._command) for offset, entry in enumerate(entries)]
         for event in events:
-            fold(self.projection, event)
+            self.handler.fold(self.projection, event)
             if isinstance(event, Event):
                 # run 所属的项目与事项取自它的 run_created 事件
                 event.project_id, event.work_item_id = self.projection.project_id, self.projection.work_item_id
@@ -150,12 +151,15 @@ class Transaction(Snapshot):
 
 
 class WritePath:
-    def __init__(self, store: EventStore) -> None:
+    # 所有领域写入唯一的入口；投影的折叠与保存按流的处理者进行，处理者由构造它的一方给出
+
+    def __init__(self, store: EventStore, handler_for: Callable[[str], StreamHandler]) -> None:
         self._store = store
+        self._handler_for = handler_for
 
     def read(self, stream: str) -> Snapshot:
         # 读取流保存的投影与流版本，用于之后以这个版本作为期望版本提交的判断
-        return Snapshot(self._store, stream, self._store.projection(stream))
+        return Snapshot(self._store, stream, self._store.projection(stream), self._handler_for(stream))
 
     def transact(self, stream: str, decide: Callable[[Transaction], T], *, expected_version: int | None = None,
                  command: Command | None = None, epoch: int | None = None) -> T:
@@ -171,14 +175,15 @@ class WritePath:
             attempt += 1
             if command is not None:
                 self._store.check_command(command)
-            transaction = Transaction(self._store, stream, self._store.projection(stream), command)
+            transaction = Transaction(self._store, stream, self._store.projection(stream),
+                                      self._handler_for(stream), command)
             if expected_version is not None and transaction.version != expected_version:
                 raise StreamVersionConflict(stream, expected_version, transaction.version)
             try:
                 result = decide(transaction)
                 if transaction.appended or command is not None:
                     self._store.commit(stream, transaction.version, transaction.appended,
-                                       dump_projection(transaction.projection), epoch=epoch, command=command,
+                                       transaction.handler.dump(transaction.projection), epoch=epoch, command=command,
                                        decisions=transaction.changed_decisions())
             except StreamVersionConflict as conflict:
                 transaction._abort()
@@ -208,7 +213,7 @@ class WritePath:
         attempt = 0
         while True:
             attempt += 1
-            transaction = Transaction(self._store, stream, self._store.projection(stream))
+            transaction = Transaction(self._store, stream, self._store.projection(stream), self._handler_for(stream))
             if expected_version is not None and transaction.version != expected_version:
                 raise StreamVersionConflict(stream, expected_version, transaction.version)
             try:
@@ -216,7 +221,7 @@ class WritePath:
                 if not transaction.appended:
                     raise ValueError("claiming an execution right requires the events that record it")
                 epoch = self._store.claim_execution_right(
-                    stream, transaction.version, transaction.appended, dump_projection(transaction.projection),
+                    stream, transaction.version, transaction.appended, transaction.handler.dump(transaction.projection),
                     decisions=transaction.changed_decisions())
             except StreamVersionConflict as conflict:
                 transaction._abort()
@@ -230,12 +235,13 @@ class WritePath:
             self._store.notify(transaction.appended)
             return epoch, result
 
-    def rebuild(self, stream: str) -> Projection:
+    def rebuild(self, stream: str) -> Any:
         # 从这个流的第一条事件重放投影与决定请求，替换保存的投影
+        handler = self._handler_for(stream)
         events = self._store.stream_events(stream)
-        state = replay(stream, events)
+        state = handler.replay(stream, events)
         decisions = replay_decisions(events)
-        self._store.replace_projection(stream, len(events), dump_projection(state),
+        self._store.replace_projection(stream, len(events), handler.dump(state),
                                        [dump_decision(decision) for decision in decisions.values()])
         return state
 
