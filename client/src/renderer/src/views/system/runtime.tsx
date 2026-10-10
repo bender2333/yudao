@@ -1,4 +1,4 @@
-// 运行与执行槽位页（原型 v9 的 ui/views/sys-runtime.js，原型 v8 设计说明第 9.3 节，工单 #378）：
+// 运行与执行槽位页（原型 v10 的 ui/views/sys-runtime.js，原型 v8 设计说明第 9.3 节，工单 #378）：
 // 执行槽位、排空与磁盘可用空间。数据都来自已经在用的查询：执行槽位数是 rules.registry 里的
 // execution.slots 参数，占用与排队数来自 system.status，磁盘可用空间是 home.disk_free_bytes。
 // 原型里「正在执行的事项」与「等待队列」的明细来自 runtime.slots，后端还没有这一条查询，
@@ -22,7 +22,7 @@ export function RuntimePage(props: { app: ClientApp; systemStatus: SystemStatus 
   }
   const status = props.systemStatus;
   return (
-    <div className="y9-sys-runtime">
+    <div className="y10-sys-runtime">
       <SlotBlock status={status} rules={rules.data ?? null} />
       <DrainBlock app={props.app} status={status} />
       <RetentionBlock status={status} />
@@ -41,23 +41,23 @@ function SlotBlock(props: { status: SystemStatus; rules: { rules: RuleEntry[] } 
       title="执行槽位"
       subtitle="执行槽位数是部署设置；三个部门共用一个池子，不同项目并行时按队列顺序取得槽位"
     >
-      <div className="y9-slot-row">
-        <div className="y9-lamps">
+      <div className="y10-slot-row">
+        <div className="y10-lamps">
           {total === null
             ? null
             : Array.from({ length: total }, (_unused, index) => (
                 <span
                   key={index}
-                  className={`y9-lamp${index < used ? " is-on" : ""}`}
+                  className={`y10-lamp${index < used ? " is-on" : ""}`}
                   title={index < used ? "已占用" : "空闲"}
                 />
               ))}
         </div>
-        <div className="y9-slot-count">
+        <div className="y10-slot-count">
           <strong>
             {used} / {total === null ? "未上报" : total}
           </strong>
-          <span className="y9-muted">已占用 / 总数</span>
+          <span className="y10-muted">已占用 / 总数</span>
         </div>
       </div>
       <KeyValue
@@ -66,7 +66,7 @@ function SlotBlock(props: { status: SystemStatus; rules: { rules: RuleEntry[] } 
           ["排队中的事项", <span key="queued">{props.status.drain.queued_work_items} 个</span>],
         ]}
       />
-      <p className="y9-note note">正在执行的事项与等待队列的明细由所属工作包登记查询以后显示。</p>
+      <p className="y10-note note">正在执行的事项与等待队列的明细由所属工作包登记查询以后显示。</p>
     </Block>
   );
 }
@@ -97,15 +97,15 @@ function DrainBlock(props: { app: ClientApp; status: SystemStatus }) {
         ]}
       />
       {canStart ? (
-        <p className="y9-row">
-          <button type="button" className="y9-btn danger" disabled={command.busy} onClick={() => submit("runtime.start_drain")}>
+        <p className="y10-row">
+          <button type="button" className="y10-btn danger" disabled={command.busy} onClick={() => submit("runtime.start_drain")}>
             开始排空
           </button>
         </p>
       ) : null}
       {canForce ? (
-        <p className="y9-row">
-          <button type="button" className="y9-btn primary danger" disabled={command.busy} onClick={() => submit("runtime.force_upgrade")}>
+        <p className="y10-row">
+          <button type="button" className="y10-btn primary danger" disabled={command.busy} onClick={() => submit("runtime.force_upgrade")}>
             强制升级
           </button>
         </p>

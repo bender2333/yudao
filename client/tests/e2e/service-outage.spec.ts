@@ -18,7 +18,7 @@ test("服务停止以后二十秒内没有 pageerror，重连间隔递增；服�
     }
   });
   try {
-    await expect(page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+    await expect(page.locator(".brand .y10-brand-name")).toContainText("Yudao");
     await expect(page.locator(".connection")).toHaveText("已连接");
     await backend.stop();
     // 断线：页面整体变灰，顶栏写明正在重新连接，页面不抛错

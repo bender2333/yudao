@@ -1,4 +1,4 @@
-// 小人合成：由原型 v9 engine.js 第 3 节（parseSpriteKey、spriteSpec、put/blk/blit、placeItem、
+// 小人合成：由原型 v10 engine.js 第 3 节（parseSpriteKey、spriteSpec、put/blk/blit、placeItem、
 // drawFace、sideLeg、composeChar、charFrame）与 sprites.js 的 rolePalette 改写为 TypeScript。
 // 输出是纯点阵（Grid），不依赖浏览器与 PixiJS：同输入必得同输出，工单 #176 的确定时钟与单测依赖这一点。
 

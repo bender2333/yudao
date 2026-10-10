@@ -92,7 +92,7 @@ export function App() {
       document.body.classList.remove("is-drawer-open");
     };
   }, [drawerOpen]);
-  // 连接断开时窗口整体变灰（工单 #296）：原型样式按 body.is-disconnected 给 .y9-app 加灰度，
+  // 连接断开时窗口整体变灰（工单 #296）：原型样式按 body.is-disconnected 给 .y10-app 加灰度，
   // 数据保留最后一次的
   const disconnected = state.kind === "connected" && state.streamConnected === false;
   useEffect(() => {
@@ -233,21 +233,21 @@ export function App() {
   // 用动态导入：正式构建里这段分支被整体消掉，图鉴的代码不进正式包，也就没有正式的页面入口。
   if (import.meta.env.DEV && route.name === "gallery") {
     return (
-      <Suspense fallback={<div className="y9-gate gate"><div className="y9-gate-card card"><h1>正在载入图鉴…</h1></div></div>}>
+      <Suspense fallback={<div className="y10-gate gate"><div className="y10-gate-card card"><h1>正在载入图鉴…</h1></div></div>}>
         <LazyGallery />
       </Suspense>
     );
   }
   if (state.kind === "connecting") {
-    return <div className="y9-gate gate"><div className="y9-gate-card card"><h1>连接中…</h1></div></div>;
+    return <div className="y10-gate gate"><div className="y10-gate-card card"><h1>连接中…</h1></div></div>;
   }
   if (state.kind === "outdated") {
     // 页面与服务出自同一个发布，接口版本不同时页面不能使用这个服务
     return (
-      <div className="y9-gate gate"><div className="y9-gate-card card">
+      <div className="y10-gate gate"><div className="y10-gate-card card">
         <h1>页面与服务的接口版本不同</h1>
         <p className="error">页面的接口版本是 {state.clientVersion}，服务 {state.serverRelease} 的接口版本是 {state.serverVersion}。重新加载页面以取得同一版本的页面文件。</p>
-        <button className="y9-btn primary" type="button" onClick={() => window.location.reload()}>重新加载</button>
+        <button className="y10-btn primary" type="button" onClick={() => window.location.reload()}>重新加载</button>
       </div></div>
     );
   }
@@ -258,10 +258,10 @@ export function App() {
   }
   if (state.kind === "failed") {
     return (
-      <div className="y9-gate gate"><div className="y9-gate-card card">
+      <div className="y10-gate gate"><div className="y10-gate-card card">
         <h1>没有连上 Yudao 服务</h1>
         <p className="error">连接失败：{state.message}</p>
-        <button className="y9-btn primary" type="button" onClick={() => void app.open(window.location.origin, token)}>重新连接</button>
+        <button className="y10-btn primary" type="button" onClick={() => void app.open(window.location.origin, token)}>重新连接</button>
       </div></div>
     );
   }
@@ -271,7 +271,7 @@ export function App() {
   const project = projects.find((item) => item.project_id === route.projectId) ?? null;
 
   return (
-    <div className="y9-app app">
+    <div className="y10-app app">
       <Sidebar
         app={app}
         capabilities={capabilities}
@@ -283,9 +283,9 @@ export function App() {
         onNavigate={navigate}
       />
       {drawerOpen ? (
-        <button type="button" className="y9-scrim drawer-scrim" aria-label="关闭左侧栏" onClick={() => setDrawerOpen(false)} />
+        <button type="button" className="y10-scrim drawer-scrim" aria-label="关闭左侧栏" onClick={() => setDrawerOpen(false)} />
       ) : null}
-      <div className="y9-main main">
+      <div className="y10-main main">
         <Topbar
           app={app}
           projectId={route.projectId}
@@ -301,7 +301,7 @@ export function App() {
           onNavigate={navigate}
         />
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
-        <main className="y9-content content">
+        <main className="y10-content content">
           {route.name === "home" ? (
             <HomePage app={app} onNavigate={navigate} at={route.at} targetDecision={targetDecision} />
           ) : route.name === "sys-models" ? (
@@ -338,11 +338,11 @@ export function App() {
 function TokenGate(props: { onSubmit: (token: string) => void }) {
   const [value, setValue] = useState("");
   return (
-    <div className="y9-gate"><div className="y9-gate-card">
+    <div className="y10-gate"><div className="y10-gate-card">
       <h1>填写访问令牌</h1>
       <p>Yudao 服务以局域网访问方式运行，接口需要访问令牌。在控制主机上用 token create 建立令牌并复制它。</p>
       <form
-        className="y9-form y9-gate-form"
+        className="y10-form y10-gate-form"
         onSubmit={(event) => {
           event.preventDefault();
           const token = value.trim();
@@ -351,20 +351,20 @@ function TokenGate(props: { onSubmit: (token: string) => void }) {
           }
         }}
       >
-        <label className="y9-field" htmlFor="access-token">
+        <label className="y10-field" htmlFor="access-token">
           <span>访问令牌</span>
           <input
             id="access-token"
             data-testid="access-token"
-            className="y9-input"
+            className="y10-input"
             type="password"
             autoComplete="off"
             value={value}
             onChange={(event) => setValue(event.target.value)}
           />
         </label>
-        <div className="y9-row">
-          <button className="y9-btn primary" type="submit">连接</button>
+        <div className="y10-row">
+          <button className="y10-btn primary" type="submit">连接</button>
         </div>
       </form>
     </div></div>

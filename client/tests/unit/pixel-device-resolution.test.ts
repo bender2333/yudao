@@ -26,7 +26,7 @@ const DPRS = [1, 1.25, 1.5];
 
 test("画面文字的字体栈是微软雅黑（ADR-0021 第 4 条）", () => {
   assert.ok(PIXEL_FONT_STACK.includes("Microsoft YaHei"), `字体栈没有微软雅黑：${PIXEL_FONT_STACK}`);
-  // 与原型 v9 engine.js 的 P.FONT 相同（生成的登记表里存着原型的那一串）
+  // 与原型 v10 engine.js 的 P.FONT 相同（生成的登记表里存着原型的那一串）
   assert.equal(PIXEL_FONT_STACK, PROTOTYPE_FONT);
 });
 

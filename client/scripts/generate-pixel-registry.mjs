@@ -1,4 +1,4 @@
-// 由原型 v9 的 sprites.js 与 engine.js 生成像素画法的登记表 JSON（工单 #176）。
+// 由原型 v10 的 sprites.js 与 engine.js 生成像素画法的登记表 JSON（工单 #176）。
 // 原型代码自定稿起不再修改（ADR-0021）；这里只读取，把纯数据的注册表导出为 JSON，
 // 作为客户端的单一事实来源：画法、姿势、动作、位图、配色与图鉴「一项不少」的核对基准都取自这份导出。
 // 输出：src/renderer/src/pixel/generated/registry.json
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientRoot = path.resolve(__dirname, '..');
-const v9Root = path.resolve(clientRoot, '..', 'docs', 'prototypes', 'v9', 'js');
+const v10Root = path.resolve(clientRoot, '..', 'docs', 'prototypes', 'v10', 'js');
 
 // ---------------------------------------------------------------------------
 // 最小的浏览器环境：原型只用 document.createElement('canvas') 与窗口尺寸相关的全局，
@@ -113,17 +113,17 @@ sandbox.self = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
-// 按原型的加载顺序执行（index.html 第 36、48、49 行）：y9.js → sprites.js → engine.js
+// 按原型的加载顺序执行（index.html 第 36、48、49 行）：y10.js → sprites.js → engine.js
 for (const [label, file] of [
-  ['y9.js', path.join(v9Root, 'y9.js')],
-  ['sprites.js', path.join(v9Root, 'pixel', 'sprites.js')],
-  ['engine.js', path.join(v9Root, 'pixel', 'engine.js')],
+  ['y10.js', path.join(v10Root, 'y10.js')],
+  ['sprites.js', path.join(v10Root, 'pixel', 'sprites.js')],
+  ['engine.js', path.join(v10Root, 'pixel', 'engine.js')],
 ]) {
   vm.runInContext(readFileSync(file, 'utf8'), sandbox, { filename: label });
 }
 
-const Y9 = sandbox.window.Y9;
-const P = Y9.pixel;
+const Y10 = sandbox.window.Y10;
+const P = Y10.pixel;
 
 // ---------------------------------------------------------------------------
 // 导出：纯数据的注册表 + 公开成员清单。
@@ -148,15 +148,15 @@ for (const name of DATA_REGISTRIES) {
 }
 
 const out = {
-  generatedFrom: 'docs/prototypes/v9/js/pixel/{sprites.js,engine.js}',
+  generatedFrom: 'docs/prototypes/v10/js/pixel/{sprites.js,engine.js}',
   inventory: {
     functions: functionMembers,
     data: dataMembers,
     all: [...functionMembers, ...dataMembers].sort(),
   },
-  levels: Y9.LEVELS,
-  levelLabels: Y9.LEVEL_LABELS,
-  levelTags: Y9.LEVEL_TAGS,
+  levels: Y10.LEVELS,
+  levelLabels: Y10.LEVEL_LABELS,
+  levelTags: Y10.LEVEL_TAGS,
   charW: P.CHAR_W,
   charH: P.CHAR_H,
   font: P.FONT,

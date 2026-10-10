@@ -1,5 +1,5 @@
 {
- "generatedFrom": "docs/prototypes/v9/js/pixel/{sprites.js,engine.js}",
+ "generatedFrom": "docs/prototypes/v10/js/pixel/{sprites.js,engine.js}",
  "inventory": {
   "functions": [
    "R",
@@ -144,6 +144,7 @@
   "3.8",
   "3.2B",
   "3.2D",
+  "pilot",
   "S4",
   "S5"
  ],
@@ -155,6 +156,7 @@
   "3.8": "3.8 接入已有项目",
   "3.2B": "3.2B 网络与 MCP",
   "3.2D": "3.2D 浏览器与 computer use",
+  "pilot": "自举试点",
   "S4": "Stage 4",
   "S5": "Stage 5"
  },
@@ -166,6 +168,7 @@
   "3.8": "3.8",
   "3.2B": "3.2B",
   "3.2D": "3.2D",
+  "pilot": "试点",
   "S4": "Stage 4",
   "S5": "Stage 5"
  },

@@ -1,4 +1,4 @@
-// 部门房间的驱动：按快照配置角色与持续状态，把事件变成动作放进角色的队列（原型 v9 room.js 的
+// 部门房间的驱动：按快照配置角色与持续状态，把事件变成动作放进角色的队列（原型 v10 room.js 的
 // setModel、playEvent、restFor、applyLights 与 handlers，工单 #177）。
 //
 // 驱动持有一个场景（world/scene.ts 的 createScene），小人的走位与动作由场景的脚本按帧推进；

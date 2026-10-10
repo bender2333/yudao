@@ -23,7 +23,7 @@ test.afterAll(async () => {
 
 async function openClient(size: { width: number; height: number }): Promise<ClientApp> {
   const client = await startClient(backend, size);
-  await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+  await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
   return client;
 }
 
@@ -196,7 +196,7 @@ test("视口 1920×1080 下外壳可用，没有横向滚动条，控制台错�
   const client = await startClient(backend, { width: 1920, height: 1080 });
   const errors = watchErrors(client);
   try {
-    await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+    await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
     const overflow = await client.page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
@@ -282,8 +282,8 @@ test("1920×1080 下内容区宽 1280 并在主区居中", async () => {
   const errors = watchErrors(client);
   try {
     const box = await client.page.evaluate(() => {
-      const mainEl = document.querySelector<HTMLElement>(".y9-main");
-      const content = document.querySelector<HTMLElement>(".y9-content");
+      const mainEl = document.querySelector<HTMLElement>(".y10-main");
+      const content = document.querySelector<HTMLElement>(".y10-content");
       if (mainEl === null || content === null) throw new Error("找不到内容区");
       const main = mainEl.getBoundingClientRect();
       const box = content.getBoundingClientRect();
@@ -304,7 +304,7 @@ test("浏览器缩放 150% 时页面没有横向滚动条", async () => {
   const client = await startClient(backend, { width: 1280, height: 720 }, { deviceScaleFactor: 1.5 });
   const errors = watchErrors(client);
   try {
-    await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+    await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
     await expect(client.page.locator(".sidebar")).toBeVisible();
     const overflow = await client.page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -328,7 +328,7 @@ test("切换浅色与深色主题以后刷新页面，主题保持", async () =>
       await client.page.getByRole("button", { name: choice }).click();
       await expect.poll(themeOf).toBe(choice === "浅色" ? "light" : "dark");
       await client.page.reload();
-      await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+      await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
       expect(await themeOf()).toBe(choice === "浅色" ? "light" : "dark");
       await expect(client.page.getByRole("button", { name: choice })).toHaveAttribute("aria-pressed", "true");
     }

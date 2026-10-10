@@ -108,17 +108,17 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
   return (
     <div className="page">
       <Section title="请求记录" note={`范围：${workItem === null ? "整个项目" : `事项 ${workItem}`}；当前显示这些部门与状态下的请求`}>
-        <div className="y9-obs-filters filters">
-          <label className="y9-obs-filter field">
+        <div className="y10-obs-filters filters">
+          <label className="y10-obs-filter field">
             <span>部门</span>
-            <select className="y9-select" value={draft.department} onChange={(event) => setDraft({ ...draft, department: event.target.value })}>
+            <select className="y10-select" value={draft.department} onChange={(event) => setDraft({ ...draft, department: event.target.value })}>
               <option value="">全部</option>
               {Object.keys(DEPARTMENTS).map((key) => <option key={key} value={key}>{DEPARTMENTS[key].name}</option>)}
             </select>
           </label>
-          <label className="y9-obs-filter field">
+          <label className="y10-obs-filter field">
             <span>状态</span>
-            <select className="y9-select" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}>
+            <select className="y10-select" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}>
               <option value="">全部</option>
               <option value="success">成功</option>
               <option value="running">进行中</option>
@@ -126,30 +126,30 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
               <option value="cancelled">已取消</option>
             </select>
           </label>
-          <label className="y9-obs-filter is-search field">
+          <label className="y10-obs-filter is-search field">
             <span>关键词</span>
-            <input className="y9-input" type="search" value={draft.q} placeholder="模型、调用目标、事项等" onChange={(event) => setDraft({ ...draft, q: event.target.value })} />
+            <input className="y10-input" type="search" value={draft.q} placeholder="模型、调用目标、事项等" onChange={(event) => setDraft({ ...draft, q: event.target.value })} />
           </label>
-          <label className="y9-obs-filter field">
+          <label className="y10-obs-filter field">
             <span>Provider 配置</span>
-            <input className="y9-input" type="text" value={draft.provider} onChange={(event) => setDraft({ ...draft, provider: event.target.value })} />
+            <input className="y10-input" type="text" value={draft.provider} onChange={(event) => setDraft({ ...draft, provider: event.target.value })} />
           </label>
-          <label className="y9-obs-filter field">
+          <label className="y10-obs-filter field">
             <span>请求的模型</span>
-            <input className="y9-input" type="text" value={draft.requestedModel} onChange={(event) => setDraft({ ...draft, requestedModel: event.target.value })} />
+            <input className="y10-input" type="text" value={draft.requestedModel} onChange={(event) => setDraft({ ...draft, requestedModel: event.target.value })} />
           </label>
-          <label className="y9-obs-filter field">
+          <label className="y10-obs-filter field">
             <span>实际的模型</span>
-            <input className="y9-input" type="text" value={draft.actualModel} onChange={(event) => setDraft({ ...draft, actualModel: event.target.value })} />
+            <input className="y10-input" type="text" value={draft.actualModel} onChange={(event) => setDraft({ ...draft, actualModel: event.target.value })} />
           </label>
           <button
             type="button"
-            className="y9-btn primary"
+            className="y10-btn primary"
             onClick={() => { setApplied(draft); setCursor(null); }}
           >
             按条件筛选
           </button>
-          {filtersChanged ? <p className="y9-note note">条件已改动，按「按条件筛选」以后生效</p> : null}
+          {filtersChanged ? <p className="y10-note note">条件已改动，按「按条件筛选」以后生效</p> : null}
         </div>
         <Loading state={attempts} />
         {rows.length === 0 && !attempts.loading ? <Empty text="这个范围没有请求记录" /> : null}
@@ -166,7 +166,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
               usageText(dict(item.usage)),
               <button
                 type="button"
-                className="y9-link link"
+                className="y10-link link"
                 key={item.attempt_id}
                 onClick={() => { window.location.hash = paths.observeDetail(projectId, item.attempt_id, { workItem, runId: item.run_id }); }}
               >
@@ -180,7 +180,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
             {attempts.loading ? "正在加载" : "加载更多"}
           </button>
         ) : null}
-        {attempts.data && attempts.data.cursor === null && rows.length > 0 ? <p className="y9-note note">已到最后一批</p> : null}
+        {attempts.data && attempts.data.cursor === null && rows.length > 0 ? <p className="y10-note note">已到最后一批</p> : null}
       </Section>
       <UsageSection usage={usage} />
     </div>
@@ -221,7 +221,7 @@ function UsageSection(props: { usage: { data: UsageReport | null; loading: boole
 
 function UsageGroups(props: { title: string; groups: UsageReport["departments"] }) {
   if (props.groups.length === 0) {
-    return <p className="y9-note note">{props.title}：没有上报的用量</p>;
+    return <p className="y10-note note">{props.title}：没有上报的用量</p>;
   }
   return (
     <Table
@@ -264,7 +264,7 @@ export function ObserveDetailPage(props: { app: ClientApp; route: Route }) {
         <p>
           <button
             type="button"
-            className="y9-link link"
+            className="y10-link link"
             onClick={() => { window.location.hash = paths.observe(projectId) + (workItem ? `?w=${workItem}` : ""); }}
           >
             返回请求记录
@@ -325,9 +325,9 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
           ])}
           caption="按栏目的上下文"
         />
-      ) : <p className="y9-note note">这一次请求没有记录上下文的栏目</p>}
+      ) : <p className="y10-note note">这一次请求没有记录上下文的栏目</p>}
       {manifest !== null ? (
-        <p className="y9-note note">
+        <p className="y10-note note">
           清单：估算 {formatNumberOr(numberValue(manifest.token_estimate), " token")} / 上限 {formatNumberOr(numberValue(manifest.budget), " token")}，
           排除 {list(manifest.excluded).length} 项，压缩 {show(optionalText(manifest.compaction_event_id), "无")}
         </p>
@@ -346,11 +346,11 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
         />
       ) : null}
       {props.data.request !== null && props.data.request !== undefined ? (
-        <pre className="y9-pre raw">{JSON.stringify(props.data.request, null, 2)}</pre>
-      ) : <p className="y9-note note">请求内容没有记录</p>}
+        <pre className="y10-pre raw">{JSON.stringify(props.data.request, null, 2)}</pre>
+      ) : <p className="y10-note note">请求内容没有记录</p>}
       {props.data.response !== null && props.data.response !== undefined ? (
-        <pre className="y9-pre raw">{JSON.stringify(props.data.response, null, 2)}</pre>
-      ) : <p className="y9-note note">响应内容没有记录</p>}
+        <pre className="y10-pre raw">{JSON.stringify(props.data.response, null, 2)}</pre>
+      ) : <p className="y10-note note">响应内容没有记录</p>}
       {events.length > 0 ? (
         <Table
           head={["种类", "时间", "说明"]}
@@ -373,7 +373,7 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
           caption="工具调用"
         />
       ) : null}
-      <p className="y9-note note">
+      <p className="y10-note note">
         阶段名称按 {label(PHASE_LABELS, "PRODUCT_SPEC")} 等取值；详情页的路径是 {paths.observeDetail(props.projectId, props.attemptId)}
       </p>
     </>
