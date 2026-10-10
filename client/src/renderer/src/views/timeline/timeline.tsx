@@ -182,6 +182,9 @@ export function Timeline(props: TimelineProps) {
         ) : (
           <span className="y9-note note">{props.liveNote}</span>
         )}
+        {position !== null ? (
+          <span className="y9-replay-fact">{current ? current.label : "范围的起点"}</span>
+        ) : null}
       </div>
       <div className="y9-ticks ticks" role="list" aria-label="关键事实的时间轴">
         {parts.length === 0 ? (
