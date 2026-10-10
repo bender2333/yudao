@@ -131,7 +131,7 @@ Stage 3 待讨论的专题（TODO，2026-09-30 记录；背景见[决策记录](
 4. **3.2B 网络与 MCP**：2026-10-01 已确定，见[决策记录](../decision.md)同日「网络取回与 MCP 工具」一条、[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)、[D36](network-and-mcp.md)与[设计说明](../design/network-and-mcp.md)。
 5. **M1 试用时的打包与安装**：2026-10-01 确定，2026-10-07 由第 7 项取代：一次发布是一个 wheel，包含界面的页面文件与执行代理的安装包，局域网访问用启动参数 `--access lan`，见 [ADR-0032](../adr/0032-interface-served-as-web-pages.md)与[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)。
 6. **声明可以重复的动作，结果未知时是否自动重新执行**：2026-10-02 已确定，见[决策记录](../decision.md)同日「结果未知的动作自动核实与自动重新执行」一条与[恢复契约](../design/recovery-contract-and-fault-matrix.md)第 4 节：可以重复的动作自动重新执行一次，文件工具按动作前的快照自动核实，仍然未知时交给用户；登记的命令增加「可以重新执行」（#242）。
-7. **界面的形式**：2026-10-07 已确定（M1 试用时用户提出「做成客户端的形式并不好，变得很重，也体现不出来客户端应用的优势」），见[决策记录](../decision.md)同日「界面由 Yudao 服务以网页提供」一条与 [ADR-0032](../adr/0032-interface-served-as-web-pages.md)：界面由 Yudao 服务以网页提供，删除 Electron 客户端；服务手动启动，现阶段不做系统服务与登录时启动；不主动推送提醒；不考虑手机；外观以原型 v9 为准并用截图对照，像素画面文字用微软雅黑（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）。
+7. **界面的形式**：2026-10-07 已确定（M1 试用时用户提出「做成客户端的形式并不好，变得很重，也体现不出来客户端应用的优势」），见[决策记录](../decision.md)同日「界面由 Yudao 服务以网页提供」一条与 [ADR-0032](../adr/0032-interface-served-as-web-pages.md)：界面由 Yudao 服务以网页提供，删除 Electron 客户端；服务手动启动，现阶段不做系统服务与登录时启动；不主动推送提醒；不考虑手机；外观以原型 v9 为准并用截图对照，像素画面文字用微软雅黑（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）。2026-10-10 改为以当前定稿的原型为准，版本号写在[原型变更记录](../prototypes/CHANGELOG.md)开头。
 
 以后阶段的讨论：
 

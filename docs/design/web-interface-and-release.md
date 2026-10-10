@@ -2,7 +2,7 @@
 
 更新：2026-10-07（界面由 Yudao 服务以网页提供，见 [ADR-0032](../adr/0032-interface-served-as-web-pages.md)；发布检查由已安装的实例提供，发布脚本只负责构建与上传，见 [ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)，第 6.3、6.4、6.5 节）。状态：设计已确认（发布的做法 2026-10-01、局域网访问方式 2026-10-02、网页界面 2026-10-07，用户逐轮采纳推荐，第 9 节）。命令行入口、数据目录与发布脚本由 #206、#209 实施；接口层提供页面文件、启动以后打开浏览器、系统通知与发布脚本构建页面文件的部分未实施。路线位置：[Stage 3 计划](../stage-3-plan.md)界面工作线。工单见第 11 节。
 
-依据：[ADR-0032](../adr/0032-interface-served-as-web-pages.md)（界面由 Yudao 服务以网页提供，服务手动启动）；[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（FastAPI 接口层与 HTTP 合同，页面使用的技术）；[ADR-0018](../adr/0018-single-control-host-remote-execution.md)（一台控制主机）；[ADR-0019](../adr/0019-project-stream-across-versions.md)（升级与排空）；[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)（像素画面与原型 v9 的核对）；[ADR-0022](../adr/0022-run-directly-without-containers.md)；[ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)（发布检查）；[应用层与接口层设计说明](app-and-interface.md)第 5.7、6、7.2、10 节；[执行环境服务设计说明](execution-environment.md)第 5.3 节。用词以 `CONTEXT.md` 为准。
+依据：[ADR-0032](../adr/0032-interface-served-as-web-pages.md)（界面由 Yudao 服务以网页提供，服务手动启动）；[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（FastAPI 接口层与 HTTP 合同，页面使用的技术）；[ADR-0018](../adr/0018-single-control-host-remote-execution.md)（一台控制主机）；[ADR-0019](../adr/0019-project-stream-across-versions.md)（升级与排空）；[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)（像素画面与定稿原型的核对）；[ADR-0022](../adr/0022-run-directly-without-containers.md)；[ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)（发布检查）；[应用层与接口层设计说明](app-and-interface.md)第 5.7、6、7.2、10 节；[执行环境服务设计说明](execution-environment.md)第 5.3 节。用词以 `CONTEXT.md` 为准。
 
 ## 1. 范围
 
@@ -126,8 +126,8 @@ Stage 4 由操作系统的服务管理负责开机启动时，访问方式写在
 ### 5.2 浏览器与显示
 
 - 在控制主机上打开 `http://127.0.0.1:<端口>/`；服务以局域网访问方式运行时，局域网中的其他电脑打开 `http://<控制主机的局域网地址>:<端口>/`。
-- 页面以 Windows 上的 Edge 与 Chrome 为准。外观以原型 v9 为准；页面内容区最宽 1280 像素、居中，整体放大使用浏览器的缩放。
-- 每个页面与像素画面的验收包括截图对照：1440×900、1920×1080 两种窗口，设备像素比 1、1.25、1.5，浅色与深色主题，与原型 v9 同一场景的截图并排交给用户查看（ADR-0021）。
+- 页面以 Windows 上的 Edge 与 Chrome 为准。外观以当前定稿的原型为准（版本写在[原型变更记录](../prototypes/CHANGELOG.md)开头）；页面内容区最宽 1280 像素、居中，整体放大使用浏览器的缩放。
+- 每个页面与像素画面的验收包括截图对照：1440×900、1920×1080 两种窗口，设备像素比 1、1.25、1.5，浅色与深色主题，与当前定稿的原型同一场景的截图并排交给用户查看（ADR-0021）。
 - 页面所在的标签页或窗口不可见时，浏览器暂停画面的绘制；回到可见时画面按当前状态继续。
 
 ### 5.3 系统通知与「安装此站点为应用」
@@ -229,6 +229,7 @@ Stage 4 由操作系统的服务管理负责开机启动时，访问方式写在
 13. 不主动推送提醒。原来由托盘发出的系统通知（D30）在本机打开页面时由浏览器发出，点击决定请求的通知回到页面并打开对应的决定卡片。
 14. 一次发布是一个 wheel，包含构建好的页面文件与执行代理的安装包；页面与服务出自同一个包，版本总是一致。
 15. 外观以原型 v9 为准；页面内容区最宽 1280 像素居中，整体放大用浏览器缩放；验收时按第 5.2 节截图，与原型 v9 同一场景并排交给用户查看（ADR-0021）。
+16. 2026-10-10：外观与截图对照以当前定稿的原型为准，版本号只写在[原型变更记录](../prototypes/CHANGELOG.md)开头（第 5.2 节）。
 
 ## 10. 遗留
 

@@ -1,6 +1,6 @@
 # D30 游戏化的 Web 界面与界面实现
 
-确认时间：2026-09-25，2026-09-28 补充长时间运行以后的界面，2026-09-29 确定原型 v8 的方向，2026-10-07 确定界面由 Yudao 服务以网页提供、外观以原型 v9 为准。状态：需求已记录，技术设计见应用层与接口层设计说明与网页界面的提供与发布设计说明；路线位置 Stage 3 的界面工作线。原型：[界面原型 v9](../prototypes/v9/index.html)（[设计说明](../prototypes/v9/design.md)、[构建约定](../prototypes/v9/BUILD.md)；屏幕清单、页面与决定卡片沿用 [v8](../prototypes/v8/design.md)），界面的结构、行为与外观以它为准（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）。
+确认时间：2026-09-25，2026-09-28 补充长时间运行以后的界面，2026-09-29 确定原型 v8 的方向，2026-10-07 确定界面由 Yudao 服务以网页提供、外观以原型 v9 为准，2026-10-10 确定界面以当前定稿的原型为准。状态：需求已记录，技术设计见应用层与接口层设计说明与网页界面的提供与发布设计说明；路线位置 Stage 3 的界面工作线。原型：当前定稿的版本写在[原型变更记录](../prototypes/CHANGELOG.md)开头（屏幕清单、页面与决定卡片沿用 [v8](../prototypes/v8/design.md)），界面的结构、行为与外观以它为准（[ADR-0021](../adr/0021-client-pixel-view-follows-prototype-structure.md)）。
 
 ## 用户原话
 
@@ -29,6 +29,7 @@
 - 2026-09-26 用户决定（[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)）：界面使用 React 19、TypeScript、Vite、PixiJS 8、XState 5 与 GSAP。接口层使用 FastAPI，OpenAPI 由 pydantic 类型生成：命令带身份与基准版本，返回接受或拒绝；查询返回快照与它对应的全局位置；一条可以按范围筛选的事件流（SSE）带全局位置，断线后按位置补齐，发现缺口时重新同步快照；能力清单列出当前部署提供的查询、命令与覆盖层；从本机以外访问需要认证。
 - 2026-10-07 用户逐轮采纳推荐（[ADR-0032](../adr/0032-interface-served-as-web-pages.md)，[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)）：界面是 Yudao 服务提供的网页。构建好的页面文件随 wheel 发布，接口层在提供接口的同时提供这些文件；在浏览器里打开服务的地址就是界面，局域网中的其他电脑打开同一个地址；需要单独的窗口时用 Edge 或 Chrome 的「安装此站点为应用」。以 Windows 上的 Edge 与 Chrome 为准，不考虑手机。Yudao 服务用 `uv tool install` 安装成 `yudao` 命令，一次发布是一个 wheel，包含构建好的页面文件与执行代理的安装包，页面与服务的版本总是相同；每个试用里程碑交给用户之前发布一次，版本号按里程碑递增（Stage 3 为 0.1.0 至 0.4.0）。服务手动启动：启动命令在服务就绪以后用默认浏览器打开页面地址，停止服务就是结束这个进程；局域网访问用启动参数 `--access lan`；注册为系统服务与登录时启动随 Stage 4 的长时间运行。界面的端到端测试用 Playwright 驱动浏览器。
 - 2026-10-07 M1 试用以后用户决定（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)，[决策记录](../decision.md)同日「界面由 Yudao 服务以网页提供」一条）：界面的外观以原型 v9 为准。验收用截图对照：每个页面与像素画面在 1440×900、1920×1080 两种窗口，设备像素比 1、1.25、1.5，浅色与深色主题下截图，与原型 v9 同一场景的截图并排做成联系表，连同按场景截取的动作过程交给用户查看，界面工单的验收都包含这一项。像素画面的图形与文字按屏幕的实际分辨率绘制，纹理使用最近邻采样，画面中的文字使用微软雅黑。页面的内容区最宽 1280 像素、居中，整体放大用浏览器的缩放。
+- 2026-10-10 用户决定（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）：界面的结构、行为与外观以当前定稿的原型为准，截图对照也用它；版本号只写在[原型变更记录](../prototypes/CHANGELOG.md)开头，原型定稿时改这一处。
 
 ## 长时间运行以后的界面
 
@@ -76,4 +77,4 @@
 
 ## 实现状态
 
-应用层、接口层与界面的第一批页面随里程碑 M1 交付：0.1.1 以 Electron 桌面客户端试用以后，界面改为 Yudao 服务提供的网页，0.1.2 发布以后用户重新试用（#183）；各工作包的界面随所属里程碑。原型设计以 v9 结束（`docs/prototypes/v9/`）；技术设计见[应用层与接口层设计说明](../design/app-and-interface.md)，页面的提供、启动与发布见[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)，像素画面的实现见 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)。路线位置：Stage 3 的界面工作线。
+应用层、接口层与界面的第一批页面随里程碑 M1 交付：0.1.1 以 Electron 桌面客户端试用以后，界面改为 Yudao 服务提供的网页，0.1.2 发布以后用户重新试用（#183）；各工作包的界面随所属里程碑。当前定稿的原型见[原型变更记录](../prototypes/CHANGELOG.md)开头；技术设计见[应用层与接口层设计说明](../design/app-and-interface.md)，页面的提供、启动与发布见[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)，像素画面的实现见 [ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)。路线位置：Stage 3 的界面工作线。
