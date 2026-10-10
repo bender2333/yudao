@@ -20,6 +20,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+from harness.data_directory import LOG_DIR, LOG_FILE
+
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -299,11 +301,47 @@ def test_installed_tooling_is_unchanged(release_build):
     # 比较运行发布脚本前后两次本机安装状态的快照
     assert release_build["installed_after"] == release_build["installed_before"]
 
-def _free_port() -> int:
-    import socket
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
+PORT_LINE = "port: "
+
+
+def _text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _diagnostics(process: subprocess.Popen, log: Path, data_dir: Path) -> str:
+    # 启动失败时的诊断输出：退出码、进程自身的输出，以及数据目录里的日志。服务进程绑定端口失败
+    # 时以退出码 3 退出（uvicorn 的 STARTUP_FAILURE），进程的输出里只有一行 logs:，原因写在
+    # 数据目录的日志里：两者都带上，失败信息才说明原因
+    data_log = data_dir / LOG_DIR / LOG_FILE
+    return (f"退出码 {process.poll()}\n"
+            f"--- process output ---\n{_text(log)}\n"
+            f"--- {data_log} ---\n{_text(data_log)}")
+
+
+def _reported_port(log: Path) -> int | None:
+    for line in _text(log).splitlines():
+        if line.startswith(PORT_LINE):
+            return int(line[len(PORT_LINE):])
+    return None
+
+
+def _wait_port(process: subprocess.Popen, log: Path, data_dir: Path) -> int:
+    # 服务自己绑定端口 0，就绪以后在输出里报告实际端口：由调用方先占用再释放端口的写法在
+    # 多进程运行中会冲突
+    import time
+
+    deadline = time.monotonic() + 300
+    while True:
+        port = _reported_port(log)
+        if port is not None:
+            return port
+        assert process.poll() is None, _diagnostics(process, log, data_dir)
+        if time.monotonic() > deadline:
+            raise TimeoutError(_diagnostics(process, log, data_dir))
+        time.sleep(0.1)
 
 def _wait_until_serving(process: subprocess.Popen, url: str, log: Path) -> None:
     import time
@@ -355,15 +393,15 @@ def test_installed_wheel_serves_the_pages(release_build, tmp_path):
     assert released.stdout.strip() == version
 
     data_dir = tmp_path / "data"
-    port = _free_port()
     log = tmp_path / "api.log"
     spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
              else {"start_new_session": True})
     with log.open("wb") as output:
         api = subprocess.Popen([str(command), "api", "--data-dir", str(data_dir),
-                                "--port", str(port), "--provider-config", ""],
+                                "--port", "0", "--provider-config", ""],
                                stdout=output, stderr=subprocess.STDOUT, **spawn)
     try:
+        port = _wait_port(api, log, data_dir)
         _wait_until_serving(api, f"http://127.0.0.1:{port}/api/queries/system.status", log)
         index = httpx.get(f"http://127.0.0.1:{port}/", timeout=10)
         assert index.status_code == 200 and index.content == packaged_index
@@ -373,7 +411,7 @@ def test_installed_wheel_serves_the_pages(release_build, tmp_path):
 
         # 同一数据目录第二次启动失败并写明原因（服务进程锁）
         second = subprocess.run(
-            [str(command), "api", "--data-dir", str(data_dir), "--port", str(_free_port()),
+            [str(command), "api", "--data-dir", str(data_dir), "--port", "0",
              "--provider-config", ""],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
             env=_env())
