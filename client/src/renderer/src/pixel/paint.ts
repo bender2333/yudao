@@ -1,4 +1,4 @@
-// 房间陈设、管道、包裹、设备、屏幕的画法：由原型 v9 engine.js 第 8 节（1465-2213 行的 paint 表）
+// 房间陈设、管道、包裹、设备、屏幕的画法：由原型 v10 engine.js 第 8 节（1465-2213 行的 paint 表）
 // 改写为 TypeScript。常量、坐标运算与分支与原型逐行一致，只把画布相关的 P.drawBitmap、P.text、P.pixText、
 // P.linePts、P.mix、P.rgba 换成同项目的模块。
 

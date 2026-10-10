@@ -145,7 +145,7 @@ function loadPrototypePixel() {
   const fs = require("node:fs");
   const vm = require("node:vm");
   const path = require("node:path");
-  const v9 = path.resolve(import.meta.dirname, "..", "..", "..", "docs", "prototypes", "v9", "js");
+  const v10 = path.resolve(import.meta.dirname, "..", "..", "..", "docs", "prototypes", "v10", "js");
   const noop = () => {};
   const makeCtx2d = () => ({
     createImageData: (w, h) => ({ data: new Uint8ClampedArray(Math.max(0, w * h * 4)) }),
@@ -170,9 +170,9 @@ function loadPrototypePixel() {
   };
   sandbox.window = sandbox; sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
-  for (const [label, file] of [["y9.js", path.join(v9, "y9.js")], ["sprites.js", path.join(v9, "pixel", "sprites.js")], ["engine.js", path.join(v9, "pixel", "engine.js")]]) {
+  for (const [label, file] of [["y10.js", path.join(v10, "y10.js")], ["sprites.js", path.join(v10, "pixel", "sprites.js")], ["engine.js", path.join(v10, "pixel", "engine.js")]]) {
     vm.runInContext(fs.readFileSync(file, "utf8"), sandbox, { filename: label });
   }
-  protoCache = sandbox.window.Y9.pixel;
+  protoCache = sandbox.window.Y10.pixel;
   return protoCache;
 }

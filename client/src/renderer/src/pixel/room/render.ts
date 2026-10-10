@@ -1,5 +1,5 @@
 // 部门房间的画法：背景、墙上的物件、地面陈设、小人、说话气泡与管道口
-// （原型 v9 room.js 的 draw 与 buildBackground，工单 #177）。
+// （原型 v10 room.js 的 draw 与 buildBackground，工单 #177）。
 //
 // 画法复用已有的画布原语（paint、shapes、char），与原型逐行对应；渲染层把这张画布交给 PixiJS
 // 显示（room-view.ts），最近邻放大到容器宽度。

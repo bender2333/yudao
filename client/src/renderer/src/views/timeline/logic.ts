@@ -1,4 +1,4 @@
-// 时间轴与回放的纯逻辑（原型 v8 设计说明第 5.5 节、原型 v9 的 ui/replay.js，工单 #180）。
+// 时间轴与回放的纯逻辑（原型 v8 设计说明第 5.5 节、原型 v10 的 ui/replay.js，工单 #180）。
 // 刻度只取关键事实：首页取 home.away_report 的关键事实列表，概览按项目筛选；刻度按种类着色。
 // 没有关键事实的时间段直接跳过，时间轴上用折断符号表示跳过的时长。
 // 这里是纯函数，界面与单元测试都直接调用；播放的推进（定时器）由组件负责。
@@ -6,7 +6,7 @@
 import type { ReportFact } from "../../api/generated/types.gen";
 
 // 关键事实的种类：由应用层按事件的种类与载荷判定（harness/app/home.py 的 _fact_kind），
-// 客户端按它给出刻度着色、图例与标题。取值与原型 v9 contract/registry.js 的 KEY_KINDS 一致
+// 客户端按它给出刻度着色、图例与标题。取值与原型 v10 contract/registry.js 的 KEY_KINDS 一致
 export type KeyKind = "handoff" | "ask" | "answer" | "rework" | "release" | "adopt" | "fault" | "repair" | "deploy" | "wait" | "decision";
 
 export const KEY_KINDS: Record<KeyKind, { label: string; color: string }> = {
@@ -28,14 +28,14 @@ export function isKeyKind(value: string | null | undefined): value is KeyKind {
   return value !== null && value !== undefined && value in KEY_KINDS;
 }
 
-// 相邻关键事实相隔超过这个时长时画折断符号（原型 v9 的 GAP_SEC）
+// 相邻关键事实相隔超过这个时长时画折断符号（原型 v10 的 GAP_SEC）
 export const GAP_SEC = 2 * 3600;
 
-// 播放速度的三档（原型 v9 的 SPEEDS）
+// 播放速度的三档（原型 v10 的 SPEEDS）
 export const SPEEDS = [1, 2, 4] as const;
 export type Speed = (typeof SPEEDS)[number];
 
-// 每一步的基准时长（毫秒，原型 v9 的 BASE_MS）
+// 每一步的基准时长（毫秒，原型 v10 的 BASE_MS）
 export const BASE_MS = 1600;
 
 // 一条关键事实：位置、时间、种类与说明。kind 由应用层给出，不是刻度种类的不作为时间轴上的刻度
@@ -95,7 +95,7 @@ export function partsOf(ticks: FactTick[]): TimelinePart[] {
   return parts;
 }
 
-// 报告项展开时的高亮刻度：报告的来源事件位置与时间轴刻度位置相同即高亮（原型 v9 的 replay.highlight）
+// 报告项展开时的高亮刻度：报告的来源事件位置与时间轴刻度位置相同即高亮（原型 v10 的 replay.highlight）
 export function ticksInRefs(refs: number[], ticks: FactTick[]): number[] {
   const known = new Set(ticks.map((tick) => tick.position));
   return refs.filter((position) => known.has(position));

@@ -1,4 +1,4 @@
-// 楼层画面的调用录制（工单 #82 验收标准 2）：在原型 v9 的页面上播放 19 个场景，
+// 楼层画面的调用录制（工单 #82 验收标准 2）：在原型 v10 的页面上播放 19 个场景，
 // 录下项目楼层画面收到的 setModel、playEvent、focus、setOverlay 调用（原型 checks/record.js 的做法），
 // 并记录每个事件之后固定时刻的状态：每个角色的任务、姿势与头顶的话，每个包裹的去向，每根管道的状态与各个信号。
 //
@@ -23,7 +23,7 @@ const outFile = join(outDir, "recordings.json");
 const args = process.argv.slice(2);
 const WRITE = args.includes("--write");
 const rootArg = args.indexOf("--root");
-const ROOT = rootArg >= 0 ? args[rootArg + 1] : pathToFileURL(join(repoRoot, "docs", "prototypes", "v9", "index.html")).href;
+const ROOT = rootArg >= 0 ? args[rootArg + 1] : pathToFileURL(join(repoRoot, "docs", "prototypes", "v10", "index.html")).href;
 
 const playwrightPath = process.env.PLAYWRIGHT_PATH
   || join(repoRoot, ".tmp", "v8", "pw", "node_modules", "playwright");
@@ -44,9 +44,12 @@ const EXE = process.env.CHROMIUM_EXE || "C:/Users/BA_H3C_Pad/AppData/Local/ms-pl
  */
 const SAMPLE_MS = [0, 800];
 
+/** 录下的场景编号上限：编号 20、21 是自举试点的场景，由实现覆盖层的工单加入录制（工单 #434）。 */
+const MAX_SCENARIO_NO = 19;
+
 // 在页面里运行的录制驱动：包装 createFloorScene，记录调用；在每次调用之后把时钟推进到固定时刻并取状态。
-const DRIVER = async ({ sampleMs }) => {
-  const P = window.Y9.pixel;
+const DRIVER = async ({ sampleMs, maxScenarioNo }) => {
+  const P = window.Y10.pixel;
   const E = P.ecs;
   // 确定的时钟与随机数
   let t = 0;
@@ -150,7 +153,7 @@ const DRIVER = async ({ sampleMs }) => {
 
   /** 播放一个场景，返回录下的调用与状态。 */
   window.__playScenario = async (id, pid) => {
-    const app = window.Y9;
+    const app = window.Y10;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const overview = "#/p/" + pid + "/overview";
     app.scenario.select(id);
@@ -171,7 +174,8 @@ const DRIVER = async ({ sampleMs }) => {
     return window.__record.take();
   };
 
-  const scenarios = window.Y9.backend.scenarios().map((s) => {
+  // 只录现有测试用到的场景（编号 1 至 19）：编号 20、21 是自举试点的场景，由实现覆盖层的工单加入录制
+  const scenarios = window.Y10.backend.scenarios().filter((s) => s.no <= maxScenarioNo).map((s) => {
     const m = /^#\/p\/([^/]+)\//.exec(s.go || "");
     let pid = m ? m[1] : null;
     if (!pid) pid = s.steps.map((st) => st.event && st.event.project_id).find(Boolean) || null;
@@ -207,10 +211,10 @@ async function main() {
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.addInitScript(() => sessionStorage.setItem("y9.level", JSON.stringify("S5")));
+  await page.addInitScript(() => sessionStorage.setItem("y10.level", JSON.stringify("S5")));
   await page.goto(ROOT + "#/sys/machines");
   await page.waitForTimeout(700);
-  const scenarios = await page.evaluate(DRIVER, { sampleMs: SAMPLE_MS });
+  const scenarios = await page.evaluate(DRIVER, { sampleMs: SAMPLE_MS, maxScenarioNo: MAX_SCENARIO_NO });
   const recordings = [];
   for (const sc of scenarios) {
     if (!sc.pid) {
@@ -242,7 +246,7 @@ async function main() {
     });
   }
   const payload = {
-    generatedFrom: "docs/prototypes/v9（原型 checks/record.js 的做法）",
+    generatedFrom: "docs/prototypes/v10（原型 checks/record.js 的做法）",
     sampleMs: SAMPLE_MS,
     models,
     scenarios: recordings,

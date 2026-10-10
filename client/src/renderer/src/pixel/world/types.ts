@@ -1,4 +1,4 @@
-// 项目楼层的世界与系统的数据形状（原型 v9 设计说明第 3 至 6 节，工单 #82）。
+// 项目楼层的世界与系统的数据形状（原型 v10 设计说明第 3 至 6 节，工单 #82）。
 // 这里只放类型：实体、组件、任务目录、待机活动、信号与画面数据。
 // 世界与系统不依赖渲染与 PixiJS，可以直接在 node --test 下驱动。
 
@@ -370,7 +370,7 @@ export interface OpenRequest {
   work_item_id: string;
 }
 
-/** 决定请求在画面上的内容（原型 Y9.cards.face 的纯文字版本，与页面卡片同一份材料，工单 #179）。 */
+/** 决定请求在画面上的内容（原型 Y10.cards.face 的纯文字版本，与页面卡片同一份材料，工单 #179）。 */
 export interface DecisionFace {
   id: string;
   kind: string;
@@ -428,7 +428,7 @@ export interface PixelFloorEvent {
   payload?: Record<string, unknown>;
 }
 
-/** 画面与系统共用的时间与数字格式（原型 y9.js 的 Y9.time）。 */
+/** 画面与系统共用的时间与数字格式（原型 y10.js 的 Y10.time）。 */
 export interface TimeText {
   clock: (iso: string | null) => string;
   duration: (sec: number) => string;
