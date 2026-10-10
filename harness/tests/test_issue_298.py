@@ -4,7 +4,6 @@
 import json
 import os
 import signal
-import socket
 import subprocess
 import sys
 import time
@@ -13,6 +12,7 @@ from pathlib import Path
 
 import httpx
 
+from harness.data_directory import LOG_DIR, LOG_FILE
 from harness.tests.protocol_helpers import responses_responder, serve
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -25,6 +25,8 @@ REF = "ISSUE298_KEY"
 PROVIDER_ID = "p298"
 MODEL_ID = "m298"
 
+PORT_LINE = "port: "
+
 
 def _user_data_environment(user_root: Path) -> dict[str, str]:
     # 把用户数据目录的根指向临时目录：Windows 读 LOCALAPPDATA，其他系统读 XDG_DATA_HOME。
@@ -33,13 +35,15 @@ def _user_data_environment(user_root: Path) -> dict[str, str]:
             "LOCALAPPDATA": str(user_root), "XDG_DATA_HOME": str(user_root)}
 
 
-def _start_service(user_root: Path, arguments: list[str], port: int, log: Path) -> subprocess.Popen:
-    # 真实的服务子进程：选项写在子命令之前或之后由 arguments 决定
+def _start_service(user_root: Path, arguments: list[str], log: Path) -> subprocess.Popen:
+    # 真实的服务子进程：选项写在子命令之前或之后由 arguments 决定。
+    # 端口由子进程自己绑定（--port 0），就绪以后在输出里报告实际端口：由调用方先占用再释放端口的
+    # 写法在多进程运行中会冲突
     spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
              else {"start_new_session": True})
     with log.open("wb") as output:
         return subprocess.Popen(
-            [sys.executable, "-m", "harness", *arguments, "--port", str(port)],
+            [sys.executable, "-m", "harness", *arguments, "--port", "0"],
             cwd=str(user_root.parent), env=_user_data_environment(user_root),
             stdout=output, stderr=subprocess.STDOUT, **spawn)
 
@@ -68,10 +72,42 @@ def _stop_service(process: subprocess.Popen) -> None:
     process.wait(STARTUP_TIMEOUT_SEC)
 
 
-def _free_port() -> int:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
+def _text(path: Path) -> str:
+    # 服务进程的输出：标准错误与标准输出合并写进同一个文件（stderr=subprocess.STDOUT）
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _diagnostics(process: subprocess.Popen, log: Path, data_dir: Path) -> str:
+    # 启动失败时的诊断输出：退出码、进程自身的输出，以及数据目录里的日志。服务进程绑定端口失败
+    # 时以退出码 3 退出（uvicorn 的 STARTUP_FAILURE），进程的输出里只有一行 logs:，原因写在
+    # 数据目录的日志里：两者都带上，失败信息才说明原因
+    data_log = data_dir / LOG_DIR / LOG_FILE
+    return (f"退出码 {process.poll()}\n"
+            f"--- process output ---\n{_text(log)}\n"
+            f"--- {data_log} ---\n{_text(data_log)}")
+
+
+def _reported_port(log: Path) -> int | None:
+    for line in _text(log).splitlines():
+        if line.startswith(PORT_LINE):
+            return int(line[len(PORT_LINE):])
+    return None
+
+
+def _wait_port(process: subprocess.Popen, log: Path, data_dir: Path) -> int:
+    # 服务自己绑定端口 0，就绪以后在输出里报告实际端口：--port 0 时启动方只能从这里得知它
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
+    while True:
+        port = _reported_port(log)
+        if port is not None:
+            return port
+        assert process.poll() is None, _diagnostics(process, log, data_dir)
+        if time.monotonic() > deadline:
+            raise TimeoutError(_diagnostics(process, log, data_dir))
+        time.sleep(0.1)
 
 
 def _provider(base_url: str) -> dict:
@@ -131,10 +167,10 @@ def test_the_service_writes_the_catalog_and_admissions_into_the_data_directory(t
     data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / ".env").write_text(f"{REF}={SECRET}\n", encoding="utf-8")
     server, _capture, upstream = serve(responses_responder)
-    port = _free_port()
     log = tmp_path / "api.log"
-    api = _start_service(user_root, ["--data-dir", str(data_dir), "api"], port, log)
+    api = _start_service(user_root, ["--data-dir", str(data_dir), "api"], log)
     try:
+        port = _wait_port(api, log, data_dir)
         _wait_until_serving(api, port, log)
         with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=STARTUP_TIMEOUT_SEC) as client:
             _save_connection(client, f"{upstream}/v1")
@@ -167,11 +203,11 @@ def test_an_explicit_provider_config_keeps_both_files_next_to_it(tmp_path):
     data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / ".env").write_text(f"{REF}={SECRET}\n", encoding="utf-8")
     server, _capture, upstream = serve(responses_responder)
-    port = _free_port()
     log = tmp_path / "api.log"
     api = _start_service(user_root, ["api", "--data-dir", str(data_dir), "--provider-config", str(config)],
-                        port, log)
+                         log)
     try:
+        port = _wait_port(api, log, data_dir)
         _wait_until_serving(api, port, log)
         with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=STARTUP_TIMEOUT_SEC) as client:
             _save_connection(client, f"{upstream}/v1")
