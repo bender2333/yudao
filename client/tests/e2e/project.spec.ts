@@ -51,7 +51,7 @@ test.afterAll(async () => {
 // 决定解答与实时事项这两类改变服务端状态的用例只在 1440 尺寸里跑一遍，1920 尺寸只看渲染。
 async function openProjectClient(size: { width: number; height: number }): Promise<ClientApp> {
   const client = await startClient(backend, size);
-  await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+  await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
   await waitUntil(
     async () => (await client.page.locator(".project-entry").count()) >= 3,
     client.page,

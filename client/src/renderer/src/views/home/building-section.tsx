@@ -1,4 +1,4 @@
-// 首页的楼（原型 v8 设计说明第 4.2 节、v9 设计说明第 7 节，工单 #178）：
+// 首页的楼（原型 v8 设计说明第 4.2 节、v10 设计说明第 7 节，工单 #178）：
 // 每个项目一层，画成缩小的项目楼层；楼层数据来自 projects.list 与每个项目的 project.loop，
 // 事件流不按项目筛选，铺到画面上的动作由楼的世界与系统推进；点击楼层进入项目概览。
 //
@@ -38,14 +38,14 @@ export function BuildingSection(props: BuildingSectionProps): React.JSX.Element 
   ), [props.projects, items]);
 
   return (
-    <Section className="y9-home-building" title="全部项目与机器" note={at !== null ? "回放中：每个项目一层，按所选位置的快照显示" : "每个项目一层；点击楼层进入项目概览"}>
-      <div className="y9-building-wrap">
-        <div className="y9-building-scroll">
+    <Section className="y10-home-building" title="全部项目与机器" note={at !== null ? "回放中：每个项目一层，按所选位置的快照显示" : "每个项目一层；点击楼层进入项目概览"}>
+      <div className="y10-building-wrap">
+        <div className="y10-building-scroll">
           <BuildingCanvas app={props.app} model={model} onNavigate={props.onNavigate} live={at === null} />
         </div>
       </div>
       {model.floors.length === 0 ? (
-        <p className="y9-note note">还没有项目</p>
+        <p className="y10-note note">还没有项目</p>
       ) : (
         <ul className="building-list">
           {model.floors.map((floor) => (
@@ -54,7 +54,7 @@ export function BuildingSection(props: BuildingSectionProps): React.JSX.Element 
                 {floor.name}
               </button>
               <span>{BUILDING_STATUS[floor.status]?.text ?? floor.status}</span>
-              <span className="y9-note note">{litText(floor.lit)}</span>
+              <span className="y10-note note">{litText(floor.lit)}</span>
               {floor.decisions > 0 ? <span className="count">待你决定 {floor.decisions}</span> : null}
             </li>
           ))}

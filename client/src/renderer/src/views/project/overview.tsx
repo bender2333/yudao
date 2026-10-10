@@ -1,7 +1,7 @@
 // 概览页（原型 v8 设计说明第 5.1 节，工单 #80）：项目摘要、循环画面的位置（#82 填入）、
 // 当前事项（输入记录与处理进度、「追加需求」、「取消事项」；没有进行中的事项时提供「记录原文」
 // 与「作为新事项开始」）、事项看板与流转记录（点击打开原始事件）。
-// 页面上方不放决定区块：决定请求在大厅的板与文字列表里（v9 第 9 节，#175）。
+// 页面上方不放决定区块：决定请求在大厅的板与文字列表里（v10 第 9 节，#175）。
 // 数据只来自 project.overview、work_item.inputs、project.flow 与 event.detail 这几个已登记的查询。
 
 import { useState } from "react";
@@ -27,7 +27,7 @@ import { RestartOnboarding } from "./restart-onboarding";
 import { BOARD_TITLES, boardColumns } from "./board";
 import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
 
-// 事项状态对应的原型标记（原型 v9 handlers/project.js 的 displayOf）：
+// 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
 // held 与 stopped 在原型图标里没有对应（held 无图标），这两项保留纯文字，界面不猜
 const ITEM_STATUS_KIND: Record<string, string> = {
   not_started: "idle",
@@ -118,7 +118,7 @@ function atTimeOf(report: AwayReport | null, at: number): string | null {
 function Summary(props: { data: ProjectOverviewResult }) {
   const adoption = props.data.current_adoption;
   return (
-    <Section id="ov-summary" className="y9-ov-summary" title="项目摘要" note={`当前读取的是项目版本 ${props.data.version}`}>
+    <Section id="ov-summary" className="y10-ov-summary" title="项目摘要" note={`当前读取的是项目版本 ${props.data.version}`}>
       <KeyValue
         items={[
           ["名称", props.data.name],
@@ -133,7 +133,7 @@ function Summary(props: { data: ProjectOverviewResult }) {
         ]}
       />
       {/* 起点只在项目还没有采纳成果时写明：project.overview 在有采纳成果时不返回起点说明 */}
-      {props.data.start_point ? <p className="y9-note note">{props.data.start_point}</p> : null}
+      {props.data.start_point ? <p className="y10-note note">{props.data.start_point}</p> : null}
     </Section>
   );
 }
@@ -165,7 +165,7 @@ function CurrentItem(props: {
   if (item === null) {
     return (
       <Section title="当前事项" note="项目没有进行中的事项，顶栏也没有选中事项">
-        <div className="y9-ov-composer composer">
+        <div className="y10-ov-composer composer">
           <TextArea label="记录原文（保存为本项目的材料）" value={recordText} onInput={setRecordText} />
           {hasCommand(props.app, "material.record") ? (
             <SubmitButton
@@ -177,9 +177,9 @@ function CurrentItem(props: {
                   .then((ok) => { if (ok) setRecordText(""); });
               }}
             />
-          ) : <p className="y9-note note">这台主机没有提供记录原文的操作</p>}
+          ) : <p className="y10-note note">这台主机没有提供记录原文的操作</p>}
         </div>
-        <div className="y9-ov-composer composer">
+        <div className="y10-ov-composer composer">
           <TextArea label="新的要求" value={recordText} onInput={setRecordText} />
           <TextInput label="事项标题（可以留空）" value={newTitle} onInput={setNewTitle} />
           {hasCommand(props.app, "work_item.create") ? (
@@ -195,15 +195,15 @@ function CurrentItem(props: {
                 void props.command.submit("work_item.create", body).then((ok) => { if (ok) { setRecordText(""); setNewTitle(""); } });
               }}
             />
-          ) : <p className="y9-note note">这台主机没有提供新建事项的操作</p>}
-          <p className="y9-note note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
+          ) : <p className="y10-note note">这台主机没有提供新建事项的操作</p>}
+          <p className="y10-note note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
           <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
           {(() => {
             const links = rejectionLinks(props.command.rejection, props.projectId);
             return links.length > 0 ? (
-              <div className="y9-row row-actions">
+              <div className="y10-row row-actions">
                 {links.map((link) => (
-                  <button key={link.hash} type="button" className="y9-link link" onClick={() => { window.location.hash = link.hash; }}>
+                  <button key={link.hash} type="button" className="y10-link link" onClick={() => { window.location.hash = link.hash; }}>
                     {link.label}
                   </button>
                 ))}
@@ -227,7 +227,7 @@ function CurrentItem(props: {
     <Section id="ov-current" title="当前事项" note={note}>
       <KeyValue
         items={[
-          ["状态", <span key="status" className="y9-row">{itemStatus(item.status)}{item.phase ? <span className="y9-muted"> · {label(PHASE_LABELS, item.phase)}</span> : null}</span>],
+          ["状态", <span key="status" className="y10-row">{itemStatus(item.status)}{item.phase ? <span className="y10-muted"> · {label(PHASE_LABELS, item.phase)}</span> : null}</span>],
           ["待决问题", show(item.pending_question, "没有")],
           ["停止原因", item.stop_reason === null || item.stop_reason === "" ? "没有" : label(STOP_REASON, item.stop_reason)],
           ["未能开始", show(item.start_error, "没有")],
@@ -236,7 +236,7 @@ function CurrentItem(props: {
       />
       <InputRecords app={props.app} inputs={data === null ? [] : data.inputs} loading={inputs.loading} />
       {item.status === "in_progress" && hasCommand(props.app, "work_item.append_input") ? (
-        <div className="y9-ov-composer composer">
+        <div className="y10-ov-composer composer">
           <TextArea label="追加需求" value={appendText} onInput={setAppendText} />
           <SubmitButton
             label="追加需求"
@@ -254,7 +254,7 @@ function CurrentItem(props: {
           用户因此能回到「等待建档」并重新开始建档（设计第 3.1 节） */}
       {(item.status === "in_progress" || item.status === "awaiting_initial_prd")
         && hasCommand(props.app, "work_item.cancel") ? (
-        <div className="y9-ov-composer composer">
+        <div className="y10-ov-composer composer">
           <SubmitButton
             label={item.status === "awaiting_initial_prd" ? "放弃本次建档" : "取消事项"}
             busy={props.command.busy}
@@ -281,22 +281,22 @@ function InputRecords(props: { app: ClientApp; inputs: WorkItemInputsResult["inp
   );
 
   if (props.inputs.length === 0) {
-    return props.loading ? <p className="y9-note note">正在读取输入记录</p> : <Empty text="这个事项没有输入记录" />;
+    return props.loading ? <p className="y10-note note">正在读取输入记录</p> : <Empty text="这个事项没有输入记录" />;
   }
 
   return (
     <>
-      <ul className="y9-ov-inputs input-list">
+      <ul className="y10-ov-inputs input-list">
         {props.inputs.map((input) => (
           <li key={input.input_id}>
-            <div className="y9-ov-input-head input-head">
+            <div className="y10-ov-input-head input-head">
               <strong>第 {input.version} 版</strong>
-              <span className="y9-code byte-range">字节 {input.byte_start}–{input.byte_end}</span>
-              <span className="y9-code byte-range">{label(INPUT_KIND, input.kind)}</span>
-              <button type="button" className="y9-link link" onClick={() => setOpenEvent(input.created_event_id)}>查看原始事件</button>
+              <span className="y10-code byte-range">字节 {input.byte_start}–{input.byte_end}</span>
+              <span className="y10-code byte-range">{label(INPUT_KIND, input.kind)}</span>
+              <button type="button" className="y10-link link" onClick={() => setOpenEvent(input.created_event_id)}>查看原始事件</button>
             </div>
-            <p className="y9-ov-input-text raw-text">{input.text}</p>
-            <p className="y9-muted byte-range">来自事件 {input.created_event_id}，git 版本 {optionalText(input.git_version?.commit) ?? "未上报"}</p>
+            <p className="y10-ov-input-text raw-text">{input.text}</p>
+            <p className="y10-muted byte-range">来自事件 {input.created_event_id}，git 版本 {optionalText(input.git_version?.commit) ?? "未上报"}</p>
           </li>
         ))}
       </ul>
@@ -311,21 +311,21 @@ function Board(props: { items: WorkItemCard[] }) {
   return (
     <Section id="ov-board" title="事项看板" note="卡片显示标题、状态、所在部门与轮次；排队中的顺序就是执行顺序">
       {props.items.length === 0 ? <Empty text="项目还没有事项" /> : (
-        <div className="y9-ov-board board">
+        <div className="y10-ov-board board">
           {BOARD_TITLES.map(([key, title]) => (
-            <div key={key} className="y9-ov-board-col board-col">
+            <div key={key} className="y10-ov-board-col board-col">
               <h3>{title}（{columns[key].length}）</h3>
               {columns[key].map((item) => (
-                <article key={item.work_item_id} className="y9-ov-card board-card">
+                <article key={item.work_item_id} className="y10-ov-card board-card">
                   <strong>{item.title}</strong>
-                  <div className="y9-ov-card-meta card-meta">
+                  <div className="y10-ov-card-meta card-meta">
                     <span>{itemStatus(item.status)}</span>
                     {departmentName(item.department) === "" ? null : <span>{departmentName(item.department)}</span>}
                     <span>第 {item.round} 轮</span>
                   </div>
-                  {item.pending_question ? <p className="y9-muted card-note">待决问题：{item.pending_question}</p> : null}
-                  {item.stop_reason ? <p className="y9-muted card-note">停止原因：{label(STOP_REASON, item.stop_reason)}</p> : null}
-                  {item.start_error ? <p className="y9-muted card-note">未能开始：{item.start_error}</p> : null}
+                  {item.pending_question ? <p className="y10-muted card-note">待决问题：{item.pending_question}</p> : null}
+                  {item.stop_reason ? <p className="y10-muted card-note">停止原因：{label(STOP_REASON, item.stop_reason)}</p> : null}
+                  {item.start_error ? <p className="y10-muted card-note">未能开始：{item.start_error}</p> : null}
                 </article>
               ))}
             </div>
@@ -351,7 +351,7 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
   if (props.flow.loading && props.flow.data === null) {
     return (
       <Section id="ov-flow" title="流转记录">
-        <p className="y9-note note">正在读取流转记录</p>
+        <p className="y10-note note">正在读取流转记录</p>
       </Section>
     );
   }
@@ -362,7 +362,7 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
         <Table
           head={["时间", "方向", "类型", "内容", "状态"]}
           rows={records.map((record) => [
-            <button type="button" className="y9-link link" key={record.flow_id} onClick={() => setOpenEvent(record.event_id)}>
+            <button type="button" className="y10-link link" key={record.flow_id} onClick={() => setOpenEvent(record.event_id)}>
               {formatTime(record.created_at)}
             </button>,
             `${departmentName(record.direction_from) || "没有"} → ${departmentName(record.direction_to) || "没有"}`,

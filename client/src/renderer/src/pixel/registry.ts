@@ -1,4 +1,4 @@
-// 像素画登记表：由 scripts/generate-pixel-registry.mjs 从冻结的原型 v9 导出生成（工单 #176）。
+// 像素画登记表：由 scripts/generate-pixel-registry.mjs 从冻结的原型 v10 导出生成（工单 #176）。
 // 本文件只做类型化再导出与常量，不重复登记数据；改画法请改生成脚本并 `npm run generate:pixel`。
 
 import data from "./generated/registry.json" with { type: "json" };
@@ -181,11 +181,11 @@ export const CHAR_H = registry.charH;
 /** 原型正文用的字体栈。 */
 export const PROTOTYPE_FONT = registry.font;
 
-/** 画面文字的字体栈（ADR-0021 第 4 条：微软雅黑，与原型 v9 engine.js 的 P.FONT 相同）。 */
+/** 画面文字的字体栈（ADR-0021 第 4 条：微软雅黑，与原型 v10 engine.js 的 P.FONT 相同）。 */
 export const PIXEL_FONT_FAMILY = '"Microsoft YaHei UI"';
 export const PIXEL_FONT_STACK = '"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Source Han Sans SC", sans-serif';
 
-/** 档位顺序与标签（原型 y9.js）。 */
+/** 档位顺序与标签（原型 y10.js）。 */
 export const LEVELS = registry.levels;
 export const LEVEL_LABELS = registry.levelLabels;
 export const LEVEL_TAGS = registry.levelTags;

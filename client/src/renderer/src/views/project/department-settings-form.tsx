@@ -61,7 +61,7 @@ export function ReminderList(props: { items: string[]; testId?: string }) {
   return (
     <>
       {props.items.map((item) => (
-        <p className="y9-note is-warn warn" role="status" key={item} data-testid={props.testId}>
+        <p className="y10-note is-warn warn" role="status" key={item} data-testid={props.testId}>
           {item}
         </p>
       ))}
@@ -96,11 +96,11 @@ export function DepartmentSettingsFields(props: {
   const tiers = tierOptions(model?.reasoning_levels ?? [], props.draft.tier);
 
   return (
-    <div className="y9-form form">
-      <label className="y9-field field">
+    <div className="y10-form form">
+      <label className="y10-field field">
         <span>模型</span>
         <select
-          className="y9-select"
+          className="y10-select"
           value={props.draft.model}
           data-testid={`department-model-${props.department}`}
           onChange={(event) => props.onDraft({ ...props.draft, model: event.target.value, tier: "" })}
@@ -116,12 +116,12 @@ export function DepartmentSettingsFields(props: {
         </select>
       </label>
       {props.draft.model !== "" && model === null ? (
-        <p className="y9-note is-warn warn" role="status">所选模型不在已准入的定义中，保存会被拒绝，请重新读取目录。</p>
+        <p className="y10-note is-warn warn" role="status">所选模型不在已准入的定义中，保存会被拒绝，请重新读取目录。</p>
       ) : null}
-      <label className="y9-field field">
+      <label className="y10-field field">
         <span>推理档位</span>
         <select
-          className="y9-select"
+          className="y10-select"
           value={props.draft.tier}
           data-testid={`department-tier-${props.department}`}
           disabled={props.draft.model === "" && props.draft.tier === ""}
@@ -132,7 +132,7 @@ export function DepartmentSettingsFields(props: {
         </select>
       </label>
       {model !== null && model.reasoning_levels.length === 0 && props.draft.tier === "" ? (
-        <p className="y9-note note">该模型未声明推理档位，请求不带推理参数。</p>
+        <p className="y10-note note">该模型未声明推理档位，请求不带推理参数。</p>
       ) : null}
       <TextArea
         label="部门 Prompt"
@@ -158,7 +158,7 @@ export function DepartmentSettingsSave(props: {
 }) {
   const selection = selectionPair(props.draft.model);
   return (
-    <div className="y9-form composer">
+    <div className="y10-form composer">
       <SubmitButton
         label="保存部门设置"
         busy={props.command.busy}
@@ -174,7 +174,7 @@ export function DepartmentSettingsSave(props: {
           }).then((ok) => { if (ok) { props.onSaved(); } });
         }}
       />
-      <p className="y9-note note">{DEPARTMENT_SAVE_NOTICE}</p>
+      <p className="y10-note note">{DEPARTMENT_SAVE_NOTICE}</p>
     </div>
   );
 }

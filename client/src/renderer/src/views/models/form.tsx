@@ -116,58 +116,58 @@ export function ProviderForm(props: ProviderFormProps) {
     && !props.busy;
 
   return (
-    <form className="y9-block y9-form-block mm-form" onSubmit={(event) => {
+    <form className="y10-block y10-form-block mm-form" onSubmit={(event) => {
       event.preventDefault();
       props.onSubmit(secret, persist);
     }}>
-      <h3 className="y9-block-title">{editing ? "编辑 Provider 配置" : "添加 Provider 配置"}</h3>
+      <h3 className="y10-block-title">{editing ? "编辑 Provider 配置" : "添加 Provider 配置"}</h3>
 
-      <div className="y9-field mm-field">
+      <div className="y10-field mm-field">
         <span className="mm-label">服务方案</span>
-        <div className="y9-pill-row mm-chips" role="group" aria-label="服务方案">
+        <div className="y10-pill-row mm-chips" role="group" aria-label="服务方案">
           {props.presets.map((item) => (
             <button key={item.id} type="button"
-                    className={item.id === state.preset_id ? "y9-pill is-on chip selected" : "y9-pill chip"}
+                    className={item.id === state.preset_id ? "y10-pill is-on chip selected" : "y10-pill chip"}
                     aria-pressed={item.id === state.preset_id}
                     onClick={() => choosePreset(item.id)}>
               {item.name}
             </button>
           ))}
-          <button type="button" className={state.preset_id === CUSTOM_PRESET_ID ? "y9-pill is-on chip selected" : "y9-pill chip"}
+          <button type="button" className={state.preset_id === CUSTOM_PRESET_ID ? "y10-pill is-on chip selected" : "y10-pill chip"}
                   aria-pressed={state.preset_id === CUSTOM_PRESET_ID}
                   onClick={() => choosePreset(CUSTOM_PRESET_ID)}>
             自定义
           </button>
         </div>
       </div>
-      <p className="y9-small y9-muted mm-meta">
+      <p className="y10-small y10-muted mm-meta">
         预置表 {props.presetRevision} · 来源 {props.presetSource}；模型能力表 {props.capabilityRevision}
         （快照日期 {props.capabilitySnapshotDate}）· 来源 {props.capabilitySource}
       </p>
-      {preset?.docs_url && <p className="y9-small y9-muted mm-meta">文档 <code>{preset.docs_url}</code></p>}
+      {preset?.docs_url && <p className="y10-small y10-muted mm-meta">文档 <code>{preset.docs_url}</code></p>}
 
-      <label className="y9-field mm-field">
+      <label className="y10-field mm-field">
         <span className="mm-label">ID</span>
-        <input className="y9-input" value={state.id} readOnly={editing} required placeholder="opencode-go"
+        <input className="y10-input" value={state.id} readOnly={editing} required placeholder="opencode-go"
                onChange={(event) => props.onPatch({ id: event.target.value })} />
       </label>
-      <label className="y9-field mm-field">
+      <label className="y10-field mm-field">
         <span className="mm-label">名称</span>
-        <input className="y9-input" value={state.name} required placeholder="OpenCode Go"
+        <input className="y10-input" value={state.name} required placeholder="OpenCode Go"
                onChange={(event) => props.onPatch({ name: event.target.value })} />
       </label>
-      <label className="y9-field mm-field">
+      <label className="y10-field mm-field">
         <span className="mm-label">协议</span>
-        <select className="y9-select" value={state.protocol} data-testid="protocol-select"
+        <select className="y10-select" value={state.protocol} data-testid="protocol-select"
                 onChange={(event) => chooseProtocol(event.target.value)}>
           {Object.entries(PROTOCOL_LABELS).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
       </label>
-      <label className="y9-field mm-field">
+      <label className="y10-field mm-field">
         <span className="mm-label">地址</span>
-        <input className="y9-input" value={state.base_url} required placeholder="https://.../v1" data-testid="provider-base-url"
+        <input className="y10-input" value={state.base_url} required placeholder="https://.../v1" data-testid="provider-base-url"
                readOnly={mode === "add" && preset !== null}
                onChange={(event) => props.onPatch(mode === "add"
                  ? formPatchForBaseUrl(state, event.target.value) : { base_url: event.target.value })}
@@ -175,95 +175,95 @@ export function ProviderForm(props: ProviderFormProps) {
                  ? formPatchForBaseUrl(state, normalizeBaseUrl(state.base_url))
                  : { base_url: normalizeBaseUrl(state.base_url) }); }} />
       </label>
-      <label className="y9-field mm-field">
+      <label className="y10-field mm-field">
         <span className="mm-label">凭据引用</span>
-        <input className="y9-input" value={state.credential_ref} placeholder="OPENCODE_GO_KEY"
+        <input className="y10-input" value={state.credential_ref} placeholder="OPENCODE_GO_KEY"
                onChange={(event) => props.onPatch({ credential_ref: event.target.value })} />
       </label>
 
-      <details className="y9-details mm-advanced">
+      <details className="y10-details mm-advanced">
         <summary>高级选项</summary>
-        <label className="y9-field mm-field">
+        <label className="y10-field mm-field">
           <span className="mm-label">超时（秒）</span>
-        <input className="y9-input" type="number" min="1" value={state.timeout_sec} data-testid="provider-timeout"
+        <input className="y10-input" type="number" min="1" value={state.timeout_sec} data-testid="provider-timeout"
                  onChange={(event) => props.onPatch({ timeout_sec: event.target.value })} />
         </label>
-        <label className="y9-field mm-field">
+        <label className="y10-field mm-field">
           <span className="mm-label">模型列表地址</span>
-        <input className="y9-input" value={state.models_url || (!preset && state.base_url ? `${state.base_url.replace(/\/$/, "")}/models` : "")}
+        <input className="y10-input" value={state.models_url || (!preset && state.base_url ? `${state.base_url.replace(/\/$/, "")}/models` : "")}
                  placeholder="留空时使用服务方案的地址" data-testid="provider-models-url"
                  onChange={(event) => props.onPatch({ models_url: event.target.value })} />
         </label>
         {!connectionTestable(state, preset) && (
-          <p className="y9-small y9-muted mm-hint" role="status" data-testid="models-url-hint">
+          <p className="y10-small y10-muted mm-hint" role="status" data-testid="models-url-hint">
             填写连接地址后，模型列表地址默认使用连接地址加 /models。
           </p>
         )}
       </details>
 
-      <p className="y9-small y9-muted mm-hint">Key 在添加连接时保存；编辑连接时也可单独保存 Key。</p>
-      {props.impact && <p className="y9-warn-text mm-warn" role="status" data-testid="impact-notice">{props.impact}</p>}
+      <p className="y10-small y10-muted mm-hint">Key 在添加连接时保存；编辑连接时也可单独保存 Key。</p>
+      {props.impact && <p className="y10-warn-text mm-warn" role="status" data-testid="impact-notice">{props.impact}</p>}
 
-      <section className="y9-cred-form mm-credential" data-testid="credential-section">
-        <h4 className="y9-h3">凭据</h4>
-        <p className="y9-small y9-muted mm-meta" data-testid="credential-status">
+      <section className="y10-cred-form mm-credential" data-testid="credential-section">
+        <h4 className="y10-h3">凭据</h4>
+        <p className="y10-small y10-muted mm-meta" data-testid="credential-status">
           {editing && props.credential
             ? `凭据引用 ${props.credential.ref || "（未填写）"}：${credentialText(props.credential)}`
             : "保存连接以后显示实际生效来源。"}
         </p>
-        <label className="y9-field mm-field">
+        <label className="y10-field mm-field">
           <span className="mm-label">API Key</span>
-        <input className="y9-input" type="password" autoComplete="new-password" value={secret} placeholder="仅本次输入，不回填"
+        <input className="y10-input" type="password" autoComplete="new-password" value={secret} placeholder="仅本次输入，不回填"
                  data-testid="credential-secret"
                  onChange={(event) => setSecret(event.target.value)} />
         </label>
-        <label className="y9-check mm-check">
+        <label className="y10-check mm-check">
           <input type="checkbox" checked={persist} data-testid="credential-persist"
                  onChange={(event) => setPersist(event.target.checked)} /> 写入 .env
         </label>
-        <p className="y9-small y9-muted mm-hint">不勾选时只在本进程有效，重启后需重新提供。</p>
-        <div className="y9-row mm-actions">
-          <button type="button" className="y9-btn" disabled={!editing || secret.trim() === "" || props.busy}
+        <p className="y10-small y10-muted mm-hint">不勾选时只在本进程有效，重启后需重新提供。</p>
+        <div className="y10-row mm-actions">
+          <button type="button" className="y10-btn" disabled={!editing || secret.trim() === "" || props.busy}
                   onClick={() => {
                     props.onCredential("set", secret, persist);
                     setSecret("");
                   }}>
             保存 Key
           </button>
-          <button type="button" className="y9-btn" disabled={!editing || props.busy}
+          <button type="button" className="y10-btn" disabled={!editing || props.busy}
                   onClick={() => props.onCredential("clear_override", "", false)}>
             清除内存覆盖
           </button>
-          <button type="button" className="y9-btn danger" disabled={!editing || props.busy}
+          <button type="button" className="y10-btn danger" disabled={!editing || props.busy}
                   onClick={() => props.onCredential("remove_persisted", "", false)}>
             删除持久凭据
           </button>
         </div>
       </section>
 
-      <section className="y9-candidates mm-candidates" data-testid="candidate-section">
-        <h4 className="y9-h3">获取模型列表</h4>
-        <div className="y9-row mm-actions">
-          <button type="button" className="y9-btn" disabled={!editing || props.collecting} onClick={props.onCollectCandidates}>
+      <section className="y10-candidates mm-candidates" data-testid="candidate-section">
+        <h4 className="y10-h3">获取模型列表</h4>
+        <div className="y10-row mm-actions">
+          <button type="button" className="y10-btn" disabled={!editing || props.collecting} onClick={props.onCollectCandidates}>
             {props.collecting ? "候选获取中…" : "获取模型列表"}
           </button>
         </div>
-        {props.candidate === null && <p className="y9-small y9-muted mm-hint">尚未获取；结果只服务本次设置，不写入目录。</p>}
+        {props.candidate === null && <p className="y10-small y10-muted mm-hint">尚未获取；结果只服务本次设置，不写入目录。</p>}
         {props.candidate?.status === "unknown" && (
-          <p className="y9-warn-text mm-warn" role="status" data-testid="candidates-unknown">
+          <p className="y10-warn-text mm-warn" role="status" data-testid="candidates-unknown">
             候选未知：{props.candidate.error || "上游模型列表不可用"}
           </p>
         )}
         {props.candidate?.status === "ok" && (
           <>
-            <p className="y9-small y9-muted mm-meta" data-testid="candidates-source">
+            <p className="y10-small y10-muted mm-meta" data-testid="candidates-source">
               来源 {props.candidate.source_url} · 采集时间 {props.candidate.fetched_at}
             </p>
-            <ul className="y9-chip-row mm-candidates">
+            <ul className="y10-chip-row mm-candidates">
               {props.candidate.candidates.map((item) => (
                 <li key={item.id}>
                   <code>{item.id}</code>
-                  <button type="button" className="y9-chip" data-testid={`admit-candidate-${item.id}`}
+                  <button type="button" className="y10-chip" data-testid={`admit-candidate-${item.id}`}
                           onClick={() => props.onAddRow(props.rowFromCandidate(item))}>
                     建立访问定义
                   </button>
@@ -274,13 +274,13 @@ export function ProviderForm(props: ProviderFormProps) {
         )}
       </section>
 
-      <section className="y9-form-block mm-models" data-testid="model-rows">
-        <h4 className="y9-h3">模型访问定义</h4>
-        <p className="y9-small y9-muted mm-hint">
+      <section className="y10-form-block mm-models" data-testid="model-rows">
+        <h4 className="y10-h3">模型访问定义</h4>
+        <p className="y10-small y10-muted mm-hint">
           ID 是本系统内的标识，只能使用字母、数字与 <code>.</code> <code>-</code> <code>_</code> <code>:</code>；
           上游模型 ID 保持上游的写法，请求发往上游时用的就是它。
         </p>
-        {state.rows.length === 0 && <p className="y9-small y9-muted mm-hint">还没有模型访问定义；获取模型列表以后点击候选，或手动添加。</p>}
+        {state.rows.length === 0 && <p className="y10-small y10-muted mm-hint">还没有模型访问定义；获取模型列表以后点击候选，或手动添加。</p>}
         {state.rows.map((row) => {
           const admission = admissionOf(state.id, row.id, props.admissions);
           const levelChoices = defaultLevelOptions(row.reasoning_levels);
@@ -293,51 +293,51 @@ export function ProviderForm(props: ProviderFormProps) {
           });
           const capacityConfirmed = (row.saved || row.capacity_confirmed) && capacityIssue === "";
           return (
-            <fieldset className="y9-block is-compact mm-row" key={row.key} data-testid={`model-row-${rowKey}`}>
+            <fieldset className="y10-block is-compact mm-row" key={row.key} data-testid={`model-row-${rowKey}`}>
               <legend>{row.id || "新的定义"}</legend>
-              <label className="y9-field mm-field">
+              <label className="y10-field mm-field">
                 <span className="mm-label">ID</span>
-                <input className="y9-input" value={row.id} required data-testid={`row-id-${rowKey}`}
+                <input className="y10-input" value={row.id} required data-testid={`row-id-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, { id: event.target.value })} />
               </label>
-              <label className="y9-field mm-field">
+              <label className="y10-field mm-field">
                 <span className="mm-label">上游模型 ID</span>
-                <input className="y9-input" value={row.model} required data-testid={`row-model-${rowKey}`}
+                <input className="y10-input" value={row.model} required data-testid={`row-model-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, { model: event.target.value })} />
               </label>
               {row.model.trim() !== "" && row.model !== row.id && (
-                <p className="y9-small y9-muted mm-hint" data-testid={`id-differs-${rowKey}`}>
+                <p className="y10-small y10-muted mm-hint" data-testid={`id-differs-${rowKey}`}>
                   发给上游的是「{row.model}」，ID「{row.id}」只在本系统内使用。
                 </p>
               )}
-              <label className="y9-field mm-field">
+              <label className="y10-field mm-field">
                 <span className="mm-label">窗口</span>
-                <input className="y9-input" type="number" min="1" value={row.context_window} data-testid={`row-window-${rowKey}`}
+                <input className="y10-input" type="number" min="1" value={row.context_window} data-testid={`row-window-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, patchRowCapacity(row, "context_window", event.target.value))} />
               </label>
-              <label className="y9-field mm-field">
+              <label className="y10-field mm-field">
                 <span className="mm-label">输出上限</span>
-                <input className="y9-input" type="number" min="1" value={row.max_output_tokens} data-testid={`row-output-${rowKey}`}
+                <input className="y10-input" type="number" min="1" value={row.max_output_tokens} data-testid={`row-output-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, patchRowCapacity(row, "max_output_tokens", event.target.value))} />
               </label>
-              <div className="y9-row y9-row-actions mm-actions mm-row-actions">
+              <div className="y10-row y10-row-actions mm-actions mm-row-actions">
                 {capacityConfirmed
-                  ? <span className="y9-small mm-ok" data-testid={`capacity-confirmed-${rowKey}`}>容量已确认</span>
+                  ? <span className="y10-small mm-ok" data-testid={`capacity-confirmed-${rowKey}`}>容量已确认</span>
                   : (
-                    <button type="button" className="y9-btn small" data-testid={`accept-capacity-${rowKey}`}
+                    <button type="button" className="y10-btn small" data-testid={`accept-capacity-${rowKey}`}
                             disabled={capacityIssue !== ""}
                             onClick={() => props.onPatchRow(row.key, { capacity_confirmed: true })}>
                       接受容量
                     </button>
                   )}
                 {capacityIssue !== "" && (
-                  <span className="y9-warn-text mm-warn" role="status" data-testid={`capacity-issue-${rowKey}`}>
+                  <span className="y10-warn-text mm-warn" role="status" data-testid={`capacity-issue-${rowKey}`}>
                     {capacityIssue}
                   </span>
                 )}
                 <span className="spacer" />
                 {editing && row.id && (
-                  <button type="button" className="y9-btn small" data-testid={`test-model-${row.id}`}
+                  <button type="button" className="y10-btn small" data-testid={`test-model-${row.id}`}
                           disabled={props.testing[`model:${row.id}`] === true || props.busy}
                           onClick={() => props.onTestModel(row.id)}>
                     {props.testing[`model:${row.id}`] ? "测试中…" : "模型测试"}
@@ -345,30 +345,30 @@ export function ProviderForm(props: ProviderFormProps) {
                 )}
                 {/* 行内测试按钮旁边同样显示这一行的模型测试结果（工单 #294） */}
                 {editing && row.id && (props.testing[`model:${row.id}`] === true || props.tests[`model:${row.id}`] !== undefined) && (
-                  <span className="y9-test-mini mm-meta" role="status" data-testid={`form-model-result-${row.id}`}>
+                  <span className="y10-test-mini mm-meta" role="status" data-testid={`form-model-result-${row.id}`}>
                     {props.testing[`model:${row.id}`] ? "模型测试中…" : props.tests[`model:${row.id}`]}
                   </span>
                 )}
-                <button type="button" className="y9-btn small" data-testid={`remove-model-${rowKey}`}
+                <button type="button" className="y10-btn small" data-testid={`remove-model-${rowKey}`}
                         onClick={() => props.onRemoveRow(row.key)}>移除</button>
               </div>
-              <label className="y9-check mm-check">
+              <label className="y10-check mm-check">
                 <input type="checkbox" checked={row.image_input} data-testid={`image-input-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, { image_input: event.target.checked })} />
                 支持图像输入
               </label>
-              <label className="y9-check mm-check">
+              <label className="y10-check mm-check">
                 <input type="checkbox" checked={row.accepts_required_tool_call}
                        data-testid={`accepts-tool-call-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, { accepts_required_tool_call: event.target.checked })} />
                 接受要求调用工具
               </label>
-              <div className="y9-field mm-field">
+              <div className="y10-field mm-field">
                 <span className="mm-label">支持档位</span>
-                <div className="y9-chip-row mm-chips" role="group" aria-label="支持的推理档位">
+                <div className="y10-chip-row mm-chips" role="group" aria-label="支持的推理档位">
                   {REASONING_LEVELS.map((level) => (
                     <button key={level} type="button"
-                            className={row.reasoning_levels.includes(level) ? "y9-chip chip selected" : "y9-chip chip"}
+                            className={row.reasoning_levels.includes(level) ? "y10-chip chip selected" : "y10-chip chip"}
                             aria-pressed={row.reasoning_levels.includes(level)}
                             data-testid={`level-${rowKey}-${level}`}
                             onClick={() => toggleLevel(row, level)}>
@@ -377,17 +377,17 @@ export function ProviderForm(props: ProviderFormProps) {
                   ))}
                 </div>
               </div>
-              <label className="y9-field mm-field">
+              <label className="y10-field mm-field">
                 <span className="mm-label">默认档位</span>
-                <select className="y9-select" value={row.default_reasoning_level} data-testid={`default-level-${rowKey}`}
+                <select className="y10-select" value={row.default_reasoning_level} data-testid={`default-level-${rowKey}`}
                         onChange={(event) => props.onPatchRow(row.key, { default_reasoning_level: event.target.value })}>
                   <option value="">未选择</option>
                   {levelChoices.map((level) => <option key={level} value={level}>{level}</option>)}
                 </select>
               </label>
-              <label className="y9-field mm-field">
+              <label className="y10-field mm-field">
                 <span className="mm-label">推理参数方式</span>
-                <select className="y9-select" value={row.reasoning_mode} data-testid={`reasoning-mode-${rowKey}`}
+                <select className="y10-select" value={row.reasoning_mode} data-testid={`reasoning-mode-${rowKey}`}
                         onChange={(event) => props.onPatchRow(row.key, { reasoning_mode: event.target.value })}>
                   <option value="">未声明</option>
                   {modeChoices.map((mode) => (
@@ -395,41 +395,41 @@ export function ProviderForm(props: ProviderFormProps) {
                   ))}
                 </select>
               </label>
-              <p className="y9-small y9-muted mm-meta" data-testid={`capability-source-${rowKey}`}>能力来源：{row.capability_source}</p>
+              <p className="y10-small y10-muted mm-meta" data-testid={`capability-source-${rowKey}`}>能力来源：{row.capability_source}</p>
               {editing && (
-                <p className="y9-small y9-muted mm-meta" data-testid={`admission-${row.id}`}>准入：{admissionLabel(admission)}</p>
+                <p className="y10-small y10-muted mm-meta" data-testid={`admission-${row.id}`}>准入：{admissionLabel(admission)}</p>
               )}
             </fieldset>
           );
         })}
-        <div className="y9-row mm-actions">
-          <button type="button" className="y9-btn" data-testid="add-model-row" onClick={() => props.onAddRow(props.blankRow())}>
+        <div className="y10-row mm-actions">
+          <button type="button" className="y10-btn" data-testid="add-model-row" onClick={() => props.onAddRow(props.blankRow())}>
             手动添加一行
           </button>
         </div>
       </section>
 
       {props.status && (
-        <p className={props.status.kind === "ok" ? "y9-small mm-ok" : "y9-warn-text mm-warn"} role="status" data-testid="form-status">
+        <p className={props.status.kind === "ok" ? "y10-small mm-ok" : "y10-warn-text mm-warn"} role="status" data-testid="form-status">
           {props.status.message}
         </p>
       )}
-      <div className="y9-row mm-actions">
-        <button className="y9-btn primary" type="submit" disabled={!canSubmit} data-testid="submit-provider">
+      <div className="y10-row mm-actions">
+        <button className="y10-btn primary" type="submit" disabled={!canSubmit} data-testid="submit-provider">
           {props.busy ? "保存中…" : editing ? "保存" : "添加"}
         </button>
         {editing && (
           <>
-            <button type="button" className="y9-btn" data-testid="test-connection" disabled={connectionTesting || props.busy}
+            <button type="button" className="y10-btn" data-testid="test-connection" disabled={connectionTesting || props.busy}
                     onClick={props.onTestConnection}>
               {connectionTesting ? "测试中…" : "测试连接"}
             </button>
-            <button type="button" className="y9-btn danger" data-testid="delete-provider" disabled={props.busy} onClick={props.onDelete}>
+            <button type="button" className="y10-btn danger" data-testid="delete-provider" disabled={props.busy} onClick={props.onDelete}>
               删除
             </button>
           </>
         )}
-        <button type="button" className="y9-btn" onClick={props.onCancel}>取消</button>
+        <button type="button" className="y10-btn" onClick={props.onCancel}>取消</button>
       </div>
     </form>
   );

@@ -1,4 +1,4 @@
-// 时间轴与回放纯逻辑的单元测试（原型 v8 设计说明第 5.5 节、原型 v9 的 ui/replay.js，工单 #180）：
+// 时间轴与回放纯逻辑的单元测试（原型 v8 设计说明第 5.5 节、原型 v10 的 ui/replay.js，工单 #180）：
 // 关键事实到刻度（按种类、按项目筛选）、刻度着色、折断符号、时长写法、报告项与刻度的高亮对应。
 // 刻度种类由应用层给出（home.away_report 的 kind），这里核对客户端按它着色与筛选。
 // 用 node --test 运行，不依赖 Electron 与网络。
@@ -31,13 +31,13 @@ function fact(overrides) {
   };
 }
 
-test("三档速度与基准时长与原型 v9 的 replay.js 一致", () => {
+test("三档速度与基准时长与原型 v10 的 replay.js 一致", () => {
   assert.deepEqual([...SPEEDS], [1, 2, 4]);
   assert.equal(BASE_MS, 1600);
   assert.equal(GAP_SEC, 2 * 3600);
 });
 
-test("认识的刻度种类：与原型 v9 的 KEY_KINDS 一一对应", () => {
+test("认识的刻度种类：与原型 v10 的 KEY_KINDS 一一对应", () => {
   for (const kind of ["handoff", "ask", "answer", "rework", "release", "adopt", "fault", "repair", "deploy", "wait", "decision"]) {
     assert.equal(isKeyKind(kind), true);
   }
@@ -110,7 +110,7 @@ test("时间差：无法解析的时间返回零", () => {
   assert.equal(secondsBetween("2026-10-03T10:01:00Z", "2026-10-03T10:00:00Z"), 0);
 });
 
-test("刻度按种类着色：着色值与原型 v9 的 KEY_KINDS 相同", () => {
+test("刻度按种类着色：着色值与原型 v10 的 KEY_KINDS 相同", () => {
   assert.equal(KEY_KINDS.handoff.color, "#4f8fd6");
   assert.equal(KEY_KINDS.ask.color, "#7c6bd6");
   assert.equal(KEY_KINDS.answer.color, "#9d8ff0");

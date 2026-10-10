@@ -1,4 +1,4 @@
-// 工具与扩展页（原型 v9 的 ui/views/sys-tools.js，原型 v8 设计说明第 9.4 节，工单 #378）：
+// 工具与扩展页（原型 v10 的 ui/views/sys-tools.js，原型 v8 设计说明第 9.4 节，工单 #378）：
 // 网络取回、MCP 工具、浏览器工具、computer use、只读观察者与准入钩子六个区块。
 // 这一页只读汇总各项目的登记，依据见网络取回与 MCP 工具设计说明第 11 节。
 // 明细由 tools.registry 给出，后端还没有这一条查询，各区块因此只写它的内容与所属阶段。
@@ -19,16 +19,16 @@ const SECTIONS: { title: string; subtitle: string }[] = [
 export function ToolsPage(props: { capabilities: Capabilities }) {
   const listed = props.capabilities.queries.some((query) => query.name === "tools.registry");
   return (
-    <div className="y9-sys-tools">
-      <p className="y9-note is-warn note" role="status">
+    <div className="y10-sys-tools">
+      <p className="y10-note is-warn note" role="status">
         这一页的依据是路线图与 Stage 3 计划的工作包说明，进入各工作包时细化。
       </p>
       {listed ? null : (
-        <p className="y9-note note">控制主机的能力清单中没有工具登记这一条查询，各部分的明细暂时不能列出。</p>
+        <p className="y10-note note">控制主机的能力清单中没有工具登记这一条查询，各部分的明细暂时不能列出。</p>
       )}
       {SECTIONS.map((section) => (
         <Block key={section.title} title={section.title} subtitle={section.subtitle}>
-          <p className="y9-note note">等待所属工作包加入工具登记的查询。</p>
+          <p className="y10-note note">等待所属工作包加入工具登记的查询。</p>
         </Block>
       ))}
     </div>

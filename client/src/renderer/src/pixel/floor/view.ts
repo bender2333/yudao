@@ -1,5 +1,5 @@
 // 项目楼层的画面对象：画布挂在宿主元素上，提供 setModel、playEvent、focus、setOverlay、resize、destroy
-// （原型 v9 floor.js 的对外接口与设计说明第 5.2 至 5.7 节，工单 #82）。
+// （原型 v10 floor.js 的对外接口与设计说明第 5.2 至 5.7 节，工单 #82）。
 //
 // 世界的推进（floor.ts）与绘制（render.ts）都不依赖画布与 WebGL；这里只把画好的画布挂到页面上，
 // 画布按设备分辨率绘制（surface.ts：像素尺寸为逻辑尺寸乘整数倍 k，先设缩放再按逻辑坐标绘制，
@@ -19,7 +19,7 @@ import type { TimeText } from "../world/types.ts";
 
 export type { FloorModel, PixelFloorEvent } from "../world/types.ts";
 
-/** 概览页与测试共用的时间写法（原型 Y9.time）。 */
+/** 概览页与测试共用的时间写法（原型 Y10.time）。 */
 export const FLOOR_TIME: TimeText = {
   clock: (iso) => {
     if (!iso) return "";

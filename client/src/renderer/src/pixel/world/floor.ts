@@ -1,4 +1,4 @@
-// 项目楼层的驱动：按快照配置世界（声明、角色、持续状态），把事件变成任务、包裹与信号（原型 v9 floor.js
+// 项目楼层的驱动：按快照配置世界（声明、角色、持续状态），把事件变成任务、包裹与信号（原型 v10 floor.js
 // 与设计说明第 4、5 节，工单 #82）。
 //
 // 世界与系统都在这里维护；画面渲染只读这里给出的世界与状态。驱动不依赖 PixiJS：
@@ -82,7 +82,7 @@ export interface FloorDriverOptions {
   catalog: Catalog;
   W: number;
   H: number;
-  /** 时间与数字在画面上的写法（原型 Y9.time）。 */
+  /** 时间与数字在画面上的写法（原型 Y10.time）。 */
   time: { clock: (iso: string | null) => string; duration: (sec: number) => string };
 }
 
