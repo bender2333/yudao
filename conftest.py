@@ -1,3 +1,4 @@
+import os
 import sys
 import tomllib
 from pathlib import Path
@@ -23,6 +24,12 @@ AUDIT_RESOURCES = {
 UNIT_DENIED = ("subprocess.Popen", "socket.connect", "socket.bind")
 MODULE_DENIED = ("socket.connect", "socket.bind")
 
+# Windows 上 asyncio 建 ProactorEventLoop 时，标准库的 socket.socketpair 用一对回环
+# 连接实现，产生一次 socket.bind 与一次 socket.connect（回退实现 _fallback_socketpair
+# 在标准库 socket.py 中）。activate_once 内部走 asyncio.run，所以这两个事件放行。
+# 按地址放行会放过测试里绑定 127.0.0.1:0 起服务的写法，所以看调用栈。
+_SOCKET_STDLIB = str(Path(os.__file__).parent / "socket.py")
+
 REWRITE_OPTIONS = ("--write-event-baselines", "--write-openapi-snapshot")
 
 _LAYER_KEY = pytest.StashKey[str]()
@@ -30,12 +37,22 @@ _LAYER_KEY = pytest.StashKey[str]()
 _current_layer: str | None = None
 
 
+def _is_event_loop_self_pipe() -> bool:
+    frame = sys._getframe(1)
+    while frame is not None:
+        code = frame.f_code
+        if code.co_filename == _SOCKET_STDLIB and code.co_name.endswith("socketpair"):
+            return True
+        frame = frame.f_back
+    return False
+
+
 def _audit_hook(event: str, _args: object) -> None:
     layer = _current_layer
     if layer is None:
         return
     denied = UNIT_DENIED if layer == UNIT else MODULE_DENIED if layer == MODULE else ()
-    if event in denied:
+    if event in denied and not _is_event_loop_self_pipe():
         pytest.fail(f"{layer} 层不允许使用{AUDIT_RESOURCES[event]}（{event}）")
 
 

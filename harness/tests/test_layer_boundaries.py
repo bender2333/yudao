@@ -64,6 +64,20 @@ BIND_CASE = (
     "    finally:\n"
     "        sock.close()\n"
 )
+ASYNCIO_CASE = (
+    "import asyncio\n\n\n"
+    "def test_example():\n"
+    "    asyncio.run(asyncio.sleep(0))\n"
+)
+ASYNCIO_LOOP_CASE = (
+    "import asyncio\n\n\n"
+    "def test_example():\n"
+    "    loop = asyncio.new_event_loop()\n"
+    "    try:\n"
+    "        loop.run_until_complete(asyncio.sleep(0))\n"
+    "    finally:\n"
+    "        loop.close()\n"
+)
 TMP_CASE = "def test_example(tmp_path):\n    pass\n"
 GIT_CASE = (
     "import subprocess\n\n\n"
@@ -113,6 +127,21 @@ def test_unit_denies_tmp_dir(pytester: pytest.Pytester) -> None:
 def test_module_denies_socket_bind(pytester: pytest.Pytester) -> None:
     _scaffold(pytester, {"test_example": BIND_CASE}, {"test_example": "module"})
     _failed_with(pytester.runpytest_subprocess(), "网络端口绑定")
+
+
+def test_module_allows_event_loop_self_pipe(pytester: pytest.Pytester) -> None:
+    _scaffold(pytester, {"test_example": ASYNCIO_CASE}, {"test_example": "module"})
+    pytester.runpytest_subprocess().assert_outcomes(passed=1)
+
+
+def test_module_denies_socket_connect(pytester: pytest.Pytester) -> None:
+    _scaffold(pytester, {"test_example": CONNECT_CASE}, {"test_example": "module"})
+    _failed_with(pytester.runpytest_subprocess(), "网络连接")
+
+
+def test_unit_allows_event_loop_self_pipe(pytester: pytest.Pytester) -> None:
+    _scaffold(pytester, {"test_example": ASYNCIO_LOOP_CASE}, {"test_example": "unit"})
+    pytester.runpytest_subprocess().assert_outcomes(passed=1)
 
 
 def test_module_allows_tmp_dir_and_git_subprocess(pytester: pytest.Pytester) -> None:
