@@ -41,7 +41,7 @@ function watchErrors(client: ClientApp): string[] {
 
 async function openClient(size: { width: number; height: number }, colorScheme: "light" | "dark" = "light"): Promise<ClientApp> {
   const client = await startClient(backend, size, { colorScheme });
-  await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+  await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
   return client;
 }
 

@@ -1,5 +1,5 @@
 // 首页楼的画面对象：画布挂在宿主元素上，提供 setModel、playEvent、resize、destroy
-// （原型 v9 building.js 的对外接口，工单 #178）。
+// （原型 v10 building.js 的对外接口，工单 #178）。
 //
 // 世界的推进（world/building.ts）与绘制（building/render.ts）都不依赖画布与 WebGL；这里只把画好的画布挂到页面上，
 // 画布按设备分辨率绘制（surface.ts：像素尺寸为逻辑尺寸乘整数倍 k，先设缩放再按逻辑坐标绘制，工单 #365）。

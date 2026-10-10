@@ -19,7 +19,7 @@ async function openModels(
 ): Promise<{ backend: Backend; client: ClientApp }> {
   const backend = await startBackend({ admitAndBind: options.admitAndBind === true, rejectUpstream: options.rejectUpstream === true });
   const client = await startClient(backend, size);
-  await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+  await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
   await client.page.getByRole("button", { name: "模型管理", exact: true }).click();
   await expect(client.page.locator(".path")).toHaveText("模型管理");
   return { backend, client };

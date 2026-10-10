@@ -4,17 +4,19 @@
 # BROWSER 环境变量指向一个记录地址的脚本，核对打开的是哪个地址。停止用 Windows 的
 # CTRL_BREAK_EVENT（与 Ctrl+C 同一条路径：uvicorn 的 HANDLED_SIGNALS 含 SIGBREAK），POSIX 上发 SIGINT。
 # 进行中的 run 在服务进程里自动继续，用真实的 uvicorn 事件循环核对（那里没有 asyncio.run 的位置）。
+# 服务监听的端口由操作系统分配（--port 0），服务就绪以后在输出里报告实际端口：先占一个空闲端口
+# 再交给服务进程绑定的写法在多进程运行中会冲突（测试分层设计说明第 5 节第 6 项）。
 
 from __future__ import annotations
 
 import os
 import signal
-import socket
 import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import NamedTuple
 
 import httpx
 import pytest
@@ -23,6 +25,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.app.access_tokens import AccessTokenStore
 from harness.app.application import Application
 from harness.models import TERMINAL_PHASES, utc_now
+from harness.data_directory import LOG_DIR, LOG_FILE
 from harness.projection import project_run
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
@@ -36,10 +39,53 @@ STARTUP_TIMEOUT_SEC = 300
 SHUTDOWN_TIMEOUT_SEC = 30
 
 
-def _free_port() -> int:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
+PORT_LINE = "port: "
+
+
+class Started(NamedTuple):
+    # 一个已启动的服务进程：port 是服务绑定端口 0 以后操作系统分配的实际端口
+    process: subprocess.Popen
+    port: int
+    output: Path
+    data_dir: Path
+
+
+def _text(path: Path) -> str:
+    # 服务进程的输出：标准错误与标准输出合并写进同一个文件（stderr=subprocess.STDOUT）
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _diagnostics(process: subprocess.Popen, log: Path, data_dir: Path) -> str:
+    # 启动失败时的诊断输出：退出码、进程自身的输出，以及数据目录里的日志。服务进程绑定端口失败
+    # 时以退出码 3 退出（uvicorn 的 STARTUP_FAILURE），进程的输出里只有一行 logs:，原因写在
+    # 数据目录的日志里：两者都带上，失败信息才说明原因
+    data_log = data_dir / LOG_DIR / LOG_FILE
+    return (f"退出码 {process.poll()}\n"
+            f"--- process output ---\n{_text(log)}\n"
+            f"--- {data_log} ---\n{_text(data_log)}")
+
+
+def _reported_port(log: Path) -> int | None:
+    for line in _text(log).splitlines():
+        if line.startswith(PORT_LINE):
+            return int(line[len(PORT_LINE):])
+    return None
+
+
+def _wait_port(process: subprocess.Popen, log: Path, data_dir: Path) -> int:
+    # 服务自己绑定端口 0，就绪以后在输出里报告实际端口：--port 0 时启动方只能从这里得知它
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
+    while True:
+        port = _reported_port(log)
+        if port is not None:
+            return port
+        assert process.poll() is None, _diagnostics(process, log, data_dir)
+        if time.monotonic() > deadline:
+            raise TimeoutError(_diagnostics(process, log, data_dir))
+        time.sleep(0.1)
 
 
 def _recording_browser(directory: Path, recorded: Path) -> Path:
@@ -50,26 +96,29 @@ def _recording_browser(directory: Path, recorded: Path) -> Path:
 
 
 @pytest.fixture
-def service(tmp_path: Path) -> Iterator[Callable[..., subprocess.Popen]]:
+def service(tmp_path: Path) -> Iterator[Callable[..., Started]]:
     # 启动真实的服务进程并在测试结束时按进程号结束它们：测试用的进程组与用户一样是新的，
     # 因此按 Ctrl+C 与 Ctrl+Break 只送达这一组
     started: list[subprocess.Popen] = []
 
-    def start(data_dir: Path, port: int, log: Path, *, extra: list[str] | None = None,
-              browser: Path | None = None) -> subprocess.Popen:
+    def start(data_dir: Path, log: Path, *, extra: list[str] | None = None,
+              browser: Path | None = None) -> Started:
+        # 服务进程绑定端口 0，由操作系统分配实际端口：启动方先占一个空闲端口再交给服务进程的
+        # 写法在多进程运行中会冲突——占用与绑定之间隔着一秒多的启动过程，这段间隔里端口可能
+        # 已被别的进程取走，服务进程随后以退出码 3 退出（uvicorn 的 STARTUP_FAILURE）
         environment = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
         if browser is None:
             environment.pop("BROWSER", None)
         else:
             environment["BROWSER"] = str(browser)
-        options = ["--data-dir", str(data_dir), "--port", str(port), "--provider-config", ""]
+        options = ["--data-dir", str(data_dir), "--port", "0", "--provider-config", ""]
         options += extra or []
         with log.open("wb") as output:
             process = subprocess.Popen(
                 [sys.executable, "-m", "harness", "api", *options], cwd=REPO_ROOT, env=environment,
                 stdout=output, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         started.append(process)
-        return process
+        return Started(process, _wait_port(process, log, data_dir), log, data_dir)
 
     yield start
     for process in reversed(started):
@@ -84,30 +133,35 @@ def service(tmp_path: Path) -> Iterator[Callable[..., subprocess.Popen]]:
         process.wait(SHUTDOWN_TIMEOUT_SEC)
 
 
-def _serving(port: int, log: Path, deadline: float) -> None:
+def _serving(started: Started, deadline: float) -> None:
     limit = time.monotonic() + deadline
     while time.monotonic() < limit:
         try:
-            if httpx.get(f"http://127.0.0.1:{port}/api/capabilities", timeout=2).status_code == 200:
+            if httpx.get(f"http://127.0.0.1:{started.port}/api/capabilities", timeout=2).status_code == 200:
                 return
         except httpx.TransportError:
             time.sleep(0.2)
-    raise TimeoutError(log.read_text(encoding="utf-8", errors="replace"))
+    raise TimeoutError(_failed(started, "服务没有开始应答"))
 
 
-def _ready(process: subprocess.Popen, port: int, log: Path, *,
-           headers: dict[str, str] | None = None) -> str:
+def _failed(started: Started, reason: str) -> str:
+    return f"{reason}\n{_diagnostics(started.process, started.output, started.data_dir)}"
+
+
+def _ready(started: Started, *, headers: dict[str, str] | None = None) -> str:
+    # 端口由服务进程报告，这里只等它开始应答：端口探测不再承担判断服务是否启动成功的职责
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
     while True:
-        assert process.poll() is None, log.read_text(encoding="utf-8", errors="replace")
+        assert started.process.poll() is None, _failed(started, "服务进程在就绪以前退出")
         try:
-            response = httpx.get(f"http://127.0.0.1:{port}/api/capabilities", timeout=2, headers=headers)
+            url = f"http://127.0.0.1:{started.port}/api/capabilities"
+            response = httpx.get(url, timeout=2, headers=headers)
             if response.status_code == 200:
-                return log.read_text(encoding="utf-8", errors="replace")
+                return _text(started.output)
         except httpx.TransportError:
             pass
         if time.monotonic() > deadline:
-            raise TimeoutError(log.read_text(encoding="utf-8", errors="replace"))
+            raise TimeoutError(_failed(started, "服务没有开始应答"))
         time.sleep(0.2)
 
 
@@ -134,39 +188,34 @@ def _stop(process: subprocess.Popen) -> int:
 
 def test_the_page_opens_in_the_browser_once_the_service_is_ready(service, tmp_path):
     # 不带 --no-browser：服务就绪以后在命令行输出页面地址，并用标准库的 webbrowser 打开同一个地址
-    port = _free_port()
-    log = tmp_path / "open.log"
     recorded = tmp_path / "opened.txt"
-    process = service(tmp_path / "data", port, log, browser=_recording_browser(tmp_path, recorded))
-    assert f"web: http://127.0.0.1:{port}/" in _ready(process, port, log)
-    assert _wait_opened(recorded, time.monotonic() + 30) == f"http://127.0.0.1:{port}/"
+    started = service(tmp_path / "data", tmp_path / "open.log",
+                      browser=_recording_browser(tmp_path, recorded))
+    address = f"http://127.0.0.1:{started.port}/"
+    assert f"web: {address}" in _ready(started)
+    assert _wait_opened(recorded, time.monotonic() + 30) == address
 
 
 def test_no_browser_leaves_the_page_closed(service, tmp_path):
     # 带 --no-browser：不打开浏览器，也不输出页面地址（供测试、走查与没有桌面的控制主机）
-    port = _free_port()
-    log = tmp_path / "quiet.log"
     recorded = tmp_path / "opened.txt"
-    process = service(tmp_path / "data", port, log, extra=["--no-browser"],
+    started = service(tmp_path / "data", tmp_path / "quiet.log", extra=["--no-browser"],
                       browser=_recording_browser(tmp_path, recorded))
-    text = _ready(process, port, log)
-    assert "web: http" not in text
+    assert "web: http" not in _ready(started)
     assert _wait_opened(recorded, 3) is None
 
 
 def test_the_lan_access_mode_opens_the_address_of_this_machine(service, tmp_path):
     # 局域网访问方式下打开的同样是本机地址：浏览器在本机地址上保留系统通知与安装应用的设置；
     # 接口路径都要求访问令牌（第 6.3 节），测试先在数据目录建立令牌，再带着它请求
-    port = _free_port()
-    log = tmp_path / "lan.log"
     recorded = tmp_path / "opened.txt"
     data_dir = tmp_path / "data"
     _entry, token = AccessTokenStore(data_dir).create("客厅的电脑", now=utc_now())
-    process = service(data_dir, port, log, extra=["--access", "lan", "--host", "0.0.0.0"],
+    started = service(data_dir, tmp_path / "lan.log", extra=["--access", "lan", "--host", "0.0.0.0"],
                       browser=_recording_browser(tmp_path, recorded))
-    _ready(process, port, log, headers=bearer(token))
-    assert _wait_opened(recorded, time.monotonic() + 30) == f"http://127.0.0.1:{port}/"
-    with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=STARTUP_TIMEOUT_SEC) as client:
+    _ready(started, headers=bearer(token))
+    assert _wait_opened(recorded, time.monotonic() + 30) == f"http://127.0.0.1:{started.port}/"
+    with httpx.Client(base_url=f"http://127.0.0.1:{started.port}", timeout=STARTUP_TIMEOUT_SEC) as client:
         # 没有令牌的接口请求被拒绝（第 6.3 节）；带令牌的请求照常给出访问方式
         without_token = client.get("/api/capabilities")
         capabilities = client.get("/api/capabilities", headers=bearer(token))
@@ -179,30 +228,26 @@ def test_the_lan_access_mode_opens_the_address_of_this_machine(service, tmp_path
 def test_ctrl_c_stops_the_service_and_releases_the_data_directory(service, tmp_path):
     # Ctrl+C 停止服务：进程正常退出，数据目录的进程锁释放，第二个服务进程可以取得同一个数据目录
     data_dir = tmp_path / "data"
-    port = _free_port()
-    log = tmp_path / "stop.log"
-    process = service(data_dir, port, log, extra=["--no-browser"])
-    _ready(process, port, log)
-    assert _stop(process) == 0
+    started = service(data_dir, tmp_path / "stop.log", extra=["--no-browser"])
+    _ready(started)
+    assert _stop(started.process) == 0
 
-    restarted_port = _free_port()
-    restarted = service(data_dir, restarted_port, tmp_path / "restart.log", extra=["--no-browser"])
-    _serving(restarted_port, tmp_path / "restart.log", time.monotonic() + STARTUP_TIMEOUT_SEC)
+    restarted = service(data_dir, tmp_path / "restart.log", extra=["--no-browser"])
+    _serving(restarted, time.monotonic() + STARTUP_TIMEOUT_SEC)
 
 
 def test_an_open_event_stream_does_not_hold_the_process(service, tmp_path):
     # 打开着的事件流连接不阻止退出：关闭开始时先让等待中的连接干净结束，进程随后退出，
     # 不拖到接口层关闭时的超时
-    port = _free_port()
-    log = tmp_path / "stream.log"
-    process = service(tmp_path / "data", port, log, extra=["--no-browser"])
-    _ready(process, port, log)
+    started = service(tmp_path / "data", tmp_path / "stream.log", extra=["--no-browser"])
+    _ready(started)
     with httpx.Client(timeout=None) as client:
-        with client.stream("GET", f"http://127.0.0.1:{port}/api/events?after=0") as stream:
+        url = f"http://127.0.0.1:{started.port}/api/events?after=0"
+        with client.stream("GET", url) as stream:
             assert stream.status_code == 200
             assert stream.headers["content-type"].startswith("text/event-stream")
             began = time.monotonic()
-            assert _stop(process) == 0
+            assert _stop(started.process) == 0
 
 
 

@@ -1,4 +1,4 @@
-// 顶栏与项目标签（原型 v9 外壳，工单 #377）：面包屑路径、事项范围、亮起的状态项、
+// 顶栏与项目标签（原型 v10 外壳，工单 #377）：面包屑路径、事项范围、亮起的状态项、
 // 版本与连接状态、项目菜单与主题切换。状态项取自 system.status 与 decisions.list 的等待数量；
 // 事项范围的选择写在路径参数 ?w={事项} 中。
 
@@ -36,44 +36,44 @@ export function Topbar(props: TopbarProps) {
   const waiting = sortByRequested(props.projectDecisions);
   const now = Date.now();
   return (
-    <header className="y9-topbar topbar">
-      <button type="button" className="y9-icon-btn y9-drawer-open drawer-toggle" onClick={props.onToggleDrawer} aria-label="打开左侧栏">
+    <header className="y10-topbar topbar">
+      <button type="button" className="y10-icon-btn y10-drawer-open drawer-toggle" onClick={props.onToggleDrawer} aria-label="打开左侧栏">
         <Icon name="menu" />
       </button>
-      <nav className="y9-crumbs" aria-label="路径">
-        <span className="y9-crumb path">{props.path}</span>
+      <nav className="y10-crumbs" aria-label="路径">
+        <span className="y10-crumb path">{props.path}</span>
       </nav>
-      <div className="y9-top-actions">
+      <div className="y10-top-actions">
         {props.projectId ? (
           <WorkItemPicker app={props.app} projectId={props.projectId} workItemId={props.workItemId} onNavigate={props.onNavigate} />
         ) : null}
         {/* 顶栏的状态项：跨项目与本项目的等待回答的决定请求，亮起时可以直接点开 */}
-        <div className="y9-top-stats">
+        <div className="y10-top-stats">
           {props.projectId !== null && waiting.length > 0 ? (
             <button
               type="button"
-              className="y9-stat is-compact is-lit is-decisions status-item lit"
+              className="y10-stat is-compact is-lit is-decisions status-item lit"
               aria-expanded={decisionsOpen}
               onClick={() => setDecisionsOpen(!decisionsOpen)}
               title="本项目等待回答的决定请求"
             >
-              <Icon name="decide" className="y9-icon y9-stat-icon" />
-              <span className="y9-stat-value">{`待你决定 · ${waiting.length}`}</span>
+              <Icon name="decide" className="y10-icon y10-stat-icon" />
+              <span className="y10-stat-value">{`待你决定 · ${waiting.length}`}</span>
             </button>
           ) : null}
           <button
             type="button"
-            className={`y9-stat is-compact${props.pending > 0 ? " is-lit is-decisions" : ""} status-item${props.pending > 0 ? " lit" : ""}`}
+            className={`y10-stat is-compact${props.pending > 0 ? " is-lit is-decisions" : ""} status-item${props.pending > 0 ? " lit" : ""}`}
             onClick={props.onPendingClick}
             title="跨项目等待回答的决定请求"
           >
-            <Icon name="bell" className="y9-icon y9-stat-icon" />
-            <span className="y9-stat-value">{`待你决定：${props.pending > 0 ? props.pending : "无"}`}</span>
+            <Icon name="bell" className="y10-icon y10-stat-icon" />
+            <span className="y10-stat-value">{`待你决定：${props.pending > 0 ? props.pending : "无"}`}</span>
           </button>
           <ThemeSwitch />
-          <span className="y9-service note" title="页面版本">{PAGE_RELEASE}</span>
-          <span className={`y9-service connection${props.streamConnected ? "" : " interrupted"}`} role="status">
-            <span className="y9-dot" />
+          <span className="y10-service note" title="页面版本">{PAGE_RELEASE}</span>
+          <span className={`y10-service connection${props.streamConnected ? "" : " interrupted"}`} role="status">
+            <span className="y10-dot" />
             {props.streamConnected ? "已连接" : `连接中断 · ${props.disconnectedAt === null ? "刚刚" : formatTime(props.disconnectedAt)}断开，正在重新连接`}
           </span>
         </div>
@@ -106,12 +106,12 @@ const THEME_LABELS: Record<ThemeChoice, string> = { system: "跟随系统", ligh
 function ThemeSwitch() {
   const { theme, setTheme } = useTheme();
   return (
-    <span className="y9-seg" role="group" aria-label="主题">
+    <span className="y10-seg" role="group" aria-label="主题">
       {(Object.keys(THEME_LABELS) as ThemeChoice[]).map((choice) => (
         <button
           key={choice}
           type="button"
-          className={`y9-seg-btn${theme === choice ? " is-on" : ""}`}
+          className={`y10-seg-btn${theme === choice ? " is-on" : ""}`}
           aria-pressed={theme === choice}
           onClick={() => setTheme(choice)}
         >
@@ -135,10 +135,10 @@ function WorkItemPicker(props: {
   const items = snapshot.data === null ? [] : list(snapshot.data.work_items);
 
   return (
-    <label className="y9-scope field picker">
-      <span className="y9-scope-label">范围</span>
+    <label className="y10-scope field picker">
+      <span className="y10-scope-label">范围</span>
       <select
-        className="y9-select"
+        className="y10-select"
         value={props.workItemId ?? ""}
         aria-label="事项范围"
         onChange={(event) => {
@@ -178,12 +178,12 @@ function ProjectMenu(props: {
   const scope = props.workItemId ? `?w=${props.workItemId}` : "";
 
   return (
-    <div className="y9-menu-wrap y9-top-menu project-menu-wrap">
-      <button type="button" className="y9-icon-btn status-item" aria-haspopup="menu" aria-expanded={open} aria-label="项目菜单" onClick={() => setOpen(!open)}>
+    <div className="y10-menu-wrap y10-top-menu project-menu-wrap">
+      <button type="button" className="y10-icon-btn status-item" aria-haspopup="menu" aria-expanded={open} aria-label="项目菜单" onClick={() => setOpen(!open)}>
         <Icon name="more" />
       </button>
       {open ? (
-        <div className="y9-menu dropdown" role="menu">
+        <div className="y10-menu dropdown" role="menu">
           <button type="button" role="menuitem" onClick={() => { props.onNavigate(`#/p/${props.projectId}/settings${scope}`); setOpen(false); }}>
             项目设置
           </button>
@@ -233,12 +233,12 @@ export function Tabbar(props: { tabs: Tab[]; activeHash: string; onNavigate: (ha
   }
   const activePath = props.activeHash.split("?")[0];
   return (
-    <nav className="y9-tabbar tabbar" aria-label="项目页面">
-      <div className="y9-ptabs">
+    <nav className="y10-tabbar tabbar" aria-label="项目页面">
+      <div className="y10-ptabs">
         {props.tabs.map((tab) => (
           <button
             key={tab.hash}
-            className={`y9-ptab tab${tab.hash === activePath ? " is-active" : ""}`}
+            className={`y10-ptab tab${tab.hash === activePath ? " is-active" : ""}`}
             aria-current={tab.hash === activePath ? "page" : undefined}
             onClick={() => props.onNavigate(tab.hash)}
           >

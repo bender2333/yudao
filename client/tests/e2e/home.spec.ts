@@ -58,7 +58,7 @@ async function fetchQuery<T>(page: Page, name: string, params: Record<string, st
 
 async function openHome(size: { width: number; height: number }): Promise<ClientApp> {
   const client = await startClient(backend, size);
-  await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+  await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
   await client.page.evaluate(() => {
     window.location.hash = "#/home";
   });

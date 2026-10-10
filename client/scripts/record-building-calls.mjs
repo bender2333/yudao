@@ -1,4 +1,4 @@
-// 首页楼的调用录制（工单 #178 验收标准 2）：在原型 v9 的页面上播放 sc-return-home（离开三天后回来），
+// 首页楼的调用录制（工单 #178 验收标准 2）：在原型 v10 的页面上播放 sc-return-home（离开三天后回来），
 // 录下首页的楼（createBuildingScene）收到的 setModel、playEvent、destroy 调用（与 #82 的 record-floor-calls.mjs 同一套做法），
 // 并记录每个调用之后固定时刻的楼层与小人状态：每层的灯、小旗、阀门、状态灯与决定计数，以及每层小人的位置、姿势与朝向。
 //
@@ -23,7 +23,7 @@ const outFile = join(outDir, "recordings.json");
 const args = process.argv.slice(2);
 const WRITE = args.includes("--write");
 const rootArg = args.indexOf("--root");
-const ROOT = rootArg >= 0 ? args[rootArg + 1] : pathToFileURL(join(repoRoot, "docs", "prototypes", "v9", "index.html")).href;
+const ROOT = rootArg >= 0 ? args[rootArg + 1] : pathToFileURL(join(repoRoot, "docs", "prototypes", "v10", "index.html")).href;
 
 const playwrightPath = process.env.PLAYWRIGHT_PATH
   || join(repoRoot, ".tmp", "v8", "pw", "node_modules", "playwright");
@@ -40,7 +40,7 @@ const SAMPLE_MS = [5000];
 
 // 在页面里运行的录制驱动：包装 createBuildingScene，记录调用；在每次调用之后把时钟推进到固定时刻并取状态。
 const DRIVER = async ({ sampleMs }) => {
-  const P = window.Y9.pixel;
+  const P = window.Y10.pixel;
   const E = P.ecs;
   // 确定的时钟与随机数（与 #82 的录制裁法一致）
   let t = 0;
@@ -121,7 +121,7 @@ const DRIVER = async ({ sampleMs }) => {
 
   // 播放 sc-return-home：它只走首页，动作是 replay.start/step/live，会驱动楼的 setModel 与 playEvent
   window.__playReturnHome = async (id) => {
-    const app = window.Y9;
+    const app = window.Y10;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     app.scenario.select(id);
     await sleep(350);
@@ -141,7 +141,7 @@ const DRIVER = async ({ sampleMs }) => {
     return current;
   };
 
-  return window.Y9.backend.scenarios().map((s) => ({ id: s.id, name: s.name, level: s.level, go: s.go || null }));
+  return window.Y10.backend.scenarios().map((s) => ({ id: s.id, name: s.name, level: s.level, go: s.go || null }));
 };
 
 /** 楼层里客户端画面用到的字段：与 scenes.js 的 buildingModels 一致。 */
@@ -162,7 +162,7 @@ async function main() {
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.addInitScript(() => {
-    sessionStorage.setItem("y9.level", JSON.stringify("S5"));
+    sessionStorage.setItem("y10.level", JSON.stringify("S5"));
     // 页面加载前就把随机数换成确定的序列：原型的卡片动画等也会取随机数，只有全程确定，
     // 客户端用同一套序列回放时小人的走位才可对照
     let seed = 987654321;
@@ -192,7 +192,7 @@ async function main() {
     return { op: op.op, model: modelIndex.get(text) };
   });
   const payload = {
-    generatedFrom: "docs/prototypes/v9（原型 scenes.js 的 buildingModels 与 checks/record.js 的做法）",
+    generatedFrom: "docs/prototypes/v10（原型 scenes.js 的 buildingModels 与 checks/record.js 的做法）",
     sampleMs: SAMPLE_MS,
     models,
     scenarios: [{ id: target.id, name: target.name, level: target.level, ops: rec.ops, samples: rec.samples }],

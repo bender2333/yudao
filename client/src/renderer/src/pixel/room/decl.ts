@@ -1,4 +1,4 @@
-// 部门房间的声明：角色与工位的排布、事件到动作的解析（原型 v9 room.js 的 spriteFor、layoutDesks、
+// 部门房间的声明：角色与工位的排布、事件到动作的解析（原型 v10 room.js 的 spriteFor、layoutDesks、
 // 以及 engine.js 的 EVENT_ACTIONS 与 resolveAction，工单 #177）。
 //
 // 动作表 EVENT_ACTIONS、动作定义 ACTIONS 与状态到动作的映射 STATUS_ACTIONS 已在注册表里生成
