@@ -178,15 +178,8 @@ const SIDE_ONLY = new Set(["guidance_in", "semantic", "freeze"]);
 const OWN_SPEECH = new Set(["hand_back"]);
 /** 打字思考类动作：头顶已有思考气泡，不再重复说话（原型 THINK_ACTIONS）。 */
 const THINK_ACTIONS = new Set(["type_think", "stream_text"]);
-/** 盖章类事件：说出盖的是哪一个（plan/delivery/review 的接纳与提交），在排队前先说 */
-const STAMP_EVENT = new Set(["proposal_submitted", "spec_accepted", "plan_accepted", "delivery_accepted", "qa_submitted"]);
 /** 状态类动作立即执行（原型 IMMEDIATE）。 */
 const IMMEDIATE = new Set(["paused", "failed", "done", "cancelled", "puzzled", "hold_card", "resume"]);
-/** 事项进入停止态时保留的排队动作：传信与交接的说话与送信不因事项很快结束而丢失。
- *  真实系统的 FakeAdapter 让一个事项在 1 秒左右跑到 done，传信事件排队后不到 900 毫秒就被清除，
- *  两端因此从不说话；这些动作已经由事件排入，继续执行到结束。 */
-const KEEP_ON_STOP: Record<string, true> = { collaboration_requested: true, collaboration_responded: true, transition: true };
- 
 
 /** 建立部门房间的驱动。 */
 export function createRoomDriver(opts: { department: string; sceneOptions: SceneOptions }): RoomDriver {
@@ -242,13 +235,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     if (!a) return;
     const text = sayCatalog(ev, { dept, side, roleName: nameOfRole });
     if (!text) return;
-    // 头顶的话还没显示完时新话排在后面：事项在 1 秒左右连续走完阶段，
-    // 立即覆盖会让前一句话只停留毫秒级，看不见。排后的回调到期后重新走同一套规则，多句话按到达顺序依次显示。
-    if (a.say && scene.realT < a.say.until) {
-      if (a.say.text === text) return;
-      scene.after(a.say.until - scene.realT, () => say(ev, a, side));
-      return;
-    }
+    // 原型 room.js 的口径：新话直接覆盖头顶正在显示的那句
     a.say = { text, until: scene.realT + sayMs(text) };
   }
   function plan(a: RoomActor): PlanApi {
@@ -323,11 +310,6 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       ? { x: SPOT.trial[0], w: 30, seatX: SPOT.trial[0], seatY: SPOT.trial[1], roleId: "", role: prim?.role ?? list[0], trial: true }
       : null;
   }
-  // 排队与临时状态的清空只在真正停下来的时候发生（暂停、失败、完成、取消）：真实系统的查询状态
-  // 在动作进行中会在「工作」与「待核实」之间来回变化，按每一次变化清空会把已经排队的动作丢掉，
-  // 画面就停在第一次动作上。原型 setModel 在任何非工作状态都清空，这里保留原型的意图，只把
-  // 进行中的临时事实（待核实、待恢复、空闲）排除在外。
-  const STOPPED_STATES = new Set(["paused", "failed", "done", "cancelled"]);
   function setModel(m: RoomModel): void {
     if (!m) throw new Error("setModel 需要 roomModel");
     if (m.department && m.department !== dept) throw new Error(`roomModel 的部门与画面不一致：${m.department}`);
@@ -346,12 +328,12 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     state.wbDone = {};
     syncRoles();
     const s = effStatus();
-    if (s !== prev && STOPPED_STATES.has(s)) {
+    if (s !== prev) {
       for (const a of roleActors()) {
-        if (s === "interrupted" || a.role.status === "away") continue;
-        a.persist = null;
-        // 持续状态与走位清除；已经排入的传信与交接动作继续执行到结束
-        a.queue = a.queue.filter((q) => KEEP_ON_STOP[q.from]);
+        if (s === "interrupted") continue;
+        const actor = actorOf(a.id);
+        if (actor?.script && (s === "waiting_resume" || s === "pending_verification" || s === "asking" || prev === "asking")) scene.cancel(actor);
+        if (s !== "working") { a.persist = null; a.queue = []; }
       }
       if (s !== "failed") for (const a of roleActors()) { if (!a.persist) ds(a).redLamp = false; }
     }
@@ -438,7 +420,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         p.to(r.x, r.y);
       }
       if (r.facing) p.add(S.turn(r.facing));
-      p.run();
+      p.run(undefined, 0);
       return;
     }
     if (r.facing) actor.facing = r.facing;
@@ -485,9 +467,9 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         const actor = actorOf(a.id);
         const inTail = actor ? scene.inTail(actor) : true;
         const justStarted = actor?.step?.st.key === true && scene.realT - actor.step.t0 < 600;
-        // 传信与交接的动作要说话：头顶的话还没说完时先等着，否则新的话会把上一句盖掉，看不出来
-        const saying = KEEP_ON_STOP[q[0].from] === true && a.say !== null && scene.realT < a.say.until;
-        if (!saying && (inTail || (waited >= 900 && !justStarted))) {
+        // 原型 room.js：排队的动作在当前动作的关键步骤做完（或进入收尾步骤）后立即开始；
+        // 等了 0.9 秒仍未轮到时打断当前动作，只让刚开始的关键步骤再显示到 0.6 秒
+        if (inTail || (waited >= 900 && !justStarted)) {
           const next = q.shift()!;
           if (actor?.script) scene.cancel(actor);
           next.fn();
@@ -590,11 +572,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       const p = plan(a);
       p.spot("pipe");
       p.add(S.call(() => {
+        // 原型 room.js：收到的一方在从管道口取件这一步说话
+        say(sayEv, a, "to");
         scene.fly({ bmp, from: [L.pipe.x + 10, L.pipe.base - 8], to: [p.x + 6, p.y - 18], ms: 620, arc: 8, onDone: () => { const actor = actorOf(a.id); if (actor) actor.hold = bmp; } });
       }), S.anim("reach", 700, true), S.anim("catch", 900));
-      // 收到交接的一方立刻说话：动作脚本可能在后续事件到达时被替换，
-      // 说在脚本步骤里会随之丢失（真实系统的事项在 1 秒左右连续走完阶段）
-      say(sayEv, a, "to");
       if (isOps() || art === "prd") {
         p.sit("carry");
         p.add(S.call(() => arrivalArt(a, art)), S.hold(null), S.anim("sit_happy", 600));
@@ -1422,8 +1403,6 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       if (ev.type === "tool_started") {
         setPersist(a, { anim: "type" });
         if (!scene.frozen) say(ev, a);
-      } else if (ev.type === "qa_started") {
-        say(ev, a);
       }
       return;
     }
@@ -1444,23 +1423,14 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       if (!OWN_SPEECH.has(action) && !THINK_ACTIONS.has(action)) say(ev, a);
       fn(ev, a);
     };
-    // 工具与盖章类事件的发生时刻就说话：排队只排走位动作，头顶的说明不跟着等（工单 #319 第 3 项）。
-    // 交接与传信仍按原来的节奏说话：它们的排队条目靠头顶的话判断是否可以执行，提前说了会卡住自己
-    if ((ev.type === "tool_started" || STAMP_EVENT.has(ev.type)) && !SIDE_ONLY.has(action)
-        && !OWN_SPEECH.has(action) && !THINK_ACTIONS.has(action)) say(ev, a);
+    // 原型 room.js 的口径：立即执行的动作清掉排队的条目；排队的条目超出上限时丢掉最早的
     if (IMMEDIATE.has(action) || (actor && scene.inTail(actor))) {
-      // 立即执行时清掉排队的普通动作；传信与交接的条目留下，它们继续执行到结束
-      a.queue = a.queue.filter((entry) => KEEP_ON_STOP[entry.from]);
+      a.queue = [];
       start();
       return;
     }
     a.queue.push({ fn: start, at: scene.realT, from: ev.type });
-    // 队列上限 3：超出时挤掉一个；传信与交接的条目不被挤掉，否则它们在能执行之前就被后来的事件顶掉。
-    // 真实系统的事项在 1 秒左右连续走完整个流程，事件成串到达，这些条目一旦被顶掉就再也补不回来。
-    if (a.queue.length > 3) {
-      const victim = a.queue.findIndex((entry) => !KEEP_ON_STOP[entry.from]);
-      if (victim >= 0) a.queue.splice(victim, 1);
-    }
+    if (a.queue.length > 3) a.queue.shift();
   }
 
   // 与原型 room.js 一致：建立画面时先按缺省角色设置同步一次（一个部门一个 Agent），快照到达时再同步
