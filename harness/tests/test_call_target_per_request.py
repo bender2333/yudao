@@ -103,9 +103,10 @@ def _transient_error() -> tuple[int, str, list[bytes]]:
 def _document(base_url: str) -> dict[str, Any]:
     # 一份目录：本机服务上一个 Responses 模型，三个部门都绑定它
     return {
-        "providers": [{"id": "local", "name": "Local", "protocol": "responses", "base_url": base_url,
+        "providers": [{"id": "local", "name": "Local", "base_url": base_url,
                        "credential_ref": "SCENARIO_KEY", "timeout_sec": 20}],
         "models": [{"id": "m-local", "provider_id": "local", "model": "m-local-target",
+                    "protocol": "responses",
                     "context_window": 32000, "max_output_tokens": 2048}],
         "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
     }
@@ -199,10 +200,11 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
             "KEY_B": CredentialMaterial("key-b", version="b-v1"),
         }, use_env=False))
         def document(target_base: str, provider_id: str, model_id: str, ref: str, upstream: str):
-            return {"providers": [{"id": provider_id, "name": provider_id, "protocol": "responses",
+            return {"providers": [{"id": provider_id, "name": provider_id,
                                    "base_url": target_base,
                                    "credential_ref": ref, "timeout_sec": 20}],
                     "models": [{"id": model_id, "provider_id": provider_id, "model": upstream,
+                                "protocol": "responses",
                                 "context_window": 32000, "max_output_tokens": 2048}]}
         document_a = document(base_a, "provider-a", "m-a", "KEY_A", "m-a-target")
         document_b = document(base_b, "provider-b", "m-b", "KEY_B", "m-b-target")
@@ -260,9 +262,10 @@ def test_request_event_records_requested_and_sent_tier(tmp_path):
         facade = ProviderFacade(credentials=CredentialChain(
             overrides={"KEY": CredentialMaterial("key", version="v1")}, use_env=False))
         facade.store_document({
-            "providers": [{"id": "local", "name": "Local", "protocol": "responses", "base_url": base,
+            "providers": [{"id": "local", "name": "Local", "base_url": base,
                            "credential_ref": "KEY", "timeout_sec": 20}],
             "models": [{"id": "m-local", "provider_id": "local", "model": "m-local-target",
+                        "protocol": "responses",
                         "context_window": 32000, "max_output_tokens": 2048,
                         "reasoning_levels": ["low", "medium"], "default_reasoning_level": "low",
                         "reasoning_mode": "effort"}],
@@ -294,14 +297,16 @@ def test_swapping_the_department_model_limits_the_saved_tier_on_the_next_request
         facade = ProviderFacade(credentials=CredentialChain(
             overrides={"KEY": CredentialMaterial("key", version="v1")}, use_env=False))
         facade.store_document({
-            "providers": [{"id": "local", "name": "Local", "protocol": "responses", "base_url": base,
+            "providers": [{"id": "local", "name": "Local", "base_url": base,
                            "credential_ref": "KEY", "timeout_sec": 20}],
             "models": [
                 {"id": "m-high", "provider_id": "local", "model": "m-local-target",
+                 "protocol": "responses",
                  "context_window": 32000, "max_output_tokens": 2048,
                  "reasoning_levels": ["medium", "high"], "default_reasoning_level": "medium",
                  "reasoning_mode": "effort"},
                 {"id": "m-low", "provider_id": "local", "model": "m-local-target",
+                 "protocol": "responses",
                  "context_window": 32000, "max_output_tokens": 2048,
                  "reasoning_levels": ["low"], "default_reasoning_level": "low",
                  "reasoning_mode": "effort"},

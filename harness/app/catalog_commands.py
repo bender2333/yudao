@@ -27,10 +27,10 @@ ProtocolName = Literal[tuple(sorted(SUPPORTED_PROTOCOLS))]
 
 
 class ProviderInput(Contract):
-    # 一份 Provider 配置：声明一种协议（ADR-0004），地址是该协议的请求基址
+    # 一份 Provider 配置：一条服务连接，不声明协议（ADR-0033）；
+    # 自定义服务的地址是请求基址，内置服务方案按访问定义的协议取预置表中的基址
     id: Text
     name: Text
-    protocol: ProtocolName
     base_url: str = ""
     credential_ref: str = ""
     timeout_sec: float = DEFAULT_TIMEOUT_SEC
@@ -39,11 +39,12 @@ class ProviderInput(Contract):
 
 
 class ModelInput(Contract):
-    # 一条模型访问定义；协议取自所属连接，容量逐行在这条命令中确认（窗口与输出上限）。
+    # 一条模型访问定义；调用协议必填（ADR-0033），容量逐行在这条命令中确认（窗口与输出上限）。
     # capacity_confirmed 是这一行的容量确认标记：新增行必须显式确认才能保存；
     # 目录文档中的定义带容量即视为已确认，确认标记只存在于这条命令（工单 #86）
     id: Text
     model: Text
+    protocol: ProtocolName
     context_window: int | None = None
     max_output_tokens: PositiveInt
     capability_source: str = ""

@@ -27,13 +27,14 @@ def _fake_doc() -> dict:
     """包含一个 fake 协议 Provider、一个模型和三部门绑定的有效文档。"""
     return {
         "providers": [
-            {"id": "pf", "name": "测试服务", "protocol": "fake"},
+            {"id": "pf", "name": "测试服务"},
         ],
         "models": [
             {
                 "id": "mf",
                 "provider_id": "pf",
                 "model": "fake-model",
+                "protocol": "fake",
                 "context_window": 8000,
                 "max_output_tokens": 512,
             },
@@ -50,13 +51,14 @@ def _fake_catalog_only() -> dict:
     """只有目录和模型，没有绑定。"""
     return {
         "providers": [
-            {"id": "pf", "name": "测试服务", "protocol": "fake"},
+            {"id": "pf", "name": "测试服务"},
         ],
         "models": [
             {
                 "id": "mf",
                 "provider_id": "pf",
                 "model": "fake-model",
+                "protocol": "fake",
                 "context_window": 8000,
                 "max_output_tokens": 512,
             },
@@ -66,7 +68,7 @@ def _fake_catalog_only() -> dict:
 
 def _fake_provider_entry() -> dict:
     """单个 Provider 结构条目，无 credential_ref。"""
-    return {"id": "pf", "name": "测试服务", "protocol": "fake"}
+    return {"id": "pf", "name": "测试服务"}
 
 
 def _write_json(path, data) -> None:
@@ -146,18 +148,20 @@ def _startup_config(state: str):
     if state == "unbound":
         # 目录有内容但没有部门绑定；fake 协议在正常启动被拒绝（工单 #86），这里用真实协议
         return {
-            "providers": [{"id": "p1", "name": "P1", "protocol": "responses",
+            "providers": [{"id": "p1", "name": "P1",
                            "base_url": "https://example.com/v1",
                            "credential_ref": _ABSENT_KEY, "timeout_sec": 60}],
             "models": [{"id": "m1", "provider_id": "p1", "model": "m",
+                        "protocol": "responses",
                         "context_window": 8000, "max_output_tokens": 512}],
             "bindings": {},
         }
     return {
-        "providers": [{"id": "p1", "name": "P1", "protocol": "responses",
+        "providers": [{"id": "p1", "name": "P1",
                        "base_url": "https://example.com/v1",
                        "credential_ref": _ABSENT_KEY, "timeout_sec": 60}],
         "models": [{"id": "m1", "provider_id": "p1", "model": "m",
+                    "protocol": "responses",
                     "context_window": 8000, "max_output_tokens": 512}],
         "bindings": {department: {"provider_id": "p1", "model_id": "m1"}
                      for department in ("product", "engineering", "quality")},
@@ -268,6 +272,7 @@ def test_frozen_snapshot_immutability(tmp_path):
     # 推进新修订：新增一个模型并重新绑定到新模型
     facade.save_model({
         "id": "mf2", "provider_id": "pf", "model": "fake-model-2",
+        "protocol": "fake",
         "context_window": 4000, "max_output_tokens": 256,
     })
     facade.save_bindings({
@@ -366,7 +371,7 @@ def test_save_after_delete_refreshes_the_config_state_to_loaded(tmp_path):
     assert facade.reload()["ok"] is True
     assert facade.config_status()["config_state"] == "deleted"
     previous = facade.to_document()
-    facade.save_provider_entry({"id": "pf", "name": "测试服务", "protocol": "fake"})
+    facade.save_provider_entry({"id": "pf", "name": "测试服务"})
     assert facade.persist_catalog(previous) is None
     assert facade.config_status()["config_state"] == "loaded"
 
@@ -470,12 +475,13 @@ def test_credentials_chain(tmp_path, monkeypatch):
     facade.configure_paths(config_path, dotenv_path)
     _write_json(config_path, {
         "providers": [
-            {"id": "p1", "name": "P1", "protocol": "responses",
+            {"id": "p1", "name": "P1",
              "credential_ref": "TEST_CRED_SECRET",
              "base_url": "https://example.com/v1", "timeout_sec": 60},
         ],
         "models": [
             {"id": "m1", "provider_id": "p1", "model": "m",
+             "protocol": "responses",
              "context_window": 8000, "max_output_tokens": 512},
         ],
         "bindings": {
@@ -555,12 +561,13 @@ def test_secret_hygiene(tmp_path, monkeypatch):
     facade.configure_paths(config_path, dotenv_path)
     _write_json(config_path, {
         "providers": [
-            {"id": "p1", "name": "P1", "protocol": "responses",
+            {"id": "p1", "name": "P1",
              "credential_ref": "SECRET_REF",
              "base_url": "https://example.com/v1", "timeout_sec": 60},
         ],
         "models": [
             {"id": "m1", "provider_id": "p1", "model": "m",
+             "protocol": "responses",
              "context_window": 8000, "max_output_tokens": 512},
         ],
         "bindings": {

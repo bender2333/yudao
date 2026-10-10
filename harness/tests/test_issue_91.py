@@ -101,13 +101,13 @@ def _two_stage(model: str = "upstream-a", *, park_after_product: Any = None):
     return responder
 
 def _provider(provider_id: str, base_url: str, ref: str) -> dict[str, Any]:
-    return {"id": provider_id, "name": provider_id, "protocol": "responses", "base_url": base_url,
+    return {"id": provider_id, "name": provider_id, "base_url": base_url,
             "credential_ref": ref, "timeout_sec": 20, "preset_id": "", "models_url": ""}
 
 def _model(model_id: str, provider_id: str, upstream: str, *, window: int = 32000) -> dict[str, Any]:
     return {"id": model_id, "provider_id": provider_id, "model": upstream,
+            "protocol": "responses",
             "context_window": window, "max_output_tokens": 2048, "capability_source": ""}
-
 class _Opened:
     # 真实目录文件、真实 .env、真实数据目录；base_url 指向测试内启动的本机模型服务
     def __init__(self, tmp_path, *, base_url: str = "http://127.0.0.1:1/v1"):

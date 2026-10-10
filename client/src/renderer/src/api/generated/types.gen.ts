@@ -1128,6 +1128,10 @@ export type CatalogModel = {
      */
     model: string;
     /**
+     * Protocol
+     */
+    protocol: string;
+    /**
      * Context Window
      */
     context_window: number | null;
@@ -1237,10 +1241,6 @@ export type CatalogProvider = {
      * Name
      */
     name: string;
-    /**
-     * Protocol
-     */
-    protocol: string;
     /**
      * Base Url
      */
@@ -1918,6 +1918,10 @@ export type DocumentModelInput = {
      */
     model: string;
     /**
+     * Protocol
+     */
+    protocol: 'chat_completions' | 'fake' | 'messages' | 'responses';
+    /**
      * Context Window
      */
     context_window?: number | null;
@@ -2520,6 +2524,10 @@ export type ModelInput = {
      * Model
      */
     model: string;
+    /**
+     * Protocol
+     */
+    protocol: 'chat_completions' | 'fake' | 'messages' | 'responses';
     /**
      * Context Window
      */
@@ -3275,10 +3283,6 @@ export type ProviderInput = {
      * Name
      */
     name: string;
-    /**
-     * Protocol
-     */
-    protocol: 'chat_completions' | 'fake' | 'messages' | 'responses';
     /**
      * Base Url
      */

@@ -85,7 +85,7 @@ for (const size of [
       await expect(client.page.getByTestId("provider-opencode-go")).toBeVisible();
       const summary = client.page.getByTestId("provider-opencode-go").locator(".mm-summary");
       await expect(summary).toContainText("OpenCode Go");
-      await expect(summary).toContainText("Responses");
+      await expect(summary).not.toContainText("Responses");
       await expect(summary).toContainText("凭据：");
       // 摘要按连接统计「已准入 x · 候选 y」；同一连接下的两条数之和等于它的模型数（与其他测试的先后无关）
       const summaryText = await summary.innerText();
@@ -206,17 +206,28 @@ for (const size of [
 
       const form = client.page.locator(".mm-form");
       await expect(form).toContainText("编辑 Provider 配置");
-      // 编辑时恢复服务方案与协议，地址取连接保存的地址（种子连接指向测试内上游）
+      // 编辑时恢复服务方案，地址取连接保存的地址（种子连接指向测试内上游）；
+      // 调用协议属于每一条访问定义（ADR-0033），这一条连接下的定义用 Responses
       await expect(form.getByRole("button", { name: "OpenCode Go" })).toHaveAttribute("aria-pressed", "true");
-      await expect(form.getByTestId("protocol-select")).toHaveValue("responses");
+      await expect(form.getByTestId("row-protocol-glm-4.6")).toHaveValue("responses");
       await expect(form.getByTestId("provider-base-url")).toHaveValue(new RegExp(`^http://127\\.0\\.0\\.1:\\d+/v1$`));
       // 预置表与能力表的信息都在方案区
       await expect(form).toContainText("预置表 2026-10-02.1");
       await expect(form).toContainText("模型能力表");
 
-      // 换协议：地址取该方案该协议的请求基址
-      await form.getByTestId("protocol-select").selectOption("messages");
-      await expect(form.getByTestId("provider-base-url")).toHaveValue("https://opencode.ai/zen/go/v1");
+      // 换这一条定义的协议：内置方案的地址取该方案该协议的请求基址，端到端里三种协议的基址
+      // 分别是三个本机上游（协议不同则地址不同）
+      const byProtocols = await client.page.evaluate(async (address: string) => {
+        const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
+        const preset = (listed.data.presets.presets as { id: string; base_urls: Record<string, string> }[])
+          .find((item) => item.id === "opencode-go");
+        return preset!.base_urls;
+      }, backend.address);
+      expect(byProtocols.responses).not.toBe(byProtocols.messages);
+      await form.getByTestId("row-protocol-glm-4.6").selectOption("messages");
+      await expect(form.getByTestId("provider-base-url")).toHaveValue(byProtocols.messages);
+      await form.getByTestId("row-protocol-glm-4.6").selectOption("responses");
+      await expect(form.getByTestId("provider-base-url")).toHaveValue(byProtocols.responses);
 
       // Key 输入框始终为空，不回填
       await expect(form.getByTestId("credential-secret")).toHaveValue("");
@@ -246,13 +257,17 @@ for (const size of [
       await form.getByTestId("accept-capacity-vision-model").click();
       await expect(form.getByTestId("capacity-confirmed-vision-model")).toBeVisible();
 
-      // 推理参数方式只列出与协议相符的选项
+      // 推理参数方式只列出与该行协议相符的选项：新建的行预填 Chat Completions，
+      // 换到 Anthropic Messages 只列出 Messages 的两种方式，换回来才有 effort（第 7.4 节）
+      await expect(form.getByTestId("row-protocol-vision-model")).toHaveValue("chat_completions");
       const modeOptions = form.getByTestId("reasoning-mode-vision-model").locator("option");
-      await expect(modeOptions).toContainText(["未声明", "adaptive（Messages 的自适应思考）"]);
-      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "effort" })).toHaveCount(0);
-      await form.getByTestId("protocol-select").selectOption("chat_completions");
-      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "effort" })).toHaveCount(1);
+      await expect(modeOptions).toContainText(["未声明", "effort（请求带档位名）"]);
       await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "adaptive" })).toHaveCount(0);
+      await form.getByTestId("row-protocol-vision-model").selectOption("messages");
+      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "effort" })).toHaveCount(0);
+      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "adaptive" })).toHaveCount(1);
+      await form.getByTestId("row-protocol-vision-model").selectOption("chat_completions");
+      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "effort" })).toHaveCount(1);
 
       // 默认档位只能从已选的支持档位中选择
       await form.getByTestId("level-vision-model-high").click();
@@ -265,6 +280,61 @@ for (const size of [
       await form.getByTestId("submit-provider").click();
       await expect(form).toHaveCount(0);
       await expect(client.page.getByTestId("model-vision-model")).toBeVisible();
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  // 工单 #382 第 4 项验收：新建自定义连接、加入一个模型并测试通过，改它的协议并保存以后回到候选
+  test(`${label}：新建自定义连接、模型测试通过后改协议保存，这条定义回到候选`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size);
+    const errors = watchErrors(client);
+    try {
+      // 地址取测试内真实上游的地址（端口由系统分配，不在测试里写死）
+      const baseUrl = await client.page.evaluate(async (address: string) => {
+        const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
+        const provider = (listed.data.providers as { id: string; base_url: string }[])
+          .find((item) => item.id === "opencode-go");
+        return provider!.base_url;
+      }, backend.address);
+      await setKey(client, backend, "OPENCODE_GO_KEY");
+
+      await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+      const form = client.page.locator(".mm-form");
+      await form.getByTestId("provider-base-url").fill(baseUrl);
+      await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("local-upstream");
+      await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("本机上游");
+      await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("OPENCODE_GO_KEY");
+      // 手动添加的一行：默认预填 Chat Completions
+      await form.getByTestId("add-model-row").click();
+      const rowKey = await form.locator('[data-testid^="row-id-"]').first().inputValue();
+      await expect(form.getByTestId(`row-protocol-${rowKey}`)).toHaveValue("chat_completions");
+      // 端到端的上游按 Responses 协议回答：这条定义要在模型测试里真实通过，就选 Responses
+      await form.getByTestId(`row-protocol-${rowKey}`).selectOption("responses");
+      await form.getByTestId(`row-model-${rowKey}`).fill("glm-4.6");
+      await form.getByTestId(`row-window-${rowKey}`).fill("200000");
+      await form.getByTestId(`row-output-${rowKey}`).fill("32000");
+      await form.getByTestId("submit-provider").click();
+      await expect(form).toHaveCount(0);
+
+      // 模型测试通过：这一条进入已准入，模型表的调用协议列显示 Responses
+      const provider = client.page.getByTestId("provider-local-upstream");
+      await provider.getByRole("button", { name: "展开" }).click();
+      await client.page.getByTestId(`row-test-${rowKey}`).click();
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("已准入：");
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("Responses");
+
+      // 把协议改成 Chat Completions 并保存：这条定义回到候选，协议列跟着改
+      await provider.getByRole("button", { name: "编辑" }).click();
+      const edit = client.page.locator(".mm-form");
+      await edit.getByTestId(`row-protocol-${rowKey}`).selectOption("chat_completions");
+      await edit.getByTestId("submit-provider").click();
+      await expect(edit).toHaveCount(0);
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("候选（准入已作废）");
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("Chat Completions");
       expect(errors).toEqual([]);
     } finally {
       await client.close();

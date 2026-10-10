@@ -477,9 +477,10 @@ def _bound_system(tmp_path, replies, *, context_window, max_output_tokens):
     try:
         facade = ProviderFacade(credentials=CredentialChain(overrides={"CONTEXT_KEY": "context-secret"}, use_env=False))
         facade.store_document({
-            "providers": [{"id": "local", "name": "Local", "protocol": "responses", "base_url": base + "/v1",
+            "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
                            "credential_ref": "CONTEXT_KEY", "timeout_sec": 30}],
             "models": [{"id": "model", "provider_id": "local", "model": "model",
+                        "protocol": "responses",
                         "context_window": context_window, "max_output_tokens": max_output_tokens}],
             "bindings": {department: {"provider_id": "local", "model_id": "model"}
                          for department in ("product", "engineering", "quality")},

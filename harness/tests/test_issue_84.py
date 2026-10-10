@@ -25,6 +25,7 @@ from harness.tests.protocol_helpers import (
     complete,
     messages_responder,
     model_call,
+    preset_base_urls,
     responses_responder,
 )
 
@@ -33,13 +34,12 @@ from harness.tests.protocol_helpers import (
 
 
 def _valid_document(base_url: str = "http://127.0.0.1:8080/v1") -> dict:
-    # 连接声明协议，模型访问定义不再声明协议
+    # 模型访问定义声明协议，连接不再声明协议
     return {
         "providers": [
             {
                 "id": "provider-1",
                 "name": "Provider 1",
-                "protocol": "responses",
                 "base_url": base_url,
                 "credential_ref": "KEY_1",
                 "timeout_sec": 30.0,
@@ -50,6 +50,7 @@ def _valid_document(base_url: str = "http://127.0.0.1:8080/v1") -> dict:
                 "id": "model-1",
                 "provider_id": "provider-1",
                 "model": "model-x",
+                "protocol": "responses",
                 "context_window": 32000,
                 "max_output_tokens": 2048,
             }
@@ -62,8 +63,8 @@ def _valid_document(base_url: str = "http://127.0.0.1:8080/v1") -> dict:
     }
 
 
-def test_model_definition_declaring_protocol_is_rejected_and_keeps_previous_catalog(tmp_path: Path):
-    # 验收 1：在模型访问定义上声明协议的目录文件读取失败，错误指出字段位置，目录保持上一个有效版本
+def test_provider_definition_declaring_protocol_is_rejected_and_keeps_previous_catalog(tmp_path: Path):
+    # 验收 1：在连接上声明协议的目录文件读取失败，错误指出字段位置，目录保持上一个有效版本
     config_file = tmp_path / "providers.json"
     config_file.write_text(json.dumps(_valid_document()), encoding="utf-8")
 
@@ -73,20 +74,22 @@ def test_model_definition_declaring_protocol_is_rejected_and_keeps_previous_cata
     original_document = facade.to_document()
 
     invalid = _valid_document()
-    invalid["models"][0]["protocol"] = "responses"
+    invalid["providers"][0]["protocol"] = "responses"
     config_file.write_text(json.dumps(invalid), encoding="utf-8")
 
     with pytest.raises(CatalogValidationError) as exc_info:
         facade.load_document(config_file)
 
-    assert any(issue.location == "models[0].protocol" for issue in exc_info.value.issues)
+    assert any(issue.location == "providers[0].protocol" for issue in exc_info.value.issues)
     # 目录保持上一个有效版本：修订号与内容都没有变化
     assert facade.catalog_revision() == original_revision
     assert facade.to_document() == original_document
+    providers = facade.providers_view()["providers"]
+    assert len(providers) == 1
+    assert "protocol" not in providers[0]
     models = facade.providers_view()["models"]
     assert len(models) == 1
-    assert "protocol" not in models[0]
-
+    assert models[0]["protocol"] == "responses"
 
 def test_opencode_go_three_protocols_paths_and_identity_headers():
     # 验收 2：OpenCode Go 三种协议各保存一份连接，地址是同一个请求基址；
@@ -131,57 +134,57 @@ def test_opencode_go_three_protocols_paths_and_identity_headers():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         shared_base = f"http://127.0.0.1:{server.server_address[1]}/v1"
-        connections = (
-            ("go-responses", "m-responses", "responses", "model-resp", "/v1/responses"),
-            ("go-chat", "m-chat", "chat_completions", "model-chat", "/v1/chat/completions"),
-            ("go-messages", "m-messages", "messages", "model-msg", "/v1/messages"),
-        )
-        document = {
-            "providers": [
-                {"id": provider_id, "name": provider_id, "protocol": protocol,
-                 "base_url": shared_base, "credential_ref": "SHARED_KEY",
-                 "preset_id": "opencode-go", "timeout_sec": 30.0,
-                 "models_url": shared_base + "/v1/models"}
-                for provider_id, _model_id, protocol, _upstream, _path in connections
-            ],
-            "models": [
-                {"id": model_id, "provider_id": provider_id, "model": upstream,
-                 "context_window": 32000, "max_output_tokens": 2048}
-                for provider_id, model_id, _protocol, upstream, _path in connections
-            ],
-            "bindings": {},
-        }
+        # 三种协议的请求路径都拼在这个本机地址后面：连接测试与模型调用都不到真实的 opencode.ai
+        with preset_base_urls(shared_base, models_url=shared_base + "/v1/models"):
+            connections = (
+                ("go-responses", "m-responses", "responses", "model-resp", "/v1/responses"),
+                ("go-chat", "m-chat", "chat_completions", "model-chat", "/v1/chat/completions"),
+                ("go-messages", "m-messages", "messages", "model-msg", "/v1/messages"),
+            )
+            document = {
+                "providers": [
+                    {"id": provider_id, "name": provider_id,
+                     "base_url": shared_base, "credential_ref": "SHARED_KEY",
+                     "preset_id": "opencode-go", "timeout_sec": 30.0,
+                     "models_url": shared_base + "/v1/models"}
+                    for provider_id, _model_id, _protocol, _upstream, _path in connections
+                ],
+                "models": [
+                    {"id": model_id, "provider_id": provider_id, "model": upstream,
+                     "protocol": protocol,
+                     "context_window": 32000, "max_output_tokens": 2048}
+                    for provider_id, model_id, protocol, upstream, _path in connections
+                ],
+                "bindings": {},
+            }
+            facade = ProviderFacade(credentials=CredentialChain(overrides={"SHARED_KEY": "go-secret"}))
+            facade.store_document(document)
+            adapter = FacadeAdapter(facade)
 
-        facade = ProviderFacade(credentials=CredentialChain(overrides={"SHARED_KEY": "go-secret"}))
-        facade.store_document(document)
-        adapter = FacadeAdapter(facade)
+            for provider_id, model_id, protocol, _upstream, expected_path in connections:
+                # 连接测试经公开接口证明地址与凭据可用（三种协议同一套缺失项检查）
+                connection = facade.test_connection(provider_id)
+                assert connection["ok"] is True, connection
+                assert "protocol" not in connection
+                facade.record_admission(provider_id, model_id, admitted_model="admitted-model")
+                session_id = f"session-{provider_id}"
+                target = facade.resolve_snapshot(
+                    [{"key": "test", "provider_id": provider_id, "model_id": model_id}]
+                ).target("test")
+                # 调用目标的协议取自访问定义，地址取自该定义在预置表中按协议的请求基址
+                assert target.protocol == protocol
+                assert target.base_url == shared_base
+                call = model_call([{"role": "user", "content": "hi"}],
+                                  max_output_tokens=1024, session_id=session_id)
+                resolution = facade.resolve_call_target(model_id)
+                assert resolution.available, resolution.message
+                facade.bind_call_key(resolution.handle_id, call.logical_call_id)
+                complete(adapter, call)
+                facade.release_call_handle(call.logical_call_id)
 
-        for provider_id, model_id, protocol, _upstream, expected_path in connections:
-            # 连接测试经公开接口证明地址与凭据可用（三种协议同一套缺失项检查）
-            connection = facade.test_connection(provider_id)
-            assert connection["ok"] is True, connection
-            assert connection["protocol"] == protocol
-
-            facade.record_admission(provider_id, model_id, admitted_model="admitted-model")
-            session_id = f"session-{provider_id}"
-            target = facade.resolve_snapshot(
-                [{"key": "test", "provider_id": provider_id, "model_id": model_id}]
-            ).target("test")
-            # 调用目标的协议与地址取自连接
-            assert target.protocol == protocol
-            assert target.base_url == shared_base
-
-            call = model_call([{"role": "user", "content": "hi"}],
-                              max_output_tokens=1024, session_id=session_id)
-            resolution = facade.resolve_call_target(model_id)
-            assert resolution.available, resolution.message
-            facade.bind_call_key(resolution.handle_id, call.logical_call_id)
-            complete(adapter, call)
-            facade.release_call_handle(call.logical_call_id)
-
-            assert captured[-1]["path"] == expected_path
-            assert captured[-1]["headers"].get("user-agent") == USER_AGENT
-            assert captured[-1]["headers"].get("x-opencode-session") == session_id
+                assert captured[-1]["path"] == expected_path
+                assert captured[-1]["headers"].get("user-agent") == USER_AGENT
+                assert captured[-1]["headers"].get("x-opencode-session") == session_id
     finally:
         server.shutdown()
         server.server_close()
@@ -191,17 +194,19 @@ def test_same_service_preset_connections_share_credential_reference():
     # 验收 3：同一服务方案的两份连接可以使用同一个凭据引用
     document = {
         "providers": [
-            {"id": "go-1", "name": "Go 1", "protocol": "responses",
+            {"id": "go-1", "name": "Go 1",
              "base_url": "https://opencode.ai/zen/go/v1", "credential_ref": "SHARED_KEY_REF",
              "preset_id": "opencode-go"},
-            {"id": "go-2", "name": "Go 2", "protocol": "chat_completions",
+            {"id": "go-2", "name": "Go 2",
              "base_url": "https://opencode.ai/zen/go/v1", "credential_ref": "SHARED_KEY_REF",
              "preset_id": "opencode-go"},
         ],
         "models": [
             {"id": "m1", "provider_id": "go-1", "model": "model-1",
+             "protocol": "responses",
              "context_window": 32000, "max_output_tokens": 1024},
             {"id": "m2", "provider_id": "go-2", "model": "model-2",
+             "protocol": "chat_completions",
              "context_window": 32000, "max_output_tokens": 1024},
         ],
         "bindings": {},

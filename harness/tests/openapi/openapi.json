@@ -5536,6 +5536,10 @@
             "type": "string",
             "title": "Model"
           },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol"
+          },
           "context_window": {
             "anyOf": [
               {
@@ -5595,6 +5599,7 @@
           "id",
           "provider_id",
           "model",
+          "protocol",
           "context_window",
           "max_output_tokens",
           "capability_source",
@@ -5708,10 +5713,6 @@
             "type": "string",
             "title": "Name"
           },
-          "protocol": {
-            "type": "string",
-            "title": "Protocol"
-          },
           "base_url": {
             "type": "string",
             "title": "Base Url"
@@ -5752,7 +5753,6 @@
         "required": [
           "id",
           "name",
-          "protocol",
           "base_url",
           "credential_ref",
           "timeout_sec",
@@ -6887,7 +6887,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 2
+            "example": 3
           },
           "contract_digest": {
             "type": "string",
@@ -6925,6 +6925,16 @@
             "type": "string",
             "minLength": 1,
             "title": "Model"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "chat_completions",
+              "fake",
+              "messages",
+              "responses"
+            ],
+            "title": "Protocol"
           },
           "context_window": {
             "anyOf": [
@@ -7006,6 +7016,7 @@
         "required": [
           "id",
           "model",
+          "protocol",
           "max_output_tokens",
           "provider_id"
         ],
@@ -7952,6 +7963,16 @@
             "minLength": 1,
             "title": "Model"
           },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "chat_completions",
+              "fake",
+              "messages",
+              "responses"
+            ],
+            "title": "Protocol"
+          },
           "context_window": {
             "anyOf": [
               {
@@ -8027,6 +8048,7 @@
         "required": [
           "id",
           "model",
+          "protocol",
           "max_output_tokens"
         ],
         "title": "ModelInput"
@@ -9165,16 +9187,6 @@
             "minLength": 1,
             "title": "Name"
           },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "chat_completions",
-              "fake",
-              "messages",
-              "responses"
-            ],
-            "title": "Protocol"
-          },
           "base_url": {
             "type": "string",
             "title": "Base Url",
@@ -9205,8 +9217,7 @@
         "type": "object",
         "required": [
           "id",
-          "name",
-          "protocol"
+          "name"
         ],
         "title": "ProviderInput"
       },
