@@ -6435,6 +6435,9 @@
               },
               {
                 "$ref": "#/components/schemas/InitialPrdRequested"
+              },
+              {
+                "$ref": "#/components/schemas/KernelModificationRequested"
               }
             ],
             "title": "Request"
@@ -6467,6 +6470,90 @@
           "answer"
         ],
         "title": "DecisionView"
+      },
+      "DeliverableAdoptedPayload": {
+        "properties": {
+          "adoption_id": {
+            "type": "string",
+            "title": "Adoption Id"
+          },
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "delivery_event_id": {
+            "type": "string",
+            "title": "Delivery Event Id"
+          },
+          "qa_event_id": {
+            "type": "string",
+            "title": "Qa Event Id"
+          },
+          "tree_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "code_tree_digest": {
+            "type": "string",
+            "title": "Code Tree Digest"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "check_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Check Names"
+          },
+          "known_risks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Known Risks"
+          },
+          "previous_adoption_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Adoption Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "adoption_id",
+          "work_item_id",
+          "run_id",
+          "delivery_event_id",
+          "qa_event_id",
+          "tree_ref",
+          "code_tree_digest",
+          "summary",
+          "files",
+          "check_names",
+          "known_risks",
+          "previous_adoption_id"
+        ],
+        "title": "DeliverableAdoptedPayload"
       },
       "DeliveryFileResult": {
         "properties": {
@@ -7781,6 +7868,85 @@
           "created_event_id"
         ],
         "title": "InputView"
+      },
+      "KernelModificationRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "kernel_modification",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "run",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "delivery_run_id": {
+            "type": "string",
+            "title": "Delivery Run Id"
+          },
+          "kernel_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kernel Paths"
+          },
+          "diff": {
+            "type": "string",
+            "title": "Diff"
+          },
+          "held_adoption": {
+            "$ref": "#/components/schemas/DeliverableAdoptedPayload"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "work_item_id",
+          "delivery_run_id",
+          "kernel_paths",
+          "diff",
+          "held_adoption"
+        ],
+        "title": "KernelModificationRequested"
       },
       "LastSeen": {
         "properties": {
@@ -17718,90 +17884,6 @@
         "title": "DeliverableAdoptedEvent",
         "type": "object"
       },
-      "DeliverableAdoptedPayload": {
-        "additionalProperties": false,
-        "properties": {
-          "adoption_id": {
-            "title": "Adoption Id",
-            "type": "string"
-          },
-          "work_item_id": {
-            "title": "Work Item Id",
-            "type": "string"
-          },
-          "run_id": {
-            "title": "Run Id",
-            "type": "string"
-          },
-          "delivery_event_id": {
-            "title": "Delivery Event Id",
-            "type": "string"
-          },
-          "qa_event_id": {
-            "title": "Qa Event Id",
-            "type": "string"
-          },
-          "tree_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
-          },
-          "code_tree_digest": {
-            "title": "Code Tree Digest",
-            "type": "string"
-          },
-          "summary": {
-            "title": "Summary",
-            "type": "string"
-          },
-          "files": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Files",
-            "type": "array"
-          },
-          "check_names": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Check Names",
-            "type": "array"
-          },
-          "known_risks": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Known Risks",
-            "type": "array"
-          },
-          "previous_adoption_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Previous Adoption Id"
-          }
-        },
-        "required": [
-          "adoption_id",
-          "work_item_id",
-          "run_id",
-          "delivery_event_id",
-          "qa_event_id",
-          "tree_ref",
-          "code_tree_digest",
-          "summary",
-          "files",
-          "check_names",
-          "known_risks",
-          "previous_adoption_id"
-        ],
-        "title": "DeliverableAdoptedPayload",
-        "type": "object"
-      },
       "DeliveryAcceptedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -25940,7 +26022,15 @@
             "type": "string"
           },
           "payload": {
-            "$ref": "#/components/schemas/InitialPrdRequested"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InitialPrdRequested"
+              },
+              {
+                "$ref": "#/components/schemas/KernelModificationRequested"
+              }
+            ],
+            "title": "Payload"
           }
         },
         "required": [

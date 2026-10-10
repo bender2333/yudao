@@ -43,7 +43,8 @@ from .providers.selection import ModelSelection
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .tools import validate_registered_command
-from .decisions import INITIAL_PRD
+from .decisions import INITIAL_PRD, KERNEL_MODIFICATION
+from .path_guard import changed_paths, kernel_diff, kernel_hits, kernel_manifest_paths
 from .streams import DRAIN_STARTED, PRIORITY_UPGRADE_RESTART, PRIORITY_USER, classify_startup_runs
 from .tree_archive import artifact_run, load_tree
 
@@ -89,6 +90,19 @@ class SourceDirectoryConflict(Exception):
     def __init__(self, current: dict[str, Any]) -> None:
         super().__init__("source directory changed since base_version")
         self.current = current
+
+
+def _adoption_payload(delivery: Any, release: Any, run: Any, item: WorkItem) -> dict[str, Any]:
+    # 采纳交付的载荷（工单 #354）：照常采纳与批准以后采纳写的是同一份内容，由结算与被批准的请求共用
+    return {
+        "adoption_id": new_id("adopt"), "work_item_id": item.work_item_id, "run_id": run.run_id,
+        "delivery_event_id": delivery.created_event_id, "qa_event_id": release.created_event_id,
+        "tree_ref": asdict(delivery.tree_ref), "code_tree_digest": delivery.code_tree_digest,
+        "summary": delivery.summary, "files": list(delivery.files), "check_names": list(delivery.check_names),
+        "known_risks": list(delivery.known_risks),
+        # 批准时按批准当时的当前采纳重写：请求可能等了很久，此刻的值才是对的
+        "previous_adoption_id": None,
+    }
 
 
 def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str, *,
@@ -1026,13 +1040,51 @@ class ProjectService:
                 "delivery_event_id": delivery.created_event_id, "code_tree_digest": delivery.code_tree_digest,
                 "reason": "baseline_changed", "expected_adoption_id": expected, "current_adoption_id": current,
             }, actor="system"))[0]
-        return transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, {
-            "adoption_id": new_id("adopt"), "work_item_id": item.work_item_id, "run_id": run.run_id,
-            "delivery_event_id": delivery.created_event_id, "qa_event_id": release.created_event_id,
-            "tree_ref": asdict(delivery.tree_ref), "code_tree_digest": delivery.code_tree_digest,
-            "summary": delivery.summary, "files": list(delivery.files), "check_names": list(delivery.check_names),
-            "known_risks": list(delivery.known_risks), "previous_adoption_id": current,
-        }, actor="system"))[0]
+        adoption = _adoption_payload(delivery, release, run, item)
+        blocked = self._guard_kernel_paths(transaction, run, item, delivery, adoption)
+        if blocked is True:
+            # 已经发出过内核修改请求：批准或拒绝以前不再采纳，也不重复请求
+            return None
+        if blocked is None:
+            return transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED,
+                                                      dict(adoption, previous_adoption_id=current),
+                                                      actor="system"))[0]
+        return transaction.append(NewProjectEvent(
+            ProjectEventType.PROJECT_DECISION_REQUESTED, blocked, actor="system"))[0]
+
+    def _guard_kernel_paths(self, transaction: Transaction, run: RunProjection, item: WorkItem,
+                            delivery: Any, adoption: dict[str, Any]) -> dict[str, Any] | bool:
+        # 路径守卫（受控内核设计说明第 4.2 节，工单 #354）：把交付相对基线的改动路径与运行实例的内核清单
+        # 比较，有交集时不自动采纳，请求用户批准，材料附改动的路径与差异；没有交集时返回空，照常采纳。
+        # 已经发出过请求时返回真：请求待回答或已被拒绝，这个 run 都不再采纳，也不重复请求。
+        # held_adoption 是批准以后要写入的采纳载荷，previous_adoption_id 在批准时按当时状态补上
+        if any(decision.kind == KERNEL_MODIFICATION.name
+               and decision.request.get("delivery_run_id") == run.run_id
+               for decision in transaction.decisions.values()):
+            return True
+        baseline_tree = self._adopted_tree(transaction.projection, item)
+        delivery_tree = load_tree(self.artifacts, artifact_run(delivery.tree_ref.path), delivery.tree_ref)
+        hits = kernel_hits(changed_paths(baseline_tree, delivery_tree), kernel_manifest_paths())
+        if not hits:
+            return None
+        return {
+            "kind": KERNEL_MODIFICATION.name, "blocks": KERNEL_MODIFICATION.blocks,
+            "options": [asdict(option) for option in KERNEL_MODIFICATION.options],
+            "description": f"交付改动了内核清单里的 {len(hits)} 个路径，批准以后才采纳",
+            "facts": [], "department": "engineering",
+            "work_item_id": item.work_item_id, "delivery_run_id": run.run_id,
+            "kernel_paths": hits, "diff": kernel_diff(baseline_tree, delivery_tree, hits),
+            "held_adoption": adoption,
+        }
+
+    def _adopted_tree(self, project: ProjectProjection, item: WorkItem) -> Any:
+        # 交付的基线树：事项基线的代码树，第一次采纳之前是项目起始文件夹快照的树（工单 #354）
+        reference = item.baseline["tree_ref"] if item.baseline else None
+        if reference is None and project.initial_snapshot:
+            reference = project.initial_snapshot["tree_ref"]
+        if reference is None:
+            return None
+        return load_tree(self.artifacts, artifact_run(reference["path"]), ArtifactRef(**reference))
 
 
     def _propose_initial_prd(self, transaction: Transaction, run: RunProjection,

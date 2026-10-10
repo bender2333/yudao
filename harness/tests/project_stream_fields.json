@@ -58,12 +58,12 @@
     },
     "project_decision_requested": {
       "baseline_review": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求带的基线核验取自被确认前的候选",
-      "blocks": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求挡住所属事项",
+      "blocks": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求挡住所属事项，内核修改请求挡住交付所属的 run",
       "candidate_run_id": "这个事件种类是新增的，旧版本的项目流中没有它：候选所属的建档 run，请求本身不属于任何 run",
       "department": "这个事件种类是新增的，旧版本的项目流中没有它：建档确认属于产品部门",
       "description": "这个事件种类是新增的，旧版本的项目流中没有它：确认第几轮建档的初始 PRD",
       "facts": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求不带事实摘要",
-      "kind": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求只有 initial_prd 一种",
+      "kind": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求有 initial_prd 与 kernel_modification 两种",
       "options": "这个事件种类是新增的，旧版本的项目流中没有它：确认或提出修改",
       "overview_ref": "这个事件种类是新增的，旧版本的项目流中没有它：仓库概况的工件引用取自建档 run",
       "prd": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求带的初始 PRD 取自被确认前的候选",
@@ -71,7 +71,11 @@
       "round": "这个事件种类是新增的，旧版本的项目流中没有它：第几轮建档",
       "snapshot": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求带的代码快照取自建档 run",
       "structure": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求带的现有结构说明取自被确认前的候选",
-      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求属于建档事项"
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求属于建档事项",
+      "delivery_run_id": "旧事件没有这个字段：只有内核修改请求携带它，建档请求读取时按没有所属交付处理",
+      "diff": "旧事件没有这个字段：只有内核修改请求携带差异，建档请求读取时按没有差异处理",
+      "held_adoption": "旧事件没有这个字段：只有内核修改请求携带待批准的采纳载荷，建档请求读取时按没有待批准采纳处理",
+      "kernel_paths": "旧事件没有这个字段：只有内核修改请求携带改动的内核路径，建档请求读取时按空列表处理"
     },
     "project_decision_withdrawn": {
       "decision_id": "这个事件种类是新增的，旧版本的项目流中没有它：被撤销的请求在此之前只写在 run 流中",
@@ -83,9 +87,6 @@
       "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
       "goal_ref": "这个事件种类是新增的，旧版本的项目流中没有它：目标原文的引用取自 project_registered（或此前最后一条 project_goal_changed）"
     },
-    "project_registered": {
-      "initial_snapshot": "旧事件没有这个字段（#321）：没有这个字段的项目没有起始文件夹，事项从空树开始"
-    },
     "project_parameter_set": {
       "bounds": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有修改所依据的界限，读取时按规则登记中该条目的界限",
       "modified_by": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有按项目修改参数的记录",
@@ -93,6 +94,9 @@
       "new_value": "这个事件种类是新增的，旧版本的项目流中没有它：没有项目级取值时这个参数按全局的当前值生效",
       "old_value": "这个事件种类是新增的，旧版本的项目流中没有它：没有项目级取值时按全局的当前值作为修改前的取值",
       "reason": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有按项目修改参数的记录"
+    },
+    "project_registered": {
+      "initial_snapshot": "旧事件没有这个字段（#321）：没有这个字段的项目没有起始文件夹，事项从空树开始"
     },
     "work_item_created": {
       "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
@@ -285,12 +289,16 @@
     },
     "project_decision_requested": {
       "baseline_review": "object",
-      "blocks": "const string[work_item]",
+      "blocks": "enum string[run, work_item]",
       "candidate_run_id": "string",
+      "delivery_run_id": "string",
       "department": "enum string[engineering, product, quality]",
       "description": "string",
+      "diff": "string",
       "facts": "array[string]",
-      "kind": "const string[initial_prd]",
+      "held_adoption": "object",
+      "kernel_paths": "array[string]",
+      "kind": "enum string[initial_prd, kernel_modification]",
       "options": "array[object]",
       "overview_ref": "object",
       "prd": "object",

@@ -12,7 +12,7 @@ from ..models import DecisionRequest, EventType, ProjectEventType
 from ..projects import ProjectNotFoundError, project_projection
 from ..projection import saved_decisions
 from .contracts import CommandId, Contract, Snapshot
-from .payloads import DecisionRequestedPayload
+from .payloads import DecisionRequestedPayload, ProjectDecisionRequestedPayload
 from .registry import QueryDefinition
 from .replay import ReplayRequest, check_position, decisions_through
 
@@ -57,7 +57,7 @@ class DecisionView(Contract):
     status: Literal["open", "answered", "withdrawn"]
     requested_at: AwareDatetime
     blocked: BlockedObjects | None
-    request: DecisionRequestedPayload
+    request: DecisionRequestedPayload | ProjectDecisionRequestedPayload
     answer: DecisionAnswerRecord | None
 
 class DecisionList(Contract):

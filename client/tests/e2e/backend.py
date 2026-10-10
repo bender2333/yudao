@@ -54,6 +54,9 @@ from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E
 
 UNAVAILABLE = "Missing configuration: provider credential"
 
+# 路径守卫的端到端验收（工单 #354）：交付改动的这个路径落在运行实例的内核清单里
+KERNEL_PATH = "harness/bounds.py"
+
 
 def lan_address() -> str:
     # 本机的局域网地址：从另一台机器访问控制主机时用的就是它；没有时用回环
@@ -215,6 +218,19 @@ def waiting_script():
     ]
 
 
+def kernel_script():
+    # 路径守卫的端到端验收（工单 #354）：预置的事项交付改动了内核清单里的路径，结算因此不采纳，
+    # 发出内核修改决定请求；用例在界面上核对卡片给出改动的路径与差异，批准以后交付被采纳。
+    # 工程计划的范围要包含这个路径，写文件的工具才会允许写它
+    return [
+        product_spec(),
+        plan_turn(scope=["src/", KERNEL_PATH]),
+        delivery_turn(summary="implemented echo CLI", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n",
+                                                             KERNEL_PATH: "# 交付改动的内核文件\n"}),
+        review_turn("release", "checks passed on the current snapshot"),
+    ]
+
+
 def read_turn(identity: str, tool: str, arguments: dict):
     # 脚本里的一项可以是接收模型调用合同的函数（harness/adapters/fake.py 的 TurnFactory），
     # 函数返回带工具调用的回答；工具由原生循环真实执行
@@ -294,6 +310,19 @@ async def seed_onboarding(application: Application) -> None:
     await application.command(
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="预置项目", goal="接入前的空项目"),
         actor="user:local")
+
+async def seed_kernel(application: Application, system: LoopSystem) -> None:
+    # 路径守卫的预置（工单 #354）：一个项目、一个改动内核清单路径的事项，跑完以后结算发出决定请求
+    created = await application.command(
+        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="内核改动", goal="改动一个内核文件"),
+        actor="user:local")
+    project_id = created.refs.project_id
+    item = await application.command(
+        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=project_id, text="改动内核文件"),
+        actor="user:local")
+    task = system.orchestrator.work_item_execution(item.refs.run_id)
+    if task is not None:
+        await task
 
 async def seed_room(application: Application, system: LoopSystem) -> str:
     # 部门房间的端到端验收（工单 #177）：建一个项目并跑完第一个事项（让部门工作间有默认选中的事项，
@@ -475,7 +504,8 @@ def main() -> int:
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
     # initial 是从想法新建带起始文件夹用的脚本（工单 #323）；waiting 是等待模型服务用的脚本（工单 #375，
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）。它们需要的轮次与预置事项不同，因此由用例选择
-    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting"), default="default")
+    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel"),
+                        default="default")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
     parser.add_argument("--reject-upstream", action="store_true")
@@ -512,6 +542,8 @@ def main() -> int:
         adapter_script = initial_script()
     elif args.script == "waiting":
         adapter_script = waiting_script()
+    elif args.script == "kernel":
+        adapter_script = kernel_script()
     else:
         adapter_script = script()
     if args.catalog_driven:
@@ -575,6 +607,8 @@ def main() -> int:
             room_project = asyncio.run(seed_room(application, system))
         elif args.script == "onboarding":
             asyncio.run(seed_onboarding(application))
+        elif args.script == "kernel":
+            asyncio.run(seed_kernel(application, system))
         elif args.script not in ("initial", "waiting"):
             # 起始文件夹的用例（工单 #323）与等待模型服务的用例（工单 #375）自己在界面上建项目并开始事项，
             # 不需要预置的项目与事项
