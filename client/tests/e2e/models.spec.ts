@@ -85,7 +85,7 @@ for (const size of [
       await expect(client.page.getByTestId("provider-opencode-go")).toBeVisible();
       const summary = client.page.getByTestId("provider-opencode-go").locator(".mm-summary");
       await expect(summary).toContainText("OpenCode Go");
-      await expect(summary).toContainText("Responses");
+      await expect(summary).not.toContainText("Responses");
       await expect(summary).toContainText("凭据：");
       // 摘要按连接统计「已准入 x · 候选 y」；同一连接下的两条数之和等于它的模型数（与其他测试的先后无关）
       const summaryText = await summary.innerText();
@@ -206,17 +206,20 @@ for (const size of [
 
       const form = client.page.locator(".mm-form");
       await expect(form).toContainText("编辑 Provider 配置");
-      // 编辑时恢复服务方案与协议，地址取连接保存的地址（种子连接指向测试内上游）
+      // 编辑时恢复服务方案，地址取连接保存的地址（种子连接指向测试内上游）；
+      // 调用协议属于每一条访问定义（ADR-0033），这一条连接下的定义用 Responses
       await expect(form.getByRole("button", { name: "OpenCode Go" })).toHaveAttribute("aria-pressed", "true");
-      await expect(form.getByTestId("protocol-select")).toHaveValue("responses");
+      await expect(form.getByTestId("row-protocol-glm-4.6")).toHaveValue("responses");
       await expect(form.getByTestId("provider-base-url")).toHaveValue(new RegExp(`^http://127\\.0\\.0\\.1:\\d+/v1$`));
       // 预置表与能力表的信息都在方案区
       await expect(form).toContainText("预置表 2026-10-02.1");
       await expect(form).toContainText("模型能力表");
 
-      // 换协议：地址取该方案该协议的请求基址
-      await form.getByTestId("protocol-select").selectOption("messages");
+      // 换这一条定义的协议：内置方案的地址取该方案该协议的请求基址
+      await form.getByTestId("row-protocol-glm-4.6").selectOption("messages");
       await expect(form.getByTestId("provider-base-url")).toHaveValue("https://opencode.ai/zen/go/v1");
+      await form.getByTestId("row-protocol-glm-4.6").selectOption("responses");
+      await expect(form.getByTestId("provider-base-url")).toHaveValue(new RegExp(`^http://127\\.0\\.0\\.1:\\d+/v1$`));
 
       // Key 输入框始终为空，不回填
       await expect(form.getByTestId("credential-secret")).toHaveValue("");

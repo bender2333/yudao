@@ -310,6 +310,7 @@ export function ProviderForm(props: ProviderFormProps) {
                   ))}
                 </select>
               </label>
+              <label className="y10-field mm-field">
                 <span className="mm-label">窗口</span>
                 <input className="y10-input" type="number" min="1" value={row.context_window} data-testid={`row-window-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, patchRowCapacity(row, "context_window", event.target.value))} />
