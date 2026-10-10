@@ -386,7 +386,7 @@ class LoopSystem:
     def environment(self, run_id: str) -> LocalEnvironment:
         # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351）
         return LocalEnvironment.open(self.workspace_root / run_id,
-                                     check_timeout_sec=self.project(run_id).check_timeout_sec)
+                                     check_timeout_sec=parameters.frozen_check_timeout(self.store, run_id))
 
     def replay(self, run_id: str) -> RunProjection:
         return verify_replay(self.store, self.artifacts, self.git_versions, run_id)

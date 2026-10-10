@@ -119,9 +119,7 @@ class ProjectEventType:
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
     # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
     BASELINE_ADOPTED = "baseline_adopted"
-    # 项目级参数（迭代底座 B3，工单 #351）：检查时限与建档的单轮上限按项目设置，写在项目流中；
-    # 事件种类字符串跨版本保持 project_parameter_set，与目录流的 parameter_set 是两个不同流的种类。
-    # 没有项目级取值时使用全局的当前值
+    # 项目级参数（迭代底座 B3，工单 #351）：种类字符串是 project_parameter_set，与目录流的 parameter_set 是两个不同流的种类
     PARAMETER_SET = "project_parameter_set"
 
 
@@ -646,8 +644,6 @@ class RunProjection:
     max_cycles: int = DEFINITIONS.rule_value("max_cycles")
     run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec")
     context_window: int = 32_000
-    # 这个 run 中检查的时限（迭代底座 B3，工单 #351）：创建时按项目级取值与全局现值冻结，运行中不跟随修改
-    check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")
     cycle_count: int = 0
     token_used: int = 0
     cost: float = 0.0

@@ -413,11 +413,10 @@ class Orchestrator:
             bindings.setdefault(department, {"provider_id": provider_id, "model_id": model_id})
         self.facade.store_document({"providers": providers, "models": models, "bindings": bindings})
 
-    def _environment(self, run_id: str, projection: RunProjection | None = None) -> LocalEnvironment:
+    def _environment(self, run_id: str) -> LocalEnvironment:
         # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351），不跟随之后的修改
-        check_timeout_sec = (self.project(run_id).check_timeout_sec if projection is None
-                             else projection.check_timeout_sec)
-        return LocalEnvironment.open(self.workspace_root / run_id, check_timeout_sec=check_timeout_sec)
+        return LocalEnvironment.open(self.workspace_root / run_id,
+                                     check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
 
     def add_input(self, run_id: str, text: str, *, base_version: int | None = None,
                   command: Command | None = None) -> RunProjection:
@@ -1726,8 +1725,9 @@ class Orchestrator:
             note_ref = asdict(ref)
         self.create_run(
             item.text, max_cycles=item.max_cycles,
-            run_time_limit_sec=self.projects.onboarding_round_limit(project_id),
-            check_timeout_sec=prior.check_timeout_sec, context_window=item.context_window, run_id=run_id,
+            run_time_limit_sec=round_limit,
+            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, candidate.run_id),
+            context_window=item.context_window, run_id=run_id,
             kind="onboarding", initial_tree=tree, code_snapshot=snapshot,
             project_id=project_id, work_item_id=candidate.work_item_id,
             project_context=self.artifacts.get(ArtifactRef(**prior.project_context_ref)).decode("utf-8"),

@@ -107,9 +107,9 @@ def history(store: Any) -> list[ParameterChange]:
     return changes
 
 
-# 项目级参数：检查时限与建档的单轮上限可以按项目设置（迭代底座 B3，工单 #351），
-# 事件写进项目流，遵守 ADR-0019。run 创建时读取一次并冻结。
-# 只有这两项可以按项目设置：其余参数按项目设置没有意义，项目级取值也只在这两项上生效。
+# 按项目设置的参数只有这两项：其余参数按项目设置没有意义，项目级取值也只在这两项上生效。
+# 事件种类字符串是 project_parameter_set：目录流已有同名种类 parameter_set，载荷类型表按字符串索引，
+# 同名的两种事件会取到同一种载荷类型，流的分类也分不开（ADR-0019 只约束已存在的种类不变，新增种类属于新增）
 PROJECT_PARAMETERS = ("check_timeout_sec", "onboarding.round_time_limit_sec")
 
 
@@ -145,6 +145,17 @@ def value_for_project(store: Any, project_id: str | None, name: str) -> Any:
         if name in project:
             return project[name]
     return current_values(store)[name]
+
+def frozen_check_timeout(store: Any, run_id: str) -> int:
+    # 一个 run 中检查的时限（迭代底座 B3，工单 #351）：run_created 事件里冻结的取值，运行中不再跟随修改。
+    # 旧事件没有这个字段时按当时的全局现值。取值不进运行投影：投影是内核模块，行数受内核清单上限约束
+    from .event_store import run_stream
+    from .models import EventType
+
+    for event in store.stream_events(run_stream(run_id), through_version=1):
+        if event.type == EventType.RUN_CREATED:
+            return int(event.payload.get("check_timeout_sec", DEFINITIONS.rule_value("check_timeout_sec")))
+    raise KeyError(run_id)
 
 
 def check_bounds(name: str, value: Any) -> Any:

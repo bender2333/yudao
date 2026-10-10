@@ -13,6 +13,7 @@ from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.event_store import catalog_stream, project_stream
 from harness.definitions import DEFINITIONS
 from harness.models import CatalogEventType, EventType, ProjectEventType
+from harness.parameters import frozen_check_timeout as parameters_frozen
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import happy_script
@@ -65,8 +66,8 @@ def _run_created(opened: _Opened, run_id: str) -> dict:
     return event.payload
 
 def _check_timeout_of(opened: _Opened, run_id: str) -> int:
-    # run 冻结的检查时限：从 run 投影读取，与执行环境看到的是同一个值
-    return opened.system.project(run_id).check_timeout_sec
+    # run 冻结的检查时限：run_created 事件里的取值，与执行环境看到的是同一个值
+    return parameters_frozen(opened.store, run_id)
 
 def _environment_timeout_of(opened: _Opened, run_id: str) -> int:
     return opened.system.environment(run_id)._check_timeout_sec
