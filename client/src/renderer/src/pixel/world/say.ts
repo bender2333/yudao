@@ -75,13 +75,16 @@ const commandOf = (ev: PixelFloorEvent, pl: Record<string, unknown>): string | n
 const FILE_RE = /([\w\-./]+\.[A-Za-z0-9]{1,5})(?![A-Za-z0-9])/;
 const fileOf = (ev: PixelFloorEvent, pl: Record<string, unknown>): string | null =>
   argOf(pl, "path") ?? argOf(pl, "source") ?? (pl.file as string) ?? (FILE_RE.exec(String(ev.label || "")) || [])[1] ?? null;
+// 翻找的查询词：真实载荷在 args.pattern，原型事件的载荷直接给 query（与原型 say.js 的 pl.query 同口径）
+const searchQuery = (pl: Record<string, unknown>): string | null =>
+  argOf(pl, "pattern") ?? argOf(pl, "query") ?? null;
 
 function toolText(ev: PixelFloorEvent, pl: Record<string, unknown>): string | null {
   const tool = String(ev.tool ?? pl.tool ?? pl.name ?? "");
   const file = fileOf(ev, pl);
   const named = (prefix: string, fallback: string): string =>
     `现在${prefix}${file ? ` ${cut(baseName(file), 16)}` : fallback}`;
-  if (tool === "search") return `现在翻找资料${argOf(pl, "pattern") ? `：${cut(argOf(pl, "pattern"), 12)}` : ""}`;
+  if (tool === "search") return `现在翻找资料${searchQuery(pl) ? `：${cut(searchQuery(pl) ?? "", 12)}` : ""}`;
   if (/^read/.test(tool)) return named("阅读", "资料");
   if (/^(edit|write)/.test(tool)) return named("编辑", "文件");
   if (tool === "delete_file") return `现在删除${file ? ` ${cut(baseName(file), 16)}` : "文件"}`;

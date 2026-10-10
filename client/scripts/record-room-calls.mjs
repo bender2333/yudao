@@ -41,8 +41,12 @@ const DEPARTMENTS = ["product", "engineering", "quality"];
 /** 录下的场景编号上限：编号 20、21 是自举试点的场景，由实现覆盖层的工单加入录制（工单 #434）。 */
 const MAX_SCENARIO_NO = 19;
 
-/** 每个事件之后固定的时刻：取 5000 毫秒，抓动作收尾之后的稳定状态。 */
-const SAMPLE_MS = [5000];
+/**
+ * 每个事件之后固定的时刻：录下的状态在这些毫秒数上取。
+ * 取 0 与 800 毫秒两个时刻：短的抓动作的进行中，长的抓动作的收尾。
+ * 曾经只取 5000 毫秒，那时几乎全部动作与头顶的话都已结束，回放就再也不比较这两项。
+ */
+const SAMPLE_MS = [0, 800];
 
 // 在页面里运行的录制驱动：包装 createRoomScene，记录调用；在每次调用之后把时钟推进到固定时刻并取状态。
 const DRIVER = async ({ sampleMs, departments }) => {
@@ -113,8 +117,10 @@ const DRIVER = async ({ sampleMs, departments }) => {
         push(name, arguments[0]);
         if (name === "setModel") model = arguments[0];
         const ret = f.apply(this, arguments);
-        step(sampleMs[0]);
-        rec.samples.push({ after: rec.ops.length - 1, ms: sampleMs[0], state: snapshot(obj, model) });
+        for (const ms of sampleMs) {
+          step(ms);
+          rec.samples.push({ after: rec.ops.length - 1, ms, state: snapshot(obj, model) });
+        }
         return ret;
       };
     });
@@ -160,7 +166,7 @@ async function main() {
   await page.goto(ROOT + "#/sys/machines");
   await page.waitForTimeout(700);
   await page.evaluate((src) => { window.__roomDriver = (0, eval)(`(${src})`); }, DRIVER.toString());
-  await page.evaluate(async (departments) => { window.__room = await window.__roomDriver({ sampleMs: [5000], departments }); }, DEPARTMENTS);
+  await page.evaluate(async (arg) => { window.__room = await window.__roomDriver(arg); }, { sampleMs: SAMPLE_MS, departments: DEPARTMENTS });
 
   // 只录现有测试用到的场景（编号 1 至 19）：编号 20、21 是自举试点的场景，由实现覆盖层的工单加入录制
   const scenarios = await page.evaluate((maxScenarioNo) => window.Y10.backend.scenarios().filter((s) => s.no <= maxScenarioNo).map((s) => {
