@@ -87,19 +87,18 @@ class _Opened:
         return self.application.system.store
 
 
-def _provider(provider_id="p1", *, protocol="responses", models_url="", preset_id=""):
-    return {"id": provider_id, "name": provider_id, "protocol": protocol, "base_url": UPSTREAM_BASE,
+def _provider(provider_id="p1", *, models_url="", preset_id=""):
+    return {"id": provider_id, "name": provider_id, "base_url": UPSTREAM_BASE,
             "credential_ref": REF, "timeout_sec": 20.0, "preset_id": preset_id, "models_url": models_url}
 
-
-def _model(model_id="m1", provider_id="p1"):
-    return {"id": model_id, "provider_id": provider_id, "model": "model-x",
+def _model(model_id="m1", provider_id="p1", *, protocol="responses"):
+    return {"id": model_id, "provider_id": provider_id, "model": "model-x", "protocol": protocol,
             "context_window": 32000, "max_output_tokens": 2048, "capability_source": ""}
 
 
 def _document(*, protocol="responses", models_url="", preset_id=""):
-    return {"providers": [_provider(protocol=protocol, models_url=models_url, preset_id=preset_id)],
-            "models": [_model()],
+    return {"providers": [_provider(models_url=models_url, preset_id=preset_id)],
+            "models": [_model(protocol=protocol)],
             "bindings": {}}
 
 
@@ -237,9 +236,8 @@ def test_collect_candidates_rejects_an_unknown_connection(tmp_path):
 
 
 def test_connection_test_sends_a_real_request_for_each_protocol(tmp_path):
-    expectations = (("responses", "authorization"), ("chat_completions", "authorization"),
-                    ("messages", "x-api-key"))
-    for protocol, expected_header in expectations:
+    # ADR-0033: 获取模型列表与连接测试按服务方案规定的认证方式带上凭据；自定义服务（preset_id=""）使用 Bearer
+    for protocol in ("responses", "chat_completions", "messages"):
         server = _ModelsServer()
         with server as models_url:
             opened = _Opened(tmp_path / protocol, _document(protocol=protocol, models_url=models_url))
@@ -251,15 +249,12 @@ def test_connection_test_sends_a_real_request_for_each_protocol(tmp_path):
                     opened.store, lambda item: item.payload.get("kind") == "connection",
                     description=f"catalog_test_finished (connection, {protocol})")
                 assert event.payload["ok"] is True, event.payload
-                assert event.payload["protocol"] == protocol
-                assert event.payload["admitted"] is None
+                assert event.payload["protocol"] is None
                 assert event.payload["error"] is None
                 # 上游确实收到了带凭据的请求
                 assert server.requests, protocol
-                assert expected_header in server.requests[-1], protocol
-                assert server.requests[-1][expected_header] == (
-                    f"Bearer {SECRET}" if expected_header == "authorization" else SECRET)
-
+                assert "authorization" in server.requests[-1], protocol
+                assert server.requests[-1]["authorization"] == f"Bearer {SECRET}"
 
 def test_connection_test_without_models_uses_saved_address_and_credential(tmp_path):
     server = _ModelsServer()

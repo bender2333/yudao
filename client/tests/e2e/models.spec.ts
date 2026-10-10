@@ -246,13 +246,17 @@ for (const size of [
       await form.getByTestId("accept-capacity-vision-model").click();
       await expect(form.getByTestId("capacity-confirmed-vision-model")).toBeVisible();
 
-      // 推理参数方式只列出与协议相符的选项
+      // 推理参数方式只列出与该行协议相符的选项：新建的行预填 Chat Completions，
+      // 换到 Anthropic Messages 只列出 Messages 的两种方式，换回来才有 effort（第 7.4 节）
+      await expect(form.getByTestId("row-protocol-vision-model")).toHaveValue("chat_completions");
       const modeOptions = form.getByTestId("reasoning-mode-vision-model").locator("option");
-      await expect(modeOptions).toContainText(["未声明", "adaptive（Messages 的自适应思考）"]);
-      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "effort" })).toHaveCount(0);
-      await form.getByTestId("protocol-select").selectOption("chat_completions");
-      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "effort" })).toHaveCount(1);
+      await expect(modeOptions).toContainText(["未声明", "effort（请求带档位名）"]);
       await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "adaptive" })).toHaveCount(0);
+      await form.getByTestId("row-protocol-vision-model").selectOption("messages");
+      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "effort" })).toHaveCount(0);
+      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "adaptive" })).toHaveCount(1);
+      await form.getByTestId("row-protocol-vision-model").selectOption("chat_completions");
+      await expect(form.getByTestId("reasoning-mode-vision-model").locator("option", { hasText: "effort" })).toHaveCount(1);
 
       // 默认档位只能从已选的支持档位中选择
       await form.getByTestId("level-vision-model-high").click();
@@ -265,6 +269,61 @@ for (const size of [
       await form.getByTestId("submit-provider").click();
       await expect(form).toHaveCount(0);
       await expect(client.page.getByTestId("model-vision-model")).toBeVisible();
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  // 工单 #382 第 4 项验收：新建自定义连接、加入一个模型并测试通过，改它的协议并保存以后回到候选
+  test(`${label}：新建自定义连接、模型测试通过后改协议保存，这条定义回到候选`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size);
+    const errors = watchErrors(client);
+    try {
+      // 地址取测试内真实上游的地址（端口由系统分配，不在测试里写死）
+      const baseUrl = await client.page.evaluate(async (address: string) => {
+        const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
+        const provider = (listed.data.providers as { id: string; base_url: string }[])
+          .find((item) => item.id === "opencode-go");
+        return provider!.base_url;
+      }, backend.address);
+      await setKey(client, backend, "OPENCODE_GO_KEY");
+
+      await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+      const form = client.page.locator(".mm-form");
+      await form.getByTestId("provider-base-url").fill(baseUrl);
+      await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("local-upstream");
+      await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("本机上游");
+      await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("OPENCODE_GO_KEY");
+      // 手动添加的一行：默认预填 Chat Completions
+      await form.getByTestId("add-model-row").click();
+      const rowKey = await form.locator('[data-testid^="row-id-"]').first().inputValue();
+      await expect(form.getByTestId(`row-protocol-${rowKey}`)).toHaveValue("chat_completions");
+      // 端到端的上游按 Responses 协议回答：这条定义要在模型测试里真实通过，就选 Responses
+      await form.getByTestId(`row-protocol-${rowKey}`).selectOption("responses");
+      await form.getByTestId(`row-model-${rowKey}`).fill("glm-4.6");
+      await form.getByTestId(`row-window-${rowKey}`).fill("200000");
+      await form.getByTestId(`row-output-${rowKey}`).fill("32000");
+      await form.getByTestId("submit-provider").click();
+      await expect(form).toHaveCount(0);
+
+      // 模型测试通过：这一条进入已准入，模型表的调用协议列显示 Responses
+      const provider = client.page.getByTestId("provider-local-upstream");
+      await provider.getByRole("button", { name: "展开" }).click();
+      await client.page.getByTestId(`row-test-${rowKey}`).click();
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("已准入：");
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("Responses");
+
+      // 把协议改成 Chat Completions 并保存：这条定义回到候选，协议列跟着改
+      await provider.getByRole("button", { name: "编辑" }).click();
+      const edit = client.page.locator(".mm-form");
+      await edit.getByTestId(`row-protocol-${rowKey}`).selectOption("chat_completions");
+      await edit.getByTestId("submit-provider").click();
+      await expect(edit).toHaveCount(0);
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("候选（准入已作废）");
+      await expect(client.page.getByTestId(`model-${rowKey}`)).toContainText("Chat Completions");
       expect(errors).toEqual([]);
     } finally {
       await client.close();

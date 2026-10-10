@@ -43,12 +43,11 @@ def protocol_reasoning_mode(protocol: str) -> str:
 
 
 def connection_document(protocol: str, *, base_url: str | None = None) -> dict[str, Any]:
-    # 一份连接只声明一种协议（ADR-0004）；三种协议共用同一个 9router 地址与凭据引用
+    # 一份连接不声明协议；三种协议共用同一个 9router 地址与凭据引用
     url = base_url if base_url is not None else eval_base_url()
     return {
         "id": f"eval-{protocol}",
         "name": f"9router {protocol}",
-        "protocol": protocol,
         "base_url": url,
         "credential_ref": "YUDAO_EVAL_API_KEY",
         "timeout_sec": 120.0,
@@ -62,6 +61,7 @@ def claude_definition(protocol: str) -> dict[str, Any]:
         "id": f"claude-{protocol}",
         "provider_id": f"eval-{protocol}",
         "model": CLAUDE_MODEL,
+        "protocol": protocol,
         "context_window": 200_000,
         "max_output_tokens": 8_192,
         "input_modalities": ["text"],
@@ -77,6 +77,7 @@ def deepseek_definition(protocol: str) -> dict[str, Any]:
         "id": f"deepseek-{protocol}",
         "provider_id": f"eval-{protocol}",
         "model": DEEPSEEK_MODEL,
+        "protocol": protocol,
         "context_window": 1_000_000,
         "max_output_tokens": 16_384,
         "input_modalities": ["text"],

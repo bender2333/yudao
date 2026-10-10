@@ -42,6 +42,19 @@ def preset_header_profile(preset_id: str) -> str:
     return "" if item is None else item.header_profile
 
 
+def preset_base_url(preset_id: str, protocol: str) -> str:
+    # 内置服务方案按访问定义的协议取请求基址（ADR-0033）；没有该协议的基址或不是预置方案时返回空串，
+    # 由调用方回落到连接的地址
+    item = _PRESET_INDEX.get(str(preset_id))
+    return "" if item is None else item.base_urls.get(str(protocol), "")
+
+
+def preset_auth(preset_id: str) -> str:
+    # 服务方案要求的认证方式，供连接测试与候选采集按方案取（ADR-0033）
+    item = _PRESET_INDEX.get(str(preset_id))
+    return "" if item is None else item.auth
+
+
 def build_identity_headers(header_profile: str, session_id: str) -> dict[str, str]:
     # Go 需要稳定会话标识与真实客户端身份；其他服务方案不带额外头
     if header_profile != "opencode-go":

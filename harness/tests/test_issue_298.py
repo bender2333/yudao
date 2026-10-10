@@ -75,12 +75,12 @@ def _free_port() -> int:
 
 
 def _provider(base_url: str) -> dict:
-    return {"id": PROVIDER_ID, "name": "工单 298 服务", "protocol": "responses", "base_url": base_url,
+    return {"id": PROVIDER_ID, "name": "工单 298 服务", "base_url": base_url,
             "credential_ref": REF, "timeout_sec": 20.0, "preset_id": "", "models_url": ""}
 
 
 def _model() -> dict:
-    return {"id": MODEL_ID, "model": "upstream-298", "capacity_confirmed": True,
+    return {"id": MODEL_ID, "model": "upstream-298", "protocol": "responses", "capacity_confirmed": True,
             "context_window": 32000, "max_output_tokens": 2048}
 
 

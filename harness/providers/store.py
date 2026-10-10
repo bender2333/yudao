@@ -41,12 +41,12 @@ REASONING_BUDGET_TOKENS: Mapping[str, int] = MappingProxyType({
 })
 
 
-# Provider 配置：一份服务连接，声明一种协议（ADR-0004）；地址保存该协议的请求基址
+# Provider 配置：一份服务连接（ADR-0033）。连接不声明协议，协议由它下面的每个模型访问定义声明；
+# 自定义服务的地址保存请求基址，内置服务方案的请求基址按访问定义的协议取自预置表
 @dataclass(frozen=True)
 class ProviderDefinition:
     id: str
     name: str
-    protocol: str = ""
     base_url: str = ""
     credential_ref: str = ""
     timeout_sec: float = DEFAULT_TIMEOUT_SEC
@@ -57,17 +57,12 @@ class ProviderDefinition:
         for name in ("id", "name", "base_url", "credential_ref", "preset_id", "models_url"):
             value = getattr(self, name)
             object.__setattr__(self, name, value.strip() if isinstance(value, str) else value)
-        object.__setattr__(
-            self, "protocol",
-            self.protocol.strip().casefold() if isinstance(self.protocol, str) else self.protocol,
-        )
 
     def public_dict(self) -> dict[str, Any]:
         # 非敏感字段，可落盘与导出
         return {
             "id": self.id,
             "name": self.name,
-            "protocol": self.protocol,
             "base_url": self.base_url,
             "credential_ref": self.credential_ref,
             "timeout_sec": self.timeout_sec,
@@ -76,7 +71,7 @@ class ProviderDefinition:
         }
 
 
-# 模型访问定义：某份 Provider 配置下的一个模型访问定义，不声明协议（协议取自所属连接，ADR-0004）
+# 模型访问定义：某份 Provider 配置下的一个模型访问定义，必填调用协议（ADR-0033）
 # 容量是声明值：窗口可以未知（None），未知时只作候选，不可用于任务；输出上限必须有值。
 # 准入记录不属于目录定义（工单 #86），保存在 ProviderFacade 的独立记录中
 @dataclass(frozen=True)
@@ -84,6 +79,7 @@ class ModelDefinition:
     id: str
     provider_id: str
     model: str
+    protocol: str
     context_window: int | None
     max_output_tokens: int
     capability_source: str = ""
@@ -93,7 +89,7 @@ class ModelDefinition:
     # 运行层按它决定提供哪些工具、哪些内容可以放入请求（第 5.6 节）。预填来自模型能力表，用户可以修改
     input_modalities: tuple[str, ...] = ("text",)
     # 推理档位声明（ADR-0006）：支持档位是全集的一个子集（按由低到高保存），默认档位属于支持档位，
-    # 推理参数方式与所属连接的协议相符；三项一起声明，没有任何一项时不发送推理参数
+    # 推理参数方式与本定义的协议相符；三项一起声明，没有任何一项时不发送推理参数
     reasoning_levels: tuple[str, ...] = ()
     default_reasoning_level: str | None = None
     reasoning_mode: str = ""
@@ -102,12 +98,18 @@ class ModelDefinition:
         for name in ("id", "provider_id", "model", "capability_source"):
             value = getattr(self, name)
             object.__setattr__(self, name, value.strip() if isinstance(value, str) else value)
+        object.__setattr__(
+            self, "protocol",
+            self.protocol.strip().casefold() if isinstance(self.protocol, str) else self.protocol,
+        )
+
 
     def public_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "provider_id": self.provider_id,
             "model": self.model,
+            "protocol": self.protocol,
             "context_window": self.context_window,
             "max_output_tokens": self.max_output_tokens,
             "capability_source": self.capability_source,
@@ -120,8 +122,9 @@ class ModelDefinition:
 
 
 # 准入记录：一次模型测试通过时写入的事实，与目录分开保存（工单 #86）。
-# 地址、凭据引用、协议取自所属连接，上游模型 ID 与推理参数方式取自定义，是测试时的受影响字段快照；
-# 有效性逐项比较，改连接字段则整条连接的定义全部回候选，改上游模型 ID 或推理参数方式只影响该条定义
+# 地址、凭据引用取自所属连接，协议、上游模型 ID 与推理参数方式取自定义，是测试时的受影响字段快照；
+# 有效性逐项比较：改连接的地址或凭据引用则整条连接的定义全部回候选，
+# 改本定义的协议、上游模型 ID 或推理参数方式只影响该条定义（ADR-0033）
 @dataclass(frozen=True)
 class AdmissionRecord:
     model_id: str
@@ -155,7 +158,7 @@ def admission_is_current(record: AdmissionRecord, model: ModelDefinition,
     # 推理参数方式参与比较（工单 #87），支持档位与默认档位不参与（修改后准入保持）
     return (record.base_url == provider.base_url
             and record.credential_ref == provider.credential_ref
-            and record.protocol == provider.protocol
+            and record.protocol == model.protocol
             and record.model == model.model
             and record.reasoning_mode == (model.reasoning_mode or ""))
 
@@ -367,8 +370,6 @@ class ProviderStore:
                 provider_by_id.setdefault(provider.id, provider)
             if not isinstance(provider.name, str) or not provider.name:
                 issues.append(ValidationIssue(f"{location}.name", "必须是非空字符串"))
-            if not isinstance(provider.protocol, str) or provider.protocol not in SUPPORTED_PROTOCOLS:
-                issues.append(ValidationIssue(f"{location}.protocol", "协议不受支持"))
             if not isinstance(provider.timeout_sec, (int, float)) or isinstance(provider.timeout_sec, bool) \
                     or not math.isfinite(float(provider.timeout_sec)) or provider.timeout_sec <= 0:
                 issues.append(ValidationIssue(f"{location}.timeout_sec", "必须是正的有限数值"))
@@ -398,6 +399,8 @@ class ProviderStore:
                 issues.append(ValidationIssue(f"{location}.provider_id", "Provider 配置不存在"))
             if not isinstance(model.model, str) or not model.model.strip():
                 issues.append(ValidationIssue(f"{location}.model", "必须是非空字符串"))
+            if not isinstance(model.protocol, str) or model.protocol not in SUPPORTED_PROTOCOLS:
+                issues.append(ValidationIssue(f"{location}.protocol", "协议不受支持"))
             _validate_positive_int(model.context_window, f"{location}.context_window", issues, allow_none=True)
             _validate_positive_int(model.max_output_tokens, f"{location}.max_output_tokens", issues, allow_none=False)
             if model.context_window is not None and model.max_output_tokens is not None \
@@ -414,15 +417,14 @@ class ProviderStore:
                                               "取值只能是 " + "、".join(sorted(INPUT_MODALITIES))))
             elif "text" not in model.input_modalities:
                 issues.append(ValidationIssue(f"{location}.input_modalities", "文本输入总是包含"))
-            _validate_reasoning_declaration(model, location, provider_by_id, issues)
+            _validate_reasoning_declaration(model, location, issues)
         if issues:
             raise CatalogValidationError(issues)
 
 def _validate_reasoning_declaration(model: ModelDefinition, location: str,
-                                    provider_by_id: Mapping[str, ProviderDefinition],
                                     issues: list[ValidationIssue]) -> None:
     # 推理档位声明（ADR-0006）：三项一起声明，部分声明直接拒绝；默认档位属于支持档位；
-    # 推理参数方式取值受限并与所属连接的协议相符（设计说明第 7.1、7.4 节）
+    # 推理参数方式取值受限并与本定义的协议相符（设计说明第 7.1、7.4 节）
     declared = (bool(model.reasoning_levels), model.default_reasoning_level is not None,
                 bool(model.reasoning_mode))
     if any(declared) and not all(declared):
@@ -448,12 +450,11 @@ def _validate_reasoning_declaration(model: ModelDefinition, location: str,
     if model.reasoning_mode not in REASONING_MODES:
         issues.append(ValidationIssue(f"{location}.reasoning_mode", "推理参数方式不受支持"))
         return
-    provider = provider_by_id.get(model.provider_id)
-    if provider is not None and provider.protocol not in ("", "fake") \
-            and provider.protocol not in REASONING_MODE_PROTOCOLS[model.reasoning_mode]:
+    if model.protocol not in ("", "fake") \
+            and model.protocol not in REASONING_MODE_PROTOCOLS[model.reasoning_mode]:
         issues.append(ValidationIssue(
             f"{location}.reasoning_mode",
-            f"推理参数方式 {model.reasoning_mode} 与连接协议 {provider.protocol} 不相符"))
+            f"推理参数方式 {model.reasoning_mode} 与协议 {model.protocol} 不相符"))
 
 
 def _parse_catalog(raw: Mapping[str, Any]) -> tuple[list[ProviderDefinition], list[ModelDefinition]]:
@@ -462,7 +463,7 @@ def _parse_catalog(raw: Mapping[str, Any]) -> tuple[list[ProviderDefinition], li
     allowed = {"providers", "models", "revision"}
     unknown = sorted(set(raw) - allowed, key=str)
     issues: list[ValidationIssue] = [ValidationIssue(f"catalog.{key}", "未知字段") for key in unknown]
-    # 一份连接声明一种协议；模型访问定义声明协议时直接报可定位问题（ADR-0004）
+    # 连接不声明协议（ADR-0033）；模型访问定义必填协议
     providers: list[ProviderDefinition] = []
     models: list[ModelDefinition] = []
     provider_items = raw.get("providers", [])
@@ -491,15 +492,18 @@ def _parse_catalog(raw: Mapping[str, Any]) -> tuple[list[ProviderDefinition], li
 def _parse_provider(raw: Any, location: str) -> tuple[ProviderDefinition | None, list[ValidationIssue]]:
     if not isinstance(raw, Mapping):
         return None, [ValidationIssue(location, "应为对象")]
-    allowed = {"id", "name", "protocol", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url"}
+    allowed = {"id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url"}
     issues = [ValidationIssue(f"{location}.{key}", "未知字段") for key in sorted(set(raw) - allowed, key=str)]
-    required = {"id", "name", "protocol"}
-    missing = required - set(raw)
+    # 连接上出现协议字段时直接拒绝，不迁移、不补默认值（ADR-0033、设计说明第 4.6 节）
+    if "protocol" in raw:
+        issues.append(ValidationIssue(
+            f"{location}.protocol", "连接不再声明调用协议，请在每个模型访问定义上声明"))
+    missing = {"id", "name"} - set(raw)
     issues.extend(ValidationIssue(f"{location}.{key}", "缺少必填项") for key in sorted(missing))
     if issues:
         return None, issues
     return ProviderDefinition(
-        id=raw["id"], name=raw["name"], protocol=raw["protocol"],
+        id=raw["id"], name=raw["name"],
         base_url=raw.get("base_url", ""), credential_ref=raw.get("credential_ref", ""),
         timeout_sec=raw.get("timeout_sec", DEFAULT_TIMEOUT_SEC),
         preset_id=raw.get("preset_id", ""), models_url=raw.get("models_url", ""),
@@ -509,19 +513,15 @@ def _parse_provider(raw: Any, location: str) -> tuple[ProviderDefinition | None,
 def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[ValidationIssue]]:
     if not isinstance(raw, Mapping):
         return None, [ValidationIssue(location, "应为对象")]
-    # protocol 仍是已知字段，但模型访问定义不再声明协议（ADR-0004）：看到它时指出字段位置，
-    # 其余未知字段（含准入字段）按未知字段处理（工单 #86）
+    # 调用协议是模型访问定义的必填字段（ADR-0033）；其余未知字段（含准入字段）按未知字段处理（工单 #86）
     allowed = {
-        "id", "provider_id", "model", "context_window", "max_output_tokens",
-        "capability_source", "accepts_required_tool_call", "protocol",
+        "id", "provider_id", "model", "protocol", "context_window", "max_output_tokens",
+        "capability_source", "accepts_required_tool_call",
         "reasoning_levels", "default_reasoning_level", "reasoning_mode", "input_modalities",
     }
     issues = [ValidationIssue(f"{location}.{key}", "未知字段")
               for key in sorted(set(raw) - allowed, key=str)]
-    if "protocol" in raw:
-        issues.append(ValidationIssue(
-            f"{location}.protocol", "模型访问定义不再声明协议，请在 Provider 配置上声明"))
-    required = {"id", "provider_id", "model", "max_output_tokens"}
+    required = {"id", "provider_id", "model", "protocol", "max_output_tokens"}
     missing = required - set(raw)
     issues.extend(ValidationIssue(f"{location}.{key}", "缺少必填项") for key in sorted(missing))
     if issues:
@@ -560,7 +560,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         issues.append(ValidationIssue(f"{location}.input_modalities", "应为字符串数组"))
     return ModelDefinition(
         id=raw["id"], provider_id=raw["provider_id"], model=raw["model"],
-        context_window=raw.get("context_window"),
+        protocol=raw["protocol"], context_window=raw.get("context_window"),
         max_output_tokens=raw["max_output_tokens"], capability_source=raw.get("capability_source", ""),
         accepts_required_tool_call=raw.get("accepts_required_tool_call", True),
         reasoning_levels=levels if isinstance(levels, tuple) else (),

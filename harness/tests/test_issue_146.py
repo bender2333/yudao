@@ -83,20 +83,20 @@ class _Upstream:
         self.server.server_close()
 
 def _provider(provider_id="provider-a", *, base_url, models_url="", preset_id=""):
-    return {"id": provider_id, "name": provider_id, "protocol": "responses", "base_url": base_url,
+    return {"id": provider_id, "name": provider_id, "base_url": base_url,
             "credential_ref": "KEY_A", "timeout_sec": 20, "preset_id": preset_id, "models_url": models_url}
 
 def _document_model(model_id, provider_id="provider-a", *, upstream="upstream-a", input_modalities=None,
-                    context_window=32000, max_output_tokens=4096):
-    entry = {"id": model_id, "provider_id": provider_id, "model": upstream,
+                    context_window=32000, max_output_tokens=4096, protocol="responses"):
+    entry = {"id": model_id, "provider_id": provider_id, "model": upstream, "protocol": protocol,
              "context_window": context_window, "max_output_tokens": max_output_tokens, "capability_source": ""}
     if input_modalities is not None:
         entry["input_modalities"] = input_modalities
     return entry
 
 def _command_model(model_id, *, upstream="upstream-a", input_modalities=None,
-                   context_window=32000, max_output_tokens=4096, capacity_confirmed=True):
-    return {"id": model_id, "model": upstream, "context_window": context_window,
+                   context_window=32000, max_output_tokens=4096, capacity_confirmed=True, protocol="responses"):
+    return {"id": model_id, "model": upstream, "protocol": protocol, "context_window": context_window,
             "max_output_tokens": max_output_tokens, "capability_source": "",
             "capacity_confirmed": capacity_confirmed, "input_modalities": input_modalities or ["text"]}
 

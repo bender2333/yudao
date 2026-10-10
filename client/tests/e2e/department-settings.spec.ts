@@ -302,14 +302,14 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
         project_id: id, department: "product", base_version: version,
         provider_id: "opencode-go", model_id: "glm-4.6", requested_tier: "high", department_prompt: null,
       });
-      const catalog = await fetchQuery<{ revision: number; providers: { id: string; name: string; protocol: string;
+      const catalog = await fetchQuery<{ revision: number; providers: { id: string; name: string;
         base_url: string; credential_ref: string; timeout_sec: number; preset_id: string; models_url: string }[] }>(
         page, "catalog");
       const provider = catalog.providers.find((item) => item.id === "opencode-go");
       expect(provider).toBeDefined();
       // 只取连接保存命令的字段（第 4.6 节：未知字段拒绝），改地址让它的准入作废；
       // 模型访问定义按原样带上，因此引用保留、显示「准入已作废」而不是「定义不存在」
-      const models = await fetchQuery<{ models: { id: string; provider_id: string; model: string;
+      const models = await fetchQuery<{ models: { id: string; provider_id: string; model: string; protocol: string;
         context_window: number | null; max_output_tokens: number; capability_source: string;
         accepts_required_tool_call: boolean; input_modalities: string[]; reasoning_levels: string[];
         default_reasoning_level: string | null; reasoning_mode: string }[] }>(page, "catalog");
@@ -318,12 +318,13 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
       await expectAccepted(page, "catalog.connection.save", {
         base_version: catalog.revision,
         provider: {
-          id: provider!.id, name: provider!.name, protocol: provider!.protocol,
+          id: provider!.id, name: provider!.name,
           base_url: "https://invalid.example/v1", credential_ref: provider!.credential_ref,
           timeout_sec: provider!.timeout_sec, preset_id: provider!.preset_id, models_url: provider!.models_url,
         },
         models: [{
-          id: definition!.id, model: definition!.model, context_window: definition!.context_window,
+          id: definition!.id, model: definition!.model, protocol: definition!.protocol,
+          context_window: definition!.context_window,
           max_output_tokens: definition!.max_output_tokens, capability_source: definition!.capability_source,
           capacity_confirmed: true, accepts_required_tool_call: definition!.accepts_required_tool_call,
           input_modalities: definition!.input_modalities, reasoning_levels: definition!.reasoning_levels,

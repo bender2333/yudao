@@ -8,6 +8,7 @@ import { useState } from "react";
 import type { CatalogAdmission, CatalogCredential } from "../../api/generated/types.gen";
 import {
   CUSTOM_PRESET_ID,
+  DEFAULT_PROTOCOL,
   PROTOCOL_LABELS,
   REASONING_MODE_LABELS,
   REASONING_LEVELS,
@@ -80,23 +81,22 @@ export function ProviderForm(props: ProviderFormProps) {
     const next = presetById(props.presets, presetId);
     const patch: Partial<FormState> = mode === "add"
       ? formPatchForPreset(state, next)
-      : { preset_id: presetId, base_url: next ? presetBaseUrlFor(next, state.protocol) : state.base_url, models_url: "" };
+      : { preset_id: presetId, base_url: next ? presetBaseUrlFor(next, state.rows[0]?.protocol ?? DEFAULT_PROTOCOL) : state.base_url,
+          models_url: "" };
     props.onPatch(patch);
   };
 
-  const chooseProtocol = (protocol: string) => {
-    const patch: Partial<FormState> = { protocol };
+  // 切换一行定义上的调用协议（ADR-0033）：内置服务方案的地址按协议取预置表基址；
+  // 推理参数方式与协议不符时清空推理档位声明（第 7.1、7.4 节）：支持档位、默认档位与推理参数方式
+  // 三项一起声明，缺任一项时请求不带推理参数，所以清空方式时三项一起清空
+  const chooseProtocol = (row: FormRow, protocol: string) => {
+    props.onPatchRow(row.key, { protocol });
     if (preset) {
-      patch.base_url = presetBaseUrlFor(preset, protocol);
+      props.onPatch({ base_url: presetBaseUrlFor(preset, protocol) });
     }
-    props.onPatch(patch);
-    // 推理参数方式与协议不符时清空推理档位声明（第 7.1、7.4 节）：支持档位、默认档位与推理参数方式
-    // 三项一起声明，缺任一项时请求不带推理参数，所以清空方式时三项一起清空
     const modes = reasoningModeOptions(protocol);
-    for (const row of state.rows) {
-      if (row.reasoning_mode !== "" && !modes.includes(row.reasoning_mode)) {
-        props.onPatchRow(row.key, { reasoning_mode: "", reasoning_levels: [], default_reasoning_level: "" });
-      }
+    if (row.reasoning_mode !== "" && !modes.includes(row.reasoning_mode)) {
+      props.onPatchRow(row.key, { reasoning_mode: "", reasoning_levels: [], default_reasoning_level: "" });
     }
   };
 
@@ -155,15 +155,6 @@ export function ProviderForm(props: ProviderFormProps) {
         <span className="mm-label">名称</span>
         <input className="y9-input" value={state.name} required placeholder="OpenCode Go"
                onChange={(event) => props.onPatch({ name: event.target.value })} />
-      </label>
-      <label className="y9-field mm-field">
-        <span className="mm-label">协议</span>
-        <select className="y9-select" value={state.protocol} data-testid="protocol-select"
-                onChange={(event) => chooseProtocol(event.target.value)}>
-          {Object.entries(PROTOCOL_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
       </label>
       <label className="y9-field mm-field">
         <span className="mm-label">地址</span>
@@ -284,7 +275,7 @@ export function ProviderForm(props: ProviderFormProps) {
         {state.rows.map((row) => {
           const admission = admissionOf(state.id, row.id, props.admissions);
           const levelChoices = defaultLevelOptions(row.reasoning_levels);
-          const modeChoices = reasoningModeOptions(state.protocol);
+          const modeChoices = reasoningModeOptions(row.protocol);
           const rowKey = row.id || row.key;
           // 容量的问题（缺少哪一项或哪一项的关系不成立）与目录文档校验同一份判断（工单 #294）
           const capacityIssue = capacityIssueText({
@@ -310,6 +301,15 @@ export function ProviderForm(props: ProviderFormProps) {
                   发给上游的是「{row.model}」，ID「{row.id}」只在本系统内使用。
                 </p>
               )}
+              <label className="y9-field mm-field">
+                <span className="mm-label">调用协议</span>
+                <select className="y9-select" value={row.protocol} data-testid={`row-protocol-${rowKey}`}
+                        onChange={(event) => chooseProtocol(row, event.target.value)}>
+                  {Object.entries(PROTOCOL_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </label>
               <label className="y9-field mm-field">
                 <span className="mm-label">窗口</span>
                 <input className="y9-input" type="number" min="1" value={row.context_window} data-testid={`row-window-${rowKey}`}

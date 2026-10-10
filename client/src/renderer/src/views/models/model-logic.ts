@@ -43,6 +43,9 @@ export const REASONING_MODE_LABELS: Record<string, string> = {
 // 三种协议与预置表 base_urls 的键一致；fake 只在测试与演示启动时出现，界面不提供
 export const UI_PROTOCOLS = ["responses", "chat_completions", "messages"] as const;
 
+// 新建的访问定义预填的协议（工单 #382 第 5 条）
+export const DEFAULT_PROTOCOL = "chat_completions";
+
 export const PROTOCOL_LABELS: Record<string, string> = {
   responses: "Responses",
   chat_completions: "Chat Completions",
@@ -67,7 +70,9 @@ export const CONFIG_STATE_LABELS: Record<string, string> = {
 // 「自定义」表示不使用预置表（设计说明第 4.1 节），连接保存空的 preset_id
 export const CUSTOM_PRESET_ID = "";
 
-// 一份服务方案在某协议下的请求基址；自定义方案没有预置地址
+// 一份服务方案在某协议下的请求基址；自定义方案没有预置地址。
+// 协议属于访问定义（ADR-0033），连接表单里的地址按定义行的协议取：
+// 没有行时用新建定义的预填协议
 export function presetBaseUrlFor(preset: ServicePreset | null, protocol: string): string {
   return preset?.base_urls?.[protocol] ?? "";
 }
@@ -436,6 +441,8 @@ export type FormRow = {
   key: string;
   id: string;
   model: string;
+  // 调用协议属于访问定义（ADR-0033），新建的定义预填 Chat Completions
+  protocol: string;
   // 窗口与输出上限保存为文本，空字符串表示没有值（未「接受」时留空）
   context_window: string;
   max_output_tokens: string;
@@ -454,7 +461,6 @@ export type FormRow = {
 export type FormState = {
   id: string;
   name: string;
-  protocol: string;
   base_url: string;
   credential_ref: string;
   preset_id: string;
@@ -505,6 +511,7 @@ export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCap
     key: newCommandId(),
     id: sanitizeModelId(candidate.id) || candidate.id,
     model: candidate.id,
+    protocol: DEFAULT_PROTOCOL,
     context_window: numberToText(prefill.context_window),
     max_output_tokens: numberToText(prefill.max_output_tokens),
     capacity_confirmed: false,
@@ -524,6 +531,7 @@ export function rowFromManual(index: number): FormRow {
     key: newCommandId(),
     id: `model-${index + 1}`,
     model: "",
+    protocol: DEFAULT_PROTOCOL,
     context_window: "",
     max_output_tokens: "",
     capacity_confirmed: false,
@@ -541,7 +549,7 @@ export function rowFromManual(index: number): FormRow {
 // 请求时限取目录合同的 default_timeout_sec：默认值只有后端一份，客户端不再各写一个数（工单 #294）
 export function emptyFormState(defaultTimeoutSec: number): FormState {
   return {
-    id: "", name: "", protocol: "responses", base_url: "", credential_ref: "",
+    id: "", name: "", base_url: "", credential_ref: "",
     preset_id: CUSTOM_PRESET_ID, models_url: "", timeout_sec: String(defaultTimeoutSec), rows: [],
   };
 }
@@ -562,7 +570,8 @@ function hostDefaults(address: string): Pick<FormState, "id" | "name" | "credent
 export function formPatchForPreset(state: FormState, preset: ServicePreset | null): Partial<FormState> {
   const defaults = preset ? { id: preset.id, name: preset.name,
     credential_ref: `${preset.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_KEY` } : null;
-  return { preset_id: preset?.id ?? CUSTOM_PRESET_ID, base_url: presetBaseUrlFor(preset, state.protocol),
+  return { preset_id: preset?.id ?? CUSTOM_PRESET_ID,
+    base_url: presetBaseUrlFor(preset, state.rows[0]?.protocol ?? DEFAULT_PROTOCOL),
     models_url: "", ...(defaults ?? { id: "", name: "", credential_ref: "" }) };
 }
 
@@ -582,7 +591,6 @@ export function formStateFromProvider(provider: CatalogProvider): FormState {
   return {
     id: provider.id,
     name: provider.name,
-    protocol: provider.protocol,
     base_url: provider.base_url,
     credential_ref: provider.credential_ref,
     preset_id: provider.preset_id,
@@ -592,6 +600,7 @@ export function formStateFromProvider(provider: CatalogProvider): FormState {
       key: model.id,
       id: model.id,
       model: model.model,
+      protocol: model.protocol,
       context_window: numberToText(model.context_window),
       max_output_tokens: numberToText(model.max_output_tokens),
       capacity_confirmed: true,
@@ -639,6 +648,7 @@ export function rowToModelInput(row: FormRow): Record<string, unknown> {
   return {
     id: row.id,
     model: row.model,
+    protocol: row.protocol,
     context_window: intFromInput(row.context_window),
     max_output_tokens: intFromInput(row.max_output_tokens),
     capability_source: row.capability_source,
@@ -658,7 +668,6 @@ export function providerInputFromForm(state: FormState): Record<string, unknown>
   return {
     id: state.id,
     name: state.name,
-    protocol: state.protocol,
     base_url: normalizeBaseUrl(state.base_url),
     credential_ref: state.credential_ref,
     ...(timeout === null ? {} : { timeout_sec: timeout }),

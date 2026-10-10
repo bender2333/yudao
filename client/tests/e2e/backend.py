@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -20,6 +21,7 @@ import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
 
 import uvicorn
 
@@ -50,7 +52,7 @@ from harness.proposals import (  # noqa: E402
 )
 from harness.providers.call import ModelResponse  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
-from harness.tests.protocol_helpers import responses_responder, serve  # noqa: E402
+from harness.tests.protocol_helpers import preset_base_urls, responses_responder, serve  # noqa: E402
 
 UNAVAILABLE = "Missing configuration: provider credential"
 
@@ -363,12 +365,13 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
         command_id=str(uuid.uuid4()),
         base_version=revision,
         provider=ProviderInput(
-            id="opencode-go", name="OpenCode Go", protocol="responses",
+            id="opencode-go", name="OpenCode Go",
             base_url=f"{upstream_base}/v1", credential_ref="OPENCODE_GO_KEY",
             timeout_sec=30, preset_id="opencode-go", models_url=models_url,
         ),
         models=[ModelInput(
-            id="glm-4.6", model="glm-4.6", context_window=200000, max_output_tokens=32000,
+            id="glm-4.6", model="glm-4.6", protocol="responses",
+            context_window=200000, max_output_tokens=32000,
             capability_source="能力表", capacity_confirmed=True,
             accepts_required_tool_call=True, input_modalities=["text"],
             reasoning_levels=["low", "high"], default_reasoning_level="low", reasoning_mode="effort",
@@ -394,12 +397,13 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
             command_id=str(uuid.uuid4()),
             base_version=application.system.facade.catalog_revision(),
             provider=ProviderInput(
-                id="rejected-go", name="拒绝的上游", protocol="responses",
+                id="rejected-go", name="拒绝的上游",
                 base_url=f"{reject_base}/v1", credential_ref="REJECTED_GO_KEY",
                 timeout_sec=30, models_url=models_url,
             ),
             models=[ModelInput(
-                id="glm-rejected", model="glm-rejected", context_window=200000, max_output_tokens=32000,
+                id="glm-rejected", model="glm-rejected", protocol="responses",
+                context_window=200000, max_output_tokens=32000,
                 capability_source="能力表", capacity_confirmed=True, input_modalities=["text"],
             )],
         ), actor="user:local")
@@ -502,6 +506,11 @@ def main() -> int:
         # 端到端据此核对预填的访问定义 ID 是合法写法、缺一项容量时不显示「容量已确认」
         {"id": "cbcn/deepseek-v4.1-flash", "limit": {"context": 128000}},
     ]})
+    # 目录里的连接带服务方案，请求基址按访问定义的协议取自预置表（ADR-0033）：端到端的真实请求
+    # 要打到测试内的上游。ExitStack 留在变量里，重定向在本进程内一直有效
+    preset_redirect = contextlib.ExitStack()
+    preset_redirect.enter_context(
+        preset_base_urls(f"{upstream_base}/v1", models_url=models_server.base))
     data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
     port = args.port
     if args.room:

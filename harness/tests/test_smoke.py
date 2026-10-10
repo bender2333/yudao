@@ -125,8 +125,9 @@ def test_directory_fake_protocol_is_flagged_and_never_passes_as_real(tmp_path):
     # fake 连接可以进入目录；它仍然不能作为真实工作通过
     facade = ProviderFacade(startup_mode="test")
     facade.store_document({
-        "providers": [{"id": "fake-provider", "name": "Fake", "protocol": "fake"}],
+        "providers": [{"id": "fake-provider", "name": "Fake", "base_url": ""}],
         "models": [{"id": "fake-model", "provider_id": "fake-provider", "model": "fake-script",
+                    "protocol": "fake",
                     "context_window": 32_000, "max_output_tokens": 4_096}],
         "bindings": {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
                      for department in ("product", "engineering", "quality")},
@@ -583,10 +584,11 @@ def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path):
     (tmp_path / "smoke-report.json").write_text(json.dumps({"scenarios": {"old": {"phase": "DONE"}}}), encoding="utf-8")
     config = tmp_path / "providers.json"
     config.write_text(json.dumps({
-        "providers": [{"id": "provider", "name": "Provider", "protocol": "responses",
+        "providers": [{"id": "provider", "name": "Provider",
                        "base_url": "https://provider.example/v1", "credential_ref": "MISSING_KEY"}],
         "models": [{"id": "model", "provider_id": "provider", "model": "model",
-                     "context_window": 32000, "max_output_tokens": 4096}],
+                    "protocol": "responses",
+                    "context_window": 32000, "max_output_tokens": 4096}],
         "bindings": {department: {"provider_id": "provider", "model_id": "model"}
                      for department in ("product", "engineering", "quality")},
     }), encoding="utf-8")
@@ -600,8 +602,9 @@ def test_smoke_markdown_reports_model_input_audit(tmp_path):
     # 模型目录使用 fake 协议，场景照常运行并写出报告
     config = tmp_path / "providers.json"
     config.write_text(json.dumps({
-        "providers": [{"id": "fake-provider", "name": "Fake", "protocol": "fake"}],
+        "providers": [{"id": "fake-provider", "name": "Fake", "base_url": ""}],
         "models": [{"id": "fake-model", "provider_id": "fake-provider", "model": "fake-script",
+                    "protocol": "fake",
                     "context_window": 32_000, "max_output_tokens": 4_096}],
         "bindings": {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
                      for department in ("product", "engineering", "quality")},
@@ -626,8 +629,9 @@ def test_smoke_reads_the_catalog_in_its_data_directory(tmp_path):
     assert missing["available"] is False and missing["stop_reason"] == "provider_config_missing"
     assert Path(missing["provider_config"]) == data_dir / "providers.json"
     (data_dir / "providers.json").write_text(json.dumps({
-        "providers": [{"id": "fake-provider", "name": "Fake", "protocol": "fake"}],
+        "providers": [{"id": "fake-provider", "name": "Fake", "base_url": ""}],
         "models": [{"id": "fake-model", "provider_id": "fake-provider", "model": "fake-script",
+                    "protocol": "fake",
                     "context_window": 32_000, "max_output_tokens": 4_096}],
         "bindings": {department: {"provider_id": "fake-provider", "model_id": "fake-model"}
                      for department in ("product", "engineering", "quality")},

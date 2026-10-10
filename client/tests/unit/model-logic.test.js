@@ -309,19 +309,19 @@ test("添加时的表单为空，编辑时恢复服务方案、协议与已保�
   const empty = emptyFormState(600);
   assert.equal(empty.rows.length, 0);
   assert.equal(empty.preset_id, CUSTOM_PRESET_ID);
-  assert.equal(empty.protocol, "responses");
   assert.equal(empty.timeout_sec, "600");
   // 后端给出别的值时按该值填入
   assert.equal(emptyFormState(45).timeout_sec, "45");
 
   const provider = {
-    id: "p1", name: "OpenCode Go", protocol: "chat_completions", base_url: "https://open/zen/go/v1",
+    id: "p1", name: "OpenCode Go", base_url: "https://open/zen/go/v1",
     credential_ref: "KEY", timeout_sec: 45, preset_id: "opencode-go", models_url: "",
     credential: { ref: "KEY", configured: true, source: "dotenv", has_override: false, version: 1 },
     credential_configured: true,
     models: [
       {
-        id: "m1", provider_id: "p1", model: "glm-4.6", context_window: 1000, max_output_tokens: 100,
+        id: "m1", provider_id: "p1", model: "glm-4.6", protocol: "chat_completions",
+        context_window: 1000, max_output_tokens: 100,
         capability_source: "能力表 2026-10-01.1", accepts_required_tool_call: true,
         input_modalities: ["text", "image"], reasoning_levels: ["low", "high"],
         default_reasoning_level: "high", reasoning_mode: "effort",
@@ -330,7 +330,7 @@ test("添加时的表单为空，编辑时恢复服务方案、协议与已保�
   };
   const state = formStateFromProvider(provider);
   assert.equal(state.preset_id, "opencode-go");
-  assert.equal(state.protocol, "chat_completions");
+  assert.equal(state.rows[0].protocol, "chat_completions");
   assert.equal(state.base_url, "https://open/zen/go/v1");
   assert.equal(state.timeout_sec, "45");
   assert.equal(state.rows.length, 1);

@@ -15,15 +15,17 @@ from harness.providers import (
 def _document(**overrides):
     document = {
         "providers": [
-            {"id": "provider-a", "name": "Provider A", "protocol": "responses",
+            {"id": "provider-a", "name": "Provider A",
              "base_url": "https://a.example/v1", "credential_ref": "credential-a"},
-            {"id": "provider-b", "name": "Provider B", "protocol": "responses",
+            {"id": "provider-b", "name": "Provider B",
              "base_url": "https://b.example/v1", "credential_ref": "credential-b"},
         ],
         "models": [
             {"id": "model-a", "provider_id": "provider-a", "model": "model-a",
+             "protocol": "responses",
              "context_window": 32000, "max_output_tokens": 4096},
             {"id": "model-b", "provider_id": "provider-b", "model": "model-b",
+             "protocol": "responses",
              "context_window": 32000, "max_output_tokens": 4096},
         ],
         "bindings": {
@@ -50,7 +52,7 @@ def admit_bound_models(facade, document=None):
     bindings = (document or facade.to_document())["bindings"]
     view = facade.providers_view()
     models = {item["id"]: item for item in view["models"]}
-    protocols = {item["id"]: item["protocol"] for item in view["providers"]}
+    protocols = {item["id"]: item.get("protocol") for item in view["models"]}
     admitted: set[tuple[str, str]] = set()
     for item in bindings.values():
         provider_id, model_id = item.get("provider_id"), item.get("model_id")
@@ -58,7 +60,7 @@ def admit_bound_models(facade, document=None):
             continue
         admitted.add((provider_id, model_id))
         model = models.get(model_id)
-        if model is None or protocols.get(provider_id) == "fake":
+        if model is None or protocols.get(model_id) == "fake":
             continue
         facade.record_admission(provider_id, model_id, admitted_model=model["model"])
 
@@ -278,33 +280,33 @@ def test_narrowing_supported_levels_keeps_a_referencing_binding_accepted():
     assert public["requested_tier"] == "high"
     assert public["sent_tier"] == "medium"
 
-def test_provider_config_requires_a_protocol():
-    # 连接声明一种协议（ADR-0004）；缺少时指出字段位置
+def test_provider_config_rejects_a_protocol():
+    # 连接不再声明调用协议（ADR-0033）；出现时指出字段位置
     document = _document()
-    del document["providers"][0]["protocol"]
+    document["providers"][0]["protocol"] = "responses"
     facade = ProviderFacade()
     with pytest.raises(CatalogValidationError) as caught:
         facade.store_document(document)
     assert any(issue.location == "providers[0].protocol" for issue in caught.value.issues)
 
 
-def test_model_definition_declaring_protocol_is_rejected_without_migration():
-    # 模型访问定义不再声明协议（ADR-0004）：指出字段位置，不迁移
+def test_model_definition_requires_a_protocol():
+    # 模型访问定义必须声明协议（ADR-0033）：缺少时指出字段位置
     document = _document()
-    document["models"][0]["protocol"] = "responses"
+    del document["models"][0]["protocol"]
     facade = ProviderFacade()
     with pytest.raises(CatalogValidationError) as caught:
         facade.store_document(document)
     assert any(issue.location == "models[0].protocol" for issue in caught.value.issues)
 
 
-def test_model_without_protocol_is_accepted():
+def test_model_with_protocol_is_accepted():
     facade = ProviderFacade()
     assertion = facade.store_document(_document())
     assert assertion >= 1
     view = facade.providers_view()
-    assert "protocol" not in view["models"][0]
-    assert view["providers"][0]["protocol"] == "responses"
+    assert view["models"][0]["protocol"] == "responses"
+    assert "protocol" not in view["providers"][0]
 
 
 def test_snapshot_freezes_three_targets_without_persisting_secrets():
@@ -326,6 +328,7 @@ def test_each_target_is_independent_and_frozen_after_publish():
     revision_before = facade.revision
     facade.save_model({
         "id": "model-c", "provider_id": "provider-a", "model": "model-c",
+        "protocol": "responses",
         "context_window": 8000, "max_output_tokens": 512,
     })
     assert facade.revision > revision_before
