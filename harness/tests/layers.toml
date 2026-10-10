@@ -144,6 +144,7 @@
 "test_text_only_reply.py" = "integration"
 "test_tools.py" = "integration"
 "test_tree_archive.py" = "module"
+"test_undefined_names.py" = "module"
 "test_user_facing_labels.py" = "unit"
 "test_workspace_boundary.py" = "unit"
 "test_workspace_delivery.py" = "integration"
