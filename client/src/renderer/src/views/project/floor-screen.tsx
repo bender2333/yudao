@@ -12,8 +12,11 @@ import { createRafClock, type Clock } from "../../pixel/clock";
 import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
 import type { DecisionAnswer, DecisionResult } from "../../pixel/floor/card";
 import type { FloorModel, LoopItem, PixelFloorEvent } from "../../pixel/world/types";
+import { itemColor } from "../../pixel/world/floor.ts";
 import { face, sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
+import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
+import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
 
 /** 画面里的事项：project.loop 的行加上队列位置与等待模型服务的时间。 */
@@ -230,7 +233,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const flow = useSnapshot<ProjectFlowResult>(props.app, "page.loop.flow", "project.flow", {
     project_id: props.projectId,
   });
-  const flowSegments = useMemo(() => flowSegmentsOf(flow.data), [flow.data]);
+  const flowSegments = useMemo(() => flowSegmentsOf(flow.data?.records ?? null), [flow.data]);
   useEffect(() => {
     viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data, flowSegments));
   }, [overlay, loop.data, decisions.data, flowSegments]);
@@ -243,48 +246,27 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   );
 
   return (
-    <div className="y9-scene floor-screen">
-      <div className="y9-overlay-bar floor-overlay-tabs">
-        {OVERLAY_LABELS.filter(([name]) => overlays.includes(name)).map(([name, labelText]) => (
-          <button
-            key={name}
-            type="button"
-            className={`y9-seg-btn${overlay === name ? " is-on active" : ""}`}
-            onClick={() => setOverlay(overlay === name ? null : name)}
-          >
-            {labelText}
-          </button>
-        ))}
+    // 覆盖层按钮条是画面上方一条独立的深色条（原型 v9 scenes.js mountFloor）：不压在画面上
+    <div className="floor-screen">
+      <div className="y9-scene y9-floor-wrap">
+        <div className="y9-overlay-bar floor-overlay-tabs" role="group" aria-label="覆盖层">
+          {OVERLAY_LABELS.filter(([name]) => overlays.includes(name)).map(([name, labelText]) => (
+            <button
+              key={name}
+              type="button"
+              className={`y9-seg-btn${overlay === name ? " is-on active" : ""}`}
+              onClick={() => setOverlay(overlay === name ? null : name)}
+            >
+              {labelText}
+            </button>
+          ))}
+        </div>
+        <div className="floor-canvas" ref={hostRef} />
       </div>
-      <div className="floor-canvas" ref={hostRef} />
       {error !== null ? <p className="pixel-canvas-error">楼层画面加载失败：{error}</p> : null}
       <FloorTextList items={model.items} decisions={openDecisions} app={props.app} />
     </div>
   );
-}
-
-/** 流转覆盖层的段：按起点、终点与是否返工分组，统计次数与最后时间（原型 v9 scenes.js overlayData）。 */
-export function flowSegmentsOf(flow: ProjectFlowResult | null): { from: string; to: string; count: number; last_at: string; kind: string }[] {
-  const groups: Record<string, { from: string; to: string; count: number; last_at: string; kind: string }> = {};
-  for (const record of flow?.records ?? []) {
-    if (!record.direction_from || !record.direction_to) continue;
-    const rework = record.kind === "返工";
-    const key = `${record.direction_from}>${record.direction_to}>${rework ? "rework" : record.kind}`;
-    const group = groups[key];
-    if (group) {
-      group.count += 1;
-      if (record.created_at > group.last_at) group.last_at = record.created_at;
-    } else {
-      groups[key] = {
-        from: record.direction_from,
-        to: record.direction_to,
-        count: 1,
-        last_at: record.created_at,
-        kind: rework ? "rework" : record.kind,
-      };
-    }
-  }
-  return Object.values(groups);
 }
 
 /** 覆盖层的数据：按能力清单里的覆盖层名称取对应查询的结果；没有登记时不给数据。 */
@@ -292,7 +274,7 @@ function overlayData(
   name: string,
   loop: ProjectLoopResult | null,
   decisions: DecisionList | null,
-  flowSegments: { from: string; to: string; count: number; last_at: string; kind: string }[],
+  flowSegments: FlowSegment[],
 ): Record<string, unknown> | null {
   if (name === "waiting") {
     const entries = (loop?.work_items ?? [])
@@ -312,7 +294,8 @@ function overlayData(
   return null;
 }
 
-/** 宽度不足时的文字列表：事项、所在部门、第几轮、状态（设计说明第 5.7 节），以及等待回答的决定请求。 */
+/** 画面下方的文字列表：默认折叠（原型 v9 scenes.js floorList），每一行是事项的色点、
+ *  标题、中文部门名、轮次与中文状态；等待回答的决定请求在列表里用页面卡片回答。 */
 function FloorTextList(props: {
   items: LoopItem[];
   decisions: DecisionView[];
@@ -323,30 +306,34 @@ function FloorTextList(props: {
     workItemId ? props.items.find((it) => it.work_item_id === workItemId)?.sign ?? workItemId : "";
   return (
     <>
-      {props.items.length === 0 ? <p className="y9-note note">项目还没有事项</p> : (
-        <ul className="y9-scene-list floor-text-list">
-          {props.items.map((item) => (
-            <li key={item.work_item_id}>
-              <strong>{item.sign}</strong>
-              <span>{item.department ?? "—"}</span>
-              <span>第 {item.round} 轮</span>
-              <span>{item.status}</span>
-              {item.kind === "onboarding" ? <span className="y9-tag tag">建档</span> : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答（设计说明第 9 节） */}
-      <DecisionCardList
-        app={props.app}
-        decisions={props.decisions}
-        now={now}
-        names={(decision) => ({ projectName: decision.project_id ?? "", workItemTitle: titleOf(decision.work_item_id) })}
-        onNavigate={(hash) => {
-          window.location.hash = hash.startsWith("#") ? hash.slice(1) : hash;
-        }}
-        emptyText="没有等待回答的决定请求"
-      />
+      <details className="y9-scene-list floor-text-list">
+        <summary>文字列表</summary>
+        {props.items.length === 0 ? <p className="y9-note note">项目还没有事项</p> : (
+          <ul>
+            {props.items.map((item) => (
+              <li key={item.work_item_id}>
+                <span className="y9-dot-color" style={{ "--c": itemColor(item) } as React.CSSProperties} />
+                <strong>{item.sign}</strong>
+                <span>{item.department === null || item.department === "" ? "大厅" : departmentName(item.department)}</span>
+                <span>第 {item.round} 轮</span>
+                <span>{label(WORK_ITEM_STATUS, item.status)}</span>
+                {item.kind === "onboarding" ? <span className="y9-tag tag">建档</span> : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答（设计说明第 9 节） */}
+        <DecisionCardList
+          app={props.app}
+          decisions={props.decisions}
+          now={now}
+          names={(decision) => ({ projectName: decision.project_id ?? "", workItemTitle: titleOf(decision.work_item_id) })}
+          onNavigate={(hash) => {
+            window.location.hash = hash.startsWith("#") ? hash.slice(1) : hash;
+          }}
+          emptyText="没有等待回答的决定请求"
+        />
+      </details>
     </>
   );
 }

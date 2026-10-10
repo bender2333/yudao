@@ -116,7 +116,7 @@ export function HomePage(props: {
         </p>
       ) : null}
 
-      <Section id="home-decisions" title="待你决定" className="card" note="跨项目，按发出时间排列">
+      <Section id="home-decisions" title="待你决定" note="跨项目，按发出时间排列">
         <DecisionNames
           app={props.app}
           decisions={waiting}
@@ -142,7 +142,7 @@ export function HomePage(props: {
         highlights={highlights}
       />
 
-      <Section id="home-projects" title="项目" className="card" note="按项目列出长期目标、当前成果与等待数量">
+      <Section id="home-projects" title="项目" note="按项目列出长期目标、当前成果与等待数量">
         {(replaying ? replayProjects.data : projects.data) === null ? (
           <Loading state={replaying ? replayProjects : projects} />
         ) : (
