@@ -94,8 +94,8 @@ class ReadOnlyCore:
         saved = self.store.projection(catalog_stream())
         if saved is None:
             return None
-        from .projection import load_projection
-        state = load_projection(saved, catalog_stream())
+        from ..project_projection import catalog_handler
+        state = catalog_handler().load(saved)
         if state.last_seen_position is None:
             return None
         return state.last_seen_position, state.last_seen_at

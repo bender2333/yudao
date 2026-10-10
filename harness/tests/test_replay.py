@@ -1,6 +1,6 @@
 import pytest
 
-from harness.projection import project_events
+from harness.projection import replay_events
 from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_decision, product_spec, response_turn, review_turn
 from harness.tests.helpers import happy_script, run_scripted, system_on_copy
 
@@ -55,7 +55,7 @@ def test_replay_matches_live_projection(happy_run):
     replayed = system.replay(run_id)
     assert replayed.canonical_state() == projection.canonical_state()
     events = system.store.list_events(run_id)
-    folded = project_events(events)
+    folded = replay_events(events)
     assert folded.canonical_state() == projection.canonical_state()
     assert folded.product_spec.content_hash == projection.product_spec.content_hash
     assert folded.delivery_spec.code_tree_digest == projection.delivery_spec.code_tree_digest

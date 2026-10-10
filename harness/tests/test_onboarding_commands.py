@@ -255,7 +255,7 @@ def test_old_project_stream_reads_kind_change_and_empty_provenance(data_dir, tmp
     from harness.artifacts import ArtifactStore
     from harness.event_store import EventStore, project_stream
     from harness.models import new_id
-    from harness.projection import saved_project
+    from harness.project_projection import handler_for, saved_project
     from harness.public_tree import capture_public_tree
     from harness.snapshot import restore_snapshot
     from harness.tree_archive import store_tree
@@ -264,7 +264,7 @@ def test_old_project_stream_reads_kind_change_and_empty_provenance(data_dir, tmp
     source = _source(tmp_path / "source")
     store = EventStore(data_dir / "events.sqlite")
     artifacts = ArtifactStore(data_dir / "artifacts")
-    writes = WritePath(store)
+    writes = WritePath(store, handler_for)
     try:
         project_id = new_id("proj")
         goal_ref = artifacts.put(project_id, "project_goal", GOAL, media_type="text/markdown")
