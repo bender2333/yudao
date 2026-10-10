@@ -75,6 +75,8 @@ export class FloorRenderer {
   private bgKey = "";
   /** 覆盖层的数据由宿主设置（setOverlay）。 */
   overlay: { id: string | null; data: Record<string, unknown> | null } = { id: null, data: null };
+  /** 最近一帧画出的覆盖层标签的矩形（画面逻辑坐标），供端到端测试核对标签互不遮挡（工单 #415）。 */
+  overlayLabels: { x: number; y: number; w: number; h: number; key: string }[] = [];
   /** 世界里的决定卡片：打开时画在最上层（工单 #179）。 */
   card: { draw: (c: CanvasRenderingContext2D) => void } | null = null;
 
@@ -614,30 +616,39 @@ export class FloorRenderer {
   private overlayLayer(c: CanvasRenderingContext2D): void {
     const overlay = this.overlay;
     if (!overlay.id || !overlay.data) return;
+    this.overlayLabels = [];
     c.fillStyle = "rgba(12,14,30,0.35)";
     c.fillRect(0, BAR, W, H - BAR);
     const world = this.driver.world;
-    const label = (x: number, y: number, text: string, bg?: string): void => {
-      drawSign(c, x, y, text, { size: 6, bg: bg ?? PAL.white, stripe: PAL.blue2, maxW: 150 });
+    const label = (key: string, x: number, y: number, text: string, bg?: string): void => {
+      const rect = drawSign(c, x, y, text, { size: 6, bg: bg ?? PAL.white, stripe: PAL.blue2, maxW: 150 });
+      this.overlayLabels.push({ ...rect, key });
     };
     const data = overlay.data;
     if (overlay.id === "flow") {
-      for (const seg of (data.segments ?? []) as { from: string; to: string; count: number; last_at: string; kind: string }[]) {
+      const segments = (data.segments ?? []) as { from: string; to: string; count: number; last_at: string; kind: string }[];
+      // 同一对部门的非返工行与返工行走同一条路径（工单 #415 的分组）：都画在中点时两块牌子叠在一起。
+      // 同一条路径上的第二块牌子往上抬一行，两块牌子因此错开，落点仍在这条路径的中点上
+      const lanes = new Map<string, number>();
+      for (const seg of segments) {
         const path = pathFor(world, seg.from, seg.to);
         if (!path) continue;
+        const key = `${seg.from}>${seg.to}`;
+        const lane = lanes.get(key) ?? 0;
+        lanes.set(key, lane + 1);
         const [x, y] = pointAt(path, polyLength(path) / 2);
-        label(x, y - 6, `${seg.count} 次`, seg.kind === "rework" ? PAL.red1 : PAL.white);
+        label(key, x, y - 6 - lane * 15, `${seg.count} 次`, seg.kind === "rework" ? PAL.red1 : PAL.white);
       }
     } else if (overlay.id === "waiting") {
       for (const e of (data.entries ?? []) as { department: string; text: string; waited_sec: number; row?: number }[]) {
         const r = roomOf(world, e.department) ?? this.rooms().hall;
-        label(r.x + r.w / 2, (e.row ?? 0) * 14 + 94, `${e.text} · ${Math.round(e.waited_sec)} 秒`, PAL.yellow1);
+        label(e.department, r.x + r.w / 2, (e.row ?? 0) * 14 + 94, `${e.text} · ${Math.round(e.waited_sec)} 秒`, PAL.yellow1);
       }
     } else if (overlay.id === "recovery") {
       for (const e of (data.entries ?? []) as { department: string; text: string; state: string }[]) {
         const r = roomOf(world, e.department);
         if (!r) continue;
-        label(r.x + r.w / 2, 94, e.text, e.state === "pending_verification" ? PAL.yellow1 : PAL.white);
+        label(e.department, r.x + r.w / 2, 94, e.text, e.state === "pending_verification" ? PAL.yellow1 : PAL.white);
       }
     } else if (overlay.id === "context_usage") {
       for (const e of (data.entries ?? []) as { department: string; role: string; ratio: number }[]) {
@@ -647,13 +658,13 @@ export class FloorRenderer {
         const seat = ch ? (r.seats && r.seats[ch.seatIndex]) || r.desk : null;
         const x = seat ? seat.seatX : r.x + r.w / 2;
         const row = ch ? ch.seatIndex % 2 : 0;
-        label(x, 152 - row * 11, `${(ch && ch.name) || e.role} ${Math.round(e.ratio * 100)}%`, e.ratio >= 0.8 ? PAL.orange1 : PAL.green1);
+        label(e.department, x, 152 - row * 11, `${(ch && ch.name) || e.role} ${Math.round(e.ratio * 100)}%`, e.ratio >= 0.8 ? PAL.orange1 : PAL.green1);
       }
     } else if (overlay.id === "semantic_records") {
       for (const e of (data.entries ?? []) as { department: string; valid: number; conflicts: number }[]) {
         const r = roomOf(world, e.department);
         if (!r) continue;
-        label(r.x + r.w / 2, 94, `有效 ${e.valid} · 冲突 ${e.conflicts}`, e.conflicts ? PAL.orange1 : PAL.white);
+        label(e.department, r.x + r.w / 2, 94, `有效 ${e.valid} · 冲突 ${e.conflicts}`, e.conflicts ? PAL.orange1 : PAL.white);
       }
     }
   }

@@ -7,11 +7,13 @@
 
 import { expect, test, type Page } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
-import { flowSegmentsOf, type FlowSegment } from "../../src/renderer/src/views/project/flow-segments.ts";
+import { type FlowSegment } from "../../src/renderer/src/views/project/flow-segments.ts";
 import type { FlowRecord } from "../../src/renderer/src/api/generated/types.gen";
 
 const SAMPLE = "示例项目";
 const SAMPLE_ITEM = "实现回声工具";
+/** 交付历史项目（工单 #415）：同一对部门上有两种非返工流转与一条返工。 */
+const HISTORY = "交付历史";
 
 let backend: Backend;
 
@@ -294,30 +296,85 @@ test("两种窗口尺寸下楼层画面都可用，控制台错误为零", async
     }
   }
 });
-// 流转覆盖层（工单 #366 验收标准 2）：项目跑过部门之间的交接后，切到「流转」覆盖层，
-test("流转覆盖层：画面的 segments 与 project.flow 查询的 records 聚合结果一致", async () => {
+// 流转覆盖层（工单 #415 验收标准 1、2）：真实事件在 quality→engineering 上产生「咨询」与「问题反馈」
+// 两种非返工流转，加上质检退回工程产生的「返工」。应有的分段由工单规定并写在这里：
+// 这一对部门上非返工一段（次数 2）、返工一段（次数 1）。端到端的预期不复用实现的聚合公式。
+test("流转覆盖层：同一对部门的两种非返工流转合成一段，返工另成一段，标签互不遮挡", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = watchErrors(client);
   const page = client.page;
   try {
-    const id = await projectId(SAMPLE);
+    const id = await projectId(HISTORY);
     const flow = await query<{ records: FlowRecord[] }>("project.flow", { project_id: id });
-    expect(flow.records.some((row) => row.direction_from && row.direction_to)).toBe(true);
+    // 场景本身来自真实事件：同一对部门至少有返工与两种非返工流转
+    const rows = flow.records.filter((row) => row.direction_from === "quality" && row.direction_to === "engineering");
+    const plainRows = rows.filter((row) => row.kind !== "返工");
+    expect(plainRows.length).toBe(2);
+    expect(new Set(plainRows.map((row) => row.kind)).size).toBe(2);
+    expect(rows.filter((row) => row.kind === "返工").length).toBe(1);
     await openFloor(page, id);
     await page.locator(".floor-overlay-tabs button", { hasText: "流转" }).click();
     await waitUntil(async () => (await readOverlay(page)).segments.length > 0, "画面写入流转覆盖层的 segments");
     const overlay = await readOverlay(page);
     expect(overlay.id).toBe("flow");
-    const expected = flowSegmentsOf(flow.records);
-    for (const seg of overlay.segments) {
-      const same = expected.find((row) => row.from === seg.from && row.to === seg.to && row.kind === seg.kind);
-      expect(same).toEqual(seg);
+
+    // 应有的分段写死：quality→engineering 上恰好两段，非返工一段次数 2、返工一段次数 1
+    const pair = overlay.segments.filter((seg) => seg.from === "quality" && seg.to === "engineering");
+    expect(pair.length).toBe(2);
+    const plain = pair.find((seg) => seg.kind !== "rework");
+    const rework = pair.find((seg) => seg.kind === "rework");
+    expect(plain?.count).toBe(2);
+    expect(rework?.count).toBe(1);
+    expect(plain!.count + rework!.count).toBe(rows.length);
+    // 六段：其余部门对各一段，quality→engineering 占非返工与返工两段
+    expect(overlay.segments.length).toBe(6);
+
+    // 标签不遮挡：quality→engineering 的两块牌子各自画出且互不重叠（读最近一帧画出的牌子矩形）
+    await waitUntil(async () => {
+      const drawn = await readLabelRects(page);
+      return drawn.filter((rect) => rect.key === "quality>engineering").length === 2;
+    }, "画面为 quality→engineering 的非返工段与返工段各画出一块标签", 20_000);
+    const rects = await readLabelRects(page);
+    const pairRects = rects.filter((rect) => rect.key === "quality>engineering");
+    expect(pairRects.length).toBe(2);
+    const [a, b] = pairRects;
+    const covered = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(covered, `quality→engineering 的两块牌子重叠：${JSON.stringify(pairRects)}`).toBe(false);
+    // 牌子落在画面内：整块牌子在楼层画面的可见范围内
+    for (const rect of pairRects) {
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.w).toBeLessThanOrEqual(640);
     }
     expect(errors).toEqual([]);
   } finally {
     await client.close();
   }
 });
+
+/** 在页面里读出最近一帧画出的覆盖层标签矩形（画面逻辑坐标）；逐字段检查再返回。 */
+async function readLabelRects(page: Page): Promise<{ x: number; y: number; w: number; h: number; key: string }[]> {
+  return page.evaluate(() => {
+    const win: unknown = window;
+    if (!win || typeof win !== "object" || !("__floorViewForTest" in win)) return [];
+    const hooks = win.__floorViewForTest;
+    if (!hooks || typeof hooks !== "object" || !("overlayLabels" in hooks)) return [];
+    const read = hooks.overlayLabels;
+    if (typeof read !== "function") return [];
+    const raw: unknown = read();
+    if (!Array.isArray(raw)) return [];
+    const out: { x: number; y: number; w: number; h: number; key: string }[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const { x, y, w, h, key } = item as Record<string, unknown>;
+      if (typeof x === "number" && typeof y === "number" && typeof w === "number"
+        && typeof h === "number" && typeof key === "string") {
+        out.push({ x, y, w, h, key });
+      }
+    }
+    return out;
+  });
+}
 
 /** 在页面里读出当前画面的覆盖层；逐字段检查再返回。 */
 async function readOverlay(page: Page): Promise<{ id: string | null; segments: FlowSegment[] }> {

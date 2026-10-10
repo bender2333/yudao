@@ -272,6 +272,10 @@ async function captureRow(address, entry, theme, systemHash) {
       const systemPage = await context.newPage();
       await systemPage.goto(`${address}/${systemHash}`);
       await settleSystem(systemPage, entry);
+      if (entry.systemOverlay !== null) {
+        await systemPage.locator(".floor-overlay-tabs button", { hasText: entry.systemOverlay }).click();
+        await systemPage.waitForTimeout(entry.settle);
+      }
       const systemShot = await systemPage.screenshot({ fullPage: true });
       await systemPage.close();
 
@@ -415,13 +419,14 @@ function renderIndex(results) {
       const rows = item ? item.rows : countRawRows(join(rawDir, `${entry.slug}-${theme}`));
       const systemHash = item ? item.systemHash : entry.systemHash;
       const project = entry.systemProject === null ? "（系统页，不选项目）" : ` · 预置项目「${entry.systemProject}」`;
+      const overlay = entry.systemOverlay === null ? "" : ` · 覆盖层「${entry.systemOverlay}」`;
       lines.push(
         `### ${entry.name}（${entry.slug}）`,
         "",
         `![${entry.name} · ${theme}](${name})`,
         "",
         `- 原型 v9 路由：\`${entry.prototypeHash}\`（档位 \`${entry.prototypeLevel}\`，用原型自带的示例数据）`,
-        `- 真实系统路由：\`${systemHash}\`${project}`,
+        `- 真实系统路由：\`${systemHash}\`${project}${overlay}`,
         `- 行数：${rows} · 图片体积：${(statSync(file).size / 1024 / 1024).toFixed(2)} MB`,
         "",
       );

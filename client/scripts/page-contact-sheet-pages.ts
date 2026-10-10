@@ -18,6 +18,8 @@ export type PageEntry = {
   systemProject: string | null;
   /** 真实系统一侧是否需要事项标识（恢复页的路径里有事项） */
   systemWorkItem: boolean;
+  /** 真实系统一侧打开页面的覆盖层（点覆盖层工具条上的这一格），null 为不开覆盖层 */
+  systemOverlay: string | null;
   /** 首屏稳定后额外等待的毫秒数：像素画面（楼、房间）里的走位动画需要时间 */
   settle: number;
 };
@@ -33,6 +35,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/home",
     systemProject: null,
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 1600,
   },
   {
@@ -43,6 +46,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/sys/machines",
     systemProject: null,
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 0,
   },
   {
@@ -53,6 +57,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/sys/runtime",
     systemProject: null,
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 0,
   },
   {
@@ -63,6 +68,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/sys/tools",
     systemProject: null,
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 0,
   },
   {
@@ -73,6 +79,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/p/{project}/overview",
     systemProject: "交付历史",
     systemWorkItem: false,
+    systemOverlay: "流转",
     settle: 1600,
   },
   {
@@ -83,6 +90,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/p/{project}/dept/engineering",
     systemProject: "文本工具",
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 1600,
   },
   {
@@ -93,6 +101,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/p/{project}/materials",
     systemProject: "示例项目",
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 0,
   },
   {
@@ -103,6 +112,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/p/{project}/observe",
     systemProject: "交付历史",
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 0,
   },
   {
@@ -113,6 +123,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/p/{project}/settings",
     systemProject: "示例项目",
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 0,
   },
   {
@@ -123,6 +134,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/p/{project}/w/{workItem}/recovery",
     systemProject: "文本工具",
     systemWorkItem: true,
+    systemOverlay: null,
     settle: 0,
   },
   {
@@ -133,6 +145,7 @@ export const PAGES: PageEntry[] = [
     systemHash: "#/sys/models",
     systemProject: null,
     systemWorkItem: false,
+    systemOverlay: null,
     settle: 0,
   },
 ];

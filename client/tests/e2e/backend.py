@@ -81,6 +81,12 @@ def script():
                               background="Engineering is preparing its independent delivery.",
                               expected_result="Explain the intended behavior without changing files."),
         response_turn("answered", "Print the argument as defined in the current requirement."),
+        # 质检向工程提出询问，工程回答（工单 #415）：quality→engineering 因此有「咨询」与
+        # 「问题反馈」两种非返工流转，与「返工」一起构成同一对部门上的三种流转
+        collaboration_request("engineering", "Which acceptance line governs the rework?",
+                             background="Quality is preparing its verdict on the current delivery.",
+                             expected_result="Name the acceptance line to follow."),
+        response_turn("answered", "Follow the acceptance line recorded in the requirement."),
         # 质检退回工程（qa_submitted 的结论为 rework_engineering，返工）
         review_turn("rework_engineering", "Missing usage text when no argument is provided.",
                     defects=[{"severity": "major", "summary": "no usage text on empty argv"}]),
