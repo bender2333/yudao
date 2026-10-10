@@ -19,8 +19,8 @@ USER_AGENT = "Yudao-Loop-System/0.1 (+https://github.com/bender2333/yudao)"
 
 
 def list_presets() -> list[dict[str, Any]]:
-    # 按声明顺序返回，OpenCode Go 是第一个落地的服务方案
-    return [_public_preset(item) for item in _TABLE.presets]
+    # 与 get_preset 读同一份索引，测试替换其中一项时公开视图同步（ADR-0033）
+    return [_public_preset(item) for item in _PRESET_INDEX.values()]
 
 
 def get_preset(preset_id: str) -> dict[str, Any] | None:

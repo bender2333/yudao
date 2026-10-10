@@ -215,11 +215,19 @@ for (const size of [
       await expect(form).toContainText("预置表 2026-10-02.1");
       await expect(form).toContainText("模型能力表");
 
-      // 换这一条定义的协议：内置方案的地址取该方案该协议的请求基址
+      // 换这一条定义的协议：内置方案的地址取该方案该协议的请求基址，端到端里三种协议的基址
+      // 分别是三个本机上游（协议不同则地址不同）
+      const byProtocols = await client.page.evaluate(async (address: string) => {
+        const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
+        const preset = (listed.data.presets.presets as { id: string; base_urls: Record<string, string> }[])
+          .find((item) => item.id === "opencode-go");
+        return preset!.base_urls;
+      }, backend.address);
+      expect(byProtocols.responses).not.toBe(byProtocols.messages);
       await form.getByTestId("row-protocol-glm-4.6").selectOption("messages");
-      await expect(form.getByTestId("provider-base-url")).toHaveValue("https://opencode.ai/zen/go/v1");
+      await expect(form.getByTestId("provider-base-url")).toHaveValue(byProtocols.messages);
       await form.getByTestId("row-protocol-glm-4.6").selectOption("responses");
-      await expect(form.getByTestId("provider-base-url")).toHaveValue(new RegExp(`^http://127\\.0\\.0\\.1:\\d+/v1$`));
+      await expect(form.getByTestId("provider-base-url")).toHaveValue(byProtocols.responses);
 
       // Key 输入框始终为空，不回填
       await expect(form.getByTestId("credential-secret")).toHaveValue("");

@@ -52,7 +52,9 @@ from harness.proposals import (  # noqa: E402
 )
 from harness.providers.call import ModelResponse  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
-from harness.tests.protocol_helpers import preset_base_urls, responses_responder, serve  # noqa: E402
+from harness.tests.protocol_helpers import (  # noqa: E402
+    chat_responder, messages_responder, preset_base_urls, responses_responder, serve,
+)
 
 UNAVAILABLE = "Missing configuration: provider credential"
 
@@ -490,10 +492,14 @@ def main() -> int:
 
     import tempfile
 
-    # 测试内启动的真实 HTTP 上游：Responses 协议的最小推理服务与模型列表服务（工单 #93）。
+    # 测试内启动的真实 HTTP 上游：三种协议的推理服务与模型列表服务（工单 #93）。
+    # 目录里的连接带服务方案，请求基址按访问定义的协议取自预置表（ADR-0033），
+    # 因此每种协议各起一个上游，端到端的请求按协议打到不同的本机服务。
     # 「yudao api」模式不预置目录数据，但上游仍然要起：fixture 与 api 两种模式共用同一个
     # 收尾清理，api 模式的上游只在没有用例连接时空转
     upstream, _capture, upstream_base = serve(responses_responder)
+    chat_upstream, _chat_capture, chat_base = serve(chat_responder)
+    messages_upstream, _messages_capture, messages_base = serve(messages_responder)
     # 第二个上游：始终返回 HTTP 401，让模型测试真实失败（工单 #294）
     reject_upstream = None
     reject_base = None
@@ -506,11 +512,13 @@ def main() -> int:
         # 端到端据此核对预填的访问定义 ID 是合法写法、缺一项容量时不显示「容量已确认」
         {"id": "cbcn/deepseek-v4.1-flash", "limit": {"context": 128000}},
     ]})
-    # 目录里的连接带服务方案，请求基址按访问定义的协议取自预置表（ADR-0033）：端到端的真实请求
-    # 要打到测试内的上游。ExitStack 留在变量里，重定向在本进程内一直有效
+    # 目录里的连接带服务方案，请求基址按访问定义的协议取自预置表（ADR-0033）：三种协议的基址
+    # 分别指向各自的本机上游，端到端的真实请求打到测试内的服务。ExitStack 留在变量里，
+    # 重定向在本进程内一直有效
     preset_redirect = contextlib.ExitStack()
-    preset_redirect.enter_context(
-        preset_base_urls(f"{upstream_base}/v1", models_url=models_server.base))
+    preset_redirect.enter_context(preset_base_urls(
+        {"responses": f"{upstream_base}/v1", "chat_completions": f"{chat_base}/v1",
+         "messages": f"{messages_base}/v1"}, models_url=models_server.base))
     data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
     port = args.port
     if args.room:
@@ -612,6 +620,10 @@ def main() -> int:
         thread.join(10)
         upstream.shutdown()
         upstream.server_close()
+        chat_upstream.shutdown()
+        chat_upstream.server_close()
+        messages_upstream.shutdown()
+        messages_upstream.server_close()
         if reject_upstream is not None:
             reject_upstream.shutdown()
             reject_upstream.server_close()
