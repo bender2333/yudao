@@ -202,7 +202,10 @@ test("概览时间轴的刻度只含本项目的关键事实，拖动刻度时�
     await page.locator(`.timeline .tick[data-position="${beforeDone.position}"]`).click();
     await expect(page.locator(".replay-banner")).toContainText("回放中");
     const atLoop = await query<{ work_items: { status: string }[] }>("project.loop", { project_id: pid, at: beforeDone.position });
-    await expect.poll(async () => page.locator(".floor-text-list li").first().innerText()).toContain(atLoop.work_items[0].status === "adopted" ? "adopted" : "in_progress");
+    // 文字列表默认折叠：先展开再读行；状态写中文（工单 #379）
+    const textList = page.locator("details.floor-text-list");
+    await textList.locator("summary").click();
+    await expect(textList.locator("li").first()).toContainText(atLoop.work_items[0].status === "adopted" ? "已采纳" : "进行中");
 
     // 回放期间不显示决定请求（概览的等待回答列表不出现）
     await expect(page.locator(".decision-card")).toHaveCount(0);
@@ -277,6 +280,40 @@ test("回放位置写在路径的 at 参数里：刷新以后回到同一位置�
     "刷新以后时间轴上的位置仍然是同一个刻度", 60_000);
 
     // 回到现在：路径上的 at 清除
+    await page.getByRole("button", { name: "回到现在" }).click();
+    await expect(page.locator(".replay-banner")).toHaveCount(0);
+    expect(new URLSearchParams(page.url().split("?")[1] ?? "").get("at")).toBeNull();
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
+// 概览页的回放位置同样写在路径里（工单 #379 验收）：刷新以后回到同一位置
+test("概览页的回放位置写在路径的 at 参数里：刷新以后回到同一位置", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    const pid = await projectId(SAMPLE);
+    await page.evaluate((id: string) => { window.location.hash = `#/p/${id}/overview`; }, pid);
+    await expect(page.getByRole("heading", { name: "循环画面", exact: true })).toBeVisible();
+    const report = await query<{ facts: Fact[] }>("home.away_report", { range: "7d", project: pid });
+    const expected = tickRows(report.facts);
+    await waitUntil(async () => (await ticks(page, ".timeline")).length === expected.length, "概览时间轴有刻度");
+
+    const tick = expected[0];
+    await page.locator(`.timeline .tick[data-position="${tick.position}"]`).click();
+    await expect(page.locator(".replay-banner")).toContainText("回放中");
+    expect(new URLSearchParams(page.url().split("?")[1] ?? "").get("at")).toBe(String(tick.position));
+
+    // 刷新：路径上的 at 让概览页回到同一位置，画面仍是回放中的状态
+    await page.reload();
+    await expect(page.locator(".replay-banner")).toContainText("回放中", { timeout: 60_000 });
+    await waitUntil(async () =>
+      (await page.locator(`.timeline .tick[data-position="${tick.position}"].current`).count()) > 0,
+    "刷新以后概览时间轴上的位置仍然是同一个刻度", 60_000);
+
     await page.getByRole("button", { name: "回到现在" }).click();
     await expect(page.locator(".replay-banner")).toHaveCount(0);
     expect(new URLSearchParams(page.url().split("?")[1] ?? "").get("at")).toBeNull();
