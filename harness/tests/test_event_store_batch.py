@@ -3,6 +3,7 @@ import sqlite3
 import pytest
 
 from harness.event_store import EventStore, StreamVersionConflict, run_stream
+from harness.projection import run_handler
 from harness.write_path import NewEvent, WritePath
 
 
@@ -15,7 +16,7 @@ def _note(name, **fields):
 
 def test_event_batch_commits_in_order_with_contiguous_versions_and_positions(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
-    writes = WritePath(store)
+    writes = WritePath(store, lambda _stream: run_handler())
     [first] = writes.append(RUN, _note("before"))
     batch = writes.append(RUN, _note("first", payload={"value": 1}), _note("second", payload={"value": 2}))
     assert [event.stream_version for event in batch] == [first.stream_version + 1, first.stream_version + 2]
@@ -28,7 +29,7 @@ def test_event_batch_commits_in_order_with_contiguous_versions_and_positions(tmp
 
 def test_failed_later_insert_rolls_back_the_whole_batch_and_its_projection(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
-    writes = WritePath(store)
+    writes = WritePath(store, lambda _stream: run_handler())
     [first] = writes.append(RUN, _note("before"))
     saved = store.projection(run_stream("run"))
     with pytest.raises(TypeError):
@@ -41,7 +42,7 @@ def test_failed_later_insert_rolls_back_the_whole_batch_and_its_projection(tmp_p
 
 def test_invalid_batch_entry_cannot_begin_a_partial_commit(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
-    writes = WritePath(store)
+    writes = WritePath(store, lambda _stream: run_handler())
     with pytest.raises(sqlite3.IntegrityError):
         writes.append(RUN, _note("valid"),
                       NewEvent("invalid", state_before="PRODUCT_SPEC", state_after=None, actor="system"))
@@ -51,7 +52,7 @@ def test_invalid_batch_entry_cannot_begin_a_partial_commit(tmp_path):
 
 def test_commit_with_a_stale_expected_version_is_rejected_without_writing(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
-    writes = WritePath(store)
+    writes = WritePath(store, lambda _stream: run_handler())
     [first] = writes.append(RUN, _note("before"))
     saved = store.projection(run_stream("run"))
     with pytest.raises(StreamVersionConflict) as rejected:

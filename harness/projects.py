@@ -15,26 +15,30 @@ from .department_prompts import save_department_prompt
 from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
 from .materials import save_text_material
 from .models import (
-    Adoption,
     ArtifactRef,
     DEPARTMENTS,
-    DepartmentSetting,
     Event,
     EventType,
-    HeldCandidate,
-    InitialPrdCandidate,
     ProjectEvent,
     ProjectEventType,
-    ProjectProjection,
-    RegisteredCommand,
     RunProjection,
-    SourceDirectory,
     TERMINAL_PHASES,
-    WorkItem,
     department_for_phase,
     new_id,
 )
-from .projection import RunNotFoundError, project_run, replay_project, replay_run, saved_project
+from .project_projection import (
+    Adoption,
+    DepartmentSetting,
+    HeldCandidate,
+    InitialPrdCandidate,
+    ProjectProjection,
+    RegisteredCommand,
+    SourceDirectory,
+    WorkItem,
+    replay_project,
+    saved_project,
+)
+from .projection import RunNotFoundError, project_run, replay_run
 from .providers.selection import ModelSelection
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot

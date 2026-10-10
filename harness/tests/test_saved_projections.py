@@ -6,7 +6,8 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import run_stream
 from harness.models import json_dumps
-from harness.projection import replay_run, saved_project
+from harness.project_projection import saved_project
+from harness.projection import replay_run
 from harness.proposals import product_spec
 from harness.providers.call import ModelResponse
 from harness.public_tree import capture_public_tree

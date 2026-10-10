@@ -20,9 +20,8 @@ from ..models import (
 )
 from ..observability import ObservabilityQuery
 from ..providers.selection import ModelSelection
-from ..projection import (
-    RunNotFoundError, project_run, replay_decisions, replay_project, replay_run, load_decisions, saved_project,
-)
+from ..project_projection import replay_project, saved_project
+from ..projection import RunNotFoundError, project_run, replay_decisions, replay_run, load_decisions
 from ..projects import ProjectNotFoundError, project_projection
 from ..replay_check import ReplayIntegrityError, verify_replay
 from ..recovery import (

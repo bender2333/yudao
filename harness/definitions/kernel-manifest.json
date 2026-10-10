@@ -1,6 +1,6 @@
 {
   "owner": "user",
-  "updated": "2026-10-07",
+  "updated": "2026-10-10",
   "kinds": {
     "module": "控制核心的裁决模块：接受导入方向与行数的两项检查",
     "material": "评价材料与守卫自身：路径守卫保护它们，导入方向与行数不适用（测试要导入 pytest，评分器按场景运行，文档与发布脚本不是 Python 模块）"
@@ -27,7 +27,7 @@
     {"path": "scripts/release.py", "kind": "material", "why": "发布脚本：它产出的发布包就是下一个实例，构建过程被修改时发布包可能与经过检查的提交不一致"},
     {"path": "docs/foundation-rules.md", "kind": "material", "why": "六条基础规则的原文，高于任何具体设计；守卫自身，只由用户修改"}
   ],
-  "python_lines_max": 5911,
+  "python_lines_max": 5467,
   "allowed_imports": ["内核文件", "标准库", "pydantic"],
   "rules": [
     {"rule": "事实只经写入口写入", "test": "kernel/test_single_write_path.py", "added_by": "工单 #352", "ready": true},
