@@ -1,10 +1,12 @@
 import asyncio
 import json
 import os
+import shutil
 import sys
 import threading
 import time
 import uuid
+
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -124,6 +126,20 @@ def run_scripted(data_dir: Path, script, task: str = "build echo", **kwargs):
     system = system_with(data_dir, script)
     run_id = system.create_run(task, **kwargs)
     return system, system.run_until_stop(run_id)
+
+
+def copy_data_dir(source: Path, destination: Path) -> Path:
+    # 保存的数据目录的一份副本。夹具建完循环以后已经关闭系统（事件库连接关闭时把预写日志收回主文件），
+    # 目录中的工件库、工作区与 Git 版本齐全，整目录复制即是一份新的数据目录
+    shutil.copytree(source, destination)
+    return destination
+
+
+def system_on_copy(source: Path, destination: Path, script=()) -> LoopSystem:
+    # 在保存的数据目录的一份副本上打开系统。保存的 run 可能还没有结束，重新打开不自动继续它，
+    # 激活由测试自己驱动（harness.runtime.LoopSystem.for_testing 的 resume_on_startup 参数）
+    return LoopSystem.for_testing(copy_data_dir(source, destination), FakeAdapter(list(script)),
+                                  resume_on_startup=False)
 
 
 def happy_script():

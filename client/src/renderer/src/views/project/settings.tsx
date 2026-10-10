@@ -60,7 +60,7 @@ function Basics(props: { app: ClientApp; data: ProjectSettingsResult; command: C
           ["状态", data.archived ? "已归档" : "进行中"],
         ]}
       />
-      <div className="row-actions">
+      <div className="y9-row row-actions">
         <button type="button" onClick={() => setEditing(!editing)}>
           {editing ? "收起" : "修改名称与长期目标"}
         </button>
@@ -88,10 +88,10 @@ function Basics(props: { app: ClientApp; data: ProjectSettingsResult; command: C
         ) : null}
       </div>
       {editing ? (
-        <div className="form">
+        <div className="y9-form form">
           <TextInput label="名称" value={name} onInput={setName} />
           <TextArea label="长期目标" value={goal} rows={3} onInput={setGoal} />
-          <p className="note">长期目标修改以后，之后开始的事项使用新目标；进行中的事项按开始时的目标做完。</p>
+          <p className="y9-note note">长期目标修改以后，之后开始的事项使用新目标；进行中的事项按开始时的目标做完。</p>
           <SubmitButton
             label="保存名称"
             busy={command.busy}
@@ -133,22 +133,22 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
         const followText = followDepartmentLabel(model?.model ?? (effectiveId ? effectiveId : ""));
         const reminders = data.department_reminders[key] ?? [];
         return (
-          <div className="sub-card" key={key}>
-            <div className="section-head">
+          <div className="y9-set-dept sub-card" key={key}>
+            <div className="y9-block-head section-head">
               <h3>
                 {departmentName(key)}（{key}）
               </h3>
-              <p className="note">
+              <p className="y9-note note">
                 {setting.version} 版；来源 {label(SETTING_SOURCE, setting.source)}
               </p>
             </div>
-            <p className="note">
+            <p className="y9-note note">
               模型与档位：{setting.model_id
                 ? `${model?.model ?? setting.model_id}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`
                 : `${followText}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`}
             </p>
             <ReminderList items={reminders} testId={`settings-reminder-${key}`} />
-            <pre className="raw department-setting-text">{setting.text || "（没有部门 Prompt 文字）"}</pre>
+            <pre className="y9-pre raw department-setting-text">{setting.text || "（没有部门 Prompt 文字）"}</pre>
             {editing === key ? (
               <DepartmentSettingsForm app={props.app} data={data} department={key} onClose={() => setEditing(null)} />
             ) : (
@@ -189,7 +189,7 @@ function DepartmentSettingsForm(props: {
   const followName = effectiveModel?.model ?? (effectiveId ? effectiveId : "");
 
   return (
-    <div className="form">
+    <div className="y9-set-form form">
       <DepartmentSettingsFields
         app={props.app}
         projectId={data.project_id}
@@ -202,7 +202,7 @@ function DepartmentSettingsForm(props: {
         }}
         reminders={[...reminders, ...savedReminders]}
       />
-      <div className="row-actions">
+      <div className="y9-row row-actions">
         <button type="button" onClick={() => setDraft({ ...draft, text: setting.text })}>恢复默认</button>
       </div>
       <DepartmentSettingsSave
@@ -250,7 +250,7 @@ function CommandRegistry(props: { app: ClientApp; data: ProjectSettingsResult })
             `第 ${setting.version} 版`,
             <button
               type="button"
-              className="link"
+              className="y9-link link"
               key={key}
               onClick={() => { setEditing(setting.name); setCreating(false); }}
             >
@@ -310,7 +310,7 @@ function CommandForm(props: {
 
   return (
     <Modal title={props.name === "" ? "登记新命令" : `修改登记命令 ${props.name}`} onClose={props.onClose}>
-      <div className="form">
+      <div className="y9-form form">
         <TextInput label="登记名" value={name} disabled={props.name !== ""} onInput={setName} />
         <TextInput label="固定参数" value={argv} placeholder="含程序名，按空格拆分，例如 python -c print(1)" onInput={setArgv} />
         <TextInput label="允许的额外参数" value={args} placeholder="留空表示不允许；多个用空格分开" onInput={setArgs} />
@@ -321,8 +321,8 @@ function CommandForm(props: {
           checked={repeatableText === "yes"}
           onChange={(checked) => setRepeatableText(checked ? "yes" : "no")}
         />
-        <p className="note">登记时声明这个命令可以重新执行：动作结果未知时，核实请求按这个声明给出「重新执行一次」的选项。</p>
-        {numbersInvalid ? <p className="error">时限与输出上限需要是非负整数</p> : null}
+        <p className="y9-note note">登记时声明这个命令可以重新执行：动作结果未知时，核实请求按这个声明给出「重新执行一次」的选项。</p>
+        {numbersInvalid ? <p className="y9-note is-warn error">时限与输出上限需要是非负整数</p> : null}
         <SubmitButton
           label="保存"
           busy={command.busy}
@@ -381,12 +381,12 @@ function SourceDirectoryForm(props: { app: ClientApp; data: ProjectSettingsResul
 
   if (!open) {
     return (
-      <button type="button" className="link" onClick={() => setOpen(true)}>修改</button>
+      <button type="button" className="y9-link link" onClick={() => setOpen(true)}>修改</button>
     );
   }
 
   return (
-    <span className="inline-form">
+    <span className="y9-set-inline inline-form">
       <TextInput label="名称" value={name} onInput={setName} />
       <TextInput label="路径" value={path} onInput={setPath} />
       <SubmitButton

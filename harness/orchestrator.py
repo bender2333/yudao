@@ -53,6 +53,7 @@ from .models import (
     DecisionRequest,
     DepartmentPrompt,
     EventType,
+    ProjectEvent,
     ProjectEventType,
     TERMINAL_PHASES,
     department_for_phase,

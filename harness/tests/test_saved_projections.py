@@ -12,21 +12,31 @@ from harness.providers.call import ModelResponse
 from harness.public_tree import capture_public_tree
 from harness.replay_check import PROJECTION_REASON, ReplayIntegrityError
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script
+from harness.tests.helpers import happy_script, system_on_copy
 
-# 保存的投影：写入口在追加事件的同一事务中更新运行状态投影与项目投影，读取不再从头重放；
-# 重放只用于重建与核对。系统整体运行，模型回答由 FakeAdapter 脚本给出。
+# 需要一份真实运行记录的文件：module 作用域的夹具各跑一次运行并保存数据目录，
+# 每项测试复制一份数据目录，在自己的副本上改写与检查。数据来自真实运行，登记为集成层。
 
 
-def _project_and_bare_run(data_dir):
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script() + happy_script()))
+@pytest.fixture(scope="module")
+def saved_project_and_bare_run(tmp_path_factory):
+    directory = tmp_path_factory.mktemp("project-and-bare")
+    system = LoopSystem.for_testing(directory / "data", FakeAdapter(happy_script() + happy_script()))
     project_id = system.projects.register("项目", "逐行文本处理工具")
     _work_item_id, run_id = system.projects.start_work_item(project_id, "事项")
     system.run_until_stop(run_id)
     system.projects.settle(run_id)
     bare = system.create_run("bare run")
     system.run_until_stop(bare)
-    return system, project_id, [run_id, bare]
+    system.close()
+    return directory / "data", project_id, [run_id, bare]
+
+
+@pytest.fixture
+def project_and_bare_run(saved_project_and_bare_run, tmp_path):
+    saved, project_id, runs = saved_project_and_bare_run
+    return system_on_copy(saved, tmp_path / "data"), project_id, runs
+
 
 
 def _delete_saved_projections(data_dir):
@@ -38,12 +48,13 @@ def _delete_saved_projections(data_dir):
         connection.close()
 
 
-def test_replaying_after_deleting_saved_projections_gives_the_same_projections(data_dir):
-    system, project_id, runs = _project_and_bare_run(data_dir)
+def test_replaying_after_deleting_saved_projections_gives_the_same_projections(project_and_bare_run):
+    system, project_id, runs = project_and_bare_run
     before = {run_id: system.project(run_id).to_dict() for run_id in runs}
     project = system.projects.projection(project_id).to_dict()
     saved = saved_project(system.store, project_id).to_dict()
     trees = {run_id: capture_public_tree(system.workspace(run_id).root).digest for run_id in runs}
+    data_dir = system.data_dir
     end = system.store.end_position()
     system.close()
     _delete_saved_projections(data_dir)
@@ -61,8 +72,8 @@ def test_replaying_after_deleting_saved_projections_gives_the_same_projections(d
     restarted.close()
 
 
-def test_rebuild_replaces_one_saved_projection_with_the_replayed_projection(data_dir):
-    system, _project_id, runs = _project_and_bare_run(data_dir)
+def test_rebuild_replaces_one_saved_projection_with_the_replayed_projection(project_and_bare_run):
+    system, _project_id, runs = project_and_bare_run
     run_id = runs[1]
     before = system.project(run_id).to_dict()
     rebuilt = system.writes.rebuild(run_stream(run_id))
@@ -70,11 +81,11 @@ def test_rebuild_replaces_one_saved_projection_with_the_replayed_projection(data
     assert system.store.projection(run_stream(run_id)).position == system.store.list_events(run_id)[-1].position
 
 
-def test_replay_check_reports_a_saved_projection_that_differs_from_the_replay(data_dir):
-    system, _project_id, runs = _project_and_bare_run(data_dir)
+def test_replay_check_reports_a_saved_projection_that_differs_from_the_replay(project_and_bare_run):
+    system, _project_id, runs = project_and_bare_run
     target, other = runs[1], runs[0]
     # 把另一个 run 的投影存成这个 run 的投影
-    connection = sqlite3.connect(data_dir / "events.sqlite")
+    connection = sqlite3.connect(system.data_dir / "events.sqlite")
     try:
         connection.execute("UPDATE projections SET state = (SELECT state FROM projections WHERE stream = ?) "
                            "WHERE stream = ?", (run_stream(other), run_stream(target)))

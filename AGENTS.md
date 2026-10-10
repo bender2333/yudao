@@ -9,6 +9,7 @@
 - 你需要讲用户的语言，不要从技术思维出发，避免使用情绪化或夸张的词语，这些用语对项目没有帮助。
 - 你有日记本，把你的行动、思考过程与关键状态记录下来，放在 `agents_jour/<工单编号>.md` 中：一张工单一个文件，执行者与审查者追加在同一个文件里，没有工单编号的工作写在 `agents_jour/其他.md`。记录格式为：`模型 ID / 时间（分钟） / 行动或者想法或者其他`，内容开头写明角色（执行者或审查者）。日记随工单的分支提交，不直接推送到 main；根目录的 `agents_jour.md` 是 2026-10-06 之前的日记，不再追加。
 - 你要表现得连贯，通过上下文和证据链一起，综合思考。
+- 交付、审查、处理既有失败或更新测试基准时，读取 [验收证据规则](docs/agents/acceptance-evidence.md)，按其中的版本身份、未解决问题与角色权限执行。
 
 # 项目
 Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份有效要求协作完成可核验交付的协作执行系统。三个部门之间相互循环，直到质检独立放行。使用方式见 `README.md`，领域词汇见 `CONTEXT.md`。
@@ -32,8 +33,9 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 
 ## 常用命令
 - 安装依赖（Python 3.11 或更新版本）：`uv sync --frozen`，按锁文件在仓库内建立项目环境 `.venv`，包含测试依赖。
+- Windows PowerShell 的测试终端先设置 `$env:PYTHONUTF8='1'`，让 Python 及其测试子进程统一输出 UTF-8；pytester 的子进程输出按 UTF-8 读取。
 - 启动服务：`uv run python -m harness api`（无参 `uv run python -m harness` 相同，默认端口 8765）；无需凭据的演示：`uv run python -m harness demo`
-- 测试：运行与本次改动相关的测试文件：`uv run python -m pytest harness/tests/<文件>`。测试将按单元、功能与模块、集成三层登记与运行（设计见 `docs/design/test-pyramid.md`，#158 实施），登记表建立以后这里再写入按层运行的命令。
+- 测试：开发中运行与本次改动相关的文件；交付前和审查时运行 `uv run python -m pytest -m "unit or module"`，再运行本次改动涉及的集成文件。#158、#406 已合并，分层定义见 `docs/design/test-pyramid.md`；新增文件必须登记。
   - 前端测试：`cd client && npm test`（客户端单元）；端到端为 `cd client && npm run test:e2e`。只在本次改动涉及 `client/` 或接口合同时运行，并且只运行相关的测试文件；客户端单元里的逐场景回放测试单独运行。
   - 每次都运行 `uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`：两项检查整个仓库的模块导入关系与接口合同，任何改动都可能影响它们。`test_openapi_snapshot.py` 里的两项检查分别核对运行中的服务与 `harness/tests/openapi/openapi.json` 相同、按快照重新生成的客户端类型与提交的 `client/src/renderer/src/api/generated/` 逐文件相同；它需要 `harness/tests/openapi` 与 `client` 各安装一次依赖（各自的 `npm install`），未安装时报错写明缺少哪个文件。改动接口合同的工单在用 `--write-openapi-snapshot` 重写快照以后，在 `client` 中运行 `npm run generate:api` 重新生成客户端类型并提交，两项检查才会都通过。
   - 只用单进程运行，不加 `-n`。集成层全部由架构师按批运行，执行者与审查者不运行全量测试：不运行 `harness/tests` 整个目录，也不把全部测试文件分批逐个运行一遍；单条命令不超过 10 分钟。
@@ -111,7 +113,7 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 1. 领取：`gh issue list --state open --label "ready-for-agent"`。只领取当前阶段父工单（`docs/program-roadmap.md` 中进行中的阶段，Stage 3 为 #9）下面的子工单，包括挂在其工作包父工单下面的子工单；只领取没有未关闭阻塞项的子工单；父工单（下面挂有子工单的规格工单）不领取，由架构师核对后关闭。认领：`gh issue edit <编号> --add-assignee @me`。
 2. 阅读：`gh issue view <编号> --comments`，以及工单链接的 `docs/design/` 设计文档、`CONTEXT.md` 与相关 ADR。
 3. 实现：按 `/implement` 的流程，测试先行（`/tdd`），完成后用 `/code-review` 审查，然后提交并推送。
-4. 自测：开发中与交付前都运行与改动相关的测试文件，加上「常用命令」中每次都运行的两项检查；改动涉及 `client/` 时再运行相关的前端测试；逐项核对工单的验收标准。
+4. 自测：开发中运行相关文件，交付前按「常用命令」运行单元层与模块层全部、本次改动涉及的集成文件及两项固定检查；改动涉及 `client/` 时再运行相关的前端测试；逐项核对工单的验收标准。
 5. 关闭（强制要求）：全部代码编写、命令执行与测试验证均已完成并通过后：
    1. 提交包含可验证交付证据、修改文件清单及验收标准的评论：
       ```bash
@@ -156,11 +158,13 @@ Issue 队列走 GitHub Issues（`gh` CLI，仓库 `bender2333/yudao`）；长文
 ## 角色
 你是审查者，在自主推进模式下独立核对执行者的交付。你不修改代码，只报告有证据的问题；发现设计冲突或缺漏时，写进审查评论并标明「架构问题」，由架构师处理。
 
+审查者推送分支、创建 PR、发表评论与切换标签。主分支合并、工单关闭和里程碑验收由架构师的后台协调流程完成。
+
 ## 审查流程
 工作目录是 `C:\project\yudao-worktrees\issue-<编号>`，工单标签为 `needs-review`。
 1. 规范检查：worktree 路径与分支名是否为 `issue-<编号>`，标签状态是否正确，最新一条 `DELIVERY:` 评论是否齐全。
 2. 内容核对：阅读工单、最新任务评论、链接的设计文档与改动（`git diff main...HEAD` 与未提交的改动），逐条核对验收标准，检查是否违反本文件的规则，例如 mock、兼容层、绕过逻辑。
-3. 测试：运行与本次改动相关的测试文件，加上「常用命令」中每次都运行的两项检查，单进程；改动涉及 `client/` 时再运行相关的前端测试；登记表建立以后（#158），核对新增的测试文件已在登记表中，并登记在 `docs/design/test-pyramid.md` 第 2 节规定的层。
+3. 测试：按「常用命令」运行单元层与模块层全部、本次改动涉及的集成文件及两项固定检查，单进程；改动涉及 `client/` 时再运行相关的前端测试；核对新增测试文件已在登记表中，所属层符合 `docs/design/test-pyramid.md` 第 2 节。
 
 ## 审查结论
 - 通过：

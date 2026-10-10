@@ -67,6 +67,7 @@
 - 收集阶段：每项测试按所在文件得到 `pytest.mark.unit`、`module` 或 `integration` 标记；`harness/tests/` 下有没有登记的测试文件时，收集以错误结束并列出这些文件；登记表中写了而文件不存在时同样报错。三个标记在 `pyproject.toml` 的 `markers` 中声明，并启用 `--strict-markers`。
 - 新增测试文件时在登记表中加一行。登记表只追加与修改单行，不同分支同时新增文件时的合并冲突容易解决。
 - 测试文件之间不再互相导入。被其他测试文件导入的辅助函数与常量移到已有的辅助文件中（`helpers.py`、`api_helpers.py`、`protocol_helpers.py`、`event_sequence.py` 等，按用途选择），范围以下面的导入检查找出的为准。一项单元层测试用标准库 `ast` 读取每个测试文件的导入语句，发现导入测试文件时失败，并写明文件与导入的名称。
+- 搬移共用代码时容易删掉同一文件里仍在使用的 `import` 行，这类缺漏只在测试跑到那一行时才报 `NameError`，集成层的用例要完整跑一次才暴露（`helpers.py` 丢掉 `import time` 使四项取消运行中命令的用例必然失败，工单 #430）。同一个文件里的另一项单元层测试用 `pyflakes` 检查 `harness/` 下全部源文件的未定义名称（F821），信息写明文件与行列；`pyflakes` 在 dev 依赖组中。
 - 混合了不同层级的文件不拆分，按第 2 节登记为其中最高的一层。
 - 操作控制主机真实桌面的测试（3.2D 的桌面会话与屏幕工具，[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 5 节）登记为 `desktop`。这些测试移动真实的鼠标、按下真实的按键、最小化用户的窗口，在用户使用电脑时运行会打断用户。`desktop` 标记同样在 `markers` 中声明；它不属于三层中的任何一层，`-m "unit or module"` 与 `-m integration` 都不选中它，第 4 节的默认运行全部排除它。界面的 Playwright 测试中操作真实桌面的用例加 `@desktop` 标签，默认运行用 `--grep-invert @desktop` 排除。登记表建立之前，`desktop` 标记直接写在测试文件中，`pyproject.toml` 的默认参数排除它，明确写 `-m desktop` 时才运行（#150 先建立这个标记）。
 - 内核的不变式测试放在 `harness/tests/kernel/`，每个文件按第 2 节的规则登记层；它们同时列在内核清单里，每条基础规则对应的测试名称由发布检查核对存在并运行（[可信内核设计说明](trusted-kernel.md)第 3 节）。
@@ -95,7 +96,7 @@ uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integra
 uv run python -m pytest -m desktop   # 只在用户同意的时间运行
 ```
 
-最后一条只由架构师在集成层的批量运行中使用。
+集成层的多进程命令只由架构师的批量流程使用；桌面命令只在用户同意的时间使用。
 
 ### 4.2 集成层的批量运行
 
@@ -121,6 +122,7 @@ flowchart TD
 - 暂停合并期间，已经 `review-passed` 的 PR 等待；执行者与审查者照常工作。
 - squash 合并使每个 PR 在 main 上只有一个提交，`git bisect` 找到的提交对应一个 PR。
 - 重新运行能通过的失败说明测试依赖机器负载或时间，这本身是缺陷，由工单修正测试，不暂停合并。
+- 并行失败、单进程重新运行通过时，原批次保留 `INTEGRATION: FAIL` 与首次计数，评论记录重新运行结果和处理工单；恢复合并是流程决定。新的通过起点必须来自实际完成的全部集成检查。工作包关闭和里程碑试用前，关联的不稳定测试工单必须完成。
 
 ## 5. 测试往下层移
 

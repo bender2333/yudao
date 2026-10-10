@@ -20,12 +20,13 @@ import httpx
 import pytest
 
 from harness.adapters.fake import FakeAdapter
+from harness.app.access_tokens import AccessTokenStore
 from harness.app.application import Application
-from harness.models import TERMINAL_PHASES
+from harness.models import TERMINAL_PHASES, utc_now
 from harness.projection import project_run
 from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
-from harness.tests.api_helpers import running_server
+from harness.tests.api_helpers import bearer, running_server
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -94,12 +95,14 @@ def _serving(port: int, log: Path, deadline: float) -> None:
     raise TimeoutError(log.read_text(encoding="utf-8", errors="replace"))
 
 
-def _ready(process: subprocess.Popen, port: int, log: Path) -> str:
+def _ready(process: subprocess.Popen, port: int, log: Path, *,
+           headers: dict[str, str] | None = None) -> str:
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
     while True:
         assert process.poll() is None, log.read_text(encoding="utf-8", errors="replace")
         try:
-            if httpx.get(f"http://127.0.0.1:{port}/api/capabilities", timeout=2).status_code == 200:
+            response = httpx.get(f"http://127.0.0.1:{port}/api/capabilities", timeout=2, headers=headers)
+            if response.status_code == 200:
                 return log.read_text(encoding="utf-8", errors="replace")
         except httpx.TransportError:
             pass
@@ -152,16 +155,25 @@ def test_no_browser_leaves_the_page_closed(service, tmp_path):
 
 
 def test_the_lan_access_mode_opens_the_address_of_this_machine(service, tmp_path):
-    # 局域网访问方式下打开的同样是本机地址：浏览器在本机地址上保留系统通知与安装应用的设置
+    # 局域网访问方式下打开的同样是本机地址：浏览器在本机地址上保留系统通知与安装应用的设置；
+    # 接口路径都要求访问令牌（第 6.3 节），测试先在数据目录建立令牌，再带着它请求
     port = _free_port()
     log = tmp_path / "lan.log"
     recorded = tmp_path / "opened.txt"
-    process = service(tmp_path / "data", port, log, extra=["--access", "lan", "--host", "0.0.0.0"],
+    data_dir = tmp_path / "data"
+    _entry, token = AccessTokenStore(data_dir).create("客厅的电脑", now=utc_now())
+    process = service(data_dir, port, log, extra=["--access", "lan", "--host", "0.0.0.0"],
                       browser=_recording_browser(tmp_path, recorded))
-    _ready(process, port, log)
+    _ready(process, port, log, headers=bearer(token))
     assert _wait_opened(recorded, time.monotonic() + 30) == f"http://127.0.0.1:{port}/"
     with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=STARTUP_TIMEOUT_SEC) as client:
-        assert client.get("/api/capabilities").json()["deployment"]["access"] == "lan"
+        # 没有令牌的接口请求被拒绝（第 6.3 节）；带令牌的请求照常给出访问方式
+        without_token = client.get("/api/capabilities")
+        capabilities = client.get("/api/capabilities", headers=bearer(token))
+    assert without_token.status_code == 401
+    assert without_token.content == b""
+    assert capabilities.status_code == 200
+    assert capabilities.json()["deployment"]["access"] == "lan"
 
 
 def test_ctrl_c_stops_the_service_and_releases_the_data_directory(service, tmp_path):

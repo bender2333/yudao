@@ -18,11 +18,11 @@ test("服务停止以后二十秒内没有 pageerror，重连间隔递增；服�
     }
   });
   try {
-    await expect(page.locator(".brand")).toHaveText("Yudao");
+    await expect(page.locator(".brand .y9-brand-name")).toContainText("Yudao");
     await expect(page.locator(".connection")).toHaveText("已连接");
     await backend.stop();
     // 断线：页面整体变灰，顶栏写明正在重新连接，页面不抛错
-    await expect(page.locator(".app")).toHaveClass(/is-disconnected/, { timeout: 60_000 });
+    await expect(page.locator("body")).toHaveClass(/is-disconnected/, { timeout: 60_000 });
     await expect(page.locator(".connection.interrupted")).toContainText("正在重新连接");
     await page.waitForTimeout(20_000);
     expect(pageerrors).toEqual([]);
@@ -38,7 +38,7 @@ test("服务停止以后二十秒内没有 pageerror，重连间隔递增；服�
     const revived: Backend = await startBackend({ port: backend.port, dataDir: backend.dataDir });
     try {
       await expect(page.locator(".connection")).toHaveText("已连接", { timeout: 60_000 });
-      await expect(page.locator(".app")).not.toHaveClass(/is-disconnected/);
+      await expect(page.locator("body")).not.toHaveClass(/is-disconnected/);
       expect(pageerrors).toEqual([]);
     } finally {
       await revived.stop();

@@ -1,12 +1,22 @@
+import pytest
+
 from harness.adapters.fake import FakeAdapter
 from harness.models import DEPARTMENTS, Event, EventType, ProjectEvent, ProjectEventType
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script
+from harness.tests.helpers import happy_script, system_on_copy
 
 # 一份事件日志：按全局位置与范围分批读取。系统整体运行，模型回答由 FakeAdapter 脚本给出。
+# 需要一份真实运行记录的文件：module 作用域的夹具各跑一次日志并保存数据目录，
+# 每项测试复制一份数据目录，在自己的副本上读取与检查。日志来自真实运行，登记为集成层。
 
 
-def _two_projects_and_a_bare_run(data_dir):
+def _saved_log(builder, directory):
+    system, extra = builder(directory)
+    system.close()
+    return system.data_dir, extra
+
+
+def _two_projects_source(data_dir):
     # 两个项目各完成一个事项并采纳，另有一个不属于项目的 run
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script() + happy_script() + happy_script()))
     owners = {}
@@ -19,7 +29,41 @@ def _two_projects_and_a_bare_run(data_dir):
     bare = system.create_run("bare run")
     system.run_until_stop(bare)
     system.projects.rename(owners["A"][0], "项目 A2")
-    return system, owners, bare
+    return system, {"owners": owners, "bare": bare}
+
+
+@pytest.fixture(scope="module")
+def saved_two_projects(tmp_path_factory):
+    return _saved_log(_two_projects_source, tmp_path_factory.mktemp("two-projects"))
+
+
+@pytest.fixture
+def two_projects_log(saved_two_projects, tmp_path):
+    saved, extra = saved_two_projects
+    system = system_on_copy(saved, tmp_path / "two-projects")
+    return system, extra["owners"], extra["bare"]
+
+
+def _actor_source(data_dir):
+    # 一个事项走完，中间有一条用户补充输入：三种提出者都出现在日志里
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
+    project_id = system.projects.register("项目", "工具")
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "事项")
+    system.add_input(run_id, "补充一句要求")  # 用户输入：提出者为 user:local
+    system.run_until_stop(run_id)
+    system.projects.settle(run_id)
+    return system, {}
+
+
+@pytest.fixture(scope="module")
+def saved_actor_log(tmp_path_factory):
+    return _saved_log(_actor_source, tmp_path_factory.mktemp("actors"))
+
+
+@pytest.fixture
+def actor_log(saved_actor_log, tmp_path):
+    saved, _extra = saved_actor_log
+    return system_on_copy(saved, tmp_path / "actors")
 
 
 def _membership(system, event):
@@ -39,8 +83,8 @@ def _matches(system, event, *, projects=(), work_items=(), runs=(), departments=
             and (not types or event.type in types))
 
 
-def test_range_reads_equal_filtering_the_whole_log(data_dir):
-    system, owners, bare = _two_projects_and_a_bare_run(data_dir)
+def test_range_reads_equal_filtering_the_whole_log(two_projects_log):
+    system, owners, bare = two_projects_log
     everything = system.store.read(limit=100_000)
     assert [event.position for event in everything] == sorted(event.position for event in everything)
     assert len({event.position for event in everything}) == len(everything)
@@ -65,8 +109,8 @@ def test_range_reads_equal_filtering_the_whole_log(data_dir):
     assert system.store.read(limit=100_000, projects=[project_a], runs=[run_b]) == []
 
 
-def test_reading_in_batches_by_position_gives_the_whole_log_once(data_dir):
-    system, owners, _bare = _two_projects_and_a_bare_run(data_dir)
+def test_reading_in_batches_by_position_gives_the_whole_log_once(two_projects_log):
+    system, owners, _bare = two_projects_log
     everything = system.store.read(limit=100_000)
     batched, after = [], 0
     while True:
@@ -99,7 +143,7 @@ def test_cross_project_reads_follow_the_order_of_writing(data_dir):
     assert [event.stream_version for event in events] == [1, 1, 2, 2]
     assert [event.position for event in events] == sorted(event.position for event in events)
 
-def test_every_event_declares_its_actor_and_the_department_lives_in_the_department_column(data_dir):
+def test_every_event_declares_its_actor_and_the_department_lives_in_the_department_column(actor_log):
     # 提出者由写入方声明（设计第 5.2 节）：命令写入的事件为命令的提出者、角色任务中的记录与提案为
     # department:<部门>、流程编排与控制核心自己的判断为 system；role 列为空，部门只在 department 列
     user_events = {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED}
@@ -109,12 +153,7 @@ def test_every_event_declares_its_actor_and_the_department_lives_in_the_departme
                      EventType.RUN_FAILED, EventType.DECISION_REQUESTED}
     system_projects = {ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
                        ProjectEventType.WORK_ITEM_START_FAILED}
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
-    project_id = system.projects.register("项目", "工具")
-    _work_item_id, run_id = system.projects.start_work_item(project_id, "事项")
-    system.add_input(run_id, "补充一句要求")  # 用户输入：提出者为 user:local
-    system.run_until_stop(run_id)
-    system.projects.settle(run_id)
+    system = actor_log
     events = system.store.read(limit=100_000)
     assert events
     # 每条事件都有提出者

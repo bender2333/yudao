@@ -30,6 +30,7 @@ evals/scenarios/scenario-3/checks/_work/
 .tmp-codex-test/
 .tmp-omp-profile/
 .tmp-omp-*.log
+.tmp-*.log
 .playwright-mcp/
 .mission-workspaces/
 .remember/

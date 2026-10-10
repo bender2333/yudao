@@ -115,24 +115,24 @@ export function JsonDialog(props: JsonDialogProps) {
   }, [text, props.onSave]);
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={props.onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label="编辑 JSON"
+    <div className="y9-modal-backdrop modal-backdrop" role="presentation" onClick={props.onClose}>
+      <div className="y9-modal modal" role="dialog" aria-modal="true" aria-label="编辑 JSON"
            onClick={(event) => event.stopPropagation()}>
         <h2>编辑 JSON</h2>
-        <p className="hint">
+        <p className="y9-small y9-muted hint">
           目录文档是 Provider 配置、模型访问定义与部门默认的完整文本，不含 API Key 与准入记录。
           校验通过时整份写入；任何一项不通过时整份拒绝，并指出字段位置。
         </p>
-        <textarea className="json-editor" aria-label="目录文档 JSON" value={text} spellCheck={false}
+        <textarea className="y9-textarea y9-json json-editor" aria-label="目录文档 JSON" value={text} spellCheck={false}
                   onChange={(event) => setText(event.target.value)} />
         {status && (
-          <p className={status.kind === "ok" ? "hint" : "hint mm-error"} role="status">{status.message}</p>
+          <p className={status.kind === "ok" ? "y9-small hint" : "y9-warn-text hint mm-error"} role="status">{status.message}</p>
         )}
-        <div className="mm-actions">
-          <button type="button" onClick={format}>格式化</button>
-          <button type="button" onClick={reset}>重置</button>
-          <button type="button" onClick={copy}>复制</button>
-          <button type="button" onClick={() => fileRef.current?.click()}>导入</button>
+        <div className="y9-row mm-actions">
+          <button type="button" className="y9-btn" onClick={format}>格式化</button>
+          <button type="button" className="y9-btn" onClick={reset}>重置</button>
+          <button type="button" className="y9-btn" onClick={copy}>复制</button>
+          <button type="button" className="y9-btn" onClick={() => fileRef.current?.click()}>导入</button>
           <input ref={fileRef} type="file" accept="application/json,.json" aria-label="导入目录 JSON 文件" hidden
                  onChange={(event) => {
                    const file = event.target.files?.[0];
@@ -141,11 +141,11 @@ export function JsonDialog(props: JsonDialogProps) {
                    }
                    event.target.value = "";
                  }} />
-          <button type="button" onClick={exportFile}>导出</button>
-          <button className="primary" type="button" disabled={saving} onClick={() => void save()}>
+          <button type="button" className="y9-btn" onClick={exportFile}>导出</button>
+          <button className="y9-btn primary" type="button" disabled={saving} onClick={() => void save()}>
             {saving ? "保存中…" : "保存"}
           </button>
-          <button type="button" onClick={props.onClose}>关闭</button>
+          <button type="button" className="y9-btn" onClick={props.onClose}>关闭</button>
         </div>
       </div>
     </div>

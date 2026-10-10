@@ -1,5 +1,5 @@
-# 访问方式（设计说明第 6.2 节）与页面文件（网页界面的提供与发布设计说明第 5.1 节）：真实启动接口，
-# 经 HTTP 检查 Host、Origin、命令的媒体类型、同一来源与页面文件。
+# 访问方式（设计说明第 6.2、6.3 节）与页面文件（网页界面的提供与发布设计说明第 5.1 节）：
+# 真实启动接口，经 HTTP 检查 Host、Origin、访问令牌、命令的媒体类型、同一来源与页面文件。
 
 import re
 import socket
@@ -7,9 +7,11 @@ import uuid
 
 from harness.__main__ import main
 from harness.adapters.fake import FakeAdapter
+from harness.app.access_tokens import AccessTokenStore
 from harness.app.application import Application
+from harness.models import utc_now
 from harness.runtime import LoopSystem
-from harness.tests.api_helpers import running_api
+from harness.tests.api_helpers import bearer, running_api
 
 
 class _Opened:
@@ -30,6 +32,7 @@ def _lan_address() -> str:
         if not address.startswith("127."):
             return address
     return "127.0.0.1"
+
 
 
 def test_local_access_rejects_a_host_that_is_not_a_local_name(data_dir):
@@ -142,8 +145,9 @@ def test_capabilities_list_the_access_mode(data_dir):
     # 能力清单列出访问方式（设计说明第 6.1、6.2 节）：本机与局域网由启动设置给出
     with running_api(_Opened(data_dir)) as client:
         local = client.get("/api/capabilities").json()["deployment"]["access"]
-    with running_api(_Opened(data_dir), access="lan") as client:
-        lan = client.get("/api/capabilities").json()["deployment"]["access"]
+    _entry, token = AccessTokenStore(data_dir).create("capabilities", now=utc_now())
+    with running_api(_Opened(data_dir), access="lan", data_dir=data_dir) as client:
+        lan = client.get("/api/capabilities", headers=bearer(token)).json()["deployment"]["access"]
     assert (local, lan) == ("local", "lan")
 
 
@@ -156,24 +160,28 @@ def test_the_local_access_mode_refuses_to_listen_on_another_address(tmp_path, ca
 
 def test_lan_access_serves_the_local_network_and_checks_only_the_origin(data_dir, tmp_path):
     # 局域网访问方式：监听任意地址，经局域网地址打开页面、读取能力清单、查询与提交命令，事件的提出者是
-    # user:local；Host 不受本机名称限制，页面文件同样经过访问检查；Origin 与服务自己的来源不同的请求被拒绝
+    # user:<令牌名称>；Host 不受本机名称限制，页面文件同样经过访问检查；Origin 与服务自己的来源不同的
+    # 请求被拒绝
     opened = _Opened(data_dir)
+    _entry, token = AccessTokenStore(data_dir).create("客厅的电脑", now=utc_now())
+    headers = bearer(token)
     with running_api(opened, access="lan", host="0.0.0.0", connect=_lan_address(),
-                     pages=_pages(tmp_path / "pages")) as client:
+                     pages=_pages(tmp_path / "pages"), data_dir=data_dir) as client:
         origin = str(client.base_url).rstrip("/")
         page = client.get("/")
         page_denied = client.get("/", headers={"Origin": "https://evil.example"})
-        capabilities = client.get("/api/capabilities")
-        status = client.get("/api/queries/system.status")
+        capabilities = client.get("/api/capabilities", headers=headers)
+        status = client.get("/api/queries/system.status", headers=headers)
         accepted = client.post("/api/commands/project.create",
                                json={"command_id": str(uuid.uuid4()), "name": "接入已有项目", "goal": "整理需求"},
-                               headers={"Origin": origin})
-        other_host = client.get("/api/capabilities", headers={"Host": "control-host"})
-        rejected = client.get("/api/queries/system.status", headers={"Origin": "https://evil.example"})
+                               headers=headers | {"Origin": origin})
+        other_host = client.get("/api/capabilities", headers=headers | {"Host": "control-host"})
+        rejected = client.get("/api/queries/system.status",
+                              headers=headers | {"Origin": "https://evil.example"})
         # 页面经局域网地址订阅事件流成功（用一个超过日志末尾的 after 位置，服务端据此立即发送 resync
         # 并关闭连接），来源不同的订阅在路由之前被拒绝
-        stream_denied = client.get("/api/events", headers={"Origin": "https://evil.example"})
-        stream_allowed = client.get("/api/events?after=999999", headers={"Origin": origin})
+        stream_denied = client.get("/api/events", headers=headers | {"Origin": "https://evil.example"})
+        stream_allowed = client.get("/api/events?after=999999", headers=headers | {"Origin": origin})
         events = opened.applications[0].system.store.list_project_events(accepted.json()["refs"]["project_id"])
     assert page.status_code == 200 and page_denied.status_code == 403
     assert capabilities.status_code == 200
@@ -187,4 +195,4 @@ def test_lan_access_serves_the_local_network_and_checks_only_the_origin(data_dir
     assert stream_allowed.status_code == 200
     assert stream_allowed.headers["content-type"].startswith("text/event-stream")
     assert "event: resync" in stream_allowed.text
-    assert [event.actor for event in events] == ["user:local"]
+    assert [event.actor for event in events] == ["user:客厅的电脑"]

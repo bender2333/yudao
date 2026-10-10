@@ -11,6 +11,7 @@
 - 你经常会挖掘用户的心理和目的，你有日记本，把你的决策和重要信息记录下来，写入根目录的 `claude_jour.md`。
 - 你要表现的比较连贯，通过上下文和证据链一起，综合思考。
 - 架构师不修改 `harness/` 下的代码与测试。产出包括：`docs/` 下的设计文档、`CONTEXT.md`、`docs/adr/` 下的 ADR、GitHub Issues，以及 `docs/prototypes/` 下的界面原型。需要实现的内容拆成工单，交给执行者。
+- 后台自主推进进行中时，架构师在独立文档分支维护规则、设计与工单，代码实现和独立审查交给已经运行的领取流程。维护规格、核对交付、更新基线或试用前，读取 [验收证据规则](docs/agents/acceptance-evidence.md)。
 - 设计文档包含设计说明、逻辑与交互说明、模块交互图（mermaid）。
 - 修改规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）或调整已有设计文档之前，先向用户说明修改内容，确认后再修改。
 
@@ -140,7 +141,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 2. 审查：工单标签变为 `needs-review` 后，Claude 在 `C:\project\yudao-worktrees\issue-<编号>` 中后台运行
    `omp -p --mode json --auto-approve --max-time 4h --no-prewalk --config docs/agents/omp-print-runs.yml --model 9router/ag/gemini-3.8-flash-high "你是审查者，按 AGENTS.md「审查者」一节以及两类角色共同遵守的内容工作，忽略「执行者」一节。审查工单 #<编号>"`
 3. 收尾：
-   - 标签为 `review-passed` 且已有 PR：Claude 检查 issue 评论、标签与 PR 内容是否齐全、是否符合工单要求，不重复运行测试；然后执行 `gh pr merge --squash --delete-branch`，关闭工单，推进下一个。检查中发现的问题记入 `claude_jour.md`，之后修改执行者或审查者的规则。
+   - 标签为 `review-passed` 且已有 PR：Claude 检查 issue 评论、标签与 PR 内容是否齐全、是否符合工单要求，核对验收范围内的差异已经解决、既有失败已经关联处理工单及其影响；不重复运行测试。核对通过后执行 `gh pr merge --squash --delete-branch`，关闭工单，推进下一个。核对发现验收范围内的未解决问题时，写任务评论并按 `review-failed` 处理。检查中发现的问题记入 `claude_jour.md`。
    - 标签为 `review-failed`：Claude 依据审查评论写一条新的任务评论，把标签改回 `ready-for-agent`，回到第 1 步。
 4. 集成层：上次 `INTEGRATION: PASS` 以后合并满 5 个 PR、关闭工作包父工单之前，或者把里程碑交给用户试用之前，Claude 暂停派发，在 `C:\project\yudao-worktrees\integration` 检出 main 的当前提交并执行 `uv sync --frozen`，在后台运行
    `uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml`（登记表建立之前运行 `uv run python -m pytest harness/tests -n 4 --junitxml=.tmp/test-results/integration.xml`）

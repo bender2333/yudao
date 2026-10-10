@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, WorkItemLoop } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
+import { newCommandId } from "../../contract/command-id.ts";
 import { createRafClock, type Clock } from "../../pixel/clock";
 import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
 import type { DecisionAnswer, DecisionResult } from "../../pixel/floor/card";
@@ -120,7 +121,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   // 画面内的回答：走与页面卡片同一条命令 decision.answer，带上决定的版本与说明；拒绝时把原因交给卡片
   decideRef.current = async (payload) => {
     const outcome = await props.app.command("decision.answer", {
-      command_id: globalThis.crypto.randomUUID(),
+      command_id: newCommandId(),
       decision_id: payload.decision_id,
       option: payload.option,
       ...(payload.note === "" ? {} : { note: payload.note }),
@@ -242,13 +243,13 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   );
 
   return (
-    <div className="floor-screen">
-      <div className="floor-overlay-tabs">
+    <div className="y9-scene floor-screen">
+      <div className="y9-overlay-bar floor-overlay-tabs">
         {OVERLAY_LABELS.filter(([name]) => overlays.includes(name)).map(([name, labelText]) => (
           <button
             key={name}
             type="button"
-            className={overlay === name ? "active" : ""}
+            className={`y9-seg-btn${overlay === name ? " is-on active" : ""}`}
             onClick={() => setOverlay(overlay === name ? null : name)}
           >
             {labelText}
@@ -322,15 +323,15 @@ function FloorTextList(props: {
     workItemId ? props.items.find((it) => it.work_item_id === workItemId)?.sign ?? workItemId : "";
   return (
     <>
-      {props.items.length === 0 ? <p className="note">项目还没有事项</p> : (
-        <ul className="floor-text-list">
+      {props.items.length === 0 ? <p className="y9-note note">项目还没有事项</p> : (
+        <ul className="y9-scene-list floor-text-list">
           {props.items.map((item) => (
             <li key={item.work_item_id}>
               <strong>{item.sign}</strong>
               <span>{item.department ?? "—"}</span>
               <span>第 {item.round} 轮</span>
               <span>{item.status}</span>
-              {item.kind === "onboarding" ? <span className="tag">建档</span> : null}
+              {item.kind === "onboarding" ? <span className="y9-tag tag">建档</span> : null}
             </li>
           ))}
         </ul>

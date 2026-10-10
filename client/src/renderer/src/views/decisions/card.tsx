@@ -7,7 +7,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { DecisionView } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
-import { CommandFeedback, KeyValue, TextArea, hasCommand } from "../project/common";
+import { Icon } from "../../shell/kit";
+import { CommandFeedback, KeyValue, Tag, TextArea, hasCommand } from "../project/common";
 import { DECISION_BLOCKS, DECISION_KIND, formatDuration, formatTime, label } from "../project/labels";
 import { useCommand } from "../project/use-snapshot";
 import { blockedText, decisionLinks, materialRows, missingNoteText, viewHref, waitedSeconds } from "./card-logic";
@@ -89,13 +90,14 @@ export function DecisionCard(props: DecisionCardProps) {
   };
 
   return (
-    <article ref={cardRef} className={`decision-card${answered ? " answered" : ""}${isSubmitted ? " submitted" : ""}${targeted ? " is-targeted" : ""}`} id={`decision-${decision.decision_id}`}>
-      <header className="decision-head">
-        <div className="decision-title">
+    <article ref={cardRef} className={`y9-card decision-card${answered ? " answered" : ""}${isSubmitted ? " submitted" : ""}${targeted ? " is-targeted" : ""}`} id={`decision-${decision.decision_id}`}>
+      <header className="y9-card-head decision-head">
+        <div className="y9-card-title decision-title">
+          <Icon name="decide" />
           <strong>{label(DECISION_KIND, decision.kind)}</strong>
-          <span className="tag">{decision.blocks === "" ? "不阻塞" : `阻塞范围：${label(DECISION_BLOCKS, decision.blocks)}`}</span>
+          <Tag>{decision.blocks === "" ? "不阻塞" : `阻塞范围：${label(DECISION_BLOCKS, decision.blocks)}`}</Tag>
         </div>
-        <div className="decision-meta">
+        <div className="y9-card-meta decision-meta">
           <span>
             {props.projectName || decision.project_id || "项目流"}
             {props.workItemTitle || decision.work_item_id ? ` · ${props.workItemTitle || decision.work_item_id}` : ""}
@@ -106,13 +108,13 @@ export function DecisionCard(props: DecisionCardProps) {
       </header>
 
       {rows.length > 0 ? (
-        <details className="decision-body" open>
+        <details className="y9-card-body decision-body" open>
           <summary>材料</summary>
           <KeyValue items={rows.map((row) => [row.term, row.value] as [string, string])} />
           {links.length > 0 ? (
-            <div className="row-actions">
+            <div className="y9-row row-actions">
               {links.map((link) => (
-                <button key={link.href} type="button" className="link" onClick={() => props.onNavigate(link.href)}>
+                <button key={link.href} type="button" className="y9-link link" onClick={() => props.onNavigate(link.href)}>
                   {link.label}
                 </button>
               ))}
@@ -120,41 +122,43 @@ export function DecisionCard(props: DecisionCardProps) {
           ) : null}
         </details>
       ) : null}
-
       {answered ? (
-        <p className="decision-result" role="status">
+        <p className="y9-card-result decision-result" role="status">
           {decision.status === "answered"
             ? `已提交：${answeredLabel(decision)}（${formatTime(decision.answer?.answered_at ?? null)}）`
             : "决定请求已经撤销，卡片不再等待回答"}
         </p>
       ) : (
-        <div className="decision-answer">
+        <div className="y9-card-answer decision-answer">
           <TextArea label="说明（可选）" value={note} rows={2} disabled={isSubmitted} onInput={(value) => setNote(value)} />
-          <div className="row-actions">
+          <div className="y9-row row-actions">
             {options.map((option) => (
               <button
                 key={option.id}
                 type="button"
-                className="primary"
+                className="y9-btn small primary"
                 disabled={command.busy || isSubmitted || !hasCommand(props.app, "decision.answer")}
+                title={option.note_required ? "需要在说明中写明修改意见" : undefined}
                 onClick={() => answer(option.id)}
               >
                 {option.label}
               </button>
             ))}
+            {isSubmitted ? <span className="y9-card-submitted">已提交，等待控制主机确认</span> : null}
           </div>
           {noteMissing === "" ? null : (
             <span className="hint" role="status">
               {noteMissing}
             </span>
           )}
-          <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
+          {/* 已提交提示挂在选项行末尾（原型 v9 卡片同样位置）。命令反馈在卡片里只留拒绝提示：
+              两条「已提交」同时出现会让提示重复（工单 #319） */}
+          <CommandFeedback submitted={command.submitted && !isSubmitted} rejection={command.rejection} />
         </div>
       )}
-
       {target !== null ? (
-        <footer className="decision-foot">
-          <button type="button" className="link" onClick={() => props.onNavigate(target)}>
+        <footer className="y9-card-foot decision-foot">
+          <button type="button" className="y9-link link" onClick={() => props.onNavigate(target)}>
             在项目中查看
           </button>
         </footer>
@@ -186,10 +190,10 @@ export function DecisionCardList(props: {
   emptyText: string;
 }) {
   if (props.decisions.length === 0) {
-    return <p className="note">{props.emptyText}</p>;
+    return <p className="y9-empty note">{props.emptyText}</p>;
   }
   return (
-    <div className="decision-cards">
+    <div className="y9-cards decision-cards">
       {props.decisions.map((decision) => {
         const resolved = props.names(decision);
         return (

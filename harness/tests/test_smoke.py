@@ -4,17 +4,46 @@ from pathlib import Path
 
 import pytest
 
-from harness.adapters.fake import FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, plan_turn, review_turn
 from harness.providers import ProviderFacade
+from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run
-from harness.tests.helpers import recorded_context, run_scripted
+from harness.tests.helpers import compacted_runner, happy_script, recorded_context, run_scripted, system_on_copy
 from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_event, rewrite_saved_events,
                                          rewrite_saved_projection)
+
+
+# 需要一份真实运行记录的文件：module 作用域的夹具各跑一次完整循环并保存数据目录，
+# 每项测试复制一份数据目录，在自己的副本上改写与检查。数据来自真实运行，这些文件登记为集成层。
+
+
+@pytest.fixture(scope="module")
+def saved_native(tmp_path_factory):
+    # 一次本机流程走完的运行：产品给要求、工程计划与写入、检查、交付、再检查、质检放行
+    script = [
+        product_spec(),
+        plan_turn(),
+        FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        FakeTurn(checks={"smoke": 0}),
+        delivery(),
+        FakeTurn(checks={"smoke": 0}),
+        review("release", "host checks passed"),
+    ]
+    system, projection = run_scripted(tmp_path_factory.mktemp("native"), script)
+    assert projection.phase == "DONE"
+    system.close()
+    return system.data_dir, projection.run_id
+
+
+@pytest.fixture
+def native_run(saved_native, tmp_path):
+    saved, run_id = saved_native
+    return system_on_copy(saved, tmp_path / "native"), run_id
 
 
 def test_smoke_requires_current_input_audit_and_host_receipts():
@@ -50,20 +79,28 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
         }}) == 1
 
 
+@pytest.fixture(scope="module")
+def saved_collaboration(tmp_path_factory):
+    from harness.demo import run_demo
+
+    system, run_id = run_demo(tmp_path_factory.mktemp("collaboration"))
+    # 记录装配上下文的检查要按 run 读回每一次请求：请求本身在调用清单里，清单随数据目录保存
+    invocations = list(system.test_adapter.invocations)
+    system.close()
+    return system.data_dir, run_id, invocations
+
+
 @pytest.fixture
-def native_run(data_dir):
-    script = [
-        product_spec(),
-        plan_turn(),
-        FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
-        FakeTurn(checks={"smoke": 0}),
-        delivery(),
-        FakeTurn(checks={"smoke": 0}),
-        review("release", "host checks passed"),
-    ]
-    system, projection = run_scripted(data_dir, script)
-    assert projection.phase == "DONE"
-    return system, projection.run_id
+def collaboration_run(saved_collaboration, tmp_path):
+    saved, run_id, _invocations = saved_collaboration
+    return system_on_copy(saved, tmp_path / "collaboration"), run_id
+
+
+@pytest.fixture
+def collaboration_invocations(saved_collaboration):
+    # 保存的运行里每一次模型请求：检查装配上下文时按请求读回同一份清单
+    _saved, _run_id, invocations = saved_collaboration
+    return invocations
 
 
 def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
@@ -172,13 +209,6 @@ def test_archive_audit_rejects_unrelated_delivery_digest(native_run):
     assert summarize_run(system, run_id, scenario="happy")["delivery_archive"]["status"] == "unverified"
 
 
-@pytest.fixture
-def collaboration_run(data_dir):
-    from harness.demo import run_demo
-
-    return run_demo(data_dir)
-
-
 def test_collaboration_audit_requires_actual_consultation_and_accepted_action_results(collaboration_run):
     system, run_id = collaboration_run
     audit = summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]
@@ -188,14 +218,14 @@ def test_collaboration_audit_requires_actual_consultation_and_accepted_action_re
     assert audit["directions"] == ["product->engineering", "engineering->product", "quality->engineering"]
 
 
-def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_run):
+def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_run, collaboration_invocations):
     system, run_id = collaboration_run
     summary = summarize_run(system, run_id, scenario="collaboration")
     assert summary["model_input_audit"]["status"] == "verified", summary["model_input_audit"]
     assert summary["check_receipts_verified"] is True
     assert summary["delivery_archive"]["status"] == "verified"
     manifests = [(request.department, recorded_context(system, request).manifest)
-                 for request in system.test_adapter.invocations]
+                 for request in collaboration_invocations]
     assert {manifest.input_version for _department, manifest in manifests} == {1, 2}
     # demo 在事项进行中修改产品部门的部门 Prompt：修改前的请求用内置默认（版本 0），之后用项目设置（版本 1）
     assert {manifest.prompt_version for department, manifest in manifests if department == "product"} == {0, 1}
@@ -232,11 +262,6 @@ def test_model_input_audit_rejects_changed_received_original(collaboration_run, 
 def test_model_input_audit_uses_the_project_department_prompt(tmp_path):
     # 部门 Prompt 来自项目部门设置（run 内没有副本）：装配的请求正文用项目设置中的 Prompt，
     # 审计从项目部门设置取出同一个 Prompt 复核
-    from harness.adapters.fake import FakeAdapter
-    from harness.providers.selection import ModelSelection
-    from harness.runtime import LoopSystem
-    from harness.tests.helpers import happy_script
-
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([*happy_script()]))
     project_id = system.projects.register("Audit", "目标")
     prompt = "  NEW_ENGINEERING_PROMPT\r\n"
@@ -315,9 +340,7 @@ def test_model_input_audit_rejects_forged_injected_source_metadata(native_run):
 
 
 def test_model_input_audit_rebuilds_summary_scope_after_contract_changes(tmp_path):
-    from harness.tests.helpers import compacted_runner as _runner
-
-    system, adapter, run_id, _ = _runner(tmp_path)
+    system, adapter, run_id, _ = compacted_runner(tmp_path)
     first = system.activate_once(run_id)
     assert first.compactions[-1]["effective_contract_hash"] is None
     system.activate_once(run_id)
@@ -430,25 +453,39 @@ def test_audit_does_not_replace_missing_run_artifact_with_another_runs_copy(nati
     assert fields["context_isolated"] is False
     assert fields["model_input_audit"]["status"] == "unverified"
 
+# 同一个脚本被两项检查共用：请求让出以后回到产品部门，两项检查各在自己的副本上改写与检查
+_PRODUCT_RETURN_SCRIPT = [
+    product_spec(), collaboration_request(), response_turn("answered", "The existing requirements do not distinguish flags."),
+    plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
+]
 
-def test_audit_preserves_department_history_when_request_returns_to_product(data_dir):
-    system, projection = run_scripted(data_dir, [
-        product_spec(), collaboration_request(), response_turn("answered", "The existing requirements do not distinguish flags."),
-        plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
-    ])
+
+@pytest.fixture(scope="module")
+def saved_product_return(tmp_path_factory):
+    system, projection = run_scripted(tmp_path_factory.mktemp("product-return"), _PRODUCT_RETURN_SCRIPT)
     assert projection.phase == "DONE"
-    fields = isolation_fields(system.store, system.artifacts, projection.run_id)
+    system.close()
+    return system.data_dir, projection.run_id
+
+
+@pytest.fixture
+def product_return_run(saved_product_return, tmp_path):
+    saved, run_id = saved_product_return
+    return system_on_copy(saved, tmp_path / "product-return"), run_id
+
+
+def test_audit_preserves_department_history_when_request_returns_to_product(product_return_run):
+    system, run_id = product_return_run
+    fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is True, fields["model_input_audit"]["notes"]
     assert fields["model_input_audit"]["activation_count"] == 6
 
 
-def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_dir):
-    system, projection = run_scripted(data_dir, [
-        product_spec(), collaboration_request(), response_turn("answered", "The existing requirements do not distinguish flags."),
-        plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
-    ])
-    assert isolation_fields(system.store, system.artifacts, projection.run_id)["model_input_audit"]["status"] == "verified"
-    events = _saved_events(system, projection.run_id)
+def test_audit_rejects_missing_new_work_message_after_product_reactivation(product_return_run):
+    system, run_id = product_return_run
+    projection = system.project(run_id)
+    assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
+    events = _saved_events(system, run_id)
     assembled = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED and event.department == "product"][1]
     request = json.loads(system.artifacts.get_text(assembled.payload["request_ref"]["content_hash"]))
     assert request["input"][-1]["role"] == "user"
@@ -463,20 +500,26 @@ def test_audit_rejects_missing_new_work_message_after_product_reactivation(data_
                      and event.payload["step_id"] == assembled.payload["step_id"])
     attempted.context_digest = canonical_hash(request)
     rewrite_saved_events(system.store, [assembled, attempted])
-    fields = isolation_fields(system.store, system.artifacts, projection.run_id)
+    fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is False
     assert any("department's recorded outputs" in note for note in fields["model_input_audit"]["notes"])
 
 
-@pytest.fixture
-def compacted_run(tmp_path):
-    from harness.tests.helpers import compacted_runner as _runner
-
-    system, _, run_id, _ = _runner(tmp_path)
+@pytest.fixture(scope="module")
+def saved_compacted(tmp_path_factory):
+    # 上下文窗口只有 6000 的运行：压缩以后继续工程工作，保存到第一次压缩之后
+    system, _adapter, run_id, _original = compacted_runner(tmp_path_factory.mktemp("compacted"))
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING"
     assert len(result.compactions) > 1
-    return system, run_id
+    system.close()
+    return system.data_dir, run_id
+
+
+@pytest.fixture
+def compacted_run(saved_compacted, tmp_path):
+    saved, run_id = saved_compacted
+    return system_on_copy(saved, tmp_path / "compacted"), run_id
 
 
 def test_compaction_audit_checks_partial_sources_and_resumed_input(compacted_run):

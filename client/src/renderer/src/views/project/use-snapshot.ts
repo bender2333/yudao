@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Rejected } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
+import { newCommandId } from "../../contract/command-id.ts";
 
 export type SnapshotState<T> = {
   data: T | null;
@@ -98,7 +99,7 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
       setBusy(true);
       setRejection(null);
       try {
-        const outcome = await app.command(name, { command_id: globalThis.crypto.randomUUID(), ...body });
+        const outcome = await app.command(name, { command_id: newCommandId(), ...body });
         if (outcome.ok) {
           setSubmitted(true);
           setAccepted(outcome.accepted);
