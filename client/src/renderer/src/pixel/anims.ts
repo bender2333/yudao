@@ -1,4 +1,4 @@
-// 动作帧序列与缓动：由原型 v9 engine.js 第 4、5 节（an、animFrame、animDuration、ease、hash）
+// 动作帧序列与缓动：由原型 v10 engine.js 第 4、5 节（an、animFrame、animDuration、ease、hash）
 // 改写为 TypeScript。取帧只做纯计算：给定动作与经过时间，得到姿势名；工单 #176 的确定时钟依赖这一点。
 
 import { ANIMS, POSES, type Pose } from "./registry.ts";

@@ -1,4 +1,4 @@
-// 部门房间的布局常量与位置表（原型 v9 room.js 的 W、H、BASE、L、SPOT、STATUS_TEXT、POSE_ALIAS、
+// 部门房间的布局常量与位置表（原型 v10 room.js 的 W、H、BASE、L、SPOT、STATUS_TEXT、POSE_ALIAS、
 // BENCH_LABEL、S，工单 #177）。这些是数据与坐标，渲染层按它们画、驱动器按它们走位。
 
 import { PAL } from "../registry.ts";

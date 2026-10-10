@@ -1,4 +1,4 @@
-// 项目楼层的驱动：按快照配置世界（声明、角色、持续状态），把事件变成任务、包裹与信号（原型 v9 floor.js
+// 项目楼层的驱动：按快照配置世界（声明、角色、持续状态），把事件变成任务、包裹与信号（原型 v10 floor.js
 // 与设计说明第 4、5 节，工单 #82）。
 //
 // 世界与系统都在这里维护；画面渲染只读这里给出的世界与状态。驱动不依赖 PixiJS：
@@ -82,7 +82,7 @@ export interface FloorDriverOptions {
   catalog: Catalog;
   W: number;
   H: number;
-  /** 时间与数字在画面上的写法（原型 Y9.time）。 */
+  /** 时间与数字在画面上的写法（原型 Y10.time）。 */
   time: { clock: (iso: string | null) => string; duration: (sec: number) => string };
 }
 
@@ -268,7 +268,8 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     if (!ev || !ev.type) throw new Error("playEvent 需要事件对象");
     const pl = (ev.payload ?? {}) as Record<string, unknown>;
     const wid = ev.work_item_id ?? null;
-    const item = wid ? (model.items.find((x) => x.work_item_id === wid) ?? null) : null;
+    // 原型 floor.js 的 itemById 按事项的 id 查；快照里的事项同时带 work_item_id
+    const item = wid ? (model.items.find((x) => x.id === wid || x.work_item_id === wid) ?? null) : null;
     const color = item ? ITEM_COLORS[item.color_index % ITEM_COLORS.length] : null;
     const lay = rooms();
     const order = world.roomOrder;
@@ -372,10 +373,13 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
         }
         return;
       }
-      case "decision_requested": {
+      case "decision_requested":
+      case "x_decision_issued":
+      case "project_decision_requested": {
         // 提出决定的部门的小人走到门口送出决定单，决定单飞到大厅的板上；决定单在路上的时候板上还看不到它。
         // 决定的身份是事件的 event_id（投影按它登记决定请求）；没有部门的决定请求（初始 PRD）从大厅上方飞进来
-        const department = (ev.department ?? null) as string | null;
+        // 事件没有部门时按它所属事项的部门承担动作（原型 floor.js：ev.department || it.department）
+        const department = (ev.department ?? item?.department ?? null) as string | null;
         const room = department && world.rooms[department] && world.rooms[department].roomKind === "dept" ? world.rooms[department] : null;
         const board = boardRectOf(lay);
         const decisionId = (ev.event_id ?? (pl.decision_id as string | undefined)) ?? null;
@@ -395,25 +399,29 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
             },
           });
         };
-        // 送单由经理做：任务键用原型声明里的 x_decision_issued，说完话（送单动作收尾）以后放单
-        const postEvent = { ...ev, type: "x_decision_issued", department } as PixelFloorEvent;
-        const postMake = (def: TaskDef, event: PixelFloorEvent, ch: Character): Partial<Task> => ({
-          ...extrasOf(def, event, ch, "from"),
-          done: post,
-        });
+        // 送单由经理做：任务键用事件本身的类型（原型 floor.js 只补部门），
+        // 事件类型是 decision_requested 时才换成原型声明里的 x_decision_issued。
+        // 说话用任务声明里的标签（原型 floor.js：make 只带 done，不按事件的 kind 换词）
+        const postKey = ev.type === "decision_requested" ? "x_decision_issued" : ev.type;
+        const postEvent = { ...ev, type: postKey, department } as PixelFloorEvent;
+        const postMake = (): Partial<Task> => ({ done: post });
         if (room && !scene.reduced && dispatch(world, postEvent, postMake)) {
           scene.after(8000, post);
         } else post();
         return;
       }
-      case "decision_answered": {
+      case "decision_answered":
+      case "x_decision_answered":
+      case "project_decision_answered": {
         // 回答过的决定单从板上飞回提出决定的部门的门口，经理在门口收下；正在展开的那张纸盖上章
-        const department = (ev.department ?? null) as string | null;
+        // 事件没有部门时按它所属事项的部门承担动作（原型 floor.js：ev.department || it.department）
+        const department = (ev.department ?? item?.department ?? null) as string | null;
         const room = department && world.rooms[department] && world.rooms[department].roomKind === "dept" ? world.rooms[department] : null;
         const board = boardRectOf(lay);
         const decisionId = pl.decision_id as string | undefined;
         if (decisionId && scene.cardStamped) scene.cardStamped(decisionId, "已回答");
-        const answerEvent = { ...ev, type: "x_decision_answered", department } as PixelFloorEvent;
+        // 任务键用事件本身的类型（原型 floor.js 只补部门）；decision_answered 换成原型声明里的 x_decision_answered
+        const answerEvent = { ...ev, type: ev.type === "decision_answered" ? "x_decision_answered" : ev.type, department } as PixelFloorEvent;
         if (room) {
           scene.fly({
             bmp: "decision",

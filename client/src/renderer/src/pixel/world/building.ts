@@ -1,4 +1,4 @@
-// 首页的楼的世界与系统（原型 v9 building.js 的 createBuildingScene、设计说明第 7 节「楼」，工单 #178）。
+// 首页的楼的世界与系统（原型 v10 building.js 的 createBuildingScene、设计说明第 7 节「楼」，工单 #178）。
 //
 // 每个项目一层，画成缩小的项目楼层：部门房间的灯、事项的小旗、楼层入口的阀门与一盏状态灯；
 // 楼里每层一个小人（角色实体，没有房间），走位与待机由 world/characters.ts 的 stepCharacters 推进；

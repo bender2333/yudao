@@ -1,4 +1,4 @@
-// 首页的楼的数据组装（原型 v9 scenes.js 的 buildingModels，工单 #178 验收标准 3、4）。
+// 首页的楼的数据组装（原型 v10 scenes.js 的 buildingModels，工单 #178 验收标准 3、4）。
 //
 // 数据来自 projects.list（项目行）与每个项目的 project.loop（事项）；组装是纯函数，
 // 与查询结果的形状解耦，可以在 node --test 下核对，也供首页与端到端测试共用。

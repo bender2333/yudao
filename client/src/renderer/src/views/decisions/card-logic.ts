@@ -1,4 +1,4 @@
-// 决定卡片的材料整理（原型 v8 设计说明第 6 节，原型 v9 的 Y9.cards.materialRows 与 Y9.cards.face）。
+// 决定卡片的材料整理（原型 v8 设计说明第 6 节，原型 v10 的 Y10.cards.materialRows 与 Y10.cards.face）。
 // 首页与项目页面共用一份整理逻辑：卡片显示的材料与给像素画面用的纯文字版本由同一个函数产出，
 // 材料按决定种类从决定请求携带的事实里读出。这里是纯函数，界面与单元测试都直接调用。
 
@@ -123,7 +123,7 @@ export function blockedText(decision: DecisionView): { text: string; muted: bool
   return { text: parts.join("，"), muted: false };
 }
 
-// 给像素画面用的纯文字版本（原型 v9 的 Y9.cards.face）：与页面卡片同一份材料，不含界面元素。
+// 给像素画面用的纯文字版本（原型 v10 的 Y10.cards.face）：与页面卡片同一份材料，不含界面元素。
 // where 是「项目 · 事项」，由调用处按快照把标识解析成名称；解析不到时回落到标识。
 // options 保留 note_required（原型选项的标记）：为真时，没有写说明就不提交。
 export function face(

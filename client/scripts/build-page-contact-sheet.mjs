@@ -1,9 +1,10 @@
-// 页面截图联系表（工单 #376 的验收）：把原型 v9 与真实系统的同一个页面在同一种窗口尺寸、
+// 页面截图联系表（工单 #376 的验收）：把原型 v10 与真实系统的同一个页面在同一种窗口尺寸、
 // 设备像素比与主题下并排拼成一张联系表，交给界面工单交付时与原型对照。
-// 每一行左侧是原型 v9（自带示例数据，file:// 打开），右侧是真实系统（端到端后端提供的页面文件）。
+// 每一行左侧是原型 v10（自带示例数据，file:// 打开），右侧是真实系统（端到端后端提供的页面文件）。
 // 整页截图缩小排布，行尾另附两块按原始像素截取的局部，用来看清晰度。
-//
-// 用法：node scripts/build-page-contact-sheet.mjs --issue 376 [--pages home,models] [--themes light,dark]
+// 原型一侧的档位由页面清单给出，--level 可以在这一次运行里改用别的档位（例如用 pilot 档看
+// 覆盖层的循环、来源与检验三格）。
+// 用法：node scripts/build-page-contact-sheet.mjs --issue 376 [--pages home,models] [--themes light,dark] [--level pilot]
 // 输出：docs/stage-3/contact-sheets/<工单号>/<页面>-<主题>.png 与 index.md；
 //       原始整页截图写在 .tmp/contact-sheet-raw/<工单号>/（被 git 忽略）。
 // 依赖：client/out/renderer 的页面构建产物（npm run build:pages）与端到端后端
@@ -14,7 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import { chromium } from "@playwright/test";
-import { PAGES, THEMES, shotConfigs, sheetFileName } from "./page-contact-sheet-pages.ts";
+import { LEVELS, PAGES, THEMES, shotConfigs, sheetFileName } from "./page-contact-sheet-pages.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const clientRoot = resolve(here, "..");
@@ -37,7 +38,9 @@ for (const theme of themes) {
 const outDir = join(repoRoot, "docs", "stage-3", "contact-sheets", issue);
 const rawDir = join(repoRoot, ".tmp", "contact-sheet-raw", issue);
 const backendDataDir = join(repoRoot, ".tmp", "contact-sheet-backend", issue);
-const prototypeUrl = pathToFileURL(join(repoRoot, "docs", "prototypes", "v9", "index.html")).href;
+const prototypeUrl = pathToFileURL(join(repoRoot, "docs", "prototypes", "v10", "index.html")).href;
+const levelArg = args.level ?? null;
+if (levelArg !== null && !LEVELS.includes(levelArg)) fail(`档位只有 ${LEVELS.join(",")}，收到 ${levelArg}`);
 
 // 联系表的显示尺寸：整页截图按固定显示宽缩小，行尾的局部按原始像素显示（图片不缩放，只露出左上角）
 const CELL_WIDTH = 640;
@@ -68,10 +71,11 @@ try {
     for (const theme of themes) {
       const started = Date.now();
       const systemHash = systemHashOf(entry, projects, workItems);
-      const shots = await captureRow(backend.address, entry, theme, systemHash);
+      const prototypeLevel = levelArg ?? entry.prototypeLevel;
+      const shots = await captureRow(backend.address, entry, theme, systemHash, prototypeLevel);
       const file = join(outDir, sheetFileName(entry.slug, theme));
-      const bytes = await composeSheet(browser, { entry, theme, systemHash, shots, file });
-      results.push({ entry, theme, systemHash, file, bytes, rows: shots.length, ms: Date.now() - started });
+      const bytes = await composeSheet(browser, { entry, theme, systemHash, shots, file, prototypeLevel });
+      results.push({ entry, theme, systemHash, file, bytes, rows: shots.length, ms: Date.now() - started, prototypeLevel });
       const line = results[results.length - 1];
       console.log(
         `${entry.slug} · ${theme} · ${line.rows} 行 · ${line.ms} 毫秒 · ` +
@@ -243,7 +247,7 @@ function systemHashOf(entry, projects, workItems) {
 }
 
 // 逐行截图：每个（窗口、设备像素比）一个浏览器上下文，同一个上下文里先后打开原型与真实系统
-async function captureRow(address, entry, theme, systemHash) {
+async function captureRow(address, entry, theme, systemHash, prototypeLevel) {
   const dir = join(rawDir, `${entry.slug}-${theme}`);
   mkdirSync(dir, { recursive: true });
   const shots = [];
@@ -256,16 +260,16 @@ async function captureRow(address, entry, theme, systemHash) {
     const tag = `${config.width}x${config.height}@${config.scaleFactor}`;
     try {
       const prototypePage = await context.newPage();
-      // 原型的档位写在 sessionStorage、主题写在 localStorage（原型 y9.js 的存储键）
+      // 原型的档位写在 sessionStorage、主题写在 localStorage（原型 y10.js 的存储键）
       await prototypePage.addInitScript(([level, chosen]) => {
-        sessionStorage.setItem("y9.level", JSON.stringify(level));
-        localStorage.setItem("y9.theme", JSON.stringify(chosen));
-      }, [entry.prototypeLevel, theme]);
+        sessionStorage.setItem("y10.level", JSON.stringify(level));
+        localStorage.setItem("y10.theme", JSON.stringify(chosen));
+      }, [prototypeLevel, theme]);
       await prototypePage.goto(`${prototypeUrl}${entry.prototypeHash}`);
-      await prototypePage.waitForSelector("#y9-content > *");
+      await prototypePage.waitForSelector("#y10-content > *");
       await prototypePage.waitForTimeout(1100 + entry.settle);
       // 原型的工具条与提示条只服务于原型演示（切换档位、场景），会盖住页面内容，截图时隐藏
-      await prototypePage.addStyleTag({ content: "#y9-toolbar, .y9-banner { display: none !important; }" });
+      await prototypePage.addStyleTag({ content: "#y10-toolbar, .y10-banner { display: none !important; }" });
       const prototypeShot = await prototypePage.screenshot({ fullPage: true });
       await prototypePage.close();
 
@@ -299,14 +303,14 @@ async function settleSystem(page, entry) {
 }
 
 
-async function composeSheet(browserRun, { entry, theme, systemHash, shots, file }) {
+async function composeSheet(browserRun, { entry, theme, systemHash, shots, file, prototypeLevel }) {
   const rows = shots.map((shot) => rowPlan(shot));
   const totalHeight = rows.reduce((sum, row) => sum + row.height + PAD, 0) + 52;
   const width = PAD * 2 + CELL_WIDTH * 2 + CROP_WIDTH + PAD * 2;
   const sheetPage = await browserRun.newPage({
     viewport: { width: Math.ceil(width), height: Math.ceil(totalHeight) },
   });
-  await sheetPage.setContent(sheetHtml(entry, theme, systemHash, rows));
+  await sheetPage.setContent(sheetHtml(entry, theme, systemHash, rows, prototypeLevel));
   await sheetPage.screenshot({ path: file, fullPage: true });
   await sheetPage.close();
   return statSync(file).size;
@@ -344,17 +348,17 @@ function rowHtml(row, theme, prototypeHash, systemHash) {
     <section class="row">
       <p class="caption">${escapeHtml(label)}</p>
       <div class="cells">
-        ${cell("原型 v9", prototypeHash, shot.prototype)}
+        ${cell("原型 v10", prototypeHash, shot.prototype)}
         ${cell("真实系统", systemHash, shot.system)}
       </div>
       <div class="crops">
-        ${crop("原型 v9 · 原始像素", shot.prototype)}
+        ${crop("原型 v10 · 原始像素", shot.prototype)}
         ${crop("真实系统 · 原始像素", shot.system)}
       </div>
     </section>`;
 }
 
-function sheetHtml(entry, theme, systemHash, rows) {
+function sheetHtml(entry, theme, systemHash, rows, prototypeLevel) {
   return `<html lang="zh-CN"><head><meta charset="utf-8"><style>
       * { box-sizing: border-box; }
       body { margin: 0; background: #eef0ef; color: #1c201d;
@@ -378,7 +382,7 @@ function sheetHtml(entry, theme, systemHash, rows) {
       .window img { display: block; max-width: none; }
     </style></head><body>
     <div class="head"><b>${escapeHtml(entry.name)} · ${theme === "light" ? "浅色" : "深色"}</b>
-      <span>左：原型 v9（${escapeHtml(entry.prototypeHash)}，档位 ${escapeHtml(entry.prototypeLevel)}）　
+      <span>左：原型 v10（${escapeHtml(entry.prototypeHash)}，档位 ${escapeHtml(prototypeLevel)}）　
       右：真实系统（${escapeHtml(systemHash)}）　行尾：两侧按原始像素显示的局部</span></div>
     ${rows.map((row) => rowHtml(row, theme, entry.prototypeHash, systemHash)).join("")}
   </body></html>`;
@@ -399,8 +403,8 @@ function renderIndex(results) {
   const lines = [
     `# 截图联系表 · 工单 #${issue}`,
     "",
-    "原型 v9 与真实系统的同一个页面并排。每张联系表六行：1440×900 与 1920×1080 两种窗口乘设备像素比 1、1.25、1.5；",
-    "每行左侧是原型 v9，右侧是真实系统，行尾附两侧按原始像素显示的局部。",
+    "原型 v10 与真实系统的同一个页面并排。每张联系表六行：1440×900 与 1920×1080 两种窗口乘设备像素比 1、1.25、1.5；",
+    "每行左侧是原型 v10，右侧是真实系统，行尾附两侧按原始像素显示的局部。",
     "",
     "真实系统一侧用端到端后端（`client/tests/e2e/backend.py` 的 default 预置：真实接口层、应用层与事件日志，",
     "模型回答由 FakeAdapter 给出）；页面清单里的预置项目名在运行时换成服务端生成的项目标识。",
@@ -420,12 +424,13 @@ function renderIndex(results) {
       const systemHash = item ? item.systemHash : entry.systemHash;
       const project = entry.systemProject === null ? "（系统页，不选项目）" : ` · 预置项目「${entry.systemProject}」`;
       const overlay = entry.systemOverlay === null ? "" : ` · 覆盖层「${entry.systemOverlay}」`;
+      const prototypeLevel = item ? item.prototypeLevel : entry.prototypeLevel;
       lines.push(
         `### ${entry.name}（${entry.slug}）`,
         "",
         `![${entry.name} · ${theme}](${name})`,
         "",
-        `- 原型 v9 路由：\`${entry.prototypeHash}\`（档位 \`${entry.prototypeLevel}\`，用原型自带的示例数据）`,
+        `- 原型 v10 路由：\`${entry.prototypeHash}\`（档位 \`${prototypeLevel}\`，用原型自带的示例数据）`,
         `- 真实系统路由：\`${systemHash}\`${project}${overlay}`,
         `- 行数：${rows} · 图片体积：${(statSync(file).size / 1024 / 1024).toFixed(2)} MB`,
         "",
@@ -439,6 +444,7 @@ function renderIndex(results) {
     "cd client && npm run build:pages",
     `node scripts/build-page-contact-sheet.mjs --issue ${issue}`,
     `node scripts/build-page-contact-sheet.mjs --issue ${issue} --pages home,models --themes light,dark`,
+    `node scripts/build-page-contact-sheet.mjs --issue ${issue} --pages overview --themes light --level pilot`,
     "```",
     "",
     "页面清单与截图矩阵：`client/scripts/page-contact-sheet-pages.ts`（单元测试 `client/tests/unit/page-contact-sheet.test.ts`）。",

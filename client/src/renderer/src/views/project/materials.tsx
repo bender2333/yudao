@@ -53,7 +53,7 @@ export function MaterialsPage(props: { app: ClientApp; route: Route }) {
 // intend 原文：首次与逐次输入，版本、字节范围与内容
 function IntendTable(props: { rows: WorkItemMaterialsResult["inputs"] }) {
   if (props.rows.length === 0) {
-    return <p className="y9-note note">intend 原文：这个事项没有输入记录</p>;
+    return <p className="y10-note note">intend 原文：这个事项没有输入记录</p>;
   }
   return (
     <Table
@@ -62,7 +62,7 @@ function IntendTable(props: { rows: WorkItemMaterialsResult["inputs"] }) {
         `第 ${input.version} 版`,
         input.kind,
         `${input.byte_start}–${input.byte_end}`,
-        <p className="y9-pre raw-text" key={input.input_id}>{input.text}</p>,
+        <p className="y10-pre raw-text" key={input.input_id}>{input.text}</p>,
       ])}
       caption="intend 原文：首次与逐次输入"
     />
@@ -72,7 +72,7 @@ function IntendTable(props: { rows: WorkItemMaterialsResult["inputs"] }) {
 // PRD 与 PLAN：各版本、状态与目标（摘要）
 function VersionTable(props: { title: string; rows: WorkItemMaterialsResult["contracts"] }) {
   if (props.rows.length === 0) {
-    return <p className="y9-note note">{props.title}：还没有版本</p>;
+    return <p className="y10-note note">{props.title}：还没有版本</p>;
   }
   return (
     <Table
@@ -100,22 +100,22 @@ function DeliveryTable(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
   );
 
   if (props.rows.length === 0) {
-    return <p className="y9-note note">交付：还没有版本</p>;
+    return <p className="y10-note note">交付：还没有版本</p>;
   }
 
   return (
     <>
       {props.rows.map((entry) => (
-        <div key={entry.event_id} className="y9-mt-doc delivery-block">
-          <h3 className="y9-h3 sub">
+        <div key={entry.event_id} className="y10-mt-doc delivery-block">
+          <h3 className="y10-h3 sub">
             交付 {entry.revision === null ? "（未编号）" : `第 ${entry.revision} 版`} · {entry.status} · {show(entry.summary, "没有摘要")}
           </h3>
-          {entry.files.length === 0 ? <p className="y9-note note">这条交付没有文件清单</p> : (
-            <ul className="y9-mt-files file-list">
+          {entry.files.length === 0 ? <p className="y10-note note">这条交付没有文件清单</p> : (
+            <ul className="y10-mt-files file-list">
               {entry.files.map((path) => (
                 <li key={path}>
-                  <span className="y9-code file-path">{path}</span>
-                  <button type="button" className="y9-link link" onClick={() => setOpen({ eventId: entry.event_id, path })}>查看内容</button>
+                  <span className="y10-code file-path">{path}</span>
+                  <button type="button" className="y10-link link" onClick={() => setOpen({ eventId: entry.event_id, path })}>查看内容</button>
                 </li>
               ))}
             </ul>
@@ -123,12 +123,12 @@ function DeliveryTable(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
         </div>
       ))}
       {open ? (
-        <div className="y9-block card">
-          <div className="y9-block-head section-head">
+        <div className="y10-block card">
+          <div className="y10-block-head section-head">
             <h2>交付文件 {open.path}</h2>
             <button type="button" onClick={() => setOpen(null)}>收起</button>
           </div>
-          {file.loading && file.data === null ? <p className="y9-note note">正在读取文件</p> : null}
+          {file.loading && file.data === null ? <p className="y10-note note">正在读取文件</p> : null}
           {file.data ? <FileContent data={file.data} /> : null}
         </div>
       ) : null}
@@ -139,15 +139,15 @@ function DeliveryTable(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
 // 文本内容直接显示；二进制给出 base64 的下载链接，界面不伪造文本
 function FileContent(props: { data: DeliveryFileResult }) {
   if (props.data.content !== null && props.data.content !== undefined) {
-    return <pre className="y9-pre raw">{props.data.content}</pre>;
+    return <pre className="y10-pre raw">{props.data.content}</pre>;
   }
   const base64 = props.data.base64;
   if (base64 !== null && base64 !== undefined) {
     return (
       <>
-        <p className="y9-note note">二进制内容（{base64.length} 个 base64 字符，指纹 {show(props.data.content_hash)}）</p>
+        <p className="y10-note note">二进制内容（{base64.length} 个 base64 字符，指纹 {show(props.data.content_hash)}）</p>
         <a
-          className="y9-btn primary"
+          className="y10-btn primary"
           href={`data:application/octet-stream;base64,${base64}`}
           download={props.data.path.split("/").pop() ?? "file"}
         >
@@ -156,19 +156,19 @@ function FileContent(props: { data: DeliveryFileResult }) {
       </>
     );
   }
-  return <p className="y9-note note">这个文件没有返回内容</p>;
+  return <p className="y10-note note">这个文件没有返回内容</p>;
 }
 
 // 质检：结论、理由、检查回执与缺陷
 function ReviewTable(props: { rows: WorkItemMaterialsResult["reviews"] }) {
   if (props.rows.length === 0) {
-    return <p className="y9-note note">质检：还没有结论</p>;
+    return <p className="y10-note note">质检：还没有结论</p>;
   }
   return (
     <>
-      <h3 className="y9-h3 sub">质检</h3>
+      <h3 className="y10-h3 sub">质检</h3>
       {props.rows.map((review) => (
-        <div key={review.event_id} className="y9-mt-doc review-block">
+        <div key={review.event_id} className="y10-mt-doc review-block">
           <KeyValue
             items={[
               ["结论", review.verdict],
@@ -193,7 +193,7 @@ function checkRow(value: Record<string, unknown>): string {
 // 项目材料：material.record 保存下来的原文
 function MaterialTable(props: { rows: WorkItemMaterialsResult["materials"] }) {
   if (props.rows.length === 0) {
-    return <p className="y9-note note">项目材料：没有记录</p>;
+    return <p className="y10-note note">项目材料：没有记录</p>;
   }
   return (
     <Table
@@ -201,7 +201,7 @@ function MaterialTable(props: { rows: WorkItemMaterialsResult["materials"] }) {
       rows={props.rows.map((material) => [
         formatTime(material.recorded_at),
         departmentName(material.department),
-        <p className="y9-pre raw-text" key={material.material_id}>{material.text}</p>,
+        <p className="y10-pre raw-text" key={material.material_id}>{material.text}</p>,
       ])}
       caption="项目材料"
     />

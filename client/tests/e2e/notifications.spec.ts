@@ -114,7 +114,7 @@ test("决定请求、等待模型服务、标签页标题与没有通知权限�
     const second = await startClient(backend, SIZE, { permissions: ["notifications"], initScript: recordNotifications });
     const errors = [...watchErrors(first), ...watchErrors(second)];
     try {
-      await expect(first.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+      await expect(first.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
       await first.page.evaluate(() => {
         window.location.hash = "#/home";
       });
@@ -182,7 +182,7 @@ test("等待模型服务时发出通知（工单 #375）", async () => {
     const backend = waiting;
     client = await startClient(backend, SIZE, { permissions: ["notifications"], initScript: recordNotifications });
     const errors = watchErrors(client);
-    await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+    await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
 
     // 页面开着的时候建项目并开始事项：前一次请求按 D17 重试（等待模型服务），
     // 后一次凭据无效进入待恢复并发出决定请求
@@ -234,7 +234,7 @@ test("标签页的标题随待决定的数量变化，没有待决定的事时�
     const client = await startClient(backend, SIZE, { permissions: ["notifications"], initScript: recordNotifications });
     const errors = watchErrors(client);
     try {
-      await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+      await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
       const waiting = await openDecisions(client.page, backend.address);
       expect(waiting.length).toBeGreaterThan(0);
       // 待决定的数量写在标题里
@@ -266,7 +266,7 @@ test("没有通知权限时页面照常工作，控制台没有错误（工单 #
     const client = await startClient(backend, SIZE);
     const errors = watchErrors(client);
     try {
-      await expect(client.page.locator(".brand .y9-brand-name")).toContainText("Yudao");
+      await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
       const waiting = await openDecisions(client.page, backend.address);
       expect(waiting.length).toBeGreaterThan(0);
       // 决定卡片照常显示，标题里的数量照常有

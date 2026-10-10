@@ -1,5 +1,5 @@
 {
- "generatedFrom": "docs/prototypes/v9/js/pixel/{floor-decl.js,say.js,ecs.js}",
+ "generatedFrom": "docs/prototypes/v10/js/pixel/{floor-decl.js,say.js,ecs.js}",
  "rooms": [
   {
    "id": "hall",
@@ -55,6 +55,7 @@
     "props",
     "roomKind",
     "spots",
+    "verifies",
     "w"
    ]
   },

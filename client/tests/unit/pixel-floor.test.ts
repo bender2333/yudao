@@ -44,7 +44,8 @@ const ROLES: Record<string, RoleInfo[]> = {
 };
 
 const item = (status: string, department: string | null): LoopItem => ({
-  work_item_id: "w1", kind: "request", sign: "测试事项", color_index: 0, status, department, round: 1,
+  // 原型 behaviors.js 的 item 用 id 查（floor.js 的 itemById 按 it.id），事项同时带 work_item_id
+  id: "w1", work_item_id: "w1", kind: "request", sign: "测试事项", color_index: 0, status, department, round: 1,
   elapsed_sec: 100, time_limit_sec: 7200, version: 1, phase: null, started_at: null, pending_question: null,
   run_id: "r1", adoption_id: null, recovery_state: null,
 });
@@ -526,7 +527,7 @@ test("系统：管道的流动由 stateOf 决定，停止以后光点留在原�
 });
 
 // ---------------------------------------------------------------------------
-// 决定请求的世界动作（原型 v9 设计说明第 9 节，工单 #179）：真实事件 decision_requested 让提出决定的
+// 决定请求的世界动作（原型 v10 设计说明第 9 节，工单 #179）：真实事件 decision_requested 让提出决定的
 // 部门的经理走到门口送出决定单、决定单飞向大厅的板；decision_answered 让板上的决定单飞回部门门口。
 
 const decisionFace = (id: string): DecisionFace => ({
@@ -583,10 +584,11 @@ test("回答到达：正在展开的那张纸盖章，决定单从板上飞回�
   assert.equal(take?.taskKey, "x_decision_answered");
 });
 
-test("决定请求没有部门时（初始 PRD）从大厅上方飞进来", () => {
-  const h = mountFloor(model({ decisions: [decisionFace("d3")] }));
+// 原型 floor.js：决定的部门是「事件上的部门，没有时按它所属事项的部门」
+test("决定请求按它所属事项的部门送单：事项没有部门时从大厅上方飞进来", () => {
+  const h = mountFloor(model({ decisions: [decisionFace("d3")], items: [item("running", null)] }));
   h.step(300);
-  h.driver.playEvent({ type: "decision_requested", event_id: "d3", department: null, work_item_id: "w1", payload: { kind: "model_unavailable" } });
+  h.driver.playEvent({ type: "project_decision_requested", event_id: "d3", department: null, work_item_id: "w1", payload: { kind: "initial_prd" } });
   let flying = 0;
   for (let i = 0; i < 20 && !flying; i++) {
     h.step(100);
@@ -597,4 +599,21 @@ test("决定请求没有部门时（初始 PRD）从大厅上方飞进来", () =
   const board = h.driver.boardRect();
   assert.equal(h.scene.flyers[0].from[0], board.x + board.w / 2);
   assert.ok(h.scene.flyers[0].from[1] < board.y);
+});
+
+test("决定请求没有部门时按它所属事项的部门送单：经理走到那个部门的门口", () => {
+  const h = mountFloor(model({ decisions: [decisionFace("d3")] }));
+  h.step(300);
+  h.driver.playEvent({ type: "project_decision_requested", event_id: "d3", department: null, work_item_id: "w1", payload: { kind: "initial_prd" } });
+  let flying = 0;
+  for (let i = 0; i < 60 && !flying; i++) {
+    h.step(100);
+    flying = h.scene.flyers.length;
+  }
+  assert.equal(flying, 1);
+  // 事项的部门是工程，起点是工程房间的门口（不是大厅上方）
+  const board = h.driver.boardRect();
+  const room = h.driver.world.rooms.engineering;
+  assert.equal(h.scene.flyers[0].from[0], room.door);
+  assert.ok(h.scene.flyers[0].from[1] > board.y);
 });
