@@ -452,6 +452,46 @@ test.describe("项目页面（1440×900）", () => {
       await client.close();
     }
   });
+  test("三个部门的页签切换：标题区的色条与强调色随部门变化，房间在深色舞台中", async () => {
+    const client = await openProjectClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      const id = await projectId(page, SAMPLE);
+      await gotoView(page, id, "overview");
+      await expect(page.locator(".tabbar .tab").first()).toBeVisible();
+
+      // 产品部门
+      await page.locator(".tabbar .tab").filter({ hasText: "产品" }).click();
+      await expect(page.locator(".y10-ws")).toHaveAttribute("data-dept", "product");
+      await expect(page.locator(".y10-ws-head-block")).toBeVisible();
+      await expect(page.locator(".y10-ws-stage")).toBeVisible();
+      const productAccent = await page.locator(".y10-ws").evaluate((el) => getComputedStyle(el).getPropertyValue("--ws-accent").trim());
+      expect(productAccent).not.toBe("");
+
+      // 工程部门
+      await page.locator(".tabbar .tab").filter({ hasText: "工程" }).click();
+      await expect(page.locator(".y10-ws")).toHaveAttribute("data-dept", "engineering");
+      await expect(page.locator(".y10-ws-head-block")).toBeVisible();
+      await expect(page.locator(".y10-ws-stage")).toBeVisible();
+      const engAccent = await page.locator(".y10-ws").evaluate((el) => getComputedStyle(el).getPropertyValue("--ws-accent").trim());
+      expect(engAccent).not.toBe(productAccent);
+
+      // 质检部门
+      await page.locator(".tabbar .tab").filter({ hasText: "质检" }).click();
+      await expect(page.locator(".y10-ws")).toHaveAttribute("data-dept", "quality");
+      await expect(page.locator(".y10-ws-head-block")).toBeVisible();
+      await expect(page.locator(".y10-ws-stage")).toBeVisible();
+      const qualityAccent = await page.locator(".y10-ws").evaluate((el) => getComputedStyle(el).getPropertyValue("--ws-accent").trim());
+      expect(qualityAccent).not.toBe(engAccent);
+      expect(qualityAccent).not.toBe(productAccent);
+
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
 
   test("资料页：intend 原文、PRD、PLAN、交付文件与项目材料", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
