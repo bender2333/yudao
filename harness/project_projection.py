@@ -136,6 +136,34 @@ class SourceDirectory:
     base_version: int | None = None
     updated_at: str | None = None
     event_id: str | None = None
+    writeback_enabled: bool = False
+    remote: str = ""
+    target_branch: str = ""
+    check_commands: list[str] = field(default_factory=list)
+    credential_ref: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+@dataclass
+class WritebackRecord:
+    status: str
+    work_item_id: str
+    run_id: str
+    adoption_id: str
+    target_commit: str
+    reason: str | None = None
+    branch: str | None = None
+    final_tree_digest: str | None = None
+    check_receipts: list[dict[str, Any]] = field(default_factory=list)
+    pull_request: dict[str, Any] | None = None
+    conflict_ref: dict[str, Any] | None = None
+    conflicts: list[dict[str, Any]] = field(default_factory=list)
+    verified_fact: dict[str, Any] | None = None
+    stream_version: int = 0
+    event_id: str = ""
+    created_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return _plain(self)
@@ -196,6 +224,7 @@ class WorkItem:
     rework: list[dict[str, Any]] = field(default_factory=list)
     pending_question: str | None = None
     adoption_id: str | None = None
+    writeback: WritebackRecord | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return _plain(self)
@@ -227,6 +256,7 @@ class ProjectProjection:
     materials: list[Material] = field(default_factory=list)
     source_directories: dict[str, SourceDirectory] = field(default_factory=dict)
     source_directory_history: list[SourceDirectory] = field(default_factory=list)
+    writebacks: list[WritebackRecord] = field(default_factory=list)
     active_work_item_id: str | None = None
     updated_at: str = ""
     # 投影所反映的项目流版本
@@ -395,7 +425,12 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
     if etype == ProjectEventType.SOURCE_DIRECTORY_CONFIGURED:
         directory = SourceDirectory(
             name=payload["name"], path=payload["path"], version=int(payload["version"]),
-            base_version=payload["base_version"], updated_at=event.created_at, event_id=event.event_id,
+            base_version=payload.get("base_version"), updated_at=event.created_at, event_id=event.event_id,
+            writeback_enabled=bool(payload.get("writeback_enabled", False)),
+            remote=str(payload.get("remote") or ""),
+            target_branch=str(payload.get("target_branch") or ""),
+            check_commands=list(payload.get("check_commands") or []),
+            credential_ref=payload.get("credential_ref"),
         )
         state.source_directories[directory.name] = directory
         state.source_directory_history.append(directory)
@@ -433,6 +468,70 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         )
         state.adoptions.append(adoption)
         state.current_adoption = adoption
+        return
+    if etype == ProjectEventType.WRITEBACK_COMPLETED:
+        rec = WritebackRecord(
+            status="completed", work_item_id=payload["work_item_id"], run_id=payload["run_id"],
+            adoption_id=payload["adoption_id"], target_commit=payload["target_commit"],
+            branch=payload.get("branch"), final_tree_digest=payload.get("final_tree_digest"),
+            check_receipts=list(payload.get("check_receipts") or []),
+            pull_request=payload.get("pull_request"), stream_version=event.stream_version,
+            event_id=event.event_id, created_at=event.created_at,
+        )
+        state.writebacks.append(rec)
+        item = state.work_item(payload["work_item_id"])
+        if item is not None:
+            item.writeback = rec
+        return
+    if etype == ProjectEventType.WRITEBACK_STOPPED:
+        rec = WritebackRecord(
+            status="stopped", work_item_id=payload["work_item_id"], run_id=payload["run_id"],
+            adoption_id=payload["adoption_id"], target_commit=payload["target_commit"],
+            reason=payload["reason"], final_tree_digest=payload.get("final_tree_digest"),
+            conflict_ref=payload.get("conflict_ref"), conflicts=list(payload.get("conflicts") or []),
+            check_receipts=list(payload.get("check_receipts") or []),
+            stream_version=event.stream_version, event_id=event.event_id, created_at=event.created_at,
+        )
+        state.writebacks.append(rec)
+        item = state.work_item(payload["work_item_id"])
+        if item is not None:
+            item.writeback = rec
+        return
+    if etype == ProjectEventType.WRITEBACK_NOT_NEEDED:
+        rec = WritebackRecord(
+            status="not_needed", work_item_id=payload["work_item_id"], run_id=payload["run_id"],
+            adoption_id=payload["adoption_id"], target_commit=payload["target_commit"],
+            reason=payload.get("reason", "changes_already_present"),
+            stream_version=event.stream_version, event_id=event.event_id, created_at=event.created_at,
+        )
+        state.writebacks.append(rec)
+        item = state.work_item(payload["work_item_id"])
+        if item is not None:
+            item.writeback = rec
+        return
+    if etype == ProjectEventType.WRITEBACK_HELD:
+        rec = WritebackRecord(
+            status="held", work_item_id=payload["work_item_id"], run_id=payload["run_id"],
+            adoption_id=payload["adoption_id"], target_commit=payload["target_commit"],
+            reason=payload.get("reason", "waiting_previous_adoption"),
+            stream_version=event.stream_version, event_id=event.event_id, created_at=event.created_at,
+        )
+        state.writebacks.append(rec)
+        item = state.work_item(payload["work_item_id"])
+        if item is not None:
+            item.writeback = rec
+        return
+    if etype == ProjectEventType.WRITEBACK_VERIFIED:
+        rec = WritebackRecord(
+            status="verified", work_item_id=payload["work_item_id"], run_id=payload["run_id"],
+            adoption_id=payload["adoption_id"], target_commit=payload["target_commit"],
+            branch=payload.get("branch"), verified_fact=payload.get("verified_fact"),
+            stream_version=event.stream_version, event_id=event.event_id, created_at=event.created_at,
+        )
+        state.writebacks.append(rec)
+        item = state.work_item(payload["work_item_id"])
+        if item is not None:
+            item.writeback = rec
         return
 
 

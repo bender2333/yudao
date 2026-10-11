@@ -90,7 +90,6 @@ class EventType:
     DECISION_ANSWERED = "decision_answered"
     DECISION_WITHDRAWN = "decision_withdrawn"
 
-
 class ProjectEventType:
     PROJECT_REGISTERED = "project_registered"
     PROJECT_RENAMED = "project_renamed"
@@ -102,35 +101,36 @@ class ProjectEventType:
     WORK_ITEM_START_FAILED = "work_item_start_failed"
     DELIVERABLE_ADOPTED = "deliverable_adopted"
     ADOPTION_HELD = "adoption_held"
-    # 项目部门设置的三项写成同一种事件；事件种类字符串跨版本保持 department_prompt_configured（ADR-0019），
-    # 只增加字段（provider_id、model_id、requested_tier）
+    # 部门设置事件跨版本保持 department_prompt_configured（ADR-0019）
     DEPARTMENT_SETTINGS_CONFIGURED = "department_prompt_configured"
     COMMAND_CONFIGURED = "command_configured"
     MATERIAL_RECORDED = "material_recorded"
     SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
-    # 建档 run 结束以后提出的初始 PRD 候选（工单 #136，设计第 3.2 节）：记下候选的引用与核验结论
+    # 建档候选（设计第 3.2 节）：记下候选引用与核验结论
     INITIAL_PRD_PROPOSED = "initial_prd_proposed"
-    # 项目流中的决定请求、回答与撤回：确认初始 PRD 可能等待数天，run 已经结束，
-    # 请求与回答记在项目流（设计第 3.2 节），字段与 run 流的三种决定事件相同
+    # 确认初始 PRD 可能等待数天，run 已结束，请求与回答记在项目流，字段与 run 流相同
     PROJECT_DECISION_REQUESTED = "project_decision_requested"
     PROJECT_DECISION_ANSWERED = "project_decision_answered"
     PROJECT_DECISION_WITHDRAWN = "project_decision_withdrawn"
-    # 用户提出修改：项目流记下这一轮的依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
+    # 用户提出修改：项目流记下这一轮依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
     # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
     BASELINE_ADOPTED = "baseline_adopted"
-    # 项目级参数（迭代底座 B3，工单 #351）：种类字符串是 project_parameter_set，与目录流的 parameter_set 是两个不同流的种类
+    # 项目级参数（迭代底座 B3，工单 #351）：project_parameter_set
     PARAMETER_SET = "project_parameter_set"
-
+    WRITEBACK_COMPLETED = "writeback_completed"
+    WRITEBACK_STOPPED = "writeback_stopped"
+    WRITEBACK_NOT_NEEDED = "writeback_not_needed"
+    WRITEBACK_HELD = "writeback_held"
+    WRITEBACK_VERIFIED = "writeback_verified"
 
 class CatalogEventType:
-    # 模型目录与凭据的事件（应用层与接口层设计说明第 10 节第 1 项）。
-    # 内容仍由 Provider 模块保存；事件只带修订号、变化与结果，不含 Key
+    # 模型目录与凭据事件（设计第 10 节）：内容由 Provider 保存，事件不含 Key
     CATALOG_REVISED = "catalog_revised"
     CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
     CATALOG_TEST_FINISHED = "catalog_test_finished"
     CREDENTIAL_CHANGED = "credential_changed"
-    # 排空与强制升级（3.1）：与目录事件同在一份流中，是控制主机这一份部署的长期事实（ADR-0019）
+    # 排空与强制升级（3.1）：与目录事件同流，是控制主机长期事实（ADR-0019）
     RUNTIME_DRAIN_STARTED = "runtime_drain_started"
     RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
     # 用户查看过的全局位置（界面工作线，工单 #127）：控制主机上只有一个，随部署长期保存

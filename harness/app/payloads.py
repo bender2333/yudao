@@ -1274,7 +1274,78 @@ class SourceDirectoryConfiguredPayload(Payload):
     path: str
     version: int
     base_version: int
+    writeback_enabled: bool = False
+    remote: str = ""
+    target_branch: str = ""
+    check_commands: list[str] = []
+    credential_ref: str | None = None
 
+
+class WritebackCompletedPayload(Payload):
+    work_item_id: str
+    run_id: str
+    adoption_id: str
+    source_tree_digest: str
+    source_tree_ref: ArtifactRef
+    adopted_tree_digest: str
+    adopted_tree_ref: ArtifactRef
+    target_commit: str
+    target_tree_digest: str
+    final_tree_digest: str
+    final_tree_ref: ArtifactRef
+    check_receipts: list[dict[str, Any]]
+    branch: str
+    pull_request: dict[str, Any] | None = None
+    verified_external: bool = False
+
+
+class WritebackStoppedPayload(Payload):
+    # 写回停止（ADR-0034）：reason 的取值集合只增加（ADR-0019）。
+    # source_tree_digest 在缺少起点依据时为空字符串：没有起点树就得出不了本事项的变更集
+    work_item_id: str
+    run_id: str
+    adoption_id: str
+    reason: Literal["conflict", "verification_failed", "target_changed", "unrepresentable_path",
+                    "missing_source_reference"]
+    target_commit: str
+    source_tree_digest: str
+    adopted_tree_digest: str
+    target_tree_digest: str
+    final_tree_digest: str | None = None
+    conflict_ref: ArtifactRef | None = None
+    conflicts: list[dict[str, Any]] = []
+    check_receipts: list[dict[str, Any]] = []
+    new_target_commit: str | None = None
+
+
+class WritebackNotNeededPayload(Payload):
+    work_item_id: str
+    run_id: str
+    adoption_id: str
+    target_commit: str
+    reason: str = "changes_already_present"
+    source_tree_digest: str
+    adopted_tree_digest: str
+    target_tree_digest: str
+
+
+class WritebackHeldPayload(Payload):
+    work_item_id: str
+    run_id: str
+    adoption_id: str
+    reason: Literal["waiting_previous_adoption"]
+    previous_adoption_id: str
+    target_commit: str
+
+
+class WritebackVerifiedPayload(Payload):
+    work_item_id: str
+    run_id: str
+    adoption_id: str
+    action: Literal["push", "pull_request"]
+    branch: str
+    target_commit: str
+    verified_fact: dict[str, Any]
 
 class InitialPrdProposedPayload(Payload):
     # 建档候选（工单 #136，接入已有项目设计说明第 3.2、3.3 节）：建档 run 以 baseline_verified 结束以后，
@@ -1514,6 +1585,11 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.ONBOARDING_REVISION_STARTED: OnboardingRevisionStartedPayload,
     ProjectEventType.BASELINE_ADOPTED: BaselineAdoptedPayload,
     ProjectEventType.PARAMETER_SET: ProjectParameterSetPayload,
+    ProjectEventType.WRITEBACK_COMPLETED: WritebackCompletedPayload,
+    ProjectEventType.WRITEBACK_STOPPED: WritebackStoppedPayload,
+    ProjectEventType.WRITEBACK_NOT_NEEDED: WritebackNotNeededPayload,
+    ProjectEventType.WRITEBACK_HELD: WritebackHeldPayload,
+    ProjectEventType.WRITEBACK_VERIFIED: WritebackVerifiedPayload,
     CatalogEventType.CATALOG_REVISED: CatalogRevisedPayload,
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,
