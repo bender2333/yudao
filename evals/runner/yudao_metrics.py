@@ -24,15 +24,9 @@ RELEASE_PHASES = frozenset({"DONE"})
 # 用量字段：模型未上报时为未知，进度时按 `notes[].reason` 写明原因
 USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens",
                 "cache_write_tokens", "total_tokens", "cost", "model_latency_ms")
-
-# 仓库内 `harness/definitions/rules.json` 中 `verification.recheck_ratio` 的现值
-# 取自参数条目本身。事件日志投影中的 `parameters_version` 是条目版本的摘要，
-# 不存在或不一致时把第 2 项检查点写为「未核实」，保留已算指标。
-RULES_FILE = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                           "..", "..", "harness", "definitions",
-                                           "rules.json"))
-RECHECK_RULE_NAME = "verification.recheck_ratio"
-
+# 冻结参数只通过 `run_created` 事件的 `parameters_version` 摘要给出（第 5.1 节第 2 项）。
+# 摘要本身不携带参数现值，run.export 之外无法读取；读不到时这一项写「未核实」，
+# 不引用仓库内任何规则文件（评测工具与 harness 分层，第 7 节）。
 
 def collect(export, outcome, replay=None, parameters_version=None):
     """从一次 `run.export` 与运行器结果算指标与过程检查点。"""
@@ -237,7 +231,9 @@ def _check_release_binding(events, parameters_version, released):
     if not reviews or not deliveries:
         return {"passed": False,
                 "detail": "没有质检提交或没有封存的交付",
-                "recheck_ratio": None, "self_run": 0, "checks_total": 0}
+                "recheck_ratio": None, "self_run": 0, "checks_total": 0,
+                "recheck_ratio_status": "unverified",
+                "recheck_ratio_note": "没有质检提交或交付，无法核对"}
     review = reviews[-1]
     delivery = deliveries[-1]
     r_payload = review.get("payload") or {}
@@ -258,8 +254,15 @@ def _check_release_binding(events, parameters_version, released):
         if check.get("activation_id") in quality_activations:
             self_run += 1
     ratio_value, ratio_status, ratio_note = _recheck_ratio_state(parameters_version)
-    return {"passed": (not released) or (not reasons) and _ratio_satisfied(self_run, len(r_checks),
-                                                                            ratio_value, ratio_status),
+    if not released:
+        passed = True
+    elif reasons:
+        passed = False
+    elif ratio_value is None:
+        passed = None
+    else:
+        passed = self_run / max(len(r_checks), 1) >= ratio_value - 1e-9
+    return {"passed": passed,
             "detail": _release_binding_detail(reasons, self_run, len(r_checks), ratio_value,
                                               ratio_status, ratio_note, released),
             "recheck_ratio": ratio_value,
@@ -283,23 +286,14 @@ def _quality_activation_ids(events):
 
 
 def _recheck_ratio_state(parameters_version):
-    """读取冻结的 recheck_ratio：缺 `parameters_version` 时直接读 rules.json 的现值。"""
-    rule = _load_rule(RECHECK_RULE_NAME)
-    if rule is None or not isinstance(rule.get("value"), (int, float)):
-        return None, "unknown", "未在 rules.json 中找到 verification.recheck_ratio"
-    value = float(rule["value"])
+    """冻结参数（`run_created` 的 `parameters_version`）缺失或不可识别时，记「未核实」。
+
+    `parameters_version` 是参数现值的内容摘要，run.export 之外无法读出参数。
+    这一项只在冻结参数可识别时按比例核对；读不到时显式标记，不引用仓库内文件。
+    """
     if not parameters_version or "<" in parameters_version:
-        # 没有冻结的 parameters_version，按设计不进行按比例核对
-        return value, "unverified", "未取到冻结的 parameters_version，按现值列示"
-    return value, "frozen", "参数版本为 " + str(parameters_version)
-
-
-def _ratio_satisfied(self_run, total, ratio, status):
-    if status != "frozen":
-        return True
-    if not total:
-        return False
-    return self_run / total >= ratio - 1e-9
+        return None, "unverified", "未取到冻结的 parameters_version"
+    return None, "frozen", "参数版本为 " + str(parameters_version) + "，比例未在导出中给出"
 
 
 def _release_binding_detail(reasons, self_run, total, ratio, status, note, released):
@@ -311,16 +305,6 @@ def _release_binding_detail(reasons, self_run, total, ratio, status, note, relea
     if reasons:
         return "放行绑定不通过：" + "；".join(reasons) + "；" + coverage + "（" + note + "）"
     return coverage + "（" + note + "）"
-
-
-def _load_rule(name):
-    try:
-        with open(RULES_FILE, encoding="utf-8") as handle:
-            rules = json.load(handle)
-    except (OSError, json.JSONDecodeError):
-        return None
-    rule = rules.get(name)
-    return rule if isinstance(rule, dict) else None
 
 
 # --- 第 3 项：工程的计划被接纳以前没有写入文件 --------------------------

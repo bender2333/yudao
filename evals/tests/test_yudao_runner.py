@@ -316,6 +316,10 @@ def test_a_normal_release_is_not_a_model_service_failure():
 # ---------------------------------------------------------------------------
 # 六项过程检查点（设计第 5.1 节）
 
+# 系统事件序列（fake 适配器）：harness 自带的测试序列，文件头 `adapter: fake`。
+# 它们用于驱动同一套 `run.export` 形状的判定逻辑；真实系统导出的证据不可取回
+# （issue-192 的 `.yudao/evals/` 不在本仓库），凡是需要真实导出才能核实的项一律记
+# 「未核实」，不把这些序列当作真实系统导出。
 FIXTURES = os.path.abspath(os.path.join(EVALS_DIR, "..", "harness", "tests",
                                         "event_sequences"))
 
@@ -324,9 +328,8 @@ def _load_fixture(name):
     with open(os.path.join(FIXTURES, name), encoding="utf-8") as handle:
         return json.load(handle)
 
-
-def test_release_checkpoint_passes_on_a_real_release():
-    """第一项四项同检：真实放行的 handoff_release 必须通过。"""
+def test_release_checkpoint_passes_on_handoff_release_fixture():
+    """第一项四项同检：系统事件序列（fake 适配器）里的放行记录必须通过。"""
     export = _load_fixture("handoff_release.json")
     params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
         "parameters_version")
@@ -337,7 +340,6 @@ def test_release_checkpoint_passes_on_a_real_release():
     assert collected["outcome"] == "done"
     assert collected["stop_reason"] == "released"
     assert collected["phase"] == "DONE"
-
 
 def test_release_checkpoint_fails_on_no_tool_call_pause():
     """第一项四项同检：no_tool_call 暂停不算放行。"""
@@ -370,6 +372,9 @@ def test_release_checkpoint_fails_on_a_time_limit():
 
 def test_release_checkpoint_fails_on_a_provider_error():
     """第一项四项同检：模型服务故障不算放行。"""
+    # 构造：retry_exhausted.json 的事件没有 ProviderError 字样，改写私有副本的
+    # `model_attempt_failed` 错误字段（`_load_fixture` 每次 `json.load` 返回的是本次
+    # 独有副本，不影响其他测试），再跑同一套判定。
     export = _load_fixture("retry_exhausted.json")
     for event in export["events"]:
         if event["type"] == "model_attempt_failed":
@@ -382,19 +387,19 @@ def test_release_checkpoint_fails_on_a_provider_error():
     assert collected["checkpoints"]["ended_within_limit"]["passed"] is False
     assert "模型服务故障" in collected["checkpoints"]["ended_within_limit"]["detail"]
 
-
 def test_release_binding_passes_when_qa_review_and_delivery_match():
-    """第二项：放行引用的快照与最后一次封存一致、recheck_ratio 满足。"""
+    """第二项：放行引用的快照与最后一次封存一致；recheck_ratio 只在冻结参数可识别时核对。"""
     export = _load_fixture("handoff_release.json")
     params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
         "parameters_version")
     collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
                                                "hidden_failures": []}, None, params)
     checkpoint = collected["checkpoints"]["quality_release_bound_to_delivery"]
-    assert checkpoint["passed"] is True
+    assert checkpoint["passed"] is None  # 冻结参数的 ratio 未在导出中给出，记未核实
+    assert checkpoint["recheck_ratio"] is None
+    assert checkpoint["recheck_ratio_status"] == "unverified"
     assert checkpoint["checks_total"] == 1
     assert checkpoint["self_run"] == 1
-    assert checkpoint["recheck_ratio"] == 1.0
 
 
 def test_release_binding_fails_when_qa_review_and_delivery_differ():
@@ -411,8 +416,13 @@ def test_release_binding_fails_when_qa_review_and_delivery_differ():
     assert "交付快照" in checkpoint["detail"]
 
 
-def test_release_binding_fails_when_no_receipt_is_self_run():
-    """第二项：所有检查都引用别的激活的，回执自取比例不达要求。"""
+def test_release_binding_is_unverified_when_ratio_is_unreadable():
+    """第二项：`parameters_version` 只是参数内容摘要，不含参数现值。
+
+    导出中取不到冻结的 `verification.recheck_ratio` 时（`run_created` 的
+    `parameters_version` 缺失、不可识别或只是摘要），比例核对记「未核实」，
+    不用仓库内文件顶替；绑定本身仍按摘要与回执引用核对。
+    """
     export = _load_fixture("handoff_release.json")
     review = next(e for e in export["events"] if e["type"] == "qa_submitted")
     review["payload"]["checks"] = [{"name": "smoke", "activation_id": "act-other",
@@ -423,15 +433,16 @@ def test_release_binding_fails_when_no_receipt_is_self_run():
                                                "hidden_failures": []}, None, params)
     checkpoint = collected["checkpoints"]["quality_release_bound_to_delivery"]
     assert checkpoint["self_run"] == 0
-    # 无冻结 parameters_version 时按设计不按比例核对，记「未核实」
+    assert checkpoint["recheck_ratio"] is None
     assert checkpoint["recheck_ratio_status"] == "unverified"
-    assert checkpoint["passed"] is True
-    # 显式冻结后这一项必须失败
+    assert checkpoint["passed"] is None
+    # 摘要可识别时仍只确认已冻结，比例仍取不到，仍按未核实
     fixed = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
                                             "hidden_failures": []}, None,
                                    "sha256:frozen")
-    assert fixed["checkpoints"]["quality_release_bound_to_delivery"]["passed"] is False
-    assert fixed["checkpoints"]["quality_release_bound_to_delivery"]["recheck_ratio_status"] == "frozen"
+    fixed_checkpoint = fixed["checkpoints"]["quality_release_bound_to_delivery"]
+    assert fixed_checkpoint["recheck_ratio_status"] == "frozen"
+    assert fixed_checkpoint["passed"] is None
 
 
 def test_release_coverage_is_unknown_when_per_data_is_absent():
@@ -636,6 +647,11 @@ def test_version_compare_improvement_no_difference_regression_and_blocked():
                                 failed=frozenset(["no_write_before_plan_accepted"]))]),
         build([_comparison_run("task-1", completion=0.5)]))
     assert regressed["verdict"] == "regressed"
+    false_release_regressed = yudao_compare.compare(
+        build([_comparison_run("task-1", false_release=True, completion=0.6)]),
+        build([_comparison_run("task-1", false_release=False, completion=0.6)]))
+    assert false_release_regressed["verdict"] == "regressed"
+    assert false_release_regressed["primary"]["difference"] == 1
     # 受阻：一侧唯一的运行不计入结果，另一侧没有可配对任务
     voided = _comparison_run("task-1")
     voided["void"] = True
@@ -649,6 +665,19 @@ def _inside(path, parent):
     parent = os.path.normcase(os.path.abspath(parent))
     return path == parent or path.startswith(parent + os.sep)
 
+
+
+def test_process_exit_failure_is_not_a_release():
+    """构造：harness 没有现成的进程退出事件序列。事件序列仍用 retry_exhausted.json
+    （fake 适配器，事件里没有 `process_exit_failed` 标志），通过 outcome 标志触发
+    运行器进程退出码非零分支：放行记未通过，停止原因取原始值。"""
+    export = _load_fixture("retry_exhausted.json")
+    outcome = {"timed_out": False, "elapsed_seconds": 60.0,
+               "hidden_failures": [], "process_exit_failed": True}
+    collected = yudao_metrics.collect(export, outcome, None, None)
+    assert collected["checkpoints"]["ended_within_limit"]["passed"] is False
+    assert "进程退出码非零" in collected["checkpoints"]["ended_within_limit"]["detail"]
+    assert collected["end_reason"] != yudao_metrics.MODEL_SERVICE_FAILURE
 
 # ---------------------------------------------------------------------------
 # 真实运行（需要模型服务凭据）
