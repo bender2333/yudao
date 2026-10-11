@@ -25,6 +25,7 @@
     "被测模型有 5 次调用返回成功但没有任何输出项（`status=success`、`output_item_count=0`、无错误）。主机把这类调用当成一次正常的模型回复，连续多次以后按 `no_tool_call` 暂停，停止原因与真实原因不符；详见 docs/architecture-issues.md 中本工单的登记。",
     "证据不可取回：原始 `evidence_dir` 指向 issue-192 worktree 下的 `.yudao/evals/`，本工单仓库内没有这些文件，无法重算检查点依据与 hidden_failures 取回；按设计要求标为「未核实」。",
     "用量按新口径：input_tokens / output_tokens / cache_read_tokens / cache_write_tokens / cost 字段都记未知（None），不进均值、不进最小/最大、不进噪声。",
+    "总用量（`total_tokens`）沿用旧 JSON 上报值：旧口径按 `usage.totals` 原值记入；上游分项统计（input_tokens / output_tokens）未上报时归零，本工单仓库内无原始事件日志，来源未核实。",
     "三次运行的版本比较（#324）尚未开展，本次报告未提供版本比较段；同版本重复运行的离散由后续阶段补上。",
     "交付到 `docs/evaluation/scenario-3-yudao.json` 的 `replay` / `qa_submitted` payload / `coverage` 等逐项未核实字段未补造。"
   ],
