@@ -155,3 +155,5 @@
 "test_workspace_delivery.py" = "integration"
 "test_workspace_unrepresentable.py" = "integration"
 "test_write_path.py" = "module"
+"test_writeback_branch.py" = "module"
+"test_writeback.py" = "module"

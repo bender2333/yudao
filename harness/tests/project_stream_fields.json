@@ -83,9 +83,6 @@
       "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
       "goal_ref": "这个事件种类是新增的，旧版本的项目流中没有它：目标原文的引用取自 project_registered（或此前最后一条 project_goal_changed）"
     },
-    "project_registered": {
-      "initial_snapshot": "旧事件没有这个字段（#321）：没有这个字段的项目没有起始文件夹，事项从空树开始"
-    },
     "project_parameter_set": {
       "bounds": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有修改所依据的界限，读取时按规则登记中该条目的界限",
       "modified_by": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有按项目修改参数的记录",
@@ -94,9 +91,78 @@
       "old_value": "这个事件种类是新增的，旧版本的项目流中没有它：没有项目级取值时按全局的当前值作为修改前的取值",
       "reason": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有按项目修改参数的记录"
     },
+    "project_registered": {
+      "initial_snapshot": "旧事件没有这个字段（#321）：没有这个字段的项目没有起始文件夹，事项从空树开始"
+    },
+    "source_directory_configured": {
+      "check_commands": "旧事件没有写回检查命令列表；没有这个字段时默认为空列表",
+      "credential_ref": "旧事件没有凭据引用；没有这个字段时默认为空",
+      "remote": "旧事件没有远端配置；没有这个字段时默认为空字符串",
+      "target_branch": "旧事件没有目标分支配置；没有这个字段时默认为空字符串",
+      "writeback_enabled": "旧事件没有采纳写回开关；没有这个字段时默认为 false，不执行写回"
+    },
     "work_item_created": {
       "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
       "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的"
+    },
+    "writeback_completed": {
+      "adopted_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：采纳树摘要",
+      "adopted_tree_ref": "这个事件种类是新增的，旧版本的项目流中没有它：采纳树工件引用",
+      "adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：本次写回绑定的采纳身份",
+      "branch": "这个事件种类是新增的，旧版本的项目流中没有它：写回分支名称",
+      "check_receipts": "这个事件种类是新增的，旧版本的项目流中没有它：最终树写回检查回执列表",
+      "final_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：最终写回树摘要",
+      "final_tree_ref": "这个事件种类是新增的，旧版本的项目流中没有它：最终写回树工件引用",
+      "pull_request": "这个事件种类是新增的，旧版本的项目流中没有它：合并请求信息",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：采纳所属的 run 标识",
+      "source_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：起点树摘要",
+      "source_tree_ref": "这个事件种类是新增的，旧版本的项目流中没有它：起点树工件引用",
+      "target_commit": "这个事件种类是新增的，旧版本的项目流中没有它：写回时目标提交哈希",
+      "target_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：写回时目标树摘要",
+      "verified_external": "这个事件种类是新增的，旧版本的项目流中没有它：是否核实过已存在的远端动作",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：采纳所属的事项标识"
+    },
+    "writeback_held": {
+      "adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：本次采纳身份",
+      "previous_adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：等待合入的前项采纳身份",
+      "reason": "这个事件种类是新增的，旧版本的项目流中没有它：写回挂起原因",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：采纳所属的 run 标识",
+      "target_commit": "这个事件种类是新增的，旧版本的项目流中没有它：当前目标提交哈希",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：事项标识"
+    },
+    "writeback_not_needed": {
+      "adopted_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：采纳树摘要",
+      "adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：本次采纳身份",
+      "reason": "这个事件种类是新增的，旧版本的项目流中没有它：无需写回原因",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：采纳所属的 run 标识",
+      "source_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：起点树摘要",
+      "target_commit": "这个事件种类是新增的，旧版本的项目流中没有它：目标提交哈希",
+      "target_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：目标树摘要",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：事项标识"
+    },
+    "writeback_stopped": {
+      "adopted_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：采纳树摘要",
+      "adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：本次采纳身份",
+      "check_receipts": "这个事件种类是新增的，旧版本的项目流中没有它：核验检查回执列表",
+      "conflict_ref": "这个事件种类是新增的，旧版本的项目流中没有它：冲突工件引用",
+      "conflicts": "这个事件种类是新增的，旧版本的项目流中没有它：冲突详情列表",
+      "final_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：核验失败时的最终树摘要",
+      "new_target_commit": "这个事件种类是新增的，旧版本的项目流中没有它：目标分支推进后的新目标提交哈希",
+      "reason": "这个事件种类是新增的，旧版本的项目流中没有它：停止原因",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：采纳所属的 run 标识",
+      "source_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：起点树摘要；缺少起点依据时为空字符串",
+      "target_commit": "这个事件种类是新增的，旧版本的项目流中没有它：原目标提交哈希",
+      "target_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：原目标树摘要",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：事项标识"
+    },
+    "writeback_verified": {
+      "action": "这个事件种类是新增的，旧版本的项目流中没有它：核实的外部动作",
+      "adoption_id": "这个事件种类是新增的，旧版本的项目流中没有它：本次采纳身份",
+      "branch": "这个事件种类是新增的，旧版本的项目流中没有它：核实的分支名",
+      "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：采纳所属的 run 标识",
+      "target_commit": "这个事件种类是新增的，旧版本的项目流中没有它：目标提交哈希",
+      "verified_fact": "这个事件种类是新增的，旧版本的项目流中没有它：核实到的外部事实",
+      "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：事项标识"
     }
   },
   "baseline": {
@@ -334,9 +400,14 @@
     "project_restored": {},
     "source_directory_configured": {
       "base_version": "integer",
+      "check_commands": "array[string]",
+      "credential_ref": "string?",
       "name": "string",
       "path": "string",
-      "version": "integer"
+      "remote": "string",
+      "target_branch": "string",
+      "version": "integer",
+      "writeback_enabled": "boolean"
     },
     "work_item_created": {
       "baseline": "object?",
@@ -358,6 +429,65 @@
     "work_item_start_failed": {
       "error": "string",
       "run_id": "string",
+      "work_item_id": "string"
+    },
+    "writeback_completed": {
+      "adopted_tree_digest": "string",
+      "adopted_tree_ref": "object",
+      "adoption_id": "string",
+      "branch": "string",
+      "check_receipts": "array[object]",
+      "final_tree_digest": "string",
+      "final_tree_ref": "object",
+      "pull_request": "object?",
+      "run_id": "string",
+      "source_tree_digest": "string",
+      "source_tree_ref": "object",
+      "target_commit": "string",
+      "target_tree_digest": "string",
+      "verified_external": "boolean",
+      "work_item_id": "string"
+    },
+    "writeback_held": {
+      "adoption_id": "string",
+      "previous_adoption_id": "string",
+      "reason": "const string[waiting_previous_adoption]",
+      "run_id": "string",
+      "target_commit": "string",
+      "work_item_id": "string"
+    },
+    "writeback_not_needed": {
+      "adopted_tree_digest": "string",
+      "adoption_id": "string",
+      "reason": "string",
+      "run_id": "string",
+      "source_tree_digest": "string",
+      "target_commit": "string",
+      "target_tree_digest": "string",
+      "work_item_id": "string"
+    },
+    "writeback_stopped": {
+      "adopted_tree_digest": "string",
+      "adoption_id": "string",
+      "check_receipts": "array[object]",
+      "conflict_ref": "object?",
+      "conflicts": "array[object]",
+      "final_tree_digest": "string?",
+      "new_target_commit": "string?",
+      "reason": "enum string[conflict, missing_source_reference, target_changed, unrepresentable_path, verification_failed]",
+      "run_id": "string",
+      "source_tree_digest": "string",
+      "target_commit": "string",
+      "target_tree_digest": "string",
+      "work_item_id": "string"
+    },
+    "writeback_verified": {
+      "action": "enum string[pull_request, push]",
+      "adoption_id": "string",
+      "branch": "string",
+      "run_id": "string",
+      "target_commit": "string",
+      "verified_fact": "object",
       "work_item_id": "string"
     }
   },
