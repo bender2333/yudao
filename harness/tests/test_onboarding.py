@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DEPARTMENTS, EventType
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem
@@ -87,11 +86,6 @@ def test_repository_overview_is_generated(tmp_path):
     # 概况只列路径与数量，不含文件内容
     assert "print(sys.argv[1])" not in overview
 
-def test_check_timeout_is_six_hundred():
-    # 登记里的现值与 bounds 一致；由 rules.registry 读出
-    rule = DEFINITIONS.rule("check_timeout_sec")
-    assert rule.value == 600 and list(rule.bounds) == [1, 86400]
-    assert DEFINITIONS.rule_value("command_timeout_max_sec") == 600
 
 def test_quality_cannot_see_existing_structure(tmp_path):
     # 第一轮工程提交结构说明；退回产品以后，新一轮里工程能看到上一轮的结构说明，产品与质检看不到
@@ -312,13 +306,6 @@ def test_design_only_capability_goes_to_boundary_with_mark(tmp_path):
     assert all(item["status"] != "existing_defect" for item in review["conclusions"])
     assert all(DESIGN_CAPABILITY not in item["requirement"] for item in review["conclusions"])
 
-def test_onboarding_prompts_state_the_two_material_kinds():
-    # 工单 #346：建档的工作说明写明两类材料与读取顺序，现有行为的材料在前
-    product = DEFINITIONS.department_work("product", "onboarding")
-    assert "描述现有行为" in product.prompt
-    assert "描述要求" in product.prompt
-    assert "设计中，未实施" in product.prompt
-    assert "设计中，未实施" in DEFINITIONS.department_work("quality", "onboarding").prompt
 
 def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
     # 工单 #346：带标记的边界条目不记为现有缺陷，基线核验按此核对

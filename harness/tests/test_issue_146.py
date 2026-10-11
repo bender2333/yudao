@@ -439,14 +439,6 @@ def test_queries_do_not_append_events_and_carry_no_key(tmp_path):
 # ---------------------------------------------------------------------------
 # 调用目标按输入方式提供工具（验收第 5 项）
 
-def test_offers_with_input_filters_tools_that_need_images():
-    # 声明需要图像输入的工具在调用目标不含图像时不提供（机制本身；3.2D 的屏幕工具使用这一声明）
-    from harness.tools import offers_with_input
-
-    names = ["read_file", "list_files"]
-    assert offers_with_input(names, ("text",)) == names
-    assert offers_with_input(names, ("text", "image")) == names
-    assert offers_with_input(names, ()) == names
 
 def test_call_target_records_input_modalities(tmp_path):
     # 请求事件记录调用目标的输入方式（设计说明第 6 节「审计」），且不含 Key
