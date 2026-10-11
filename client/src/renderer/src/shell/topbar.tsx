@@ -235,19 +235,16 @@ export function Tabbar(props: { tabs: Tab[]; activeHash: string; onNavigate: (ha
   return (
     <nav className="y10-tabbar tabbar" aria-label="项目页面">
       <div className="y10-ptabs">
-        {props.tabs.map((tab) => {
-          const isActive = tab.hash.split("?")[0] === activePath;
-          return (
-            <button
-              key={tab.hash}
-              className={`y10-ptab tab${isActive ? " is-active" : ""}`}
-              aria-current={isActive ? "page" : undefined}
-              onClick={() => props.onNavigate(tab.hash)}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+        {props.tabs.map((tab) => (
+          <button
+            key={tab.hash}
+            className={`y10-ptab tab${tab.hash === activePath ? " is-active" : ""}`}
+            aria-current={tab.hash === activePath ? "page" : undefined}
+            onClick={() => props.onNavigate(tab.hash)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
     </nav>
   );

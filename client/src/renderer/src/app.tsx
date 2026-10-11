@@ -404,14 +404,13 @@ function buildTabs(route: Route, capabilities: Capabilities): Tab[] {
   }
   const has = (name: string) => capabilities.queries.some((query) => query.name === name);
   const projectId = route.projectId;
-  const scope = route.workItemId ? `?w=${encodeURIComponent(route.workItemId)}` : "";
   const candidates: { label: string; hash: string; query: string }[] = [
-    { label: "概览", hash: `${paths.overview(projectId)}${scope}`, query: "project.overview" },
-    { label: "产品", hash: `${paths.dept(projectId, "product")}${scope}`, query: "department.workspace" },
-    { label: "工程", hash: `${paths.dept(projectId, "engineering")}${scope}`, query: "department.workspace" },
-    { label: "质检", hash: `${paths.dept(projectId, "quality")}${scope}`, query: "department.workspace" },
-    { label: "资料", hash: `${paths.materials(projectId)}${scope}`, query: "work_item.materials" },
-    { label: "观测", hash: `${paths.observe(projectId)}${scope}`, query: "project.attempts" },
+    { label: "概览", hash: paths.overview(projectId), query: "project.overview" },
+    { label: "产品", hash: paths.dept(projectId, "product"), query: "department.workspace" },
+    { label: "工程", hash: paths.dept(projectId, "engineering"), query: "department.workspace" },
+    { label: "质检", hash: paths.dept(projectId, "quality"), query: "department.workspace" },
+    { label: "资料", hash: paths.materials(projectId), query: "work_item.materials" },
+    { label: "观测", hash: paths.observe(projectId), query: "project.attempts" },
     { label: "设置", hash: paths.settings(projectId), query: "project.settings" },
   ];
   return candidates.filter((tab) => has(tab.query)).map((tab) => ({ label: tab.label, hash: tab.hash }));
