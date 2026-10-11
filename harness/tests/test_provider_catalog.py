@@ -10,6 +10,10 @@ from harness.providers import (
     ProviderFacade,
     ProviderStore,
 )
+from harness.definitions import DEFINITIONS
+from harness.providers import capabilities
+from harness.providers.discovery import _parse_candidates
+from harness.providers.presets import preset_auth, preset_default_protocol
 
 
 def _document(**overrides):
@@ -445,3 +449,33 @@ def test_store_rejects_base_url_with_credentials_and_missing_reference():
         facade.store_document(bad_url)
     assert any(issue.location.endswith("base_url") for issue in caught.value.issues)
     assert ProviderStore.empty().public_view()["providers"] == []
+
+
+def test_preset_declares_the_default_protocol_and_the_auth_for_models_and_tests():
+    # 服务方案预置表带默认协议与认证方式（设计说明第 4.1 节）：OpenCode Go 是 Chat Completions
+    preset = next(item for item in DEFINITIONS.service_presets.presets if item.id == "opencode-go")
+    assert preset.default_protocol == "chat_completions"
+    assert preset.auth == "api_key"
+    assert preset_default_protocol("opencode-go") == "chat_completions"
+    assert preset_auth("opencode-go") == "api_key"
+    # 自定义服务不在预置表里：取不到默认协议与认证方式，由调用方预填 Chat Completions
+    assert preset_default_protocol("") == ""
+    assert preset_auth("") == ""
+    assert preset_default_protocol("custom") == ""
+
+
+def test_candidate_prefill_carries_the_protocol_and_its_source():
+    # 候选带预填的协议与来源（设计说明第 4.3 节）：能力表优先，其次是服务方案的默认协议
+    known = _parse_candidates({"data": [{"id": "grok-4.7"}, {"id": "glm-5.3-flash"},
+                                        {"id": "清单里没有的模型"}]}, "opencode-go")
+    by_id = {item["id"]: item for item in known}
+    assert by_id["grok-4.7"]["protocol"] == "responses"
+    assert by_id["grok-4.7"]["protocol_source"] == "capability_table"
+    assert by_id["glm-5.3-flash"]["protocol"] == "chat_completions"
+    assert by_id["清单里没有的模型"]["protocol"] == "chat_completions"
+    assert by_id["清单里没有的模型"]["protocol_source"] == "preset_default"
+    # 自定义服务不在能力表里：预填 Chat Completions，来源 default
+    custom = _parse_candidates({"data": [{"id": "任意模型"}]}, "")
+    assert custom[0]["protocol"] == "chat_completions"
+    assert custom[0]["protocol_source"] == "default"
+    assert capabilities.capability("", "任意模型") is None
