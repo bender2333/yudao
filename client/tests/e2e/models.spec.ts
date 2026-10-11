@@ -212,7 +212,7 @@ for (const size of [
       await expect(form.getByTestId("row-protocol-glm-4.6")).toHaveValue("responses");
       await expect(form.getByTestId("provider-base-url")).toHaveValue(new RegExp(`^http://127\\.0\\.0\\.1:\\d+/v1$`));
       // 预置表与能力表的信息都在方案区
-      await expect(form).toContainText("预置表 2026-10-02.1");
+      await expect(form).toContainText("预置表 2026-10-11.1");
       await expect(form).toContainText("模型能力表");
 
       // 换这一条定义的协议：内置方案的地址取该方案该协议的请求基址，端到端里三种协议的基址
@@ -237,6 +237,9 @@ for (const size of [
       await form.getByRole("button", { name: "获取模型列表" }).click();
       await form.getByTestId("admit-candidate-vision-model").click();
       await expect(form.getByTestId("model-row-vision-model")).toContainText("窗口：上游模型列表");
+      // 加入时预填调用协议并标明来源：这个模型不在能力表里，预填服务方案的默认协议（工单 #383）
+      await expect(form.getByTestId("model-row-vision-model")).toContainText("协议：服务方案默认");
+      await expect(form.getByTestId("row-protocol-vision-model")).toHaveValue("chat_completions");
       await expect(form.getByTestId("capacity-confirmed-vision-model")).toHaveCount(0);
       // 手动添加的一行两项容量都空着：界面写明缺哪两项，「接受容量」不可用（工单 #294）
       await form.getByTestId("add-model-row").click();

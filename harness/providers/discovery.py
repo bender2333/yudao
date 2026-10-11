@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from . import capabilities
-from .presets import USER_AGENT, preset_auth, preset_models_url
+from .presets import USER_AGENT, preset_auth, preset_default_protocol, preset_models_url
 from .store import ProviderDefinition
 from .tls import certificate_verification_failed, service_address, ssl_context
 
@@ -109,14 +109,16 @@ def effective_models_url(provider: ProviderDefinition, override: str | None = No
 
 
 def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
-    # 候选带预填值与来源（设计说明第 4.3 节）：窗口与输出上限先取上游模型列表（来源 models_url），
-    # 其次取模型能力表（来源 capability_table），两处都没有时留空；输入方式取能力表，
-    # 包含 image 时预填文本与图像，不包含 image、能力表没有记录或服务方案为自定义时只有文本。
-    # 不按模型名称推测
+    # 候选带预填值与来源（设计说明第 4.3 节）：协议先取能力表（来源 capability_table），
+    # 其次取服务方案的默认协议（来源 preset_default），自定义服务预填 Chat Completions（来源 default）；
+    # 窗口与输出上限先取上游模型列表（来源 models_url），其次取模型能力表（来源 capability_table），
+    # 两处都没有时留空；输入方式取能力表，包含 image 时预填文本与图像，
+    # 不包含 image、能力表没有记录或服务方案为自定义时只有文本。不按模型名称推测
     items = payload.get("data") if isinstance(payload, dict) else payload
     if not isinstance(items, list):
         raise ValueError("模型列表缺少 data 数组")
     candidates: list[dict[str, Any]] = []
+
     seen: set[str] = set()
     for item in items:
         model_id = item.get("id") if isinstance(item, dict) else None
@@ -128,6 +130,11 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         seen.add(model_id)
         # 上游列表带窗口与输出上限时（limit.context 与 limit.output）带上这两项，来源是上游模型列表
         candidate: dict[str, Any] = {"id": model_id}
+        entry = capabilities.capability(preset_id, model_id) if preset_id else None
+        candidate["protocol"], candidate["protocol_source"] = (
+            (entry.protocol, "capability_table") if entry is not None
+            else (preset_default_protocol(preset_id), "preset_default") if preset_id
+            else ("chat_completions", "default"))
         limits = item.get("limit") if isinstance(item, dict) else None
         if isinstance(limits, Mapping):
             window = limits.get("context")
@@ -138,7 +145,7 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
             if isinstance(output, int) and not isinstance(output, bool) and output > 0:
                 candidate["max_output_tokens"] = output
                 candidate["max_output_tokens_source"] = "models_url"
-        entry = capabilities.capability(preset_id, model_id) if preset_id else None
+
         for field in ("context_window", "max_output_tokens"):
             if field not in candidate and entry is not None and getattr(entry, field) is not None:
                 candidate[field] = getattr(entry, field)

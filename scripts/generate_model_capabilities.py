@@ -25,6 +25,14 @@ PRESETS_PATH = REPO_ROOT / "harness" / "definitions" / "service_presets.json"
 OUTPUT_PATH = REPO_ROOT / "harness" / "definitions" / "model_capabilities.json"
 DEFAULT_SOURCE_URL = "https://models.dev/api.json"
 
+# models.dev 中每个模型的 provider.npm 与调用协议的对应（设计说明第 4.1 节）：
+# 模型没有单独声明 provider.npm 时记录服务方案的默认协议；这三种以外的取值由提取脚本报告
+NPM_PROTOCOLS: dict[str, str] = {
+    "@ai-sdk/openai": "responses",
+    "@ai-sdk/anthropic": "messages",
+    "@ai-sdk/openai-compatible": "chat_completions",
+}
+
 
 def load_models_dev(source_url: str, input_path: Path | None) -> dict[str, Any]:
     if input_path is not None:
@@ -36,10 +44,19 @@ def load_models_dev(source_url: str, input_path: Path | None) -> dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
-def extract_model(entry: dict[str, Any], model_id: str) -> dict[str, Any]:
+def declared_npm(entry: dict[str, Any]) -> str:
+    # 模型单独声明的 provider.npm；没有声明或取值不是字符串时返回空串，由调用方改用服务方案的默认协议
+    provider = entry.get("provider")
+    npm = provider.get("npm") if isinstance(provider, dict) else None
+    return npm.strip() if isinstance(npm, str) else ""
+
+
+def extract_model(entry: dict[str, Any], model_id: str, default_protocol: str) -> dict[str, Any]:
     # 一条模型记录：models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式；
-    # limit 缺少或取值非法时对应的容量字段为 null；工具调用与推理按布尔取值记录
-    capability: dict[str, Any] = {"model": model_id}
+    # limit 缺少或取值非法时对应的容量字段为 null；工具调用与推理按布尔取值记录；
+    # 协议按 provider.npm 映射，模型没有单独声明时取服务方案的默认协议
+    capability: dict[str, Any] = {"model": model_id,
+                                  "protocol": NPM_PROTOCOLS.get(declared_npm(entry), default_protocol)}
     modalities = entry.get("modalities")
     if isinstance(modalities, dict):
         for field in ("input", "output"):
@@ -62,6 +79,7 @@ def build_table(presets: list[dict[str, Any]], models_dev: dict[str, Any],
     # 「自定义」不使用预置表，在能力表中没有条目
     table_presets: dict[str, list[dict[str, Any]]] = {}
     missing: list[str] = []
+    unknown: list[str] = []
     for preset in presets:
         models_dev_id = str(preset.get("models_dev_id") or "")
         if not models_dev_id:
@@ -72,10 +90,20 @@ def build_table(presets: list[dict[str, Any]], models_dev: dict[str, Any],
             missing.append(f"{preset['id']} → {models_dev_id}")
             continue
         entries = provider["models"]
-        table_presets[preset["id"]] = [extract_model(entries[key], key)
+        default_protocol = str(preset["default_protocol"])
+        for key in sorted(entries):
+            if not isinstance(entries[key], dict):
+                continue
+            npm = declared_npm(entries[key])
+            if npm and npm not in NPM_PROTOCOLS:
+                unknown.append(f"{preset['id']}/{key}（{npm}）")
+        table_presets[preset["id"]] = [extract_model(entries[key], key, default_protocol)
                                        for key in sorted(entries) if isinstance(entries[key], dict)]
     if missing:
         raise ValueError("models.dev 中找不到预置服务方案：" + "、".join(missing))
+    if unknown:
+        # 遇到三种取值以外的 provider.npm 时以错误结束并列出这些模型，由更新快照的人决定
+        raise ValueError("models.dev 的 provider.npm 不在协议映射中：\n  " + "\n  ".join(unknown))
     return {
         "presets": table_presets,
         "revision": revision,
