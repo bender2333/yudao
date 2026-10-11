@@ -27,7 +27,7 @@ flowchart TD
 - `runner/`：OpenCode 一侧的运行器、指标收集与报告（`run_eval.py` 是入口）。它把材料起点复制到仓库之外的运行目录，运行 `opencode run`，从 JSON 事件流收集指标，再用评分器评分，最后写出机器可读结果与中文报告。
 - `runner/yudao.py`、`yudao_metrics.py`、`yudao_report.py`：Yudao 一侧的运行器、指标收集与报告（`run_yudao_eval.py` 是入口）。运行器只经 HTTP 接口驱动 Yudao，只从 `run.export` 导出的事件日志观察它，不导入 `harness` 的任何模块，也不引用被测方内部文件的路径。它在仓库之外新建数据目录启动被测的 Yudao，写入被测模型并经模型测试准入，建立项目、绑定三个部门、登记场景 3 的命令（`run_cli` 与 `check_data`，按接口约定第 5 节的命令行入口），以用户原始意图提交需求原文加接口约定，到时间上限时经 `work_item.cancel` 结束并标记超时；运行结束以后导出事件日志，取最后一次封存的交付交给评分器，并计算过程检查点与指标。
 - `baseline/`：omp 流程开发 Yudao 的基线数字。`collect.py` 抓取 Stage 3 里程碑下的工单、标签时间线与评论、合并请求、阶段父工单 #9 的集成层记录与运行目录里的运行输出，合成一个数据文件；`compute.py` 只读这个数据文件，算出每个工单的审查轮数、集成层失败归因、搁置原因、耗时与用量，写出中文报告。
-- `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。基线工具的测试读录制的数据文件，同样不使用 mock。`test_yudao_runner.py` 用 `harness/tests/event_sequences/` 里的系统事件序列驱动同一套 `run.export` 形状的判定逻辑；这些序列的事件头是 `adapter: fake`，不是真实系统导出，凡是需要真实导出才能核实的项记「未核实」。`test_regen_scenario3.py` 用 `runner/regen_scenario3.py` 从 `origin/main` 上的旧版 JSON 重算 `docs/evaluation/scenario-3-yudao.json` 与 `.md`，与已提交的文件逐字节比对。
+- `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。基线工具的测试读录制的数据文件，同样不使用 mock。`test_yudao_runner.py` 用 `harness/tests/event_sequences/` 里的系统事件序列驱动同一套 `run.export` 形状的判定逻辑；这些序列的事件头是 `adapter: fake`，不是真实系统导出，凡是需要真实导出才能核实的项记「未核实」。`test_regen_scenario3.py` 用 `runner/regen_scenario3.py` 从仓库内固定的历史 JSON（`data/scenario-3-yudao-historical.json`，提交 `aaa91883` 的旧版原文，不可修改）重算 `docs/evaluation/scenario-3-yudao.json` 与 `.md`，与已提交的文件逐字节比对；以已提交的新 JSON 为输入重算同样逐字节一致（幂等）。`test_no_harness_paths.py` 用 `ast` 扫描并折叠字符串拼接与 `os.path.join` 字面量参数，再比对被测方内部文件路径。
 
 ## 材料版本
 

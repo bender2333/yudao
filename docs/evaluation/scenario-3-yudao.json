@@ -119,7 +119,7 @@
           "ended_within_limit": {
             "passed": false,
             "applicable": true,
-            "detail": "运行未通过放行判定：阶段 PAUSED（实际为 PAUSED）；停止原因 no_tool_call（实际为 no_tool_call）；没有当前交付快照的质检放行；用量未超限额"
+            "detail": "运行未通过放行判定：阶段不是 DONE（实际为 PAUSED）；停止原因不是 released（实际为 no_tool_call）；没有当前交付快照的质检放行；用量未超限额"
           },
           "quality_release_bound_to_delivery": {
             "passed": true,
@@ -409,7 +409,7 @@
           "ended_within_limit": {
             "passed": false,
             "applicable": true,
-            "detail": "运行未通过放行判定：阶段 FAILED（实际为 FAILED）；停止原因 cancelled（实际为 cancelled）；没有当前交付快照的质检放行；用量未超限额"
+            "detail": "运行未通过放行判定：阶段不是 DONE（实际为 FAILED）；停止原因不是 released（实际为 cancelled）；没有当前交付快照的质检放行；用量未超限额"
           },
           "quality_release_bound_to_delivery": {
             "passed": true,

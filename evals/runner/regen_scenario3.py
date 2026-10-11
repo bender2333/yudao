@@ -1,14 +1,17 @@
-"""从可取回的旧版 JSON 重生 `docs/evaluation/scenario-3-yudao.json` 与 `.md`。
+"""从不可变历史输入重生 `docs/evaluation/scenario-3-yudao.json` 与 `.md`。
 
-本次重算以已提交的旧版 JSON 为输入，重算检查点与用量 unknown 字段：
-- 输入：旧版 JSON（默认从 `origin/main` 的 `docs/evaluation/scenario-3-yudao.json`
-  读取；测试可指定 `--source <path>` 从本地副本读）。
-- 重算只重新解释旧 JSON 已有的字段——不再现原始导出，不补造未知字段。
-- 旧 JSON 里没有的字段（replay 结果、质检 payload、覆盖比例、参数版本）一律标
+本次重算以仓库内固定的历史 JSON 为输入，重算检查点与用量 unknown 字段：
+- 输入：`evals/data/scenario-3-yudao-historical.json`（默认；`--source` 可指定
+  其他路径）。历史文件取自提交 `aaa91883` 的
+  `docs/evaluation/scenario-3-yudao.json` 原文，不可修改。
+- 重算只重新解释输入 JSON 已有的字段——不再现原始导出，不补造未知字段。
+- 输入 JSON 里没有的字段（replay 结果、质检 payload、覆盖比例、参数版本）一律标
   为「未核实」，不取回也不补造。
-- 旧 JSON 里上报为零的 `total_tokens`/`model_latency_ms` 仍按上游上报值原样保留
+- 输入 JSON 里上报为零的 `total_tokens`/`model_latency_ms` 仍按上游上报值原样保留
   （旧口径：缺失字段记 0，按上限报 `total` 时分项未上报）；仓库内没有原始事件日志
   可核对其来源，因此报告写「来源未核实」。
+- 幂等：5 条重算说明按精确字符串去重追加；以历史文件或已生成的 JSON 为输入，
+  输出都与已提交的文件逐字节一致。
 
 脚本与评测工具共用 `yudao_report` 中的形状，保证生成结果与
 `docs/evaluation/scenario-3-yudao.json` 的现有口径一致。
@@ -17,7 +20,6 @@ import argparse
 import copy
 import json
 import os
-import subprocess
 import sys
 import tempfile
 
@@ -26,22 +28,15 @@ sys.path.insert(0, os.path.join(ROOT, "evals", "runner"))
 
 import yudao_report  # noqa: E402
 
-DEFAULT_SOURCE = "origin/main:docs/evaluation/scenario-3-yudao.json"
+DEFAULT_SOURCE = os.path.join(ROOT, "evals", "data", "scenario-3-yudao-historical.json")
 DEFAULT_JSON = os.path.join(ROOT, "docs", "evaluation", "scenario-3-yudao.json")
 DEFAULT_MD = os.path.join(ROOT, "docs", "evaluation", "scenario-3-yudao.md")
 
 
 def _read_source(path):
-    """读旧版 JSON：本地路径直接读，git 引用走 `git show`。"""
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as handle:
-            return json.load(handle)
-    if ":" in path:
-        result = subprocess.run(
-            ["git", "-C", ROOT, "show", path],
-            check=True, capture_output=True, encoding="utf-8")
-        return json.loads(result.stdout)
-    raise FileNotFoundError(path)
+    """读输入 JSON：只读本地文件，不依赖 git 引用或网络。"""
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def _reshape_checkpoints(run_metrics, hidden_failures):
@@ -54,7 +49,7 @@ def _reshape_checkpoints(run_metrics, hidden_failures):
                   + "、停止原因 " + str(stop_reason)
                   + "、质检已放行、用量未超限额")
     else:
-        detail = "运行未通过放行判定：阶段 " + str(phase) + "（实际为 " + str(phase) + "）；停止原因 " + str(stop_reason) + "（实际为 " + str(stop_reason) + "）；没有当前交付快照的质检放行；用量未超限额"
+        detail = "运行未通过放行判定：阶段不是 DONE（实际为 " + str(phase or "未知") + "）；停止原因不是 released（实际为 " + str(stop_reason or "未知") + "）；没有当前交付快照的质检放行；用量未超限额"
     return {
         "ended_within_limit": {"passed": released, "applicable": True, "detail": detail},
         "quality_release_bound_to_delivery": {
@@ -105,23 +100,28 @@ def _extract_hidden_failures(run):
 
 
 def regenerate(source, comparison=None):
-    """重算：从 source 读到旧版 JSON，重算检查点与用量 unknown。"""
+    """重算：从 source 读到输入 JSON，重算检查点与用量 unknown；幂等。"""
     data = _read_source(source)
 
+    regen_notes = [
+        "证据不可取回：原始 `evidence_dir` 指向 issue-192 worktree 下的 "
+        "`.yudao/evals/`，本工单仓库内没有这些文件，无法重算检查点依据与 "
+        "hidden_failures 取回；按设计要求标为「未核实」。",
+        "用量按新口径：input_tokens / output_tokens / cache_read_tokens / "
+        "cache_write_tokens / cost 字段都记未知（None），不进均值、不进最小/"
+        "最大、不进噪声。",
+        "总用量（`total_tokens`）沿用旧 JSON 上报值：旧口径按 `usage.totals` "
+        "原值记入；上游分项统计（input_tokens / output_tokens）未上报时归零，"
+        "本工单仓库内无原始事件日志，来源未核实。",
+        "三次运行的版本比较（#324）尚未开展，本次报告未提供版本比较段；"
+        "同版本重复运行的离散由后续阶段补上。",
+        "交付到 `docs/evaluation/scenario-3-yudao.json` 的 `replay` / "
+        "`qa_submitted` payload / `coverage` 等逐项未核实字段未补造。",
+    ]
     notes = list(data.get("notes") or [])
-    notes.append("证据不可取回：原始 `evidence_dir` 指向 issue-192 worktree 下的 "
-                 "`.yudao/evals/`，本工单仓库内没有这些文件，无法重算检查点依据与 "
-                 "hidden_failures 取回；按设计要求标为「未核实」。")
-    notes.append("用量按新口径：input_tokens / output_tokens / cache_read_tokens / "
-                 "cache_write_tokens / cost 字段都记未知（None），不进均值、不进最小/"
-                 "最大、不进噪声。")
-    notes.append("总用量（`total_tokens`）沿用旧 JSON 上报值：旧口径按 `usage.totals` "
-                 "原值记入；上游分项统计（input_tokens / output_tokens）未上报时归零，"
-                 "本工单仓库内无原始事件日志，来源未核实。")
-    notes.append("三次运行的版本比较（#324）尚未开展，本次报告未提供版本比较段；"
-                 "同版本重复运行的离散由后续阶段补上。")
-    notes.append("交付到 `docs/evaluation/scenario-3-yudao.json` 的 `replay` / "
-                 "`qa_submitted` payload / `coverage` 等逐项未核实字段未补造。")
+    for note in regen_notes:
+        if note not in notes:
+            notes.append(note)
 
     runs = []
     for run in data["runs"]:
@@ -172,7 +172,7 @@ def render_md(payload):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", default=DEFAULT_SOURCE,
-                        help="旧版 JSON 路径（默认 origin/main 上的文档）")
+                        help="输入 JSON 路径（默认仓库内固定的历史文件）")
     parser.add_argument("--json-out", default=DEFAULT_JSON)
     parser.add_argument("--md-out", default=DEFAULT_MD)
     parser.add_argument("--check", action="store_true",
