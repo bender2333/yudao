@@ -522,6 +522,8 @@ def compute(data):
         model for model, entry in summary["by_model"].items()
         if entry.get("missing_price")})
     summary["latest_refresh_at"] = data.get("latest_refresh_at")
+    summary["runs_collected_at"] = data.get("runs_collected_at")
+    summary["runs_refreshed"] = data.get("runs_refreshed")
     return {"collected_at": data.get("collected_at"),
             "latest_refresh_at": data.get("latest_refresh_at"),
             "stage_parent_issue": data.get("stage_parent_issue"),
@@ -536,11 +538,15 @@ def build_report(result):
     summary = result["summary"]
     refresh = result.get("latest_refresh_at") or result.get("collected_at")
     missing_prices = summary.get("missing_model_prices") or []
+    runs_at = summary.get("runs_collected_at") or result.get("collected_at")
+    runs_note = ("；运行记录截止 %s，本次未刷新（本机无运行目录）" % runs_at
+                 if summary.get("runs_refreshed") is False
+                 else "；运行记录截止 %s" % runs_at)
     lines = ["# Stage 3 基线数字：omp 流程开发 Yudao",
              "",
-             "首次抓取时间：%s；最近一次刷新时间：%s；数据文件："
+             "首次抓取时间：%s。工单、合并请求、评论截止 %s%s；数据文件："
              "`docs/evaluation/baseline-omp-stage3.json`。"
-             % (result["collected_at"], refresh),
+             % (result["collected_at"], refresh, runs_note),
              "",
              "这份报告给出 omp 流程（执行者与审查者都由 omp 运行）在 Stage 3 里程碑下的基线数字，"
              "供自举第一层的配对验收对照使用（[总体路线图](../program-roadmap.md)第 6.1 节）。"
@@ -598,7 +604,8 @@ def build_report(result):
                         entry["input_tokens"], entry["output_tokens"],
                         entry["cache_read_tokens"], entry["cache_write_tokens"],
                         entry["total_tokens"],
-                        _number(entry["valid_cost_usd"]),
+                        "未知" if entry["missing_price"]
+                        else _number(entry["valid_cost_usd"]),
                         "是" if entry["missing_price"] else "否",
                         entry["issues"]))
     lines += ["", "## 四、汇总（按工单统计，中位数/最小/最大/平均）", "",
@@ -641,7 +648,9 @@ def build_report(result):
                         usage["requests_with_usage"],
                         usage["requests_without_usage"],
                         _number(usage["total_tokens"]),
-                        _number(usage["valid_cost_usd"])))
+                        "未知" if any(model.get("missing_price")
+                                      for model in usage["models"].values())
+                        else _number(usage["valid_cost_usd"])))
     lines += ["", "## 六、搁置的原因", ""]
     stalled = [record for record in result["issues"] if record["stalled"]]
     if not stalled:

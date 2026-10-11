@@ -44,10 +44,10 @@ def test_issue_numbers_from_recorded_data():
     # 每个工单的数字：审查轮数、交付轮数、集成层失败、耗时与用量
     result = computed()
     summary = result["summary"]
-    assert summary["issues"] >= 171
-    assert summary["merged"] == 94
-    assert summary["with_usage"] == 70
-    assert summary["stalled"] >= 15
+    assert summary["issues"] >= 195
+    assert summary["merged"] == 128
+    assert summary["with_usage"] == 76
+    assert summary["stalled"] >= 16
 
     # 一轮通过、有运行记录、无集成层失败
     assert record_for(result, 346)["review_rounds"] == 1
@@ -97,19 +97,19 @@ def test_issue_numbers_from_recorded_data():
 def test_summary_numbers_from_recorded_data():
     result = computed()
     summary = result["summary"]
-    assert summary["review_rounds"]["count"] == 94
-    assert summary["review_rounds"]["distribution"] == {1: 85, 2: 9}
+    assert summary["review_rounds"]["count"] == 128
+    assert summary["review_rounds"]["distribution"] == {1: 118, 2: 10}
     assert summary["review_rounds"]["median"] == 1
-    assert summary["integration_failures"]["distribution"] == {0: 84, 1: 10}
+    assert summary["integration_failures"]["distribution"] == {0: 113, 1: 15}
     assert summary["integration_failures"]["median"] == 0
-    assert summary["elapsed_minutes"]["median"] == 221.5
-    assert summary["elapsed_minutes"]["min"] == 17
-    assert summary["elapsed_minutes"]["count"] == 92
+    assert summary["elapsed_minutes"]["median"] == 221
+    assert summary["elapsed_minutes"]["min"] == 16
+    assert summary["elapsed_minutes"]["count"] == 121
     # 费用：omp 的运行输出里 cost 全为 0，费用要按用量乘单价另算
     assert summary["cost"]["median"] == 0
     # 失败计数按集成层记录：归因到的写明工单，没写明的列为未归因
-    assert result["failures"] == {"failures": 11, "attributed_failures": 8,
-                                  "unattributed_failures": 3, "failure_pairs": 10}
+    assert result["failures"] == {"failures": 18, "attributed_failures": 12,
+                                  "unattributed_failures": 6, "failure_pairs": 15}
     # 归因结果不含范围外工单：#268 出现在评论里但没有 Stage 3 里程碑
     assert all(268 not in entry["issues"] for entry in result["attribution"])
 
@@ -117,9 +117,9 @@ def test_summary_numbers_from_recorded_data():
 def test_integration_records_and_stalled_reasons():
     data = recorded_data()
     integration = compute.integration_runs(data["stage_comments"])
-    assert len(integration) == 27
+    assert len(integration) == 36
     failures = [record for record in integration if record["verdict"] == "FAIL"]
-    assert len(failures) == 11
+    assert len(failures) == 18
     # 两种首行写法都解析得动：带竖线计数与不带计数
     counts = {record["commit"]: record["counts"] for record in failures}
     assert counts["d7718fc5"].startswith("17 failed")
@@ -156,7 +156,7 @@ def test_compute_touches_no_external_process(monkeypatch):
         raise AssertionError("计算一步不应调用外部命令")
 
     monkeypatch.setattr(collect.subprocess, "run", explode)
-    assert computed()["summary"]["merged"] == 94
+    assert computed()["summary"]["merged"] == 128
 
 
 def test_collect_parses_usage_from_real_run_output(tmp_path):
@@ -499,7 +499,7 @@ def test_collect_writes_prices_and_refresh_marker(tmp_path, monkeypatch):
         if args and args[0] == "pr" and args[1] == "list":
             return []
         if args and args[0] == "issue" and args[1] == "view":
-            return {"comments": []}
+            return []
         raise AssertionError("unexpected: %s" % args)
 
     def fake_gh_items(args):
@@ -527,3 +527,93 @@ def test_collect_writes_prices_and_refresh_marker(tmp_path, monkeypatch):
     with open(data_path, encoding="utf-8") as handle:
         persisted = json.load(handle)
     assert persisted["latest_refresh_at"] == data2["latest_refresh_at"]
+
+
+def _stub_gh(monkeypatch):
+    # 不调外部命令：用 monkeypatch 替换 gh 调用返回空数据集
+    def fake_gh(args):
+        if args and args[0] == "issue" and args[1] == "list":
+            return []
+        if args and args[0] == "pr" and args[1] == "list":
+            return []
+        if args and args[0] == "issue" and args[1] == "view":
+            # --jq 已经把评论取成列表
+            return []
+        raise AssertionError("unexpected: %s" % args)
+
+    def fake_gh_items(args):
+        return []
+
+    monkeypatch.setattr(collect, "_gh", fake_gh)
+    monkeypatch.setattr(collect, "_gh_items", fake_gh_items)
+
+
+def _write_previous_data(path, runs, collected_at, runs_collected_at=None):
+    payload = {"collected_at": collected_at,
+               "stage_parent_issue": 9,
+               "scope": {"milestone_prefix": "Stage 3"},
+               "issues": [], "pull_requests": [], "stage_comments": [],
+               "runs": runs}
+    if runs_collected_at:
+        payload["runs_collected_at"] = runs_collected_at
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _run_file(directory, name, tokens):
+    line = ('{"type": "message_end", "message": {"role": "assistant", '
+            '"provider": "9router", "model": "oro", "usage": {"input": %d, '
+            '"output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": %d, '
+            '"cost": {"total": 0}}, "timestamp": 1700000000000, '
+            '"completedAt": 1700000001000}}' % (tokens, tokens))
+    (directory / name).write_text(line + "\n", encoding="utf-8")
+
+
+def test_collect_keeps_recorded_runs_when_directory_missing(tmp_path, monkeypatch):
+    # 运行目录不存在（本机不是生成运行记录的那台机器）时保留已有 runs，不清空
+    _stub_gh(monkeypatch)
+    data_path = tmp_path / "data.json"
+    recorded = [{"file": "omp-345a.jsonl", "role": "omp", "issue": 345,
+                 "round": "a", "requests": 1, "requests_with_usage": 1,
+                 "requests_without_usage": 0, "input_tokens": 10,
+                 "output_tokens": 0, "cache_read_tokens": 0,
+                 "cache_write_tokens": 0, "total_tokens": 10,
+                 "reported_cost": 0.0, "models": {}, "started_ms": None,
+                 "finished_ms": None, "exit_code": None,
+                 "finished_local": None}]
+    _write_previous_data(data_path, recorded, "2026-10-07T09:55:24Z")
+    data = collect.collect(stage_parent=9,
+                           runs_root=str(tmp_path / "不存在目录"),
+                           data_path=str(data_path))
+    assert data["runs"] == recorded
+    assert data["runs_refreshed"] is False
+    assert data["runs_collected_at"] == "2026-10-07T09:55:24Z"
+    # 工单与评论的刷新时间照常写入，与运行记录的截止时间分开
+    assert data["latest_refresh_at"] != "2026-10-07T09:55:24Z"
+    result = compute.compute(data)
+    report = compute.build_report(result)
+    assert "2026-10-07T09:55:24Z，本次未刷新（本机无运行目录）" in report
+
+
+def test_collect_refreshes_runs_when_directory_exists(tmp_path, monkeypatch):
+    # 运行目录存在时重新读取，runs_collected_at 更新为本次时刻
+    _stub_gh(monkeypatch)
+    runs_root = tmp_path / "runs"
+    runs_root.mkdir()
+    _run_file(runs_root, "omp-345a.jsonl", 10)
+    data_path = tmp_path / "data.json"
+    stale = [{"file": "omp-1a.jsonl", "role": "omp", "issue": 1, "round": "a",
+              "requests": 0, "requests_with_usage": 0,
+              "requests_without_usage": 0, "input_tokens": 0,
+              "output_tokens": 0, "cache_read_tokens": 0,
+              "cache_write_tokens": 0, "total_tokens": 0,
+              "reported_cost": 0.0, "models": {}, "started_ms": None,
+              "finished_ms": None, "exit_code": None, "finished_local": None}]
+    _write_previous_data(data_path, stale, "2026-10-07T09:55:24Z",
+                         runs_collected_at="2026-10-07T09:55:24Z")
+    data = collect.collect(stage_parent=9, runs_root=str(runs_root),
+                           data_path=str(data_path))
+    assert [run["file"] for run in data["runs"]] == ["omp-345a.jsonl"]
+    assert data["runs_refreshed"] is True
+    assert data["runs_collected_at"] != "2026-10-07T09:55:24Z"
+    report = compute.build_report(compute.compute(data))
+    assert "本次未刷新" not in report

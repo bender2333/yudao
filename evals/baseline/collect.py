@@ -208,9 +208,16 @@ def collect(stage_parent, runs_root, data_path, model_prices_path=None):
     已抓工单的标签时间线、评论与最新状态在每次抓取时重新拉取，按 (created_at, event,
     body 哈希) 去重合并并刷新到本次截止时间，避免混合未注明日期的状态。模型单价文件
     缺失或字段为空时记为「缺单价」，不参与费用统计。
+
+    运行目录只在生成运行记录的那台机器上有：目录不存在时保留数据文件里已有的 runs，
+    并标 `runs_refreshed: false` 与沿用上一次的 `runs_collected_at`，不把已有记录清空。
+    `collected_at` 保持首次抓取的时刻，每次刷新的截止时间写 `latest_refresh_at`。
     """
     data = _read_partial(data_path)
-    data.update({"collected_at": _now(), "stage_parent_issue": stage_parent,
+    previous_runs = list(data.get("runs") or [])
+    previous_runs_at = data.get("runs_collected_at") or data.get("collected_at")
+    data.setdefault("collected_at", _now())
+    data.update({"stage_parent_issue": stage_parent,
                  "runs_root": runs_root,
                  "scope": {"milestone_prefix": STAGE_MILESTONE_PREFIX}})
     issues = data.setdefault("issues", [])
@@ -243,10 +250,22 @@ def collect(stage_parent, runs_root, data_path, model_prices_path=None):
     data["latest_refresh_at"] = cutoff
     data["pull_requests"] = pull_requests()
     data["stage_comments"] = integration_comments(stage_parent)
-    data["runs"] = run_usage(runs_root)
+    data["runs"], data["runs_collected_at"], data["runs_refreshed"] = _runs_payload(
+        runs_root, previous_runs, previous_runs_at)
     data["model_prices"] = load_model_prices(model_prices_path)
     _write(data, data_path)
     return data
+
+
+def _runs_payload(runs_root, previous_runs, previous_runs_at):
+    """本次的运行记录、它的截止时间与是否刷新过。
+
+    目录存在时重新读取全部 `omp-` / `rv-` 输出；目录不存在（本机不是生成运行记录的
+    那台机器）时保留已有记录，避免把已抓到的运行数据清成空列表。
+    """
+    if os.path.isdir(runs_root):
+        return run_usage(runs_root), _now(), True
+    return previous_runs, previous_runs_at, False
 
 
 def _timeline_key(event):
