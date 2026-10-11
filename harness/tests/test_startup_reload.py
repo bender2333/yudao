@@ -433,12 +433,14 @@ def test_watcher_detects_external_write(tmp_path):
     facade.load_document(config_path)
     initial_rev = facade.revision
 
-    # 启动监视
+    # 启动监视：监视线程没有启动回调，用截止时限内轮询等待它已经运行
     facade.start_watching(interval_sec=0.05)
-    time.sleep(0.1)  # 等待线程启动
+    deadline = time.monotonic() + 3.0
+    while not facade.config_status()["watching"]:
+        assert time.monotonic() < deadline, "监视线程没有启动"
+        time.sleep(0.01)
 
-    # 外部写入新有效文档
-    time.sleep(0.15)  # 确保至少一个轮询周期已过去
+    # 外部写入新有效文档；写入发生在监视已经运行之后，修订变化由下面的轮询确认
     _write_json(config_path, _fake_doc())
 
     # 轮询等待修订变化

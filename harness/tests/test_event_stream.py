@@ -90,18 +90,16 @@ def test_after_beyond_the_log_end_resyncs_and_closes(tmp_path):
 def test_queue_overflow_resyncs_when_the_client_is_too_slow(tmp_path):
     # 客户端处理太慢：订阅队列写满以后服务端发送 resync 并关闭连接
     application = _application(tmp_path)
-    stream = application.open_event_stream(EventScope(projects=("empty",)), after=0, live=False,
+    # 先写入一条范围内的历史事件：它从历史补发返回，订阅在此之前已经登记
+    _record(application, "p1", 0)
+    stream = application.open_event_stream(EventScope(projects=("p1",)), after=0, live=False,
                                            queue_limit=8)
 
     async def run():
         generator = stream.messages()
-        messages = []
-        # 历史为空，第一条消息来自溢出判断；先推进一次以登记订阅，再写入事件把队列写满
-        first = asyncio.ensure_future(generator.__anext__())
-        await asyncio.sleep(0)
+        messages = [await generator.__anext__()]  # 订阅已登记：此后写入的事件进入订阅队列
         for index in range(40):
-            _record(application, "p1", index)
-        messages.append(await first)
+            _record(application, "p1", index + 1)
         async for message in generator:
             messages.append(message)
         return messages
@@ -113,17 +111,18 @@ def test_queue_overflow_resyncs_when_the_client_is_too_slow(tmp_path):
 def test_live_events_arrive_within_a_hundred_milliseconds(tmp_path):
     # 写入以后推送不依赖定时查询：新事件在 100 毫秒以内到达
     application = _application(tmp_path)
+    # 先写入一条范围内的历史事件：它从历史补发返回，订阅在此之前已经登记；
+    # 再次取消息时生成器进入等待，新事件由订阅回调唤醒它，不经过定时查询
+    _record(application, "p1", 0)
     stream = application.open_event_stream(EventScope(projects=("p1",)), after=0, live=False,
                                            checkpoint_idle_sec=5.0)
 
     async def run():
         generator = stream.messages()
-        task = asyncio.ensure_future(generator.__anext__())
-        await asyncio.sleep(0.05)
-        started = time.monotonic()
+        assert (await generator.__anext__()).kind == "event"
+        started = time.monotonic()  # 到收到为止最多经过一个等待时间片（POLL_SEC）
         _record(application, "p1", 1)
-        message = await task
-        return message, time.monotonic() - started
+        return await generator.__anext__(), time.monotonic() - started
 
     message, elapsed = asyncio.run(asyncio.wait_for(run(), 10))
     assert message.kind == "event"
