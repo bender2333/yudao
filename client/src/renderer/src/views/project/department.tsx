@@ -60,16 +60,8 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
           onOpenSettings={() => setSettingsOpen(true)}
         />
       ) : null}
-      <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
-        <div className="y10-ws-stage stage">
-          <RoomScreen app={props.app} department={department} data={data} />
-        </div>
-        {data ? (
-          <div className="y10-ws-room-info room-info" data-ws-info>
-            <RoomInfoArea data={data} />
-          </div>
-        ) : null}
-      </Section>
+      <RoomSection app={props.app} department={department} data={data} />
+
       {data ? (
         <>
           <InspectArea app={props.app} data={data} />
@@ -84,6 +76,21 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
         </>
       ) : null}
     </div>
+  );
+}
+
+export function RoomSection(props: { app: ClientApp; department: string; data: DepartmentWorkspaceResult | null }) {
+  return (
+    <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
+      <div className="y10-ws-stage stage">
+        <RoomScreen app={props.app} department={props.department} data={props.data} />
+      </div>
+      {props.data ? (
+        <div className="y10-ws-room-info room-info" data-ws-info>
+          <RoomInfoArea data={props.data} />
+        </div>
+      ) : null}
+    </Section>
   );
 }
 

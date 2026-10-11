@@ -51,9 +51,11 @@ export function roomWorkspaceFixture(department: string): RoomWorkspaceFixture {
 
 /** 数据从空到有的存活观测：挂载计数与画面容器节点在前后两步是否同一个 DOM 节点。 */
 export interface RoomSurvivalReport {
-  /** 每次 root.render 之后页面上活着的房间容器个数。 */
+  /** 每次 root.render 之后舞台里活着的房间画面容器个数。 */
   mountCounts: number[];
-  /** 每一步读到的画面容器节点是否与上一步是同一个（用节点标记判断）。 */
+  /** 每次 root.render 之后舞台容器个数（应恒为 1）。 */
+  stageCounts: number[];
+  /** 每一步读到的舞台与画面容器节点是否与上一步是同一个（用节点标记判断）。 */
   sameHost: boolean;
   /** 画面加载失败提示。 */
   errorText: string | null;
@@ -160,14 +162,14 @@ export async function runRoomSwitch(steps: { department: string; data: RoomWorks
   }
 }
 
-// 数据从空到有的存活驱动（工单 #381）：页面级包装组件按传入的结构名渲染：
-// "single" 在条件分支之外只放一处房间组件；"split" 在两个分支各放一处（第 1 轮的错误写法）。
-// 每一步数页面上活着的房间容器个数（挂载计数），并给第一个看到的容器打标记，
+// 数据从空到有的存活驱动（工单 #381）：挂载 department.tsx 里真实的 RoomSection，
+// 同一个 React root 先后传入空数据与真实录下的数据。每一步数舞台里活着的房间画面容器
+// 个数（挂载计数），并给舞台容器与第一个看到的画面容器打标记，
 // 读回数据到达前后是否还是同一个 DOM 节点。
-async function survivalDriver(input: { structure: string; department: string; datas: (RoomWorkspaceFixture | null)[] }): Promise<{ mountCounts: number[]; sameHost: boolean; errorText: string | null }> {
+async function survivalDriver(input: { department: string; datas: (RoomWorkspaceFixture | null)[] }): Promise<{ mountCounts: number[]; stageCounts: number[]; sameHost: boolean; errorText: string | null }> {
   const React = (await import(/* @vite-ignore */ "/@id/react" as string)).default as typeof import("react");
   const ReactDOMClient = (await import(/* @vite-ignore */ "/@id/react-dom/client" as string)).default as typeof import("react-dom/client");
-  const { RoomScreen } = await import(/* @vite-ignore */ "/src/views/project/room-screen.tsx" as string) as typeof import("../../src/renderer/src/views/project/room-screen.tsx");
+  const { RoomSection } = await import(/* @vite-ignore */ "/src/views/project/department.tsx" as string) as typeof import("../../src/renderer/src/views/project/department.tsx");
   const { ClientApp } = await import(/* @vite-ignore */ "/src/contract/client-app.ts" as string) as typeof import("../../src/renderer/src/contract/client-app.ts");
   const app = new ClientApp(async () => {
     throw new Error("存活测试不查询");
@@ -176,45 +178,45 @@ async function survivalDriver(input: { structure: string; department: string; da
   document.body.appendChild(host);
   const root = ReactDOMClient.createRoot(host);
   const department = input.department;
-  // 第 1 轮的写法：房间组件的父级类型在空态与数据态之间不同（空态是 article、数据态是 section），
-  // 父级类型一变 React 就卸载整棵子树再重建，房间组件随之重挂：
-  // Pixi 画面与事件流订阅被重置，首段流式文字丢失（第 89/132/230 行的端到端失败正是这个原因）
-  const Wrapper = (props: { data: RoomWorkspaceFixture | null }) => {
-    if (input.structure === "split") {
-      if (props.data) {
-        return React.createElement("section", { className: "ws-stage" },
-          React.createElement(RoomScreen, { app, department, data: props.data }));
-      }
-      return React.createElement("article", { className: "ws-stage" },
-        React.createElement(RoomScreen, { app, department, data: null }));
-    }
-    return React.createElement("section", { className: "ws-stage" },
-      React.createElement(RoomScreen, { app, department, data: props.data }));
-  };
   const mountCounts: number[] = [];
-  let mark: string | null = null;
+  const stageCounts: number[] = [];
+  let sceneMark: string | null = null;
+  let stageMark: string | null = null;
   let sameHost = true;
   let errorText: string | null = null;
   for (const data of input.datas) {
-    root.render(React.createElement(Wrapper, { data }));
+    root.render(React.createElement(RoomSection, { app, department, data }));
     // 等一帧与效果提交：画面建立或数据应用完成
     for (let i = 0; i < 80; i++) {
-      const canvases = host.querySelectorAll(".y10-scene");
+      const canvases = host.querySelectorAll(".y10-ws-stage .y10-scene");
       if (canvases.length > 0) break;
       await new Promise<void>((resolve) => setTimeout(resolve, 25));
     }
     await new Promise<void>((resolve) => setTimeout(resolve, 300));
-    const canvases = host.querySelectorAll(".y10-scene");
+    const stages = host.querySelectorAll(".y10-ws-stage");
+    const canvases = host.querySelectorAll(".y10-ws-stage .y10-scene");
+    stageCounts.push(stages.length);
     mountCounts.push(canvases.length);
+    const stage = stages[0] as HTMLElement | undefined;
     const first = canvases[0] as HTMLElement | undefined;
     const err = host.querySelector(".pixel-canvas-error");
     if (err !== null) errorText = err.textContent;
-    if (first !== undefined) {
-      if (mark === null) {
-        mark = "room-survival-mark";
-        first.dataset.survival = mark;
+    if (stage !== undefined) {
+      if (stageMark === null) {
+        stageMark = "room-survival-stage";
+        stage.dataset.survival = stageMark;
       } else {
-        sameHost = sameHost && first.dataset.survival === mark;
+        sameHost = sameHost && stage.dataset.survival === stageMark;
+      }
+    } else {
+      sameHost = false;
+    }
+    if (first !== undefined) {
+      if (sceneMark === null) {
+        sceneMark = "room-survival-mark";
+        first.dataset.survival = sceneMark;
+      } else {
+        sameHost = sameHost && first.dataset.survival === sceneMark;
       }
     } else {
       sameHost = false;
@@ -222,11 +224,11 @@ async function survivalDriver(input: { structure: string; department: string; da
   }
   root.unmount();
   host.remove();
-  return { mountCounts, sameHost, errorText };
+  return { mountCounts, stageCounts, sameHost, errorText };
 }
 
-/** 在渲染进程页面运行存活驱动：先空数据再真实数据，读回挂载计数与节点身份。 */
-export async function runRoomSurvival(structure: "single" | "split", department: string, datas: (RoomWorkspaceFixture | null)[]): Promise<RoomSurvivalReport> {
+/** 在渲染进程页面运行存活驱动：挂载真实的 RoomSection，先空数据再真实数据，读回挂载计数与节点身份。 */
+export async function runRoomSurvival(department: string, datas: (RoomWorkspaceFixture | null)[]): Promise<RoomSurvivalReport> {
   const server = await createServer({
     root: join(clientRoot, "src", "renderer"),
     cacheDir: join(clientRoot, "node_modules", ".vite-room-survival"),
@@ -249,18 +251,18 @@ export async function runRoomSurvival(structure: "single" | "split", department:
       body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body></body></html>",
     }));
     await page.goto(address + "room-survival.html");
-    const result = await page.evaluate(async (input: { fnSource: string; structure: string; department: string; datas: typeof datas }) => {
+    const result = await page.evaluate(async (input: { fnSource: string; department: string; datas: typeof datas }) => {
       try {
-        const fn = (0, eval)(`(${input.fnSource})`) as (i: { structure: string; department: string; datas: typeof datas }) => Promise<{ mountCounts: number[]; sameHost: boolean; errorText: string | null }>;
-        return { ok: await fn({ structure: input.structure, department: input.department, datas: input.datas }) };
+        const fn = (0, eval)(`(${input.fnSource})`) as (i: { department: string; datas: typeof datas }) => Promise<{ mountCounts: number[]; stageCounts: number[]; sameHost: boolean; errorText: string | null }>;
+        return { ok: await fn({ department: input.department, datas: input.datas }) };
       } catch (e) {
         return { failed: String((e as Error)?.stack ?? e) };
       }
-    }, { fnSource: survivalDriver.toString(), structure, department, datas });
+    }, { fnSource: survivalDriver.toString(), department, datas });
     if ("failed" in result) {
       throw new Error(`驱动失败：${String(result.failed)}`);
     }
-    return { mountCounts: result.ok.mountCounts, sameHost: result.ok.sameHost, errorText: result.ok.errorText, pageErrors };
+    return { mountCounts: result.ok.mountCounts, stageCounts: result.ok.stageCounts, sameHost: result.ok.sameHost, errorText: result.ok.errorText, pageErrors };
   } finally {
     await browser.close();
     await server.close();
