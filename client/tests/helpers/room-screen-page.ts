@@ -49,6 +49,17 @@ export function roomWorkspaceFixture(department: string): RoomWorkspaceFixture {
   return { department, room } as unknown as DepartmentWorkspaceResult;
 }
 
+/** 数据从空到有的存活观测：挂载计数与画面容器节点在前后两步是否同一个 DOM 节点。 */
+export interface RoomSurvivalReport {
+  /** 每次 root.render 之后页面上活着的房间容器个数。 */
+  mountCounts: number[];
+  /** 每一步读到的画面容器节点是否与上一步是同一个（用节点标记判断）。 */
+  sameHost: boolean;
+  /** 画面加载失败提示。 */
+  errorText: string | null;
+  pageErrors: string[];
+}
+
 /** 在页面里运行的驱动：依次把各部门的查询结果交给房间组件，每步等画面建立并读回状态。 */
 async function driver(input: { steps: { department: string; data: RoomWorkspaceFixture | null }[] }): Promise<{ states: RoomTabState[] }> {
   // 这段代码经字符串化以后在浏览器里求值，模块只能动态引入（房间回放同样做法）
@@ -143,6 +154,113 @@ export async function runRoomSwitch(steps: { department: string; data: RoomWorks
       throw new Error(`驱动失败：${String(result.failed)}`);
     }
     return { states: result.ok.states, pageErrors };
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+}
+
+// 数据从空到有的存活驱动（工单 #381）：页面级包装组件按传入的结构名渲染：
+// "single" 在条件分支之外只放一处房间组件；"split" 在两个分支各放一处（第 1 轮的错误写法）。
+// 每一步数页面上活着的房间容器个数（挂载计数），并给第一个看到的容器打标记，
+// 读回数据到达前后是否还是同一个 DOM 节点。
+async function survivalDriver(input: { structure: string; department: string; datas: (RoomWorkspaceFixture | null)[] }): Promise<{ mountCounts: number[]; sameHost: boolean; errorText: string | null }> {
+  const React = (await import(/* @vite-ignore */ "/@id/react" as string)).default as typeof import("react");
+  const ReactDOMClient = (await import(/* @vite-ignore */ "/@id/react-dom/client" as string)).default as typeof import("react-dom/client");
+  const { RoomScreen } = await import(/* @vite-ignore */ "/src/views/project/room-screen.tsx" as string) as typeof import("../../src/renderer/src/views/project/room-screen.tsx");
+  const { ClientApp } = await import(/* @vite-ignore */ "/src/contract/client-app.ts" as string) as typeof import("../../src/renderer/src/contract/client-app.ts");
+  const app = new ClientApp(async () => {
+    throw new Error("存活测试不查询");
+  }, { onState() {}, onPendingDecisions() {} });
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = ReactDOMClient.createRoot(host);
+  const department = input.department;
+  // 第 1 轮的写法：房间组件的父级类型在空态与数据态之间不同（空态是 article、数据态是 section），
+  // 父级类型一变 React 就卸载整棵子树再重建，房间组件随之重挂：
+  // Pixi 画面与事件流订阅被重置，首段流式文字丢失（第 89/132/230 行的端到端失败正是这个原因）
+  const Wrapper = (props: { data: RoomWorkspaceFixture | null }) => {
+    if (input.structure === "split") {
+      if (props.data) {
+        return React.createElement("section", { className: "ws-stage" },
+          React.createElement(RoomScreen, { app, department, data: props.data }));
+      }
+      return React.createElement("article", { className: "ws-stage" },
+        React.createElement(RoomScreen, { app, department, data: null }));
+    }
+    return React.createElement("section", { className: "ws-stage" },
+      React.createElement(RoomScreen, { app, department, data: props.data }));
+  };
+  const mountCounts: number[] = [];
+  let mark: string | null = null;
+  let sameHost = true;
+  let errorText: string | null = null;
+  for (const data of input.datas) {
+    root.render(React.createElement(Wrapper, { data }));
+    // 等一帧与效果提交：画面建立或数据应用完成
+    for (let i = 0; i < 80; i++) {
+      const canvases = host.querySelectorAll(".y10-scene");
+      if (canvases.length > 0) break;
+      await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    const canvases = host.querySelectorAll(".y10-scene");
+    mountCounts.push(canvases.length);
+    const first = canvases[0] as HTMLElement | undefined;
+    const err = host.querySelector(".pixel-canvas-error");
+    if (err !== null) errorText = err.textContent;
+    if (first !== undefined) {
+      if (mark === null) {
+        mark = "room-survival-mark";
+        first.dataset.survival = mark;
+      } else {
+        sameHost = sameHost && first.dataset.survival === mark;
+      }
+    } else {
+      sameHost = false;
+    }
+  }
+  root.unmount();
+  host.remove();
+  return { mountCounts, sameHost, errorText };
+}
+
+/** 在渲染进程页面运行存活驱动：先空数据再真实数据，读回挂载计数与节点身份。 */
+export async function runRoomSurvival(structure: "single" | "split", department: string, datas: (RoomWorkspaceFixture | null)[]): Promise<RoomSurvivalReport> {
+  const server = await createServer({
+    root: join(clientRoot, "src", "renderer"),
+    cacheDir: join(clientRoot, "node_modules", ".vite-room-survival"),
+    plugins: [],
+    server: { host: "127.0.0.1", port: 0, strictPort: false },
+    logLevel: "error",
+    appType: "spa",
+    optimizeDeps: { include: ["react", "react/jsx-runtime", "react-dom/client"] },
+  });
+  await server.listen();
+  const address = server.resolvedUrls?.local[0];
+  if (!address) throw new Error("渲染进程的模块服务器没有给出地址");
+  const browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
+  const pageErrors: string[] = [];
+  try {
+    const page = await browser.newPage();
+    page.on("pageerror", (e) => pageErrors.push(e.message));
+    await page.route(address + "room-survival.html", (route) => route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body></body></html>",
+    }));
+    await page.goto(address + "room-survival.html");
+    const result = await page.evaluate(async (input: { fnSource: string; structure: string; department: string; datas: typeof datas }) => {
+      try {
+        const fn = (0, eval)(`(${input.fnSource})`) as (i: { structure: string; department: string; datas: typeof datas }) => Promise<{ mountCounts: number[]; sameHost: boolean; errorText: string | null }>;
+        return { ok: await fn({ structure: input.structure, department: input.department, datas: input.datas }) };
+      } catch (e) {
+        return { failed: String((e as Error)?.stack ?? e) };
+      }
+    }, { fnSource: survivalDriver.toString(), structure, department, datas });
+    if ("failed" in result) {
+      throw new Error(`驱动失败：${String(result.failed)}`);
+    }
+    return { mountCounts: result.ok.mountCounts, sameHost: result.ok.sameHost, errorText: result.ok.errorText, pageErrors };
   } finally {
     await browser.close();
     await server.close();

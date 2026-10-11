@@ -52,38 +52,37 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
       <Loading state={workspace} />
       {noWorkItem ? <Empty text="项目还没有事项，部门工作间没有内容可显示" /> : null}
       {data ? (
+        <TitleArea
+          data={data}
+          scopeNote={requested !== null
+            ? "（顶栏选中）"
+            : workItem !== null ? "（未选中事项，取当前事项）" : "（项目还没有事项）"}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      ) : null}
+      <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
+        <div className="y10-ws-stage stage">
+          <RoomScreen app={props.app} department={department} data={data} />
+        </div>
+        {data ? (
+          <div className="y10-ws-room-info room-info" data-ws-info>
+            <RoomInfoArea data={data} />
+          </div>
+        ) : null}
+      </Section>
+      {data ? (
         <>
-          <TitleArea
-            data={data}
-            scopeNote={requested !== null
-              ? "（顶栏选中）"
-              : workItem !== null ? "（未选中事项，取当前事项）" : "（项目还没有事项）"}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
-          <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
-            <div className="y10-ws-stage stage">
-              <RoomScreen app={props.app} department={department} data={data} />
-            </div>
-            <div className="y10-ws-room-info room-info" data-ws-info>
-              <RoomInfoArea data={data} />
-            </div>
-          </Section>
+          <InspectArea app={props.app} data={data} />
+          <MessagesAndGuidance app={props.app} data={data} command={command} />
+          {/* 「阅读已有项目」不是原型 v10 的区块；原型最后一个区块是部门消息与指导，放在它之后 */}
           <ReadExisting
             app={props.app}
             runId={data.run_id}
             item={items.find((item) => item.work_item_id === workItem) ?? null}
           />
-          <InspectArea app={props.app} data={data} />
-          <MessagesAndGuidance app={props.app} data={data} command={command} />
           {settingsOpen ? <SettingsDialog app={props.app} data={data} onClose={() => setSettingsOpen(false)} /> : null}
         </>
-      ) : (
-        <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
-          <div className="y10-ws-stage stage">
-            <RoomScreen app={props.app} department={department} data={null} />
-          </div>
-        </Section>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -96,8 +95,11 @@ function RoomInfoArea(props: { data: DepartmentWorkspaceResult }) {
       <KeyValue
         className="is-inline y10-ws-facts facts"
         items={[
-          ["状态", departmentStatus(data)],
-          ["第几轮", data.run_id ? "第 1 轮" : "—"],
+          ["第几轮", data.room.crt.cycle === null || data.room.crt.cycle === undefined
+            ? "—"
+            : `第 ${data.room.crt.cycle} 轮`],
+          // 已用时间与上限：department.workspace 不带这两项（project.loop 里有），没有数据显示「—」
+          ["已用时间 / 上限", "—"],
           ["执行机器", room.machine ? room.machine : "—"],
           ["信箱", `${room.mailbox} 封未读指导`],
           ["待核实动作", room.pending_tool ? room.pending_tool : "没有"],
@@ -167,7 +169,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
           <p className="y10-eyebrow">部门工作间</p>
           <div className="y10-ws-title-row">
             <h1 className="y10-h1 title" style={{ margin: 0, fontSize: "20px", fontWeight: 700 }}>
-              {departmentName(data.department)}工作间
+              {departmentName(data.department)}部门
             </h1>
             <span className={`y10-status is-${statusKind}`}>{statusText}</span>
           </div>
@@ -425,22 +427,6 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
           )}
         </Section>
         <Section title="部门指导" note="已接收的指导在下一次安全激活进入模型输入">
-          {data.guidance.length === 0 ? <Empty text="这个部门还没有指导记录" /> : (
-            <ul className="y10-ws-guidance guidance-list">
-              {data.guidance.map((record) => (
-                <li key={record.guidance_id}>
-                  <div className="y10-ws-log-meta input-head">
-                    <strong>{label(GUIDANCE_STATUS, record.status)}</strong>
-                    <span className="y10-code byte-range">第 {record.version} 版</span>
-                    {record.applied_activation_id ? <span className="y10-code byte-range">已用于激活 {record.applied_activation_id}</span> : null}
-                    <button type="button" className="y10-link link" onClick={() => setOpenEvent(record.created_event_id)}>查看原始事件</button>
-                  </div>
-                  <p className="y10-ws-guidance p msg-text">{record.text}</p>
-                  {record.response_status ? <p className="y10-muted card-note">部门的回应：{show(record.response_text, record.response_status)}</p> : null}
-                </li>
-              ))}
-            </ul>
-          )}
           {data.work_item_id && hasCommand(props.app, "guidance.send") ? (
             <div className="y10-ws-composer composer">
               <TextArea label={`向${departmentName(data.department)}下达指导`} value={draft} onInput={setDraft} />
@@ -462,6 +448,22 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
             <p className="y10-note note">
               {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "这台主机没有提供发送指导的操作"}
             </p>
+          )}
+          {data.guidance.length === 0 ? <Empty text="这个部门还没有指导记录" /> : (
+            <ul className="y10-ws-guidance guidance-list">
+              {data.guidance.map((record) => (
+                <li key={record.guidance_id}>
+                  <div className="y10-ws-log-meta input-head">
+                    <strong>{label(GUIDANCE_STATUS, record.status)}</strong>
+                    <span className="y10-code byte-range">第 {record.version} 版</span>
+                    {record.applied_activation_id ? <span className="y10-code byte-range">已用于激活 {record.applied_activation_id}</span> : null}
+                    <button type="button" className="y10-link link" onClick={() => setOpenEvent(record.created_event_id)}>查看原始事件</button>
+                  </div>
+                  <p className="y10-ws-guidance p msg-text">{record.text}</p>
+                  {record.response_status ? <p className="y10-muted card-note">部门的回应：{show(record.response_text, record.response_status)}</p> : null}
+                </li>
+              ))}
+            </ul>
           )}
         </Section>
       </div>
