@@ -111,8 +111,7 @@ def test_queue_overflow_resyncs_when_the_client_is_too_slow(tmp_path):
 def test_live_events_arrive_within_a_hundred_milliseconds(tmp_path):
     # 写入以后推送不依赖定时查询：新事件在 100 毫秒以内到达
     application = _application(tmp_path)
-    # 先写入一条范围内的历史事件：它从历史补发返回，订阅在此之前已经登记；
-    # 再次取消息时生成器进入等待，新事件由订阅回调唤醒它，不经过定时查询
+    # 先写入一条历史事件：生成器读完它以后进入等待，新事件随后才写入
     _record(application, "p1", 0)
     stream = application.open_event_stream(EventScope(projects=("p1",)), after=0, live=False,
                                            checkpoint_idle_sec=5.0)
@@ -120,9 +119,16 @@ def test_live_events_arrive_within_a_hundred_milliseconds(tmp_path):
     async def run():
         generator = stream.messages()
         assert (await generator.__anext__()).kind == "event"
-        started = time.monotonic()  # 到收到为止最多经过一个等待时间片（POLL_SEC）
+        # 把下一次取消息包成任务，用零时长让渡轮询等生成器挂在等待上（ag_await 非 None），
+        # 此时它已经不看历史读取：写入之后到达的事件只能是实时推送
+        pending = asyncio.ensure_future(generator.__anext__())
+        deadline = asyncio.get_running_loop().time() + 3.0
+        while generator.ag_await is None:
+            assert asyncio.get_running_loop().time() < deadline, "生成器没有进入等待"
+            await asyncio.sleep(0)
+        started = time.monotonic()
         _record(application, "p1", 1)
-        return await generator.__anext__(), time.monotonic() - started
+        return await pending, time.monotonic() - started
 
     message, elapsed = asyncio.run(asyncio.wait_for(run(), 10))
     assert message.kind == "event"
