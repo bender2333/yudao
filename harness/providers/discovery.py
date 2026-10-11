@@ -131,16 +131,10 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         # 上游列表带窗口与输出上限时（limit.context 与 limit.output）带上这两项，来源是上游模型列表
         candidate: dict[str, Any] = {"id": model_id}
         entry = capabilities.capability(preset_id, model_id) if preset_id else None
-        if entry is not None:
-            # 能力表里记着这个模型时按它预填协议（设计说明第 4.3 节）
-            candidate["protocol"] = entry.protocol
-            candidate["protocol_source"] = "capability_table"
-        elif preset_id:
-            candidate["protocol"] = preset_default_protocol(preset_id)
-            candidate["protocol_source"] = "preset_default"
-        else:
-            candidate["protocol"] = "chat_completions"
-            candidate["protocol_source"] = "default"
+        candidate["protocol"], candidate["protocol_source"] = (
+            (entry.protocol, "capability_table") if entry is not None
+            else (preset_default_protocol(preset_id), "preset_default") if preset_id
+            else ("chat_completions", "default"))
         limits = item.get("limit") if isinstance(item, dict) else None
         if isinstance(limits, Mapping):
             window = limits.get("context")

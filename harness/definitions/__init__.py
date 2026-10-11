@@ -199,12 +199,12 @@ class ProposalContracts(_Definition):
 
 Protocol = Literal["responses", "chat_completions", "messages"]
 
+
 class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    # 获取模型列表与连接测试使用的认证方式（ADR-0033）
     auth: str = Field(min_length=1)
-    # 服务方案的默认协议：模型没有单独声明协议时预填它（设计说明第 4.1 节）
+    # 获取模型列表与连接测试使用的认证方式（ADR-0033）；默认协议：模型没有单独声明协议时预填（设计说明第 4.1 节）
     default_protocol: Protocol
     # 按协议的请求基址，请求路径由各协议适配器拼接
     base_urls: Mapping[Protocol, str]
@@ -213,11 +213,12 @@ class ServicePreset(_Definition):
     header_profile: str
     source: str
     notes: str
-    # 这个服务方案在 models.dev 中对应的 provider ID，提取脚本据此取材；
+    # 这个服务方案在 models.dev 中对应的 provider ID，模型能力表的提取脚本据此取材；
     # 「自定义」不使用预置表，在能力表中没有条目，不填这一项
     models_dev_id: str = ""
 
     freeze_base_urls = _frozen("base_urls")
+
 
 class ServicePresets(_Definition):
     # 服务方案预置表（ADR-0003）：整张表的 revision 与来源随界面显示；每个服务方案一项
@@ -225,9 +226,10 @@ class ServicePresets(_Definition):
     source: str = Field(min_length=1)
     presets: tuple[ServicePreset, ...]
 
+
 class ModelCapability(_Definition):
     # 模型能力表中的一条：取自 models.dev 的快照，只保留设计说明第 4.1 节的字段。
-    # modalities 可以缺少，缺少时不记录输入与输出方式（空元组）
+    # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
     model: str = Field(min_length=1)
     # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务方案的默认协议
     protocol: Protocol
@@ -240,7 +242,9 @@ class ModelCapability(_Definition):
 
 
 class ModelCapabilities(_Definition):
-    # 模型能力表（ADR-0003）：只收录预置表中服务方案的模型，带 revision、快照日期与来源
+    # 模型能力表（ADR-0003）：只收录预置表中服务方案的模型，整张表带 revision、快照日期与来源；
+    # 运行时不从远端刷新，只用于新建模型访问定义时的预填（设计说明第 4.1 节）。
+    # 键是预置表中的服务方案 ID（取值与 ServicePreset.id 一致，可以含连字符）
     presets: Mapping[str, tuple[ModelCapability, ...]]
     revision: str = Field(min_length=1)
     snapshot_date: str = Field(min_length=1)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
+from types import MappingProxyType
 
 import pytest
 
@@ -11,9 +13,23 @@ from harness.providers import (
     ProviderStore,
 )
 from harness.definitions import DEFINITIONS
-from harness.providers import capabilities
-from harness.providers.discovery import _parse_candidates
+from harness.providers import capabilities, presets
+from harness.providers.discovery import _auth_headers, _parse_candidates
 from harness.providers.presets import preset_auth, preset_default_protocol
+from harness.providers.store import ProviderDefinition
+
+
+@contextmanager
+def preset_auth_as(preset_id: str, auth: str):
+    # 预置表里现在只有 api_key 一种方案，x-api-key 分支靠临时改预置表索引的一项取得（不写定义文件）：
+    # 其余字段保持原值，退出时还原
+    index = presets._PRESET_INDEX
+    item = index[preset_id].model_copy(update={"auth": auth})
+    presets._PRESET_INDEX = MappingProxyType({**index, preset_id: item})
+    try:
+        yield
+    finally:
+        presets._PRESET_INDEX = index
 
 
 def _document(**overrides):
@@ -462,16 +478,33 @@ def test_preset_declares_the_default_protocol_and_the_auth_for_models_and_tests(
     assert preset_default_protocol("") == ""
     assert preset_auth("") == ""
     assert preset_default_protocol("custom") == ""
+    # 获取模型列表与连接测试的认证头按服务方案的认证方式（设计说明第 4.2 节）：
+    # 预置方案 api_key 用 Bearer；认证方式为 x-api-key 的方案用同名头，这一项由测试临时改预置表索引取得
+    # （预置表里现在只有 api_key 一种方案）；自定义服务用 Bearer；没有凭据时不带认证头，由上游决定拒绝
+    go = ProviderDefinition(id="p", name="P", base_url="https://a.example/v1", preset_id="opencode-go")
+    assert _auth_headers(go, "secret-a") == {"Authorization": "Bearer secret-a"}
+    assert _auth_headers(go, "") == {}
+    with preset_auth_as("opencode-go", "x-api-key"):
+        assert _auth_headers(go, "secret-b") == {"x-api-key": "secret-b"}
+        assert _auth_headers(go, "") == {}
+    custom = ProviderDefinition(id="p", name="P", base_url="https://a.example/v1")
+    assert _auth_headers(custom, "secret-c") == {"Authorization": "Bearer secret-c"}
+    assert _auth_headers(custom, "") == {}
 
 
 def test_candidate_prefill_carries_the_protocol_and_its_source():
-    # 候选带预填的协议与来源（设计说明第 4.3 节）：能力表优先，其次是服务方案的默认协议
+    # 候选带预填的协议与来源（设计说明第 4.3 节）：能力表优先，其次是服务方案的默认协议。
+    # 三种协议各取一个能力表里的真实模型
     known = _parse_candidates({"data": [{"id": "grok-4.7"}, {"id": "glm-5.3-flash"},
-                                        {"id": "清单里没有的模型"}]}, "opencode-go")
+                                        {"id": "claude-haiku-5-5"}, {"id": "清单里没有的模型"}]},
+                              "opencode-go")
     by_id = {item["id"]: item for item in known}
     assert by_id["grok-4.7"]["protocol"] == "responses"
     assert by_id["grok-4.7"]["protocol_source"] == "capability_table"
     assert by_id["glm-5.3-flash"]["protocol"] == "chat_completions"
+    assert by_id["glm-5.3-flash"]["protocol_source"] == "capability_table"
+    assert by_id["claude-haiku-5-5"]["protocol"] == "messages"
+    assert by_id["claude-haiku-5-5"]["protocol_source"] == "capability_table"
     assert by_id["清单里没有的模型"]["protocol"] == "chat_completions"
     assert by_id["清单里没有的模型"]["protocol_source"] == "preset_default"
     # 自定义服务不在能力表里：预填 Chat Completions，来源 default
