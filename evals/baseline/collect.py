@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -110,13 +111,23 @@ def run_usage(runs_root):
 
 
 def _run_summary(path, name, role, number, round_suffix, runs_root):
-    """一个运行输出的用量汇总：请求数、用量、费用、模型与起止时刻。"""
+    """一个运行输出的用量汇总：请求数、用量、费用、模型与起止时刻。
+
+    区分三种状态：
+    - 明确用量：消息中含 usage 对象，且 input/output/cacheRead/cacheWrite/totalTokens 五个键出现（含零）；
+    - 缺用量：消息没有 usage，或五个键里至少有一个缺失；记为「用量未知」，不参与统计；
+    - 缺成本：消息没有 cost.total 字段；只影响按费用计算的费用汇总，不影响请求数与用量。
+    """
     summary = {"file": name, "role": role, "issue": number,
                "round": round_suffix or "a", "requests": 0,
+               "requests_with_usage": 0, "requests_without_usage": 0,
                "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
-               "cache_write_tokens": 0, "total_tokens": 0, "cost": 0.0,
+               "cache_write_tokens": 0, "total_tokens": 0,
+               "reported_cost": 0.0,
                "models": {}, "started_ms": None, "finished_ms": None,
                "exit_code": None, "finished_local": None}
+    usage_token_keys = ("input", "output", "cacheRead", "cacheWrite",
+                        "totalTokens")
     with open(path, encoding="utf-8", errors="replace") as handle:
         for line in handle:
             if '"message_end"' not in line:
@@ -130,28 +141,46 @@ def _run_summary(path, name, role, number, round_suffix, runs_root):
             message = event.get("message") or {}
             if message.get("role") != "assistant":
                 continue
-            _add_usage(summary, message)
+            _add_usage(summary, message, usage_token_keys)
     _read_done_file(summary, os.path.join(runs_root, name[:-len(".jsonl")] + ".done"))
     return summary
 
 
-def _add_usage(summary, message):
+def _add_usage(summary, message, usage_token_keys):
     # 一条助手消息就是一次模型请求；用量与费用按消息累计，模型分列
+    summary["requests"] += 1
     usage = message.get("usage") or {}
     cost = usage.get("cost") or {}
-    summary["requests"] += 1
-    for key, name in (("input", "input_tokens"), ("output", "output_tokens"),
-                      ("cacheRead", "cache_read_tokens"),
-                      ("cacheWrite", "cache_write_tokens"),
-                      ("totalTokens", "total_tokens")):
-        summary[name] += int(usage.get(key) or 0)
-    summary["cost"] += float(cost.get("total") or 0)
+    if usage and all(key in usage for key in usage_token_keys):
+        for key, name in (("input", "input_tokens"), ("output", "output_tokens"),
+                          ("cacheRead", "cache_read_tokens"),
+                          ("cacheWrite", "cache_write_tokens"),
+                          ("totalTokens", "total_tokens")):
+            summary[name] += int(usage.get(key) or 0)
+        summary["requests_with_usage"] += 1
+    else:
+        summary["requests_without_usage"] += 1
+    if cost.get("total") is not None:
+        summary["reported_cost"] += float(cost.get("total") or 0)
     model = "%s/%s" % (message.get("provider"), message.get("model"))
-    entry = summary["models"].setdefault(model, {"requests": 0, "total_tokens": 0,
-                                                  "cost": 0.0})
+    entry = summary["models"].setdefault(model, {"requests": 0,
+                                                  "requests_with_usage": 0,
+                                                  "input_tokens": 0,
+                                                  "output_tokens": 0,
+                                                  "cache_read_tokens": 0,
+                                                  "cache_write_tokens": 0,
+                                                  "total_tokens": 0,
+                                                  "reported_cost": 0.0})
     entry["requests"] += 1
-    entry["total_tokens"] += int(usage.get("totalTokens") or 0)
-    entry["cost"] += float(cost.get("total") or 0)
+    if usage and all(key in usage for key in usage_token_keys):
+        for key, name in (("input", "input_tokens"), ("output", "output_tokens"),
+                          ("cacheRead", "cache_read_tokens"),
+                          ("cacheWrite", "cache_write_tokens"),
+                          ("totalTokens", "total_tokens")):
+            entry[name] += int(usage.get(key) or 0)
+        entry["requests_with_usage"] += 1
+    if cost.get("total") is not None:
+        entry["reported_cost"] += float(cost.get("total") or 0)
     started = message.get("timestamp")
     finished = message.get("completedAt")
     if isinstance(started, int):
@@ -173,35 +202,118 @@ def _read_done_file(summary, path):
         summary["finished_local"] = fields[2]
 
 
-def collect(stage_parent, runs_root, data_path):
-    """抓取一次真实数据，写出数据文件。中断以后重跑按编号续抓。"""
+def collect(stage_parent, runs_root, data_path, model_prices_path=None):
+    """抓取一次真实数据，写出数据文件。中断以后重跑按编号续抓。
+
+    已抓工单的标签时间线、评论与最新状态在每次抓取时重新拉取，按 (created_at, event,
+    body 哈希) 去重合并并刷新到本次截止时间，避免混合未注明日期的状态。模型单价文件
+    缺失或字段为空时记为「缺单价」，不参与费用统计。
+    """
     data = _read_partial(data_path)
     data.update({"collected_at": _now(), "stage_parent_issue": stage_parent,
                  "runs_root": runs_root,
                  "scope": {"milestone_prefix": STAGE_MILESTONE_PREFIX}})
     issues = data.setdefault("issues", [])
     known = {issue["number"] for issue in issues}
+    cutoff = _now()
     for issue in stage_issues():
-        if issue["number"] in known:
-            continue
-        timeline, comments = issue_detail(issue["number"])
-        issues.append({"number": issue["number"], "title": issue["title"],
-                       "milestone": (issue.get("milestone") or {}).get("title", ""),
-                       "state": issue.get("state"),
-                       "state_reason": issue.get("stateReason"),
-                       "created_at": issue.get("createdAt"),
-                       "closed_at": issue.get("closedAt"),
-                       "author": (issue.get("author") or {}).get("login"),
-                       "url": issue.get("url"),
-                       "current_labels": [label["name"] for label in issue.get("labels") or []],
-                       "timeline": timeline, "comments": comments})
+        number = issue["number"]
+        timeline, comments = issue_detail(number)
+        existing = next((item for item in issues if item["number"] == number), None)
+        merged = {
+            "number": number, "title": issue["title"],
+            "milestone": (issue.get("milestone") or {}).get("title", ""),
+            "state": issue.get("state"),
+            "state_reason": issue.get("stateReason"),
+            "created_at": issue.get("createdAt"),
+            "closed_at": issue.get("closedAt"),
+            "author": (issue.get("author") or {}).get("login"),
+            "url": issue.get("url"),
+            "current_labels": [label["name"] for label in issue.get("labels") or []],
+            "timeline": _merge_timeline(
+                existing["timeline"] if existing else [], timeline),
+            "comments": _merge_comments(
+                existing["comments"] if existing else [], comments)}
+        if existing:
+            issues[issues.index(existing)] = merged
+        else:
+            issues.append(merged)
         issues.sort(key=lambda item: item["number"])
         _write(data, data_path)
+    data["latest_refresh_at"] = cutoff
     data["pull_requests"] = pull_requests()
     data["stage_comments"] = integration_comments(stage_parent)
     data["runs"] = run_usage(runs_root)
+    data["model_prices"] = load_model_prices(model_prices_path)
     _write(data, data_path)
     return data
+
+
+def _timeline_key(event):
+    # 同一条 timeline 事件的判别依据：时间 + 类型 + 标签/里程碑 + 操作者
+    return (
+        event.get("created_at"), event.get("event"),
+        event.get("label"), event.get("milestone"),
+        event.get("actor"))
+
+
+def _comment_key(comment):
+    # 评论判别依据：时间 + 作者 + 评论哈希前 32 个 hex 字符，足以排除重复与编辑后的差异
+    body = comment.get("body") or ""
+    digest = hashlib.sha256(body.encode("utf-8", errors="replace")).hexdigest()[:32]
+    return (comment.get("created_at"), comment.get("author"), digest)
+
+
+def _merge_timeline(previous, latest):
+    by_key = {_timeline_key(event): event for event in previous}
+    by_key.update({_timeline_key(event): event for event in latest})
+    return sorted(by_key.values(), key=lambda event: event.get("created_at") or "")
+
+
+def _merge_comments(previous, latest):
+    by_key = {_comment_key(comment): comment for comment in previous}
+    by_key.update({_comment_key(comment): comment for comment in latest})
+    return sorted(by_key.values(), key=lambda comment: comment.get("created_at") or "")
+
+
+def load_model_prices(path):
+    """加载基线模型单价文件。文件缺失或解析失败时返回空 dict，调用方据此判断缺单价。
+
+    文件格式：{"<provider>/<model>": {"input": float, "output": float,
+    "cache_read": float, "cache_write": float}}；任一字段为 None 视为缺失，整条记为未知。
+    """
+    if not path or not os.path.exists(path):
+        return {"_source": path or "", "loaded": False, "prices": {}}
+    try:
+        with open(path, encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {"_source": path, "loaded": False, "prices": {},
+                "error": "文件无法解析为 JSON"}
+    prices = {}
+    missing_fields = []
+    for key, entry in (raw or {}).items():
+        if not isinstance(entry, dict):
+            missing_fields.append((key, "不是字典"))
+            continue
+        normalized = {}
+        any_missing = False
+        for field in ("input", "output", "cache_read", "cache_write"):
+            if field not in entry or entry[field] is None:
+                any_missing = True
+                continue
+            try:
+                normalized[field] = float(entry[field])
+            except (TypeError, ValueError):
+                any_missing = True
+        if not normalized:
+            missing_fields.append((key, "全部字段缺失"))
+            continue
+        if any_missing:
+            missing_fields.append((key, "部分字段缺失"))
+        prices[key] = normalized
+    return {"_source": path, "loaded": True, "prices": prices,
+            "missing_fields": missing_fields}
 
 
 def _now():
@@ -231,11 +343,18 @@ def main():
     parser.add_argument("--runs-root", required=True,
                         help="自主推进运行目录，含 omp- 与 rv- 开头的运行输出")
     parser.add_argument("--data", required=True, help="数据文件路径")
+    parser.add_argument("--model-prices", default=None,
+                        help="基线模型单价文件路径（可选）；缺失时记为缺单价")
     args = parser.parse_args()
-    data = collect(args.stage_parent, args.runs_root, args.data)
-    print("抓取工单 %d 个，合并请求 %d 个，运行输出 %d 个，阶段评论 %d 条：%s"
+    data = collect(args.stage_parent, args.runs_root, args.data,
+                   args.model_prices)
+    prices = data.get("model_prices") or {}
+    price_count = len(prices.get("prices") or {})
+    print("抓取工单 %d 个，合并请求 %d 个，运行输出 %d 个，阶段评论 %d 条"
+          "，模型单价 %d 个：%s"
           % (len(data["issues"]), len(data["pull_requests"]),
-             len(data["runs"]), len(data["stage_comments"]), args.data))
+             len(data["runs"]), len(data["stage_comments"]), price_count,
+             args.data))
 
 
 if __name__ == "__main__":
