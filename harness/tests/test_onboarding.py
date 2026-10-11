@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DEPARTMENTS, EventType
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem

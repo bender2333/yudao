@@ -11,7 +11,6 @@ from harness.public_tree import capture_public_tree
 from harness.environment import LocalEnvironment
 from harness.runtime import LoopSystem
 from harness.tests.helpers import perform
-from harness.tools import tool_action, tool_kind, tools_for
 from harness.tree_archive import load_tree
 from harness.workspace import Workspace
 
