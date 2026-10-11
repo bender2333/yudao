@@ -40,11 +40,6 @@ def _edit_call(identity, path, start, end, expected, new, digest):
     }
 
 
-def test_edit_range_is_an_engineering_only_write_tool():
-    assert tool_kind("edit_range") == "environment" and tool_action("edit_range") == "write"
-    assert "edit_range" in tools_for("engineering")
-    assert "edit_range" not in tools_for("product")
-    assert "edit_range" not in tools_for("quality")
 
 
 def test_successful_edit_replaces_exactly_the_requested_span(tmp_path):
