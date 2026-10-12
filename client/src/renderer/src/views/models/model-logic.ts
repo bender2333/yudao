@@ -676,10 +676,23 @@ export function providerInputFromForm(state: FormState): Record<string, unknown>
   };
 }
 
-// 自定义服务使用连接地址加 /models；内置方案取预置的模型列表地址。
-export function connectionTestable(state: { base_url: string; models_url: string }, preset: ServicePreset | null): boolean {
-  return state.models_url.trim() !== "" || state.base_url.trim() !== "" || preset !== null;
+// 自定义服务的模型列表地址默认值：连接地址去掉末尾的「/」再加 /models（设计说明第 4.2 节）
+export function defaultModelsUrl(baseUrl: string): string {
+  const address = baseUrl.trim();
+  return address === "" ? "" : `${address.replace(/\/$/, "")}/models`;
 }
+
+// 表单上实际生效的模型列表地址：已填写用填写值，自定义未填用默认值，内置用方案地址
+export function effectiveModelsUrl(state: { base_url: string; models_url: string }, preset: ServicePreset | null): string {
+  if (state.models_url.trim() !== "") return state.models_url;
+  if (preset !== null) return preset.models_url;
+  return defaultModelsUrl(state.base_url);
+}
+
+ // 自定义服务使用连接地址加 /models；内置方案取预置的模型列表地址。
+ export function connectionTestable(state: { base_url: string; models_url: string }, preset: ServicePreset | null): boolean {
+  return effectiveModelsUrl(state, preset).trim() !== "";
+ }
 
 // 部门默认与项目设置的模型选项：按连接分组的已准入定义（第 9.1 节）
 export function admittedModels(

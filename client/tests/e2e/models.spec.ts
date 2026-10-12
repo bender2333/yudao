@@ -604,11 +604,10 @@ for (const size of [
       }, backend.address);
       const baseUrl = modelsUrl.slice(0, -"/models".length);
 
-      // 新建表单默认就是「自定义」：没有预置地址时在高级选项旁写明怎么取得候选
+      // 新建表单默认就是「自定义」：模型列表地址直接显示在表单上，不放在折叠的高级选项里（工单 #384）
       await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
       const form = client.page.locator(".mm-form");
       await expect(form.getByRole("button", { name: "自定义" })).toHaveAttribute("aria-pressed", "true");
-      await form.locator(".mm-advanced > summary").click();
       await expect(form.getByTestId("models-url-hint")).toBeVisible();
 
       // 填上模型列表地址：提示消失（设计规定地址由连接填写或取自服务方案，这条只改提示）
@@ -694,14 +693,41 @@ test("新建表单选择 OpenCode Go 与无协议头自定义地址自动填写�
     await expect(form.getByLabel("ID", { exact: true })).toHaveValue("opencode-go");
     await expect(form.getByLabel("名称", { exact: true })).toHaveValue("OpenCode Go");
     await expect(form.getByLabel("凭据引用")).toHaveValue("OPENCODE_GO_KEY");
+    // 内置方案的模型列表地址只读显示在表单上（工单 #384），地址栏只读
+    await expect(form.getByTestId("preset-models-url")).toContainText("模型列表地址");
+    await expect(form.getByTestId("provider-base-url")).not.toBeEditable();
     await form.getByRole("button", { name: "自定义" }).click();
     await form.getByTestId("provider-base-url").fill("9router.huiju.asia/v1");
     await form.getByLabel("名称", { exact: true }).click();
     await expect(form.getByTestId("provider-base-url")).toHaveValue("https://9router.huiju.asia/v1");
     await expect(form.getByLabel("ID", { exact: true })).toHaveValue("9router.huiju.asia");
     await expect(form.getByLabel("凭据引用")).toHaveValue("HOST_9ROUTER_HUIJU_ASIA_KEY");
-    await form.locator(".mm-advanced > summary").click();
     await expect(form.getByTestId("provider-models-url")).toHaveValue("https://9router.huiju.asia/v1/models");
+  } finally {
+    await client.close();
+    await backend.stop();
+  }
+});
+
+test("获取模型列表失败时页面显示请求的地址与状态码（工单 #384）", async () => {
+  test.setTimeout(300_000);
+  const { backend, client } = await openModels({ width: 1440, height: 900 }, { rejectUpstream: true });
+  const errors = watchErrors(client);
+  try {
+    // 这条连接指向测试内的真实 HTTP 上游，那个上游对任何请求都返回 401
+    const modelsUrl = await client.page.evaluate(async (address: string) => {
+      const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
+      const provider = (listed.data.providers as { id: string; models_url: string }[])
+        .find((item) => item.id === "rejected-go");
+      return provider!.models_url;
+    }, backend.address);
+    await client.page.getByTestId("provider-rejected-go").getByRole("button", { name: "展开" }).click();
+    await setKey(client, backend, "REJECTED_GO_KEY");
+    await client.page.getByTestId("collect-rejected-go").click();
+    const candidates = client.page.getByTestId("candidates-rejected-go");
+    await expect(candidates).toContainText(modelsUrl);
+    await expect(candidates).toContainText("401");
+    expect(errors).toEqual([]);
   } finally {
     await client.close();
     await backend.stop();
