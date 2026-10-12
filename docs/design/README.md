@@ -42,15 +42,15 @@
 - [执行环境服务](execution-environment.md)
   - 内容：执行环境服务的合同（操作、类型、工作区的建立封存与传输、动作与回执、执行权编号、HTTP 路径、版本核对）；本机进程与远程执行代理两种实现；执行位置上的程序与依赖缓存；心跳、结果未知、迟到回执与等待机器；执行位置；认证与加密（TODO）；故障与验收场景；含模块交互图与时序图。
   - 状态：设计已确认（2026-09-29 用户确认第 11 节的决定：机器流、本机进程在进程内调用），2026-09-30 按 ADR-0022 改为代码在执行位置上直接运行；远程机器的真实验收在 Orange Pi AIpro 开发板上进行，开发板已经到位，执行代理的安装包由控制主机提供（2026-09-30，第 1.1、5.3.2 节）；#110 已完成，其余未实施。工单：父工单 #120（#110、#128 至 #130、#140 至 #145，界面 #117），属于里程碑 M3。2026-10-07 按意图校准整理，修改内容见该文件更新行。
-  - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)、[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。调研：[执行环境服务调研](../research/execution-environment.md)。
+  - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)、[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。调研：[执行环境服务调研](../archive/research/execution-environment.md)。
 - [浏览器与 computer use](browser-and-computer-use.md)
   - 内容：试用会话与执行位置上的程序；交付说明中的启动方式；Playwright MCP 浏览器工具；computer use（控制主机的交互桌面、真实输入、用户同意与独占，ADR-0026）；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
   - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。Stage 3 实施浏览器的部分：父工单 #123（#147 至 #149、#151 至 #155），属于里程碑 M4；computer use 的部分（第 5 节等，见该文件更新行）是以后阶段的专题（[各阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节），工单 #150、#246、#247 不属于 M4。2026-10-07 按意图校准整理，资料页的逐条结论表增加检验方式与开环标记，修改内容见该文件更新行。
-  - 需求：[D34](../requirements/browser-and-computer-use.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0026](../adr/0026-desktop-trials-on-control-host-desktop.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)。调研：[浏览器与 computer use](../research/browser-and-computer-use.md)、[computer use 实现](../research/computer-use-implementations.md)。
+  - 需求：[D34](../requirements/browser-and-computer-use.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0026](../adr/0026-desktop-trials-on-control-host-desktop.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)。调研：[浏览器与 computer use](../archive/research/browser-and-computer-use.md)、[computer use 实现](../archive/research/computer-use-implementations.md)。
 - [网络取回与 MCP 工具](network-and-mcp.md)
   - 内容：取回与登记的 MCP 服务器的放置（固定在控制主机）；项目的登记（取回的来源、MCP 服务器、工具清单快照与处理方式、版本与固定、凭据）；授权与一次性批准；网络取回（地址规则、重定向、内容与保存）；MCP 服务器（官方 SDK、运行规则、结果）；恢复契约；外部来源工件与证据；应用层接口；界面；含模块图与时序图。
   - 状态：2026-10-01 设计，用户逐轮采纳推荐，未实施。工单：父工单 #122（#68 网络取回、#69 MCP 客户端模块、#236 登记的 MCP 服务器，界面 #237 至 #239），属于里程碑 M3。
-  - 需求：[D36](../requirements/network-and-mcp.md)。ADR：[0025](../adr/0025-network-and-mcp-run-on-control-host.md)。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../research/network-and-mcp-references.md)。
+  - 需求：[D36](../requirements/network-and-mcp.md)。ADR：[0025](../adr/0025-network-and-mcp-run-on-control-host.md)。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。
 - [接入已有项目](existing-project-onboarding.md)
   - 内容：建档事项（事项种类、命令、决定请求）；产品的初始 PRD、工程的结构说明、质检的基线核对；用户确认的往返与基线采纳；大仓库的仓库概况；失败与中断；含流程图、时序图与模块交互图。
   - 状态：设计已确认（2026-09-29 用户确认第 12 节的决定：已有项目的代码经 `project.onboard` 接入并建档、检查时限 600 秒、验收项目为 openai-agents-python 与 issue 842）；实施中：#134 至 #137 与 #346 已实施，#138、#139、#347 未实施。工单：父工单 #124（#134 至 #139），属于里程碑 M2。2026-10-07 结构说明的可见范围改为参数，建档材料分类，新增采纳写回（B8，挂在 3.8 下，M2）。
@@ -78,7 +78,7 @@
 - [语义系统](semantic-system.md)
   - 内容：整理（轨迹、七类图谱内容与抽象层、写入与证据核对）与上下文组装（栏目、目录、接触时附加、通知、查询、各角色的上下文、长度控制、提示缓存）。
   - 状态：2026-09-26 设计说明，规则已由用户确认，未实施；路线位置为 Stage 5（部门内协作、上下文与界面）。第 4 节按总体架构写明语义系统在各层中的位置；教训由教训发现模块找出，它与惊讶机制放到后面设计，设计中保留扩展点。2026-10-07 按意图校准整理，修改内容见该文件更新行。
-  - 需求：[D25](../requirements/semantic-system.md)。ADR：0008、0009、0010、0028、0029、0030。调研：[语义系统与部门内多角色](../research/semantic-system-and-department-roles.md)、[Semantica 参照调研](../research/semantica-reference.md)、[上下文组装：参照调研](../research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)。
+  - 需求：[D25](../requirements/semantic-system.md)。ADR：0008、0009、0010、0028、0029、0030。调研：[语义系统与部门内多角色](../archive/research/semantic-system-and-department-roles.md)、[Semantica 参照调研](../archive/research/semantica-reference.md)、[上下文组装：参照调研](../archive/research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)。
 - [部门内多角色](department-roles.md)
   - 内容：中心型协作（中心角色、经理、探索者、主程、审查者）、角色清单、内部循环、角色任务、预测性探索与执行槽位、部门账本与交出检查、角色模型设置，含概念图、模块关系图、内部循环图与角色任务状态图。
   - 状态：2026-09-25 设计草案，2026-09-26 按总体架构（各角色的步骤由控制核心驱动）与反复退回时提醒用户的决定修改，同日补全计划的更新、执行槽位的计数、停滞时的历史、交出检查的审查记录与自测、专家请求期间的角色任务、验收对照与角色任务的恢复这几项规则；规则已由用户确认，未实施；路线位置为 Stage 5（部门内协作、上下文与界面），对产品、工程、质检、运维四个部门一起引入。2026-10-07 按意图校准整理，修改内容见该文件更新行。
@@ -86,7 +86,7 @@
 - [评测场景：版本回归与 OpenCode 对照](evaluation-scenarios.md)
   - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；结束状态与放行状态的独立核对；未知用量、费用和有效样本数；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），回归场景与留出场景、噪声范围与三种结论，含模块交互图。
   - 状态：2026-09-28 设计，场景与评分方法经用户确认；2026-09-30 用户逐项审阅完毕（各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分），未实施，工单为 #118 的子工单 #188 至 #198（评测工具、OpenCode 基础分与场景 2、3 的 Yudao 一侧属于里程碑 M2，场景 1 的 Yudao 一侧属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。2026-10-07 版本比较增加噪声范围与三种结论，报告增加费用与检验覆盖比例，三个场景作为回归场景、另设留出场景。
-  - 需求：[D32](../requirements/comparison-experiment.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。调研：[评测场景选题调研](../research/evaluation-benchmarks.md)。共同报告合同见 [Stage 3 试用与自举准备验收合同](../stage-3/trial-acceptance-contract.md)。
+  - 需求：[D32](../requirements/comparison-experiment.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。调研：[评测场景选题调研](../archive/research/evaluation-benchmarks.md)。共同报告合同见 [Stage 3 试用与自举准备验收合同](../stage-3/trial-acceptance-contract.md)。
 - [测试分层](test-pyramid.md)
   - 证据与角色流程：[验收证据规则](../agents/acceptance-evidence.md)。
   - 内容：单元、功能与模块、集成三层的定义与登记表 `layers.toml`（测试文件原地不动），审计钩子检查边界、单项时间上限、多进程只用于集成层；共用的辅助函数放在已有的辅助文件中，测试文件之间不互相导入；执行者、审查者与架构师各自运行的层；集成层每 5 个 PR 批量运行、失败时暂停合并并用 `git bisect` 找出问题 PR；测试往下层移的规则；输出每项失败一行；含流程图与模块交互图。

@@ -1,54 +1,44 @@
-# Issue tracker: GitHub
+# 工单系统：GitHub Issues
 
-Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+本仓库的工单与规格都是 GitHub Issues，全部操作用 `gh` 命令行。仓库 `bender2333/yudao`，`gh` 在仓库目录内运行时自动从 `git remote -v` 识别。
 
-Repo: `bender2333/yudao` (inferred automatically from `git remote -v` when `gh` runs inside the clone).
+## 常用写法
 
-## Conventions
+- 创建工单：`gh issue create --title "..." --body "..."`，多行正文用 `--body-file`。
+- 读取工单：`gh issue view <编号> --comments`，需要时用 `--json` 与 `jq` 取标签与评论。
+- 列出工单：`gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`，按需加 `--label` 与 `--state`。
+- 评论：`gh issue comment <编号> --body "..."`
+- 加减标签：`gh issue edit <编号> --add-label "..."` / `--remove-label "..."`
+- 关闭：`gh issue close <编号> --comment "..."`
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
-- **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
-- **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
-- **Comment on an issue**: `gh issue comment <number> --body "..."`
-- **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
-- **Close**: `gh issue close <number> --comment "..."`
+## 工单与 `docs/` 的分工
 
-Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
+两个地方各管一样，不合并：
 
-## Division of labour with `docs/`
+- **GitHub Issues**：工作队列。哪些打开、谁领取、被什么阻塞、是否完成。技能发布的内容都放这里。
+- **`docs/`**：设计与证据。需求记录（`docs/requirements/`）、模块设计与架构（`docs/design/`）、阶段计划与验收合同（`docs/*.md`、`docs/stage-3/`）。长篇论证留在这里，工单只链接，不复制。日记：架构师的 `claude_jour.md` 在仓库根目录，执行者与审查者的在 `agents_jour/<工单编号>.md`（根目录的 `agents_jour.md` 是 2026-10-06 之前的日记）。
 
-This repo keeps two surfaces; don't collapse them:
+## PR 是否作为分诊入口
 
-- **GitHub issues** — the work queue: what is open, claimed, blocked, done. Anything a skill publishes goes here.
-- **`docs/`** — design and evidence: requirement docs (`docs/requirements/`), module designs and architecture (`docs/design/`), stage plans and acceptance criteria (`docs/*.md`, `docs/stage-3/`). Long-form reasoning stays here and is linked from the issue, not copied into it. Journals: `claude_jour.md` at the repo root (architect) and `agents_jour/<issue number>.md` (executors and reviewers, one file per issue; the root `agents_jour.md` holds the entries written before 2026-10-06).
+**否。**（本仓库不把外部 PR 当作功能请求；`/triage` 读取这个标记。）
 
-## Pull requests as a triage surface
+设为「是」时，PR 走与工单相同的标签与状态，命令换成 `gh pr` 的对应形式：`gh pr view <编号> --comments`、`gh pr diff <编号>`；列出外部 PR 时用 `gh pr list --state open --json number,title,body,labels,author,authorAssociation,comments`，只保留 `authorAssociation` 为 `CONTRIBUTOR`、`FIRST_TIME_CONTRIBUTOR` 或 `NONE` 的；评论、标签与关闭用 `gh pr comment`、`gh pr edit --add-label`/`--remove-label`、`gh pr close`。工单与 PR 共用一个编号空间，裸写的 `#42` 两者都可能是：先 `gh pr view 42`，再退回 `gh issue view 42`。
 
-**PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
+## 技能说「发布到工单系统」时
 
-When set to `yes`, PRs run through the same labels and states as issues, using the `gh pr` equivalents:
+创建一个 GitHub Issue。
 
-- **Read a PR**: `gh pr view <number> --comments` and `gh pr diff <number>` for the diff.
-- **List external PRs for triage**: `gh pr list --state open --json number,title,body,labels,author,authorAssociation,comments` then keep only `authorAssociation` of `CONTRIBUTOR`, `FIRST_TIME_CONTRIBUTOR`, or `NONE` (drop `OWNER`/`MEMBER`/`COLLABORATOR`).
-- **Comment / label / close**: `gh pr comment`, `gh pr edit --add-label`/`--remove-label`, `gh pr close`.
+## 技能说「取相关工单」时
 
-GitHub shares one number space across issues and PRs, so a bare `#42` may be either: resolve with `gh pr view 42` and fall back to `gh issue view 42`.
+运行 `gh issue view <编号> --comments`。
 
-## When a skill says "publish to the issue tracker"
+## `/wayfinder` 的操作
 
-Create a GitHub issue.
+**地图**是一张工单，**子工单**是它的子项。
 
-## When a skill says "fetch the relevant ticket"
-
-Run `gh issue view <number> --comments`.
-
-## Wayfinding operations
-
-Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
-
-- **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `gh issue create --label wayfinder:map`.
-- **Child ticket**: an issue linked to the map as a GitHub sub-issue (`gh api` on the sub-issues endpoint). Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
-- **Blocking**: GitHub's **native issue dependencies**, the canonical, UI-visible representation. Add an edge with `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, _not_ the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
-- **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
-- **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
-- **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
+- **地图**：一张带 `wayfinder:map` 标签的工单，正文放 Notes、Decisions-so-far、Fog 三段。`gh issue create --label wayfinder:map`。
+- **子工单**：作为 GitHub 子工单（sub-issue）挂在地图下（用 `gh api` 调 sub-issues 接口）。不能用子工单时，在地图正文的任务清单里列出，子工单正文开头写 `Part of #<地图编号>`。标签 `wayfinder:<类型>`（`research`、`prototype`、`grilling`、`task`）。领取后分配给负责的开发者。
+- **阻塞**：用 GitHub 原生的工单依赖，界面可见。加一条依赖：`gh api --method POST repos/<owner>/<repo>/issues/<子工单>/dependencies/blocked_by -F issue_id=<阻塞方的数据库 id>`，其中数据库 id 用 `gh api repos/<owner>/<repo>/issues/<n> --jq .id` 取得（既不是 `#编号` 也不是 `node_id`）。GitHub 在 `issue_dependencies_summary.blocked_by` 里只报告未关闭的阻塞方。不能用依赖时，退回在子工单正文开头写一行 `Blocked by: #<n>, #<n>`。所有阻塞方关闭后子工单解除阻塞。
+- **前沿查询**：列出地图下打开的子工单（`gh issue list --state open`，限定在地图的子工单或任务清单内），去掉有未关闭阻塞方（`issue_dependencies_summary.blocked_by > 0`，或 `Blocked by` 行里有打开的工单）或已有负责人的，按地图顺序取第一个。
+- **领取**：`gh issue edit <n> --add-assignee @me`，是会话的第一次写入。
+- **结束**：`gh issue comment <n> --body "<答案>"`，然后 `gh issue close <n>`，再把上下文指针（gist 与链接）追加到地图的 Decisions-so-far。

@@ -8,7 +8,7 @@
 - [组织与持续运行研究](../research/organization-runtime-evolution.md) 第 2 节（三层责任与权限、2.2 最小工作契约）、第 3 节（3.1 四种有限组织、3.2 进展判断、3.3 根任务预算守恒）、第 9 节（独立比较与验收）、第 11 节（准备包定义）
 - [总体路线图](../program-roadmap.md) 第 4 节
 - [实验协议](../research/experiment-protocol.md) 第 8 节
-- [原生项目演化设计](../research/native-project-evolution-design.md) 第 9 节贯穿验收任务
+- [原生项目演化设计](../archive/research/native-project-evolution-design.md) 第 9 节贯穿验收任务
 
 本文是隔离样例，不是已实现能力。四种组织都写在**工程部门内部**；外层仍是产品合同、工程整体交付、独立质检。内部复核不能代替独立 QA（研究 2.1）。
 
@@ -34,7 +34,7 @@
 
 ## 1. 共同场景与选择理由
 
-选用贯穿验收的**第二次变更**：「在已有 echo 工具上增加文件输入」（[原生项目演化设计](../research/native-project-evolution-design.md) 第 9 节）。
+选用贯穿验收的**第二次变更**：「在已有 echo 工具上增加文件输入」（[原生项目演化设计](../archive/research/native-project-evolution-design.md) 第 9 节）。
 
 理由：
 

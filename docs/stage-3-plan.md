@@ -1,6 +1,6 @@
 # Stage 3：通用工具、可靠恢复与执行环境
 
-更新：2026-10-07。状态：3.0B 于 2026-09-21 完成；3.2A 于 2026-09-26 验收（[3.2A 验收报告](stage-3/3.2a-registered-commands-e2e-report-2026-09-26.md)）；里程碑 M1 以 0.1.1 交给用户试用（#183，[M1 试用指南](stage-3/m1-trial-guide.md)），M2 至 M4 推进中，进度见 GitHub 里程碑与[当前验收基线](current-baseline.md)。2026-10-07 按意图校准（[D38](requirements/system-intent.md)）新增「迭代底座」工作包与自举工作线（第 3 节）；同日写入自举试点的首批六个工单（第 2、3 节自举工作线一行），#173 改在控制主机的 Windows 上进行（第 7 节）。阶段父工单 [#9](https://github.com/bender2333/yudao/issues/9)，每个工作包一个父工单，挂在 #9 下。
+更新：2026-10-07。状态：3.0B 于 2026-09-21 完成；3.2A 于 2026-09-26 验收（[3.2A 验收报告](archive/stage-3/3.2a-registered-commands-e2e-report-2026-09-26.md)）；里程碑 M1 以 0.1.1 交给用户试用（#183，[M1 试用指南](archive/stage-3/m1-trial-guide.md)），M2 至 M4 推进中，进度见 GitHub 里程碑与[当前验收基线](current-baseline.md)。2026-10-07 按意图校准（[D38](requirements/system-intent.md)）新增「迭代底座」工作包与自举工作线（第 3 节）；同日写入自举试点的首批六个工单（第 2、3 节自举工作线一行），#173 改在控制主机的 Windows 上进行（第 7 节）。阶段父工单 [#9](https://github.com/bender2333/yudao/issues/9)，每个工作包一个父工单，挂在 #9 下。
 
 上位入口：[总体路线图](program-roadmap.md)。代码与证据起点：[当前验收基线](current-baseline.md)。架构分层：[总体架构](design/architecture/overall-architecture.md)。
 
@@ -142,7 +142,7 @@ SQLite 内同事务维护执行权判定和有权推进的领域提交；进程�
 
 每包按契约与样例、最小端到端实现、独立反例审查、真实验收四步推进。实现可由子代理按工具、控制、观察分工；恢复引擎与项目采纳的共享修改不得无边界并发。每次小交付提交、推送，再开始下一个依赖包。
 
-3.0B 于 2026-09-21 完成：冻结版本 `bcfe89d`，Provider 为 OpenCode Go 的 `mimo-v2.5`（Chat Completions）；冻结回归见 [3.0B 基线报告](stage-3/3.0b-baseline-2026-09-21.md)，三个中等压力场景见 [3.0B 场景报告](stage-3/3.0b-scenarios-report-2026-09-21.md)。3.2A 于 2026-09-26 验收：#12 至 #15 关闭，真实模型（`opencode-go` / `space-bunny-free`，Chat Completions）在可信项目上完成搜索、阅读、编辑、登记命令、独立质检、封存与采纳的全链路（`run_5f1aff849e244a37`，[3.2A 验收报告](stage-3/3.2a-registered-commands-e2e-report-2026-09-26.md)）。2026-09-29 起按自主推进模式执行，集成层批量运行两次通过：`a56493f4`（1364 passed）与 `1bbd5b81`（1398 passed），记录在 #9 的评论中。其余工作包的状态见第 3 节与本文开头。
+3.0B 于 2026-09-21 完成：冻结版本 `bcfe89d`，Provider 为 OpenCode Go 的 `mimo-v2.5`（Chat Completions）；冻结回归见 [3.0B 基线报告](archive/stage-3/3.0b-baseline-2026-09-21.md)，三个中等压力场景见 [3.0B 场景报告](archive/stage-3/3.0b-scenarios-report-2026-09-21.md)。3.2A 于 2026-09-26 验收：#12 至 #15 关闭，真实模型（`opencode-go` / `space-bunny-free`，Chat Completions）在可信项目上完成搜索、阅读、编辑、登记命令、独立质检、封存与采纳的全链路（`run_5f1aff849e244a37`，[3.2A 验收报告](archive/stage-3/3.2a-registered-commands-e2e-report-2026-09-26.md)）。2026-09-29 起按自主推进模式执行，集成层批量运行两次通过：`a56493f4`（1364 passed）与 `1bbd5b81`（1398 passed），记录在 #9 的评论中。其余工作包的状态见第 3 节与本文开头。
 
 关键路径（2026-09-30）：最长的依赖链是 3.1 → 3.2D，即 #16 → #17 → #128 → #148 → #149 → #151 → #152 → #153 → #155，之后是评测场景 1 的 Yudao 一侧与 3.9；#149 另外依赖 3.2B 的 #69，#155 另外依赖 3.2C 的 #143。3.2C 的远程部分 #129 → #130 → #140 → #142 → #143 → #145 同时进行。界面工作线的链是 #75 → #127 → #79 → #80 与 #176 → #82 → #178 → #180。
 

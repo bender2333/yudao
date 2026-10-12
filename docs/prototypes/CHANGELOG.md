@@ -30,7 +30,7 @@
 
 ### 原型交付
 - 原型文件：[v9/index.html](v9/index.html)（浏览器直接打开）
-- 设计文档：[v9/design.md](v9/design.md)；构建约定：[v9/BUILD.md](v9/BUILD.md)；验收脚本：[v9/checks/](v9/checks/)
+- 设计文档：[v9/design.md](v9/design.md)；构建约定：[v9/BUILD.md](v9/BUILD.md)；验收脚本：[v9/checks/](../archive/prototypes/v9/checks/)
 
 ### 变更明细
 1. **像素引擎改为实体—组件—系统结构（第一步）**：v8 反馈画面像快照加一次性动画，缺少沉浸感。项目楼层、楼里的小人、通往机房的管线、地下室的机房都由实体组成。房间与管道由图结构声明排布（声明在 `js/pixel/floor-decl.js`，引擎 `ecs.js` 与画面 `floor.js` 里没有具体的部门名）；域事件变成任务放进角色的队列，或者变成信号；快照决定角色的持续状态；交接由经理放进管道口的任务、沿管道移动的包裹实体、接收方的经理从管道口取出的任务组成，两个房间之间没有直接的管道时包裹沿声明的管道一段一段走；整层中断时小人停在原地，队列等着。
@@ -49,7 +49,7 @@
 ## [v8] - 2026-09-29
 
 ### 原型交付
-- 原型文件：[v8/index.html](v8/index.html)（浏览器直接打开）
+- 原型文件：[v8/index.html](../archive/prototypes/v8/index.html)（浏览器直接打开）
 - 设计文档：[v8/design.md](v8/design.md)；构建约定：[v8/BUILD.md](v8/BUILD.md)
 
 ### 变更明细
@@ -67,8 +67,8 @@
 ## [v7] - 2026-09-25
 
 ### 原型交付
-- 原型文件：[v7/index.html](v7/index.html)（浏览器直接打开）
-- 设计文档：[v7/design.md](v7/design.md)；构建约定：[v7/BUILD.md](v7/BUILD.md)
+- 原型文件：[v7/index.html](../archive/prototypes/v7/index.html)（浏览器直接打开）
+- 设计文档：[v7/design.md](../archive/prototypes/v7/design.md)；构建约定：[v7/BUILD.md](../archive/prototypes/v7/BUILD.md)
 
 ### 变更明细
 1. **按七个阶段的路线图重新组织界面**

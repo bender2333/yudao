@@ -3,7 +3,6 @@ provider.md
 
 # --- run artifacts ---
 runs/
-docs/journal/codex/*.log
 
 # --- third-party benchmarks (clone locally) ---
 third_party/

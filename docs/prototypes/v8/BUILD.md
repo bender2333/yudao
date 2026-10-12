@@ -131,7 +131,7 @@ docs/prototypes/v8/
 | 任务 C 部门页面 | `js/contract/handlers/department.js`、`js/ui/views/department.js`、`js/ui/views/observe.js`、`js/ui/views/settings.js`、`styles/department.css` |
 | 任务 E 系统页 | `js/contract/handlers/system.js`、`js/ui/views/sys-models.js`、`js/ui/views/sys-machines.js`、`js/ui/views/sys-runtime.js`、`js/ui/views/sys-tools.js`、`js/ui/views/sys-reserved.js`、`js/ui/views/connect.js`、`styles/system.css` |
 
-v7 的文件（`docs/prototypes/v7/`）可以作为参考与起点，按本文件的接口改写。
+v7 的文件（`docs/archive/prototypes/v7/`）可以作为参考与起点，按本文件的接口改写。
 
 ## 4. 档位
 

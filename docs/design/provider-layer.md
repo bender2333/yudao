@@ -204,7 +204,7 @@ sequenceDiagram
 - Go 官方有“Use balance”设置，用户开启后可能在同一 Go 端点消耗 Zen 余额。Yudao 不调整该设置，也不承诺“订阅请求必然不再付费”；缺少响应证据时不能把费用标零。
 - 不建立计费系统与预算控制，不用月费推算每次调用价格，不把套餐剩余额度变成 D09 的本地 token 预算。费用等于用量乘以用户在模型访问定义中填写的单价，进入评测报告与对照记录，不进入运行中的控制；没有填写单价时费用保持未知，不填零（[模型管理设计说明](model-management.md)第 4.3 节）。
 
-事实依据和限制见 [一手资料报告](../research/opencode-go-provider-integration.md)。
+事实依据和限制见 [一手资料报告](../archive/research/opencode-go-provider-integration.md)。
 
 ## 8. Provider 设置页交互说明
 
