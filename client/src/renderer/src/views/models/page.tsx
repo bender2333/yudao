@@ -457,8 +457,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
               </button>
               <span className="y10-conn-name mm-name">{provider.name}</span>
               <span className="y10-small y10-muted mm-meta">
-                服务方案 {preset?.name ?? "自定义"} · 协议 {PROTOCOL_LABELS[provider.protocol] ?? provider.protocol}
-                {" · "}{provider.base_url || "（没有地址）"}
+                服务方案 {preset?.name ?? "自定义"} · {provider.base_url || "（没有地址）"}
               </span>
               <span className="y10-conn-cred y10-small y10-muted mm-meta">凭据：{credentialStatusLabel(provider.credential)}</span>
               <span className="y10-conn-count mm-count">已准入 {summary.admitted} · 候选 {summary.candidates}</span>
@@ -508,7 +507,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                                             mode: "edit" as const,
                                             state: formStateFromProvider(provider),
                                           };
-                                          const row = rowFromCandidate(item, catalog.capability_table, provider.preset_id);
+                                          const row = rowFromCandidate(item, catalog.capability_table, provider.preset_id,
+                                                                       presetById(presets, provider.preset_id));
                                           return { mode: "edit", state: { ...base.state, rows: [...base.state.rows, row] } };
                                         });
                                       }}>
@@ -526,6 +526,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                   <thead>
                     <tr>
                       <th>上游模型 ID</th>
+                      <th>调用协议</th>
                       <th>窗口</th>
                       <th>输出上限</th>
                       <th>推理档位声明</th>
@@ -542,6 +543,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                       return (
                         <tr key={model.id} data-testid={`model-${model.id}`}>
                           <td>{model.model}</td>
+                          <td>{PROTOCOL_LABELS[model.protocol] ?? model.protocol}</td>
                           <td>{model.context_window ?? "—"}</td>
                           <td>{model.max_output_tokens ?? "—"}</td>
                           <td className="y10-cell-stack">{model.reasoning_levels.length === 0 ? "未声明" : model.reasoning_levels.join("、")}</td>
@@ -599,7 +601,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           onRemoveRow={(key) => setForm((current) => (
             current ? { ...current, state: { ...current.state, rows: current.state.rows.filter((row) => row.key !== key) } } : current
           ))}
-          rowFromCandidate={(item) => rowFromCandidate(item, catalog.capability_table, form.state.preset_id)}
+          rowFromCandidate={(item) => rowFromCandidate(item, catalog.capability_table, form.state.preset_id,
+                                                       presetById(presets, form.state.preset_id))}
           blankRow={() => rowFromManual(form.state.rows.length)}
           presets={presets}
           presetRevision={catalog.presets.revision}
@@ -820,7 +823,7 @@ function groupByProvider(choices: ModelOption[]): { provider: string; label: str
 // 一份连接内容：卡片里「移除」与表单保存用的是同一份取值口径（设计说明第 4.4 节的拟议修改）
 function providerInputOf(provider: Catalog["providers"][number]): Record<string, unknown> {
   return {
-    id: provider.id, name: provider.name, protocol: provider.protocol, base_url: provider.base_url,
+    id: provider.id, name: provider.name, base_url: provider.base_url,
     credential_ref: provider.credential_ref, timeout_sec: provider.timeout_sec,
     preset_id: provider.preset_id, models_url: provider.models_url,
   };
@@ -829,7 +832,7 @@ function providerInputOf(provider: Catalog["providers"][number]): Record<string,
 // 一条模型访问定义按目录文档形状提交：catalog.change_impact 的拟议修改用它（不含 capacity_confirmed）
 function modelDocumentFromDefinition(model: Catalog["models"][number]): Record<string, unknown> {
   return {
-    id: model.id, model: model.model, context_window: model.context_window,
+    id: model.id, model: model.model, protocol: model.protocol, context_window: model.context_window,
     max_output_tokens: model.max_output_tokens, capability_source: model.capability_source,
     accepts_required_tool_call: model.accepts_required_tool_call, input_modalities: model.input_modalities,
     reasoning_levels: model.reasoning_levels, default_reasoning_level: model.default_reasoning_level,

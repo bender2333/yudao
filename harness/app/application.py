@@ -52,6 +52,7 @@ from .project_and_work_item_commands import (
     PROJECT_RESTORE,
     PROJECT_SET_GOAL,
     SOURCE_DIRECTORY_SAVE,
+    WRITEBACK_EXECUTE,
     WORK_ITEM_APPEND_INPUT,
     WORK_ITEM_CANCEL,
     WORK_ITEM_CREATE,
@@ -94,8 +95,8 @@ class ReadOnlyCore:
         saved = self.store.projection(catalog_stream())
         if saved is None:
             return None
-        from .projection import load_projection
-        state = load_projection(saved, catalog_stream())
+        from ..project_projection import catalog_handler
+        state = catalog_handler().load(saved)
         if state.last_seen_position is None:
             return None
         return state.last_seen_position, state.last_seen_at
@@ -109,7 +110,7 @@ class ReadOnlyCore:
 DEFAULT_REGISTRY = Registry(
     commands=[PROJECT_CREATE, PROJECT_ONBOARD, ONBOARDING_RESTART, PROJECT_RENAME, PROJECT_SET_GOAL, PROJECT_PIN, PROJECT_ARCHIVE, PROJECT_RESTORE,
               MATERIAL_RECORD, WORK_ITEM_CREATE, WORK_ITEM_APPEND_INPUT, WORK_ITEM_CANCEL, GUIDANCE_SEND,
-              DEPARTMENT_SETTINGS_SAVE, COMMAND_REGISTRATION_SAVE, SOURCE_DIRECTORY_SAVE,
+              DEPARTMENT_SETTINGS_SAVE, COMMAND_REGISTRATION_SAVE, SOURCE_DIRECTORY_SAVE, WRITEBACK_EXECUTE,
               DECISION_ANSWER, CATALOG_CONNECTION_SAVE, CATALOG_CONNECTION_DELETE,
               CATALOG_MODEL_REMOVE, CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT,
               CATALOG_CONNECTION_TEST,

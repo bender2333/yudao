@@ -141,8 +141,9 @@ AccessMode = Literal["local", "lan"]
 
 # 接口版本（第 6.1 节）：删除或改变已有的查询、命令、事件种类及其字段时提高；增加查询、命令、
 # 事件种类或字段时不变。客户端在构建时记录生成类型所用的接口版本，与它核对。
-# 版本 2：删除 run 流事件种类 department_prompt_updated 与 run_created 的 department_prompts 字段（#89）
-API_VERSION = 2
+# 版本 3：调用协议从连接移到模型访问定义（ADR-0033，#382）：CatalogProvider 去掉 protocol，
+# CatalogModel 增加 protocol，保存连接的命令在每个访问定义上带 protocol
+API_VERSION = 3
 
 
 class Deployment(Contract):

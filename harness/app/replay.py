@@ -1,14 +1,14 @@
 # 按位置读取（回放，设计说明第 4.1 节，工单 #127）：可回放的查询接受 at（全局位置），
-# 在内存中从事件重放到该位置，不写入、不调用模型与工具。折叠是纯函数（projection.py 的 replay /
-# project_events / replay_decisions 不读时钟、不读工件），喂给它 position <= at 的事件前缀就得到
-# 该位置时的投影；前缀单调性由写入口在同一个事务中折叠保存的投影与 replay_check 保证。
+# 在内存中从事件重放到该位置，不写入、不调用模型与工具。折叠是纯函数（折叠规则不读时钟、不读工件），
+# 喂给它 position <= at 的事件前缀就得到该位置时的投影；前缀单调性由写入口在同一个事务中折叠保存的投影与 replay_check 保证。
 # 宿主是只读打开（Application.open_readonly），不写保存的投影。
 
 from __future__ import annotations
 
 from ..event_store import Event, EventStore, ProjectEvent, catalog_stream
-from ..models import CatalogEvent, CatalogProjection, DecisionRequest
-from ..projection import apply_catalog_event, replay_decisions
+from ..models import CatalogEvent, DecisionRequest
+from ..project_projection import CatalogProjection, apply_catalog_event
+from ..projection import replay_decisions
 from .contracts import Contract
 
 class ReplayOutOfRange(Exception):

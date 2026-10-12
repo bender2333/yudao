@@ -136,22 +136,11 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds):
         json.dump(export, handle, ensure_ascii=False, indent=2)
 
     outcome = {"timed_out": timed_out, "elapsed_seconds": elapsed, "hidden_failures": []}
-    metrics = yudao_metrics.collect(export, outcome, replay)
-    # 质检误放行这一项要等评分结果，因此先算其余指标，评分以后再补
-    metrics["checkpoints"]["no_false_release"] = {
-        "passed": released, "detail": "等待评分结果核对隐藏检查"}
-
-    log_text = json.dumps(export, ensure_ascii=False)
-    void_reasons = []
-    hits = yudao.material_path_hits(log_text)
-    if hits:
-        void_reasons.append("导出的事件日志中出现材料目录的路径：" + yudao.describe_hits(hits))
-
     scores = score_delivery(delivery_dir, evidence_dir)
-    failed = [check["id"] for check in scores["checks"] if check["status"] != "pass"]
-    # 误放行要等评分结果才有结论：这一项在评分以后用同一个判断重算
-    outcome["hidden_failures"] = failed
-    metrics = yudao_metrics.collect(export, outcome, replay)
+    # 质检误放行这一项要等评分结果，先算其余指标，评分以后用同一个判断重算
+    parameters_version = _parameters_version(export)
+    outcome["hidden_failures"] = [check["id"] for check in scores["checks"] if check["status"] != "pass"]
+    metrics = yudao_metrics.collect(export, outcome, replay, parameters_version)
 
     with open(os.path.join(evidence_dir, "metrics.json"), "w", encoding="utf-8") as handle:
         json.dump({"run_id": run_id, "data_dir": data_dir, "metrics": metrics,
@@ -171,6 +160,17 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds):
         "model_service_failure": metrics["model_service_failure"],
         "score": scores,
     }
+
+
+def _parameters_version(export):
+    """取冻结的参数版本：`run_created` 事件的 `parameters_version`。
+    缺失或占位返回空，第 2 项检查点写「未取到冻结的 parameters_version」。"""
+    for event in export["events"]:
+        if event["type"] != "run_created":
+            continue
+        version = (event.get("payload") or {}).get("parameters_version")
+        return version if isinstance(version, str) else None
+    return None
 
 
 def main(argv=None):

@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from . import capabilities
-from .presets import USER_AGENT, preset_models_url
+from .presets import USER_AGENT, preset_auth, preset_default_protocol, preset_models_url
 from .store import ProviderDefinition
 from .tls import certificate_verification_failed, service_address, ssl_context
 
@@ -24,11 +24,11 @@ def refresh_candidates(
     fetched_at = datetime.now(timezone.utc).isoformat()
     if not source_url:
         return _unknown(provider, "", fetched_at, "未提供模型列表地址，请填写或选择带模型列表的服务方案")
-    if provider.protocol != "fake" and not api_key.strip():
+    if not api_key.strip():
         return _unknown(provider, source_url, fetched_at,
                         f"凭据引用 {provider.credential_ref or '（未填写）'} 无法解析，请在模型管理中配置凭据")
     try:
-        headers = {**_auth_headers(provider.protocol, api_key), "User-Agent": USER_AGENT}
+        headers = {**_auth_headers(provider, api_key), "User-Agent": USER_AGENT}
         with httpx.Client(timeout=timeout_sec, verify=ssl_context()) as client:
             response = client.get(source_url, headers=headers)
         response.raise_for_status()
@@ -67,9 +67,9 @@ def probe_connection(
 ) -> dict[str, Any]:
     source_url = effective_models_url(provider)
     if not source_url:
-        return {"ok": False, "source_url": "", "protocol": provider.protocol,
+        return {"ok": False, "source_url": "",
                 "reason": "no_models_url", "message": "连接与服务方案都没有模型列表地址，不提供连接测试"}
-    headers = {**_auth_headers(provider.protocol, api_key), "User-Agent": USER_AGENT}
+    headers = {**_auth_headers(provider, api_key), "User-Agent": USER_AGENT}
     try:
         with httpx.Client(timeout=timeout_sec, verify=ssl_context()) as client:
             response = client.get(source_url, headers=headers)
@@ -77,25 +77,23 @@ def probe_connection(
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
         reason = "credential_rejected" if status in (401, 403) else "upstream_error"
-        return {"ok": False, "source_url": source_url, "protocol": provider.protocol, "reason": reason,
+        return {"ok": False, "source_url": source_url, "reason": reason,
                 "message": f"模型列表返回 HTTP {status}"}
     except httpx.HTTPError as exc:
         if certificate_verification_failed(exc):
-            return {"ok": False, "source_url": source_url, "protocol": provider.protocol,
-                    "reason": "upstream_error",
+            return {"ok": False, "source_url": source_url, "reason": "upstream_error",
                     "message": f"模型列表请求失败：证书校验失败（{service_address(source_url)}）"}
-        return {"ok": False, "source_url": source_url, "protocol": provider.protocol,
-                "reason": "upstream_error", "message": f"模型列表请求失败：{type(exc).__name__}"}
-    return {"ok": True, "source_url": source_url, "protocol": provider.protocol, "reason": "",
-            "message": ""}
+        return {"ok": False, "source_url": source_url, "reason": "upstream_error",
+                "message": f"模型列表请求失败：{type(exc).__name__}"}
+    return {"ok": True, "source_url": source_url, "reason": "", "message": ""}
 
 
-def _auth_headers(protocol: str, api_key: str) -> dict[str, str]:
-    # 模型列表地址要求认证时按该连接的协议带上凭据：Responses 与 Chat Completions 用 Bearer，
-    # Anthropic Messages 用 x-api-key；fake 不需要凭据。没有凭据时不带认证头，由上游决定拒绝
+def _auth_headers(provider: ProviderDefinition, api_key: str) -> dict[str, str]:
+    # 模型列表地址要求认证时按服务方案规定的认证方式带上凭据（设计说明第 4.2 节）：
+    # 内置方案取预置表的 auth，自定义服务使用 Bearer；没有凭据时不带认证头，由上游决定拒绝
     if not api_key:
         return {}
-    if protocol == "messages":
+    if preset_auth(provider.preset_id) == "x-api-key":
         return {"x-api-key": api_key}
     return {"Authorization": f"Bearer {api_key}"}
 
@@ -111,14 +109,16 @@ def effective_models_url(provider: ProviderDefinition, override: str | None = No
 
 
 def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
-    # 候选带预填值与来源（设计说明第 4.3 节）：窗口与输出上限先取上游模型列表（来源 models_url），
-    # 其次取模型能力表（来源 capability_table），两处都没有时留空；输入方式取能力表，
-    # 包含 image 时预填文本与图像，不包含 image、能力表没有记录或服务方案为自定义时只有文本。
-    # 不按模型名称推测
+    # 候选带预填值与来源（设计说明第 4.3 节）：协议先取能力表（来源 capability_table），
+    # 其次取服务方案的默认协议（来源 preset_default），自定义服务预填 Chat Completions（来源 default）；
+    # 窗口与输出上限先取上游模型列表（来源 models_url），其次取模型能力表（来源 capability_table），
+    # 两处都没有时留空；输入方式取能力表，包含 image 时预填文本与图像，
+    # 不包含 image、能力表没有记录或服务方案为自定义时只有文本。不按模型名称推测
     items = payload.get("data") if isinstance(payload, dict) else payload
     if not isinstance(items, list):
         raise ValueError("模型列表缺少 data 数组")
     candidates: list[dict[str, Any]] = []
+
     seen: set[str] = set()
     for item in items:
         model_id = item.get("id") if isinstance(item, dict) else None
@@ -130,6 +130,11 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         seen.add(model_id)
         # 上游列表带窗口与输出上限时（limit.context 与 limit.output）带上这两项，来源是上游模型列表
         candidate: dict[str, Any] = {"id": model_id}
+        entry = capabilities.capability(preset_id, model_id) if preset_id else None
+        candidate["protocol"], candidate["protocol_source"] = (
+            (entry.protocol, "capability_table") if entry is not None
+            else (preset_default_protocol(preset_id), "preset_default") if preset_id
+            else ("chat_completions", "default"))
         limits = item.get("limit") if isinstance(item, dict) else None
         if isinstance(limits, Mapping):
             window = limits.get("context")
@@ -140,7 +145,7 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
             if isinstance(output, int) and not isinstance(output, bool) and output > 0:
                 candidate["max_output_tokens"] = output
                 candidate["max_output_tokens_source"] = "models_url"
-        entry = capabilities.capability(preset_id, model_id) if preset_id else None
+
         for field in ("context_window", "max_output_tokens"):
             if field not in candidate and entry is not None and getattr(entry, field) is not None:
                 candidate[field] = getattr(entry, field)

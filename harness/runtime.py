@@ -16,7 +16,8 @@ from .event_store import Command, EventStore, catalog_stream
 from .models import CatalogEventType, ProjectEventType
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .write_path import NewCatalogEvent, WritePath
-from .projection import RunNotFoundError, RunProjection, load_projection, project_run
+from .projection import RunNotFoundError, RunProjection, project_run
+from .project_projection import catalog_handler, handler_for
 from .projects import ProjectService
 from .providers import ProviderFacade
 from .streams import (
@@ -56,7 +57,7 @@ class LoopSystem:
         # 输出片段通道：步骤驱动发布，应用层订阅并转发给 live=1 的连接（设计说明第 5.6 节）
         self.deltas = DeltaChannel()
         # 唯一的写入口；保存的投影缺失的流（例如投影被删除）在启动时由重放补建
-        self.writes = WritePath(self.store)
+        self.writes = WritePath(self.store, handler_for)
         self.writes.rebuild_missing()
         self.artifacts = ArtifactStore(self.data_dir / "artifacts")
         if test_adapter_factory is not None and facade is not None:
@@ -309,7 +310,7 @@ class LoopSystem:
         saved = self.store.projection(catalog_stream())
         if saved is None:
             return None
-        state = load_projection(saved, catalog_stream())
+        state = catalog_handler().load(saved)
         if state.last_seen_position is None:
             return None
         return state.last_seen_position, state.last_seen_at

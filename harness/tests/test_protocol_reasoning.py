@@ -117,12 +117,13 @@ def _run_product_activation(tmp_path, responder, protocol: str):
         facade = ProviderFacade(credentials=CredentialChain(overrides={"GO_KEY": "local-secret"}))
         facade.store_document({
             "providers": [{
-                "id": "go", "name": "Go", "protocol": protocol,
+                "id": "go", "name": "Go",
                 "base_url": f"http://127.0.0.1:{server.server_address[1]}/v1",
-                "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": "opencode-go",
+                "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": "",
             }],
             "models": [{
                 "id": "m-go", "provider_id": "go", "model": "target-model",
+                "protocol": protocol,
                 "context_window": 32000, "max_output_tokens": 2048,
                 "capability_source": "preset-v1",
             }],
@@ -266,9 +267,10 @@ def test_switching_model_drops_reasoning_and_protocol_item_ids_but_keeps_pairs(t
 
     def document(model: str) -> dict:
         return {
-            "providers": [{"id": "go", "name": "Go", "protocol": "responses", "base_url": base,
-                           "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": "opencode-go"}],
+            "providers": [{"id": "go", "name": "Go", "base_url": base,
+                           "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": ""}],
             "models": [{"id": "m-go", "provider_id": "go", "model": model,
+                        "protocol": "responses",
                         "context_window": 32000, "max_output_tokens": 2048, "capability_source": "preset-v1"}],
             "bindings": {department: {"provider_id": "go", "model_id": "m-go"}
                          for department in ("product", "engineering", "quality")},

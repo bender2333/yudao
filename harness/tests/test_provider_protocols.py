@@ -27,6 +27,7 @@ from harness.tests.protocol_helpers import (
     invoke,
     messages_responder,
     model_call,
+    preset_base_urls,
     provider_system,
     responses_responder,
     send_reply,
@@ -53,12 +54,14 @@ def _call_with_tool(*, follow_up_result: str | None = None):
 
 def test_chat_wire_format_tool_round_trip_and_identity_headers():
     server, capture, base = serve(chat_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="chat_completions")
-        result = invoke(facade, bound_target(facade), _call_with_tool())
-    finally:
-        server.shutdown()
-        server.server_close()
+    with preset_base_urls(base + "/v1"):
+        try:
+            facade = facade_with(base + "/v1", protocol="chat_completions",
+                                 preset_id="opencode-go")
+            result = invoke(facade, bound_target(facade), _call_with_tool())
+        finally:
+            server.shutdown()
+            server.server_close()
     body = capture.requests[0]
     assert capture.paths[0].endswith("/chat/completions")
     assert body["model"] == "target-model"
@@ -113,22 +116,23 @@ def test_chat_sends_tool_result_paired_by_tool_call_id():
 
 def test_messages_wire_format_system_split_tool_round_trip_and_usage():
     server, capture, base = serve(messages_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="messages")
-        input_items = [
-            {"type": "message", "role": "system", "content": [{"type": "input_text", "text": "部门指令"}]},
-            {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "请写文件"}]},
-            {"type": "function_call", "call_id": "call-1", "name": "write_file",
-             "arguments": '{"path": "a.txt"}'},
-            {"type": "function_call_output", "call_id": "call-1", "output": "已写入"},
-        ]
-        call = model_call(input_items, [{"name": "write_file", "description": "写文件",
-                                         "parameters": {"type": "object"}}],
-                          max_output_tokens=1024, session_id="run-1:product", attempt_id="a1")
-        result = invoke(facade, bound_target(facade), call)
-    finally:
-        server.shutdown()
-        server.server_close()
+    with preset_base_urls(base + "/v1"):
+        try:
+            facade = facade_with(base + "/v1", protocol="messages", preset_id="opencode-go")
+            input_items = [
+                {"type": "message", "role": "system", "content": [{"type": "input_text", "text": "部门指令"}]},
+                {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "请写文件"}]},
+                {"type": "function_call", "call_id": "call-1", "name": "write_file",
+                 "arguments": '{"path": "a.txt"}'},
+                {"type": "function_call_output", "call_id": "call-1", "output": "已写入"},
+            ]
+            call = model_call(input_items, [{"name": "write_file", "description": "写文件",
+                                             "parameters": {"type": "object"}}],
+                              max_output_tokens=1024, session_id="run-1:product", attempt_id="a1")
+            result = invoke(facade, bound_target(facade), call)
+        finally:
+            server.shutdown()
+            server.server_close()
     body = capture.requests[0]
     assert capture.paths[0] == "/v1/messages"
     assert body["system"] == "部门指令"
@@ -164,12 +168,13 @@ def test_messages_requires_max_output_tokens_before_connecting():
 
 def test_responses_requests_carry_identity_headers():
     server, capture, base = serve(responses_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="responses")
-        result = invoke(facade, bound_target(facade), model_call(HI, session_id="run-2:quality", attempt_id="a1"))
-    finally:
-        server.shutdown()
-        server.server_close()
+    with preset_base_urls(base + "/v1"):
+        try:
+            facade = facade_with(base + "/v1", protocol="responses", preset_id="opencode-go")
+            result = invoke(facade, bound_target(facade), model_call(HI, session_id="run-2:quality", attempt_id="a1"))
+        finally:
+            server.shutdown()
+            server.server_close()
     assert capture.headers[0]["x-opencode-session"] == "run-2:quality"
     assert capture.headers[0]["user-agent"].startswith("Yudao-Loop-System/")
     assert result.output[0]["content"][0]["text"] == "ok"
@@ -359,55 +364,56 @@ def test_go_preset_base_url_reaches_the_official_protocol_path(protocol, respond
     assert capture.paths[0] == urlsplit(official).path
 
 
-def test_one_preset_supports_independent_connections_with_own_address_and_key():
-    # 同一服务方案下两份连接：地址与凭据各自独立，都带该方案要求的身份头
-    server_a, capture_a, base_a = serve(responses_responder)
-    server_b, capture_b, base_b = serve(responses_responder)
-    try:
-        facade = ProviderFacade(credentials=CredentialChain(
-            overrides={"GO_KEY_A": "key-a", "GO_KEY_B": "key-b"}, use_env=False))
-        facade.store_document({
-            "providers": [
-                {"id": "go-a", "name": "Go 个人", "protocol": "responses", "base_url": base_a + "/v1",
-                 "credential_ref": "GO_KEY_A", "timeout_sec": 20.0, "preset_id": "opencode-go"},
-                {"id": "go-b", "name": "Go 团队", "protocol": "responses", "base_url": base_b + "/v1",
-                 "credential_ref": "GO_KEY_B", "timeout_sec": 20.0, "preset_id": "opencode-go"},
-            ],
-            "models": [
-                {"id": "m-a", "provider_id": "go-a", "model": "model-x",
-                 "context_window": 32000, "max_output_tokens": 2048},
-                {"id": "m-b", "provider_id": "go-b", "model": "model-x",
-                 "context_window": 32000, "max_output_tokens": 2048},
-            ],
-            "bindings": {},
-        })
-        snapshot = facade.resolve_snapshot([
-            {"key": "a", "provider_id": "go-a", "model_id": "m-a"},
-            {"key": "b", "provider_id": "go-b", "model_id": "m-b"},
-        ])
-        for key in ("a", "b"):
-            invoke(facade, snapshot.target(key), model_call(HI, session_id=f"session-{key}", attempt_id=f"attempt-{key}"))
-    finally:
-        for server in (server_a, server_b):
+def test_one_preset_connections_keep_their_own_credentials_and_identity():
+    # 同一服务方案下两份连接：请求地址都取该方案按协议的基址（ADR-0033），凭据与会话身份各自独立
+    server, capture, base = serve(responses_responder)
+    with preset_base_urls(base + "/v1"):
+        try:
+            facade = ProviderFacade(credentials=CredentialChain(
+                overrides={"GO_KEY_A": "key-a", "GO_KEY_B": "key-b"}, use_env=False))
+            facade.store_document({
+                "providers": [
+                    {"id": "go-a", "name": "Go 个人", "base_url": "http://127.0.0.1:1/v1",
+                     "credential_ref": "GO_KEY_A", "timeout_sec": 20.0, "preset_id": "opencode-go"},
+                    {"id": "go-b", "name": "Go 团队", "base_url": "http://127.0.0.1:1/v1",
+                     "credential_ref": "GO_KEY_B", "timeout_sec": 20.0, "preset_id": "opencode-go"},
+                ],
+                "models": [
+                    {"id": "m-a", "provider_id": "go-a", "model": "model-x",
+                     "protocol": "responses",
+                     "context_window": 32000, "max_output_tokens": 2048},
+                    {"id": "m-b", "provider_id": "go-b", "model": "model-x",
+                     "protocol": "responses",
+                     "context_window": 32000, "max_output_tokens": 2048},
+                ],
+                "bindings": {},
+            })
+            snapshot = facade.resolve_snapshot([
+                {"key": "a", "provider_id": "go-a", "model_id": "m-a"},
+                {"key": "b", "provider_id": "go-b", "model_id": "m-b"},
+            ])
+            for key in ("a", "b"):
+                invoke(facade, snapshot.target(key),
+                       model_call(HI, session_id=f"session-{key}", attempt_id=f"attempt-{key}"))
+        finally:
             server.shutdown()
             server.server_close()
-    assert len(capture_a.requests) == 1 and len(capture_b.requests) == 1
-    assert capture_a.headers[0]["authorization"] == "Bearer key-a"
-    assert capture_b.headers[0]["authorization"] == "Bearer key-b"
-    assert capture_a.headers[0]["x-opencode-session"] == "session-a"
-    assert capture_b.headers[0]["x-opencode-session"] == "session-b"
-    assert capture_a.headers[0]["user-agent"].startswith("Yudao-Loop-System/")
+    assert len(capture.requests) == 2
+    assert {item["authorization"] for item in capture.headers} == {"Bearer key-a", "Bearer key-b"}
+    assert {item["x-opencode-session"] for item in capture.headers} == {"session-a", "session-b"}
+    assert capture.headers[0]["user-agent"].startswith("Yudao-Loop-System/")
 
 
 def test_model_test_uses_its_own_diagnostic_session():
     # 模型测试使用独立诊断会话，不借用任何任务部门的会话身份
     server, capture, base = serve(messages_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="messages")
-        result = facade.model_test("go", "m-go")
-    finally:
-        server.shutdown()
-        server.server_close()
+    with preset_base_urls(base + "/v1"):
+        try:
+            facade = facade_with(base + "/v1", protocol="messages", preset_id="opencode-go")
+            result = facade.model_test("go", "m-go")
+        finally:
+            server.shutdown()
+            server.server_close()
     assert result["ok"] is True
     assert capture.headers[0]["x-opencode-session"] == "diagnostic:go:m-go"
 
@@ -689,14 +695,15 @@ def test_request_the_client_refuses_to_send_is_not_retryable(protocol):
     # 会话标识中的换行使请求头不合法，客户端在发出之前拒绝（LocalProtocolError）：openai 的客户端经 httpx、
     # anthropic 的客户端经 httpx2 报告，都记为不可重试的协议错误，请求没有到达服务
     server, capture, base = serve(lambda _body: (200, "text/event-stream", [b""]))
-    try:
-        facade = facade_with(base + "/v1", protocol=protocol)
-        with pytest.raises(ProviderError) as caught:
-            invoke(facade, bound_target(facade),
-                   model_call(HI, max_output_tokens=64, session_id="run-1\nproduct", attempt_id="a"))
-    finally:
-        server.shutdown()
-        server.server_close()
+    with preset_base_urls(base + "/v1"):
+        try:
+            facade = facade_with(base + "/v1", protocol=protocol, preset_id="opencode-go")
+            with pytest.raises(ProviderError) as caught:
+                invoke(facade, bound_target(facade),
+                       model_call(HI, max_output_tokens=64, session_id="run-1\nproduct", attempt_id="a"))
+        finally:
+            server.shutdown()
+            server.server_close()
     assert caught.value.retryable is False
     assert caught.value.diagnostics == {"error_type": "provider_protocol"}
     assert capture.requests == []

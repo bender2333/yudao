@@ -319,13 +319,13 @@ def test_no_tool_call_continue_uses_the_model_changed_before_answering(tmp_path)
     try:
         facade = ProviderFacade(credentials=CredentialChain(overrides={"SCENARIO_KEY": "secret"}, use_env=False))
         facade.store_document({
-            "providers": [{"id": "local", "name": "Local", "protocol": "responses", "base_url": base + "/v1",
+            "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
                            "credential_ref": "SCENARIO_KEY", "timeout_sec": 20.0}],
             "models": [
-                {"id": "m-a", "provider_id": "local", "model": "model-a", "context_window": 32000,
-                 "max_output_tokens": 2048},
-                {"id": "m-b", "provider_id": "local", "model": "model-b", "context_window": 32000,
-                 "max_output_tokens": 2048},
+                {"id": "m-a", "provider_id": "local", "model": "model-a", "protocol": "responses",
+                 "context_window": 32000, "max_output_tokens": 2048},
+                {"id": "m-b", "provider_id": "local", "model": "model-b", "protocol": "responses",
+                 "context_window": 32000, "max_output_tokens": 2048},
             ],
             "bindings": {department: {"provider_id": "local", "model_id": "m-a"} for department in DEPARTMENTS},
         })

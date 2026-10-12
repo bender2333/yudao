@@ -378,7 +378,7 @@ test.describe("项目页面（1440×900）", () => {
       const id = await projectId(page, SAMPLE);
       await gotoView(page, id, "dept/product");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL["dept/product"]}`);
-      const title = await section(page, "产品工作间");
+      const title = await section(page, "产品部门");
       await expect(title.locator(".section-head .note")).toHaveText("把用户的要求整理成有效需求");
       await expect(title).toContainText("部门状态");
       await expect(title).toContainText("这次运行不在本部门 · 已完成");
@@ -429,7 +429,7 @@ test.describe("项目页面（1440×900）", () => {
     }
   });
 
-  test("工程与质检工作间：没有配置部门 Prompt 时用内置默认 Prompt", async () => {
+  test("工程与质检部门：没有配置部门 Prompt 时用内置默认 Prompt", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
     const page = client.page;
@@ -437,13 +437,13 @@ test.describe("项目页面（1440×900）", () => {
       const id = await projectId(page, SAMPLE);
       await gotoView(page, id, "dept/engineering");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL["dept/engineering"]}`);
-      await expect(await section(page, "工程工作间")).toContainText("按有效需求实现并封存交付");
+      await expect(await section(page, "工程部门")).toContainText("按有效需求实现并封存交付");
       const engineering = page.locator('section.card:has([role="tablist"])').first();
       await engineering.locator('[role="tab"]').nth(2).click();
       await expect(engineering.locator(".kv").first()).toContainText("第 0 版（来源 跟随部门默认）");
       await gotoView(page, id, "dept/quality");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL["dept/quality"]}`);
-      await expect(await section(page, "质检工作间")).toContainText("按验收条件核验并给出放行或返工");
+      await expect(await section(page, "质检部门")).toContainText("按验收条件核验并给出放行或返工");
       const quality = page.locator('section.card:has([role="tablist"])').first();
       await quality.locator('[role="tab"]').nth(2).click();
       await expect(quality.locator(".kv").first()).toContainText("第 0 版（来源 跟随部门默认）");
@@ -452,6 +452,46 @@ test.describe("项目页面（1440×900）", () => {
       await client.close();
     }
   });
+  test("三个部门的页签切换：标题区的色条与强调色随部门变化，房间在深色舞台中", async () => {
+    const client = await openProjectClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      const id = await projectId(page, SAMPLE);
+      await gotoView(page, id, "overview");
+      await expect(page.locator(".tabbar .tab").first()).toBeVisible();
+
+      // 产品部门
+      await page.locator(".tabbar .tab").filter({ hasText: "产品" }).click();
+      await expect(page.locator(".y10-ws")).toHaveAttribute("data-dept", "product");
+      await expect(page.locator(".y10-ws-head-block")).toBeVisible();
+      await expect(page.locator(".y10-ws-stage")).toBeVisible();
+      const productAccent = await page.locator(".y10-ws").evaluate((el) => getComputedStyle(el).getPropertyValue("--ws-accent").trim());
+      expect(productAccent).not.toBe("");
+
+      // 工程部门
+      await page.locator(".tabbar .tab").filter({ hasText: "工程" }).click();
+      await expect(page.locator(".y10-ws")).toHaveAttribute("data-dept", "engineering");
+      await expect(page.locator(".y10-ws-head-block")).toBeVisible();
+      await expect(page.locator(".y10-ws-stage")).toBeVisible();
+      const engAccent = await page.locator(".y10-ws").evaluate((el) => getComputedStyle(el).getPropertyValue("--ws-accent").trim());
+      expect(engAccent).not.toBe(productAccent);
+
+      // 质检部门
+      await page.locator(".tabbar .tab").filter({ hasText: "质检" }).click();
+      await expect(page.locator(".y10-ws")).toHaveAttribute("data-dept", "quality");
+      await expect(page.locator(".y10-ws-head-block")).toBeVisible();
+      await expect(page.locator(".y10-ws-stage")).toBeVisible();
+      const qualityAccent = await page.locator(".y10-ws").evaluate((el) => getComputedStyle(el).getPropertyValue("--ws-accent").trim());
+      expect(qualityAccent).not.toBe(engAccent);
+      expect(qualityAccent).not.toBe(productAccent);
+
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
 
   test("资料页：intend 原文、PRD、PLAN、交付文件与项目材料", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
@@ -709,7 +749,7 @@ test.describe("项目页面（1440×900）", () => {
       expect(await activeTabCount(page)).toBe(1);
       const selected = await fetchQuery<{ work_items: { work_item_id: string }[] }>(page, "project.overview", { project_id: id });
       await page.evaluate((hash) => { window.location.hash = hash; }, `${navHash(id, "dept/product")}?w=${selected.work_items[0].work_item_id}`);
-      await expect(await section(page, "产品工作间")).toContainText("（顶栏选中）");
+      await expect(await section(page, "产品部门")).toContainText("（顶栏选中）");
       // 状态项点击 -> 首页（没有 #/decisions 这个页面）
       await page.locator(".topbar .status-item").filter({ hasText: "待你决定：" }).click();
       await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe("#/home");
@@ -788,7 +828,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(registry.getByRole("row").filter({ hasText: "echo-live" })).toContainText("第 2 版");
       // 文本工具：给产品部门发一条指导，指导列表由事件流更新
       await gotoView(page, blockedId, "dept/product");
-      await expect(await section(page, "产品工作间")).toContainText("工程处理中");
+      await expect(await section(page, "产品部门")).toContainText("工程处理中");
       const guidance = await section(page, "部门指导");
       const note = `界面发出的指导 ${Date.now()}`;
       await guidance.getByLabel("向产品下达指导").fill(note);
@@ -823,9 +863,9 @@ test.describe("项目页面（1920×1080）", () => {
       await expect(page.locator("aside.sidebar")).toBeVisible();
       const markers: Record<View, string> = {
         overview: "项目摘要",
-        "dept/product": "产品工作间",
-        "dept/engineering": "工程工作间",
-        "dept/quality": "质检工作间",
+        "dept/product": "产品部门",
+        "dept/engineering": "工程部门",
+        "dept/quality": "质检部门",
         materials: "intend 原文",
         observe: "请求记录",
         settings: "基本信息",
@@ -838,7 +878,7 @@ test.describe("项目页面（1920×1080）", () => {
       }
       // 弹窗与详情页也各查一次
       await gotoView(page, id, "dept/product");
-      await (await section(page, "产品工作间")).getByRole("button", { name: "部门设置" }).click();
+      await (await section(page, "产品部门")).getByRole("button", { name: "部门设置" }).click();
       await expect(page.locator(".modal-backdrop")).toBeVisible();
       await expectNoOverflow(page, "部门设置弹窗");
       await page.locator(".modal-backdrop").getByRole("button", { name: "关闭" }).click();

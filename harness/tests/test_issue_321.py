@@ -114,12 +114,12 @@ def test_a_project_registered_event_without_the_field_reads_back_as_no_initial_d
     from harness.artifacts import ArtifactStore
     from harness.event_store import EventStore, project_stream
     from harness.models import new_id
-    from harness.projection import saved_project
+    from harness.project_projection import handler_for, saved_project
     from harness.write_path import NewProjectEvent, WritePath
 
     store = EventStore(data_dir / "events.sqlite")
     artifacts = ArtifactStore(data_dir / "artifacts")
-    writes = WritePath(store)
+    writes = WritePath(store, handler_for)
     try:
         project_id = new_id("proj")
         goal_ref = artifacts.put(project_id, "project_goal", GOAL, media_type="text/markdown")

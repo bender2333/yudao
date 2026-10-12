@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -15,26 +15,30 @@ from .department_prompts import save_department_prompt
 from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
 from .materials import save_text_material
 from .models import (
-    Adoption,
     ArtifactRef,
     DEPARTMENTS,
-    DepartmentSetting,
     Event,
     EventType,
-    HeldCandidate,
-    InitialPrdCandidate,
     ProjectEvent,
     ProjectEventType,
-    ProjectProjection,
-    RegisteredCommand,
     RunProjection,
-    SourceDirectory,
     TERMINAL_PHASES,
-    WorkItem,
     department_for_phase,
     new_id,
 )
-from .projection import RunNotFoundError, project_run, replay_project, replay_run, saved_project
+from .project_projection import (
+    Adoption,
+    DepartmentSetting,
+    HeldCandidate,
+    InitialPrdCandidate,
+    ProjectProjection,
+    RegisteredCommand,
+    SourceDirectory,
+    WorkItem,
+    replay_project,
+    saved_project,
+)
+from .projection import RunNotFoundError, project_run, replay_run
 from .providers.selection import ModelSelection
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
@@ -368,7 +372,6 @@ class ProjectService:
         # 每个项目正在开始的事项：事项已经登记、它的 run 还没有创建时，事项的状态看起来是没有开始，
         # 归档与记录材料按这里判断有事项进行中
         self._starting: dict[str, set[object]] = {}
-
     def _limit_values(self, max_cycles: int | None, run_time_limit_sec: int | None) -> tuple[int, int]:
         # 事项的两个限额：调用方显式给出时按给出值，否则取参数现值（工单 #349）。
         # 运行中的 run 已经按创建时的限额冻结，之后改参数不影响它
@@ -828,9 +831,40 @@ class ProjectService:
             return None
         if run.project_id is None or run.work_item_id is None:
             return None
-        return self.writes.transact(project_stream(run.project_id),
+        settled = self.writes.transact(project_stream(run.project_id),
                                     lambda transaction: self._settle_run(transaction, run))
+        if settled is not None and settled.type == ProjectEventType.DELIVERABLE_ADOPTED:
+            self._trigger_writeback_if_enabled(run.project_id, settled.payload["adoption_id"])
+        return settled
 
+    def _trigger_writeback_if_enabled(self, project_id: str, adoption_id: str) -> None:
+        # 采纳以后按源目录登记的写回设置执行写回（ADR-0034）：停止与冲突由写回自己记成事件，
+        # 不在这里吞掉结果；异常表示写回没有产生事件，由用户重新发起
+        project = self.projection(project_id)
+        if any(d.writeback_enabled for d in project.source_directories.values()):
+            self.execute_writeback(project_id, adoption_id)
+
+    def execute_writeback(
+        self,
+        project_id: str,
+        adoption_id: str | None = None,
+        *,
+        command: Command | None = None,
+        simulate_unknown_push: bool = False,
+    ) -> ProjectEvent | None:
+        from .writeback import perform_writeback
+        project = self._writable(project_id)
+        if adoption_id is None:
+            if project.current_adoption is None:
+                return None
+            adoption_id = project.current_adoption.adoption_id
+        return perform_writeback(
+            self,
+            project_id,
+            adoption_id,
+            command=command,
+            simulate_unknown_push=simulate_unknown_push,
+        )
     def settle_pending(self, project_id: str) -> list[ProjectEvent]:
         """补跑结算：覆盖进程在 RUN_DONE 与结算之间中断的情形。"""
         written: list[ProjectEvent] = []
@@ -1158,7 +1192,13 @@ class ProjectService:
     # 源目录登记（#74）
 
     def configure_source_directory(self, project_id: str, name: str, path: str, *,
-                                   base_version: int, command: Command | None = None) -> dict[str, Any]:
+                                   base_version: int,
+                                   writeback_enabled: bool = False,
+                                   remote: str = "",
+                                   target_branch: str = "",
+                                   check_commands: Sequence[str] = (),
+                                   credential_ref: str | None = None,
+                                   command: Command | None = None) -> dict[str, Any]:
         # 登记与修改本项目的源目录：名称是登记名，路径是控制主机上的路径；
         # 基准版本是该项目源目录登记的版本（初次登记为 0），不相等时拒绝并返回当前版本
         _require_text("name", name)
@@ -1173,6 +1213,11 @@ class ProjectService:
                 raise SourceDirectoryConflict({} if current is None else _source_directory_view(current))
             transaction.append(NewProjectEvent(ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, {
                 "name": name, "path": path, "version": current_version + 1, "base_version": base_version,
+                "writeback_enabled": bool(writeback_enabled),
+                "remote": str(remote or ""),
+                "target_branch": str(target_branch or ""),
+                "check_commands": [str(c) for c in check_commands],
+                "credential_ref": credential_ref,
             }, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), configure, command=command)
@@ -1302,8 +1347,12 @@ def _source_directory_view(config: SourceDirectory) -> dict[str, Any]:
         "path": config.path,
         "version": config.version,
         "updated_at": config.updated_at,
+        "writeback_enabled": config.writeback_enabled,
+        "remote": config.remote,
+        "target_branch": config.target_branch,
+        "check_commands": list(config.check_commands),
+        "credential_ref": config.credential_ref,
     }
-
 
 def _require_text(name: str, value: Any) -> None:
     if not isinstance(value, str) or not value.strip():

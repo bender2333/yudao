@@ -3,7 +3,7 @@ from contextlib import closing
 
 from harness.event_store import run_stream
 from harness.models import json_dumps, new_id
-from harness.projection import dump_projection
+from harness.projection import run_handler
 
 # 核对与审计必须面对已经保存的事实。这些辅助用 SQLite 的普通连接直接改写事件行、保存的投影与事件顺序，
 # 不替换运行系统、事件库或工件库的任何读取方法。
@@ -31,7 +31,7 @@ def rewrite_saved_projection(store, run_id, projection) -> None:
     with closing(_connection(store)) as connection:
         cursor = connection.execute(
             "UPDATE projections SET state = ? WHERE stream = ?",
-            (dump_projection(projection), run_stream(run_id)),
+            (run_handler().dump(projection), run_stream(run_id)),
         )
         if cursor.rowcount != 1:
             raise AssertionError(f"saved projection for {run_id} was not rewritten")
