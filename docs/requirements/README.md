@@ -29,7 +29,7 @@
 | D17 | [模型等待与失败重试](provider-retries.md) | H 已实现；慢响应、重试边界及桌面手机已验证，真实完整流程仍有连续连接失败 |
 | D18 | [统一 Provider 管理与部门绑定](department-providers.md) | 底层目录、三部门绑定与原生循环已接入，本地多连接回归通过；配置 UI 已随 D22/D23 实现；真实跨 Provider 完整验收未完成；按每次模型请求解析由 #45 实施 |
 | D19 | [按原型建设 Web 工作台](web-workspace-prototype.md) | 原型已归档、任务已规划；Provider 等配置原型预留 |
-| D20 | [部门定向追加指导](department-guidance.md) | 已实现（`fe78667`、`fcb06ab`）；接收、进入模型输入与部门回应分别记录，处理时机与放行关系按[处理设计](../design/department-guidance.md)；3.0B 场景 B 的真实运行中指导完成处理 |
+| D20 | [部门定向追加指导](department-guidance.md) | 接收与查询已实现（`fe78667`、`fcb06ab`）；2026-10-12 按 ADR-0036 修改送达与处理结果（通知或询问分支，删除正式回应与放行前的核对），未实施，见[处理设计](../design/department-guidance.md) |
 | D21 | [模型请求、原始数据与用量观测](request-observability.md) | 原型已确定；复用已有事件；查询 `project.attempts`、`project.usage`、`run.attempt` 已由应用层提供，界面的观测页（请求记录、用量统计、请求详情）由 #80 实现，属于 Stage 3 的里程碑 M1 |
 | D22 | [启动与 Provider 热生效](startup-provider-reload.md) | Stage 2.7 已实现；无参空态启动、统一模块重载、页面 Key 与独立 .env 来源均通过本地验收，真实 Go 侧已用用户指定模型完成模型测试与三部门任务；现有实现只对新任务生效，按每次模型请求生效由 #45 实施 |
 | D24 | [模型管理与部门模型选择](model-management.md) | 需求与[设计说明](../design/model-management.md)已确认，实施中：调用目标每次请求解析（#45）、获取模型列表带凭据与连接测试（#85）已完成，其余在 #83 下，属于 Stage 3 的里程碑 M1；2026-10-07 M1 试用以后，调用协议属于模型访问定义（[ADR-0033](../adr/0033-protocol-belongs-to-model-access.md)），自定义服务的模型列表地址默认取「地址/models」，加入模型时直接采用预填的容量并自动进行模型测试；部门默认加项目部门设置、按请求解析调用目标、推理档位，取代 D02/D18/D22/D23 中的任务冻结与事项内 Prompt 编辑 |
