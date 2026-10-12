@@ -10,7 +10,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
-from harness.event_store import project_stream
+from harness.event_store import Command, project_stream
 from harness.department_prompts import save_department_prompt
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, ProjectEventType, json_dumps
 from harness.write_path import NewProjectEvent
@@ -31,7 +31,7 @@ from harness.proposals import (
     response_turn,
     review_turn,
 )
-from harness.projection import RunNotFoundError
+from harness.projection import RunNotFoundError, saved_decision, saved_decisions
 from harness.providers.call import ModelResponse
 from harness.public_tree import TreeError, capture_public_tree
 from harness.runtime import LoopSystem
@@ -54,6 +54,12 @@ def _v2_files():
     return {"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n", "src/extra.py": "EXTRA = True\n"}
 
 
+def _kernel_release_script(summary="v1", files=None):
+    # 工程计划的范围包含要改动的内核清单路径，工具才会允许写这个文件
+    return [product_spec(), plan_turn(scope=["src/", *files]), delivery_turn(summary=summary, files=files),
+            review_turn("release", f"ok {summary}")]
+
+
 def _pinned_sources(system, request):
     return [part.source for part in recorded_context(system, request).parts]
 
@@ -63,7 +69,18 @@ def _project_events(system, project_id, event_type):
 
 
 # ---------------------------------------------------------------------------
+
 # §3 项目流
+
+
+def _open_decisions(system):
+    return [decision for decision in saved_decisions(system.store, kinds=("kernel_modification",))[1]
+            if decision.status == "open"]
+
+
+def _answer(system, decision_id, option):
+    command = Command(decision_id, "decision.answer", f"sha256:{option}", "user:local")
+    return system.orchestrator.answer_decision(decision_id, option, None, base_version=1, command=command)
 
 
 def test_project_events_have_their_own_stream_in_the_one_log(data_dir):
@@ -740,6 +757,74 @@ def test_archived_unsettled_release_settles_on_read_not_on_start(data_dir):
     project = system.projects.projection(project_id)
     assert project.archived is True and project.current_adoption.run_id == run_id
     assert project.work_items[0].status == "adopted"
+
+
+def test_release_touching_kernel_paths_is_not_adopted_without_approval(data_dir):
+    # 受控内核设计说明第 4.2 节：交付改动了内核清单里的路径时，结算不自动采纳，
+    # 而是发出内核修改决定请求，材料附改动的路径与差异
+    kernel_files = {"src/echo.py": "LOWER = True\n", "harness/bounds.py": "# 被交付改动的内核文件\n"}
+    system = _system(data_dir, _kernel_release_script(files=kernel_files))
+    project_id = system.projects.register("Kernel", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "改动了内核")
+    system.run_until_stop(run_id)
+    system.projects.settle(run_id)
+    project = system.projects.projection(project_id)
+    assert project.current_adoption is None
+    assert project.work_item(work_item_id).status == "released_unsettled"
+    assert _project_events(system, project_id, ProjectEventType.DELIVERABLE_ADOPTED) == []
+    [decision] = _open_decisions(system)
+    assert decision.kind == "kernel_modification" and decision.blocks == "run"
+    assert decision.status == "open"
+    assert decision.request["delivery_run_id"] == run_id
+    assert decision.request["kernel_paths"] == ["harness/bounds.py"]
+    assert "+# 被交付改动的内核文件" in decision.request["diff"]
+    assert [option["id"] for option in decision.request["options"]] == ["approve", "reject"]
+    # 幂等：重复结算不再发出第二个决定请求
+    assert system.projects.settle(run_id) is None
+    assert len(_open_decisions(system)) == 1
+
+def test_release_outside_kernel_paths_is_adopted_as_before(data_dir):
+    # 没有落在内核清单里的改动照常采纳，不产生决定请求
+    system = _system(data_dir, _release_script("v1", files=_v2_files()))
+    project_id = system.projects.register("Ordinary", GOAL)
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "常规改动")
+    system.run_until_stop(run_id)
+    system.projects.settle(run_id)
+    project = system.projects.projection(project_id)
+    assert project.current_adoption.run_id == run_id
+    assert _open_decisions(system) == []
+
+def test_kernel_modification_approved_adopts_the_delivery(data_dir):
+    system = _system(data_dir, _kernel_release_script(files={"harness/bounds.py": "# 批准以后采纳\n"}))
+    project_id = system.projects.register("Approve", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "批准内核改动")
+    system.run_until_stop(run_id)
+    system.projects.settle(run_id)
+    [decision] = _open_decisions(system)
+    assert _answer(system, decision.decision_id, "approve") is None
+    project = system.projects.projection(project_id)
+    assert project.current_adoption.run_id == run_id
+    assert project.current_adoption.previous_adoption_id is None
+    assert project.work_item(work_item_id).status == "adopted"
+    assert _open_decisions(system) == []
+    # 批准以后再结算：同一个 run 已有请求，不再发出第二个请求，也不重复采纳
+    assert system.projects.settle(run_id) is None
+    assert len(_project_events(system, project_id, ProjectEventType.DELIVERABLE_ADOPTED)) == 1
+
+def test_kernel_modification_rejected_leaves_the_delivery_unadopted(data_dir):
+    system = _system(data_dir, _kernel_release_script(files={"harness/bounds.py": "# 拒绝以后不采纳\n"}))
+    project_id = system.projects.register("Reject", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "拒绝对内核的改动")
+    system.run_until_stop(run_id)
+    system.projects.settle(run_id)
+    [decision] = _open_decisions(system)
+    assert _answer(system, decision.decision_id, "reject") is None
+    project = system.projects.projection(project_id)
+    assert project.current_adoption is None
+    assert project.work_item(work_item_id).status == "released_unsettled"
+    assert _project_events(system, project_id, ProjectEventType.DELIVERABLE_ADOPTED) == []
+    assert _open_decisions(system) == []
+    assert system.projects.settle(run_id) is None
 
 
 def test_source_run_from_another_project_cannot_be_baseline(data_dir):
