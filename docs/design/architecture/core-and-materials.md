@@ -2,7 +2,7 @@
 
 更新：2026-10-07 按 [ADR-0027](../../adr/0027-trusted-kernel-outside-self-modification.md) 至 [ADR-0031](../../adr/0031-declared-loop-layers-and-sub-loops.md) 修改第 2、3、4.1、4.3、5、6、7.2 节；2026-09-30，第 2、3 节按 [ADR-0020](../../adr/0020-block-only-when-no-downstream-check.md)（权威拓扑与目标层的治理形状、阻塞与否的判据）修改；第 7 节按 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)（一台控制主机，执行环境分布到多台机器）与 [ADR-0022](../../adr/0022-run-directly-without-containers.md)（代码在执行位置上直接运行）修改。状态：架构讨论记录。用户的陈述与确认单独标注；其余是架构师的分析，经用户确认后写入 ADR、需求记录与各模块设计。2026-09-26 用户确认每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动（[ADR-0010](../../adr/0010-control-core-drives-role-steps.md)），第 2、6、7、8、9 节按此修改；教训的来源与反复退回的处理按用户同日的决定修改第 4.2 节；同日确认的 [ADR-0011](../../adr/0011-async-control-core.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 写入第 7、9、11 节；2026-10-07 按 [ADR-0032](../../adr/0032-interface-served-as-web-pages.md) 与 [ADR-0021](../../adr/0021-client-pixel-view-follows-v9-structure.md) 修改第 7.3、7.4、9 节的界面形式与画面文字。
 
-依据：[Loop System 原理](../../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md)、[D29 远程执行环境](../../requirements/remote-execution.md)、[D31 部门内的外包角色](../../requirements/outsourced-agent-roles.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../../research/loop-engineering-2026.md)、[Graph engineering](../../research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../../research/anthropic-ai-native-sdlc-sources.md)。分层与模块见 [总体架构：职责分层](overall-architecture.md)。
+依据：[Loop System 原理](../../archive/native-harness/loop-system-principles.md)、[Loop System 架构](../../archive/native-harness/loop-system-architecture.md)、[ADR-0007](../../adr/0007-boundaries-for-distributed-deployment.md)、[D29 远程执行环境](../../requirements/remote-execution.md)、[D31 部门内的外包角色](../../requirements/outsourced-agent-roles.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)，以及三份调研：[Loop engineering](../../archive/research/loop-engineering-2026.md)、[Graph engineering](../../archive/research/graph-engineering-2026.md)、[Anthropic AI-native SDLC](../../archive/research/anthropic-ai-native-sdlc-sources.md)。分层与模块见 [总体架构：职责分层](overall-architecture.md)。
 
 ## 1. 出发点
 
@@ -133,7 +133,7 @@ Astra 把循环放进模型内部，代价是过程不可见。Yudao 的控制�
 
 - 手册：「A skill is a control, though an advisory one … the hook makes them close to impossible」，对应规则由代码执行、不靠提示词。
 - 手册总结的一次内部事故：事故响应 agent 通过 Slack 请另一个能写代码的 Claude 推送修复；教训是「draw the boundary around access and actions, not around a model's instructions」，对应权威拓扑不能被参与者协商改变、执行者之间没有直接通道。
-- 手册的交接文件链 intent → spec → plan，对应 Yudao 的 intend → PRD → PLAN（2026-09-06 的比较见 [AI 原生 SDLC 对 Yudao 的启示](../../research/ai-native-sdlc-insights.md)）。
+- 手册的交接文件链 intent → spec → plan，对应 Yudao 的 intend → PRD → PLAN（2026-09-06 的比较见 [AI 原生 SDLC 对 Yudao 的启示](../../archive/research/ai-native-sdlc-insights.md)）。
 - loop 工程中 Ralph 与 routines 每轮全新会话、从文件装配，以及 maker 与 checker 分开，对应会话可以丢弃与独立核验。
 - graph 工程中由脚本决定下一步，对应编排器只依据已记录的事实决定流转。
 - Proof-or-Stop：「Agent outputs may propose lifecycle claims, but do not themselves constitute lifecycle state」，对应 U ≠ f。

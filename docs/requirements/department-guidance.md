@@ -28,6 +28,6 @@
 
 ## 验收与状态
 
-状态：接收与查询已实现（`fe78667`、`fcb06ab`），命令 `guidance.send` 接收指导，`harness/interactions.py` 保存原文并写入 `department_guidance_received` 事件，指导记录由 `department.workspace` 查询读取。2026-10-12 按 ADR-0036 修改送达与处理结果，删除部门的正式回应与放行前的核对，这部分未实施。真实运行：3.0B 场景 B 中指导 `guidance_c0f7c8ea684b4e48` 在返工激活中处理，事项完成到 release（[3.0B 场景报告](../stage-3/3.0b-scenarios-report-2026-09-21.md)）。
+状态：接收与查询已实现（`fe78667`、`fcb06ab`），命令 `guidance.send` 接收指导，`harness/interactions.py` 保存原文并写入 `department_guidance_received` 事件，指导记录由 `department.workspace` 查询读取。2026-10-12 按 ADR-0036 修改送达与处理结果，删除部门的正式回应与放行前的核对，这部分未实施。真实运行：3.0B 场景 B 中指导 `guidance_c0f7c8ea684b4e48` 在返工激活中处理，事项完成到 release（[3.0B 场景报告](../archive/stage-3/3.0b-scenarios-report-2026-09-21.md)）。
 
 验收至少覆盖三个部门的定向发送、活跃与非活跃接收、工具及模型在途、返工与询问、终态边界、刷新重连、原文保真和处理来源审计。模型的实际输入必须含目标指导，其他部门收到的内容限于可见范围规定的部分。

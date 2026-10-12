@@ -1,6 +1,6 @@
 # 部门内多角色设计说明
 
-日期：2026-09-25；2026-09-26 按总体架构与用户的决定修改，同日补全计划的更新、执行槽位的计数、停滞时的历史、交出检查的审查记录与自测、专家请求期间的角色任务、验收对照与角色任务的恢复这几项规则；2026-10-07 按 [ADR-0029](../adr/0029-departments-form-by-information-cohesion.md)、[ADR-0030](../adr/0030-rules-are-provisional-defaults.md)、[ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md) 修改第 2、4、9、10、11、12、13、16 节。状态：设计草案，规则已由用户确认（[D26](../requirements/department-roles.md) 2026-09-25 至 2026-09-26），未实施。需求：[D26 部门内多角色与多循环](../requirements/department-roles.md)。调研：[语义系统与部门内多角色：参照调研](../research/semantic-system-and-department-roles.md)。前置设计：[总体架构：职责分层](architecture/overall-architecture.md)、[语义系统设计说明](semantic-system.md)、[模型管理设计说明](model-management.md)。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。
+日期：2026-09-25；2026-09-26 按总体架构与用户的决定修改，同日补全计划的更新、执行槽位的计数、停滞时的历史、交出检查的审查记录与自测、专家请求期间的角色任务、验收对照与角色任务的恢复这几项规则；2026-10-07 按 [ADR-0029](../adr/0029-departments-form-by-information-cohesion.md)、[ADR-0030](../adr/0030-rules-are-provisional-defaults.md)、[ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md) 修改第 2、4、9、10、11、12、13、16 节。状态：设计草案，规则已由用户确认（[D26](../requirements/department-roles.md) 2026-09-25 至 2026-09-26），未实施。需求：[D26 部门内多角色与多循环](../requirements/department-roles.md)。调研：[语义系统与部门内多角色：参照调研](../archive/research/semantic-system-and-department-roles.md)。前置设计：[总体架构：职责分层](architecture/overall-architecture.md)、[语义系统设计说明](semantic-system.md)、[模型管理设计说明](model-management.md)。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
 ## 1. 要解决的问题
 
@@ -430,6 +430,6 @@ stateDiagram-v2
 | [语义系统设计说明](semantic-system.md) | 第 10.8 节写明中心角色、经理、探索者与主程、审查者各自的上下文，以及 PRD 更新后依据旧版本的预测性任务记录的内容变为失效；第 10.3 节写明部门账本在中心角色与经理的当前状态栏目中的显示；第 4、8 节写明复盘由流程编排安排，中心角色通过一次单独的请求完成 |
 | [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md) | 第 5 节写明角色任务（含审查任务与预测性任务）的恢复规则；进行中的角色任务由步骤驱动从已提交的状态重新装配后继续 |
 | [D31](../requirements/outsourced-agent-roles.md) | 自有角色的步骤由控制核心驱动；外包角色由控制核心派发给外部 agent |
-| [界面原型 v7](../prototypes/v7/design.md)、[D30](../requirements/web-game-frontend.md) | 房间围绕中心角色布置，增加审查者，「开发者」改为「主程」；角色详情显示每一步的模型请求、工具调用及工具许可的结果；通知增加反复退回的提醒 |
+| [界面原型 v7](../archive/prototypes/v7/design.md)、[D30](../requirements/web-game-frontend.md) | 房间围绕中心角色布置，增加审查者，「开发者」改为「主程」；角色详情显示每一步的模型请求、工具调用及工具许可的结果；通知增加反复退回的提醒 |
 | [总体路线图](../program-roadmap.md) | Stage 5（部门内协作、上下文与界面）包含本设计，对产品、工程、质检、运维四个部门一起引入，运维部门的角色在 Stage 5 设计时确定；本阶段内各项工作的先后由 [D32](../requirements/comparison-experiment.md) 对照实验的结果决定 |
 | ADR | [ADR-0010](../adr/0010-control-core-drives-role-steps.md) 记录每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动；[ADR-0016](../adr/0016-center-role-collaboration.md) 记录部门采用中心型协作，经理是部门唯一的对外接口，工具角色经中心角色的分派接受任务；[ADR-0017](../adr/0017-role-settings-override-department.md) 记录模型选择中角色设置优先于部门设置 |

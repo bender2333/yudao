@@ -1,6 +1,6 @@
 # 模型管理设计说明
 
-日期：2026-09-24；2026-09-26 按 ADR-0017 在第 5 节增加角色一层；2026-10-02 第 5.3 节增加事项种类的工作说明（工单 #248）；2026-10-07 按 [ADR-0028](../adr/0028-three-means-of-adjudication.md)、[ADR-0030](../adr/0030-rules-are-provisional-defaults.md)、[ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md)：不自动改用其他模型限定为角色的模型失败时，等待模型服务有时长上限，模型访问定义增加单价，工作上限与整理请求等数值登记为暂定默认值；同日 M1 试用以后按 [ADR-0033](../adr/0033-protocol-belongs-to-model-access.md) 与 [ADR-0002](../adr/0002-candidates-need-test-to-admit.md)：调用协议属于模型访问定义，预置表增加默认协议、能力表增加每个模型的协议，自定义服务的模型列表地址默认取连接地址加 `/models`，从模型列表勾选「加入」时直接采用预填的容量并自动进行模型测试，新建连接按服务方案自动填写 ID、名称与凭据引用并随连接保存 Key（#364）（第 1 至 3 节、第 4.1 至 4.4、4.6、9.1、10 至 12 节）。状态：设计已确认，未实施。需求：[D24 模型管理与部门模型选择](../requirements/model-management.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。相关决定：[ADR-0002 准入](../adr/0002-candidates-need-test-to-admit.md)、[ADR-0003 预置表](../adr/0003-versioned-preset-table-no-remote-refresh.md)、[ADR-0033 协议属于模型访问定义](../adr/0033-protocol-belongs-to-model-access.md)、[ADR-0005 按请求解析调用目标](../adr/0005-resolve-call-target-per-request.md)、[ADR-0006 推理档位](../adr/0006-reasoning-levels-declared-per-model.md)、[ADR-0017 角色设置优先于部门设置](../adr/0017-role-settings-override-department.md)。界面原型：[v7 原型](../prototypes/v7/design.md)，模型管理页与部门设置弹窗按第 9 节制作。
+日期：2026-09-24；2026-09-26 按 ADR-0017 在第 5 节增加角色一层；2026-10-02 第 5.3 节增加事项种类的工作说明（工单 #248）；2026-10-07 按 [ADR-0028](../adr/0028-three-means-of-adjudication.md)、[ADR-0030](../adr/0030-rules-are-provisional-defaults.md)、[ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md)：不自动改用其他模型限定为角色的模型失败时，等待模型服务有时长上限，模型访问定义增加单价，工作上限与整理请求等数值登记为暂定默认值；同日 M1 试用以后按 [ADR-0033](../adr/0033-protocol-belongs-to-model-access.md) 与 [ADR-0002](../adr/0002-candidates-need-test-to-admit.md)：调用协议属于模型访问定义，预置表增加默认协议、能力表增加每个模型的协议，自定义服务的模型列表地址默认取连接地址加 `/models`，从模型列表勾选「加入」时直接采用预填的容量并自动进行模型测试，新建连接按服务方案自动填写 ID、名称与凭据引用并随连接保存 Key（#364）（第 1 至 3 节、第 4.1 至 4.4、4.6、9.1、10 至 12 节）。状态：设计已确认，未实施。需求：[D24 模型管理与部门模型选择](../requirements/model-management.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。相关决定：[ADR-0002 准入](../adr/0002-candidates-need-test-to-admit.md)、[ADR-0003 预置表](../adr/0003-versioned-preset-table-no-remote-refresh.md)、[ADR-0033 协议属于模型访问定义](../adr/0033-protocol-belongs-to-model-access.md)、[ADR-0005 按请求解析调用目标](../adr/0005-resolve-call-target-per-request.md)、[ADR-0006 推理档位](../adr/0006-reasoning-levels-declared-per-model.md)、[ADR-0017 角色设置优先于部门设置](../adr/0017-role-settings-override-department.md)。界面原型：[v7 原型](../archive/prototypes/v7/design.md)，模型管理页与部门设置弹窗按第 9 节制作。
 
 本说明是模型目录、部门与角色的模型选择、推理档位、调用目标解析与上下文容量的判断标准。其他文档与本说明冲突时，以本说明为准。
 
@@ -359,7 +359,7 @@ sequenceDiagram
 ### 8.3 预留与阈值
 
 - 预留量 = max(窗口 × 15%, 16384)（暂定默认值，见规则登记）。这个值达到窗口的 85% 时（窗口约 19275 以下，只在小窗口测试中出现），预留量取窗口的 15%。
-- 压缩阈值 = min(窗口 − 预留量, 工作上限)。工作上限取规则登记中 `context.work_limit_tokens` 的值（暂定默认值 100000 token，见规则登记），取 Anthropic 工具结果清理的默认触发值；输入越长模型表现越差，即使相关信息全部在其中（[上下文组装：参照调研](../research/context-assembly-reference.md)第 4.7 节）。1M 窗口在 100000 时压缩。
+- 压缩阈值 = min(窗口 − 预留量, 工作上限)。工作上限取规则登记中 `context.work_limit_tokens` 的值（暂定默认值 100000 token，见规则登记），取 Anthropic 工具结果清理的默认触发值；输入越长模型表现越差，即使相关信息全部在其中（[上下文组装：参照调研](../archive/research/context-assembly-reference.md)第 4.7 节）。1M 窗口在 100000 时压缩。
 - 本次请求的输出上限 = min(模型输出上限, 窗口 − 输入估算)。
 
 ### 8.4 整理请求
@@ -390,7 +390,7 @@ sequenceDiagram
 
 ## 9. 界面
 
-本节以 [v6 原型](../archive/prototypes/department-workspace-v6.html)为基础写成，列出按本说明修改的地方；[v7 原型](../prototypes/v7/design.md)已按本节制作。
+本节以 [v6 原型](../archive/prototypes/department-workspace-v6.html)为基础写成，列出按本说明修改的地方；[v7 原型](../archive/prototypes/v7/design.md)已按本节制作。
 
 ### 9.1 模型管理页
 
@@ -478,7 +478,7 @@ sequenceDiagram
 - D02 的「默认修改当前任务，目标部门下一次激活生效」与事项内 Prompt 编辑。
 - D10 与[决策记录](../decision.md)中「摘要请求不带推理参数」「摘要输出上限固定 4096」，以及按字符数估算用量。
 - D23 原有的「连接地址为完整端点」。
-- [OMP 能力差距清单](../stage-3/omp-capability-gap.md)中「会话内换模型：不采用」。
+- [OMP 能力差距清单](../archive/stage-3/omp-capability-gap.md)中「会话内换模型：不采用」。
 
 ## 12. TODO
 

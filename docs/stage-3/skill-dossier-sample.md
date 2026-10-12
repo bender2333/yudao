@@ -8,7 +8,7 @@
 - [组织与持续运行研究](../research/organization-runtime-evolution.md) 第 4 节（4.1 技能是有证据的工作过程、4.2 技能比较）、第 11 节准备包
 - [总体路线图](../program-roadmap.md) 第 4 节技能封装
 - [实验协议](../research/experiment-protocol.md) 第 8 节「技能封装」
-- [原生项目演化设计](../research/native-project-evolution-design.md) 第 9 节（技能比较可挂在同一 CLI 任务族上）
+- [原生项目演化设计](../archive/research/native-project-evolution-design.md) 第 9 节（技能比较可挂在同一 CLI 任务族上）
 
 **这是研发者手写的技能档案。系统自动提炼技能属于第四阶段。** 一次成功的 run 不能把本档案变成默认技能（研究 4.1）。封装后的正常路径与展开路径使用**同一过程版本**；展开是显示并操控这些步骤，不是失败后换成无限自由 Agent。
 
