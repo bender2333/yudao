@@ -1590,7 +1590,11 @@ class Orchestrator:
             if option not in [item["id"] for item in decision.request["options"]]:
                 raise InvalidOption(decision, option)
             if is_catalog_stream(saved.stream):
-                return self._answer_catalog_decision(transaction, decision, option, note, base_version, decision_id)
+                # 目录流中的决定请求（工单 #355）：不属于任何 run 或项目，回答只是记下用户的决定
+                transaction.append(NewCatalogEvent(CatalogEventType.INSTANCE_UPGRADE_ANSWERED, {
+                    "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
+                }, actor="system"))
+                return None
             if is_run_stream(saved.stream):
                 return self._answer_run_decision(transaction, decision, option, note, base_version, decision_id)
             return self._answer_project_decision(transaction, decision, option, note, base_version, decision_id)

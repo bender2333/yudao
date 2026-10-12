@@ -157,14 +157,16 @@ def apply_decision_event(decisions: dict[str, DecisionRequest], event: Event | P
             work_item_id=event.work_item_id, requested_at=event.created_at, request=dict(payload),
         )
         return event.event_id
-    if event.type == EventType.DECISION_ANSWERED:
+    if event.type in (EventType.DECISION_ANSWERED, ProjectEventType.PROJECT_DECISION_ANSWERED,
+                      CatalogEventType.INSTANCE_UPGRADE_ANSWERED):
         decision = decisions[payload["decision_id"]]
         decision.status = "answered"
         decision.answer = {"event_id": event.event_id, "option": payload["option"], "note": payload["note"],
                            "base_version": payload["base_version"], "actor": event.actor,
                            "command_id": event.command_id, "answered_at": event.created_at}
         return decision.decision_id
-    if event.type == EventType.DECISION_WITHDRAWN:
+    if event.type in (EventType.DECISION_WITHDRAWN, ProjectEventType.PROJECT_DECISION_WITHDRAWN,
+                      CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN):
         decision = decisions[payload["decision_id"]]
         decision.status = "withdrawn"
         decision.withdrawal = {"event_id": event.event_id, "reason": payload["reason"],
@@ -178,39 +180,12 @@ def apply_decision_event(decisions: dict[str, DecisionRequest], event: Event | P
             requested_at=event.created_at, request=dict(payload),
         )
         return event.event_id
-    if event.type == ProjectEventType.PROJECT_DECISION_ANSWERED:
-        decision = decisions[payload["decision_id"]]
-        decision.status = "answered"
-        decision.answer = {"event_id": event.event_id, "option": payload["option"], "note": payload["note"],
-                           "base_version": payload["base_version"], "actor": event.actor,
-                           "command_id": event.command_id, "answered_at": event.created_at}
-        return decision.decision_id
-    if event.type == ProjectEventType.PROJECT_DECISION_WITHDRAWN:
-        decision = decisions[payload["decision_id"]]
-        decision.status = "withdrawn"
-        decision.withdrawal = {"event_id": event.event_id, "reason": payload["reason"],
-                               "withdrawn_at": event.created_at}
-        return decision.decision_id
     if event.type == CatalogEventType.INSTANCE_UPGRADE_REQUESTED:
-        # 目录流中的决定请求（迭代底座 B7，工单 #355）：不属于任何项目或 run，范围列为空
+        # 目录流中的决定请求（工单 #355）：不属于任何项目或 run，范围列为空
         decisions[event.event_id] = DecisionRequest(
             decision_id=event.event_id, stream=event.stream, run_id=None, project_id=None, work_item_id=None,
-            requested_at=event.created_at, request=dict(payload),
-        )
+            requested_at=event.created_at, request=dict(payload))
         return event.event_id
-    if event.type == CatalogEventType.INSTANCE_UPGRADE_ANSWERED:
-        decision = decisions[payload["decision_id"]]
-        decision.status = "answered"
-        decision.answer = {"event_id": event.event_id, "option": payload["option"], "note": payload["note"],
-                           "base_version": payload["base_version"], "actor": event.actor,
-                           "command_id": event.command_id, "answered_at": event.created_at}
-        return decision.decision_id
-    if event.type == CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN:
-        decision = decisions[payload["decision_id"]]
-        decision.status = "withdrawn"
-        decision.withdrawal = {"event_id": event.event_id, "reason": payload["reason"],
-                               "withdrawn_at": event.created_at}
-        return decision.decision_id
     return None
 
 
