@@ -1661,8 +1661,59 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested;
+    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | KernelModificationRequested;
     answer: DecisionAnswerRecord | null;
+};
+
+/**
+ * DeliverableAdoptedPayload
+ */
+export type DeliverableAdoptedPayload = {
+    /**
+     * Adoption Id
+     */
+    adoption_id: string;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Delivery Event Id
+     */
+    delivery_event_id: string;
+    /**
+     * Qa Event Id
+     */
+    qa_event_id: string;
+    tree_ref: ArtifactRef;
+    /**
+     * Code Tree Digest
+     */
+    code_tree_digest: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Files
+     */
+    files: Array<string>;
+    /**
+     * Check Names
+     */
+    check_names: Array<string>;
+    /**
+     * Known Risks
+     */
+    known_risks: Array<string>;
+    /**
+     * Previous Adoption Id
+     */
+    previous_adoption_id: string | null;
 };
 
 /**
@@ -2414,6 +2465,53 @@ export type InputView = {
     git_version?: {
         [key: string]: unknown;
     } | null;
+};
+
+/**
+ * KernelModificationRequested
+ */
+export type KernelModificationRequested = {
+    /**
+     * Kind
+     */
+    kind: 'kernel_modification';
+    /**
+     * Blocks
+     */
+    blocks: 'run';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality';
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Delivery Run Id
+     */
+    delivery_run_id: string;
+    /**
+     * Kernel Paths
+     */
+    kernel_paths: Array<string>;
+    /**
+     * Diff
+     */
+    diff: string;
+    held_adoption: DeliverableAdoptedPayload;
 };
 
 /**
@@ -7841,57 +7939,6 @@ export type DeliverableAdoptedEvent = {
 };
 
 /**
- * DeliverableAdoptedPayload
- */
-export type DeliverableAdoptedPayload = {
-    /**
-     * Adoption Id
-     */
-    adoption_id: string;
-    /**
-     * Work Item Id
-     */
-    work_item_id: string;
-    /**
-     * Run Id
-     */
-    run_id: string;
-    /**
-     * Delivery Event Id
-     */
-    delivery_event_id: string;
-    /**
-     * Qa Event Id
-     */
-    qa_event_id: string;
-    tree_ref: ArtifactRef;
-    /**
-     * Code Tree Digest
-     */
-    code_tree_digest: string;
-    /**
-     * Summary
-     */
-    summary: string;
-    /**
-     * Files
-     */
-    files: Array<string>;
-    /**
-     * Check Names
-     */
-    check_names: Array<string>;
-    /**
-     * Known Risks
-     */
-    known_risks: Array<string>;
-    /**
-     * Previous Adoption Id
-     */
-    previous_adoption_id: string | null;
-};
-
-/**
  * DeliveryAcceptedEvent
  */
 export type DeliveryAcceptedEvent = {
@@ -11889,7 +11936,10 @@ export type ProjectDecisionRequestedEvent = {
      * Type
      */
     type: 'project_decision_requested';
-    payload: InitialPrdRequested;
+    /**
+     * Payload
+     */
+    payload: InitialPrdRequested | KernelModificationRequested;
 };
 
 /**

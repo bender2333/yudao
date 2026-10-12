@@ -28,13 +28,15 @@ from .compaction import response_reserve
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION, DecisionClosed,
+    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION,
+    DecisionClosed,
     DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_activation, blocks_run,
 )
 from .environment import LocalEnvironment
 from .deltas import DeltaChannel
-from .event_store import Command, EventStore, StreamVersionConflict, is_run_stream, project_stream, run_stream
-from .write_path import NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
+from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog_stream, is_run_stream,
+                          project_stream, run_stream)
+from .write_path import NewCatalogEvent, NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
 from .tree_archive import artifact_run, load_tree
 from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .streams import (
@@ -48,6 +50,7 @@ from .overview import repository_overview
 from . import parameters as parameter_values
 from .models import (
     ArtifactRef,
+    CatalogEventType,
     Event as RunEvent,
     DEPARTMENTS,
     DecisionRequest,
@@ -1587,6 +1590,12 @@ class Orchestrator:
                 raise StaleDecision(decision, base_version)
             if option not in [item["id"] for item in decision.request["options"]]:
                 raise InvalidOption(decision, option)
+            if is_catalog_stream(saved.stream):
+                # 目录流中的决定请求（工单 #355）：不属于任何 run 或项目，回答只是记下用户的决定
+                transaction.append(NewCatalogEvent(CatalogEventType.INSTANCE_UPGRADE_ANSWERED, {
+                    "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
+                }, actor="system"))
+                return None
             if is_run_stream(saved.stream):
                 return self._answer_run_decision(transaction, decision, option, note, base_version, decision_id)
             return self._answer_project_decision(transaction, decision, option, note, base_version, decision_id)
@@ -1658,6 +1667,9 @@ class Orchestrator:
             "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
             "work_item_id": work_item_id, "run_id": candidate_run_id,
         }, actor="system"))
+        if decision.kind == KERNEL_MODIFICATION.name:
+            self._settle_kernel_modification(transaction, decision, option)
+            return None
         if decision.kind != INITIAL_PRD.name:
             return None
         candidate = next((item for item in transaction.projection.initial_prd_candidates
@@ -1668,6 +1680,16 @@ class Orchestrator:
             self._adopt_baseline(transaction, candidate, decision_id)
             return None
         return self._start_onboarding_revision(transaction, candidate, note)
+
+    def _settle_kernel_modification(self, transaction: Transaction, decision: DecisionRequest, option: str) -> None:
+        # 内核修改的批准与拒绝（受控内核设计说明第 4.2 节，工单 #354）：批准时把请求携带的采纳载荷写入
+        # 项目流，交付自此成为当前采纳成果；拒绝时什么都不写，交付保持未采纳
+        if option != "approve":
+            return
+        current = transaction.projection.current_adoption
+        adoption = dict(decision.request["held_adoption"],
+                        previous_adoption_id=None if current is None else current.adoption_id)
+        transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, adoption, actor="system"))
 
     def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
         # 采纳建档基线（工单 #136，设计第 5 节）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要

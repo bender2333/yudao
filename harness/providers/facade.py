@@ -783,6 +783,14 @@ class ProviderFacade:
             api_key = self._resolve_api_key(provider)
         return _refresh_candidates(provider, models_url_override=models_url_override, api_key=api_key)
 
+    def models_url_of(self, provider_id: str, models_url_override: str | None = None) -> str:
+        # 这次请求实际读取的模型列表地址：覆盖值、已保存值、预置表地址，最后是自定义默认值
+        with self._lock:
+            provider = self._store.providers.get(str(provider_id))
+            if provider is None:
+                return ""
+            return effective_models_url(provider, models_url_override)
+
     def _resolve_api_key(self, provider: Any) -> str:
         # 模型列表地址要求认证时按协议取凭据；fake 不需要凭据。
         # 凭据引用无法解析时交回空串，由获取模型列表与连接测试报告「候选未知」并说明原因

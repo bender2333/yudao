@@ -67,13 +67,28 @@ def _render(schema: dict, defs: dict) -> str:
         return "object"
     return schema.get("type", "any")
 
+def _merge(value: str, other: str) -> str:
+    # 同一个字段在联合的两个成员里都有时的写法：取值固定且基础类型相同则合并取值集合，否则按类型取并集
+    left, right = parse_fixed_values(value), parse_fixed_values(other)
+    if left is not None and right is not None and left[0] == right[0]:
+        return f"enum {left[0]}[{', '.join(sorted(left[1] | right[1]))}]"
+    return " | ".join(sorted({value, other}))
+
 def live_fields() -> dict[str, dict[str, str]]:
-    # 合同类型中项目流每个事件种类的字段与类型
+    # 合同类型中项目流每个事件种类的字段与类型。一个事件种类的载荷是以某字段区分的联合时（项目决定请求按
+    # kind 区分，工单 #136、#354），登记的字段是各成员字段的并集：Project 流只增加字段，联合的每个成员
+    # 各自只携带自己的那一组字段
     fields: dict[str, dict[str, str]] = {}
     for kind in sorted(PROJECT_EVENT_TYPES):
         schema = TypeAdapter(PAYLOADS[kind]).json_schema()
         defs = schema.pop("$defs", {})
-        fields[kind] = {name: _render(sub, defs) for name, sub in schema.get("properties", {}).items()}
+        members = [_resolve(sub, defs) for sub in schema.get("anyOf", ())]
+        rendered: dict[str, str] = {}
+        for properties in [schema, *members]:
+            for name, sub in properties.get("properties", {}).items():
+                value = _render(sub, defs)
+                rendered[name] = value if name not in rendered else _merge(rendered[name], value)
+        fields[kind] = rendered
     return fields
 
 class ManifestWriteRejected(ValueError):

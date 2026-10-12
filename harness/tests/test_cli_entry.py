@@ -91,3 +91,13 @@ def test_smoke_takes_the_provider_config_from_either_position(tmp_path):
     config, dotenv = _provider_paths(_data_dir(parsed, "smoke"), parsed.provider_config)
     assert config == (tmp_path / "data" / "providers.json").resolve()
     assert dotenv == default_dotenv(tmp_path / "data").resolve()
+
+
+def test_release_check_takes_the_repository_and_the_data_directory_from_either_position(tmp_path):
+    # 发布检查（工单 #355）：待发布仓库是位置参数，--data-dir 写在子命令之前或之后都生效
+    before = build_parser().parse_args(["--data-dir", str(tmp_path), "release-check", "some-repo"])
+    assert before.command == "release-check" and before.repository == "some-repo"
+    assert _data_dir(before, "release-check") == str(tmp_path)
+    after = build_parser().parse_args(["release-check", "some-repo", "--data-dir", str(tmp_path)])
+    assert after.command == "release-check" and after.repository == "some-repo"
+    assert _data_dir(after, "release-check") == str(tmp_path)

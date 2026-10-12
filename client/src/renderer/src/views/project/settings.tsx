@@ -13,6 +13,7 @@ import {
 } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, useDepartmentDraft } from "./department-settings-form";
 import { SETTING_SOURCE, departmentName, label } from "./labels";
+import { PageHead } from "../../shell/kit";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { followDepartmentLabel, mergedModelId, modelById } from "../models/model-logic";
 
@@ -26,7 +27,12 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
   const command = useCommand(props.app, pageKey([data?.version, data?.name, data?.goal, data?.pinned, data?.archived]));
 
   return (
-    <div className="page">
+    <div className="page y10-set">
+      <PageHead
+        eyebrow="项目设置"
+        title={data ? data.name : "项目设置"}
+        subtitle="基本信息、部门设置、登记命令、源目录、工具授权、机器授权、执行位置与角色设置。"
+      />
       <Loading state={settings} />
       {data ? (
         <>
@@ -34,10 +40,65 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
           <Departments app={props.app} data={data} />
           <CommandRegistry app={props.app} data={data} />
           <SourceDirectories app={props.app} data={data} />
+          <ToolAuthorization />
+          <MachineAuthorization />
+          <ExecutionPlacement />
+          <Operations />
+          <RoleSettings />
         </>
       ) : null}
     </div>
   );
+}
+
+// 工具授权（3.2B）、机器授权（3.2C）、执行位置、运维与本项目各角色设置：
+// 命令与查询还在所属工作包，登记以后这里改成对应的表单；在此之前如实写明等待登记，不造表
+function PendingBlock(props: { title: string; note: string; text: string }) {
+  return (
+    <Section title={props.title} note={props.note} className="y10-set-pending">
+      <Empty text={props.text} />
+    </Section>
+  );
+}
+
+function ToolAuthorization() {
+  return <PendingBlock
+    title="工具授权"
+    note="各工具在本项目的授权范围"
+    text="工具授权的命令还没有登记，等 3.2B 工作包登记以后在这里填写授权范围与批准方式"
+  />;
+}
+
+function MachineAuthorization() {
+  return <PendingBlock
+    title="机器授权"
+    note="本项目可以使用的机器"
+    text="机器授权的命令还没有登记，等 3.2C 工作包登记以后在这里选择机器并写明登记的目录与可以执行的操作"
+  />;
+}
+
+function ExecutionPlacement() {
+  return <PendingBlock
+    title="执行位置"
+    note="运行工作区与各检查的位置"
+    text="执行位置的命令还没有登记，等 3.2C 工作包登记以后在这里选择运行工作区与三个部门的检查位置"
+  />;
+}
+
+function Operations() {
+  return <PendingBlock
+    title="运维"
+    note="观察窗口与连续修复失败的次数上限"
+    text="运维配置由运维工作的工单登记，登记以后这里只读显示观察窗口与次数上限"
+  />;
+}
+
+function RoleSettings() {
+  return <PendingBlock
+    title="本项目各角色设置"
+    note="项目角色设置优先于角色默认与部门设置"
+    text="各角色设置的命令还没有登记，等 Stage 5 工作包登记以后在这里设置每个角色使用的模型、推理档位与角色 Prompt"
+  />;
 }
 
 // 基本信息（7.5 节第 1 项）：名称、长期目标、置顶、归档与恢复。

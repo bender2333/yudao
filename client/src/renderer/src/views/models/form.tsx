@@ -16,6 +16,8 @@ import {
   admissionOf,
   capacityIssueText,
   connectionTestable,
+  defaultModelsUrl,
+  effectiveModelsUrl,
   formPatchForBaseUrl,
   formPatchForPreset,
   defaultLevelOptions,
@@ -166,6 +168,32 @@ export function ProviderForm(props: ProviderFormProps) {
                  ? formPatchForBaseUrl(state, normalizeBaseUrl(state.base_url))
                  : { base_url: normalizeBaseUrl(state.base_url) }); }} />
       </label>
+      {preset === null ? (
+        <label className="y10-field mm-field">
+          <span className="mm-label">模型列表地址</span>
+          <input className="y10-input" value={state.models_url || defaultModelsUrl(state.base_url)}
+                 placeholder={defaultModelsUrl(state.base_url) || "填写连接地址后自动给出默认值"}
+                 data-testid="provider-models-url"
+                 onChange={(event) => {
+                   const fallback = defaultModelsUrl(state.base_url);
+                   props.onPatch({ models_url: event.target.value === fallback ? "" : event.target.value });
+                 }} />
+        </label>
+      ) : (
+        <p className="y10-small y10-muted mm-meta" data-testid="preset-models-url">
+          模型列表地址 {preset.models_url}（取自服务方案，只读）
+        </p>
+      )}
+      {connectionTestable(state, preset) ? (
+        <p className="y10-small y10-muted mm-meta" data-testid="models-url-effect">
+          本次请求 {effectiveModelsUrl(state, preset)}
+        </p>
+      ) : (
+        <p className="y10-small y10-muted mm-hint" role="status" data-testid="models-url-hint">
+          填写连接地址后，模型列表地址默认使用连接地址加 /models。
+        </p>
+      )}
+
       <label className="y10-field mm-field">
         <span className="mm-label">凭据引用</span>
         <input className="y10-input" value={state.credential_ref} placeholder="OPENCODE_GO_KEY"
@@ -179,17 +207,6 @@ export function ProviderForm(props: ProviderFormProps) {
         <input className="y10-input" type="number" min="1" value={state.timeout_sec} data-testid="provider-timeout"
                  onChange={(event) => props.onPatch({ timeout_sec: event.target.value })} />
         </label>
-        <label className="y10-field mm-field">
-          <span className="mm-label">模型列表地址</span>
-        <input className="y10-input" value={state.models_url || (!preset && state.base_url ? `${state.base_url.replace(/\/$/, "")}/models` : "")}
-                 placeholder="留空时使用服务方案的地址" data-testid="provider-models-url"
-                 onChange={(event) => props.onPatch({ models_url: event.target.value })} />
-        </label>
-        {!connectionTestable(state, preset) && (
-          <p className="y10-small y10-muted mm-hint" role="status" data-testid="models-url-hint">
-            填写连接地址后，模型列表地址默认使用连接地址加 /models。
-          </p>
-        )}
       </details>
 
       <p className="y10-small y10-muted mm-hint">Key 在添加连接时保存；编辑连接时也可单独保存 Key。</p>
@@ -242,7 +259,7 @@ export function ProviderForm(props: ProviderFormProps) {
         {props.candidate === null && <p className="y10-small y10-muted mm-hint">尚未获取；结果只服务本次设置，不写入目录。</p>}
         {props.candidate?.status === "unknown" && (
           <p className="y10-warn-text mm-warn" role="status" data-testid="candidates-unknown">
-            候选未知：{props.candidate.error || "上游模型列表不可用"}
+            请求 {props.candidate.source_url || "（没有模型列表地址）"} 时候选未知：{props.candidate.error || "上游模型列表不可用"}
           </p>
         )}
         {props.candidate?.status === "ok" && (

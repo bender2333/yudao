@@ -489,7 +489,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                 {candidates[provider.id] && (
                   <div className="y10-candidates mm-candidates" data-testid={`candidates-${provider.id}`}>
                     {candidates[provider.id].status === "unknown" ? (
-                      <p className="y10-warn-text mm-warn" role="status">候选未知：{candidates[provider.id].error || "上游模型列表不可用"}</p>
+                      <p className="y10-warn-text mm-warn" role="status">请求 {candidates[provider.id].source_url || "（没有模型列表地址）"} 时候选未知：{candidates[provider.id].error || "上游模型列表不可用"}</p>
                     ) : (
                       <>
                         <p className="y10-small y10-muted mm-meta">
