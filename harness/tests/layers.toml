@@ -117,6 +117,7 @@
 "test_registered_commands.py" = "integration"
 "test_release_archive_integrity.py" = "module"
 "test_release_script.py" = "integration"
+"test_release_check.py" = "module"
 "test_replay.py" = "module"
 "test_request_time_limit.py" = "integration"
 "test_resolve_call_target.py" = "unit"
