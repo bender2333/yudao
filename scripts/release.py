@@ -226,6 +226,17 @@ def publish(repo_root: Path, version: str, wheel: Path, *, remote: str) -> None:
     _run([_tool("gh"), "release", "create", tag, str(wheel), "--title", tag,
           "--notes", f"Yudao {version}"], cwd=repo_root)
 
+def _check_release(repo_root: Path) -> None:
+    # 发布检查（网页界面的提供与发布设计说明第 6.3、6.4 节）：由已安装的实例提供，
+    # 用当前运行版本里的清单与检查检查待发布的提交；脚本不运行也不修改这些检查。
+    # 命令不存在或检查不通过时拒绝上传；检查通过以后才打标签与上传
+    yudao = _tool("yudao")
+    result = subprocess.run([yudao, "release-check", str(repo_root)], cwd=repo_root, check=False,
+                            capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if result.returncode != 0:
+        raise ReleaseError("发布检查不通过，先让用户经决定请求「实例升级」批准，再发布：\n"
+                           + (result.stdout or "").strip())
+
 def release(repo_root: Path, *, publish_flag: bool, output_dir: Path, branch: str,
             remote: str) -> dict[str, object]:
     # 依设计说明第 6.3 节的顺序执行，返回 wheel 的路径与核对值
@@ -235,6 +246,7 @@ def release(repo_root: Path, *, publish_flag: bool, output_dir: Path, branch: st
     wheel = build_wheel(repo_root, version, output_dir)
     verify_wheel_contents(wheel, pages)
     if publish_flag:
+        _check_release(repo_root)
         publish(repo_root, version, wheel, remote=remote)
     return {"version": version, "wheel": wheel, "sha256": sha256_hex(wheel)}
 

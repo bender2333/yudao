@@ -137,6 +137,10 @@ class CatalogEventType:
     HOME_SEEN = "home_seen"
     # 参数修改（迭代底座 B3，工单 #349）：参数是全局的，事件写进目录流，随部署长期保存
     PARAMETER_SET = "parameter_set"
+    # 实例升级的决定请求（工单 #355）：升级已安装的实例是一次用户决定，随部署长期保存
+    INSTANCE_UPGRADE_REQUESTED = "instance_upgrade_requested"
+    INSTANCE_UPGRADE_ANSWERED = "instance_upgrade_answered"
+    INSTANCE_UPGRADE_WITHDRAWN = "instance_upgrade_withdrawn"
 
 
 GIT_VERSION_EVENTS = frozenset({

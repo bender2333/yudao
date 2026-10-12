@@ -289,6 +289,51 @@ def _write_fake_gh(directory: Path, record: Path) -> Path:
         script.chmod(0o755)
     return directory
 
+def _write_fake_yudao(directory: Path, *, exit_code: int, output: str) -> Path:
+    # 假 yudao：release-check 返回给定的状态与输出。发布门只认状态与标准输出，不读真实的仓库
+    directory.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        (directory / "yudao.cmd").write_text(
+            f"@echo off\r\necho {output}\r\nexit /b {exit_code}\r\n", encoding="utf-8")
+    else:
+        script = directory / "yudao"
+        script.write_text(f"#!/bin/sh\necho {output}\nexit {exit_code}\n", encoding="utf-8")
+        script.chmod(0o755)
+    return directory
+
+
+def test_the_release_gate_refuses_upload_when_the_check_fails(tmp_path):
+    # 发布检查不通过时发布脚本拒绝上传：已安装实例的 yudao release-check 返回非零状态，
+    # 发布门抛出 ReleaseError 并附检查输出，不打新标签
+    module = _load_release_module()
+    source, _remote = _prepare_checkout(tmp_path)
+    fake_bin = _write_fake_yudao(tmp_path / "fake-yudao", exit_code=1, output="kernel-diff-failure")
+    original_path = os.environ["PATH"]
+    os.environ["PATH"] = str(fake_bin) + os.pathsep + original_path
+    try:
+        try:
+            module._check_release(source)
+        except module.ReleaseError as failed:
+            assert "kernel-diff-failure" in str(failed)
+        else:
+            raise AssertionError("_check_release accepted a failing release check")
+    finally:
+        os.environ["PATH"] = original_path
+
+
+def test_the_release_gate_passes_when_the_check_passes(tmp_path):
+    # 发布检查通过时发布门放行：yudao release-check 返回零状态，不抛错
+    module = _load_release_module()
+    source, _remote = _prepare_checkout(tmp_path)
+    fake_bin = _write_fake_yudao(tmp_path / "fake-yudao", exit_code=0, output="all-checks-passed")
+    original_path = os.environ["PATH"]
+    os.environ["PATH"] = str(fake_bin) + os.pathsep + original_path
+    try:
+        module._check_release(source)
+    finally:
+        os.environ["PATH"] = original_path
+
+
 def _installed_tooling_state() -> str:
     # 本机安装状态的快照：uv tool list 的输出。
     # 发布脚本只构建与上传，不运行 uv tool install，两次快照应当相同

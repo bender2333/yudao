@@ -65,8 +65,14 @@ INITIAL_PRD = DecisionKind("initial_prd", "work_item",
 KERNEL_MODIFICATION = DecisionKind("kernel_modification", "run",
                                    (Option("approve", "批准采纳"), Option("reject", "拒绝")))
 
+# 实例升级（迭代底座 B7，工单 #355）：升级这台电脑上安装的那一份是一次用户决定，请求写在目录流中，
+# 不属于任何 run 或项目，也不阻塞它们；发布检查的结果作为材料附在请求里
+INSTANCE_UPGRADE = DecisionKind("instance_upgrade", "instance",
+                                (Option("approve", "批准升级"), Option("reject", "拒绝")))
+
 DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED, UNKNOWN_ACTION,
                                                NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE, INITIAL_PRD,
+                                               INSTANCE_UPGRADE,
                                                KERNEL_MODIFICATION)}
 
 

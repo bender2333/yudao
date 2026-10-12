@@ -1110,7 +1110,21 @@ class InitialPrdRequested(Payload):
     snapshot: CodeSnapshot
     revision_note_ref: ArtifactRef | None = None
 
-# 交付改动了内核清单里的路径（受控内核设计说明第 4.2 节、接口与应用层设计说明第 3.3 节，工单 #354）：
+class DeliverableAdoptedPayload(Payload):
+    adoption_id: str
+    work_item_id: str
+    run_id: str
+    delivery_event_id: str
+    qa_event_id: str
+    tree_ref: ArtifactRef
+    code_tree_digest: str
+    summary: str
+    files: list[str]
+    check_names: list[str]
+    known_risks: list[str]
+    previous_adoption_id: str | None
+
+
 # 请求写在项目流中，阻塞范围是 run，回答之前交付不采纳。kernel_paths 是交付相对基线的改动路径中
 # 落在运行实例内核清单里的那些；diff 是这些路径的差异全文；delivery_run_id 是交付所属的 run；
 # held_adoption 是批准以后要写入的采纳载荷（与照常采纳时写的那一份相同）
@@ -1224,21 +1238,6 @@ class WorkItemStartFailedPayload(Payload):
     work_item_id: str
     run_id: str
     error: str
-
-
-class DeliverableAdoptedPayload(Payload):
-    adoption_id: str
-    work_item_id: str
-    run_id: str
-    delivery_event_id: str
-    qa_event_id: str
-    tree_ref: ArtifactRef
-    code_tree_digest: str
-    summary: str
-    files: list[str]
-    check_names: list[str]
-    known_risks: list[str]
-    previous_adoption_id: str | None
 
 
 class AdoptionHeldPayload(Payload):

@@ -34,8 +34,9 @@ from .decisions import (
 )
 from .environment import LocalEnvironment
 from .deltas import DeltaChannel
-from .event_store import Command, EventStore, StreamVersionConflict, is_run_stream, project_stream, run_stream
-from .write_path import NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
+from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog_stream, is_run_stream,
+                          project_stream, run_stream)
+from .write_path import NewCatalogEvent, NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
 from .tree_archive import artifact_run, load_tree
 from .engine import Judgment, StepDriver, StepLimits, Stopped
 from .streams import (
@@ -49,6 +50,7 @@ from .overview import repository_overview
 from . import parameters as parameter_values
 from .models import (
     ArtifactRef,
+    CatalogEventType,
     Event as RunEvent,
     DEPARTMENTS,
     DecisionRequest,
@@ -1588,6 +1590,12 @@ class Orchestrator:
                 raise StaleDecision(decision, base_version)
             if option not in [item["id"] for item in decision.request["options"]]:
                 raise InvalidOption(decision, option)
+            if is_catalog_stream(saved.stream):
+                # 目录流中的决定请求（工单 #355）：不属于任何 run 或项目，回答只是记下用户的决定
+                transaction.append(NewCatalogEvent(CatalogEventType.INSTANCE_UPGRADE_ANSWERED, {
+                    "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
+                }, actor="system"))
+                return None
             if is_run_stream(saved.stream):
                 return self._answer_run_decision(transaction, decision, option, note, base_version, decision_id)
             return self._answer_project_decision(transaction, decision, option, note, base_version, decision_id)
