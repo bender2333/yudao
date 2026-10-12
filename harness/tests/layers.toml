@@ -22,6 +22,7 @@
 "test_analysis_l2.py" = "module"
 "test_analysis_l3.py" = "module"
 "test_api.py" = "integration"
+"test_assembly.py" = "module"
 "test_bash.py" = "integration"
 "test_call_target_per_request.py" = "integration"
 "test_catalog_api.py" = "integration"
