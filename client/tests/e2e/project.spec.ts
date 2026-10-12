@@ -588,7 +588,7 @@ test.describe("项目页面（1440×900）", () => {
       expect(await activeTabCount(page)).toBe(1);
       await record.getByRole("tab", { name: "用量统计" }).click();
       const usage = await section(page, "用量统计");
-      await expect(usage.locator(".section-head .note")).toContainText("只读显示用量，不做预算判断");
+      await expect(usage.locator(".section-head .note")).toContainText("用量只读显示，不是事项的预算");
       await expect(usage).toContainText("请求数");
       await expect(usage).toContainText("4（上报 0）");
       await expect(await table(page, "按部门")).toContainText("product");
