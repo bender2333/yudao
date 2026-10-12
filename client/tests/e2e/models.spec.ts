@@ -714,26 +714,40 @@ test("新建表单选择 OpenCode Go 与无协议头自定义地址自动填写�
 
 test("获取模型列表失败时页面显示请求的地址与状态码（工单 #384）", async () => {
   test.setTimeout(300_000);
-  const { backend, client } = await openModels({ width: 1440, height: 900 }, { rejectUpstream: true });
+  const failing = createServer((_request, response) => {
+    response.writeHead(404, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "not found" } }));
+  });
+  failing.listen(0, "127.0.0.1");
+  await once(failing, "listening");
+  const failingAddress = failing.address();
+  if (failingAddress === null || typeof failingAddress === "string") throw new Error("HTTP 上游未启动");
+  const { backend, client } = await openModels({ width: 1440, height: 900 });
   const errors = watchErrors(client);
   try {
-    // 这条连接指向测试内的真实 HTTP 上游，那个上游对任何请求都返回 401
-    const modelsUrl = await client.page.evaluate(async (address: string) => {
-      const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
-      const provider = (listed.data.providers as { id: string; models_url: string }[])
-        .find((item) => item.id === "rejected-go");
-      return provider!.models_url;
-    }, backend.address);
-    await client.page.getByTestId("provider-rejected-go").getByRole("button", { name: "展开" }).click();
-    await setKey(client, backend, "REJECTED_GO_KEY");
-    await client.page.getByTestId("collect-rejected-go").click();
-    const candidates = client.page.getByTestId("candidates-rejected-go");
+    // 真实返回 404 的上游：采集失败时页面写明请求的地址与状态码
+    const modelsUrl = `http://127.0.0.1:${failingAddress.port}/v1/models`;
+    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+    const form = client.page.locator(".mm-form");
+    await form.getByTestId("provider-base-url").fill(`http://127.0.0.1:${failingAddress.port}/v1`);
+    await form.getByTestId("provider-models-url").fill(modelsUrl);
+    await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("failing-up");
+    await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("失败的上游");
+    await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("FAILING_UP_KEY");
+    await form.getByTestId("credential-secret").fill(KEY);
+    await form.getByTestId("submit-provider").click();
+    await expect(form).toHaveCount(0);
+    const provider = client.page.getByTestId("provider-failing-up");
+    await provider.getByRole("button", { name: "展开" }).click();
+    await provider.getByTestId("collect-failing-up").click();
+    const candidates = provider.getByTestId("candidates-failing-up");
     await expect(candidates).toContainText(modelsUrl);
-    await expect(candidates).toContainText("401");
+    await expect(candidates).toContainText("404");
     expect(errors).toEqual([]);
   } finally {
     await client.close();
     await backend.stop();
+    failing.close();
   }
 });
 

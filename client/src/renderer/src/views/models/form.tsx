@@ -194,6 +194,12 @@ export function ProviderForm(props: ProviderFormProps) {
         </p>
       )}
 
+      <label className="y10-field mm-field">
+        <span className="mm-label">凭据引用</span>
+        <input className="y10-input" value={state.credential_ref} placeholder="OPENCODE_GO_KEY"
+               onChange={(event) => props.onPatch({ credential_ref: event.target.value })} />
+      </label>
+
       <details className="y10-details mm-advanced">
         <summary>高级选项</summary>
         <label className="y10-field mm-field">
