@@ -604,3 +604,4 @@ claude-opus-5-5 / 2026-10-13 00:31 / 修改 docs/design/app-and-interface.md（�
 claude-opus-5-5 / 2026-10-13 00:31 / 修改 evaluation-scenarios.md 第 3 节（评分之前核对隐藏材料的摘要、关闭取回的启动参数、查找对上游仓库的访问）与第 7 节运行器；browser-and-computer-use.md、department-loop.md、department-roles.md、existing-project-onboarding.md 中命令与工作区的说法；foundation-rules.md 基础规则 3 下两行（用户授权） / ADR-0038
 claude-opus-5-5 / 2026-10-13 00:31 / ADR-0018、ADR-0022、ADR-0025、ADR-0034 加状态说明，写明由 ADR-0038 取代的部分；D29、阶段需求概览（3.1、3.2C、3.2B、Stage 6、第 5.3 节、讨论顺序第 6 项）、self-hosting.md、路线图、Stage 3 计划（M0 改名为三部门的循环结构与命令执行）、设计与需求索引同步修改 / ADR-0038
 claude-opus-5-5 / 2026-10-13 00:31 / docs/prototypes/CHANGELOG.md 开头加「下一版原型的待办」：v10 中一次性批准卡片、登记命令与取回来源的表单、MCP 工具的处理方式、动作核实的决定不实现，下一版删除 / 用户决定原型这次不改，随下一次新设计一起更新
+claude-opus-5-5 / 2026-10-13 00:45 / 路线图、Stage 3 计划第 9 节 M0 一行、设计索引的本地通用工具条目写入父工单 #478 / /to-spec 发布了命令执行的父工单

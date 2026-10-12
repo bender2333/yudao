@@ -36,7 +36,7 @@
   - 需求：[D24](../requirements/model-management.md)。ADR：0002、0003、0005、0006、[0033](../adr/0033-protocol-belongs-to-model-access.md)、[0017](../adr/0017-role-settings-override-department.md)、[0028](../adr/0028-three-means-of-adjudication.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [本地通用工具](local-tools.md)
   - 内容：代码快照接入的使用过程；运行工作区、每个会话一个的检查工作区与检查副本；公开树、搜索、区间阅读与编辑、命令（`bash`，任意命令字符串、后台运行、环境变量）、检查、动作回执、结果未知、独立质检、网络取回与 MCP 工具的边界与验收反例；使用的依赖与成熟实现，含模块交互图。
-  - 状态：2026-09-26 随 3.2A 验收（#12 至 #15）；2026-09-29 由 Stage 3 计划第 4 节移出成为设计说明，3.2B、3.2C、3.2D 新增的工具同样遵守；2026-10-13 按 ADR-0038 改写（命令不经登记，检查接受任意命令字符串，结果未知交还模型），未实施，属于里程碑 M0。
+  - 状态：2026-09-26 随 3.2A 验收（#12 至 #15）；2026-09-29 由 Stage 3 计划第 4 节移出成为设计说明，3.2B、3.2C、3.2D 新增的工具同样遵守；2026-10-13 按 ADR-0038 改写（命令不经登记，检查接受任意命令字符串，结果未知交还模型），未实施，父工单 #478，属于里程碑 M0。
   - 计划：[Stage 3 计划](../stage-3-plan.md) 第 4 节、第 9 节 M0。
   - ADR：[0024](../adr/0024-git-in-process-with-pygit2.md)、[0038](../adr/0038-function-first-commands-without-registration.md)。
 - [执行环境服务](execution-environment.md)
