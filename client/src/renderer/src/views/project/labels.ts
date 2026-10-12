@@ -16,6 +16,15 @@ export const WORK_ITEM_STATUS: Record<string, string> = {
   stopped: "已停止",
   held: "排队中",
 };
+// 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
+// held 与 stopped 在原型图标里没有对应（held 无图标），这两项保留纯文字，界面不猜
+export const WORK_ITEM_STATUS_KIND: Record<string, string> = {
+  not_started: "idle",
+  in_progress: "running",
+  adopted: "adopted",
+  released_unsettled: "released",
+  awaiting_initial_prd: "asking",
+};
 
 export const RECOVERY_STATE: Record<string, string> = {
   running: "运行中",
