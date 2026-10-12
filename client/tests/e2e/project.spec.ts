@@ -524,8 +524,8 @@ test.describe("项目页面（1440×900）", () => {
       // 没有事项的项目：资料页显示空态，没有一直转的「正在读取数据」（工单 #295 第 3 项）
       const liveId = await projectId(page, LIVE);
       await gotoView(page, liveId, "materials");
-      await expect(await section(page, "资料")).toContainText("项目还没有事项，没有资料可看");
-      await expect(await section(page, "资料")).not.toContainText("正在读取数据");
+      await expect(await section(page, "按事项查看")).toContainText("项目还没有事项，没有资料可看");
+      await expect(await section(page, "按事项查看")).not.toContainText("正在读取数据");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -537,9 +537,11 @@ test.describe("项目页面（1440×900）", () => {
     const errors = watchErrors(client);
     const page = client.page;
     try {
+      const id = await projectId(page, SAMPLE);
+      await gotoView(page, id, "observe");
+      expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
       const record = await section(page, "请求记录与用量");
       await expect(record.locator(".section-head .note")).toContainText("范围：整个项目");
-      expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
       const all = page.locator("section.card table").first();
       await expect(all.locator("tbody tr")).toHaveCount(4);
       await expect(all.locator("tbody tr").first()).toContainText("fake-script");
@@ -587,8 +589,9 @@ test.describe("项目页面（1440×900）", () => {
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
       expect(await activeTabCount(page)).toBe(1);
       await record.getByRole("tab", { name: "用量统计" }).click();
-      const usage = await section(page, "用量统计");
-      await expect(usage.locator(".section-head .note")).toContainText("用量只读显示，不是事项的预算");
+      const usage = record.locator(".y10-usage");
+      await expect(usage.locator("h3")).toHaveText("用量统计");
+      await expect(usage.locator(".y10-usage-note")).toContainText("用量只读显示，不是事项的预算");
       await expect(usage).toContainText("请求数");
       await expect(usage).toContainText("4（上报 0）");
       await expect(await table(page, "按部门")).toContainText("product");

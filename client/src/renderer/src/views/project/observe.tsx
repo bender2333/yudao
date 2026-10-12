@@ -252,15 +252,17 @@ function UsageSection(props: { usage: { data: UsageReport | null; loading: boole
   const data = props.usage.data;
   if (data === null) {
     return (
-      <Section title="用量统计">
+      <div className="y10-usage">
         <Loading state={props.usage} />
-      </Section>
+      </div>
     );
   }
   const totals = dict(data.totals);
 
   return (
-    <Section title="用量统计" note="输入（含缓存）与缓存读取（输入子集）不重复相加；用量只读显示，不是事项的预算">
+    <div className="y10-usage">
+      <h3>用量统计</h3>
+      <p className="y10-usage-note note">输入（含缓存）与缓存读取（输入子集）不重复相加；用量只读显示，不是事项的预算</p>
       <KeyValue
         items={[
           ["请求数", `${formatNumberOr(numberValue(totals.attempts))}（上报 ${formatNumberOr(numberValue(totals.reported))}）`],
@@ -273,7 +275,7 @@ function UsageSection(props: { usage: { data: UsageReport | null; loading: boole
       />
       <UsageGroups title="按部门" groups={data.departments} />
       <UsageGroups title="按模型" groups={data.models} />
-    </Section>
+    </div>
   );
 }
 
