@@ -1,22 +1,18 @@
-# Triage Labels
+# 分诊标签
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+技能用五个分诊角色说话，这份文件把角色对应到本仓库实际使用的标签字符串。
 
-| Label in mattpocock/skills | Label in our tracker | Meaning                                  |
-| -------------------------- | -------------------- | ---------------------------------------- |
-| `needs-triage`             | `needs-triage`       | Maintainer needs to evaluate this issue  |
-| `needs-info`               | `needs-info`         | Waiting on reporter for more information |
-| `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
-| `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
-| `wontfix`                  | `wontfix`            | Will not be actioned                     |
+| 技能中的角色 | 本仓库的标签 | 含义 |
+| --- | --- | --- |
+| `needs-triage` | `needs-triage` | 维护者需要评估这张工单 |
+| `needs-info` | `needs-info` | 等报告人补充信息 |
+| `ready-for-agent` | `ready-for-agent` | 规格完整，可以交给无人值守的 agent |
+| `ready-for-human` | `ready-for-human` | 需要人来处理 |
+| `wontfix` | `wontfix` | 不处理 |
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
+技能提到某个角色时（例如「加上 AFK-ready 的分诊标签」），用表中对应的标签字符串。
 
-Edit the right-hand column to match whatever vocabulary you actually use.
-
-## State in this repo
-
-All five labels exist in `bender2333/yudao`. `wontfix` predates this setup (GitHub's default label); the other four were created alongside it. GitHub's default `bug` / `enhancement` / `question` labels are orthogonal — they describe *what* an issue is, the five above describe *where it sits in triage*.
+五个标签在 `bender2333/yudao` 中都存在。`wontfix` 是 GitHub 的默认标签，其余四个随这套配置创建。GitHub 默认的 `bug`、`enhancement`、`question` 与这五个正交：它们说明工单**是什么**，这五个说明工单**在分诊中的位置**。
 
 ## 等待条件的工单
 
