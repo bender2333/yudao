@@ -5,7 +5,8 @@ import pytest
 import trustme
 
 from harness.models import EventType
-from harness.providers import ProviderDefinition, refresh_candidates, ssl_context
+from harness.providers import ProviderDefinition, effective_models_url, refresh_candidates, ssl_context
+from harness.providers.tls import service_address
 from harness.tests.helpers import FAST_RETRIES
 from harness.tests.protocol_helpers import ScriptedProvider, facade_with, provider_system, send_reply
 from harness.tests.provider_replies import product_spec_reply
@@ -115,11 +116,12 @@ def test_model_list_is_read_over_the_same_trust_source(trusted_ca):
 
 def test_model_list_reports_the_certificate_verification_failure():
     provider = ScriptedProvider([_model_list], tls=_server_context(trustme.CA()))
+    definition = ProviderDefinition(id="go", name="Go", models_url=provider.base + "/v1/models")
     try:
-        result = refresh_candidates(ProviderDefinition(id="go", name="Go", models_url=provider.base + "/v1/models"),
-                                    api_key="tls-secret")
+        result = refresh_candidates(definition, api_key="tls-secret")
     finally:
         provider.close()
+    source_url = effective_models_url(definition)
     assert result["status"] == "unknown"
-    assert result["error"] == f"模型列表请求失败：证书校验失败（{provider.base}）"
+    assert result["error"] == f"模型列表请求 {source_url} 失败：证书校验失败（{service_address(source_url)}）"
     assert provider.requests == []
