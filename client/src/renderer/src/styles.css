@@ -27,4 +27,5 @@
 /* 像素画布与动作图鉴（工单 #176）：画布按整数倍最近邻放大 */
 .pixel-canvas { line-height: 0; }
 .pixel-canvas canvas { image-rendering: pixelated; display: block; }
+.y10-ws-stage canvas { display: block; image-rendering: pixelated; }
 .pixel-canvas-error { color: var(--red); font-size: 12px; }

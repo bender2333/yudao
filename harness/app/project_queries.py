@@ -1620,7 +1620,11 @@ class SourceDirectorySetting(Contract):
     name: str
     path: str
     version: int
-
+    writeback_enabled: bool = False
+    remote: str = ""
+    target_branch: str = ""
+    check_commands: list[str] = []
+    credential_ref: str | None = None
 
 class ProjectSettingsResult(Contract):
     project_id: str
@@ -1664,7 +1668,14 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
                 for name, value in state.commands.items()
             },
             source_directories={
-                name: SourceDirectorySetting(name=value.name, path=value.path, version=value.version)
+                name: SourceDirectorySetting(
+                    name=value.name, path=value.path, version=value.version,
+                    writeback_enabled=getattr(value, "writeback_enabled", False),
+                    remote=getattr(value, "remote", ""),
+                    target_branch=getattr(value, "target_branch", ""),
+                    check_commands=list(getattr(value, "check_commands", ())),
+                    credential_ref=getattr(value, "credential_ref", None),
+                )
                 for name, value in state.source_directories.items()
             },
             # 各部门生效模型（跟随部门默认时取部门默认）的建议能力提醒（设计说明第 5.6 节）

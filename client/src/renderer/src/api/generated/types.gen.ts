@@ -4253,6 +4253,26 @@ export type SourceDirectorySave = {
      * Path
      */
     path: string;
+    /**
+     * Writeback Enabled
+     */
+    writeback_enabled?: boolean;
+    /**
+     * Remote
+     */
+    remote?: string;
+    /**
+     * Target Branch
+     */
+    target_branch?: string;
+    /**
+     * Check Commands
+     */
+    check_commands?: Array<string>;
+    /**
+     * Credential Ref
+     */
+    credential_ref?: string | null;
 };
 
 /**
@@ -4271,6 +4291,26 @@ export type SourceDirectorySetting = {
      * Version
      */
     version: number;
+    /**
+     * Writeback Enabled
+     */
+    writeback_enabled?: boolean;
+    /**
+     * Remote
+     */
+    remote?: string;
+    /**
+     * Target Branch
+     */
+    target_branch?: string;
+    /**
+     * Check Commands
+     */
+    check_commands?: Array<string>;
+    /**
+     * Credential Ref
+     */
+    credential_ref?: string | null;
 };
 
 /**
@@ -4993,6 +5033,28 @@ export type WorkItemStats = {
      * Not Started
      */
     not_started: number;
+};
+
+/**
+ * WritebackExecute
+ */
+export type WritebackExecute = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version?: number | null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Adoption Id
+     */
+    adoption_id?: string | null;
 };
 
 /**
@@ -13619,6 +13681,26 @@ export type SourceDirectoryConfiguredPayload = {
      * Base Version
      */
     base_version: number;
+    /**
+     * Writeback Enabled
+     */
+    writeback_enabled?: boolean;
+    /**
+     * Remote
+     */
+    remote?: string;
+    /**
+     * Target Branch
+     */
+    target_branch?: string;
+    /**
+     * Check Commands
+     */
+    check_commands?: Array<string>;
+    /**
+     * Credential Ref
+     */
+    credential_ref?: string | null;
 };
 
 /**
@@ -15459,6 +15541,565 @@ export type WorkItemStartFailedPayload = {
 };
 
 /**
+ * WritebackCompletedEvent
+ */
+export type WritebackCompletedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'writeback_completed';
+    payload: WritebackCompletedPayload;
+};
+
+/**
+ * WritebackCompletedPayload
+ */
+export type WritebackCompletedPayload = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Adoption Id
+     */
+    adoption_id: string;
+    /**
+     * Source Tree Digest
+     */
+    source_tree_digest: string;
+    source_tree_ref: ArtifactRef;
+    /**
+     * Adopted Tree Digest
+     */
+    adopted_tree_digest: string;
+    adopted_tree_ref: ArtifactRef;
+    /**
+     * Target Commit
+     */
+    target_commit: string;
+    /**
+     * Target Tree Digest
+     */
+    target_tree_digest: string;
+    /**
+     * Final Tree Digest
+     */
+    final_tree_digest: string;
+    final_tree_ref: ArtifactRef;
+    /**
+     * Check Receipts
+     */
+    check_receipts: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Branch
+     */
+    branch: string;
+    /**
+     * Pull Request
+     */
+    pull_request?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Verified External
+     */
+    verified_external?: boolean;
+};
+
+/**
+ * WritebackHeldEvent
+ */
+export type WritebackHeldEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'writeback_held';
+    payload: WritebackHeldPayload;
+};
+
+/**
+ * WritebackHeldPayload
+ */
+export type WritebackHeldPayload = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Adoption Id
+     */
+    adoption_id: string;
+    /**
+     * Reason
+     */
+    reason: 'waiting_previous_adoption';
+    /**
+     * Previous Adoption Id
+     */
+    previous_adoption_id: string;
+    /**
+     * Target Commit
+     */
+    target_commit: string;
+};
+
+/**
+ * WritebackNotNeededEvent
+ */
+export type WritebackNotNeededEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'writeback_not_needed';
+    payload: WritebackNotNeededPayload;
+};
+
+/**
+ * WritebackNotNeededPayload
+ */
+export type WritebackNotNeededPayload = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Adoption Id
+     */
+    adoption_id: string;
+    /**
+     * Target Commit
+     */
+    target_commit: string;
+    /**
+     * Reason
+     */
+    reason?: string;
+    /**
+     * Source Tree Digest
+     */
+    source_tree_digest: string;
+    /**
+     * Adopted Tree Digest
+     */
+    adopted_tree_digest: string;
+    /**
+     * Target Tree Digest
+     */
+    target_tree_digest: string;
+};
+
+/**
+ * WritebackStoppedEvent
+ */
+export type WritebackStoppedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'writeback_stopped';
+    payload: WritebackStoppedPayload;
+};
+
+/**
+ * WritebackStoppedPayload
+ */
+export type WritebackStoppedPayload = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Adoption Id
+     */
+    adoption_id: string;
+    /**
+     * Reason
+     */
+    reason: 'conflict' | 'verification_failed' | 'target_changed' | 'unrepresentable_path' | 'missing_source_reference';
+    /**
+     * Target Commit
+     */
+    target_commit: string;
+    /**
+     * Source Tree Digest
+     */
+    source_tree_digest: string;
+    /**
+     * Adopted Tree Digest
+     */
+    adopted_tree_digest: string;
+    /**
+     * Target Tree Digest
+     */
+    target_tree_digest: string;
+    /**
+     * Final Tree Digest
+     */
+    final_tree_digest?: string | null;
+    conflict_ref?: ArtifactRef | null;
+    /**
+     * Conflicts
+     */
+    conflicts?: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Check Receipts
+     */
+    check_receipts?: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * New Target Commit
+     */
+    new_target_commit?: string | null;
+};
+
+/**
+ * WritebackVerifiedEvent
+ */
+export type WritebackVerifiedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'writeback_verified';
+    payload: WritebackVerifiedPayload;
+};
+
+/**
+ * WritebackVerifiedPayload
+ */
+export type WritebackVerifiedPayload = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Adoption Id
+     */
+    adoption_id: string;
+    /**
+     * Action
+     */
+    action: 'push' | 'pull_request';
+    /**
+     * Branch
+     */
+    branch: string;
+    /**
+     * Target Commit
+     */
+    target_commit: string;
+    /**
+     * Verified Fact
+     */
+    verified_fact: {
+        [key: string]: unknown;
+    };
+};
+
+/**
  * YieldedWork
  */
 export type YieldedWork = {
@@ -15619,6 +16260,16 @@ export type EventObject = ({
 } & BaselineAdoptedEvent) | ({
     type: 'project_parameter_set';
 } & ProjectParameterSetEvent) | ({
+    type: 'writeback_completed';
+} & WritebackCompletedEvent) | ({
+    type: 'writeback_stopped';
+} & WritebackStoppedEvent) | ({
+    type: 'writeback_not_needed';
+} & WritebackNotNeededEvent) | ({
+    type: 'writeback_held';
+} & WritebackHeldEvent) | ({
+    type: 'writeback_verified';
+} & WritebackVerifiedEvent) | ({
     type: 'catalog_revised';
 } & CatalogRevisedEvent) | ({
     type: 'catalog_candidates_collected';
@@ -16145,6 +16796,35 @@ export type CommandSourceDirectorySaveResponses = {
 };
 
 export type CommandSourceDirectorySaveResponse = CommandSourceDirectorySaveResponses[keyof CommandSourceDirectorySaveResponses];
+
+export type CommandWritebackExecuteData = {
+    body: WritebackExecute;
+    path?: never;
+    query?: never;
+    url: '/api/commands/writeback.execute';
+};
+
+export type CommandWritebackExecuteErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, project_archived, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandWritebackExecuteError = CommandWritebackExecuteErrors[keyof CommandWritebackExecuteErrors];
+
+export type CommandWritebackExecuteResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandWritebackExecuteResponse = CommandWritebackExecuteResponses[keyof CommandWritebackExecuteResponses];
 
 export type CommandDecisionAnswerData = {
     body: DecisionAnswer;

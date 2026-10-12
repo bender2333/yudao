@@ -821,6 +821,57 @@
         }
       }
     },
+    "/api/commands/writeback.execute": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "writeback.execute",
+        "operationId": "command_writeback_execute",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WritebackExecute"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, project_archived, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/decision.answer": {
       "post": {
         "tags": [
@@ -10783,6 +10834,44 @@
             "type": "string",
             "minLength": 1,
             "title": "Path"
+          },
+          "writeback_enabled": {
+            "type": "boolean",
+            "title": "Writeback Enabled",
+            "default": false
+          },
+          "remote": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Remote",
+            "default": ""
+          },
+          "target_branch": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Target Branch",
+            "default": ""
+          },
+          "check_commands": {
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Check Commands",
+            "default": []
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
           }
         },
         "additionalProperties": false,
@@ -10809,6 +10898,40 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "writeback_enabled": {
+            "type": "boolean",
+            "title": "Writeback Enabled",
+            "default": false
+          },
+          "remote": {
+            "type": "string",
+            "title": "Remote",
+            "default": ""
+          },
+          "target_branch": {
+            "type": "string",
+            "title": "Target Branch",
+            "default": ""
+          },
+          "check_commands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Check Commands",
+            "default": []
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
           }
         },
         "additionalProperties": false,
@@ -12126,6 +12249,48 @@
           "not_started"
         ],
         "title": "WorkItemStats"
+      },
+      "WritebackExecute": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "adoption_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adoption Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "project_id"
+        ],
+        "title": "WritebackExecute"
       },
       "ActionVerifiedEvent": {
         "additionalProperties": false,
@@ -29529,6 +29694,40 @@
           "base_version": {
             "title": "Base Version",
             "type": "integer"
+          },
+          "writeback_enabled": {
+            "default": false,
+            "title": "Writeback Enabled",
+            "type": "boolean"
+          },
+          "remote": {
+            "default": "",
+            "title": "Remote",
+            "type": "string"
+          },
+          "target_branch": {
+            "default": "",
+            "title": "Target Branch",
+            "type": "string"
+          },
+          "check_commands": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Check Commands",
+            "type": "array"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
           }
         },
         "required": [
@@ -33240,6 +33439,1032 @@
         "title": "WorkItemStartFailedPayload",
         "type": "object"
       },
+      "WritebackCompletedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "writeback_completed",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/WritebackCompletedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "WritebackCompletedEvent",
+        "type": "object"
+      },
+      "WritebackCompletedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "adoption_id": {
+            "title": "Adoption Id",
+            "type": "string"
+          },
+          "source_tree_digest": {
+            "title": "Source Tree Digest",
+            "type": "string"
+          },
+          "source_tree_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "adopted_tree_digest": {
+            "title": "Adopted Tree Digest",
+            "type": "string"
+          },
+          "adopted_tree_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "target_commit": {
+            "title": "Target Commit",
+            "type": "string"
+          },
+          "target_tree_digest": {
+            "title": "Target Tree Digest",
+            "type": "string"
+          },
+          "final_tree_digest": {
+            "title": "Final Tree Digest",
+            "type": "string"
+          },
+          "final_tree_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "check_receipts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Check Receipts",
+            "type": "array"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "pull_request": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pull Request"
+          },
+          "verified_external": {
+            "default": false,
+            "title": "Verified External",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "work_item_id",
+          "run_id",
+          "adoption_id",
+          "source_tree_digest",
+          "source_tree_ref",
+          "adopted_tree_digest",
+          "adopted_tree_ref",
+          "target_commit",
+          "target_tree_digest",
+          "final_tree_digest",
+          "final_tree_ref",
+          "check_receipts",
+          "branch"
+        ],
+        "title": "WritebackCompletedPayload",
+        "type": "object"
+      },
+      "WritebackHeldEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "writeback_held",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/WritebackHeldPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "WritebackHeldEvent",
+        "type": "object"
+      },
+      "WritebackHeldPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "adoption_id": {
+            "title": "Adoption Id",
+            "type": "string"
+          },
+          "reason": {
+            "const": "waiting_previous_adoption",
+            "title": "Reason",
+            "type": "string"
+          },
+          "previous_adoption_id": {
+            "title": "Previous Adoption Id",
+            "type": "string"
+          },
+          "target_commit": {
+            "title": "Target Commit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "work_item_id",
+          "run_id",
+          "adoption_id",
+          "reason",
+          "previous_adoption_id",
+          "target_commit"
+        ],
+        "title": "WritebackHeldPayload",
+        "type": "object"
+      },
+      "WritebackNotNeededEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "writeback_not_needed",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/WritebackNotNeededPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "WritebackNotNeededEvent",
+        "type": "object"
+      },
+      "WritebackNotNeededPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "adoption_id": {
+            "title": "Adoption Id",
+            "type": "string"
+          },
+          "target_commit": {
+            "title": "Target Commit",
+            "type": "string"
+          },
+          "reason": {
+            "default": "changes_already_present",
+            "title": "Reason",
+            "type": "string"
+          },
+          "source_tree_digest": {
+            "title": "Source Tree Digest",
+            "type": "string"
+          },
+          "adopted_tree_digest": {
+            "title": "Adopted Tree Digest",
+            "type": "string"
+          },
+          "target_tree_digest": {
+            "title": "Target Tree Digest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "work_item_id",
+          "run_id",
+          "adoption_id",
+          "target_commit",
+          "source_tree_digest",
+          "adopted_tree_digest",
+          "target_tree_digest"
+        ],
+        "title": "WritebackNotNeededPayload",
+        "type": "object"
+      },
+      "WritebackStoppedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "writeback_stopped",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/WritebackStoppedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "WritebackStoppedEvent",
+        "type": "object"
+      },
+      "WritebackStoppedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "adoption_id": {
+            "title": "Adoption Id",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "conflict",
+              "verification_failed",
+              "target_changed",
+              "unrepresentable_path",
+              "missing_source_reference"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "target_commit": {
+            "title": "Target Commit",
+            "type": "string"
+          },
+          "source_tree_digest": {
+            "title": "Source Tree Digest",
+            "type": "string"
+          },
+          "adopted_tree_digest": {
+            "title": "Adopted Tree Digest",
+            "type": "string"
+          },
+          "target_tree_digest": {
+            "title": "Target Tree Digest",
+            "type": "string"
+          },
+          "final_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Tree Digest"
+          },
+          "conflict_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflicts": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "check_receipts": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Check Receipts",
+            "type": "array"
+          },
+          "new_target_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Target Commit"
+          }
+        },
+        "required": [
+          "work_item_id",
+          "run_id",
+          "adoption_id",
+          "reason",
+          "target_commit",
+          "source_tree_digest",
+          "adopted_tree_digest",
+          "target_tree_digest"
+        ],
+        "title": "WritebackStoppedPayload",
+        "type": "object"
+      },
+      "WritebackVerifiedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "writeback_verified",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/WritebackVerifiedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "WritebackVerifiedEvent",
+        "type": "object"
+      },
+      "WritebackVerifiedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {
+            "title": "Work Item Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "adoption_id": {
+            "title": "Adoption Id",
+            "type": "string"
+          },
+          "action": {
+            "enum": [
+              "push",
+              "pull_request"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "target_commit": {
+            "title": "Target Commit",
+            "type": "string"
+          },
+          "verified_fact": {
+            "additionalProperties": true,
+            "title": "Verified Fact",
+            "type": "object"
+          }
+        },
+        "required": [
+          "work_item_id",
+          "run_id",
+          "adoption_id",
+          "action",
+          "branch",
+          "target_commit",
+          "verified_fact"
+        ],
+        "title": "WritebackVerifiedPayload",
+        "type": "object"
+      },
       "YieldedWork": {
         "additionalProperties": false,
         "properties": {
@@ -33381,7 +34606,12 @@
             "transition": "#/components/schemas/TransitionEvent",
             "user_input_received": "#/components/schemas/UserInputReceivedEvent",
             "work_item_created": "#/components/schemas/WorkItemCreatedEvent",
-            "work_item_start_failed": "#/components/schemas/WorkItemStartFailedEvent"
+            "work_item_start_failed": "#/components/schemas/WorkItemStartFailedEvent",
+            "writeback_completed": "#/components/schemas/WritebackCompletedEvent",
+            "writeback_held": "#/components/schemas/WritebackHeldEvent",
+            "writeback_not_needed": "#/components/schemas/WritebackNotNeededEvent",
+            "writeback_stopped": "#/components/schemas/WritebackStoppedEvent",
+            "writeback_verified": "#/components/schemas/WritebackVerifiedEvent"
           },
           "propertyName": "type"
         },
@@ -33592,6 +34822,21 @@
           },
           {
             "$ref": "#/components/schemas/ProjectParameterSetEvent"
+          },
+          {
+            "$ref": "#/components/schemas/WritebackCompletedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/WritebackStoppedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/WritebackNotNeededEvent"
+          },
+          {
+            "$ref": "#/components/schemas/WritebackHeldEvent"
+          },
+          {
+            "$ref": "#/components/schemas/WritebackVerifiedEvent"
           },
           {
             "$ref": "#/components/schemas/CatalogRevisedEvent"

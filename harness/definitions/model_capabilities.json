@@ -4,6 +4,22 @@
       {
         "context_window": 1000000,
         "input_modalities": [
+          "image",
+          "pdf",
+          "text"
+        ],
+        "max_output_tokens": 128000,
+        "model": "claude-haiku-5-5",
+        "output_modalities": [
+          "text"
+        ],
+        "protocol": "messages",
+        "reasoning": true,
+        "tool_call": true
+      },
+      {
+        "context_window": 1000000,
+        "input_modalities": [
           "text"
         ],
         "max_output_tokens": 384000,
@@ -11,6 +27,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -25,6 +42,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -38,6 +56,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -52,6 +71,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -65,6 +85,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -78,6 +99,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -94,6 +116,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -109,6 +132,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "responses",
         "reasoning": true,
         "tool_call": true
       },
@@ -124,6 +148,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "responses",
         "reasoning": true,
         "tool_call": true
       },
@@ -138,6 +163,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "responses",
         "reasoning": true,
         "tool_call": true
       },
@@ -152,6 +178,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "responses",
         "reasoning": true,
         "tool_call": true
       },
@@ -167,6 +194,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "responses",
         "reasoning": true,
         "tool_call": true
       },
@@ -180,6 +208,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -193,6 +222,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -208,6 +238,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -223,6 +254,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -238,6 +270,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -251,6 +284,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -265,6 +299,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -281,6 +316,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -294,6 +330,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -310,6 +347,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -326,6 +364,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -339,6 +378,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "messages",
         "reasoning": true,
         "tool_call": true
       },
@@ -354,6 +394,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "messages",
         "reasoning": true,
         "tool_call": true
       },
@@ -371,6 +412,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "responses",
         "reasoning": true,
         "tool_call": true
       },
@@ -388,6 +430,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "responses",
         "reasoning": true,
         "tool_call": true
       },
@@ -403,6 +446,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -416,6 +460,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -431,6 +476,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "messages",
         "reasoning": true,
         "tool_call": true
       },
@@ -446,6 +492,7 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "messages",
         "reasoning": true,
         "tool_call": true
       },
@@ -461,6 +508,23 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "messages",
+        "reasoning": true,
+        "tool_call": true
+      },
+      {
+        "context_window": 1048576,
+        "input_modalities": [
+          "image",
+          "text",
+          "video"
+        ],
+        "max_output_tokens": 524288,
+        "model": "space-bunny",
+        "output_modalities": [
+          "text"
+        ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       },
@@ -476,12 +540,29 @@
         "output_modalities": [
           "text"
         ],
+        "protocol": "chat_completions",
+        "reasoning": true,
+        "tool_call": true
+      },
+      {
+        "context_window": 1000000,
+        "input_modalities": [
+          "image",
+          "text",
+          "video"
+        ],
+        "max_output_tokens": 65536,
+        "model": "step-5-preview-free",
+        "output_modalities": [
+          "text"
+        ],
+        "protocol": "chat_completions",
         "reasoning": true,
         "tool_call": true
       }
     ]
   },
-  "revision": "2026-10-02.1",
-  "snapshot_date": "2026-10-02",
+  "revision": "2026-10-11.1",
+  "snapshot_date": "2026-10-11",
   "source": "https://models.dev/api.json（本地文件 models-dev.json）"
 }

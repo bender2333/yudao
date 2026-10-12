@@ -90,18 +90,16 @@ def test_after_beyond_the_log_end_resyncs_and_closes(tmp_path):
 def test_queue_overflow_resyncs_when_the_client_is_too_slow(tmp_path):
     # 客户端处理太慢：订阅队列写满以后服务端发送 resync 并关闭连接
     application = _application(tmp_path)
-    stream = application.open_event_stream(EventScope(projects=("empty",)), after=0, live=False,
+    # 先写入一条范围内的历史事件：它从历史补发返回，订阅在此之前已经登记
+    _record(application, "p1", 0)
+    stream = application.open_event_stream(EventScope(projects=("p1",)), after=0, live=False,
                                            queue_limit=8)
 
     async def run():
         generator = stream.messages()
-        messages = []
-        # 历史为空，第一条消息来自溢出判断；先推进一次以登记订阅，再写入事件把队列写满
-        first = asyncio.ensure_future(generator.__anext__())
-        await asyncio.sleep(0)
+        messages = [await generator.__anext__()]  # 订阅已登记：此后写入的事件进入订阅队列
         for index in range(40):
-            _record(application, "p1", index)
-        messages.append(await first)
+            _record(application, "p1", index + 1)
         async for message in generator:
             messages.append(message)
         return messages
@@ -113,17 +111,24 @@ def test_queue_overflow_resyncs_when_the_client_is_too_slow(tmp_path):
 def test_live_events_arrive_within_a_hundred_milliseconds(tmp_path):
     # 写入以后推送不依赖定时查询：新事件在 100 毫秒以内到达
     application = _application(tmp_path)
+    # 先写入一条历史事件：生成器读完它以后进入等待，新事件随后才写入
+    _record(application, "p1", 0)
     stream = application.open_event_stream(EventScope(projects=("p1",)), after=0, live=False,
                                            checkpoint_idle_sec=5.0)
 
     async def run():
         generator = stream.messages()
-        task = asyncio.ensure_future(generator.__anext__())
-        await asyncio.sleep(0.05)
+        assert (await generator.__anext__()).kind == "event"
+        # 把下一次取消息包成任务，用零时长让渡轮询等生成器挂在等待上（ag_await 非 None），
+        # 此时它已经不看历史读取：写入之后到达的事件只能是实时推送
+        pending = asyncio.ensure_future(generator.__anext__())
+        deadline = asyncio.get_running_loop().time() + 3.0
+        while generator.ag_await is None:
+            assert asyncio.get_running_loop().time() < deadline, "生成器没有进入等待"
+            await asyncio.sleep(0)
         started = time.monotonic()
         _record(application, "p1", 1)
-        message = await task
-        return message, time.monotonic() - started
+        return await pending, time.monotonic() - started
 
     message, elapsed = asyncio.run(asyncio.wait_for(run(), 10))
     assert message.kind == "event"

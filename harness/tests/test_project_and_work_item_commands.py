@@ -143,7 +143,7 @@ def test_source_directory_save_and_project_settings(data_dir):
         settings = client.get(f"/api/queries/project.settings?project_id={project_id}")
         assert settings.status_code == 200
         directories = settings.json()["data"]["source_directories"]
-        assert directories["src"] == {"name": "src", "path": "C:/repo/other", "version": 2}
+        assert directories["src"] == {"name": "src", "path": "C:/repo/other", "version": 2, "writeback_enabled": False, "remote": "", "target_branch": "", "check_commands": [], "credential_ref": None}
 
 
 def test_command_registration_save_and_department_settings_save(data_dir):

@@ -507,7 +507,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                                             mode: "edit" as const,
                                             state: formStateFromProvider(provider),
                                           };
-                                          const row = rowFromCandidate(item, catalog.capability_table, provider.preset_id);
+                                          const row = rowFromCandidate(item, catalog.capability_table, provider.preset_id,
+                                                                       presetById(presets, provider.preset_id));
                                           return { mode: "edit", state: { ...base.state, rows: [...base.state.rows, row] } };
                                         });
                                       }}>
@@ -600,7 +601,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           onRemoveRow={(key) => setForm((current) => (
             current ? { ...current, state: { ...current.state, rows: current.state.rows.filter((row) => row.key !== key) } } : current
           ))}
-          rowFromCandidate={(item) => rowFromCandidate(item, catalog.capability_table, form.state.preset_id)}
+          rowFromCandidate={(item) => rowFromCandidate(item, catalog.capability_table, form.state.preset_id,
+                                                       presetById(presets, form.state.preset_id))}
           blankRow={() => rowFromManual(form.state.rows.length)}
           presets={presets}
           presetRevision={catalog.presets.revision}

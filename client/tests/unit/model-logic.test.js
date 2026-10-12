@@ -55,6 +55,7 @@ const PRESETS = [
     id: "opencode-go",
     name: "OpenCode Go",
     auth: "api_key",
+    default_protocol: "chat_completions",
     base_urls: {
       responses: "https://opencode.ai/zen/go/v1",
       chat_completions: "https://opencode.ai/zen/go/v1",
@@ -75,6 +76,7 @@ const TABLE = {
     "opencode-go": [
       {
         model: "deepseek-v4-flash",
+        protocol: "chat_completions",
         input_modalities: ["text"],
         output_modalities: ["text"],
         context_window: 1000000,
@@ -83,6 +85,7 @@ const TABLE = {
         reasoning: true,
       },
       {
+        protocol: "responses",
         model: "vision-model",
         input_modalities: ["text", "image"],
         output_modalities: ["text"],
@@ -221,6 +224,54 @@ test("预填取上游模型列表优先，其次能力表，来源逐项标明�
   assert.equal(custom.sources.input_modalities, "default");
 });
 
+test("协议按能力表、服务方案默认与 Chat Completions 三级预填，来源逐项标明（设计说明第 4.3 节）", () => {
+  // 候选自带协议与来源时直接用它：后端按第 4.3 节决定，界面不再另算
+  const listed = prefillModel(
+    "vision-model",
+    { id: "vision-model", protocol: "responses", protocol_source: "capability_table" },
+    TABLE, "opencode-go", presetById(PRESETS, "opencode-go"),
+  );
+  assert.equal(listed.protocol, "responses");
+  assert.equal(listed.sources.protocol, "capability_table");
+
+  // 候选没带协议时取能力表
+  const fromTable = prefillModel("vision-model", { id: "vision-model" },
+                                 TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
+  assert.equal(fromTable.protocol, "responses");
+  assert.equal(fromTable.sources.protocol, "capability_table");
+
+  // 能力表没有这个模型时取服务方案的默认协议
+  const fromPreset = prefillModel("not-in-the-table", { id: "not-in-the-table" },
+                                  TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
+  assert.equal(fromPreset.protocol, "chat_completions");
+  assert.equal(fromPreset.sources.protocol, "preset_default");
+  // 后端已按方案默认给出时，来源同为服务方案默认
+  const listedPreset = prefillModel(
+    "not-in-the-table",
+    { id: "not-in-the-table", protocol: "chat_completions", protocol_source: "preset_default" },
+    TABLE, "opencode-go", presetById(PRESETS, "opencode-go"),
+  );
+  assert.equal(listedPreset.protocol, "chat_completions");
+  assert.equal(listedPreset.sources.protocol, "preset_default");
+
+  // 自定义服务方案不在预置表里：预填 Chat Completions，来源为默认
+  const custom = prefillModel("deepseek-v4-flash", { id: "deepseek-v4-flash" }, TABLE, CUSTOM_PRESET_ID, null);
+  assert.equal(custom.protocol, "chat_completions");
+  assert.equal(custom.sources.protocol, "default");
+
+  // 点击候选建立的行带着预填的协议与来源
+  const row = rowFromCandidate({ id: "vision-model", protocol: "responses", protocol_source: "capability_table" },
+                               TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
+  assert.equal(row.protocol, "responses");
+  assert.match(row.capability_source, /协议：能力表/);
+  const presetRow = rowFromCandidate({ id: "not-in-the-table" }, TABLE, "opencode-go",
+                                     presetById(PRESETS, "opencode-go"));
+  assert.equal(presetRow.protocol, "chat_completions");
+  assert.match(presetRow.capability_source, /协议：服务方案默认/);
+  // 手动添加的行没有预填来源，协议取 Chat Completions
+  assert.equal(rowFromManual(0).protocol, "chat_completions");
+});
+
 test("默认档位只能从已选的支持档位中选择；推理参数方式只列出与协议相符的选项（验收第 4 项）", () => {
   assert.deepEqual(defaultLevelOptions(["low", "high"]), ["low", "high"]);
   assert.deepEqual(defaultLevelOptions(["high", "low", "bogus"]), ["low", "high"]);
@@ -344,8 +395,10 @@ test("添加时的表单为空，编辑时恢复服务方案、协议与已保�
 });
 
 test("点击候选预填并标明来源；未「接受」的行不能保存（验收第 3 项）", () => {
-  const row = rowFromCandidate({ id: "deepseek-v4-flash", context_window: 500000, max_output_tokens: 64000 }, TABLE, "opencode-go");
+  const row = rowFromCandidate({ id: "deepseek-v4-flash", context_window: 500000, max_output_tokens: 64000 },
+                               TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
   assert.equal(row.id, "deepseek-v4-flash");
+  assert.equal(row.protocol, "chat_completions");
   assert.equal(row.model, "deepseek-v4-flash");
   assert.equal(row.context_window, "500000");
   assert.equal(row.capacity_confirmed, false);
@@ -361,14 +414,19 @@ test("点击候选预填并标明来源；未「接受」的行不能保存（�
   assert.deepEqual(patchRowCapacity(row, "context_window", "123"), { capacity_confirmed: true, context_window: "123", capability_source: "手动" });
 
   // 能力表里有图像输入的模型：预填为文本与图像
-  const vision = rowFromCandidate({ id: "vision-model" }, TABLE, "opencode-go");
+  const vision = rowFromCandidate({ id: "vision-model" }, TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
   assert.equal(vision.image_input, true);
   assert.equal(vision.context_window, "256000");
+  // 协议取能力表里这个模型的协议
+  assert.equal(vision.protocol, "responses");
+  assert.match(vision.capability_source, /协议：能力表/);
   assert.match(vision.capability_source, /窗口：能力表/);
 
-  // 两处都没有：容量留空，不能保存
-  const unknown = rowFromCandidate({ id: "not-in-the-table" }, TABLE, "opencode-go");
+  // 两处都没有：容量留空，不能保存，协议取服务方案的默认协议
+  const unknown = rowFromCandidate({ id: "not-in-the-table" }, TABLE, "opencode-go",
+                                   presetById(PRESETS, "opencode-go"));
   assert.equal(unknown.context_window, "");
+  assert.equal(unknown.protocol, "chat_completions");
   assert.equal(rowSavable({ ...unknown, capacity_confirmed: true }), false);
 
   // 手动添加的行：没有预填，来源为手动
@@ -380,7 +438,8 @@ test("点击候选预填并标明来源；未「接受」的行不能保存（�
 
 test("提交的形状：档位与输入方式按声明写入，默认档位不在支持档位时为未选择（验收第 4 项）", () => {
   const row = {
-    ...rowFromCandidate({ id: "m1", context_window: 1000, max_output_tokens: 100 }, TABLE, "opencode-go"),
+    ...rowFromCandidate({ id: "m1", context_window: 1000, max_output_tokens: 100 }, TABLE, "opencode-go",
+                        presetById(PRESETS, "opencode-go")),
     capacity_confirmed: true,
     image_input: true,
     reasoning_levels: ["low", "high"],
@@ -488,8 +547,10 @@ test("容量的缺项与非法关系在界面写明（工单 #294）", () => {
 test("上游模型 ID 带斜杠时预填的访问定义 ID 是合法标识符，上游 ID 保持原值（工单 #302）", () => {
   const row = rowFromCandidate(
     { id: "cbcn/deepseek-v4.1-flash", context_window: 128000, max_output_tokens: 16000 },
-    TABLE, CUSTOM_PRESET_ID,
+    TABLE, CUSTOM_PRESET_ID, presetById(PRESETS, CUSTOM_PRESET_ID),
   );
+  // 自定义服务方案没有预置条目，协议预填 Chat Completions
+  assert.equal(row.protocol, "chat_completions");
   // ID 换成合法写法：后端只接受字母数字打头的简单标识符，带斜杠保存会被拒
   assert.equal(row.id, "cbcn-deepseek-v4.1-flash");
   // 上游模型 ID 原样保留：请求发往上游时用的就是它

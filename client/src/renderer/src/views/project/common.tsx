@@ -305,9 +305,9 @@ export function Table(props: { head: string[]; rows: React.ReactNode[][]; captio
   );
 }
 
-export function KeyValue(props: { items: [string, React.ReactNode][] }) {
+export function KeyValue(props: { items: [string, React.ReactNode][]; className?: string }) {
   return (
-    <div className="y10-kv is-rows kv">
+    <div className={`y10-kv is-rows kv ${props.className ?? ""}`}>
       {props.items.map(([term, value]) => (
         <Line key={term} term={term} value={value} />
       ))}
