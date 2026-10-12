@@ -461,20 +461,20 @@ test.describe("项目页面（1440×900）", () => {
       const id = await projectId(page, SAMPLE);
       await gotoView(page, id, "materials");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.materials}`);
-      const head = await section(page, "资料");
-      await expect(head.locator(".section-head .note")).toContainText("本页的事项 wi_");
-      await expect(head.locator(".section-head .note")).toContainText("（未选中事项，取当前事项）");
-      const intend = await table(page, "intend 原文：首次与逐次输入");
+      const index = await section(page, "按事项查看");
+      await expect(index.locator(".section-head .note")).toContainText("本页的事项 wi_");
+      await expect(index.locator(".section-head .note")).toContainText("（未选中事项，取当前事项）");
+      const intend = await section(page, "intend 原文");
       await expect(intend).toContainText("第 1 版");
       await expect(intend).toContainText("text");
       await expect(intend).toContainText("0–18");
-      await expect(await table(page, "PRD（有效合同）")).toContainText("第 1 版");
-      await expect(await table(page, "PLAN（工程方案）")).toContainText("Implement and verify");
+      await expect(await section(page, "PRD")).toContainText("第 1 版");
+      await expect(await section(page, "PLAN")).toContainText("Implement and verify");
       const delivery = page.locator(".delivery-block").first();
-      await expect(delivery.locator("h3")).toContainText("交付 第 1 版");
+      await expect(delivery.locator(".y10-mt-doc-head strong")).toContainText("交付 第 1 版");
       await expect(delivery).toContainText(ADOPTED_SUMMARY);
       await expect(delivery.locator(".file-list")).toContainText(DELIVERY_FILE);
-      await expect(await table(page, "项目材料")).toContainText(SEEDED_MATERIAL);
+      await expect(await section(page, "项目材料")).toContainText(SEEDED_MATERIAL);
       // 文件内容由 delivery.file 取回
       await delivery.locator("button.link", { hasText: "查看内容" }).click();
       const viewer = page.locator("div.card").filter({ has: page.getByRole("heading", { name: `交付文件 ${DELIVERY_FILE}` }) });
@@ -497,11 +497,9 @@ test.describe("项目页面（1440×900）", () => {
     const errors = watchErrors(client);
     const page = client.page;
     try {
-      const id = await projectId(page, SAMPLE);
-      await gotoView(page, id, "observe");
-      expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
-      const record = await section(page, "请求记录");
+      const record = await section(page, "请求记录与用量");
       await expect(record.locator(".section-head .note")).toContainText("范围：整个项目");
+      expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
       const all = page.locator("section.card table").first();
       await expect(all.locator("tbody tr")).toHaveCount(4);
       await expect(all.locator("tbody tr").first()).toContainText("fake-script");
@@ -544,9 +542,11 @@ test.describe("项目页面（1440×900）", () => {
       await expect(detail.locator(".line", { hasText: "失败类型" }).locator(".value")).toHaveText("没有");
       await expect(detail).toContainText("结束原因");
       await expect(detail.locator(".line", { hasText: "结束原因" }).locator(".value")).toHaveText("未上报");
+      // 详情页的返回：回到观测页，页签回到请求记录
       await detail.getByRole("button", { name: "返回请求记录" }).click();
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
       expect(await activeTabCount(page)).toBe(1);
+      await record.getByRole("tab", { name: "用量统计" }).click();
       const usage = await section(page, "用量统计");
       await expect(usage.locator(".section-head .note")).toContainText("只读显示用量，不做预算判断");
       await expect(usage).toContainText("请求数");
