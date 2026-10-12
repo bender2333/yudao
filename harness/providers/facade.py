@@ -264,7 +264,7 @@ class ProviderFacade:
 
     def impacted_definitions(self, document: Mapping[str, Any]) -> list[dict[str, str]]:
         # 按拟议的目录文档算出会作废准入的模型访问定义（设计说明第 4.4 节的受影响字段）：
-        # 只比较受影响字段，返回受影响定义的公开身份，不写入任何内容；
+        # 只比较受影响字段（连接的地址与凭据引用，定义的协议、上游模型 ID 与推理参数方式），
         # 定义本身被移除时不列在这里，由应用层按「将一并删除」处理。
         # Provider 模块只交出定义，引用方与进行中事项由应用层汇总
         with self._lock:
@@ -593,7 +593,7 @@ class ProviderFacade:
                 binding = self._bindings.get(key, {})
                 model = self._store.models.get(binding.get("model_id", ""))
                 provider = self._store.providers.get(binding.get("provider_id", ""))
-                if model is None or provider is None or provider.protocol == "fake":
+                if model is None or provider is None or model.protocol == "fake":
                     continue
                 record = self._admissions.get(model.id)
                 if record is None or not admission_is_current(record, model, provider):
@@ -696,7 +696,7 @@ class ProviderFacade:
             if provider is None:
                 raise CatalogValidationError((ValidationIssue(
                     f"departments.{department}.model_id", "Provider 配置不存在"),))
-            if provider.protocol != "fake":
+            if model.protocol != "fake":
                 record = self._admissions.get(model.id)
                 if record is None:
                     raise CatalogValidationError((ValidationIssue(
@@ -786,7 +786,7 @@ class ProviderFacade:
     def _resolve_api_key(self, provider: Any) -> str:
         # 模型列表地址要求认证时按协议取凭据；fake 不需要凭据。
         # 凭据引用无法解析时交回空串，由获取模型列表与连接测试报告「候选未知」并说明原因
-        if provider.protocol == "fake" or not provider.credential_ref:
+        if not provider.credential_ref:
             return ""
         material = self._credentials.resolve(provider.credential_ref)
         if material is None:
@@ -808,7 +808,7 @@ class ProviderFacade:
                 provider_id=provider.id,
                 admitted_at=_utc_now(),
                 admitted_model="" if admitted_model is None else str(admitted_model),
-                protocol=provider.protocol,
+                protocol=model.protocol,
                 base_url=provider.base_url,
                 credential_ref=provider.credential_ref,
                 model=model.model,
@@ -849,7 +849,7 @@ class ProviderFacade:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
             return {
                 "ok": False, "error": str(exc), "model": None, "admitted": False,
-                "protocol": provider.protocol, "revision": self.revision,
+                "protocol": model.protocol, "revision": self.revision,
                 "elapsed_ms": elapsed_ms, "usage_reported": False,
             }
         elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
@@ -863,7 +863,7 @@ class ProviderFacade:
             "error": None,
             "model": actual,
             "admitted": bool(capacity_confirmed),
-            "protocol": provider.protocol,
+            "protocol": model.protocol,
             "revision": self.revision,
             "elapsed_ms": elapsed_ms,
             "usage_reported": bool(result.usage.get("reported", False)),
@@ -1018,7 +1018,7 @@ class ProviderFacade:
                 rows.append({
                     "model_id": model_id,
                     "provider_id": model.provider_id,
-                    "protocol": None if provider is None else provider.protocol,
+                    "protocol": model.protocol,
                     "admitted": current,
                     "stale": not current,
                     "admitted_at": record.admitted_at,
@@ -1107,12 +1107,10 @@ class ProviderFacade:
             provider = self._store.providers[provider_id]
             revision = self._revision
             material = self._credentials.resolve(provider.credential_ref)
-        protocol = provider.protocol
-        if protocol not in SUPPORTED_PROTOCOLS:
-            raise ProviderError(f"unsupported provider protocol: {protocol}", reason="unsupported_protocol")
-        result = {"kind": "connection", "revision": revision, "protocol": protocol,
+            is_fake = any(m.protocol == "fake" for m in self._store.models.values() if m.provider_id == provider.id)
+        result = {"kind": "connection", "revision": revision,
                   "source_url": effective_models_url(provider)}
-        if protocol == "fake":
+        if is_fake:
             return {**result, "ok": True, "reason": "", "message": ""}
         if material is None:
             return {**result, "ok": False, "reason": "provider_unavailable",
@@ -1426,10 +1424,10 @@ def _reject_fake_if_normal(store: ProviderStore, startup_mode: str) -> None:
     if startup_mode != "normal":
         return
     issues = [
-        ValidationIssue(f"providers.{provider_id}.protocol",
-                        "正常启动的系统不允许 fake 协议连接，fake 只在测试或演示方式下可用")
-        for provider_id in sorted(store.providers)
-        if store.providers[provider_id].protocol == "fake"
+        ValidationIssue(f"models.{model_id}.protocol",
+                        "正常启动的系统不允许 fake 协议的模型访问定义，fake 只在测试或演示方式下可用")
+        for model_id in sorted(store.models)
+        if store.models[model_id].protocol == "fake"
     ]
     if issues:
         raise CatalogValidationError(issues)
@@ -1517,7 +1515,7 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
 def _require_bound_admissions(bindings: Mapping[str, Mapping[str, str]],
                               store: ProviderStore,
                               admissions: Mapping[str, AdmissionRecord]) -> None:
-    # 保存部门默认要求所选定义已准入且未作废；fake 连接无真实上游可测，豁免该要求（工单 #86）
+    # 保存部门默认要求所选定义已准入且未作废；fake 定义无真实上游可测，豁免该要求（工单 #86）
     issues: list[ValidationIssue] = []
     for department in sorted(bindings):
         model_id = bindings[department].get("model_id", "")
@@ -1525,7 +1523,7 @@ def _require_bound_admissions(bindings: Mapping[str, Mapping[str, str]],
         if model is None:
             continue
         provider = store.providers.get(model.provider_id)
-        if provider is not None and provider.protocol == "fake":
+        if model.protocol == "fake":
             continue
         record = admissions.get(model_id)
         location = f"bindings.{department}.model_id"

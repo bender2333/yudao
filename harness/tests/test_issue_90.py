@@ -194,6 +194,7 @@ def test_connection_address_change_lists_impact_and_returns_definitions_to_candi
             saved = _post(client, "catalog.connection.save", base_version=impact["revision"],
                           provider=proposed,
                           models=[{"id": item["id"], "model": item["model"],
+                                   "protocol": item.get("protocol", "responses"),
                                    "context_window": item.get("context_window"),
                                    "max_output_tokens": item["max_output_tokens"],
                                    "capability_source": item.get("capability_source", ""),
@@ -261,7 +262,8 @@ def test_provider_delete_lists_definitions_and_deletes_unreferenced_ones(tmp_pat
         project_id = _create_project(client, "P")
         saved = _post(client, "catalog.connection.save", base_version=_catalog(client)["revision"],
                       provider=_provider("provider-b", "http://127.0.0.1:1/v1", "KEY_B"),
-                      models=[{"id": "model-b", "model": "upstream-b", "context_window": 32000,
+                      models=[{"id": "model-b", "model": "upstream-b", "protocol": "responses",
+                               "context_window": 32000,
                                "max_output_tokens": 2048, "capability_source": "",
                                "capacity_confirmed": True}])
         assert saved.status_code == 200, saved.text

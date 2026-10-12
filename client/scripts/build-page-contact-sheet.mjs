@@ -41,7 +41,30 @@ const backendDataDir = join(repoRoot, ".tmp", "contact-sheet-backend", issue);
 const prototypeUrl = pathToFileURL(join(repoRoot, "docs", "prototypes", "v10", "index.html")).href;
 const levelArg = args.level ?? null;
 if (levelArg !== null && !LEVELS.includes(levelArg)) fail(`档位只有 ${LEVELS.join(",")}，收到 ${levelArg}`);
-
+const deptArg = args.dept ?? args.depts ?? null;
+const DEPTS = ["product", "engineering", "quality"];
+if (deptArg !== null) {
+  for (const d of deptArg.split(",")) {
+    if (!DEPTS.includes(d)) fail(`部门只有 ${DEPTS.join(",")}，收到 ${d}`);
+  }
+}
+const pagesToCapture = [];
+for (const entry of pages) {
+  if (entry.slug === "dept" && deptArg !== null) {
+    for (const d of deptArg.split(",")) {
+      const dName = { product: "产品", engineering: "工程", quality: "质检" }[d] ?? d;
+      pagesToCapture.push({
+        ...entry,
+        slug: `dept-${d}`,
+        name: `部门工作间（${dName}）`,
+        prototypeHash: entry.prototypeHash.replace("/dept/engineering", `/dept/${d}`),
+        systemHash: entry.systemHash.replace("/dept/engineering", `/dept/${d}`),
+      });
+    }
+  } else {
+    pagesToCapture.push(entry);
+  }
+}
 // 联系表的显示尺寸：整页截图按固定显示宽缩小，行尾的局部按原始像素显示（图片不缩放，只露出左上角）
 const CELL_WIDTH = 640;
 const CROP_WIDTH = 320;
@@ -62,12 +85,12 @@ const results = [];
 try {
   const projects = await readProjects(backend.address);
   const workItems = new Map();
-  for (const entry of pages) {
+  for (const entry of pagesToCapture) {
     if (entry.systemProject !== null && !workItems.has(entry.systemProject)) {
       workItems.set(entry.systemProject, await readWorkItems(backend.address, projects.get(entry.systemProject)));
     }
   }
-  for (const entry of pages) {
+  for (const entry of pagesToCapture) {
     for (const theme of themes) {
       const started = Date.now();
       const systemHash = systemHashOf(entry, projects, workItems);
@@ -411,9 +434,15 @@ function renderIndex(results) {
     "机器、运行、工具与恢复四个页面在真实系统里当前是占位内容（由工单 #378、#380 填入），联系表照拍占位画面。",
     "",
   ];
+  const allEntries = [...PAGES];
+  for (const item of results) {
+    if (!allEntries.some((entry) => entry.slug === item.entry.slug)) {
+      allEntries.push(item.entry);
+    }
+  }
   for (const theme of THEMES) {
     lines.push(`## ${theme === "light" ? "浅色" : "深色"}`, "");
-    for (const entry of PAGES) {
+    for (const entry of allEntries) {
       const name = sheetFileName(entry.slug, theme);
       const file = join(outDir, name);
       if (!existsSync(file)) {

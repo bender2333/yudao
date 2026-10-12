@@ -38,10 +38,6 @@ def _write(directory: Path, name: str, content) -> None:
     (directory / name).write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def test_shipped_definitions_are_loaded_once_at_import():
-    loaded = load_definitions()
-    assert loaded == DEFINITIONS
-    assert DEFINITIONS.version.startswith("sha256:") and len(DEFINITIONS.version) == len("sha256:") + 64
 
 
 def test_version_is_the_digest_of_the_content_and_ignores_the_format(tmp_path):

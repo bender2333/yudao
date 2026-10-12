@@ -13,17 +13,17 @@ from harness.providers.errors import CatalogValidationError
 # 目录层用例不触网，经真实 ProviderStore 与 ProviderFacade 校验。
 
 def _provider(provider_id="p1", *, base_url="http://127.0.0.1:9/v1", credential_ref="KEY_1",
-              protocol="responses", name=None, timeout_sec=20.0, models_url="", preset_id=""):
+              name=None, timeout_sec=20.0, models_url="", preset_id=""):
     return {
-        "id": provider_id, "name": name or provider_id, "protocol": protocol, "base_url": base_url,
+        "id": provider_id, "name": name or provider_id, "base_url": base_url,
         "credential_ref": credential_ref, "timeout_sec": timeout_sec, "preset_id": preset_id,
         "models_url": models_url,
     }
 
-def _model(model_id="m1", *, provider_id="p1", model="model-x", context_window=32000,
-           max_output_tokens=2048, capability_source=""):
+def _model(model_id="m1", *, provider_id="p1", model="model-x", protocol="responses",
+           context_window=32000, max_output_tokens=2048, capability_source=""):
     return {
-        "id": model_id, "provider_id": provider_id, "model": model,
+        "id": model_id, "provider_id": provider_id, "model": model, "protocol": protocol,
         "context_window": context_window, "max_output_tokens": max_output_tokens,
         "capability_source": capability_source,
     }
@@ -66,14 +66,14 @@ def test_connection_save_requires_per_row_capacity_confirmation(tmp_path):
 
     unconfirmed = CatalogConnectionSave.model_validate({
         "command_id": str(uuid.uuid4()), "base_version": 1, "provider": _provider(),
-        "models": [{"id": "m1", "model": "model-x", "context_window": 32000,
+        "models": [{"id": "m1", "model": "model-x", "protocol": "responses", "context_window": 32000,
                     "max_output_tokens": 2048}],
     })
     assert unconfirmed.models[0].capacity_confirmed is False
 
     confirmed = CatalogConnectionSave.model_validate({
         "command_id": str(uuid.uuid4()), "base_version": 1, "provider": _provider(),
-        "models": [{"id": "m1", "model": "model-x", "context_window": 32000,
+        "models": [{"id": "m1", "model": "model-x", "protocol": "responses", "context_window": 32000,
                     "max_output_tokens": 2048, "capacity_confirmed": True}],
     })
     assert confirmed.models[0].capacity_confirmed is True
@@ -165,12 +165,14 @@ def test_changing_credential_ref_makes_all_models_candidates(tmp_path):
     facade.save_provider_entry({**_provider(credential_ref="KEY_2")}, [_model("m1")])
     assert facade.model_admissions()[0]["stale"] is True
 
-def test_changing_protocol_makes_all_models_candidates(tmp_path):
-    facade = _facade(tmp_path, providers=[_provider()], models=[_model("m1")])
+def test_changing_protocol_makes_that_model_candidate(tmp_path):
+    facade = _facade(tmp_path, providers=[_provider()], models=[_model("m1", protocol="responses"), _model("m2", protocol="responses")])
     facade.record_admission("p1", "m1", admitted_model="model-x")
-    facade.save_provider_entry({**_provider(protocol="chat_completions")}, [_model("m1")])
-    assert facade.model_admissions()[0]["stale"] is True
-
+    facade.record_admission("p1", "m2", admitted_model="model-x")
+    facade.save_provider_entry(_provider(), [_model("m1", protocol="chat_completions"), _model("m2")])
+    admissions = {item["model_id"]: item for item in facade.model_admissions()}
+    assert admissions["m1"]["stale"] is True
+    assert admissions["m2"]["stale"] is False
 def test_changing_upstream_model_id_makes_only_that_model_candidate(tmp_path):
     facade = _facade(tmp_path, providers=[_provider()], models=[_model("m1"), _model("m2")])
     facade.record_admission("p1", "m1", admitted_model="model-x")
@@ -272,23 +274,22 @@ def test_fake_protocol_rejected_on_normal_startup(tmp_path):
     facade.startup_mode = "normal"
     with pytest.raises(CatalogValidationError) as exc:
         facade.store_document({
-            "providers": [_provider(protocol="fake", credential_ref="")],
-            "models": [_model()],
+            "providers": [_provider(credential_ref="")],
+            "models": [_model(protocol="fake")],
             "bindings": {},
         })
-    assert any("fake" in issue.message or issue.location.endswith("protocol") for issue in exc.value.issues)
+    assert any("fake" in issue.message or issue.location == "models[0].protocol" for issue in exc.value.issues)
 
 def test_fake_protocol_allowed_on_demo_startup(tmp_path):
     facade = ProviderFacade()
     facade.configure_paths(tmp_path / "providers.json", tmp_path / ".env")
     facade.startup_mode = "demo"
     facade.store_document({
-        "providers": [_provider(protocol="fake", credential_ref="")],
-        "models": [_model()],
+        "providers": [_provider(credential_ref="")],
+        "models": [_model(protocol="fake")],
         "bindings": {},
     })
     assert "p1" in facade.providers_view()["providers"][0]["id"]
-
 def test_system_with_adapter_factory_reads_catalog_in_test_mode(tmp_path):
     # 只提供适配器工厂的测试系统在运行时写入 fake 连接：装配的目录必须按 test 方式读取，
     # 与提供单个适配器的系统一致（工单 #86）
@@ -300,8 +301,8 @@ def test_system_with_adapter_factory_reads_catalog_in_test_mode(tmp_path):
         facade = system.facade
         facade.configure_paths(tmp_path / "providers.json", tmp_path / ".env")
         facade.store_document({
-            "providers": [_provider(protocol="fake", credential_ref="")],
-            "models": [_model()],
+            "providers": [_provider(credential_ref="")],
+            "models": [_model(protocol="fake")],
             "bindings": {},
         })
         assert facade.providers_view()["providers"][0]["id"] == "p1"

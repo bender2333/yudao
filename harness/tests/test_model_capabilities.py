@@ -11,6 +11,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "harness" / "tests" / "data" / "models_dev_snapshot.json"
+# 另一份 fixtures：同一个服务方案下的模型带三种取值以外的 provider.npm，提取脚本要报出它
+OTHER_FIXTURE = REPO_ROOT / "harness" / "tests" / "data" / "models_dev_snapshot_other_npm.json"
 SPEC = REPO_ROOT / "scripts" / "generate_model_capabilities.py"
 
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, load_definitions
@@ -49,12 +51,14 @@ def test_shipped_capability_table_covers_only_preset_plans():
 
 def test_extractor_keeps_section_4_1_fields_and_filters_providers():
     module = _extractor()
-    table = module.build_table(_presets(), _fixture_copy(), "2026-10-02.1", "2026-10-02", "https://models.dev")
+    table = module.build_table(_presets(), _fixture_copy(), "2026-10-11.1", "2026-10-11", "https://models.dev")
     assert set(table["presets"]) == {"opencode-go"}  # fixtures 里的 anthropic 不被收录
     entries = {entry["model"]: entry for entry in table["presets"]["opencode-go"]}
-    assert set(entries) == {"deepseek-v4-flash", "deepseek-v4-flash-vision-exp", "kimi-k2.7-code"}
+    assert set(entries) == {"claude-haiku-5-5", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp",
+                            "glm-5.3-flash", "grok-4.7", "kimi-k2.7-code"}
     assert entries["deepseek-v4-flash"] == {
         "model": "deepseek-v4-flash",
+        "protocol": "chat_completions",
         "input_modalities": ["text"],
         "output_modalities": ["text"],
         "context_window": 1000000,
@@ -63,19 +67,26 @@ def test_extractor_keeps_section_4_1_fields_and_filters_providers():
         "reasoning": True,
     }
     assert entries["deepseek-v4-flash-vision-exp"]["input_modalities"] == ["image", "text"]
+    # 协议按 provider.npm 映射：openai → responses，anthropic → messages，openai-compatible → chat_completions
+    assert entries["grok-4.7"]["protocol"] == "responses"
+    assert entries["claude-haiku-5-5"]["protocol"] == "messages"
+    # 模型没有单独声明 provider.npm 时记录服务方案的默认协议
+    assert entries["glm-5.3-flash"]["protocol"] == "chat_completions"
+    assert entries["kimi-k2.7-code"]["protocol"] == "chat_completions"
+    assert entries["deepseek-v4-flash-vision-exp"]["protocol"] == "chat_completions"
 
 
 def test_extractor_skips_missing_modalities_and_unknown_limit():
     module = _extractor()
     # fixtures 中 kimi-k2.7-code 的记录缺少 modalities 字段（上游允许缺少）：不记录输入与输出方式
-    table = module.build_table(_presets(), _fixture_copy(), "2026-10-02.1", "2026-10-02", "https://models.dev")
+    table = module.build_table(_presets(), _fixture_copy(), "2026-10-11.1", "2026-10-11", "https://models.dev")
     kimi = {entry["model"]: entry for entry in table["presets"]["opencode-go"]}["kimi-k2.7-code"]
     assert "input_modalities" not in kimi and "output_modalities" not in kimi
     assert kimi["context_window"] == 262144 and kimi["max_output_tokens"] == 262144
     # limit 缺少时容量记为 null，预填留空由用户填写
     stripped = _fixture_copy()
     del stripped["opencode-go"]["models"]["deepseek-v4-flash"]["limit"]
-    second = module.build_table(_presets(), stripped, "2026-10-02.1", "2026-10-02", "https://models.dev")
+    second = module.build_table(_presets(), stripped, "2026-10-11.1", "2026-10-11", "https://models.dev")
     flash = {entry["model"]: entry for entry in second["presets"]["opencode-go"]}["deepseek-v4-flash"]
     assert flash["context_window"] is None and flash["max_output_tokens"] is None
 
@@ -84,13 +95,24 @@ def test_extractor_fails_fast_when_preset_plan_is_absent_upstream():
     module = _extractor()
     models_dev = {key: value for key, value in _fixture_copy().items() if key != "opencode-go"}
     with pytest.raises(ValueError, match="opencode-go"):
-        module.build_table(_presets(), models_dev, "2026-10-02.1", "2026-10-02", "https://models.dev")
+        module.build_table(_presets(), models_dev, "2026-10-11.1", "2026-10-11", "https://models.dev")
+
+
+def test_extractor_fails_fast_on_unmapped_provider_npm():
+    # 三种取值以外的 provider.npm：以错误结束，并列出这些模型（设计说明第 4.1 节）
+    module = _extractor()
+    models_dev = json.loads(OTHER_FIXTURE.read_text(encoding="utf-8"))
+    with pytest.raises(ValueError) as raised:
+        module.build_table(_presets(), models_dev, "2026-10-11.1", "2026-10-11", "https://models.dev")
+    message = str(raised.value)
+    assert "provider.npm 不在协议映射中" in message
+    assert "mistral-large-4（@ai-sdk/mistral）" in message
 
 
 def test_extractor_output_is_stable(tmp_path):
     module = _extractor()
     out_a, out_b = tmp_path / "a.json", tmp_path / "b.json"
-    argv = ["--input", str(FIXTURE), "--date", "2026-10-02"]
+    argv = ["--input", str(FIXTURE), "--date", "2026-10-11"]
     module.main([*argv, "--out", str(out_a)])
     module.main([*argv, "--out", str(out_b)])
     assert out_a.read_bytes() == out_b.read_bytes()
@@ -100,7 +122,7 @@ def test_committed_table_matches_the_extractor():
     # 提交的能力表与提取脚本按仓库内 fixtures 的取材结果一致（同一脚本、同一预置表）。
     # fixtures 里 kimi 的记录被有意裁掉 modalities 覆盖缺少的形状，逐条比对只看未裁剪的记录
     module = _extractor()
-    table = module.build_table(_presets(), _fixture_copy(), "2026-10-02.1", "2026-10-02", "https://models.dev")
+    table = module.build_table(_presets(), _fixture_copy(), "2026-10-11.1", "2026-10-11", "https://models.dev")
     committed = json.loads((DEFINITIONS_DIR / "model_capabilities.json").read_text(encoding="utf-8"))
     by_model = {row["model"]: row for row in committed["presets"]["opencode-go"]}
     for entry in table["presets"]["opencode-go"]:
@@ -116,7 +138,7 @@ def test_table_public_lists_entries_with_metadata():
     assert view["source"] == capabilities.CAPABILITY_TABLE_SOURCE
     assert set(view["presets"]) == set(DEFINITIONS.model_capabilities.presets)
     entry = view["presets"]["opencode-go"][0]
-    assert set(entry) == {"model", "input_modalities", "output_modalities",
+    assert set(entry) == {"model", "protocol", "input_modalities", "output_modalities",
                           "context_window", "max_output_tokens", "tool_call", "reasoning"}
 
 

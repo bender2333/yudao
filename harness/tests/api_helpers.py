@@ -101,12 +101,12 @@ CREDENTIAL_B = "KEY_B"
 
 
 def catalog_provider(provider_id: str, base_url: str, ref: str) -> dict:
-    return {"id": provider_id, "name": provider_id, "protocol": "responses", "base_url": base_url,
+    return {"id": provider_id, "name": provider_id, "base_url": base_url,
             "credential_ref": ref, "timeout_sec": 20, "preset_id": "", "models_url": ""}
 
 
-def catalog_model(model_id: str, provider_id: str, upstream: str) -> dict:
-    return {"id": model_id, "provider_id": provider_id, "model": upstream,
+def catalog_model(model_id: str, provider_id: str, upstream: str, *, protocol: str = "responses") -> dict:
+    return {"id": model_id, "provider_id": provider_id, "model": upstream, "protocol": protocol,
             "context_window": 32000, "max_output_tokens": 2048, "capability_source": ""}
 
 

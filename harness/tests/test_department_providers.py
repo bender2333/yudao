@@ -19,6 +19,7 @@ from harness.providers import CredentialChain, CredentialMaterial, ProviderFacad
 from harness.proposals import collaboration_request, collaboration_response, delivery, engineering_plan, product_spec, review
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
+from harness.tests.protocol_helpers import preset_base_urls
 
 
 @dataclass(frozen=True)
@@ -256,19 +257,23 @@ def _facade(
     facade = ProviderFacade(credentials=CredentialChain(use_env=False))
     facade.store_document({
         "providers": [
-            {"id": "provider-a", "name": "Provider A", "protocol": "responses", "base_url": product_url,
+            {"id": "provider-a", "name": "Provider A", "base_url": product_url,
              "credential_ref": "credential-a", "timeout_sec": timeout_sec},
-            {"id": "provider-b", "name": "Provider B", "protocol": "responses", "base_url": engineering_url,
+            {"id": "provider-b", "name": "Provider B", "base_url": engineering_url,
              "credential_ref": "credential-b", "timeout_sec": timeout_sec},
         ],
         "models": [
             {"id": "model-a-product", "provider_id": "provider-a", "model": "a-product",
+             "protocol": "responses",
              "context_window": product_context_window, "max_output_tokens": 1_000},
             {"id": "model-a-quality", "provider_id": "provider-a", "model": "a-quality",
+             "protocol": "responses",
              "context_window": 20_000, "max_output_tokens": 1_000},
             {"id": "model-b-engineering", "provider_id": "provider-b", "model": "b-engineering",
+             "protocol": "responses",
              "context_window": 20_000, "max_output_tokens": 1_000},
             {"id": "model-b-product", "provider_id": "provider-b", "model": "b-product",
+             "protocol": "responses",
              "context_window": product_context_window, "max_output_tokens": 1_000},
         ],
         "bindings": {
@@ -825,21 +830,24 @@ def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: 
     facade = ProviderFacade(credentials=CredentialChain(use_env=False))
     facade.store_document({
         "providers": [
-            {"id": "provider-p", "name": "Messages 服务", "protocol": "messages", "base_url": product_url,
+            {"id": "provider-p", "name": "Messages 服务", "base_url": product_url,
              "credential_ref": "credential-p", "timeout_sec": 10, "preset_id": "opencode-go"},
-            {"id": "provider-e", "name": "Chat 服务", "protocol": "chat_completions",
+            {"id": "provider-e", "name": "Chat 服务",
              "base_url": engineering_url,
              "credential_ref": "credential-e", "timeout_sec": 10, "preset_id": "opencode-go"},
-            {"id": "provider-q", "name": "Responses 服务", "protocol": "responses",
+            {"id": "provider-q", "name": "Responses 服务",
              "base_url": quality_url,
              "credential_ref": "credential-q", "timeout_sec": 10, "preset_id": "opencode-go"},
         ],
         "models": [
             {"id": "model-p", "provider_id": "provider-p", "model": "p-model",
+             "protocol": "messages",
              "context_window": 6_000, "max_output_tokens": 1_000},
             {"id": "model-e", "provider_id": "provider-e", "model": "e-model",
+             "protocol": "chat_completions",
              "context_window": 20_000, "max_output_tokens": 1_000},
             {"id": "model-q", "provider_id": "provider-q", "model": "q-model",
+             "protocol": "responses",
              "context_window": 20_000, "max_output_tokens": 1_000},
         ],
         "bindings": {
@@ -907,12 +915,17 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
     with _provider_server("provider-p", "unused", product) as (config_p, captures_p, errors_p), \
             _provider_server("provider-e", "unused", engineering) as (config_e, captures_e, errors_e), \
             _provider_server("provider-q", "unused", quality) as (config_q, captures_q, errors_q):
-        system = LoopSystem(tmp_path, facade=_mixed_protocol_facade(
-            config_p.base_url, config_e.base_url, config_q.base_url), step_limits=MILLISECOND_RETRIES)
-        run_id = system.create_run("build an echo command")
-        system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5_000)
-        result = system.run_until_stop(run_id)
-        other_run = system.create_run("a second task")
+        # 三条连接都带服务方案：请求基址按各自访问定义的协议取自预置表（ADR-0033），
+        # 测试把预置表中这三种协议的基址分别指向各自部门的本机上游
+        with preset_base_urls({"messages": config_p.base_url,
+                               "chat_completions": config_e.base_url,
+                               "responses": config_q.base_url}):
+            system = LoopSystem(tmp_path, facade=_mixed_protocol_facade(
+                config_p.base_url, config_e.base_url, config_q.base_url), step_limits=MILLISECOND_RETRIES)
+            run_id = system.create_run("build an echo command")
+            system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5_000)
+            result = system.run_until_stop(run_id)
+            other_run = system.create_run("a second task")
 
     assert not errors_p and not errors_e and not errors_q
     assert result.phase == "DONE", result.error
