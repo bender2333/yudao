@@ -85,6 +85,7 @@
 "test_issue_317_onboarding_upgrade.py" = "integration"
 "test_issue_321.py" = "integration"
 "test_issue_374.py" = "integration"
+"test_issue_384.py" = "integration"
 "test_issue_350_usage_resumes.py" = "integration"
 "test_layers.py" = "unit"
 "test_layer_boundaries.py" = "module"

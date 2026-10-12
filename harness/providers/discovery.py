@@ -34,12 +34,14 @@ def refresh_candidates(
         response.raise_for_status()
         payload = response.json()
     except httpx.HTTPStatusError as exc:
-        return _unknown(provider, source_url, fetched_at, f"模型列表返回 HTTP {exc.response.status_code}")
+        return _unknown(provider, source_url, fetched_at,
+                        f"模型列表请求 {source_url} 返回 HTTP {exc.response.status_code}")
     except httpx.HTTPError as exc:
         if certificate_verification_failed(exc):
             return _unknown(provider, source_url, fetched_at,
-                            f"模型列表请求失败：证书校验失败（{service_address(source_url)}）")
-        return _unknown(provider, source_url, fetched_at, f"模型列表请求失败：{type(exc).__name__}")
+                            f"模型列表请求 {source_url} 失败：证书校验失败（{service_address(source_url)}）")
+        return _unknown(provider, source_url, fetched_at,
+                        f"模型列表请求 {source_url} 连接失败：{_connection_reason(exc)}")
     except ValueError:
         return _unknown(provider, source_url, fetched_at, "模型列表不是合法 JSON")
     try:
@@ -78,13 +80,13 @@ def probe_connection(
         status = exc.response.status_code
         reason = "credential_rejected" if status in (401, 403) else "upstream_error"
         return {"ok": False, "source_url": source_url, "reason": reason,
-                "message": f"模型列表返回 HTTP {status}"}
+                "message": f"模型列表请求 {source_url} 返回 HTTP {status}"}
     except httpx.HTTPError as exc:
         if certificate_verification_failed(exc):
             return {"ok": False, "source_url": source_url, "reason": "upstream_error",
-                    "message": f"模型列表请求失败：证书校验失败（{service_address(source_url)}）"}
+                    "message": f"模型列表请求 {source_url} 失败：证书校验失败（{service_address(source_url)}）"}
         return {"ok": False, "source_url": source_url, "reason": "upstream_error",
-                "message": f"模型列表请求失败：{type(exc).__name__}"}
+                "message": f"模型列表请求 {source_url} 连接失败：{_connection_reason(exc)}"}
     return {"ok": True, "source_url": source_url, "reason": "", "message": ""}
 
 
@@ -158,6 +160,35 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         candidates.append(candidate)
     candidates.sort(key=lambda entry: entry["id"])
     return candidates
+
+
+def _connection_reason(exc: httpx.HTTPError) -> str:
+    # 连接失败的原因写成用户看得懂的中文：无法解析主机、连接被拒绝、超时（设计说明第 9.1 节）
+    if isinstance(exc, httpx.TimeoutException):
+        return "请求超时"
+    seen: set[int] = set()
+    cause: BaseException | None = exc
+    texts: list[str] = []
+    while cause is not None and id(cause) not in seen:
+        seen.add(id(cause))
+        texts.append(f"{type(cause).__name__}: {cause}")
+        if type(cause).__name__ == "gaierror":
+            return "无法解析主机"
+        if isinstance(cause, ConnectionRefusedError):
+            return "连接被拒绝"
+        if isinstance(cause, TimeoutError):
+            return "请求超时"
+        cause = cause.__cause__ or cause.__context__
+    joined = "\n".join(texts).lower()
+    if any(token in joined for token in ("name or service not known", "nodename nor servname",
+                                         "getaddrinfo", "name resolution", "temporary failure",
+                                         "无法解析", "dns")):
+        return "无法解析主机"
+    if any(token in joined for token in ("refused", "拒绝", "10061", "10060", "timed out", "timeout")):
+        if "timed out" in joined or "timeout" in joined:
+            return "请求超时"
+        return "连接被拒绝"
+    return f"连接失败：{exc}"
 
 
 def _unknown(provider: ProviderDefinition, source_url: str, fetched_at: str, error: str) -> dict[str, Any]:

@@ -607,11 +607,10 @@ for (const size of [
       }, backend.address);
       const baseUrl = modelsUrl.slice(0, -"/models".length);
 
-      // 新建表单默认就是「自定义」：没有预置地址时在高级选项旁写明怎么取得候选
+      // 新建表单默认就是「自定义」：模型列表地址直接显示在表单上，不放在折叠的高级选项里（工单 #384）
       await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
       const form = client.page.locator(".mm-form");
       await expect(form.getByRole("button", { name: "自定义" })).toHaveAttribute("aria-pressed", "true");
-      await form.locator(".mm-advanced > summary").click();
       await expect(form.getByTestId("models-url-hint")).toBeVisible();
 
       // 填上模型列表地址：提示消失（设计规定地址由连接填写或取自服务方案，这条只改提示）
@@ -697,17 +696,58 @@ test("新建表单选择 OpenCode Go 与无协议头自定义地址自动填写�
     await expect(form.getByLabel("ID", { exact: true })).toHaveValue("opencode-go");
     await expect(form.getByLabel("名称", { exact: true })).toHaveValue("OpenCode Go");
     await expect(form.getByLabel("凭据引用")).toHaveValue("OPENCODE_GO_KEY");
+    // 内置方案的模型列表地址只读显示在表单上（工单 #384），地址栏只读
+    await expect(form.getByTestId("preset-models-url")).toContainText("模型列表地址");
+    await expect(form.getByTestId("provider-base-url")).not.toBeEditable();
     await form.getByRole("button", { name: "自定义" }).click();
     await form.getByTestId("provider-base-url").fill("9router.huiju.asia/v1");
     await form.getByLabel("名称", { exact: true }).click();
     await expect(form.getByTestId("provider-base-url")).toHaveValue("https://9router.huiju.asia/v1");
     await expect(form.getByLabel("ID", { exact: true })).toHaveValue("9router.huiju.asia");
     await expect(form.getByLabel("凭据引用")).toHaveValue("HOST_9ROUTER_HUIJU_ASIA_KEY");
-    await form.locator(".mm-advanced > summary").click();
     await expect(form.getByTestId("provider-models-url")).toHaveValue("https://9router.huiju.asia/v1/models");
   } finally {
     await client.close();
     await backend.stop();
+  }
+});
+
+test("获取模型列表失败时页面显示请求的地址与状态码（工单 #384）", async () => {
+  test.setTimeout(300_000);
+  const failing = createServer((_request, response) => {
+    response.writeHead(404, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "not found" } }));
+  });
+  failing.listen(0, "127.0.0.1");
+  await once(failing, "listening");
+  const failingAddress = failing.address();
+  if (failingAddress === null || typeof failingAddress === "string") throw new Error("HTTP 上游未启动");
+  const { backend, client } = await openModels({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  try {
+    // 真实返回 404 的上游：采集失败时页面写明请求的地址与状态码
+    const modelsUrl = `http://127.0.0.1:${failingAddress.port}/v1/models`;
+    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+    const form = client.page.locator(".mm-form");
+    await form.getByTestId("provider-base-url").fill(`http://127.0.0.1:${failingAddress.port}/v1`);
+    await form.getByTestId("provider-models-url").fill(modelsUrl);
+    await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("failing-up");
+    await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("失败的上游");
+    await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("FAILING_UP_KEY");
+    await form.getByTestId("credential-secret").fill(KEY);
+    await form.getByTestId("submit-provider").click();
+    await expect(form).toHaveCount(0);
+    const provider = client.page.getByTestId("provider-failing-up");
+    await provider.getByRole("button", { name: "展开" }).click();
+    await provider.getByTestId("collect-failing-up").click();
+    const candidates = provider.getByTestId("candidates-failing-up");
+    await expect(candidates).toContainText(modelsUrl);
+    await expect(candidates).toContainText("404");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+    await backend.stop();
+    failing.close();
   }
 });
 
