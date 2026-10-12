@@ -29,7 +29,7 @@
       "delete_file",
       "move_file",
       "run_check",
-      "run_command",
+      "bash",
       "submit_request",
       "submit_response",
       "submit_guidance_response",

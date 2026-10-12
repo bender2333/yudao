@@ -77,7 +77,7 @@ test("房间：中心角色的动作姿势按 roomModel.pose 摆放，无法对�
 });
 
 test("房间：工具种类对应房间里的位置", () => {
-  assert.equal(toolSpot("run_command"), "terminal");
+  assert.equal(toolSpot("bash"), "terminal");
   assert.equal(toolSpot("search"), "cabinet");
   assert.equal(toolSpot("run_check"), "bench");
   assert.equal(toolSpot("edit_range"), "desk");
@@ -358,27 +358,27 @@ test("工具类：工具调用排在取信之后，事件成串时头顶显示�
   assert.equal(rm.actor("eng-architect")?.say?.text, "现在把计划贴上白板");
 });
 
-test("工具类：登记命令说出登记名而不是工具名", () => {
-  assert.equal(say(real({ payload: { name: "run_command", registered_name: "unit-tests", args: { name: "unit-tests" } } })),
-    "现在执行 unit-tests");
+test("工具类：bash 说出命令原文而不是工具名", () => {
+  assert.equal(say(real({ payload: { name: "bash", args: { command: "pytest -q" } } })), "现在执行 pytest -q");
 });
 
-test("工具类：没有登记名的命令只说明在跑登记命令，不把工具名说出来", () => {
-  assert.equal(say(real({ payload: { name: "run_command", args: { name: "lint" } } })), "现在执行 lint");
+test("工具类：没有给出命令的 bash 只说明在跑命令，不把工具名说出来", () => {
+  assert.equal(say(real({ payload: { name: "bash", args: {} } })), "现在执行命令");
 });
 
-test("工具类：登记命令的结论按 ok 说成功或失败", () => {
+test("工具类：bash 的结论按 ok 说成功或失败", () => {
   const done = (payload: Record<string, unknown>): PixelFloorEvent =>
-    ({ type: "tool_called", work_item_id: "w1", department: "engineering", tool: "run_command", payload });
-  assert.equal(say(done({ name: "run_command", ok: true })), "命令通过了");
-  assert.equal(say(done({ name: "run_command", ok: false, error: "命令不存在" })), "命令没有通过：命令不存在");
+    ({ type: "tool_called", work_item_id: "w1", department: "engineering", tool: "bash", payload });
+  assert.equal(say(done({ name: "bash", ok: true })), "命令通过了");
+  assert.equal(say(done({ name: "bash", ok: false, error: "命令不存在" })), "命令没有通过：命令不存在");
 });
 
-test("动作解析：原型没登记的三个工具也解析到动作", () => {
+test("动作解析：原型没登记的四个工具也解析到动作", () => {
   assert.equal(resolveAction(real({ payload: { name: "list_files" } })), "search");
   assert.equal(resolveAction(real({ payload: { name: "delete_file" } })), "write");
   assert.equal(resolveAction(real({ payload: { name: "move_file" } })), "write");
   assert.equal(resolveAction(real({ payload: { name: "read_file" } })), "read");
+  assert.equal(resolveAction(real({ payload: { name: "bash" } })), "run_command");
 });
 
 test("协作：真实载荷用 requester 与 recipient，两端各说一句", () => {

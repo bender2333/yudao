@@ -14,7 +14,9 @@ def test_check_timeout_is_six_hundred():
     # 登记里的现值与 bounds 一致；由 rules.registry 读出
     rule = DEFINITIONS.rule("check_timeout_sec")
     assert rule.value == 600 and list(rule.bounds) == [1, 86400]
-    assert DEFINITIONS.rule_value("command_timeout_max_sec") == 600
+    # bash 缺省 300 秒、最长 3600 秒（本地工具设计说明第 3 节，ADR-0038）
+    assert DEFINITIONS.rule_value("bash_timeout_default_sec") == 300
+    assert DEFINITIONS.rule_value("bash_timeout_max_sec") == 3600
 
 
 def test_onboarding_prompts_state_the_two_material_kinds():
