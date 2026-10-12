@@ -180,11 +180,13 @@ def test_collect_candidates_keeps_upstream_window_and_output_limit(tmp_path):
             # 预填值带来源（#146）：窗口与输出上限取上游模型列表，输入方式取能力表；
             # 这个连接的服务方案是自定义，能力表没有记录，输入方式预填为只有文本
             assert event.payload["candidates"][0] == {
-                "id": "m1", "context_window": 128000, "context_window_source": "models_url",
+                "id": "m1", "protocol": "chat_completions", "protocol_source": "default",
+                "context_window": 128000, "context_window_source": "models_url",
                 "max_output_tokens": 8192, "max_output_tokens_source": "models_url",
                 "input_modalities": ["text"], "input_modalities_source": "default"}
             assert event.payload["candidates"][1] == {
-                "id": "m2", "input_modalities": ["text"], "input_modalities_source": "default"}
+                "id": "m2", "protocol": "chat_completions", "protocol_source": "default",
+                "input_modalities": ["text"], "input_modalities_source": "default"}
             _assert_no_secret(client, opened)
 
 

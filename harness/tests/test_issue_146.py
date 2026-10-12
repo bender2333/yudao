@@ -160,7 +160,7 @@ def test_catalog_exposes_the_capability_table(tmp_path):
             assert table["source"] == capabilities.CAPABILITY_TABLE_SOURCE
             assert set(table["presets"]) == set(DEFINITIONS.model_capabilities.presets)
             entry = table["presets"]["opencode-go"][0]
-            assert set(entry) == {"model", "input_modalities", "output_modalities",
+            assert set(entry) == {"model", "protocol", "input_modalities", "output_modalities",
                                   "context_window", "max_output_tokens", "tool_call", "reasoning"}
 
 def test_candidates_take_the_window_from_upstream_and_the_input_from_the_table(tmp_path):
