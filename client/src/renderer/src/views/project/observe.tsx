@@ -12,11 +12,11 @@ import type {
   RunAttemptResult,
   UsageReport,
 } from "../../api/generated/types.gen";
-import type { Route } from "../../shell/routing";
-import { paths } from "../../shell/routing";
+import { paths, type Route } from "../../shell/routing";
+import { PageHead } from "../../shell/kit";
 import { failureRows } from "./attempt-failure";
-import { Empty, KeyValue, Loading, Section, Table, dict, formatNumberOr, list, numberValue, optionalText, pageKey, show, text } from "./common";
-import { ATTEMPT_STATUS, DEPARTMENTS, PHASE_LABELS, departmentName, formatTime, label } from "./labels";
+import { Empty, KeyValue, Loading, Section, Table, Tabs, dict, formatNumberOr, list, numberValue, optionalText, pageKey, show, text } from "./common";
+import { ATTEMPT_STATUS, DEPARTMENTS, departmentName, formatTime, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
 import { usageText } from "./usage-text";
 
@@ -85,6 +85,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
   const workItem = props.route.workItemId;
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
+  const [tab, setTab] = useState<"records" | "usage">("records");
   const [cursor, setCursor] = useState<string | null>(null);
   const params = filterParams(projectId, workItem, applied, PAGE_SIZE);
   const usageParams = { ...params, limit: undefined };
@@ -104,10 +105,21 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
   }
 
   const filtersChanged = pageKey([draft]) !== pageKey([applied]);
+  const inFlight = rows.filter((item) => item.status === "running" || item.status === "requesting").length;
 
   return (
-    <div className="page">
-      <Section title="请求记录" note={`范围：${workItem === null ? "整个项目" : `事项 ${workItem}`}；当前显示这些部门与状态下的请求`}>
+    <div className="page y10-obs">
+      <PageHead
+        eyebrow={`观测 · ${workItem === null ? "整个项目" : "事项范围"}`}
+        title="模型请求"
+        subtitle={`${inFlight} 个请求进行中 · 共 ${rows.length} 条记录。调用目标、按栏目的来源与用量都在这里；用量只读显示。`}
+      />
+      <Section
+        id="obs-requests"
+        title="请求记录与用量"
+        note={`范围：${workItem === null ? "整个项目" : `事项 ${workItem}`}；按部门、状态、Provider 与模型筛选；两个页签使用同一组筛选。`}
+        className="y10-obs"
+      >
         <div className="y10-obs-filters filters">
           <label className="y10-obs-filter field">
             <span>部门</span>
@@ -149,43 +161,91 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
           >
             按条件筛选
           </button>
+          {pageKey([applied]) !== pageKey([EMPTY_FILTERS]) ? (
+            <button
+              type="button"
+              className="y10-link y10-obs-reset link"
+              onClick={() => { setDraft(EMPTY_FILTERS); setApplied(EMPTY_FILTERS); setCursor(null); }}
+            >
+              清除筛选
+            </button>
+          ) : null}
           {filtersChanged ? <p className="y10-note note">条件已改动，按「按条件筛选」以后生效</p> : null}
         </div>
-        <Loading state={attempts} />
-        {rows.length === 0 && !attempts.loading ? <Empty text="这个范围没有请求记录" /> : null}
-        {rows.length > 0 ? (
-          <Table
-            head={["时间", "部门", "状态", "请求的模型", "实际的模型", "用时", "用量", ""]}
-            rows={rows.map((item) => [
+        <Tabs
+          items={[{ id: "records", label: "请求记录" }, { id: "usage", label: "用量统计" }]}
+          active={tab}
+          onPick={(id) => setTab(id === "usage" ? "usage" : "records")}
+        />
+        {tab === "records" ? (
+          <RecordsPanel
+            projectId={projectId}
+            rows={rows}
+            workItem={workItem}
+            loading={attempts.loading}
+            cursor={attempts.data?.cursor ?? null}
+            onMore={() => setCursor(attempts.data?.cursor ?? null)}
+          />
+        ) : <UsageSection usage={usage} />}
+      </Section>
+    </div>
+  );
+}
+
+// 请求记录面板：列按原型 v10 的「请求记录」页签排布（开始、状态、耗时、部门、请求、返回、请求类型、输入输出）；
+// 请求与返回的模型分开列出，用量没有上报时写「未上报」，不填 0
+function RecordsPanel(props: {
+  projectId: string;
+  rows: AttemptView[];
+  workItem: string | null;
+  loading: boolean;
+  cursor: string | null;
+  onMore: () => void;
+}) {
+  return (
+    <>
+      <p className="y10-note note">用量没有上报时显示「未上报」，不填 0；请求与返回的模型分开列出。</p>
+      {props.rows.length === 0 && !props.loading ? <Empty text="这个范围没有请求记录" /> : null}
+      {props.rows.length > 0 ? (
+        <Table
+          head={["开始", "状态", "耗时", "部门", "请求", "返回", "请求类型", "输入 / 输出", ""]}
+          rows={props.rows.map((item) => {
+            const usage = dict(item.usage);
+            const input = numberValue(usage.input_tokens);
+            const output = numberValue(usage.output_tokens);
+            return [
               formatTime(item.started_at ?? item.finished_at),
-              departmentName(item.department),
               label(ATTEMPT_STATUS, item.status),
-              show(item.requested_model),
-              show(item.actual_model),
-              formatNumberOr(item.duration_ms, " 毫秒"),
-              usageText(dict(item.usage)),
+              item.status === "prepared" || item.status === "requesting" || item.status === "running"
+                ? "进行中"
+                : formatNumberOr(item.duration_ms, " 毫秒"),
+              departmentName(item.department),
+              show(item.requested_model, "未知"),
+              show(item.actual_model, "未知"),
+              item.purpose === "work" ? "工作请求" : item.purpose === "compaction" ? "压缩请求" : show(item.purpose, ""),
+              input === null && output === null
+                ? "未上报"
+                : `${input === null ? "未上报" : input.toLocaleString("zh-CN")} / ${output === null ? "未上报" : output.toLocaleString("zh-CN")}`,
               <button
                 type="button"
                 className="y10-link link"
                 key={item.attempt_id}
-                onClick={() => { window.location.hash = paths.observeDetail(projectId, item.attempt_id, { workItem, runId: item.run_id }); }}
+                onClick={() => { window.location.hash = paths.observeDetail(props.projectId, item.attempt_id, { workItem: props.workItem, runId: item.run_id }); }}
               >
                 详情
               </button>,
-            ])}
-          />
-        ) : null}
-        {attempts.data?.cursor ? (
-          <button type="button" onClick={() => setCursor(attempts.data?.cursor ?? null)} disabled={attempts.loading}>
-            {attempts.loading ? "正在加载" : "加载更多"}
-          </button>
-        ) : null}
-        {attempts.data && attempts.data.cursor === null && rows.length > 0 ? <p className="y10-note note">已到最后一批</p> : null}
-      </Section>
-      <UsageSection usage={usage} />
-    </div>
+            ];
+          })}
+        />
+      ) : null}
+      {props.cursor ? (
+        <button type="button" onClick={props.onMore} disabled={props.loading}>
+          {props.loading ? "正在加载" : "加载更多"}
+        </button>
+      ) : null}
+      {props.cursor === null && props.rows.length > 0 ? <p className="y10-note note">已到最后一批</p> : null}
+    </>
   );
-
 }
 
 function UsageSection(props: { usage: { data: UsageReport | null; loading: boolean } }) {
@@ -200,17 +260,15 @@ function UsageSection(props: { usage: { data: UsageReport | null; loading: boole
   const totals = dict(data.totals);
 
   return (
-    <Section title="用量统计" note="只读显示用量，不做预算判断">
+    <Section title="用量统计" note="输入（含缓存）与缓存读取（输入子集）不重复相加；用量只读显示，不是事项的预算">
       <KeyValue
         items={[
           ["请求数", `${formatNumberOr(numberValue(totals.attempts))}（上报 ${formatNumberOr(numberValue(totals.reported))}）`],
-          ["输入 token", formatNumberOr(numberValue(totals.input_tokens), " token")],
-          ["输出 token", formatNumberOr(numberValue(totals.output_tokens), " token")],
-          ["缓存读取", formatNumberOr(numberValue(totals.cache_read_tokens), " token")],
-          ["缓存写入", formatNumberOr(numberValue(totals.cache_write_tokens), " token")],
-          ["合计 token", formatNumberOr(numberValue(totals.total_tokens), " token")],
-          ["耗时", formatNumberOr(numberValue(totals.latency_ms), " 毫秒")],
-          ["费用", totals.cost === null || totals.cost === undefined ? "未上报" : String(totals.cost)],
+          ["输入（含缓存）", formatNumberOr(numberValue(totals.input_tokens), " token")],
+          ["输出", formatNumberOr(numberValue(totals.output_tokens), " token")],
+          ["缓存读取（输入子集）", formatNumberOr(numberValue(totals.cache_read_tokens), " token")],
+          ["总 Token", formatNumberOr(numberValue(totals.total_tokens), " token")],
+          ["成本", totals.cost === null || totals.cost === undefined ? "未上报" : String(totals.cost)],
         ]}
       />
       <UsageGroups title="按部门" groups={data.departments} />
@@ -225,14 +283,14 @@ function UsageGroups(props: { title: string; groups: UsageReport["departments"] 
   }
   return (
     <Table
-      head={["名称", "请求数", "输入", "输出", "合计", "耗时"]}
+      head={["名称", "请求数", "输入（含缓存）", "输出", "总 Token", "成本"]}
       rows={props.groups.map((group) => [
         group.label || group.key,
         formatNumberOr(group.attempts),
         formatNumberOr(numberValue(group.input_tokens)),
         formatNumberOr(numberValue(group.output_tokens)),
         formatNumberOr(numberValue(group.total_tokens)),
-        formatNumberOr(numberValue(group.latency_ms), " 毫秒"),
+        group.cost === null || group.cost === undefined ? "未上报" : String(group.cost),
       ])}
       caption={props.title}
     />
@@ -373,9 +431,6 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
           caption="工具调用"
         />
       ) : null}
-      <p className="y10-note note">
-        阶段名称按 {label(PHASE_LABELS, "PRODUCT_SPEC")} 等取值；详情页的路径是 {paths.observeDetail(props.projectId, props.attemptId)}
-      </p>
     </>
   );
 }
