@@ -105,17 +105,12 @@ def tool_permission(
     reason = tool_error(projection, department, name, args)
     if reason:
         return ToolPermission(reason=reason)
-    command_basis: dict[str, Any] = {}
-    if tool_action(name) == "command":
-        # 登记命令在执行前核对冻结的登记表：未登记的名称与越界参数在这里拒绝，不执行
-        reason, command_basis = _run_command_basis(projection, args, facts)
-        if reason:
-            return ToolPermission(reason=reason)
     if _is_write(name):
+        # 工程计划范围之外写入按工作区中的规范路径再核对一次
         reason = _plan_scope_error(projection, name, args, facts)
         if reason:
             return ToolPermission(reason=reason)
-    return ToolPermission(command_basis=command_basis)
+    return ToolPermission()
 
 
 def proposal_decision(projection: RunProjection, *, department: str, proposal: dict[str, Any] | None,
@@ -163,27 +158,6 @@ def _is_write(name: str) -> bool:
 
 def _write_targets(name: str, args: dict[str, Any]) -> list[Any]:
     return [args.get("source"), args.get("destination")] if name == "move_file" else [args.get("path")]
-
-
-def _run_command_basis(projection: RunProjection, args: dict[str, Any],
-                       facts: WorkspaceFacts) -> tuple[str | None, dict[str, Any]]:
-    # 执行前依据：命令身份（登记名与完整参数）加当时公开树的摘要；只读核对，不执行
-    name = args.get("name")
-    if not isinstance(name, str) or not name:
-        return "run_command requires a registered command name", {}
-    entry = projection.registered_commands.get(name)
-    if entry is None:
-        return f"unknown registered command: {name}; only project-registered commands may run", {}
-    extra = args.get("args", [])
-    if extra is None:
-        extra = []
-    if not isinstance(extra, list) or any(not isinstance(item, str) for item in extra):
-        return f"run_command {name} args must be a list of strings", {}
-    for item in extra:
-        if item not in entry.get("args", []):
-            return f"argument not allowlisted for {name}: {item}", {}
-    return None, {"registered_name": name, "registered_argv": [*entry["argv"], *extra],
-                  "snapshot_hash": facts.tree.digest}
 
 
 def _plan_scope_error(projection: RunProjection, name: str, args: dict[str, Any],

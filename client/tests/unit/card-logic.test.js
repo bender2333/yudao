@@ -69,7 +69,7 @@ test("结果未知的动作：材料写明契约是否声明可以重复", () =>
         facts: ["evt_1"],
         department: "engineering",
         action_id: "act_9",
-        tool: "run_command",
+        tool: "bash",
         action_kind: "command",
         repeatable: true,
       },

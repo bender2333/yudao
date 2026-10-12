@@ -2,7 +2,7 @@
 # establish 从封存快照建立工作区，open 打开已经建立的工作区，perform 执行环境工具的动作并交回回执，
 # cancel 按动作身份取消，query 提供工作区事实的只读查询，snapshot 交回交付封存所需的带文件内容的公开树，
 # verify_tree 核对当前公开树仍与判断所依据的快照一致。
-# 进程类动作（检查、登记的本地命令）以异步方式启动与等待；超时或取消时结束整个进程树，回执带截至结束时的输出；
+# 进程类动作（检查、bash 命令）以异步方式启动与等待；超时或取消时结束整个进程树，回执带截至结束时的输出；
 # 取消在动作开始之前到达时不启动进程。
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -29,8 +30,7 @@ from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_
 from .definitions import DEFINITIONS, DefinitionError
 from .path_rules import TreeError, is_private_path
 from .redact import redact_text, sanitized_env
-from .tools import normalize_registered_commands
-from .workspace import Workspace, WorkspaceSnapshot
+from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
 
 # 一次工具结果的输出上限，取规则登记中的现值
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
@@ -42,7 +42,59 @@ SEARCH_SNIPPET_LIMIT = 1000
 TIMEOUT_EXIT_CODE = 124
 CANCELLED_EXIT_CODE = 130
 
+_BASH_TIMEOUT_DEFAULT = DEFINITIONS.rule_value("bash_timeout_default_sec")
+_BASH_TIMEOUT_MAX = DEFINITIONS.rule_value("bash_timeout_max_sec")
 _PYTHON_NAMES = {"python", "python3", "py", "python.exe", "python3.exe"}
+
+_BASH_PATH: str | None = None
+_BASH_OUTPUT_SUBDIR = "tool-output"
+_SAFE_OUTPUT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.json")
+_TRUNCATED_MARKER = (
+    f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is saved, "
+    "pass \"next_cursor\" back to bash as \"cursor\" to read the rest"
+)
+
+
+def _safe_output_name(action_id: str) -> str:
+    # 存档文件名只留安全字符：游标回读时按同规则核对，防止路径穿越
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", action_id)[:80] or "output"
+
+
+def _bash_slice(full: str, start: int) -> tuple[str, int | None]:
+    # 从字符偏移 start 取一页：尽量在 _OUTPUT_LIMIT 个字符内不断行；
+    # 取完返回 (剩余全文, None)，否则返回 (页, 下一页的字符偏移)
+    end = start + _OUTPUT_LIMIT
+    if end >= len(full):
+        return full[start:], None
+    newline = full.rfind("\n", start, end)
+    cut = newline + 1 if newline > start else end
+    return full[start:cut], cut
+
+
+def _resolve_bash() -> str:
+    # 找到可执行的 bash：Windows 上先看 Git 安装目录，再看 PATH；POSIX 上只认 /bin/bash。
+    # 找不到就直接报错，不回退到 cmd 或 PowerShell。
+    global _BASH_PATH
+    if _BASH_PATH is not None:
+        return _BASH_PATH
+    if os.name == "nt":
+        candidates = [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files (x86)\Git\bin\bash.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\bin\bash.exe"),
+            shutil.which("bash.exe"),
+            shutil.which("bash"),
+        ]
+        for candidate in candidates:
+            if candidate and os.path.isfile(candidate):
+                _BASH_PATH = candidate
+                return candidate
+        raise FileNotFoundError("Git for Windows bash not found; install Git for Windows or add bash.exe to PATH")
+    posix = "/bin/bash"
+    if os.path.isfile(posix):
+        _BASH_PATH = posix
+        return posix
+    raise FileNotFoundError(f"bash not found at {posix}")
 
 # 环境工具与执行它的方法：直接执行的工具，与以进程执行、可以超时与取消的工具
 _HANDLERS = {
@@ -55,7 +107,7 @@ _HANDLERS = {
     "delete_file": "_delete_file",
     "move_file": "_move_file",
 }
-_PROCESSES = {"run_check": "_run_check", "run_command": "_run_command"}
+_PROCESSES = {"run_check": "_run_check", "bash": "_bash"}
 
 # 定义中的每个环境工具都要在这里有执行方法，否则启动失败
 _UNIMPLEMENTED = sorted(name for name, tool in DEFINITIONS.tools.items()
@@ -74,12 +126,13 @@ class _Finished:
 
 
 class LocalEnvironment:
-    def __init__(self, workspace: Workspace, *, registered_commands: dict[str, Any] | None = None,
-                 check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> None:
+    def __init__(self, workspace: Workspace,
+                 check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
+                 registered_commands: dict[str, Any] | None = None) -> None:
+        # registered_commands 已不再使用：bash 替代 run_command 后登记命令没有执行入口；参数仅为兼容
+        # orchestrator 等调用方，#484 删除注册体系时一并移除。传入值被忽略。
         self.workspace = workspace
-        self._registered_commands = normalize_registered_commands(registered_commands)
         self._check_timeout_sec = check_timeout_sec
-        self._command_attempts: dict[str, int] = {}
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
         self._lock = Lock()
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -91,20 +144,19 @@ class LocalEnvironment:
 
     @classmethod
     def establish(cls, root: str | Path, tree: CapturedTree | None, *,
-                  registered_commands: dict[str, Any] | None = None,
                   check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
             Path(root).parent.mkdir(parents=True, exist_ok=True)
             materialize_tree(tree, root)
-        return cls(Workspace(root), registered_commands=registered_commands, check_timeout_sec=check_timeout_sec)
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec)
 
     @classmethod
-    def open(cls, root: str | Path, *, registered_commands: dict[str, Any] | None = None,
-                  check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> LocalEnvironment:
-        # 打开已经建立的工作区
-        return cls(Workspace(root), registered_commands=registered_commands, check_timeout_sec=check_timeout_sec)
-
+    def open(cls, root: str | Path,
+             check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
+             registered_commands: dict[str, Any] | None = None) -> LocalEnvironment:
+        # 打开已经建立的工作区（registered_commands 兼容 #484 前的调用方，传入值被忽略）
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec)
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None,
                    engineering_plan_hash: str | None = None) -> None:
@@ -380,69 +432,94 @@ class LocalEnvironment:
         _require_reason(args)
         return self.workspace.move_file(args["source"], args["destination"])
 
-    async def _run_command(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str, str | None]:
+    async def _bash(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str, str | None]:
         args = action.input
-        name = args.get("name")
-        if not isinstance(name, str) or not name:
-            raise ValueError("run_command requires a registered command name")
-        entry = self._registered_commands.get(name)
-        if entry is None:
-            raise ValueError(f"unknown registered command: {name}; only project-registered commands may run")
-        extra = args.get("args", [])
-        if extra is None:
-            extra = []
-        if not isinstance(extra, list) or any(not isinstance(item, str) for item in extra):
-            raise ValueError(f"run_command {name} args must be a list of strings")
-        for item in extra:
-            if item not in entry["args"]:
-                raise ValueError(f"argument not allowlisted for {name}: {item}")
-        # 模型自报 exit_code 不是证据：这里只读登记表与主机执行结果，从不读取该字段
-        argv = [*entry["argv"], *extra]
-        resolved = _resolve_argv(self.workspace, argv)
+        cursor_arg = args.get("cursor")
+        if cursor_arg not in (None, ""):
+            # 继续取回上次截断的完整输出：只读主机私有的存档，不启动新进程，不核对公开树
+            return self._bash_continuation(str(cursor_arg)), "completed", None
+        command = args.get("command")
+        if not isinstance(command, str) or not command.strip():
+            raise ValueError("bash requires a non-empty command string")
+        timeout_sec = args.get("timeout_sec")
+        if timeout_sec is None:
+            timeout_sec = _BASH_TIMEOUT_DEFAULT
+        else:
+            if type(timeout_sec) is not int or timeout_sec < 1:
+                raise ValueError("timeout_sec must be a positive integer")
+            timeout_sec = min(timeout_sec, _BASH_TIMEOUT_MAX)
+        # 模型自报 exit_code 不是证据：这里只读主机执行结果，从不读取该字段
         snapshot = self.workspace.snapshot()
         # 前置条件：工具许可所依据的公开树没有改变
         expected = action.preconditions.tree_digest
         if expected is not None and snapshot.digest != expected:
-            raise ValueError("the workspace changed after the tool permission; call run_command again")
-        attempt = self._command_attempts.get(name, 0) + 1
-        self._command_attempts[name] = attempt
+            raise ValueError("the workspace changed after the tool permission; call bash again")
+        # 每次调用都是新进程，不保留 shell 状态；进程继承 Yudao 进程的完整环境。
+        # 不用 -l：登录 shell 会读用户 profile，环境不可复现。
         finished = await _run_process(
-            resolved, self.workspace.root, {**sanitized_env(), "PYTHONDONTWRITEBYTECODE": "1"},
-            entry["timeout_sec"], stop,
+            [_resolve_bash(), "-c", command], self.workspace.root,
+            {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}, timeout_sec, stop,
         )
         text = "\n".join(part for part in (finished.stdout.strip(), finished.stderr.strip()) if part)
-        truncated = False
-        if len(text) > entry["output_limit"]:
-            text = text[:entry["output_limit"]] + "\n...truncated..."
-            truncated = True
         if finished.status == "timeout":
             exit_code, status = TIMEOUT_EXIT_CODE, "timeout"
-            text = ((text + "\n") if text else "") + f"command timed out after {entry['timeout_sec']}s; the process tree was stopped"
+            text = ((text + "\n") if text else "") + f"command timed out after {timeout_sec}s; the process tree was stopped"
         elif finished.status == "cancelled":
             exit_code, status = CANCELLED_EXIT_CODE, "cancelled"
             text = ((text + "\n") if text else "") + "command cancelled; the process tree was stopped"
         else:
             exit_code = finished.returncode
             status = "ok" if exit_code == 0 else "failed"
-        # 登记命令结束后主机立即取得公开树核对。命令留下无法表示的条目（例如链接）时，核对结果
-        # 随回执交回，步骤驱动在回执照常记录之后以 workspace_unrepresentable 暂停；被忽略的条目
-        # 不进入公开树，核对通过
+        text = redact_text(text)
+        meta = {"command": command, "exit_code": exit_code, "status": status,
+                "snapshot_hash": snapshot.digest, "executor": "host"}
+        output, truncated, next_cursor = self._bash_page(action.action_id, meta, text)
+        # 命令结束后主机立即取的公开树核对。命令留下无法表示的条目（例如链接）时，核对结果随回执
+        # 交回，步骤驱动在回执照常记录之后以 workspace_unrepresentable 暂停；被忽略的条目不进入
+        # 公开树，核对通过
         workspace_error = None
         try:
             self.workspace.snapshot()
         except UnrepresentableWorkspace as exc:
             workspace_error = {"message": str(exc), "paths": list(exc.paths)}
-        return {
-            "name": name,
-            "argv": argv,
-            "exit_code": exit_code,
-            "status": status,
-            "output": redact_text(text),
-            "truncated": truncated,
-            "snapshot_hash": snapshot.digest,
-            "executor": "host",
-            "attempt": attempt,
-        }, finished.status, workspace_error
+        return {**meta, "output": output, "truncated": truncated, "next_cursor": next_cursor}, finished.status, workspace_error
+
+    def _bash_page(self, action_id: str, meta: dict[str, Any], full: str) -> tuple[str, bool, str | None]:
+        # 完整输出的第一页：超限时全文存主机私有的存档（公开树之外，不进入快照与交付），
+        # 回执只带截断页与继续取回的游标；各页按字符直接拼接与原文逐字相等
+        if len(full) <= _OUTPUT_LIMIT:
+            return full, False, None
+        directory = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / (_safe_output_name(action_id) + ".json")
+        path.write_bytes(json.dumps({**meta, "full": full}, ensure_ascii=False).encode("utf-8"))
+        page, next_start = _bash_slice(full, 0)
+        if next_start is None:
+            return page, False, None
+        cursor = _encode_cursor({"kind": "bash_output", "name": path.name, "offset": next_start})
+        return page + _TRUNCATED_MARKER, True, cursor
+
+    def _bash_continuation(self, cursor: str) -> dict[str, Any]:
+        payload = _decode_cursor(cursor, kind="bash_output")
+        name = payload.get("name")
+        offset = payload.get("offset")
+        if (not isinstance(name, str) or not _SAFE_OUTPUT_NAME.fullmatch(name)
+                or type(offset) is not int or offset < 0):
+            raise ValueError("invalid bash output cursor")
+        path = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR / name
+        try:
+            saved = json.loads(path.read_bytes().decode("utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"saved bash output is no longer available: {name}") from exc
+        full = saved.get("full")
+        if not isinstance(full, str) or offset >= len(full):
+            raise ValueError(f"saved bash output is no longer available: {name}")
+        meta = {key: saved[key] for key in ("command", "exit_code", "status", "snapshot_hash", "executor")}
+        page, next_start = _bash_slice(full, offset)
+        if next_start is None:
+            return {**meta, "output": page, "truncated": False, "next_cursor": None}
+        next_cursor = _encode_cursor({"kind": "bash_output", "name": name, "offset": next_start})
+        return {**meta, "output": page + _TRUNCATED_MARKER, "truncated": True, "next_cursor": next_cursor}
 
     async def _run_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         args = action.input
@@ -516,7 +593,7 @@ class LocalEnvironment:
 async def _run_process(argv: list[str], cwd: Path, env: dict[str, str], timeout_sec: float,
                        stop: asyncio.Event) -> _Finished:
     # 进程在新的进程组（Windows）或新的会话（POSIX）中启动，超时或停止信号到达时结束整个进程树，
-    # 输出读到管道关闭为止：结束以后是截至结束时的输出。标准输入接空设备：登记命令与检查都不读输入，
+    # 输出读到管道关闭为止：结束以后是截至结束时的输出。标准输入接空设备：bash 调用与检查都不读输入，
     # 若继承服务进程的标准输入（一根打开但无人写入的管道），解释器启动时对该句柄取状态会一直等待
     spawn: dict[str, Any] = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
                              else {"start_new_session": True})

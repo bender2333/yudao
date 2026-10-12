@@ -124,7 +124,7 @@ export function keyOf(ev: Pick<PixelFloorEvent, "type" | "department" | "tool" |
   if (ev.type === "tool_started") {
     const tool = String(ev.tool ?? pl.tool ?? "");
     if (tool === "search") return "tool_started_search";
-    if (tool === "run_command") return "tool_started_run_command";
+    if (tool === "bash") return "tool_started_run_command";
     if (tool === "run_check") return "qa_started";
     if (/write|edit/.test(tool)) return "tool_started_write";
     if (/fetch|http|net|url/.test(tool)) return "tool_started_fetch";
