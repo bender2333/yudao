@@ -280,19 +280,19 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
     assert capabilities["decisions"] == ["model_unavailable", "definitions_changed", "unknown_action",
-                                         "no_tool_call", "workspace_unrepresentable", "initial_prd"]
+                                         "no_tool_call", "workspace_unrepresentable", "initial_prd",
+                                         "instance_upgrade", "kernel_modification"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id
     assert deployment["version"] == document["info"]["version"]
     assert deployment["api_version"] == API_VERSION
     assert deployment["access"] == "local"
-    # 事件种类：现有全部 run 事件、项目事件与目录事件，与 OpenAPI 中事件对象的联合一致
-    known = {value for owner in (EventType, ProjectEventType, CatalogEventType)
-             for key, value in vars(owner).items() if not key.startswith("_")}
-    assert set(capabilities["event_types"]) == known == set(EVENT_TYPES)
+    # 事件种类：能力表列出的种类与 OpenAPI 中事件对象的联合一致（注册处 PAYLOADS 的全部种类；
+    # 枚举与流声明的一致性由 test_event_classification 覆盖，这里不重复枚举 models 里的三类事件）
+    assert set(capabilities["event_types"]) == set(EVENT_TYPES)
     mapping = document["components"]["schemas"]["EventObject"]["discriminator"]["mapping"]
-    assert set(mapping) == known
+    assert set(mapping) == set(EVENT_TYPES)
     assert "OutputDelta" in document["components"]["schemas"]
 
 
