@@ -288,11 +288,14 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert deployment["version"] == document["info"]["version"]
     assert deployment["api_version"] == API_VERSION
     assert deployment["access"] == "local"
-    # 事件种类：能力表列出的种类与 OpenAPI 中事件对象的联合一致（注册处 PAYLOADS 的全部种类；
-    # 枚举与流声明的一致性由 test_event_classification 覆盖，这里不重复枚举 models 里的三类事件）
-    assert set(capabilities["event_types"]) == set(EVENT_TYPES)
+    # 事件种类：现有全部 run 事件、项目事件与目录事件，与 OpenAPI 中事件对象的联合一致
+    known = {value for owner in (EventType, ProjectEventType, CatalogEventType)
+             for key, value in vars(owner).items() if not key.startswith("_")}
+    # 已知缺口（工单 #462）：实例升级的三个目录事件没有登记负载契约，能力表和接口文件里没有它们；    # 补登记以后删掉这个差集
+    unregistered = {"instance_upgrade_requested", "instance_upgrade_answered", "instance_upgrade_withdrawn"}
+    assert set(capabilities["event_types"]) == known - unregistered == set(EVENT_TYPES)
     mapping = document["components"]["schemas"]["EventObject"]["discriminator"]["mapping"]
-    assert set(mapping) == set(EVENT_TYPES)
+    assert set(mapping) == known - unregistered
     assert "OutputDelta" in document["components"]["schemas"]
 
 
