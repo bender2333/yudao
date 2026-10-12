@@ -101,6 +101,7 @@ export const DECISION_KIND: Record<string, string> = {
   definitions_changed: "定义版本不同，等待选择",
   unknown_action: "动作结果未知，等待核实",
   initial_prd: "接入已有项目的初始需求文档等待确认",
+  kernel_modification: "交付改动了内核路径，等待批准",
 };
 
 // 决定请求的阻塞范围（DecisionView 的 blocks 取值）：卡片头的标记按中文写，不出现内部词 run

@@ -59,9 +59,15 @@ UNKNOWN_ACTION = DecisionKind("unknown_action", "action",
 # 「提出修改」必须附说明：说明为空的回答由服务端以 not_allowed 拒绝
 INITIAL_PRD = DecisionKind("initial_prd", "work_item",
                            (Option("confirm", "确认"), Option("revise", "提出修改", note_required=True)))
+# 交付改动了内核清单里的路径（受控内核设计说明第 4.2 节，接口与应用层设计说明第 3.3 节，工单 #354）：
+# 采纳之前由控制核心把交付相对基线的改动路径与运行实例的内核清单比较，有交集时不自动采纳，
+# 请求用户批准；请求写在项目流中，阻塞整个 run（交付所属的 run 已经结束，阻塞范围按请求给出的范围标注）
+KERNEL_MODIFICATION = DecisionKind("kernel_modification", "run",
+                                   (Option("approve", "批准采纳"), Option("reject", "拒绝")))
 
 DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED, UNKNOWN_ACTION,
-                                               NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE, INITIAL_PRD)}
+                                               NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE, INITIAL_PRD,
+                                               KERNEL_MODIFICATION)}
 
 
 def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:

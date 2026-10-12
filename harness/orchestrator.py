@@ -28,7 +28,8 @@ from .compaction import response_reserve
 from .contracts import current_contract_hash, current_plan_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION, DecisionClosed,
+    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION,
+    DecisionClosed,
     DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_activation, blocks_run,
 )
 from .environment import LocalEnvironment
@@ -1658,6 +1659,9 @@ class Orchestrator:
             "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
             "work_item_id": work_item_id, "run_id": candidate_run_id,
         }, actor="system"))
+        if decision.kind == KERNEL_MODIFICATION.name:
+            self._settle_kernel_modification(transaction, decision, option)
+            return None
         if decision.kind != INITIAL_PRD.name:
             return None
         candidate = next((item for item in transaction.projection.initial_prd_candidates
@@ -1668,6 +1672,16 @@ class Orchestrator:
             self._adopt_baseline(transaction, candidate, decision_id)
             return None
         return self._start_onboarding_revision(transaction, candidate, note)
+
+    def _settle_kernel_modification(self, transaction: Transaction, decision: DecisionRequest, option: str) -> None:
+        # 内核修改的批准与拒绝（受控内核设计说明第 4.2 节，工单 #354）：批准时把请求携带的采纳载荷写入
+        # 项目流，交付自此成为当前采纳成果；拒绝时什么都不写，交付保持未采纳
+        if option != "approve":
+            return
+        current = transaction.projection.current_adoption
+        adoption = dict(decision.request["held_adoption"],
+                        previous_adoption_id=None if current is None else current.adoption_id)
+        transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, adoption, actor="system"))
 
     def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
         # 采纳建档基线（工单 #136，设计第 5 节）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要

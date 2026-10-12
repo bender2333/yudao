@@ -63,6 +63,10 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
         }
       }
       break;
+    case "kernel_modification":
+      push("改动的内核路径", Array.isArray(request.kernel_paths) ? request.kernel_paths.join("\n") : "");
+      push("差异", request.diff);
+      break;
     default:
       break;
   }
