@@ -16,6 +16,15 @@ export const WORK_ITEM_STATUS: Record<string, string> = {
   stopped: "已停止",
   held: "排队中",
 };
+// 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
+// held 与 stopped 在原型图标里没有对应（held 无图标），这两项保留纯文字，界面不猜
+export const WORK_ITEM_STATUS_KIND: Record<string, string> = {
+  not_started: "idle",
+  in_progress: "running",
+  adopted: "adopted",
+  released_unsettled: "released",
+  awaiting_initial_prd: "asking",
+};
 
 export const RECOVERY_STATE: Record<string, string> = {
   running: "运行中",
@@ -92,6 +101,7 @@ export const DECISION_KIND: Record<string, string> = {
   definitions_changed: "定义版本不同，等待选择",
   unknown_action: "动作结果未知，等待核实",
   initial_prd: "接入已有项目的初始需求文档等待确认",
+  kernel_modification: "交付改动了内核路径，等待批准",
 };
 
 // 决定请求的阻塞范围（DecisionView 的 blocks 取值）：卡片头的标记按中文写，不出现内部词 run

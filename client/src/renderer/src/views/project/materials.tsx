@@ -1,95 +1,193 @@
-// 资料页（原型 v8 设计说明第 7.3 节，工单 #80）：只读，按事项查看。
-// intend 原文（版本与字节范围）、PRD（各版本与状态）、PLAN（各版本与目标）、交付（版本、文件清单与摘要，
-// 文件内容由 delivery.file 取回）、质检（结论、理由、检查与缺陷）、项目材料（material.record 保存的原文）。
-// 范围跟随顶栏的 ?w=；没有选中事项时取进行中的一项，并在页面上写明所选事项。
-// Git 差异、截图与启动方式属于 3.2D/3.8，在对应查询登记以后加入。
+// 资料页（原型 v10 设计说明第 7.3 节，工单 #380）：只读，先按事项索引，再按 intend、PRD、PLAN、
+// 交付、质检、项目材料的顺序查看。数据仍来自 project.overview 与 work_item.materials 两个已登记的查询。
+// 范围跟随顶栏的 ?w=；没有选中事项时取进行中的一项，并在索引卡上写明当前查看的是哪一项。
+// 结构说明与旧版本的执行（原型里的 mt-structure 与 mt-oldruns）在所属工作包登记查询以后加入；
+// 逐条结论表属 #154，本页不实现。
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { ClientApp } from "../../contract/client-app";
-import type { DeliveryFileResult, ProjectOverviewResult, WorkItemMaterialsResult } from "../../api/generated/types.gen";
+import type { DeliveryFileResult, ProjectOverviewResult, WorkItemMaterialsResult,
+  WorkItemCard } from "../../api/generated/types.gen";
 import type { Route } from "../../shell/routing";
-import { Empty, KeyValue, Loading, Section, Table, list, show, text } from "./common";
-import { departmentName, formatTime } from "./labels";
+import { StatusMark } from "../../shell/kit";
+import { ITEM_COLORS } from "../../pixel/registry";
+import { Empty, KeyValue, Loading, Section, Tag, list, show, text } from "./common";
+import { departmentName, formatTime, label, WORK_ITEM_STATUS, WORK_ITEM_STATUS_KIND } from "./labels";
 import { useSnapshot } from "./use-snapshot";
 
-export function MaterialsPage(props: { app: ClientApp; route: Route }) {
+const COUNT_KINDS = [
+  ["intend", "intend"],
+  ["prd", "PRD"],
+  ["plan", "PLAN"],
+  ["delivery", "交付"],
+  ["qa", "质检"],
+  ["note", "材料"],
+] as const;
+
+export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate: (hash: string) => void }) {
   const projectId = props.route.projectId ?? "";
   const overview = useSnapshot<ProjectOverviewResult>(props.app, "page.materials.pick", "project.overview", {
     project_id: projectId,
   });
   const items = overview.data?.work_items ?? [];
   const requested = props.route.workItemId;
-  const chosen = requested ?? (items.find((item) => item.status === "in_progress")?.work_item_id ?? items[0]?.work_item_id ?? null);
+  const chosen = requested ?? (items.find((item) => item.status === "in_progress")?.work_item_id
+    ?? items[0]?.work_item_id ?? null);
   const materials = useSnapshot<WorkItemMaterialsResult>(props.app, "page.materials", "work_item.materials", {
     project_id: projectId,
     work_item: chosen ?? "",
   }, chosen === null);
   const data = materials.data;
-
   return (
-    <div className="page">
-      <Section
-        title="资料"
-        note={`只读，按事项查看；本页的事项 ${chosen ?? "无"}${requested === null && chosen !== null ? "（未选中事项，取当前事项）" : requested === null ? "" : "（顶栏选中）"}`}
-      >
-        <Loading state={overview} />
-        {overview.data !== null && chosen === null ? <Empty text="项目还没有事项，没有资料可看" /> : null}
-        <Loading state={materials} />
-        {data ? (
-          <>
-            <IntendTable rows={data.inputs} />
-            <VersionTable title="PRD（有效合同）" rows={data.contracts} />
-            <VersionTable title="PLAN（工程方案）" rows={data.plans} />
-            <DeliveryTable app={props.app} rows={data.deliveries} />
-            <ReviewTable rows={data.reviews} />
-            <MaterialTable rows={data.materials} />
-          </>
-        ) : null}
-      </Section>
+    <div className="page y10-pp y10-mt">
+      <header className="y10-pp-head">
+        <h1>{requested === null ? "资料" : `资料 · ${items.find((item) => item.work_item_id === requested)?.title ?? ""}`}</h1>
+        <p className="y10-block-sub note">
+          {overview.data === null ? "" : requested === null
+            ? `${overview.data.name} · 在顶栏选择事项以后查看这个事项的完整资料`
+            : `${overview.data.name} · 按事项查看的资料全部只读`}
+        </p>
+      </header>
+      <Loading state={overview} />
+      {overview.data !== null ? (
+        <IndexBlock
+          items={items}
+          chosen={chosen}
+          requested={requested}
+          counts={data === null ? null : countsOf(data)}
+          onNavigate={props.onNavigate}
+          projectId={projectId}
+        />
+      ) : null}
+      {data ? (
+        <>
+          <IntendBlock rows={data.inputs} />
+          <VersionBlock id="mt-prd" title="PRD" note="产品部门提交并被接纳的各版本；接入已有项目的初始 PRD 标明确认记录" rows={data.contracts} empty="产品部门还没有提交 PRD" />
+          <VersionBlock id="mt-plan" title="PLAN" note="工程部门的计划各版本" rows={data.plans} empty="工程部门还没有提交计划" />
+          <DeliveryBlock app={props.app} rows={data.deliveries} />
+          <ReviewBlock rows={data.reviews} />
+          <NotesBlock rows={data.materials} scoped={requested !== null} />
+        </>
+      ) : null}
     </div>
   );
 }
 
-// intend 原文：首次与逐次输入，版本、字节范围与内容
-function IntendTable(props: { rows: WorkItemMaterialsResult["inputs"] }) {
-  if (props.rows.length === 0) {
-    return <p className="y10-note note">intend 原文：这个事项没有输入记录</p>;
-  }
+// 当前查看事项各资料的条数；其余事项没有读取，索引卡上按未查看显示
+function countsOf(data: WorkItemMaterialsResult): Record<string, number> {
+  return {
+    intend: data.inputs.length,
+    prd: data.contracts.length,
+    plan: data.plans.length,
+    delivery: data.deliveries.length,
+    qa: data.reviews.length,
+    note: data.materials.length,
+  };
+}
+
+// 按事项查看（原型 mt-index）：点击卡上的标题换到那个事项
+function IndexBlock(props: {
+  items: WorkItemCard[];
+  chosen: string;
+  requested: string | null;
+  counts: Record<string, number> | null;
+  projectId: string;
+  onNavigate: (hash: string) => void;
+}) {
   return (
-    <Table
-      head={["版本", "种类", "字节范围", "内容"]}
-      rows={props.rows.map((input) => [
-        `第 ${input.version} 版`,
-        input.kind,
-        `${input.byte_start}–${input.byte_end}`,
-        <p className="y10-pre raw-text" key={input.input_id}>{input.text}</p>,
-      ])}
-      caption="intend 原文：首次与逐次输入"
-    />
+    <Section
+      id="mt-index"
+      title="按事项查看"
+      note={`资料按事项保存；点击事项查看它的 intend、PRD、PLAN、交付、质检与项目材料；本页的事项 ${props.chosen}${props.requested === null ? "（未选中事项，取当前事项）" : ""}`}
+      className="y10-mt"
+    >
+      {props.items.length === 0 ? <Empty text="项目还没有事项，没有资料可看" /> : (
+        <div className="y10-mt-index">
+          {props.items.map((item, index) => {
+            const current = item.work_item_id === props.chosen;
+            return (
+              <article
+                key={item.work_item_id}
+                className={`y10-mt-index-card${current ? " is-current" : ""}`}
+                style={{ "--item": ITEM_COLORS[(index + 1) % ITEM_COLORS.length] } as CSSProperties}
+              >
+                <button
+                  type="button"
+                  className="y10-pp-title"
+                  onClick={() => props.onNavigate(`#/p/${props.projectId}/materials?w=${item.work_item_id}`)}
+                >
+                  {item.title}
+                </button>
+                <StatusMark kind={WORK_ITEM_STATUS_KIND[item.status] ?? "idle"} text={label(WORK_ITEM_STATUS, item.status)} />
+                <div className="y10-mt-counts">
+                  {current && props.counts !== null ? (
+                    COUNT_KINDS.map(([kind, name]) => (
+                      <span key={kind} className={props.counts?.[kind] ? "" : "is-zero"}>{name} {props.counts?.[kind] ?? 0}</span>
+                    ))
+                  ) : <span className="is-zero">未查看</span>}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </Section>
   );
 }
 
-// PRD 与 PLAN：各版本、状态与目标（摘要）
-function VersionTable(props: { title: string; rows: WorkItemMaterialsResult["contracts"] }) {
-  if (props.rows.length === 0) {
-    return <p className="y10-note note">{props.title}：还没有版本</p>;
-  }
+// intend 原文（原型 mt-intend）：首次与逐次输入，按接收顺序保存
+function IntendBlock(props: { rows: WorkItemMaterialsResult["inputs"] }) {
   return (
-    <Table
-      head={["版本", "状态", "内容摘要", "内容指纹"]}
-      rows={props.rows.map((entry) => [
-        entry.revision === null ? "未编号" : `第 ${entry.revision} 版`,
-        entry.status,
-        show(entry.summary, "没有摘要"),
-        show(entry.content_hash, "未上报"),
-      ])}
-      caption={props.title}
-    />
+    <Section id="mt-intend" title="intend 原文" note="按接收顺序保存的用户原文" className="y10-mt">
+      {props.rows.length === 0 ? <Empty text="这个事项还没有 intend 原文" /> : (
+        <ol className="y10-mt-list">
+          {props.rows.map((input) => (
+            <li className="y10-mt-doc" key={input.input_id}>
+              <header className="y10-mt-doc-head">
+                <strong>intend 原文 第 {input.version} 版</strong>
+                <Tag>{input.version === 1 ? "首次输入" : `第 ${input.version} 次输入`}</Tag>
+                <span className="y10-muted">{input.byte_start}–{input.byte_end} 字节</span>
+                <span className="y10-muted">{input.kind}</span>
+              </header>
+              <p className="y10-clamp">{input.text}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Section>
   );
 }
 
-// 交付：各版本、文件清单与摘要；点开文件用 delivery.file 取内容
-function DeliveryTable(props: { app: ClientApp; rows: WorkItemMaterialsResult["deliveries"] }) {
+// PRD 与 PLAN（原型 mt-prd、mt-plan）：各版本、状态与目标（摘要）
+function VersionBlock(props: {
+  id: string;
+  title: string;
+  note: string;
+  rows: WorkItemMaterialsResult["contracts"];
+  empty: string;
+}) {
+  return (
+    <Section id={props.id} title={props.title} note={props.note} className="y10-mt">
+      {props.rows.length === 0 ? <Empty text={props.empty} /> : (
+        <ol className="y10-mt-list">
+          {props.rows.map((entry, index) => (
+            <li className={`y10-mt-doc${index === props.rows.length - 1 ? " is-current" : " is-old"}`} key={entry.event_id}>
+              <header className="y10-mt-doc-head">
+                <strong>{props.title} {entry.revision === null ? "未编号" : `第 ${entry.revision} 版`}</strong>
+                <Tag>{entry.status}</Tag>
+                <span className="y10-muted">指纹 {show(entry.content_hash, "未上报")}</span>
+              </header>
+              <p className="y10-clamp">{show(entry.summary, "没有摘要")}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Section>
+  );
+}
+
+// 交付（原型 mt-delivery）：各版本的封存快照，文件清单与摘要；点开文件用 delivery.file 取内容
+function DeliveryBlock(props: { app: ClientApp; rows: WorkItemMaterialsResult["deliveries"] }) {
   const [open, setOpen] = useState<{ eventId: string; path: string } | null>(null);
   const file = useSnapshot<DeliveryFileResult>(
     props.app,
@@ -99,29 +197,31 @@ function DeliveryTable(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
     open === null,
   );
 
-  if (props.rows.length === 0) {
-    return <p className="y10-note note">交付：还没有版本</p>;
-  }
-
   return (
-    <>
-      {props.rows.map((entry) => (
-        <div key={entry.event_id} className="y10-mt-doc delivery-block">
-          <h3 className="y10-h3 sub">
-            交付 {entry.revision === null ? "（未编号）" : `第 ${entry.revision} 版`} · {entry.status} · {show(entry.summary, "没有摘要")}
-          </h3>
-          {entry.files.length === 0 ? <p className="y10-note note">这条交付没有文件清单</p> : (
-            <ul className="y10-mt-files file-list">
-              {entry.files.map((path) => (
-                <li key={path}>
-                  <span className="y10-code file-path">{path}</span>
-                  <button type="button" className="y10-link link" onClick={() => setOpen({ eventId: entry.event_id, path })}>查看内容</button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ))}
+    <Section id="mt-delivery" title="交付" note="各版本的封存快照：文件清单、摘要与文件下载" className="y10-mt">
+      {props.rows.length === 0 ? <Empty text="工程部门还没有封存交付" /> : (
+        <ol className="y10-mt-list">
+          {props.rows.map((entry, index) => (
+            <li className={`y10-mt-doc delivery-block${index === props.rows.length - 1 ? " is-current" : " is-old"}`} key={entry.event_id}>
+              <header className="y10-mt-doc-head">
+                <strong>交付 {entry.revision === null ? "（未编号）" : `第 ${entry.revision} 版`}</strong>
+                <Tag>{entry.status}</Tag>
+                <span className="y10-muted">{show(entry.summary, "没有摘要")}</span>
+              </header>
+              {entry.files.length === 0 ? <p className="y10-note note">这条交付没有文件清单</p> : (
+                <ul className="y10-mt-files file-list">
+                  {entry.files.map((path) => (
+                    <li key={path}>
+                      <code className="y10-code file-path">{path}</code>
+                      <button type="button" className="y10-link link" onClick={() => setOpen({ eventId: entry.event_id, path })}>查看内容</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
       {open ? (
         <div className="y10-block card">
           <div className="y10-block-head section-head">
@@ -132,7 +232,7 @@ function DeliveryTable(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
           {file.data ? <FileContent data={file.data} /> : null}
         </div>
       ) : null}
-    </>
+    </Section>
   );
 }
 
@@ -159,29 +259,46 @@ function FileContent(props: { data: DeliveryFileResult }) {
   return <p className="y10-note note">这个文件没有返回内容</p>;
 }
 
-// 质检：结论、理由、检查回执与缺陷
-function ReviewTable(props: { rows: WorkItemMaterialsResult["reviews"] }) {
-  if (props.rows.length === 0) {
-    return <p className="y10-note note">质检：还没有结论</p>;
-  }
+// 质检（原型 mt-qa）：结论、理由、检查回执与缺陷
+function ReviewBlock(props: { rows: WorkItemMaterialsResult["reviews"] }) {
   return (
-    <>
-      <h3 className="y10-h3 sub">质检</h3>
-      {props.rows.map((review) => (
-        <div key={review.event_id} className="y10-mt-doc review-block">
-          <KeyValue
-            items={[
-              ["结论", review.verdict],
-              ["理由", show(review.rationale, "没有写明")],
-              ["检查回执", review.checks.length === 0 ? "无" : list(review.checks).map(checkRow).join("；")],
-              ["缺陷", review.defects.length === 0 ? "无" : list(review.defects).map(checkRow).join("；")],
-            ]}
-          />
-        </div>
-      ))}
-    </>
+    <Section id="mt-qa" title="质检" note="结论、理由、检查回执；截图绑定到交付快照" className="y10-mt">
+      {props.rows.length === 0 ? <Empty text="质检部门还没有给出结论" /> : (
+        <ol className="y10-mt-list">
+          {props.rows.map((review) => (
+            <li className={`y10-mt-doc ${verdictClass(review.verdict)}`} key={review.event_id}>
+              <header className="y10-mt-doc-head">
+                <strong>质检结论</strong>
+                <Tag tone={review.verdict === "release" ? "ok" : "danger"}>{verdictName(review.verdict)}</Tag>
+              </header>
+              <KeyValue
+                items={[
+                  ["理由", show(review.rationale, "没有写明")],
+                  ["检查回执", review.checks.length === 0 ? "无" : list(review.checks).map(checkRow).join("；")],
+                  ["缺陷", review.defects.length === 0 ? "无" : list(review.defects).map(checkRow).join("；")],
+                ]}
+              />
+            </li>
+          ))}
+        </ol>
+      )}
+    </Section>
   );
 }
+
+function verdictName(verdict: string): string {
+  return VERDICT_LABELS[verdict] ?? verdict;
+}
+
+function verdictClass(verdict: string): string {
+  return verdict === "release" ? "is-release" : "is-rework";
+}
+
+const VERDICT_LABELS: Record<string, string> = {
+  release: "放行",
+  rework_engineering: "退回工程",
+  rework_product: "退回产品",
+};
 
 function checkRow(value: Record<string, unknown>): string {
   const name = text(value.name) || text(value.id) || text(value.check_id);
@@ -190,20 +307,23 @@ function checkRow(value: Record<string, unknown>): string {
   return [name || "未命名", result, detail].filter((part) => part !== "").join(" · ");
 }
 
-// 项目材料：material.record 保存下来的原文
-function MaterialTable(props: { rows: WorkItemMaterialsResult["materials"] }) {
-  if (props.rows.length === 0) {
-    return <p className="y10-note note">项目材料：没有记录</p>;
-  }
+// 项目材料（原型 mt-notes）：「记录原文」保存下来的材料
+function NotesBlock(props: { rows: WorkItemMaterialsResult["materials"]; scoped: boolean }) {
   return (
-    <Table
-      head={["时间", "交给的部门", "内容"]}
-      rows={props.rows.map((material) => [
-        formatTime(material.recorded_at),
-        departmentName(material.department),
-        <p className="y10-pre raw-text" key={material.material_id}>{material.text}</p>,
-      ])}
-      caption="项目材料"
-    />
+    <Section id="mt-notes" title="项目材料" note="「记录原文」保存的材料；项目材料只记录原文，不注入后续事项" className="y10-mt">
+      {props.rows.length === 0 ? <Empty text={props.scoped ? "这个范围还没有项目材料" : "项目还没有记录原文"} /> : (
+        <ul className="y10-mt-notes">
+          {props.rows.map((material) => (
+            <li key={material.material_id}>
+              <header className="y10-mt-doc-head">
+                <strong>{material.department === null ? "项目材料" : `${departmentName(material.department)}部门记录`}</strong>
+                <span className="y10-muted">{formatTime(material.recorded_at)} 记录</span>
+              </header>
+              <blockquote className="y10-mt-quote">{material.text}</blockquote>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   );
 }

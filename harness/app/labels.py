@@ -36,6 +36,8 @@ DECISION_KIND_NAMES: dict[str, str] = {
     "definitions_changed": "定义版本不同，等待选择",
     "unknown_action": "动作结果未知，等待核实",
     "initial_prd": "接入已有项目的初始需求文档等待确认",
+    "instance_upgrade": "实例升级等待批准",
+    "kernel_modification": "交付改动了内核清单里的路径，等待批准",
 }
 
 

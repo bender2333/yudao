@@ -22,6 +22,7 @@ import { DepartmentPage } from "./views/project/department";
 import { MaterialsPage } from "./views/project/materials";
 import { ObserveDetailPage, ObservePage } from "./views/project/observe";
 import { OverviewPage } from "./views/project/overview";
+import { RecoveryPage } from "./views/project/recovery";
 import { SettingsPage } from "./views/project/settings";
 import { departmentName } from "./views/project/labels";
 
@@ -372,8 +373,7 @@ function TokenGate(props: { onSubmit: (token: string) => void }) {
 }
 
 // 项目页面（原型 v8 设计说明第 3.3 节的路径，工单 #80）：按路径分派到具体页面。
-// 概览、部门工作间、资料、观测与设置由本工单实现；恢复页（3.1）与系统页由所属工单实现，
-// 未实现时显示占位，写明由哪个工单填入。
+// 概览、部门工作间、资料、观测、设置与恢复由本工单实现；未实现的系统页显示占位，写明由哪个工单填入。
 function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null; onNavigate: (hash: string) => void }) {
   const { route } = props;
   if (route.projectId === null) {
@@ -385,13 +385,15 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
     case "dept":
       return <DepartmentPage app={props.app} route={route} />;
     case "materials":
-      return <MaterialsPage app={props.app} route={route} />;
+      return <MaterialsPage app={props.app} route={route} onNavigate={props.onNavigate} />;
     case "observe":
       return <ObservePage app={props.app} route={route} />;
     case "observe-detail":
       return <ObserveDetailPage app={props.app} route={route} />;
     case "settings":
       return <SettingsPage app={props.app} route={route} />;
+    case "recovery":
+      return <RecoveryPage app={props.app} route={route} onNavigate={props.onNavigate} />;
     default:
       return <PlaceholderPage route={route} systemStatus={props.systemStatus} />;
   }

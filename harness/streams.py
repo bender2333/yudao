@@ -112,6 +112,10 @@ CATALOG_EVENT_TYPES = frozenset({
     "runtime_force_upgrade_requested",
     "home_seen",
     "parameter_set",
+    # 实例升级的决定请求（迭代底座 B7，工单 #355）
+    "instance_upgrade_requested",
+    "instance_upgrade_answered",
+    "instance_upgrade_withdrawn",
 })
 
 # 全部声明过分类的事件种类

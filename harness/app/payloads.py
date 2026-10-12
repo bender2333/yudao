@@ -1110,10 +1110,43 @@ class InitialPrdRequested(Payload):
     snapshot: CodeSnapshot
     revision_note_ref: ArtifactRef | None = None
 
+class DeliverableAdoptedPayload(Payload):
+    adoption_id: str
+    work_item_id: str
+    run_id: str
+    delivery_event_id: str
+    qa_event_id: str
+    tree_ref: ArtifactRef
+    code_tree_digest: str
+    summary: str
+    files: list[str]
+    check_names: list[str]
+    known_risks: list[str]
+    previous_adoption_id: str | None
+
+
+# 请求写在项目流中，阻塞范围是 run，回答之前交付不采纳。kernel_paths 是交付相对基线的改动路径中
+# 落在运行实例内核清单里的那些；diff 是这些路径的差异全文；delivery_run_id 是交付所属的 run；
+# held_adoption 是批准以后要写入的采纳载荷（与照常采纳时写的那一份相同）
+class KernelModificationRequested(Payload):
+    kind: Literal["kernel_modification"]
+    blocks: Literal["run"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    work_item_id: str
+    # 交付所属的 run；这个请求本身不属于任何 run，请求写在项目流中
+    delivery_run_id: str
+    kernel_paths: list[str]
+    diff: str
+    held_adoption: DeliverableAdoptedPayload
 
 # 决定请求的载荷：以 kind 区分的各种决定请求
 DecisionRequestedPayload = (ModelUnavailableRequested | UnknownActionRequested | PauseRequested
                             | InitialPrdRequested)
+# 项目流中的决定请求（工单 #136、#354）：写在项目流中的那几种，run 流中没有它们
+ProjectDecisionRequestedPayload = InitialPrdRequested | KernelModificationRequested
 
 
 class DecisionAnsweredPayload(Payload):
@@ -1205,21 +1238,6 @@ class WorkItemStartFailedPayload(Payload):
     work_item_id: str
     run_id: str
     error: str
-
-
-class DeliverableAdoptedPayload(Payload):
-    adoption_id: str
-    work_item_id: str
-    run_id: str
-    delivery_event_id: str
-    qa_event_id: str
-    tree_ref: ArtifactRef
-    code_tree_digest: str
-    summary: str
-    files: list[str]
-    check_names: list[str]
-    known_risks: list[str]
-    previous_adoption_id: str | None
 
 
 class AdoptionHeldPayload(Payload):
@@ -1579,7 +1597,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.MATERIAL_RECORDED: MaterialRecordedPayload,
     ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: SourceDirectoryConfiguredPayload,
     ProjectEventType.INITIAL_PRD_PROPOSED: InitialPrdProposedPayload,
-    ProjectEventType.PROJECT_DECISION_REQUESTED: InitialPrdRequested,
+    ProjectEventType.PROJECT_DECISION_REQUESTED: ProjectDecisionRequestedPayload,
     ProjectEventType.PROJECT_DECISION_ANSWERED: ProjectDecisionAnsweredPayload,
     ProjectEventType.PROJECT_DECISION_WITHDRAWN: ProjectDecisionWithdrawnPayload,
     ProjectEventType.ONBOARDING_REVISION_STARTED: OnboardingRevisionStartedPayload,

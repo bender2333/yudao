@@ -14,6 +14,8 @@ import {
   confirmImpactText,
   connectionTestable,
   defaultLevelOptions,
+  defaultModelsUrl,
+  effectiveModelsUrl,
   emptyFormState,
   formDocumentValid,
   formStateFromProvider,
@@ -580,5 +582,19 @@ test("连接测试结果写明读取的模型列表地址（工单 #302）", () 
 test("添加与保存的成功提示用词不同（工单 #302）", () => {
   assert.equal(saveSuccessText("add"), "已添加 Provider 配置。");
   assert.equal(saveSuccessText("edit"), "已保存 Provider 配置。");
+});
+
+test("自定义服务的默认模型列表地址与实际生效地址（工单 #384）", () => {
+  assert.equal(defaultModelsUrl("http://up.test/v1"), "http://up.test/v1/models");
+  assert.equal(defaultModelsUrl("http://up.test/v1/"), "http://up.test/v1/models");
+  assert.equal(defaultModelsUrl("  "), "");
+  assert.equal(effectiveModelsUrl({ base_url: "http://up.test/v1", models_url: "" }, null),
+    "http://up.test/v1/models");
+  assert.equal(effectiveModelsUrl({ base_url: "http://up.test/v1", models_url: "http://other.test/m" }, null),
+    "http://other.test/m");
+  assert.equal(effectiveModelsUrl({ base_url: "http://up.test/v1", models_url: "" }, PRESETS[0]),
+    PRESETS[0].models_url);
+  assert.equal(effectiveModelsUrl({ base_url: "http://up.test/v1", models_url: "http://other.test/m" }, PRESETS[0]),
+    "http://other.test/m");
 });
 

@@ -407,9 +407,10 @@ async def _collect_candidates(application: Application, command: Command, reques
             result = await asyncio.to_thread(facade.refresh_candidates, request.provider_id,
                                              models_url_override=request.models_url)
         except (CatalogValidationError, ProviderError) as exc:
+            address = facade.models_url_of(request.provider_id, request.models_url)
             _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
                 "base_revision": request.base_version,
-                "provider_id": request.provider_id, "status": "unknown", "source_url": request.models_url or "",
+                "provider_id": request.provider_id, "status": "unknown", "source_url": address,
                 "fetched_at": "", "candidates": [], "candidate_ids": [], "error": str(exc),
             })
             return
