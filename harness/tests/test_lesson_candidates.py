@@ -8,7 +8,7 @@ from harness.app.project_queries import EventDetail, ReplayCheck, RunExport
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, json_dumps
-from harness.projection import project_events
+from harness.projection import replay_events
 from harness.proposals import delivery_turn, plan_turn, product_spec, review, review_turn
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
 
@@ -37,7 +37,7 @@ def rework_script(verdict="rework_engineering"):
 
 def assert_candidate_does_not_change_execution(system, projection):
     events = system.store.list_events(projection.run_id)
-    without_candidates = project_events([
+    without_candidates = replay_events([
         event for event in events if event.type != EventType.LESSON_CANDIDATE_RECORDED
     ]).to_dict()
     actual = projection.to_dict()

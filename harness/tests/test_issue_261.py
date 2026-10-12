@@ -21,8 +21,8 @@ DEPARTMENTS = ("product", "engineering", "quality")
 
 def _model(model_id: str, provider_id: str) -> dict[str, Any]:
     return {"id": model_id, "provider_id": provider_id, "model": f"upstream-{model_id}",
+            "protocol": "responses",
             "context_window": 32000, "max_output_tokens": 2048, "capability_source": ""}
-
 def _document_of(*, capacity_confirmed: bool = False, missing_required: bool = False) -> dict[str, Any]:
     model = _model("model-a", "provider-a")
     if missing_required:
@@ -67,11 +67,11 @@ def test_change_impact_refuses_an_invalid_connection_document(tmp_path):
     opened = _Opened(tmp_path)
     with running_api(opened) as client:
         opened.admit(("provider-a", "model-a"))
-        proposed = {"provider": {"id": "provider-a", "name": "provider-a", "protocol": "responses",
+        proposed = {"provider": {"id": "provider-a", "name": "provider-a",
                                  "base_url": "http://127.0.0.1:2/v1", "credential_ref": "KEY_A",
                                  "timeout_sec": 20, "preset_id": "", "models_url": ""},
-                    "models": [{"id": "model-a", "model": "upstream-a", "max_output_tokens": 2048,
-                                "capacity_confirmed": True}]}
+                    "models": [{"id": "model-a", "model": "upstream-a", "protocol": "responses",
+                                "max_output_tokens": 2048, "capacity_confirmed": True}]}
         document = json.dumps(proposed, ensure_ascii=False)
         end = opened.system.store.end_position()
         response = _impact(client, kind="connection", provider_id="provider-a", document=document)

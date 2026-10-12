@@ -90,7 +90,6 @@ class EventType:
     DECISION_ANSWERED = "decision_answered"
     DECISION_WITHDRAWN = "decision_withdrawn"
 
-
 class ProjectEventType:
     PROJECT_REGISTERED = "project_registered"
     PROJECT_RENAMED = "project_renamed"
@@ -102,35 +101,36 @@ class ProjectEventType:
     WORK_ITEM_START_FAILED = "work_item_start_failed"
     DELIVERABLE_ADOPTED = "deliverable_adopted"
     ADOPTION_HELD = "adoption_held"
-    # 项目部门设置的三项写成同一种事件；事件种类字符串跨版本保持 department_prompt_configured（ADR-0019），
-    # 只增加字段（provider_id、model_id、requested_tier）
+    # 部门设置事件跨版本保持 department_prompt_configured（ADR-0019）
     DEPARTMENT_SETTINGS_CONFIGURED = "department_prompt_configured"
     COMMAND_CONFIGURED = "command_configured"
     MATERIAL_RECORDED = "material_recorded"
     SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
-    # 建档 run 结束以后提出的初始 PRD 候选（工单 #136，设计第 3.2 节）：记下候选的引用与核验结论
+    # 建档候选（设计第 3.2 节）：记下候选引用与核验结论
     INITIAL_PRD_PROPOSED = "initial_prd_proposed"
-    # 项目流中的决定请求、回答与撤回：确认初始 PRD 可能等待数天，run 已经结束，
-    # 请求与回答记在项目流（设计第 3.2 节），字段与 run 流的三种决定事件相同
+    # 确认初始 PRD 可能等待数天，run 已结束，请求与回答记在项目流，字段与 run 流相同
     PROJECT_DECISION_REQUESTED = "project_decision_requested"
     PROJECT_DECISION_ANSWERED = "project_decision_answered"
     PROJECT_DECISION_WITHDRAWN = "project_decision_withdrawn"
-    # 用户提出修改：项目流记下这一轮的依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
+    # 用户提出修改：项目流记下这一轮依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
     # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
     BASELINE_ADOPTED = "baseline_adopted"
-    # 项目级参数（迭代底座 B3，工单 #351）：种类字符串是 project_parameter_set，与目录流的 parameter_set 是两个不同流的种类
+    # 项目级参数（迭代底座 B3，工单 #351）：project_parameter_set
     PARAMETER_SET = "project_parameter_set"
-
+    WRITEBACK_COMPLETED = "writeback_completed"
+    WRITEBACK_STOPPED = "writeback_stopped"
+    WRITEBACK_NOT_NEEDED = "writeback_not_needed"
+    WRITEBACK_HELD = "writeback_held"
+    WRITEBACK_VERIFIED = "writeback_verified"
 
 class CatalogEventType:
-    # 模型目录与凭据的事件（应用层与接口层设计说明第 10 节第 1 项）。
-    # 内容仍由 Provider 模块保存；事件只带修订号、变化与结果，不含 Key
+    # 模型目录与凭据事件（设计第 10 节）：内容由 Provider 保存，事件不含 Key
     CATALOG_REVISED = "catalog_revised"
     CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
     CATALOG_TEST_FINISHED = "catalog_test_finished"
     CREDENTIAL_CHANGED = "credential_changed"
-    # 排空与强制升级（3.1）：与目录事件同在一份流中，是控制主机这一份部署的长期事实（ADR-0019）
+    # 排空与强制升级（3.1）：与目录事件同流，是控制主机长期事实（ADR-0019）
     RUNTIME_DRAIN_STARTED = "runtime_drain_started"
     RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
     # 用户查看过的全局位置（界面工作线，工单 #127）：控制主机上只有一个，随部署长期保存
@@ -553,19 +553,6 @@ class CatalogEvent:
 
 
 @dataclass
-class CatalogProjection:
-    # 目录流的投影：只记最后一条事件与最后一条 catalog_revised 的修订号。
-    # 目录内容与凭据仍由 Provider 模块保存，这里不复制。
-    # last_seen_position 是用户查看过的全局位置（工单 #127），控制主机上只有一个
-    last_event_id: str | None = None
-    stream_version: int = 0
-    updated_at: str | None = None
-    revision: int = 0
-    last_seen_position: int | None = None
-    last_seen_at: str | None = None
-
-
-@dataclass
 class DecisionRequest:
     # 一个等待用户回答的决定请求（总体架构第 7.4 节），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。
     # 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）；
@@ -736,241 +723,6 @@ class RunProjection:
         return self.department_call_targets
 
 
-# ---------------------------------------------------------------------------
-# 项目投影：由项目流的事件折叠而成；事项的状态等字段在读取时由所属 run 的投影派生，不保存
-
-
-@dataclass
-class Adoption:
-    adoption_id: str
-    work_item_id: str
-    run_id: str
-    delivery_event_id: str
-    qa_event_id: str
-    tree_ref: dict[str, Any]
-    code_tree_digest: str
-    summary: str
-    files: list[str]
-    check_names: list[str]
-    known_risks: list[str]
-    previous_adoption_id: str | None
-    adopted_at: str
-    stream_version: int
-    event_id: str
-    # 建档基线特有的三项（工单 #136，设计第 5 节）：被确认的初始 PRD、现有结构说明与代码快照。
-    # 普通事项的交付采纳没有这三项，它们为空
-    prd_ref: dict[str, Any] | None = None
-    product_spec_hash: str | None = None
-    structure_ref: dict[str, Any] | None = None
-    snapshot: dict[str, Any] | None = None
-    # 建档基线中状态为 existing_defect 的结论（工单 #136）：现有缺陷数按它计数，
-    # known_risks 还包含未被结论覆盖的其他失败
-    existing_defects: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-
-@dataclass
-class InitialPrdCandidate:
-    # 一个建档候选（工单 #136，设计第 3.3 节）：建档 run 结束以后提出的初始 PRD 及其依据。
-    # prd、structure、baseline_review 是这一轮三份产物的事件编号、内容哈希与工件引用；
-    # overview_ref 是仓库概况的工件引用；snapshot 是这一轮建档使用的代码快照；
-    # revision_note_ref 是上一轮用户的修改意见（第二轮起）
-    work_item_id: str
-    run_id: str
-    round: int
-    prd: dict[str, Any]
-    structure: dict[str, Any]
-    baseline_review: dict[str, Any]
-    overview_ref: dict[str, Any]
-    snapshot: dict[str, Any]
-    proposed_at: str
-    stream_version: int
-    event_id: str
-    revision_note_ref: dict[str, Any] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class HeldCandidate:
-    work_item_id: str
-    run_id: str
-    delivery_event_id: str
-    code_tree_digest: str
-    reason: str
-    expected_adoption_id: str | None
-    current_adoption_id: str | None
-    held_at: str
-    stream_version: int
-    event_id: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class DepartmentSetting:
-    # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；
-    # 三项一起保存、一个版本（设计说明第 5.2 节）。没有写入的项使用部门默认，部门 Prompt 没有写入时使用内置默认 Prompt。
-    department: str
-    version: int
-    text: str
-    source: str
-    provider_id: str | None = None
-    model_id: str | None = None
-    requested_tier: str | None = None
-    configured_prompt: bool = False
-    prompt_ref: dict[str, Any] | None = None
-    base_version: int | None = None
-    updated_at: str | None = None
-    event_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class Material:
-    material_id: str
-    text: str
-    material_ref: dict[str, Any]
-    department: str | None
-    recorded_at: str
-    stream_version: int
-    event_id: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class SourceDirectory:
-    # 项目登记的源目录：名称是登记名，路径是控制主机上的路径；
-    # 版本是该条登记的版本，作为 source_directory.save 的基准版本
-    name: str
-    path: str
-    version: int
-    base_version: int | None = None
-    updated_at: str | None = None
-    event_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class RegisteredCommand:
-    name: str
-    version: int
-    argv: list[str]
-    args: list[str]
-    timeout_sec: int
-    output_limit: int
-    base_version: int | None = None
-    updated_at: str | None = None
-    event_id: str | None = None
-    # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）；旧事件没有这个字段时为否
-    repeatable: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-    def frozen(self) -> dict[str, Any]:
-        # 事项创建时冻结进 run 的执行形态：只有固定参数与限额，没有版本管理字段
-        return {"argv": list(self.argv), "args": list(self.args),
-                "timeout_sec": self.timeout_sec, "output_limit": self.output_limit,
-                "repeatable": self.repeatable}
-
-
-@dataclass
-class WorkItem:
-    work_item_id: str
-    title: str
-    text: str
-    run_id: str
-    baseline: dict[str, Any] | None
-    project_context_ref: dict[str, Any]
-    prompt_config_versions: dict[str, int]
-    max_cycles: int
-    run_time_limit_sec: int
-    context_window: int
-    created_at: str
-    stream_version: int
-    event_id: str
-    snapshot: dict[str, Any] | None = None
-    start_error: str | None = None
-    # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
-    kind: str = "change"
-    command_versions: dict[str, int] = field(default_factory=dict)
-    # 以下字段由所属 run 的投影派生，不存事件。
-    status: str = "not_started"
-    department: str | None = None
-    phase: str | None = None
-    stop_reason: str | None = None
-    human_action: str | None = None
-    cycle_count: int = 0
-    last_handoff: dict[str, Any] | None = None
-    rework: list[dict[str, Any]] = field(default_factory=list)
-    pending_question: str | None = None
-    adoption_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-
-@dataclass
-class ProjectProjection:
-    project_id: str = ""
-    name: str = ""
-    goal: str = ""
-    goal_ref: dict[str, Any] | None = None
-    source: str = "idea"
-    created_at: str = ""
-    pinned: bool = False
-    archived: bool = False
-    # 起始文件夹快照记录（工单 #321）：新建项目时给出的起点文件夹的只读采集结果，所属范围是项目。
-    # 旧事件没有这个字段时缺省为没有起始文件夹（ADR-0019）
-    initial_snapshot: dict[str, Any] | None = None
-    work_items: list[WorkItem] = field(default_factory=list)
-    current_adoption: Adoption | None = None
-    adoptions: list[Adoption] = field(default_factory=list)
-    held: list[HeldCandidate] = field(default_factory=list)
-    # 各轮建档候选（工单 #136）：等待确认的与已被确认或提出修改的候选都在这里，按提出顺序
-    initial_prd_candidates: list[InitialPrdCandidate] = field(default_factory=list)
-    department_settings: dict[str, DepartmentSetting] = field(default_factory=dict)
-    department_setting_history: list[DepartmentSetting] = field(default_factory=list)
-    commands: dict[str, RegisteredCommand] = field(default_factory=dict)
-    command_history: list[RegisteredCommand] = field(default_factory=list)
-    materials: list[Material] = field(default_factory=list)
-    source_directories: dict[str, SourceDirectory] = field(default_factory=dict)
-    source_directory_history: list[SourceDirectory] = field(default_factory=list)
-    active_work_item_id: str | None = None
-    updated_at: str = ""
-    # 投影所反映的项目流版本
-    stream_version: int = 0
-    last_event_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-    def canonical_state(self) -> dict[str, Any]:
-        data = self.to_dict()
-        data.pop("last_event_id", None)
-        return data
-
-    def work_item(self, work_item_id: str) -> WorkItem | None:
-        return next((item for item in self.work_items if item.work_item_id == work_item_id), None)
-
-    def work_item_for_run(self, run_id: str) -> WorkItem | None:
-        return next((item for item in self.work_items if item.run_id == run_id), None)
-
-
-def _plain(value: Any) -> Any:
-    return json.loads(json_dumps(value))
 
 
 def department_for_phase(phase: str) -> str | None:

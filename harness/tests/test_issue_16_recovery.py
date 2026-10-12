@@ -308,9 +308,10 @@ def test_credentials_are_resolved_from_the_host_again_and_not_written_into_event
     server, _capture, base = serve(_spec_reply())
     try:
         def document():
-            return {"providers": [{"id": "provider-1", "name": "provider-1", "protocol": "responses",
+            return {"providers": [{"id": "provider-1", "name": "provider-1",
                                    "base_url": base, "credential_ref": "RECOVERY_KEY", "timeout_sec": 20}],
                     "models": [{"id": "model-1", "provider_id": "provider-1", "model": "fake-model",
+                                "protocol": "responses",
                                 "context_window": 32_000, "max_output_tokens": 2_048}],
                     "bindings": {department: {"provider_id": "provider-1", "model_id": "model-1"}
                                  for department in ("product", "engineering", "quality")}}

@@ -159,11 +159,12 @@ def test_truncated_chat_stream_never_replays_invalid_assistant_arguments(tmp_pat
         facade = ProviderFacade(credentials=CredentialChain(overrides={"GO_KEY": "local-secret"}))
         facade.store_document({
             "providers": [{
-                "id": "go", "name": "Go", "protocol": "chat_completions", "base_url": base + "/v1",
-                "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": "opencode-go",
+                "id": "go", "name": "Go", "base_url": base + "/v1",
+                "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": "",
             }],
             "models": [{
                 "id": "m-go", "provider_id": "go", "model": "target-model",
+                "protocol": "chat_completions",
                 "context_window": 32000, "max_output_tokens": 2048,
                 "capability_source": "preset-v1",
             }],

@@ -32,10 +32,11 @@ class CatalogCredential(Contract):
 
 
 class CatalogModel(Contract):
-    # 模型访问定义；协议取自所属连接。准入记录由 catalog.admissions 单独返回（工单 #86）
+    # 模型访问定义；调用协议是定义自己的字段（ADR-0033）。准入记录由 catalog.admissions 单独返回（工单 #86）
     id: str
     provider_id: str
     model: str
+    protocol: str
     context_window: int | None
     max_output_tokens: int
     capability_source: str
@@ -63,7 +64,6 @@ class CatalogAdmission(Contract):
 class CatalogProvider(Contract):
     id: str
     name: str
-    protocol: str
     base_url: str
     credential_ref: str
     timeout_sec: float

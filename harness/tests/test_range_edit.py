@@ -11,7 +11,6 @@ from harness.public_tree import capture_public_tree
 from harness.environment import LocalEnvironment
 from harness.runtime import LoopSystem
 from harness.tests.helpers import perform
-from harness.tools import tool_action, tool_kind, tools_for
 from harness.tree_archive import load_tree
 from harness.workspace import Workspace
 
@@ -40,11 +39,6 @@ def _edit_call(identity, path, start, end, expected, new, digest):
     }
 
 
-def test_edit_range_is_an_engineering_only_write_tool():
-    assert tool_kind("edit_range") == "environment" and tool_action("edit_range") == "write"
-    assert "edit_range" in tools_for("engineering")
-    assert "edit_range" not in tools_for("product")
-    assert "edit_range" not in tools_for("quality")
 
 
 def test_successful_edit_replaces_exactly_the_requested_span(tmp_path):

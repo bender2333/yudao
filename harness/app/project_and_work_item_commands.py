@@ -390,7 +390,11 @@ class SourceDirectorySave(CommandRequest):
     project_id: str
     name: Text
     path: Text
-
+    writeback_enabled: bool = False
+    remote: Text = ""
+    target_branch: Text = ""
+    check_commands: list[Text] = []
+    credential_ref: Text | None = None
 
 class SourceDirectoryRefs(Contract):
     name: str
@@ -406,7 +410,13 @@ async def _save_source_directory(application: "Application", command: Command,
     try:
         application.system.projects.configure_source_directory(
             request.project_id, request.name, request.path,
-            base_version=request.base_version, command=command)
+            base_version=request.base_version,
+            writeback_enabled=request.writeback_enabled,
+            remote=request.remote,
+            target_branch=request.target_branch,
+            check_commands=request.check_commands,
+            credential_ref=request.credential_ref,
+            command=command)
     except ProjectNotFoundError as missing:
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     except ProjectArchivedError as archived:
@@ -416,6 +426,22 @@ async def _save_source_directory(application: "Application", command: Command,
         raise Rejection("stale_base", "源目录登记已经被修改，请重新读取以后提交",
                         current_version=current.get("version", 0)) from conflict
 
+
+class WritebackExecute(CommandRequest):
+    base_version: int | None = None
+    project_id: str
+    adoption_id: str | None = None
+
+
+async def _execute_writeback(application: "Application", command: Command,
+                             request: WritebackExecute) -> None:
+    try:
+        application.system.projects.execute_writeback(
+            request.project_id, adoption_id=request.adoption_id, command=command)
+    except ProjectNotFoundError as missing:
+        raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
+    except ProjectArchivedError as archived:
+        raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
 
 # ---------------------------------------------------------------------------
 # 登记
@@ -465,3 +491,6 @@ COMMAND_REGISTRATION_SAVE = CommandDefinition(
 SOURCE_DIRECTORY_SAVE = CommandDefinition(
     name="source_directory.save", request=SourceDirectorySave, refs=NoRefs, handle=_save_source_directory,
     derive_refs=_no_refs, reasons=("not_found", "stale_base", "project_archived"))
+WRITEBACK_EXECUTE = CommandDefinition(
+    name="writeback.execute", request=WritebackExecute, refs=NoRefs, handle=_execute_writeback,
+    derive_refs=_no_refs, reasons=("not_found", "project_archived"))

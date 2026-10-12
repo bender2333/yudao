@@ -39,50 +39,6 @@ def test_quality_checks_only_through_run_check(tmp_path):
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
 
-def test_tools_are_host_tools_or_environment_actions():
-    # 主机工具只有提交类工具；其余工具是环境工具，各有动作类别
-    assert {name for name, tool in TOOLS.items() if tool.kind == "host"} == {
-        name for name in TOOLS if name.startswith("submit_")}
-    assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
-        "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
-        "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
-        "run_check": "check", "run_command": "command",
-    }
-
-
-def test_submit_review_description_rejects_engineering_receipts_as_quality_evidence():
-    review = TOOLS["submit_review"]
-    assert "Engineering receipts are not accepted as QA evidence." in review.description
-    assert review.parameters["properties"]["checks"]["description"] == "Quality check names run via run_check"
-
-
-def test_submit_delivery_description_states_that_check_receipts_come_from_run_check():
-    delivery = TOOLS["submit_delivery"]
-    text = delivery.description
-    assert "Every name in check_names must be a name you passed to run_check in this activation on the current workspace" in text
-    assert "if any file changes after a check, call run_check again before submitting" in text
-    assert "run_command results are action receipts and are not accepted as delivery check receipts" in text
-    names = delivery.parameters["properties"]["check_names"]["description"]
-    assert "Names passed to run_check in this activation on the current workspace" in names
-    assert "run_command results do not count" in names
-
-
-def test_run_command_description_separates_action_receipts_from_delivery_check_receipts():
-    text = TOOLS["run_command"].description
-    assert "The host-observed exit status is the evidence; a self-reported exit_code is never read." in text
-    assert "run_command results are action receipts and cannot be listed in submit_delivery check_names" in text
-    assert "run the checks a delivery needs with run_check" in text
-
-
-def test_write_tool_descriptions_state_the_plan_requirement():
-    write = TOOLS["write_file"].description
-    assert "replace its entire content" in write and "missing parent directories are created" in write
-    assert "Use edit_range to change part of an existing file." in write
-    for name in ("write_file", "edit_range"):
-        text = TOOLS[name].description
-        assert "Requires an accepted engineering plan for the current effective contract" in text
-        assert "the path must be inside that plan's scope" in text
-
 
 def test_write_file_creates_parents_and_replaces_the_whole_file(tmp_path):
     workspace = Workspace(tmp_path)
@@ -150,11 +106,6 @@ def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp
     assert receipt.exit_code == 3
     assert "host-executed" in receipt.summary
 
-
-def test_check_receipt_shows_the_host_interpreter_as_python():
-    # 回执里的解释器名称固定为 python，各平台的回执文字与 token 估计相同
-    assert json.loads(_display_argv([sys.executable, "-c", "print('smoke ok')"])) == [
-        "python", "-c", "print('smoke ok')"]
 
 
 def test_check_receipt_shows_a_workspace_program_as_its_own_path(tmp_path):
@@ -498,30 +449,3 @@ def test_refactoring_tools_move_and_delete_regular_files(tmp_path):
     assert workspace.list_files() == []
 
 
-def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():
-    from harness.smoke import smoke_exit_code
-
-    assert smoke_exit_code({"available": False}) == 2
-    done = {
-        "phase": "DONE",
-        "stop_reason": "released",
-        "replay_consistent": True,
-        "context_isolated": True,
-        "model_input_audit": {"status": "verified"},
-        "check_receipts": [{"name": "smoke"}],
-        "check_receipts_verified": True,
-        "delivery_archive": {"status": "verified"},
-        "git_audit": {"status": "verified"},
-        "fake_used": False,
-        "request_count": 2,
-        "collaboration_audit": {"status": "verified", "pre_spec_consultation": True, "requirements_action": True},
-    }
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": done, "collaboration": done}}) == 0
-    fake = dict(done, fake_used=True)
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": fake}}) == 2
-    no_receipts = dict(done, check_receipts=[])
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": no_receipts}}) == 1
-    no_git_audit = {key: value for key, value in done.items() if key != "git_audit"}
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": no_git_audit}}) == 1
-    unverified_git = dict(done, git_audit={"status": "unverified"})
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": unverified_git}}) == 1

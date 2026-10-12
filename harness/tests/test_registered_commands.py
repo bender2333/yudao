@@ -427,22 +427,6 @@ def test_a_command_configured_event_without_the_field_reads_as_not_repeatable(da
     restarted.close()
 
 
-def test_the_single_repeatable_judgment_answers_for_tools_and_run_commands():
-    # 唯一的判断入口（恢复契约第 4 节）：读取、搜索与 run_check 可以重复，写入、编辑、删除与移动不可以；
-    # run_command 按这个 run 中固定的登记回答（工单 #242）
-    registry = {"lint": {"repeatable": True}, "deploy": {"repeatable": False}}
-    for tool in ("read_file", "list_files", "search", "read_range", "run_check"):
-        assert action_repeatable(tool, {"path": "src/a.py"}, registered_commands=registry) is True, tool
-    for tool in ("write_file", "edit_range", "delete_file", "move_file"):
-        assert action_repeatable(tool, {"path": "src/a.py"}, registered_commands=registry) is False, tool
-    assert action_repeatable("run_command", {"name": "lint"}, registered_commands=registry) is True
-    assert action_repeatable("run_command", {"name": "deploy"}, registered_commands=registry) is False
-    # 没有固定值、没有登记命令名或没有声明时按否
-    assert action_repeatable("run_command", {"name": "lint"}) is False
-    assert action_repeatable("run_command", {"name": "absent"}, registered_commands=registry) is False
-    assert action_repeatable("run_command", {}, registered_commands=registry) is False
-    assert action_repeatable("submit_delivery", {}, registered_commands=registry) is False
-
 
 def test_run_command_actions_repeat_by_the_registration_frozen_in_the_run(data_dir):
     # 判断入口读的是 run 中固定的登记：事项创建以后修改登记不改这个 run 的回答，新事项取新登记

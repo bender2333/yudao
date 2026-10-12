@@ -204,6 +204,8 @@ class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     auth: str = Field(min_length=1)
+    # 获取模型列表与连接测试使用的认证方式（ADR-0033）；默认协议：模型没有单独声明协议时预填（设计说明第 4.1 节）
+    default_protocol: Protocol
     # 按协议的请求基址，请求路径由各协议适配器拼接
     base_urls: Mapping[Protocol, str]
     models_url: str
@@ -229,6 +231,8 @@ class ModelCapability(_Definition):
     # 模型能力表中的一条：取自 models.dev 的快照，只保留设计说明第 4.1 节的字段。
     # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
     model: str = Field(min_length=1)
+    # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务方案的默认协议
+    protocol: Protocol
     input_modalities: tuple[str, ...] = ()
     output_modalities: tuple[str, ...] = ()
     context_window: int | None = None

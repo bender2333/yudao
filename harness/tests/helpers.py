@@ -75,10 +75,13 @@ LONG_RUNNING_TREE = (
 )
 
 
-# 等待放行的进程（argv 的一项）：在第一个参数给出的目录中写下 started，然后等待同一目录中出现 release（至多 30 秒）
+# 等待放行的进程（argv 的一项）：在第一个参数给出的目录中写下 started 与自己的进程号，
+# 然后等待同一目录中出现 release（至多 30 秒）。父进程先终止 Yudao 进程、等它退出，
+# 再按记录的进程号收掉这个子进程（工单 #338）：它与 Yudao 进程不同组，进程树终止到不了它
 WAIT_FOR_RELEASE = (
-    "import pathlib, sys, time; signals = pathlib.Path(sys.argv[1]); "
+    "import os, pathlib, sys, time; signals = pathlib.Path(sys.argv[1]); "
     "(signals / 'started').write_text('running'); "
+    "(signals / 'child.pid').write_text(str(os.getpid())); "
     "[time.sleep(0.05) for _ in range(600) if not (signals / 'release').exists()]"
 )
 

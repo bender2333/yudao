@@ -36,28 +36,47 @@ CHECKPOINT_LABELS = {
     "no_write_before_plan_accepted": "工程的计划被接纳以前没有写入文件",
     "replay_consistent": "重放结果与记录一致",
     "no_false_release": "质检没有误放行",
+    "release_coverage": "放行记录附检验覆盖比例、模型阅读条件数与开环条件数",
+}
+
+# 用量字段缺失时的原因：模型服务没有返回，取不到单价（设计第 5.2 节）
+UNKNOWN_REASONS = {
+    "input_tokens": "模型服务未上报输入用量",
+    "output_tokens": "模型服务未上报输出用量",
+    "cache_read_tokens": "模型服务未上报缓存读取代币数",
+    "cache_write_tokens": "模型服务未上报缓存写取代币数",
+    "total_tokens": "模型服务未上报总用量",
+    "cost": "模型服务未上报费用，或材料版本未登记单价",
+    "elapsed_seconds": "运行没有结束",
 }
 
 
 def aggregate_metrics(runs):
-    """按 Yudao 的指标名聚合（第 5.2 节：平均值、最小值与最大值）。"""
+    """按 Yudao 的指标名聚合（第 5.2 节）：平均值、最小值与最大值。
+    缺字段的样本按未知处理：不进均值、最小与最大，另计未知样本数与原因。
+    """
     counted = [run for run in runs
                if not run.get("void") and not run.get("metrics", {}).get("model_service_failure")]
     summary = {}
     for name in AGGREGATED_METRICS:
-        values = [float(run["metrics"][name]) for run in counted if name in run["metrics"]]
-        if not values:
-            continue
-        summary[name] = {"count": len(values), "mean": sum(values) / len(values),
-                         "min": min(values), "max": max(values)}
+        values = [float(run["metrics"][name]) for run in counted
+                  if run["metrics"].get(name) is not None]
+        unknown = len(counted) - len(values)
+        item = {"count": len(counted), "unknown": unknown}
+        if unknown:
+            item["unknown_reason"] = UNKNOWN_REASONS.get(name, "模型服务未上报该项")
+        if values:
+            item.update({"mean": sum(values) / len(values),
+                         "min": min(values), "max": max(values)})
+        summary[name] = item
     return summary
 
 
 def build_result(scenario, material_version, scorer_version, model, runs, yudao_commit,
-                 notes=()):
+                 notes=(), comparison=None):
     counted = [run for run in runs
                if not run.get("void") and not run["metrics"].get("model_service_failure")]
-    return {
+    payload = {
         "scenario": scenario,
         "material_version": material_version,
         "scorer_version": scorer_version,
@@ -77,6 +96,9 @@ def build_result(scenario, material_version, scorer_version, model, runs, yudao_
         "summary": aggregate_metrics(runs),
         "runs": runs,
     }
+    if comparison is not None:
+        payload["comparison"] = comparison
+    return payload
 
 
 def write_result(result, path):
@@ -98,9 +120,14 @@ def write_report(result, path, run_reports):
     lines.append("## 七、不计入结果的运行")
     lines.append("")
     lines.extend(_excluded_section(result))
+    if result.get("comparison"):
+        lines.append("")
+        lines.append("## 八、版本比较")
+        lines.append("")
+        lines.extend(_comparison_section(result["comparison"]))
     if result["notes"]:
         lines.append("")
-        lines.append("## 八、起点缺口与运行条件")
+        lines.append("## 九、起点缺口与运行条件")
         lines.append("")
         for note in result["notes"]:
             lines.append("- " + note)
@@ -108,6 +135,41 @@ def write_report(result, path, run_reports):
     lines.append("原始证据（事件日志导出、交付副本、评分日志）在 `.yudao/evals/` 下，不进入 Git。")
     _write(path, "\n".join(lines) + "\n")
 
+def _comparison_section(comparison):
+    """版本比较（`docs/design/rules-and-parameters.md` 第 4 节）：结论与逐任务差值。"""
+    labels = {"improved": "改进", "no_difference": "无差别", "regressed": "退化", "blocked": "受阻"}
+    verdict = labels.get(comparison.get("verdict"), "未判定")
+    lines = ["| 项目 | 取值 |", "| --- | --- |",
+             "| 结论 | " + verdict + " |",
+             "| 材料版本 | " + str(comparison.get("material_version")) + " |",
+             "| 评分器版本 | " + str(comparison.get("scorer_version")) + " |",
+             "| 主要指标 | " + str(comparison.get("primary", {}).get("metric")) + "（当前 "
+             + str(comparison.get("primary", {}).get("current")) + "，基线 "
+             + str(comparison.get("primary", {}).get("baseline")) + "，差值 "
+             + str(comparison.get("primary", {}).get("difference")) + "） |",
+             "| 噪声 | " + _noise_text(comparison.get("noise")) + " |"]
+    if comparison.get("block_reason"):
+        lines.append("| 受阻原因 | " + comparison["block_reason"] + " |")
+    lines.append("")
+    if comparison.get("paired_tasks"):
+        lines.append("| 任务 | 本次误放行 | 基线误放行 | 差值 | 本次完成度 | 基线完成度 |")
+        lines.append("| --- | --- | --- | --- | --- | --- |")
+        for item in comparison["paired_tasks"]:
+            lines.append("| " + item["task"]
+                         + " | " + str(item["current_false_release"])
+                         + " | " + str(item["baseline_false_release"])
+                         + " | " + str(item["false_release_difference"])
+                         + " | " + _maybe(item["current_completion"])
+                         + " | " + _maybe(item["baseline_completion"]) + " |")
+        lines.append("")
+    return lines
+
+
+def _noise_text(noise):
+    if not noise:
+        return "未知"
+    spread = noise.get("completion_spread")
+    return "完成度极差 " + (str(spread) if spread is not None else "未知") + "（" + noise.get("note", "") + "）"
 
 def _basic_section(result):
     lines = ["## 一、基本信息", ""]
@@ -137,7 +199,7 @@ def _network_section():
 
 
 def _checkpoints_section(result):
-    """过程检查点（第 5.1 节）：结论与依据，逐次运行列出。"""
+    """过程检查点（第 5.1 节）：结论与依据，逐次运行列出。三态：通过 / 未通过 / 未核实。"""
     lines = ["## 四、过程检查点", ""]
     lines.append("| 检查点 | " + " | ".join(run["run_id"] for run in result["runs"]) + " |")
     lines.append("| --- | " + " | ".join("---" for _ in result["runs"]) + " |")
@@ -145,7 +207,7 @@ def _checkpoints_section(result):
         cells = []
         for run in result["runs"]:
             checkpoint = run["metrics"]["checkpoints"].get(key, {})
-            cells.append("通过" if checkpoint.get("passed") else "未通过")
+            cells.append(_checkpoint_cell(checkpoint))
         lines.append("| " + label + " | " + " | ".join(cells) + " |")
     lines.append("")
     for run in result["runs"]:
@@ -160,15 +222,41 @@ def _checkpoints_section(result):
 
 def _summary_section(result):
     lines = ["## 五、指标汇总", ""]
-    if result["summary"]:
-        lines.append("| 指标 | 平均值 | 最小值 | 最大值 |")
-        lines.append("| --- | --- | --- | --- |")
-        for name, item in result["summary"].items():
-            lines.append("| " + METRIC_LABELS.get(name, name) + " | " + _number(item["mean"])
-                         + " | " + _number(item["min"]) + " | " + _number(item["max"]) + " |")
+    summary = result["summary"]
+    if summary:
+        lines.append("| 指标 | 平均值 | 最小值 | 最大值 | 有效样本数 | 未知样本数 |")
+        lines.append("| --- | --- | --- | --- | --- | --- |")
+        for name, item in summary.items():
+            if "mean" in item:
+                cells = [_number(item["mean"]), _number(item["min"]), _number(item["max"])]
+            else:
+                cells = ["未知", "未知", "未知"]
+            lines.append("| " + METRIC_LABELS.get(name, name) + " | " + " | ".join(cells)
+                         + " | " + str(item["count"] - item.get("unknown", 0))
+                         + " | " + str(item.get("unknown", 0)) + " |")
     else:
         lines.append("没有计入结果的运行。")
-    return lines + [""]
+    lines.append("")
+    unknowns = [(name, item.get("unknown_reason", "")) for name, item in summary.items()
+                if item.get("unknown")]
+    if unknowns:
+        lines.append("未知样本不进均值、最小值与最大值。缺失的原因：")
+        lines.append("")
+        for name, reason in unknowns:
+            lines.append("- " + METRIC_LABELS.get(name, name) + "：" + reason)
+        lines.append("")
+    return lines
+
+
+def _checkpoint_cell(checkpoint):
+    if checkpoint.get("passed") is None:
+        return "未核实"
+    return "通过" if checkpoint.get("passed") else "未通过"
+
+
+def _maybe(value):
+    """用量字段缺失时写「未知」，不记 0（设计第 5.2 节）。"""
+    return "未知" if value is None else _number(value)
 
 
 def run_section(run, scores):
@@ -184,9 +272,11 @@ def run_section(run, scores):
     lines.append("| 返工次数 | " + _number(metrics["rework"]) + " |")
     lines.append("| 部门之间询问次数 | " + _number(metrics["collaboration"]) + " |")
     lines.append("| 模型请求数 | " + _number(metrics["model_requests"]) + " |")
-    lines.append("| 输入用量 | " + _number(metrics["input_tokens"]) + " |")
-    lines.append("| 输出用量 | " + _number(metrics["output_tokens"]) + " |")
-    lines.append("| 耗时（秒） | " + _number(metrics["elapsed_seconds"]) + " |")
+    lines.append("| 输入用量 | " + _maybe(metrics["input_tokens"]) + " |")
+    lines.append("| 输出用量 | " + _maybe(metrics["output_tokens"]) + " |")
+    lines.append("| 总用量 | " + _maybe(metrics["total_tokens"]) + " |")
+    lines.append("| 费用 | " + _maybe(metrics["cost"]) + " |")
+    lines.append("| 耗时（秒） | " + _maybe(metrics["elapsed_seconds"]) + " |")
     lines.append("| 封存的交付文件数 | " + _number(run.get("delivery_files", 0)) + " |")
     lines.append("| 成功但没有输出项的模型调用 | "
                  + _number(metrics.get("empty_model_responses", 0)) + " |")
