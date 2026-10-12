@@ -1139,14 +1139,14 @@
      {
       "digest": "<sha256#40>",
       "source": "tool_schemas",
-      "tokens": 2657,
+      "tokens": 2710,
       "version": "engineering"
      }
     ],
     "input_modalities": [
      "text"
     ],
-    "input_token_estimate": 4827,
+    "input_token_estimate": 4880,
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "max_output_tokens": 4800,
@@ -1176,7 +1176,7 @@
     "snapshot_hash": "<sha256#1>",
     "source_event_id": null,
     "step_id": 1,
-    "token_estimate": 4833,
+    "token_estimate": 4886,
     "tokens_charged": 0,
     "truncated": false
    }
@@ -1820,7 +1820,7 @@
     "input_modalities": [
      "text"
     ],
-    "input_token_estimate": 6194,
+    "input_token_estimate": 6247,
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "max_output_tokens": 4800,
@@ -1850,7 +1850,7 @@
     "snapshot_hash": "<sha256#1>",
     "source_event_id": null,
     "step_id": 1,
-    "token_estimate": 6201,
+    "token_estimate": 6254,
     "tokens_charged": 0,
     "truncated": false
    }
@@ -3047,11 +3047,11 @@
      {
       "digest": "<sha256#40>",
       "source": "tool_schemas",
-      "tokens": 2657,
+      "tokens": 2710,
       "version": "engineering"
      }
     ],
-    "input_token_estimate": 4827,
+    "input_token_estimate": 4880,
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
@@ -3064,7 +3064,7 @@
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#19>",
     "step_id": 1,
-    "token_estimate": 4833,
+    "token_estimate": 4886,
     "truncated": false
    },
    {
@@ -3097,7 +3097,7 @@
     "guidance_ids": [],
     "guidance_only": false,
     "injected": "<shared#2>",
-    "input_token_estimate": 6194,
+    "input_token_estimate": 6247,
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
@@ -3110,7 +3110,7 @@
     "session_id": "<ses_eng#1>",
     "source_event_id": "<evt#31>",
     "step_id": 1,
-    "token_estimate": 6201,
+    "token_estimate": 6254,
     "truncated": false
    }
   ],
@@ -4073,7 +4073,7 @@
   "<art#14>": {
    "kind": "department_input",
    "media_type": "application/json",
-   "content": "<shared#19>"
+   "content": "<shared#20>"
   },
   "<art#15>": {
    "kind": "context_parts",
@@ -4195,7 +4195,7 @@
       "output": "<shared#1>",
       "type": "function_call_output"
      },
-     "<shared#19>"
+     "<shared#20>"
     ],
     "max_output_tokens": 4800,
     "tools": "<shared#13>"
@@ -4380,7 +4380,7 @@
    {
     "digest": "<sha256#40>",
     "source": "tool_schemas",
-    "tokens": 2657,
+    "tokens": 2710,
     "version": "engineering"
    }
   ],
@@ -4406,7 +4406,7 @@
    "text": "<shared#12>",
    "version": "engineering"
   },
-  "<shared#12>": "[{\"description\":\"Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.\",\"name\":\"read_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \\\"src/\\\" keeps only the src directory, while \\\"src\\\" also keeps paths such as \\\"src2/a.py\\\". Paths under .checks are never listed.\",\"name\":\"list_files\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"prefix\":{\"description\":\"Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory\",\"type\":\"string\"}},\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.\",\"name\":\"search\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated search\",\"type\":[\"string\",\"null\"]},\"max_results\":{\"description\":\"Maximum matches per page\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Optional file or directory scope within the public tree\",\"type\":[\"string\",\"null\"]},\"pattern\":{\"description\":\"Python re regex searched per line\",\"type\":\"string\"}},\"required\":[\"pattern\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.\",\"name\":\"read_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated read\",\"type\":[\"string\",\"null\"]},\"end_line\":{\"description\":\"Last line to read, inclusive; omit for end of file\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to read, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope; otherwise the call is rejected and nothing is written. Paths under .checks are host-private. Use edit_range to change part of an existing file.\",\"name\":\"write_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"content\":{\"description\":\"Full file contents\",\"type\":\"string\"},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope.\",\"name\":\"edit_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"end_line\":{\"description\":\"Last line to replace, inclusive\",\"type\":\"integer\"},\"expected_digest\":{\"description\":\"File content_hash observed when the span was read; omit to skip the digest check\",\"type\":[\"string\",\"null\"]},\"expected_text\":{\"description\":\"Exact original lines previously read, joined by newline without a trailing newline\",\"type\":\"string\"},\"new_text\":{\"description\":\"Replacement text for the span, lines joined by newline\",\"type\":\"string\"},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to replace, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\",\"end_line\",\"expected_text\",\"new_text\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Delete one existing regular workspace file within the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.\",\"name\":\"delete_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"type\":\"string\"},\"reason\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"path\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Move one existing regular workspace file without overwriting. Both paths must be in the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.\",\"name\":\"move_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"destination\":{\"type\":\"string\"},\"reason\":{\"minLength\":1,\"type\":\"string\"},\"source\":{\"type\":\"string\"}},\"required\":[\"source\",\"destination\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"].\",\"name\":\"run_check\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"argv\":{\"description\":\"Argument vector executed by the host, e.g. [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"]\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"name\":{\"description\":\"Check name, e.g. smoke\",\"type\":\"string\"}},\"required\":[\"name\",\"argv\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Run one arbitrary shell command string in this session's workspace with bash, and get the host-observed exit status and output back. Each call starts a new process and keeps no shell state between calls; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output longer than the limit is stored as an artifact; the truncated part is returned and the full output can be read back. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.\",\"name\":\"bash\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"command\":{\"description\":\"The command string to run with bash in the workspace root, e.g. uv run pytest tests\",\"type\":\"string\"},\"timeout_sec\":{\"description\":\"Optional time limit in seconds; omitted uses the default, larger values apply the maximum\",\"type\":[\"integer\",\"null\"]}},\"required\":[\"command\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.\",\"name\":\"submit_request\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"action\":{\"enum\":[null,\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"type\":[\"string\",\"null\"]},\"background\":{\"type\":\"string\"},\"expected_result\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"recipient\":{\"enum\":[\"product\",\"engineering\",\"quality\"],\"type\":\"string\"},\"request_type\":{\"enum\":[\"consultation\",\"action\"],\"type\":\"string\"}},\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\",\"action\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit an engineering plan before changing delivery files. The host binds it to the current effective contract. Plan adjustments require a reason; product requirements must be decided by product.\",\"name\":\"submit_plan\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"assumptions\":{\"description\":\"Professional defaults and their basis; do not present defaults as user statements\",\"items\":{\"additionalProperties\":false,\"properties\":{\"basis\":{\"type\":\"string\"},\"decision\":{\"type\":\"string\"}},\"required\":[\"decision\",\"basis\"],\"type\":\"object\"},\"type\":\"array\"},\"objective\":{\"type\":\"string\"},\"reason\":{\"description\":\"Reason for adjusting an existing plan; may be empty for the first plan\",\"type\":\"string\"},\"refactoring\":{\"description\":\"Necessary structural changes, or an empty list\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"scope\":{\"description\":\"Relative files or directories ending with /; . means the entire public workspace\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"tasks\":{\"description\":\"Non-empty tasks in execution order\",\"items\":{\"additionalProperties\":false,\"properties\":{\"outputs\":{\"description\":\"Observable outputs of this task\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"title\":{\"type\":\"string\"},\"verification\":{\"description\":\"How to verify these outputs\",\"type\":\"string\"}},\"required\":[\"title\",\"outputs\",\"verification\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"objective\",\"scope\",\"tasks\",\"refactoring\",\"assumptions\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. bash results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.\",\"name\":\"submit_delivery\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"check_names\":{\"description\":\"Names passed to run_check in this activation on the current workspace; bash results do not count\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"files\":{\"description\":\"Workspace-relative files included in the delivery\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"known_risks\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"summary\":{\"type\":\"string\"}},\"required\":[\"summary\",\"files\",\"check_names\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"}]",
+  "<shared#12>": "[{\"description\":\"Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.\",\"name\":\"read_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \\\"src/\\\" keeps only the src directory, while \\\"src\\\" also keeps paths such as \\\"src2/a.py\\\". Paths under .checks are never listed.\",\"name\":\"list_files\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"prefix\":{\"description\":\"Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory\",\"type\":\"string\"}},\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.\",\"name\":\"search\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated search\",\"type\":[\"string\",\"null\"]},\"max_results\":{\"description\":\"Maximum matches per page\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Optional file or directory scope within the public tree\",\"type\":[\"string\",\"null\"]},\"pattern\":{\"description\":\"Python re regex searched per line\",\"type\":\"string\"}},\"required\":[\"pattern\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.\",\"name\":\"read_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated read\",\"type\":[\"string\",\"null\"]},\"end_line\":{\"description\":\"Last line to read, inclusive; omit for end of file\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to read, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope; otherwise the call is rejected and nothing is written. Paths under .checks are host-private. Use edit_range to change part of an existing file.\",\"name\":\"write_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"content\":{\"description\":\"Full file contents\",\"type\":\"string\"},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope.\",\"name\":\"edit_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"end_line\":{\"description\":\"Last line to replace, inclusive\",\"type\":\"integer\"},\"expected_digest\":{\"description\":\"File content_hash observed when the span was read; omit to skip the digest check\",\"type\":[\"string\",\"null\"]},\"expected_text\":{\"description\":\"Exact original lines previously read, joined by newline without a trailing newline\",\"type\":\"string\"},\"new_text\":{\"description\":\"Replacement text for the span, lines joined by newline\",\"type\":\"string\"},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to replace, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\",\"end_line\",\"expected_text\",\"new_text\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Delete one existing regular workspace file within the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.\",\"name\":\"delete_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"type\":\"string\"},\"reason\":{\"minLength\":1,\"type\":\"string\"}},\"required\":[\"path\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Move one existing regular workspace file without overwriting. Both paths must be in the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.\",\"name\":\"move_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"destination\":{\"type\":\"string\"},\"reason\":{\"minLength\":1,\"type\":\"string\"},\"source\":{\"type\":\"string\"}},\"required\":[\"source\",\"destination\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"].\",\"name\":\"run_check\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"argv\":{\"description\":\"Argument vector executed by the host, e.g. [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"]\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"name\":{\"description\":\"Check name, e.g. smoke\",\"type\":\"string\"}},\"required\":[\"name\",\"argv\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Run one arbitrary shell command string in this session's workspace with bash, and get the host-observed exit status and output back. Each call starts a new process and keeps no shell state between calls; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output longer than the limit is stored as an artifact; the truncated part is returned and the full output can be read back. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.\",\"name\":\"bash\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"command\":{\"description\":\"The command string to run with bash in the workspace root, e.g. uv run pytest tests. Omit it when passing cursor to read back a truncated output.\",\"type\":\"string\"},\"cursor\":{\"description\":\"Pass the previous receipt's next_cursor to read the next page of a truncated output; no new process starts\",\"type\":[\"string\",\"null\"]},\"timeout_sec\":{\"description\":\"Optional time limit in seconds; omitted uses the default, larger values apply the maximum\",\"type\":[\"integer\",\"null\"]}},\"required\":[],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.\",\"name\":\"submit_request\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"action\":{\"enum\":[null,\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"type\":[\"string\",\"null\"]},\"background\":{\"type\":\"string\"},\"expected_result\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"recipient\":{\"enum\":[\"product\",\"engineering\",\"quality\"],\"type\":\"string\"},\"request_type\":{\"enum\":[\"consultation\",\"action\"],\"type\":\"string\"}},\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\",\"action\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit an engineering plan before changing delivery files. The host binds it to the current effective contract. Plan adjustments require a reason; product requirements must be decided by product.\",\"name\":\"submit_plan\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"assumptions\":{\"description\":\"Professional defaults and their basis; do not present defaults as user statements\",\"items\":{\"additionalProperties\":false,\"properties\":{\"basis\":{\"type\":\"string\"},\"decision\":{\"type\":\"string\"}},\"required\":[\"decision\",\"basis\"],\"type\":\"object\"},\"type\":\"array\"},\"objective\":{\"type\":\"string\"},\"reason\":{\"description\":\"Reason for adjusting an existing plan; may be empty for the first plan\",\"type\":\"string\"},\"refactoring\":{\"description\":\"Necessary structural changes, or an empty list\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"scope\":{\"description\":\"Relative files or directories ending with /; . means the entire public workspace\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"tasks\":{\"description\":\"Non-empty tasks in execution order\",\"items\":{\"additionalProperties\":false,\"properties\":{\"outputs\":{\"description\":\"Observable outputs of this task\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"title\":{\"type\":\"string\"},\"verification\":{\"description\":\"How to verify these outputs\",\"type\":\"string\"}},\"required\":[\"title\",\"outputs\",\"verification\"],\"type\":\"object\"},\"type\":\"array\"}},\"required\":[\"objective\",\"scope\",\"tasks\",\"refactoring\",\"assumptions\",\"reason\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. bash results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.\",\"name\":\"submit_delivery\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"check_names\":{\"description\":\"Names passed to run_check in this activation on the current workspace; bash results do not count\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"files\":{\"description\":\"Workspace-relative files included in the delivery\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"known_risks\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"summary\":{\"type\":\"string\"}},\"required\":[\"summary\",\"files\",\"check_names\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"}]",
   "<shared#13>": [
    {
     "description": "<shared#4>",
@@ -4668,32 +4668,7 @@
     "strict": false,
     "type": "function"
    },
-   {
-    "description": "<shared#16>",
-    "name": "bash",
-    "parameters": {
-     "additionalProperties": false,
-     "properties": {
-      "command": {
-       "description": "The command string to run with bash in the workspace root, e.g. uv run pytest tests",
-       "type": "string"
-      },
-      "timeout_sec": {
-       "description": "Optional time limit in seconds; omitted uses the default, larger values apply the maximum",
-       "type": [
-        "integer",
-        "null"
-       ]
-      }
-     },
-     "required": [
-      "command"
-     ],
-     "type": "object"
-    },
-    "strict": false,
-    "type": "function"
-   },
+   "<shared#16>",
    {
     "description": "Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.",
     "name": "submit_request",
@@ -4751,9 +4726,9 @@
     "strict": false,
     "type": "function"
    },
-   "<shared#17>",
+   "<shared#18>",
    {
-    "description": "<shared#18>",
+    "description": "<shared#19>",
     "name": "submit_delivery",
     "parameters": {
      "additionalProperties": false,
@@ -4796,8 +4771,39 @@
   ],
   "<shared#14>": "Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope; otherwise the call is rejected and nothing is written. Paths under .checks are host-private. Use edit_range to change part of an existing file.",
   "<shared#15>": "Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope.",
-  "<shared#16>": "Run one arbitrary shell command string in this session's workspace with bash, and get the host-observed exit status and output back. Each call starts a new process and keeps no shell state between calls; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output longer than the limit is stored as an artifact; the truncated part is returned and the full output can be read back. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
-  "<shared#17>": {
+  "<shared#16>": {
+   "description": "<shared#17>",
+   "name": "bash",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "command": {
+      "description": "The command string to run with bash in the workspace root, e.g. uv run pytest tests. Omit it when passing cursor to read back a truncated output.",
+      "type": "string"
+     },
+     "cursor": {
+      "description": "Pass the previous receipt's next_cursor to read the next page of a truncated output; no new process starts",
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "timeout_sec": {
+      "description": "Optional time limit in seconds; omitted uses the default, larger values apply the maximum",
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    },
+    "required": [],
+    "type": "object"
+   },
+   "strict": false,
+   "type": "function"
+  },
+  "<shared#17>": "Run one arbitrary shell command string in this session's workspace with bash, and get the host-observed exit status and output back. Each call starts a new process and keeps no shell state between calls; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output longer than the limit is stored as an artifact; the truncated part is returned and the full output can be read back. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+  "<shared#18>": {
    "description": "Submit an engineering plan before changing delivery files. The host binds it to the current effective contract. Plan adjustments require a reason; product requirements must be decided by product.",
    "name": "submit_plan",
    "parameters": {
@@ -4887,11 +4893,11 @@
    "strict": false,
    "type": "function"
   },
-  "<shared#18>": "Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. bash results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.",
-  "<shared#19>": {
-   "content": "<shared#20>",
+  "<shared#19>": "Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. bash results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.",
+  "<shared#20>": {
+   "content": "<shared#21>",
    "role": "user"
   },
-  "<shared#20>": "[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#23>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#41>\",\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#22>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[current_contract]\n{\"content_hash\":\"<sha256#23>\",\"created_event_id\":\"<evt#14>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#24>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#24>\"},\"product_spec_hash\":\"<sha256#22>\",\"revision\":1}\n\n[current_engineering_plan]\n{\"assumptions\":[],\"content_hash\":\"<sha256#41>\",\"created_event_id\":\"<evt#27>\",\"effective_contract_hash\":\"<sha256#23>\",\"id\":\"<plan#1>\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"parent_hash\":null,\"plan_ref\":{\"content_hash\":\"<sha256#42>\",\"kind\":\"engineering_plan\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#42>\"},\"reason\":\"\",\"refactoring\":[],\"revision\":1,\"run_id\":\"<run#1>\",\"scope\":[\"src/\"],\"status\":\"active\",\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#22>\",\"created_event_id\":\"<evt#13>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#22>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]"
+  "<shared#21>": "[current_work]\n{\"current_goal\":\"build an echo CLI\",\"department\":\"engineering\",\"phase\":\"ENGINEERING\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"依据当前产品要求实现、运行检查并提交交付。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":1,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"engineering\",\"effective_contract_hash\":\"<sha256#23>\",\"effective_decision_count\":0,\"engineering_plan_hash\":\"<sha256#41>\",\"pending_guidance_ids\":[],\"phase\":\"ENGINEERING\",\"product_spec_hash\":\"<sha256#22>\",\"product_spec_id\":\"<spec#1>\",\"product_spec_revision\":1,\"request_id\":null}\n\n[current_contract]\n{\"content_hash\":\"<sha256#23>\",\"created_event_id\":\"<evt#14>\",\"decision_hashes\":[],\"input_version\":1,\"prd_ref\":{\"content_hash\":\"<sha256#24>\",\"kind\":\"prd\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#24>\"},\"product_spec_hash\":\"<sha256#22>\",\"revision\":1}\n\n[current_engineering_plan]\n{\"assumptions\":[],\"content_hash\":\"<sha256#41>\",\"created_event_id\":\"<evt#27>\",\"effective_contract_hash\":\"<sha256#23>\",\"id\":\"<plan#1>\",\"objective\":\"Implement and verify the current echo CLI requirements\",\"parent_hash\":null,\"plan_ref\":{\"content_hash\":\"<sha256#42>\",\"kind\":\"engineering_plan\",\"media_type\":\"text/markdown\",\"path\":\"<run#1>/<sha256#42>\"},\"reason\":\"\",\"refactoring\":[],\"revision\":1,\"run_id\":\"<run#1>\",\"scope\":[\"src/\"],\"status\":\"active\",\"tasks\":[{\"outputs\":[\"src/echo.py\"],\"title\":\"Implement the current contract\",\"verification\":\"Run the CLI through host checks against the current requirements\"}]}\n\n[current_product_spec]\n{\"acceptance_criteria\":[\"running the program with a word prints that word\"],\"boundaries\":[\"do not read files\"],\"change_record\":null,\"constraints\":[\"single file implementation\"],\"content_hash\":\"<sha256#22>\",\"created_event_id\":\"<evt#13>\",\"decision_changes\":[],\"fatal_conditions\":[\"non-zero exit on valid input\"],\"goal\":\"build an echo CLI\",\"id\":\"<spec#1>\",\"input_version\":1,\"non_goals\":[\"network access\"],\"requirements\":[\"print the given argument to stdout\"],\"revision\":1,\"status\":\"active\"}\n\n[causal_chain]\n[{\"hash\":\"<sha256#22>\",\"id\":\"<spec#1>\",\"kind\":\"product_spec\",\"revision\":\"r1\",\"status\":\"active\"},{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"},{\"kind\":\"transition\",\"route\":\"PRODUCT_SPEC->ENGINEERING\"}]"
  }
 }

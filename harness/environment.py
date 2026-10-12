@@ -30,7 +30,7 @@ from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_
 from .definitions import DEFINITIONS, DefinitionError
 from .path_rules import TreeError, is_private_path
 from .redact import redact_text, sanitized_env
-from .workspace import Workspace, WorkspaceSnapshot
+from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
 
 # 一次工具结果的输出上限，取规则登记中的现值
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
@@ -47,6 +47,28 @@ _BASH_TIMEOUT_MAX = DEFINITIONS.rule_value("bash_timeout_max_sec")
 _PYTHON_NAMES = {"python", "python3", "py", "python.exe", "python3.exe"}
 
 _BASH_PATH: str | None = None
+_BASH_OUTPUT_SUBDIR = "tool-output"
+_SAFE_OUTPUT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.json")
+_TRUNCATED_MARKER = (
+    f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is saved, "
+    "pass \"next_cursor\" back to bash as \"cursor\" to read the rest"
+)
+
+
+def _safe_output_name(action_id: str) -> str:
+    # 存档文件名只留安全字符：游标回读时按同规则核对，防止路径穿越
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", action_id)[:80] or "output"
+
+
+def _bash_slice(full: str, start: int) -> tuple[str, int | None]:
+    # 从字符偏移 start 取一页：尽量在 _OUTPUT_LIMIT 个字符内不断行；
+    # 取完返回 (剩余全文, None)，否则返回 (页, 下一页的字符偏移)
+    end = start + _OUTPUT_LIMIT
+    if end >= len(full):
+        return full[start:], None
+    newline = full.rfind("\n", start, end)
+    cut = newline + 1 if newline > start else end
+    return full[start:cut], cut
 
 
 def _resolve_bash() -> str:
@@ -412,6 +434,10 @@ class LocalEnvironment:
 
     async def _bash(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str, str | None]:
         args = action.input
+        cursor_arg = args.get("cursor")
+        if cursor_arg not in (None, ""):
+            # 继续取回上次截断的完整输出：只读主机私有的存档，不启动新进程，不核对公开树
+            return self._bash_continuation(str(cursor_arg)), "completed", None
         command = args.get("command")
         if not isinstance(command, str) or not command.strip():
             raise ValueError("bash requires a non-empty command string")
@@ -428,16 +454,13 @@ class LocalEnvironment:
         expected = action.preconditions.tree_digest
         if expected is not None and snapshot.digest != expected:
             raise ValueError("the workspace changed after the tool permission; call bash again")
-        # 每次调用都是新进程，不保留 shell 状态；进程继承 Yudao 进程的完整环境
+        # 每次调用都是新进程，不保留 shell 状态；进程继承 Yudao 进程的完整环境。
+        # 不用 -l：登录 shell 会读用户 profile，环境不可复现。
         finished = await _run_process(
-            [_resolve_bash(), "-lc", command], self.workspace.root,
+            [_resolve_bash(), "-c", command], self.workspace.root,
             {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}, timeout_sec, stop,
         )
         text = "\n".join(part for part in (finished.stdout.strip(), finished.stderr.strip()) if part)
-        truncated = False
-        if len(text) > _OUTPUT_LIMIT:
-            text = text[:_OUTPUT_LIMIT] + f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is stored under tool_output and can be re-read"
-            truncated = True
         if finished.status == "timeout":
             exit_code, status = TIMEOUT_EXIT_CODE, "timeout"
             text = ((text + "\n") if text else "") + f"command timed out after {timeout_sec}s; the process tree was stopped"
@@ -447,6 +470,10 @@ class LocalEnvironment:
         else:
             exit_code = finished.returncode
             status = "ok" if exit_code == 0 else "failed"
+        text = redact_text(text)
+        meta = {"command": command, "exit_code": exit_code, "status": status,
+                "snapshot_hash": snapshot.digest, "executor": "host"}
+        output, truncated, next_cursor = self._bash_page(action.action_id, meta, text)
         # 命令结束后主机立即取的公开树核对。命令留下无法表示的条目（例如链接）时，核对结果随回执
         # 交回，步骤驱动在回执照常记录之后以 workspace_unrepresentable 暂停；被忽略的条目不进入
         # 公开树，核对通过
@@ -455,15 +482,44 @@ class LocalEnvironment:
             self.workspace.snapshot()
         except UnrepresentableWorkspace as exc:
             workspace_error = {"message": str(exc), "paths": list(exc.paths)}
-        return {
-            "command": command,
-            "exit_code": exit_code,
-            "status": status,
-            "output": redact_text(text),
-            "truncated": truncated,
-            "snapshot_hash": snapshot.digest,
-            "executor": "host",
-        }, finished.status, workspace_error
+        return {**meta, "output": output, "truncated": truncated, "next_cursor": next_cursor}, finished.status, workspace_error
+
+    def _bash_page(self, action_id: str, meta: dict[str, Any], full: str) -> tuple[str, bool, str | None]:
+        # 完整输出的第一页：超限时全文存主机私有的存档（公开树之外，不进入快照与交付），
+        # 回执只带截断页与继续取回的游标；各页按字符直接拼接与原文逐字相等
+        if len(full) <= _OUTPUT_LIMIT:
+            return full, False, None
+        directory = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / (_safe_output_name(action_id) + ".json")
+        path.write_bytes(json.dumps({**meta, "full": full}, ensure_ascii=False).encode("utf-8"))
+        page, next_start = _bash_slice(full, 0)
+        if next_start is None:
+            return page, False, None
+        cursor = _encode_cursor({"kind": "bash_output", "name": path.name, "offset": next_start})
+        return page + _TRUNCATED_MARKER, True, cursor
+
+    def _bash_continuation(self, cursor: str) -> dict[str, Any]:
+        payload = _decode_cursor(cursor, kind="bash_output")
+        name = payload.get("name")
+        offset = payload.get("offset")
+        if (not isinstance(name, str) or not _SAFE_OUTPUT_NAME.fullmatch(name)
+                or type(offset) is not int or offset < 0):
+            raise ValueError("invalid bash output cursor")
+        path = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR / name
+        try:
+            saved = json.loads(path.read_bytes().decode("utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"saved bash output is no longer available: {name}") from exc
+        full = saved.get("full")
+        if not isinstance(full, str) or offset >= len(full):
+            raise ValueError(f"saved bash output is no longer available: {name}")
+        meta = {key: saved[key] for key in ("command", "exit_code", "status", "snapshot_hash", "executor")}
+        page, next_start = _bash_slice(full, offset)
+        if next_start is None:
+            return {**meta, "output": page, "truncated": False, "next_cursor": None}
+        next_cursor = _encode_cursor({"kind": "bash_output", "name": name, "offset": next_start})
+        return {**meta, "output": page + _TRUNCATED_MARKER, "truncated": True, "next_cursor": next_cursor}
 
     async def _run_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         args = action.input

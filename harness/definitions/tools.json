@@ -278,7 +278,7 @@
       "properties": {
         "command": {
           "type": "string",
-          "description": "The command string to run with bash in the workspace root, e.g. uv run pytest tests"
+          "description": "The command string to run with bash in the workspace root, e.g. uv run pytest tests. Omit it when passing cursor to read back a truncated output."
         },
         "timeout_sec": {
           "type": [
@@ -286,12 +286,17 @@
             "null"
           ],
           "description": "Optional time limit in seconds; omitted uses the default, larger values apply the maximum"
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Pass the previous receipt's next_cursor to read the next page of a truncated output; no new process starts"
         }
       },
       "additionalProperties": false,
-      "required": [
-        "command"
-      ]
+      "required": []
     },
     "repeatable": true
   },
