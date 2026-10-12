@@ -16,6 +16,7 @@ export type ServicePreset = {
   id: string;
   name: string;
   auth: string;
+  default_protocol: string;
   base_urls: Record<string, string>;
   models_url: string;
   docs_url: string;
@@ -43,6 +44,9 @@ export const REASONING_MODE_LABELS: Record<string, string> = {
 // 三种协议与预置表 base_urls 的键一致；fake 只在测试与演示启动时出现，界面不提供
 export const UI_PROTOCOLS = ["responses", "chat_completions", "messages"] as const;
 
+// 新建的访问定义预填的协议（工单 #382 第 5 条）
+export const DEFAULT_PROTOCOL = "chat_completions";
+
 export const PROTOCOL_LABELS: Record<string, string> = {
   responses: "Responses",
   chat_completions: "Chat Completions",
@@ -67,7 +71,9 @@ export const CONFIG_STATE_LABELS: Record<string, string> = {
 // 「自定义」表示不使用预置表（设计说明第 4.1 节），连接保存空的 preset_id
 export const CUSTOM_PRESET_ID = "";
 
-// 一份服务方案在某协议下的请求基址；自定义方案没有预置地址
+// 一份服务方案在某协议下的请求基址；自定义方案没有预置地址。
+// 协议属于访问定义（ADR-0033），连接表单里的地址按定义行的协议取：
+// 没有行时用新建定义的预填协议
 export function presetBaseUrlFor(preset: ServicePreset | null, protocol: string): string {
   return preset?.base_urls?.[protocol] ?? "";
 }
@@ -191,12 +197,14 @@ export function formDocumentValid(provider: { id: string; name: string; base_url
 
 // 预填一条模型访问定义（设计说明第 4.3 节）：上游模型列表优先，其次模型能力表，都没有时留空；
 // 输入方式取能力表（含 image → 文本与图像，否则只有文本），能力表没有记录或自定义方案时只有文本。
-// 返回每个值的来源，界面据此标明（上游模型列表 / 能力表 / 默认）
-export type PrefillSource = "models_url" | "capability_table" | "default";
+// 返回每个值的来源，界面据此标明（上游模型列表 / 能力表 / 服务方案默认 / 默认）
+export type PrefillSource = "models_url" | "capability_table" | "preset_default" | "default";
 
 // 事件 catalog_candidates_collected 里的一个候选：来源字段由后端按第 4.3 节给出
 export type UpstreamCandidate = {
   id: string;
+  protocol?: string;
+  protocol_source?: string;
   context_window?: number | null;
   max_output_tokens?: number | null;
   context_window_source?: string;
@@ -206,15 +214,60 @@ export type UpstreamCandidate = {
 };
 
 export type PrefillValue = {
+  protocol: string;
   context_window: number | null;
   max_output_tokens: number | null;
   input_modalities: string[];
   sources: {
+    protocol: PrefillSource;
     context_window: PrefillSource | null;
     max_output_tokens: PrefillSource | null;
     input_modalities: PrefillSource;
   };
 };
+
+export function prefillModel(modelId: string, upstream: UpstreamCandidate | null, table: CatalogCapabilityTable, presetId: string, preset: ServicePreset | null): PrefillValue {
+  const entry = capabilityEntry(table, presetId, modelId);
+  const upstreamWindow = upstream?.context_window ?? null;
+  const upstreamOutput = upstream?.max_output_tokens ?? null;
+  const tableWindow = typeof entry?.context_window === "number" ? entry.context_window : null;
+  const tableOutput = typeof entry?.max_output_tokens === "number" ? entry.max_output_tokens : null;
+
+  const contextWindow = upstreamWindow ?? tableWindow;
+  const windowSource: PrefillSource | null =
+    upstreamWindow !== null ? "models_url" : tableWindow !== null ? "capability_table" : null;
+
+  const maxOutput = upstreamOutput ?? tableOutput;
+  const outputSource: PrefillSource | null =
+    upstreamOutput !== null ? "models_url" : tableOutput !== null ? "capability_table" : null;
+
+  // 协议：候选带来源时直接用它，其次能力表，其次服务方案的默认协议，都没有时预填 Chat Completions
+  const listedProtocol = typeof upstream?.protocol === "string" ? upstream.protocol : "";
+  const tableProtocol = typeof entry?.protocol === "string" ? entry.protocol : "";
+  const protocol = listedProtocol || tableProtocol || preset?.default_protocol || DEFAULT_PROTOCOL;
+  const protocolSource: PrefillSource = listedProtocol && upstream?.protocol_source === "preset_default"
+    ? "preset_default"
+    : listedProtocol || tableProtocol
+      ? "capability_table"
+      : preset?.default_protocol
+        ? "preset_default"
+        : "default";
+
+  const listed = entry?.input_modalities;
+  const hasImage = Array.isArray(listed) && listed.includes("image");
+  return {
+    protocol: protocol,
+    context_window: contextWindow,
+    max_output_tokens: maxOutput,
+    input_modalities: hasImage ? ["text", "image"] : ["text"],
+    sources: {
+      protocol: protocolSource,
+      context_window: windowSource,
+      max_output_tokens: outputSource,
+      input_modalities: entry ? "capability_table" : "default",
+    },
+  };
+}
 
 function capabilityEntry(table: CatalogCapabilityTable, presetId: string, modelId: string): Record<string, unknown> | null {
   if (!presetId) {
@@ -230,35 +283,6 @@ function capabilityEntry(table: CatalogCapabilityTable, presetId: string, modelI
     }
   }
   return null;
-}
-
-export function prefillModel(modelId: string, upstream: UpstreamCandidate | null, table: CatalogCapabilityTable, presetId: string): PrefillValue {
-  const entry = capabilityEntry(table, presetId, modelId);
-  const upstreamWindow = upstream?.context_window ?? null;
-  const upstreamOutput = upstream?.max_output_tokens ?? null;
-  const tableWindow = typeof entry?.context_window === "number" ? entry.context_window : null;
-  const tableOutput = typeof entry?.max_output_tokens === "number" ? entry.max_output_tokens : null;
-
-  const contextWindow = upstreamWindow ?? tableWindow;
-  const windowSource: PrefillSource | null =
-    upstreamWindow !== null ? "models_url" : tableWindow !== null ? "capability_table" : null;
-
-  const maxOutput = upstreamOutput ?? tableOutput;
-  const outputSource: PrefillSource | null =
-    upstreamOutput !== null ? "models_url" : tableOutput !== null ? "capability_table" : null;
-
-  const listed = entry?.input_modalities;
-  const hasImage = Array.isArray(listed) && listed.includes("image");
-  return {
-    context_window: contextWindow,
-    max_output_tokens: maxOutput,
-    input_modalities: hasImage ? ["text", "image"] : ["text"],
-    sources: {
-      context_window: windowSource,
-      max_output_tokens: outputSource,
-      input_modalities: entry ? "capability_table" : "default",
-    },
-  };
 }
 
 // 默认档位只能从已选的支持档位中选择（设计说明第 4.3、7.1 节）
@@ -285,6 +309,7 @@ export function intFromInput(text: string): number | null {
 export const PREFILL_SOURCE_LABELS: Record<string, string> = {
   models_url: "上游模型列表",
   capability_table: "能力表",
+  preset_default: "服务方案默认",
   default: "默认",
 };
 
@@ -436,6 +461,8 @@ export type FormRow = {
   key: string;
   id: string;
   model: string;
+  // 调用协议属于访问定义（ADR-0033），新建的定义预填 Chat Completions
+  protocol: string;
   // 窗口与输出上限保存为文本，空字符串表示没有值（未「接受」时留空）
   context_window: string;
   max_output_tokens: string;
@@ -454,7 +481,6 @@ export type FormRow = {
 export type FormState = {
   id: string;
   name: string;
-  protocol: string;
   base_url: string;
   credential_ref: string;
   preset_id: string;
@@ -486,6 +512,7 @@ export function numberToText(value: number | null): string {
 // 预填值的来源标注（第 4.3 节「界面标明每个预填值的来源」）
 export function prefillSourceText(prefill: PrefillValue): string {
   const parts: string[] = [];
+  parts.push(`协议：${PREFILL_SOURCE_LABELS[prefill.sources.protocol] ?? prefill.sources.protocol}`);
   if (prefill.sources.context_window) {
     parts.push(`窗口：${PREFILL_SOURCE_LABELS[prefill.sources.context_window] ?? prefill.sources.context_window}`);
   }
@@ -496,15 +523,17 @@ export function prefillSourceText(prefill: PrefillValue): string {
   return parts.join(" · ");
 }
 
-// 点击候选建立的一行：容量与输入方式按第 4.3 节预填并标明来源，容量未经用户「接受」以前不能保存。
+// 点击候选建立的一行：协议、容量与输入方式按第 4.3 节预填并标明来源，容量未经用户「接受」以前不能保存。
 // 访问定义 ID 预填为符合规则的写法（上游模型 ID 带「/」时换成「-」，工单 #302），
 // 上游模型 ID 保持上游写法原样：请求发往上游时用的就是它
-export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCapabilityTable, presetId: string): FormRow {
-  const prefill = prefillModel(candidate.id, candidate, table, presetId);
+export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCapabilityTable, presetId: string,
+                                 preset: ServicePreset | null): FormRow {
+  const prefill = prefillModel(candidate.id, candidate, table, presetId, preset);
   return {
     key: newCommandId(),
     id: sanitizeModelId(candidate.id) || candidate.id,
     model: candidate.id,
+    protocol: prefill.protocol,
     context_window: numberToText(prefill.context_window),
     max_output_tokens: numberToText(prefill.max_output_tokens),
     capacity_confirmed: false,
@@ -524,6 +553,7 @@ export function rowFromManual(index: number): FormRow {
     key: newCommandId(),
     id: `model-${index + 1}`,
     model: "",
+    protocol: DEFAULT_PROTOCOL,
     context_window: "",
     max_output_tokens: "",
     capacity_confirmed: false,
@@ -541,7 +571,7 @@ export function rowFromManual(index: number): FormRow {
 // 请求时限取目录合同的 default_timeout_sec：默认值只有后端一份，客户端不再各写一个数（工单 #294）
 export function emptyFormState(defaultTimeoutSec: number): FormState {
   return {
-    id: "", name: "", protocol: "responses", base_url: "", credential_ref: "",
+    id: "", name: "", base_url: "", credential_ref: "",
     preset_id: CUSTOM_PRESET_ID, models_url: "", timeout_sec: String(defaultTimeoutSec), rows: [],
   };
 }
@@ -562,7 +592,8 @@ function hostDefaults(address: string): Pick<FormState, "id" | "name" | "credent
 export function formPatchForPreset(state: FormState, preset: ServicePreset | null): Partial<FormState> {
   const defaults = preset ? { id: preset.id, name: preset.name,
     credential_ref: `${preset.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_KEY` } : null;
-  return { preset_id: preset?.id ?? CUSTOM_PRESET_ID, base_url: presetBaseUrlFor(preset, state.protocol),
+  return { preset_id: preset?.id ?? CUSTOM_PRESET_ID,
+    base_url: presetBaseUrlFor(preset, state.rows[0]?.protocol ?? DEFAULT_PROTOCOL),
     models_url: "", ...(defaults ?? { id: "", name: "", credential_ref: "" }) };
 }
 
@@ -582,7 +613,6 @@ export function formStateFromProvider(provider: CatalogProvider): FormState {
   return {
     id: provider.id,
     name: provider.name,
-    protocol: provider.protocol,
     base_url: provider.base_url,
     credential_ref: provider.credential_ref,
     preset_id: provider.preset_id,
@@ -592,6 +622,7 @@ export function formStateFromProvider(provider: CatalogProvider): FormState {
       key: model.id,
       id: model.id,
       model: model.model,
+      protocol: model.protocol,
       context_window: numberToText(model.context_window),
       max_output_tokens: numberToText(model.max_output_tokens),
       capacity_confirmed: true,
@@ -639,6 +670,7 @@ export function rowToModelInput(row: FormRow): Record<string, unknown> {
   return {
     id: row.id,
     model: row.model,
+    protocol: row.protocol,
     context_window: intFromInput(row.context_window),
     max_output_tokens: intFromInput(row.max_output_tokens),
     capability_source: row.capability_source,
@@ -658,7 +690,6 @@ export function providerInputFromForm(state: FormState): Record<string, unknown>
   return {
     id: state.id,
     name: state.name,
-    protocol: state.protocol,
     base_url: normalizeBaseUrl(state.base_url),
     credential_ref: state.credential_ref,
     ...(timeout === null ? {} : { timeout_sec: timeout }),

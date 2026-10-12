@@ -34,6 +34,7 @@ def table_public() -> dict[str, Any]:
             preset_id: [
                 {
                     "model": entry.model,
+                    "protocol": entry.protocol,
                     "input_modalities": list(entry.input_modalities),
                     "output_modalities": list(entry.output_modalities),
                     "context_window": entry.context_window,

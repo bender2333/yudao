@@ -55,8 +55,17 @@ def department_name(department: Any) -> str:
     return f"{DEFINITIONS.department_labels.get(value, value)}部门"
 
 
-# 有两个字段的取值不在停止原因里（暂缓采纳、用户取消决定请求），单独给中文名
-OTHER_VALUE_NAMES = {"baseline_changed": "基线已经变化", "user_cancelled": "用户已取消"}
+# 写回停止原因的中文名（工单 #347）：取值不在停止原因里，单独给中文名
+WRITEBACK_REASON_NAMES = {
+    "conflict": "合并出现冲突",
+    "verification_failed": "最终树核验没有通过",
+    "target_changed": "目标分支已经推进",
+    "unrepresentable_path": "路径无法表示",
+    "missing_source_reference": "缺少事项起点依据",
+}
+# 说明里出现的取值按中文写，机器标识不直接出现（暂缓采纳、用户取消决定请求、写回停止原因）
+OTHER_VALUE_NAMES = {"baseline_changed": "基线已经变化", "user_cancelled": "用户已取消",
+                     **WRITEBACK_REASON_NAMES}
 
 
 def value_name(value: Any) -> str:
@@ -163,6 +172,11 @@ _LABELS: dict[str, str] = {
     ProjectEventType.PROJECT_DECISION_WITHDRAWN: "撤销了决定请求：{reason}",
     ProjectEventType.ONBOARDING_REVISION_STARTED: "开始第 {round} 轮建档",
     ProjectEventType.BASELINE_ADOPTED: "采纳了建档基线：{summary}",
+    ProjectEventType.WRITEBACK_COMPLETED: "写回了采纳成果：分支 {branch}，最终树 {final_tree_digest}",
+    ProjectEventType.WRITEBACK_STOPPED: "写回停止：{reason}",
+    ProjectEventType.WRITEBACK_NOT_NEEDED: "无需写回：本事项的变更已经在目标分支上",
+    ProjectEventType.WRITEBACK_HELD: "写回等待前项合入：{previous_adoption_id}",
+    ProjectEventType.WRITEBACK_VERIFIED: "核实了已发生的写回动作：分支 {branch}",
     CatalogEventType.CATALOG_REVISED: "模型目录修订到第 {revision} 号（{operation}）",
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: "收集了模型候选：{candidate_ids} 个",
     CatalogEventType.CATALOG_TEST_FINISHED: "模型测试结束：{kind}，结果 {ok}",

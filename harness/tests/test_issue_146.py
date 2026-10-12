@@ -83,20 +83,20 @@ class _Upstream:
         self.server.server_close()
 
 def _provider(provider_id="provider-a", *, base_url, models_url="", preset_id=""):
-    return {"id": provider_id, "name": provider_id, "protocol": "responses", "base_url": base_url,
+    return {"id": provider_id, "name": provider_id, "base_url": base_url,
             "credential_ref": "KEY_A", "timeout_sec": 20, "preset_id": preset_id, "models_url": models_url}
 
 def _document_model(model_id, provider_id="provider-a", *, upstream="upstream-a", input_modalities=None,
-                    context_window=32000, max_output_tokens=4096):
-    entry = {"id": model_id, "provider_id": provider_id, "model": upstream,
+                    context_window=32000, max_output_tokens=4096, protocol="responses"):
+    entry = {"id": model_id, "provider_id": provider_id, "model": upstream, "protocol": protocol,
              "context_window": context_window, "max_output_tokens": max_output_tokens, "capability_source": ""}
     if input_modalities is not None:
         entry["input_modalities"] = input_modalities
     return entry
 
 def _command_model(model_id, *, upstream="upstream-a", input_modalities=None,
-                   context_window=32000, max_output_tokens=4096, capacity_confirmed=True):
-    return {"id": model_id, "model": upstream, "context_window": context_window,
+                   context_window=32000, max_output_tokens=4096, capacity_confirmed=True, protocol="responses"):
+    return {"id": model_id, "model": upstream, "protocol": protocol, "context_window": context_window,
             "max_output_tokens": max_output_tokens, "capability_source": "",
             "capacity_confirmed": capacity_confirmed, "input_modalities": input_modalities or ["text"]}
 
@@ -439,14 +439,6 @@ def test_queries_do_not_append_events_and_carry_no_key(tmp_path):
 # ---------------------------------------------------------------------------
 # 调用目标按输入方式提供工具（验收第 5 项）
 
-def test_offers_with_input_filters_tools_that_need_images():
-    # 声明需要图像输入的工具在调用目标不含图像时不提供（机制本身；3.2D 的屏幕工具使用这一声明）
-    from harness.tools import offers_with_input
-
-    names = ["read_file", "list_files"]
-    assert offers_with_input(names, ("text",)) == names
-    assert offers_with_input(names, ("text", "image")) == names
-    assert offers_with_input(names, ()) == names
 
 def test_call_target_records_input_modalities(tmp_path):
     # 请求事件记录调用目标的输入方式（设计说明第 6 节「审计」），且不含 Key

@@ -5,10 +5,11 @@ import json
 import math
 import ssl
 import threading
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import aclosing, contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from harness.adapters.base import Availability, ModelAdapter, ProviderError
@@ -372,7 +373,7 @@ def responses_responder(body: dict):
     return 200, "text/event-stream", [sse(*events)]
 
 
-def facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
+def facade_with(base_url: str, *, protocol: str, preset_id: str = "",
                 model: str = "target-model",
                 accepts_required_tool_call: bool = True,
                 reasoning_levels: list[str] | None = None,
@@ -388,11 +389,12 @@ def facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
         }
     facade.store_document({
         "providers": [{
-            "id": "go", "name": "Go", "protocol": protocol, "base_url": base_url,
+            "id": "go", "name": "Go", "base_url": base_url,
             "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": preset_id,
         }],
         "models": [{
             "id": "m-go", "provider_id": "go", "model": model,
+            "protocol": protocol,
             "context_window": 32000, "max_output_tokens": 2048,
             "accepts_required_tool_call": accepts_required_tool_call,
             "capability_source": "preset-v1",
@@ -401,6 +403,27 @@ def facade_with(base_url: str, *, protocol: str, preset_id: str = "opencode-go",
         "bindings": {},
     })
     return facade
+
+
+@contextmanager
+def preset_base_urls(base_url: str | Mapping[str, str], *, preset_id: str = "opencode-go",
+                     models_url: str = ""):
+    # 内置服务方案的请求基址与模型列表地址都来自预置表（ADR-0033）。测试要让带服务方案的连接打到
+    # 本机上游时临时改这两项：base_url 给字符串时该方案的每个协议都用同一个地址，给按协议的字典时
+    # 每个协议各用一项（不同协议的请求由不同的本机服务记录）。其余字段（认证方式、身份头、来源）保持原值
+    from harness.providers import presets
+
+    item = presets._PRESET_INDEX[preset_id]
+    urls = {protocol: base_url[protocol] if isinstance(base_url, Mapping) else base_url
+            for protocol in item.base_urls}
+    local = item.model_copy(update={"base_urls": urls,
+                                    "models_url": models_url or item.models_url})
+    index = presets._PRESET_INDEX
+    presets._PRESET_INDEX = MappingProxyType({**index, preset_id: local})
+    try:
+        yield
+    finally:
+        presets._PRESET_INDEX = index
 
 
 def bound_target(facade: ProviderFacade, requested_tier: str | None = None) -> FrozenTarget:
@@ -459,9 +482,10 @@ def provider_system(data_dir: Path, base: str, protocol: str, *, timeout_sec: fl
     # 经真实 Provider 模块的系统：三个部门绑定同一个本机 HTTP 服务上的模型，模型已经记录准入
     facade = ProviderFacade(credentials=CredentialChain(overrides={"SCENARIO_KEY": "scenario-secret"}, use_env=False))
     facade.store_document({
-        "providers": [{"id": "local", "name": "Local", "protocol": protocol, "base_url": base + "/v1",
+        "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
                        "credential_ref": "SCENARIO_KEY", "timeout_sec": timeout_sec}],
         "models": [{"id": "m-local", "provider_id": "local", "model": "scenario-model",
+                    "protocol": protocol,
                     "context_window": 32000, "max_output_tokens": 2048,
                     "accepts_required_tool_call": accepts_required_tool_call}],
         "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
@@ -523,12 +547,13 @@ def _build_delegate(config: ResponsesConfig, loop: ConnectionLoop | None) -> Mod
     facade.store_document({
         "providers": [{
             "id": config.provider or "test-provider", "name": config.provider or "test-provider",
-            "protocol": "responses", "base_url": config.base_url, "credential_ref": "TEST_CREDENTIAL",
+            "base_url": config.base_url, "credential_ref": "TEST_CREDENTIAL",
             "timeout_sec": float(config.timeout_sec),
         }],
         "models": [{
             "id": "test-model", "provider_id": config.provider or "test-provider",
             "model": config.model,
+            "protocol": "responses",
             "context_window": 128000, "max_output_tokens": 4096,
         }],
         "bindings": {},

@@ -398,17 +398,17 @@ class Orchestrator:
         # 这里只取目录定义本身的字段，未知字段会被整份拒绝
         providers = [
             {key: item[key] for key in (
-                "id", "name", "protocol", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")}
+                "id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")}
             for item in view["providers"]
         ]
         models = list(view["models"])
         bindings = {key: dict(value) for key, value in view["bindings"].items()}
         if not any(item["id"] == provider_id for item in providers):
-            providers.append({"id": provider_id, "name": provider_id, "protocol": "fake", "base_url": ""})
+            providers.append({"id": provider_id, "name": provider_id, "base_url": ""})
         if not any(item["id"] == model_id for item in models):
             models.append({
                 "id": model_id, "provider_id": provider_id, "model": self.test_model,
-                "context_window": context_window,
+                "protocol": "fake", "context_window": context_window,
                 "max_output_tokens": response_reserve(context_window, None),
             })
         for department in DEPARTMENTS:

@@ -222,13 +222,14 @@ sequenceDiagram
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
 | --- | --- | --- | --- | --- | --- |
 | `department_settings.save` | 保存项目部门设置；所选模型不具备部门的建议能力时照常保存，结果带提醒（D24） | 项目、部门、部门 Prompt、模型（模型访问定义引用或跟随部门默认）、推理档位（或跟随） | `department_prompt_configured`；模型与档位的事件由 D24 确定 | 该部门设置的版本 | 部门 Prompt 已有 `PUT /api/projects/{id}/department-settings/{dept}`；模型与档位、提醒新增（D24 第 5.2、5.6 节） |
-| `source_directory.save` | 登记与修改本项目的源目录；`project.onboard` 填写的路径是项目的第一条登记，`onboarding.restart` 从登记的源目录重新采集快照 | 项目、名称、路径 | 由界面工作线的工单确定 | 该项目源目录登记的版本 | 新增（界面工作线，#74） |
+| `source_directory.save` | 登记与修改本项目的源目录；`project.onboard` 填写的路径是项目的第一条登记，`onboarding.restart` 从登记的源目录重新采集快照 | 项目、名称、路径、是否开启采纳写回、远端名称或地址、目标分支、写回检查命令名清单、凭据名称引用（只按名称引用，不含凭据内容） | `source_directory_configured` | 该项目源目录登记的版本 | 新增（界面工作线，#74）；采纳写回的四个参数新增（3.8，工单 #347） |
 | `command_registration.save` | 登记与修改命令 | 项目、登记名、固定参数、允许的额外参数、时限、输出上限、可以重新执行（结果未知时自动重新执行，默认为否；恢复契约第 4 节） | `command_configured`（「可以重新执行」是新增字段，旧事件为否） | 该登记命令的版本 | 已有 `PUT /api/projects/{id}/commands/{name}`；界面入口新增 |
 | `tool_authorization.save` | 保存网络取回的来源与 MCP 服务器（含工具清单快照与每个工具的处理方式）在本项目的整份登记 | 项目、整份登记文档 | `tool_authorization_configured`（项目流，内容是这个版本的整份文档） | 工具授权版本 | 新增（3.2B，[网络取回与 MCP 工具设计说明](network-and-mcp.md)第 4.4 节） |
 | `tool_server.probe` | 读取一个 MCP 服务器的工具清单（临时启动或连接，读取后关闭）；接受以后作为任务进行，结果以事件出现 | 项目、服务器的登记内容（保存前也可以探测） | `tool_server_probe_finished`（项目流，带工具清单快照或失败原因） | 空 | 新增（3.2B，设计说明第 4.3 节） |
 | `machine_authorization.save` | 保存本项目可以使用的机器与授权 | 项目；每台机器的登记目录与可以执行的操作（3.2C）；是否作为本项目的运行环境与常设授权（Stage 4） | `machine_authorization_configured`（项目流）；运行环境与常设授权的事件由 Stage 4 确定 | 该项目机器授权的版本 | 新增（3.2C）；运行环境与常设授权在 Stage 4 加入 |
 | `execution_placement.save` | 保存本项目的执行位置：运行工作区的位置，产品、工程、质检各自检查的位置（缺省与运行工作区相同）；位置取值为本机进程或一台授权的机器 | 项目、运行工作区的位置、各部门检查的位置 | `execution_placement_configured`（项目流） | 该项目执行位置的版本 | 新增（3.2C，[执行环境服务设计说明](execution-environment.md)第 7 节） |
 | `role_settings.save` | 保存本项目的角色设置；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 项目、部门、角色、模型、档位、角色 Prompt | 由 D26 确定 | 该角色设置的版本 | 新增（Stage 5，多角色设计第 14 节） |
+| `writeback.execute` | 对一次采纳重新发起采纳写回：三方合并、最终树核验、推送分支与创建合并请求；采纳以后源目录开启了写回时由系统自动发起 | 项目、采纳身份（空为当前采纳） | `writeback_completed`、`writeback_stopped`、`writeback_not_needed`、`writeback_held`、`writeback_verified` | 空 | 新增（3.8，[ADR-0034](../adr/0034-adopted-change-writeback-three-tree-merge.md)，工单 #347） |
 
 **用户决定（通知、恢复页、部门工作间、元观察页）**
 
