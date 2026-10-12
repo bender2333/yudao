@@ -35,20 +35,20 @@
   - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前，已完成），Stage 3 的工作包父工单 #83（子工单 #84 至 #96、#146），属于里程碑 M1。实施中：#84、#85 已完成。2026-10-07 按意图校准整理；同日 M1 试用以后，调用协议移到模型访问定义上（ADR-0033），自定义服务的模型列表地址默认取「地址/models」，加入模型时直接采用预填的容量并自动进行模型测试，修改内容见该文件更新行；工单为父工单 #371（#83 下）与子工单 #382 至 #386，属于里程碑 M1。
   - 需求：[D24](../requirements/model-management.md)。ADR：0002、0003、0005、0006、[0033](../adr/0033-protocol-belongs-to-model-access.md)、[0017](../adr/0017-role-settings-override-department.md)、[0028](../adr/0028-three-means-of-adjudication.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [本地通用工具](local-tools.md)
-  - 内容：代码快照接入的使用过程；公开树、搜索、区间阅读与编辑、本地命令、动作回执、独立质检的边界与验收反例；使用的依赖与成熟实现，含模块交互图。
-  - 状态：2026-09-26 随 3.2A 验收（#12 至 #15）；2026-09-29 由 Stage 3 计划第 4 节移出成为设计说明，3.2B、3.2C、3.2D 新增的工具同样遵守。
-  - 计划：[Stage 3 计划](../stage-3-plan.md) 第 4 节。
-  - ADR：[0024](../adr/0024-git-in-process-with-pygit2.md)。
+  - 内容：代码快照接入的使用过程；运行工作区、每个会话一个的检查工作区与检查副本；公开树、搜索、区间阅读与编辑、命令（`bash`，任意命令字符串、后台运行、环境变量）、检查、动作回执、结果未知、独立质检、网络取回与 MCP 工具的边界与验收反例；使用的依赖与成熟实现，含模块交互图。
+  - 状态：2026-09-26 随 3.2A 验收（#12 至 #15）；2026-09-29 由 Stage 3 计划第 4 节移出成为设计说明，3.2B、3.2C、3.2D 新增的工具同样遵守；2026-10-13 按 ADR-0038 改写（命令不经登记，检查接受任意命令字符串，结果未知交还模型），未实施，属于里程碑 M0。
+  - 计划：[Stage 3 计划](../stage-3-plan.md) 第 4 节、第 9 节 M0。
+  - ADR：[0024](../adr/0024-git-in-process-with-pygit2.md)、[0038](../adr/0038-function-first-commands-without-registration.md)。
 - [执行环境服务](execution-environment.md)
   - 内容：执行环境服务的合同（操作、类型、工作区的建立封存与传输、动作与回执、执行权编号、HTTP 路径、版本核对）；本机进程与远程执行代理两种实现；执行位置上的程序与依赖缓存；心跳、结果未知、迟到回执与等待机器；执行位置；认证与加密（TODO）；故障与验收场景；含模块交互图与时序图。
   - 状态：设计已确认（2026-09-29 用户确认第 11 节的决定：机器流、本机进程在进程内调用），2026-09-30 按 ADR-0022 改为代码在执行位置上直接运行；远程机器的真实验收在 Orange Pi AIpro 开发板上进行，开发板已经到位，执行代理的安装包由控制主机提供（2026-09-30，第 1.1、5.3.2 节）；#110 已完成，其余未实施。工单：父工单 #120（#110、#128 至 #130、#140 至 #145，界面 #117），属于里程碑 M3。2026-10-07 按意图校准整理，修改内容见该文件更新行。
-  - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)、[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。调研：[执行环境服务调研](../archive/research/execution-environment.md)。
+  - 需求：[D29](../requirements/remote-execution.md)。ADR：[0018](../adr/0018-single-control-host-remote-execution.md)、[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)、[0038](../adr/0038-function-first-commands-without-registration.md)（命令接受任意命令字符串、可以后台运行，每个会话一个检查工作区，机器授权只写目录）。调研：[执行环境服务调研](../archive/research/execution-environment.md)。
 - [浏览器与 computer use](browser-and-computer-use.md)
   - 内容：试用会话与执行位置上的程序；交付说明中的启动方式；Playwright MCP 浏览器工具；computer use（控制主机的交互桌面、真实输入、用户同意与独占，ADR-0026）；按模型输入方式提供工具；截图作为证据；质检从 PRD 生成试用用例、逐条结论、无法核验与放行；各工具的恢复契约；含概念图、模块交互图与时序图。
   - 状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定：验收条件的引用与放行规则、质检无法核验、试用在执行位置上直接进行（2026-09-30，ADR-0022）、启动方式由工程写在交付说明中、不提供脚本执行工具、屏幕工具用 Yudao 自己的函数工具）。Stage 3 实施浏览器的部分：父工单 #123（#147 至 #149、#151 至 #155），属于里程碑 M4；computer use 的部分（第 5 节等，见该文件更新行）是以后阶段的专题（[各阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节），工单 #150、#246、#247 不属于 M4。2026-10-07 按意图校准整理，资料页的逐条结论表增加检验方式与开环标记，修改内容见该文件更新行。
   - 需求：[D34](../requirements/browser-and-computer-use.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0026](../adr/0026-desktop-trials-on-control-host-desktop.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)。调研：[浏览器与 computer use](../archive/research/browser-and-computer-use.md)、[computer use 实现](../archive/research/computer-use-implementations.md)。
 - [网络取回与 MCP 工具](network-and-mcp.md)
-  - 内容：取回与登记的 MCP 服务器的放置（固定在控制主机）；项目的登记（取回的来源、MCP 服务器、工具清单快照与处理方式、版本与固定、凭据）；授权与一次性批准；网络取回（地址规则、重定向、内容与保存）；MCP 服务器（官方 SDK、运行规则、结果）；恢复契约；外部来源工件与证据；应用层接口；界面；含模块图与时序图。
+  - 内容：取回与 MCP 服务器的放置（固定在控制主机）；项目设置中的 MCP 服务器（工具清单快照、MCP 设置版本与固定、凭据）；工具的提供与工具许可；网络取回（拒绝的地址、重定向、内容与保存）；MCP 服务器（官方 SDK、运行规则、结果）；恢复契约；外部来源工件与证据；应用层接口；界面；含模块图与时序图。2026-10-13 按 [ADR-0038](../adr/0038-function-first-commands-without-registration.md) 修改：取回任何地址，MCP 工具全部直接提供，结果未知交还模型。
   - 状态：2026-10-01 设计，用户逐轮采纳推荐，未实施。工单：父工单 #122（#68 网络取回、#69 MCP 客户端模块、#236 登记的 MCP 服务器，界面 #237 至 #239），属于里程碑 M3。
   - 需求：[D36](../requirements/network-and-mcp.md)。ADR：[0025](../adr/0025-network-and-mcp-run-on-control-host.md)。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。
 - [接入已有项目](existing-project-onboarding.md)
@@ -93,6 +93,6 @@
   - 状态：2026-09-29 设计，用户已确认各角色运行的层、批量运行的规则与规则文件的修改；2026-10-07 恢复并放进 M2。#158、#406、#159 已合并，按层全部检查生效；#160、#161 待完成。工单：父工单 #157。
 - [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)
   - 内容：3.1 单机可靠恢复的恢复契约、角色任务的恢复、故障矩阵与产品边界。
-  - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），2026-09-28 写明启动时自动继续与执行权没有期限（第 3 节）；项目流与 run 流（#126）已完成，其余未实现；对应工单 #16、#17、#18，界面 #181，属于里程碑 M2。2026-10-07 按意图校准整理，修改内容见该文件更新行。
-  - ADR：[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。
+  - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），2026-09-28 写明启动时自动继续与执行权没有期限（第 3 节）；项目流与 run 流（#126）已完成，其余未实现；对应工单 #16、#17、#18，界面 #181，属于里程碑 M2。2026-10-07 按意图校准整理；2026-10-13 按 ADR-0038 修改第 4 节：结果未知的动作在自动核实以后交还发出它的会话，由模型决定是否重新执行，修改内容见该文件更新行。
+  - ADR：[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)、[0038](../adr/0038-function-first-commands-without-registration.md)。
   - 计划：[Stage 3 计划](../stage-3-plan.md) 3.1。
