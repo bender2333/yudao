@@ -1,6 +1,6 @@
 # 总体架构：职责分层
 
-更新：2026-10-13。状态：设计，用户已确认（2026-10-13 按 [ADR-0038](../../adr/0038-function-first-commands-without-registration.md) 修改第 6.3、7.3、7.4 节与阶段对照表：命令接受任意命令字符串，工具许可只有允许与拒绝，删除一次性批准与动作核实的决定；2026-10-12 按 [ADR-0036](../../adr/0036-concurrent-departments-and-nested-asks.md)、[ADR-0037](../../adr/0037-engineering-plan-stays-with-engineering.md) 修改第 5、7.1、7.3 节：三个部门同时运行，询问是嵌套的调用，工程计划不再是正式成果；2026-10-01 按 [ADR-0025](../../adr/0025-network-and-mcp-run-on-control-host.md) 修改第 6.3 节与第 7.3 节：网络取回与登记的 MCP 服务器固定在控制主机；2026-09-26 认可分层图与职责分层表；同日确认 [ADR-0010](../../adr/0010-control-core-drives-role-steps.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 与第 3 节的十项长期决定；2026-09-28 确认 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)，第 3 节第 3、6 项按它修改；2026-09-29 用户确认本机进程在进程内调用以及机器流，第 3 节第 6 项、第 7.3 节按它修改；2026-09-30 按 [ADR-0022](../../adr/0022-run-directly-without-containers.md) 修改第 3 节第 6 项与第 7.3 节；2026-10-07 用户确认按意图校准整理项目，按 [ADR-0027](../../adr/0027-trusted-kernel-outside-self-modification.md) 至 [ADR-0031](../../adr/0031-declared-loop-layers-and-sub-loops.md) 与[系统意图](../../requirements/system-intent.md)新增第 1.1、1.2 节与第 7.5 至 7.7 节，修改第 1、2、3、5、6.1、7.2、7.4、8、10、11 节；同日按 [ADR-0032](../../adr/0032-interface-served-as-web-pages.md)，界面是 Yudao 服务提供的网页，页面文件由接口层提供，见第 1、1.2、2、3、5、7.2、8、9、10 节）。未实施的部分按[总体路线图](../../program-roadmap.md)推进，第 10 节是近期的实施顺序。
+更新：2026-10-13（同日按 ADR-0035 修改第 8 节「技能」一行与第 11 节第 4 项：技能移到 Stage 3 的 M5）。状态：设计，用户已确认（2026-10-13 按 [ADR-0038](../../adr/0038-function-first-commands-without-registration.md) 修改第 6.3、7.3、7.4 节与阶段对照表：命令接受任意命令字符串，工具许可只有允许与拒绝，删除一次性批准与动作核实的决定；2026-10-12 按 [ADR-0036](../../adr/0036-concurrent-departments-and-nested-asks.md)、[ADR-0037](../../adr/0037-engineering-plan-stays-with-engineering.md) 修改第 5、7.1、7.3 节：三个部门同时运行，询问是嵌套的调用，工程计划不再是正式成果；2026-10-01 按 [ADR-0025](../../adr/0025-network-and-mcp-run-on-control-host.md) 修改第 6.3 节与第 7.3 节：网络取回与登记的 MCP 服务器固定在控制主机；2026-09-26 认可分层图与职责分层表；同日确认 [ADR-0010](../../adr/0010-control-core-drives-role-steps.md) 至 [ADR-0015](../../adr/0015-desktop-client-and-http-contracts.md) 与第 3 节的十项长期决定；2026-09-28 确认 [ADR-0018](../../adr/0018-single-control-host-remote-execution.md)，第 3 节第 3、6 项按它修改；2026-09-29 用户确认本机进程在进程内调用以及机器流，第 3 节第 6 项、第 7.3 节按它修改；2026-09-30 按 [ADR-0022](../../adr/0022-run-directly-without-containers.md) 修改第 3 节第 6 项与第 7.3 节；2026-10-07 用户确认按意图校准整理项目，按 [ADR-0027](../../adr/0027-trusted-kernel-outside-self-modification.md) 至 [ADR-0031](../../adr/0031-declared-loop-layers-and-sub-loops.md) 与[系统意图](../../requirements/system-intent.md)新增第 1.1、1.2 节与第 7.5 至 7.7 节，修改第 1、2、3、5、6.1、7.2、7.4、8、10、11 节；同日按 [ADR-0032](../../adr/0032-interface-served-as-web-pages.md)，界面是 Yudao 服务提供的网页，页面文件由接口层提供，见第 1、1.2、2、3、5、7.2、8、9、10 节）。未实施的部分按[总体路线图](../../program-roadmap.md)推进，第 10 节是近期的实施顺序。
 
 原理依据：[系统架构原理：控制核心与可替换的材料](core-and-materials.md)。本文把路线图中的全部模块放进同一个结构，写明各层的职责与边界、长期决定、合同与使用的技术。
 
@@ -382,7 +382,7 @@ sequenceDiagram
 | D25 语义系统（#22） | 1、9、10 | 知识层投影；P 与 U；证据核对判定点；只读观察者（#98）就是应用层的查询与事件流加提案 |
 | JEV 接入 | 4 | 判定点合同；Provider 的 systemone 协议 |
 | D26 部门内多角色 | 2、7 | 角色定义；同时驱动多个角色任务 |
-| 技能 | 7 | 定义中的技能；P 的目录；主机工具取得全文 |
+| 技能（M5，ADR-0035） | 7 | 定义中的技能；P 的目录；主机工具取得全文；具体做法由 S0 确定 |
 | D30 界面与可观测性 | 10 | 应用层、接口层与界面 |
 | D27 运维部门 | 6、7、8 | 新部门与修复事项这一事项种类；外部动作经执行代理执行，常设授权清单以内直接执行，清单以外走用户决定 |
 | Stage 4 长时间运行 | 3、5、8 | 操作系统的服务管理重新启动 Yudao 后按 3.1 继续；Provider 重试用完以后 run 进入等待模型服务，恢复后自动继续 |
@@ -423,5 +423,5 @@ sequenceDiagram
 1. 判定点的清单（合同、校准与升级规则见第 7.5、7.7 节；证据核对是第一个判定点，流转上的判定点各自校准以后加入）与元观察（D28）。
 2. 教训发现模块与惊讶机制（D25）：单独审查事件与事实，找出教训与洞见；可能与元观察结合；参考主动推断与自由能原理。
 3. 修复事项（D27）：运维发起的修复事项自动开始，不需要用户批准；同一项目一次只进行一个事项，按优先级排队，修复事项在前；登记的运行环境带常设授权清单，清单以外的动作走用户决定。项目层长期存在的运维部门与 run 内各部门之间的询问方式在 Stage 4 设计时确定。
-4. 技能的定义（Stage 5）：注册、适用性、执行与展开。
+4. 技能的定义（Stage 3 的 M5，[ADR-0035](../../adr/0035-mcp-and-skills-move-into-stage-3.md)，需求由 S0 讨论，#494）：注册、适用性、执行与展开。
 5. Stage 6 与持续改进工作线的需求记录。

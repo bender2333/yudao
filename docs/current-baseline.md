@@ -1,6 +1,6 @@
 # 当前验收基线
 
-更新：2026-10-08。用途：区分已验收的历史版本、当前代码及尚待执行的验收。本页统一报告口径，不代替真实运行报告。路线以 [总体路线图](program-roadmap.md) 为准，总体意图见 [D38](requirements/system-intent.md)。本页的代码身份取远端 `origin/main` 的冻结提交；未重新运行的历史证据继续标为历史证据。
+更新：2026-10-08；2026-10-13 按 [ADR-0035](adr/0035-mcp-and-skills-move-into-stage-3.md) 拆开第 5 节「技能、部门内多角色」一行，「网络/MCP」一行按 ADR-0038 更新。用途：区分已验收的历史版本、当前代码及尚待执行的验收。本页统一报告口径，不代替真实运行报告。路线以 [总体路线图](program-roadmap.md) 为准，总体意图见 [D38](requirements/system-intent.md)。本页的代码身份取远端 `origin/main` 的冻结提交；未重新运行的历史证据继续标为历史证据。
 
 Stage 2.7 补充：用户新增 [Stage 2.7](archive/stage-2-provider-plan.md)，先做 D22 启动/重载与 D23 独立 Provider / Go 接入。该阶段代码与应用侧验收已完成，结果见 [执行报告](archive/stage-2-7-provider-report.md)；真实 Go 覆盖 Responses 与 Chat Completions 两个协议并各自完成三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制。本页 3.0B 在 2.7 后的新冻结版本上完成；同版本已覆盖证据可直接引用。
 
@@ -109,9 +109,10 @@ Stage 2.7 补充：用户新增 [Stage 2.7](archive/stage-2-provider-plan.md)，
 | 项目流跨版本保存与升级排空 | 3.1 的版本规则（[ADR-0019](adr/0019-project-stream-across-versions.md)） | 3.1 按 run 事件版本核对 |
 | Go 所需三协议与统一 Provider | 2.7，已于 2026-09-20 关闭（[执行报告](archive/stage-2-7-provider-report.md)） | 不阻塞；2026-09-26 核对后 #2 至 #5 关闭（预置表的 Go 请求基址已改正，`import harness.providers` 不再加载内核模块）；#7 已关闭，Anthropic Messages 的真实工具往返由 Stage 3 D24 工作包的真实 Provider 验收（#96）检验，#96 覆盖三种协议；推理设置属于 Stage 3 的 D24 工作包（#83） |
 | 执行环境服务（远程执行代理） | Stage 3 后续独立包（3.2C，[ADR-0018](adr/0018-single-control-host-remote-execution.md)、[ADR-0022](adr/0022-run-directly-without-containers.md)） | 不阻塞 3.1；依赖 3.1 的动作核实与 #110，3.2B、3.2D 只依赖它的合同（#128） |
-| 网络/MCP | Stage 3 后续独立包（3.2B，设计 2026-10-01 已确认，[设计说明](design/network-and-mcp.md)） | 按对应能力依赖推进 |
+| 网络/MCP | Stage 3 的 3.2B（M3，设计 2026-10-01 确认，2026-10-13 按 [ADR-0038](adr/0038-function-first-commands-without-registration.md) 改写，[设计说明](design/network-and-mcp.md)；真实验收 #495） | 按对应能力依赖推进 |
 | 运维、长时间运行 | Stage 4 运维部门与长时间运行 | 不阻塞通用工具与单机恢复 |
-| 技能、部门内多角色 | Stage 5 | 不阻塞通用工具与单机恢复 |
+| 技能与 MCP 扩展 | Stage 3 的 M5（#494，[ADR-0035](adr/0035-mcp-and-skills-move-into-stage-3.md)），需求由 S0 讨论 | 不阻塞 M0 至 M4；3.9 组合验收（#100）与 #173 排在它之后 |
+| 部门内多角色 | Stage 5（[D26](requirements/department-roles.md)），进入时先按 ADR-0036、ADR-0037 修改设计再拆分 | 不阻塞通用工具与单机恢复 |
 | 学习与系统演化 | 持续改进工作线、Stage 6 | 不阻塞通用工具与单机恢复 |
 
 ## 6. 状态记录规则
