@@ -1,8 +1,9 @@
+import json
 from dataclasses import replace
 
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
-from harness.models import EventType
+from harness.models import EventType, json_dumps
 from harness.proposals import (collaboration_request, delivery, delivery_turn, product_spec,
                                 product_spec_turn, response_turn, review, review_turn)
 from harness.runtime import LoopSystem
@@ -221,3 +222,146 @@ def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path)
                                                  basis_delivery_spec_hash=projection.delivery_spec.content_hash))
     assert not decision.accepted
     assert "product_spec_hash" in [error["field"] for error in decision.error_dicts]
+
+
+def _basis_errors(projection):
+    return [item for rejection in projection.rejections for item in rejection["errors"]]
+
+
+def test_a_first_spec_that_declares_a_hash_is_rejected_by_the_host(tmp_path):
+    # 第一份规格声明了不存在的依据：activate_once 的提交判断拒绝，错误要求 null
+    system, run_id = _system(tmp_path, product_spec(basis_product_spec_hash="sha256:" + "1" * 64))
+    rejected = system.activate_once(run_id)
+    [error] = _basis_errors(rejected)
+    assert error["field"] == "basis_product_spec_hash" and "null" in error["message"]
+    assert not _events(system, run_id, EventType.SPEC_ACCEPTED)
+    assert rejected.product_spec is None
+
+
+def test_a_spec_that_omits_the_basis_is_rejected_by_the_host(tmp_path):
+    # 依据字段整个缺失：提交判断拒绝，错误指明字段必需
+    proposal = product_spec()
+    del proposal["basis_product_spec_hash"]
+    system, run_id = _system(tmp_path, proposal)
+    rejected = system.activate_once(run_id)
+    [error] = _basis_errors(rejected)
+    assert error["field"] == "basis_product_spec_hash" and "required" in error["message"]
+    assert not _events(system, run_id, EventType.SPEC_ACCEPTED)
+
+
+def test_a_revision_with_a_stale_basis_is_rejected_by_the_host_and_can_be_resubmitted(tmp_path):
+    # 产品拿着过期版本提交修订：activate_once 整次拒绝，错误给出当前版本；
+    # 拒绝的原因与当前版本作为 validation_feedback 交回，产品读过反馈以后按当前版本重交，修订被接纳
+    system, run_id = _system(tmp_path, product_spec(), delivery_turn(),
+                              review_turn("rework_product", "the contract missed empty input",
+                                          defects=[{"severity": "major", "summary": "empty input not covered"}]),
+                              product_spec_turn(acceptance=["empty input prints a blank line"],
+                                                change_record=CHANGE_RECORD))
+    projection = _activate_until(system, run_id, 2)
+    assert projection.phase == "ENGINEERING"
+    current_hash = projection.product_spec.content_hash
+    # 修订提交必须来自产品会话：用指导把产品请回工作，脚本按会话给
+    system.add_guidance(run_id, "product", "请再确认一次验收边界。")
+    system.test_adapter.scripts = {"product": [FakeTurn(proposal=_revision(CHANGE_RECORD, "sha256:" + "0" * 64))]}
+    rejected = system.activate_once(run_id)
+    [error] = _basis_errors(rejected)
+    assert error["field"] == "basis_product_spec_hash" and current_hash in error["message"]
+    assert [item["field"] for item in _basis_errors(rejected)] == ["basis_product_spec_hash"]
+    assert rejected.pending_feedback["product"]["errors"][0]["field"] == "basis_product_spec_hash"
+
+    def resubmit(call):
+        feedback = json.loads(prompt_part(call, "validation_feedback") or "{}")
+        assert current_hash in json_dumps(feedback)
+        assert current_hash in prompt_part(call, "current_product_spec")
+        return _revision(CHANGE_RECORD, current_hash)
+    system.test_adapter.scripts = {"product": [resubmit]}
+    accepted = system.activate_once(run_id)
+    assert accepted.product_spec.revision == 3
+    assert accepted.product_spec.parent_hash == current_hash
+    assert accepted.product_spec.status == "active"
+    [event] = _events(system, run_id, EventType.SPEC_ACCEPTED)[-1:]
+    assert event.payload["revision"] == 3 and event.payload["parent_hash"] == current_hash
+    assert accepted.pending_feedback == {}
+
+
+def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_current_version(tmp_path):
+    # 交付链闭环：工程拿着过期规格提交被拒，拒绝的原因与当前版本作为工具结果交回，
+    # 读过反馈以后按当前版本重交，交付被接纳并进入质检
+    system, run_id = _system(tmp_path, product_spec(), delivery_turn(),
+                              review_turn("rework_product", "the contract missed empty input",
+                                          defects=[{"severity": "major", "summary": "empty input not covered"}]),
+                              product_spec_turn(acceptance=["empty input prints a blank line"],
+                                                change_record=CHANGE_RECORD))
+    projection = _activate_until(system, run_id, 2)
+    assert projection.phase == "ENGINEERING"
+    current_hash = projection.product_spec.content_hash
+    files = {"src/echo.py": "import sys\nprint(sys.argv[1])\n"}
+    stale = FakeTurn(proposal=delivery(
+        summary="implemented echo CLI", check_names=["smoke"],
+        basis_product_spec_hash=projection.product_specs[0].content_hash),
+        writes=files, checks={"smoke": 0})
+    accepted_before = len(_events(system, run_id, EventType.DELIVERY_ACCEPTED))
+    system.test_adapter.script = [stale]
+    rejected = system.activate_once(run_id)
+    [error] = _basis_errors(rejected)
+    assert error["field"] == "basis_product_spec_hash" and current_hash in error["message"]
+    assert rejected.pending_feedback["engineering"]["errors"][0]["field"] == "basis_product_spec_hash"
+    assert len(_events(system, run_id, EventType.DELIVERY_ACCEPTED)) == accepted_before
+
+    def resubmit(call):
+        feedback = json.loads(prompt_part(call, "validation_feedback") or "{}")
+        assert current_hash in json_dumps(feedback)
+        assert current_hash in prompt_part(call, "current_product_spec")
+        return FakeTurn(proposal=delivery(
+            summary="implemented echo CLI", check_names=["smoke"], basis_product_spec_hash=current_hash),
+            writes=files, checks={"smoke": 0})
+
+    system.test_adapter.script = [resubmit]
+    accepted = system.activate_once(run_id)
+    assert len(_events(system, run_id, EventType.DELIVERY_ACCEPTED)) == accepted_before + 1
+    assert accepted.delivery_spec is not None
+    assert accepted.delivery_spec.product_spec_hash == current_hash
+    [event] = _events(system, run_id, EventType.DELIVERY_ACCEPTED)[-1:]
+    assert event.payload["product_spec_hash"] == current_hash
+    assert accepted.phase == "QUALITY"
+    assert accepted.pending_feedback == {}
+
+
+def test_a_review_with_a_stale_basis_is_rejected_then_resubmitted_with_the_current_version(tmp_path):
+    # 质检提交过期的交付依据被拒，读过反馈以后按当前版本重交，放行进入 DONE
+    system, run_id = _system(tmp_path, product_spec(), delivery_turn(),
+                              review_turn("rework_engineering", "naming does not match the requirements",
+                                          defects=[{"severity": "minor", "summary": "naming"}]),
+                              delivery_turn(summary="revised implementation"))
+    projection = system.project(run_id)
+    while projection.phase != "QUALITY" or len(projection.delivery_specs) < 2:
+        projection = system.activate_once(run_id)
+        assert projection.phase not in ("DONE", "FAILED"), projection.stop_reason
+    current_hash = projection.delivery_spec.content_hash
+    stale = FakeTurn(proposal=review(
+        "release", "the superseded delivery passed", checks=["smoke"],
+        basis_delivery_spec_hash=projection.delivery_specs[0].content_hash), checks={"smoke": 0})
+    submitted_before = len(_events(system, run_id, EventType.QA_SUBMITTED))
+    system.test_adapter.script = [stale]
+    rejected = system.activate_once(run_id)
+    [error] = _basis_errors(rejected)
+    assert error["field"] == "basis_delivery_spec_hash" and current_hash in error["message"]
+    assert rejected.pending_feedback["quality"]["errors"][0]["field"] == "basis_delivery_spec_hash"
+    assert len(_events(system, run_id, EventType.QA_SUBMITTED)) == submitted_before
+
+    def resubmit(call):
+        feedback = json.loads(prompt_part(call, "validation_feedback") or "{}")
+        assert current_hash in json_dumps(feedback)
+        assert current_hash in prompt_part(call, "current_delivery_spec")
+        return FakeTurn(proposal=review(
+            "release", "the current delivery passed", checks=["smoke"],
+            basis_delivery_spec_hash=current_hash), checks={"smoke": 0})
+
+    system.test_adapter.script = [resubmit]
+    accepted = system.activate_once(run_id)
+    assert len(_events(system, run_id, EventType.QA_SUBMITTED)) == submitted_before + 1
+    assert accepted.phase == "DONE"
+    assert accepted.delivery_spec.content_hash == current_hash
+    [event] = _events(system, run_id, EventType.QA_SUBMITTED)[-1:]
+    assert event.payload["delivery_spec_hash"] == current_hash
+    assert accepted.pending_feedback == {}
