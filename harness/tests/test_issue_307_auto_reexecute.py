@@ -1,6 +1,7 @@
 # 工单 #307：恢复契约第 4 节。结果未知的动作自动重新执行一次（契约声明可以重复的动作）。
 # 三个场景都用真实的子进程运行系统，在工具执行中被终止：读取是同步执行的，没有子进程可等，
-# 在 tool_started 提交以后停住；检查与登记命令有真实进程，等它们写下 started 标记以后终止。
+# 在 tool_started 提交以后停住；检查与 bash 有真实进程，等它们写下 started 标记以后终止，
+# 提交类工具由控制核心同步执行，同样在 tool_started 提交以后停住。
 # 每次终止以后都用同一个数据目录重新打开系统，走启动恢复。辅助代码在 harness/tests/process_kill.py
 # （#317、#308、#143 复用同一套）。
 
@@ -10,7 +11,7 @@ from pathlib import Path
 
 from harness.proposals import product_spec
 from harness.tests import process_kill as killed
-from harness.tests.helpers import WAIT_FOR_RELEASE, run_wait_command
+from harness.tests.helpers import run_wait_command
 
 # 读取的种子文件：重新执行读的是同一份内容，第二次尝试必须成功
 NOTES = "re-execute reads the same bytes\n"
@@ -108,17 +109,18 @@ def test_a_killed_check_is_retried_once_and_the_second_loss_asks_the_user(tmp_pa
     second.close()
     first.close()
 
-def test_a_registered_command_retry_follows_its_declaration(tmp_path):
-    # 验收三：登记命令声明「可以重新执行」的，中途终止以后自动重新执行一次；
-    # 没有声明（缺省为否）的，出现决定请求，选项里没有「重新执行」
-    declared = _command_case(tmp_path / "declared", repeatable=True)
-    undeclared = _command_case(tmp_path / "undeclared", repeatable=None)
+def test_a_repeatable_tool_is_retried_and_a_non_repeatable_tool_asks_the_user(tmp_path):
+    # 验收三：契约声明「可以重新执行」的工具，动作中途终止以后自动重新执行一次；
+    # 没有声明的工具（缺省为否）出现决定请求，选项里没有「重新执行」。
+    # 声明按工具给（#479 以后没有按命令声明的登记体系），所以两个半场用不同的工具
+    declared = _bash_case(tmp_path / "declared")
+    undeclared = _submit_case(tmp_path / "undeclared")
 
     # 声明了「可以重新执行」：自动重新执行一次，没有决定请求
     second = killed.restarted(declared["data"], [], started=declared["signals"] / "started",
                               resume_after=False)
     attempts = _attempts(second.before, second.run_id, declared["action_id"])
-    assert len(attempts) == 2, "声明可以重新执行的命令自动重新执行一次"
+    assert len(attempts) == 2, "声明可以重新执行的工具自动重新执行一次"
     assert attempts[1]["auto_retry_of"] == attempts[0]["event_id"]
     second.close()
 
@@ -141,27 +143,38 @@ def test_a_registered_command_retry_follows_its_declaration(tmp_path):
     fourth.close()
     undeclared["close"]()
 
-def _command_case(root: Path, *, repeatable: bool | None) -> dict:
-    # 一份登记命令的中断：命令执行到一半终止。repeatable 为空时注册表里不写这一项（缺省为否）。
-    # 重新执行用的是记录下来的 argv，标记一直落在同一个目录；每一轮终止以前删掉上一轮的标记
+def _bash_case(root: Path) -> dict:
+    # 一次 bash 的中断：命令执行到一半终止（bash 契约声明可以重新执行）。
+    # 重新执行用的是记录下来的命令行，标记一直落在同一个目录；每一轮终止以前删掉上一轮的标记
     root.mkdir(exist_ok=True)
     signals = root / "signals"
     signals.mkdir(exist_ok=True)
-    command = {"argv": [sys.executable, "-c", WAIT_FOR_RELEASE, str(signals)]}
-    if repeatable is not None:
-        command["repeatable"] = repeatable
     interrupted = killed.interrupted(
         root / "data",
         [{"proposal": product_spec()},
-         {"output": [_call("call-cmd", "run_command", {"name": "tooling"})]}],
-        registered_commands={"tooling": command}, started=signals / "started", resume_after=False)
+         {"output": [_call("call-bash", "bash", {"command": run_wait_command(signals)})]}],
+        started=signals / "started", resume_after=False)
     (signals / "started").unlink(missing_ok=True)
     return {"data": root / "data", "signals": signals, "run_id": interrupted.run_id,
-            "action_id": _command_action(interrupted.before, interrupted.run_id),
+            "action_id": _tool_action(interrupted.before, interrupted.run_id, "bash"),
             "close": interrupted.close}
 
-def _command_action(system, run_id: str) -> str:
+def _submit_case(root: Path) -> dict:
+    # 一次提交的中断：提交类工具由控制核心同步执行，没有子进程可等，在 tool_started 提交以后停住；
+    # submit_delivery 契约没有声明可以重新执行，也不是文件工具（不走路自动核实那条路径）
+    root.mkdir(exist_ok=True)
+    interrupted = killed.interrupted(
+        root / "data",
+        [{"proposal": product_spec()},
+         {"output": [_call("call-submit", "submit_delivery",
+                           {"summary": "declared delivery", "files": [], "check_names": []})]}],
+        hold_after="tool_started", hold_action="call-submit", resume_after=False)
+    return {"data": root / "data", "run_id": interrupted.run_id,
+            "action_id": _tool_action(interrupted.before, interrupted.run_id, "submit_delivery"),
+            "close": interrupted.close}
+
+def _tool_action(system, run_id: str, tool: str) -> str:
     started = [event.payload for event in killed.events(system, run_id, "tool_started")
-               if event.payload.get("name") == "run_command"]
-    assert started, "登记命令没有被执行"
+               if event.payload.get("name") == tool]
+    assert started, f"{tool} 没有被执行"
     return str(started[-1]["id"])
