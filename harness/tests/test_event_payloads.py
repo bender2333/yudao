@@ -6,7 +6,7 @@ import pytest
 
 from harness.adapters.fake import FakeAdapter
 from harness.models import ArtifactRef, EventType, ProjectEventType
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.selection import ModelSelection
 from harness.public_tree import CapturedFile, CapturedTree
 from harness.runtime import LoopSystem
@@ -18,11 +18,9 @@ from harness.tree_archive import artifact_run, load_tree
 # 两个事项一个采纳一个保留为未采纳候选，再加一个事项走真实的采纳写回流程（#347 的五种写回事件全部产出），
 # 核对日志中的每条事件。
 
-
 def _release_script(summary, files=None):
-    return [product_spec(), plan_turn(), delivery_turn(summary=summary, files=files),
+    return [product_spec(), delivery_turn(summary=summary, files=files),
             review_turn("release", f"ok {summary}")]
-
 
 def _writeback_tree(repo, files):
     # 文件路径按 / 分层建树：采纳树与目标树的内容都经这条路径写入裸仓库
@@ -45,7 +43,6 @@ def _writeback_tree(repo, files):
 
     return insert(nested)
 
-
 def _force_target_commit(bare_path, captured, message):
     # 目标分支的推进（前项合入、已含变更、冲突）由测试直接提交：写回只读它，不伪造写回事件
     repo = pygit2.Repository(str(bare_path))
@@ -56,7 +53,6 @@ def _force_target_commit(bare_path, captured, message):
     del repo
     gc.collect()
     return commit
-
 
 def _produce_writeback_events(system, projects, project_id, base_version, adoption_id, remote):
     # 真实的采纳写回流程（harness/writeback.py）：按事项基线查到的采纳树做三方合并，检查、推分支、
@@ -108,7 +104,6 @@ def _produce_writeback_events(system, projects, project_id, base_version, adopti
     _force_target_commit(remote, conflict, "target conflicts")
     stopped = projects.execute_writeback(project_id, adoption_id)
     assert stopped.type == ProjectEventType.WRITEBACK_STOPPED
-
 
 def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter([

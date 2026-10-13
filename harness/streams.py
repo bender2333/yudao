@@ -15,7 +15,8 @@ from .models import TERMINAL_PHASES
 # 当前的 run 事件版本：run 事件的语义改变时提高这个版本。每个 run 在创建时把它记进 run_created 事件。
 # 版本 2：删除事件种类 department_prompt_updated 与 run_created 的 department_prompts 字段（#89）
 # 版本 3：activation_finished 新增累计已用量字段 elapsed_ms、activations、model_steps（#350）
-RUN_EVENT_VERSION = 3
+# 版本 4：删除事件种类 plan_accepted 与工程计划工具的提交与接纳（#470）
+RUN_EVENT_VERSION = 4
 
 # run 流：事项的进行过程（每次 run 的交接、询问、尝试与动作）
 RUN_EVENT_TYPES = frozenset({
@@ -48,7 +49,6 @@ RUN_EVENT_TYPES = frozenset({
     "spec_accepted",
     "spec_superseded",
     "contract_accepted",
-    "plan_accepted",
     "collaboration_requested",
     "collaboration_responded",
     "collaboration_closed",

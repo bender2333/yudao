@@ -44,12 +44,11 @@ def _phase(body: dict[str, Any]) -> str:
     return match.group(1) if match else ""
 
 def _proposal_reply(*, response_id: str, model: str, payload: dict[str, Any]) -> tuple[int, str, list[bytes]]:
-    # 带工具调用的回答：部门交出结构化提案，运行离开起始阶段进入下一个部门
-    from harness.proposals import engineering_plan, product_spec
-    kind = payload["kind"]
-    value = product_spec() if kind == "product_spec" else engineering_plan()
+    # 带工具调用的回答：产品交出产品要求，运行离开起始阶段进入工程部门
+    from harness.proposals import product_spec
+    value = product_spec()
     value.pop("kind")
-    name = "submit_product_spec" if kind == "product_spec" else "submit_plan"
+    name = "submit_product_spec"
     response = {
         "id": response_id, "object": "response", "created_at": 1, "status": "completed", "model": model,
         "output": [{"id": f"call-{response_id}", "type": "function_call", "name": name,
@@ -84,9 +83,8 @@ def _text_reply(*, response_id: str, model: str, text: str) -> tuple[int, str, l
     return 200, "text/event-stream", [sse(*frames)]
 
 def _two_stage(model: str = "upstream-a", *, park_after_product: Any = None):
-    # 产品先交产品要求，工程再交工程计划，之后普通回答让运行停下（停在工程进行中）。
+    # 产品先交产品要求，之后普通回答让运行停下（停在工程进行中）。
     # park_after_product 在产品交完提案后调用一次，可让此后的工程解析失败从而停在工程进行中
-    state = {"plan": 0}
     def responder(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
         chosen = str(body.get("model") or model)
         if _phase(body) != "ENGINEERING":
@@ -94,10 +92,7 @@ def _two_stage(model: str = "upstream-a", *, park_after_product: Any = None):
             if park_after_product is not None:
                 park_after_product()
             return reply
-        if state["plan"] == 0:
-            state["plan"] += 1
-            return _proposal_reply(response_id="plan", model=chosen, payload={"kind": "engineering_plan"})
-        return _text_reply(response_id="idle", model=chosen, text="按当前计划继续。")
+        return _text_reply(response_id="idle", model=chosen, text="按当前要求继续。")
     return responder
 
 def _provider(provider_id: str, base_url: str, ref: str) -> dict[str, Any]:

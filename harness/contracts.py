@@ -26,11 +26,6 @@ def current_contract_hash(projection: RunProjection) -> str | None:
     return None if contract is None else contract.content_hash
 
 
-def current_plan_hash(projection: RunProjection) -> str | None:
-    plan = projection.engineering_plan
-    return None if plan is None else plan.content_hash
-
-
 def normalize_scope(value: str) -> str:
     relative = value.replace("\\", "/")
     if relative == ".":
@@ -87,27 +82,6 @@ def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_plan(plan: dict[str, Any]) -> str:
-    lines = ["# Engineering Plan", "", f"Plan: {plan['content_hash']}",
-             f"Effective contract: {plan['effective_contract_hash']}", "", "## Objective", "", plan["objective"],
-             "", "## Change Scope", ""]
-    lines.extend(f"- {item}" for item in plan["scope"])
-    lines.extend(["", "## Ordered Tasks", ""])
-    for index, task in enumerate(plan["tasks"], 1):
-        lines.extend([f"### {index}. {task['title']}", "", "Outputs:"])
-        lines.extend(f"- {item}" for item in task["outputs"])
-        lines.extend(["", f"Verification: {task['verification']}", ""])
-    lines.extend(["## Necessary Refactoring", ""])
-    lines.extend(f"- {item}" for item in plan["refactoring"])
-    if not plan["refactoring"]:
-        lines.append("None.")
-    lines.extend(["", "## Defaults and Basis", ""])
-    lines.extend(f"- {item['decision']}\n  Basis: {item['basis']}" for item in plan["assumptions"])
-    if not plan["assumptions"]:
-        lines.append("None.")
-    if plan["reason"]:
-        lines.extend(["", "## Adjustment Reason", "", plan["reason"]])
-    return "\n".join(lines).rstrip() + "\n"
 
 
 def render_structure(structure: dict[str, Any]) -> str:

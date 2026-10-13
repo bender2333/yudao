@@ -7,7 +7,7 @@
 # 读事件日志、写数据目录、用子进程，属于集成层。
 
 from harness.models import EventType
-from harness.proposals import engineering_plan, product_spec
+from harness.proposals import product_spec
 from harness.tests import process_kill as killed
 
 # 中断点：一次激活结束以后。此时已用量已经写入事件，进程停在安全节点上
@@ -24,7 +24,7 @@ def _usage(events) -> tuple[int, int, int] | None:
 
 
 def _script() -> list[dict]:
-    return [{"proposal": product_spec()}, {"proposal": engineering_plan()}]
+    return [{"proposal": product_spec()}, {"transcript": "继续工程工作"}]
 
 
 def test_accumulated_usage_does_not_decrease_across_a_restart(tmp_path):

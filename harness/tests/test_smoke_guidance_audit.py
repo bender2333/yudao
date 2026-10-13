@@ -9,7 +9,8 @@ from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.tools import usable_when_guidance_only
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import (
-    collaboration_request, delivery_turn, guidance_response, plan_turn, product_spec, response_turn, review_turn,
+    collaboration_request, delivery_turn, guidance_response,
+    product_spec, response_turn, review_turn,
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -19,10 +20,8 @@ from harness.tests.saved_rewrite import rewrite_saved_event, rewrite_saved_event
 
 INPUT_V2 = "Also print a status column in the export.\r\n"
 
-
 def _guidance_ids(request):
     return [item["id"] for item in json.loads(prompt_part(request, "department_guidance"))]
-
 
 def _list_files(request):
     return ModelResponse(output=[{
@@ -32,7 +31,6 @@ def _list_files(request):
 
 # 需要一份真实运行记录的文件：module 作用域的夹具跑一次完整循环并保存数据目录，
 # 每项测试复制一份数据目录，在自己的副本上改写与检查。数据来自真实运行，登记为集成层。
-
 
 @pytest.fixture(scope="module")
 def saved_combined(tmp_path_factory):
@@ -80,7 +78,6 @@ def saved_combined(tmp_path_factory):
                               background="Engineering is planning the export.",
                               expected_result="Confirm the acceptance basis without changing files."),
         response_turn("answered", "The status column is part of the accepted requirements."),
-        plan_turn(),
         delivery_turn(files={"src/echo.py": "# export-format: csv\nimport sys\nprint(sys.argv[1])\n"}),
         review_turn("release", "Independent quality check passed on the current delivery."),
     ])
@@ -93,13 +90,11 @@ def saved_combined(tmp_path_factory):
     system.close()
     return system.data_dir, run_id, projection, invocations
 
-
 @pytest.fixture
 def combined_run(saved_combined, tmp_path):
     # 每项测试在自己的数据目录副本上改写与检查
     saved, run_id, projection, invocations = saved_combined
     return system_on_copy(saved, tmp_path / "combined"), run_id, projection, invocations
-
 
 def test_combined_run_shape(combined_run):
     system, run_id, projection, invocations = combined_run
@@ -119,15 +114,13 @@ def test_combined_run_shape(combined_run):
                    if (text := prompt_part(request, "guidance_results")) and json.loads(text))
     assert results[0]["name"] == "run_check"
 
-
 def test_model_input_audit_verifies_combined_run(combined_run):
     system, run_id, _projection, _invocations = combined_run
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["model_input_audit"]["status"] == "verified", fields["model_input_audit"]["notes"]
     assert fields["context_isolated"] is True
-    # 产品 / 工程让出 / 两次 guidance_only / 产品处理 v2 / 工程发起协作 / 产品回应 / 工程计划 / 工程交付 / 质检
-    assert fields["model_input_audit"]["activation_count"] == 10
-
+    # 产品 / 工程让出 / 两次 guidance_only / 产品处理 v2 / 工程发起协作 / 产品回应 / 工程交付 / 质检
+    assert fields["model_input_audit"]["activation_count"] == 9
 
 def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_path):
     """写操作之后、下一次检查之前仍有待处理指导且检查结果可认领：审计靠记录下来的快照重建，而不是推断。"""
@@ -139,10 +132,9 @@ def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_pa
         holder["guidance_ids"] = _guidance_ids(request)
         return FakeTurn(writes={"src/echo.py": code}, checks={"probe": 0})
 
-    adapter = FakeAdapter([product_spec(), plan_turn()])
+    adapter = FakeAdapter([product_spec(),])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build an echo CLI")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     assert system.project(run_id).phase == "ENGINEERING"
 
@@ -164,7 +156,6 @@ def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_pa
     assert all(isinstance(event.payload.get("snapshot_hash"), str) and event.payload["snapshot_hash"] for event in assembled)
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["model_input_audit"]["status"] == "verified", fields["model_input_audit"]["notes"]
-
 
 @pytest.mark.parametrize("mutation,expected", [
     ("other_snapshot", "pinned developer input differs"),
@@ -188,11 +179,9 @@ def test_model_input_audit_rejects_tampered_or_missing_snapshot_record(combined_
     assert audit["status"] == "unverified"
     assert any(expected in note for note in audit["notes"]), audit["notes"]
 
-
 def _saved_events(system, run_id):
     # 审计读到的必须是事件库中保存的事件；测试改动以后写回事件行，再经公开接口运行审计
     return system.store.list_events(run_id)
-
 
 def _rehash_request(system, events, assembled, request):
     ref = system.artifacts.put(assembled.run_id, "model_request", json_dumps(request), media_type="application/json")
@@ -204,7 +193,6 @@ def _rehash_request(system, events, assembled, request):
                      and item.payload["step_id"] == assembled.payload["step_id"])
     attempted.context_digest = assembled.context_digest
     rewrite_saved_events(system.store, [assembled, attempted])
-
 
 @pytest.mark.parametrize("mutation,expected", [
     ("private_text_in_guidance", "pinned developer input differs"),

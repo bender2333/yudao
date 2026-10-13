@@ -61,7 +61,6 @@ class ActivationScope:
 
     def work_basis(self) -> dict[str, Any]:
         return {"effective_contract_hash": self.basis.effective_contract_hash,
-                "engineering_plan_hash": self.basis.engineering_plan_hash,
                 "request_id": self.basis.request_id}
 
 
@@ -288,7 +287,6 @@ class StepRecorder:
                      "started_at": request.attempt_started_at,
                      "attempted": True, "purpose": request.purpose,
                      "effective_contract_hash": request.effective_contract_hash,
-                     "engineering_plan_hash": request.engineering_plan_hash,
                      "request_id": scope.basis.request_id,
                      **self._call_target(request),
                      "effective_context_window": request.context.manifest.budget,
@@ -498,7 +496,6 @@ class StepRecorder:
                 "usage": _usage_summary(capture.usage or self._step_usage),
                 "raw_usage_ref": capture.usage_ref or self._raw_usage_ref,
                 "effective_contract_hash": request.effective_contract_hash,
-                "engineering_plan_hash": request.engineering_plan_hash,
                 "request_id": request.request_id,
                 "reason": error.reason,
                 "retryable": error.retryable,
@@ -540,7 +537,6 @@ class StepRecorder:
                 "next_attempt": request.attempt + 1,
                 "purpose": request.purpose,
                 "effective_contract_hash": request.effective_contract_hash,
-                "engineering_plan_hash": request.engineering_plan_hash,
                 "request_id": request.request_id,
                 "reason": error.reason,
                 "retryable": True,

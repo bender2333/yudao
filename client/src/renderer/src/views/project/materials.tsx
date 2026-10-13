@@ -1,4 +1,4 @@
-// 资料页（原型 v10 设计说明第 7.3 节，工单 #380）：只读，先按事项索引，再按 intend、PRD、PLAN、
+// 资料页（原型 v10 设计说明第 7.3 节，工单 #380）：只读，先按事项索引，再按 intend、PRD、
 // 交付、质检、项目材料的顺序查看。数据仍来自 project.overview 与 work_item.materials 两个已登记的查询。
 // 范围跟随顶栏的 ?w=；没有选中事项时取进行中的一项，并在索引卡上写明当前查看的是哪一项。
 // 结构说明与旧版本的执行（原型里的 mt-structure 与 mt-oldruns）在所属工作包登记查询以后加入；
@@ -18,7 +18,6 @@ import { useSnapshot } from "./use-snapshot";
 const COUNT_KINDS = [
   ["intend", "intend"],
   ["prd", "PRD"],
-  ["plan", "PLAN"],
   ["delivery", "交付"],
   ["qa", "质检"],
   ["note", "材料"],
@@ -63,7 +62,6 @@ export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate:
         <>
           <IntendBlock rows={data.inputs} />
           <VersionBlock id="mt-prd" title="PRD" note="产品部门提交并被接纳的各版本；接入已有项目的初始 PRD 标明确认记录" rows={data.contracts} empty="产品部门还没有提交 PRD" />
-          <VersionBlock id="mt-plan" title="PLAN" note="工程部门的计划各版本" rows={data.plans} empty="工程部门还没有提交计划" />
           <DeliveryBlock app={props.app} rows={data.deliveries} />
           <ReviewBlock rows={data.reviews} />
           <NotesBlock rows={data.materials} scoped={requested !== null} />
@@ -78,7 +76,6 @@ function countsOf(data: WorkItemMaterialsResult): Record<string, number> {
   return {
     intend: data.inputs.length,
     prd: data.contracts.length,
-    plan: data.plans.length,
     delivery: data.deliveries.length,
     qa: data.reviews.length,
     note: data.materials.length,
@@ -98,7 +95,7 @@ function IndexBlock(props: {
     <Section
       id="mt-index"
       title="按事项查看"
-      note={`资料按事项保存；点击事项查看它的 intend、PRD、PLAN、交付、质检与项目材料；本页的事项 ${props.chosen}${props.requested === null ? "（未选中事项，取当前事项）" : ""}`}
+      note={`资料按事项保存；点击事项查看它的 intend、PRD、交付、质检与项目材料；本页的事项 ${props.chosen}${props.requested === null ? "（未选中事项，取当前事项）" : ""}`}
       className="y10-mt"
     >
       {props.items.length === 0 ? <Empty text="项目还没有事项，没有资料可看" /> : (
@@ -158,7 +155,7 @@ function IntendBlock(props: { rows: WorkItemMaterialsResult["inputs"] }) {
   );
 }
 
-// PRD 与 PLAN（原型 mt-prd、mt-plan）：各版本、状态与目标（摘要）
+// PRD（原型 mt-prd）：各版本、状态与目标（摘要）
 function VersionBlock(props: {
   id: string;
   title: string;

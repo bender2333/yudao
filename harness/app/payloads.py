@@ -56,7 +56,6 @@ class CheckReceipt(Payload):
     name: str
     product_spec_hash: str | None
     effective_contract_hash: str | None
-    engineering_plan_hash: str | None
     snapshot_hash: str
     summary: str
 
@@ -65,7 +64,6 @@ class YieldedWork(Payload):
     # 部门为回应指导让出的工作与让出时的依据
     phase: Phase
     effective_contract_hash: str | None
-    engineering_plan_hash: str | None
     delivery_spec_hash: str | None
 
 
@@ -156,11 +154,9 @@ class Versions(Payload):
     guidance_ids: list[str]
     guidance_only: bool
 
-
 class WorkBasis(Payload):
-    # 激活开始时的有效合同、工程计划与协作请求
+    # 激活开始时的有效合同与协作请求
     effective_contract_hash: str | None
-    engineering_plan_hash: str | None
     request_id: str | None
 
 
@@ -711,41 +707,9 @@ class ProductDecisionAcceptedPayload(Payload):
     git_version: GitVersion | None = None
 
 
-class PlanTask(Payload):
-    title: str
-    outputs: list[str]
-    verification: str
-
-
-class PlanAssumption(Payload):
-    decision: str
-    basis: str
-
-
-class PlanAcceptedPayload(Payload):
-    effective_contract_hash: str
-    objective: str
-    scope: list[str]
-    tasks: list[PlanTask]
-    refactoring: list[str]
-    assumptions: list[PlanAssumption]
-    reason: str
-    kind: Literal["engineering_plan"]
-    issuer: Literal["engineering"]
-    parent_hash: str | None
-    revision: int
-    status: Literal["active"]
-    content_hash: str
-    id: str
-    plan_ref: ArtifactRef
-    request_id: str | None
-    git_version: GitVersion
-
-
 class CollaborationBasis(Payload):
     intend_hash: str
     effective_contract_hash: str | None
-    engineering_plan_hash: str | None
     delivery_spec_hash: str | None
     phase: Phase
 
@@ -798,7 +762,6 @@ class DeliveryAcceptedPayload(Payload):
     known_risks: list[str]
     product_spec_hash: str
     effective_contract_hash: str
-    engineering_plan_hash: str
     code_tree_digest: str
     kind: Literal["delivery_spec"]
     issuer: Literal["engineering"]
@@ -820,7 +783,6 @@ class Defect(Payload):
 class QaSubmittedPayload(Payload):
     product_spec_hash: str
     effective_contract_hash: str
-    engineering_plan_hash: str
     delivery_spec_hash: str
     code_snapshot_hash: str
     verdict: Literal["rework_product", "rework_engineering", "release"]
@@ -1563,7 +1525,6 @@ PAYLOADS: dict[str, Any] = {
     EventType.SPEC_ACCEPTED: SpecAcceptedPayload,
     EventType.SPEC_SUPERSEDED: SpecSupersededPayload,
     EventType.CONTRACT_ACCEPTED: ContractAcceptedPayload,
-    EventType.PLAN_ACCEPTED: PlanAcceptedPayload,
     EventType.COLLABORATION_REQUESTED: CollaborationRequestedPayload,
     EventType.COLLABORATION_RESPONDED: CollaborationRespondedPayload,
     EventType.COLLABORATION_CLOSED: CollaborationClosedPayload,

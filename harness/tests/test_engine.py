@@ -6,18 +6,16 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, EventType, canonical_hash, estimate_tokens, json_dumps
-from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
+from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import (FAST_RETRIES, WAIT_FOR_RELEASE, after_event, recorded_context,
                                    from_another_thread, wait_for_file)
 from harness.tests.protocol_helpers import complete, model_call
 
-
 def _call(identity, name, **args):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
             "arguments": json_dumps(args)}
-
 
 def _submit(identity="submit"):
     proposal = product_spec()
@@ -27,7 +25,6 @@ def _submit(identity="submit"):
 def change_product_model(system: LoopSystem, upstream_model: str) -> None:
     # 运行中更换模型：确定性测试适配器登记的上游模型名取自编排器，在下一次解析时生效（#45 架构答复第 6 条）
     system.orchestrator.test_model = upstream_model
-
 
 def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
@@ -48,7 +45,6 @@ def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
     assert json.loads(response.output[0]["arguments"]) == {"path": "owned.txt", "content": "content"}
     assert not (tmp_path / "owned.txt").exists()
 
-
 def test_each_step_assembles_auditable_input_with_only_current_activation_history(tmp_path):
     reasoning = {"id": "reason-1", "type": "reasoning", "summary": [], "encrypted_content": "PRIVATE_CHAIN"}
     lookup = _call("read-1", "read_file", path="proof.txt")
@@ -56,14 +52,14 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
         ModelResponse(output=[lookup], reasoning={"provider_id": "fake", "protocol": "fake",
                                                   "model": "fake-script", "items": [reasoning]}),
         ModelResponse(output=[_submit(), _call("after-submit", "read_file", path="must-not-read.txt")]),
-        plan_turn(), delivery_turn(), review_turn("release", "valid host evidence"),
+        delivery_turn(), review_turn("release", "valid host evidence"),
     ])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.workspace(run_id).write_file("proof.txt", "CAUSAL_TOOL_OUTPUT")
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
-    assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1, 1]
+    assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1]
     # 同一连接、同一协议、同一上游模型时推理内容原样回放，紧接它产生的那次输出（工单 #88）
     replayed = adapter.invocations[1].input_items[2]
     assert replayed["id"] == "reason-1" and replayed["encrypted_content"] == "PRIVATE_CHAIN"
@@ -76,7 +72,7 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
         assert "CAUSAL_TOOL_OUTPUT" not in json_dumps(request.input_items)
         assert request.input_items[-1]["role"] == "user"
     assert len(adapter.invocations[2].input_items) == len(adapter.invocations[4].input_items) == 2
-    assert any(item.get("name") == "submit_plan" for item in adapter.invocations[3].input_items)
+    assert any(item.get("name") == "submit_delivery" for item in adapter.invocations[3].input_items)
     events = system.store.list_events(run_id)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "after-submit" for event in events)
     assert any(event.type == EventType.MODEL_REASONING and event.model == "fake-script"
@@ -95,7 +91,6 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
         assert event.payload["admitted"]
         assert event.payload["request_ref"]["content_hash"] in event.artifact_hashes
     assert result.canonical_state() == system.replay(run_id).canonical_state()
-
 
 def test_large_history_requests_compaction_and_rejects_submit_in_summary_response(tmp_path):
     # A tool call in a tool-less summary request is malformed provider output: it is retried
@@ -123,7 +118,6 @@ def test_large_history_requests_compaction_and_rejects_submit_in_summary_respons
     assert tool.payload["input_item"]["call_id"] == "read-1"
     assert tool.payload["output_ref"]
 
-
 def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path):
     # 请求装配完成以后，另一个线程取消运行：取消在开始请求之前提交，这一步不开始模型调用
     adapter = FakeAdapter([product_spec()])
@@ -145,7 +139,6 @@ def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path):
     assert result.manifests[0].admitted
     assert not any(event.type == EventType.MODEL_REQUESTED for event in system.store.list_events(run_id))
 
-
 def test_cancel_before_tool_start_rejects_new_side_effect(tmp_path):
     def cancel_during_request(_call):
         system.cancel(run_id)
@@ -160,20 +153,17 @@ def test_cancel_before_tool_start_rejects_new_side_effect(tmp_path):
     assert "new.txt" not in system.workspace(run_id).list_files()
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "write-1" for event in system.store.list_events(run_id))
 
-
 def _command_run(tmp_path, registry, script):
-    # 工程部门的激活之前：产品规格与工程计划都已接纳
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(scope=["later.txt"]), *script]))
+    # 工程部门的激活之前：产品规格已接纳
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), *script]))
     run_id = system.create_run("echo", registered_commands=registry, command_versions={name: 1 for name in registry})
     system.activate_once(run_id)
     system.activate_once(run_id)
     return system, run_id
 
-
 def _command_call(identity, command):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": "run_command",
             "arguments": json_dumps({"name": command})}
-
 
 def _tool_output(system, run_id, identity):
     called = next(event for event in system.store.list_events(run_id)
@@ -182,7 +172,6 @@ def _tool_output(system, run_id, identity):
     if "output_ref" in called.payload:
         output = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**called.payload["output_ref"])))
     return called, output
-
 
 def test_cancel_stops_the_running_command_and_does_not_start_following_tool(tmp_path):
     # 登记命令运行中另一个线程取消运行：进程树结束，回执记为已取消，之后的工具不开始
@@ -211,7 +200,6 @@ def test_cancel_stops_the_running_command_and_does_not_start_following_tool(tmp_
     assert result.stop_reason == "cancelled"
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_cancel_after_the_tool_permission_does_not_start_the_process(tmp_path):
     # 工具许可已经允许、动作还没有开始时取消到达（在 tool_started 提交的时点、写入方的线程中取消）：进程不启动
     signals = tmp_path / "signals"
@@ -229,7 +217,6 @@ def test_cancel_after_the_tool_permission_does_not_start_the_process(tmp_path):
     assert result.canonical_state() == system.replay(run_id).canonical_state()
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_original_intend_is_preserved_verbatim_outside_the_delivery_tree(tmp_path):
     original = "  Original request\r\n\r\nKeep these spaces.  \n\t"
     adapter = FakeAdapter([product_spec()])
@@ -243,7 +230,6 @@ def test_original_intend_is_preserved_verbatim_outside_the_delivery_tree(tmp_pat
     assert adapter.invocations[0].input_items[0]["content"].startswith(f"[intend]\n{original}\n\n[current_work]\n")
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_reactivated_department_restores_its_received_work_outputs_and_complete_submit_pairs(tmp_path):
     private = {"id": "product-private", "type": "reasoning", "summary": [], "encrypted_content": "PRODUCT_PRIVATE"}
     skipped = _call("skip-read", "read_file", path="never-read.txt")
@@ -251,7 +237,7 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
         ModelResponse(output=[private, _submit(), skipped]),
         FakeTurn(proposal=collaboration_request(), transcript="ENGINEERING_PRIVATE"),
         response_turn("answered", "The existing requirements define the current behavior."),
-        plan_turn(), delivery_turn(), review_turn("release", "valid host evidence"),
+        delivery_turn(), review_turn("release", "valid host evidence"),
     ])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("Original intent")

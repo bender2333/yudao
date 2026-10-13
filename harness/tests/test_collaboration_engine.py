@@ -8,28 +8,25 @@ from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id, pro
 from harness.event_store import run_stream
 from harness.models import EventType, json_dumps
 from harness.proposals import (
-    collaboration_request, collaboration_response, delivery_turn, plan_turn,
-    product_decision, product_spec, response_turn, review, review_turn,
+    collaboration_request, collaboration_response, delivery_turn,
+    product_decision, product_spec, response_turn,
+    review, review_turn,
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.validation import evaluate_proposal
 
-
 def _call(identity, name, **arguments):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
             "arguments": json_dumps(arguments)}
-
 
 def _steps(system, run_id, count):
     for _ in range(count):
         current = system.activate_once(run_id)
     return current
 
-
 def _events(system, run_id, event_type):
     return [event for event in system.store.list_events(run_id) if event.type == event_type]
-
 
 @pytest.mark.parametrize("recipient", ["engineering", "quality"])
 def test_product_can_consult_before_prd_without_granting_write_or_acceptance(tmp_path, recipient):
@@ -39,7 +36,7 @@ def test_product_can_consult_before_prd_without_granting_write_or_acceptance(tmp
         assert "current_contract" not in parts and "current_product_spec" not in parts
         names = {tool["name"] for tool in request.tools}
         assert "write_file" not in names and "submit_response" in names
-        assert not {"submit_plan", "submit_delivery", "submit_review", "submit_spec"} & names
+        assert not {"submit_delivery", "submit_review", "submit_spec"} & names
         return ModelResponse(output=[
             _call("unauthorized-write", "write_file", path="src/bypass.py", content="no"),
             _call("answer", "submit_response", request_id=pending_request_id(request), status="answered",
@@ -51,7 +48,7 @@ def test_product_can_consult_before_prd_without_granting_write_or_acceptance(tmp
     pending = system.activate_once(run_id)
     assert pending.phase == "PRODUCT_SPEC"
     basis = pending.pending_request.basis
-    assert basis["effective_contract_hash"] is basis["engineering_plan_hash"] is None
+    assert basis["effective_contract_hash"] is None and "engineering_plan_hash" not in basis
     responded = system.activate_once(run_id)
     assert responded.phase == "PRODUCT_SPEC" and responded.pending_request is None
     assert responded.responses[-1].return_work_valid
@@ -62,17 +59,16 @@ def test_product_can_consult_before_prd_without_granting_write_or_acceptance(tmp
     assert rejected.payload["ok"] is False
     assert system.activate_once(run_id).phase == "ENGINEERING"
 
-
 def test_quality_clarification_preserves_contract_and_requires_a_new_independent_check(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(),
+        product_spec(),delivery_turn(),
         FakeTurn(proposal=collaboration_request("product"), checks={"smoke": 0}),
         response_turn("answered", "Print the argument as defined in the current requirement."),
         review("release", "Reuse the earlier check"),
         review_turn("release", "Checked the current delivery again after the answer."),
     ]))
     run_id = system.create_run("build echo", max_cycles=12)
-    old = _steps(system, run_id, 4)
+    old = _steps(system, run_id, 3)
     returned = system.activate_once(run_id)
     assert returned.phase == "QUALITY" and returned.responses[-1].return_work_valid
     assert returned.effective_contract == old.effective_contract
@@ -85,23 +81,18 @@ def test_quality_clarification_preserves_contract_and_requires_a_new_independent
     assert done.phase == "DONE" and done.rework_count == 0
     assert done.last_review.checks[0]["activation_id"] != old.last_activations["quality"]
 
-
-def test_revision_request_accepts_plan_delivery_then_response_without_changing_main_phase(tmp_path):
+def test_revision_request_accepts_delivery_then_response_without_changing_main_phase(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(),
+        product_spec(),delivery_turn(),
         collaboration_request("engineering", "Correct the implementation.", request_type="action", action="revise_delivery"),
-        plan_turn(reason="Correct the implementation requested by quality."),
         delivery_turn("Corrected echo", files={"src/echo.py": "import sys\nprint(str(sys.argv[1]))\n"}),
         response_turn("completed", "The corrected delivery is ready.", result_types=[EventType.DELIVERY_ACCEPTED]),
         review_turn("release", "Verified the corrected delivery independently."),
     ]))
     run_id = system.create_run("build echo", max_cycles=12)
-    pending = _steps(system, run_id, 4)
+    pending = _steps(system, run_id, 3)
     original_basis = dict(pending.pending_request.basis)
     original_delivery = pending.delivery_spec.content_hash
-    planned = system.activate_once(run_id)
-    assert planned.phase == "QUALITY" and planned.active_department == "engineering"
-    assert planned.delivery_spec is None and planned.pending_request.basis == original_basis
     delivered = system.activate_once(run_id)
     assert delivered.phase == "QUALITY" and delivered.active_department == "engineering"
     assert delivered.delivery_spec.content_hash != original_delivery
@@ -113,7 +104,6 @@ def test_revision_request_accepts_plan_delivery_then_response_without_changing_m
     assert response.requests[-1].basis == original_basis
     assert system.activate_once(run_id).phase == "DONE"
     assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
-
 
 @pytest.mark.parametrize("status", ["declined", "needs_work"])
 @pytest.mark.parametrize("mutation", ["write_file", "delete_file", "move_file"])
@@ -132,11 +122,11 @@ def test_partial_mutation_and_response_in_one_activation_cannot_resume_old_quali
         ])
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(),
+        product_spec(),delivery_turn(),
         collaboration_request("engineering", request_type="action", action="revise_delivery"), partial,
     ]))
     run_id = system.create_run("build echo")
-    pending = _steps(system, run_id, 4)
+    pending = _steps(system, run_id, 3)
     current = system.activate_once(run_id)
     assert current.phase == "ENGINEERING", current.rejections
     assert current.pending_request is None and current.active_department == "engineering"
@@ -145,7 +135,6 @@ def test_partial_mutation_and_response_in_one_activation_cannot_resume_old_quali
     assert current.requests[-1].basis == pending.pending_request.basis
     assert not _events(system, run_id, EventType.COLLABORATION_CLOSED)
     assert current.canonical_state() == system.replay(run_id).canonical_state()
-
 
 @pytest.mark.parametrize("disposition", ["retain", "integrate", "retire"])
 def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_source(tmp_path, disposition):
@@ -191,7 +180,6 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
     assert complete.pending_request is None and complete.phase == "ENGINEERING"
     assert complete.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_consultation_cannot_submit_nested_request_or_formal_decision(tmp_path):
     decision = product_decision("Change the goal.", "Not authorized by a consultation.")
     decision.pop("kind")
@@ -212,7 +200,6 @@ def test_consultation_cannot_submit_nested_request_or_formal_decision(tmp_path):
         assert not event.payload["ok"]
         assert not any(event.payload.get("id") == identity for event in _events(system, run_id, EventType.TOOL_STARTED))
 
-
 def test_completed_action_requires_an_accepted_result_not_model_claims(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), collaboration_request("product", request_type="action", action="revise_requirements"),
@@ -227,21 +214,19 @@ def test_completed_action_requires_an_accepted_result_not_model_claims(tmp_path)
     assert not rejected.product_decisions
     assert system.activate_once(run_id).requests[-1].status == "declined"
 
-
 def test_quality_recipient_cannot_release_while_answering_a_consultation(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), collaboration_request("quality"),
+        product_spec(),collaboration_request("quality"),
         review_turn("release", "A consultation must not release the run."),
         response_turn("answered", "The engineering checks should cover normal and invalid input."),
     ]))
     run_id = system.create_run("build echo")
-    _steps(system, run_id, 3)
+    _steps(system, run_id, 2)
     rejected = system.activate_once(run_id)
     assert rejected.phase == "ENGINEERING" and rejected.pending_request is not None
     assert not rejected.reviews and not _events(system, run_id, EventType.RUN_DONE)
     assert rejected.rejections[-1]["errors"][0]["field"] == "kind"
     assert system.activate_once(run_id).pending_request is None
-
 
 def test_response_rejects_wrong_request_or_department_without_closing_current_request(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("engineering")]))
@@ -255,7 +240,6 @@ def test_response_rejects_wrong_request_or_department_without_closing_current_re
         )
         assert not decision.accepted
     assert system.project(run_id).pending_request.id == pending.pending_request.id
-
 
 @pytest.mark.parametrize("action,recipient", [("inspect", "engineering"), ("check", "quality")])
 def test_read_and_check_actions_use_real_host_results_even_when_check_finds_failure(tmp_path, action, recipient):
@@ -275,7 +259,6 @@ def test_read_and_check_actions_use_real_host_results_even_when_check_finds_fail
     assert result.department == recipient and result.payload["ok"]
     assert current.product_spec is None and not current.reviews
 
-
 @pytest.mark.parametrize("reason,status,phase", [
     ("provider_timeout", "timed_out", "FAILED"),
     ("model_steps_exhausted", "stopped", "PAUSED"),
@@ -294,7 +277,6 @@ def test_pending_request_is_closed_before_provider_or_loop_stop(tmp_path, reason
     assert closure.stream_version < terminal.stream_version and terminal.department == "quality"
     assert current.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_pending_request_is_closed_when_activation_limit_is_reached(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("engineering")]))
     run_id = system.create_run("build echo", max_cycles=1)
@@ -303,7 +285,6 @@ def test_pending_request_is_closed_when_activation_limit_is_reached(tmp_path):
     assert current.phase == "PAUSED" and current.stop_reason == "max_cycles"
     assert current.pending_request is None and current.requests[-1].status == "stopped"
     assert len(system.test_adapter.invocations) == 1
-
 
 def test_cancellation_during_recipient_model_call_cannot_accept_a_late_response(tmp_path):
     def cancel(request):
@@ -319,9 +300,9 @@ def test_cancellation_during_recipient_model_call_cannot_accept_a_late_response(
     assert not current.responses
     assert len(_events(system, run_id, EventType.COLLABORATION_CLOSED)) == 1
 
-
 def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), collaboration_request("product"), plan_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), collaboration_request("product"),
+        delivery_turn()]))
     run_id = system.create_run("build echo")
     before = _steps(system, run_id, 2)
     external = replace(before, phase="PRODUCT_SPEC", pending_request=None)
@@ -339,18 +320,16 @@ def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(t
         session_id=before.sessions["product"].session_id, provider="fake", model="fake-script",
     ).append(transaction))
     current = system.activate_once(run_id)
-    assert current.phase == "ENGINEERING" and current.pending_request is None
+    assert current.phase == "QUALITY" and current.pending_request is None
     assert current.requests[-1].status == "superseded" and current.requests[-1].basis == before.pending_request.basis
-    assert not current.responses and current.engineering_plan is not None
+    assert not current.responses and current.delivery_spec is not None
     assert _events(system, run_id, EventType.COLLABORATION_CLOSED)[0].payload["return_work_valid"] is False
-
 
 def test_private_receiver_history_is_not_injected_into_requester_context(tmp_path):
     marker = "RECEIVER_PRIVATE_ANALYSIS_735912"
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         collaboration_request("engineering"), FakeTurn(transcript=marker), response_turn("answered", "Use one clear output check."),
-        product_spec(), plan_turn(),
-    ]))
+        product_spec(),    ]))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.activate_once(run_id)

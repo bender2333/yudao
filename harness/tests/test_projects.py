@@ -24,12 +24,8 @@ from harness.projects import (
     project_projection,
 )
 from harness.proposals import (
-    collaboration_request,
-    delivery_turn,
-    plan_turn,
-    product_spec,
-    response_turn,
-    review_turn,
+    collaboration_request, delivery_turn, product_spec,
+    response_turn, review_turn,
 )
 from harness.projection import RunNotFoundError, saved_decision, saved_decisions
 from harness.providers.call import ModelResponse
@@ -41,47 +37,37 @@ from harness.tree_archive import load_tree
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 
-
 def _system(data_dir, script):
     return LoopSystem.for_testing(data_dir, FakeAdapter(script))
 
-
 def _release_script(summary="v1", files=None):
-    return [product_spec(), plan_turn(), delivery_turn(summary=summary, files=files), review_turn("release", f"ok {summary}")]
-
+    return [product_spec(),delivery_turn(summary=summary, files=files), review_turn("release", f"ok {summary}")]
 
 def _v2_files():
     return {"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n", "src/extra.py": "EXTRA = True\n"}
 
-
 def _kernel_release_script(summary="v1", files=None):
-    # 工程计划的范围包含要改动的内核清单路径，工具才会允许写这个文件
-    return [product_spec(), plan_turn(scope=["src/", *files]), delivery_turn(summary=summary, files=files),
+    # 内核清单路径的写操作需要用户决定授权，工具才会允许写这个文件
+    return [product_spec(),delivery_turn(summary=summary, files=files),
             review_turn("release", f"ok {summary}")]
-
 
 def _pinned_sources(system, request):
     return [part.source for part in recorded_context(system, request).parts]
 
-
 def _project_events(system, project_id, event_type):
     return [event for event in system.store.list_project_events(project_id) if event.type == event_type]
-
 
 # ---------------------------------------------------------------------------
 
 # §3 项目流
 
-
 def _open_decisions(system):
     return [decision for decision in saved_decisions(system.store, kinds=("kernel_modification",))[1]
             if decision.status == "open"]
 
-
 def _answer(system, decision_id, option):
     command = Command(decision_id, "decision.answer", f"sha256:{option}", "user:local")
     return system.orchestrator.answer_decision(decision_id, option, None, base_version=1, command=command)
-
 
 def test_project_events_have_their_own_stream_in_the_one_log(data_dir):
     system = _system(data_dir, happy_script())
@@ -104,10 +90,8 @@ def test_project_events_have_their_own_stream_in_the_one_log(data_dir):
     assert system.store.list_run_ids() == []
     assert system.store.list_events(project_a) == []
 
-
 # ---------------------------------------------------------------------------
 # §13.1 同一项目两事项：继承与新版本
-
 
 def test_second_work_item_inherits_adopted_tree_byte_for_byte(data_dir):
     system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
@@ -153,10 +137,8 @@ def test_second_work_item_inherits_adopted_tree_byte_for_byte(data_dir):
     assert {item.path for item in new_tree.files} == {"src/echo.py", "src/extra.py"}
     assert new_tree.digest != old_tree.digest
 
-
 # ---------------------------------------------------------------------------
 # §13.2 基线在放行前已变：保留为未采纳候选
-
 
 def test_release_after_baseline_change_is_held_not_adopted(data_dir):
     system = _system(data_dir, [*_release_script("A"), *_release_script("B", files=_v2_files())])
@@ -184,10 +166,8 @@ def test_release_after_baseline_change_is_held_not_adopted(data_dir):
     assert system.project(run_c).baseline["adoption_id"] == project.current_adoption.adoption_id
     assert system.project(run_c).workspace_digest == project.current_adoption.code_tree_digest
 
-
 # ---------------------------------------------------------------------------
 # §13.3 取消 / max_cycles 暂停 / provider 失败：stopped，不采纳
-
 
 @pytest.mark.parametrize("scenario,expected", [
     ("cancelled", ("FAILED", "cancelled")),
@@ -218,10 +198,8 @@ def test_stopped_runs_keep_stop_reason_and_are_not_adopted(data_dir, scenario, e
     types = {event.type for event in system.store.list_project_events(project_id)}
     assert ProjectEventType.DELIVERABLE_ADOPTED not in types and ProjectEventType.ADOPTION_HELD not in types
 
-
 # ---------------------------------------------------------------------------
 # §13.4 两个项目互不可见
-
 
 def test_projects_do_not_see_each_other(data_dir):
     system = _system(data_dir, [*_release_script("A"), *_release_script("B")])
@@ -249,10 +227,8 @@ def test_projects_do_not_see_each_other(data_dir):
     assert [item.name for item in system.projects.list_projects()] == ["A", "B"]
     assert system.project(run_a).project_id == project_a and system.project(run_b).project_id == project_b
 
-
 # ---------------------------------------------------------------------------
 # §13.5 事件重放：两表重建 == 在线
-
 
 def test_project_projection_rebuilds_from_two_tables_and_cli_replay(data_dir, capsys):
     system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
@@ -285,17 +261,14 @@ def test_project_projection_rebuilds_from_two_tables_and_cli_replay(data_dir, ca
     with pytest.raises(SystemExit):
         main(["replay", "--data-dir", str(data_dir)])
 
-
 # ---------------------------------------------------------------------------
 # §13.6 create_run 归属参数
-
 
 def _ownership(project_id="proj_x", work_item_id="wi_x"):
     return {
         "project_id": project_id, "work_item_id": work_item_id, "project_context": "项目：X",
         "prompt_config_versions": {department: 0 for department in DEPARTMENTS},
     }
-
 
 def test_create_run_rejects_mixed_ownership_parameters(data_dir, tmp_path):
     system = _system(data_dir, happy_script())
@@ -322,7 +295,6 @@ def test_create_run_rejects_mixed_ownership_parameters(data_dir, tmp_path):
     assembled = ContextAssembler(system.artifacts).assemble(
         run, department="product", session_id="s", activation_id="a", prompt=prompt)
     assert "project" not in [part.source for part in assembled.parts]
-
 
 def test_create_run_rejects_baseline_digest_mismatch_and_existing_workspace(data_dir, tmp_path):
     system = _system(data_dir, happy_script())
@@ -352,10 +324,8 @@ def test_create_run_rejects_baseline_digest_mismatch_and_existing_workspace(data
     with pytest.raises(RunNotFoundError):
         system.project("run_existing")
 
-
 # ---------------------------------------------------------------------------
 # §13.7 项目上下文部件
-
 
 def test_project_context_part_is_pinned_between_current_work_and_department_rules(data_dir):
     adapter = FakeAdapter(happy_script())
@@ -400,7 +370,6 @@ def test_project_context_part_is_pinned_between_current_work_and_department_rule
     assert summary["context_isolated"] is True, summary["context_isolation_notes"]
     assert summary["delivery_archive"]["status"] == "verified"
 
-
 def test_project_context_guidance_stays_before_department_rules(data_dir):
     adapter = FakeAdapter([lambda request: product_spec()])
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -410,7 +379,6 @@ def test_project_context_guidance_stays_before_department_rules(data_dir):
     system.activate_once(run_id)
     sources = _pinned_sources(system, adapter.invocations[0])
     assert sources[:5] == ["intend", "current_work", "project", "department_guidance", "department_rules"]
-
 
 def test_compaction_pinned_input_contains_project_part(data_dir):
     # 步数上限已放开为时间边界，本用例按旧步数上限验证单次激活内的压缩行为
@@ -449,10 +417,8 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
     assert audit["status"] == "verified", audit["notes"]
     assert audit["compaction_count"] >= 1
 
-
 # ---------------------------------------------------------------------------
 # §13.8 部门 Prompt 项目配置
-
 
 def test_department_setting_versions_conflicts_and_effect_timing(data_dir):
     # 部门 Prompt 保存在项目部门设置中，run 内没有副本：修改从该部门的下一次模型请求起生效
@@ -465,7 +431,7 @@ def test_department_setting_versions_conflicts_and_effect_timing(data_dir):
                        "default_text": default_text, "department_setting_configured": False, "provider_id": None,
                        "model_id": None, "requested_tier": None, "version": 0, "updated_at": None,
                        "source": "default"}
-    v1 = "工程 Prompt v1：先写计划再写代码。"
+    v1 = "工程 Prompt v1：直接写代码。"
     saved = system.projects.configure_department_settings(
         project_id, "engineering", ModelSelection(department_prompt=v1), 0)
     assert (saved["version"], saved["source"], saved["unchanged"], saved["text"]) == (1, "configured", False, v1)
@@ -516,10 +482,8 @@ def test_department_setting_versions_conflicts_and_effect_timing(data_dir):
     assert later_a == requests_a
     assert system.projects.read_department_setting(project_id, "engineering")["version"] == 2
 
-
 # ---------------------------------------------------------------------------
 # §13.9 归档项目只读
-
 
 def test_archived_project_rejects_writes_until_restored(data_dir):
     system = _system(data_dir, happy_script())
@@ -549,7 +513,6 @@ def test_archived_project_rejects_writes_until_restored(data_dir):
     _work_item_id, run_id = system.projects.start_work_item(project_id, "恢复后的事项")
     assert system.project(run_id).project_id == project_id
 
-
 def test_in_progress_work_item_blocks_archive_and_materials(data_dir):
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("Busy", GOAL)
@@ -565,10 +528,8 @@ def test_in_progress_work_item_blocks_archive_and_materials(data_dir):
     assert project.archived is False and project.materials == []
     assert project.work_items[0].status == "in_progress"
 
-
 # ---------------------------------------------------------------------------
 # §13.10 D-H：记录原文不产生 run 事件
-
 
 def test_material_recording_creates_no_run_events(data_dir):
     system = _system(data_dir, happy_script())
@@ -589,10 +550,8 @@ def test_material_recording_creates_no_run_events(data_dir):
     with pytest.raises(ValueError):
         system.projects.record_material(project_id, "x", department="finance")
 
-
 # ---------------------------------------------------------------------------
 # §5 / §6 / §7 / §8 其他约定
-
 
 def test_project_context_text_is_deterministic_and_ordered(data_dir):
     system = _system(data_dir, _release_script("交付摘要"))
@@ -632,7 +591,6 @@ def test_project_context_text_is_deterministic_and_ordered(data_dir):
     )
     assert project.work_item(work_item_id).run_id == run_id
 
-
 def test_second_work_item_project_part_includes_source_spec(data_dir):
     system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
     project_id = system.projects.register("决定", GOAL)
@@ -648,7 +606,6 @@ def test_second_work_item_project_part_includes_source_spec(data_dir):
     assert spec.goal in second
     assert spec.requirements[0] in second
 
-
 def test_work_item_title_defaults_to_first_line_truncated(data_dir):
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("Title", GOAL)
@@ -659,13 +616,12 @@ def test_work_item_title_defaults_to_first_line_truncated(data_dir):
     work_item_2, _ = system.projects.start_work_item(project_id, "正文", title="显式标题")
     assert system.projects.projection(project_id).work_item(work_item_2).title == "显式标题"
 
-
 def test_work_item_derived_fields_follow_the_run(data_dir):
     script = [
         product_spec(), collaboration_request(question="边界怎么定？"), response_turn(),
-        plan_turn(), delivery_turn(summary="v1"),
+delivery_turn(summary="v1"),
         review_turn("rework_engineering", "命名不符", defects=[{"severity": "minor", "summary": "naming"}]),
-        plan_turn(reason="修正命名"), delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"}),
+delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"}),
         review_turn("release", "ok"),
     ]
     system = _system(data_dir, script)
@@ -696,12 +652,10 @@ def test_work_item_derived_fields_follow_the_run(data_dir):
     assert any(entry["kind"] == "loop" and entry["type"] == EventType.RUN_DONE and entry["run_id"] == run_id for entry in recent)
     assert all(entry["position"] > later["position"] for entry, later in zip(recent, recent[1:]))
 
-
 def _overview(system, project_id):
     from harness.projects import project_overview
 
     return project_overview(system.store, system.projects.projection(project_id))
-
 
 def test_work_item_start_failure_is_recorded_and_project_stays_usable(data_dir):
     system = _system(data_dir, happy_script())
@@ -721,7 +675,6 @@ def test_work_item_start_failure_is_recorded_and_project_stays_usable(data_dir):
     assert system.projects.projection(project_id).work_item(work_item_id).status == "in_progress"
     assert system.project(run_id).work_item_id == work_item_id
 
-
 def test_settle_pending_recovers_release_left_unsettled(data_dir):
     system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
     project_id = system.projects.register("Recover", GOAL)
@@ -735,7 +688,6 @@ def test_settle_pending_recovers_release_left_unsettled(data_dir):
     assert system.project(run_2).baseline["adoption_id"] == project.current_adoption.adoption_id
     assert system.project(run_2).workspace_digest == project.current_adoption.code_tree_digest
     assert system.projects.settle_pending(project_id) == []
-
 
 def test_archived_unsettled_release_settles_on_read_not_on_start(data_dir):
     system = _system(data_dir, _release_script("v1"))
@@ -757,7 +709,6 @@ def test_archived_unsettled_release_settles_on_read_not_on_start(data_dir):
     project = system.projects.projection(project_id)
     assert project.archived is True and project.current_adoption.run_id == run_id
     assert project.work_items[0].status == "adopted"
-
 
 def test_release_touching_kernel_paths_is_not_adopted_without_approval(data_dir):
     # 受控内核设计说明第 4.2 节：交付改动了内核清单里的路径时，结算不自动采纳，
@@ -826,7 +777,6 @@ def test_kernel_modification_rejected_leaves_the_delivery_unadopted(data_dir):
     assert _open_decisions(system) == []
     assert system.projects.settle(run_id) is None
 
-
 def test_source_run_from_another_project_cannot_be_baseline(data_dir):
     system = _system(data_dir, _release_script("v1"))
     project_a = system.projects.register("A", GOAL)
@@ -848,7 +798,6 @@ def test_source_run_from_another_project_cannot_be_baseline(data_dir):
         system.projects.start_work_item(project_b, "偷树")
     assert system.projects.projection(project_b).work_items == []
 
-
 def test_mismatched_run_ownership_does_not_derive_work_item(data_dir):
     system = _system(data_dir, happy_script())
     project_a = system.projects.register("A", GOAL)
@@ -868,7 +817,6 @@ def test_mismatched_run_ownership_does_not_derive_work_item(data_dir):
     real = system.projects.projection(project_a).work_item(work_a)
     assert real.status == "in_progress" and real.phase is not None
 
-
 def test_register_validates_and_stores_goal_artifact(data_dir):
     system = _system(data_dir, happy_script())
     with pytest.raises(ValueError):
@@ -887,7 +835,6 @@ def test_register_validates_and_stores_goal_artifact(data_dir):
     }
     with pytest.raises(ProjectNotFoundError):
         system.projects.projection("proj_missing")
-
 
 def test_cli_project_list_and_show(data_dir, capsys):
     system = _system(data_dir, happy_script())

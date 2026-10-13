@@ -27,7 +27,7 @@ def test_cross_session_interleave_still_passes():
     # 调换两个会话之间事件交错的先后（会话内部顺序与因果关系不变）：产品组收尾的
     # activation_finished（<evt#16>）与工程组开头的 department_activated（<evt#17>）在数组里
     # 相邻且分属两组，调换后两组各自的内部顺序不变，transition → activation 边的方向也不变，
-    # 应通过；工程组收尾（<evt#48>）与质检组开头（<evt#49>）同样调换一对
+    # 应通过；工程组收尾（<evt#36>）与质检组开头（<evt#37>）同样调换一对（计划删除后编号前移）
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     events = actual["events"]
@@ -35,21 +35,21 @@ def test_cross_session_interleave_still_passes():
     second = next(i for i, e in enumerate(events) if e["event"] == "<evt#17>")
     assert second == first + 1
     _swap(events, first, second)
-    third = next(i for i, e in enumerate(events) if e["event"] == "<evt#48>")
-    fourth = next(i for i, e in enumerate(events) if e["event"] == "<evt#49>")
+    third = next(i for i, e in enumerate(events) if e["event"] == "<evt#36>")
+    fourth = next(i for i, e in enumerate(events) if e["event"] == "<evt#37>")
     assert fourth == third + 1
     _swap(events, third, fourth)
     compare_documents("handoff_release", expected, actual)
 
 
 def test_intra_session_swap_fails_with_diff():
-    # 调换工程会话内部两条相邻的工具事件（<evt#38> tool_started 与 <evt#39> tool_called）：
+    # 调换工程会话内部两条相邻的工具事件（<evt#26> tool_started 与 <evt#27> tool_called，计划删除后编号前移）：
     # 会话内顺序变了，分组比较应失败并点名差异
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     events = actual["events"]
-    first = next(i for i, e in enumerate(events) if e["event"] == "<evt#38>")
-    second = next(i for i, e in enumerate(events) if e["event"] == "<evt#39>")
+    first = next(i for i, e in enumerate(events) if e["event"] == "<evt#26>")
+    second = next(i for i, e in enumerate(events) if e["event"] == "<evt#27>")
     assert events[first]["session_id"] == events[second]["session_id"] == "<ses_eng#1>"
     assert second == first + 1
     _swap(events, first, second)

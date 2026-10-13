@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler
 from typing import Any
 
 from harness.models import json_dumps
-from harness.proposals import delivery, engineering_plan, product_spec, review
+from harness.proposals import delivery, product_spec, review
 from harness.tests.protocol_helpers import ScriptedProvider, send_reply, sse
 
 # 检查命令一律写成 ["python", ...]，由主机解析解释器，基准中不出现本机路径
@@ -17,10 +17,9 @@ def _submission(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if key != "kind"}
 
 
-# 交接一次需要的四段脚本：产品提交规格、工程提交计划、工程写文件并自检、质检复核并放行
+# 交接一次需要的三段脚本：产品提交规格、工程写文件并自检、质检复核并放行
 HTTP_SCRIPT: list[list[tuple[str, dict[str, Any]]]] = [
     [("submit_product_spec", _submission(product_spec()))],
-    [("submit_plan", _submission(engineering_plan()))],
     [("write_file", {"path": "src/echo.py", "content": ECHO}),
      ("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
      ("submit_delivery", _submission(delivery(check_names=["smoke"])))],

@@ -4,10 +4,9 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.models import EventType
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script, list_files_turn, run_scripted
-
 
 def _slow(turn):
     # 模型调用持续超过 1 秒的运行时间限制
@@ -17,10 +16,9 @@ def _slow(turn):
 
     return respond
 
-
 def test_time_limit_stops_run_with_failed_state(data_dir):
     # 运行时间限制为 1 秒，第一次模型调用期间运行时间用完
-    script = [_slow(product_spec()), plan_turn(), delivery_turn(),
+    script = [_slow(product_spec()),delivery_turn(),
               *[FakeTurn(proposal=None, transcript="working") for _ in range(100)]]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1, max_cycles=999)
@@ -30,9 +28,8 @@ def test_time_limit_stops_run_with_failed_state(data_dir):
     assert result.human_action is not None
     assert "运行时间已达上限" in (result.waiting_reason or "")
 
-
 def test_time_limit_checked_between_activations(data_dir):
-    script = [product_spec(), plan_turn(), delivery_turn(),
+    script = [product_spec(),delivery_turn(),
               review_turn("release", "ok")]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1)
@@ -45,14 +42,12 @@ def test_time_limit_checked_between_activations(data_dir):
     assert result.phase == "ENGINEERING"
     assert len(system.test_adapter.invocations) == 2
 
-
 def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
     # 旧默认值 max_cycles=8，新默认值 999999
     # 用 10 个激活（超过旧限制 8），验证不会暂停
     script = [
         product_spec(),
         *[list_files_turn for _ in range(50)],
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "ok"),
     ]
@@ -65,7 +60,6 @@ def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
 
-
 def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
     # 最大模型步数的默认值是 999999（StepLimits），不再是 32
     # 用超过 32 个步骤后提交，验证不会暂停
@@ -73,7 +67,6 @@ def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
     script = [
         product_spec(),
         *many_steps,
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "ok"),
     ]
@@ -82,14 +75,12 @@ def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
 
-
 def test_small_cycle_limit_still_pauses(data_dir):
-    script = [product_spec(), plan_turn(), delivery_turn(),
+    script = [product_spec(),delivery_turn(),
               review_turn("release", "ok")]
     _, projection = run_scripted(data_dir, script, max_cycles=1, run_time_limit_sec=7200)
     assert projection.phase == "PAUSED"
     assert projection.stop_reason == "max_cycles"
-
 
 def test_small_step_limit_still_pauses(data_dir):
     script = [
@@ -104,7 +95,6 @@ def test_small_step_limit_still_pauses(data_dir):
     assert result.phase == "PAUSED"
     assert result.stop_reason == "model_steps_exhausted"
 
-
 def test_convergence_with_defaults_always_terminates(data_dir):
     # 验证在默认配置下，有限的适配器脚本始终到达终态
     script = happy_script()
@@ -114,13 +104,11 @@ def test_convergence_with_defaults_always_terminates(data_dir):
     from harness.models import TERMINAL_PHASES
     assert result.phase in TERMINAL_PHASES
 
-
 def test_convergence_with_long_script_reaches_terminal(data_dir):
     # 用较长脚本验证收敛：即使有很多步骤，最终仍到达终态
     long_script = [
         product_spec(),
         *[list_files_turn for _ in range(100)],
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "ok"),
     ]
@@ -130,9 +118,8 @@ def test_convergence_with_long_script_reaches_terminal(data_dir):
     from harness.models import TERMINAL_PHASES
     assert result.phase in TERMINAL_PHASES
 
-
 def test_time_limit_event_recorded(data_dir):
-    script = [_slow(product_spec()), plan_turn(), delivery_turn(),
+    script = [_slow(product_spec()),delivery_turn(),
               *[FakeTurn(proposal=None, transcript="working") for _ in range(50)]]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1, max_cycles=999)
@@ -143,7 +130,6 @@ def test_time_limit_event_recorded(data_dir):
     assert failed_events[0].stop_reason == "time_limit"
     assert failed_events[0].payload["stop_reason"] == "time_limit"
 
-
 def test_time_limit_stored_in_run_created_event(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     run_id = system.create_run("echo", run_time_limit_sec=3600)
@@ -152,13 +138,11 @@ def test_time_limit_stored_in_run_created_event(data_dir):
     assert len(created) == 1
     assert created[0].payload["run_time_limit_sec"] == 3600
 
-
 def test_run_time_limit_sec_projected(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     run_id = system.create_run("echo", run_time_limit_sec=1800)
     projection = system.project(run_id)
     assert projection.run_time_limit_sec == 1800
-
 
 def test_per_request_timeout_still_applies_inside_step(data_dir):
     # 单步内的 per-request timeout 仍然生效（由适配器层控制）
@@ -171,10 +155,9 @@ def test_per_request_timeout_still_applies_inside_step(data_dir):
     assert result.phase == "FAILED"
     assert result.stop_reason == "provider_error"
 
-
 def test_explicit_small_max_cycles_with_large_time_limit(data_dir):
     # 明确设置小的 max_cycles 和大的时间限制，验证 max_cycles 仍然生效
-    script = [product_spec(), plan_turn(), delivery_turn(),
+    script = [product_spec(),delivery_turn(),
               review_turn("release", "ok")]
     _, projection = run_scripted(data_dir, script, max_cycles=1, run_time_limit_sec=7200)
     assert projection.phase == "PAUSED"

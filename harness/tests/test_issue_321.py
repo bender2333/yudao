@@ -14,7 +14,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.models import ArtifactRef, ProjectEventType
 from harness.projection import project_run
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.public_tree import TreeError, capture_public_tree
 from harness.event_store import run_stream
 from harness.runtime import LoopSystem
@@ -23,7 +23,6 @@ from harness.tests.helpers import happy_script
 
 GOAL = "把起点文件夹里的数据用到第一个事项的交付里。"
 TEXT = "用起始文件夹里的数据文件改一处代码"
-
 
 def _initial_directory(tmp_path, files=None):
     root = tmp_path / "initial"
@@ -36,7 +35,6 @@ def _initial_directory(tmp_path, files=None):
         (root / name).write_text(text, encoding="utf-8")
     return root
 
-
 def _blocked_script():
     # 产品提交规格以后工程部门的请求失败：run 停在非终态，用来检查排空期间排队的事项
     from harness.adapters.base import ProviderError
@@ -45,7 +43,6 @@ def _blocked_script():
 
 def _opened(data_dir, script=None):
     return LoopSystem.for_testing(data_dir, FakeAdapter(script or happy_script()))
-
 
 class _Opened:
     # 服务生命周期中建立的应用层：真实启动 FastAPI 应用，经 HTTP 提交命令与读取查询
@@ -63,21 +60,17 @@ class _Opened:
     def store(self):
         return self.applications[-1].system.store
 
-
 def _adopt(system, project_id, run_id):
     # 把一个跑到 DONE 的 run 结算到采纳：结算写在 RUN_DONE 之后，这里显式补做
     assert system.run_until_stop(run_id).phase == "DONE"
     system.projects.settle_pending(project_id)
 
-
 def _post(client, command, **body):
     return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})
-
 
 def _overview(client, project_id):
     body = client.get("/api/queries/project.overview", params={"project_id": project_id}).json()
     return body["data"]
-
 
 # ---------------------------------------------------------------------------
 # 命令：project.create 的 initial_directory
@@ -97,7 +90,6 @@ def test_create_with_initial_directory_records_the_snapshot_in_the_project_strea
     assert snapshot["tree_ref"]["path"].startswith(f"{project_id}/")
     system.close()
 
-
 def test_create_without_initial_directory_leaves_the_event_as_it_was(data_dir, tmp_path):
     system = _opened(data_dir)
     project_id = system.projects.register("普通项目", GOAL)
@@ -106,7 +98,6 @@ def test_create_without_initial_directory_leaves_the_event_as_it_was(data_dir, t
     assert system.projects.projection(project_id).initial_snapshot is None
     assert system.projects.projection(project_id).source == "idea"
     system.close()
-
 
 def test_a_project_registered_event_without_the_field_reads_back_as_no_initial_directory(data_dir):
     # 旧版本写入的 project_registered 没有 initial_snapshot：读回为没有起始文件夹（ADR-0019）
@@ -135,7 +126,6 @@ def test_a_project_registered_event_without_the_field_reads_back_as_no_initial_d
     finally:
         store.close()
 
-
 @pytest.mark.parametrize("broken", ["private_path", "missing_directory"])
 def test_an_unusable_initial_directory_is_rejected_and_writes_nothing(data_dir, tmp_path, broken):
     source = _initial_directory(tmp_path)
@@ -151,7 +141,6 @@ def test_an_unusable_initial_directory_is_rejected_and_writes_nothing(data_dir, 
     # 没有建立项目，也没有写入任何事件
     assert system.store.list_project_ids() == before
     system.close()
-
 
 # ---------------------------------------------------------------------------
 # 起点：没有采纳成果时是起始文件夹快照
@@ -174,7 +163,6 @@ def test_the_first_work_item_starts_from_the_initial_directory(data_dir, tmp_pat
     assert (workspace.root / "src" / "app.py").read_text(encoding="utf-8") == "print('start')\n"
     system.close()
 
-
 def test_after_the_first_adoption_the_start_point_is_the_adopted_tree(data_dir, tmp_path):
     source = _initial_directory(tmp_path)
     system = _opened(data_dir)
@@ -195,7 +183,6 @@ def test_after_the_first_adoption_the_start_point_is_the_adopted_tree(data_dir, 
     assert not (workspace.root / "data.json").exists()
     assert (workspace.root / "src" / "app.py").exists()
     system.close()
-
 
 def test_the_start_point_function_serves_the_three_call_sites(data_dir, tmp_path):
     # 三种情形各一个用例：有采纳成果、没有采纳成果且有起始文件夹快照、两者都没有
@@ -220,7 +207,6 @@ def test_the_start_point_function_serves_the_three_call_sites(data_dir, tmp_path
     assert adopted_point.initial_tree.digest == adopted_point.baseline["code_tree_digest"]
     system.close()
 
-
 def test_the_first_item_restarts_for_upgrade_with_the_initial_directory(data_dir, tmp_path):
     # 因升级重新开始的第一个事项（没有采纳成果）带着起始文件夹重新开始（排空期间的强制升级）
     source = _initial_directory(tmp_path)
@@ -238,7 +224,6 @@ def test_the_first_item_restarts_for_upgrade_with_the_initial_directory(data_dir
     assert (workspace.root / "data.json").exists()
     assert (workspace.root / "src" / "app.py").exists()
     system.close()
-
 
 # ---------------------------------------------------------------------------
 # 中断：run 创建之前终止进程
@@ -295,7 +280,6 @@ def test_a_queued_work_item_is_not_treated_as_a_run_missing_after_an_interruptio
     assert reopened.projects.projection(project_id).work_item(queued_work_item).status == "not_started"
     reopened.close()
 
-
 # ---------------------------------------------------------------------------
 # 查询与接口
 
@@ -312,7 +296,6 @@ def test_project_overview_reports_the_start_point_until_the_first_adoption(data_
         assert opened.store.list_project_events(project_id)[0].payload["initial_snapshot"]["tree_digest"] \
             == capture_public_tree(source).digest
 
-
 def test_the_create_command_rejects_an_unreadable_directory_with_source_invalid(data_dir, tmp_path):
     with running_api(_Opened(data_dir)) as client:
         missing = tmp_path / "nope"
@@ -323,7 +306,6 @@ def test_the_create_command_rejects_an_unreadable_directory_with_source_invalid(
         assert response.json()["message"]
         # 没有建立项目
         assert client.get("/api/queries/projects.list").json()["data"]["projects"] == []
-
 
 def test_the_create_command_accepts_an_initial_directory_over_http(data_dir, tmp_path):
     source = _initial_directory(tmp_path)

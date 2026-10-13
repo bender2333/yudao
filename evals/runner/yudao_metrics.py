@@ -14,8 +14,6 @@ from metrics import FAILURE_MARKERS
 
 MODEL_SERVICE_FAILURE = "model_service_failure"
 TIME_LIMIT = "time_limit"
-# 写入工作区的环境工具：只有这四个会改文件（第 5.1 节第 3 项）
-WRITE_TOOLS = frozenset({"write_file", "edit_range", "delete_file", "move_file"})
 # 设计第 5.1 节第 1 项：no_tool_call / 取消 / 达到限额 / 服务故障 / 进程退出
 # 都不能通过「放行」这一项；放行等于 `phase == "DONE"` 且 `stop_reason == "released"`
 RELEASE_STOP_REASONS = frozenset({"released"})
@@ -129,18 +127,17 @@ def _count(events, event_type):
 
 
 # ---------------------------------------------------------------------------
-# 过程检查点（设计第 5.1 节）：六项
+# 过程检查点（设计第 5.1 节）：五项
 
 
 def checkpoints_of(events, status, replay, outcome, parameters_version=None,
                    model_service_failure=False):
-    """第 5.1 节的六项过程检查点：四项同检 + recheck_ratio + 覆盖比例。"""
+    """第 5.1 节的五项过程检查点：三项同检 + recheck_ratio + 覆盖比例。"""
     released = status == "released"
     return {
         "ended_within_limit": _check_release_and_limit(events, outcome, status, parameters_version,
                                                        model_service_failure),
         "quality_release_bound_to_delivery": _check_release_binding(events, parameters_version, released),
-        "no_write_before_plan_accepted": _check_no_write_before_plan(events),
         "replay_consistent": _check_replay(replay),
         "no_false_release": _check_false_release(released, outcome),
         "release_coverage": _check_release_coverage(events, released),
@@ -307,37 +304,7 @@ def _release_binding_detail(reasons, self_run, total, ratio, status, note, relea
     return coverage + "（" + note + "）"
 
 
-# --- 第 3 项：工程的计划被接纳以前没有写入文件 --------------------------
-
-def _check_no_write_before_plan(events):
-    return {"passed": _no_write_before_plan(events),
-            "detail": _write_order_detail(events)}
-
-
-def _no_write_before_plan(events):
-    for event in events:
-        if event["type"] == "tool_called" and event["payload"].get("name") in WRITE_TOOLS:
-            return False
-        if event["type"] == "plan_accepted":
-            return True
-    return True
-
-
-def _write_order_detail(events):
-    first_write = None
-    for event in events:
-        if event["type"] == "tool_called" and event["payload"].get("name") in WRITE_TOOLS:
-            first_write = event
-            break
-    if first_write is None:
-        return "工程没有写入文件"
-    plan = next((event for event in events if event["type"] == "plan_accepted"), None)
-    if plan is None:
-        return "工程在计划被接纳以前写入了文件（位置 " + str(first_write.get("position")) + "）"
-    return "工程在计划被接纳（位置 " + str(plan.get("position")) + "）以后写入文件"
-
-
-# --- 第 4 项：重放结果与记录一致 ---------------------------------------
+# --- 第 3 项：重放结果与记录一致 ---------------------------------------
 
 def _check_replay(replay):
     if replay is None:
@@ -349,10 +316,10 @@ def _check_replay(replay):
                        else "重放结果与记录不一致：" + "、".join(diffs))}
 
 
-# --- 第 5 项：质检误放行 ------------------------------------------------
+# --- 第 4 项：质检误放行 ------------------------------------------------
 
 def _check_false_release(released, outcome):
-    """第 5 项：质检放行而隐藏检查中存在失败记未通过；没有放行时不适用，按通过计。"""
+    """第 4 项：质检放行而隐藏检查中存在失败记未通过；没有放行时不适用，按通过计。"""
     failures = (outcome or {}).get("hidden_failures") or []
     if not released:
         return {"passed": True,
@@ -365,7 +332,7 @@ def _check_false_release(released, outcome):
 
 
 def _check_release_coverage(events, released):
-    """设计第 5.1 节第 6 项：放行记录附检验覆盖比例、模型阅读条件数、开环条件数。
+    """设计第 5.1 节第 5 项：放行记录附检验覆盖比例、模型阅读条件数、开环条件数。
     没有放行时本项不适用，按通过计。无逐条覆盖数据的历史记录写未知。
     """
     if not released:

@@ -10,8 +10,9 @@ from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
 from harness.proposals import (
-    collaboration_request, collaboration_response, delivery_turn, plan_turn,
-    product_decision, product_spec, response_turn, review_turn,
+    collaboration_request, collaboration_response, delivery_turn,
+    product_decision, product_spec, response_turn,
+    review_turn,
 )
 from harness.providers.call import ModelResponse
 from harness.providers.selection import ModelSelection
@@ -20,7 +21,6 @@ from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_his
                                    recorded_context, wait_for_file)
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
-
 CHANGE_RECORD = {
     "changed": ["Print the argument in uppercase"],
     "retained": ["Accept one command-line argument"],
@@ -28,33 +28,26 @@ CHANGE_RECORD = {
     "rationale": "Apply the user's explicit change to uppercase output",
 }
 
-
 def _revision():
     return product_spec(requirements=["print the argument in uppercase"], change_record=CHANGE_RECORD)
-
 
 def _call(identity, name, **arguments):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
             "arguments": json_dumps(arguments)}
-
 
 def _steps(system, run_id, count):
     for _ in range(count):
         current = system.activate_once(run_id)
     return current
 
-
 def _events(system, run_id, kind):
     return [event for event in system.store.list_events(run_id) if event.type == kind]
-
 
 def _parts(system, request):
     return {part.source: part.text for part in recorded_context(system, request).parts}
 
-
 def _manifest(system, request):
     return recorded_context(system, request).manifest
-
 
 @pytest.mark.parametrize("operation", ["input", "stop", "guidance"])
 def test_operations_arriving_when_the_request_cannot_fit_find_the_run_ended(tmp_path, operation):
@@ -83,7 +76,6 @@ def test_operations_arriving_when_the_request_cannot_fit_find_the_run_ended(tmp_
     assert not kinds & {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED}
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_path):
     texts = ["  build echo\r\n", "Uppercase output", "\n\n  keep one argument  "]
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
@@ -105,7 +97,6 @@ def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_pa
     assert _manifest(system, request).input_version == 3 and _parts(system, request)["intend"] == "".join(texts)
     assert [item["text"] for item in json.loads(_parts(system, request)["pending_inputs"])] == texts
     assert accepted.canonical_state() == system.replay(run_id).canonical_state()
-
 
 @pytest.mark.parametrize("failure", ["partial_write", "replace"])
 def test_failed_intend_publication_preserves_previous_original_and_received_state(tmp_path, monkeypatch, failure):
@@ -143,7 +134,6 @@ def test_failed_intend_publication_preserves_previous_original_and_received_stat
     assert system.project(run_id).canonical_state() == before
     assert list(path.parent.glob(".intend-*.tmp")) == []
 
-
 def test_only_complete_product_spec_can_process_received_input(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), product_decision("Uppercase all output", "This cannot consume pending input"),
@@ -166,7 +156,6 @@ def test_only_complete_product_spec_can_process_received_input(tmp_path):
     assert "Accepted user input through version: 2" in prd
     assert CHANGE_RECORD["rationale"] in prd and old.product_spec.content_hash in prd
 
-
 def test_product_can_consult_while_current_inputs_still_wait_for_requirement_acceptance(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), collaboration_request("quality", "How should uppercase output be verified?"),
@@ -184,7 +173,6 @@ def test_product_can_consult_while_current_inputs_still_wait_for_requirement_acc
     assert len(_events(system, run_id, EventType.PRODUCT_INPUT_ASSIGNED)) == 1
     assert system.activate_once(run_id).processed_input_version == 2
 
-
 def test_new_input_during_pre_prd_consultation_supersedes_old_request_and_response(tmp_path):
     def reply(request):
         system.add_input(request.run_id, "Make the output uppercase")
@@ -200,7 +188,6 @@ def test_new_input_during_pre_prd_consultation_supersedes_old_request_and_respon
     assert _events(system, run_id, EventType.TOOL_SKIPPED)[-1].payload["name"] == "submit_response"
     assert system.activate_once(run_id).product_spec.input_version == 2
 
-
 def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_path):
     def old_spec(request):
         assert _manifest(system, request).input_version == 1
@@ -215,7 +202,6 @@ def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_pa
     current = system.activate_once(run_id)
     assert current.product_spec.revision == 1 and current.processed_input_version == 2
     assert [_manifest(system, request).input_version for request in system.test_adapter.invocations] == [1, 2]
-
 
 def test_input_before_model_request_start_does_not_send_the_prepared_old_context(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
@@ -235,7 +221,6 @@ def test_input_before_model_request_start_does_not_send_the_prepared_old_context
     assert system.activate_once(run_id).processed_input_version == 2
     assert _manifest(system, system.test_adapter.invocations[-1]).input_version == 2
 
-
 def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_limit(tmp_path):
     def final_old_response(request):
         system.add_input(run_id, "Confirm uppercase output")
@@ -250,7 +235,6 @@ def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_l
     assert current.product_work_input_version == 2 and current.processed_input_version == 0
     assert system.activate_once(run_id).processed_input_version == 2
 
-
 def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_input(tmp_path):
     # 登记命令运行中收到新输入：这个命令照常完成并记录，其余工具跳过
     signals = tmp_path / "signals"
@@ -263,9 +247,9 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
               "arguments": json_dumps({"name": "first"})},
              _call("second", "write_file", path="src/second.py", content="must not start"),
              _call("submission", "submit_delivery", summary="old delivery", files=["src/first.py"], check_names=["smoke"])]
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), ModelResponse(output=calls), _revision()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),ModelResponse(output=calls), _revision()]))
     run_id = system.create_run("build echo", registered_commands=registry, command_versions={"first": 1})
-    _steps(system, run_id, 2)
+    _steps(system, run_id, 1)
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         try:
@@ -289,30 +273,28 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
     visible_history(department_history(system, run_id, "engineering"))
     assert system.activate_once(run_id).processed_input_version == 2
 
-
 def test_input_received_during_quality_model_response_prevents_its_old_release(tmp_path):
     def stale_release(request):
         system.add_input(request.run_id, "Print uppercase instead")
         return review_turn("release", "This belongs to the old input")
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn(), stale_release]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),delivery_turn(), stale_release]))
     run_id = system.create_run("build echo")
-    _steps(system, run_id, 3)
+    _steps(system, run_id, 2)
     current = system.activate_once(run_id)
     assert current.phase == "PRODUCT_SPEC" and current.last_review is None
     assert current.input_version == 2 and current.processed_input_version == 1
     assert not _events(system, run_id, EventType.RUN_DONE)
     assert [event.payload["name"] for event in _events(system, run_id, EventType.TOOL_SKIPPED)] == ["run_check", "submit_review"]
 
-
 def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_path, monkeypatch):
     # 质检放行正在准备接纳时另一个线程写入新输入：放行的提交因流版本改变被写入口拒绝，按写入以后的状态重新判断；
     # 激活开始以后输入改变，放行按 execution_basis 拒绝，新输入保留，运行没有结束
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Current check passed"),
+        product_spec(),delivery_turn(), review_turn("release", "Current check passed"),
     ]))
     run_id = system.create_run("build echo")
-    _steps(system, run_id, 3)
+    _steps(system, run_id, 2)
     prepare = system.orchestrator.submissions.prepare
     receivers = []
 
@@ -331,7 +313,6 @@ def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_p
     assert [error["field"] for error in rejected.payload["errors"]] == ["execution_basis"]
     assert current.canonical_state() == system.replay(run_id).canonical_state()
 
-
 @pytest.mark.parametrize("command", ["/stop", "  /cancel\r\n"])
 def test_text_stop_commands_preserve_original_before_immediate_cancellation(tmp_path, command):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
@@ -344,7 +325,6 @@ def test_text_stop_commands_preserve_original_before_immediate_cancellation(tmp_
     assert (_events(system, run_id, EventType.USER_INPUT_RECEIVED)[0].stream_version
             < _events(system, run_id, EventType.RUN_FAILED)[0].stream_version)
 
-
 def test_cancel_button_does_not_fabricate_text_and_terminal_work_never_resumes(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("original")
@@ -356,7 +336,6 @@ def test_cancel_button_does_not_fabricate_text_and_terminal_work_never_resumes(t
     with pytest.raises(RunTerminalError):
         system.add_guidance(run_id, "product", "new instructions")
     assert system.project(run_id).canonical_state() == before
-
 
 def test_project_department_prompt_changes_apply_from_the_next_model_request(tmp_path):
     # 部门 Prompt 保存在项目部门设置中，run 内没有副本：修改发生在工程部门的第一次请求之后，
@@ -371,7 +350,7 @@ def test_project_department_prompt_changes_apply_from_the_next_model_request(tmp
         return ModelResponse(output=[_call("inspect", "list_files")])
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), update, plan_turn(), collaboration_request("product"),
+        product_spec(), update,collaboration_request("product"),
     ]))
     project_id["value"] = system.projects.register("P", "验证部门 Prompt 生效时机")
     _work_item_id, run_id = system.projects.start_work_item(project_id["value"], "build echo")
@@ -395,22 +374,20 @@ def test_project_department_prompt_changes_apply_from_the_next_model_request(tmp
     assert system.projects.read_department_setting(project_id["value"], "engineering")["version"] == 1
     assert current.canonical_state() == system.replay(run_id).canonical_state()
 
-
-def test_identical_requirement_text_for_new_input_still_has_new_contract_and_plan_binding(tmp_path):
+def test_identical_requirement_text_for_new_input_still_has_new_contract_binding(tmp_path):
     same_requirements = product_spec(change_record={
         "changed": [], "retained": ["Echo the argument exactly"], "retired": [],
         "rationale": "The new user input confirms the existing behavior",
     })
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), same_requirements]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),same_requirements]))
     run_id = system.create_run("build echo")
-    old = _steps(system, run_id, 2)
+    old = _steps(system, run_id, 1)
     system.add_input(run_id, "Confirm the existing echo behavior")
     current = system.activate_once(run_id)
     assert current.product_spec.requirements == old.product_spec.requirements
     assert current.effective_contract.content_hash != old.effective_contract.content_hash
-    assert current.effective_contract.input_version == 2 and current.engineering_plan is None
-    assert current.engineering_plans[-1].status == "superseded"
-
+    assert current.effective_contract.input_version == 2
+    assert not hasattr(current, "engineering_plan")
 
 def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(tmp_path):
     counts = {}
@@ -462,24 +439,20 @@ def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(
             assert manifest.input_version == expected_input and manifest.prompt_version == expected_prompt
     assert second.canonical_state() == system.replay(run_id).canonical_state()
 
-
-def test_updated_requirements_flow_through_new_plan_delivery_and_independent_quality(tmp_path):
+def test_updated_requirements_flow_through_new_delivery_and_independent_quality(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(), _revision(),
-        plan_turn(reason="Implement the newly accepted uppercase requirement"),
+        product_spec(),delivery_turn(), _revision(),
         delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
         review_turn("release", "Independently checked the updated uppercase output"),
     ]))
     run_id = system.create_run("build echo", max_cycles=12)
-    old = _steps(system, run_id, 3)
+    old = _steps(system, run_id, 2)
     system.add_input(run_id, "Print the argument in uppercase")
     done = system.run_until_stop(run_id)
     assert done.phase == "DONE", done.error
     assert done.processed_input_version == done.input_version == 2
     assert done.product_spec.change_record == CHANGE_RECORD
     assert done.effective_contract.content_hash != old.effective_contract.content_hash
-    assert done.engineering_plan.effective_contract_hash == done.effective_contract.content_hash
     assert done.delivery_spec.effective_contract_hash == done.last_review.effective_contract_hash == done.effective_contract.content_hash
-    assert done.delivery_spec.engineering_plan_hash == done.last_review.engineering_plan_hash == done.engineering_plan.content_hash
-    assert done.delivery_specs[0].status == "superseded" and done.engineering_plans[0].status == "superseded"
+    assert done.delivery_specs[0].status == "superseded"
     assert done.canonical_state() == system.replay(run_id).canonical_state()

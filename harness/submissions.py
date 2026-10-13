@@ -13,7 +13,7 @@ import tempfile
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .contracts import contract_payload, render_plan, render_prd, render_structure
+from .contracts import contract_payload, render_prd, render_structure
 from .event_store import run_stream
 from .write_path import NewEvent, Transaction
 from .environment import LocalEnvironment
@@ -92,14 +92,6 @@ class SubmissionWriter:
         elif kind == "product_decision":
             artifact["id"] = new_id("decision")
             event = append(EventType.PRODUCT_DECISION_ACCEPTED, artifact, [artifact["content_hash"]])
-        elif kind == "engineering_plan":
-            artifact["id"] = new_id("plan")
-            markdown = render_plan(artifact)
-            ref = self.artifacts.put(run_id, "engineering_plan", markdown, media_type="text/markdown")
-            artifact["plan_ref"] = asdict(ref)
-            event = append(EventType.PLAN_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
-            updates["specs/plan.json"] = _json_bytes(prepared[event][1])
-            updates["PLAN.md"] = materials["PLAN.md"] = self.artifacts.get_for_run(run_id, ref)
         elif kind == "collaboration_request":
             artifact["id"] = new_id("request")
             event = append(EventType.COLLABORATION_REQUESTED, artifact, [artifact["content_hash"]])
@@ -163,7 +155,7 @@ class SubmissionWriter:
         if kind in {"product_spec", "product_decision"}:
             contract = contract_payload(current)
             if current.effective_contract is None or contract["content_hash"] != current.effective_contract.content_hash:
-                contract["revision"] = len(current.effective_contracts) + 1
+                contract["revision"] = 1 if current.effective_contract is None else current.effective_contract.revision + 1
                 markdown = render_prd(current, contract)
                 ref = self.artifacts.put(run_id, "prd", markdown, media_type="text/markdown")
                 contract["prd_ref"] = asdict(ref)
@@ -200,7 +192,7 @@ class SubmissionWriter:
                     ref = (ArtifactRef(**projection.structures[-1]["structure_ref"])
                            if projection.structures else None)
                 else:
-                    ref = projection.engineering_plans[-1].plan_ref if projection.engineering_plans else None
+                    ref = None
                 previous_materials[name] = None if ref is None else self.artifacts.get_for_run(run_id, ref)
                 self._write_material(run_id, name, raw)
         except Exception:

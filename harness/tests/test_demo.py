@@ -35,8 +35,8 @@ def test_demo_fills_four_views(demo_run):
     assert projection.task == DEMO_TASK + DEMO_CHANGE
     assert projection.product_spec.input_version == 2
     assert projection.product_spec.change_record["retired"] == ["Unknown flags are rejected with exit 2"]
-    assert len(projection.engineering_plans) == 3
-    assert projection.engineering_plans[0].effective_contract_hash != projection.engineering_plan.effective_contract_hash
+    assert projection.delivery_specs and projection.delivery_spec is not None
+    assert projection.effective_contract is not None
     # 部门 Prompt 在项目部门设置中，run 内没有副本；demo 改过产品部门的 Prompt
     assert system.projects.read_department_setting(projection.project_id, "product")["version"] == 1
     assert projection.reviews[0].checks[0]["name"] == "usage"

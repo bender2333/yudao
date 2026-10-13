@@ -12,7 +12,7 @@ from .app.contracts import Rejected
 from .app.project_and_work_item_commands import WorkItemAppendInput, WorkItemCreate
 from .app.project_commands import ProjectCreate
 from .definitions import DEFINITIONS
-from .proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
+from .proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
 from .providers.selection import ModelSelection
 from .runtime import LoopSystem
 
@@ -98,9 +98,7 @@ def demo_script():
         V2,
         response_turn("completed", "The revised product requirements define flags and usage.",
                       result_types=["spec_accepted"]),
-        plan_turn(),
         V3,
-        plan_turn(reason="The user replaced flag rejection with ordinary-text echo; update the plan against PRD V3"),
         delivery_turn(
             "first delivery treats dash-prefixed input as ordinary text",
             files={"src/echo.py": echo_flags},
@@ -117,7 +115,6 @@ def demo_script():
             checks={"usage": quality_checks["usage"]},
             defects=[{"severity": "major", "summary": "no usage text on empty argv"}],
         ),
-        plan_turn(reason="Address the quality review by adding the missing usage behavior"),
         delivery_turn(
             "added usage text",
             files={"src/echo.py": echo_help},
@@ -150,8 +147,10 @@ async def _run_demo(application: Application, system: LoopSystem) -> tuple[LoopS
     work_item_id, run_id = created.refs.work_item_id, created.refs.run_id
     task = system.orchestrator.work_item_execution(run_id)
     assert task is not None, "work_item.create did not start the run task"
-    # 等到第一次工程计划被接纳，再追加变更、修改本项目的部门 Prompt（从产品部门的下一次请求起生效）
-    await _wait_for(lambda: system.project(run_id).engineering_plan is not None)
+    # 等到修订要求的协作请求已关闭（V2 接纳且 engineering 回复 completed），再追加变更：
+    # 主分支上这笔输入在首次计划接纳后才追加；删计划后等价点是请求关闭后，V3 消费它
+    await _wait_for(lambda: (len(system.project(run_id).effective_contracts) >= 2
+                             and system.project(run_id).pending_request is None))
     await _command(application, "work_item.append_input",
                    WorkItemAppendInput(command_id=str(uuid.uuid4()), work_item_id=work_item_id, text=DEMO_CHANGE))
     system.projects.configure_department_settings(
@@ -172,7 +171,7 @@ async def _wait_for(predicate, timeout_sec: float = 300.0) -> None:
         if predicate():
             return
         await asyncio.sleep(0.02)
-    raise RuntimeError("demo did not reach its initial accepted engineering plan")
+    raise RuntimeError("demo did not reach its initial accepted contract")
 
 
 async def _command(application: Application, name: str, request):

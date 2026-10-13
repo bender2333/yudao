@@ -40,7 +40,7 @@ def _read_source(path):
 
 
 def _reshape_checkpoints(run_metrics, hidden_failures):
-    """按新六项口径重算检查点；未核实项如实标注。"""
+    """按新五项口径重算检查点；未核实项如实标注。"""
     released = run_metrics.get("end_status") == "released"
     phase = run_metrics.get("phase")
     stop_reason = run_metrics.get("stop_reason")
@@ -59,9 +59,6 @@ def _reshape_checkpoints(run_metrics, hidden_failures):
             "recheck_ratio": None, "self_run": None, "checks_total": None,
             "recheck_ratio_status": "unverified",
             "recheck_ratio_note": "原始事件日志不在仓库内，取不回 parameters_version"},
-        "no_write_before_plan_accepted": {
-            "passed": None, "applicable": True,
-            "detail": "原始事件日志不在仓库内，工程是否在计划被接纳前写入待核实。"},
         "replay_consistent": {
             "passed": None, "applicable": True,
             "detail": "原始事件日志不在仓库内，重放结果无法取回，按未核实。"},

@@ -38,7 +38,8 @@ from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import (
-    product_spec, plan_turn, delivery_turn, review_turn, collaboration_request, response_turn,
+    product_spec, delivery_turn, review_turn,
+    collaboration_request, response_turn,
 )
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
@@ -48,21 +49,17 @@ from harness.write_path import NewEvent
 
 GOAL = "把文本按行处理清楚"
 
-
 def _release_script(summary="v1", files=None):
     return [
-        product_spec(), plan_turn(), delivery_turn(summary=summary, files=files),
+        product_spec(),delivery_turn(summary=summary, files=files),
         review_turn("release", f"ok {summary}"),
     ]
-
 
 def _system(data_dir, script):
     return LoopSystem.for_testing(data_dir, FakeAdapter(script))
 
-
 def _application(system: LoopSystem) -> Application:
     return Application(system)
-
 
 def _projection_rows(store) -> list[tuple]:
     with store._reading() as connection:
@@ -70,7 +67,6 @@ def _projection_rows(store) -> list[tuple]:
             "SELECT stream, version, position, state FROM projections ORDER BY stream"
         ).fetchall()
     return [(row["stream"], row["version"], row["position"], row["state"]) for row in rows]
-
 
 def test_overlays_list_only_when_every_dependent_query_is_registered(data_dir):
     application = _application(_system(data_dir, []))
@@ -85,7 +81,6 @@ def test_overlays_list_only_when_every_dependent_query_is_registered(data_dir):
     partial = Registry(commands=[], queries=[SYSTEM_STATUS], decisions=())
     listed = {item.name for item in partial.capabilities(capabilities.deployment).overlays}
     assert listed == set()
-
 
 def test_each_query_returns_a_snapshot_and_later_events_have_greater_positions(data_dir):
     system = _system(data_dir, happy_script())
@@ -103,7 +98,6 @@ def test_each_query_returns_a_snapshot_and_later_events_have_greater_positions(d
         ))
         assert system.store.end_position() > snapshot.position
 
-
 def test_queries_do_not_write_events_or_saved_projections(data_dir):
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("只读", GOAL)
@@ -116,7 +110,6 @@ def test_queries_do_not_write_events_or_saved_projections(data_dir):
         application.query(name, request)
     assert system.store.end_position() == before_position
     assert _projection_rows(system.store) == before_rows
-
 
 def _all_requests(system, project_id, work_item_id, run_id):
     # 全部已登记的查询各一个请求：位置与只读的断言都用它
@@ -151,7 +144,6 @@ def _all_requests(system, project_id, work_item_id, run_id):
         ("rules.registry", RulesRegistryRequest()),
     ]
 
-
 def test_overview_does_not_settle_a_released_run(data_dir):
     system = _system(data_dir, _release_script())
     project_id = system.projects.register("未结算", GOAL)
@@ -164,7 +156,6 @@ def test_overview_does_not_settle_a_released_run(data_dir):
     assert item.status == "released_unsettled"
     assert [event.type for event in system.store.list_project_events(project_id)] == before
     assert ProjectEventType.DELIVERABLE_ADOPTED not in before
-
 
 def test_deleting_read_models_and_rebuilding_returns_the_same_queries_without_calling_a_model(data_dir):
     system = _system(data_dir, happy_script())
@@ -191,7 +182,6 @@ def test_deleting_read_models_and_rebuilding_returns_the_same_queries_without_ca
     assert system.store.end_position() == end_position
     for name, request in requests:
         assert application.query(name, request).data.model_dump(mode="json") == before[name], name
-
 
 def test_attempt_pages_stay_inside_the_first_page_position(data_dir):
     system = _system(data_dir, happy_script())
@@ -229,7 +219,6 @@ def test_attempt_pages_stay_inside_the_first_page_position(data_dir):
     assert "late-attempt" in [item.attempt_id for item in complete.data.attempts]
     bounded = {item.attempt_id for item in complete.data.attempts if item.position <= first.position}
     assert set(seen) == bounded
-
 
 def test_query_time_does_not_grow_with_unrelated_history(data_dir):
     # 同一场景把历史事件数量增加十倍：已登记的查询耗时不变。
@@ -277,7 +266,6 @@ def test_query_time_does_not_grow_with_unrelated_history(data_dir):
     measure()  # 订阅把新事件吸收进读取模型；之后的查询不再处理它们
     again = min(measure(), measure(), measure())
     assert again < baseline * 4, f"baseline={baseline:.4f}s again={again:.4f}s"
-
 
 def test_current_queries_cover_the_old_read_scenarios(data_dir):
     system = _system(data_dir, happy_script())
@@ -348,7 +336,6 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
         project_id=project_id, work_item=work_item_id,
     ))
     assert materials.data.contracts
-    assert materials.data.plans
     assert materials.data.deliveries[0].summary == "implemented echo CLI"
 
     delivery_event = projection.delivery_spec.created_event_id
@@ -377,7 +364,6 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
 
     exported = application.query("run.export", RunExport(run_id=run_id))
     assert any(event["type"] == EventType.RUN_CREATED for event in exported.data.events)
-
 
 def test_department_workspace_room_reflects_the_run_state(data_dir):
     # 部门房间的画面数据随 run 的状态变化（原型 roomStatus 与房间数据）：
@@ -419,7 +405,6 @@ def test_department_workspace_room_reflects_the_run_state(data_dir):
     project_checked = application.query("replay.check", ReplayCheck(project_id=project_id))
     assert project_checked.data.consistent is True
 
-
 def test_flow_records_cover_handoff_delivery_problem_and_rework(data_dir):
     system = _system(data_dir, _rework_script())
     project_id = system.projects.register("流转", GOAL)
@@ -438,21 +423,18 @@ def test_flow_records_cover_handoff_delivery_problem_and_rework(data_dir):
     assert positions == sorted(positions)
     assert flow.position >= positions[-1]
 
-
-
 def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(data_dir):
     # 工单 #415 的场景：质检在工程退回事项的结论之前向工程提出询问并得到回答，
     # engineering 一侧与 quality 一侧因此在 quality→engineering 上留下「咨询」「问题反馈」与「返工」。
     # 期望直接写出应有的记录条数与种类，不复用画面侧的分组公式：分组若改变，这段断言照样成立
     system = _system(data_dir, [
-        product_spec(), plan_turn(), delivery_turn(),
+        product_spec(),delivery_turn(),
         collaboration_request("engineering", "Which acceptance line governs the rework?",
                               background="Quality is preparing its verdict.",
                               expected_result="Name the acceptance line to follow."),
         response_turn("answered", "Follow the acceptance line recorded in the requirement."),
         review_turn("rework_engineering", "质检退回",
                     defects=[{"severity": "minor", "summary": "空输入需要处理"}]),
-        plan_turn(reason="处理质检退回"),
         delivery_turn(summary="处理空输入"),
         review_turn("release", "revised delivery checked"),
     ])
@@ -471,7 +453,6 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
     assert by_kind["问题反馈"].status == "已退回"
     assert by_kind["返工"].status == "已退回"
 
-
 def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
     system = _system(data_dir, _release_script())
     project_id = system.projects.register("工件", GOAL)
@@ -489,7 +470,6 @@ def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
                      if item.type == EventType.CONTEXT_ASSEMBLED)
     context = application.query("event.detail", EventDetail(event_id=assembled.event_id))
     assert context.data.artifacts["request"]["input"][0]["role"] == "developer"
-
 
 def test_event_detail_rejects_an_artifact_of_another_run(data_dir, monkeypatch):
     system = _system(data_dir, [*_release_script(), *_release_script()])
@@ -512,7 +492,6 @@ def test_event_detail_rejects_an_artifact_of_another_run(data_dir, monkeypatch):
     with pytest.raises(NotFound):
         application.query("delivery.file", DeliveryFile(event_id=event.event_id, path="src/echo.py"))
 
-
 def test_event_detail_includes_compaction_summary_and_its_sources(tmp_path):
     from harness.tests.helpers import compacted_runner as _runner
 
@@ -524,7 +503,6 @@ def test_event_detail_includes_compaction_summary_and_its_sources(tmp_path):
     detail = application.query("event.detail", EventDetail(event_id=event.event_id))
     assert detail.data.artifacts["compaction_summary"]
     assert detail.data.artifacts["compaction_sources"]
-
 
 def test_delivery_detail_and_file_use_the_archived_bytes(data_dir):
     # 封存的清单与文件原文取自交付封存，不取自当前工作区
@@ -557,7 +535,6 @@ def test_delivery_detail_and_file_use_the_archived_bytes(data_dir):
     assert binary.data.content is None
     assert base64.b64decode(binary.data.base64) == b"\x00\xff\x01"
 
-
 def test_delivery_file_is_limited_to_the_archived_paths_of_a_delivery(data_dir):
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("路径", GOAL)
@@ -574,7 +551,6 @@ def test_delivery_file_is_limited_to_the_archived_paths_of_a_delivery(data_dir):
         application.query("delivery.file", DeliveryFile(event_id=assembled.event_id, path="src/echo.py"))
     with pytest.raises(NotFound):
         application.query("delivery.file", DeliveryFile(event_id="event_missing", path="src/echo.py"))
-
 
 @pytest.mark.parametrize("damage", ["missing_blob", "modified_blob"])
 def test_queries_reject_a_corrupted_delivery_archive(data_dir, damage):
@@ -598,7 +574,6 @@ def test_queries_reject_a_corrupted_delivery_archive(data_dir, damage):
     with pytest.raises(file_error):
         application.query("delivery.file", DeliveryFile(event_id=delivery.created_event_id, path="src/echo.py"))
 
-
 @pytest.mark.parametrize("mismatch", ["other_commit", "fake_tree", "forged_material"])
 def test_event_detail_rejects_a_git_version_not_bound_to_its_materials(data_dir, mismatch):
     # 改写保存的事件行以后核对绑定：另一个事件的版本、伪造的树、伪造的正式材料
@@ -621,7 +596,6 @@ def test_event_detail_rejects_a_git_version_not_bound_to_its_materials(data_dir,
     application = _application(system)
     with pytest.raises(ValueError):
         application.query("event.detail", EventDetail(event_id=delivery.event_id))
-
 
 def test_work_item_scope_is_checked_in_every_project_query(data_dir):
     # 事项范围参数指向别的事项时，项目内的查询都以目标不存在拒绝（旧路由的跨项目场景）
@@ -648,16 +622,13 @@ def test_work_item_scope_is_checked_in_every_project_query(data_dir):
         with pytest.raises(NotFound):
             application.query(name, request.model_copy(update={"work_item": "wi_missing"}))
 
-
 def _rework_script(verdict="rework_engineering"):
     return [
-        product_spec(), plan_turn(), delivery_turn(),
+        product_spec(),delivery_turn(),
         review_turn(verdict, "质检退回", defects=[{"severity": "minor", "summary": "空输入需要处理"}]),
-        plan_turn(reason="处理质检退回"),
         delivery_turn(summary="处理空输入"),
         review_turn("release", "revised delivery checked"),
     ]
-
 
 def test_read_models_write_only_their_own_database(data_dir):
     system = _system(data_dir, happy_script())
@@ -676,7 +647,6 @@ def test_read_models_write_only_their_own_database(data_dir):
     }
     assert not (data_dir / "read-models.sqlite").samefile(data_dir / "events.sqlite")
 
-
 def _log_tables(path: Path) -> dict[str, list[tuple]]:
     # 事件日志的三张表：读取模型与查询都不写它们
     with sqlite3.connect(path) as connection:
@@ -685,12 +655,10 @@ def _log_tables(path: Path) -> dict[str, list[tuple]]:
             for name in ("events", "projections", "commands")
         }
 
-
 def _table_names(path: Path) -> set[str]:
     with sqlite3.connect(path) as connection:
         rows = connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
     return {row[0] for row in rows}
-
 
 def test_cli_output_matches_the_queries_and_does_not_write_or_lock(data_dir, capsys):
     system = _system(data_dir, happy_script())
@@ -724,7 +692,6 @@ def test_cli_output_matches_the_queries_and_does_not_write_or_lock(data_dir, cap
     assert _files(data_dir) == before
     assert not (data_dir / "service.lock").exists()
 
-
 def test_demo_and_smoke_take_the_data_directory_lock_and_refuse_when_it_is_held(data_dir, capsys):
     data_dir.mkdir()
     held = FileLock(data_dir / "service.lock")
@@ -736,7 +703,6 @@ def test_demo_and_smoke_take_the_data_directory_lock_and_refuse_when_it_is_held(
         assert "data directory is in use by another service process" in capsys.readouterr().err
     finally:
         held.release()
-
 
 def _files(data_dir: Path) -> dict[str, bytes]:
     # SQLite 的只读连接会建立空的边车文件（-wal/-shm），它们不改变保存的数据

@@ -12,7 +12,7 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.event_store import Command
 from harness.models import EventType, Usage
-from harness.proposals import delivery, delivery_turn, engineering_plan, plan_turn, product_spec, review, review_turn
+from harness.proposals import delivery, delivery_turn, product_spec, review, review_turn
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests import process_kill as killed
@@ -25,11 +25,9 @@ CHECKS = {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" 
 TIME_LIMIT_SEC = 10
 SLOW_CHECK = {"slow": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"import time; time.sleep(12)\""}}
 
-
 def _call(identity, name, arguments):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
             "arguments": json.dumps(arguments)}
-
 
 def _usage(events):
     # 最后一个 activation_finished 记下的累计已用量；没有这样的事件时为空
@@ -39,18 +37,16 @@ def _usage(events):
     payload = finished[-1].payload or {}
     return (payload.get("elapsed_ms"), payload.get("activations"), payload.get("model_steps"))
 
-
 def _event_counts(events):
     activations = len([event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED])
     steps = len([event for event in events if event.type == EventType.MODEL_REQUESTED])
     return activations, steps
 
-
 def test_restart_keeps_accumulated_time_and_counts(tmp_path):
     # 验收一：run 在运行中被终止进程，重启以后自动继续，已用的运行时间、激活次数与模型步数
     # 与终止之前连续，恢复不重新计数
     data_dir = tmp_path / "data"
-    script = [{"proposal": product_spec()}, {"proposal": engineering_plan()},
+    script = [{"proposal": product_spec()},
               {"output": [_call("call-read", "read_file", {"path": "notes.txt"})]}]
     tail = [{"proposal": delivery(check_names=["smoke"]), "writes": {"src/echo.py": ECHO},
              "checks": CHECKS},
@@ -82,14 +78,13 @@ def test_restart_keeps_accumulated_time_and_counts(tmp_path):
                      if event.type == EventType.DEPARTMENT_ACTIVATED]
         assert after_activations == before_activations + len(unsettled), "累计激活数恰好推进了上个检查点以后的新增激活"
 
-
 def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
     # 验收二：短的运行时间上限，进程终止并重启以后按累计的已用时间达到上限，以运行时间上限的停止原因停止。
     # 断言只核对事件推出的关系：中断时 run 还没有以运行时间上限停止；重启以后的累计不小于终止前
     # 记录的累计（累计在进程终止与重启之间连续）并且达到上限
     data_dir = tmp_path / "data"
     script = [{"proposal": product_spec()}]
-    tail = [{"proposal": engineering_plan(), "checks": SLOW_CHECK}]
+    tail = [{"proposal": delivery(check_names=["slow"]), "checks": SLOW_CHECK}]
 
     with killed.interrupted(data_dir, script, tail=tail, run_time_limit_sec=TIME_LIMIT_SEC,
                             hold_after="activation_finished") as run:
@@ -111,12 +106,10 @@ def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
             f"重启后累计 {after_usage[0]}ms，达到 {TIME_LIMIT_SEC} 秒的运行时间上限"
         assert after_usage[1:] == _event_counts(after), "累计次数与事件数一致"
 
-
 def test_waiting_for_a_decision_is_excluded_from_run_time(tmp_path):
     # 验收三：等待用户决定期间不计入运行时间
     script = [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
               ProviderError("model is not available", reason="provider_unavailable"),
-              plan_turn(),
               delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
               review_turn("release", "checks passed on the current snapshot")]
     data_dir = tmp_path / "data"
