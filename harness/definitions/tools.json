@@ -244,7 +244,7 @@
     "kind": "environment",
     "action": "check",
     "guidance_only": true,
-    "description": "Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\"python\", \"src/echo.py\", \"hello\"].",
+    "description": "Host-executes a check in a fresh copy of the checked snapshot and records exit_code, summary, and snapshot hash. The command string runs with bash at the copy root, in a new process with the Yudao process's full environment; the copy is deleted when the check finishes. Do not self-report exit_code. command example: \"uv run pytest tests\". timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). Only run_check receipts count as check evidence; bash results are action receipts.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -252,18 +252,22 @@
           "type": "string",
           "description": "Check name, e.g. smoke"
         },
-        "argv": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Argument vector executed by the host, e.g. [\"python\", \"src/echo.py\", \"hello\"]"
+        "command": {
+          "type": "string",
+          "description": "The command string to run with bash at the copy root, e.g. uv run pytest tests"
+        },
+        "timeout_sec": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Optional time limit in seconds; omitted uses the default, larger values apply the maximum"
         }
       },
       "additionalProperties": false,
       "required": [
         "name",
-        "argv"
+        "command"
       ]
     },
     "repeatable": true
@@ -729,11 +733,11 @@
             "type": "object",
             "properties": {
               "name": {"type": "string", "description": "The name you passed to run_check"},
-              "argv": {"type": "array", "items": {"type": "string"}, "description": "The argv you passed to run_check"},
+              "command": {"type": "string", "description": "The command string you passed to run_check"},
               "purpose": {"type": "string", "description": "What this command builds or tests"}
             },
             "additionalProperties": false,
-            "required": ["name", "argv", "purpose"]
+            "required": ["name", "command", "purpose"]
           },
           "description": "Each entry needs a run_check receipt from this activation bound to the current snapshot"
         },

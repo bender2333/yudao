@@ -37,7 +37,7 @@ def _move(identity: str, source: str, destination: str) -> dict:
 def _settle() -> dict:
     # 交付以后的检查：模型按核实结果继续往下走
     return {"writes": {"src/done.txt": "done"},
-            "checks": {"smoke": {"argv": [sys.executable, "-c", "print('smoke ok')"]}}}
+            "checks": {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}}
 
 def test_a_write_that_never_happened_is_retried_once_without_asking_the_user(tmp_path):
     # 验收一（没有发生）：写入执行前终止进程，重启以后工作区与动作前快照相同，

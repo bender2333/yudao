@@ -36,7 +36,7 @@ def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-wri
                                media_type="application/json")
     activated = [event for event in system.store.list_events(run_id)
                  if event.type == EventType.DEPARTMENT_ACTIVATED]
-    args = ({"name": "smoke", "argv": ["python", "src/echo.py"]} if tool == "run_check"
+    args = ({"name": "smoke", "command": "python src/echo.py"} if tool == "run_check"
             else {"path": "src/a.py", "content": "A"})
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.TOOL_STARTED, actor="department:engineering", department="engineering",

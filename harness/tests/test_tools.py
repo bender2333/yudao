@@ -2,20 +2,19 @@ import asyncio
 import json
 import os
 import re
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.environment import LocalEnvironment, _display_argv
+from harness.environment import LocalEnvironment
 from harness.models import EventType, json_dumps
 from harness.public_tree import UnrepresentableWorkspace
 from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import LONG_RUNNING_TREE, action, perform, wait_for_file, wait_until_stopped
+from harness.tests.helpers import action, perform, run_tree_command, wait_for_file, wait_until_stopped
 from harness.definitions import DEFINITIONS
 from harness.tools import tools_for
 from harness.workspace import Workspace
@@ -30,7 +29,7 @@ def test_quality_checks_only_through_run_check(tmp_path):
     assert [name for name in tools_for("quality") if TOOLS[name].action == "check"] == ["run_check"]
     workspace = Workspace(tmp_path)
     workspace.write_file("ok.py", "raise SystemExit(0)\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "ok.py"]},
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python ok.py"},
                      department="quality")
     assert result.ok is True and result.output["executor"] == "host"
     assert workspace.snapshot().facts.latest_check("quality", "smoke").exit_code == 0
@@ -88,7 +87,7 @@ def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp
     workspace = Workspace(tmp_path)
     environment = LocalEnvironment(workspace)
     workspace.write_file("ok.py", "raise SystemExit(3)\n")
-    result = perform(environment, "run_check", {"name": "smoke", "argv": ["python", "ok.py"], "exit_code": 0})
+    result = perform(environment, "run_check", {"name": "smoke", "command": "python ok.py", "exit_code": 0})
     assert result.ok is True
     assert result.status == "completed"
     assert result.output["exit_code"] == 3
@@ -98,18 +97,10 @@ def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp
     assert receipt.exit_code == 3
     assert "host-executed" in receipt.summary
 
-def test_check_receipt_shows_a_workspace_program_as_its_own_path(tmp_path):
-    # 不是主机解释器的程序原样显示，工作区里的路径不换写法
-    workspace = Workspace(tmp_path)
-    workspace.write_file("tools/echo.py", "raise SystemExit(0)\n")
-    script = str(workspace.root / "tools" / "echo.py")
-    assert _display_argv([script]) == json_dumps([script])
-    assert _display_argv([sys.executable, script]) == json_dumps(["python", script])
-
 def test_run_check_requires_command(tmp_path):
     result = perform(LocalEnvironment(Workspace(tmp_path)), "run_check", {"name": "smoke", "exit_code": 0})
     assert result.ok is False
-    assert "argv" in (result.error or "") or "command" in (result.error or "")
+    assert "command" in (result.error or "")
 
 def test_agent_cannot_read_or_write_checks(tmp_path):
     environment = LocalEnvironment(Workspace(tmp_path))
@@ -125,7 +116,7 @@ def test_check_cannot_persist_forged_receipt(tmp_path):
         "forge.py",
         "from pathlib import Path\nPath('.checks/receipts.jsonl').write_text('forged\\n')\n",
     )
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "forge.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python forge.py"})
     assert result.ok is True
     text = (tmp_path / ".checks" / "receipts.jsonl").read_text(encoding="utf-8")
     assert text.strip() != "forged"
@@ -138,24 +129,27 @@ def test_check_does_not_keep_workspace_mutations(tmp_path):
     workspace = Workspace(tmp_path)
     workspace.write_file("src/echo.py", "print('ok')\n")
     workspace.write_file("mutate.py", "from pathlib import Path\nPath('hacked.txt').write_text('x')\n")
-    perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "mutate.py"]},
+    perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python mutate.py"},
             department="quality")
     assert "hacked.txt" not in workspace.list_files()
     assert workspace.read_file("src/echo.py") == "print('ok')\n"
 
-def test_check_subprocess_does_not_inherit_provider_credentials(tmp_path, monkeypatch):
+def test_check_subprocess_inherits_environment_and_redacts_secrets(tmp_path, monkeypatch):
+    # 检查继承 Yudao 进程的全部环境变量（与 bash 相同），输出里只脱敏不删除
     monkeypatch.setenv("BLACKROUTER_API_KEY", "super-secret-value-123456")
     workspace = Workspace(tmp_path)
     workspace.write_file(
         "env.py",
         "import os, sys\n"
         "print('has' if os.environ.get('BLACKROUTER_API_KEY') else 'missing')\n"
+        "print(os.environ.get('BLACKROUTER_API_KEY'))\n"
         "raise SystemExit(0)\n",
     )
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "env", "argv": [sys.executable, "env.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "env", "command": "python env.py"})
     assert result.ok is True
-    assert "missing" in result.output["summary"]
+    assert "has" in result.output["summary"]
     assert "super-secret-value-123456" not in result.output["summary"]
+    assert "${BLACKROUTER_API_KEY}" in result.output["summary"]
 
 def test_mutating_check_does_not_bind_pass_to_original_snapshot(tmp_path):
     workspace = Workspace(tmp_path)
@@ -168,7 +162,7 @@ def test_mutating_check_does_not_bind_pass_to_original_snapshot(tmp_path):
         "assert 'FIXED' in p.read_text()\n",
     )
     original = workspace.digest()
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "fix.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python fix.py"})
     assert result.ok is True
     assert result.output["exit_code"] == 0
     assert workspace.read_file("app.py") == "BROKEN = True\n"
@@ -189,7 +183,7 @@ def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
     workspace.write_file("poke.py", "from pathlib import Path\nPath('target.txt').write_text('HACKED')\n")
     # 工作区已有公开树无法表示的条目：检查不开始，由步骤驱动以 workspace_unrepresentable 暂停运行
     with pytest.raises(UnrepresentableWorkspace, match="Hard-linked files are not supported: target.txt"):
-        perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "poke.py"]})
+        perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python poke.py"})
     assert workspace.receipts() == []
     assert outside.read_text(encoding="utf-8") == "EXTERNAL"
     assert target.read_text(encoding="utf-8") != "HACKED"
@@ -197,7 +191,7 @@ def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
 def test_failed_check_records_real_exit_code(tmp_path):
     workspace = Workspace(tmp_path)
     workspace.write_file("fail.py", "raise SystemExit(7)\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "fail.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python fail.py"})
     assert result.ok is True
     assert result.output["exit_code"] == 7
     receipt = workspace.snapshot().facts.latest_check("engineering", "smoke")
@@ -210,7 +204,8 @@ def test_timed_out_check_records_timeout_exit_code_and_stops_the_process_tree(tm
     environment = LocalEnvironment(workspace, check_timeout_sec=2)
     marker = tmp_path / "started"
     started = time.monotonic()
-    result = perform(environment, "run_check", {"name": "smoke", "argv": ["python", "-c", LONG_RUNNING_TREE, str(marker)]})
+    result = perform(environment, "run_check",
+                     {"name": "smoke", "command": run_tree_command(marker)})
     assert time.monotonic() - started < 20
     assert result.ok is True and result.status == "timeout"
     assert result.output["exit_code"] == 124
@@ -227,7 +222,7 @@ def test_cancel_stops_a_running_check_and_its_receipt_is_cancelled(tmp_path):
     workspace = Workspace(tmp_path / "ws")
     environment = LocalEnvironment(workspace)
     marker = tmp_path / "started"
-    request = action("run_check", {"name": "smoke", "argv": ["python", "-c", LONG_RUNNING_TREE, str(marker)]})
+    request = action("run_check", {"name": "smoke", "command": run_tree_command(marker)})
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(asyncio.run, environment.perform(request))
         wait_for_file(marker)
@@ -248,7 +243,7 @@ def test_cancel_before_the_action_starts_does_not_start_the_process(tmp_path):
     workspace = Workspace(tmp_path / "ws")
     environment = LocalEnvironment(workspace)
     marker = tmp_path / "started"
-    request = action("run_check", {"name": "smoke", "argv": ["python", "-c", LONG_RUNNING_TREE, str(marker)]})
+    request = action("run_check", {"name": "smoke", "command": run_tree_command(marker)})
     environment.cancel(request.action_id)
     result = asyncio.run(environment.perform(request))
     assert result.status == "cancelled" and result.ok is False and result.output is None
@@ -264,11 +259,12 @@ def check_copy_base(tmp_path, monkeypatch):
     return base
 
 def test_missing_check_command_does_not_leave_a_copy(tmp_path, check_copy_base):
+    # 命令字符串缺失：检查不开始，副本不留
     workspace = Workspace(tmp_path / "workspace")
     workspace.write_file("ok.py", "print('ok')\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["missing.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke"})
     assert result.ok is False
-    assert "missing.py" in (result.error or "")
+    assert "command" in (result.error or "")
     assert list(check_copy_base.iterdir()) == []
 
 def test_failed_check_copy_does_not_leave_a_copy(tmp_path, monkeypatch, check_copy_base):
@@ -279,7 +275,7 @@ def test_failed_check_copy_does_not_leave_a_copy(tmp_path, monkeypatch, check_co
         raise OSError("copy failed")
 
     monkeypatch.setattr("harness.workspace.materialize_tree", fail_copy)
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "argv": ["python", "ok.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python ok.py"})
     assert result.ok is False
     assert "copy failed" in (result.error or "")
     assert list(check_copy_base.iterdir()) == []
@@ -292,8 +288,8 @@ def test_successful_and_failed_checks_do_not_leave_copies(tmp_path, check_copy_b
     with workspace.check_copy(workspace.snapshot().tree) as copy_root:
         assert copy_root.parent.parent == check_copy_base
         assert not copy_root.is_relative_to(workspace.root)
-    ok = perform(environment, "run_check", {"name": "ok", "argv": ["python", "ok.py"]})
-    failed = perform(environment, "run_check", {"name": "fail", "argv": ["python", "fail.py"]})
+    ok = perform(environment, "run_check", {"name": "ok", "command": "python ok.py"})
+    failed = perform(environment, "run_check", {"name": "fail", "command": "python fail.py"})
     assert ok.ok is True
     assert ok.output["exit_code"] == 0
     assert failed.ok is True
@@ -333,7 +329,7 @@ def test_module_import_check_preserves_complete_tree(tmp_path):
     workspace = Workspace(tmp_path)
     workspace.write_file("helper.py", "VALUE = 42\n")
     workspace.write_file("main.py", "from helper import VALUE\nprint(VALUE)\nassert VALUE == 42\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "imports", "argv": ["python", "main.py"]})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "imports", "command": "python main.py"})
     assert result.ok and result.output["exit_code"] == 0
     assert result.output["tree_changed"] is False
     assert "42" in result.output["summary"]
@@ -359,7 +355,7 @@ def test_check_records_source_workspace_change(tmp_path):
         "Path(sys.argv[1]).write_text('changed after the check\\n')\nraise SystemExit(7)\n",
     )
     result = perform(LocalEnvironment(workspace), "run_check", {
-        "name": "source", "argv": ["python", "app.py", str(workspace.root / "app.py")],
+        "name": "source", "command": 'python app.py "' + str(workspace.root / "app.py") + '"',
     })
     assert result.ok and result.output["exit_code"] == 7
     assert result.output["tree_changed"] is True
@@ -378,8 +374,8 @@ def test_check_keeps_process_evidence_when_postcheck_capture_fails(tmp_path, fai
         "os.link(os.path.join(root, 'app.py'), os.path.join(root, 'linked.py'))\n"
         "print('observed output')\nraise SystemExit(9)\n",
     )
-    argv = ["python", "app.py"] + ([str(workspace.root)] if failed_root == "source" else [])
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "unverified", "argv": argv})
+    command = "python app.py" + (f' "{workspace.root}"' if failed_root == "source" else "")
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "unverified", "command": command})
     assert result.ok and result.output["exit_code"] == 9
     assert result.output["tree_changed"] is True
     assert "observed output" in result.output["summary"]

@@ -30078,12 +30078,9 @@
             "title": "Name",
             "type": "string"
           },
-          "argv": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Argv",
-            "type": "array"
+          "command": {
+            "title": "Command",
+            "type": "string"
           },
           "purpose": {
             "title": "Purpose",
@@ -30095,7 +30092,7 @@
         },
         "required": [
           "name",
-          "argv",
+          "command",
           "purpose",
           "receipt"
         ],

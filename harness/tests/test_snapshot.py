@@ -35,7 +35,7 @@ def _system(data_dir):
         structure_turn(checks={"smoke": 0},
                        modules=[{"path": "src/", "responsibility": "the app"}],
                        entry_points=[{"kind": "command_line", "path": "src/app.py", "how_to_run": "python src/app.py"}],
-                       build_and_test=[{"name": "smoke", "argv": ["python", "src/app.py"], "purpose": "run it"}],
+                       build_and_test=[{"name": "smoke", "command": "python src/app.py", "purpose": "run it"}],
                        requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/app.py"]}]),
         baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}]),
     ]))

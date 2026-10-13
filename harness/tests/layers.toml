@@ -127,6 +127,7 @@
 "test_release_check.py" = "module"
 "test_replay.py" = "module"
 "test_request_time_limit.py" = "integration"
+"test_run_check.py" = "integration"
 "test_resolve_call_target.py" = "unit"
 "test_responses.py" = "integration"
 "test_retry_input_boundaries.py" = "module"

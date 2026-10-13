@@ -13898,9 +13898,9 @@ export type StructureBuildItem = {
      */
     name: string;
     /**
-     * Argv
+     * Command
      */
-    argv: Array<string>;
+    command: string;
     /**
      * Purpose
      */

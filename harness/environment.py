@@ -13,11 +13,11 @@ import io
 import json
 import os
 import re
-import shlex
+
 import shutil
 import signal
 import subprocess
-import sys
+
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,8 +28,8 @@ from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFact
 from .models import hash_bytes, json_dumps
 from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
-from .path_rules import TreeError, is_private_path
-from .redact import redact_text, sanitized_env
+from .path_rules import TreeError
+from .redact import redact_text
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
 
 # 一次工具结果的输出上限，取规则登记中的现值
@@ -44,7 +44,7 @@ CANCELLED_EXIT_CODE = 130
 
 _BASH_TIMEOUT_DEFAULT = DEFINITIONS.rule_value("bash_timeout_default_sec")
 _BASH_TIMEOUT_MAX = DEFINITIONS.rule_value("bash_timeout_max_sec")
-_PYTHON_NAMES = {"python", "python3", "py", "python.exe", "python3.exe"}
+_CHECK_TIMEOUT_MAX = DEFINITIONS.rule_value("check_timeout_max_sec")
 
 _BASH_PATH: str | None = None
 _BASH_OUTPUT_SUBDIR = "tool-output"
@@ -524,21 +524,31 @@ class LocalEnvironment:
         name = str(args.get("name") or "").strip()
         if not name:
             raise ValueError("check name is required")
-        argv = _argv_from_args(args)
+        command = args.get("command")
+        if not isinstance(command, str) or not command.strip():
+            raise ValueError("run_check requires a non-empty command string; argv is not accepted")
+        timeout_sec = args.get("timeout_sec")
+        if timeout_sec is None:
+            timeout_sec = self._check_timeout_sec
+        else:
+            if type(timeout_sec) is not int or timeout_sec < 1:
+                raise ValueError("timeout_sec must be a positive integer")
+            timeout_sec = min(timeout_sec, _CHECK_TIMEOUT_MAX)
+        # 模型自报 exit_code 不是证据：这里只读主机执行结果，从不读取该字段
         snapshot = self.workspace.snapshot()
         original_digest = snapshot.digest
         with self.workspace.check_copy(snapshot.tree) as copy_root:
-            resolved = _resolve_argv(self.workspace, argv, cwd=copy_root)
             finished = await _run_process(
-                resolved, copy_root, {**sanitized_env(), "PYTHONDONTWRITEBYTECODE": "1"},
-                self._check_timeout_sec, stop,
+                [_resolve_bash(), "-c", command], copy_root,
+                {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                timeout_sec, stop,
             )
             if finished.status == "completed":
                 exit_code = finished.returncode
                 output = _summarize_output(finished.stdout, finished.stderr)
             else:
                 if finished.status == "timeout":
-                    exit_code, output = TIMEOUT_EXIT_CODE, f"check timed out after {self._check_timeout_sec}s"
+                    exit_code, output = TIMEOUT_EXIT_CODE, f"check timed out after {timeout_sec}s"
                 else:
                     exit_code, output = CANCELLED_EXIT_CODE, "check cancelled; the process tree was stopped"
                 if finished.stdout:
@@ -563,7 +573,7 @@ class LocalEnvironment:
                 output = (output + "\n" if output else "") + "; ".join(verification_errors)
                 output += "; pass is not bound to the original snapshot"
             summary = redact_text(
-                f"host-executed argv={_display_argv(resolved)} exit={exit_code}\n{output}".strip()
+                f"host-executed command={command} exit={exit_code}\n{output}".strip()
             )
             receipt = self.workspace.record_check(
                 action.department,
@@ -638,55 +648,6 @@ def _require_reason(args: dict[str, Any]) -> None:
     reason = args.get("reason")
     if not isinstance(reason, str) or not reason.strip():
         raise ValueError("a non-empty reason is required for deleting or moving files")
-
-
-def _argv_from_args(args: dict[str, Any]) -> list[str]:
-    if "argv" in args and args["argv"] not in (None, ""):
-        argv = args["argv"]
-        if not isinstance(argv, list) or not argv or any(not isinstance(item, str) or not item.strip() for item in argv):
-            raise ValueError("argv must be a non-empty list of strings")
-        return [item.strip() for item in argv]
-    command = args.get("command")
-    if isinstance(command, list):
-        if not command or any(not isinstance(item, str) or not item.strip() for item in command):
-            raise ValueError("command must be a non-empty list of strings")
-        return [item.strip() for item in command]
-    if isinstance(command, str) and command.strip():
-        parts = shlex.split(command, posix=False)
-        if not parts:
-            raise ValueError("command is empty")
-        return parts
-    raise ValueError("run_check requires host-executed argv or command; exit_code is not evidence")
-
-
-def _resolve_argv(workspace: Workspace, argv: list[str], *, cwd: Path | None = None) -> list[str]:
-    for item in argv:
-        if ".." in Path(item).parts or is_private_path(item):
-            raise PermissionError("check argv cannot reference private or parent paths")
-    prog = argv[0]
-    name = Path(prog).name.lower()
-    if name in _PYTHON_NAMES:
-        return [sys.executable, *argv[1:]]
-    if Path(prog).is_absolute():
-        resolved = Path(prog).resolve()
-        if resolved != Path(sys.executable).resolve():
-            raise PermissionError("absolute executables other than the host python are not allowed")
-        return [str(resolved), *argv[1:]]
-    base = cwd if cwd is not None else workspace.root
-    path = (base / prog)
-    if not path.exists():
-        raise FileNotFoundError(f"check program not in workspace: {prog}")
-    return [str(path), *argv[1:]]
-
-
-def _display_argv(argv: list[str]) -> str:
-    shown = []
-    for index, item in enumerate(argv):
-        if index == 0 and Path(item).resolve() == Path(sys.executable).resolve():
-            shown.append("python")
-        else:
-            shown.append(item)
-    return json_dumps(shown)
 
 
 def _summarize_output(stdout: str, stderr: str) -> str:

@@ -1028,20 +1028,20 @@ class ProjectService:
         events = self.store.list_events(run_id)
         return next((event for event in reversed(events) if event.type == event_type), None)
 
-    def _quality_check_argvs(self, run_id: str) -> dict[str, list[str]]:
-        # 质检自己在快照上运行的 run_check 调用的 argv（工单 #136，设计第 3.3、4.6 节）：
+    def _quality_check_commands(self, run_id: str) -> dict[str, str]:
+        # 质检自己在快照上运行的 run_check 调用的命令字符串（工单 #136，设计第 3.3、4.6 节）：
         # 按 run 事件里质检的 run_check 调用取，同一个检查以后一次调用为准
-        argvs: dict[str, list[str]] = {}
+        commands: dict[str, str] = {}
         for event in self.store.list_events(run_id):
             if event.type != EventType.TOOL_CALLED or event.payload.get("name") != "run_check":
                 continue
             args = event.payload.get("args") or {}
             if not isinstance(args, dict):
                 continue
-            name, argv = args.get("name"), args.get("argv")
-            if isinstance(name, str) and isinstance(argv, list) and all(isinstance(item, str) for item in argv):
-                argvs[name] = list(argv)
-        return argvs
+            name, command = args.get("name"), args.get("command")
+            if isinstance(name, str) and isinstance(command, str):
+                commands[name] = command
+        return commands
 
     def _settle_run(self, transaction: Transaction, run: RunProjection) -> ProjectEvent | None:
         project = transaction.projection
@@ -1149,7 +1149,7 @@ class ProjectService:
                           "code_tree_digest": structure["code_tree_digest"]},
             "baseline_review": {"event_id": review["event_id"], "content_hash": review["content_hash"],
                                 "conclusions": list(review["conclusions"]), "omissions": list(review["omissions"]),
-                                "checks": _baseline_checks(review["checks"], self._quality_check_argvs(run.run_id)),
+                                "checks": _baseline_checks(review["checks"], self._quality_check_commands(run.run_id)),
                                 "other_failures": list(review["other_failures"])},
             "overview_ref": run.overview_ref, "snapshot": snapshot,
         }
@@ -1347,11 +1347,11 @@ class _NewWorkItem:
 
 
 
-def _baseline_checks(receipts: list[dict[str, Any]], argvs: dict[str, list[str]]) -> list[dict[str, Any]]:
-    # 基线核验里的检查回执（工单 #136，设计第 4.6 节）补上质检自己运行该检查时用的 argv：
-    # argv 取自质检在本 run 中 run_check 的调用（按检查名绑定），质检没有记录时为空
+def _baseline_checks(receipts: list[dict[str, Any]], commands: dict[str, str]) -> list[dict[str, Any]]:
+    # 基线核验里的检查回执（工单 #136，设计第 4.6 节）补上质检自己运行该检查时用的命令字符串：
+    # 命令取自质检在本 run 中 run_check 的调用（按检查名绑定），质检没有记录时为空
     return [
-        {"name": receipt["name"], "argv": list(argvs.get(receipt["name"], [])), "exit_code": int(receipt["exit_code"]),
+        {"name": receipt["name"], "command": commands.get(receipt["name"], ""), "exit_code": int(receipt["exit_code"]),
          "summary": receipt["summary"], "snapshot_hash": receipt["snapshot_hash"]}
         for receipt in receipts
     ]

@@ -39,7 +39,7 @@ from harness.tests.provider_replies import (
 )
 
 
-CHECKS = {"smoke": {"argv": ["python", "-c", "print('smoke ok')"]}}
+CHECKS = {"smoke": {"command": "python -c \"print('smoke ok')\""}}
 ECHO = "import sys\nprint(sys.argv[1])\n"
 
 
@@ -311,10 +311,10 @@ def bash_is_not_a_check_receipt(data_dir):
         ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
                               _call("command-1", "bash", {"command": "python src/echo.py hello"}),
                               submit("submit-1")]),
-        ModelResponse(output=[_call("check-2", "run_check", {"name": "unit-tests", "argv": argv}),
+        ModelResponse(output=[_call("check-2", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}),
                               _call("write-2", "write_file", {"path": "src/echo.py", "content": ECHO + "\n"}),
                               submit("submit-2")]),
-        ModelResponse(output=[_call("check-3", "run_check", {"name": "unit-tests", "argv": argv}), submit("submit-3")]),
+        ModelResponse(output=[_call("check-3", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}), submit("submit-3")]),
         _release("verified the delivered echo CLI"),
     ])
     system.run_until_stop(run_id)
@@ -348,11 +348,11 @@ def _delivery_call(identity: str) -> dict[str, Any]:
 def cancel_while_check_runs(data_dir):
     # 标记文件的路径写成正斜杠形式，规整以后各平台相同
     marker = (data_dir / "check-running").as_posix()
-    argv = ["python", "-c", _running("check"), marker]
+    command = f'python -c "{_running("check")}" "{marker}"'
     system, _, run_id = _system(data_dir, [
         product_spec(),
         ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
-                              _call("check-1", "run_check", {"name": "smoke", "argv": argv}),
+                              _call("check-1", "run_check", {"name": "smoke", "command": command}),
                               _delivery_call("submit-1")]),
     ])
     canceller = _cancel_when_running(system, run_id, data_dir / "check-running")

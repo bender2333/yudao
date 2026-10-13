@@ -322,7 +322,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
             _call(
                 f"quality-check-{counts[department]}",
                 "run_check",
-                {"name": "smoke", "argv": [sys.executable, "-c", "print('quality')"]},
+                {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""},
             ),
             _call(f"quality-review-{counts[department]}", "submit_review", payload),
         ]
@@ -349,7 +349,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
             _call(
                 f"engineering-check-{counts[department]}",
                 "run_check",
-                {"name": "smoke", "argv": [sys.executable, "-c", "print('engineering')"]},
+                {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('engineering')\""},
             ),
             _call(f"delivery-{counts[department]}", "submit_delivery", payload),
         ]
@@ -857,7 +857,7 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
         return _chat_stream([
             _call("write-echo", "write_file", {"path": "src/echo.py", "content": "import sys\nprint(sys.argv[1])\n"}),
             _call("engineering-check", "run_check",
-                  {"name": "smoke", "argv": [sys.executable, "-c", "print('engineering')"]}),
+                  {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('engineering')\""}),
             _call("engineering-delivery", "submit_delivery", payload),
         ], response_id=f"e-delivery-{count}", model="e-model-actual")
 
@@ -867,7 +867,7 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
         payload.pop("kind")
         return _stream([
             _call("quality-check", "run_check",
-                  {"name": "smoke", "argv": [sys.executable, "-c", "print('quality')"]}),
+                  {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""}),
             _call("quality-review", "submit_review", payload),
         ], response_id=f"q-review-{count}", model="q-model-actual")
 

@@ -66,9 +66,9 @@ V2 = product_spec(
 
 def demo_script():
     quality_checks = {
-        "echo": {"argv": ["python", "-c", "import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py','hello'],capture_output=True,text=True); assert r.returncode==0 and r.stdout.strip()=='hello'"]},
-        "flags": {"argv": ["python", "-c", "import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py','--unknown'],capture_output=True,text=True); assert r.returncode==0 and r.stdout.strip()=='--unknown' and not r.stderr"]},
-        "usage": {"argv": ["python", "-c", "import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py'],capture_output=True,text=True); assert r.returncode==2 and 'usage' in r.stderr"]},
+        "echo": {"command": "python -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py','hello'],capture_output=True,text=True); assert r.returncode==0 and r.stdout.strip()=='hello'\""},
+        "flags": {"command": "python -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py','--unknown'],capture_output=True,text=True); assert r.returncode==0 and r.stdout.strip()=='--unknown' and not r.stderr\""},
+        "usage": {"command": "python -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py'],capture_output=True,text=True); assert r.returncode==2 and 'usage' in r.stderr\""},
     }
     echo_flags = (
         "import sys\n"
@@ -102,7 +102,7 @@ def demo_script():
         delivery_turn(
             "first delivery treats dash-prefixed input as ordinary text",
             files={"src/echo.py": echo_flags},
-            checks={"smoke": {"argv": ["python", "src/echo.py", "hello"]}},
+            checks={"smoke": {"command": "python src/echo.py hello"}},
             transcript="implemented the user's revised argument behavior",
         ),
         collaboration_request("engineering", "Where is the CLI entry point?",
@@ -118,7 +118,7 @@ def demo_script():
         delivery_turn(
             "added usage text",
             files={"src/echo.py": echo_help},
-            checks={"smoke": {"argv": ["python", "src/echo.py", "hello"]}},
+            checks={"smoke": {"command": "python src/echo.py hello"}},
             transcript="added usage",
         ),
         review_turn(

@@ -816,7 +816,7 @@ class StructureEntryPoint(Payload):
 class StructureBuildItem(Payload):
     # 构建与测试的一条命令，带本次激活中绑定当前快照的执行回执
     name: str
-    argv: list[str]
+    command: str
     purpose: str
     receipt: CheckReceipt
 

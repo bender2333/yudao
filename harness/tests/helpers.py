@@ -75,6 +75,12 @@ LONG_RUNNING_TREE = (
 )
 
 
+def run_tree_command(marker) -> str:
+    # 把长时间运行的程序连同标记文件的位置包成一条检查命令：程序只用单引号，
+    # 整段用双引号包给 bash，Windows 上的解释器路径用正斜杠
+    return f'"{sys.executable.replace(chr(92), "/")}" -c "{LONG_RUNNING_TREE}" "{Path(marker).as_posix()}"'
+
+
 # 等待放行的进程（argv 的一项）：在第一个参数给出的目录中写下 started 与自己的进程号，
 # 然后等待同一目录中出现 release（至多 30 秒）。父进程先终止 Yudao 进程、等它退出，
 # 再按记录的进程号收掉这个子进程（工单 #338）：它与 Yudao 进程不同组，进程树终止到不了它
@@ -84,6 +90,11 @@ WAIT_FOR_RELEASE = (
     "(signals / 'child.pid').write_text(str(os.getpid())); "
     "[time.sleep(0.05) for _ in range(600) if not (signals / 'release').exists()]"
 )
+
+
+def run_wait_command(signals) -> str:
+    # 等待放行的程序连同信号目录的位置包成一条命令字符串
+    return f'"{sys.executable.replace(chr(92), "/")}" -c "{WAIT_FOR_RELEASE}" "{Path(signals).as_posix()}"'
 
 
 def wait_for_file(path: Path) -> None:

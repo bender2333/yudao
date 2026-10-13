@@ -97,7 +97,7 @@ def render_structure(structure: dict[str, Any]) -> str:
                  for item in structure["entry_points"])
     lines.extend(["", "## 构建与测试", ""])
     for item in structure["build_and_test"]:
-        lines.append(f"- {item['name']}（`{' '.join(item['argv'])}`）：{item['purpose']}")
+        lines.append(f"- {item['name']}（`{item['command']}`）：{item['purpose']}")
         receipt = item["receipt"]
         lines.append(f"  本次激活的回执：退出状态 {receipt['exit_code']}；{receipt['summary']}")
     lines.extend(["", "## 要求所在的位置", ""])

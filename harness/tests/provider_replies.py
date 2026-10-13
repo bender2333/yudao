@@ -21,9 +21,9 @@ def _submission(payload: dict[str, Any]) -> dict[str, Any]:
 HTTP_SCRIPT: list[list[tuple[str, dict[str, Any]]]] = [
     [("submit_product_spec", _submission(product_spec()))],
     [("write_file", {"path": "src/echo.py", "content": ECHO}),
-     ("run_check", {"name": "smoke", "argv": ["python", "-c", "print('smoke ok')"]}),
+     ("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
      ("submit_delivery", _submission(delivery(check_names=["smoke"])))],
-    [("run_check", {"name": "smoke", "argv": ["python", "-c", "print('smoke ok')"]}),
+    [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
      ("submit_review", _submission(review("release", "checks passed on the current snapshot")))],
 ]
 
