@@ -60,13 +60,15 @@ def _product_spec_stream(*, response_id: str, model: str) -> bytes:
     return _responses_reply([_call_item("product-spec", "submit_product_spec", payload)],
                             response_id=response_id, model=model)
 
-def _delivery_stream(*, response_id: str, model: str) -> bytes:
-    # 工程部门返回一次可接纳的交付：同一次运行要跨越两个部门
+def _delivery_stream(*, response_id: str, model: str, basis_product_spec_hash: str | None) -> bytes:
+    # 工程部门返回一次可接纳的交付：同一次运行要跨越两个部门。交付按依据版本声明（工单 #471）：
+    # 依据取自工程请求里写明的当前 ProductSpec content_hash
     return _responses_reply([
         _call_item("engineering-write", "write_file", {"path": "src/echo.py", "content": "print('echo')\n"}),
-        _call_item("engineering-check", "run_check", {"name": "smoke", "argv": ["python", "src/echo.py"]}),
+        _call_item("engineering-check", "run_check", {"name": "smoke", "command": "python src/echo.py"}),
         _call_item("engineering-delivery", "submit_delivery",
-                   {"summary": "implemented echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"]}),
+                   {"summary": "implemented echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"],
+                    "basis_product_spec_hash": basis_product_spec_hash}),
     ], response_id=response_id, model=model)
 
 def _stream_reply(body: bytes) -> tuple[int, str, list[bytes]]:
@@ -83,13 +85,29 @@ def _request_phase(body: dict[str, Any]) -> str:
             for segment in content:
                 if isinstance(segment, dict) and isinstance(segment.get("text"), str):
                     parts.append(segment["text"])
+
     match = re.search(r'"phase":"([A-Z_]+)"', "\n".join(parts))
     return match.group(1) if match else ""
+
+def _request_spec_hash(body: dict[str, Any]) -> str | None:
+    # 从请求内容里取当前有效 ProductSpec 的 content_hash：交付按依据版本声明（工单 #471）
+    parts: list[str] = []
+    for item in body.get("input", []):
+        content = item.get("content")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):
+            for segment in content:
+                if isinstance(segment, dict) and isinstance(segment.get("text"), str):
+                    parts.append(segment["text"])
+    match = re.search(r"\[current_product_spec\]\n(\{.*?\})\n", "\n".join(parts))
+    return json.loads(match.group(1))["content_hash"] if match else None
 
 def _department_aware_reply(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
     # 产品部门返回产品要求，工程部门返回一次可接纳的交付：同一次运行要跨越两个部门
     if _request_phase(body) == "ENGINEERING":
-        return _stream_reply(_delivery_stream(response_id="resp-plan", model="m-local-target"))
+        return _stream_reply(_delivery_stream(response_id="resp-plan", model="m-local-target",
+                                              basis_product_spec_hash=_request_spec_hash(body)))
     return _stream_reply(_product_spec_stream(response_id="resp-1", model="m-local-target"))
 
 def _transient_error() -> tuple[int, str, list[bytes]]:
@@ -183,8 +201,8 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
         return _stream_reply(_product_spec_stream(response_id="resp-retry", model="m-a-target"))
 
     server_a, capture_a, base_a = serve(lambda body: provider_a(body))
-    server_b, capture_b, base_b = serve(lambda _body: _stream_reply(_delivery_stream(response_id="resp-plan",
-                                                                                model="m-b-target")))
+    server_b, capture_b, base_b = serve(lambda body: _stream_reply(_delivery_stream(
+        response_id="resp-plan", model="m-b-target", basis_product_spec_hash=_request_spec_hash(body))))
     try:
         facade = ProviderFacade(credentials=CredentialChain(overrides={
             "KEY_A": CredentialMaterial("key-a", version="a-v1"),
