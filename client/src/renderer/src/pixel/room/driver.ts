@@ -944,7 +944,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     },
     puzzled(ev) {
       state.eventStatus = "pending_verification";
-      state.eventTool = ((ev.payload as Record<string, unknown>)?.tool as string) || ev.tool || "run_command";
+      state.eventTool = ((ev.payload as Record<string, unknown>)?.tool as string) || ev.tool || "bash";
       state.lastPendingTool = state.eventTool;
       scene.frozen = false;
       applyLights();
@@ -1257,7 +1257,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     decided(ev, a: RoomActor) {
       const pl = (ev.payload ?? {}) as Record<string, unknown>;
       const choice = (pl.choice as string) || "accept_current";
-      const tool = ev.tool || (pl.tool as string) || state.lastPendingTool || model.pending_tool || "run_command";
+      const tool = ev.tool || (pl.tool as string) || state.lastPendingTool || model.pending_tool || "bash";
       const words: Record<string, string> = { rerun: "重新执行", accept_current: "按当前实际状态继续", stop: "停止事项" };
       state.eventStatus = choice === "stop" ? "cancelled" : "working";
       state.eventTool = null;

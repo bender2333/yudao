@@ -58,7 +58,7 @@
       "notes": [
         "直接 write_file、run_check，最后 submit_delivery；写入范围必须落在当前有效合同界定的目标与边界之内。",
         "改变产品要求必须请产品正常接纳，不能在交付中新增要求。",
-        "check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。"
+        "check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；bash 的结果不能作为检查回执，模型自报的 exit_code 无效。"
       ]
     },
     "quality": {

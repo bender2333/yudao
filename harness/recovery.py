@@ -109,17 +109,17 @@ def _tool_name(event: Event) -> str:
 def action_repeatable(tool: str, args: Mapping[str, Any] | None = None, *,
                       registered_commands: Mapping[str, Any] | None = None) -> bool:
     # 一个动作能否重复执行（恢复契约第 4 节，工单 #242）：唯一的判断入口，后面三张工单共用。
-    # 读取、搜索与检查由工具契约各自声明 repeatable；登记的本地命令取这个 run 中固定的登记里的声明
-    # （登记时声明「可以重新执行」，缺省为否）；没有定义或没有声明的工具为否
-    definition = DEFINITIONS.tools.get(tool)
-    if definition is None:
-        return False
-    if definition.action == "command":
+    # 读取、搜索、检查与 bash 由工具契约各自声明 repeatable；没有定义或没有声明的工具为否。
+    # 已删除的 run_command 仍按这个 run 中固定的登记里的声明回答（#484 删除注册体系时连参数一并移除）。
+    if tool == "run_command":
         name = (args or {}).get("name")
         if not isinstance(name, str):
             return False
         entry = (registered_commands or {}).get(name)
         return bool(entry is not None and entry.get("repeatable"))
+    definition = DEFINITIONS.tools.get(tool)
+    if definition is None:
+        return False
     return definition.repeatable
 
 

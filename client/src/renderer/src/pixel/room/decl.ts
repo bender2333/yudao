@@ -73,12 +73,14 @@ export function poseAnim(action: string): string {
   throw new Error(`roomModel.pose.action 无法对应到动作：${action}`);
 }
 
-// 真实系统有三个工具在原型里没有单独的动作：看目录、删文件、移动文件。
-// 它们的动作按同一类工作取：看目录是翻找，删文件是改，移动文件是改（画面上都是动手改文件）。
+// 真实系统有四个工具在原型里没有单独的动作：看目录、删文件、移动文件，以及取代登记命令的 bash。
+// 它们的动作按同一类工作取：看目录是翻找，删文件是改，移动文件是改（画面上都是动手改文件）；
+// bash 沿用原来 run_command 的终端拉杆动作。
 const TOOL_ACTIONS: Record<string, string> = {
   list_files: "search",
   delete_file: "write",
   move_file: "write",
+  bash: "run_command",
 };
 
 /** 事件到动作（原型 engine.js 的 resolveAction）。 */
@@ -115,7 +117,7 @@ export function statusAction(status: string): string | null {
 
 /** 工具种类对应的房间位置（原型 room.js 的 toolSpot）。 */
 export function toolSpot(tool: string | null | undefined): string {
-  if (tool === "run_command") return "terminal";
+  if (tool === "bash") return "terminal";
   if (tool === "search") return "cabinet";
   if (tool === "run_check") return "bench";
   return "desk";

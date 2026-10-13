@@ -268,32 +268,37 @@
     },
     "repeatable": true
   },
-  "run_command": {
+  "bash": {
     "kind": "environment",
     "action": "command",
     "guidance_only": false,
-    "description": "Engineering-only: run one project-registered command in the run workspace with a stripped environment, time limit, output limit, and process-tree cleanup. Only the registered name and allowlisted extra args are accepted. The host-observed exit status is the evidence; a self-reported exit_code is never read. run_command results are action receipts and cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string in this session's workspace with bash, and get the host-observed exit status and output back. Each call starts a new process and keeps no shell state between calls; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output longer than the limit is stored as an artifact; the truncated part is returned and the full output can be read back. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "parameters": {
       "type": "object",
       "properties": {
-        "name": {
+        "command": {
           "type": "string",
-          "description": "Registered command name frozen for this run"
+          "description": "The command string to run with bash in the workspace root, e.g. uv run pytest tests. Omit it when passing cursor to read back a truncated output."
         },
-        "args": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Extra arguments; every item must be in the registered allowlist"
+        "timeout_sec": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Optional time limit in seconds; omitted uses the default, larger values apply the maximum"
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Pass the previous receipt's next_cursor to read the next page of a truncated output; no new process starts"
         }
       },
       "additionalProperties": false,
-      "required": [
-        "name"
-      ]
+      "required": []
     },
-    "repeatable": false
+    "repeatable": true
   },
   "submit_product_spec": {
     "kind": "host",
@@ -592,7 +597,7 @@
     "kind": "host",
     "proposal": "delivery_spec",
     "guidance_only": false,
-    "description": "Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. run_command results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.",
+    "description": "Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. bash results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -611,7 +616,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Names passed to run_check in this activation on the current workspace; run_command results do not count"
+          "description": "Names passed to run_check in this activation on the current workspace; bash results do not count"
         },
         "known_risks": {
           "type": "array",

@@ -66,15 +66,21 @@ def _handoff_script() -> list[Any]:
     return [product_spec(), _deliver(), _release()]
 
 
-def _system(data_dir, script: list[Any], *, step_limits: StepLimits = StepLimits(),
+def _system(data_dir, script: list[Any] | dict[str, list[Any]], *, step_limits: StepLimits = StepLimits(),
             **run_options: Any) -> tuple[LoopSystem, FakeAdapter, str]:
+    # 脚本两种给法：一个队列按请求先后取用；按部门给的每个部门一份，各自取用自己的（#469）
     adapter = FakeAdapter(script)
     system = LoopSystem.for_testing(data_dir, adapter, step_limits=step_limits)
     return system, adapter, system.create_run("build an echo CLI", **run_options)
 
 
 def handoff_release(data_dir):
-    system, _, run_id = _system(data_dir, _handoff_script())
+    # 按部门给出的脚本：产品一份、工程一份（交付）、质检一份（#469 验收 1；计划已随 #470 删除）
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [_deliver()],
+        "quality": [_release()],
+    })
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -151,11 +157,7 @@ def invalid_tool_arguments(data_dir):
     return system, run_id, {}
 
 
-def tool_denied_unregistered_command(data_dir):
-    registry = {"unit": {"argv": ["python", "-c", "print('unit ok')"], "args": [], "timeout_sec": 30, "output_limit": 4000}}
-    unknown = ModelResponse(output=[_call("command-missing", "run_command", {"name": "missing"})])
-    system, _, run_id = _system(data_dir, [product_spec(), unknown, _deliver(), _release()],
-                                registered_commands=registry, command_versions={"unit": 1})
+
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -297,9 +299,8 @@ def no_tool_call_pause(data_dir):
     return system, run_id, {}
 
 
-def run_command_is_not_a_check_receipt(data_dir):
+def bash_is_not_a_check_receipt(data_dir):
     argv = ["python", "src/echo.py", "hello"]
-    registry = {"unit-tests": {"argv": argv, "args": [], "timeout_sec": 30, "output_limit": 4000}}
 
     def submit(identity):
         return _call(identity, "submit_delivery",
@@ -308,13 +309,14 @@ def run_command_is_not_a_check_receipt(data_dir):
     system, _, run_id = _system(data_dir, [
         product_spec(),
         ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
-                              _call("command-1", "run_command", {"name": "unit-tests"}), submit("submit-1")]),
+                              _call("command-1", "bash", {"command": "python src/echo.py hello"}),
+                              submit("submit-1")]),
         ModelResponse(output=[_call("check-2", "run_check", {"name": "unit-tests", "argv": argv}),
                               _call("write-2", "write_file", {"path": "src/echo.py", "content": ECHO + "\n"}),
                               submit("submit-2")]),
         ModelResponse(output=[_call("check-3", "run_check", {"name": "unit-tests", "argv": argv}), submit("submit-3")]),
         _release("verified the delivered echo CLI"),
-    ], registered_commands=registry, command_versions={"unit-tests": 1})
+    ])
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -359,14 +361,13 @@ def cancel_while_check_runs(data_dir):
     return system, run_id, {}
 
 
-def cancel_while_command_runs(data_dir):
+def cancel_while_bash_runs(data_dir):
     marker = (data_dir / "command-running").as_posix()
-    registry = {"serve": {"argv": ["python", "-c", _running("command"), marker], "args": [], "timeout_sec": 60,
-                          "output_limit": 4000}}
+    command = f"echo command started; printf running > \"{marker}\"; sleep 60"
     system, _, run_id = _system(data_dir, [
         product_spec(),
-        ModelResponse(output=[_call("command-1", "run_command", {"name": "serve"}), _delivery_call("submit-1")]),
-    ], registered_commands=registry, command_versions={"serve": 1})
+        ModelResponse(output=[_call("command-1", "bash", {"command": command}), _delivery_call("submit-1")]),
+    ])
     canceller = _cancel_when_running(system, run_id, data_dir / "command-running")
     system.run_until_stop(run_id)
     canceller.join(60)
@@ -577,9 +578,7 @@ SCENARIOS: dict[str, Scenario] = {
     "invalid_tool_arguments": Scenario(
         "模型给出无法解析的工具参数：工具不启动，错误作为工具结果返回模型，记入历史的参数换成 {}；下一步提交成功。",
         invalid_tool_arguments),
-    "tool_denied_unregistered_command": Scenario(
-        "工具许可拒绝没有登记的命令，命令不执行，拒绝原因作为工具结果返回；之后正常交付并放行。",
-        tool_denied_unregistered_command),
+
     "tool_denied_guidance_only": Scenario(
         "质检阶段收到给工程部门的指导：工程部门以只能回应指导的方式激活，写文件被工具许可拒绝，回应指导（explained）后回到质检并放行。",
         tool_denied_guidance_only),
@@ -620,17 +619,17 @@ SCENARIOS: dict[str, Scenario] = {
     "no_tool_call_pause": Scenario(
         "连续 4 次只回复文字（#47）：前 3 次各追加一条主机提示，第 4 次以 no_tool_call 暂停运行。",
         no_tool_call_pause),
-    "run_command_is_not_a_check_receipt": Scenario(
-        "只运行登记命令就提交交付被拒绝（#103）；运行检查后又修改文件再次被拒绝；重新调用 run_check 后交付被接纳，质检放行。",
-        run_command_is_not_a_check_receipt),
+    "bash_is_not_a_check_receipt": Scenario(
+        "只运行 bash 就提交交付被拒绝（#103）；运行检查后又修改文件再次被拒绝；重新调用 run_check 后交付被接纳，质检放行。",
+        bash_is_not_a_check_receipt),
     "cancel_while_check_runs": Scenario(
         "工程部门的检查进程运行中另一个线程取消运行：运行以 cancelled 结束；检查的进程树结束，回执记为已取消"
         "（exit 130，带截至结束时的输出），之后的提交记为跳过，不再激活部门。",
         cancel_while_check_runs),
-    "cancel_while_command_runs": Scenario(
-        "工程部门的登记命令运行中另一个线程取消运行：运行以 cancelled 结束；命令的进程树结束，回执记为已取消"
+    "cancel_while_bash_runs": Scenario(
+        "工程部门的 bash 命令运行中另一个线程取消运行：运行以 cancelled 结束；命令的进程树结束，回执记为已取消"
         "（status cancelled、exit 130，带截至结束时的输出），之后的提交记为跳过，不再激活部门。",
-        cancel_while_command_runs),
+        cancel_while_bash_runs),
     "http_responses_handoff": Scenario(
         "经真实 Provider 模块与测试内启动的 HTTP 服务（Responses 协议）走完交接与放行：记录序列化请求、流式进度、响应与用量。",
         _http_scenario("responses")),

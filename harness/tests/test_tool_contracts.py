@@ -21,7 +21,7 @@ def test_tools_are_host_tools_or_environment_actions():
     assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
         "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
         "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
-        "run_check": "check", "run_command": "command",
+        "run_check": "check", "bash": "command",
     }
 
 
@@ -36,16 +36,17 @@ def test_submit_delivery_description_states_that_check_receipts_come_from_run_ch
     text = delivery.description
     assert "Every name in check_names must be a name you passed to run_check in this activation on the current workspace" in text
     assert "if any file changes after a check, call run_check again before submitting" in text
-    assert "run_command results are action receipts and are not accepted as delivery check receipts" in text
+    assert "bash results are action receipts and are not accepted as delivery check receipts" in text
     names = delivery.parameters["properties"]["check_names"]["description"]
     assert "Names passed to run_check in this activation on the current workspace" in names
-    assert "run_command results do not count" in names
+    assert "bash results do not count" in names
 
 
-def test_run_command_description_separates_action_receipts_from_delivery_check_receipts():
-    text = TOOLS["run_command"].description
-    assert "The host-observed exit status is the evidence; a self-reported exit_code is never read." in text
-    assert "run_command results are action receipts and cannot be listed in submit_delivery check_names" in text
+def test_bash_description_separates_action_receipts_from_delivery_check_receipts():
+    text = TOOLS["bash"].description
+    assert "host-observed exit status" in text
+    assert "A bash result is an action receipt, not a check receipt" in text
+    assert "it cannot be listed in submit_delivery check_names" in text
     assert "run the checks a delivery needs with run_check" in text
 
 
@@ -102,11 +103,12 @@ def test_edit_range_is_an_engineering_only_write_tool():
 
 
 def test_the_single_repeatable_judgment_answers_for_tools_and_run_commands():
-    # 唯一的判断入口（恢复契约第 4 节）：读取、搜索与 run_check 可以重复，写入、编辑、删除与移动不可以；
-    # run_command 按这个 run 中固定的登记回答（工单 #242）
+    # 唯一的判断入口（恢复契约第 4 节）：读取、搜索、检查与 bash 由工具契约各自声明 repeatable，
+    # 写入、编辑、删除与移动不可以；已删除的 run_command 仍按这个 run 中固定的登记回答（工单 #242，
+    # #484 删除注册体系时一并移除）
     registry = {"lint": {"repeatable": True}, "deploy": {"repeatable": False}}
-    for tool in ("read_file", "list_files", "search", "read_range", "run_check"):
-        assert action_repeatable(tool, {"path": "src/a.py"}, registered_commands=registry) is True, tool
+    for tool in ("read_file", "list_files", "search", "read_range", "run_check", "bash"):
+        assert action_repeatable(tool, {"command": "echo hi"}, registered_commands=registry) is True, tool
     for tool in ("write_file", "edit_range", "delete_file", "move_file"):
         assert action_repeatable(tool, {"path": "src/a.py"}, registered_commands=registry) is False, tool
     assert action_repeatable("run_command", {"name": "lint"}, registered_commands=registry) is True

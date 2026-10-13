@@ -35,7 +35,7 @@
             "delete_file",
             "move_file",
             "run_check",
-            "run_command",
+            "bash",
             "submit_request",
             "submit_response",
             "submit_guidance_response",
@@ -43,7 +43,7 @@
           ],
           "notes": [
             "直接写文件并用 run_check 检查，最后 submit_delivery。",
-            "check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。"
+            "check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；bash 的结果不能作为检查回执，模型自报的 exit_code 无效。"
           ]
         },
         "quality": {

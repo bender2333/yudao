@@ -494,7 +494,7 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
                     "check_names",
                     f"no run_check receipt named {name} in this activation for the current snapshot and effective contract. "
                     f"Call run_check with the name {name} on the current workspace, then submit_delivery again; "
-                    "run_command results are action receipts and do not count as check receipts.",
+                    "bash results are action receipts and do not count as check receipts.",
                 )
             )
             continue

@@ -128,7 +128,7 @@ def test_tool_categories_and_references_are_checked(tmp_path):
     tools = _read(directory, "tools.json")
     tools["submit_delivery"]["action"] = "write"
     tools["submit_baseline_review"]["proposal"] = "delivery_spec"
-    del tools["run_command"]
+    del tools["bash"]
     _write(directory, "tools.json", tools)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
@@ -140,8 +140,8 @@ def test_tool_categories_and_references_are_checked(tmp_path):
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     assert raised.value.issues[:3] == (
-        ("roles.json", "engineering.tools[9]", "工具 run_command 没有定义"),
-        ("work_items.json", "kinds.change.departments.engineering.tools[9]", "工具 run_command 没有定义"),
+        ("roles.json", "engineering.tools[9]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.engineering.tools[9]", "工具 bash 没有定义"),
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
     )
 

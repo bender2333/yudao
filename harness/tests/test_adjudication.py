@@ -46,10 +46,8 @@ def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
     guidance = _permission(system, projection, "write_file", {"path": "src/echo.py", "content": ""}, guidance_only=True)
     outside = _permission(system, projection, "write_file", {"path": "docs/notes.md", "content": ""})
     assert outside.allowed
-    unknown = _permission(system, projection, "run_command", {"name": "deploy"})
-    assert unknown.reason == "unknown registered command: deploy; only project-registered commands may run"
-    extra = _permission(system, projection, "run_command", {"name": "unit", "args": ["--slow"]})
-    assert extra.reason == "argument not allowlisted for unit: --slow"
+    missing_command = _permission(system, projection, "bash", {})
+    assert missing_command.reason is None
 
 def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_path):
     system, projection = _engineering(tmp_path)
@@ -77,15 +75,13 @@ def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_pa
     assert not changed.accepted
     assert changed.errors[0].message.startswith("The workspace snapshot changed")
 
-def test_registered_command_permission_carries_its_execution_basis(tmp_path):
+
+def test_bash_permission_has_no_command_registry_basis(tmp_path):
     system, projection = _engineering(tmp_path)
-    permission = _permission(system, projection, "run_command", {"name": "unit", "args": ["--fast"]})
+    permission = _permission(system, projection, "bash", {"command": "python -c \"print('ok')\""})
     assert permission.allowed
-    assert permission.command_basis == {
-        "registered_name": "unit",
-        "registered_argv": ["python", "-c", "print('ok')", "--fast"],
-        "snapshot_hash": _environment(system, projection).query(FactsQuery(tree=True)).tree.digest,
-    }
+    # bash 不核对命令登记表，许可不再带登记执行依据
+    assert permission.command_basis == {}
 
 def test_write_permission_uses_the_canonical_path_from_the_environment(tmp_path):
     system, projection = _engineering(tmp_path)

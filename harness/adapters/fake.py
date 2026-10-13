@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from collections.abc import AsyncIterator, Callable, Generator, Sequence
+from collections.abc import AsyncIterator, Callable, Generator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -53,12 +53,24 @@ def pending_request_id(call: ModelCall) -> str | None:
     return None if pending is None else json.loads(pending)["id"]
 
 
+def session_key(call: ModelCall) -> str:
+    # 会话身份：主线按部门区分，询问分支按所属询问区分（分支事件落地以后扩展这里）
+    return call.department
+
+
 class FakeAdapter:
     name = "fake"
     model = "fake-script"
-
-    def __init__(self, script: Sequence[TurnSpec] | None = None, *, stream_gap_sec: float = 0.0) -> None:
-        self.script = list(script or [])
+    def __init__(self, script: Sequence[TurnSpec] | Mapping[str, Sequence[TurnSpec]] | None = None, *,
+                 stream_gap_sec: float = 0.0) -> None:
+        # 脚本两种给法：一个队列按请求先后取用（只有一个会话的场景）；按会话给的每个会话一份，
+        # 几个会话同时运行时各自取用自己的，与请求先后无关
+        if isinstance(script, Mapping):
+            self.scripts = {key: list(turns) for key, turns in script.items()}
+            self.script: list[TurnSpec] = []
+        else:
+            self.scripts: dict[str, list[TurnSpec]] = {}
+            self.script = list(script or [])
         self.invocations: list[ModelCall] = []
         self.cancelled: set[str] = set()
         # 流式轮次里片段之间的停顿：需要订阅方在请求进行中读到 attempt.live 时给出（部门房间验收）
@@ -75,9 +87,10 @@ class FakeAdapter:
         if call.attempt_id in self.cancelled:
             yield self._aborted()
             return
-        if not self.script:
+        queue = self.scripts.get(session_key(call), self.script) if self.scripts else self.script
+        if not queue:
             raise ProviderError("fake adapter script exhausted")
-        item = self.script.pop(0)
+        item = queue.pop(0)
         if callable(item):
             item = item(call)
         if isinstance(item, Generator):

@@ -361,7 +361,7 @@ test("说话气泡：内容来自事件已经带着的事实", () => {
   assert.equal(say({ type: "proposal_submitted", department: "engineering", label: "工程经理代表部门提交交付说明", payload: {} }), "现在提交交付说明");
   assert.equal(say({ type: "proposal_submitted", department: "quality", payload: { kind: "qa_review" } }), "现在提交质检结论");
   assert.equal(say({ type: "tool_started", tool: "edit_range", department: "engineering", label: "工程部门按区间编辑 app.js：导出为 CSV", payload: {} }), "现在编辑 app.js");
-  assert.equal(say({ type: "tool_started", tool: "run_command", department: "engineering", label: "工程部门走到终端执行登记命令 npm_test", payload: {} }), "现在执行 npm_test");
+  assert.equal(say({ type: "tool_started", tool: "bash", department: "engineering", label: "工程部门走到终端执行命令 npm test", payload: { command: "npm test" } }), "现在执行 npm test");
   assert.equal(say({ type: "x_role_task_assigned", department: "engineering", payload: { to: "e-lead", task: "起草 PLAN" } }, { dept: "engineering", roleName: () => "主程" }), "现在把任务交给主程：起草 PLAN");
   assert.equal(say({ type: "x_role_task_assigned", department: "engineering", payload: { to: "e-lead", task: "起草 PLAN" } }, { dept: "engineering", side: "to" }), "收到任务：起草 PLAN");
 });

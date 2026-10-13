@@ -53,7 +53,7 @@ function proposalName(ev: PixelFloorEvent, pl: Record<string, unknown>): string 
 }
 
 // 真实系统把工具名与参数放在载荷里：工具名是 name，参数在 args 之下（harness/app/payloads.py 的 ToolStartedPayload）。
-// args 以下的键按工具各自的要求取：读取与修改类用 path，翻找用 pattern，登记命令用 name。
+// args 以下的键按工具各自的要求取：读取与修改类用 path，翻找用 pattern，bash 用 command。
 const argsOf = (pl: Record<string, unknown>): Record<string, unknown> =>
   (pl.args as Record<string, unknown> | undefined) ?? {};
 
@@ -62,12 +62,10 @@ const argOf = (pl: Record<string, unknown>, key: string): string | null => {
   return typeof value === "string" && value !== "" ? value : null;
 };
 
-// 登记命令名：真实载荷给 registered_name（工具名在 name，登记名在 registered_name）；
-// 原型事件把命令名写在说明的末尾，按它取
+// bash 的命令原文：真实载荷给 args.command（顶层 command 也认）；原型事件把命令名写在说明的末尾，按它取。
+// 注意不回退 name：真实载荷的顶层 name 是工具名（ToolStartedPayload），回退会把工具名当命令说出来。
 const commandOf = (ev: PixelFloorEvent, pl: Record<string, unknown>): string | null =>
-  (typeof pl.registered_name === "string" && pl.registered_name !== "" ? pl.registered_name : null)
-  ?? argOf(pl, "command")
-  ?? argOf(pl, "name")
+  argOf(pl, "command")
   ?? (/([A-Za-z][\w.\-]*)\s*$/.exec(String(ev.label || "")) || [])[1]
   ?? null;
 
@@ -94,9 +92,9 @@ function toolText(ev: PixelFloorEvent, pl: Record<string, unknown>): string | nu
   const submit = SUBMIT_NAME[tool];
   if (submit !== undefined) return `现在提交${submit}`;
   if (/^submit_/.test(tool)) return "现在提交";
-  if (tool === "run_command") {
-    const name = commandOf(ev, pl);
-    return `现在执行${name ? ` ${cut(name, 14)}` : "登记命令"}`;
+  if (tool === "bash") {
+    const command = commandOf(ev, pl);
+    return `现在执行${command ? ` ${cut(command, 14)}` : "命令"}`;
   }
   if (tool === "run_check") {
     const name = argOf(pl, "name");
@@ -141,7 +139,7 @@ export const SAY_CATALOG: Record<string, SayRule> = {
   tool_started: toolText,
   tool_called: (ev, pl) => {
     // 真实载荷只有 ok 与 error：退出码在工件里，事件上读不到（harness/app/payloads.py 的 ToolCallResult）
-    if (String(ev.tool ?? pl.tool ?? pl.name ?? "") !== "run_command") return null;
+    if (String(ev.tool ?? pl.tool ?? pl.name ?? "") !== "bash") return null;
     return commandResultText(pl);
   },
   tool_skipped: () => "这个工具没有获准，换个办法",
