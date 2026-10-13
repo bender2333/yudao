@@ -292,7 +292,7 @@ def test_stale_pass_verdict_cannot_be_reused_after_tree_changes(tmp_path):
     workspace, environment = _environment(tmp_path)
     workspace.write_file("app.py", "print('ok')\n")
     workspace.write_file("check.py", "raise SystemExit(0)\n")
-    passed = perform(environment, "run_check", {"name": "smoke", "argv": ["python", "check.py"]})
+    passed = perform(environment, "run_check", {"name": "smoke", "command": "python check.py"})
     assert passed.ok and passed.output["exit_code"] == 0, passed.error
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is not None
     content_hash = _read_content_hash(environment, "app.py", 1, 1)
@@ -317,7 +317,7 @@ def test_mutated_check_copy_does_not_become_the_tested_delivery(tmp_path):
         "assert 'FIXED' in p.read_text()\n",
     )
     original = workspace.digest()
-    result = perform(environment, "run_check", {"name": "smoke", "argv": ["python", "fix.py"]})
+    result = perform(environment, "run_check", {"name": "smoke", "command": "python fix.py"})
     assert result.ok is True
     assert result.output["exit_code"] == 0
     assert result.output["tree_changed"] is True

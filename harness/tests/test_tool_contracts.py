@@ -1,13 +1,9 @@
 # 工具定义本身的规则：工具种类与动作类别、工具说明写明的证据要求、回执的显示方式、唯一的可重复判断入口，
 # 以及按输入方式提供工具的机制。这些结论只读取仓库内的定义与纯函数，登记为单元层。
 
-import json
-import sys
-
 import pytest
 
 from harness.definitions import DEFINITIONS
-from harness.environment import _display_argv
 from harness.recovery import action_repeatable
 from harness.tools import offers_with_input, tool_action, tool_kind, tools_for
 
@@ -60,10 +56,14 @@ def test_write_tool_descriptions_state_the_plan_requirement():
         assert "the path must be inside that plan's scope" in text
 
 
-def test_check_receipt_shows_the_host_interpreter_as_python():
-    # 回执里的解释器名称固定为 python，各平台的回执文字与 token 估计相同
-    assert json.loads(_display_argv([sys.executable, "-c", "print('smoke ok')"])) == [
-        "python", "-c", "print('smoke ok')"]
+def test_run_check_requires_a_command_string():
+    # 工单 #480：检查的调用是命令字符串，不再是 argv 向量；超时缺省、超限截断
+    check = TOOLS["run_check"]
+    assert set(check.parameters["required"]) == {"name", "command"}
+    assert "command" in check.parameters["properties"]
+    assert "argv" not in check.parameters["properties"]
+    assert "The command string runs with bash at the copy root" in check.description
+    assert "Only run_check receipts count as check evidence" in check.description
 
 
 def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():

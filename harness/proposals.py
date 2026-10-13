@@ -156,7 +156,7 @@ def structure(
         "overall": overall,
         "modules": modules or [{"path": "src/", "responsibility": "the package implementation"}],
         "entry_points": entry_points or [{"kind": "command_line", "path": "src/echo.py", "how_to_run": "python src/echo.py"}],
-        "build_and_test": build_and_test or [{"name": "smoke", "argv": ["python", "src/echo.py"], "purpose": "run the CLI"}],
+        "build_and_test": build_and_test or [{"name": "smoke", "command": "python src/echo.py", "purpose": "run the CLI"}],
         "requirement_locations": requirement_locations or [
             {"requirement": "print the given argument to stdout", "locations": ["src/echo.py"]},
         ],
@@ -176,7 +176,7 @@ def structure_turn(
 ) -> FakeTurn:
     checks = {"smoke": 0} if checks is None else checks
     if build_and_test is None:
-        build_and_test = [{"name": name, "argv": ["python", "src/echo.py"], "purpose": "run the CLI"} for name in checks]
+        build_and_test = [{"name": name, "command": "python src/echo.py", "purpose": "run the CLI"} for name in checks]
     return FakeTurn(
         proposal=structure(overall=overall, modules=modules, entry_points=entry_points,
                            build_and_test=build_and_test, requirement_locations=requirement_locations,

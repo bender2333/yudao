@@ -54,6 +54,17 @@
     "tighten_when": "同一项目的检查用时分布长期低于现值的四分之一",
     "origin": "规则登记第 8 节表格，检查的时限；D17 单次请求等待的暂定默认值 600 秒"
   },
+  "check_timeout_max_sec": {
+    "value": 3600,
+    "bounds": [10, 86400],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "检查的时限没有上界",
+    "cost": "长时间占住执行环境的一次检查位",
+    "relax_when": "项目需要更长的检查时限时按项目设置",
+    "tighten_when": "超时以后从未取回结果的检查占多数",
+    "origin": "本地工具设计说明第 3 节；工单 #480，单次检查时限的最大值"
+  },
   "onboarding.round_time_limit_sec": {
     "value": 7200,
     "bounds": [600, 86400],

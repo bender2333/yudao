@@ -236,7 +236,7 @@ def test_structure_requires_activation_receipt(tmp_path):
     system, run_id = _onboarding_run(tmp_path, [
         _product_turn(),
         structure_turn(requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}],
-                       checks={}, build_and_test=[{"name": "smoke", "argv": ["python", "src/echo.py"], "purpose": "run the CLI"}]),
+                       checks={}, build_and_test=[{"name": "smoke", "command": "python src/echo.py", "purpose": "run the CLI"}]),
     ])
     result = system.run_until_stop(run_id)
     assert result.phase != "QUALITY"
@@ -268,7 +268,7 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
         "kind": "structure", "overall": "text",
         "modules": [{"path": "src/", "responsibility": "implementation"}],
         "entry_points": [{"kind": "command_line", "path": "src/echo.py", "how_to_run": "python src/echo.py"}],
-        "build_and_test": [{"name": "smoke", "argv": ["python", "src/echo.py"], "purpose": "run the CLI"}],
+        "build_and_test": [{"name": "smoke", "command": "python src/echo.py", "purpose": "run the CLI"}],
         "requirement_locations": [{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}],
         "conventions": [],
     }

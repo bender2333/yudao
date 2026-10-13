@@ -298,14 +298,14 @@
      {
       "digest": "<sha256#21>",
       "source": "tool_schemas",
-      "tokens": 1477,
+      "tokens": 1604,
       "version": "product"
      }
     ],
     "input_modalities": [
      "text"
     ],
-    "input_token_estimate": 3034,
+    "input_token_estimate": 3161,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_output_tokens": 4800,
@@ -335,7 +335,7 @@
     "snapshot_hash": "<sha256#1>",
     "source_event_id": null,
     "step_id": 1,
-    "token_estimate": 3040,
+    "token_estimate": 3167,
     "tokens_charged": 0,
     "truncated": false
    }
@@ -703,14 +703,14 @@
      {
       "digest": "<sha256#21>",
       "source": "tool_schemas",
-      "tokens": 1477,
+      "tokens": 1604,
       "version": "product"
      }
     ],
     "input_modalities": [
      "text"
     ],
-    "input_token_estimate": 3034,
+    "input_token_estimate": 3161,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_output_tokens": 4800,
@@ -740,7 +740,7 @@
     "snapshot_hash": "<sha256#1>",
     "source_event_id": null,
     "step_id": 2,
-    "token_estimate": 3040,
+    "token_estimate": 3167,
     "tokens_charged": 0,
     "truncated": false
    }
@@ -1563,11 +1563,11 @@
      {
       "digest": "<sha256#21>",
       "source": "tool_schemas",
-      "tokens": 1477,
+      "tokens": 1604,
       "version": "product"
      }
     ],
-    "input_token_estimate": 3034,
+    "input_token_estimate": 3161,
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
@@ -1580,7 +1580,7 @@
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#5>",
     "step_id": 1,
-    "token_estimate": 3040,
+    "token_estimate": 3167,
     "truncated": false
    },
    {
@@ -1700,11 +1700,11 @@
      {
       "digest": "<sha256#21>",
       "source": "tool_schemas",
-      "tokens": 1477,
+      "tokens": 1604,
       "version": "product"
      }
     ],
-    "input_token_estimate": 3034,
+    "input_token_estimate": 3161,
     "input_version": 1,
     "max_output_tokens": 4800,
     "output_reserve_tokens": 4800,
@@ -1717,7 +1717,7 @@
     "session_id": "<ses_pro#1>",
     "source_event_id": "<evt#9>",
     "step_id": 2,
-    "token_estimate": 3040,
+    "token_estimate": 3167,
     "truncated": false
    }
   ],
@@ -2075,7 +2075,7 @@
     {
      "digest": "<sha256#21>",
      "source": "tool_schemas",
-     "text": "[{\"description\":\"Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.\",\"name\":\"read_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \\\"src/\\\" keeps only the src directory, while \\\"src\\\" also keeps paths such as \\\"src2/a.py\\\". Paths under .checks are never listed.\",\"name\":\"list_files\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"prefix\":{\"description\":\"Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory\",\"type\":\"string\"}},\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.\",\"name\":\"search\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated search\",\"type\":[\"string\",\"null\"]},\"max_results\":{\"description\":\"Maximum matches per page\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Optional file or directory scope within the public tree\",\"type\":[\"string\",\"null\"]},\"pattern\":{\"description\":\"Python re regex searched per line\",\"type\":\"string\"}},\"required\":[\"pattern\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.\",\"name\":\"read_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated read\",\"type\":[\"string\",\"null\"]},\"end_line\":{\"description\":\"Last line to read, inclusive; omit for end of file\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to read, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"].\",\"name\":\"run_check\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"argv\":{\"description\":\"Argument vector executed by the host, e.g. [\\\"<python>\\\", \\\"src/echo.py\\\", \\\"hello\\\"]\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"name\":{\"description\":\"Check name, e.g. smoke\",\"type\":\"string\"}},\"required\":[\"name\",\"argv\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.\",\"name\":\"submit_product_spec\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"acceptance_criteria\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"boundaries\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"change_record\":{\"additionalProperties\":false,\"description\":\"Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec.\",\"properties\":{\"changed\":{\"description\":\"Requirements added or changed in this revision\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"rationale\":{\"minLength\":1,\"type\":\"string\"},\"retained\":{\"description\":\"Requirements explicitly preserved\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"retired\":{\"description\":\"Requirements explicitly removed\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"changed\",\"retained\",\"retired\",\"rationale\"],\"type\":\"object\"},\"constraints\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"decision_changes\":{\"description\":\"When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec.\",\"items\":{\"additionalProperties\":false,\"properties\":{\"decision_hash\":{\"type\":\"string\"},\"disposition\":{\"enum\":[\"retain\",\"integrate\",\"retire\"],\"type\":\"string\"},\"rationale\":{\"type\":\"string\"}},\"required\":[\"decision_hash\",\"disposition\",\"rationale\"],\"type\":\"object\"},\"type\":\"array\"},\"fatal_conditions\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"goal\":{\"type\":\"string\"},\"non_goals\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"requirements\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"goal\",\"requirements\",\"acceptance_criteria\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.\",\"name\":\"submit_request\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"action\":{\"enum\":[null,\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"type\":[\"string\",\"null\"]},\"background\":{\"type\":\"string\"},\"expected_result\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"recipient\":{\"enum\":[\"product\",\"engineering\",\"quality\"],\"type\":\"string\"},\"request_type\":{\"enum\":[\"consultation\",\"action\"],\"type\":\"string\"}},\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\",\"action\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"}]",
+     "text": "[{\"description\":\"Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.\",\"name\":\"read_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \\\"src/\\\" keeps only the src directory, while \\\"src\\\" also keeps paths such as \\\"src2/a.py\\\". Paths under .checks are never listed.\",\"name\":\"list_files\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"prefix\":{\"description\":\"Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory\",\"type\":\"string\"}},\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.\",\"name\":\"search\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated search\",\"type\":[\"string\",\"null\"]},\"max_results\":{\"description\":\"Maximum matches per page\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Optional file or directory scope within the public tree\",\"type\":[\"string\",\"null\"]},\"pattern\":{\"description\":\"Python re regex searched per line\",\"type\":\"string\"}},\"required\":[\"pattern\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.\",\"name\":\"read_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated read\",\"type\":[\"string\",\"null\"]},\"end_line\":{\"description\":\"Last line to read, inclusive; omit for end of file\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to read, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Host-executes a check in a fresh copy of the checked snapshot and records exit_code, summary, and snapshot hash. The command string runs with bash at the copy root, in a new process with the Yudao process's full environment; the copy is deleted when the check finishes. Do not self-report exit_code. command example: \\\"uv run pytest tests\\\". timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). Only run_check receipts count as check evidence; bash results are action receipts.\",\"name\":\"run_check\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"command\":{\"description\":\"The command string to run with bash at the copy root, e.g. uv run pytest tests\",\"type\":\"string\"},\"name\":{\"description\":\"Check name, e.g. smoke\",\"type\":\"string\"},\"timeout_sec\":{\"description\":\"Optional time limit in seconds; omitted uses the default, larger values apply the maximum\",\"type\":[\"integer\",\"null\"]}},\"required\":[\"name\",\"command\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.\",\"name\":\"submit_product_spec\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"acceptance_criteria\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"boundaries\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"change_record\":{\"additionalProperties\":false,\"description\":\"Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec.\",\"properties\":{\"changed\":{\"description\":\"Requirements added or changed in this revision\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"rationale\":{\"minLength\":1,\"type\":\"string\"},\"retained\":{\"description\":\"Requirements explicitly preserved\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"retired\":{\"description\":\"Requirements explicitly removed\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"changed\",\"retained\",\"retired\",\"rationale\"],\"type\":\"object\"},\"constraints\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"decision_changes\":{\"description\":\"When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec.\",\"items\":{\"additionalProperties\":false,\"properties\":{\"decision_hash\":{\"type\":\"string\"},\"disposition\":{\"enum\":[\"retain\",\"integrate\",\"retire\"],\"type\":\"string\"},\"rationale\":{\"type\":\"string\"}},\"required\":[\"decision_hash\",\"disposition\",\"rationale\"],\"type\":\"object\"},\"type\":\"array\"},\"fatal_conditions\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"goal\":{\"type\":\"string\"},\"non_goals\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"requirements\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"goal\",\"requirements\",\"acceptance_criteria\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.\",\"name\":\"submit_request\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"action\":{\"enum\":[null,\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"type\":[\"string\",\"null\"]},\"background\":{\"type\":\"string\"},\"expected_result\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"recipient\":{\"enum\":[\"product\",\"engineering\",\"quality\"],\"type\":\"string\"},\"request_type\":{\"enum\":[\"consultation\",\"action\"],\"type\":\"string\"}},\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\",\"action\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"}]",
      "version": "product"
     }
    ]
@@ -2210,26 +2210,30 @@
       "type": "function"
      },
      {
-      "description": "Host-executes a check in the workspace and records exit_code, summary, and snapshot hash. Do not self-report exit_code. argv example: [\"<python>\", \"src/echo.py\", \"hello\"].",
+      "description": "Host-executes a check in a fresh copy of the checked snapshot and records exit_code, summary, and snapshot hash. The command string runs with bash at the copy root, in a new process with the Yudao process's full environment; the copy is deleted when the check finishes. Do not self-report exit_code. command example: \"uv run pytest tests\". timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). Only run_check receipts count as check evidence; bash results are action receipts.",
       "name": "run_check",
       "parameters": {
        "additionalProperties": false,
        "properties": {
-        "argv": {
-         "description": "Argument vector executed by the host, e.g. [\"<python>\", \"src/echo.py\", \"hello\"]",
-         "items": {
-          "type": "string"
-         },
-         "type": "array"
+        "command": {
+         "description": "The command string to run with bash at the copy root, e.g. uv run pytest tests",
+         "type": "string"
         },
         "name": {
          "description": "Check name, e.g. smoke",
          "type": "string"
+        },
+        "timeout_sec": {
+         "description": "Optional time limit in seconds; omitted uses the default, larger values apply the maximum",
+         "type": [
+          "integer",
+          "null"
+         ]
         }
        },
        "required": [
         "name",
-        "argv"
+        "command"
        ],
        "type": "object"
       },

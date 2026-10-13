@@ -221,11 +221,11 @@ def _structure_schema_errors(proposal: dict[str, Any]) -> list[FieldError]:
         if isinstance(item, dict) and item.get("kind") not in {"program", "command_line", "service"}:
             entry_errors.append(FieldError(f"entry_points[{index}].kind", "kind must be program, command_line, or service"))
     errors.extend(entry_errors)
-    errors.extend(_record_list_errors(proposal, "build_and_test", {"name", "argv", "purpose"}, ("name", "purpose")))
+    errors.extend(_record_list_errors(proposal, "build_and_test", {"name", "command", "purpose"}, ("name", "purpose")))
     for index, item in enumerate(proposal.get("build_and_test", [])):
         if isinstance(item, dict):
-            errors.extend(FieldError(f"build_and_test[{index}].{error.field}", error.message)
-                          for error in _require_string_list(item, "argv", min_items=1))
+            errors.extend(FieldError(f"build_and_test[{index}].command", error.message)
+                          for error in _require_text(item, "command"))
     errors.extend(_record_list_errors(proposal, "requirement_locations", {"requirement", "locations"},
                                       ("requirement",)))
     for index, item in enumerate(proposal.get("requirement_locations", [])):
@@ -718,7 +718,7 @@ def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts
             ))
             continue
         build_and_test.append({**item, "name": item["name"].strip(), "purpose": item["purpose"].strip(),
-                               "argv": [argument.strip() for argument in item["argv"]],
+                               "command": item["command"].strip(),
                                "receipt": _receipt_evidence(receipt)})
     if errors:
         return ProposalDecision(False, errors)

@@ -5,14 +5,12 @@
 # 「补做之前」的状态从只读连接读出（run.observed）：系统打开数据目录时会立刻补做结算与补建缺少的 run。
 # 模型回答由 FakeAdapter 给出，不使用 mock。辅助代码在 harness/tests/process_kill.py（与 #307 共用）。
 
-import sys
-
 from harness.artifacts import ArtifactRef
 from harness.models import EventType, ProjectEventType
 from harness.projection import saved_decisions
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.tests import process_kill as killed
-from harness.tests.helpers import WAIT_FOR_RELEASE
+from harness.tests.helpers import run_wait_command
 from harness.tests.onboarding_project import (
     ONBOARDING_GOAL as GOAL,
     ONBOARDING_REQUIREMENT as REQUIREMENT,
@@ -78,7 +76,7 @@ def test_a_killed_onboarding_check_is_retried_and_the_round_finishes(tmp_path):
     data_dir = tmp_path / "data"
     signals = tmp_path / "signals"
     signals.mkdir()
-    blocking = {"smoke": {"argv": [sys.executable, "-c", WAIT_FOR_RELEASE, str(signals)]}}
+    blocking = {"smoke": {"command": run_wait_command(signals)}}
     # 产品的规格以后是带着阻塞检查的结构说明：进程在这个检查的进程里被终止
     script = [_product_turn(), _structure_turn(blocking)]
 

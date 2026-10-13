@@ -17,6 +17,9 @@ def test_check_timeout_is_six_hundred():
     # bash 缺省 300 秒、最长 3600 秒（本地工具设计说明第 3 节，ADR-0038）
     assert DEFINITIONS.rule_value("bash_timeout_default_sec") == 300
     assert DEFINITIONS.rule_value("bash_timeout_max_sec") == 3600
+    # 工单 #480：run_check 的上限与 bash 相同；缺省仍是 check_timeout_sec
+    limit = DEFINITIONS.rule("check_timeout_max_sec")
+    assert limit.value == 3600 and list(limit.bounds) == [10, 86400]
 
 
 def test_onboarding_prompts_state_the_two_material_kinds():

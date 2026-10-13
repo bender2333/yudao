@@ -56,7 +56,7 @@
           "optional": ["conventions"],
           "modules": [{"path": "workspace-relative file or directory", "responsibility": "what it is responsible for"}],
           "entry_points": [{"kind": "program|command_line|service", "path": "workspace-relative file", "how_to_run": "the command that starts it"}],
-          "build_and_test": [{"name": "name passed to run_check", "argv": ["the", "argv"], "purpose": "what it builds or tests"}],
+          "build_and_test": [{"name": "name passed to run_check", "command": "the command string", "purpose": "what it builds or tests"}],
           "requirement_locations": [{"requirement": "an initial PRD requirement", "locations": ["main files or directories"]}],
           "bind": [
             "current_product_spec.content_hash",

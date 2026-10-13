@@ -10,7 +10,7 @@ from pathlib import Path
 
 from harness.proposals import engineering_plan, product_spec
 from harness.tests import process_kill as killed
-from harness.tests.helpers import WAIT_FOR_RELEASE
+from harness.tests.helpers import WAIT_FOR_RELEASE, run_wait_command
 
 # 读取的种子文件：重新执行读的是同一份内容，第二次尝试必须成功
 NOTES = "re-execute reads the same bytes\n"
@@ -23,13 +23,13 @@ def _call(identity: str, name: str, arguments: dict) -> dict:
 
 def _check(name: str = "smoke") -> dict:
     # 交付以后的检查：写文件再运行检查，两项都在同一次回答里
-    return {"writes": {"src/after.txt": "after"}, "checks": {name: {"argv": [sys.executable, "-c",
-                                                                            "print('smoke ok')"]}}}
+    return {"writes": {"src/after.txt": "after"},
+            "checks": {name: {"command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('smoke ok')\""}}}
 
 
 def _blocking_check(signals: Path) -> dict:
     # 等待放行的真实检查进程：写下 started 以后一直等，被终止时它正在运行
-    return {"checks": {"smoke": {"argv": [sys.executable, "-c", WAIT_FOR_RELEASE, str(signals)]}}}
+    return {"checks": {"smoke": {"command": run_wait_command(signals)}}}
 
 
 def _attempts(system, run_id: str, action_id: str) -> list[dict]:

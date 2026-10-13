@@ -166,16 +166,17 @@ class FakeAdapter:
 
 def _fake_check_payload(name: str, spec: int | dict[str, Any]) -> dict[str, Any]:
     # Fake 只选择要跑的进程；exit_code 仍由主机执行产生
-    if isinstance(spec, dict) and (spec.get("argv") or spec.get("command")):
+    if isinstance(spec, dict) and spec.get("command"):
         payload = dict(spec)
         payload["name"] = name
         payload.pop("exit_code", None)
         payload["source"] = "fake_script_process"
         return payload
     code = int(spec if not isinstance(spec, dict) else spec.get("exit_code", 0))
+    interpreter = sys.executable.replace("\\", "/")
     return {
         "name": name,
-        "argv": [sys.executable, "-c", f"raise SystemExit({code})"],
+        "command": f"\"{interpreter}\" -c \"raise SystemExit({code})\"",
         "source": "fake_script_process",
     }
 
