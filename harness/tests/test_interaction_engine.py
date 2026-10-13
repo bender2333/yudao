@@ -1,5 +1,7 @@
 import json
+import sys
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import pytest
 
@@ -11,7 +13,7 @@ from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
 from harness.proposals import (
     collaboration_request, collaboration_response, delivery_turn,
-    product_decision, product_spec, response_turn,
+    product_decision, product_spec, product_spec_turn, response_turn,
     review_turn,
 )
 from harness.providers.call import ModelResponse
@@ -236,19 +238,20 @@ def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_l
     assert system.activate_once(run_id).processed_input_version == 2
 
 def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_input(tmp_path):
-    # 登记命令运行中收到新输入：这个命令照常完成并记录，其余工具跳过
+    # bash 命令运行中收到新输入：这个命令照常完成并记录，其余工具跳过
     signals = tmp_path / "signals"
     signals.mkdir()
     code = ("import pathlib; pathlib.Path('src').mkdir(exist_ok=True); "
             "pathlib.Path('src/first.py').write_text('completed first tool'); " + WAIT_FOR_RELEASE)
-    registry = {"first": {"argv": ["python", "-c", code, str(signals)], "args": [], "timeout_sec": 60,
-                          "output_limit": 4000}}
-    calls = [{"id": "first", "call_id": "first", "type": "function_call", "name": "run_command",
-              "arguments": json_dumps({"name": "first"})},
+    command = f'"{sys.executable.replace(chr(92), "/")}" -c "{code}" "{Path(signals).as_posix()}"'
+    calls = [{"id": "first", "call_id": "first", "type": "function_call", "name": "bash",
+              "arguments": json_dumps({"command": command})},
              _call("second", "write_file", path="src/second.py", content="must not start"),
              _call("submission", "submit_delivery", summary="old delivery", files=["src/first.py"], check_names=["smoke"])]
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),ModelResponse(output=calls), _revision()]))
-    run_id = system.create_run("build echo", registered_commands=registry, command_versions={"first": 1})
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
+        product_spec(), ModelResponse(output=calls),
+        product_spec_turn(requirements=["print the argument in uppercase"], change_record=CHANGE_RECORD)]))
+    run_id = system.create_run("build echo")
     _steps(system, run_id, 1)
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)

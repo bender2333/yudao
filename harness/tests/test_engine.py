@@ -9,8 +9,8 @@ from harness.models import ArtifactRef, DepartmentPrompt, EventType, canonical_h
 from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import (FAST_RETRIES, WAIT_FOR_RELEASE, after_event, recorded_context,
-                                   from_another_thread, wait_for_file)
+from harness.tests.helpers import (FAST_RETRIES, after_event, recorded_context,
+                                   from_another_thread, run_wait_command, wait_for_file)
 from harness.tests.protocol_helpers import complete, model_call
 
 def _call(identity, name, **args):
@@ -153,17 +153,16 @@ def test_cancel_before_tool_start_rejects_new_side_effect(tmp_path):
     assert "new.txt" not in system.workspace(run_id).list_files()
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "write-1" for event in system.store.list_events(run_id))
 
-def _command_run(tmp_path, registry, script):
+def _command_run(tmp_path, script):
     # 工程部门的激活之前：产品规格已接纳
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), *script]))
-    run_id = system.create_run("echo", registered_commands=registry, command_versions={name: 1 for name in registry})
-    system.activate_once(run_id)
+    run_id = system.create_run("echo")
     system.activate_once(run_id)
     return system, run_id
 
 def _command_call(identity, command):
-    return {"id": identity, "call_id": identity, "type": "function_call", "name": "run_command",
-            "arguments": json_dumps({"name": command})}
+    return {"id": identity, "call_id": identity, "type": "function_call", "name": "bash",
+            "arguments": json_dumps({"command": command})}
 
 def _tool_output(system, run_id, identity):
     called = next(event for event in system.store.list_events(run_id)
@@ -174,13 +173,11 @@ def _tool_output(system, run_id, identity):
     return called, output
 
 def test_cancel_stops_the_running_command_and_does_not_start_following_tool(tmp_path):
-    # 登记命令运行中另一个线程取消运行：进程树结束，回执记为已取消，之后的工具不开始
+    # bash 命令运行中另一个线程取消运行：进程树结束，回执记为已取消，之后的工具不开始
     signals = tmp_path / "signals"
     signals.mkdir()
-    registry = {"wait": {"argv": ["python", "-c", WAIT_FOR_RELEASE, str(signals)], "args": [],
-                         "timeout_sec": 60, "output_limit": 4000}}
-    system, run_id = _command_run(tmp_path, registry, [ModelResponse(output=[
-        _command_call("command-1", "wait"), _call("write-2", "write_file", path="later.txt", content="later")])])
+    system, run_id = _command_run(tmp_path, [ModelResponse(output=[
+        _command_call("command-1", run_wait_command(signals)), _call("write-2", "write_file", path="later.txt", content="later")])])
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         wait_for_file(signals / "started")
@@ -204,9 +201,7 @@ def test_cancel_after_the_tool_permission_does_not_start_the_process(tmp_path):
     # 工具许可已经允许、动作还没有开始时取消到达（在 tool_started 提交的时点、写入方的线程中取消）：进程不启动
     signals = tmp_path / "signals"
     signals.mkdir()
-    registry = {"wait": {"argv": ["python", "-c", WAIT_FOR_RELEASE, str(signals)], "args": [],
-                         "timeout_sec": 60, "output_limit": 4000}}
-    system, run_id = _command_run(tmp_path, registry, [ModelResponse(output=[_command_call("command-1", "wait")])])
+    system, run_id = _command_run(tmp_path, [ModelResponse(output=[_command_call("command-1", run_wait_command(signals))])])
     after_event(system, EventType.TOOL_STARTED, lambda _event: system.cancel(run_id))
     result = system.activate_once(run_id)
     assert result.stop_reason == "cancelled"
@@ -214,7 +209,6 @@ def test_cancel_after_the_tool_permission_does_not_start_the_process(tmp_path):
     called, output = _tool_output(system, run_id, "command-1")
     assert called.payload["ok"] is False and output is None
     assert called.payload["error"] == "The action was cancelled before it started."
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 def test_original_intend_is_preserved_verbatim_outside_the_delivery_tree(tmp_path):
