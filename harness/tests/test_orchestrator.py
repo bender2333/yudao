@@ -1,5 +1,8 @@
+import json
+
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.artifacts import ArtifactRef
 from harness.definitions import DEFINITIONS
 from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review, review_turn
 from harness.runtime import LoopSystem
@@ -7,13 +10,18 @@ from harness.tests.helpers import department_history, happy_script, run_scripted
 
 def test_happy_path_requires_quality_release(data_dir):
     system, projection = run_scripted(data_dir, happy_script())
-    facts = system.workspace(projection.run_id).snapshot().facts
-    engineering_check = facts.latest_check("engineering", "smoke")
-    quality_check = facts.latest_check("quality", "smoke")
+    # 质检在自己的检查工作区里跑检查（工单 #481），运行工作区只留工程的回执；
+    # 质检会话结束即清理该目录，质检的检查结果以工具事件的回执工件为准
+    engineering_check = system.workspace(projection.run_id).snapshot().facts.latest_check("engineering", "smoke")
+    quality_event = next(event for event in system.store.list_events(projection.run_id)
+                         if event.type == "tool_called" and event.payload.get("name") == "run_check"
+                         and event.department == "quality")
+    quality_check = json.loads(
+        system.artifacts.get(ArtifactRef(**quality_event.payload["output_ref"])).decode("utf-8"))
     assert engineering_check is not None and engineering_check.exit_code == 0
-    assert quality_check is not None and quality_check.exit_code == 0
+    assert quality_check["exit_code"] == 0
     assert "host-executed" in engineering_check.summary
-    assert "host-executed" in quality_check.summary
+    assert "host-executed" in quality_check["summary"]
 
     assert projection.phase == "DONE"
     assert projection.outcome == "done"

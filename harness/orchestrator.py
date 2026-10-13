@@ -436,16 +436,23 @@ class Orchestrator:
                 or bool(request and request.action == "revise_delivery"))
 
     def _inspection_source_tree(self, department: str, projection: RunProjection) -> CapturedTree:
-        # 每个会话检查工作区的建立源：质检从封存交付，其他从当前运行工作区快照。
-        # 封存交付读不出来（归档缺失或损坏）时退回运行工作区的当前快照：交付树本身在提交判断里
-        # 另有一次核对，那里的 host_commit_error 才是这个缺陷对 U 的正式报告
-        if department == "quality" and projection.delivery_spec is not None:
-            tree_ref = projection.delivery_spec.tree_ref
-            if tree_ref is not None:
-                try:
-                    return load_tree(self.artifacts, artifact_run(tree_ref.path), tree_ref)
-                except (ValueError, OSError):
-                    pass
+        # 每个会话检查工作区的建立源：质检从它当前面对的快照建立——最新的封存交付，
+        # 还没有交付时是事项开始时的项目起点（采纳成果或项目的起始文件夹快照，都没有时为空树），
+        # 不读运行工作区（local-tools 第 2 节）；其他会话从当前运行工作区快照建立。
+        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools 第 2 节
+        # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
+        # host_commit_error 正式报告
+        if department == "quality":
+            if projection.delivery_spec is not None and projection.delivery_spec.tree_ref is not None:
+                tree_ref = projection.delivery_spec.tree_ref
+                return load_tree(self.artifacts, artifact_run(tree_ref.path), tree_ref)
+            for record in (projection.baseline, projection.snapshot):
+                # 事项开始时的项目起点：run_created 写下的采纳成果或起始文件夹快照，两者都没有时为空树
+                if not record:
+                    continue
+                start_ref = ArtifactRef(**record["tree_ref"])
+                return load_tree(self.artifacts, artifact_run(start_ref.path), start_ref)
+            return CapturedTree(directories=(), files=())
         return workspace_tree(self.workspace_root / projection.run_id)
 
     def _inspection_environment(self, run_id: str, department: str) -> LocalEnvironment:
@@ -1289,6 +1296,16 @@ class Orchestrator:
         projection = self.project(run_id)
         try:
             environment = self._environment_for(run_id, department, refresh=True)
+        except (ValueError, OSError) as exc:
+            # 检查工作区的建立源读不出来（质检的封存交付归档缺失或损坏）：不退回运行工作区
+            # （ADR-0038 与 local-tools 第 2 节：检查工作区从封存的交付建立）。这次激活无法开始，
+            # 以 host_commit_error 正式终止并报告真实原因，与提交判断对同一缺陷的报告方式一致
+            self._end_run(activation, "host_commit_error",
+                          f"the persisted delivery tree cannot be read for the {department} "
+                          f"inspection workspace: {exc}",
+                          activation.version)
+            return
+        try:
             environment.bind_check(
                 activation_id=scope.activation_id,
                 product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,

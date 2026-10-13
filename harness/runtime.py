@@ -98,6 +98,9 @@ class LoopSystem:
         self.orchestrator.projects = self.projects
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
+        # 启动时补建缺少的建档修改轮 run（工单 #136，设计第 6 节）：回答「提出修改」以后
+        # 修改轮事件已经写入项目流，run 在事务提交以后创建，两者之间中断时在这里补建
+        self.recovered_revision_runs = self.projects.create_missing_revision_runs_on_startup()
         # 启动时扫描上次异常退出留下的检查工作区（工单 #481）：run 已经结束但 on_commit 没有跑过
         # 的目录在这里清掉；文件未删除时不阻塞启动
         self._cleanup_orphaned_inspections_on_startup()
@@ -405,6 +408,7 @@ class LoopSystem:
                     cleanup_inspection_workspace(self.workspace_root / run_id, department)
                 except RuntimeError:
                     pass
+
     def replay(self, run_id: str) -> RunProjection:
         return verify_replay(self.store, self.artifacts, self.git_versions, run_id)
 
