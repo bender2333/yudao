@@ -126,26 +126,24 @@ def test_department_without_label_fails_naming_the_department(tmp_path):
 def test_tool_categories_and_references_are_checked(tmp_path):
     directory = _copy(tmp_path)
     tools = _read(directory, "tools.json")
-    tools["submit_plan"]["action"] = "write"
-    tools["submit_delivery"]["proposal"] = "engineering_plan"
+    tools["submit_delivery"]["action"] = "write"
+    tools["submit_baseline_review"]["proposal"] = "delivery_spec"
     del tools["run_command"]
     _write(directory, "tools.json", tools)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     [issue] = raised.value.issues
-    assert issue[:2] == ("tools.json", "submit_plan") and "a host tool requires proposal and has no action" in issue[2]
+    assert issue[:2] == ("tools.json", "submit_delivery") and "a host tool requires proposal and has no action" in issue[2]
 
-    tools["submit_plan"].pop("action")
+    tools["submit_delivery"].pop("action")
     _write(directory, "tools.json", tools)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     assert raised.value.issues[:3] == (
         ("roles.json", "engineering.tools[9]", "工具 run_command 没有定义"),
         ("work_items.json", "kinds.change.departments.engineering.tools[9]", "工具 run_command 没有定义"),
-        ("tools.json", "submit_delivery.proposal", "提案种类 engineering_plan 已经由 submit_plan 提交"),
+        ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
     )
-    # 工程部门的提案合同仍然说明 delivery_spec，与提交工具的种类不再相符
-    assert raised.value.issues[3][:2] == ("proposal_contracts.json", "roles.engineering.kinds")
 
 
 def test_proposal_contracts_must_match_the_submit_tools_of_each_role(tmp_path):
@@ -410,8 +408,8 @@ def test_work_item_creation_model_requests_and_proposal_decisions_record_the_def
         if event.type in recorded:
             counts[event.type] += 1
             assert event.payload["definitions_version"] == DEFINITIONS.version, event.type
-    assert counts == {EventType.RUN_CREATED: 1, EventType.MODEL_REQUESTED: 5,
-                      EventType.PROPOSAL_SUBMITTED: 5, EventType.PROPOSAL_REJECTED: 1}
+    assert counts == {EventType.RUN_CREATED: 1, EventType.MODEL_REQUESTED: 4,
+                      EventType.PROPOSAL_SUBMITTED: 4, EventType.PROPOSAL_REJECTED: 1}
     system.close()
 
 

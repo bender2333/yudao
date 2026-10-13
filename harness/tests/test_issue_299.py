@@ -12,14 +12,13 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.models import ProjectEventType, TERMINAL_PHASES, Usage
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 UNAVAILABLE = "Missing configuration: provider credential"
-
 
 class _Service:
     # 服务的生命周期中建立应用层；每次启动取一份模型回答脚本
@@ -37,28 +36,23 @@ class _Service:
     def system(self) -> LoopSystem:
         return self.applications[-1].system
 
-
 def _blocked_script():
     # 产品提交规格以后工程部门的请求被提供方报告为不可用：run 停在等待用户回答的待恢复状态，
     # 回答以后从这次请求接着进行到放行，交付与放行评审齐备，结算才有可采纳的成果
     return [
         FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ]
 
-
 def _release_script():
-    return [product_spec(), plan_turn(), delivery_turn(),
+    return [product_spec(),delivery_turn(),
             review_turn("release", "checks passed on the current snapshot")]
-
 
 def _completion_script():
     # 产品已经提交规格以后剩下的三个回答：计划、交付与放行评审
-    return [plan_turn(), delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
-
+    return [delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
 
 def _open_decision(system, run_id):
     _position, decisions = saved_decisions(system.store, statuses=("open",))
@@ -66,11 +60,9 @@ def _open_decision(system, run_id):
     assert decision.request["kind"] == "model_unavailable" and decision.request["blocks"] == "run"
     return decision
 
-
 def _adoptions(system, project_id):
     return [event for event in system.store.list_project_events(project_id)
             if event.type == ProjectEventType.DELIVERABLE_ADOPTED]
-
 
 def _wait_for_terminal(system, run_id):
     # run 在服务的事件循环中作为任务继续运行：等到它到了终态并且任务已从任务表摘除
@@ -81,7 +73,6 @@ def _wait_for_terminal(system, run_id):
             return projection
         time.sleep(0.02)
     raise AssertionError(f"run {run_id} was not finished by its task within {WAIT_FOR_HOST_WORK_SEC}s")
-
 
 def test_answering_the_resume_decision_settles_the_run_it_finishes(data_dir):
     # 事项因模型引用无法使用停在待恢复；回答「继续执行」以后 run 跑完，项目流出现采纳，
@@ -115,7 +106,6 @@ def test_answering_the_resume_decision_settles_the_run_it_finishes(data_dir):
         assert project.current_adoption.run_id == run_id
         assert project.current_adoption.adoption_id == adopted.payload["adoption_id"]
 
-
 def test_a_run_resumed_on_startup_is_settled_when_it_stops(data_dir):
     # 进程在模型步骤之间退出；重新打开数据目录时启动自动继续这个 run，跑完以后同样被结算
     interrupted = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec()]))
@@ -137,7 +127,6 @@ def test_a_run_resumed_on_startup_is_settled_when_it_stops(data_dir):
     finally:
         restarted.close()
 
-
 def test_a_settled_run_does_not_write_another_adoption(data_dir):
     # 已经结算过的 run 再次经过运行到停止的入口：不写第二条采纳，成果与事项状态保持
     system = LoopSystem.for_testing(data_dir, FakeAdapter(_release_script()))
@@ -158,7 +147,6 @@ def test_a_settled_run_does_not_write_another_adoption(data_dir):
     assert project.work_items[0].status == "adopted" and project.work_item(work_item_id).status == "adopted"
     assert project.current_adoption.run_id == run_id
     system.close()
-
 
 async def _start_again(system, run_id):
     # 经回答决定以后使用的入口再运行一次这个已经结算的 run

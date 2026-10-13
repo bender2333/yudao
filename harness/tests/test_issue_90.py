@@ -49,15 +49,13 @@ def _text_reply(*, response_id: str, model: str, text: str) -> tuple[int, str, l
     return 200, "text/event-stream", [sse(*frames)]
 
 def _proposal_reply(*, response_id: str, model: str, payload: dict[str, Any]) -> tuple[int, str, list[bytes]]:
-    # 带工具调用的回答：部门要交出结构化提案，运行才会离开起始阶段、进入下一个部门
-    from harness.proposals import engineering_plan, product_spec
-    kind = payload["kind"]
-    value = product_spec() if kind == "product_spec" else engineering_plan()
+    # 带工具调用的回答：产品交出产品要求，运行离开起始阶段、进入工程部门
+    from harness.proposals import product_spec
+    value = product_spec()
     value.pop("kind")
-    name = "submit_product_spec" if kind == "product_spec" else "submit_plan"
     response = {
         "id": response_id, "object": "response", "created_at": 1, "status": "completed", "model": model,
-        "output": [{"id": f"call-{response_id}", "type": "function_call", "name": name,
+        "output": [{"id": f"call-{response_id}", "type": "function_call", "name": "submit_product_spec",
                     "call_id": f"call-{response_id}", "arguments": json.dumps(value, ensure_ascii=False),
                     "status": "completed"}],
         "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2,
@@ -86,10 +84,9 @@ def _phase(body: dict[str, Any]) -> str:
     return match.group(1) if match else ""
 
 def _department_aware(model: str = "upstream-a", *, on_product=None):
-    # 产品部门先提交产品要求，工程部门再提交工程计划，之后返回不带工具调用的普通回答让运行停下来。
+    # 产品部门先提交产品要求，之后返回不带工具调用的普通回答让运行停下来。
     # on_product 在产品交完提案以后调用一次：可以让此时刻之后的工程部门解析不到目标，
     # 使运行停在工程进行中（不是终止阶段，事项保持「进行中」且部门是工程部门）
-    state = {"plan": 0}
     def responder(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
         chosen = str(body.get("model") or model)
         if _phase(body) != "ENGINEERING":
@@ -97,10 +94,7 @@ def _department_aware(model: str = "upstream-a", *, on_product=None):
             if on_product is not None:
                 on_product()
             return reply
-        if state["plan"] == 0:
-            state["plan"] += 1
-            return _proposal_reply(response_id="plan", model=chosen, payload={"kind": "engineering_plan"})
-        return _text_reply(response_id="idle", model=chosen, text="按当前计划继续。")
+        return _text_reply(response_id="idle", model=chosen, text="按当前要求继续。")
     return responder
 
 

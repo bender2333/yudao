@@ -70,7 +70,6 @@ class EventType:
     SPEC_ACCEPTED = "spec_accepted"
     SPEC_SUPERSEDED = "spec_superseded"
     CONTRACT_ACCEPTED = "contract_accepted"
-    PLAN_ACCEPTED = "plan_accepted"
     COLLABORATION_REQUESTED = "collaboration_requested"
     COLLABORATION_RESPONDED = "collaboration_responded"
     COLLABORATION_CLOSED = "collaboration_closed"
@@ -145,7 +144,7 @@ class CatalogEventType:
 
 GIT_VERSION_EVENTS = frozenset({
     EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.SPEC_ACCEPTED,
-    EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED, EventType.PLAN_ACCEPTED,
+    EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED,
     EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED, EventType.STRUCTURE_ACCEPTED,
     EventType.BASELINE_REVIEW_ACCEPTED,
 })
@@ -246,8 +245,6 @@ class CheckReceipt:
     activation_id: str | None = None
     tree_changed: bool = False
     effective_contract_hash: str | None = None
-    engineering_plan_hash: str | None = None
-
 
 @dataclass(frozen=True)
 class ProductSpec:
@@ -330,25 +327,6 @@ class EffectiveContract:
 
 
 @dataclass(frozen=True)
-class EngineeringPlan:
-    id: str
-    run_id: str
-    content_hash: str
-    revision: int
-    parent_hash: str | None
-    status: str
-    created_event_id: str
-    effective_contract_hash: str
-    objective: str
-    scope: list[str]
-    tasks: list[dict[str, Any]]
-    refactoring: list[str]
-    assumptions: list[dict[str, str]]
-    reason: str
-    plan_ref: ArtifactRef
-
-
-@dataclass(frozen=True)
 class DeliverySpec:
     id: str
     run_id: str
@@ -360,7 +338,6 @@ class DeliverySpec:
     created_event_id: str
     product_spec_hash: str
     effective_contract_hash: str
-    engineering_plan_hash: str
     summary: str
     files: list[str]
     check_names: list[str]
@@ -389,7 +366,6 @@ class QAReview:
     created_event_id: str
     product_spec_hash: str
     effective_contract_hash: str
-    engineering_plan_hash: str
     delivery_spec_hash: str
     code_snapshot_hash: str
     verdict: str
@@ -448,7 +424,6 @@ class ContextManifest:
     max_output_tokens: int | None = None
     compaction_event_id: str | None = None
     effective_contract_hash: str | None = None
-    engineering_plan_hash: str | None = None
     request_id: str | None = None
     input_version: int = 0
     prompt_version: int = 0
@@ -658,7 +633,6 @@ class RunProjection:
     error: str | None = None
     product_spec: ProductSpec | None = None
     effective_contract: EffectiveContract | None = None
-    engineering_plan: EngineeringPlan | None = None
     delivery_spec: DeliverySpec | None = None
     pending_request: CollaborationRequest | None = None
     last_review: QAReview | None = None
@@ -676,7 +650,6 @@ class RunProjection:
     sessions: dict[str, SessionRecord] = field(default_factory=dict)
     product_specs: list[ProductSpec] = field(default_factory=list)
     effective_contracts: list[EffectiveContract] = field(default_factory=list)
-    engineering_plans: list[EngineeringPlan] = field(default_factory=list)
     delivery_specs: list[DeliverySpec] = field(default_factory=list)
     requests: list[CollaborationRequest] = field(default_factory=list)
     responses: list[CollaborationResponse] = field(default_factory=list)

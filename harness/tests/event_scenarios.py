@@ -22,7 +22,7 @@ from harness.event_store import Command
 from harness.models import EventType, Usage, json_dumps
 from harness.providers.call import ModelResponse
 from harness.proposals import (
-    collaboration_request, delivery, delivery_turn, engineering_plan, guidance_response, plan_turn,
+    collaboration_request, delivery, delivery_turn, guidance_response,
     product_spec, response_turn, review, review_turn,
 )
 from harness.projection import saved_decisions
@@ -63,7 +63,7 @@ def _release(rationale: str = "checks passed on the current snapshot") -> FakeTu
 
 
 def _handoff_script() -> list[Any]:
-    return [product_spec(), plan_turn(), _deliver(), _release()]
+    return [product_spec(), _deliver(), _release()]
 
 
 def _system(data_dir, script: list[Any], *, step_limits: StepLimits = StepLimits(),
@@ -151,17 +151,10 @@ def invalid_tool_arguments(data_dir):
     return system, run_id, {}
 
 
-def tool_denied_outside_plan(data_dir):
-    outside = ModelResponse(output=[_call("write-outside", "write_file", {"path": "docs/notes.md", "content": "notes\n"})])
-    system, _, run_id = _system(data_dir, [product_spec(), plan_turn(), outside, _deliver(), _release()])
-    system.run_until_stop(run_id)
-    return system, run_id, {}
-
-
 def tool_denied_unregistered_command(data_dir):
     registry = {"unit": {"argv": ["python", "-c", "print('unit ok')"], "args": [], "timeout_sec": 30, "output_limit": 4000}}
     unknown = ModelResponse(output=[_call("command-missing", "run_command", {"name": "missing"})])
-    system, _, run_id = _system(data_dir, [product_spec(), plan_turn(), unknown, _deliver(), _release()],
+    system, _, run_id = _system(data_dir, [product_spec(), unknown, _deliver(), _release()],
                                 registered_commands=registry, command_versions={"unit": 1})
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -172,8 +165,8 @@ def _guidance_id(call) -> str:
 
 
 def tool_denied_guidance_only(data_dir):
-    system, adapter, run_id = _system(data_dir, [product_spec(), plan_turn(), _deliver()])
-    for _ in range(3):
+    system, adapter, run_id = _system(data_dir, [product_spec(), _deliver()])
+    for _ in range(2):
         system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请直接改交付文件以处理错误输出。")
     adapter.script.extend([
@@ -192,7 +185,7 @@ def collaboration_request_answer(data_dir):
     system, _, run_id = _system(data_dir, [
         product_spec(), collaboration_request(),
         response_turn("answered", "The existing contract covers unknown flags: print them as given."),
-        plan_turn(), _deliver(), _release(),
+        _deliver(), _release(),
     ])
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -205,7 +198,7 @@ def guidance_response_explained(data_dir):
     adapter.script.extend([
         lambda request: FakeTurn(proposal=guidance_response(
             _guidance_id(request), status="explained", text="当前合同已覆盖该边界，无需变更。")),
-        plan_turn(), _deliver(), _release(),
+        _deliver(), _release(),
     ])
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -222,7 +215,7 @@ def proposal_rejected(data_dir):
 
 def quality_rework(data_dir):
     system, _, run_id = _system(data_dir, [
-        product_spec(), plan_turn(), _deliver(),
+        product_spec(), _deliver(),
         review_turn("rework_engineering", "the output misses a trailing newline check", checks=CHECKS,
                     defects=[{"severity": "major", "summary": "no check covers an argument with spaces"}]),
         delivery_turn("handled arguments with spaces", files={"src/echo.py": "import sys\nprint(' '.join(sys.argv[1:]))\n"},
@@ -248,7 +241,7 @@ def cancel_during_model_call(data_dir):
         holder["system"].cancel(request.run_id)
         return _deliver()
 
-    system, _, run_id = _system(data_dir, [product_spec(), plan_turn(), cancel_then_deliver])
+    system, _, run_id = _system(data_dir, [product_spec(), cancel_then_deliver])
     holder["system"] = system
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -313,7 +306,7 @@ def run_command_is_not_a_check_receipt(data_dir):
                      {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["unit-tests"]})
 
     system, _, run_id = _system(data_dir, [
-        product_spec(), plan_turn(),
+        product_spec(),
         ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
                               _call("command-1", "run_command", {"name": "unit-tests"}), submit("submit-1")]),
         ModelResponse(output=[_call("check-2", "run_check", {"name": "unit-tests", "argv": argv}),
@@ -355,7 +348,7 @@ def cancel_while_check_runs(data_dir):
     marker = (data_dir / "check-running").as_posix()
     argv = ["python", "-c", _running("check"), marker]
     system, _, run_id = _system(data_dir, [
-        product_spec(), plan_turn(),
+        product_spec(),
         ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
                               _call("check-1", "run_check", {"name": "smoke", "argv": argv}),
                               _delivery_call("submit-1")]),
@@ -371,7 +364,7 @@ def cancel_while_command_runs(data_dir):
     registry = {"serve": {"argv": ["python", "-c", _running("command"), marker], "args": [], "timeout_sec": 60,
                           "output_limit": 4000}}
     system, _, run_id = _system(data_dir, [
-        product_spec(), plan_turn(),
+        product_spec(),
         ModelResponse(output=[_call("command-1", "run_command", {"name": "serve"}), _delivery_call("submit-1")]),
     ], registered_commands=registry, command_versions={"serve": 1})
     canceller = _cancel_when_running(system, run_id, data_dir / "command-running")
@@ -464,7 +457,6 @@ def _request_time_unavailable_script() -> list[Any]:
     return [
         FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
         ProviderError(_UNAVAILABLE_MESSAGE, reason="provider_unavailable"),
-        plan_turn(),
         delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
         review_turn("release", "checks passed on the current snapshot"),
     ]
@@ -565,7 +557,7 @@ def _credential_rejected_then_continue(protocol: str, first):
 
 SCENARIOS: dict[str, Scenario] = {
     "handoff_release": Scenario(
-        "一次成功的提交与部门交接：产品提交规格，工程提交计划，再写文件、运行检查并提交交付，质检运行检查后放行，运行结束于 DONE。",
+        "一次成功的提交与部门交接：产品提交规格，工程直接写文件、运行检查并提交交付，质检运行检查后放行，运行结束于 DONE。",
         handoff_release),
     "retry_then_success": Scenario(
         "模型调用失败一次（可重试）：记录失败的尝试与重试安排，同一个逻辑调用的第二次尝试成功，产品规格被接纳。",
@@ -585,9 +577,6 @@ SCENARIOS: dict[str, Scenario] = {
     "invalid_tool_arguments": Scenario(
         "模型给出无法解析的工具参数：工具不启动，错误作为工具结果返回模型，记入历史的参数换成 {}；下一步提交成功。",
         invalid_tool_arguments),
-    "tool_denied_outside_plan": Scenario(
-        "工具许可拒绝计划范围之外的写入，拒绝原因作为工具结果返回；之后在范围内交付并由质检放行。",
-        tool_denied_outside_plan),
     "tool_denied_unregistered_command": Scenario(
         "工具许可拒绝没有登记的命令，命令不执行，拒绝原因作为工具结果返回；之后正常交付并放行。",
         tool_denied_unregistered_command),
@@ -595,10 +584,10 @@ SCENARIOS: dict[str, Scenario] = {
         "质检阶段收到给工程部门的指导：工程部门以只能回应指导的方式激活，写文件被工具许可拒绝，回应指导（explained）后回到质检并放行。",
         tool_denied_guidance_only),
     "collaboration_request_answer": Scenario(
-        "工程部门向产品部门提出咨询，产品部门回答（answered），工程部门继续计划与交付，质检放行。",
+        "工程部门向产品部门提出咨询，产品部门回答（answered），工程部门继续交付，质检放行。",
         collaboration_request_answer),
     "guidance_response_explained": Scenario(
-        "产品规格接纳后用户给工程部门写指导：指导在请求之前写入并标记已进入输入，工程部门回应指导（explained），之后计划、交付并放行。",
+        "产品规格接纳后用户给工程部门写指导：指导在请求之前写入并标记已进入输入，工程部门回应指导（explained），之后交付并放行。",
         guidance_response_explained),
     "proposal_rejected": Scenario(
         "产品规格缺少目标被控制层拒绝，拒绝原因作为 validation_feedback 进入下一次激活，修正后接纳，走完交付与放行。",

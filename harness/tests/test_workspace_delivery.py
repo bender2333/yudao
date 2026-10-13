@@ -9,16 +9,15 @@ import harness.submissions as submissions
 import harness.workspace as workspaces
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.public_tree import TreeError, capture_public_tree, materialize_tree
 from harness.runtime import LoopSystem
 from harness.tree_archive import load_tree
 from harness.workspace import Workspace
 
-
 def _system_with_delivery(tmp_path):
     system = LoopSystem.for_testing(tmp_path / "new" / "data", FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Checks passed"),
+        product_spec(),delivery_turn(), review_turn("release", "Checks passed"),
     ]))
     run_id = system.create_run("Build echo")
     workspace = system.workspace(run_id)
@@ -26,7 +25,6 @@ def _system_with_delivery(tmp_path):
     (workspace.root / "undeclared.bin").write_bytes(b"\x80\x81\r\n")
     (workspace.root / "empty" / "nested").mkdir(parents=True)
     return system, run_id, workspace
-
 
 def test_first_run_archives_and_restores_every_public_byte_from_a_new_data_directory(tmp_path):
     system, run_id, workspace = _system_with_delivery(tmp_path)
@@ -51,7 +49,6 @@ def test_first_run_archives_and_restores_every_public_byte_from_a_new_data_direc
     assert capture_public_tree(restored).digest == delivery.code_tree_digest
     assert system.replay(run_id).delivery_spec.tree_ref == delivery.tree_ref
 
-
 def test_delivery_blob_failure_does_not_accept_or_release_the_delivery(tmp_path, monkeypatch):
     system, run_id, _ = _system_with_delivery(tmp_path)
     put = system.artifacts.put
@@ -68,7 +65,6 @@ def test_delivery_blob_failure_does_not_accept_or_release_the_delivery(tmp_path,
     assert "simulated artifact write failure" in result.error
     assert result.delivery_spec is None
     assert not any(event.type in {EventType.DELIVERY_ACCEPTED, EventType.RUN_DONE} for event in system.store.list_events(run_id))
-
 
 def test_source_change_after_blob_storage_rejects_acceptance_without_replacing_captured_bytes(tmp_path, monkeypatch):
     system, run_id, workspace = _system_with_delivery(tmp_path)
@@ -91,7 +87,6 @@ def test_source_change_after_blob_storage_rejects_acceptance_without_replacing_c
     archived = load_tree(system.artifacts, run_id, reference)
     assert archived == captured
     assert next(item.data for item in archived.files if item.path == "undeclared.bin") == b"\x80\x81\r\n"
-
 
 def test_workspace_snapshot_and_copy_derive_from_one_capture(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "new" / "nested" / "workspace")
@@ -117,7 +112,6 @@ def test_workspace_snapshot_and_copy_derive_from_one_capture(tmp_path, monkeypat
         assert capture_public_tree(copy_root).digest == snapshot.digest
     assert len(calls) == 1
 
-
 @pytest.mark.parametrize("department", ["engineering", "quality"])
 def test_changed_tree_receipts_are_not_reused_even_when_the_hash_later_matches(tmp_path, department):
     workspace = Workspace(tmp_path)
@@ -128,7 +122,6 @@ def test_changed_tree_receipts_are_not_reused_even_when_the_hash_later_matches(t
     assert snapshot.checks[-1].snapshot_hash == snapshot.digest
     assert snapshot.checks[-1].exit_code == 0
     assert snapshot.facts.latest_check(department, "changed-check") is None
-
 
 def test_move_and_delete_preserve_binary_bytes_and_do_not_delete_old_archives(tmp_path):
     system, run_id, workspace = _system_with_delivery(tmp_path)
@@ -145,7 +138,6 @@ def test_move_and_delete_preserve_binary_bytes_and_do_not_delete_old_archives(tm
     assert not (workspace.root / "moved" / "new.bin").exists()
     assert load_tree(system.artifacts, run_id, reference) == before
 
-
 def test_move_refuses_existing_destination_without_changing_either_file(tmp_path):
     workspace = Workspace(tmp_path)
     workspace.write_file("source", "source bytes")
@@ -154,7 +146,6 @@ def test_move_refuses_existing_destination_without_changing_either_file(tmp_path
         workspace.move_file("source", "destination")
     assert workspace.read_file("source") == "source bytes"
     assert workspace.read_file("destination") == "existing bytes"
-
 
 def test_move_never_overwrites_a_destination_created_after_validation(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path)
@@ -170,7 +161,6 @@ def test_move_never_overwrites_a_destination_created_after_validation(tmp_path, 
         workspace.move_file("source", "destination")
     assert workspace.read_file("source") == "source bytes"
     assert workspace.read_file("destination") == "concurrent destination"
-
 
 def test_move_rolls_back_its_destination_when_source_removal_fails(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path)
@@ -189,7 +179,6 @@ def test_move_rolls_back_its_destination_when_source_removal_fails(tmp_path, mon
     assert not (workspace.root / "destination").exists()
     assert (workspace.root / "source").stat().st_nlink == 1
 
-
 @pytest.mark.parametrize("operation", ["delete", "move"])
 def test_file_mutations_do_not_recursively_operate_on_directories(tmp_path, operation):
     workspace = Workspace(tmp_path)
@@ -202,7 +191,6 @@ def test_file_mutations_do_not_recursively_operate_on_directories(tmp_path, oper
     assert workspace.read_file("directory/keep") == "kept"
     assert not (workspace.root / "elsewhere").exists()
 
-
 @pytest.mark.parametrize("path", [".checks/receipts.jsonl", ".CHECKS/receipts.jsonl", "../outside", "C:relative", "/absolute", "file:stream", "file.", "dir\\file"])
 @pytest.mark.parametrize("operation", ["read", "write", "delete", "move_source", "move_destination"])
 def test_all_workspace_file_operations_share_public_path_rules(tmp_path, path, operation):
@@ -213,7 +201,6 @@ def test_all_workspace_file_operations_share_public_path_rules(tmp_path, path, o
         _operate(workspace, operation, path)
     assert workspace.read_file("source") == "kept"
     assert (workspace.root / ".checks" / "receipts.jsonl").read_bytes() == b"host record"
-
 
 @pytest.mark.parametrize("operation", ["read", "write", "delete", "move_source", "move_destination"])
 def test_all_workspace_file_operations_reject_hardlinks(tmp_path, operation):
@@ -226,7 +213,6 @@ def test_all_workspace_file_operations_reject_hardlinks(tmp_path, operation):
         _operate(workspace, operation, "linked")
     assert outside.read_bytes() == b"outside"
     assert workspace.read_file("source") == "kept"
-
 
 @pytest.mark.skipif(os.name != "nt", reason="junctions are Windows-specific")
 @pytest.mark.parametrize("operation", ["read", "write", "delete", "move_source", "move_destination"])
@@ -242,7 +228,6 @@ def test_all_workspace_file_operations_reject_junction_ancestors(tmp_path, opera
         _operate(workspace, operation, "linked/file")
     assert (outside / "file").read_bytes() == b"outside"
     assert workspace.read_file("source") == "kept"
-
 
 def test_write_file_stores_the_given_bytes_without_newline_conversion(tmp_path):
     workspace = Workspace(tmp_path)
@@ -262,7 +247,6 @@ def test_file_operations_preserve_legal_leading_spaces_in_names(tmp_path):
     assert not (workspace.root / "moved").exists()
     workspace.delete_file(" moved")
     assert workspace.list_files() == []
-
 
 def _operate(workspace, operation, path):
     if operation == "read":

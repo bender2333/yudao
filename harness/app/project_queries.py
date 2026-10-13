@@ -504,10 +504,9 @@ def _event_artifacts(application: Application, event: Any) -> dict[str, Any]:
         tree, archive = _delivery_archive(application, event)
         loaded["tree_archive"] = archive
         loaded["tree_files"] = [{"path": item.path, "size": len(item.data)} for item in tree.files]
-    for name in ("prd", "plan"):
-        ref = event.payload.get(f"{name}_ref")
-        if ref:
-            loaded[name] = artifacts.get_for_run(run_id, ArtifactRef(**ref)).decode("utf-8")
+    ref = event.payload.get("prd_ref")
+    if ref:
+        loaded["prd"] = artifacts.get_for_run(run_id, ArtifactRef(**ref)).decode("utf-8")
     ref = event.payload.get("request_ref")
     if ref:
         loaded["request"] = json.loads(artifacts.get_for_run(run_id, ArtifactRef(**ref)))
@@ -1180,7 +1179,6 @@ class WorkItemMaterialsResult(Contract):
     work_item_id: str
     run_id: str
     contracts: list[VersionEntry]
-    plans: list[VersionEntry]
     deliveries: list[VersionEntry]
     reviews: list[ReviewEntry]
     inputs: list[InputView]
@@ -1203,8 +1201,6 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
             work_item_id=item.work_item_id, run_id=run.run_id,
             contracts=[_version_entry(value.created_event_id, "contract", "active", value.revision,
                                       value.content_hash, None, []) for value in run.effective_contracts],
-            plans=[_version_entry(value.created_event_id, "plan", value.status, value.revision,
-                                  value.content_hash, value.objective, []) for value in run.engineering_plans],
             deliveries=[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
                                        value.content_hash, value.summary, list(value.files))
                         for value in run.delivery_specs],
@@ -1966,7 +1962,7 @@ WORK_ITEM_MATERIALS = QueryDefinition(
     name="work_item.materials", request=WorkItemMaterials, result=WorkItemMaterialsResult,
     handle=_work_item_materials,
     changed_by=(EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.CONTRACT_ACCEPTED,
-                EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
                 ProjectEventType.MATERIAL_RECORDED, ProjectEventType.INITIAL_PRD_PROPOSED,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN),

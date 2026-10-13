@@ -76,7 +76,6 @@ class StepFrame:
     prompt: DepartmentPrompt
     guidance_only: bool
     effective_contract_hash: str | None
-    engineering_plan_hash: str | None
     input_version: int
 
 
@@ -243,7 +242,6 @@ class ContextAssembly:
         recorded = next((item for item in reversed(projection.compactions)
                          if item["department"] == frame.department
                          and item["effective_contract_hash"] == frame.effective_contract_hash
-                         and item["engineering_plan_hash"] == frame.engineering_plan_hash
                          and item["input_version"] == frame.input_version
                          and item["prompt_version"] == frame.prompt.version
                          and item["prompt_hash"] == frame.prompt.prompt_ref.content_hash), None)

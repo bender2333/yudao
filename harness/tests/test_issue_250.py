@@ -6,7 +6,7 @@ import pytest
 from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.environment import LocalEnvironment
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 
 # 数据目录以 Windows 的 8.3 短路径给出时（用户名超过 8 个字符的机器上 TEMP 的默认值就是这种形式），
@@ -20,8 +20,8 @@ def _short_path(path):
     return buffer.value
 
 def _delivery_script():
-    # 一轮完整的三部门：产品规格、工程计划、交付提案与质检放行
-    return [product_spec(), plan_turn(), delivery_turn(), review_turn("release", "Checks passed")]
+    # 一轮完整的三部门：产品规格、交付提案与质检放行
+    return [product_spec(),delivery_turn(), review_turn("release", "Checks passed")]
 
 @pytest.mark.skipif(os.name != "nt", reason="8.3 short paths are Windows-specific")
 def test_delivery_accepts_a_short_data_directory(tmp_path):

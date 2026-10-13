@@ -267,7 +267,7 @@ test("事件成串到达时，队满挤掉最早排入的那个", () => {
   rm.driver.playEvent({ type: "collaboration_requested", department: "engineering", label: "工程询问产品：线路偏好", payload: { from: "engineering", to: "product", request_id: "q1" } } as PixelFloorEvent);
   assert.equal(rm.actor("eng-architect")?.queue.length, 1);
   // 后面的动作连续到达，队满时挤掉最早的（原型 room.js：queue.length > 3 时 shift）
-  for (const ev of ["model_requested", "model_attempt_finished", "proposal_submitted", "plan_accepted", "department_activated"]) {
+  for (const ev of ["model_requested", "model_attempt_finished", "proposal_submitted", "delivery_accepted", "department_activated"]) {
     rm.driver.playEvent({ type: ev, department: "engineering", role: "eng-architect", payload: {} } as PixelFloorEvent);
   }
   const queued = rm.actor("eng-architect")!.queue.map((entry) => entry.from);
@@ -340,7 +340,6 @@ test("工具类：真实载荷的名字与参数说出是哪件事", () => {
   assert.equal(say(real({ payload: { name: "run_check", args: { name: "unit-tests" } } })), "现在检查交付：unit-tests");
 });
 test("工具类：交出类工具说出交的是哪一份，名称与提案事件一致", () => {
-  assert.equal(say(real({ payload: { name: "submit_plan", args: {} } })), "现在提交工程计划");
   assert.equal(say(real({ payload: { name: "submit_delivery", args: {} } })), "现在提交交付说明");
   assert.equal(say(real({ payload: { name: "submit_request", args: {} } })), "现在提交询问");
 });
@@ -352,10 +351,10 @@ test("工具类：工具调用排在取信之后，事件成串时头顶显示�
   rm.step(4500);
   assert.equal(rm.actor("eng-architect")?.say?.text, "收到PRD，来自产品");
   rm.driver.playEvent(real({ payload: { name: "list_files", args: {} } }));
-  rm.driver.playEvent(real({ payload: { name: "submit_plan", args: {} } }));
-  rm.driver.playEvent({ type: "plan_accepted", department: "engineering", work_item_id: "w1", payload: {} });
+  rm.driver.playEvent(real({ payload: { name: "submit_delivery", args: {} } }));
+  rm.driver.playEvent({ type: "delivery_accepted", department: "engineering", work_item_id: "w1", payload: {} });
   rm.step(30000);
-  assert.equal(rm.actor("eng-architect")?.say?.text, "现在把计划贴上白板");
+  assert.equal(rm.actor("eng-architect")?.say?.text, "现在装箱封存");
 });
 
 test("工具类：登记命令说出登记名而不是工具名", () => {

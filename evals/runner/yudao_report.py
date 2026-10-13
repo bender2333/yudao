@@ -33,7 +33,6 @@ METRIC_LABELS = {
 CHECKPOINT_LABELS = {
     "ended_within_limit": "run 在限额内结束，状态为放行",
     "quality_release_bound_to_delivery": "质检的放行绑定最后提交的交付树",
-    "no_write_before_plan_accepted": "工程的计划被接纳以前没有写入文件",
     "replay_consistent": "重放结果与记录一致",
     "no_false_release": "质检没有误放行",
     "release_coverage": "放行记录附检验覆盖比例、模型阅读条件数与开环条件数",

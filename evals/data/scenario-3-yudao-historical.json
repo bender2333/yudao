@@ -116,10 +116,6 @@
             "passed": false,
             "detail": "没有质检提交或没有封存的交付"
           },
-          "no_write_before_plan_accepted": {
-            "passed": true,
-            "detail": "工程没有写入文件"
-          },
           "replay_consistent": {
             "passed": true,
             "detail": "重放结果与记录一致"
@@ -388,10 +384,6 @@
           "quality_release_bound_to_delivery": {
             "passed": false,
             "detail": "没有质检提交或没有封存的交付"
-          },
-          "no_write_before_plan_accepted": {
-            "passed": true,
-            "detail": "工程没有写入文件"
           },
           "replay_consistent": {
             "passed": true,

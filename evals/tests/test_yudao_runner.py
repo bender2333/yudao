@@ -141,7 +141,6 @@ def _release_events(binding="match", coverage=None):
                                             "parameters_version": "sha256:test"}},
         {"type": "department_activated", "department": "quality",
          "payload": {"activation_id": "act-qa-1"}},
-        {"type": "plan_accepted", "payload": {}},
         {"type": "delivery_accepted",
          "payload": {"code_tree_digest": "tree-a", "content_hash": "spec-a",
                      "checks": [{"name": "smoke"}]}},
@@ -192,30 +191,6 @@ def test_metrics_read_cycles_rework_requests_and_usage():
     assert collected["input_tokens"] == 1000
     assert collected["output_tokens"] == 250
     assert collected["elapsed_seconds"] == 12.3
-
-
-def test_write_before_the_plan_is_accepted_fails_the_checkpoint():
-    events = [{"type": "tool_called", "payload": {"name": "write_file"}}]
-    checkpoints = yudao_metrics.checkpoints_of(events, "ended", None,
-                                               {"timed_out": False, "hidden_failures": []})
-    assert checkpoints["no_write_before_plan_accepted"]["passed"] is False
-
-
-def test_write_after_the_plan_is_accepted_passes_the_checkpoint():
-    events = [{"type": "plan_accepted", "payload": {}},
-              {"type": "tool_called", "payload": {"name": "write_file"}}]
-    checkpoints = yudao_metrics.checkpoints_of(events, "ended", None,
-                                               {"timed_out": False, "hidden_failures": []})
-    assert checkpoints["no_write_before_plan_accepted"]["passed"] is True
-
-
-def test_reading_files_before_the_plan_does_not_fail_the_checkpoint():
-    events = [{"type": "tool_called", "payload": {"name": "read_file"}},
-              {"type": "plan_accepted", "payload": {}},
-              {"type": "tool_called", "payload": {"name": "write_file"}}]
-    checkpoints = yudao_metrics.checkpoints_of(events, "ended", None,
-                                               {"timed_out": False, "hidden_failures": []})
-    assert checkpoints["no_write_before_plan_accepted"]["passed"] is True
 
 
 def test_replay_difference_fails_the_checkpoint():
@@ -314,7 +289,7 @@ def test_a_normal_release_is_not_a_model_service_failure():
 
 
 # ---------------------------------------------------------------------------
-# 六项过程检查点（设计第 5.1 节）
+# 五项过程检查点（设计第 5.1 节）
 
 # 系统事件序列（fake 适配器）：harness 自带的测试序列，文件头 `adapter: fake`。
 # 它们用于驱动同一套 `run.export` 形状的判定逻辑；真实系统导出的证据不可取回
@@ -446,7 +421,7 @@ def test_release_binding_is_unverified_when_ratio_is_unreadable():
 
 
 def test_release_coverage_is_unknown_when_per_data_is_absent():
-    """第六项：放行记录没有逐条覆盖数据时写未知。"""
+    """第五项：放行记录没有逐条覆盖数据时写未知。"""
     export = _load_fixture("handoff_release.json")
     params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
         "parameters_version")
@@ -459,7 +434,7 @@ def test_release_coverage_is_unknown_when_per_data_is_absent():
 
 
 def test_release_coverage_passes_with_full_coverage():
-    """第六项：放行记录给出完整覆盖时通过。"""
+    """第五项：放行记录给出完整覆盖时通过。"""
     export = _load_fixture("handoff_release.json")
     review = next(e for e in export["events"] if e["type"] == "qa_submitted")
     review["payload"]["coverage"] = {"covered_ratio": 1.0, "model_read_count": 0,
@@ -476,7 +451,7 @@ def test_release_coverage_passes_with_full_coverage():
 
 
 def test_release_coverage_fails_with_open_loop_conditions():
-    """第六项：放行记录给出开环条件时，第六项不通过。"""
+    """第五项：放行记录给出开环条件时，第五项不通过。"""
     export = _load_fixture("handoff_release.json")
     review = next(e for e in export["events"] if e["type"] == "qa_submitted")
     review["payload"]["coverage"] = {"covered_ratio": 1.0, "model_read_count": 0,
@@ -492,7 +467,7 @@ def test_release_coverage_fails_with_open_loop_conditions():
 
 
 def test_release_coverage_is_not_applicable_without_a_release():
-    """第六项：没有放行时本项不适用。"""
+    """第五项：没有放行时本项不适用。"""
     collected = yudao_metrics.collect(_export("paused"), {"timed_out": False, "elapsed_seconds": 1.0,
                                                           "hidden_failures": []}, None, None)
     checkpoint = collected["checkpoints"]["release_coverage"]
@@ -501,14 +476,13 @@ def test_release_coverage_is_not_applicable_without_a_release():
     assert "不适用" in checkpoint["detail"]
 
 
-def test_checkpoints_cover_all_six_items():
-    """六项检查点：键集合固定。"""
+def test_checkpoints_cover_all_five_items():
+    """五项检查点：键集合固定。"""
     collected = yudao_metrics.collect(_export("paused"), {"timed_out": False, "elapsed_seconds": 1.0,
                                                           "hidden_failures": []}, None, None)
     assert set(collected["checkpoints"]) == {
         "ended_within_limit", "quality_release_bound_to_delivery",
-        "no_write_before_plan_accepted", "replay_consistent",
-        "no_false_release", "release_coverage"}
+        "replay_consistent", "no_false_release", "release_coverage"}
 
 
 # ---------------------------------------------------------------------------
@@ -644,7 +618,7 @@ def test_version_compare_improvement_no_difference_regression_and_blocked():
     assert same["verdict"] == "no_difference"
     regressed = yudao_compare.compare(
         build([_comparison_run("task-1", completion=0.5,
-                                failed=frozenset(["no_write_before_plan_accepted"]))]),
+                                failed=frozenset(["no_false_release"]))]),
         build([_comparison_run("task-1", completion=0.5)]))
     assert regressed["verdict"] == "regressed"
     false_release_regressed = yudao_compare.compare(
@@ -684,7 +658,7 @@ def test_process_exit_failure_is_not_a_release():
 
 @needs_model
 def test_real_run_produces_metrics_a_score_and_a_report(runs_root, tmp_path):
-    """真实运行一次 Yudao：指标、六项过程检查点、评分与报告都在。"""
+    """真实运行一次 Yudao：指标、五项过程检查点、评分与报告都在。"""
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO,
                                  "yudao-tests")
     run = run_yudao_eval.run_once("yudao-real-1", runs_root, evidence_root,
@@ -693,8 +667,7 @@ def test_real_run_produces_metrics_a_score_and_a_report(runs_root, tmp_path):
     assert run["metrics"]["elapsed_seconds"] > 0
     assert set(run["metrics"]["checkpoints"]) == {
         "ended_within_limit", "quality_release_bound_to_delivery",
-        "no_write_before_plan_accepted", "replay_consistent",
-        "no_false_release", "release_coverage"}
+        "replay_consistent", "no_false_release", "release_coverage"}
     assert os.path.exists(os.path.join(run["evidence_dir"], "run-export.json"))
     assert os.path.exists(os.path.join(run["evidence_dir"], "scoring", "score.json"))
     assert 0.0 <= run["score"]["completion"] <= 1.0

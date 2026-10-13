@@ -9,14 +9,12 @@ from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, json_dumps
 from harness.projection import replay_events
-from harness.proposals import delivery_turn, plan_turn, product_spec, review, review_turn
+from harness.proposals import delivery_turn, product_spec, review, review_turn
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
-
 
 def rework_script(verdict="rework_engineering"):
     script = [
         product_spec(),
-        plan_turn(),
         delivery_turn(),
         review_turn(verdict, "QA reported missing empty-input handling", defects=[
             {"severity": "minor", "summary": "Empty input needs review"},
@@ -29,11 +27,9 @@ def rework_script(verdict="rework_engineering"):
         }))
     return [
         *script,
-        plan_turn(reason="Address the quality finding under the current product requirements"),
         delivery_turn(summary="handle empty input"),
         review_turn("release", "checked revised delivery"),
     ]
-
 
 def assert_candidate_does_not_change_execution(system, projection):
     events = system.store.list_events(projection.run_id)
@@ -45,7 +41,6 @@ def assert_candidate_does_not_change_execution(system, projection):
         actual.pop(field)
         without_candidates.pop(field)
     assert actual == without_candidates
-
 
 @pytest.mark.parametrize("verdict", ["rework_engineering", "rework_product"])
 def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, verdict):
@@ -81,7 +76,6 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, ve
     assert system.run_until_stop(result.run_id).stream_version == before
     assert system.activate_once(result.run_id).stream_version == before
 
-
 def test_candidate_is_never_injected_into_department_context(tmp_path):
     rules = {department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS}
     system, result = run_scripted(tmp_path, rework_script())
@@ -103,10 +97,9 @@ def test_candidate_is_never_injected_into_department_context(tmp_path):
     assert {department: DEFINITIONS.role(department).prompt for department in DEPARTMENTS} == rules
     assert (system.test_adapter.name, system.test_adapter.model) == ("fake", "fake-script")
 
-
 @pytest.mark.parametrize("with_delivery", [False, True])
 def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path, with_delivery):
-    script = [product_spec(), plan_turn(), delivery_turn()] if with_delivery else []
+    script = [product_spec(),delivery_turn()] if with_delivery else []
     script.append(ProviderError("controlled connection failure"))
     system, result = run_scripted(tmp_path, script)
     assert result.phase == "FAILED"
@@ -131,7 +124,6 @@ def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path
     assert_candidate_does_not_change_execution(system, result)
     assert system.replay(result.run_id).canonical_state() == result.canonical_state()
 
-
 def test_success_cancel_pause_and_rejected_review_do_not_invent_candidates(tmp_path):
     _system, success = run_scripted(tmp_path / "success", happy_script())
     assert success.phase == "DONE" and success.lesson_candidates == []
@@ -143,15 +135,14 @@ def test_success_cancel_pause_and_rejected_review_do_not_invent_candidates(tmp_p
     invalid = review("rework_engineering", "unverified rejected opinion", defects=[{"severity": "minor", "summary": "claim"}])
     invalid["defects"] = None
     _system, rejected = run_scripted(
-        tmp_path / "rejected", [product_spec(), plan_turn(), delivery_turn(), invalid], max_cycles=4
+        tmp_path / "rejected", [product_spec(),delivery_turn(), invalid], max_cycles=4
     )
     assert rejected.phase == "PAUSED" and rejected.rejections
     assert rejected.lesson_candidates == []
 
-
 def test_release_with_defect_keeps_existing_rejection_and_does_not_create_candidate(tmp_path):
     system, result = run_scripted(tmp_path, [
-        product_spec(), plan_turn(), delivery_turn(),
+        product_spec(),delivery_turn(),
         review_turn("release", "nonblocking observation", defects=[{"severity": "minor", "summary": "naming could improve"}]),
         review_turn("release", "no defects remain"),
     ])
@@ -160,7 +151,6 @@ def test_release_with_defect_keeps_existing_rejection_and_does_not_create_candid
     assert result.rejections[0]["errors"] == [{"field": "defects", "message": "release requires an empty defect list"}]
     assert len(system.test_adapter.invocations) == 5
     assert_candidate_does_not_change_execution(system, result)
-
 
 def test_evidence_source_export_and_replay_keep_the_same_candidate(tmp_path):
     system, result = run_scripted(tmp_path, rework_script())

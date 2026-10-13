@@ -136,7 +136,7 @@ const DEPARTMENTS: Record<string, true> = { product: true, engineering: true, qu
 const HANDOFF_SINKS: Record<string, true> = { library: true, adopted: true, adoption: true };
 const PHASE_DEPARTMENT: Record<string, string> = {
   PRODUCT_SPEC: "product", PRODUCT_REVIEW: "product",
-  ENGINEERING: "engineering", ENGINEERING_PLAN: "engineering", DELIVERY: "engineering",
+  ENGINEERING: "engineering", DELIVERY: "engineering",
   QUALITY: "quality", QUALITY_REVIEW: "quality",
 };
 

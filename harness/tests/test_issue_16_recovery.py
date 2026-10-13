@@ -15,7 +15,7 @@ from harness.providers import ProviderFacade
 from harness.providers.credentials import CredentialChain
 from harness.runtime import LoopSystem
 from harness.streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
-from harness.tests.helpers import delivery_turn, plan_turn, review_turn
+from harness.tests.helpers import delivery_turn, review_turn
 from harness.tests.protocol_helpers import serve, sse
 from harness.tests.saved_rewrite import reload_without_saved_projection as _reload_without_saved_projection
 from harness.write_path import NewEvent
@@ -74,7 +74,6 @@ def _older_run_event_version(data_dir):
         connection.close()
     _reload_without_saved_projection(data_dir)
 
-
 def _older_definitions_version(data_dir, version="sha256:定义版本在升级之前的内容"):
     # 模拟一次升级：把 run_created 记录的定义版本改成另一个版本。ADR-0014 的定义版本只有发布新版本时改变，
     # 因此测试改写事件库中的事实，不加载第二套定义文件
@@ -121,7 +120,7 @@ def _spec_reply():
     return responder
 
 def _completion_script():
-    return [plan_turn(), delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
+    return [delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
 
 def test_startup_resumes_an_interrupted_run_without_user_action(data_dir):
     # 中断的 run 在启动时自动继续到终态，不需要用户操作

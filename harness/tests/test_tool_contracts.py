@@ -49,14 +49,14 @@ def test_run_command_description_separates_action_receipts_from_delivery_check_r
     assert "run the checks a delivery needs with run_check" in text
 
 
-def test_write_tool_descriptions_state_the_plan_requirement():
+def test_write_tool_descriptions_state_engineering_only():
     write = TOOLS["write_file"].description
     assert "replace its entire content" in write and "missing parent directories are created" in write
     assert "Use edit_range to change part of an existing file." in write
     for name in ("write_file", "edit_range"):
         text = TOOLS[name].description
-        assert "Requires an accepted engineering plan for the current effective contract" in text
-        assert "the path must be inside that plan's scope" in text
+        assert "Engineering only" in text
+        assert "plan" not in text.lower()
 
 
 def test_check_receipt_shows_the_host_interpreter_as_python():
@@ -137,7 +137,7 @@ def test_offers_with_input_filters_tools_that_need_images():
 
 @pytest.mark.parametrize("path", ["../src/", "/src/", "C:/src/", "src/../other/", ".checks/", ".CHECKS/",
                                   "src:file", "src/ ", ".checks /", "src./", "NUL", "src/COM1.py"])
-def test_plan_scope_rejects_paths_outside_public_workspace(path):
+def test_normalize_scope_rejects_paths_outside_public_workspace(path):
     from harness.contracts import normalize_scope
 
     with pytest.raises(ValueError):

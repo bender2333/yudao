@@ -9,7 +9,7 @@ from harness.decisions import DecisionClosed, DecisionNotFound, InvalidOption, S
 from harness.event_store import Command, DuplicateCommand, run_stream
 from harness.models import EventType, Usage
 from harness.projection import saved_decision, saved_decisions
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.write_path import NewEvent
@@ -21,7 +21,6 @@ from harness.write_path import NewEvent
 
 UNAVAILABLE = "Missing configuration: provider credential"
 
-
 def _answer(system: LoopSystem, decision_id: str, option: str = "continue", *, base_version: int = 1,
             note: str | None = None, command_id: str | None = None) -> str | None:
     command = Command(command_id or str(uuid.uuid4()), "decision.answer", f"sha256:{option}:{base_version}",
@@ -29,24 +28,20 @@ def _answer(system: LoopSystem, decision_id: str, option: str = "continue", *, b
     return system.orchestrator.answer_decision(decision_id, option, note, base_version=base_version,
                                                command=command)
 
-
 def _engineering_unavailable_system(data_dir):
     # 产品规格被接纳以后，工程部门的请求被提供方报告为不可用（缺少凭据）
     adapter = FakeAdapter([
         FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ])
     system = LoopSystem.for_testing(data_dir, adapter)
     return system, adapter, system.create_run("build an echo CLI")
 
-
 def _open(system: LoopSystem):
     _position, decisions = saved_decisions(system.store, statuses=("open",))
     return decisions
-
 
 def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run_then_continues(data_dir):
     system, adapter, run_id = _engineering_unavailable_system(data_dir)
@@ -84,12 +79,11 @@ def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run
     finished = system.run_until_stop(run_id)
     assert finished.phase == "DONE"
     assert [call.department for call in adapter.invocations] == [
-        "product", "engineering", "engineering", "engineering", "quality"]
+        "product", "engineering", "engineering", "quality"]
     assert finished.product_specs == blocked.product_specs
-    assert finished.cycle_count == 5 and finished.token_used >= 120
+    assert finished.cycle_count == 4 and finished.token_used >= 120
     assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
     assert_payloads_follow_contract(system.store.list_events(run_id))
-
 
 def test_choosing_to_stop_ends_the_run_in_the_same_transaction_as_the_answer(data_dir):
     system, adapter, run_id = _engineering_unavailable_system(data_dir)
@@ -103,7 +97,6 @@ def test_choosing_to_stop_ends_the_run_in_the_same_transaction_as_the_answer(dat
     assert len(adapter.invocations) == 2
     with pytest.raises(DecisionClosed):
         _answer(system, decision.decision_id)
-
 
 def test_cancelling_a_blocked_run_withdraws_its_decision_request(data_dir):
     system, adapter, run_id = _engineering_unavailable_system(data_dir)
@@ -120,7 +113,6 @@ def test_cancelling_a_blocked_run_withdraws_its_decision_request(data_dir):
     with pytest.raises(DecisionClosed):
         _answer(system, decision.decision_id)
     assert_payloads_follow_contract(events)
-
 
 def test_an_answer_that_does_not_hold_writes_nothing_and_does_not_register_its_command(data_dir):
     system, _adapter, run_id = _engineering_unavailable_system(data_dir)
@@ -145,7 +137,6 @@ def test_an_answer_that_does_not_hold_writes_nothing_and_does_not_register_its_c
     with pytest.raises(DecisionClosed):
         _answer(system, decision.decision_id)
     assert len(system.store.command_events(command_id)) == 1
-
 
 def test_a_decision_request_blocking_the_run_stops_a_running_activation_at_its_next_safe_node(data_dir):
     # 激活进行中出现阻塞 run 的决定请求（这里由测试经写入口写入）：模型回答以后的安全节点得到停止，

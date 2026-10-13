@@ -20,8 +20,7 @@ _READS = frozenset({"read_file", "list_files"})
 _CHECKS = frozenset(name for name, tool in DEFINITIONS.tools.items() if tool.action == "check")
 _CLAIMABLE_TOOLS = _MUTATIONS | _CHECKS
 _ACCEPTED_RESULTS = {
-    EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED,
-    EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED,
+    EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED, EventType.DELIVERY_ACCEPTED,
 }
 _GUIDANCE_ACCEPTED = _ACCEPTED_RESULTS | {EventType.COLLABORATION_REQUESTED}
 _GUIDANCE_RESPONSE_STATUSES = {"explained", "completed", "declined", "needs_work"}
@@ -31,7 +30,6 @@ def request_basis(projection: RunProjection) -> dict[str, Any]:
     return {
         "intend_hash": hash_bytes(projection.task.encode("utf-8")),
         "effective_contract_hash": _content_hash(projection.effective_contract),
-        "engineering_plan_hash": _content_hash(projection.engineering_plan),
         "delivery_spec_hash": _content_hash(projection.delivery_spec),
         "phase": projection.phase,
     }
@@ -49,7 +47,7 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
         if request.request_type == "action" and request.action == "revise_requirements":
             allowed.update({"product_spec", "product_decision"})
         if request.request_type == "action" and request.action == "revise_delivery":
-            allowed.update({"engineering_plan", "delivery_spec"})
+            allowed.update({"delivery_spec"})
         if has_guidance:
             allowed.add("department_guidance_response")
         return allowed
@@ -138,13 +136,9 @@ def request_still_applicable(request: CollaborationRequest, projection: RunProje
                 return False
             if event.type == EventType.CONTRACT_ACCEPTED:
                 if expected["effective_contract_hash"] != payload.get("content_hash"):
-                    expected["engineering_plan_hash"] = None
                     expected["delivery_spec_hash"] = None
                 expected["effective_contract_hash"] = payload.get("content_hash")
             elif event.type == EventType.SPEC_ACCEPTED:
-                expected["delivery_spec_hash"] = None
-            elif event.type == EventType.PLAN_ACCEPTED:
-                expected["engineering_plan_hash"] = payload.get("content_hash")
                 expected["delivery_spec_hash"] = None
             elif event.type == EventType.DELIVERY_ACCEPTED:
                 expected["delivery_spec_hash"] = payload.get("content_hash")
@@ -314,7 +308,6 @@ def guidance_result_summaries(projection: RunProjection, department: str, events
 def guidance_resume_phase(yielded: dict[str, Any], projection: RunProjection) -> str:
     current = {
         "effective_contract_hash": _content_hash(projection.effective_contract),
-        "engineering_plan_hash": _content_hash(projection.engineering_plan),
         "delivery_spec_hash": _content_hash(projection.delivery_spec),
     }
     yielded_hashes = {key: yielded.get(key) for key in current}
@@ -327,8 +320,7 @@ def guidance_resume_phase(yielded: dict[str, Any], projection: RunProjection) ->
         return "PRODUCT_SPEC"
     delivery = projection.delivery_spec
     if (delivery is not None
-            and delivery.effective_contract_hash == current["effective_contract_hash"]
-            and delivery.engineering_plan_hash == current["engineering_plan_hash"]):
+            and delivery.effective_contract_hash == current["effective_contract_hash"]):
         return "QUALITY"
     return "ENGINEERING"
 
@@ -339,8 +331,7 @@ def resume_phase(request: CollaborationRequest, projection: RunProjection, event
         return projection.phase, False
     delivery = projection.delivery_spec
     delivery_current = bool(delivery and delivery.code_tree_digest == snapshot_hash
-                            and delivery.effective_contract_hash == _content_hash(projection.effective_contract)
-                            and delivery.engineering_plan_hash == _content_hash(projection.engineering_plan))
+                            and delivery.effective_contract_hash == _content_hash(projection.effective_contract))
     unchanged = request.basis == request_basis(projection)
     if unchanged and (delivery is None or delivery_current) and request_still_applicable(request, projection, events):
         return request.return_phase, True
@@ -367,7 +358,6 @@ def _has_completed_action(request: CollaborationRequest, projection: RunProjecti
     return bool(request.action == "revise_delivery" and delivery
                 and delivery.code_tree_digest == snapshot_hash
                 and delivery.effective_contract_hash == _content_hash(projection.effective_contract)
-                and delivery.engineering_plan_hash == _content_hash(projection.engineering_plan)
                 and any(event.type == EventType.DELIVERY_ACCEPTED
                         and event.payload.get("content_hash") == delivery.content_hash for event in results))
 
@@ -417,7 +407,6 @@ def _usable_tool_result(event: Event, result: dict[str, Any], projection: RunPro
             and type(output.get("exit_code")) is int and output.get("snapshot_hash") == snapshot_hash
             and output.get("activation_id") == event.payload.get("activation_id")
             and output.get("effective_contract_hash") == _content_hash(projection.effective_contract)
-            and output.get("engineering_plan_hash") == _content_hash(projection.engineering_plan)
             and output.get("delivery_spec_hash") == _content_hash(projection.delivery_spec)
             and output.get("product_spec_hash") == _content_hash(projection.product_spec))
 
@@ -427,7 +416,7 @@ def _authorized_result(event_type: str, request: CollaborationRequest) -> bool:
         return False
     if request.action == "revise_requirements":
         return event_type in {EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED}
-    return request.action == "revise_delivery" and event_type in {EventType.PLAN_ACCEPTED, EventType.DELIVERY_ACCEPTED}
+    return request.action == "revise_delivery" and event_type == EventType.DELIVERY_ACCEPTED
 
 
 def _creation(request: CollaborationRequest, events: list[Event]) -> Event | None:
@@ -465,8 +454,7 @@ def _consumed_guidance_result_ids(events: list[Event], run_id: str) -> set[str]:
 
 
 def _guidance_tool_current(event: Event, projection: RunProjection) -> bool:
-    return (event.payload.get("effective_contract_hash") == _content_hash(projection.effective_contract)
-            and event.payload.get("engineering_plan_hash") == _content_hash(projection.engineering_plan))
+    return event.payload.get("effective_contract_hash") == _content_hash(projection.effective_contract)
 
 
 def _current_guidance_result(event: Event, projection: RunProjection, snapshot_hash: str) -> bool:
@@ -475,15 +463,12 @@ def _current_guidance_result(event: Event, projection: RunProjection, snapshot_h
         return projection.product_spec is not None and payload.get("content_hash") == projection.product_spec.content_hash
     if event.type == EventType.PRODUCT_DECISION_ACCEPTED:
         return any(item.content_hash == payload.get("content_hash") for item in projection.effective_decisions)
-    if event.type == EventType.PLAN_ACCEPTED:
-        return projection.engineering_plan is not None and payload.get("content_hash") == projection.engineering_plan.content_hash
     if event.type == EventType.DELIVERY_ACCEPTED:
         delivery = projection.delivery_spec
         return bool(delivery and delivery.status == "active"
                     and payload.get("content_hash") == delivery.content_hash
                     and delivery.code_tree_digest == snapshot_hash
-                    and delivery.effective_contract_hash == _content_hash(projection.effective_contract)
-                    and delivery.engineering_plan_hash == _content_hash(projection.engineering_plan))
+                    and delivery.effective_contract_hash == _content_hash(projection.effective_contract))
     pending = projection.pending_request
     return bool(event.type == EventType.COLLABORATION_REQUESTED and pending is not None
                 and pending.created_event_id == event.event_id and pending.requester == event.department)

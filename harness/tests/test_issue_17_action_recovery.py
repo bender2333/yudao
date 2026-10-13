@@ -11,7 +11,7 @@ from harness.app.decision_commands import DecisionAnswer
 from harness.app.project_queries import RunActions
 from harness.event_store import run_stream
 from harness.models import EventType, new_id
-from harness.proposals import plan_turn, product_spec
+from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.write_path import NewEvent
 
@@ -21,10 +21,9 @@ def _write_events(run_id):
     return [EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED]
 
 def _engineering_run(data_dir, script):
-    # 一个已完成产品规格与工程计划、停在 ENGINEERING 的 run：可以直接继续工程部门的模型步骤
+    # 一个已完成产品规格、停在 ENGINEERING 的 run：可以直接继续工程部门的模型步骤
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     assert system.project(run_id).phase == "ENGINEERING"
     return system, run_id
@@ -65,7 +64,7 @@ def _answer(system, decision_id, option, base_version=1):
 
 def test_a_lost_write_action_asks_the_user_and_is_not_blindly_redone(data_dir):
     # 窄场景一：工具效果已经写入、完成确认没有保存。恢复不会盲目重做写入，而是发出「核实结果未知的动作」请求
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id)
     system.close()
 
@@ -98,7 +97,7 @@ def _append_retry(system, run_id, previous, *, tool="run_check", action_id="lost
 
 def test_a_lost_repeatable_action_is_automatically_retried_once(data_dir):
     # 契约声明可以重复的动作（检查）：恢复时自动重新执行一次，不询问用户（工单 #307，恢复契约第 4 节第 2 步）
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id, tool="run_check", action_id="lost-check")
     system.close()
 
@@ -112,7 +111,7 @@ def test_a_lost_repeatable_action_is_automatically_retried_once(data_dir):
 def test_a_retried_action_still_unknown_asks_the_user_with_repeat_attempted(data_dir):
     # 新的尝试仍然结果未知（自动重新执行的机会已经用掉）：恢复不再重新执行，只发出决定请求，
     # 材料写明连续两次结果未知，「重新执行」照旧提供（恢复契约第 4 节第 3 步）
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id, tool="run_check", action_id="lost-check")
     [previous] = [event for event in system.store.list_events(run_id)
                   if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-check"]
@@ -130,7 +129,7 @@ def test_a_retried_action_still_unknown_asks_the_user_with_repeat_attempted(data
 
 def test_an_open_unknown_action_blocks_the_next_activation(data_dir):
     # 未知副作用没有解决以前，依赖它的下一步不继续：run 不进入新的激活，也不重新调用模型
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id)
     system.close()
 
@@ -148,7 +147,7 @@ def test_an_open_unknown_action_blocks_the_next_activation(data_dir):
 def test_taking_over_does_not_write_the_workspace_concurrently(data_dir):
     # 窄场景二：旧执行者失联时接管。接管时不与未知旧写者同时改同一工作区：在这个动作得到核实以前，
     # 工作区不被改动，run 也不推进
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id, tool="write_file", action_id="lost-write")
     system.close()
 
@@ -159,7 +158,7 @@ def test_taking_over_does_not_write_the_workspace_concurrently(data_dir):
 
 def test_answering_continue_records_a_verification_and_unblocks(data_dir):
     # 用户通过 decision.answer 回答；回答被接受以后流程编排按回答解除阻塞，重放使用记录的回答
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id)
     system.close()
 
@@ -179,7 +178,7 @@ def test_answering_continue_records_a_verification_and_unblocks(data_dir):
     restarted.close()
 
 def test_answering_stop_ends_the_run(data_dir):
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id)
     system.close()
 
@@ -192,7 +191,7 @@ def test_answering_stop_ends_the_run(data_dir):
 
 def test_run_actions_reports_unknown_with_snapshots(data_dir):
     # run.actions 返回每个动作的状态与前后快照：中断的写入是 unknown，带动作前快照
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id)
     system.close()
 
@@ -206,7 +205,7 @@ def test_run_actions_reports_unknown_with_snapshots(data_dir):
 
 def test_a_partial_model_response_only_executes_the_remaining_calls(data_dir):
     # 部分执行的模型响应只补剩余合法动作，不整批重发、不重新调用模型
-    system, run_id = _engineering_run(data_dir, [product_spec(), plan_turn()])
+    system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_partial_response(system, run_id, executed=("c1",), remaining=("c2",))
     system.close()
 
@@ -252,7 +251,7 @@ def test_an_adoption_settlement_is_idempotent_across_recovery(data_dir):
     from harness.proposals import delivery_turn, review_turn
 
     system = LoopSystem.for_testing(data_dir, FakeAdapter(
-        [product_spec(), plan_turn(), delivery_turn(), review_turn("release", "ok")]))
+        [product_spec(),delivery_turn(), review_turn("release", "ok")]))
     project_id = system.projects.register("采纳项目", "核对采纳结算幂等")
     _work_item_id, run_id = system.projects.start_work_item(project_id, "被中断的事项")
     # 只把 run 运行到结束，不做结算：与「run 已经结束、采纳以前进程退出」留下的状态一致

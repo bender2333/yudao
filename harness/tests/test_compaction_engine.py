@@ -63,7 +63,6 @@ def test_compaction_checkpoint_survives_reactivation_and_new_controller(tmp_path
     assert later
     assert later[0]["previous_compaction_event_id"] == first_checkpoint
     assert later[0]["effective_contract_hash"] == first.compactions[-1]["effective_contract_hash"] is None
-    assert later[0]["engineering_plan_hash"] == first.compactions[-1]["engineering_plan_hash"] is None
     assert later[-1]["checkpoint"]["boundary"]
     assert recorded_context(reloaded, adapter.invocations[-1]).manifest.compaction_event_id == later[-1]["source_event_id"]
     assert "department_memory" in json_dumps(adapter.invocations[-1].input_items)

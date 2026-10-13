@@ -7,7 +7,7 @@ from copy import deepcopy
 from typing import Any
 
 from .adjudication import offered_tools
-from .contracts import current_contract_hash, current_plan_hash
+from .contracts import current_contract_hash
 from .collaboration import guidance_result_summaries
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
@@ -175,9 +175,6 @@ class ContextAssembler:
         if projection.effective_contract is not None:
             parts.append(ContextPart("current_contract", projection.effective_contract.content_hash,
                                      json_dumps(projection.effective_contract)))
-        if projection.engineering_plan is not None:
-            parts.append(ContextPart("current_engineering_plan", projection.engineering_plan.content_hash,
-                                     json_dumps(projection.engineering_plan)))
         if projection.pending_request is not None:
             request = projection.pending_request
             parts.append(ContextPart("pending_request", request.id, json_dumps(request)))
@@ -316,7 +313,6 @@ class ContextAssembler:
             step_id=step_id,
             compaction_event_id=compaction_event_id,
             effective_contract_hash=current_contract_hash(projection),
-            engineering_plan_hash=current_plan_hash(projection),
             request_id=None if projection.pending_request is None else projection.pending_request.id,
             input_version=projection.input_version,
             prompt_version=prompt.version,
@@ -397,7 +393,6 @@ class ContextAssembler:
             budget=pinned.manifest.budget, digest=canonical_hash(request), purpose="compaction",
             max_output_tokens=max_output_tokens, compaction_event_id=compaction_event_id,
             effective_contract_hash=pinned.manifest.effective_contract_hash,
-            engineering_plan_hash=pinned.manifest.engineering_plan_hash,
             request_id=pinned.manifest.request_id,
             input_version=pinned.manifest.input_version,
             prompt_version=pinned.manifest.prompt_version,
@@ -430,13 +425,11 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
                 else "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。")
     elif department == "engineering" and projection.effective_decisions:
         work = "依据 current_product_decisions 中已正式接纳的有效决定继续当前工程工作。"
-    if projection.kind != "onboarding" and department == "engineering" and projection.engineering_plan is None:
-        work += " 当前没有有效工程计划，请先提交绑定 current_contract.content_hash 的 submit_plan，接纳后再修改代码。"
     if projection.pending_request is not None and projection.pending_request.recipient == department:
         request = projection.pending_request
         work = (f"处理来自 {request.requester} 的请求 {request.id}：{request.question}。"
                 f"预期结果：{request.expected_result}。完成正常动作或形成意见后用 submit_response 回应；"
-                "已经正式接纳的结果会列在 request_results 中，回复不能替代正常需求、计划或交付接纳。")
+                "已经正式接纳的结果会列在 request_results 中，回复不能替代正常需求或交付接纳。")
     pending_guidance = [item for item in projection.department_guidance
                         if item.department == department and item.status in {"received", "in_input"}]
     if pending_guidance:
@@ -444,7 +437,7 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
                  "然后用 submit_guidance_response 逐条回应：explained 表示已解释或无需新动作，"
                  "completed 表示本指导被采用后的动作已有主机结果。"
                  "guidance_results 只列出本指导被采用后可由宿主绑定的结果；completed 时宿主绑定这些结果，不必手抄事件 id；"
-                 "指导不能替代产品要求、工程计划或质检放行。")
+                 "指导不能替代产品要求、交付说明或质检放行。")
     return {
         "department": department, "phase": projection.phase, "work": work,
         "current_goal": projection.product_spec.goal if projection.product_spec else None,
@@ -462,7 +455,6 @@ def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
         "product_spec_hash": None if spec is None else spec.content_hash,
         "product_spec_revision": None if spec is None else spec.revision,
         "effective_contract_hash": current_contract_hash(projection),
-        "engineering_plan_hash": current_plan_hash(projection),
         "delivery_spec_id": None if delivery is None else delivery.id,
         "delivery_spec_hash": None if delivery is None else delivery.content_hash,
         "delivery_code_tree_digest": None if delivery is None else delivery.code_tree_digest,
@@ -529,7 +521,6 @@ def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None) -> 
         "known_risks": delivery.known_risks,
         "product_spec_hash": delivery.product_spec_hash,
         "effective_contract_hash": delivery.effective_contract_hash,
-        "engineering_plan_hash": delivery.engineering_plan_hash,
         "revision": delivery.revision,
         "status": delivery.status,
         "summary": delivery.summary,

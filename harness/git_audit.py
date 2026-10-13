@@ -122,9 +122,6 @@ def _apply_materials(files: dict[str, bytes], artifacts: ArtifactStore,
         files["intend.md"] = original
     elif kind == EventType.SPEC_ACCEPTED:
         files["specs/product.json"] = _json_bytes(payload)
-    elif kind == EventType.PLAN_ACCEPTED:
-        files["specs/plan.json"] = _json_bytes(payload)
-        files["PLAN.md"] = artifacts.get_for_run(run_id, ArtifactRef(**payload["plan_ref"]))
     elif kind == EventType.CONTRACT_ACCEPTED:
         decisions = [{key: value for key, value in asdict(item).items()
                       if key not in {"run_id", "created_event_id"}} for item in current.effective_decisions]

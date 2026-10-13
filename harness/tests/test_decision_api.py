@@ -7,7 +7,7 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.models import EventType, TERMINAL_PHASES, Usage
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
@@ -18,7 +18,6 @@ from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 # FakeAdapter 脚本给出；新建事项与运行到阻塞经控制核心的公开接口，核对经 HTTP 与应用层。
 
 UNAVAILABLE = "Missing configuration: provider credential"
-
 
 class _Service:
     # 服务的生命周期中建立应用层；每次启动取一份模型回答脚本，脚本用尽时模型调用失败
@@ -39,17 +38,14 @@ class _Service:
     def system(self) -> LoopSystem:
         return self.applications[-1].system
 
-
 def _unavailable_script() -> list[object]:
     # 产品提交规格（带用量）以后，工程部门的请求被提供方报告为不可用（缺少凭据）；修复配置以后从这次请求接着进行
     return [
         FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ]
-
 
 def _blocked_run(client, service):
     # 新建项目经命令，事项与运行经控制核心的公开接口；运行到模型不可用而停在这次请求之前
@@ -60,16 +56,13 @@ def _blocked_run(client, service):
     work_item_id, run_id = service.system.projects.start_work_item(project_id, "build an echo CLI")
     return project_id, work_item_id, run_id, service.system.run_until_stop(run_id)
 
-
 def _list(client, **params):
     response = client.get("/api/queries/decisions.list", params=params)
     assert response.status_code == 200, response.text
     return response.json()
 
-
 def _answer(client, command_id: str, **body):
     return client.post("/api/commands/decision.answer", json={"command_id": command_id, **body})
-
 
 def _wait_for_completion(system: LoopSystem, run_id: str, timeout_sec: float = WAIT_FOR_HOST_WORK_SEC):
     # 回答以后 run 由服务的事件循环中的任务继续运行：等到任务结束并且 run 到了终态，再核对它的投影
@@ -81,7 +74,6 @@ def _wait_for_completion(system: LoopSystem, run_id: str, timeout_sec: float = W
         time.sleep(0.02)
     raise AssertionError(f"run {run_id} was not finished by its task within {timeout_sec}s")
 
-
 def _delete_saved_projections(data_dir):
     connection = sqlite3.connect(data_dir / "events.sqlite")
     try:
@@ -90,7 +82,6 @@ def _delete_saved_projections(data_dir):
         connection.commit()
     finally:
         connection.close()
-
 
 def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_continues(data_dir):
     service = _Service(data_dir, [_unavailable_script()])
@@ -149,10 +140,10 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
         finished = _wait_for_completion(system, run_id)
         assert finished.phase == "DONE"
         assert [call.department for call in service.adapters[0].invocations] == [
-            "product", "engineering", "engineering", "engineering", "quality"]
+            "product", "engineering", "engineering", "quality"]
         # 已完成的工作、激活次数与已用限额保留：产品的成果不变，激活与用量从阻塞时接着增加
         assert finished.product_specs == blocked.product_specs
-        assert finished.cycle_count == blocked.cycle_count + 3
+        assert finished.cycle_count == blocked.cycle_count + 2
         assert finished.token_used >= blocked.token_used
         assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
 
@@ -171,7 +162,6 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
         assert (datetime.fromisoformat(answer["answered_at"])
                 == datetime.fromisoformat(answer_event.created_at))
         assert answered_decision["request"] == request
-
 
 def test_answering_stop_ends_the_work_item_as_cancelled(data_dir):
     service = _Service(data_dir, [_unavailable_script()])
@@ -194,7 +184,6 @@ def test_answering_stop_ends_the_work_item_as_cancelled(data_dir):
         [answered_decision] = _list(client, project_id=project_id, status=["answered"])["data"]["decisions"]
         assert (answered_decision["status"], answered_decision["answer"]["option"],
                 answered_decision["answer"]["note"]) == ("answered", "stop", None)
-
 
 def test_a_repeated_command_identity_applies_once_and_every_rejection_explains_itself(data_dir):
     service = _Service(data_dir, [_unavailable_script()])
@@ -253,7 +242,6 @@ def test_a_repeated_command_identity_applies_once_and_every_rejection_explains_i
         assert len([event for event in system.store.list_events(run_id)
                     if event.type == EventType.DECISION_ANSWERED]) == 1
 
-
 def test_a_withdrawn_request_is_not_in_the_waiting_list_and_cannot_be_answered(data_dir):
     # 运行结束时撤销的请求不在等待回答的列表里（状态为 withdrawn）；按已撤销或省略状态时列出，再次回答被拒绝
     service = _Service(data_dir, [_unavailable_script()])
@@ -277,7 +265,6 @@ def test_a_withdrawn_request_is_not_in_the_waiting_list_and_cannot_be_answered(d
         assert closed.status_code == 409 and closed.json()["reason"] == "decision_closed"
         assert "已经撤销" in closed.json()["message"]
         assert system.store.end_position() == end and len(service.adapters[0].invocations) == 2
-
 
 def test_the_listing_filters_by_several_states_and_reports_the_owning_identities(data_dir):
     # 状态筛选可以重复给出多个状态（?status=open&status=answered），也可以一次给出多个；省略状态时不限制。
@@ -331,7 +318,6 @@ def test_the_listing_filters_by_several_states_and_reports_the_owning_identities
         invalid = client.get("/api/queries/decisions.list", params=[("status", "open"), ("status", "bogus")])
         assert invalid.status_code == 422
         assert system.store.end_position() == end
-
 
 def test_a_decision_request_and_its_answer_survive_deleting_the_saved_projection(data_dir):
     service = _Service(data_dir, [_unavailable_script(), []])

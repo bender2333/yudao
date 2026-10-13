@@ -6,7 +6,7 @@ import pytest
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
-from harness.proposals import delivery, delivery_turn, plan_turn, product_spec, review, review_turn
+from harness.proposals import delivery, delivery_turn, product_spec, review, review_turn
 from harness.public_tree import capture_public_tree
 from harness.environment import LocalEnvironment
 from harness.runtime import LoopSystem
@@ -14,11 +14,9 @@ from harness.tests.helpers import perform
 from harness.tree_archive import load_tree
 from harness.workspace import Workspace
 
-
 def _environment(root):
     workspace = Workspace(root)
     return workspace, LocalEnvironment(workspace)
-
 
 def _read_content_hash(environment, path, start=1, end=None):
     args = {"path": path, "start_line": start}
@@ -28,7 +26,6 @@ def _read_content_hash(environment, path, start=1, end=None):
     assert seen.ok, seen.error
     return seen.output["content_hash"]
 
-
 def _edit_call(identity, path, start, end, expected, new, digest):
     return {
         "id": identity, "call_id": identity, "type": "function_call", "name": "edit_range",
@@ -37,9 +34,6 @@ def _edit_call(identity, path, start, end, expected, new, digest):
             "expected_text": expected, "new_text": new, "expected_digest": digest,
         }),
     }
-
-
-
 
 def test_successful_edit_replaces_exactly_the_requested_span(tmp_path):
     workspace, environment = _environment(tmp_path)
@@ -62,7 +56,6 @@ def test_successful_edit_replaces_exactly_the_requested_span(tmp_path):
         "HEADER = True", "VALUE = 2", "DOUBLED = True", "FOOTER = True",
     ]
     assert workspace.read_file("src/a.py") == "HEADER = True\nVALUE = 2\nDOUBLED = True\nFOOTER = True\n"
-
 
 def test_changed_file_since_read_is_rejected_without_modification(tmp_path):
     workspace, environment = _environment(tmp_path)
@@ -93,7 +86,6 @@ def test_changed_file_since_read_is_rejected_without_modification(tmp_path):
     assert (workspace.root / "src" / "a.py").read_bytes() == before_bytes.replace(b"VALUE = 1", b"VALUE = 9")
     assert workspace.digest() == changed_digest
 
-
 def test_ambiguous_expected_text_is_rejected_without_modification(tmp_path):
     workspace, environment = _environment(tmp_path)
     workspace.write_file("src/a.py", "VALUE = 1\nOTHER = 2\nVALUE = 1\n")
@@ -109,7 +101,6 @@ def test_ambiguous_expected_text_is_rejected_without_modification(tmp_path):
     assert "ambiguous" in (result.error or "")
     assert (workspace.root / "src" / "a.py").read_bytes() == before_bytes
     assert workspace.digest() == before_digest
-
 
 @pytest.mark.parametrize("path,start,end", [
     ("src/missing.py", 1, 1),
@@ -130,7 +121,6 @@ def test_missing_target_is_rejected_without_modification(tmp_path, path, start, 
     assert result.error
     assert workspace.digest() == before_digest
     assert workspace.list_files() == before_files
-
 
 def test_encoding_difference_is_rejected_without_modification(tmp_path):
     workspace, environment = _environment(tmp_path)
@@ -154,7 +144,6 @@ def test_encoding_difference_is_rejected_without_modification(tmp_path):
     assert raw_path.read_bytes() == before_bytes
     assert workspace.read_file("src/a.py") == "VALUE = 1\n"
 
-
 @pytest.mark.parametrize("rel", [
     ".checks/receipts.jsonl",
     ".git/HEAD",
@@ -174,7 +163,6 @@ def test_unsafe_paths_are_rejected_without_modification(tmp_path, rel):
     assert result.error
     assert workspace.read_file("ok.txt") == "needle\n"
     assert workspace.digest() == before_digest
-
 
 def test_symlink_is_rejected_without_modification(tmp_path):
     workspace, environment = _environment(tmp_path / "workspace")
@@ -200,7 +188,6 @@ def test_symlink_is_rejected_without_modification(tmp_path):
     link.unlink()
     assert workspace.digest() == before_digest
 
-
 def test_link_made_by_a_command_during_a_run_is_refused_as_a_tool_result(tmp_path):
     outside = tmp_path / "outside.txt"
     outside.write_text("VALUE = 9\n", encoding="utf-8")
@@ -216,7 +203,7 @@ def test_link_made_by_a_command_during_a_run_is_refused_as_a_tool_result(tmp_pat
             _edit_call("edit-link", "src/linked.txt", 1, 1, "VALUE = 9", "VALUE = 2", None),
         ])
 
-    system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(), plan_turn(), link_then_edit]))
+    system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(),link_then_edit]))
     registry = {"make-link": {"argv": ["python", "make_link.py"], "args": [], "timeout_sec": 30, "output_limit": 4000}}
     run_id = system.create_run("Edit a file that a command turned into a link",
                                registered_commands=registry, command_versions={"make-link": 1})
@@ -246,9 +233,8 @@ def test_link_made_by_a_command_during_a_run_is_refused_as_a_tool_result(tmp_pat
     assert link.is_symlink() and link.resolve() == outside.resolve()
     assert outside.read_text(encoding="utf-8") == "VALUE = 9\n"
 
-
 def test_two_edits_in_one_activation_produce_a_complete_delivery_tree(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn(scope=["src/"])])
+    adapter = FakeAdapter([product_spec(),])
     system = LoopSystem.for_testing(tmp_path, adapter)
 
     def work_turn(request):
@@ -287,7 +273,6 @@ def test_two_edits_in_one_activation_produce_a_complete_delivery_tree(tmp_path):
     assert workspace.read_file("src/keep.py") == "KEPT = True\n"
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_stale_pass_verdict_cannot_be_reused_after_tree_changes(tmp_path):
     workspace, environment = _environment(tmp_path)
     workspace.write_file("app.py", "print('ok')\n")
@@ -304,7 +289,6 @@ def test_stale_pass_verdict_cannot_be_reused_after_tree_changes(tmp_path):
     assert edited.ok, edited.error
     # 树已变，绑定旧树的通过结论不能沿用
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
-
 
 def test_mutated_check_copy_does_not_become_the_tested_delivery(tmp_path):
     workspace, environment = _environment(tmp_path)
@@ -327,10 +311,9 @@ def test_mutated_check_copy_does_not_become_the_tested_delivery(tmp_path):
     assert "hacked.txt" not in workspace.list_files()
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
-
 def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(),
+        product_spec(),delivery_turn(),
         FakeTurn(proposal=review("release", "stale verdict on the old tree")),
     ]))
     run_id = system.create_run("echo")
@@ -357,10 +340,9 @@ def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
     assert rejected
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
-
 def test_adopted_baseline_applies_to_next_work_item_and_replay_verifies(data_dir):
     adapter = FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(summary="v1"), review_turn("release", "ok v1"),
+        product_spec(),delivery_turn(summary="v1"), review_turn("release", "ok v1"),
     ])
     system = LoopSystem.for_testing(data_dir, adapter)
     project_id = system.projects.register("Echo", "做一个可以长期演进的逐行文本处理工具。")
@@ -374,7 +356,7 @@ def test_adopted_baseline_applies_to_next_work_item_and_replay_verifies(data_dir
         ])
 
     adapter.script.extend([
-        product_spec(), plan_turn(), second_work,
+        product_spec(),second_work,
         FakeTurn(
             proposal=delivery("v2", files=["src/echo.py"], check_names=["smoke"]),
             checks={"smoke": 0},

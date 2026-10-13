@@ -120,7 +120,7 @@
     "kind": "environment",
     "action": "write",
     "guidance_only": false,
-    "description": "Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope; otherwise the call is rejected and nothing is written. Paths under .checks are host-private. Use edit_range to change part of an existing file.",
+    "description": "Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Paths under .checks are host-private. Use edit_range to change part of an existing file.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -145,7 +145,7 @@
     "kind": "environment",
     "action": "write",
     "guidance_only": false,
-    "description": "Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged. Requires an accepted engineering plan for the current effective contract, and the path must be inside that plan's scope.",
+    "description": "Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -192,7 +192,7 @@
     "kind": "environment",
     "action": "write",
     "guidance_only": false,
-    "description": "Delete one existing regular workspace file within the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.",
+    "description": "Delete one existing regular workspace file. Engineering only; requires a reason. Directories and links are rejected.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -216,7 +216,7 @@
     "kind": "environment",
     "action": "write",
     "guidance_only": false,
-    "description": "Move one existing regular workspace file without overwriting. Both paths must be in the effective engineering plan. Engineering only; requires a reason. Directories and links are rejected.",
+    "description": "Move one existing regular workspace file without overwriting. Engineering only; requires a reason. Directories and links are rejected.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -551,7 +551,7 @@
     "kind": "host",
     "proposal": "department_guidance_response",
     "guidance_only": true,
-    "description": "Respond to one persisted department guidance item. Use explained when the handling is an explanation, no change is required, or this department cannot apply it. Use completed only when host-verified actions after this guidance was adopted are listed in guidance_results; the host binds those results and result_event_ids cannot enlarge that set. Empty, rejected, failed, or earlier-unrelated results cannot complete an action. This response does not change the contract, plan, files, or QA result by itself.",
+    "description": "Respond to one persisted department guidance item. Use explained when the handling is an explanation, no change is required, or this department cannot apply it. Use completed only when host-verified actions after this guidance was adopted are listed in guidance_results; the host binds those results and result_event_ids cannot enlarge that set. Empty, rejected, failed, or earlier-unrelated results cannot complete an action. This response does not change the contract, files, or QA result by itself.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -584,97 +584,6 @@
         "status",
         "text",
         "result_event_ids"
-      ]
-    },
-    "repeatable": false
-  },
-  "submit_plan": {
-    "kind": "host",
-    "proposal": "engineering_plan",
-    "guidance_only": false,
-    "description": "Submit an engineering plan before changing delivery files. The host binds it to the current effective contract. Plan adjustments require a reason; product requirements must be decided by product.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "objective": {
-          "type": "string"
-        },
-        "scope": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Relative files or directories ending with /; . means the entire public workspace"
-        },
-        "tasks": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "title": {
-                "type": "string"
-              },
-              "outputs": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Observable outputs of this task"
-              },
-              "verification": {
-                "type": "string",
-                "description": "How to verify these outputs"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "title",
-              "outputs",
-              "verification"
-            ]
-          },
-          "description": "Non-empty tasks in execution order"
-        },
-        "refactoring": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Necessary structural changes, or an empty list"
-        },
-        "assumptions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "decision": {
-                "type": "string"
-              },
-              "basis": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "decision",
-              "basis"
-            ]
-          },
-          "description": "Professional defaults and their basis; do not present defaults as user statements"
-        },
-        "reason": {
-          "type": "string",
-          "description": "Reason for adjusting an existing plan; may be empty for the first plan"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "objective",
-        "scope",
-        "tasks",
-        "refactoring",
-        "assumptions",
-        "reason"
       ]
     },
     "repeatable": false

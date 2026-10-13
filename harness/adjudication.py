@@ -8,12 +8,12 @@ from typing import Any
 
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .collaboration import request_basis, tool_error
-from .contracts import current_contract_hash, current_plan_hash, path_in_scope
+from .contracts import current_contract_hash
 from .models import TERMINAL_PHASES, Event, RunProjection
 from .tools import has_tool, offers_with_input, tool_action, tools_for, usable_when_guidance_only
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 
-_STALE_BASIS = ("The input, contract, plan, or current work changed after this activation began; "
+_STALE_BASIS = ("The input, contract, or current work changed after this activation began; "
                 "stale results cannot be rebound.")
 _STALE_SNAPSHOT = "The workspace snapshot changed after this activation began; stale results cannot be rebound."
 
@@ -27,7 +27,6 @@ def guidance_version(projection: RunProjection, department: str) -> int:
 class WorkBasis:
     # 激活开始时采用的工作依据；依据改变以后，这次激活不能再开始模型请求与工具
     effective_contract_hash: str | None
-    engineering_plan_hash: str | None
     request_id: str | None
     input_version: int
     guidance_version: int
@@ -36,7 +35,6 @@ class WorkBasis:
     def current(cls, projection: RunProjection, department: str) -> WorkBasis:
         return cls(
             effective_contract_hash=current_contract_hash(projection),
-            engineering_plan_hash=current_plan_hash(projection),
             request_id=None if projection.pending_request is None else projection.pending_request.id,
             input_version=projection.input_version,
             guidance_version=guidance_version(projection, department),
@@ -45,7 +43,6 @@ class WorkBasis:
     def changed(self, projection: RunProjection, department: str) -> bool:
         current = WorkBasis.current(projection, department)
         return (current.effective_contract_hash != self.effective_contract_hash
-                or current.engineering_plan_hash != self.engineering_plan_hash
                 or current.request_id != self.request_id
                 or current.input_version != self.input_version
                 or current.guidance_version > self.guidance_version)
@@ -105,14 +102,14 @@ def tool_permission(
     reason = tool_error(projection, department, name, args)
     if reason:
         return ToolPermission(reason=reason)
+    if _is_write(name):
+        reason = _write_path_error(name, args, facts)
+        if reason:
+            return ToolPermission(reason=reason)
     command_basis: dict[str, Any] = {}
     if tool_action(name) == "command":
         # 登记命令在执行前核对冻结的登记表：未登记的名称与越界参数在这里拒绝，不执行
         reason, command_basis = _run_command_basis(projection, args, facts)
-        if reason:
-            return ToolPermission(reason=reason)
-    if _is_write(name):
-        reason = _plan_scope_error(projection, name, args, facts)
         if reason:
             return ToolPermission(reason=reason)
     return ToolPermission(command_basis=command_basis)
@@ -138,14 +135,13 @@ def commit_decision(
     current_facts: TreeFacts,
     events: list[Event],
 ) -> ProposalDecision:
-    # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。激活开始以后输入、指导、合同、计划、
+    # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。激活开始以后输入、指导、合同、
     # 协作请求或当前工作改变，或者校验以后工作区改变，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验
     before, now = WorkBasis.current(started, department), WorkBasis.current(current, department)
     if (current.phase != started.phase
             or now.input_version != basis.input_version
             or now.guidance_version != basis.guidance_version
             or now.effective_contract_hash != before.effective_contract_hash
-            or now.engineering_plan_hash != before.engineering_plan_hash
             or now.request_id != before.request_id
             or request_basis(current) != request_basis(evaluated)):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
@@ -159,6 +155,17 @@ def commit_decision(
 
 def _is_write(name: str) -> bool:
     return tool_action(name) == "write"
+
+
+def _write_path_error(name: str, args: dict[str, Any], facts: WorkspaceFacts) -> str | None:
+    # 写入目标在工作区中不能表示时直接拒绝，原因就是执行环境给出的原因；计划范围检查已随 #470 删除
+    for target in _write_targets(name, args):
+        if not isinstance(target, str):
+            continue
+        path = facts.paths.get(target)
+        if path is not None and path.error is not None:
+            return path.error
+    return None
 
 
 def _write_targets(name: str, args: dict[str, Any]) -> list[Any]:
@@ -186,18 +193,3 @@ def _run_command_basis(projection: RunProjection, args: dict[str, Any],
                   "snapshot_hash": facts.tree.digest}
 
 
-def _plan_scope_error(projection: RunProjection, name: str, args: dict[str, Any],
-                      facts: WorkspaceFacts) -> str | None:
-    # 写入只能落在当前有效合同的工程计划范围之内，按路径在工作区中的规范形式再核对一次
-    plan = projection.engineering_plan
-    if plan is None or plan.effective_contract_hash != current_contract_hash(projection):
-        return "Submit an engineering plan for the current effective contract before writing files."
-    for target in _write_targets(name, args):
-        if not path_in_scope(target, plan.scope):
-            return "The file is outside the current engineering plan scope; submit an adjusted plan with a reason first."
-        path = facts.paths[target]
-        if path.error is not None:
-            return path.error
-        if not path_in_scope(path.canonical, plan.scope):
-            return "The resolved file is outside the current engineering plan scope."
-    return None

@@ -27,24 +27,14 @@
       ]
     },
     "engineering": {
-      "submit_tools": ["submit_plan", "submit_delivery", "submit_structure"],
+      "submit_tools": ["submit_delivery", "submit_structure"],
       "kinds": {
-        "engineering_plan": {
-          "when": ["ENGINEERING", "REWORK_ENGINEERING"],
-          "required": ["kind=engineering_plan", "objective", "scope", "tasks"],
-          "optional": ["refactoring", "assumptions", "reason"],
-          "scope": "relative files, directories ending with /, or . for the full public workspace",
-          "tasks": [{"title": "ordered task", "outputs": ["verifiable output"], "verification": "how to verify"}],
-          "assumptions": [{"decision": "professional default", "basis": "project convention, standard, or maintained component"}],
-          "bind": ["current_contract.content_hash (bound by the host when the proposal is accepted)"]
-        },
         "delivery_spec": {
           "when": ["ENGINEERING", "REWORK_ENGINEERING"],
           "required": ["kind=delivery_spec", "summary", "files", "check_names"],
           "optional": ["known_risks"],
           "bind": [
             "current_contract.content_hash",
-            "current_engineering_plan.content_hash",
             "workspace files must exist",
             "run_check receipts from this activation on the current workspace"
           ]
@@ -66,8 +56,8 @@
         }
       },
       "notes": [
-        "先 submit_plan；接纳后下一次激活继续 write_file、run_check，最后 submit_delivery。",
-        "已有计划的调整必须提供 reason；超出路径范围或改变任务需先更新计划，产品要求改变先交产品。",
+        "直接 write_file、run_check，最后 submit_delivery；写入范围必须落在当前有效合同界定的目标与边界之内。",
+        "改变产品要求必须请产品正常接纳，不能在交付中新增要求。",
         "check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；run_command 的结果不能作为检查回执，模型自报的 exit_code 无效。"
       ]
     },
@@ -81,7 +71,6 @@
           "verdict": ["rework_product", "rework_engineering", "release"],
           "bind": [
             "current_contract.content_hash",
-            "current_engineering_plan.content_hash",
             "current_delivery_spec.content_hash",
             "current code snapshot",
             "quality host check receipts; engineering receipts are rejected"

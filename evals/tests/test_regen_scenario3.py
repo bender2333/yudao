@@ -75,8 +75,7 @@ def test_regenerated_checkpoints_mark_unverifiable_fields(tmp_path):
         checkpoints = run["metrics"]["checkpoints"]
         assert checkpoints["quality_release_bound_to_delivery"]["recheck_ratio_status"] in (
             "unverified", "frozen")
-        assert "未核实" in (checkpoints["no_write_before_plan_accepted"]["detail"]
-                            + checkpoints["replay_consistent"]["detail"])
+        assert "未核实" in checkpoints["replay_consistent"]["detail"]
 
 
 def test_regenerated_details_state_the_missed_target(tmp_path):

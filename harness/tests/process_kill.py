@@ -8,7 +8,7 @@
 # （终止以后、重新打开之前读出的事件），都可以直接查询。
 #
 # 脚本是一项回答的序列，每一项是 JSON：
-#   {"proposal": {...}}      提交一种提案（product_spec、engineering_plan 等）
+#   {"proposal": {...}}      提交一种提案（product_spec、delivery_spec 等）
 #   {"output": [...]}        一次回答的全部输出条目（自己写调用，例如指定编号的一次读取）
 #   其余字段                  FakeTurn 的字段（checks、transcript、files 等）
 #
@@ -54,7 +54,7 @@ STARTUP_TIMEOUT_SEC = 300
 
 def build_script(items: Sequence[dict[str, Any]]) -> list[Any]:
     # 把 JSON 脚本项变成 FakeAdapter 的脚本项：
-    #   {"proposal": {...}}   提交一种提案（product_spec、engineering_plan 等）
+    #   {"proposal": {...}}   提交一种提案（product_spec、delivery_spec 等）
     #   {"output": [...]}     一次回答的全部输出条目（自己写调用，例如指定编号的一次读取）
     #   其余字段              FakeTurn 的字段（checks、transcript、files 等）
     # 提案与检查可以写在同一项里：建档的结构说明与基线核验要求检查回执绑定同一次激活（design 第 4.1 节）。

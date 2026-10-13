@@ -131,11 +131,6 @@
             "recheck_ratio_status": "unverified",
             "recheck_ratio_note": "原始事件日志不在仓库内，取不回 parameters_version"
           },
-          "no_write_before_plan_accepted": {
-            "passed": null,
-            "applicable": true,
-            "detail": "原始事件日志不在仓库内，工程是否在计划被接纳前写入待核实。"
-          },
           "replay_consistent": {
             "passed": null,
             "applicable": true,
@@ -420,11 +415,6 @@
             "checks_total": null,
             "recheck_ratio_status": "unverified",
             "recheck_ratio_note": "原始事件日志不在仓库内，取不回 parameters_version"
-          },
-          "no_write_before_plan_accepted": {
-            "passed": null,
-            "applicable": true,
-            "detail": "原始事件日志不在仓库内，工程是否在计划被接纳前写入待核实。"
           },
           "replay_consistent": {
             "passed": null,

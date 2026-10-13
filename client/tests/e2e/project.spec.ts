@@ -493,7 +493,7 @@ test.describe("项目页面（1440×900）", () => {
   });
 
 
-  test("资料页：intend 原文、PRD、PLAN、交付文件与项目材料", async () => {
+  test("资料页：intend 原文、PRD、交付文件与项目材料", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
     const page = client.page;
@@ -509,7 +509,6 @@ test.describe("项目页面（1440×900）", () => {
       await expect(intend).toContainText("text");
       await expect(intend).toContainText("0–18");
       await expect(await section(page, "PRD")).toContainText("第 1 版");
-      await expect(await section(page, "PLAN")).toContainText("Implement and verify");
       const delivery = page.locator(".delivery-block").first();
       await expect(delivery.locator(".y10-mt-doc-head strong")).toContainText("交付 第 1 版");
       await expect(delivery).toContainText(ADOPTED_SUMMARY);

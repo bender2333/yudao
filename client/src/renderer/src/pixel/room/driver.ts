@@ -171,7 +171,7 @@ function blocked(blocks: Block[], p0: [number, number], p1: [number, number]): b
 /** 交接的物件到画法位图（原型 room.js 的 ART_BMP）。 */
 const ART_BMP: Record<string, string | false> = { prd: "scroll", box: "box_sealed", defect: "box_rework", release: "box_release", letter: "letter" };
 /** 提案被接纳或退回后托盘清空（原型 PROPOSAL_DONE）。 */
-const PROPOSAL_DONE = new Set(["spec_accepted", "contract_accepted", "plan_accepted", "delivery_accepted", "qa_submitted", "proposal_rejected"]);
+const PROPOSAL_DONE = new Set(["spec_accepted", "contract_accepted", "delivery_accepted", "qa_submitted", "proposal_rejected"]);
 /** 只改变房间物件的事件：不影响小人正在做和排队的动作（原型 SIDE_ONLY）。 */
 const SIDE_ONLY = new Set(["guidance_in", "semantic", "freeze"]);
 /** 由动作自己让两端说话的（原型 OWN_SPEECH）。 */
@@ -744,16 +744,6 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       })), S.anim("side_reach", 900, true));
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; shelve(); });
-    },
-    pin_plan(_ev: PixelFloorEvent, a: RoomActor) {
-      setPersist(a, null);
-      const p = plan(a);
-      p.stand();
-      p.add(S.hold("doc"));
-      p.spot("wb", "carry");
-      p.add(S.anim("board_pin", undefined, true), S.call(() => { state.wbSheetUntil = scene.realT + PROP_KEEP; }), S.hold(null), S.anim("back", 500), S.anim("idle_happy", 400));
-      p.back();
-      p.run(() => { if (state.wbSheetUntil < scene.realT) state.wbSheetUntil = scene.realT + PROP_KEEP; const actor = actorOf(a.id); if (actor) actor.hold = null; });
     },
     seal(_ev: PixelFloorEvent, a: RoomActor) {
       setPersist(a, null);
