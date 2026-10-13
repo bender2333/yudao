@@ -488,9 +488,9 @@ export type BaselineCheck = {
      */
     name: string;
     /**
-     * Argv
+     * Command
      */
-    argv: Array<string>;
+    command: string;
     /**
      * Exit Code
      */
