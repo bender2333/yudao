@@ -7,13 +7,14 @@ from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.department_prompts import save_department_prompt
 from harness.models import DepartmentPrompt, EventType, RunProjection, SessionRecord
-from harness.proposals import collaboration_request, delivery_turn, product_spec, product_decision, response_turn, review_turn
+from harness.proposals import (collaboration_request, delivery_turn, product_decision, product_spec,
+                                product_spec_turn, response_turn, review_turn)
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
 from harness.tests.helpers import developer_text, happy_script, recorded_context, run_scripted
 from harness.tests.protocol_helpers import serve
-from harness.tests.provider_replies import HTTP_REPLIES, HTTP_SCRIPT
+from harness.tests.provider_replies import HTTP_REPLIES, http_script
 from harness.tools import tool_action
 
 def _part(call, source: str):
@@ -52,7 +53,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
 
 def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
     unique = "UNIQUE_GOAL_V1_MUST_NOT_LEAK"
-    v2 = product_spec(goal="Build echo v2", acceptance=["v2 works"], change_record={
+    v2 = product_spec_turn(goal="Build echo v2", acceptance=["v2 works"], change_record={
         "changed": ["Use the v2 goal and acceptance criteria"], "retained": ["The echo CLI scope"],
         "retired": ["The original goal and acceptance criteria"], "rationale": "The requested revision replaces v1.",
     })
@@ -231,14 +232,14 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
 
     def retire_decisions(request):
         decisions = _part(request, "current_product_decisions")
-        return product_spec(acceptance=["new behavior"], change_record={
+        return product_spec_turn(acceptance=["new behavior"], change_record={
             "changed": ["Use the new behavior acceptance criterion"], "retained": ["The echo CLI scope"],
             "retired": ["The previous acceptance criterion and product decision"],
             "rationale": "Quality found that the previous product contract was wrong.",
         }, decision_changes=[
             {"decision_hash": item["content_hash"], "disposition": "retire", "rationale": "The new behavior replaces this requirement."}
             for item in decisions
-        ])
+        ])(request)
 
     adapter = FakeAdapter(
         [
@@ -279,7 +280,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
                 "contract is wrong",
                 defects=[{"severity": "major", "summary": "contract issue"}],
             ),
-            product_spec(acceptance=["new behavior"], change_record={
+            product_spec_turn(acceptance=["new behavior"], change_record={
                 "changed": ["Replace old behavior with new behavior"], "retained": ["The echo CLI scope"],
                 "retired": ["The old behavior acceptance criterion"], "rationale": "Address the quality contract defect.",
             }),
@@ -432,14 +433,15 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
     assert manifest.input_token_estimate + manifest.output_reserve_tokens <= manifest.budget == 8000
 
 @contextmanager
-def _bound_system(tmp_path, replies, *, context_window, max_output_tokens):
+def _bound_system(tmp_path, *, context_window, max_output_tokens):
     # 三个部门绑定测试内启动的 HTTP 服务上的模型（Responses 协议），模型声明给定的窗口与输出上限；
-    # 服务按请求顺序回放脚本中的工具调用，记录收到的请求
-    queue = iter(enumerate(replies, start=1))
+    # 服务按请求顺序回放交接脚本中的工具调用，记录收到的请求。提交依据的版本取自本次请求装配好的材料
+    state = {"index": 0}
 
-    def responder(_body):
-        index, calls = next(queue)
-        return 200, "text/event-stream", [HTTP_REPLIES["responses"](index, calls)]
+    def responder(body):
+        calls = http_script(body)[state["index"]]
+        state["index"] += 1
+        return 200, "text/event-stream", [HTTP_REPLIES["responses"](state["index"], calls)]
 
     server, capture, base = serve(responder)
     try:
@@ -464,7 +466,7 @@ def _work_assemblies(system, run_id):
             if event.type == EventType.CONTEXT_ASSEMBLED and event.payload["purpose"] == "work"]
 
 def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_path):
-    with _bound_system(tmp_path, HTTP_SCRIPT[:1], context_window=8000, max_output_tokens=4096) as (system, capture):
+    with _bound_system(tmp_path, context_window=8000, max_output_tokens=4096) as (system, capture):
         run_id = system.create_run("build echo")
         result = system.activate_once(run_id)
 
@@ -481,7 +483,7 @@ def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_p
     assert summarize_run(system, run_id, scenario="narrow")["model_input_audit"]["status"] == "verified"
 
 def test_wide_window_work_requests_keep_the_declared_output_limit(tmp_path):
-    with _bound_system(tmp_path, HTTP_SCRIPT, context_window=32000, max_output_tokens=4096) as (system, capture):
+    with _bound_system(tmp_path, context_window=32000, max_output_tokens=4096) as (system, capture):
         run_id = system.create_run("build echo")
         result = system.run_until_stop(run_id)
 

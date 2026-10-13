@@ -5,7 +5,7 @@
       "kinds": {
         "product_spec": {
           "when": ["PRODUCT_SPEC", "REWORK_PRODUCT"],
-          "required": ["kind=product_spec", "goal", "requirements", "acceptance_criteria"],
+          "required": ["kind=product_spec", "goal", "requirements", "acceptance_criteria", "basis_product_spec_hash"],
           "optional": ["boundaries", "constraints", "fatal_conditions", "non_goals", "decision_changes", "change_record"],
           "decision_changes": [{"decision_hash": "every current decision", "disposition": "retain|integrate|retire", "rationale": "reason"}],
           "change_record": {
@@ -14,8 +14,9 @@
             "retained": ["still valid behavior"],
             "retired": ["legitimately removed behavior"],
             "rationale": "reason for the revision"
-          }
-        },
+          },
+          "basis_product_spec_hash": "content hash of the ProductSpec this revision is based on; null for the first spec; the host rejects the submission if it does not equal the current effective ProductSpec content_hash"
+         },
         "product_decision": {
           "required": ["kind=product_decision", "statement", "rationale"],
           "bind": ["current_product_spec.content_hash"]
@@ -31,13 +32,14 @@
       "kinds": {
         "delivery_spec": {
           "when": ["ENGINEERING", "REWORK_ENGINEERING"],
-          "required": ["kind=delivery_spec", "summary", "files", "check_names"],
+          "required": ["kind=delivery_spec", "summary", "files", "check_names", "basis_product_spec_hash"],
           "optional": ["known_risks"],
           "bind": [
             "current_contract.content_hash",
             "workspace files must exist",
             "run_check receipts from this activation on the current workspace"
-          ]
+          ],
+          "basis_product_spec_hash": "content hash of the ProductSpec this delivery is based on; the host rejects the submission if it does not equal the current effective ProductSpec content_hash"
         },
         "structure": {
           "when": ["ENGINEERING"],
@@ -66,7 +68,7 @@
       "kinds": {
         "qa_review": {
           "when": ["QUALITY"],
-          "required": ["kind=qa_review", "verdict", "rationale", "checks"],
+          "required": ["kind=qa_review", "verdict", "rationale", "checks", "basis_delivery_spec_hash"],
           "optional": ["defects"],
           "verdict": ["rework_product", "rework_engineering", "release"],
           "bind": [
@@ -74,8 +76,9 @@
             "current_delivery_spec.content_hash",
             "current code snapshot",
             "quality host check receipts; engineering receipts are rejected"
-          ]
-        },
+          ],
+          "basis_delivery_spec_hash": "content hash of the DeliverySpec this review is based on; the host rejects the submission if it does not equal the current effective DeliverySpec content_hash"
+         },
         "baseline_review": {
           "when": ["QUALITY"],
           "work_item": "onboarding",
