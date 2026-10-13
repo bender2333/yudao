@@ -66,15 +66,21 @@ def _handoff_script() -> list[Any]:
     return [product_spec(), plan_turn(), _deliver(), _release()]
 
 
-def _system(data_dir, script: list[Any], *, step_limits: StepLimits = StepLimits(),
+def _system(data_dir, script: list[Any] | dict[str, list[Any]], *, step_limits: StepLimits = StepLimits(),
             **run_options: Any) -> tuple[LoopSystem, FakeAdapter, str]:
+    # 脚本两种给法：一个队列按请求先后取用；按部门给的每个部门一份，各自取用自己的（#469）
     adapter = FakeAdapter(script)
     system = LoopSystem.for_testing(data_dir, adapter, step_limits=step_limits)
     return system, adapter, system.create_run("build an echo CLI", **run_options)
 
 
 def handoff_release(data_dir):
-    system, _, run_id = _system(data_dir, _handoff_script())
+    # 按部门给出的脚本：产品一份、工程两份（计划与交付）、质检一份（#469 验收 1）
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [plan_turn(), _deliver()],
+        "quality": [_release()],
+    })
     system.run_until_stop(run_id)
     return system, run_id, {}
 

@@ -13,7 +13,8 @@ from harness.parameters import initial_version
 PARAMETERS_VERSION = initial_version()
 
 # 事件序列对照：把一次 run 的完整事件序列规整成与运行时刻、机器路径无关的形式，与 event_sequences/ 下的基准比较。
-# 基准记录的是行为：之后任何提交使基准改变，说明行为改变，必须修正代码，不能更新基准。
+# 比较方式（#469）：每个会话内部的事件按顺序比较，会话之间只比较因果关系
+# （询问 → 分支开始 → 回答 → 工具结果，提交 → 下一个部门开始），见文件尾的 compare_documents。
 #
 # 基准文件的结构：
 #   scenario   场景名；covers  场景覆盖的行为
@@ -244,9 +245,155 @@ def compare_with_baseline(name: str, covers: str, run: dict[str, Any], *, write:
         path.write_text(actual, encoding="utf-8", newline="\n")
         return
     assert path.exists(), f"missing event sequence baseline {path.name}"
-    expected = path.read_text(encoding="utf-8")
-    if actual != expected:
-        diff = list(difflib.unified_diff(expected.splitlines(), actual.splitlines(),
-                                         "baseline", "actual", lineterm="", n=3))
-        shown = "\n".join(diff[:120])
-        raise AssertionError(f"event sequence of {name} differs from its baseline:\n{shown}")
+    expected = json.loads(path.read_text(encoding="utf-8"))
+    compare_documents(name, expected, json.loads(actual))
+
+
+RUN_GROUP = "__run__"
+
+_TOOL_RESULT_TYPES = frozenset({
+    "tool_called", "tool_started", "proposal_submitted", "spec_accepted", "contract_accepted",
+    "plan_accepted", "delivery_accepted", "qa_submitted",
+})
+
+
+def _inline(value, shared, artifacts, memo):
+    if isinstance(value, str):
+        if value in memo:
+            return memo[value]
+        if value in shared or value in artifacts:
+            memo[value] = None
+            resolved = _inline(shared.get(value, artifacts.get(value)), shared, artifacts, memo)
+            memo[value] = resolved
+            return resolved
+        return value
+    if isinstance(value, dict):
+        return {name: _inline(item, shared, artifacts, memo) for name, item in value.items()}
+    if isinstance(value, list):
+        return [_inline(item, shared, artifacts, memo) for item in value]
+    return value
+
+
+def _session_groups(events):
+    groups = {}
+    for event in events:
+        groups.setdefault(event.get("session_id") or RUN_GROUP, []).append(event)
+    return groups
+
+
+def _group_records(document):
+    shared, artifacts = document.get("shared") or {}, document.get("artifacts") or {}
+    events = [_inline(event, shared, artifacts, {}) for event in document["events"]]
+    groups = _session_groups(events)
+    positions = {}
+    for key, items in groups.items():
+        for index, item in enumerate(items, start=1):
+            positions[item["event"]] = f"{key}#{index}"
+    records = {}
+    for key, items in groups.items():
+        group_records = []
+        for index, item in enumerate(items, start=1):
+            record = dict(item)
+            record["event"] = index
+            parent = item.get("parent_event_id")
+            record["parent_event_id"] = positions.get(parent) if parent else None
+            group_records.append(record)
+        records[key] = group_records
+    return records
+
+
+def _request_ref(payload):
+    return str(payload.get("request_id") or payload.get("collaboration_request_id")
+               or payload.get("id") or "")
+
+
+def _event_key(event, group, ordinal):
+    payload = event.get("payload") or {}
+    return f"{group} {event.get('type')} {_request_ref(payload)} #{ordinal}".replace("  ", " ")
+
+
+def _causal_edges(events):
+    groups = _session_groups(events)
+    group_of = [event.get("session_id") or RUN_GROUP for event in events]
+    ordinals = {}
+    keys = {}
+    for position, event in enumerate(events):
+        slot = (group_of[position], event.get("type"), _request_ref(event.get("payload") or {}))
+        ordinals[slot] = ordinals.get(slot, 0) + 1
+        keys[position] = _event_key(event, group_of[position], ordinals[slot])
+    edges = set()
+
+    def link(one, other):
+        # 边的方向由数组里的先后决定：键本身与顺序无关，方向记录谁在前
+        before, after = (one, other) if one < other else (other, one)
+        edges.add(f"{keys[before]} -> {keys[after]}")
+    activations = [pos for pos, event in enumerate(events) if event.get("type") == "department_activated"]
+    if events and events[0].get("type") == "run_created" and activations:
+        link(0, activations[0])
+    for position, event in enumerate(events):
+        payload = event.get("payload") or {}
+        if event.get("type") == "collaboration_requested" and payload.get("id"):
+            request_id = str(payload["id"])
+            starts = [pos for pos in activations
+                      if pos > position and str((events[pos].get("payload") or {}).get("request_id")) == request_id]
+            answers = [pos for pos, other in enumerate(events)
+                       if other.get("type") == "collaboration_responded"
+                       and str((other.get("payload") or {}).get("request_id")) == request_id and pos > position]
+            if starts and answers:
+                link(position, starts[0])
+                link(starts[0], answers[0])
+                requester = group_of[position]
+                stop = next((pos for pos, other in enumerate(events)
+                             if pos > answers[0] and group_of[pos] == requester
+                             and other.get("type") in {"transition", "run_done"}), len(events))
+                for pos in range(answers[0] + 1, stop):
+                    if group_of[pos] == requester and events[pos].get("type") in _TOOL_RESULT_TYPES:
+                        link(answers[0], pos)
+        elif event.get("type") == "transition":
+            targets = [pos for pos in activations if pos > position]
+            if targets:
+                link(position, targets[0])
+    return edges
+
+
+def _canon(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _diff_lines(expected_lines, actual_lines):
+    diff = list(difflib.unified_diff(expected_lines, actual_lines, "baseline", "actual", lineterm="", n=3))
+    return "\n".join(diff[:120])
+
+
+def compare_documents(name, expected, actual):
+    for field in ("scenario", "covers"):
+        if expected.get(field) != actual.get(field):
+            raise AssertionError(f"event sequence of {name} differs from its baseline:\n"
+                                 f"{field} differs: {expected.get(field)!r} != {actual.get(field)!r}")
+    if _canon(expected.get("projection")) != _canon(actual.get("projection")):
+        raise AssertionError(f"event sequence of {name} differs from its baseline:\nprojection differs:\n"
+                             + _diff_lines(_canon(expected.get("projection")).splitlines(),
+                                           _canon(actual.get("projection")).splitlines()))
+    expected_groups, actual_groups = _group_records(expected), _group_records(actual)
+    if set(expected_groups) != set(actual_groups):
+        raise AssertionError(f"event sequence of {name} differs from its baseline:\nsessions differ: "
+                             f"{sorted(set(expected_groups) - set(actual_groups))} missing, "
+                             f"{sorted(set(actual_groups) - set(expected_groups))} unexpected")
+    for key in expected_groups:
+        wanted = [_canon(record) for record in expected_groups[key]]
+        got = [_canon(record) for record in actual_groups[key]]
+        if wanted != got:
+            for index, (one, other) in enumerate(zip(wanted, got), start=1):
+                if one != other:
+                    break
+            else:
+                index = min(len(wanted), len(got)) + 1
+            raise AssertionError(f"event sequence of {name} differs from its baseline:\n"
+                                 f"session {key} event #{index} differs:\n"
+                                 + _diff_lines(wanted, got))
+    expected_edges, actual_edges = _causal_edges(expected["events"]), _causal_edges(actual["events"])
+    if expected_edges != actual_edges:
+        missing = sorted(expected_edges - actual_edges)
+        unexpected = sorted(actual_edges - expected_edges)
+        raise AssertionError(f"event sequence of {name} differs from its baseline:\ncausal edges differ:\n"
+                             f"missing: {missing}\nunexpected: {unexpected}")
