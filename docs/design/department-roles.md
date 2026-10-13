@@ -2,6 +2,14 @@
 
 日期：2026-09-25；2026-09-26 按总体架构与用户的决定修改，同日补全计划的更新、执行槽位的计数、停滞时的历史、交出检查的审查记录与自测、专家请求期间的角色任务、验收对照与角色任务的恢复这几项规则；2026-10-07 按 [ADR-0029](../adr/0029-departments-form-by-information-cohesion.md)、[ADR-0030](../adr/0030-rules-are-provisional-defaults.md)、[ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md) 修改第 2、4、9、10、11、12、13、16 节。状态：设计草案，规则已由用户确认（[D26](../requirements/department-roles.md) 2026-09-25 至 2026-09-26），未实施。需求：[D26 部门内多角色与多循环](../requirements/department-roles.md)。调研：[语义系统与部门内多角色：参照调研](../archive/research/semantic-system-and-department-roles.md)。前置设计：[总体架构：职责分层](architecture/overall-architecture.md)、[语义系统设计说明](semantic-system.md)、[模型管理设计说明](model-management.md)。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
+2026-10-13 状态补充：本文以下规则已被[三部门的循环结构](department-loop.md)（[ADR-0036](../adr/0036-concurrent-departments-and-nested-asks.md)、[ADR-0037](../adr/0037-engineering-plan-stays-with-engineering.md)）取代，进入 Stage 5 时先按它们修改本文，再拆分工单；#50、#55、#56、#61、#66 的正文同样不能直接作为执行规格：
+
+- 工程计划是正式成果，计划被接纳之前主程的写入被拒绝，交出检查按计划条目核对 → 部门内是否制订计划、怎样分解任务由部门自己决定；正式接纳只看有效 PRD、交付快照与独立证据。
+- PRD 更新后预测性任务取消、结果全部作废 → 送达通知，由部门判断已有工作还算不算数。
+- 同一事项一次一个未结请求、不嵌套 → 询问是一次工具调用，可以同时有多个、可以嵌套，按询问链规则限制。
+
+每个新增角色写明它内聚的目标函数、证据来源与工作过程，由此说明它新增的独立性（D38 N-I6），由对照结果决定是否保留它带来的成本。
+
 ## 1. 要解决的问题
 
 1. 每个部门目前是一个 Agent 循环，一段历史承担全部工作。查资料产生的大量中间内容、实现细节、设计推敲与最终材料混在同一段历史里，占用上下文，也干扰后续判断。
