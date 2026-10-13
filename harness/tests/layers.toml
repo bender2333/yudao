@@ -133,6 +133,7 @@
 "test_resolve_call_target.py" = "unit"
 "test_responses.py" = "integration"
 "test_retry_input_boundaries.py" = "module"
+"test_onboarding_baseline_check_command.py" = "integration"
 "test_run_event_version.py" = "module"
 "test_run_time_limit.py" = "integration"
 "test_runtime_drain.py" = "integration"

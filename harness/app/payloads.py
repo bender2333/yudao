@@ -979,10 +979,10 @@ class StructureProposal(Payload):
 
 class BaselineCheck(Payload):
     # 基线检查（工单 #136，设计第 4.6 节）：质检在快照上运行的检查回执，随建档基线一起记入项目流，
-    # 以后的事项据此区分原有的失败与新引入的失败。argv 与 summary 取自工程结构说明中的同名构建检查与
+    # 以后的事项据此区分原有的失败与新引入的失败。command 与 summary 取自工程结构说明中的同名构建检查与
     # 检查回执的输出摘要；snapshot_hash 是它绑定的快照摘要
     name: str
-    argv: list[str]
+    command: str
     exit_code: int
     summary: str
     snapshot_hash: str

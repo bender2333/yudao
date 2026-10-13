@@ -4473,12 +4473,9 @@
             "type": "string",
             "title": "Name"
           },
-          "argv": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Argv"
+          "command": {
+            "type": "string",
+            "title": "Command"
           },
           "exit_code": {
             "type": "integer",
@@ -4497,7 +4494,7 @@
         "type": "object",
         "required": [
           "name",
-          "argv",
+          "command",
           "exit_code",
           "summary",
           "snapshot_hash"
