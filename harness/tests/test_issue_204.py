@@ -17,7 +17,7 @@ from harness.definitions import DEFINITIONS
 from harness.event_store import Command
 from harness.models import EventType, new_id
 from harness.projection import saved_decisions
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
@@ -44,7 +44,7 @@ def _plain_reply():
     return lambda _call: FakeTurn(transcript="先整理一下思路，稍后提交。")
 
 def _completion_script():
-    return [plan_turn(), delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
+    return [delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
 
 def _no_tool_call_run(tmp_path, tail=None):
     script = [_plain_reply() for _ in range(LIMIT + 1)]
@@ -182,9 +182,9 @@ def _workspace_unrepresentable_run(tmp_path, tail):
     def link_then(request):
         return ModelResponse(output=[_command_call("cmd-link", "make-link", ["linked"])])
 
-    # 产品先提交产品要求，工程提交计划，工步建立链接（node_modules/linked）导致公开树无法表示
+    # 产品先提交产品要求，工步建立链接（node_modules/linked）导致公开树无法表示
     system = LoopSystem.for_testing(tmp_path / "data",
-                                    FakeAdapter([product_spec(), plan_turn(), link_then, tail]))
+                                    FakeAdapter([product_spec(),link_then, tail]))
     run_id = system.create_run("A link pauses the run", registered_commands=REGISTRY,
                                command_versions={"make-link": 1})
     workspace = system.workspace(run_id)

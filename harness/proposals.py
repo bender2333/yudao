@@ -112,35 +112,6 @@ def delivery(
     }
 
 
-def engineering_plan(
-    objective: str = "Implement and verify the current echo CLI requirements",
-    *,
-    scope: list[str] | None = None,
-    tasks: list[dict[str, Any]] | None = None,
-    refactoring: list[str] | None = None,
-    assumptions: list[dict[str, str]] | None = None,
-    reason: str = "",
-) -> dict[str, Any]:
-    return {
-        "kind": "engineering_plan",
-        "objective": objective,
-        "scope": ["src/"] if scope is None else scope,
-        "tasks": [{
-            "title": "Implement the current contract",
-            "outputs": ["src/echo.py"],
-            "verification": "Run the CLI through host checks against the current requirements",
-        }] if tasks is None else tasks,
-        "refactoring": [] if refactoring is None else refactoring,
-        "assumptions": [] if assumptions is None else assumptions,
-        "reason": reason,
-    }
-
-
-def plan_turn(**kwargs: Any) -> Callable[[ModelCall], dict[str, Any]]:
-    def submit(call: ModelCall) -> dict[str, Any]:
-        return engineering_plan(**kwargs)
-
-    return submit
 
 def structure(
     *,

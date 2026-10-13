@@ -27,7 +27,7 @@ from harness.app.application import Application
 from harness.models import TERMINAL_PHASES, utc_now
 from harness.data_directory import LOG_DIR, LOG_FILE
 from harness.projection import project_run
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import bearer, running_server
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
@@ -38,9 +38,7 @@ STARTUP_TIMEOUT_SEC = 300
 # 关闭以后等待进程退出的时间：服务停止接受新请求、关闭事件流连接、等待进行中的写入以后进程退出
 SHUTDOWN_TIMEOUT_SEC = 30
 
-
 PORT_LINE = "port: "
-
 
 class Started(NamedTuple):
     # 一个已启动的服务进程：port 是服务绑定端口 0 以后操作系统分配的实际端口
@@ -49,14 +47,12 @@ class Started(NamedTuple):
     output: Path
     data_dir: Path
 
-
 def _text(path: Path) -> str:
     # 服务进程的输出：标准错误与标准输出合并写进同一个文件（stderr=subprocess.STDOUT）
     try:
         return path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return ""
-
 
 def _diagnostics(process: subprocess.Popen, log: Path, data_dir: Path) -> str:
     # 启动失败时的诊断输出：退出码、进程自身的输出，以及数据目录里的日志。服务进程绑定端口失败
@@ -67,13 +63,11 @@ def _diagnostics(process: subprocess.Popen, log: Path, data_dir: Path) -> str:
             f"--- process output ---\n{_text(log)}\n"
             f"--- {data_log} ---\n{_text(data_log)}")
 
-
 def _reported_port(log: Path) -> int | None:
     for line in _text(log).splitlines():
         if line.startswith(PORT_LINE):
             return int(line[len(PORT_LINE):])
     return None
-
 
 def _wait_port(process: subprocess.Popen, log: Path, data_dir: Path) -> int:
     # 服务自己绑定端口 0，就绪以后在输出里报告实际端口：--port 0 时启动方只能从这里得知它
@@ -87,13 +81,11 @@ def _wait_port(process: subprocess.Popen, log: Path, data_dir: Path) -> int:
             raise TimeoutError(_diagnostics(process, log, data_dir))
         time.sleep(0.1)
 
-
 def _recording_browser(directory: Path, recorded: Path) -> Path:
     # 标准库 webbrowser 读 BROWSER 环境变量（设计说明第 12 节），用一条命令把打开的地址记进文件
     script = directory / "record-browser.cmd"
     script.write_text(f'@echo off\r\necho %1 > "{recorded}"\r\n', encoding="utf-8")
     return script
-
 
 @pytest.fixture
 def service(tmp_path: Path) -> Iterator[Callable[..., Started]]:
@@ -132,7 +124,6 @@ def service(tmp_path: Path) -> Iterator[Callable[..., Started]]:
             os.killpg(process.pid, signal.SIGKILL)
         process.wait(SHUTDOWN_TIMEOUT_SEC)
 
-
 def _serving(started: Started, deadline: float) -> None:
     limit = time.monotonic() + deadline
     while time.monotonic() < limit:
@@ -143,10 +134,8 @@ def _serving(started: Started, deadline: float) -> None:
             time.sleep(0.2)
     raise TimeoutError(_failed(started, "服务没有开始应答"))
 
-
 def _failed(started: Started, reason: str) -> str:
     return f"{reason}\n{_diagnostics(started.process, started.output, started.data_dir)}"
-
 
 def _ready(started: Started, *, headers: dict[str, str] | None = None) -> str:
     # 端口由服务进程报告，这里只等它开始应答：端口探测不再承担判断服务是否启动成功的职责
@@ -164,10 +153,8 @@ def _ready(started: Started, *, headers: dict[str, str] | None = None) -> str:
             raise TimeoutError(_failed(started, "服务没有开始应答"))
         time.sleep(0.2)
 
-
 def _opened_address(recorded: Path) -> str | None:
     return recorded.read_text(encoding="utf-8").strip() if recorded.exists() else None
-
 
 def _wait_opened(recorded: Path, deadline: float) -> str | None:
     limit = time.monotonic() + deadline
@@ -178,13 +165,11 @@ def _wait_opened(recorded: Path, deadline: float) -> str | None:
         time.sleep(0.1)
     return None
 
-
 def _stop(process: subprocess.Popen) -> int:
     # 用户在命令行窗口里按 Ctrl+C：Windows 上 Ctrl+Break 走同一条路径（uvicorn 捕获 SIGBREAK），
     # 且可以送达指定的服务进程组；CTRL_C_EVENT 只能送达调用者自己的进程组，因此这里不用它
     process.send_signal(signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT)
     return process.wait(SHUTDOWN_TIMEOUT_SEC)
-
 
 def test_the_page_opens_in_the_browser_once_the_service_is_ready(service, tmp_path):
     # 不带 --no-browser：服务就绪以后在命令行输出页面地址，并用标准库的 webbrowser 打开同一个地址
@@ -195,7 +180,6 @@ def test_the_page_opens_in_the_browser_once_the_service_is_ready(service, tmp_pa
     assert f"web: {address}" in _ready(started)
     assert _wait_opened(recorded, time.monotonic() + 30) == address
 
-
 def test_no_browser_leaves_the_page_closed(service, tmp_path):
     # 带 --no-browser：不打开浏览器，也不输出页面地址（供测试、走查与没有桌面的控制主机）
     recorded = tmp_path / "opened.txt"
@@ -203,7 +187,6 @@ def test_no_browser_leaves_the_page_closed(service, tmp_path):
                       browser=_recording_browser(tmp_path, recorded))
     assert "web: http" not in _ready(started)
     assert _wait_opened(recorded, 3) is None
-
 
 def test_the_lan_access_mode_opens_the_address_of_this_machine(service, tmp_path):
     # 局域网访问方式下打开的同样是本机地址：浏览器在本机地址上保留系统通知与安装应用的设置；
@@ -224,7 +207,6 @@ def test_the_lan_access_mode_opens_the_address_of_this_machine(service, tmp_path
     assert capabilities.status_code == 200
     assert capabilities.json()["deployment"]["access"] == "lan"
 
-
 def test_ctrl_c_stops_the_service_and_releases_the_data_directory(service, tmp_path):
     # Ctrl+C 停止服务：进程正常退出，数据目录的进程锁释放，第二个服务进程可以取得同一个数据目录
     data_dir = tmp_path / "data"
@@ -234,7 +216,6 @@ def test_ctrl_c_stops_the_service_and_releases_the_data_directory(service, tmp_p
 
     restarted = service(data_dir, tmp_path / "restart.log", extra=["--no-browser"])
     _serving(restarted, time.monotonic() + STARTUP_TIMEOUT_SEC)
-
 
 def test_an_open_event_stream_does_not_hold_the_process(service, tmp_path):
     # 打开着的事件流连接不阻止退出：关闭开始时先让等待中的连接干净结束，进程随后退出，
@@ -249,12 +230,9 @@ def test_an_open_event_stream_does_not_hold_the_process(service, tmp_path):
             began = time.monotonic()
             assert _stop(started.process) == 0
 
-
-
 def _completion_script():
     # 中断在产品提交规格以后，恢复时剩下三个回答：计划、交付与放行评审
-    return [plan_turn(), delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
-
+    return [delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
 
 def _interrupted_data_dir(data_dir: Path) -> tuple[str, str]:
     # 一份有未结束 run 的数据目录：产品已经提交规格，run 停在工程部门请求模型以前；
@@ -266,7 +244,6 @@ def _interrupted_data_dir(data_dir: Path) -> tuple[str, str]:
     assert project_run(system.store, run_id).phase not in TERMINAL_PHASES
     system.close()
     return project_id, run_id
-
 
 def test_a_run_in_progress_continues_at_the_next_start(tmp_path):
     # 停止服务不等待 run 结束；进行中的 run 在服务进程的事件循环中由启动序列自动继续到结束

@@ -49,7 +49,6 @@ class Workspace:
         self.check_product_spec_hash: str | None = None
         self.check_delivery_spec_hash: str | None = None
         self.check_effective_contract_hash: str | None = None
-        self.check_engineering_plan_hash: str | None = None
 
     def bind_check(
         self,
@@ -58,13 +57,11 @@ class Workspace:
         product_spec_hash: str | None,
         delivery_spec_hash: str | None,
         effective_contract_hash: str | None = None,
-        engineering_plan_hash: str | None = None,
     ) -> None:
         self.check_activation_id = activation_id
         self.check_product_spec_hash = product_spec_hash
         self.check_delivery_spec_hash = delivery_spec_hash
         self.check_effective_contract_hash = effective_contract_hash
-        self.check_engineering_plan_hash = engineering_plan_hash
 
     def resolve(self, rel: str) -> Path:
         return resolve_public_path(self.root, rel)
@@ -159,7 +156,6 @@ class Workspace:
             activation_id=self.check_activation_id,
             tree_changed=bool(tree_changed),
             effective_contract_hash=self.check_effective_contract_hash,
-            engineering_plan_hash=self.check_engineering_plan_hash,
         )
         self._receipts_path.parent.mkdir(parents=True, exist_ok=True)
         with self._receipts_path.open("a", encoding="utf-8") as handle:
@@ -185,8 +181,7 @@ class Workspace:
                     delivery_spec_hash=data.get("delivery_spec_hash"),
                     activation_id=data.get("activation_id"),
                     tree_changed=bool(data.get("tree_changed", False)),
-                    effective_contract_hash=data["effective_contract_hash"],
-                    engineering_plan_hash=data["engineering_plan_hash"],
+                    effective_contract_hash=data.get("effective_contract_hash"),
                 )
             )
         return items
@@ -207,5 +202,4 @@ def _receipt_dict(receipt: CheckReceipt) -> dict[str, object]:
         "summary": receipt.summary,
         "tree_changed": receipt.tree_changed,
         "effective_contract_hash": receipt.effective_contract_hash,
-        "engineering_plan_hash": receipt.engineering_plan_hash,
     }

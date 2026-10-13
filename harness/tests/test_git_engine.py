@@ -10,12 +10,11 @@ from harness.event_store import run_stream
 from harness.write_path import NewEvent
 from harness.git_versions import GitVersionError
 from harness.models import EventType, GIT_VERSION_EVENTS
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.public_tree import TreeError, capture_public_tree, materialize_tree
 from harness.runtime import CancelledInputSaveError, LoopSystem, RunTerminalError
 from harness.tree_archive import load_tree
 from harness.validation import evaluate_proposal
-
 
 CHANGE_RECORD = {
     "changed": ["Print the argument in uppercase"],
@@ -24,14 +23,11 @@ CHANGE_RECORD = {
     "rationale": "Apply the new user input",
 }
 
-
 def _revision():
     return product_spec(requirements=["Print the argument in uppercase"], change_record=CHANGE_RECORD)
 
-
 def _formal(system, run_id):
     return [event for event in system.store.list_events(run_id) if event.type in GIT_VERSION_EVENTS]
-
 
 def _commit_spec(system, run_id, proposal):
     projection = system.project(run_id)
@@ -45,15 +41,13 @@ def _commit_spec(system, run_id, proposal):
         session_id=projection.sessions["product"].session_id, provider="fake", model="fake",
     ).append(transaction))
 
-
 def test_new_input_and_requirement_diff_form_one_accepted_history_through_redelivery(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(), delivery_turn(), _revision(), plan_turn(reason="Apply the uppercase requirement"),
-        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
+        product_spec(),delivery_turn(), _revision(),        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
         review_turn("release", "Uppercase output was independently verified"),
     ]))
     run_id = system.create_run("  build echo\r\n", max_cycles=12)
-    for _ in range(3):
+    for _ in range(2):
         before = system.activate_once(run_id)
     old_spec_event = system.store.get_event(before.product_spec.created_event_id)
     old_code = system.git_versions.read_file(run_id, before.git_version, "code/src/echo.py")
@@ -72,24 +66,22 @@ def test_new_input_and_requirement_diff_form_one_accepted_history_through_redeli
     assert old_spec["revision"] == 1 and old_spec["change_record"] is None
     current = system.run_until_stop(run_id)
     assert current.phase == "DONE", current.error
-    assert len(current.git_versions) == 9
+    assert len(current.git_versions) == 7
     parent = None
     for entry in current.git_versions:
         assert entry["parent_commit"] == parent
         parent = entry["commit"]
     files = system.git_versions.read_files(run_id, current.git_version)
     assert set(files) == {
-        "intend.md", "PRD.md", "PLAN.md", "specs/product.json", "specs/contract.json",
-        "specs/plan.json", "specs/delivery.json", "specs/delivery-tree.json", "specs/qa.json", "code/src/echo.py",
+        "intend.md", "PRD.md", "specs/product.json", "specs/contract.json",
+        "specs/delivery.json", "specs/delivery-tree.json", "specs/qa.json", "code/src/echo.py",
     }
     for event_type, path in ((EventType.SPEC_ACCEPTED, "specs/product.json"),
-                             (EventType.PLAN_ACCEPTED, "specs/plan.json"),
                              (EventType.DELIVERY_ACCEPTED, "specs/delivery.json"),
                              (EventType.QA_SUBMITTED, "specs/qa.json")):
         event = [item for item in _formal(system, run_id) if item.type == event_type][-1]
         assert json.loads(files[path]) == {key: value for key, value in event.payload.items() if key != "git_version"}
     assert current.canonical_state() == system.replay(run_id).canonical_state()
-
 
 @pytest.mark.parametrize("operation", ["initial", "input", "spec"])
 def test_git_preparation_failure_does_not_accept_or_publish_materials(tmp_path, monkeypatch, operation):
@@ -118,7 +110,6 @@ def test_git_preparation_failure_does_not_accept_or_publish_materials(tmp_path, 
     else:
         assert (material / "intend.md").read_bytes() == b"original"
 
-
 def _failing_append(store, event_type):
     # 存储提交含有这种事件的一批事件时失败，整批都不写入
     commit = store.commit
@@ -129,7 +120,6 @@ def _failing_append(store, event_type):
         return commit(stream, expected_version, events, *args, **kwargs)
 
     return failing_commit
-
 
 def test_sqlite_input_failure_leaves_only_candidate_and_next_parent_is_still_accepted(tmp_path, monkeypatch):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
@@ -154,7 +144,6 @@ def test_sqlite_input_failure_leaves_only_candidate_and_next_parent_is_still_acc
     accepted = system.add_input(run_id, "accepted")
     assert accepted.git_version["parent_commit"] == before.git_version["commit"]
     assert candidates[0]["commit"] not in {item["commit"] for item in accepted.git_versions}
-
 
 def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path, monkeypatch):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
@@ -191,9 +180,8 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
     assert candidates[0]["commit"] not in {item["commit"] for item in current.git_versions}
     assert current.product_spec.revision == 2 and current.effective_contract.revision == 2
 
-
 def test_git_delivery_and_archive_share_binary_bytes_and_complete_directory_manifest(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(), plan_turn(), delivery_turn()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),delivery_turn()]))
     run_id = system.create_run("build echo")
     workspace = system.workspace(run_id)
     (workspace.root / "empty").mkdir()
@@ -218,14 +206,12 @@ def test_git_delivery_and_archive_share_binary_bytes_and_complete_directory_mani
     assert capture_public_tree(restored) == archived
     assert not any(".git" in path or ".checks" in path for path in files)
 
-
 @pytest.mark.parametrize("path", [".git/config", "src/.git/config", ".GIT/config", "src/.GiT/HEAD"])
 def test_git_metadata_is_not_accessible_to_workspace_tools(tmp_path, path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("build echo")
     with pytest.raises(TreeError):
         system.workspace(run_id).write_file(path, "must not write")
-
 
 def test_nonformal_event_cannot_advance_git_version_projection(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
@@ -237,7 +223,6 @@ def test_nonformal_event_cannot_advance_git_version_projection(tmp_path):
         payload={"git_version": {"commit": "unaccepted"}}))
     after = system.project(run_id)
     assert after.git_version == before.git_version and after.git_versions == before.git_versions
-
 
 @pytest.mark.parametrize("command", [" /cancel\r\n", "\n/stop  "])
 @pytest.mark.parametrize("failure", ["git", "material", "input_event", "cancellation_event", "adapter_abort"])
@@ -332,7 +317,6 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
         system.add_input(run_id, "Do not resume stopped work")
     with pytest.raises(RunTerminalError):
         system.add_guidance(run_id, "product", "Do not resume stopped work")
-
 
 @pytest.mark.parametrize("git_fails", [False, True])
 def test_cancel_notifies_model_before_waiting_for_git_storage(tmp_path, monkeypatch, git_fails):

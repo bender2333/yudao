@@ -3,7 +3,7 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.project_queries import ProjectFlow
-from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_decision, product_spec, response_turn, review_turn
+from harness.proposals import collaboration_request, delivery_turn, product_decision, product_spec, response_turn, review_turn
 from harness.runtime import LoopSystem
 
 def _application(system: LoopSystem) -> Application:
@@ -16,7 +16,7 @@ def _application(system: LoopSystem) -> Application:
 ])
 def test_every_consultation_direction_is_visible_and_returns_to_original_work(tmp_path, requester, recipient):
     product = [product_spec()]
-    engineering = [plan_turn(), delivery_turn()]
+    engineering = [delivery_turn()]
     quality = [review_turn("release", "Independent quality checks passed.")]
     prefix = [] if requester == "product" else product if requester == "engineering" else product + engineering
     suffix = product + engineering + quality if requester == "product" else engineering + quality if requester == "engineering" else quality
@@ -75,7 +75,7 @@ def test_projection_keeps_product_decision_and_response_as_separate_accepted_eve
                               request_type="action", action="revise_requirements"),
         product_decision("Dash-prefixed input must be printed as ordinary text.", "This CLI echoes its first argument."),
         response_turn("completed", "The requirement has been published.", result_types=["product_decision_accepted"]),
-        plan_turn(), delivery_turn(), review_turn("release", "Independent quality checks passed."),
+        delivery_turn(), review_turn("release", "Independent quality checks passed."),
     ]))
     run_id = system.create_run("build echo", max_cycles=16)
     assert system.run_until_stop(run_id).phase == "DONE"

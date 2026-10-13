@@ -12,14 +12,13 @@ from harness.adapters.fake import FakeAdapter
 from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.event_store import run_stream
 from harness.models import EventType
-from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
+from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.saved_rewrite import rewrite_saved_event
 
 CONSULTATION_SCRIPT = [
     product_spec(),
-    plan_turn(),
     delivery_turn(),
     # 质检向产品提出咨询，产品回答，质检继续独立放行
     collaboration_request("product", "Unknown flags 应该怎么处理？"),

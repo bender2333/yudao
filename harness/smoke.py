@@ -19,7 +19,7 @@ from .app.project_commands import ProjectCreate
 from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, TARGET_KEYS, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
-from .contracts import current_contract_hash, current_plan_hash
+from .contracts import current_contract_hash
 from .data_directory import default_provider_config
 from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
@@ -575,7 +575,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
         activation = payload.get("activation_id")
         work_basis = {
             "effective_contract_hash": current_contract_hash(current_work),
-            "engineering_plan_hash": current_plan_hash(current_work),
             "request_id": None if current_work.pending_request is None else current_work.pending_request.id,
         }
         if event.type in {EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED}:
@@ -702,7 +701,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     value = basis[field]
                     if field not in payload or payload[field] != value or work_basis[field] != value:
                         raise ValueError(f"{field} does not match the activation and current work")
-            checkpoint_key = (event.department, basis["effective_contract_hash"], basis["engineering_plan_hash"],
+            checkpoint_key = (event.department, basis["effective_contract_hash"],
                               basis["input_version"], basis["prompt_version"], basis["prompt_hash"])
             # 按记录下来的事件由 P 重新装配：调用目标取这次请求事件记录的解析结果，
             # 部门身份、提示词与只能回应指导按激活时的记录，guidance_results 使用装配时已有的事件与记录下来的工作区快照。
@@ -729,7 +728,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 department=event.department, session_id=event.session_id, activation_id=activation,
                 prompt=activation_prompts[activation], guidance_only=activation_guidance_only[activation],
                 effective_contract_hash=basis["effective_contract_hash"],
-                engineering_plan_hash=basis["engineering_plan_hash"], input_version=basis["input_version"],
+                input_version=basis["input_version"],
             )
             before = events[:index]
             # 回放用的调用目标与本次请求事件记录的一致：CONTEXT_ASSEMBLED 事件本身带目标字段，
@@ -1015,7 +1014,6 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
     spec = projection.product_spec
     delivery = projection.delivery_spec
     contract = projection.effective_contract
-    plan = projection.engineering_plan
     for department in ("engineering", "quality"):
         valid = [receipt for receipt in receipts
                  if receipt.get("department") == department and receipt.get("exit_code") == 0
@@ -1023,9 +1021,6 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
                  and receipt.get("snapshot_hash") == snapshot and spec is not None
                  and receipt.get("product_spec_hash") == spec.content_hash
                  and contract is not None and receipt.get("effective_contract_hash") == contract.content_hash
-                 and plan is not None and plan.status == "active"
-                 and plan.effective_contract_hash == contract.content_hash
-                 and receipt.get("engineering_plan_hash") == plan.content_hash
                  and (department != "quality" or delivery is not None
                       and receipt.get("delivery_spec_hash") == delivery.content_hash)]
         if not valid:

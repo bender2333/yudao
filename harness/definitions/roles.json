@@ -33,7 +33,6 @@
       "submit_request",
       "submit_response",
       "submit_guidance_response",
-      "submit_plan",
       "submit_delivery"
     ],
     "visibility": [

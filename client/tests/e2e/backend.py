@@ -47,7 +47,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
 from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
-    baseline_review_turn, collaboration_request, delivery_turn, plan_turn, product_spec, response_turn,
+    baseline_review_turn, collaboration_request, delivery_turn, product_spec, response_turn,
     review_turn, structure_turn,
 )
 from harness.providers.call import ModelResponse  # noqa: E402
@@ -75,13 +75,11 @@ def script():
     # 第一个事项：正常走完一轮三部门（产品 → 工程 → 质检放行），供项目列表与看板显示
     return [
         product_spec(),
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
         # 第二个项目（交付历史）：一轮包含询问与回答、返工、放行与采纳的运行，
         # 供首页与概览的时间轴核对交接、返工、询问与回答、采纳都有关键事实（工单 #180 的验收）
         product_spec(),
-        plan_turn(),
         delivery_turn(),
         # 工程向产品提出询问，产品回答（collaboration_requested / collaboration_responded）
         collaboration_request("product", "How should unknown flags be handled?",
@@ -97,7 +95,6 @@ def script():
         # 质检退回工程（qa_submitted 的结论为 rework_engineering，返工）
         review_turn("rework_engineering", "Missing usage text when no argument is provided.",
                     defects=[{"severity": "major", "summary": "no usage text on empty argv"}]),
-        plan_turn(reason="Address the quality review by adding the missing usage behavior"),
         delivery_turn("added usage text"),
         # 放行（qa_submitted 的结论为 release），随后由项目采纳（deliverable_adopted）
         review_turn("release", "checks passed on the current snapshot"),
@@ -108,13 +105,11 @@ def script():
         # 回答「继续执行」以后再次遇到不可用：发出第二个决定请求，供新的决定请求到达的验收
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
         # 再次回答「继续执行」以后走完剩下的三部门：端到端测试核对一个事项的全过程随事件流完成
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
         # 第四个项目：预置时没有事项。执行槽位空出来以后，端到端测试在界面上提交需求并开始事项，
         # 这四轮让第二个事项的全过程也在浏览器里随事件流走完
         product_spec(),
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ]
@@ -128,7 +123,6 @@ def initial_script():
         read_turn("list-initial", "list_files", {}),
         read_turn("read-initial", "read_file", {"path": "README.md"}),
         product_spec(),
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ]
@@ -173,17 +167,15 @@ def room_script():
     return [
         # 预置的已完成事项：走完一轮，给项目留下一个已完成的事项，部门工作间默认选中它时房间照常渲染
         product_spec(),
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
-        # 端到端测试开始的事项：产品分三段流式请求（思考气泡），工程写计划后向质检发出一次询问
+        # 端到端测试开始的事项：产品分三段流式请求（思考气泡），工程向质检发出一次询问
         # （传信的两端），质检回答，工程交付（交接的两端）、质检放行
         product_stream,
-        # 工单 #319 第 3 项：工程先列出工作区里的文件再写计划，房间事件流里因此有 tool_started
-        # （工具类说明「现在看看有什么文件」）。盖章类的 spec_accepted、plan_accepted、qa_started
+        # 工单 #319 第 3 项：工程先列出工作区里的文件再直接交付，房间事件流里因此有 tool_started
+        # （工具类说明「现在看看有什么文件」）。盖章类的 spec_accepted、qa_started
         # 与 qa_submitted 由这一轮本身产生
         read_turn("list-workspace", "list_files", {}),
-        plan_turn(),
         collaboration_request("quality", "交付前需要确认哪一条验收条件"),
         answer_turn(pending_request_id),
         delivery_turn(),
@@ -225,10 +217,8 @@ def waiting_script():
 def kernel_script():
     # 路径守卫的端到端验收（工单 #354）：预置的事项交付改动了内核清单里的路径，结算因此不采纳，
     # 发出内核修改决定请求；用例在界面上核对卡片给出改动的路径与差异，批准以后交付被采纳。
-    # 工程计划的范围要包含这个路径，写文件的工具才会允许写它
     return [
         product_spec(),
-        plan_turn(scope=["src/", KERNEL_PATH]),
         delivery_turn(summary="implemented echo CLI", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n",
                                                              KERNEL_PATH: "# 交付改动的内核文件\n"}),
         review_turn("release", "checks passed on the current snapshot"),

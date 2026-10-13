@@ -10,14 +10,12 @@ from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import compacted_runner as _runner, list_files_turn
 
-
 def test_model_limits_use_the_call_target_window_and_reserve_half_of_a_narrow_one():
     # 阈值只用本次调用目标的窗口；宽窗口保留 15%，窄窗口最多保留一半给回复
     assert model_limits(32000, 4096) == ModelLimits(32000, 4096, 4800)
     assert model_limits(8000, 4096) == ModelLimits(8000, 4096, 4000)
     assert model_limits(6000, 1000) == ModelLimits(6000, 1000, 1000)
     assert model_limits(32000, None) == ModelLimits(32000, None, 4800)
-
 
 def _rebuild_recorded_steps(system, run_id):
     # 按记录下来的事件逐步重新装配：每个请求与它之前的事件重建的结果一致，每次压缩的检查点与重建的请求加上
@@ -44,7 +42,7 @@ def _rebuild_recorded_steps(system, run_id):
                 department=event.department, session_id=event.session_id, activation_id=payload["activation_id"],
                 prompt=prompt, guidance_only=payload["guidance_only"],
                 effective_contract_hash=payload["effective_contract_hash"],
-                engineering_plan_hash=payload["engineering_plan_hash"], input_version=payload["input_version"],
+                input_version=payload["input_version"],
             )
         elif event.type == EventType.CONTEXT_ASSEMBLED:
             before = events[:index]
@@ -72,13 +70,11 @@ def _rebuild_recorded_steps(system, run_id):
         apply_event(projection, event)
     return counts
 
-
 def test_each_recorded_request_is_rebuilt_from_the_events_before_it(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([list_files_turn, product_spec()]))
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     assert _rebuild_recorded_steps(system, run_id) == {"work": 2, "compaction": 0, "recorded": 0}
-
 
 def test_compaction_requests_and_checkpoints_are_rebuilt_from_recorded_events(tmp_path):
     system, _, run_id, _ = _runner(tmp_path)

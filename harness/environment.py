@@ -158,13 +158,11 @@ class LocalEnvironment:
         # 打开已经建立的工作区（registered_commands 兼容 #484 前的调用方，传入值被忽略）
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec)
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
-                   delivery_spec_hash: str | None, effective_contract_hash: str | None = None,
-                   engineering_plan_hash: str | None = None) -> None:
-        # 这次激活的运行状态身份随检查回执记录，供 U 判断回执是否属于当前有效的合同与计划
+                   delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:
+        # 这次激活的运行状态身份随检查回执记录，供 U 判断回执是否属于当前有效的合同与快照
         self.workspace.bind_check(
             activation_id=activation_id, product_spec_hash=product_spec_hash,
             delivery_spec_hash=delivery_spec_hash, effective_contract_hash=effective_contract_hash,
-            engineering_plan_hash=engineering_plan_hash,
         )
 
     def verify_tree(self, snapshot: WorkspaceSnapshot) -> None:
@@ -582,11 +580,10 @@ class LocalEnvironment:
                 "snapshot_hash": receipt.snapshot_hash,
                 "executor": "host",
                 "tree_changed": receipt.tree_changed,
+                "activation_id": receipt.activation_id,
                 "product_spec_hash": receipt.product_spec_hash,
                 "delivery_spec_hash": receipt.delivery_spec_hash,
-                "activation_id": receipt.activation_id,
                 "effective_contract_hash": receipt.effective_contract_hash,
-                "engineering_plan_hash": receipt.engineering_plan_hash,
             }, finished.status
 
 

@@ -8,7 +8,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
-from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, plan_turn, review_turn
+from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, review_turn
 from harness.providers import ProviderFacade
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
@@ -17,17 +17,14 @@ from harness.tests.helpers import compacted_runner, happy_script, recorded_conte
 from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_event, rewrite_saved_events,
                                          rewrite_saved_projection)
 
-
 # 需要一份真实运行记录的文件：module 作用域的夹具各跑一次完整循环并保存数据目录，
 # 每项测试复制一份数据目录，在自己的副本上改写与检查。数据来自真实运行，这些文件登记为集成层。
 
-
 @pytest.fixture(scope="module")
 def saved_native(tmp_path_factory):
-    # 一次本机流程走完的运行：产品给要求、工程计划与写入、检查、交付、再检查、质检放行
+    # 一次本机流程走完的运行：产品给要求、工程写入、检查、交付、再检查、质检放行
     script = [
         product_spec(),
-        plan_turn(),
         FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         FakeTurn(checks={"smoke": 0}),
         delivery(),
@@ -39,12 +36,10 @@ def saved_native(tmp_path_factory):
     system.close()
     return system.data_dir, projection.run_id
 
-
 @pytest.fixture
 def native_run(saved_native, tmp_path):
     saved, run_id = saved_native
     return system_on_copy(saved, tmp_path / "native"), run_id
-
 
 def test_smoke_requires_current_input_audit_and_host_receipts():
     base = {
@@ -78,7 +73,6 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
             "collaboration": dict(base, collaboration_audit=audit),
         }}) == 1
 
-
 @pytest.fixture(scope="module")
 def saved_collaboration(tmp_path_factory):
     from harness.demo import run_demo
@@ -89,12 +83,10 @@ def saved_collaboration(tmp_path_factory):
     system.close()
     return system.data_dir, run_id, invocations
 
-
 @pytest.fixture
 def collaboration_run(saved_collaboration, tmp_path):
     saved, run_id, _invocations = saved_collaboration
     return system_on_copy(saved, tmp_path / "collaboration"), run_id
-
 
 @pytest.fixture
 def collaboration_invocations(saved_collaboration):
@@ -102,23 +94,21 @@ def collaboration_invocations(saved_collaboration):
     _saved, _run_id, invocations = saved_collaboration
     return invocations
 
-
 def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
     system, run_id = native_run
     summary = summarize_run(system, run_id, scenario="happy")
     assert summary["context_isolated"] is True, summary["context_isolation_notes"]
     assert summary["model_input_audit"]["status"] == "verified"
     assert summary["model_input_audit"]["request_count"] > 3
-    assert summary["model_input_audit"]["activation_count"] == 4
+    assert summary["model_input_audit"]["activation_count"] == 3
     assert summary["check_receipts_verified"] is True, summary["check_receipt_notes"]
     assert summary["delivery_archive"]["status"] == "verified", summary["delivery_archive"]
     assert summary["delivery_archive"]["tree_digest"] == system.project(run_id).delivery_spec.code_tree_digest
     assert summary["git_audit"]["status"] == "verified", summary["git_audit"]
-    assert summary["git_audit"]["version_count"] == 5
+    assert summary["git_audit"]["version_count"] == 4
     assert summary["replay_consistent"] is True
     assert summary["fake_used"] is True
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
-
 
 def test_directory_fake_protocol_is_flagged_and_never_passes_as_real(tmp_path):
     # fake 协议只在测试或演示方式启动的系统中可用（工单 #86）：本用例以测试方式启动，
@@ -142,7 +132,6 @@ def test_directory_fake_protocol_is_flagged_and_never_passes_as_real(tmp_path):
     assert summary["provider_bindings"]["product"]["protocol"] == "fake"
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
 
-
 def test_git_audit_rejects_valid_same_run_commit_with_wrong_accepted_material(native_run):
     system, run_id = native_run
     assert summarize_run(system, run_id, scenario="happy")["git_audit"]["status"] == "verified"
@@ -160,9 +149,8 @@ def test_git_audit_rejects_valid_same_run_commit_with_wrong_accepted_material(na
     rewrite_saved_event(system.store, event)
     assert summarize_run(system, run_id, scenario="happy")["git_audit"]["status"] == "unverified"
 
-
-@pytest.mark.parametrize("changed", ["effective_contract", "engineering_plan"])
-def test_receipt_audit_rejects_new_contract_or_plan_even_with_unchanged_spec_and_tree(native_run, changed):
+@pytest.mark.parametrize("changed", ["effective_contract"])
+def test_receipt_audit_rejects_new_contract_even_with_unchanged_spec_and_tree(native_run, changed):
     system, run_id = native_run
     assert summarize_run(system, run_id, scenario="happy")["check_receipts_verified"] is True
     projection = system.project(run_id)
@@ -176,7 +164,6 @@ def test_receipt_audit_rejects_new_contract_or_plan_even_with_unchanged_spec_and
     assert "engineering: no successful host check bound to the final contract and snapshot" in notes
     assert "quality: no successful host check bound to the final contract and snapshot" in notes
 
-
 def test_archive_audit_restores_from_persisted_bytes_after_workspace_changes(native_run):
     # 交付以后工作区的文件改变：核对仍按封存的内容恢复，所以结果与交付时一致
     system, run_id = native_run
@@ -184,7 +171,6 @@ def test_archive_audit_restores_from_persisted_bytes_after_workspace_changes(nat
     result = summarize_run(system, run_id, scenario="happy")["delivery_archive"]
     assert result["status"] == "verified", result
     assert result["files"] == 1
-
 
 @pytest.mark.parametrize("damage", ["missing", "modified"])
 def test_archive_audit_rejects_missing_or_modified_persisted_bytes(native_run, damage):
@@ -200,7 +186,6 @@ def test_archive_audit_rejects_missing_or_modified_persisted_bytes(native_run, d
     assert result["status"] == "unverified"
     assert result["notes"]
 
-
 def test_archive_audit_rejects_unrelated_delivery_digest(native_run):
     system, run_id = native_run
     assert summarize_run(system, run_id, scenario="happy")["delivery_archive"]["status"] == "verified"
@@ -209,7 +194,6 @@ def test_archive_audit_rejects_unrelated_delivery_digest(native_run):
     rewrite_saved_projection(system.store, run_id, replace(projection, delivery_spec=delivery))
     assert summarize_run(system, run_id, scenario="happy")["delivery_archive"]["status"] == "unverified"
 
-
 def test_collaboration_audit_requires_actual_consultation_and_accepted_action_results(collaboration_run):
     system, run_id = collaboration_run
     audit = summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]
@@ -217,7 +201,6 @@ def test_collaboration_audit_requires_actual_consultation_and_accepted_action_re
     assert audit["pre_spec_consultation"] is True
     assert audit["requirements_action"] is True
     assert audit["directions"] == ["product->engineering", "engineering->product", "quality->engineering"]
-
 
 def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_run, collaboration_invocations):
     system, run_id = collaboration_run
@@ -230,7 +213,6 @@ def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_ru
     assert {manifest.input_version for _department, manifest in manifests} == {1, 2}
     # demo 在事项进行中修改产品部门的部门 Prompt：修改前的请求用内置默认（版本 0），之后用项目设置（版本 1）
     assert {manifest.prompt_version for department, manifest in manifests if department == "product"} == {0, 1}
-
 
 @pytest.mark.parametrize("field", ["input_version", "prompt_version", "prompt_hash"])
 @pytest.mark.parametrize("event_type", [EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED,
@@ -246,7 +228,6 @@ def test_model_input_audit_rejects_forged_adopted_versions(native_run, field, ev
     assert audit["status"] == "unverified", audit
     assert any(field in note for note in audit["notes"])
 
-
 @pytest.mark.parametrize("field", ["text", "byte_start", "byte_end"])
 def test_model_input_audit_rejects_changed_received_original(collaboration_run, field):
     system, run_id = collaboration_run
@@ -258,7 +239,6 @@ def test_model_input_audit_rejects_changed_received_original(collaboration_run, 
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified", audit
     assert any("input bytes or range" in note for note in audit["notes"])
-
 
 def test_model_input_audit_uses_the_project_department_prompt(tmp_path):
     # 部门 Prompt 来自项目部门设置（run 内没有副本）：装配的请求正文用项目设置中的 Prompt，
@@ -276,7 +256,6 @@ def test_model_input_audit_uses_the_project_department_prompt(tmp_path):
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "verified", audit
 
-
 def test_collaboration_audit_rejects_results_from_another_request(collaboration_run):
     system, run_id = collaboration_run
     assert summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]["status"] == "verified"
@@ -290,22 +269,20 @@ def test_collaboration_audit_rejects_results_from_another_request(collaboration_
     assert audit["requirements_action"] is False
     assert any("result is not bound" in note for note in audit["notes"])
 
-
 @pytest.mark.parametrize("event_type", [EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED])
-@pytest.mark.parametrize("field", ["request_id", "effective_contract_hash", "engineering_plan_hash", "all"])
+@pytest.mark.parametrize("field", ["request_id", "effective_contract_hash", "all"])
 def test_model_input_audit_rejects_changed_work_basis(collaboration_run, event_type, field):
     system, run_id = collaboration_run
     events = _saved_events(system, run_id)
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == event_type and item.payload.get("request_id"))
-    fields = ["request_id", "effective_contract_hash", "engineering_plan_hash"] if field == "all" else [field]
+    fields = ["request_id", "effective_contract_hash"] if field == "all" else [field]
     for name in fields:
         event.payload[name] = "wrong-" + name
     rewrite_saved_event(system.store, event)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
     assert any(any(name in note for name in fields) for note in audit["notes"])
-
 
 def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(collaboration_run):
     system, run_id = collaboration_run
@@ -327,7 +304,6 @@ def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(coll
     assert audit["status"] == "unverified"
     assert any("pinned developer input differs" in note for note in audit["notes"])
 
-
 def test_model_input_audit_rejects_forged_injected_source_metadata(native_run):
     system, run_id = native_run
     events = _saved_events(system, run_id)
@@ -338,7 +314,6 @@ def test_model_input_audit_rejects_forged_injected_source_metadata(native_run):
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
     assert any("injected source metadata" in note for note in audit["notes"])
-
 
 def test_model_input_audit_rebuilds_summary_scope_after_contract_changes(tmp_path):
     system, adapter, run_id, _ = compacted_runner(tmp_path)
@@ -352,7 +327,6 @@ def test_model_input_audit_rebuilds_summary_scope_after_contract_changes(tmp_pat
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "verified", audit["notes"]
 
-
 def test_failed_run_without_requests_has_no_context_evidence(tmp_path):
     store = EventStore(tmp_path / "events.sqlite")
     artifacts = ArtifactStore(tmp_path / "artifacts")
@@ -361,11 +335,9 @@ def test_failed_run_without_requests_has_no_context_evidence(tmp_path):
     assert fields["model_input_audit"]["status"] == "unverified"
     assert fields["context_isolated"] is False
 
-
 def _saved_events(system, run_id):
     # 审计读到的必须是事件库中保存的事件；测试改动以后写回事件行，再经公开接口运行审计
     return system.store.list_events(run_id)
-
 
 @pytest.mark.parametrize("field,value", [
     ("request_ref", None), ("activation_id", "foreign-activation"),
@@ -382,7 +354,6 @@ def test_unbound_or_missing_request_cannot_certify_run(native_run, field, value)
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is False
     assert fields["model_input_audit"]["status"] == "unverified"
-
 
 @pytest.mark.parametrize("mutation,expected", [
     ("foreign_history", "department's recorded outputs"), ("extra_tool", "actual tool schemas"),
@@ -414,7 +385,6 @@ def test_actual_inputs_are_checked_even_when_artifact_hash_is_valid(native_run, 
     assert fields["context_isolated"] is False
     assert any(expected in note for note in fields["model_input_audit"]["notes"])
 
-
 def test_tool_history_must_match_recorded_result(native_run):
     system, run_id = native_run
     events = _saved_events(system, run_id)
@@ -425,7 +395,6 @@ def test_tool_history_must_match_recorded_result(native_run):
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is False
     assert any("recorded result" in note for note in fields["model_input_audit"]["notes"])
-
 
 def test_consistently_relabelled_steps_must_still_match_activation_event(native_run):
     system, run_id = native_run
@@ -443,7 +412,6 @@ def test_consistently_relabelled_steps_must_still_match_activation_event(native_
     assert fields["context_isolated"] is False
     assert any("department activation" in note for note in fields["model_input_audit"]["notes"])
 
-
 def test_audit_does_not_replace_missing_run_artifact_with_another_runs_copy(native_run):
     system, run_id = native_run
     event = next(item for item in system.store.list_events(run_id) if item.type == EventType.CONTEXT_ASSEMBLED)
@@ -457,9 +425,8 @@ def test_audit_does_not_replace_missing_run_artifact_with_another_runs_copy(nati
 # 同一个脚本被两项检查共用：请求让出以后回到产品部门，两项检查各在自己的副本上改写与检查
 _PRODUCT_RETURN_SCRIPT = [
     product_spec(), collaboration_request(), response_turn("answered", "The existing requirements do not distinguish flags."),
-    plan_turn(), delivery_turn(), review_turn("release", "host checks passed"),
+delivery_turn(), review_turn("release", "host checks passed"),
 ]
-
 
 @pytest.fixture(scope="module")
 def saved_product_return(tmp_path_factory):
@@ -468,19 +435,16 @@ def saved_product_return(tmp_path_factory):
     system.close()
     return system.data_dir, projection.run_id
 
-
 @pytest.fixture
 def product_return_run(saved_product_return, tmp_path):
     saved, run_id = saved_product_return
     return system_on_copy(saved, tmp_path / "product-return"), run_id
 
-
 def test_audit_preserves_department_history_when_request_returns_to_product(product_return_run):
     system, run_id = product_return_run
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is True, fields["model_input_audit"]["notes"]
-    assert fields["model_input_audit"]["activation_count"] == 6
-
+    assert fields["model_input_audit"]["activation_count"] == 5
 
 def test_audit_rejects_missing_new_work_message_after_product_reactivation(product_return_run):
     system, run_id = product_return_run
@@ -505,7 +469,6 @@ def test_audit_rejects_missing_new_work_message_after_product_reactivation(produ
     assert fields["context_isolated"] is False
     assert any("department's recorded outputs" in note for note in fields["model_input_audit"]["notes"])
 
-
 @pytest.fixture(scope="module")
 def saved_compacted(tmp_path_factory):
     # 上下文窗口只有 6000 的运行：压缩以后继续工程工作，保存到第一次压缩之后
@@ -516,19 +479,16 @@ def saved_compacted(tmp_path_factory):
     system.close()
     return system.data_dir, run_id
 
-
 @pytest.fixture
 def compacted_run(saved_compacted, tmp_path):
     saved, run_id = saved_compacted
     return system_on_copy(saved, tmp_path / "compacted"), run_id
-
 
 def test_compaction_audit_checks_partial_sources_and_resumed_input(compacted_run):
     system, run_id = compacted_run
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is True, fields["model_input_audit"]["notes"]
     assert fields["model_input_audit"]["compaction_count"] > 1
-
 
 @pytest.mark.parametrize("mutation,expected", [
     ("source_ref", "recorded compaction plan"), ("coverage", "checkpoint coverage"),
@@ -568,7 +528,6 @@ def test_compaction_audit_rejects_invented_sources_summary_or_visible_history(co
     assert fields["context_isolated"] is False
     assert any(expected in note for note in fields["model_input_audit"]["notes"])
 
-
 def test_unmatched_host_receipt_does_not_pass(native_run):
     system, run_id = native_run
     assert summarize_run(system, run_id, scenario="happy")["check_receipts_verified"] is True
@@ -578,7 +537,6 @@ def test_unmatched_host_receipt_does_not_pass(native_run):
     summary = summarize_run(system, run_id, scenario="happy")
     assert summary["check_receipts_verified"] is False
     assert any("no matching host execution" in note for note in summary["check_receipt_notes"])
-
 
 def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path):
     (tmp_path / "smoke-report.json").write_text(json.dumps({"scenarios": {"old": {"phase": "DONE"}}}), encoding="utf-8")
@@ -595,7 +553,6 @@ def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path):
     report = run_smoke(tmp_path, provider_config=config)
     assert report["available"] is False
     assert report["scenarios"] == {}
-
 
 def test_smoke_markdown_reports_model_input_audit(tmp_path):
     # smoke 报告的 Markdown 写出每个场景的模型输入核对、请求数、上下文隔离与检查回执的结论。
@@ -619,7 +576,6 @@ def test_smoke_markdown_reports_model_input_audit(tmp_path):
     assert f"context isolated: `{scenario['context_isolated']}`" in text
     assert f"host receipts verified: `{scenario['check_receipts_verified']}`" in text
     assert "omp" not in text.lower()
-
 
 def test_smoke_reads_the_catalog_in_its_data_directory(tmp_path):
     # 没有明确给目录文件时 smoke 在自己的数据目录内读取（设计说明第 3.4 节）：

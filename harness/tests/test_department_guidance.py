@@ -10,35 +10,29 @@ from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace
 from harness.models import EventType
 from harness.proposals import (
-    collaboration_request, delivery_turn, engineering_plan, guidance_response, plan_turn,
+    collaboration_request, delivery_turn, guidance_response,
     product_spec, response_turn, review_turn,
 )
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import recorded_context
 
-
 def _guidance_id(request):
     return json.loads(prompt_part(request, "department_guidance"))[0]["id"]
-
 
 def _tool_names(request):
     return [item["name"] for item in request.tools]
 
-
 def _guidance_only(system, request):
     return recorded_context(system, request).manifest.guidance_only
-
 
 def _last_activation(system, run_id):
     return next(event for event in reversed(system.store.list_events(run_id))
                 if event.type == EventType.DEPARTMENT_ACTIVATED)
 
-
 def _guidance_results(request):
     part = prompt_part(request, "guidance_results")
     return [] if part is None else json.loads(part)
-
 
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
     adapter = FakeAdapter([product_spec()])
@@ -72,12 +66,10 @@ def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_pa
         project_id=project_id, department="product", work_item=work_item_id))
     assert not any(message.get("text") == guidance.text for message in product.data.messages)
 
-
 def test_guidance_for_previous_department_gets_a_read_only_activation_before_release(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    adapter = FakeAdapter([product_spec(),delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
     assert system.project(run_id).phase == "QUALITY"
@@ -95,7 +87,6 @@ def test_guidance_for_previous_department_gets_a_read_only_activation_before_rel
     assert _tool_names(request) == [
         "read_file", "list_files", "run_check", "submit_request", "submit_guidance_response",
     ]
-
 
 def test_guidance_received_during_model_request_invalidates_old_submission(tmp_path):
     holder = {}
@@ -115,7 +106,6 @@ def test_guidance_received_during_model_request_invalidates_old_submission(tmp_p
     assert not any(event.type == EventType.SPEC_ACCEPTED for event in system.store.list_events(run_id))
     assert any(event.type == EventType.PROPOSAL_SUBMITTED for event in system.store.list_events(run_id)) is False
 
-
 def test_guidance_command_returns_persisted_target_record(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
     project_id = system.projects.register("指导", "把文本按行处理清楚")
@@ -129,7 +119,6 @@ def test_guidance_command_returns_persisted_target_record(data_dir):
         workspace = application.query("department.workspace", DepartmentWorkspace(
             project_id=project_id, department="quality", work_item=work_item_id))
         assert workspace.data.guidance[0].text == "请记录当前验收边界。"
-
 
 def test_guidance_not_completed_by_activation_or_rejection(tmp_path):
     adapter = FakeAdapter([product_spec(goal="   ")])
@@ -147,7 +136,6 @@ def test_guidance_not_completed_by_activation_or_rejection(tmp_path):
     assert any(event.type == EventType.PROPOSAL_REJECTED for event in system.store.list_events(run_id))
     assert any(event.type == EventType.CONTEXT_ASSEMBLED for event in system.store.list_events(run_id))
     assert any(event.type == EventType.ACTIVATION_FINISHED for event in system.store.list_events(run_id))
-
 
 @pytest.mark.parametrize("text", ["", "   ", "\n\t"])
 @pytest.mark.parametrize("status", ["explained", "completed", "declined", "needs_work"])
@@ -167,7 +155,6 @@ def test_guidance_completed_requires_nonempty_response_text(tmp_path, text, stat
     assert any(error["field"] == "text" for error in result.rejections[-1]["errors"])
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))
-
 
 def test_guidance_response_binds_that_guidance_id(tmp_path):
     adapter = FakeAdapter([product_spec()])
@@ -193,12 +180,10 @@ def test_guidance_response_binds_that_guidance_id(tmp_path):
                      if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
     assert responded.payload["guidance_id"] == done.department_guidance[0].id
 
-
 def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn()])
+    adapter = FakeAdapter([product_spec(),])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     assert system.project(run_id).phase == "ENGINEERING"
 
@@ -217,22 +202,20 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     yielded = _last_activation(system, run_id).payload["yielded_work"]
     assert yielded["phase"] == "ENGINEERING"
     assert yielded["effective_contract_hash"] == result.effective_contract.content_hash
-    assert yielded["engineering_plan_hash"] == result.engineering_plan.content_hash
+    assert "engineering_plan_hash" not in yielded
     assert result.department_guidance[0].status == "explained"
     assert result.phase == "ENGINEERING"
 
-    adapter.script.append(plan_turn(reason="Continue engineering after product guidance."))
+    adapter.script.append(delivery_turn())
     resumed = system.activate_once(run_id)
     assert adapter.invocations[-1].department == "engineering"
-    assert resumed.phase == "ENGINEERING"
-    assert resumed.active_department == "engineering"
-
+    assert resumed.phase == "QUALITY"
+    assert resumed.delivery_spec is not None
 
 def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    adapter = FakeAdapter([product_spec(),delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
     before = system.project(run_id)
@@ -253,7 +236,6 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     first_yield = {
         "phase": "QUALITY",
         "effective_contract_hash": before.effective_contract.content_hash,
-        "engineering_plan_hash": before.engineering_plan.content_hash,
         "delivery_spec_hash": old_delivery,
     }
     revised = system.activate_once(run_id)
@@ -284,19 +266,16 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     assert resume.payload["yielded_work"] == first_yield
     assert responded.yielded_work is None
 
-    adapter.script.append(plan_turn(reason="Rebuild after product guidance changed the contract."))
+    adapter.script.append(delivery_turn())
     next_work = system.activate_once(run_id)
-    assert next_work.phase == "ENGINEERING"
-    assert next_work.active_department == "engineering"
+    assert next_work.phase == "QUALITY"
     assert adapter.invocations[-1].department == "engineering"
-    assert next_work.delivery_spec is None
-
+    assert next_work.delivery_spec is not None
 
 def test_guidance_only_engineering_can_request_product(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    adapter = FakeAdapter([product_spec(),delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
     assert system.project(run_id).phase == "QUALITY"
@@ -320,12 +299,10 @@ def test_guidance_only_engineering_can_request_product(tmp_path):
     assert result.pending_request.recipient == "product"
     assert result.department_guidance[0].status in {"received", "in_input"}
 
-
 def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    adapter = FakeAdapter([product_spec(),delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
     original = system.workspace(run_id).read_file("src/echo.py")
@@ -353,7 +330,6 @@ def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
     assert system.workspace(run_id).read_file("src/echo.py") == original
     assert result.phase == "QUALITY"
 
-
 def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
     holder = {}
 
@@ -378,12 +354,10 @@ def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))
 
-
 def test_qa_release_blocked_until_guidance_response(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    adapter = FakeAdapter([product_spec(),delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
     assert system.project(run_id).phase == "QUALITY"
@@ -408,12 +382,10 @@ def test_qa_release_blocked_until_guidance_response(tmp_path):
     assert done.phase == "DONE"
     assert done.last_review.verdict == "release"
 
-
 def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    adapter = FakeAdapter([product_spec(),delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
     assert system.project(run_id).phase == "QUALITY"
@@ -444,13 +416,12 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     assert _guidance_only(system, adapter.invocations[-1]) is True
     assert not any(event.type == EventType.RUN_DONE for event in system.store.list_events(run_id))
 
-    adapter.script.append(plan_turn(reason="Fix empty-input handling after QA rework."))
+    adapter.script.append(delivery_turn())
     next_work = system.activate_once(run_id)
-    assert next_work.phase == "ENGINEERING"
-    assert next_work.active_department == "engineering"
+    assert next_work.phase == "QUALITY"
     assert adapter.invocations[-1].department == "engineering"
+    assert next_work.delivery_spec is not None
     assert next_work.last_review.verdict == "rework_engineering"
-
 
 def test_open_collaboration_blocks_cross_department_guidance_schedule(tmp_path):
     adapter = FakeAdapter([collaboration_request("engineering")])
@@ -472,7 +443,6 @@ def test_open_collaboration_blocks_cross_department_guidance_schedule(tmp_path):
     assert result.pending_request is None
     assert result.responses[-1].status == "answered"
 
-
 def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -489,12 +459,10 @@ def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
     assert responded.payload["status"] == "explained"
     assert responded.payload["result_event_ids"] == []
 
-
 def test_engineering_write_then_completed_without_tool_id_is_host_bound(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn()])
+    adapter = FakeAdapter([product_spec(),])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     assert system.project(run_id).phase == "ENGINEERING"
 
@@ -516,7 +484,6 @@ def test_engineering_write_then_completed_without_tool_id_is_host_bound(tmp_path
                      if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
     assert write.event_id in responded.payload["result_event_ids"]
 
-
 def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
     holder = {}
 
@@ -533,11 +500,10 @@ def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
             result_event_ids=[write.event_id],
         ))
 
-    adapter = FakeAdapter([product_spec(), plan_turn()])
+    adapter = FakeAdapter([product_spec(),])
     system = LoopSystem.for_testing(tmp_path, adapter)
     holder["system"] = system
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请修改错误输出处理。")
     adapter.script.append(FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}))
@@ -550,12 +516,10 @@ def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
     assert write.type == EventType.TOOL_CALLED and write.payload["name"] == "write_file"
     assert write.payload["ok"] is True
 
-
 def test_write_then_later_empty_completed_still_binds_tool_id(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn()])
+    adapter = FakeAdapter([product_spec(),])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请修改错误输出处理。")
     adapter.script.append(lambda request: FakeTurn(
@@ -577,7 +541,6 @@ def test_write_then_later_empty_completed_still_binds_tool_id(tmp_path):
     responded = next(event for event in system.store.list_events(run_id)
                      if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
     assert write.event_id in responded.payload["result_event_ids"]
-
 
 @pytest.mark.parametrize("result_event_ids", [["unknown-event-id"], None])
 def test_guidance_completed_rejects_unknown_or_cross_run_result_ids(tmp_path, result_event_ids):
@@ -601,7 +564,6 @@ def test_guidance_completed_rejects_unknown_or_cross_run_result_ids(tmp_path, re
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))
 
-
 def test_guidance_completed_rejects_proposal_rejected_as_result(tmp_path):
     adapter = FakeAdapter([])
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -622,13 +584,11 @@ def test_guidance_completed_rejects_proposal_rejected_as_result(tmp_path):
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))
 
-
 @pytest.mark.parametrize("kind", ["delivery", "check"])
 def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_path, kind):
-    adapter = FakeAdapter([product_spec(), plan_turn(), delivery_turn()])
+    adapter = FakeAdapter([product_spec(),delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.activate_once(run_id)
     before = system.project(run_id)
@@ -677,12 +637,10 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
         for event in system.store.list_events(run_id)
     )
 
-
 def test_completed_without_host_action_after_guidance_is_rejected(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn()])
+    adapter = FakeAdapter([product_spec(),])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请创建 src/guidance-proof.txt，内容为 VERIFIED。")
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
@@ -704,19 +662,16 @@ def test_completed_without_host_action_after_guidance_is_rejected(tmp_path):
         for event in system.store.list_events(run_id)
     )
 
-
 def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
     adapter = FakeAdapter([
         product_spec(),
-        plan_turn(),
         FakeTurn(
             writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-            proposal=engineering_plan(reason="Continue after writing the current echo CLI."),
+            proposal=guidance_response("guidance-not-yet", text=""),
         ),
     ])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     written = system.activate_once(run_id)
     assert written.phase == "ENGINEERING", written.stop_reason
@@ -742,7 +697,6 @@ def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))
 
-
 def test_explained_without_tools_is_recorded_as_explained(tmp_path):
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -762,12 +716,10 @@ def test_explained_without_tools_is_recorded_as_explained(tmp_path):
     assert responded.payload["status"] == "explained"
     assert responded.payload["result_event_ids"] == []
 
-
 def test_one_write_cannot_complete_two_guidance_items(tmp_path):
-    adapter = FakeAdapter([product_spec(), plan_turn()])
+    adapter = FakeAdapter([product_spec(),])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
-    system.activate_once(run_id)
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请创建 src/guidance-a.txt，内容为 A。")
     system.add_guidance(run_id, "engineering", "请创建 src/guidance-b.txt，内容为 B。")
@@ -802,6 +754,4 @@ def test_one_write_cannot_complete_two_guidance_items(tmp_path):
         if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
         and event.payload.get("guidance_id") == first_item.id
     )
-
-
 

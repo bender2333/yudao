@@ -16,11 +16,10 @@ from openai import DEFAULT_CONNECTION_LIMITS
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade, ResponsesConfig
-from harness.proposals import collaboration_request, collaboration_response, delivery, engineering_plan, product_spec, review
+from harness.proposals import collaboration_request, collaboration_response, delivery, product_spec, review
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
 from harness.tests.protocol_helpers import preset_base_urls
-
 
 @dataclass(frozen=True)
 class _Reply:
@@ -29,15 +28,12 @@ class _Reply:
     content_type: str = "text/event-stream"
     headers: dict[str, str] | None = None
 
-
 Responder = Callable[[dict[str, Any], int], _Reply]
 MILLISECOND_RETRIES = StepLimits(retry_initial_delay_sec=0.001, retry_max_delay_sec=0.001)
-
 
 def _event(kind: str, **payload: Any) -> bytes:
     body = {"type": kind, **payload}
     return f"event: {kind}\ndata: {json.dumps(body)}\n\n".encode()
-
 
 def _stream(output: list[dict[str, Any]], *, response_id: str, model: str, usage: bool = True) -> _Reply:
     raw_usage = (
@@ -74,7 +70,6 @@ def _stream(output: list[dict[str, Any]], *, response_id: str, model: str, usage
     frames.append(_event("response.completed", response=response, sequence_number=len(frames)))
     return _Reply(b"".join(frames))
 
-
 def _chat_stream(calls: list[dict[str, Any]], *, response_id: str, model: str) -> _Reply:
     # Chat Completions 流：每个工具调用一个增量块，随后是结束块与用量块
     def chunk(choices: list[dict[str, Any]], **extra: Any) -> bytes:
@@ -93,7 +88,6 @@ def _chat_stream(calls: list[dict[str, Any]], *, response_id: str, model: str) -
     frames.append(chunk([], usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}))
     frames.append(b"data: [DONE]\n\n")
     return _Reply(b"".join(frames))
-
 
 def _messages_stream(calls: list[dict[str, Any]], *, message_id: str, model: str, text: str = "") -> _Reply:
     # Anthropic Messages 流：文本块与 tool_use 块依次开始、增量、结束
@@ -116,14 +110,12 @@ def _messages_stream(calls: list[dict[str, Any]], *, message_id: str, model: str
     frames.append(_event("message_stop"))
     return _Reply(b"".join(frames))
 
-
 def _error(status: int = 500) -> _Reply:
     return _Reply(
         b'{"error":{"code":"server_error","message":"transient"}}',
         status=status,
         content_type="application/json",
     )
-
 
 def _call(call_id: str, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -135,7 +127,6 @@ def _call(call_id: str, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         "status": "completed",
     }
 
-
 def _message(message_id: str, text: str) -> dict[str, Any]:
     return {
         "id": message_id,
@@ -144,7 +135,6 @@ def _message(message_id: str, text: str) -> dict[str, Any]:
         "status": "completed",
         "content": [{"type": "output_text", "text": text, "annotations": []}],
     }
-
 
 @contextmanager
 def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[tuple[ResponsesConfig, list[dict[str, Any]], list[BaseException]]]:
@@ -205,7 +195,6 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
         server.server_close()
         worker.join(timeout=2)
 
-
 def _connections_kept_alive(captures: list[dict[str, Any]]) -> list[tuple[int, int]]:
     # Responses 的连接池使用 SDK 的默认连接限制（DEFAULT_CONNECTION_LIMITS），空闲超过保持时限的连接关闭。
     # 相邻两次请求之间，服务端开始送出回复到收到下一次请求的时间不短于客户端连接的空闲时间；这段时间短于
@@ -214,7 +203,6 @@ def _connections_kept_alive(captures: list[dict[str, Any]]) -> list[tuple[int, i
     return [(earlier["client_port"], later["client_port"])
             for earlier, later in zip(captures, captures[1:])
             if 0 <= later["arrived"] - earlier["replied"] < keepalive]
-
 
 def _part(body: dict[str, Any], name: str) -> str | None:
     # Work requests open with the pinned department material; tool-less compaction requests
@@ -226,23 +214,19 @@ def _part(body: dict[str, Any], name: str) -> str | None:
     value = content.split(marker, 1)[1]
     return value.split("\n\n[", 1)[0]
 
-
 def _department(body: dict[str, Any]) -> str:
     raw = _part(body, "binding_refs")
     assert raw is not None
     return json.loads(raw)["department"]
 
-
 def _pending_request_id(body: dict[str, Any]) -> str | None:
     raw = _part(body, "pending_request")
     return None if raw is None else json.loads(raw)["id"]
-
 
 def _contract_hash(body: dict[str, Any]) -> str:
     raw = _part(body, "current_contract")
     assert raw is not None
     return json.loads(raw)["content_hash"]
-
 
 def _facade(
     product_url: str,
@@ -295,18 +279,15 @@ def _facade(
             facade.record_admission(provider_id, model_id, admitted_model=entry["model"])
     return facade
 
-
 def _credentials(product: str = "provider-a-key-v1") -> dict[str, CredentialMaterial]:
     return {
         "credential-a": CredentialMaterial(product, version="a-v1"),
         "credential-b": CredentialMaterial("provider-b-key-v1", version="b-v1"),
     }
 
-
 def _public_run_data(system: LoopSystem, run_id: str) -> str:
     events = [event.__dict__ for event in system.store.list_events(run_id)]
     return json_dumps({"projection": system.project(run_id), "events": events})
-
 
 def test_http_provider_bindings_route_full_consultation_and_engineering_rework(tmp_path):
     counts = {"product": 0, "engineering": 0, "quality": 0}
@@ -360,12 +341,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
             payload.pop("kind")
             return _stream([_call("engineering-consultation", "submit_request", payload)],
                            response_id="b-consultation", model="b-engineering-actual")
-        if counts[department] == 2:
-            payload = engineering_plan()
-            payload.pop("kind")
-            return _stream([_call("engineering-plan", "submit_plan", payload)],
-                           response_id="b-plan", model="b-engineering-actual")
-        content = delivery_file if counts[department] == 3 else repaired_file
+        content = delivery_file if counts[department] == 2 else repaired_file
         payload = delivery(files=["src/echo.py"], check_names=["smoke"])
         payload.pop("kind")
         calls = [
@@ -393,15 +369,15 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert result.phase == "DONE", result.error
         assert result.rework_count == 1
         assert result.requests[-1].status == "answered"
-        assert counts == {"product": 2, "engineering": 4, "quality": 2}
+        assert counts == {"product": 2, "engineering": 3, "quality": 2}
         assert [item["path"] for item in captures_a] == ["/v1/responses"] * len(captures_a)
         assert [item["path"] for item in captures_b] == ["/v1/responses"] * len(captures_b)
         assert [_department(item["body"]) for item in captures_a] == ["product", "product", "quality", "quality"]
-        assert [_department(item["body"]) for item in captures_b] == ["engineering"] * 4
+        assert [_department(item["body"]) for item in captures_b] == ["engineering"] * 3
         assert all(item["authorization"] == "Bearer provider-a-key-v1" for item in captures_a)
         assert all(item["authorization"] == "Bearer provider-b-key-v1" for item in captures_b)
         assert [item["body"]["model"] for item in captures_a] == ["a-product", "a-product", "a-quality", "a-quality"]
-        assert [item["body"]["model"] for item in captures_b] == ["b-engineering"] * 4
+        assert [item["body"]["model"] for item in captures_b] == ["b-engineering"] * 3
         timeline = [(item["client_port"], round(item["arrived"], 2), round(item["replied"], 2))
                     for item in captures_a + captures_b]
         kept_alive = _connections_kept_alive(captures_a) + _connections_kept_alive(captures_b)
@@ -417,7 +393,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert [(item["provider_config_id"], item["requested_model"]) for item in requests] == [
             ("provider-a", "a-product"), ("provider-b", "b-engineering"),
             ("provider-a", "a-product"), ("provider-b", "b-engineering"),
-            ("provider-b", "b-engineering"), ("provider-a", "a-quality"),
+            ("provider-a", "a-quality"),
             ("provider-b", "b-engineering"), ("provider-a", "a-quality"),
         ]
         assert all(item["actual_model"] for item in requests)
@@ -445,7 +421,6 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert audit["replay_consistent"] is True
         assert audit["fake_used"] is False
         assert audit["collaboration_audit"]["status"] == "verified", audit["collaboration_audit"]
-
 
 def test_each_run_resolves_credentials_from_its_own_source(tmp_path):
     def product_response(body: dict[str, Any], count: int) -> _Reply:
@@ -489,7 +464,6 @@ def test_each_run_resolves_credentials_from_its_own_source(tmp_path):
         public = _public_run_data(original, first_run) + _public_run_data(updated, second_run)
         assert "provider-a-key-v1" not in public
         assert "provider-b-key-v2" not in public
-
 
 def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
     # 两个运行共用 Provider 适配器：要取消的运行的请求一直保持，另一个运行在这期间完成激活；
@@ -543,7 +517,6 @@ def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
         assert all(item["body"]["model"] == "a-product" for item in captures_a)
         assert system.project(other_run).phase == "ENGINEERING"
 
-
 def test_restart_resolves_the_current_credentials_for_the_next_request(tmp_path):
     # 上游拒绝凭据（HTTP 401）：请求带着重启后解析出的 Key 发出，运行进入待恢复，不因「凭据已不在本进程」结束
     def rejecting(_body: dict[str, Any], _count: int) -> _Reply:
@@ -581,7 +554,6 @@ def test_restart_resolves_the_current_credentials_for_the_next_request(tmp_path)
         public = _public_run_data(restarted, run_id)
         for secret in ("provider-a-key", "provider-a-new-key", "provider-b-new-key"):
             assert secret not in public
-
 
 def test_retry_stays_on_the_bound_provider_and_model(tmp_path):
     def retrying(body: dict[str, Any], count: int) -> _Reply:
@@ -625,7 +597,6 @@ def test_retry_stays_on_the_bound_provider_and_model(tmp_path):
             assert "authorization" not in json_dumps(persisted).casefold()
             assert "provider-a-key" not in json_dumps(persisted)
 
-
 def test_missing_returned_model_remains_unknown_in_request_trace(tmp_path):
     def without_model(body: dict[str, Any], _count: int) -> _Reply:
         assert _department(body) == "product"
@@ -649,7 +620,6 @@ def test_missing_returned_model_remains_unknown_in_request_trace(tmp_path):
         assert result.model_requests[0]["requested_model"] == "a-product"
         assert result.model_requests[0]["actual_model"] is None
         assert result.actual_model is None
-
 
 def test_terminal_returned_models_are_recorded_for_unreported_multi_step_work(tmp_path):
     def unreported(body: dict[str, Any], count: int) -> _Reply:
@@ -690,7 +660,6 @@ def test_terminal_returned_models_are_recorded_for_unreported_multi_step_work(tm
         assert result.actual_model == "a-product-actual-3"
         assert result.token_used == 0
 
-
 def test_failed_http_attempt_keeps_requested_identity_without_actual_model(tmp_path):
     def always_fails(body: dict[str, Any], _count: int) -> _Reply:
         assert _department(body) == "product"
@@ -719,7 +688,6 @@ def test_failed_http_attempt_keeps_requested_identity_without_actual_model(tmp_p
         assert len(failures) == 3
         assert all(event.provider == "provider-a" and event.model is None for event in failures)
         assert all(event.payload["requested_model"] == "a-product" for event in failures)
-
 
 def test_cancelled_http_request_keeps_bound_identity_without_a_response(tmp_path):
     entered = Event()
@@ -757,7 +725,6 @@ def test_cancelled_http_request_keeps_bound_identity_without_a_response(tmp_path
         assert not any(event.type == EventType.MODEL_MESSAGE for event in events)
         public = _public_run_data(system, run_id)
         assert "provider-a-key" not in public and "provider-b-key" not in public
-
 
 def test_small_bound_model_uses_its_own_compaction_request(tmp_path):
     state = {"read": False, "compactions": 0}
@@ -820,10 +787,8 @@ def test_small_bound_model_uses_its_own_compaction_request(tmp_path):
         assert audit["context_isolated"] is True
         assert audit["replay_consistent"] is True
 
-
 _MIXED_SECRETS = {"credential-p": "secret-messages-p", "credential-e": "secret-chat-e",
                   "credential-q": "secret-responses-q"}
-
 
 def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: str) -> ProviderFacade:
     # 三个部门各绑一条协议：产品 Messages（小窗口触发压缩）、工程 Chat Completions、质检 Responses
@@ -864,7 +829,6 @@ def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: 
         facade.record_admission(provider_id, model_id, admitted_model=model)
     return facade
 
-
 def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_department(tmp_path):
     state = {"read": False}
 
@@ -884,15 +848,10 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
                                 message_id="p-spec", model="p-model-actual")
 
     def engineering(body: dict[str, Any], count: int) -> _Reply:
-        # 第一次请求临时失败，重试后提交计划，下一次激活交付
+        # 第一次请求临时失败，重试以后直接交付
         assert body["model"] == "e-model"
         if count == 1:
             return _error()
-        if count == 2:
-            payload = engineering_plan()
-            payload.pop("kind")
-            return _chat_stream([_call("engineering-plan", "submit_plan", payload)],
-                                response_id="e-plan", model="e-model-actual")
         payload = delivery(files=["src/echo.py"], check_names=["smoke"])
         payload.pop("kind")
         return _chat_stream([
@@ -968,11 +927,11 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
     delivery_messages = captures_e[-1]["body"]["messages"]
     assert all(message.get("content") != "" for message in delivery_messages)
     call_index = next(index for index, message in enumerate(delivery_messages) if message.get("tool_calls"))
-    assert [call["id"] for call in delivery_messages[call_index]["tool_calls"]] == ["engineering-plan"]
+    assert [call["id"] for call in delivery_messages[call_index]["tool_calls"]] == ["engineering-delivery"]
     assert delivery_messages[call_index + 1] == {**delivery_messages[call_index + 1],
-                                                 "role": "tool", "tool_call_id": "engineering-plan"}
+                                                 "role": "tool", "tool_call_id": "engineering-delivery"}
     assert [message["tool_call_id"] for message in delivery_messages if message["role"] == "tool"] == [
-        "engineering-plan"]
+        "engineering-delivery"]
 
     # 会话身份：同部门跨激活、重试与压缩不变；部门之间、任务之间互相隔离
     def run_sessions(target_run: str) -> dict[str, str]:

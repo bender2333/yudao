@@ -82,7 +82,6 @@ class TreeFacts(BaseModel):
         delivery_spec_hash: str | None = None,
         activation_id: str | None = None,
         effective_contract_hash: str | None = None,
-        engineering_plan_hash: str | None = None,
     ) -> CheckReceipt | None:
         found = [
             item
@@ -98,8 +97,6 @@ class TreeFacts(BaseModel):
             found = [item for item in found if item.activation_id == activation_id]
         if effective_contract_hash is not None:
             found = [item for item in found if item.effective_contract_hash == effective_contract_hash]
-        if engineering_plan_hash is not None:
-            found = [item for item in found if item.engineering_plan_hash == engineering_plan_hash]
         return found[-1] if found else None
 
 

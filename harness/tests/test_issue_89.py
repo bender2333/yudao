@@ -58,24 +58,18 @@ def _phase(body: dict[str, Any]) -> str:
     return match.group(1) if match else ""
 
 def _proposal_reply(*, response_id: str, model: str, payload: dict[str, Any]) -> tuple[int, str, list[bytes]]:
-    from harness.proposals import engineering_plan, product_spec
-    kind = payload["kind"]
-    value = product_spec() if kind == "product_spec" else engineering_plan()
+    from harness.proposals import product_spec
+    value = product_spec()
     value.pop("kind")
-    name = "submit_product_spec" if kind == "product_spec" else "submit_plan"
-    item = {"id": f"call-{response_id}", "type": "function_call", "name": name, "call_id": f"call-{response_id}",
+    item = {"id": f"call-{response_id}", "type": "function_call", "name": "submit_product_spec", "call_id": f"call-{response_id}",
             "arguments": json.dumps(value, ensure_ascii=False), "status": "completed"}
     return 200, "text/event-stream", [_reply([item], response_id=response_id, model=model)]
 
 def _department_aware(model: str):
-    # 产品部门先提交产品要求，工程部门再提交一次工程计划，之后返回不带工具调用的回答让运行停下来
-    state = {"plan": 0}
+    # 产品部门先提交产品要求，之后返回不带工具调用的回答让运行停在工程进行中
     def responder(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
         if _phase(body) != "ENGINEERING":
             return _proposal_reply(response_id="spec", model=model, payload={"kind": "product_spec"})
-        if state["plan"] == 0:
-            state["plan"] += 1
-            return _proposal_reply(response_id="plan", model=model, payload={"kind": "engineering_plan"})
         return _text_reply(response_id="idle", model=model, text="waiting")
     return responder
 

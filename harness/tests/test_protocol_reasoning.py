@@ -201,9 +201,9 @@ def test_responses_reasoning_item_is_saved_and_replayed_on_the_same_model(tmp_pa
     replayed = [item for item in requests[1]["input"] if item.get("type") == "reasoning"]
     assert replayed and replayed[0]["encrypted_content"] == "CIPHER-1"
 
-def _plan_arguments() -> str:
-    from harness.proposals import engineering_plan
-    return json_dumps({key: value for key, value in engineering_plan().items() if key != "kind"})
+def _delivery_arguments() -> str:
+    from harness.proposals import delivery
+    return json_dumps({key: value for key, value in delivery().items() if key != "kind"})
 
 def _phase(body: dict) -> str:
     parts: list[str] = []
@@ -229,8 +229,8 @@ def _department_responses_body(body: dict, model: str) -> str:
     def event(kind: str, payload: dict) -> str:
         return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload}, ensure_ascii=False)}\n\n"
     if _phase(body) == "ENGINEERING":
-        items = _reasoning_call_item("eng-plan", "submit_plan", _plan_arguments())
-        response_id = "resp-plan"
+        items = _reasoning_call_item("eng-delivery", "submit_delivery", _delivery_arguments())
+        response_id = "resp-delivery"
     elif _has_department_history_pair(body):
         items = _reasoning_call_item("product-spec", "submit_product_spec", _spec_arguments())
         response_id = "resp-spec"

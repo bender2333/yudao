@@ -12295,13 +12295,6 @@
             "type": "array",
             "title": "Contracts"
           },
-          "plans": {
-            "items": {
-              "$ref": "#/components/schemas/VersionEntry"
-            },
-            "type": "array",
-            "title": "Plans"
-          },
           "deliveries": {
             "items": {
               "$ref": "#/components/schemas/VersionEntry"
@@ -12344,7 +12337,6 @@
           "work_item_id",
           "run_id",
           "contracts",
-          "plans",
           "deliveries",
           "reviews",
           "inputs",
@@ -12817,17 +12809,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -12984,7 +12965,6 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "attempt_id",
           "logical_call_id",
@@ -14714,17 +14694,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "snapshot_hash": {
             "title": "Snapshot Hash",
             "type": "string"
@@ -14741,7 +14710,6 @@
           "name",
           "product_spec_hash",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "snapshot_hash",
           "summary"
         ],
@@ -14765,17 +14733,6 @@
               }
             ],
             "title": "Effective Contract Hash"
-          },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
           },
           "delivery_spec_hash": {
             "anyOf": [
@@ -14808,7 +14765,6 @@
         "required": [
           "intend_hash",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "delivery_spec_hash",
           "phase"
         ],
@@ -16107,17 +16063,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -16243,7 +16188,6 @@
           "default_reasoning_level",
           "reasoning_mode",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "input_version",
           "prompt_version",
@@ -16654,17 +16598,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -16893,7 +16826,6 @@
           "default_reasoning_level",
           "reasoning_mode",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "input_version",
           "prompt_version",
@@ -18241,10 +18173,6 @@
             "title": "Effective Contract Hash",
             "type": "string"
           },
-          "engineering_plan_hash": {
-            "title": "Engineering Plan Hash",
-            "type": "string"
-          },
           "code_tree_digest": {
             "title": "Code Tree Digest",
             "type": "string"
@@ -18313,7 +18241,6 @@
           "known_risks",
           "product_spec_hash",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "code_tree_digest",
           "kind",
           "issuer",
@@ -18481,17 +18408,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -18558,7 +18474,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "input_version",
           "prompt_version",
@@ -19312,17 +19227,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -19378,7 +19282,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "input_version",
           "prompt_version",
@@ -20768,17 +20671,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -21224,7 +21116,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "provider_config_id",
           "model_id",
@@ -22252,17 +22143,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -22374,7 +22254,6 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "attempt_id",
           "logical_call_id",
@@ -22751,17 +22630,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -22843,7 +22711,6 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "attempt_id",
           "logical_call_id",
@@ -23216,17 +23083,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -23336,7 +23192,6 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "attempt_id",
           "logical_call_id",
@@ -23714,17 +23569,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -23865,7 +23709,6 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "attempt_id",
           "logical_call_id",
@@ -24248,17 +24091,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -24380,7 +24212,6 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "attempt_id",
           "logical_call_id",
@@ -25090,311 +24921,6 @@
           "parameters_version"
         ],
         "title": "ParameterSetPayload",
-        "type": "object"
-      },
-      "PlanAcceptedEvent": {
-        "additionalProperties": false,
-        "properties": {
-          "position": {
-            "title": "Position",
-            "type": "integer"
-          },
-          "previous": {
-            "title": "Previous",
-            "type": "integer"
-          },
-          "event_id": {
-            "title": "Event Id",
-            "type": "string"
-          },
-          "at": {
-            "format": "date-time",
-            "title": "At",
-            "type": "string"
-          },
-          "stream": {
-            "title": "Stream",
-            "type": "string"
-          },
-          "stream_version": {
-            "title": "Stream Version",
-            "type": "integer"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
-          "work_item_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Work Item Id"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Run Id"
-          },
-          "department": {
-            "anyOf": [
-              {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department"
-          },
-          "role": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Role"
-          },
-          "actor": {
-            "title": "Actor",
-            "type": "string"
-          },
-          "command_id": {
-            "anyOf": [
-              {
-                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Command Id"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "type": {
-            "const": "plan_accepted",
-            "title": "Type",
-            "type": "string"
-          },
-          "payload": {
-            "$ref": "#/components/schemas/PlanAcceptedPayload"
-          }
-        },
-        "required": [
-          "position",
-          "previous",
-          "event_id",
-          "at",
-          "stream",
-          "stream_version",
-          "project_id",
-          "work_item_id",
-          "run_id",
-          "department",
-          "role",
-          "actor",
-          "command_id",
-          "label",
-          "type",
-          "payload"
-        ],
-        "title": "PlanAcceptedEvent",
-        "type": "object"
-      },
-      "PlanAcceptedPayload": {
-        "additionalProperties": false,
-        "properties": {
-          "effective_contract_hash": {
-            "title": "Effective Contract Hash",
-            "type": "string"
-          },
-          "objective": {
-            "title": "Objective",
-            "type": "string"
-          },
-          "scope": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Scope",
-            "type": "array"
-          },
-          "tasks": {
-            "items": {
-              "$ref": "#/components/schemas/PlanTask"
-            },
-            "title": "Tasks",
-            "type": "array"
-          },
-          "refactoring": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Refactoring",
-            "type": "array"
-          },
-          "assumptions": {
-            "items": {
-              "$ref": "#/components/schemas/PlanAssumption"
-            },
-            "title": "Assumptions",
-            "type": "array"
-          },
-          "reason": {
-            "title": "Reason",
-            "type": "string"
-          },
-          "kind": {
-            "const": "engineering_plan",
-            "title": "Kind",
-            "type": "string"
-          },
-          "issuer": {
-            "const": "engineering",
-            "title": "Issuer",
-            "type": "string"
-          },
-          "parent_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parent Hash"
-          },
-          "revision": {
-            "title": "Revision",
-            "type": "integer"
-          },
-          "status": {
-            "const": "active",
-            "title": "Status",
-            "type": "string"
-          },
-          "content_hash": {
-            "title": "Content Hash",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "plan_ref": {
-            "$ref": "#/components/schemas/ArtifactRef"
-          },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
-          "git_version": {
-            "$ref": "#/components/schemas/GitVersion"
-          }
-        },
-        "required": [
-          "effective_contract_hash",
-          "objective",
-          "scope",
-          "tasks",
-          "refactoring",
-          "assumptions",
-          "reason",
-          "kind",
-          "issuer",
-          "parent_hash",
-          "revision",
-          "status",
-          "content_hash",
-          "id",
-          "plan_ref",
-          "request_id",
-          "git_version"
-        ],
-        "title": "PlanAcceptedPayload",
-        "type": "object"
-      },
-      "PlanAssumption": {
-        "additionalProperties": false,
-        "properties": {
-          "decision": {
-            "title": "Decision",
-            "type": "string"
-          },
-          "basis": {
-            "title": "Basis",
-            "type": "string"
-          }
-        },
-        "required": [
-          "decision",
-          "basis"
-        ],
-        "title": "PlanAssumption",
-        "type": "object"
-      },
-      "PlanTask": {
-        "additionalProperties": false,
-        "properties": {
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "outputs": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Outputs",
-            "type": "array"
-          },
-          "verification": {
-            "title": "Verification",
-            "type": "string"
-          }
-        },
-        "required": [
-          "title",
-          "outputs",
-          "verification"
-        ],
-        "title": "PlanTask",
         "type": "object"
       },
       "ProductDecisionAcceptedEvent": {
@@ -27899,10 +27425,6 @@
             "title": "Effective Contract Hash",
             "type": "string"
           },
-          "engineering_plan_hash": {
-            "title": "Engineering Plan Hash",
-            "type": "string"
-          },
           "delivery_spec_hash": {
             "title": "Delivery Spec Hash",
             "type": "string"
@@ -28001,7 +27523,6 @@
         "required": [
           "product_spec_hash",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "delivery_spec_hash",
           "code_snapshot_hash",
           "verdict",
@@ -30803,17 +30324,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -30893,7 +30403,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "input_version",
           "prompt_version",
@@ -31133,17 +30642,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -31273,7 +30771,6 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "attempt_id",
           "logical_call_id",
@@ -31797,17 +31294,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -31906,7 +31392,6 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "attempt_id",
           "logical_call_id",
@@ -32076,17 +31561,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "request_id": {
             "anyOf": [
               {
@@ -32248,7 +31722,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "engineering_plan_hash",
           "request_id",
           "input_version",
           "prompt_version",
@@ -34585,17 +34058,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "engineering_plan_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engineering Plan Hash"
-          },
           "delivery_spec_hash": {
             "anyOf": [
               {
@@ -34611,7 +34073,6 @@
         "required": [
           "phase",
           "effective_contract_hash",
-          "engineering_plan_hash",
           "delivery_spec_hash"
         ],
         "title": "YieldedWork",
@@ -34661,7 +34122,6 @@
             "model_stream_progress": "#/components/schemas/ModelStreamProgressEvent",
             "onboarding_revision_started": "#/components/schemas/OnboardingRevisionStartedEvent",
             "parameter_set": "#/components/schemas/ParameterSetEvent",
-            "plan_accepted": "#/components/schemas/PlanAcceptedEvent",
             "product_decision_accepted": "#/components/schemas/ProductDecisionAcceptedEvent",
             "product_input_assigned": "#/components/schemas/ProductInputAssignedEvent",
             "project_archived": "#/components/schemas/ProjectArchivedEvent",
@@ -34792,9 +34252,6 @@
           },
           {
             "$ref": "#/components/schemas/ContractAcceptedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/PlanAcceptedEvent"
           },
           {
             "$ref": "#/components/schemas/CollaborationRequestedEvent"

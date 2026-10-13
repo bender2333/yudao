@@ -57,7 +57,7 @@
     "provider": "fake",
     "registered_commands": {},
     "round": 0,
-    "run_event_version": 3,
+    "run_event_version": 4,
     "run_time_limit_sec": 7200,
     "sessions": {
      "engineering": "<ses_eng#1>",
@@ -110,7 +110,6 @@
     "activation_id": "<act#1>",
     "cycle": 1,
     "effective_contract_hash": null,
-    "engineering_plan_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
     "guidance_version": 0,
@@ -225,8 +224,6 @@
   "effective_contract": null,
   "effective_contracts": [],
   "effective_decisions": [],
-  "engineering_plan": null,
-  "engineering_plans": [],
   "error": "the model request leaves no room for model output",
   "evidence": [],
   "git_version": {
@@ -316,7 +313,7 @@
   "reviews": [],
   "rework_count": 0,
   "round": 0,
-  "run_event_version": 3,
+  "run_event_version": 4,
   "run_id": "<run#1>",
   "run_time_limit_sec": 7200,
   "sessions": {

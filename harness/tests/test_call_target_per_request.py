@@ -13,7 +13,7 @@ from typing import Any
 
 from harness.engine import StepLimits
 from harness.models import DEPARTMENTS, EventType
-from harness.proposals import engineering_plan, product_spec
+from harness.proposals import product_spec
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade
 from harness.providers.errors import CatalogValidationError
 from harness.event_store import Command
@@ -24,10 +24,8 @@ from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 MILLISECOND_RETRIES = StepLimits(retry_initial_delay_sec=0.001, retry_max_delay_sec=0.001)
 
-
 def _event(kind: str, **payload: Any) -> str:
     return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload}, ensure_ascii=False)}\n\n"
-
 
 def _call_item(call_id: str, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -38,7 +36,6 @@ def _call_item(call_id: str, name: str, arguments: dict[str, Any]) -> dict[str, 
         "arguments": json.dumps(arguments, ensure_ascii=False, separators=(",", ":")),
         "status": "completed",
     }
-
 
 def _responses_reply(items: list[dict[str, Any]], *, response_id: str, model: str) -> bytes:
     response = {
@@ -57,20 +54,20 @@ def _responses_reply(items: list[dict[str, Any]], *, response_id: str, model: st
     frames.append(_event("response.completed", sequence_number=len(frames), response=response))
     return sse(*frames)
 
-
 def _product_spec_stream(*, response_id: str, model: str) -> bytes:
     payload = product_spec()
     payload.pop("kind")
     return _responses_reply([_call_item("product-spec", "submit_product_spec", payload)],
                             response_id=response_id, model=model)
 
-
-def _plan_stream(*, response_id: str, model: str) -> bytes:
-    payload = engineering_plan()
-    payload.pop("kind")
-    return _responses_reply([_call_item("engineering-plan", "submit_plan", payload)],
-                            response_id=response_id, model=model)
-
+def _delivery_stream(*, response_id: str, model: str) -> bytes:
+    # 工程部门返回一次可接纳的交付：同一次运行要跨越两个部门
+    return _responses_reply([
+        _call_item("engineering-write", "write_file", {"path": "src/echo.py", "content": "print('echo')\n"}),
+        _call_item("engineering-check", "run_check", {"name": "smoke", "argv": ["python", "src/echo.py"]}),
+        _call_item("engineering-delivery", "submit_delivery",
+                   {"summary": "implemented echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"]}),
+    ], response_id=response_id, model=model)
 
 def _stream_reply(body: bytes) -> tuple[int, str, list[bytes]]:
     return 200, "text/event-stream", [body]
@@ -90,15 +87,13 @@ def _request_phase(body: dict[str, Any]) -> str:
     return match.group(1) if match else ""
 
 def _department_aware_reply(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
-    # 产品部门返回产品要求，工程部门返回工程计划：同一次运行要跨越两个部门
+    # 产品部门返回产品要求，工程部门返回一次可接纳的交付：同一次运行要跨越两个部门
     if _request_phase(body) == "ENGINEERING":
-        return _stream_reply(_plan_stream(response_id="resp-plan", model="m-local-target"))
+        return _stream_reply(_delivery_stream(response_id="resp-plan", model="m-local-target"))
     return _stream_reply(_product_spec_stream(response_id="resp-1", model="m-local-target"))
-
 
 def _transient_error() -> tuple[int, str, list[bytes]]:
     return 500, "application/json", [b'{"error": {"code": "server_error", "message": "transient"}}']
-
 
 def _document(base_url: str) -> dict[str, Any]:
     # 一份目录：本机服务上一个 Responses 模型，三个部门都绑定它
@@ -110,7 +105,6 @@ def _document(base_url: str) -> dict[str, Any]:
                     "context_window": 32000, "max_output_tokens": 2048}],
         "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
     }
-
 
 def _file_system(tmp_path, base_url: str, *, dotenv_text: str) -> tuple[LoopSystem, ProviderFacade, Any]:
     # 目录与 .env 都从文件读取：修复凭据就是把这些文件写成可解析的内容，再让运行中的门面读到
@@ -124,7 +118,6 @@ def _file_system(tmp_path, base_url: str, *, dotenv_text: str) -> tuple[LoopSyst
     facade.record_admission("local", "m-local", admitted_model="m-local-target")
     return LoopSystem(tmp_path / "data", facade=facade), facade, dotenv
 
-
 def _answer_open_decision(system: LoopSystem, option: str) -> None:
     # 只经公开接口回答待恢复：按保存的投影列出未回答的决定请求，经流程编排的回答入口回答
     _position, decisions = saved_decisions(system.store, statuses=("open",))
@@ -133,7 +126,6 @@ def _answer_open_decision(system: LoopSystem, option: str) -> None:
     assert (decision.request["kind"], decision.request["blocks"]) == ("model_unavailable", "run")
     command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:{option}:1", "user:local")
     system.orchestrator.answer_decision(decision.decision_id, option, None, base_version=1, command=command)
-
 
 def test_missing_credential_blocks_until_the_dotenv_file_is_fixed(tmp_path):
     server, capture, base = serve(lambda _body: _stream_reply(
@@ -176,7 +168,6 @@ def test_missing_credential_blocks_until_the_dotenv_file_is_fixed(tmp_path):
         server.shutdown()
         server.server_close()
 
-
 def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
     # 请求进行中修改部门默认：这次逻辑调用（含重试）仍发往解析当时的目标，下一次逻辑调用按新默认解析
     held = threading.Event()
@@ -192,7 +183,7 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
         return _stream_reply(_product_spec_stream(response_id="resp-retry", model="m-a-target"))
 
     server_a, capture_a, base_a = serve(lambda body: provider_a(body))
-    server_b, capture_b, base_b = serve(lambda _body: _stream_reply(_plan_stream(response_id="resp-plan",
+    server_b, capture_b, base_b = serve(lambda _body: _stream_reply(_delivery_stream(response_id="resp-plan",
                                                                                 model="m-b-target")))
     try:
         facade = ProviderFacade(credentials=CredentialChain(overrides={
@@ -343,7 +334,7 @@ def test_swapping_the_department_model_limits_the_saved_tier_on_the_next_request
 def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
     # 部门默认所选模型的准入作废（改了连接的地址）以后，该部门的下一次模型请求进入待恢复，
     # 重新测试通过并回答以后继续执行；引用保留，已完成的工作与已用限额保留（工单 #86）
-    # 同一次运行跨越产品与工程两个部门：产品请求返回产品要求，工程请求返回工程计划
+    # 同一次运行跨越产品与工程两个部门：产品请求返回产品要求，工程请求返回交付文件
     server, capture, base = serve(_department_aware_reply)
     try:
         system, facade, _dotenv = _file_system(tmp_path, base, dotenv_text="SCENARIO_KEY=secret-1\n")
@@ -381,13 +372,12 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
 
         _answer_open_decision(system, "continue")
         finished = system.activate_once(run_id)
-        # 从被挡住的那次请求接着进行：工程部门的计划请求重新发出并被接受
-        assert finished.phase == "ENGINEERING", finished.error
+        # 从被挡住的那次请求接着进行：工程部门的交付请求重新发出并被接受
+        assert finished.phase == "QUALITY", finished.error
         assert [item["model"] for item in capture.requests] == ["m-local-target", "m-local-target"]
-        plans = [event for event in system.store.list_events(run_id) if event.type == EventType.PLAN_ACCEPTED]
-        assert len(plans) == 1
-        assert plans[0].department == "engineering" and plans[0].actor == "department:engineering"
-        # 待恢复的决定已关闭，已完成的工作与已用限额保留
+        deliveries = [event for event in system.store.list_events(run_id) if event.type == EventType.DELIVERY_ACCEPTED]
+        assert len(deliveries) == 1
+        assert deliveries[0].department == "engineering" and deliveries[0].actor == "department:engineering"
         assert saved_decisions(system.store, statuses=("open",))[1] == []
     finally:
         server.shutdown()

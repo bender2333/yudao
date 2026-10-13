@@ -147,7 +147,6 @@ class _RecoveredCall:
     request_id: str | None
     context_event_id: str | None
     effective_contract_hash: str | None
-    engineering_plan_hash: str | None
     call_target: dict[str, Any]
     purpose: str = "work"
     attempt: int = 1
@@ -193,10 +192,9 @@ def auto_retry_request(scope: ActivationScope, started: Any, events: Sequence[An
     return _RecoveredCall(
         run_id=scope.run_id, department=scope.department, session_id=scope.session_id,
         activation_id=scope.activation_id, step_id=step_id,
-        request_id=payload.get("collaboration_request_id"),
         context_event_id=payload.get("context_event_id") or "",
+        request_id=payload.get("collaboration_request_id"),
         effective_contract_hash=scope.basis.effective_contract_hash,
-        engineering_plan_hash=scope.basis.engineering_plan_hash,
         call_target=recovered_call_target(events, activation_id, step_id),
         purpose=str(payload.get("purpose") or "work"),
         attempt=int(payload.get("attempt") or 1),
@@ -227,7 +225,7 @@ class StepDriver:
         self._scope = scope
         basis = scope.basis
         self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt, scope.guidance_only,
-                                basis.effective_contract_hash, basis.engineering_plan_hash, basis.input_version)
+                                basis.effective_contract_hash, basis.input_version)
         self._stream = run_stream(scope.run_id)
         self._writes = writes
         self._artifacts = artifacts
@@ -619,7 +617,6 @@ class StepDriver:
             activation_id=self._scope.activation_id, step_id=int(payload.get("step_id") or 0),
             request_id=payload.get("collaboration_request_id"), context_event_id=payload.get("context_event_id"),
             effective_contract_hash=self._scope.basis.effective_contract_hash,
-            engineering_plan_hash=self._scope.basis.engineering_plan_hash,
             call_target=dict(self._call_public or {}), purpose="work",
         )
 
@@ -742,7 +739,6 @@ class StepDriver:
                                    tool_choice=self._tool_choice(assembled.manifest.purpose, assembled.tools,
                                                                  replies_without_tool_call),
                                    effective_contract_hash=scope.basis.effective_contract_hash,
-                                   engineering_plan_hash=scope.basis.engineering_plan_hash,
                                    request_id=scope.basis.request_id,
                                    attempt=attempt, root_step_id=root_step_id,
                                    retry_of_step_id=retry_of_step_id,

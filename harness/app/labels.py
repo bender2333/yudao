@@ -134,7 +134,6 @@ _LABELS: dict[str, str] = {
     EventType.SPEC_ACCEPTED: "采纳了产品规格（第 {revision} 版）",
     EventType.SPEC_SUPERSEDED: "产品规格被新的版本取代（第 {revision} 版）",
     EventType.CONTRACT_ACCEPTED: "采纳了有效合同（第 {revision} 版）",
-    EventType.PLAN_ACCEPTED: "采纳了工程方案（第 {revision} 版）",
     EventType.COLLABORATION_REQUESTED: "{requester}向{recipient}提出请求：{question}",
     EventType.COLLABORATION_RESPONDED: "{recipient}回应了协作请求：{status}",
     EventType.COLLABORATION_CLOSED: "关闭了协作请求：{status}",

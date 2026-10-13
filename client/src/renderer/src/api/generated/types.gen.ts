@@ -5060,10 +5060,6 @@ export type WorkItemMaterialsResult = {
      */
     contracts: Array<VersionEntry>;
     /**
-     * Plans
-     */
-    plans: Array<VersionEntry>;
-    /**
      * Deliveries
      */
     deliveries: Array<VersionEntry>;
@@ -5330,10 +5326,6 @@ export type ActionVerifiedPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -6278,10 +6270,6 @@ export type CheckReceipt = {
      */
     effective_contract_hash: string | null;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
-    /**
      * Snapshot Hash
      */
     snapshot_hash: string;
@@ -6303,10 +6291,6 @@ export type CollaborationBasis = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Delivery Spec Hash
      */
@@ -6962,10 +6946,6 @@ export type CompactionRecordedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
-    /**
      * Request Id
      */
     request_id: string | null;
@@ -7231,10 +7211,6 @@ export type ContextAssembledPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -8038,10 +8014,6 @@ export type DeliveryAcceptedPayload = {
      */
     effective_contract_hash: string;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string;
-    /**
      * Code Tree Digest
      */
     code_tree_digest: string;
@@ -8156,10 +8128,6 @@ export type DepartmentActivatedPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -8574,10 +8542,6 @@ export type DepartmentInputPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -9311,10 +9275,6 @@ export type ModelAttemptFailedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
-    /**
      * Request Id
      */
     request_id: string | null;
@@ -9977,10 +9937,6 @@ export type ModelMessagePayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
-    /**
      * Request Id
      */
     request_id: string | null;
@@ -10207,10 +10163,6 @@ export type ModelReasoningPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
-    /**
      * Request Id
      */
     request_id: string | null;
@@ -10420,10 +10372,6 @@ export type ModelRequestSerializedPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -10654,10 +10602,6 @@ export type ModelRequestedPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -10911,10 +10855,6 @@ export type ModelRetryScheduledPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -11353,173 +11293,6 @@ export type ParameterSetPayload = {
      * Parameters Version
      */
     parameters_version: string;
-};
-
-/**
- * PlanAcceptedEvent
- */
-export type PlanAcceptedEvent = {
-    /**
-     * Position
-     */
-    position: number;
-    /**
-     * Previous
-     */
-    previous: number;
-    /**
-     * Event Id
-     */
-    event_id: string;
-    /**
-     * At
-     */
-    at: string;
-    /**
-     * Stream
-     */
-    stream: string;
-    /**
-     * Stream Version
-     */
-    stream_version: number;
-    /**
-     * Project Id
-     */
-    project_id: string | null;
-    /**
-     * Work Item Id
-     */
-    work_item_id: string | null;
-    /**
-     * Run Id
-     */
-    run_id: string | null;
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality' | null;
-    /**
-     * Role
-     */
-    role: string | null;
-    /**
-     * Actor
-     */
-    actor: string;
-    /**
-     * Command Id
-     */
-    command_id: string | null;
-    /**
-     * Label
-     */
-    label: string;
-    /**
-     * Type
-     */
-    type: 'plan_accepted';
-    payload: PlanAcceptedPayload;
-};
-
-/**
- * PlanAcceptedPayload
- */
-export type PlanAcceptedPayload = {
-    /**
-     * Effective Contract Hash
-     */
-    effective_contract_hash: string;
-    /**
-     * Objective
-     */
-    objective: string;
-    /**
-     * Scope
-     */
-    scope: Array<string>;
-    /**
-     * Tasks
-     */
-    tasks: Array<PlanTask>;
-    /**
-     * Refactoring
-     */
-    refactoring: Array<string>;
-    /**
-     * Assumptions
-     */
-    assumptions: Array<PlanAssumption>;
-    /**
-     * Reason
-     */
-    reason: string;
-    /**
-     * Kind
-     */
-    kind: 'engineering_plan';
-    /**
-     * Issuer
-     */
-    issuer: 'engineering';
-    /**
-     * Parent Hash
-     */
-    parent_hash: string | null;
-    /**
-     * Revision
-     */
-    revision: number;
-    /**
-     * Status
-     */
-    status: 'active';
-    /**
-     * Content Hash
-     */
-    content_hash: string;
-    /**
-     * Id
-     */
-    id: string;
-    plan_ref: ArtifactRef;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
-    git_version: GitVersion;
-};
-
-/**
- * PlanAssumption
- */
-export type PlanAssumption = {
-    /**
-     * Decision
-     */
-    decision: string;
-    /**
-     * Basis
-     */
-    basis: string;
-};
-
-/**
- * PlanTask
- */
-export type PlanTask = {
-    /**
-     * Title
-     */
-    title: string;
-    /**
-     * Outputs
-     */
-    outputs: Array<string>;
-    /**
-     * Verification
-     */
-    verification: string;
 };
 
 /**
@@ -12788,10 +12561,6 @@ export type QaSubmittedPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string;
     /**
      * Delivery Spec Hash
      */
@@ -14261,10 +14030,6 @@ export type ToolCallRequiredPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
-    /**
      * Request Id
      */
     request_id: string | null;
@@ -14427,10 +14192,6 @@ export type ToolCallResult = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -14736,10 +14497,6 @@ export type ToolSkippedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
-    /**
      * Request Id
      */
     request_id: string | null;
@@ -14865,10 +14622,6 @@ export type ToolStartedPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
     /**
      * Request Id
      */
@@ -16162,10 +15915,6 @@ export type YieldedWork = {
      */
     effective_contract_hash: string | null;
     /**
-     * Engineering Plan Hash
-     */
-    engineering_plan_hash: string | null;
-    /**
      * Delivery Spec Hash
      */
     delivery_spec_hash: string | null;
@@ -16230,8 +15979,6 @@ export type EventObject = ({
 } & SpecSupersededEvent) | ({
     type: 'contract_accepted';
 } & ContractAcceptedEvent) | ({
-    type: 'plan_accepted';
-} & PlanAcceptedEvent) | ({
     type: 'collaboration_requested';
 } & CollaborationRequestedEvent) | ({
     type: 'collaboration_responded';

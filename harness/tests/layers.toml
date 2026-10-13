@@ -12,7 +12,6 @@
 "kernel/test_manifest.py" = "unit"
 "kernel/test_single_write_path.py" = "unit"
 "kernel/test_tool_needs_permission.py" = "unit"
-"test_a4_compare.py" = "module"
 "test_access.py" = "integration"
 "test_access_tokens.py" = "integration"
 "test_activation_accounting.py" = "integration"

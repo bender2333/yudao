@@ -12,7 +12,7 @@
     {"path": "harness/models.py", "kind": "module", "why": "事件与投影的数据结构、序列化与哈希，裁决与事件日志共用"},
     {"path": "harness/adjudication.py", "kind": "module", "why": "裁决规则：工具许可、提案校验与提交前复核；生成者不裁决自己"},
     {"path": "harness/validation.py", "kind": "module", "why": "提案校验：按投影、工作区事实与事件判断提案能否接纳"},
-    {"path": "harness/contracts.py", "kind": "module", "why": "有效合同身份与工程计划范围；越界写入在这里判定"},
+    {"path": "harness/contracts.py", "kind": "module", "why": "有效合同身份；交付按合同版本绑定"},
     {"path": "harness/collaboration.py", "kind": "module", "why": "协作规则：未结协作的工作依据与回应范围"},
     {"path": "harness/path_rules.py", "kind": "module", "why": "公开路径规则：可移植相对路径与主机私有路径，裁决与执行层共用"},
     {"path": "harness/actions.py", "kind": "module", "why": "裁决读取的工作区事实合同（不读取，只表达要查询什么）"},

@@ -20,7 +20,7 @@ from harness.context import ContextPart
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, ContextManifest, Event, json_dumps
-from harness.proposals import collaboration_request, delivery_turn, plan_turn, product_spec, response_turn, review_turn
+from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
 from harness.environment import LocalEnvironment
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
@@ -148,7 +148,6 @@ def system_on_copy(source: Path, destination: Path, script=()) -> LoopSystem:
 def happy_script():
     return [
         product_spec(),
-        plan_turn(),
         delivery_turn(),
         review_turn("release", "checks passed on the current snapshot"),
     ]

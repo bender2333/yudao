@@ -25,7 +25,7 @@ from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
-from .contracts import current_contract_hash, current_plan_hash
+from .contracts import current_contract_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
     DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION,
@@ -1130,7 +1130,7 @@ class Orchestrator:
             provider=provider_name,
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": basis.effective_contract_hash,
-                     "engineering_plan_hash": basis.engineering_plan_hash, "request_id": basis.request_id,
+                     "request_id": basis.request_id,
                      "guidance_ids": list(guidance_ids),
                      "guidance_only": guidance_only,
                      "yielded_work": yielded_work,
@@ -1182,9 +1182,8 @@ class Orchestrator:
     @staticmethod
     def _work_basis(projection: RunProjection) -> dict[str, Any]:
         return {
-            "phase": projection.phase,
             "effective_contract_hash": current_contract_hash(projection),
-            "engineering_plan_hash": current_plan_hash(projection),
+            "phase": projection.phase,
             "delivery_spec_hash": None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
         }
 
@@ -1231,7 +1230,6 @@ class Orchestrator:
                 product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
                 delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
                 effective_contract_hash=scope.basis.effective_contract_hash,
-                engineering_plan_hash=scope.basis.engineering_plan_hash,
             )
             activation.driver = StepDriver.start(
                 scope, activation.prompt, writes=self.writes, artifacts=self.artifacts,

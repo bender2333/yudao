@@ -10,7 +10,7 @@ import pytest
 from harness.actions import Action
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, EventType, json_dumps
-from harness.proposals import delivery, delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery, delivery_turn, product_spec, review_turn
 from harness.public_tree import capture_public_tree
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -21,7 +21,7 @@ REGISTRY = {"make-link": {"argv": ["python", "make_link.py"], "args": ["nested",
                           "timeout_sec": 30, "output_limit": 4000}}
 
 def _system(tmp_path, turns):
-    return LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(), plan_turn(), *turns]))
+    return LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(),*turns]))
 
 def _write_command_body(workspace, outside):
     # 登记命令的脚本：在 node_modules 下建立指向工作区之外的目录链接
@@ -230,7 +230,6 @@ def test_read_of_an_ignored_regular_file_is_refused_with_the_ignore_rule_reason(
     # 未被忽略的常规文件仍可阅读
     normal = _perform(environment, "read_file", {"path": ".gitignore"})
     assert normal.ok is True and normal.output == "node_modules/\n"
-
 
 def test_delivery_adoption_tree_excludes_ignored_directories(tmp_path):
     try:
