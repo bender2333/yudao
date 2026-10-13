@@ -29,7 +29,9 @@ def test_time_limit_stops_run_with_failed_state(data_dir):
     assert "运行时间已达上限" in (result.waiting_reason or "")
 
 def test_time_limit_checked_between_activations(data_dir):
-    script = [product_spec(),delivery_turn(),
+    # #470 删除工程计划以后工程激活只有交付一步：第一次激活提交产品约定，
+    # 第二次激活提交交付并转入质检
+    script = [product_spec(), delivery_turn(),
               review_turn("release", "ok")]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1)
@@ -39,7 +41,8 @@ def test_time_limit_checked_between_activations(data_dir):
     assert result.phase == "ENGINEERING"
     time.sleep(1.1)
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING"
+    assert result.stop_reason is None
+    assert result.phase == "QUALITY"
     assert len(system.test_adapter.invocations) == 2
 
 def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
