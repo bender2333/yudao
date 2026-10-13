@@ -244,6 +244,8 @@ class Orchestrator:
         # 会话结束（事务 on_commit）执行后留下的清理错误：Windows 句柄长期占用时会出现，
         # 留给运维或下一次启动扫描处理，不阻塞 run 的正常退出
         self._close_errors: dict[str, list[Exception]] = {}
+        # 每个 run 累计的已用运行时间（毫秒，重启时从事件恢复）与当前运行段的起点（单调时钟）：
+        # 等待期间段计时暂停，等待的时间不计入（工单 #350）
         self._run_elapsed_ms: dict[str, int] = {}
         self._run_segment_start: dict[str, float] = {}
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除

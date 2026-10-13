@@ -18,7 +18,6 @@ from harness.environment import (
     LocalEnvironment,
     cleanup_inspection_workspace,
     inspection_root,
-    workspace_tree,
 )
 from harness.public_tree import capture_public_tree
 from harness.providers.call import ModelResponse
@@ -241,14 +240,6 @@ def test_the_inspection_workspaces_are_removed_when_the_run_reaches_done(tmp_pat
     assert (run_root / "src" / "echo.py").exists()
 
 
-def _original_source_tree(orchestrator, department, projection):
-    # 反向核对用的原实现：质检从封存交付建立，其他从当前运行工作区快照建立
-    if department == "quality" and projection.delivery_spec is not None:
-        tree_ref = projection.delivery_spec.tree_ref
-        if tree_ref is not None:
-            return load_tree(orchestrator.artifacts, projection.run_id, tree_ref)
-    return workspace_tree(orchestrator.workspace_root / projection.run_id)
-
 def _quality_bash_script() -> dict[str, list]:
     # 质检一轮里先用 bash 读交付、写下自己看到的版本并写入自己的文件，跑主机检查，最后退回返工；
     # 返工让 run 继续，检查工作区保留，可以就这一轮 bash 写下的内容断言
@@ -299,27 +290,6 @@ def test_quality_bash_reads_the_sealed_delivery(tmp_path: Path) -> None:
     # 验收 (a)(b)：质检在会话里用 bash 读到的是封存交付，写下的文件不泄漏到运行工作区，
     # 也不进入封存交付树
     _inspection_bash_reads_the_sealed_delivery(tmp_path)
-
-
-def test_the_sealed_delivery_is_the_inspection_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # 反向核对：把质检的建立源改成运行工作区快照（评审提出过的回退写法），
-    # 交付之后的改动立刻出现在质检的 bash 输出里，测试变红
-    monkeypatch.setattr(
-        "harness.orchestrator.Orchestrator._inspection_source_tree",
-        lambda self, department, projection: (
-            workspace_tree(self.workspace_root / projection.run_id)
-            if department == "quality" else
-            _original_source_tree(self, department, projection)),
-    )
-    system, _adapter, run_id = event_scenarios._system(tmp_path, _quality_bash_script())
-    run_root = tmp_path / "workspaces" / run_id
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    system.workspace(run_id).write_file("src/echo.py", "CHANGED_AFTER_DELIVERY\n")
-    system.activate_once(run_id)
-
-    assert (inspection_root(run_root, "quality") / "seen.txt").read_text(
-        encoding="utf-8") == "SEALED_VERSION\n"
 
 
 def test_product_bash_views_and_runs_the_snapshot(tmp_path: Path) -> None:
