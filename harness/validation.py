@@ -397,6 +397,10 @@ def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjectio
 def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
     if projection.input_version != projection.product_work_input_version:
         return ProposalDecision(False, [FieldError("input_version", "new user input must enter product work before requirements can be accepted")])
+    current_hash = None if projection.product_spec is None else projection.product_spec.content_hash
+    basis_errors = _basis_hash_errors(proposal, "basis_product_spec_hash", current_hash)
+    if basis_errors:
+        return ProposalDecision(False, basis_errors)
     if projection.product_spec is not None and proposal.get("change_record") is None:
         return ProposalDecision(False, [FieldError("change_record", "a revised ProductSpec must explain changed, retained, and retired behavior and its rationale")])
     active_hashes = {item.content_hash for item in projection.effective_decisions}
@@ -475,6 +479,7 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
     if contract is None:
         return ProposalDecision(False, [FieldError("effective_contract", "delivery requires a current effective contract")])
     errors: list[FieldError] = []
+    errors.extend(_basis_hash_errors(proposal, "basis_product_spec_hash", projection.product_spec.content_hash))
     files = [item.replace("\\", "/") for item in proposal["files"]]
     for rel in files:
         if not facts.has_file(rel):
@@ -540,6 +545,7 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
     if contract is None:
         return ProposalDecision(False, [FieldError("effective_contract", "quality review requires a current contract")])
     errors: list[FieldError] = []
+    errors.extend(_basis_hash_errors(proposal, "basis_delivery_spec_hash", projection.delivery_spec.content_hash))
     if projection.delivery_spec.product_spec_hash != projection.product_spec.content_hash:
         errors.append(FieldError("product_spec_hash", "delivery is not bound to the current ProductSpec"))
     if projection.delivery_spec.effective_contract_hash != contract.content_hash:
@@ -869,6 +875,23 @@ def _require_text(payload: dict[str, Any], field: str) -> list[FieldError]:
     value = payload.get(field)
     if not isinstance(value, str) or not value.strip():
         return [FieldError(field, f"{field} must be a non-empty string")]
+    return []
+
+
+# 提交者声明的依据版本（工单 #471）：每个正式成果都要写明它依据的版本；与当前 host 端有效版本的
+# content_hash 不一致时整次提交被拒绝，错误指向声明的字段，消息给出实际当前版本，便于模型重试
+def _basis_hash_errors(proposal: dict[str, Any], field: str, current_hash: str | None) -> list[FieldError]:
+    if field not in proposal:
+        return [FieldError(field, f"{field} is required; declare the version this artifact is based on")]
+    value = proposal[field]
+    if value is not None and (not isinstance(value, str) or not value.strip()):
+        return [FieldError(field, f"{field} must be a content hash string or null")]
+    if current_hash is None:
+        if value is not None:
+            return [FieldError(field, f"{field} must be null when no current version exists; current value is {value!r}")]
+        return []
+    if value != current_hash:
+        return [FieldError(field, f"submitted artifact is based on {value!r}; current version is {current_hash!r}. Read the current version and submit again.")]
     return []
 
 

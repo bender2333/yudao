@@ -308,7 +308,7 @@
     "kind": "host",
     "proposal": "product_spec",
     "guidance_only": false,
-    "description": "Submit a ProductSpec. Required: goal, requirements, acceptance_criteria.",
+    "description": "Submit a ProductSpec. Required: goal, requirements, acceptance_criteria, basis_product_spec_hash. basis_product_spec_hash must equal the current effective ProductSpec content_hash (or null on the first spec); a stale basis is rejected so the revision cannot proceed against a superseded PRD.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -423,15 +423,23 @@
             ]
           },
           "description": "When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec."
-        }
-      },
-      "additionalProperties": false,
-      "required": [
+        },
+        "basis_product_spec_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Content hash of the ProductSpec this revision is based on. Pass the current effective ProductSpec content_hash; pass null only for the first spec. The host rejects the submission if this value does not equal the current effective ProductSpec content_hash."
+         }
+       },
+       "additionalProperties": false,
+       "required": [
+        "basis_product_spec_hash",
         "goal",
         "requirements",
         "acceptance_criteria"
-      ]
-    },
+       ]
+      },
     "repeatable": false
   },
   "submit_product_decision": {
@@ -601,7 +609,7 @@
     "kind": "host",
     "proposal": "delivery_spec",
     "guidance_only": false,
-    "description": "Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. bash results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery.",
+    "description": "Submit a DeliverySpec after writing files and running checks. Every name in check_names must be a name you passed to run_check in this activation on the current workspace; receipts from earlier activations are not reused, and if any file changes after a check, call run_check again before submitting. bash results are action receipts and are not accepted as delivery check receipts. A name without a matching run_check receipt rejects the delivery. basis_product_spec_hash must equal the current effective ProductSpec content_hash; a stale basis is rejected so the delivery cannot proceed against a superseded PRD.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -628,22 +636,30 @@
             "type": "string"
           },
           "description": "Optional"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
+        },
+        "basis_product_spec_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Content hash of the ProductSpec this delivery is based on. The host rejects the submission if this value does not equal the current effective ProductSpec content_hash."
+         }
+       },
+       "additionalProperties": false,
+       "required": [
+        "basis_product_spec_hash",
         "summary",
         "files",
         "check_names"
-      ]
-    },
+       ]
+      },
     "repeatable": false
   },
   "submit_review": {
     "kind": "host",
     "proposal": "qa_review",
     "guidance_only": false,
-    "description": "Submit a QAReview. release requires quality-run host receipts with exit_code 0 on the current snapshot. Engineering receipts are not accepted as QA evidence. checks are check names.",
+    "description": "Submit a QAReview. release requires quality-run host receipts with exit_code 0 on the current snapshot. Engineering receipts are not accepted as QA evidence. checks are check names. basis_delivery_spec_hash must equal the current effective DeliverySpec content_hash; a stale basis is rejected so the review cannot proceed against a superseded delivery.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -688,9 +704,22 @@
             ]
           }
         }
-      },
-      "additionalProperties": false,
-      "required": ["verdict", "rationale", "checks"]
+        ,
+        "basis_delivery_spec_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Content hash of the DeliverySpec this review is based on. The host rejects the submission if this value does not equal the current effective DeliverySpec content_hash."
+         }
+       },
+       "additionalProperties": false,
+       "required": [
+        "basis_delivery_spec_hash",
+         "verdict",
+         "rationale",
+         "checks"
+       ]
     }
   },
   "submit_structure": {
