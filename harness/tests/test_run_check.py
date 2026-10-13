@@ -23,7 +23,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment
 from harness.models import EventType, json_dumps
-from harness.proposals import delivery_turn, plan_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import action, perform, wait_until_stopped
@@ -207,7 +207,7 @@ def _tool_call(identity: str, name: str, arguments: dict[str, Any]) -> dict[str,
 
 
 def _script_with(checks: dict[str, Any]) -> list[dict[str, Any]]:
-    return [product_spec(), plan_turn(),
+    return [product_spec(),
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}, checks=checks),
             review_turn("release", "checks passed on the current snapshot", checks=checks)]
 
@@ -232,7 +232,7 @@ def test_delivery_citing_a_bash_result_is_rejected_with_the_check_reason(tmp_pat
     smoke_delivery = dict(delivery("echo CLI", files=["src/echo.py"], check_names=["smoke"]))
     smoke_delivery.pop("kind", None)
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), plan_turn(),
+        product_spec(),
         ModelResponse(output=[
             _tool_call("write-1", "write_file", {"path": "src/echo.py",
                                                  "content": "import sys\nprint(sys.argv[1])\n"}),
