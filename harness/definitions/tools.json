@@ -276,27 +276,27 @@
     "kind": "environment",
     "action": "command",
     "guidance_only": false,
-    "description": "Run one arbitrary shell command string in this session's workspace with bash, and get the host-observed exit status and output back. Each call starts a new process and keeps no shell state between calls; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output longer than the limit is stored as an artifact; the truncated part is returned and the full output can be read back. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "parameters": {
       "type": "object",
       "properties": {
         "command": {
           "type": "string",
-          "description": "The command string to run with bash in the workspace root, e.g. uv run pytest tests. Omit it when passing cursor to read back a truncated output."
+          "description": "Command string, e.g. uv run pytest tests"
         },
         "timeout_sec": {
           "type": [
             "integer",
             "null"
           ],
-          "description": "Optional time limit in seconds; omitted uses the default, larger values apply the maximum"
+          "description": "Optional seconds; default and maximum are rule-registered"
         },
         "cursor": {
           "type": [
             "string",
             "null"
           ],
-          "description": "Pass the previous receipt's next_cursor to read the next page of a truncated output; no new process starts"
+          "description": "Previous next_cursor, for the next page"
         }
       },
       "additionalProperties": false,

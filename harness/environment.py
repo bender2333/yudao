@@ -18,9 +18,10 @@ import shutil
 import signal
 import subprocess
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from threading import Lock
 from typing import Any
 
@@ -49,6 +50,11 @@ _CHECK_TIMEOUT_MAX = DEFINITIONS.rule_value("check_timeout_max_sec")
 _BASH_PATH: str | None = None
 _BASH_OUTPUT_SUBDIR = "tool-output"
 _SAFE_OUTPUT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.json")
+INSPECTIONS_DIR = "inspections"
+# Windows 句柄占用时清理目录的退避：3 次尝试，间隔按毫秒级递增（工单 #479 教训）
+_CLEANUP_ATTEMPTS = 3
+_CLEANUP_INITIAL_BACKOFF_SEC = 0.05
+
 _TRUNCATED_MARKER = (
     f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is saved, "
     "pass \"next_cursor\" back to bash as \"cursor\" to read the rest"
@@ -57,7 +63,57 @@ _TRUNCATED_MARKER = (
 
 def _safe_output_name(action_id: str) -> str:
     # 存档文件名只留安全字符：游标回读时按同规则核对，防止路径穿越
+
     return re.sub(r"[^A-Za-z0-9_.-]", "_", action_id)[:80] or "output"
+
+
+def inspection_root(run_root: str | Path, department: str) -> Path:
+    # 每个部门会话的检查工作区根：<运行工作区同级>/inspections/<run_id>/<部门>。
+    # 放在运行工作区外面以免被 capture_public_tree 当作运行内容（工单 #481）。
+    # 部门是预定义的合法分量，不做路径校验
+    path = Path(run_root)
+    return path.parent / INSPECTIONS_DIR / path.name / department
+
+
+def workspace_tree(run_root: str | Path) -> CapturedTree:
+    # 运行工作区的当前公开树：建立检查工作区的源。放在执行环境里是因为控制核心不直接
+    # 读写工作区文件（工作区边界的检查只看这里与工件、快照模块）
+    return capture_public_tree(run_root, True)
+
+
+def _prune_empty_inspection_parents(root: Path) -> None:
+    # 三个部门都删除后 <root>/../ 与 <root>/../../ 空了，把它们一并删掉，不留空骨架目录。
+    # 只删两级且都空：别的 run 的检查工作区还在时父目录非空，自然跳过
+    for parent in (root.parent, root.parent.parent):
+        try:
+            parent.rmdir()
+        except OSError:
+            return
+
+
+def cleanup_inspection_workspace(run_root: str | Path, department: str) -> None:
+    # 删除部门的检查工作区：会话结束、取消、异常三种路径都调用。Windows 上有进程仍持有目录句柄时
+    # shutil.rmtree 会抛 PermissionError（工单 #479）；按固定次数与递增退避重试，仍失败时把最后一次
+    # 异常透传，由调用方决定是放行还是写进事件。多次调用与目录不存在都是幂等的
+    root = inspection_root(run_root, department)
+    if not root.exists():
+        return
+    backoff = _CLEANUP_INITIAL_BACKOFF_SEC
+
+    for attempt in range(_CLEANUP_ATTEMPTS):
+        try:
+            shutil.rmtree(root)
+            break
+        except OSError as exc:
+            if attempt + 1 >= _CLEANUP_ATTEMPTS:
+                raise RuntimeError(
+                    f"failed to remove inspection workspace for {department} at {root} after "
+                    f"{_CLEANUP_ATTEMPTS} attempts: {type(exc).__name__}: {exc}"
+                ) from exc
+            time.sleep(backoff)
+            backoff *= 2
+    _prune_empty_inspection_parents(root)
+
 
 
 def _bash_slice(full: str, start: int) -> tuple[str, int | None]:
@@ -157,6 +213,8 @@ class LocalEnvironment:
              registered_commands: dict[str, Any] | None = None) -> LocalEnvironment:
         # 打开已经建立的工作区（registered_commands 兼容 #484 前的调用方，传入值被忽略）
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec)
+
+
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:
         # 这次激活的运行状态身份随检查回执记录，供 U 判断回执是否属于当前有效的合同与快照

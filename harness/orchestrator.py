@@ -32,7 +32,9 @@ from .decisions import (
     DecisionClosed,
     DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_activation, blocks_run,
 )
-from .environment import LocalEnvironment
+from .environment import (
+    LocalEnvironment, cleanup_inspection_workspace, inspection_root, workspace_tree,
+)
 from .deltas import DeltaChannel
 from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog_stream, is_run_stream,
                           project_stream, run_stream)
@@ -231,7 +233,7 @@ class Orchestrator:
         self.test_adapter_name = test_adapter_name
         self.test_model = test_model
         self.assembly = ContextAssembly(artifacts, store)
-        self.sessions = sessions or SessionFactory()
+        self.sessions = sessions or SessionFactory(self.workspace_root)
         self._abort: dict[str, Event] = {}
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
         self._cancellers: dict[str, set[object]] = {}
@@ -239,6 +241,9 @@ class Orchestrator:
         # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 只能有一次激活），_active 是激活本身
         self._running: dict[str, object] = {}
         self._active: dict[str, _Activation] = {}
+        # 会话结束（事务 on_commit）执行后留下的清理错误：Windows 句柄长期占用时会出现，
+        # 留给运维或下一次启动扫描处理，不阻塞 run 的正常退出
+        self._close_errors: dict[str, list[Exception]] = {}
         # 每个 run 累计的已用运行时间（毫秒，重启时从事件恢复）与当前运行段的起点（单调时钟）：
         # 等待期间段计时暂停，等待的时间不计入（工单 #350）
         self._run_elapsed_ms: dict[str, int] = {}
@@ -420,6 +425,68 @@ class Orchestrator:
         # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351），不跟随之后的修改
         return LocalEnvironment.open(self.workspace_root / run_id,
                                      check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
+
+    def _is_handoff_session(self, department: str, projection: RunProjection) -> bool:
+        # 持有交接的工程：工程部门，且这次激活产出的东西进入运行工作区——当前阶段属于工程，
+        # 或者挂起的请求要求工程重新交付（_run_workspace 是这次交付的唯一写入者）。
+        # 询问分支与产品要求都由各自的部门在检查工作区里回答，它们才是 local-tools 第 2 节
+        # 「在询问分支里回答的工程」那一格
+        if department != "engineering":
+            return False
+        request = projection.pending_request
+        return (department == department_for_phase(projection.phase)
+                or bool(request and request.action == "revise_delivery"))
+
+    def _inspection_source_tree(self, department: str, projection: RunProjection) -> CapturedTree:
+        # 每个会话检查工作区的建立源：质检从它当前面对的快照建立——最新的封存交付，
+        # 还没有交付时是事项开始时的项目起点（采纳成果或项目的起始文件夹快照，都没有时为空树），
+        # 不读运行工作区（local-tools 第 2 节）；其他会话从当前运行工作区快照建立。
+        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools 第 2 节
+        # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
+        # host_commit_error 正式报告
+        if department == "quality":
+            if projection.delivery_spec is not None and projection.delivery_spec.tree_ref is not None:
+                tree_ref = projection.delivery_spec.tree_ref
+                return load_tree(self.artifacts, artifact_run(tree_ref.path), tree_ref)
+            for record in (projection.baseline, projection.snapshot):
+                # 事项开始时的项目起点：run_created 写下的采纳成果或起始文件夹快照，两者都没有时为空树
+                if not record:
+                    continue
+                start_ref = ArtifactRef(**record["tree_ref"])
+                return load_tree(self.artifacts, artifact_run(start_ref.path), start_ref)
+            return CapturedTree(directories=(), files=())
+        return workspace_tree(self.workspace_root / projection.run_id)
+
+    def _inspection_environment(self, run_id: str, department: str) -> LocalEnvironment:
+        # 会话的检查工作区（工单 #481）：根在运行工作区以外，激活开始时从当前源
+        # （质检从最新交付，其他从当前运行工作区）建立；提案提交按同一根打开，
+        # 不重新建立，激活里写入的文件与检查回执在提交判断时仍然可见
+        root = inspection_root(self.workspace_root / run_id, department)
+        return LocalEnvironment.open(
+            root, check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
+
+    def _new_inspection_environment(self, run_id: str, department: str) -> LocalEnvironment:
+        # 激活开始：旧的检查工作区按工单的重试清理删除，再按当前源建立；
+        # 源可能在上一次激活后被新交付覆盖，质检必须看到最新交付而不是上一次的副本
+        projection = self.project(run_id)
+        run_root = self.workspace_root / run_id
+        root = inspection_root(run_root, department)
+        if root.exists():
+            cleanup_inspection_workspace(run_root, department)
+        tree = self._inspection_source_tree(department, projection)
+        return LocalEnvironment.establish(
+            root, tree, check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
+
+    def _environment_for(self, run_id: str, department: str, *, refresh: bool = False) -> LocalEnvironment:
+        # 给定部门在当前阶段下的执行环境：持有交接的工程使用运行工作区，其他会话使用检查工作区。
+        # refresh 只在激活开始时为真：按当前源重新建立检查工作区；提案提交时为假，
+        # 沿用激活内的同一份工作区，使写入与检查回执在提交判断时仍然可见
+        projection = self.project(run_id)
+        if self._is_handoff_session(department, projection):
+            return self._environment(run_id)
+        if refresh:
+            return self._new_inspection_environment(run_id, department)
+        return self._inspection_environment(run_id, department)
 
     def add_input(self, run_id: str, text: str, *, base_version: int | None = None,
                   command: Command | None = None) -> RunProjection:
@@ -654,6 +721,13 @@ class Orchestrator:
         if wakeup is not None:
             loop, changed = wakeup
             loop.call_soon_threadsafe(changed.set)
+
+    def _on_close_run(self, run_id: str) -> None:
+        # 会话结束（事务提交以后）执行的副作用：关闭会话并清理检查工作区。
+        # 清理错误（如 Windows 句柄长期占用）记录在 self._close_errors 供后续处理
+        errors = self.sessions.close_run(run_id)
+        if errors:
+            self._close_errors.setdefault(run_id, []).extend(errors)
 
     def _close_request(self, transaction: Transaction, *, status: str, reason: str,
                        return_phase: str, return_work_valid: bool) -> RunProjection:
@@ -1223,8 +1297,17 @@ class Orchestrator:
         run_id, department = scope.run_id, scope.department
         projection = self.project(run_id)
         try:
-            environment = LocalEnvironment.open(
-                self.workspace_root / run_id, registered_commands=dict(projection.registered_commands))
+            environment = self._environment_for(run_id, department, refresh=True)
+        except (ValueError, OSError) as exc:
+            # 检查工作区的建立源读不出来（质检的封存交付归档缺失或损坏）：不退回运行工作区
+            # （ADR-0038 与 local-tools 第 2 节：检查工作区从封存的交付建立）。这次激活无法开始，
+            # 以 host_commit_error 正式终止并报告真实原因，与提交判断对同一缺陷的报告方式一致
+            self._end_run(activation, "host_commit_error",
+                          f"the persisted delivery tree cannot be read for the {department} "
+                          f"inspection workspace: {exc}",
+                          activation.version)
+            return
+        try:
             environment.bind_check(
                 activation_id=scope.activation_id,
                 product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
@@ -1304,8 +1387,11 @@ class Orchestrator:
         # 校验以后另一方写入了这个 run 时写入口拒绝提交，按写入以后的状态重新校验与判断（仍然有效就提交，
         # 否则按 execution_basis 拒绝）。
         # 工作区事实向执行环境查询；提交需要带文件内容的公开树（交付封存），提交判断使用同一次读取的事实
-        environment = self._environment(run_id)
+        # 提案由激活中的会话提交：用会话的执行环境查询工作区事实（工单 #481：非工程交接的会话使用检查工作区）
         while True:
+            # 每次尝试按当前运行状态解析执行环境：取消等结束路径可能已经删除了检查工作区，
+            # 重试时按同一根重新打开，读到的是这份工作区此刻的样子
+            environment = self._environment_for(run_id, department)
             evaluated = self.writes.read(run_stream(run_id))
             facts = environment.query(FactsQuery(tree=True)).tree
             decision = proposal_decision(evaluated.projection, department=department, proposal=proposal,
@@ -1445,7 +1531,7 @@ class Orchestrator:
                     stop_reason=stop_reason,
                     payload={"stop_reason": stop_reason},
                 ))
-                transaction.on_commit(lambda: self.sessions.close_run(run_id))
+                transaction.on_commit(lambda: self._on_close_run(run_id))
         self._resume_yielded_work(
             transaction, artifact=artifact, yielded_work=yielded_work,
             parent_event_id=parent_event_id, session_id=session_id, department=department,
@@ -1869,7 +1955,7 @@ class Orchestrator:
         kind = RESUMABLE_PAUSE_KINDS.get(reason)
         if kind is not None:
             self._request_pause_resume(transaction, kind, department, paused_at_phase, reason, message, facts or [])
-        transaction.on_commit(lambda: self.sessions.close_run(projection.run_id))
+        transaction.on_commit(lambda: self._on_close_run(projection.run_id))
 
     def _request_pause_resume(self, transaction: Transaction, kind: DecisionKind, department: str,
                               paused_at_phase: str, reason: str, message: str | None,
@@ -1909,7 +1995,7 @@ class Orchestrator:
             payload={"stop_reason": reason, "human_action": human, "message": message,
                      **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},
         ))[0]
-        transaction.on_commit(lambda: self.sessions.close_run(projection.run_id))
+        transaction.on_commit(lambda: self._on_close_run(projection.run_id))
         if reason != "cancelled":
             self._record_lesson_candidate(transaction, source_event, projection)
 
