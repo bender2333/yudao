@@ -263,7 +263,9 @@ def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path):
     adapter = FakeAdapter([respond] * 100)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=32))
     original = "Original intent"
-    run_id = system.create_run(original, context_window=4000)
+    # 合并 #471 拉长 submit_* schema、#481 给产品/质检加 bash 后，4000 窗口的固定区超过压缩预算；
+    # 5000 与同文件 test_empty_compaction_summary_allows_retry_on_next_activation 一致
+    run_id = system.create_run(original, context_window=5000)
     # 使用足够大的工具输出触发压缩
     system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 8000)
     result = system.activate_once(run_id)

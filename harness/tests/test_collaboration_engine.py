@@ -139,14 +139,15 @@ def test_partial_mutation_and_response_in_one_activation_cannot_resume_old_quali
 @pytest.mark.parametrize("disposition", ["retain", "integrate", "retire"])
 def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_source(tmp_path, disposition):
     def revision(request):
-        decisions = json.loads(prompt_parts(request)["current_product_decisions"])
+        parts = prompt_parts(request)
+        decisions = json.loads(parts["current_product_decisions"])
         return product_spec(requirements=["print the argument and reject unknown flags"], change_record={
             "changed": ["Make unknown flag behavior explicit"], "retained": ["Echo valid input"],
             "retired": [], "rationale": "Clarify argument validation",
         }, decision_changes=[{
             "decision_hash": decisions[0]["content_hash"], "disposition": disposition,
             "rationale": "Make the handling of this earlier decision explicit.",
-        }])
+        }], basis_product_spec_hash=json.loads(parts["current_product_spec"])["content_hash"])
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), collaboration_request("product", request_type="action", action="revise_requirements"),
@@ -164,8 +165,9 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
                     [{"decision_hash": original_decision.content_hash, "disposition": "retain", "rationale": "Keep"}] * 2):
         decision = evaluate_proposal(phase=before.phase, department="product", projection=before,
                                      facts=facts, proposal=product_spec(decision_changes=changes, change_record={
-                                         "changed": [], "retained": ["Echo behavior"], "retired": [], "rationale": "Review earlier decisions",
-                                     }))
+                                         "changed": [], "retained": ["Echo behavior"], "retired": [],
+                                         "rationale": "Review earlier decisions",
+                                     }, basis_product_spec_hash=before.product_spec.content_hash))
         assert not decision.accepted and decision.errors[0].field == "decision_changes"
     revised = system.activate_once(run_id)
     assert revised.product_spec.content_hash != original_spec
@@ -311,7 +313,7 @@ def test_external_contract_change_closes_request_and_does_not_rebind_its_basis(t
                                  facts=snapshot.facts, proposal=product_spec(requirements=["print the input in uppercase"], change_record={
                                      "changed": ["Uppercase output"], "retained": ["Read one argument"],
                                      "retired": ["Original casing"], "rationale": "The current product goal changed",
-                                 }))
+                                 }, basis_product_spec_hash=before.product_spec.content_hash))
     assert decision.accepted
     # 运行之外接纳新的产品规格（经写入口的事务），协作请求的依据随之改变
     system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(

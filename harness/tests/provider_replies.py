@@ -17,15 +17,46 @@ def _submission(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if key != "kind"}
 
 
-# 交接一次需要的三段脚本：产品提交规格、工程写文件并自检、质检复核并放行
-HTTP_SCRIPT: list[list[tuple[str, dict[str, Any]]]] = [
-    [("submit_product_spec", _submission(product_spec()))],
-    [("write_file", {"path": "src/echo.py", "content": ECHO}),
-     ("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
-     ("submit_delivery", _submission(delivery(check_names=["smoke"])))],
-    [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
-     ("submit_review", _submission(review("release", "checks passed on the current snapshot")))],
-]
+def _material_text(item: Any) -> str:
+    # 三种协议的输入项形状不同：Responses 的 input 与 Chat 的 messages 用字符串正文，
+    # Messages 协议把正文放在 content 块的 text 里
+    content = item.get("content") if isinstance(item, dict) else None
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(block.get("text", "") for block in content if isinstance(block, dict))
+    return ""
+
+
+def _material_hash(body: dict[str, Any], source: str, field: str) -> str | None:
+    # 从本机服务收到的请求里取出装配好的部门材料中的 content_hash（工单 #471）：
+    # 服务回放的提交据此声明它依据的版本，与真实模型从上下文读到的一样
+    items = body.get("input") or body.get("messages") or []
+    material = "\n\n".join(_material_text(item) for item in items)
+    for segment in ("\n\n" + material).split("\n\n[")[1:]:
+        name, separator, text = segment.partition("]\n")
+        if separator and name == source:
+            return json.loads(text).get(field)
+    return None
+
+
+def http_script(body: dict[str, Any]) -> list[list[tuple[str, dict[str, Any]]]]:
+    # 交接一次需要的三段脚本（工单 #471）：提交依据的版本取自本次请求装配好的部门材料，
+    # 与真实模型从上下文读到的当前版本是同一个
+    spec_hash = _material_hash(body, "current_product_spec", "content_hash")
+    delivery_hash = _material_hash(body, "current_delivery_spec", "content_hash")
+    return [
+        [("submit_product_spec", _submission(product_spec()))],
+        [("write_file", {"path": "src/echo.py", "content": ECHO}),
+         ("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
+         ("submit_delivery", _submission(delivery(check_names=["smoke"], basis_product_spec_hash=spec_hash)))],
+        [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
+         ("submit_review", _submission(review("release", "checks passed on the current snapshot",
+                                              basis_delivery_spec_hash=delivery_hash)))],
+    ]
+
+
+HTTP_SCRIPT: list[list[tuple[str, dict[str, Any]]]] = http_script({})
 
 
 def _sse_event(kind: str, payload: dict[str, Any]) -> str:

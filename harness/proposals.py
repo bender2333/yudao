@@ -14,6 +14,7 @@ def product_spec(
     goal: str = "build an echo CLI",
     requirements: list[str] | None = None,
     acceptance: list[str] | None = None,
+    basis_product_spec_hash: str | None = None,
     **extra: Any,
 ) -> dict[str, Any]:
     payload = {
@@ -27,9 +28,29 @@ def product_spec(
         "non_goals": extra.get("non_goals", ["network access"]),
         "decision_changes": extra.get("decision_changes", []),
         "change_record": extra.get("change_record"),
+        "basis_product_spec_hash": basis_product_spec_hash,
     }
     payload.update({key: value for key, value in extra.items() if key in payload})
     return payload
+
+
+def product_spec_turn(
+    goal: str = "build an echo CLI",
+    requirements: list[str] | None = None,
+    acceptance: list[str] | None = None,
+    basis_product_spec_hash: str | None = None,
+    **extra: Any,
+) -> Callable[[ModelCall], dict[str, Any]]:
+    # 返回按请求里的当前 ProductSpec 填依据版本的假模型轮次（工单 #471）：
+    # 第一次提交依据 null，修订版依据请求里写明的当前版本，与真实模型从上下文读到的一样
+    def submit(call: ModelCall) -> dict[str, Any]:
+        declared = basis_product_spec_hash
+        if declared is None:
+            raw = prompt_part(call, "current_product_spec")
+            declared = json.loads(raw).get("content_hash") if raw else None
+        return product_spec(goal, requirements, acceptance, declared, **extra)
+
+    return submit
 
 
 def collaboration_request(
@@ -102,6 +123,7 @@ def delivery(
     files: list[str] | None = None,
     check_names: list[str] | None = None,
     known_risks: list[str] | None = None,
+    basis_product_spec_hash: str | None = None,
 ) -> dict[str, Any]:
     return {
         "kind": "delivery_spec",
@@ -109,6 +131,7 @@ def delivery(
         "files": files or ["src/echo.py"],
         "check_names": check_names or ["smoke"],
         "known_risks": known_risks or [],
+        "basis_product_spec_hash": basis_product_spec_hash,
     }
 
 
@@ -198,6 +221,7 @@ def review(
     rationale: str,
     checks: list[str] | None = None,
     defects: list[dict[str, str]] | None = None,
+    basis_delivery_spec_hash: str | None = None,
 ) -> dict[str, Any]:
     return {
         "kind": "qa_review",
@@ -205,6 +229,7 @@ def review(
         "rationale": rationale,
         "checks": checks or ["smoke"],
         "defects": defects or [],
+        "basis_delivery_spec_hash": basis_delivery_spec_hash,
     }
 
 
@@ -213,16 +238,28 @@ def delivery_turn(
     *,
     files: dict[str, str] | None = None,
     checks: dict[str, int | dict[str, Any]] | None = None,
+    basis_product_spec_hash: str | None = None,
     transcript: str = "",
-) -> FakeTurn:
+) -> Callable[[Any], FakeTurn]:
+    # 返回按请求里的当前 ProductSpec 填依据版本的假模型轮次（工单 #471）：
+    # 调用方拿到的是脚本项而不是 FakeTurn，写出的提交才能通过依据版本校验
     files = files or {"src/echo.py": "import sys\nprint(sys.argv[1])\n"}
     checks = checks or {"smoke": 0}
-    return FakeTurn(
-        proposal=delivery(summary, files=list(files), check_names=list(checks)),
-        writes=files,
-        checks=checks,
-        transcript=transcript,
-    )
+
+    def factory(call: Any) -> FakeTurn:
+        declared = basis_product_spec_hash
+        if declared is None:
+            raw = prompt_part(call, "current_product_spec")
+            declared = json.loads(raw).get("content_hash") if raw else None
+        return FakeTurn(
+            proposal=delivery(summary, files=list(files), check_names=list(checks),
+                              basis_product_spec_hash=declared),
+            writes=files,
+            checks=checks,
+            transcript=transcript,
+        )
+
+    return factory
 
 
 def review_turn(
@@ -231,11 +268,21 @@ def review_turn(
     *,
     checks: dict[str, int | dict[str, Any]] | None = None,
     defects: list[dict[str, str]] | None = None,
+    basis_delivery_spec_hash: str | None = None,
     transcript: str = "",
-) -> FakeTurn:
+) -> Callable[[Any], FakeTurn]:
     checks = checks or {"smoke": 0}
-    return FakeTurn(
-        proposal=review(verdict, rationale, checks=list(checks), defects=defects),
-        checks=checks,
-        transcript=transcript,
-    )
+
+    def factory(call: Any) -> FakeTurn:
+        declared = basis_delivery_spec_hash
+        if declared is None:
+            raw = prompt_part(call, "current_delivery_spec")
+            declared = json.loads(raw).get("content_hash") if raw else None
+        return FakeTurn(
+            proposal=review(verdict, rationale, checks=list(checks), defects=defects,
+                            basis_delivery_spec_hash=declared),
+            checks=checks,
+            transcript=transcript,
+        )
+
+    return factory

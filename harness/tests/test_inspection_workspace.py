@@ -20,7 +20,7 @@ from harness.environment import (
     inspection_root,
 )
 from harness.public_tree import capture_public_tree
-from harness.providers.call import ModelResponse
+from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.sessions import SessionFactory
 from harness.tests import event_scenarios
@@ -240,24 +240,28 @@ def test_the_inspection_workspaces_are_removed_when_the_run_reaches_done(tmp_pat
     assert (run_root / "src" / "echo.py").exists()
 
 
-def _quality_bash_script() -> dict[str, list]:
+def _quality_bash_turn(call: ModelCall) -> ModelResponse:
     # 质检一轮里先用 bash 读交付、写下自己看到的版本并写入自己的文件，跑主机检查，最后退回返工；
     # 返工让 run 继续，检查工作区保留，可以就这一轮 bash 写下的内容断言
     turn = event_scenarios.review_turn(
         "rework_engineering", "the sealed output needs a newline check",
         checks=event_scenarios.CHECKS,
         defects=[{"severity": "major", "summary": "no check covers the sealed output"}])
+    return ModelResponse(output=[
+        event_scenarios._call("q-read-1", "bash", {"command": "cat src/echo.py > seen.txt"}),
+        event_scenarios._call("q-write-2", "bash", {"command": "mkdir -p qa && printf x > qa/new.txt"}),
+        event_scenarios._call("q-check-3", "run_check", {"name": "smoke"}),
+        event_scenarios._call("q-submit-4", "submit_review",
+                              {key: value for key, value in turn(call).proposal.items() if key != "kind"}),
+    ])
+
+
+def _quality_bash_script() -> dict[str, list]:
     return {
         "product": [event_scenarios.product_spec()],
         "engineering": [event_scenarios.delivery_turn(
             files={"src/echo.py": "SEALED_VERSION\n"}, checks=event_scenarios.CHECKS)],
-        "quality": [ModelResponse(output=[
-            event_scenarios._call("q-read-1", "bash", {"command": "cat src/echo.py > seen.txt"}),
-            event_scenarios._call("q-write-2", "bash", {"command": "mkdir -p qa && printf x > qa/new.txt"}),
-            event_scenarios._call("q-check-3", "run_check", {"name": "smoke"}),
-            event_scenarios._call("q-submit-4", "submit_review",
-                                  {key: value for key, value in turn.proposal.items() if key != "kind"}),
-        ])],
+        "quality": [_quality_bash_turn],
     }
 
 

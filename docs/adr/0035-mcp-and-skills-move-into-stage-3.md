@@ -1,6 +1,6 @@
 # 将 MCP 和技能提前到 Stage 3
 
-状态：已采纳（2026-10-12）。方案：[Stage 3 重排方案](../stage-3/replan-mcp-skills.md)。
+状态：已采纳（2026-10-12）；文档同步与 GitHub 里程碑 M5、父工单 #494、3.2B 真实验收 #495 于 2026-10-13 完成。方案：[Stage 3 重排方案](../stage-3/replan-mcp-skills.md)。
 
 背景：
 

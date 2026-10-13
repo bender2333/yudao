@@ -20,7 +20,7 @@ from harness.decisions import DecisionClosed
 from harness.engine import StepLimits
 from harness.event_store import Command
 from harness.models import EventType, Usage, json_dumps
-from harness.providers.call import ModelResponse
+from harness.providers.call import ModelCall, ModelResponse
 from harness.proposals import (
     collaboration_request, delivery, delivery_turn, guidance_response,
     product_spec, response_turn, review, review_turn,
@@ -32,7 +32,7 @@ from harness.tests.protocol_helpers import ScriptedProvider, provider_system, se
 from harness.tests.provider_replies import (
     BROKEN_STREAMS,
     HTTP_REPLIES,
-    HTTP_SCRIPT,
+    http_script,
     http_error as _http_error,
     messages_credential_rejected as _messages_credential_rejected,
     product_spec_reply,
@@ -54,11 +54,16 @@ def _call(identity: str, name: str, arguments: Any) -> dict[str, Any]:
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name, "arguments": raw}
 
 
-def _deliver() -> FakeTurn:
+def _current_spec_hash(call: ModelCall) -> str | None:
+    raw = prompt_part(call, "current_product_spec")
+    return json.loads(raw).get("content_hash") if raw else None
+
+
+def _deliver() -> Callable[[ModelCall], FakeTurn]:
     return delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)
 
 
-def _release(rationale: str = "checks passed on the current snapshot") -> FakeTurn:
+def _release(rationale: str = "checks passed on the current snapshot") -> Callable[[ModelCall], FakeTurn]:
     return review_turn("release", rationale, checks=CHECKS)
 
 
@@ -302,19 +307,30 @@ def no_tool_call_pause(data_dir):
 def bash_is_not_a_check_receipt(data_dir):
     argv = ["python", "src/echo.py", "hello"]
 
-    def submit(identity):
+    def submit(call, identity):
         return _call(identity, "submit_delivery",
-                     {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["unit-tests"]})
+                     {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["unit-tests"],
+                      "basis_product_spec_hash": _current_spec_hash(call)})
+
+    def first(call):
+        return ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
+                                     _call("command-1", "bash", {"command": "python src/echo.py hello"}),
+                                     submit(call, "submit-1")])
+
+    def second(call):
+        return ModelResponse(output=[_call("check-2", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}),
+                                     _call("write-2", "write_file", {"path": "src/echo.py", "content": ECHO + "\n"}),
+                                     submit(call, "submit-2")])
+
+    def third(call):
+        return ModelResponse(output=[_call("check-3", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}),
+                                     submit(call, "submit-3")])
 
     system, _, run_id = _system(data_dir, [
         product_spec(),
-        ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
-                              _call("command-1", "bash", {"command": "python src/echo.py hello"}),
-                              submit("submit-1")]),
-        ModelResponse(output=[_call("check-2", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}),
-                              _call("write-2", "write_file", {"path": "src/echo.py", "content": ECHO + "\n"}),
-                              submit("submit-2")]),
-        ModelResponse(output=[_call("check-3", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}), submit("submit-3")]),
+        first,
+        second,
+        third,
         _release("verified the delivered echo CLI"),
     ])
     system.run_until_stop(run_id)
@@ -341,19 +357,20 @@ def _cancel_when_running(system: LoopSystem, run_id: str, marker) -> threading.T
     return canceller
 
 
-def _delivery_call(identity: str) -> dict[str, Any]:
-    return _call(identity, "submit_delivery", {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"]})
-
 
 def cancel_while_check_runs(data_dir):
     # 标记文件的路径写成正斜杠形式，规整以后各平台相同
     marker = (data_dir / "check-running").as_posix()
     command = f'python -c "{_running("check")}" "{marker}"'
+    def deliver(call):
+        return ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
+                                     _call("check-1", "run_check", {"name": "smoke", "command": command}),
+                                     _call("submit-1", "submit_delivery",
+                                           {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"],
+                                            "basis_product_spec_hash": _current_spec_hash(call)})])
     system, _, run_id = _system(data_dir, [
         product_spec(),
-        ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
-                              _call("check-1", "run_check", {"name": "smoke", "command": command}),
-                              _delivery_call("submit-1")]),
+        deliver,
     ])
     canceller = _cancel_when_running(system, run_id, data_dir / "check-running")
     system.run_until_stop(run_id)
@@ -364,9 +381,14 @@ def cancel_while_check_runs(data_dir):
 def cancel_while_bash_runs(data_dir):
     marker = (data_dir / "command-running").as_posix()
     command = f"echo command started; printf running > \"{marker}\"; sleep 60"
+    def deliver(call):
+        return ModelResponse(output=[_call("command-1", "bash", {"command": command}),
+                                     _call("submit-1", "submit_delivery",
+                                           {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"],
+                                            "basis_product_spec_hash": _current_spec_hash(call)})])
     system, _, run_id = _system(data_dir, [
         product_spec(),
-        ModelResponse(output=[_call("command-1", "bash", {"command": command}), _delivery_call("submit-1")]),
+        deliver,
     ])
     canceller = _cancel_when_running(system, run_id, data_dir / "command-running")
     system.run_until_stop(run_id)
@@ -377,11 +399,12 @@ def cancel_while_bash_runs(data_dir):
 # 真实 Provider 模块：三个部门绑定同一个本机 HTTP 服务，服务按请求顺序回放脚本中的工具调用
 def _http_scenario(protocol: str):
     def run(data_dir):
-        replies = iter(enumerate(HTTP_SCRIPT, start=1))
+        state = {"index": 0}
 
-        def responder(_body):
-            index, calls = next(replies)
-            return 200, "text/event-stream", [HTTP_REPLIES[protocol](index, calls)]
+        def responder(body):
+            calls = http_script(body)[state["index"]]
+            state["index"] += 1
+            return 200, "text/event-stream", [HTTP_REPLIES[protocol](state["index"], calls)]
 
         server, _capture, base = serve(responder)
         try:
@@ -458,8 +481,8 @@ def _request_time_unavailable_script() -> list[Any]:
     return [
         FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
         ProviderError(_UNAVAILABLE_MESSAGE, reason="provider_unavailable"),
-        delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
-        review_turn("release", "checks passed on the current snapshot"),
+        _deliver(),
+        _release(),
     ]
 
 
@@ -538,9 +561,16 @@ def _credential_rejected_then_continue(protocol: str, first):
     # 回答继续执行以后走完交接与放行；四个成功回复按交接脚本顺序回放
     def run(data_dir):
         replies = [first]
-        for index, calls in enumerate(HTTP_SCRIPT, start=1):
-            replies.append((lambda index, calls: lambda _provider, handler: send_reply(
-                handler, 200, "text/event-stream", HTTP_REPLIES[protocol](index, calls)))(index, calls))
+        counter = {"index": 0}
+
+        def after_rejection(provider, handler):
+            # 提交依据的版本取自这次请求装配好的部门材料（ScriptedProvider 记录了收到的请求体）
+            calls = http_script(provider.requests[-1])[counter["index"]]
+            counter["index"] += 1
+            send_reply(handler, 200, "text/event-stream",
+                       HTTP_REPLIES[protocol](counter["index"], calls))
+
+        replies.extend(after_rejection for _ in range(3))
         provider = ScriptedProvider(replies)
         try:
             system, run_id = provider_system(data_dir, provider.base, protocol)

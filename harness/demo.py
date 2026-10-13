@@ -12,7 +12,8 @@ from .app.contracts import Rejected
 from .app.project_and_work_item_commands import WorkItemAppendInput, WorkItemCreate
 from .app.project_commands import ProjectCreate
 from .definitions import DEFINITIONS
-from .proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
+from .proposals import (collaboration_request, delivery_turn, product_spec, product_spec_turn,
+                        response_turn, review_turn)
 from .providers.selection import ModelSelection
 from .runtime import LoopSystem
 
@@ -25,7 +26,7 @@ V1 = product_spec(
     non_goals=["network access", "configuration files"],
 )
 
-V3 = product_spec(
+V3 = product_spec_turn(
     goal="Echo any single argument as ordinary text",
     requirements=["Print every given argument unchanged, including text beginning with '-'",
                   "Missing arguments must print usage and exit 2"],
@@ -42,7 +43,7 @@ V3 = product_spec(
     },
 )
 
-V2 = product_spec(
+V2 = product_spec_turn(
     goal="Build a local echo CLI with strict flags",
     requirements=[
         "Print the given argument to stdout",

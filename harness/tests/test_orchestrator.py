@@ -4,7 +4,8 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactRef
 from harness.definitions import DEFINITIONS
-from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review, review_turn
+from harness.proposals import (collaboration_request, delivery_turn, product_spec, product_spec_turn,
+                                response_turn, review, review_turn)
 from harness.runtime import LoopSystem
 from harness.tests.helpers import department_history, happy_script, run_scripted
 
@@ -59,7 +60,7 @@ def test_consultation_response_returns_to_engineering(data_dir):
     assert projection.product_spec.revision == 1
 
 def test_requested_requirements_revision_creates_normal_spec_before_response(data_dir):
-    updated = product_spec(
+    updated = product_spec_turn(
         goal="Build echo with strict flags", acceptance=["unknown flags exit 2"],
         change_record={
             "changed": ["Unknown flags must exit 2"],
@@ -140,7 +141,7 @@ def test_quality_rework_routes_to_product(data_dir):
             "acceptance misses empty input",
             defects=[{"severity": "blocker", "summary": "empty input not in spec"}],
         ),
-        product_spec(
+        product_spec_turn(
             goal="Build echo including empty input", acceptance=["empty input prints a blank line"],
             change_record={
                 "changed": ["Empty input must print a blank line"],
@@ -241,7 +242,7 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
             "contract is wrong",
             defects=[{"severity": "major", "summary": "contract issue"}],
         ),
-        product_spec(
+        product_spec_turn(
             acceptance=["new behavior"],
             change_record={
                 "changed": ["Replace the acceptance criterion with new behavior"],
