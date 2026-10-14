@@ -183,7 +183,7 @@ stateDiagram-v2
 | `definition.adopt`、`definition.withdraw` | 候选与已采用的版本 | 用户批准后在写明的范围内采用；撤回即采用上一个版本 |
 | `experiment.start` | 两个版本与任务集 | 交给评测工具，结果回填对照记录 |
 
-没有修改某一次运行里交接去向的命令，也没有修改基础规则与内核清单的命令。读取模型与界面见[应用层与接口层设计说明](app-and-interface.md)。
+没有指定某个部门开始工作的命令（部门按关注的成果开始工作，[ADR-0039](../adr/0039-departments-work-from-watched-outputs.md)），也没有修改基础规则与内核清单的命令。读取模型与界面见[应用层与接口层设计说明](app-and-interface.md)。
 
 ## 10. 模块交互
 
