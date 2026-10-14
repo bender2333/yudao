@@ -1,0 +1,62 @@
+# 每个 PR 与 main 的每次推送都运行。合并 main 要求 check 通过（docs/agents/dispatcher.md）。
+# 本文件由架构师维护，修改前经用户确认；执行者使用的开发 App 没有 workflows 权限。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            harness/tests/openapi/package-lock.json
+
+      - name: git 身份（测试会建仓库并提交）
+        run: |
+          git config --global user.name "Yudao CI"
+          git config --global user.email "ci@yudao.invalid"
+
+      - name: 安装依赖
+        run: |
+          uv sync --frozen
+          npm ci --prefix client
+          npm ci --prefix harness/tests/openapi
+
+      # 包括两项固定检查（test_layers.py 在单元层，test_openapi_snapshot.py 在模块层）
+      - name: 单元层与模块层
+        run: uv run python -m pytest -m "unit or module"
+
+      - name: 客户端类型检查与单元测试
+        working-directory: client
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: 编译页面与 wheel
+        run: |
+          npm run build:pages --prefix client
+          uv build --wheel
