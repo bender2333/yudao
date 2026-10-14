@@ -41,31 +41,37 @@ jobs:
           git config --global user.email "ci@yudao.invalid"
 
       - name: 安装依赖
+        id: install
         run: |
           uv sync --frozen
           npm ci --prefix client
           npm ci --prefix harness/tests/openapi
 
+      # 安装以后的各项检查互不依赖：前一项失败时后面的照样运行，一次给出全部结果
       # 包括两项固定检查（test_layers.py 在单元层，test_openapi_snapshot.py 在模块层）
       - name: 单元层与模块层
         run: uv run python -m pytest -m "unit or module"
 
       # room-screen-switch 等测试用 Playwright 启动 Chromium 挂载页面
       - name: 安装 Chromium
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client
         run: npx playwright install chromium
 
       # 逐场景回放测试（*-replay）按 AGENTS.md 单独运行，不在 CI 中
       - name: 客户端单元测试
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client
         timeout-minutes: 10
         run: node --test --test-force-exit --test-timeout=60000 --test-reporter=spec $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- '-replay\.test\.')
 
       - name: 编译页面与 wheel
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
           npm run build:pages --prefix client
           uv build --wheel
 
       - name: 客户端类型检查
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client
         run: npm run typecheck
