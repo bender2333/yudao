@@ -135,14 +135,25 @@ def test_tool_categories_and_references_are_checked(tmp_path):
     [issue] = raised.value.issues
     assert issue[:2] == ("tools.json", "submit_delivery") and "a host tool requires proposal and has no action" in issue[2]
 
+    # 删掉 bash 以后，三个角色的工具清单、两类事项里用到 bash 的部门清单都会报缺定义；
+    # submit_baseline_review 指向 delivery_spec 与 submit_delivery 重复，质检角色能提交的种类
+    # 也因此少一项：这些引用关系都由定义装载时的核对逐条报出
     tools["submit_delivery"].pop("action")
     _write(directory, "tools.json", tools)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
-    assert raised.value.issues[:3] == (
+    assert raised.value.issues == (
+        ("roles.json", "product.tools[4]", "工具 bash 没有定义"),
         ("roles.json", "engineering.tools[9]", "工具 bash 没有定义"),
+        ("roles.json", "quality.tools[4]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.product.tools[4]", "工具 bash 没有定义"),
         ("work_items.json", "kinds.change.departments.engineering.tools[9]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.quality.tools[4]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.onboarding.departments.product.tools[4]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.onboarding.departments.quality.tools[4]", "工具 bash 没有定义"),
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
+        ("proposal_contracts.json", "roles.quality.kinds",
+         "与共同部分合起来必须恰好说明这些提案种类：collaboration_request、collaboration_response、delivery_spec、department_guidance_response、qa_review"),
     )
 
 
