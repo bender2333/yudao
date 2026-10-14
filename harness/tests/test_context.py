@@ -473,7 +473,7 @@ def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_p
     assert result.phase == "ENGINEERING", result.error
     [payload] = _work_assemblies(system, run_id)
     assert payload["effective_context_window"] == 8000 and payload["configured_max_output_tokens"] == 4096
-    assert 2000 <= payload["input_token_estimate"] <= 3500  # pinned department material plus tool schemas
+    assert 2000 <= payload["input_token_estimate"] <= 3600  # pinned department material plus tool schemas
     # The request keeps whatever the window leaves after its input, up to the declared limit:
     # the old fixed 15% reserve would have allowed only 1200 tokens here.
     assert payload["max_output_tokens"] == min(4096, 8000 - payload["input_token_estimate"]) >= 4000

@@ -9,7 +9,7 @@ from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, json_dumps
 from harness.projection import replay_events
-from harness.proposals import delivery_turn, product_spec, review, review_turn
+from harness.proposals import (delivery_turn, product_spec, product_spec_turn, review, review_turn)
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
 
 def rework_script(verdict="rework_engineering"):
@@ -21,7 +21,9 @@ def rework_script(verdict="rework_engineering"):
         ]),
     ]
     if verdict == "rework_product":
-        script.append(product_spec(acceptance=["empty input prints an empty line"], change_record={
+        # 修订版产品要求的提交依据由工厂从请求里的当前 ProductSpec 取（工单 #471），
+        # 改写后的验收标准与变更记录照旧，证明候选保留下的是质检触发的那次修订
+        script.append(product_spec_turn(acceptance=["empty input prints an empty line"], change_record={
             "changed": ["Require an empty output line for empty input"], "retained": ["Echo the provided argument"],
             "retired": [], "rationale": "Quality identified missing empty-input behavior.",
         }))
@@ -64,9 +66,14 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, ve
     assert candidate.evidence_refs
     for ref in candidate.evidence_refs:
         assert system.artifacts.get(ref)
-    receipts = [asdict(item) for item in system.workspace(result.run_id).receipts()]
+    # #481 以后，质检的 run_check 写在质检会话的检查工作区里，run 结束即删除；
+    # 质检回执的持久来源是 QA_SUBMITTED 事件的 payload，每条都在质检会话语境下绑定
+    # （harness.validation._receipt_evidence：receipt 不带 department，事件本身就是质检提交）。
+    # 仍然逐条核对候选的检查与质检真实回执相符，只是改从事件里取
+    receipts = list(source.payload["checks"])
+    assert receipts
     for check in candidate.checks:
-        assert any(receipt["department"] == "quality" and all(check[key] == receipt[key] for key in (
+        assert any(all(check[key] == receipt[key] for key in (
             "name", "snapshot_hash", "product_spec_hash", "delivery_spec_hash", "activation_id"
         )) for receipt in receipts)
     assert len(system.test_adapter.invocations) == len(script)

@@ -5,6 +5,7 @@ import json
 from harness.tests.helpers import FAST_RETRIES
 from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec
+from harness.environment import inspection_root
 from harness.runtime import LoopSystem
 from harness.tests.protocol_helpers import (
     STUB_CALL as CALL,
@@ -108,13 +109,19 @@ def test_same_provider_call_id_in_different_steps_executes_each_host_call(tmp_pa
     run_id = None
 
     def repeat_call(handler, _body):
-        system.workspace(run_id).write_file("proof.txt", "second-result")
+        # 同一个 call_id 的两次调用都执行在本会话的检查工作区里（工单 #481）：
+        # 产品会话不持有交接，改写检查工作区才会改变第二次调用的结果
+        product_root = inspection_root(system.workspace_root / run_id, "product")
+        product_root.mkdir(parents=True, exist_ok=True)
+        product_root.joinpath("proof.txt").write_text("second-result", encoding="utf-8")
         _send(handler, _stream([CALL], response_id="resp-two"))
 
     with _server([_stream([CALL]), repeat_call, _stream([SUBMIT], response_id="resp-three")]) as (config, captures, *_):
         system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
         try:
             run_id = system.create_run("distinct executions")
+            # 检查工作区从激活开始时的运行快照建立：先写运行工作区，产品会话才读得到第一份内容；
+            # 两步之间改写检查工作区里的同一份文件，第二次调用读到的是另一份内容
             system.workspace(run_id).write_file("proof.txt", "first-result")
             result = system.activate_once(run_id)
             assert result.phase == "ENGINEERING", result.error
