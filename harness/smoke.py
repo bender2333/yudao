@@ -158,8 +158,7 @@ async def _create_and_run(application: Application, task: str) -> tuple[str, str
 def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str, Any]:
     projection = system.project(run_id)
     replayed = project_run(system.store, run_id)
-    workspace = system.workspace(run_id)
-    receipts = [_receipt(item) for item in workspace.receipts()]
+    receipts = _check_receipts(system, run_id)
     tool_calls = _tool_events(system.store, run_id)
     isolation = isolation_fields(system.store, system.artifacts, run_id)
     receipts_ok, receipt_notes = _receipt_evidence(system, run_id, receipts)
@@ -980,22 +979,8 @@ def _receipt(item: Any) -> dict[str, Any]:
 
 def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, Any]]) -> tuple[bool, list[str]]:
     notes: list[str] = []
-    executions: list[tuple[str, dict[str, Any]]] = []
-    for event in system.store.list_events(run_id):
-        payload = event.payload or {}
-        if event.type != EventType.TOOL_CALLED or payload.get("name") != "run_check":
-            continue
-        if not payload.get("output_ref"):
-            continue
-        try:
-            output = _read_artifact(system.artifacts, run_id, payload["output_ref"])
-            if isinstance(output, dict) and output.get("executor") == "host":
-                if not payload.get("activation_id") or output.get("activation_id") != payload.get("activation_id"):
-                    notes.append(f"check event {event.stream_version}: receipt activation does not match its execution")
-                    continue
-                executions.append((event.department, output))
-        except (KeyError, TypeError, ValueError, OSError) as exc:
-            notes.append(f"check event {event.stream_version}: {exc}")
+    executions, read_notes = _host_check_executions(system, run_id)
+    notes.extend(read_notes)
     for receipt in receipts:
         match = next((index for index, (role, output) in enumerate(executions)
                       if role == receipt.get("department") and all(
@@ -1026,6 +1011,48 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
         if not valid:
             notes.append(f"{department}: no successful host check bound to the final contract and snapshot")
     return not notes, notes
+
+
+def _check_receipts(system: LoopSystem, run_id: str) -> list[dict[str, Any]]:
+    # 检查回执的两个来源合并去重：运行工作区的回执文件与工具事件里 run_check 的主机执行工件。
+    # 工单 #481 起质检会话在自己的检查工作区里工作，会话结束即删，
+    # 质检的回执只剩工具事件的工件留得下；工程在运行工作区的回执仍然写在那里，
+    # 保持为可独立核对的主机记录来源（读法与 harness/tests/test_orchestrator.py 一致）。
+    # 同一次检查在两处各有一份、字段值相同，不去重会被核对循环算成两条回执
+    receipts = [_receipt(item) for item in system.workspace(run_id).receipts()]
+    seen = {(receipt.get("department"), receipt.get("name"), receipt.get("activation_id"),
+             receipt.get("snapshot_hash"), receipt.get("exit_code")) for receipt in receipts}
+    for department, output in _host_check_executions(system, run_id)[0]:
+        receipt = {key: value for key, value in output.items() if key != "executor"}
+        receipt["department"] = department
+        key = (department, receipt.get("name"), receipt.get("activation_id"),
+               receipt.get("snapshot_hash"), receipt.get("exit_code"))
+        if key not in seen:
+            seen.add(key)
+            receipts.append(receipt)
+    return receipts
+
+
+def _host_check_executions(system: LoopSystem, run_id: str) -> tuple[list[tuple[str, dict[str, Any]]], list[str]]:
+    # 工具事件里每一次 run_check 的主机执行：执行工件与它的激活核对，读数失败的备注一并返回
+    executions: list[tuple[str, dict[str, Any]]] = []
+    notes: list[str] = []
+    for event in system.store.list_events(run_id):
+        payload = event.payload or {}
+        if event.type != EventType.TOOL_CALLED or payload.get("name") != "run_check":
+            continue
+        if not payload.get("output_ref"):
+            continue
+        try:
+            output = _read_artifact(system.artifacts, run_id, payload["output_ref"])
+            if isinstance(output, dict) and output.get("executor") == "host":
+                if not payload.get("activation_id") or output.get("activation_id") != payload.get("activation_id"):
+                    notes.append(f"check event {event.stream_version}: receipt activation does not match its execution")
+                    continue
+                executions.append((event.department, output))
+        except (KeyError, TypeError, ValueError, OSError) as exc:
+            notes.append(f"check event {event.stream_version}: {exc}")
+    return executions, notes
 
 
 def _write_report(data_dir: Path, report: dict[str, Any]) -> None:
