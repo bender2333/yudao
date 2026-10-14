@@ -50,9 +50,10 @@ jobs:
       - name: 单元层与模块层
         run: uv run python -m pytest -m "unit or module"
 
+      # 逐场景回放测试（*-replay）按 AGENTS.md 单独运行，不在 CI 中
       - name: 客户端单元测试
         working-directory: client
-        run: npm test
+        run: node --test --test-reporter=dot $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- '-replay\.test\.')
 
       - name: 编译页面与 wheel
         run: |
