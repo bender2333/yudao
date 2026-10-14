@@ -21,7 +21,9 @@ import {
   formStateFromProvider,
   formPatchForBaseUrl,
   formPatchForPreset,
+  groupAdmittedModels,
   intFromInput,
+  MODEL_OPTION_COLLATOR,
   modelRemoveReferrers,
   patchRowCapacity,
   prefillModel,
@@ -502,6 +504,35 @@ test("部门默认的选项只含已准入且未作废的定义，档位选项�
   assert.match(kept[1].label, /按模型限制/);
 });
 
+
+test("模型选项排序不随系统语言变化（工单 #519）", () => {
+  const providers = [
+    { id: "p1", name: "OpenCode Go" },
+    { id: "p2", name: "其他连接" },
+  ];
+  const models = [
+    { id: "m1", provider_id: "p1", model: "glm-4.6" },
+    { id: "m2", provider_id: "p1", model: "kimi-k2" },
+    { id: "m3", provider_id: "p2", model: "deepseek" },
+    { id: "m4", provider_id: "p2", model: "deepseek-chat" },
+  ];
+  const admissions = models.map((item) => ({ model_id: item.id, provider_id: item.provider_id, admitted: true, stale: false }));
+  const options = admittedOptions(models, providers, admissions);
+  // 固定比较给出固定顺序：中文与英文系统语言下都是这一份
+  assert.deepEqual(options.map((item) => item.id), ["m3", "m4", "m1", "m2"]);
+  // 连接分组内按上游模型 ID 排序，中文与英文两种比较的结果一致
+  const groups = groupAdmittedModels(options, providers);
+  assert.deepEqual(groups.map((group) => group.provider_id), ["p1", "p2"]);
+  const order = groups[1].options.map((item) => item.model);
+  assert.deepEqual(order, ["deepseek", "deepseek-chat"]);
+  // 不带语言参数的 localeCompare 随系统语言变化：同一份数据的连接顺序在中文与英文下相反，
+  // 因此界面必须用固定比较，不能依赖运行机器的系统语言
+  const keys = options.map((item) => `${item.provider_name}/${item.id}`);
+  const zhOrder = keys.slice().sort((left, right) => new Intl.Collator("zh-CN").compare(left, right));
+  const enOrder = keys.slice().sort((left, right) => new Intl.Collator("en-US").compare(left, right));
+  assert.notDeepEqual(zhOrder, enOrder);
+  assert.deepEqual(keys.slice().sort((left, right) => MODEL_OPTION_COLLATOR.compare(left, right)), zhOrder);
+});
 test("连接测试使用自定义服务地址推导的模型列表地址", () => {
   assert.equal(connectionTestable({ base_url: "", models_url: "" }, PRESETS[0]), true);
   assert.equal(connectionTestable({ base_url: "https://x/v1", models_url: "" }, null), true);

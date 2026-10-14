@@ -429,6 +429,10 @@ export const STALE_ADMISSION_LABEL = "无法使用：准入已作废";
 
 export type ModelOption = { id: string; model: string; provider_id: string; provider_name: string };
 
+// 模型选项的固定比较：一处定义，两处使用，排序结果不随运行机器的系统语言变化（工单 #519）。
+// 固定语言保证中文系统与英文系统给出同一份顺序；不带语言参数的 localeCompare 按系统语言变化。
+export const MODEL_OPTION_COLLATOR = new Intl.Collator("zh-CN");
+
 // 部门默认与项目设置的模型选项：按连接分组的已准入定义（准入作废的不列出，第 9.1 节）
 export function admittedOptions(models: CatalogModel[], providers: CatalogProvider[], admissions: CatalogAdmission[]): ModelOption[] {
   return models
@@ -442,7 +446,7 @@ export function admittedOptions(models: CatalogModel[], providers: CatalogProvid
       provider_id: model.provider_id,
       provider_name: providers.find((item) => item.id === model.provider_id)?.name ?? model.provider_id,
     }))
-    .sort((left, right) => `${left.provider_name}/${left.id}`.localeCompare(`${right.provider_name}/${right.id}`));
+    .sort((left, right) => MODEL_OPTION_COLLATOR.compare(`${left.provider_name}/${left.id}`, `${right.provider_name}/${right.id}`));
 }
 
 // 部门默认的档位选项：来自所选模型的声明；已保存的档位不在声明内时额外保留并标明按模型限制（第 7.3 节）
@@ -737,7 +741,7 @@ export function groupAdmittedModels(models: ModelOption[], providers: CatalogPro
   for (const provider of providers) {
     const options = models
       .filter((model) => model.provider_id === provider.id)
-      .sort((left, right) => left.model.localeCompare(right.model));
+      .sort((left, right) => MODEL_OPTION_COLLATOR.compare(left.model, right.model));
     if (options.length > 0) {
       groups.push({ provider_id: provider.id, provider_name: provider.name, options });
     }
