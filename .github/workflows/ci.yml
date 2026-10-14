@@ -53,7 +53,8 @@ jobs:
       # 逐场景回放测试（*-replay）按 AGENTS.md 单独运行，不在 CI 中
       - name: 客户端单元测试
         working-directory: client
-        run: node --test --test-reporter=dot $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- '-replay\.test\.')
+        timeout-minutes: 10
+        run: node --test --test-timeout=60000 --test-reporter=spec $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- '-replay\.test\.')
 
       - name: 编译页面与 wheel
         run: |
