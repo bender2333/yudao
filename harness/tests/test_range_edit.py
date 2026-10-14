@@ -6,7 +6,8 @@ import pytest
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
-from harness.proposals import delivery, delivery_turn, product_spec, review, review_turn
+from harness.proposals import (collaboration_request, delivery_turn, product_spec, response_turn,
+                               review, review_turn)
 from harness.public_tree import capture_public_tree
 from harness.environment import LocalEnvironment
 from harness.runtime import LoopSystem
@@ -246,17 +247,20 @@ def test_two_edits_in_one_activation_produce_a_complete_delivery_tree(tmp_path):
                        _read_content_hash(environment, "src/b.py", 1, 1)),
         ])
 
-    adapter.script.extend([work_turn, FakeTurn(
-        proposal=delivery("two range edits", files=["src/a.py", "src/b.py"], check_names=["smoke"]),
+    # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：脚本项是工厂而不是 FakeTurn 实例
+    adapter.script.extend([work_turn, delivery_turn(
+        summary="two range edits",
+        files={"src/a.py": "HEADER = True\nVALUE = 2\nFOOTER = True\n",
+               "src/b.py": "GREETING = 'hello'\n", "src/keep.py": "KEPT = True\n"},
         checks={"smoke": 0},
     )])
     run_id = system.create_run("Apply two range edits")
-    system.activate_once(run_id)
-    system.activate_once(run_id)
+    # #470 删除工程计划以后，第二次激活就是工程写入轮次：文件要先存在，区间编辑才改得动
     workspace = system.workspace(run_id)
     workspace.write_file("src/a.py", "HEADER = True\nVALUE = 1\nFOOTER = True\n")
     workspace.write_file("src/b.py", "GREETING = 'hi'\n")
     workspace.write_file("src/keep.py", "KEPT = True\n")
+    system.activate_once(run_id)
     system.activate_once(run_id)
     result = system.activate_once(run_id)
     assert result.delivery_spec is not None, result.error
@@ -312,28 +316,52 @@ def test_mutated_check_copy_does_not_become_the_tested_delivery(tmp_path):
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
 def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),delivery_turn(),
-        FakeTurn(proposal=review("release", "stale verdict on the old tree")),
-    ]))
-    run_id = system.create_run("echo")
+    # 质检在交付 A 上退回一次重交付：工程重新封存交付 B 以后，质检带着依据旧交付 A 的放行结论
+    # 与这一次激活里重新跑过的检查提交。检查证据绑的是新快照，依据版本绑的是旧交付，
+    # #481 之后质检的检查工作区每次激活从最新封存交付建立，运行工作区的改动不影响这次判断
+    def stale_release(call):
+        # 质检这一步面对的是新封存的交付，放行结论却声明依据退回前的那份旧交付
+        return FakeTurn(
+            proposal=review("release", "stale verdict on the old tree", checks=["smoke"],
+                            basis_delivery_spec_hash=original),
+            checks={"smoke": 0},
+        )
+
+    adapter = FakeAdapter([
+        product_spec(),
+        delivery_turn(),
+        FakeTurn(proposal=collaboration_request(
+            "engineering", "The implementation does not match the requirement.",
+            request_type="action", action="revise_delivery")),
+        delivery_turn("revised echo", files={"src/echo.py": "import sys\nprint(str(sys.argv[1]))\n"}),
+        response_turn("completed", "The revised delivery is ready.",
+                      result_types=[EventType.DELIVERY_ACCEPTED]),
+        stale_release,
+    ])
+
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo", max_cycles=12)
     for _ in range(3):
-        system.activate_once(run_id)
-    assert system.project(run_id).delivery_spec is not None
-    accepted_digest = system.project(run_id).delivery_spec.code_tree_digest
-    workspace = system.workspace(run_id)
-    environment = LocalEnvironment(workspace)
-    content_hash = _read_content_hash(environment, "src/echo.py", 2, 2)
-    edited = perform(environment, "edit_range", {
-        "path": "src/echo.py", "start_line": 2, "end_line": 2,
-        "expected_text": "print(sys.argv[1])", "new_text": "print(sys.argv[1].upper())",
-        "expected_digest": content_hash,
-    })
-    assert edited.ok, edited.error
-    assert workspace.digest() != accepted_digest
+        pending = system.activate_once(run_id)
+    assert pending.phase == "QUALITY" and pending.pending_request is not None
+    original = pending.delivery_spec.content_hash
+    original_digest = pending.delivery_spec.code_tree_digest
+    delivered = system.activate_once(run_id)
+    assert delivered.phase == "QUALITY" and delivered.active_department == "engineering"
+    assert delivered.delivery_spec.content_hash != original
+    assert delivered.delivery_spec.code_tree_digest != original_digest
+    response = system.activate_once(run_id)
+    assert response.phase == "QUALITY" and response.active_department == "quality"
+    assert response.pending_request is None
     result = system.activate_once(run_id)
     assert result.phase == "QUALITY", result.error
     assert result.last_review is None
+    errors = result.rejections[-1]["errors"]
+    assert [error["field"] for error in errors] == ["basis_delivery_spec_hash"]
+    assert f"submitted artifact is based on {original!r}" in errors[0]["message"]
+    assert delivered.delivery_spec.content_hash in errors[0]["message"]
+    # 拒绝的原因不是缺少检查：这一次激活里质检真实跑过 smoke，回执绑的是新交付快照
+    assert not any(error["field"] == "checks" for error in errors)
     events = system.store.list_events(run_id)
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in events)
     rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
@@ -357,8 +385,9 @@ def test_adopted_baseline_applies_to_next_work_item_and_replay_verifies(data_dir
 
     adapter.script.extend([
         product_spec(),second_work,
-        FakeTurn(
-            proposal=delivery("v2", files=["src/echo.py"], check_names=["smoke"]),
+        # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：脚本项是工厂而不是 FakeTurn 实例
+        delivery_turn(
+            summary="v2", files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"},
             checks={"smoke": 0},
         ),
         review_turn("release", "ok v2"),

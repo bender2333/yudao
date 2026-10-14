@@ -104,10 +104,11 @@ def test_fake_run_exposes_attempt_identity_and_keeps_missing_usage_null(tmp_path
     assert first.attempt_id
     assert first.usage["input_tokens"] is None
     assert first.usage["total_tokens"] is None
-    assert len(_attempts(application, project_id, work_item_id).data.attempts) == 4
+    # happy_script 三次激活各一次模型调用：#470 删除工程计划以后，工程激活不再先提交计划
+    assert len(_attempts(application, project_id, work_item_id).data.attempts) == 3
 
     usage = _usage(application, project_id, work_item_id)
-    assert usage.data.totals.attempts == 4
+    assert usage.data.totals.attempts == 3
     assert usage.data.totals.reported == 0
     assert usage.data.totals.total_tokens is None
     assert usage.data.totals.cost is None
@@ -346,6 +347,7 @@ def test_observability_export_contains_attempt_context_and_usage_without_mutatin
     exported = application.query("run.export", RunExport(run_id=run_id))
 
     assert exported.data.run_id == run_id
-    assert len(exported.data.attempts) == 4
-    assert exported.data.usage["totals"]["attempts"] == 4
+    # happy_script 三次激活各一次模型调用：#470 删除工程计划以后，工程激活不再先提交计划
+    assert len(exported.data.attempts) == 3
+    assert exported.data.usage["totals"]["attempts"] == 3
     assert system.project(run_id).stream_version == before

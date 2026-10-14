@@ -134,8 +134,10 @@ def test_success_cancel_pause_and_rejected_review_do_not_invent_candidates(tmp_p
     assert cancelled.stop_reason == "cancelled" and cancelled.lesson_candidates == []
     invalid = review("rework_engineering", "unverified rejected opinion", defects=[{"severity": "minor", "summary": "claim"}])
     invalid["defects"] = None
+    # #470 删除工程计划以后，工程激活不再先提交计划：轮次上限回到 3，
+    # 质检的整次提交被拒绝以后没有下一段脚本，运行按上限暂停，不因为脚本耗尽失败
     _system, rejected = run_scripted(
-        tmp_path / "rejected", [product_spec(),delivery_turn(), invalid], max_cycles=4
+        tmp_path / "rejected", [product_spec(),delivery_turn(), invalid], max_cycles=3
     )
     assert rejected.phase == "PAUSED" and rejected.rejections
     assert rejected.lesson_candidates == []
@@ -149,7 +151,8 @@ def test_release_with_defect_keeps_existing_rejection_and_does_not_create_candid
     assert result.phase == "DONE"
     assert result.lesson_candidates == []
     assert result.rejections[0]["errors"] == [{"field": "defects", "message": "release requires an empty defect list"}]
-    assert len(system.test_adapter.invocations) == 5
+    # #470 删除工程计划以后，工程激活只提交一次计划，模型调用少一次：产品、交付、两次质检
+    assert len(system.test_adapter.invocations) == 4
     assert_candidate_does_not_change_execution(system, result)
 
 def test_evidence_source_export_and_replay_keep_the_same_candidate(tmp_path):
