@@ -52,14 +52,17 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
         ModelResponse(output=[lookup], reasoning={"provider_id": "fake", "protocol": "fake",
                                                   "model": "fake-script", "items": [reasoning]}),
         ModelResponse(output=[_submit(), _call("after-submit", "read_file", path="must-not-read.txt")]),
-        delivery_turn(), review_turn("release", "valid host evidence"),
+        # 工程先拿着过期依据提交被拒，再按当前版本重交（工单 #471、#499）：
+        # 提交的历史留在本部门，工程的第二次请求看得到它，别的部门看不到
+        delivery_turn(basis_product_spec_hash="stale"), delivery_turn(),
+        review_turn("release", "valid host evidence"),
     ])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.workspace(run_id).write_file("proof.txt", "CAUSAL_TOOL_OUTPUT")
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE"
-    assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1]
+    assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1, 1]
     # 同一连接、同一协议、同一上游模型时推理内容原样回放，紧接它产生的那次输出（工单 #88）
     replayed = adapter.invocations[1].input_items[2]
     assert replayed["id"] == "reason-1" and replayed["encrypted_content"] == "PRIVATE_CHAIN"
