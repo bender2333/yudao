@@ -54,7 +54,7 @@ jobs:
       - name: 客户端单元测试
         working-directory: client
         timeout-minutes: 10
-        run: node --test --test-timeout=60000 --test-reporter=spec $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- '-replay\.test\.')
+        run: node --test --test-force-exit --test-timeout=60000 --test-reporter=spec $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- '-replay\.test\.')
 
       - name: 编译页面与 wheel
         run: |
