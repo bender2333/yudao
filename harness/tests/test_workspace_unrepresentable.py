@@ -1,9 +1,10 @@
 # 工单 #104 的验收：公开树按项目的忽略规则取得，工作区出现无法表示的条目时暂停。
-# 测试从 LoopSystem 整体驱动，使用真实的文件系统、真实的 Git 与真实的登记命令进程；FakeAdapter 只给出模型的回答。
+# 测试从 LoopSystem 整体驱动，使用真实的文件系统、真实的 Git 与真实的 bash 命令进程；FakeAdapter 只给出模型的回答。
 
 import asyncio
 import json
 import os
+import sys
 
 import pytest
 
@@ -24,7 +25,7 @@ def _system(tmp_path, turns):
     return LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(),*turns]))
 
 def _write_command_body(workspace, outside):
-    # 登记命令的脚本：在 node_modules 下建立指向工作区之外的目录链接
+    # bash 命令调用的脚本：在 node_modules 下建立指向工作区之外的目录链接
     workspace.write_file("make_link.py", (
         "import os, sys\n"
         "os.makedirs('node_modules', exist_ok=True)\n"
@@ -32,8 +33,12 @@ def _write_command_body(workspace, outside):
     ))
 
 def _command_call(identity, name="make-link", args=None):
-    return {"id": identity, "call_id": identity, "type": "function_call", "name": "run_command",
-            "arguments": json_dumps({"name": name, "args": args or []})}
+    # bash 的 cwd 是工作区根，命令串里直接带上脚本参数；登记命令进程已随 run_command 删除（工单 #484），
+    # 这里证明的是同一件事：主机执行的命令在工作区里留下无法表示的链接以后 run 暂停
+    argument = (args or ["nested"])[0]
+    command = f'"{sys.executable.replace(chr(92), "/")}" make_link.py {argument}'
+    return {"id": identity, "call_id": identity, "type": "function_call", "name": "bash",
+            "arguments": json_dumps({"command": command})}
 
 def _called(events, name):
     return [event for event in events
@@ -70,11 +75,10 @@ def _workspace_and_command(tmp_path):
 def test_ignored_link_does_not_pause_and_never_enters_snapshot_seal_or_delivery(tmp_path):
     def work(request):
         return ModelResponse(output=[_command_call("cmd-link", "make-link", ["nested"])])
-    system = _system(tmp_path, [work, FakeTurn(
-        proposal=delivery("with ignored dependency link", files=["src/echo.py"], check_names=["smoke"]),
-        writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-        checks={"smoke": 0},
-    ), review_turn("release", "ok")])
+    # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：FakeTurn 是脚本项而不是实例
+    system = _system(tmp_path, [work, delivery_turn(
+        summary="with ignored dependency link", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+        checks={"smoke": 0}), review_turn("release", "ok")])
     run_id = system.create_run("Dependencies with links do not affect the public tree",
                                registered_commands=REGISTRY, command_versions={"make-link": 1})
     workspace = system.workspace(run_id)
@@ -123,7 +127,7 @@ def test_link_outside_ignored_paths_pauses_after_the_command_receipt(tmp_path):
     system.run_until_stop(run_id)
     events = system.store.list_events(run_id)
     # 回执照常记录
-    commands = _called(events, "run_command")
+    commands = _called(events, "bash")
     assert len(commands) == 1 and commands[0].payload["ok"] is True
     # 然后暂停，停止说明写链接在工作区内的相对路径
     pause = _paused(events)
@@ -161,11 +165,9 @@ def test_link_at_proposal_commit_pauses_with_the_same_reason(tmp_path):
     except OSError:
         pytest.skip("symbolic links are unavailable")
 
-    system = _system(tmp_path, [FakeTurn(
-        proposal=delivery("submit and pause", files=["src/echo.py"], check_names=["smoke"]),
-        writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-        checks={"smoke": 0},
-    )])
+    system = _system(tmp_path, [delivery_turn(
+        summary="submit and pause", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+        checks={"smoke": 0})])
     run_id = system.create_run("A link at proposal commit pauses the run",
                                registered_commands=REGISTRY, command_versions={"make-link": 1})
     workspace = system.workspace(run_id)
