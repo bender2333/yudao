@@ -10,7 +10,7 @@ from harness.event_store import run_stream
 from harness.write_path import NewEvent
 from harness.git_versions import GitVersionError
 from harness.models import EventType, GIT_VERSION_EVENTS
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec, product_spec_turn, review_turn
 from harness.public_tree import TreeError, capture_public_tree, materialize_tree
 from harness.runtime import CancelledInputSaveError, LoopSystem, RunTerminalError
 from harness.tree_archive import load_tree
@@ -24,7 +24,13 @@ CHANGE_RECORD = {
 }
 
 def _revision():
-    return product_spec(requirements=["Print the argument in uppercase"], change_record=CHANGE_RECORD)
+    # 修订版 ProductSpec 的提案（工单 #471）：依据版本由工厂从请求里的当前版本取
+    return product_spec_turn(requirements=["Print the argument in uppercase"], change_record=CHANGE_RECORD)
+
+def _revision_proposal(basis):
+    # 直接提交用的修订提案：依据版本由调用方给出
+    return product_spec(requirements=["Print the argument in uppercase"], change_record=CHANGE_RECORD,
+                        basis_product_spec_hash=basis)
 
 def _formal(system, run_id):
     return [event for event in system.store.list_events(run_id) if event.type in GIT_VERSION_EVENTS]
@@ -170,11 +176,11 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
     with monkeypatch.context() as failure:
         failure.setattr(system.store, "commit", _failing_append(system.store, EventType.CONTRACT_ACCEPTED))
         with pytest.raises(OSError):
-            _commit_spec(system, run_id, _revision())
+            _commit_spec(system, run_id, _revision_proposal(before.product_spec.content_hash))
     assert system.project(run_id).canonical_state() == before.canonical_state()
     assert (tmp_path / "materials" / run_id / "PRD.md").read_bytes() == original_prd
     assert b'"revision": 2' in system.git_versions.read_file(run_id, candidates[0], "specs/product.json")
-    accepted = _commit_spec(system, run_id, _revision())
+    accepted = _commit_spec(system, run_id, _revision_proposal(before.product_spec.content_hash))
     current = system.project(run_id)
     assert accepted.payload["git_version"]["parent_commit"] == before.git_version["commit"]
     assert candidates[0]["commit"] not in {item["commit"] for item in current.git_versions}

@@ -30,8 +30,9 @@ CHANGE_RECORD = {
     "rationale": "Apply the user's explicit change to uppercase output",
 }
 
+# 提交依据的版本由工厂从请求里的当前版本取（工单 #471）：修订必须声明它依据的那一版
 def _revision():
-    return product_spec(requirements=["print the argument in uppercase"], change_record=CHANGE_RECORD)
+    return product_spec_turn(requirements=["print the argument in uppercase"], change_record=CHANGE_RECORD)
 
 def _call(identity, name, **arguments):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
@@ -139,7 +140,7 @@ def test_failed_intend_publication_preserves_previous_original_and_received_stat
 def test_only_complete_product_spec_can_process_received_input(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), product_decision("Uppercase all output", "This cannot consume pending input"),
-        product_spec(requirements=["print the argument in uppercase"]), _revision(),
+        product_spec_turn(requirements=["print the argument in uppercase"]), _revision(),
     ]))
     run_id = system.create_run("build echo")
     old = system.activate_once(run_id)
@@ -279,7 +280,7 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
 def test_input_received_during_quality_model_response_prevents_its_old_release(tmp_path):
     def stale_release(request):
         system.add_input(request.run_id, "Print uppercase instead")
-        return review_turn("release", "This belongs to the old input")
+        return review_turn("release", "This belongs to the old input")(request)
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),delivery_turn(), stale_release]))
     run_id = system.create_run("build echo")
@@ -378,7 +379,7 @@ def test_project_department_prompt_changes_apply_from_the_next_model_request(tmp
     assert current.canonical_state() == system.replay(run_id).canonical_state()
 
 def test_identical_requirement_text_for_new_input_still_has_new_contract_binding(tmp_path):
-    same_requirements = product_spec(change_record={
+    same_requirements = product_spec_turn(change_record={
         "changed": [], "retained": ["Echo the argument exactly"], "retired": [],
         "rationale": "The new user input confirms the existing behavior",
     })

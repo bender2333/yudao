@@ -2,7 +2,7 @@ from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, DEPARTMENTS, EventType
-from harness.proposals import baseline_review_turn, product_spec, structure_turn
+from harness.proposals import baseline_review_turn, product_spec, product_spec_turn, structure_turn
 from harness.runtime import LoopSystem
 from harness.snapshot import ingest_snapshot
 from harness.tools import tools_for
@@ -92,10 +92,12 @@ def test_quality_cannot_see_existing_structure(tmp_path):
     captured: dict[str, object] = {}
     holder: dict[str, LoopSystem] = {}
 
-    def product_rework_turn():
-        return FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"],
-                                              change_record={"changed": ["clarified the requirement"], "retained": [],
-                                                             "retired": [], "rationale": "rework"}))
+    # 提交依据的版本由工厂从请求里的当前版本取（工单 #471）
+    def product_rework_turn(call):
+        return FakeTurn(proposal=product_spec_turn(
+            requirements=[REQUIREMENT], acceptance=["run the CLI with a word"],
+            change_record={"changed": ["clarified the requirement"], "retained": [],
+                           "retired": [], "rationale": "rework"})(call))
 
     def engineering_turn(call):
         from harness.tests.helpers import recorded_context
@@ -114,7 +116,7 @@ def test_quality_cannot_see_existing_structure(tmp_path):
 
     def product_then_mark(call):
         captured["reworked"] = True
-        return product_rework_turn()
+        return product_rework_turn(call)
 
     system, run_id = _onboarding_run(tmp_path, [
         _product_turn(), engineering_turn, quality_turn, product_then_mark, engineering_turn, quality_turn,
