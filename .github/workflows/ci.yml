@@ -50,6 +50,10 @@ jobs:
       - name: 单元层与模块层
         run: uv run python -m pytest -m "unit or module"
 
+      # room-screen-switch 等测试用 Playwright 启动 Chromium 挂载页面
+      - name: 安装 Chromium
+        run: npx --prefix client playwright install chromium
+
       # 逐场景回放测试（*-replay）按 AGENTS.md 单独运行，不在 CI 中
       - name: 客户端单元测试
         working-directory: client
