@@ -26,7 +26,7 @@
 - 除非工单或用户指定，不读取 `docs/archive/`。
 - 中间结果放在 `.tmp/`（已被 git 忽略）。
 - 修改 `docs/` 下的文档时，在 `docs/CHANGELOG.md` 追加记录，格式：`模型 ID / 时间（到分钟） / 具体的改动 / 原因`。
-- 日记格式：`模型 ID / 时间（分钟） / 行动或者想法或者其他`。架构师的日记是根目录的 `claude_jour.md`；执行者与审查者的日记在 `agents_jour/<工单编号>.md`，一张工单一个文件，没有工单编号的工作写在 `agents_jour/其他.md`，内容开头写明角色。`agents_jour.md` 是 2026-10-06 之前的日记，不再追加。
+- 日记格式：`模型 ID / 时间（分钟） / 行动或者想法或者其他`。架构师的日记是根目录的 `claude_jour.md`；执行者的日记在 `agents_jour/<工单编号>.md`，一张工单一个文件，没有工单编号的工作写在 `agents_jour/其他.md`，内容开头写明角色；审查者的记录是 PR 上的审查。`agents_jour.md` 是 2026-10-06 之前的日记，不再追加。
 - 工单：GitHub Issues 是工作队列，记录状态、领取、阻塞与验收清单；长篇设计、计划与证据放在 `docs/`，工单正文只写摘要并链接到对应文档。`gh` 命令写法见 [issue-tracker.md](issue-tracker.md)，标签含义见 [triage-labels.md](triage-labels.md)，领域文档的读法见 [domain.md](domain.md)。
 
 ## 规则

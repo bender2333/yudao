@@ -21,13 +21,13 @@
 
 ## 自主推进模式的流程标签
 
-自主推进模式（见 `CLAUDE.md` 与 `AGENTS.md`）另用四个标签表示工单在执行与审查之间的位置。同一时间一个工单只带其中一个，切换时去掉原标签。
+自主推进模式（见[派发者规则](dispatcher.md)与 `AGENTS.md`）另用两个标签表示工单在执行与审查之间的位置。同一时间一个工单只带其中一个，切换时去掉原标签。
 
 | 标签 | 含义 | 由谁加上 |
 | --- | --- | --- |
 | `in-progress` | 执行者正在处理 | 执行者，领到 `ready-for-agent` 工单时 |
-| `needs-review` | 执行者已交付，等待审查 | 执行者，发出 `DELIVERY:` 评论后 |
-| `review-passed` | 审查通过，PR 已创建，等待架构师合并 | 审查者，发出 `REVIEW: PASS` 评论后 |
-| `review-failed` | 审查未通过，等待架构师写下一轮任务 | 审查者，发出 `REVIEW: FAIL` 评论后 |
+| `needs-review` | CI 已通过，交付说明已写在 PR 上，等待审查 | 执行者，在 PR 上发出 `DELIVERY:` 评论后 |
 
-架构师在 `review-failed` 后把标签改回 `ready-for-agent`；卡住的工单改为 `ready-for-human`。
+审查的结论是 PR 审查的状态（批准或要求修改），不用标签表示。要求修改后，派发者把标签改回 `ready-for-agent`；卡住的工单改为 `ready-for-human`。
+
+2026-10-14 以前用过的 `review-passed`、`review-failed` 不再使用。仓库里保留这两个标签，已有工单上的记录供评测统计使用。
