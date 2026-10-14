@@ -8,7 +8,8 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
-from harness.proposals import product_spec, delivery, review, collaboration_request, response_turn, delivery_turn, review_turn
+from harness.proposals import (product_spec, delivery, delivery_turn, review, review_turn,
+                               collaboration_request, response_turn)
 from harness.providers import ProviderFacade
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
@@ -23,13 +24,14 @@ from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_even
 @pytest.fixture(scope="module")
 def saved_native(tmp_path_factory):
     # 一次本机流程走完的运行：产品给要求、工程写入、检查、交付、再检查、质检放行
+    # 提交依据的版本由工厂从请求里的当前版本取（工单 #471）：脚本项是工厂而不是裸提交
     script = [
         product_spec(),
         FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         FakeTurn(checks={"smoke": 0}),
-        delivery(),
+        delivery_turn(),
         FakeTurn(checks={"smoke": 0}),
-        review("release", "host checks passed"),
+        review_turn("release", "host checks passed"),
     ]
     system, projection = run_scripted(tmp_path_factory.mktemp("native"), script)
     assert projection.phase == "DONE"

@@ -34,6 +34,7 @@ import subprocess
 import sys
 import time
 import uuid
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -43,6 +44,7 @@ from harness.app.project_queries import RunActions, RunRecovery
 from harness.event_store import Command, EventStore
 from harness.models import EventType, ProjectEventType
 from harness.projection import saved_decisions
+from harness.proposals import delivery_turn, product_spec_turn, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import after_event
@@ -50,6 +52,11 @@ from harness.tests.helpers import after_event
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # 子进程启动、超时与等待退出的上限；真实进程要走文件系统与进程表，比内存里的操作慢
 STARTUP_TIMEOUT_SEC = 300
+_TURN_FACTORIES = {"product_spec": product_spec_turn, "delivery_spec": delivery_turn,
+                   "qa_review": review_turn}
+# 工厂自己按请求取依据版本，字段名与 shape 也不一样：这几项不进工厂参数
+_FACTORY_SKIP_FIELDS = frozenset({"kind", "basis_product_spec_hash", "basis_delivery_spec_hash",
+                                  "check_names", "known_risks"})
 
 
 def build_script(items: Sequence[dict[str, Any]]) -> list[Any]:
@@ -59,17 +66,48 @@ def build_script(items: Sequence[dict[str, Any]]) -> list[Any]:
     #   其余字段              FakeTurn 的字段（checks、transcript、files 等）
     # 提案与检查可以写在同一项里：建档的结构说明与基线核验要求检查回执绑定同一次激活（design 第 4.1 节）。
     # 只有提案的项仍然直接给出提案对象，行为与 #307 建立时相同
+    # 正式成果的提案（product_spec、delivery_spec、qa_review）换成工厂（工单 #471）：
+    # 脚本项只写提案内容，依据版本由工厂从请求里的当前版本取
     script: list[Any] = []
     for item in items:
         if "output" in item:
             script.append(ModelResponse(output=[dict(entry) for entry in item["output"]]))
-        elif "proposal" in item:
-            rest = {key: value for key, value in item.items() if key != "proposal"}
-            script.append(FakeTurn(proposal=dict(item["proposal"]), **rest) if rest
-                          else dict(item["proposal"]))
-        else:
+            continue
+        rest = {key: value for key, value in item.items() if key != "proposal"}
+        proposal = dict(item["proposal"]) if "proposal" in item else None
+        factory = _TURN_FACTORIES.get((proposal or {}).get("kind"))
+        if factory is not None:
+            # 依据字段交给工厂从请求里取：脚本项里写了的也丢掉，工厂读到的当前版本才是 host 端。
+            # 只有交付提案带 writes/checks：脚本项的 writes（路径到内容）与 checks（检查名到进程）
+            # 交给工厂生成 FakeTurn 的同名字段，质检提案的 checks 直接套在 FakeTurn 上
+            fields = {key: value for key, value in proposal.items()
+                      if key not in _FACTORY_SKIP_FIELDS}
+            if factory is delivery_turn:
+                # 提案的 files 只是文件名：内容由脚本项的 writes 给，没有 writes 时用工厂默认内容
+                content = rest.pop("writes", {})
+                fields["files"] = content or {name: "import sys\nprint(sys.argv[1])\n"
+                                              for name in fields.pop("files", []) or ["src/echo.py"]}
+                fields["checks"] = {name: 0 for name in fields.get("check_names") or []}
+            script.append(lambda call, factory=factory, fields=fields, rest=rest: _with_fields(
+                factory(**fields)(call), rest))
+            continue
+        if "proposal" not in item:
             script.append(FakeTurn(**item))
+        elif rest:
+            script.append(FakeTurn(proposal=proposal, **rest))
+        else:
+            script.append(proposal)
     return script
+
+def _with_fields(turn: Any, rest: dict[str, Any]) -> FakeTurn:
+    # product_spec_turn 返回的是提案 dict，另外两个工厂返回 FakeTurn：统一成 FakeTurn。
+    # 工厂把提案里的 check_names 生成为 {name: 0} 的 checks、把 files 生成为 writes；
+    # 脚本项另外给 writes/checks 时按脚本项的覆盖（值分别是路径到内容、检查名到进程）
+    if not isinstance(turn, FakeTurn):
+        turn = FakeTurn(proposal=turn)
+    if not rest:
+        return turn
+    return replace(turn, **rest)
 
 
 def _hold_after(system: LoopSystem, event_type: str, directory: Path, *,

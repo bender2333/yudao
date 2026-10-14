@@ -11,7 +11,7 @@ from harness.app.project_queries import DepartmentWorkspace
 from harness.models import EventType
 from harness.proposals import (
     collaboration_request, delivery_turn, guidance_response,
-    product_spec, response_turn, review_turn,
+    product_spec, product_spec_turn, response_turn, review_turn,
 )
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
@@ -223,7 +223,7 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     old_delivery = before.delivery_spec.content_hash
 
     system.add_guidance(run_id, "product", "请把输出改为大写并更新验收。")
-    adapter.script.append(product_spec(
+    adapter.script.append(product_spec_turn(
         requirements=["print the given argument in uppercase"],
         acceptance=["running the program with a word prints that word in uppercase"],
         change_record={
@@ -602,7 +602,7 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
     cited = old_delivery_id if kind == "delivery" else old_check_id
 
     system.add_guidance(run_id, "product", "请把输出改为大写并更新验收。")
-    adapter.script.append(product_spec(
+    adapter.script.append(product_spec_turn(
         requirements=["print the given argument in uppercase"],
         acceptance=["running the program with a word prints that word in uppercase"],
         change_record={
