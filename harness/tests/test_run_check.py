@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -22,7 +23,7 @@ from harness import environment as environment_module
 from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment
-from harness.models import EventType, json_dumps
+from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -221,9 +222,15 @@ def test_delivery_citing_a_run_check_receipt_is_accepted_and_quality_releases_on
     system.run_until_stop(run_id)
     projection = system.project(run_id)
     assert projection.phase == "DONE" and projection.stop_reason == "released"
-    passed = [receipt for receipt in system.workspace(run_id).receipts() if receipt.name == "smoke"]
+    engineering = [receipt for receipt in system.workspace(run_id).receipts() if receipt.name == "smoke"]
+    # 质检在自己的检查工作区里跑，会话结束即删，回执按 #481 的位置从工具事件工件读
+    quality = [json.loads(system.artifacts.get(ArtifactRef(**event.payload["output_ref"])).decode("utf-8"))
+               for event in system.store.list_events(run_id)
+               if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("name") == "run_check"
+               and event.department == "quality"]
     # 工程与质检各运行过一次检查：两次都是主机执行的真实进程
-    assert len(passed) == 2 and all(receipt.exit_code == 0 for receipt in passed)
+    assert len(engineering) == 1 and engineering[0].exit_code == 0
+    assert len(quality) == 1 and quality[0]["executor"] == "host" and quality[0]["exit_code"] == 0
 
 
 def test_delivery_citing_a_bash_result_is_rejected_with_the_check_reason(tmp_path):

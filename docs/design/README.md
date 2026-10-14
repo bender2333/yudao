@@ -19,9 +19,9 @@
   - 状态：2026-10-07 设计，用户已确认，未实施。工单：迭代底座 B3（M2），评测工作线的 #194、#196、#198。
   - 需求：[D38](../requirements/system-intent.md)。ADR：[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [三部门的循环结构](department-loop.md)
-  - 内容：交接与部门的步骤循环两层、三个部门同时运行的情况与条件、询问是一次工具调用、询问分支、回答能做什么、询问链、用量与失败、工作中途要求变化、指导、提交与版本、工程的计划、停止与恢复、与现有代码的差异，含状态图、模块交互图与时序图。
-  - 状态：2026-10-12 设计，用户逐轮采纳推荐，未实施。
-  - 需求：[D38](../requirements/system-intent.md)、[D20](../requirements/department-guidance.md)。ADR：[0036](../adr/0036-concurrent-departments-and-nested-asks.md)、[0037](../adr/0037-engineering-plan-stays-with-engineering.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。
+  - 内容：部门按关注的成果开始工作与部门的步骤循环、三个部门同时运行的情况与条件、询问是一次工具调用、询问分支、回答能做什么、询问链（允许回问，层数上限是规则参数）、用量与失败、工作中途要求变化、指导、提交与版本、工程的计划、停止与恢复、与现有代码的差异，含成果流向图、模块交互图与时序图。
+  - 状态：2026-10-12 设计，用户逐轮采纳推荐；2026-10-14 按 #488、#489 的讨论去掉交接、询问链允许回问，用户确认；未实施。
+  - 需求：[D38](../requirements/system-intent.md)、[D20](../requirements/department-guidance.md)。ADR：[0036](../adr/0036-concurrent-departments-and-nested-asks.md)、[0037](../adr/0037-engineering-plan-stays-with-engineering.md)、[0039](../adr/0039-departments-work-from-watched-outputs.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。
 - [循环与收敛](loops-and-convergence.md)
   - 内容：循环层的声明、一定会停、子循环、收敛的检测、防止滑向静态编排的五条判据、容纳变化的判据。
   - 状态：2026-10-07 设计，用户已确认，未实施；同日第 5 节写明 Stage 3 判定步骤循环与 run 两层、run 层只计有可执行检验的条件、步骤循环取 8 步与 3 次。工单：B2（M2）、#143、#246、自举试点的首批工单（收敛状态投影与 `run.loops`）、Stage 4、Stage 5。
