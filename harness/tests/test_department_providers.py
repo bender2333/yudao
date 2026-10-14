@@ -84,7 +84,12 @@ def _chat_stream(calls: list[dict[str, Any]], *, response_id: str, model: str) -
         }]}}])
         for index, call in enumerate(calls)
     ]
-    frames.append(chunk([{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]))
+    if calls:
+        frames.append(chunk([{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]))
+    else:
+        # 压缩请求不带工具：只回摘要文本，以普通结束而不是工具调用结束
+        frames.append(chunk([{"index": 0, "delta": {"content": "Compacted work summary."}}]))
+        frames.append(chunk([{"index": 0, "delta": {}, "finish_reason": "stop"}]))
     frames.append(chunk([], usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}))
     frames.append(b"data: [DONE]\n\n")
     return _Reply(b"".join(frames))
@@ -135,6 +140,30 @@ def _message(message_id: str, text: str) -> dict[str, Any]:
         "status": "completed",
         "content": [{"type": "output_text", "text": text, "annotations": []}],
     }
+
+def _material_hash(body: dict[str, Any], source: str, field: str) -> str | None:
+    # 从本机服务收到的请求里取出装配好的部门材料中的 content_hash（工单 #471）：
+    # 服务回放的提交据此声明它依据的版本，与真实模型从上下文读到的一样
+    items = body.get("input") or body.get("messages") or []
+    material = "\n\n".join(_material_text(item) for item in items)
+    for segment in ("\n\n" + material).split("\n\n[")[1:]:
+        name, separator, text = segment.partition("]\n")
+        if separator and name == source:
+            return json.loads(text).get(field)
+    return None
+
+def _spec_hash(body: dict[str, Any]) -> str | None:
+    return _material_hash(body, "current_product_spec", "content_hash")
+
+def _material_text(item: Any) -> str:
+    # 三种协议的输入项形状不同：Responses 的 input 与 Chat 的 messages 用字符串正文，
+    # Messages 协议把正文放在 content 块的 text 里
+    content = item.get("content") if isinstance(item, dict) else None
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(block.get("text", "") for block in content if isinstance(block, dict))
+    return ""
 
 @contextmanager
 def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[tuple[ResponsesConfig, list[dict[str, Any]], list[BaseException]]]:
@@ -848,11 +877,16 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
                                 message_id="p-spec", model="p-model-actual")
 
     def engineering(body: dict[str, Any], count: int) -> _Reply:
-        # 第一次请求临时失败，重试以后直接交付
         assert body["model"] == "e-model"
         if count == 1:
             return _error()
-        payload = delivery(files=["src/echo.py"], check_names=["smoke"])
+        if not body.get("tools"):
+            return _chat_stream([], response_id=f"e-compact-{count}", model="e-model-actual")
+        # 第一次交付拿过期依据被拒，下一次激活按当前版本重交（工单 #471）：
+        # 被拒的提交留在本部门历史里，工程的第三次请求看得到它，别的部门看不到
+        basis = "stale" if count == 2 else _spec_hash(body)
+        payload = delivery(files=["src/echo.py"], check_names=["smoke"],
+                           basis_product_spec_hash=basis)
         payload.pop("kind")
         return _chat_stream([
             _call("write-echo", "write_file", {"path": "src/echo.py", "content": "import sys\nprint(sys.argv[1])\n"}),
@@ -863,8 +897,8 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
 
     def quality(body: dict[str, Any], count: int) -> _Reply:
         assert body["model"] == "q-model"
-        payload = review("release", "The delivery passes.", checks=["smoke"], defects=[])
-        payload.pop("kind")
+        payload = review("release", "The delivery passes.", checks=["smoke"], defects=[],
+                         basis_delivery_spec_hash=_material_hash(body, "current_delivery_spec", "content_hash"))
         return _stream([
             _call("quality-check", "run_check",
                   {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""}),
@@ -926,12 +960,17 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
             assert item.get("type") in {"message", "function_call"}, item
     delivery_messages = captures_e[-1]["body"]["messages"]
     assert all(message.get("content") != "" for message in delivery_messages)
-    call_index = next(index for index, message in enumerate(delivery_messages) if message.get("tool_calls"))
-    assert [call["id"] for call in delivery_messages[call_index]["tool_calls"]] == ["engineering-delivery"]
-    assert delivery_messages[call_index + 1] == {**delivery_messages[call_index + 1],
-                                                 "role": "tool", "tool_call_id": "engineering-delivery"}
-    assert [message["tool_call_id"] for message in delivery_messages if message["role"] == "tool"] == [
-        "engineering-delivery"]
+    # 上一次激活的 write_file、run_check 与被拒的提交都在历史里：最后一条工具调用是这次交付，
+    # 它的结果紧随其后，之前的结果也都在同一份跨激活历史里
+    call_index = next(index for index, message in enumerate(delivery_messages)
+                      if message.get("tool_calls") and any(
+                          call["id"] == "engineering-delivery" for call in message["tool_calls"]))
+    assert [call["id"] for call in delivery_messages[call_index]["tool_calls"]] == [
+        "write-echo", "engineering-check", "engineering-delivery"]
+    tool_messages = [message for message in delivery_messages if message["role"] == "tool"]
+    assert [message["tool_call_id"] for message in tool_messages] == [
+        "write-echo", "engineering-check", "engineering-delivery"]
+    assert all(message.get("content") != "" for message in tool_messages)
 
     # 会话身份：同部门跨激活、重试与压缩不变；部门之间、任务之间互相隔离
     def run_sessions(target_run: str) -> dict[str, str]:
