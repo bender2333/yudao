@@ -277,7 +277,7 @@ sequenceDiagram
 | `definition.withdraw` | 撤回已采用的版本，即采用上一个版本 | 版本 | 由 Stage 6 的工单确定 | 当前采用的版本 | 新增（Stage 6） |
 | `experiment.start` | 在指定的两个版本上运行同一组任务，结果回填对照记录 | 两个版本（定义摘要与参数摘要）、任务集、对照约定 | 由评测工作线的工单确定 | 空 | 新增（持续改进工作线） |
 
-目标由已有的 `project.set_goal` 修改。没有修改某一次运行里交接去向的命令，也没有修改基础规则与内核清单的命令。
+目标由已有的 `project.set_goal` 修改。没有指定某个部门开始工作的命令（部门按关注的成果开始工作，[ADR-0039](../adr/0039-departments-work-from-watched-outputs.md)），也没有修改基础规则与内核清单的命令。
 
 **模型管理（D24）**
 
@@ -529,7 +529,7 @@ sequenceDiagram
 
 事件种类与载荷类型是一个以 `type` 区分的联合，OpenAPI 中完整列出，页面代码生成的类型与之一致。
 
-`actor` 由写入方经写入口声明，每条事件都有：命令写入的事件为命令的提出者；角色任务中的记录与提案为 `department:<部门>`；流程编排与控制核心自己的判断（激活的开始与结束、交接、停止、结算）为 `system`；观察者的提案为 `observer:<名称>`。`role` 在 Stage 5 之前为空，部门只在 `department` 字段中出现。机器的上线与离线事件的 `actor` 为 `system`，`source` 为 `host_measurement`，写在这台机器的机器流中。
+`actor` 由写入方经写入口声明，每条事件都有：命令写入的事件为命令的提出者；角色任务中的记录与提案为 `department:<部门>`；流程编排与控制核心自己的判断（一轮工作的开始与结束、停止、结算）为 `system`；观察者的提案为 `observer:<名称>`。`role` 在 Stage 5 之前为空，部门只在 `department` 字段中出现。机器的上线与离线事件的 `actor` 为 `system`，`source` 为 `host_measurement`，写在这台机器的机器流中。
 
 ### 5.3 范围筛选
 
@@ -628,7 +628,7 @@ H1、H2、H4 至 H7 写成页面代码的单元测试，使用录制的事件夹
 | `overlays` | 覆盖层的名称与它依赖的查询；依赖的查询都已登记时才列出 |
 | `stream` | 是否提供模型输出片段、支持的范围参数 |
 
-- 覆盖层的清单（标识：名称，依赖的查询）：`flow`：交接流向（`project.flow`）；`waiting`：等待关系（`project.loop`、`decisions.list`）；`recovery`：结果未知的动作、等待机器与风险（`run.recovery`）；`context_usage`：上下文占用（`overlay.context_usage`）；`semantic_records`：语义记录（`semantic.records`）；`loops`：循环实例与收敛状态（`run.loops`）；`sources`：事实来源（事件对象的 `source` 字段，第 5.2 节，事件对象带上这个字段以后列出）；`coverage`：检验覆盖与开环（`acceptance.coverage`）。覆盖层的定义登记在注册表中，能力清单按依赖的查询是否都已登记自动列出；`overlays` 字段与前五个定义由 #73 加入，后三个由自举试点的首批工单加入，画面见原型 v10。
+- 覆盖层的清单（标识：名称，依赖的查询）：`flow`：成果流向（`project.flow`）；`waiting`：等待关系（`project.loop`、`decisions.list`）；`recovery`：结果未知的动作、等待机器与风险（`run.recovery`）；`context_usage`：上下文占用（`overlay.context_usage`）；`semantic_records`：语义记录（`semantic.records`）；`loops`：循环实例与收敛状态（`run.loops`）；`sources`：事实来源（事件对象的 `source` 字段，第 5.2 节，事件对象带上这个字段以后列出）；`coverage`：检验覆盖与开环（`acceptance.coverage`）。覆盖层的定义登记在注册表中，能力清单按依赖的查询是否都已登记自动列出；`overlays` 字段与前五个定义由 #73 加入，后三个由自举试点的首批工单加入，画面见原型 v10。
 - 接口版本在删除或改变已有的查询、命令、事件种类及其字段时提高；增加查询、命令、事件种类或字段时不变。
 - 页面与 Yudao 服务出自同一个 wheel，页面构建时的接口版本与服务相同（[ADR-0032](../adr/0032-interface-served-as-web-pages.md)）。页面打开时读取能力清单，只显示所需查询与命令都已列出的页面、区块与覆盖层（前端技术调研第 3.3 节「研究后才出现的覆盖层」）。
 - 本次启动的身份改变时（服务重启），页面重新读取能力清单并重新同步。

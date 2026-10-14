@@ -2,6 +2,8 @@
 
 日期：2026-09-26。状态：设计说明，规则已由用户确认（[D25](../requirements/semantic-system.md) 2026-09-25 至 2026-09-26）；2026-09-26 按[总体架构](architecture/overall-architecture.md)与用户的决定修改：第 4 节写明语义系统在总体架构中的位置，教训与洞见由教训发现模块找出（第 8、15 节）。未实施；路线位置为 Stage 5（部门内协作、上下文与界面）。2026-10-07 按 [ADR-0029](../adr/0029-departments-form-by-information-cohesion.md) 与 [ADR-0030](../adr/0030-rules-are-provisional-defaults.md)：第 7.2 节证据核对按判定点合同，第 9 节可见范围，第 10.8 节审查者，第 10、11 节的上限与阈值进入规则登记。需求：[D25 语义系统](../requirements/semantic-system.md)。调研：[Semantica 参照调研](../archive/research/semantica-reference.md)、[上下文组装：参照调研](../archive/research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)、[惊讶与预测误差](../archive/research/surprise-and-prediction-error.md)、[语义系统与部门内多角色：参照调研](../archive/research/semantic-system-and-department-roles.md)。ADR：[0008](../adr/0008-trajectory-and-graph-as-event-projections.md)、[0009](../adr/0009-deterministic-context-assembly.md)、[0010](../adr/0010-control-core-drives-role-steps.md)、[0019](../adr/0019-project-stream-across-versions.md)。相关设计：[总体架构：职责分层](architecture/overall-architecture.md)、[模型管理设计说明](model-management.md)第 8 节、[部门内多角色设计说明](department-roles.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
+2026-10-14 状态补充：交接已改为部门按关注的成果开始工作（[ADR-0039](../adr/0039-departments-work-from-watched-outputs.md)），轨迹的「交接」一层改称「一轮工作」；本文的用语在实施语义系统之前按[术语表](../../CONTEXT.md)修改。
+
 ## 1. 要解决的问题
 
 Agent 最重要的是上下文管理。一个长任务运行很久以后，只靠对话历史，上下文会放不下，内容也会混乱：旧决定与新决定同时出现时，模型会把旧内容当作候选事实。模型得到的上下文越长，表现越差，即使相关信息全部在里面（调研第 4.7 节）。
