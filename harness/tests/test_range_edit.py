@@ -4,7 +4,7 @@ import os
 import pytest
 
 from harness.providers.call import ModelResponse
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
 from harness.proposals import delivery, delivery_turn, product_spec, review, review_turn
 from harness.public_tree import capture_public_tree
@@ -246,17 +246,20 @@ def test_two_edits_in_one_activation_produce_a_complete_delivery_tree(tmp_path):
                        _read_content_hash(environment, "src/b.py", 1, 1)),
         ])
 
-    adapter.script.extend([work_turn, FakeTurn(
-        proposal=delivery("two range edits", files=["src/a.py", "src/b.py"], check_names=["smoke"]),
+    # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：脚本项是工厂而不是 FakeTurn 实例
+    adapter.script.extend([work_turn, delivery_turn(
+        summary="two range edits",
+        files={"src/a.py": "HEADER = True\nVALUE = 2\nFOOTER = True\n",
+               "src/b.py": "GREETING = 'hello'\n", "src/keep.py": "KEPT = True\n"},
         checks={"smoke": 0},
     )])
     run_id = system.create_run("Apply two range edits")
-    system.activate_once(run_id)
-    system.activate_once(run_id)
+    # #470 删除工程计划以后，第二次激活就是工程写入轮次：文件要先存在，区间编辑才改得动
     workspace = system.workspace(run_id)
     workspace.write_file("src/a.py", "HEADER = True\nVALUE = 1\nFOOTER = True\n")
     workspace.write_file("src/b.py", "GREETING = 'hi'\n")
     workspace.write_file("src/keep.py", "KEPT = True\n")
+    system.activate_once(run_id)
     system.activate_once(run_id)
     result = system.activate_once(run_id)
     assert result.delivery_spec is not None, result.error
@@ -312,12 +315,22 @@ def test_mutated_check_copy_does_not_become_the_tested_delivery(tmp_path):
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
 def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
+    # 过期的放行结论：依据版本取当前 DeliverySpec（从请求里读），但树已经改过、这一次激活没有重跑检查，
+    # 提交因为缺少绑定当前快照的检查证据被整次拒绝
+    def stale_release(call):
+        raw = prompt_part(call, "current_delivery_spec")
+        return FakeTurn(
+            proposal=review("release", "stale verdict on the old tree", checks=[],
+                            basis_delivery_spec_hash=json.loads(raw)["content_hash"]),
+        )
+
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),delivery_turn(),
-        FakeTurn(proposal=review("release", "stale verdict on the old tree")),
+        product_spec(),delivery_turn(), stale_release,
     ]))
     run_id = system.create_run("echo")
-    for _ in range(3):
+    # #470 删除工程计划以后，工程激活不再先提交计划：两次激活就到等质检，
+    # 第三次激活提交过期的放行结论（提交前测试先把树改掉）
+    for _ in range(2):
         system.activate_once(run_id)
     assert system.project(run_id).delivery_spec is not None
     accepted_digest = system.project(run_id).delivery_spec.code_tree_digest
@@ -357,8 +370,9 @@ def test_adopted_baseline_applies_to_next_work_item_and_replay_verifies(data_dir
 
     adapter.script.extend([
         product_spec(),second_work,
-        FakeTurn(
-            proposal=delivery("v2", files=["src/echo.py"], check_names=["smoke"]),
+        # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：脚本项是工厂而不是 FakeTurn 实例
+        delivery_turn(
+            summary="v2", files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"},
             checks={"smoke": 0},
         ),
         review_turn("release", "ok v2"),
