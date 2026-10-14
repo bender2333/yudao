@@ -50,13 +50,15 @@ jobs:
       - name: 单元层与模块层
         run: uv run python -m pytest -m "unit or module"
 
-      - name: 客户端类型检查与单元测试
+      - name: 客户端单元测试
         working-directory: client
-        run: |
-          npm run typecheck
-          npm test
+        run: npm test
 
       - name: 编译页面与 wheel
         run: |
           npm run build:pages --prefix client
           uv build --wheel
+
+      - name: 客户端类型检查
+        working-directory: client
+        run: npm run typecheck
