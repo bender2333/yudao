@@ -18,7 +18,9 @@ yudao = "harness.__main__:main"
 
 # uv sync 默认安装 dev 组，测试在按锁文件安装的项目环境中运行
 [dependency-groups]
-# PyYAML 供测试读取 YAML 固件，也供发布脚本 scripts/release.py 读取 latest.yml
+# PyYAML 供测试读取 YAML 固件，也供发布脚本 scripts/release.py 读取 latest.yml；
+# cryptography 供 scripts/github-app/ 用私钥签 GitHub App 的 JWT（工单 #513），
+# trustme 已经带着同一个包，这里显式声明，不依赖传递依赖
 dev = [
     "pytest>=8",
     "pytest-xdist>=3.8",
@@ -27,6 +29,7 @@ dev = [
     "pyyaml>=6,<7",
     "pytest-timeout>=2.4.0",
     "pyflakes>=3.3,<5",
+    "cryptography>=42,<51",
 ]
 
 [tool.setuptools.packages.find]

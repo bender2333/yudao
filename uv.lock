@@ -1084,6 +1084,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "cryptography" },
     { name = "import-linter" },
     { name = "pyflakes" },
     { name = "pytest" },
@@ -1109,6 +1110,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "cryptography", specifier = ">=42,<51" },
     { name = "import-linter", specifier = ">=2.15,<3" },
     { name = "pyflakes", specifier = ">=3.3,<5" },
     { name = "pytest", specifier = ">=8" },
