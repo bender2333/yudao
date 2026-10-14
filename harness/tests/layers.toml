@@ -58,6 +58,7 @@
 "test_event_store_batch.py" = "module"
 "test_event_stream.py" = "module"
 "test_events_api.py" = "integration"
+"test_git_audit.py" = "integration"
 "test_git_engine.py" = "integration"
 "test_github_app_token.py" = "integration"
 "test_git_versions.py" = "module"
