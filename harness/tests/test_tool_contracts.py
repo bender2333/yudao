@@ -44,6 +44,9 @@ def test_bash_description_separates_action_receipts_from_delivery_check_receipts
     assert "A bash result is an action receipt, not a check receipt" in text
     assert "it cannot be listed in submit_delivery check_names" in text
     assert "run the checks a delivery needs with run_check" in text
+    assert "inherits the Yudao process's full environment" in text
+    assert "replaces the value of any known secret with its name" in text
+    assert "the whole process tree is stopped" in text
 
 
 def test_write_tool_descriptions_state_engineering_only():
