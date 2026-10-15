@@ -2,8 +2,9 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from harness.adapters.fake import FakeAdapter
-from harness.engine import StepLimits
+from harness.compaction import SUMMARY_OUTPUT_TOKENS
 from harness.models import EventType, canonical_hash, json_dumps
+from harness.engine import StepLimits
 from harness.proposals import collaboration_request, product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
@@ -11,6 +12,7 @@ from harness.tests.helpers import (
     FAST_RETRIES,
     compacted_runner as _runner,
     department_history,
+    pinned_input_tokens,
     read_file_call as _read,
     recorded_context,
     summary_message as _message,
@@ -263,11 +265,13 @@ def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path):
     adapter = FakeAdapter([respond] * 100)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=32))
     original = "Original intent"
-    # 合并 #471 拉长 submit_* schema、#481 给产品/质检加 bash 后，4000 窗口的固定区超过压缩预算；
-    # 5000 与同文件 test_empty_compaction_summary_allows_retry_on_next_activation 一致
-    run_id = system.create_run(original, context_window=5000)
-    # 使用足够大的工具输出触发压缩
-    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 8000)
+    # 窗口由固定材料（部门提示、规则、提案合同、工具清单）的实测 token 数推出：
+    # n 加上 plan_compaction 一次压缩请求需要的余量（摘要上限至少 32 token、SUMMARY_OUTPUT_TOKENS 的两倍规则）
+    measure_id = system.create_run(original, context_window=1_000_000)
+    window = pinned_input_tokens(system, measure_id) + SUMMARY_OUTPUT_TOKENS * 2
+    run_id = system.create_run(original, context_window=window)
+    # 使用足够大的工具输出触发压缩：字符数为窗口的 8 倍，读取以后一定超过窗口
+    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * (window * 8 // 11))
     result = system.activate_once(run_id)
 
     # 空摘要不导致失败，部门继续工作
@@ -296,8 +300,11 @@ def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path):
 
     adapter = FakeAdapter([respond] * 200)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=32))
-    run_id = system.create_run("Original intent", context_window=5000)
-    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 8000)
+    # 窗口由固定材料的实测 token 数推出，理由与 test_empty_summary_does_not_fail_the_run_and_department_continues 相同
+    measure_id = system.create_run("Original intent", context_window=1_000_000)
+    window = pinned_input_tokens(system, measure_id) + SUMMARY_OUTPUT_TOKENS * 2
+    run_id = system.create_run("Original intent", context_window=window)
+    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * (window * 8 // 11))
 
     # 第一次激活：空摘要，但不失败
     current_activation[0] = 1
