@@ -11,63 +11,13 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
-    "adapter": "fake",
-    "baseline": null,
-    "check_timeout_sec": 600,
-    "command_versions": {},
-    "context_window": 1500,
     "definitions_version": "<definitions>",
-    "git_version": {
-     "commit": "<git#1>",
-     "parent_commit": null,
-     "tree": "<git#2>"
-    },
-    "initial_input": {
-     "byte_end": 17,
-     "byte_start": 0,
-     "git_version": {
-      "commit": "<git#1>",
-      "parent_commit": null,
-      "tree": "<git#2>"
-     },
-     "id": "<input#1>",
-     "input_ref": "<art#1>",
-     "intend_ref": "<art#1>",
-     "kind": "text",
-     "text": "build an echo CLI",
-     "version": 1
-    },
-    "intend_path": "materials/<run#1>/intend.md",
-    "intend_ref": "<art#1>",
     "kind": "change",
     "max_cycles": 999999,
-    "onboarding_basis": null,
-    "overview_ref": null,
-    "parameters_version": "<parameters>",
-    "project_context_ref": null,
-    "project_id": null,
-    "prompt_config_versions": {},
-    "provider": "fake",
-    "registered_commands": {},
-    "round": 0,
-    "run_event_version": 4,
-    "run_time_limit_sec": 7200,
-    "sessions": {
-     "engineering": "<ses_eng#1>",
-     "product": "<ses_pro#1>",
-     "quality": "<ses_qua#1>"
-    },
-    "snapshot": null,
-    "task": "build an echo CLI",
-    "work_item_id": null,
-    "workspace_digest": "<sha256#1>"
+    "parameters_version": "<parameters>"
    }
   },
   {
@@ -79,12 +29,8 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "from": "CREATED",
     "route": "CREATED->PRODUCT_SPEC",
@@ -100,12 +46,8 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": "<ses_pro#1>",
-   "provider": "fake",
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
     "cycle": 1,
@@ -114,10 +56,8 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
-    "request_id": null,
-    "yielded_work": null
+    "request_id": null
    }
   },
   {
@@ -129,15 +69,10 @@
    "state_after": "FAILED",
    "parent_event_id": null,
    "session_id": null,
-   "provider": "fake",
-   "model": null,
-   "context_digest": null,
    "stop_reason": "context_overflow",
    "error": "the model request leaves no room for model output",
-   "artifact_hashes": [],
    "payload": {
     "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高模型服务的上下文窗口后，作为新事项重新开始。",
-    "message": "the model request leaves no room for model output",
     "stop_reason": "context_overflow"
    }
   },
@@ -150,27 +85,15 @@
    "state_after": "FAILED",
    "parent_event_id": "<evt#4>",
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
-    "checks": [],
     "delivery_spec_hash": null,
-    "evidence_refs": [],
     "id": "<lesson#1>",
     "kind": "lesson_candidate",
-    "observation": {
-     "message": "the model request leaves no room for model output",
-     "stop_reason": "context_overflow"
-    },
     "product_spec_hash": null,
     "source_event_id": "<evt#4>",
-    "source_type": "run_failed",
-    "status": "unverified",
-    "suggestion": "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
+    "status": "unverified"
    }
   },
   {
@@ -182,182 +105,39 @@
    "state_after": "FAILED",
    "parent_event_id": "<evt#3>",
    "session_id": "<ses_pro#1>",
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
     "activations": 1,
-    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
-    "latency_ms": "<duration>",
     "model_steps": 0,
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
     "stop_reason": "context_overflow"
    }
   }
  ],
  "projection": {
-  "active_department": null,
-  "actual_model": null,
-  "actual_provider": null,
-  "adapter": "fake",
-  "baseline": null,
-  "baseline_review": null,
-  "baseline_reviews": [],
-  "command_versions": {},
-  "compactions": [],
-  "context_window": 1500,
-  "cost": 0.0,
-  "cycle_count": 1,
-  "definitions_version": "<definitions>",
-  "delivery_spec": null,
-  "delivery_specs": [],
-  "department_call_targets": {},
-  "department_guidance": [],
-  "effective_contract": null,
-  "effective_contracts": [],
-  "effective_decisions": [],
-  "error": "the model request leaves no room for model output",
-  "evidence": [],
-  "git_version": {
-   "commit": "<git#1>",
-   "parent_commit": null,
-   "tree": "<git#2>"
-  },
-  "git_versions": [
-   {
-    "commit": "<git#1>",
-    "event_id": "<evt#1>",
-    "parent_commit": null,
-    "tree": "<git#2>",
-    "type": "run_created"
-   }
-  ],
-  "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高模型服务的上下文窗口后，作为新事项重新开始。",
-  "input_version": 1,
-  "inputs": [
-   {
-    "byte_end": 17,
-    "byte_start": 0,
-    "created_event_id": "<evt#1>",
-    "id": "<input#1>",
-    "input_ref": "<art#1>",
-    "intend_ref": "<art#1>",
-    "kind": "text",
-    "run_id": "<run#1>",
-    "text": "build an echo CLI",
-    "version": 1
-   }
-  ],
-  "intend_ref": "<art#1>",
-  "kind": "change",
-  "last_activations": {
-   "product": "<act#1>"
-  },
-  "last_review": null,
-  "latency_ms": "<duration>",
-  "lesson_candidates": [
-   {
-    "checks": [],
-    "created_event_id": "<evt#5>",
-    "delivery_spec_hash": null,
-    "evidence_refs": [],
-    "id": "<lesson#1>",
-    "observation": {
-     "message": "the model request leaves no room for model output",
-     "stop_reason": "context_overflow"
-    },
-    "product_spec_hash": null,
-    "run_id": "<run#1>",
-    "source_event_id": "<evt#4>",
-    "source_type": "run_failed",
-    "status": "unverified",
-    "suggestion": "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
-   }
-  ],
-  "manifests": [],
-  "max_cycles": 999999,
-  "model": null,
-  "model_requests": [],
-  "onboarding_basis": null,
-  "outcome": "failed",
-  "overview_ref": null,
-  "parameters_version": "<parameters>",
-  "pending_feedback": {},
-  "pending_request": null,
   "phase": "FAILED",
-  "processed_input_version": 0,
-  "product_decisions": [],
-  "product_spec": null,
-  "product_specs": [],
-  "product_work_input_version": 1,
-  "project_context_ref": null,
-  "project_id": null,
-  "prompt_config_versions": {},
-  "provider": "fake",
-  "registered_commands": {},
-  "rejections": [],
-  "request_count": 0,
-  "request_results": [],
-  "requested_model": null,
-  "requested_provider": null,
-  "requests": [],
-  "responses": [],
-  "reviews": [],
-  "rework_count": 0,
-  "round": 0,
-  "run_event_version": 4,
-  "run_id": "<run#1>",
-  "run_time_limit_sec": 7200,
-  "sessions": {
-   "engineering": {
-    "activations": 0,
-    "department": "engineering",
-    "session_id": "<ses_eng#1>",
-    "status": "idle"
-   },
-   "product": {
-    "activations": 1,
-    "department": "product",
-    "session_id": "<ses_pro#1>",
-    "status": "closed"
-   },
-   "quality": {
-    "activations": 0,
-    "department": "quality",
-    "session_id": "<ses_qua#1>",
-    "status": "idle"
-   }
-  },
-  "snapshot": null,
   "stop_reason": "context_overflow",
-  "stream_version": 6,
-  "structure": null,
-  "structures": [],
-  "task": "build an echo CLI",
-  "token_used": 0,
-  "tool_count": 0,
-  "transitions": [
-   "CREATED->PRODUCT_SPEC"
-  ],
+  "outcome": "failed",
+  "error": "the model request leaves no room for model output",
   "waiting_reason": "未能完成：上下文超过窗口",
-  "work_item_id": null,
-  "workspace_digest": "<sha256#1>",
-  "yielded_work": null
- },
- "artifacts": {
-  "<art#1>": {
-   "kind": "user_input",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "build an echo CLI"
-  }
+  "active_department": null,
+  "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高模型服务的上下文窗口后，作为新事项重新开始。",
+  "cycle_count": 1,
+  "rework_count": 0,
+  "request_count": 0,
+  "round": 0,
+  "input_version": 1,
+  "processed_input_version": 0,
+  "product_work_input_version": 1,
+  "run_event_version": 4,
+  "stream_version": 6,
+  "definitions_version": "<definitions>",
+  "parameters_version": "<parameters>"
  },
  "shared": {}
 }

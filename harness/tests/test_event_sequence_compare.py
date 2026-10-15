@@ -108,3 +108,21 @@ def test_tool_result_before_response_fails_with_diff():
         compare_documents("ask", expected, _ask_documents(moved=True))
     message = str(raised.value)
     assert "causal edges differ" in message, message
+
+
+def test_payload_field_difference_fails_with_fields_line():
+    # 只改一条事件的一个载荷字段（质检放行改为退回）：同一会话内同一位置的事件载荷不同，
+    # 分组比较应失败，并在 `fields:` 一行点名是哪个字段（#532 步骤 5 第 3 条）
+    expected = _load("handoff_release")
+    actual = copy.deepcopy(expected)
+    events = actual["events"]
+    index = next(i for i, e in enumerate(events) if e["type"] == "qa_submitted")
+    assert events[index]["payload"]["verdict"] == "release"
+    events[index]["payload"]["verdict"] = "rework_product"
+    with pytest.raises(AssertionError) as raised:
+        compare_documents("handoff_release", expected, actual)
+    message = str(raised.value)
+    assert "handoff_release" in message, message
+    assert "session <ses_qua#1>" in message, message
+    assert "event #" in message, message
+    assert "payload.verdict" in message, message

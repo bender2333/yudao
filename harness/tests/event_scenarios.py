@@ -286,7 +286,7 @@ def history_exceeds_the_window(data_dir):
     # 摘要请求也放不下，运行以 compaction_failed 结束，没有模型调用
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(data_dir, adapter)
-    run_id = system.create_run("build an echo CLI. " + "Keep the requirement text. " * 370, context_window=10000)
+    run_id = system.create_run("build an echo CLI. " + "Keep the requirement text. " * 370, context_window=9740)
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -640,7 +640,7 @@ SCENARIOS: dict[str, Scenario] = {
         "固定材料超过上下文窗口（1500）：请求在发送之前判定超限，没有模型调用，运行以 context_overflow 失败。",
         context_overflow),
     "history_exceeds_the_window": Scenario(
-        "固定材料放得下，加入部门历史以后超过上下文窗口（10000）：摘要请求也放不下，运行以 compaction_failed 失败，"
+        "固定材料放得下，加入部门历史以后超过上下文窗口（9740）：摘要请求也放不下，运行以 compaction_failed 失败，"
         "没有模型调用（调用目标声明了输出上限，#45 起测试也走调用目标）。",
         history_exceeds_the_window),
     "text_only_reply": Scenario(
