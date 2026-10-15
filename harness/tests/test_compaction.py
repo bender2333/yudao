@@ -434,3 +434,28 @@ def test_summary_output_tokens_cap_applies_regardless_of_model_output_limit():
     # 声明很小的模型输出上限
     plan_small = plan_compaction(records, None, 32000, PINNED, TOOLS, output_limit=1024)
     assert plan_small.max_output_tokens <= 1024
+
+
+def test_estimate_tokens_counts_characters_not_bytes():
+    """token 估算按字符数，不是字节数：同样字符数下中文与 ASCII 结果一致。"""
+    assert estimate_tokens("") == 0
+    assert estimate_tokens("a") == 1
+    assert estimate_tokens("abcd") == 1
+    assert estimate_tokens("abcde") == 2
+    assert estimate_tokens("中文文字") == 1
+    assert estimate_tokens("中文文字中文文字") == 2
+
+
+def test_estimate_tokens_rounds_up_in_groups_of_four_characters():
+    """非空文本至少估 1 个 token，每四个字符一组向上取整。"""
+    assert estimate_tokens("x") == 1
+    assert estimate_tokens("xy") == 1
+    assert estimate_tokens("xyz") == 1
+    assert estimate_tokens("xyzw") == 1
+    assert estimate_tokens("xyzwv") == 2
+    assert estimate_tokens("xyzwvu") == 2
+    assert estimate_tokens("xyzwvut") == 2
+    assert estimate_tokens("xyzwvuts") == 2
+    assert estimate_tokens("x" * 100) == 25
+    assert estimate_tokens("x" * 4001) == 1001
+
