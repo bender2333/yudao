@@ -44,7 +44,12 @@ PowerShell 的测试终端先设置 `$env:PYTHONUTF8='1'`，让 Python 及其测
 
 - 两个 App 只安装在 `bender2333/yudao`。私钥文件放在派发的机器上仓库以外的目录。
 - 执行者与审查者的进程启动前设置 `YUDAO_GH_APP_ID`（App 编号）与 `YUDAO_GH_APP_KEY_FILE`（私钥文件路径），并把仓库的 `scripts/github-app/` 放在 `PATH` 的最前面。之后进程里的 `gh` 与 `git push` 以这个 App 的身份运行，令牌快到期时自动换新（#513）。
-- `scripts/github-app/` 下的 `gh`、`gh.cmd`、`git`、`git.cmd` 是入口：先找到真正的 `gh` 与 `git`，再由 `yudao_github_app.py` 换取安装令牌后转过去。Git bash 与 `cmd` 两种调用方式都能用。
+- `scripts/github-app/` 下的 `gh.exe` 与 `git.exe` 是入口，由同目录的 `make_entries.py` 生成并提交（#526）。入口用 `PATH` 上的第一个 `python` 运行 `yudao_github_app.py`，它在 `PATH` 上跳过本目录找到真正的 `gh` 与 `git`，换取安装令牌后转过去。入口是真正的可执行文件，参数不经过 `cmd` 重新解析，`|`、`&`、`^`、`(`、`)`、`%`、引号、空格与中文原样到达；`cmd`、PowerShell、Git bash 与 `gh` 自己调用 `git` 都命中入口。修改 `make_entries.py` 以后运行 `uv run python scripts/github-app/make_entries.py` 重新生成，`harness/tests/test_github_app_entries.py` 核对提交的入口与生成的逐字节相同。
+- `PATH` 的写法（`<仓库>` 是仓库的位置，例如 `D:\codes\yudao`）：
+  - `cmd`：`set "PATH=<仓库>\scripts\github-app;%PATH%"`，例如 `set "PATH=D:\codes\yudao\scripts\github-app;%PATH%"`。
+  - PowerShell：`$env:PATH = "<仓库>\scripts\github-app;" + $env:PATH`。
+  - Git bash：盘符写成 `/d/` 的形式，用冒号分隔，例如 `export PATH="/d/codes/yudao/scripts/github-app:$PATH"`。写成 `D:/codes/...` 时 Git bash 把 `D:` 后面的冒号当作分隔符，`which gh` 仍然得到 `C:\Program Files\GitHub CLI\gh`。
+  - 设置以后 `which gh`（Git bash）或 `where gh`（`cmd`）的第一行应当是 `scripts/github-app` 下的入口。
 - 令牌换取按需进行：安装令牌一小时过期，缓存放在 `%LOCALAPPDATA%\yudao\github-app-token-<App 编号>.json`，剩余有效时间不到 10 分钟时换新，否则复用。缓存只写令牌与过期时刻，私钥与令牌的内容不出现在命令输出、日志与提交中。
 - 安装编号由 App 编号与仓库所有者自动查到，不另外配置。
 - 两个变量都没有设置时，入口直接运行原来的 `gh` 与 `git`，参数与退出码原样传递。私钥文件不存在或不可读时报错写明是哪个变量、哪个路径，不回退到其他身份。

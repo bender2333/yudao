@@ -622,3 +622,5 @@ claude-opus-5-5 / 2026-10-14 18:55 / 新增 docs/adr/0039-departments-work-from-
 claude-opus-5-5 / 2026-10-14 18:55 / 「持有交接」「交接」改用新说法：docs/design/architecture/overall-architecture.md、architecture/core-and-materials.md、local-tools.md、recovery-contract-and-fault-matrix.md、loops-and-convergence.md、independent-verification.md、app-and-interface.md、rules-and-parameters.md、design/README.md，docs/requirements/system-intent.md（N-I7）、three-department-loop.md、stage-requirements-overview.md，docs/program-roadmap.md、docs/stage-3-plan.md；department-roles.md 的被取代规则清单加一条，semantic-system.md 开头加状态补充；docs/decision.md 新增一条 / 同上；README.md 描述已实现的系统，等实现以后修改
 
 claude-opus-5-5 / 2026-10-19 10:30 / docs/agents/autopilot-runtime.md 第 2 节补充 GitHub App 入口的完整使用说明（两个环境变量、PATH 顺序、令牌缓存位置与回退行为）/ 工单 #513 的实现入口落在 scripts/github-app/，运行配置写清楚执行者与审查者怎么启用
+
+claude-opus-5-5 / 2026-10-15 09:35 / docs/agents/autopilot-runtime.md 第 2 节：入口改为 scripts/github-app/ 下的 gh.exe 与 git.exe（make_entries.py 生成），写明 cmd、PowerShell 与 Git bash 里 PATH 的写法 / 工单 #526：.cmd 入口经 cmd 重新解析参数，gh 调用 git 时含 | ( ) 的正则被截断
