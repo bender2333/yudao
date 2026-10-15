@@ -1,6 +1,6 @@
 {
  "scenario": "history_exceeds_the_window",
- "covers": "固定材料放得下，加入部门历史以后超过上下文窗口（10000）：摘要请求也放不下，运行以 compaction_failed 失败，没有模型调用（调用目标声明了输出上限，#45 起测试也走调用目标）。",
+ "covers": "固定材料放得下，加入部门历史以后超过上下文窗口（窗口由固定材料的实测 token 数加余量推出）：摘要请求也放不下，运行以 compaction_failed 失败，没有模型调用（调用目标声明了输出上限，#45 起测试也走调用目标）。",
  "events": [
   {
    "event": "<evt#1>",
@@ -11,63 +11,13 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
-    "adapter": "fake",
-    "baseline": null,
-    "check_timeout_sec": 600,
-    "command_versions": {},
-    "context_window": 10000,
     "definitions_version": "<definitions>",
-    "git_version": {
-     "commit": "<git#1>",
-     "parent_commit": null,
-     "tree": "<git#2>"
-    },
-    "initial_input": {
-     "byte_end": 10009,
-     "byte_start": 0,
-     "git_version": {
-      "commit": "<git#1>",
-      "parent_commit": null,
-      "tree": "<git#2>"
-     },
-     "id": "<input#1>",
-     "input_ref": "<art#1>",
-     "intend_ref": "<art#1>",
-     "kind": "text",
-     "text": "<shared#1>",
-     "version": 1
-    },
-    "intend_path": "materials/<run#1>/intend.md",
-    "intend_ref": "<art#1>",
     "kind": "change",
     "max_cycles": 999999,
-    "onboarding_basis": null,
-    "overview_ref": null,
-    "parameters_version": "<parameters>",
-    "project_context_ref": null,
-    "project_id": null,
-    "prompt_config_versions": {},
-    "provider": "fake",
-    "registered_commands": {},
-    "round": 0,
-    "run_event_version": 4,
-    "run_time_limit_sec": 7200,
-    "sessions": {
-     "engineering": "<ses_eng#1>",
-     "product": "<ses_pro#1>",
-     "quality": "<ses_qua#1>"
-    },
-    "snapshot": null,
-    "task": "<shared#1>",
-    "work_item_id": null,
-    "workspace_digest": "<sha256#1>"
+    "parameters_version": "<parameters>"
    }
   },
   {
@@ -79,12 +29,8 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "from": "CREATED",
     "route": "CREATED->PRODUCT_SPEC",
@@ -100,12 +46,8 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": "<ses_pro#1>",
-   "provider": "fake",
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
     "cycle": 1,
@@ -114,10 +56,8 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
-    "request_id": null,
-    "yielded_work": null
+    "request_id": null
    }
   },
   {
@@ -129,22 +69,14 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
    "session_id": "<ses_pro#1>",
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [
-    "<sha256#3>"
-   ],
    "payload": {
     "activation_id": "<act#1>",
     "effective_contract_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#2>",
     "input_version": 1,
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
     "request_id": null,
     "step_id": 1
@@ -159,15 +91,10 @@
    "state_after": "FAILED",
    "parent_event_id": null,
    "session_id": null,
-   "provider": "fake",
-   "model": null,
-   "context_digest": null,
    "stop_reason": "compaction_failed",
    "error": "the model request leaves no room for model output",
-   "artifact_hashes": [],
    "payload": {
     "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
-    "message": "the model request leaves no room for model output",
     "stop_reason": "compaction_failed"
    }
   },
@@ -180,27 +107,15 @@
    "state_after": "FAILED",
    "parent_event_id": "<evt#5>",
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
-    "checks": [],
     "delivery_spec_hash": null,
-    "evidence_refs": [],
     "id": "<lesson#1>",
     "kind": "lesson_candidate",
-    "observation": {
-     "message": "the model request leaves no room for model output",
-     "stop_reason": "compaction_failed"
-    },
     "product_spec_hash": null,
     "source_event_id": "<evt#5>",
-    "source_type": "run_failed",
-    "status": "unverified",
-    "suggestion": "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
+    "status": "unverified"
    }
   },
   {
@@ -212,192 +127,39 @@
    "state_after": "FAILED",
    "parent_event_id": "<evt#3>",
    "session_id": "<ses_pro#1>",
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
     "activations": 1,
-    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
-    "latency_ms": "<duration>",
     "model_steps": 0,
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
     "stop_reason": "compaction_failed"
    }
   }
  ],
  "projection": {
-  "active_department": null,
-  "actual_model": null,
-  "actual_provider": null,
-  "adapter": "fake",
-  "baseline": null,
-  "baseline_review": null,
-  "baseline_reviews": [],
-  "command_versions": {},
-  "compactions": [],
-  "context_window": 10000,
-  "cost": 0.0,
-  "cycle_count": 1,
-  "definitions_version": "<definitions>",
-  "delivery_spec": null,
-  "delivery_specs": [],
-  "department_call_targets": {},
-  "department_guidance": [],
-  "effective_contract": null,
-  "effective_contracts": [],
-  "effective_decisions": [],
-  "error": "the model request leaves no room for model output",
-  "evidence": [],
-  "git_version": {
-   "commit": "<git#1>",
-   "parent_commit": null,
-   "tree": "<git#2>"
-  },
-  "git_versions": [
-   {
-    "commit": "<git#1>",
-    "event_id": "<evt#1>",
-    "parent_commit": null,
-    "tree": "<git#2>",
-    "type": "run_created"
-   }
-  ],
-  "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
-  "input_version": 1,
-  "inputs": [
-   {
-    "byte_end": 10009,
-    "byte_start": 0,
-    "created_event_id": "<evt#1>",
-    "id": "<input#1>",
-    "input_ref": "<art#1>",
-    "intend_ref": "<art#1>",
-    "kind": "text",
-    "run_id": "<run#1>",
-    "text": "<shared#1>",
-    "version": 1
-   }
-  ],
-  "intend_ref": "<art#1>",
-  "kind": "change",
-  "last_activations": {
-   "product": "<act#1>"
-  },
-  "last_review": null,
-  "latency_ms": "<duration>",
-  "lesson_candidates": [
-   {
-    "checks": [],
-    "created_event_id": "<evt#6>",
-    "delivery_spec_hash": null,
-    "evidence_refs": [],
-    "id": "<lesson#1>",
-    "observation": {
-     "message": "the model request leaves no room for model output",
-     "stop_reason": "compaction_failed"
-    },
-    "product_spec_hash": null,
-    "run_id": "<run#1>",
-    "source_event_id": "<evt#5>",
-    "source_type": "run_failed",
-    "status": "unverified",
-    "suggestion": "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
-   }
-  ],
-  "manifests": [],
-  "max_cycles": 999999,
-  "model": null,
-  "model_requests": [],
-  "onboarding_basis": null,
-  "outcome": "failed",
-  "overview_ref": null,
-  "parameters_version": "<parameters>",
-  "pending_feedback": {},
-  "pending_request": null,
   "phase": "FAILED",
-  "processed_input_version": 0,
-  "product_decisions": [],
-  "product_spec": null,
-  "product_specs": [],
-  "product_work_input_version": 1,
-  "project_context_ref": null,
-  "project_id": null,
-  "prompt_config_versions": {},
-  "provider": "fake",
-  "registered_commands": {},
-  "rejections": [],
-  "request_count": 0,
-  "request_results": [],
-  "requested_model": null,
-  "requested_provider": null,
-  "requests": [],
-  "responses": [],
-  "reviews": [],
-  "rework_count": 0,
-  "round": 0,
-  "run_event_version": 4,
-  "run_id": "<run#1>",
-  "run_time_limit_sec": 7200,
-  "sessions": {
-   "engineering": {
-    "activations": 0,
-    "department": "engineering",
-    "session_id": "<ses_eng#1>",
-    "status": "idle"
-   },
-   "product": {
-    "activations": 1,
-    "department": "product",
-    "session_id": "<ses_pro#1>",
-    "status": "closed"
-   },
-   "quality": {
-    "activations": 0,
-    "department": "quality",
-    "session_id": "<ses_qua#1>",
-    "status": "idle"
-   }
-  },
-  "snapshot": null,
   "stop_reason": "compaction_failed",
-  "stream_version": 7,
-  "structure": null,
-  "structures": [],
-  "task": "<shared#1>",
-  "token_used": 0,
-  "tool_count": 0,
-  "transitions": [
-   "CREATED->PRODUCT_SPEC"
-  ],
+  "outcome": "failed",
+  "error": "the model request leaves no room for model output",
   "waiting_reason": "未能完成：上下文压缩失败",
-  "work_item_id": null,
-  "workspace_digest": "<sha256#1>",
-  "yielded_work": null
+  "active_department": null,
+  "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
+  "cycle_count": 1,
+  "rework_count": 0,
+  "request_count": 0,
+  "round": 0,
+  "input_version": 1,
+  "processed_input_version": 0,
+  "product_work_input_version": 1,
+  "run_event_version": 4,
+  "stream_version": 7,
+  "definitions_version": "<definitions>",
+  "parameters_version": "<parameters>"
  },
- "artifacts": {
-  "<art#1>": {
-   "kind": "user_input",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "<shared#1>"
-  },
-  "<art#2>": {
-   "kind": "department_input",
-   "media_type": "application/json",
-   "content": {
-    "content": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":10009,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. \",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-    "role": "user"
-   }
-  }
- },
- "shared": {
-  "<shared#1>": "build an echo CLI. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. Keep the requirement text. "
- }
+ "shared": {}
 }

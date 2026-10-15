@@ -27,7 +27,7 @@ from harness.proposals import (
 )
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES
+from harness.tests.helpers import FAST_RETRIES, pinned_input_tokens
 from harness.tests.protocol_helpers import ScriptedProvider, provider_system, send_reply, serve
 from harness.tests.provider_replies import (
     BROKEN_STREAMS,
@@ -283,10 +283,18 @@ def context_overflow(data_dir):
 
 def history_exceeds_the_window(data_dir):
     # 固定材料放得下；激活第一步的部门工作消息再次带上整段原始意图，加上部门历史以后超过窗口，
-    # 摘要请求也放不下，运行以 compaction_failed 结束，没有模型调用
+    # 摘要请求也放不下，运行以 compaction_failed 结束，没有模型调用。
+    # 窗口按固定材料的实测 token 数加余量推出，不写死数字（测试分层设计第 10 节第 3 条）。
+    # 余量的可行区间由实测确定：低于下界时错误变成「固定材料放不下摘要」，
+    # 高于上界时摘要请求放得下，运行会真的调用模型（适配器脚本耗尽）。
+    task = "build an echo CLI. " + "Keep the requirement text. " * 370
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(data_dir, adapter)
-    run_id = system.create_run("build an echo CLI. " + "Keep the requirement text. " * 370, context_window=10000)
+    measure_id = system.create_run(task, context_window=1_000_000)
+    # 测量 run 与真实 run 共用同一个 data_dir：调用目标按事项窗口逐次安装（orchestrator.py:1162），
+    # 后建的 run 用自己 create_run 时声明的窗口，两者互不影响。
+    pinned = pinned_input_tokens(system, measure_id)
+    run_id = system.create_run(task, context_window=pinned + 2048)
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -640,8 +648,9 @@ SCENARIOS: dict[str, Scenario] = {
         "固定材料超过上下文窗口（1500）：请求在发送之前判定超限，没有模型调用，运行以 context_overflow 失败。",
         context_overflow),
     "history_exceeds_the_window": Scenario(
-        "固定材料放得下，加入部门历史以后超过上下文窗口（10000）：摘要请求也放不下，运行以 compaction_failed 失败，"
-        "没有模型调用（调用目标声明了输出上限，#45 起测试也走调用目标）。",
+        "固定材料放得下，加入部门历史以后超过上下文窗口（窗口由固定材料的实测 token 数加余量推出）："
+        "摘要请求也放不下，运行以 compaction_failed 失败，没有模型调用"
+        "（调用目标声明了输出上限，#45 起测试也走调用目标）。",
         history_exceeds_the_window),
     "text_only_reply": Scenario(
         "模型只回复文字（#47）：回复记入历史，主机追加一条要求调用工具的 user 消息（tool_call_required），下一步提交成功。",

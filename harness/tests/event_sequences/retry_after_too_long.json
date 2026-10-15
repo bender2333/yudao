@@ -11,63 +11,13 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
-    "adapter": "fake",
-    "baseline": null,
-    "check_timeout_sec": 600,
-    "command_versions": {},
-    "context_window": 32000,
     "definitions_version": "<definitions>",
-    "git_version": {
-     "commit": "<git#1>",
-     "parent_commit": null,
-     "tree": "<git#2>"
-    },
-    "initial_input": {
-     "byte_end": 17,
-     "byte_start": 0,
-     "git_version": {
-      "commit": "<git#1>",
-      "parent_commit": null,
-      "tree": "<git#2>"
-     },
-     "id": "<input#1>",
-     "input_ref": "<art#1>",
-     "intend_ref": "<art#1>",
-     "kind": "text",
-     "text": "build an echo CLI",
-     "version": 1
-    },
-    "intend_path": "materials/<run#1>/intend.md",
-    "intend_ref": "<art#1>",
     "kind": "change",
     "max_cycles": 999999,
-    "onboarding_basis": null,
-    "overview_ref": null,
-    "parameters_version": "<parameters>",
-    "project_context_ref": null,
-    "project_id": null,
-    "prompt_config_versions": {},
-    "provider": "fake",
-    "registered_commands": {},
-    "round": 0,
-    "run_event_version": 4,
-    "run_time_limit_sec": 7200,
-    "sessions": {
-     "engineering": "<ses_eng#1>",
-     "product": "<ses_pro#1>",
-     "quality": "<ses_qua#1>"
-    },
-    "snapshot": null,
-    "task": "build an echo CLI",
-    "work_item_id": null,
-    "workspace_digest": "<sha256#1>"
+    "parameters_version": "<parameters>"
    }
   },
   {
@@ -79,12 +29,8 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "from": "CREATED",
     "route": "CREATED->PRODUCT_SPEC",
@@ -100,12 +46,8 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": null,
    "session_id": "<ses_pro#1>",
-   "provider": "fake",
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
     "cycle": 1,
@@ -114,10 +56,8 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
-    "request_id": null,
-    "yielded_work": null
+    "request_id": null
    }
   },
   {
@@ -129,22 +69,14 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
    "session_id": "<ses_pro#1>",
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [
-    "<sha256#3>"
-   ],
    "payload": {
     "activation_id": "<act#1>",
     "effective_contract_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_ref": "<art#2>",
     "input_version": 1,
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
     "request_id": null,
     "step_id": 1
@@ -159,182 +91,27 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
    "session_id": "<ses_pro#1>",
-   "provider": "fake",
-   "model": null,
-   "context_digest": "<sha256#5>",
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [
-    "<sha256#5>",
-    "<sha256#6>"
-   ],
    "payload": {
-    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "admitted": true,
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "base_url": "",
-    "budget": 32000,
     "collaboration_request_id": null,
     "compaction_event_id": null,
-    "configured_max_output_tokens": 4800,
-    "context_window": 32000,
-    "credential_ref": null,
-    "credential_version": null,
-    "default_reasoning_level": null,
     "department": "product",
-    "digest": "<sha256#5>",
-    "effective_context_window": 32000,
     "effective_contract_hash": null,
-    "excluded": [
-     {
-      "reason": "cross-department transcripts are never injected",
-      "source": "other_department_transcript"
-     },
-     {
-      "reason": "older specs remain in department history but are never presented as current requirements",
-      "source": "superseded_spec_as_current"
-     },
-     {
-      "reason": "earlier decisions enter the current contract only when the current ProductSpec explicitly retains them",
-      "source": "expired_product_decisions"
-     },
-     {
-      "reason": "superseded deliveries are not injected as current_delivery_spec",
-      "source": "invalid_delivery_as_current"
-     }
-    ],
     "guidance_ids": [],
     "guidance_only": false,
-    "injected": [
-     {
-      "digest": "<sha256#7>",
-      "source": "intend",
-      "tokens": 5,
-      "version": "1"
-     },
-     {
-      "digest": "<sha256#8>",
-      "source": "current_work",
-      "tokens": 38,
-      "version": "PRODUCT_SPEC"
-     },
-     {
-      "digest": "<sha256#9>",
-      "source": "department_rules",
-      "tokens": 34,
-      "version": "0"
-     },
-     {
-      "digest": "<sha256#10>",
-      "source": "work_item_guidance",
-      "tokens": 54,
-      "version": "change"
-     },
-     {
-      "digest": "<sha256#11>",
-      "source": "input_progress",
-      "tokens": 17,
-      "version": "1"
-     },
-     {
-      "digest": "<sha256#12>",
-      "source": "input_handling",
-      "tokens": 47,
-      "version": null
-     },
-     {
-      "digest": "<sha256#13>",
-      "source": "professional_completion",
-      "tokens": 30,
-      "version": null
-     },
-     {
-      "digest": "<sha256#14>",
-      "source": "collaboration_rules",
-      "tokens": 44,
-      "version": null
-     },
-     {
-      "digest": "<sha256#15>",
-      "source": "proposal_contract",
-      "tokens": 504,
-      "version": "product"
-     },
-     {
-      "digest": "<sha256#16>",
-      "source": "binding_refs",
-      "tokens": 78,
-      "version": null
-     },
-     {
-      "digest": "<sha256#17>",
-      "source": "allowed_tools",
-      "tokens": 27,
-      "version": "product"
-     },
-     {
-      "digest": "<sha256#18>",
-      "source": "pending_inputs",
-      "tokens": 178,
-      "version": "1"
-     },
-     {
-      "digest": "<sha256#19>",
-      "source": "causal_chain",
-      "tokens": 14,
-      "version": null
-     },
-     {
-      "digest": "<sha256#20>",
-      "source": "department_history",
-      "tokens": 386,
-      "version": "product"
-     },
-     {
-      "digest": "<sha256#21>",
-      "source": "tool_schemas",
-      "tokens": 1970,
-      "version": "product"
-     }
-    ],
-    "input_modalities": [
-     "text"
-    ],
-    "input_token_estimate": 3591,
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "max_output_tokens": 4800,
-    "model_id": "fake-model",
-    "output_reserve_tokens": 4800,
-    "parts_ref": "<art#3>",
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
-    "protocol": "fake",
-    "provider_config_id": "fake",
-    "provider_name": "fake",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
-    "request_ref": "<art#4>",
-    "requested_model": "fake-script",
-    "requested_protocol": "fake",
-    "requested_provider": "fake",
-    "requested_tier": null,
     "retry_of_step_id": null,
-    "root_step_id": 1,
-    "run_id": "<run#1>",
-    "selection_source": "department_default",
-    "sent_tier": null,
-    "session_id": "<ses_pro#1>",
-    "snapshot_hash": "<sha256#1>",
     "source_event_id": null,
-    "step_id": 1,
-    "token_estimate": 3597,
-    "tokens_charged": 0,
-    "truncated": false
+    "step_id": 1
    }
   },
   {
@@ -346,60 +123,28 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
    "session_id": "<ses_pro#1>",
-   "provider": "fake",
-   "model": null,
-   "context_digest": "<sha256#5>",
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
-    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "attempted": true,
-    "base_url": "",
     "collaboration_request_id": null,
-    "configured_max_output_tokens": 4800,
     "context_event_id": "<evt#5>",
-    "context_window": 32000,
-    "credential_ref": null,
-    "credential_version": null,
-    "default_reasoning_level": null,
     "definitions_version": "<definitions>",
-    "effective_context_window": 32000,
     "effective_contract_hash": null,
     "guidance_ids": [],
     "guidance_only": false,
-    "input_modalities": [
-     "text"
-    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
-    "max_output_tokens": 4800,
-    "model_id": "fake-model",
     "parameters_version": "<parameters>",
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
-    "protocol": "fake",
-    "provider_config_id": "fake",
-    "provider_name": "fake",
     "purpose": "work",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
-    "requested_model": "fake-script",
-    "requested_protocol": "fake",
-    "requested_provider": "fake",
-    "requested_tier": null,
     "retry_of_step_id": null,
-    "root_step_id": 1,
-    "selection_source": "department_default",
-    "sent_tier": null,
-    "started_at": "<time>",
-    "step_id": 1,
-    "tool_choice": "auto"
+    "step_id": 1
    }
   },
   {
@@ -411,82 +156,28 @@
    "state_after": "PRODUCT_SPEC",
    "parent_event_id": "<evt#3>",
    "session_id": "<ses_pro#1>",
-   "provider": "fake",
-   "model": null,
-   "context_digest": "<sha256#5>",
    "stop_reason": null,
    "error": "Provider requested Retry-After of 60.1 seconds, exceeding the 60-second limit",
-   "artifact_hashes": [],
    "payload": {
-    "accepts_required_tool_call": true,
     "activation_id": "<act#1>",
-    "actual_model": null,
-    "actual_provider": null,
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "base_url": "",
     "collaboration_request_id": null,
-    "collection_scope": {
-     "credentials": "excluded",
-     "events": "SDK decoded stream event JSON objects captured as JSON Lines with credential and header fields redacted; raw HTTP/SSE bytes are not available.",
-     "request": "SDK request JSON object captured from the prepared HTTP request; authentication headers and raw HTTP bytes are excluded.",
-     "response": "Complete SDK response object exposed by the provider SDK when a terminal response was received, with credential and header fields redacted."
-    },
-    "configured_max_output_tokens": 4800,
     "context_event_id": "<evt#5>",
-    "context_window": 32000,
-    "credential_ref": null,
-    "credential_version": null,
-    "default_reasoning_level": null,
-    "diagnostics": {
-     "retry_after_limit_sec": 60.0,
-     "retry_after_sec": 60.1,
-     "underlying_reason": "provider_error"
-    },
-    "duration_ms": "<duration>",
-    "duration_source": "monotonic",
     "effective_contract_hash": null,
-    "finished_at": "<time>",
     "guidance_ids": [],
     "guidance_only": false,
-    "input_modalities": [
-     "text"
-    ],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
-    "model_id": "fake-model",
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
-    "protocol": "fake",
-    "provider_config_id": "fake",
-    "provider_name": "fake",
-    "provider_response_id": null,
     "purpose": "work",
-    "raw_usage_ref": null,
     "reason": "retry_after_too_long",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
     "request_id": null,
-    "requested_model": "fake-script",
-    "requested_protocol": "fake",
-    "requested_provider": "fake",
-    "requested_tier": null,
-    "response_ref": null,
     "retry_of_step_id": null,
     "retryable": false,
-    "root_step_id": 1,
-    "selection_source": "department_default",
-    "sent_tier": null,
-    "started_at": "<time>",
     "status": "failed",
     "step_id": 1,
-    "stream_event_count": 0,
-    "stream_events_ref": null,
-    "stream_first_observed_at": null,
-    "stream_first_output_at": null,
-    "stream_last_stage": null,
-    "usage": null,
     "will_retry": false
    }
   },
@@ -499,15 +190,10 @@
    "state_after": "FAILED",
    "parent_event_id": null,
    "session_id": null,
-   "provider": "fake",
-   "model": null,
-   "context_digest": null,
    "stop_reason": "retry_after_too_long",
    "error": "Provider requested Retry-After of 60.1 seconds, exceeding the 60-second limit",
-   "artifact_hashes": [],
    "payload": {
     "human_action": null,
-    "message": "Provider requested Retry-After of 60.1 seconds, exceeding the 60-second limit",
     "stop_reason": "retry_after_too_long"
    }
   },
@@ -520,27 +206,15 @@
    "state_after": "FAILED",
    "parent_event_id": "<evt#8>",
    "session_id": null,
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
-    "checks": [],
     "delivery_spec_hash": null,
-    "evidence_refs": [],
     "id": "<lesson#1>",
     "kind": "lesson_candidate",
-    "observation": {
-     "message": "Provider requested Retry-After of 60.1 seconds, exceeding the 60-second limit",
-     "stop_reason": "retry_after_too_long"
-    },
     "product_spec_hash": null,
     "source_event_id": "<evt#8>",
-    "source_type": "run_failed",
-    "status": "unverified",
-    "suggestion": "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
+    "status": "unverified"
    }
   },
   {
@@ -552,896 +226,39 @@
    "state_after": "FAILED",
    "parent_event_id": "<evt#3>",
    "session_id": "<ses_pro#1>",
-   "provider": null,
-   "model": null,
-   "context_digest": null,
    "stop_reason": null,
    "error": null,
-   "artifact_hashes": [],
    "payload": {
     "activation_id": "<act#1>",
     "activations": 1,
-    "elapsed_ms": "<duration>",
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
-    "latency_ms": "<duration>",
     "model_steps": 1,
-    "prompt_hash": "<sha256#2>",
     "prompt_version": 0,
     "stop_reason": "retry_after_too_long"
    }
   }
  ],
  "projection": {
-  "active_department": null,
-  "actual_model": null,
-  "actual_provider": null,
-  "adapter": "fake",
-  "baseline": null,
-  "baseline_review": null,
-  "baseline_reviews": [],
-  "command_versions": {},
-  "compactions": [],
-  "context_window": 32000,
-  "cost": 0.0,
-  "cycle_count": 1,
-  "definitions_version": "<definitions>",
-  "delivery_spec": null,
-  "delivery_specs": [],
-  "department_call_targets": {
-   "product": {
-    "accepts_required_tool_call": true,
-    "base_url": "",
-    "configured_max_output_tokens": 4800,
-    "context_window": 32000,
-    "credential_ref": null,
-    "credential_version": null,
-    "default_reasoning_level": null,
-    "input_modalities": [
-     "text"
-    ],
-    "model_id": "fake-model",
-    "protocol": "fake",
-    "provider_config_id": "fake",
-    "provider_name": "fake",
-    "reasoning_levels": [],
-    "reasoning_mode": null,
-    "requested_model": "fake-script",
-    "requested_protocol": "fake",
-    "requested_provider": "fake",
-    "requested_tier": null,
-    "selection_source": "department_default",
-    "sent_tier": null
-   }
-  },
-  "department_guidance": [],
-  "effective_contract": null,
-  "effective_contracts": [],
-  "effective_decisions": [],
-  "error": "Provider requested Retry-After of 60.1 seconds, exceeding the 60-second limit",
-  "evidence": [],
-  "git_version": {
-   "commit": "<git#1>",
-   "parent_commit": null,
-   "tree": "<git#2>"
-  },
-  "git_versions": [
-   {
-    "commit": "<git#1>",
-    "event_id": "<evt#1>",
-    "parent_commit": null,
-    "tree": "<git#2>",
-    "type": "run_created"
-   }
-  ],
-  "human_action": null,
-  "input_version": 1,
-  "inputs": [
-   {
-    "byte_end": 17,
-    "byte_start": 0,
-    "created_event_id": "<evt#1>",
-    "id": "<input#1>",
-    "input_ref": "<art#1>",
-    "intend_ref": "<art#1>",
-    "kind": "text",
-    "run_id": "<run#1>",
-    "text": "build an echo CLI",
-    "version": 1
-   }
-  ],
-  "intend_ref": "<art#1>",
-  "kind": "change",
-  "last_activations": {
-   "product": "<act#1>"
-  },
-  "last_review": null,
-  "latency_ms": "<duration>",
-  "lesson_candidates": [
-   {
-    "checks": [],
-    "created_event_id": "<evt#9>",
-    "delivery_spec_hash": null,
-    "evidence_refs": [],
-    "id": "<lesson#1>",
-    "observation": {
-     "message": "Provider requested Retry-After of 60.1 seconds, exceeding the 60-second limit",
-     "stop_reason": "retry_after_too_long"
-    },
-    "product_spec_hash": null,
-    "run_id": "<run#1>",
-    "source_event_id": "<evt#8>",
-    "source_type": "run_failed",
-    "status": "unverified",
-    "suggestion": "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
-   }
-  ],
-  "manifests": [
-   {
-    "activation_id": "<act#1>",
-    "admitted": true,
-    "budget": 32000,
-    "compaction_event_id": null,
-    "department": "product",
-    "digest": "<sha256#5>",
-    "effective_contract_hash": null,
-    "excluded": [
-     {
-      "reason": "cross-department transcripts are never injected",
-      "source": "other_department_transcript"
-     },
-     {
-      "reason": "older specs remain in department history but are never presented as current requirements",
-      "source": "superseded_spec_as_current"
-     },
-     {
-      "reason": "earlier decisions enter the current contract only when the current ProductSpec explicitly retains them",
-      "source": "expired_product_decisions"
-     },
-     {
-      "reason": "superseded deliveries are not injected as current_delivery_spec",
-      "source": "invalid_delivery_as_current"
-     }
-    ],
-    "guidance_ids": [],
-    "guidance_only": false,
-    "injected": [
-     {
-      "digest": "<sha256#7>",
-      "source": "intend",
-      "tokens": 5,
-      "version": "1"
-     },
-     {
-      "digest": "<sha256#8>",
-      "source": "current_work",
-      "tokens": 38,
-      "version": "PRODUCT_SPEC"
-     },
-     {
-      "digest": "<sha256#9>",
-      "source": "department_rules",
-      "tokens": 34,
-      "version": "0"
-     },
-     {
-      "digest": "<sha256#10>",
-      "source": "work_item_guidance",
-      "tokens": 54,
-      "version": "change"
-     },
-     {
-      "digest": "<sha256#11>",
-      "source": "input_progress",
-      "tokens": 17,
-      "version": "1"
-     },
-     {
-      "digest": "<sha256#12>",
-      "source": "input_handling",
-      "tokens": 47,
-      "version": null
-     },
-     {
-      "digest": "<sha256#13>",
-      "source": "professional_completion",
-      "tokens": 30,
-      "version": null
-     },
-     {
-      "digest": "<sha256#14>",
-      "source": "collaboration_rules",
-      "tokens": 44,
-      "version": null
-     },
-     {
-      "digest": "<sha256#15>",
-      "source": "proposal_contract",
-      "tokens": 504,
-      "version": "product"
-     },
-     {
-      "digest": "<sha256#16>",
-      "source": "binding_refs",
-      "tokens": 78,
-      "version": null
-     },
-     {
-      "digest": "<sha256#17>",
-      "source": "allowed_tools",
-      "tokens": 27,
-      "version": "product"
-     },
-     {
-      "digest": "<sha256#18>",
-      "source": "pending_inputs",
-      "tokens": 178,
-      "version": "1"
-     },
-     {
-      "digest": "<sha256#19>",
-      "source": "causal_chain",
-      "tokens": 14,
-      "version": null
-     },
-     {
-      "digest": "<sha256#20>",
-      "source": "department_history",
-      "tokens": 386,
-      "version": "product"
-     },
-     {
-      "digest": "<sha256#21>",
-      "source": "tool_schemas",
-      "tokens": 1970,
-      "version": "product"
-     }
-    ],
-    "input_token_estimate": 3591,
-    "input_version": 1,
-    "max_output_tokens": 4800,
-    "output_reserve_tokens": 4800,
-    "parts_ref": "<art#3>",
-    "prompt_hash": "<sha256#2>",
-    "prompt_version": 0,
-    "purpose": "work",
-    "request_id": null,
-    "request_ref": "<art#4>",
-    "session_id": "<ses_pro#1>",
-    "source_event_id": "<evt#5>",
-    "step_id": 1,
-    "token_estimate": 3597,
-    "truncated": false
-   }
-  ],
-  "max_cycles": 999999,
-  "model": null,
-  "model_requests": [
-   {
-    "accepts_required_tool_call": true,
-    "activation_id": "<act#1>",
-    "actual_model": null,
-    "actual_provider": null,
-    "attempt": 1,
-    "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "base_url": "",
-    "collaboration_request_id": null,
-    "collection_scope": {
-     "credentials": "excluded",
-     "events": "SDK decoded stream event JSON objects captured as JSON Lines with credential and header fields redacted; raw HTTP/SSE bytes are not available.",
-     "request": "SDK request JSON object captured from the prepared HTTP request; authentication headers and raw HTTP bytes are excluded.",
-     "response": "Complete SDK response object exposed by the provider SDK when a terminal response was received, with credential and header fields redacted."
-    },
-    "configured_max_output_tokens": 4800,
-    "context_digest": "<sha256#5>",
-    "context_event_id": "<evt#5>",
-    "credential_ref": null,
-    "credential_version": null,
-    "department": "product",
-    "duration_ms": "<duration>",
-    "effective_context_window": 32000,
-    "event_id": "<evt#6>",
-    "finished_at": "<time>",
-    "input_modalities": [
-     "text"
-    ],
-    "logical_call_id": "<act#1>:root-1:work",
-    "max_attempts": 3,
-    "max_output_tokens": 4800,
-    "model_id": "fake-model",
-    "prompt_version": 0,
-    "protocol": "fake",
-    "provider": "fake",
-    "provider_config_id": "fake",
-    "provider_name": "fake",
-    "provider_response_id": null,
-    "purpose": "work",
-    "raw_usage_ref": null,
-    "requested_model": "fake-script",
-    "requested_protocol": "fake",
-    "requested_provider": "fake",
-    "requested_tier": null,
-    "response_ref": null,
-    "retry_of_step_id": null,
-    "root_step_id": 1,
-    "selection_source": "department_default",
-    "sent_tier": null,
-    "seq": 6,
-    "started_at": "<time>",
-    "status": "failed",
-    "step_id": 1,
-    "stream_event_count": 0,
-    "stream_events_ref": null,
-    "usage": null
-   }
-  ],
-  "onboarding_basis": null,
-  "outcome": "failed",
-  "overview_ref": null,
-  "parameters_version": "<parameters>",
-  "pending_feedback": {},
-  "pending_request": null,
   "phase": "FAILED",
-  "processed_input_version": 0,
-  "product_decisions": [],
-  "product_spec": null,
-  "product_specs": [],
-  "product_work_input_version": 1,
-  "project_context_ref": null,
-  "project_id": null,
-  "prompt_config_versions": {},
-  "provider": "fake",
-  "registered_commands": {},
-  "rejections": [],
-  "request_count": 0,
-  "request_results": [],
-  "requested_model": "fake-script",
-  "requested_provider": "fake",
-  "requests": [],
-  "responses": [],
-  "reviews": [],
-  "rework_count": 0,
-  "round": 0,
-  "run_event_version": 4,
-  "run_id": "<run#1>",
-  "run_time_limit_sec": 7200,
-  "sessions": {
-   "engineering": {
-    "activations": 0,
-    "department": "engineering",
-    "session_id": "<ses_eng#1>",
-    "status": "idle"
-   },
-   "product": {
-    "activations": 1,
-    "department": "product",
-    "session_id": "<ses_pro#1>",
-    "status": "closed"
-   },
-   "quality": {
-    "activations": 0,
-    "department": "quality",
-    "session_id": "<ses_qua#1>",
-    "status": "idle"
-   }
-  },
-  "snapshot": null,
   "stop_reason": "retry_after_too_long",
-  "stream_version": 10,
-  "structure": null,
-  "structures": [],
-  "task": "build an echo CLI",
-  "token_used": 0,
-  "tool_count": 0,
-  "transitions": [
-   "CREATED->PRODUCT_SPEC"
-  ],
+  "outcome": "failed",
+  "error": "Provider requested Retry-After of 60.1 seconds, exceeding the 60-second limit",
   "waiting_reason": "未能完成：要求等待的时间过长",
-  "work_item_id": null,
-  "workspace_digest": "<sha256#1>",
-  "yielded_work": null
+  "active_department": null,
+  "human_action": null,
+  "cycle_count": 1,
+  "rework_count": 0,
+  "request_count": 0,
+  "round": 0,
+  "input_version": 1,
+  "processed_input_version": 0,
+  "product_work_input_version": 1,
+  "run_event_version": 4,
+  "stream_version": 10,
+  "definitions_version": "<definitions>",
+  "parameters_version": "<parameters>"
  },
- "artifacts": {
-  "<art#1>": {
-   "kind": "user_input",
-   "media_type": "text/plain; charset=utf-8",
-   "content": "build an echo CLI"
-  },
-  "<art#2>": {
-   "kind": "department_input",
-   "media_type": "application/json",
-   "content": {
-    "content": "<shared#1>",
-    "role": "user"
-   }
-  },
-  "<art#3>": {
-   "kind": "context_parts",
-   "media_type": "application/json",
-   "content": [
-    {
-     "digest": "<sha256#7>",
-     "source": "intend",
-     "text": "build an echo CLI",
-     "version": "1"
-    },
-    {
-     "digest": "<sha256#8>",
-     "source": "current_work",
-     "text": "{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}",
-     "version": "PRODUCT_SPEC"
-    },
-    {
-     "digest": "<sha256#9>",
-     "source": "department_rules",
-     "text": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。自然语言中的“完成”不会改变任务状态。你在会话检查工作区中读写与运行命令（从当前运行工作区建立），改动不进入运行工作区与交付，会话结束即删除。",
-     "version": "0"
-    },
-    {
-     "digest": "<sha256#10>",
-     "source": "work_item_guidance",
-     "text": "普通事项中，产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交。你看到的是这次会话的检查工作区，从当前运行工作区快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。",
-     "version": "change"
-    },
-    {
-     "digest": "<sha256#11>",
-     "source": "input_progress",
-     "text": "{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}",
-     "version": "1"
-    },
-    {
-     "digest": "<sha256#12>",
-     "source": "input_handling",
-     "text": "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。",
-     "version": null
-    },
-    {
-     "digest": "<sha256#13>",
-     "source": "professional_completion",
-     "text": "常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 由主机从接纳结果生成；模型不能直接改写它。",
-     "version": null
-    },
-    {
-     "digest": "<sha256#14>",
-     "source": "collaboration_rules",
-     "text": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
-     "version": null
-    },
-    {
-     "digest": "<sha256#15>",
-     "source": "proposal_contract",
-     "text": "{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"basis_product_spec_hash\":\"content hash of the ProductSpec this revision is based on; null for the first spec; the host rejects the submission if it does not equal the current effective ProductSpec content_hash\",\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\",\"basis_product_spec_hash\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}",
-     "version": "product"
-    },
-    {
-     "digest": "<sha256#16>",
-     "source": "binding_refs",
-     "text": "{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}",
-     "version": null
-    },
-    {
-     "digest": "<sha256#17>",
-     "source": "allowed_tools",
-     "text": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"run_check\",\"submit_product_spec\",\"submit_request\"]",
-     "version": "product"
-    },
-    {
-     "digest": "<sha256#18>",
-     "source": "pending_inputs",
-     "text": "[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]",
-     "version": "1"
-    },
-    {
-     "digest": "<sha256#19>",
-     "source": "causal_chain",
-     "text": "[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-     "version": null
-    },
-    {
-     "digest": "<sha256#20>",
-     "source": "department_history",
-     "text": "[{\"content\":\"[current_work]\\n{\\\"current_goal\\\":null,\\\"department\\\":\\\"product\\\",\\\"phase\\\":\\\"PRODUCT_SPEC\\\",\\\"precedence\\\":\\\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\\\",\\\"work\\\":\\\"形成并提交当前产品要求。\\\"}\\n\\n[input_progress]\\n{\\\"accepted_in_requirements\\\":0,\\\"assigned_to_product\\\":1,\\\"received\\\":1}\\n\\n[binding_refs]\\n{\\\"delivery_code_tree_digest\\\":null,\\\"delivery_spec_hash\\\":null,\\\"delivery_spec_id\\\":null,\\\"department\\\":\\\"product\\\",\\\"effective_contract_hash\\\":null,\\\"effective_decision_count\\\":0,\\\"pending_guidance_ids\\\":[],\\\"phase\\\":\\\"PRODUCT_SPEC\\\",\\\"product_spec_hash\\\":null,\\\"product_spec_id\\\":null,\\\"product_spec_revision\\\":null,\\\"request_id\\\":null}\\n\\n[pending_inputs]\\n[{\\\"byte_end\\\":17,\\\"byte_start\\\":0,\\\"created_event_id\\\":\\\"<evt#1>\\\",\\\"id\\\":\\\"<input#1>\\\",\\\"input_ref\\\":{\\\"content_hash\\\":\\\"<sha256#4>\\\",\\\"kind\\\":\\\"user_input\\\",\\\"media_type\\\":\\\"text/plain; charset=utf-8\\\",\\\"path\\\":\\\"<run#1>/<sha256#4>\\\"},\\\"intend_ref\\\":{\\\"content_hash\\\":\\\"<sha256#4>\\\",\\\"kind\\\":\\\"intend\\\",\\\"media_type\\\":\\\"text/plain; charset=utf-8\\\",\\\"path\\\":\\\"<run#1>/<sha256#4>\\\"},\\\"kind\\\":\\\"text\\\",\\\"run_id\\\":\\\"<run#1>\\\",\\\"text\\\":\\\"build an echo CLI\\\",\\\"version\\\":1}]\\n\\n[causal_chain]\\n[{\\\"kind\\\":\\\"transition\\\",\\\"route\\\":\\\"CREATED->PRODUCT_SPEC\\\"}]\",\"role\":\"user\"}]",
-     "version": "product"
-    },
-    {
-     "digest": "<sha256#21>",
-     "source": "tool_schemas",
-     "text": "[{\"description\":\"Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.\",\"name\":\"read_file\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \\\"src/\\\" keeps only the src directory, while \\\"src\\\" also keeps paths such as \\\"src2/a.py\\\". Paths under .checks are never listed.\",\"name\":\"list_files\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"prefix\":{\"description\":\"Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory\",\"type\":\"string\"}},\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.\",\"name\":\"search\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated search\",\"type\":[\"string\",\"null\"]},\"max_results\":{\"description\":\"Maximum matches per page\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Optional file or directory scope within the public tree\",\"type\":[\"string\",\"null\"]},\"pattern\":{\"description\":\"Python re regex searched per line\",\"type\":\"string\"}},\"required\":[\"pattern\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.\",\"name\":\"read_range\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"cursor\":{\"description\":\"Continuation cursor from a truncated read\",\"type\":[\"string\",\"null\"]},\"end_line\":{\"description\":\"Last line to read, inclusive; omit for end of file\",\"type\":[\"integer\",\"null\"]},\"path\":{\"description\":\"Workspace-relative file path\",\"type\":\"string\"},\"start_line\":{\"description\":\"First line to read, 1-based\",\"type\":\"integer\"}},\"required\":[\"path\",\"start_line\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.\",\"name\":\"bash\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"command\":{\"description\":\"Command string, e.g. uv run pytest tests\",\"type\":\"string\"},\"cursor\":{\"description\":\"Previous next_cursor, for the next page\",\"type\":[\"string\",\"null\"]},\"timeout_sec\":{\"description\":\"Optional seconds; default and maximum are rule-registered\",\"type\":[\"integer\",\"null\"]}},\"required\":[],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Host-executes a check in a fresh copy of the checked snapshot and records exit_code, summary, and snapshot hash. The command string runs with bash at the copy root, in a new process with the Yudao process's full environment; the copy is deleted when the check finishes. Do not self-report exit_code. command example: \\\"uv run pytest tests\\\". timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). Only run_check receipts count as check evidence; bash results are action receipts.\",\"name\":\"run_check\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"command\":{\"description\":\"The command string to run with bash at the copy root, e.g. uv run pytest tests\",\"type\":\"string\"},\"name\":{\"description\":\"Check name, e.g. smoke\",\"type\":\"string\"},\"timeout_sec\":{\"description\":\"Optional time limit in seconds; omitted uses the default, larger values apply the maximum\",\"type\":[\"integer\",\"null\"]}},\"required\":[\"name\",\"command\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Submit a ProductSpec. Required: goal, requirements, acceptance_criteria, basis_product_spec_hash. basis_product_spec_hash must equal the current effective ProductSpec content_hash (or null on the first spec); a stale basis is rejected so the revision cannot proceed against a superseded PRD.\",\"name\":\"submit_product_spec\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"acceptance_criteria\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"basis_product_spec_hash\":{\"description\":\"Content hash of the ProductSpec this revision is based on. Pass the current effective ProductSpec content_hash; pass null only for the first spec. The host rejects the submission if this value does not equal the current effective ProductSpec content_hash.\",\"type\":[\"string\",\"null\"]},\"boundaries\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"change_record\":{\"additionalProperties\":false,\"description\":\"Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec.\",\"properties\":{\"changed\":{\"description\":\"Requirements added or changed in this revision\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"rationale\":{\"minLength\":1,\"type\":\"string\"},\"retained\":{\"description\":\"Requirements explicitly preserved\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"retired\":{\"description\":\"Requirements explicitly removed\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"changed\",\"retained\",\"retired\",\"rationale\"],\"type\":\"object\"},\"constraints\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"decision_changes\":{\"description\":\"When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec.\",\"items\":{\"additionalProperties\":false,\"properties\":{\"decision_hash\":{\"type\":\"string\"},\"disposition\":{\"enum\":[\"retain\",\"integrate\",\"retire\"],\"type\":\"string\"},\"rationale\":{\"type\":\"string\"}},\"required\":[\"decision_hash\",\"disposition\",\"rationale\"],\"type\":\"object\"},\"type\":\"array\"},\"fatal_conditions\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"goal\":{\"type\":\"string\"},\"non_goals\":{\"description\":\"Optional\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"requirements\":{\"description\":\"Must contain at least one item\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"basis_product_spec_hash\",\"goal\",\"requirements\",\"acceptance_criteria\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"},{\"description\":\"Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.\",\"name\":\"submit_request\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"action\":{\"enum\":[null,\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"type\":[\"string\",\"null\"]},\"background\":{\"type\":\"string\"},\"expected_result\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"recipient\":{\"enum\":[\"product\",\"engineering\",\"quality\"],\"type\":\"string\"},\"request_type\":{\"enum\":[\"consultation\",\"action\"],\"type\":\"string\"}},\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\",\"action\"],\"type\":\"object\"},\"strict\":false,\"type\":\"function\"}]",
-     "version": "product"
-    }
-   ]
-  },
-  "<art#4>": {
-   "kind": "model_request",
-   "media_type": "application/json",
-   "content": {
-    "input": [
-     {
-      "content": "[intend]\nbuild an echo CLI\n\n[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[department_rules]\n你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。自然语言中的“完成”不会改变任务状态。你在会话检查工作区中读写与运行命令（从当前运行工作区建立），改动不进入运行工作区与交付，会话结束即删除。\n\n[work_item_guidance]\n普通事项中，产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交。你看到的是这次会话的检查工作区，从当前运行工作区快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[input_handling]\n新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。\n\n[professional_completion]\n常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 由主机从接纳结果生成；模型不能直接改写它。\n\n[collaboration_rules]\n一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。\n\n[proposal_contract]\n{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"basis_product_spec_hash\":\"content hash of the ProductSpec this revision is based on; null for the first spec; the host rejects the submission if it does not equal the current effective ProductSpec content_hash\",\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\",\"basis_product_spec_hash\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[allowed_tools]\n[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"run_check\",\"submit_product_spec\",\"submit_request\"]\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]",
-      "role": "developer"
-     },
-     {
-      "content": "<shared#1>",
-      "role": "user"
-     }
-    ],
-    "max_output_tokens": 4800,
-    "tools": [
-     {
-      "description": "Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.",
-      "name": "read_file",
-      "parameters": {
-       "additionalProperties": false,
-       "properties": {
-        "path": {
-         "description": "Workspace-relative file path",
-         "type": "string"
-        }
-       },
-       "required": [
-        "path"
-       ],
-       "type": "object"
-      },
-      "strict": false,
-      "type": "function"
-     },
-     {
-      "description": "List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \"src/\" keeps only the src directory, while \"src\" also keeps paths such as \"src2/a.py\". Paths under .checks are never listed.",
-      "name": "list_files",
-      "parameters": {
-       "additionalProperties": false,
-       "properties": {
-        "prefix": {
-         "description": "Optional string prefix on workspace-relative paths; end it with / to limit the list to one directory",
-         "type": "string"
-        }
-       },
-       "type": "object"
-      },
-      "strict": false,
-      "type": "function"
-     },
-     {
-      "description": "Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.",
-      "name": "search",
-      "parameters": {
-       "additionalProperties": false,
-       "properties": {
-        "cursor": {
-         "description": "Continuation cursor from a truncated search",
-         "type": [
-          "string",
-          "null"
-         ]
-        },
-        "max_results": {
-         "description": "Maximum matches per page",
-         "type": [
-          "integer",
-          "null"
-         ]
-        },
-        "path": {
-         "description": "Optional file or directory scope within the public tree",
-         "type": [
-          "string",
-          "null"
-         ]
-        },
-        "pattern": {
-         "description": "Python re regex searched per line",
-         "type": "string"
-        }
-       },
-       "required": [
-        "pattern"
-       ],
-       "type": "object"
-      },
-      "strict": false,
-      "type": "function"
-     },
-     {
-      "description": "Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.",
-      "name": "read_range",
-      "parameters": {
-       "additionalProperties": false,
-       "properties": {
-        "cursor": {
-         "description": "Continuation cursor from a truncated read",
-         "type": [
-          "string",
-          "null"
-         ]
-        },
-        "end_line": {
-         "description": "Last line to read, inclusive; omit for end of file",
-         "type": [
-          "integer",
-          "null"
-         ]
-        },
-        "path": {
-         "description": "Workspace-relative file path",
-         "type": "string"
-        },
-        "start_line": {
-         "description": "First line to read, 1-based",
-         "type": "integer"
-        }
-       },
-       "required": [
-        "path",
-        "start_line"
-       ],
-       "type": "object"
-      },
-      "strict": false,
-      "type": "function"
-     },
-     {
-      "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
-      "name": "bash",
-      "parameters": {
-       "additionalProperties": false,
-       "properties": {
-        "command": {
-         "description": "Command string, e.g. uv run pytest tests",
-         "type": "string"
-        },
-        "cursor": {
-         "description": "Previous next_cursor, for the next page",
-         "type": [
-          "string",
-          "null"
-         ]
-        },
-        "timeout_sec": {
-         "description": "Optional seconds; default and maximum are rule-registered",
-         "type": [
-          "integer",
-          "null"
-         ]
-        }
-       },
-       "required": [],
-       "type": "object"
-      },
-      "strict": false,
-      "type": "function"
-     },
-     {
-      "description": "Host-executes a check in a fresh copy of the checked snapshot and records exit_code, summary, and snapshot hash. The command string runs with bash at the copy root, in a new process with the Yudao process's full environment; the copy is deleted when the check finishes. Do not self-report exit_code. command example: \"uv run pytest tests\". timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). Only run_check receipts count as check evidence; bash results are action receipts.",
-      "name": "run_check",
-      "parameters": {
-       "additionalProperties": false,
-       "properties": {
-        "command": {
-         "description": "The command string to run with bash at the copy root, e.g. uv run pytest tests",
-         "type": "string"
-        },
-        "name": {
-         "description": "Check name, e.g. smoke",
-         "type": "string"
-        },
-        "timeout_sec": {
-         "description": "Optional time limit in seconds; omitted uses the default, larger values apply the maximum",
-         "type": [
-          "integer",
-          "null"
-         ]
-        }
-       },
-       "required": [
-        "name",
-        "command"
-       ],
-       "type": "object"
-      },
-      "strict": false,
-      "type": "function"
-     },
-     {
-      "description": "Submit a ProductSpec. Required: goal, requirements, acceptance_criteria, basis_product_spec_hash. basis_product_spec_hash must equal the current effective ProductSpec content_hash (or null on the first spec); a stale basis is rejected so the revision cannot proceed against a superseded PRD.",
-      "name": "submit_product_spec",
-      "parameters": {
-       "additionalProperties": false,
-       "properties": {
-        "acceptance_criteria": {
-         "description": "Must contain at least one item",
-         "items": {
-          "type": "string"
-         },
-         "type": "array"
-        },
-        "basis_product_spec_hash": {
-         "description": "Content hash of the ProductSpec this revision is based on. Pass the current effective ProductSpec content_hash; pass null only for the first spec. The host rejects the submission if this value does not equal the current effective ProductSpec content_hash.",
-         "type": [
-          "string",
-          "null"
-         ]
-        },
-        "boundaries": {
-         "description": "Optional",
-         "items": {
-          "type": "string"
-         },
-         "type": "array"
-        },
-        "change_record": {
-         "additionalProperties": false,
-         "description": "Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec.",
-         "properties": {
-          "changed": {
-           "description": "Requirements added or changed in this revision",
-           "items": {
-            "type": "string"
-           },
-           "type": "array"
-          },
-          "rationale": {
-           "minLength": 1,
-           "type": "string"
-          },
-          "retained": {
-           "description": "Requirements explicitly preserved",
-           "items": {
-            "type": "string"
-           },
-           "type": "array"
-          },
-          "retired": {
-           "description": "Requirements explicitly removed",
-           "items": {
-            "type": "string"
-           },
-           "type": "array"
-          }
-         },
-         "required": [
-          "changed",
-          "retained",
-          "retired",
-          "rationale"
-         ],
-         "type": "object"
-        },
-        "constraints": {
-         "description": "Optional",
-         "items": {
-          "type": "string"
-         },
-         "type": "array"
-        },
-        "decision_changes": {
-         "description": "When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec.",
-         "items": {
-          "additionalProperties": false,
-          "properties": {
-           "decision_hash": {
-            "type": "string"
-           },
-           "disposition": {
-            "enum": [
-             "retain",
-             "integrate",
-             "retire"
-            ],
-            "type": "string"
-           },
-           "rationale": {
-            "type": "string"
-           }
-          },
-          "required": [
-           "decision_hash",
-           "disposition",
-           "rationale"
-          ],
-          "type": "object"
-         },
-         "type": "array"
-        },
-        "fatal_conditions": {
-         "description": "Optional",
-         "items": {
-          "type": "string"
-         },
-         "type": "array"
-        },
-        "goal": {
-         "type": "string"
-        },
-        "non_goals": {
-         "description": "Optional",
-         "items": {
-          "type": "string"
-         },
-         "type": "array"
-        },
-        "requirements": {
-         "description": "Must contain at least one item",
-         "items": {
-          "type": "string"
-         },
-         "type": "array"
-        }
-       },
-       "required": [
-        "basis_product_spec_hash",
-        "goal",
-        "requirements",
-        "acceptance_criteria"
-       ],
-       "type": "object"
-      },
-      "strict": false,
-      "type": "function"
-     },
-     {
-      "description": "Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.",
-      "name": "submit_request",
-      "parameters": {
-       "additionalProperties": false,
-       "properties": {
-        "action": {
-         "enum": [
-          null,
-          "inspect",
-          "check",
-          "revise_requirements",
-          "revise_delivery"
-         ],
-         "type": [
-          "string",
-          "null"
-         ]
-        },
-        "background": {
-         "type": "string"
-        },
-        "expected_result": {
-         "type": "string"
-        },
-        "question": {
-         "type": "string"
-        },
-        "recipient": {
-         "enum": [
-          "product",
-          "engineering",
-          "quality"
-         ],
-         "type": "string"
-        },
-        "request_type": {
-         "enum": [
-          "consultation",
-          "action"
-         ],
-         "type": "string"
-        }
-       },
-       "required": [
-        "recipient",
-        "request_type",
-        "question",
-        "background",
-        "expected_result",
-        "action"
-       ],
-       "type": "object"
-      },
-      "strict": false,
-      "type": "function"
-     }
-    ]
-   }
-  }
- },
- "shared": {
-  "<shared#1>": "[current_work]\n{\"current_goal\":null,\"department\":\"product\",\"phase\":\"PRODUCT_SPEC\",\"precedence\":\"本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。\",\"work\":\"形成并提交当前产品要求。\"}\n\n[input_progress]\n{\"accepted_in_requirements\":0,\"assigned_to_product\":1,\"received\":1}\n\n[binding_refs]\n{\"delivery_code_tree_digest\":null,\"delivery_spec_hash\":null,\"delivery_spec_id\":null,\"department\":\"product\",\"effective_contract_hash\":null,\"effective_decision_count\":0,\"pending_guidance_ids\":[],\"phase\":\"PRODUCT_SPEC\",\"product_spec_hash\":null,\"product_spec_id\":null,\"product_spec_revision\":null,\"request_id\":null}\n\n[pending_inputs]\n[{\"byte_end\":17,\"byte_start\":0,\"created_event_id\":\"<evt#1>\",\"id\":\"<input#1>\",\"input_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"user_input\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"intend_ref\":{\"content_hash\":\"<sha256#4>\",\"kind\":\"intend\",\"media_type\":\"text/plain; charset=utf-8\",\"path\":\"<run#1>/<sha256#4>\"},\"kind\":\"text\",\"run_id\":\"<run#1>\",\"text\":\"build an echo CLI\",\"version\":1}]\n\n[causal_chain]\n[{\"kind\":\"transition\",\"route\":\"CREATED->PRODUCT_SPEC\"}]"
- }
+ "shared": {}
 }
