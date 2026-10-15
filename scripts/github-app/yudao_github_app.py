@@ -3,13 +3,14 @@
 # 角色进程启动前设置两个环境变量，并把本目录放在 PATH 最前面：
 #   YUDAO_GH_APP_ID        App 编号
 #   YUDAO_GH_APP_KEY_FILE  私钥文件（GitHub App 生成的 .private-key.pem）
-# 两个变量都没有设置时，入口直接运行原来的 gh 与 git，行为不变。
+# 两个变量都没有设置时，入口直接运行原来的 gh 与 git，参数与退出码原样传递。
 #
 # 令牌按需换取：安装令牌一小时过期，剩余不到 600 秒换新，否则复用缓存。
 # 缓存放在仓库以外的用户目录（%LOCALAPPDATA%\yudao），只写令牌与过期时刻，不写私钥。
 #
-# 入口（gh.cmd/gh、git.cmd/git）都转到这里：先探测能 import cryptography 的解释器，
-# 再按 argv[0] 的名字分发到 gh 包装或 git 包装。
+# 入口 gh.exe 与 git.exe 由 make_entries.py 生成，把入口名与参数原样转到这里（工单 #526）：
+# 先在 PATH 上跳过本目录找到真正的 gh 与 git，再探测能 import cryptography 的解释器，
+# 分发到 gh 包装或 git 包装。
 
 from __future__ import annotations
 
@@ -186,8 +187,8 @@ def installation_token() -> str:
     return token
 
 # 入口调用本模块的参数布局：
-#   python yudao_github_app.py gh  <真 gh 绝对路径> [gh 参数...]
-#   python yudao_github_app.py git <真 git 绝对路径> [git 参数...]
+#   python yudao_github_app.py gh  [gh 参数...]
+#   python yudao_github_app.py git [git 参数...]
 #   python yudao_github_app.py credential            （git 的凭证助手协议，读 stdin）
 # 入口可能由任意 Python 启动（系统 Python 往往没有 cryptography）。
 # 探测一个能 import cryptography 的解释器；探测过就打标记，避免重复 exec 自己。
@@ -223,15 +224,42 @@ def _candidate_interpreters() -> list[str]:
 def ensure_interpreter() -> None:
     # 当前解释器缺 cryptography 时 exec 到第一个可用的解释器，并带上探测标记；
     # 都不可用说明依赖没装，报错而不是退回其他身份
-    if os.environ.get(PROBE_MARK) == "1":
+    # 标记只给紧接着的这一次运行用，取出后不再传给 gh、git 与它们再调起的入口
+    if os.environ.pop(PROBE_MARK, None) == "1":
         return
     if _has_cryptography(sys.executable):
         return
+    # Windows 上的 os.execv 会先退出当前进程，入口启动器随之结束并带走子进程，
+    # 所以用子进程运行并等它结束
+    import subprocess
     for candidate in _candidate_interpreters():
         if candidate != sys.executable and _has_cryptography(candidate):
             os.environ[PROBE_MARK] = "1"
-            os.execv(candidate, [candidate, str(Path(__file__).resolve()), *sys.argv[1:]])
+            result = subprocess.run([candidate, str(Path(__file__).resolve()), *sys.argv[1:]],
+                                    check=False)
+            raise SystemExit(result.returncode)
     _fail("找不到带 cryptography 的 Python 解释器；在项目环境里装好依赖（uv sync）再运行")
+
+def _real_binary(name: str) -> str:
+    # 按 PATH 顺序、每个目录内按 PATHEXT 顺序找真正的 gh 与 git，跳过入口所在的本目录。
+    # 不用 shutil.which：Python 3.12 以前它在 Windows 上先查当前目录，
+    # 当前目录是本目录时会找回入口自己
+    here = Path(__file__).resolve().parent
+    extensions = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(os.pathsep)
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if not directory or Path(directory).resolve() == here:
+            continue
+        for extension in extensions:
+            candidate = Path(directory) / (name + extension)
+            if extension and candidate.is_file():
+                return str(candidate)
+    _fail(f"PATH 里找不到 {name}")
+
+def _run(real: str, arguments: list[str]) -> None:
+    # 两个变量都没有设置时原样运行：参数、标准输入输出与退出码都不变
+    import subprocess
+    result = subprocess.run([real, *arguments], check=False)
+    raise SystemExit(result.returncode)
 
 
 def _run_gh(real: str, arguments: list[str]) -> None:
@@ -285,14 +313,16 @@ def _run_credential() -> None:
 
 
 def main() -> None:
-    ensure_interpreter()
     command = sys.argv[1] if len(sys.argv) > 1 else ""
-    arguments = sys.argv[3:]
+    arguments = sys.argv[2:]
+    if command in ("gh", "git") and not configured():
+        _run(_real_binary(command), arguments)
+    ensure_interpreter()
     try:
         if command == "gh":
-            _run_gh(sys.argv[2], arguments)
+            _run_gh(_real_binary("gh"), arguments)
         elif command == "git":
-            _run_git(sys.argv[2], arguments)
+            _run_git(_real_binary("git"), arguments)
         elif command == "credential":
             _run_credential()
         else:

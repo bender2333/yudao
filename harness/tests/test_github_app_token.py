@@ -190,12 +190,12 @@ def key(tmp_path: Path) -> Path:
 def test_gh_and_git_requests_carry_the_installation_token(key, tmp_path):
     # 验收 1：请求带上从私钥换来的安装令牌。本地 HTTP 接口核对 JWT 头、
     # 安装编号按仓库所有者选中、令牌请求的路径
+    bin_dir = _write_fake_gh(tmp_path / "bin")
     with _FakeGitHub() as github:
         result = subprocess.run(
-            [str(_python()), str(MODULE_PATH), "gh", str(_write_fake_gh(tmp_path / "bin") / "gh.cmd"),
-             "pr", "list", "--limit", "5"],
-            env={**_configured_env(tmp_path, github.root)}, capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=120)
+            [str(_python()), str(MODULE_PATH), "gh", "pr", "list", "--limit", "5"],
+            env={**_configured_env(tmp_path, github.root), "PATH": _front_path(bin_dir)},
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     assert result.returncode == 7, result.stdout + result.stderr
     assert github.jwt_headers == [{"alg": "RS256", "typ": "JWT"}]
     claim = github.jwt_claims[0]

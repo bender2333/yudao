@@ -20,7 +20,8 @@ yudao = "harness.__main__:main"
 [dependency-groups]
 # PyYAML 供测试读取 YAML 固件，也供发布脚本 scripts/release.py 读取 latest.yml；
 # cryptography 供 scripts/github-app/ 用私钥签 GitHub App 的 JWT（工单 #513），
-# trustme 已经带着同一个包，这里显式声明，不依赖传递依赖
+# trustme 已经带着同一个包，这里显式声明，不依赖传递依赖；
+# distlib 供 scripts/github-app/make_entries.py 生成 gh.exe 与 git.exe 两个入口（工单 #526）
 dev = [
     "pytest>=8",
     "pytest-xdist>=3.8",
@@ -30,6 +31,7 @@ dev = [
     "pytest-timeout>=2.4.0",
     "pyflakes>=3.3,<5",
     "cryptography>=42,<51",
+    "distlib>=0.4,<1",
 ]
 
 [tool.setuptools.packages.find]
