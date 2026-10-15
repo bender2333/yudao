@@ -628,3 +628,5 @@ claude-opus-5-5 / 2026-10-15 09:35 / docs/agents/autopilot-runtime.md 第 2 节�
 claude-opus-5-5 / 2026-10-15 22:40 / docs/design/test-pyramid.md 增加第 11.1 节：事件序列基准按保留的关键字段写（信封、每类事件的关键载荷、工具回执的退出码与状态、投影的关键字段），快照文件的位置与键，依赖说明长度的测试与场景按实测固定材料设置窗口；状态行补一句 / #514 执行者运行 4 小时没有产出，拆分前用实验确定可以落地的格式：只去掉说明与估算时最近三次合并仍改 16 至 40 份基准，按关键字段写为 0 份
 
 claude-opus-5-5 / 2026-10-16 11:20 / 工单 #532 落地 docs/design/test-pyramid.md 第 11.1 节的事件序列基准瘦身：harness/tests/event_sequence.py 增加 KEY_FIELDS、PROJECTION_KEY_FIELDS、工具回执 receipt、prompt_entries 与提示快照，新增 harness/tests/prompt_snapshot.json 收 7 个部门提示与工具说明条目；history_exceeds_the_window 改为 context_window=9740，摘要请求也放不下时以 compaction_failed 结束 / #532
+
+claude-opus-5-5 / 2026-10-16 12:40 / 工单 #532 第 2 轮：harness/tests/event_scenarios.py 的 history_exceeds_the_window 不再写死 context_window=9740，改为在同一 data_dir 用宽窗口跑同一份任务、装配一次不带历史的请求取固定材料的实测 token 数，窗口取该数加固定余量；docs/design/test-pyramid.md 第 3 行状态行与第 11.1 节末条同步改写；agents_jour/532.md 追加本轮记录并标注第 1 轮反向验证一（read_file 说明）作废 / 审查指出写死窗口违反测试分层设计第 10 节第 3 条「依赖说明总长度的场景不写固定数字」，反向验证一的对象必须是 tools.json 的 bash 说明；#532
