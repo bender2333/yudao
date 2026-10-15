@@ -185,4 +185,7 @@ _LABELS: dict[str, str] = {
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: "请求强制升级（目录第 {version} 号）：停了 {stopped_runs} 个运行",
     CatalogEventType.HOME_SEEN: "记下用户查看的位置：{position}",
     CatalogEventType.PARAMETER_SET: "把参数 {name} 从 {old_value} 改为 {new_value}：{reason}",
+    CatalogEventType.INSTANCE_UPGRADE_REQUESTED: "请用户决定是否升级实例（{kind}）：{description}",
+    CatalogEventType.INSTANCE_UPGRADE_ANSWERED: "回答了实例升级的决定：{option}",
+    CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN: "撤销了实例升级的决定：{reason}",
 }

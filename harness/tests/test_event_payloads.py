@@ -1,26 +1,45 @@
 import gc
 import sys
+import uuid
 
 import pygit2
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.models import ArtifactRef, EventType, ProjectEventType
+from harness.event_store import Command, catalog_stream
+from harness.models import ArtifactRef, CatalogEventType, EventType, ProjectEventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.selection import ModelSelection
 from harness.public_tree import CapturedFile, CapturedTree
+from harness.release_check import ReleaseCheckReport, request_instance_upgrade
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.tree_archive import artifact_run, load_tree
+from harness.write_path import NewCatalogEvent
 
 # 应用层合同中的事件载荷类型与控制核心实际写入的载荷一致。run 事件的各种路径由事件序列对照的全部场景核对
 # （test_event_sequence.py），这里从系统整体运行一个项目：登记、配置、材料、归档与恢复、事项开始失败、
 # 两个事项一个采纳一个保留为未采纳候选，再加一个事项走真实的采纳写回流程（#347 的五种写回事件全部产出），
-# 核对日志中的每条事件。
-
+# 目录流中的实例升级三个事件（#355、#462）也在这里产出，核对日志中的每条事件。
 def _release_script(summary, files=None):
     return [product_spec(), delivery_turn(summary=summary, files=files),
             review_turn("release", f"ok {summary}")]
+
+def _release_report() -> ReleaseCheckReport:
+    # 一次通过的发布检查结果：与 harness/release_check.py 写进决定请求的同一形状
+    return ReleaseCheckReport(
+        repository="D:/repo", pending_commit="0123456789abcdef", base_tag="v0.1.0",
+        kernel_changes=("harness/bounds.py",), kernel_python_lines=5290, python_lines_max=5471,
+        findings=(), text="发布检查：通过")
+
+
+def _withdraw_instance_upgrade(system, decision_id: str, reason: str) -> None:
+    # 目录流中的撤销（工单 #462）：没有生产写出方，按投影读取的字段直接写出
+    def decide(transaction):
+        transaction.append(NewCatalogEvent(CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN,
+                                           {"decision_id": decision_id, "reason": reason}, actor="system"))
+
+    system.writes.transact(catalog_stream(), decide)
 
 def _writeback_tree(repo, files):
     # 文件路径按 / 分层建树：采纳树与目标树的内容都经这条路径写入裸仓库
@@ -139,6 +158,13 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     adoption_id = projects.projection(project_id).current_adoption.adoption_id
     _produce_writeback_events(system, projects, project_id, base_version=1,
                               adoption_id=adoption_id, remote=data_dir.parent / "writeback-target.git")
+    # 实例升级的三个目录事件（工单 #462）：requested 由发布检查的真实入口写出，
+    # answered 由 orchestrator 的目录流分支写出；withdrawn 没有生产写出方，按投影读的字段直接写
+    decision_id = request_instance_upgrade(system, _release_report())
+    system.orchestrator.answer_decision(
+        decision_id, "approve", None, base_version=1,
+        command=Command(str(uuid.uuid4()), "decision.answer", "sha256:approve:1", "user:local"))
+    _withdraw_instance_upgrade(system, decision_id, "user_cancelled")
 
     events = system.store.read(0, limit=100_000)
     written = {event.type for event in events}
