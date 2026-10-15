@@ -218,4 +218,4 @@ flowchart LR
 - 键是「部门/请求目的」，回答询问时加上 `/request`，有待处理的指导时加上 `/guidance`，只能回应指导时加上 `/guidance_only`；这几种情况下部门可用的工具不同。42 个场景中出现的是：产品、工程、质检的工作请求，产品的压缩请求，产品回答询问，工程有待处理的指导，工程只能回应指导。每个键记一次：部门 Prompt、事项种类的工作说明、全体共同的三段规则、提案合同、可用工具名，以及工具清单（名称、说明、参数）；压缩请求记摘要请求的固定说明。不记 token 数，不记随场景变化的材料（意图、当前工作、版本引用、待处理输入、部门历史）。
 - 由 `test_event_sequence.py` 里单独的一项测试生成与比较：它运行覆盖这些键的最少场景（`handoff_release`、`compaction_success`、`collaboration_request_answer`、`guidance_response_explained`、`tool_denied_guidance_only`），从请求材料取出上面的内容。同一个键在两个场景里取到的内容不同时测试失败，写明场景与键。
 
-依赖说明总长度的测试与场景（第 10 节第 3 条）：窗口与阈值由「固定材料的实测 token 数」加上场景需要的余量算出，不写固定的数字。实验中依赖长度的有三处：`test_context.py` 的窄窗口测试（固定上限 3600）、`test_compaction_engine.py` 中为说明长度调过窗口的两项及它们使用的 `helpers.py::compacted_runner`，以及事件序列场景 `history_exceeds_the_window`（窗口 10000，说明加长以后失败原因从「没有留给输出的空间」变成「固定材料放不下摘要」）。
+依赖说明总长度的测试与场景（第 10 节第 3 条）：窗口与阈值由「固定材料的实测 token 数」加上场景需要的余量算出，不写固定的数字。实验中依赖长度的有三处：`test_context.py` 的窄窗口测试（固定上限 3600）、`test_compaction_engine.py` 中注释写明为说明长度调过窗口的两项（窗口 5000），以及事件序列场景 `history_exceeds_the_window`（窗口 10000，说明加长以后失败原因从「没有留给输出的空间」变成「固定材料放不下摘要」）。
