@@ -16,10 +16,11 @@ from typing import Any
 from harness.actions import Action, ActionReceipt, Preconditions
 from harness.adapters.fake import FakeAdapter, pending_request_id
 from harness.assembly import ContextAssembly
-from harness.context import ContextPart
+from harness.context import ContextAssembler, ContextPart
 from harness.definitions import DEFINITIONS
+from harness.department_prompts import save_department_prompt
 from harness.engine import StepLimits
-from harness.models import ArtifactRef, ContextManifest, Event, json_dumps
+from harness.models import ArtifactRef, ContextManifest, DepartmentPrompt, Event, json_dumps
 from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
 from harness.environment import LocalEnvironment
 from harness.providers.call import ModelCall, ModelResponse
@@ -270,3 +271,16 @@ def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=Fals
     run_id = system.create_run(original, context_window=6000)
     system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
     return system, adapter, run_id, original
+
+def pinned_input_tokens(system: LoopSystem, run_id: str, department: str = "product") -> int:
+    # 固定材料（部门提示、规则、提案合同、工具清单）的实测 token 估算；依赖总长度的测试由它推出窗口。
+    # 窗口取足够大的值，避免装配本身因窗口失败；历史为空，只测不带历史时一次工作请求的输入
+    text = DEFINITIONS.role(department).prompt
+    prompt_ref = save_department_prompt(system.artifacts, run_id, department, text)
+    prompt = DepartmentPrompt(department, 0, text, prompt_ref, "")
+    projection = system.project(run_id)
+    session = projection.sessions[department]
+    assembled = ContextAssembler(system.artifacts).assemble(
+        projection, department=department, session_id=session.session_id, activation_id="pinned",
+        prompt=prompt, context_window=1_000_000, max_output_tokens=1_000_000)
+    return assembled.manifest.input_token_estimate
