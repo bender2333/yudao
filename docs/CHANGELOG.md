@@ -632,3 +632,5 @@ claude-opus-5-5 / 2026-10-16 11:20 / 工单 #532 落地 docs/design/test-pyramid
 claude-opus-5-5 / 2026-10-16 12:40 / 工单 #532 第 2 轮：harness/tests/event_scenarios.py 的 history_exceeds_the_window 不再写死 context_window=9740，改为在同一 data_dir 用宽窗口跑同一份任务、装配一次不带历史的请求取固定材料的实测 token 数，窗口取该数加固定余量；docs/design/test-pyramid.md 第 3 行状态行与第 11.1 节末条同步改写；agents_jour/532.md 追加本轮记录并标注第 1 轮反向验证一（read_file 说明）作废 / 审查指出写死窗口违反测试分层设计第 10 节第 3 条「依赖说明总长度的场景不写固定数字」，反向验证一的对象必须是 tools.json 的 bash 说明；#532
 
 claude-opus-5-5 / 2026-10-16 13:10 / 工单 #532 第 2 轮补充：合并 main 后 harness/tests/event_scenarios.py 改为调用 #533 新增的 harness/tests/helpers.py::pinned_input_tokens（原先内联的同一段装配代码删除），反向验证一（tools.json 的 bash 说明）在合并后的树上重做一次，结论不变；agents_jour/532.md 追加合并与重做记录 / #533 合并后 helpers.py 已提供同一助手，避免同一逻辑存在两份实现；#532
+
+claude-opus-5-5 / 2026-10-16 15:30 / 工单 #534 恢复 #481 第 1 轮为通过说明长度测试而删掉的 bash 工具说明：harness/definitions/tools.json 的 bash.description 在「the workspace root is the working directory.」之后补上环境变量继承与密钥值替换、超时或取消结束整个进程树两句；harness/tests/test_tool_contracts.py 增加对应三条断言；harness/tests/prompt_snapshot.json 用 --write-event-baselines 重写，差异只是 4 处 bash 说明；agents_jour/534.md 记录步骤与反向验证 / 依赖项 #532、#533 合并后说明长度不再影响测试，恢复说明不再引起基准变动
