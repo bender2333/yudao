@@ -16,13 +16,10 @@ import pytest
 
 from harness.adapters.base import Availability, ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from harness.context import ContextAssembler
 from harness.decisions import DecisionClosed
-from harness.definitions import DEFINITIONS
-from harness.department_prompts import save_department_prompt
 from harness.engine import StepLimits
 from harness.event_store import Command
-from harness.models import DepartmentPrompt, EventType, Usage, json_dumps
+from harness.models import EventType, Usage, json_dumps
 from harness.providers.call import ModelCall, ModelResponse
 from harness.proposals import (
     collaboration_request, delivery, delivery_turn, guidance_response,
@@ -30,7 +27,7 @@ from harness.proposals import (
 )
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES
+from harness.tests.helpers import FAST_RETRIES, pinned_input_tokens
 from harness.tests.protocol_helpers import ScriptedProvider, provider_system, send_reply, serve
 from harness.tests.provider_replies import (
     BROKEN_STREAMS,
@@ -287,25 +284,16 @@ def context_overflow(data_dir):
 def history_exceeds_the_window(data_dir):
     # 固定材料放得下；激活第一步的部门工作消息再次带上整段原始意图，加上部门历史以后超过窗口，
     # 摘要请求也放不下，运行以 compaction_failed 结束，没有模型调用。
-    # 窗口按固定材料的实测 token 数加余量推出，不写死数字（#532 第 2 轮，测试分层设计第 10 节第 3 条）。
+    # 窗口按固定材料的实测 token 数加余量推出，不写死数字（测试分层设计第 10 节第 3 条）。
     # 余量的可行区间由实测确定：低于下界时错误变成「固定材料放不下摘要」，
     # 高于上界时摘要请求放得下，运行会真的调用模型（适配器脚本耗尽）。
     task = "build an echo CLI. " + "Keep the requirement text. " * 370
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(data_dir, adapter)
     measure_id = system.create_run(task, context_window=1_000_000)
-    # 实测固定材料：用宽窗口跑同一份任务，装配一次不带历史与指引的请求（与 #533 的 pinned_input_tokens 同一做法）。
     # 测量 run 与真实 run 共用同一个 data_dir：调用目标按事项窗口逐次安装（orchestrator.py:1162），
     # 后建的 run 用自己 create_run 时声明的窗口，两者互不影响。
-    prompt_text = DEFINITIONS.role("product").prompt
-    prompt_ref = save_department_prompt(system.artifacts, measure_id, "product", prompt_text)
-    prompt = DepartmentPrompt("product", 0, prompt_text, prompt_ref, "")
-    projection = system.project(measure_id)
-    session = projection.sessions["product"]
-    assembled = ContextAssembler(system.artifacts).assemble(
-        projection, department="product", session_id=session.session_id, activation_id="pinned",
-        prompt=prompt, context_window=1_000_000, max_output_tokens=1_000_000)
-    pinned = assembled.manifest.input_token_estimate
+    pinned = pinned_input_tokens(system, measure_id)
     run_id = system.create_run(task, context_window=pinned + 2048)
     system.run_until_stop(run_id)
     return system, run_id, {}
