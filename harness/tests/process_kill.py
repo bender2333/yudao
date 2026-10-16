@@ -21,7 +21,7 @@
 # 终止时先停 Yudao 进程本身、等它退出，再收掉它留下的子进程（工单 #338）：子进程是另起进程组启动的，
 # 与 Yudao 进程不同组，同时终止时谁先死不确定，子进程先死会让这次动作的回执被写下来
 #
-# 子进程入口：python -m harness.tests.process_kill <数据目录> <脚本 JSON> <事项任务> [登记注册表 JSON]
+# 子进程入口：python -m harness.tests.process_kill <数据目录> <脚本 JSON> <事项任务>
 # 建档（工单 #317）的额外动作：--onboard 与 --onboard-source 接入已有项目并开始建档事项，取代 create_run；
 # --settle 在 run 结束以后结算；--answer-revise 在结算以后回答「提出修改」并写下修改意见。
 # --hold-after onboarding_revision_started 停在修改轮的事件提交以后、新 run 建立以前。
@@ -238,6 +238,7 @@ def main() -> None:
             args.project_name, args.task, "src", str(args.onboard_source))
     else:
         options = {} if args.run_time_limit is None else {"run_time_limit_sec": args.run_time_limit}
+        run_id = system.create_run(args.task, **options)
     if args.await_file is not None:
         # 工单 #308、#338：在回执写入的那一刻自己停住，等父进程来终止
         _hold_before_receipt(args.data_dir, args.await_dir, args.await_file, args.await_content,
@@ -510,8 +511,7 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]], *,
     script_file.write_text(json.dumps(list(script), ensure_ascii=False), encoding="utf-8")
     hold_dir = work / f"hold-{restart_round}"
     hold_dir.mkdir(exist_ok=True)
-
-    process = _spawn(data_dir, script_file, "restart", None, log, resume_only=True,
+    process = _spawn(data_dir, script_file, "restart", log, resume_only=True,
                      hold_after=hold_after, hold_dir=hold_dir, hold_action=hold_action)
     try:
         if hold_after is not None:
