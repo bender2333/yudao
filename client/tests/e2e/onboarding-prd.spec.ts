@@ -234,8 +234,9 @@ test.describe("初始 PRD 的资料（1440×900）", () => {
       await expect(first).toContainText("PRD");
       await expect(first).toContainText("# 现有结构说明");
       await expect(first).toContainText("要求所在的位置");
-      await expect(first).toContainText("read the project layout at step 0");
-      await expect(first).toContainText("verified");
+      // 建档脚本的模型调用队列在本文件内共享，第几条用例接入决定用到第几轮的要求文案，这里只核对接入
+      await expect(first).toContainText(/read the project layout at step \d+/);
+      await expect(first).toContainText("已核实");
 
       // STRUCTURE.md 链接同样跳到资料页
       await page.evaluate(() => {
