@@ -8997,6 +8997,310 @@ export type InputSaveFailure = {
 };
 
 /**
+ * InstanceUpgradeAnswered
+ */
+export type InstanceUpgradeAnswered = {
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Option
+     */
+    option: string;
+    /**
+     * Note
+     */
+    note: string | null;
+    /**
+     * Base Version
+     */
+    base_version: number;
+};
+
+/**
+ * InstanceUpgradeAnsweredEvent
+ */
+export type InstanceUpgradeAnsweredEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'instance_upgrade_answered';
+    payload: InstanceUpgradeAnswered;
+};
+
+/**
+ * InstanceUpgradeReport
+ */
+export type InstanceUpgradeReport = {
+    /**
+     * Repository
+     */
+    repository: string;
+    /**
+     * Pending Commit
+     */
+    pending_commit: string;
+    /**
+     * Base Tag
+     */
+    base_tag: string | null;
+    /**
+     * Kernel Changes
+     */
+    kernel_changes: Array<string>;
+    /**
+     * Kernel Python Lines
+     */
+    kernel_python_lines: number;
+    /**
+     * Python Lines Max
+     */
+    python_lines_max: number;
+    /**
+     * Passed
+     */
+    passed: boolean;
+    /**
+     * Findings
+     */
+    findings: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+/**
+ * InstanceUpgradeRequested
+ */
+export type InstanceUpgradeRequested = {
+    /**
+     * Kind
+     */
+    kind: 'instance_upgrade';
+    /**
+     * Blocks
+     */
+    blocks: 'instance';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    report: InstanceUpgradeReport;
+};
+
+/**
+ * InstanceUpgradeRequestedEvent
+ */
+export type InstanceUpgradeRequestedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'instance_upgrade_requested';
+    payload: InstanceUpgradeRequested;
+};
+
+/**
+ * InstanceUpgradeWithdrawn
+ */
+export type InstanceUpgradeWithdrawn = {
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
+ * InstanceUpgradeWithdrawnEvent
+ */
+export type InstanceUpgradeWithdrawnEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'instance_upgrade_withdrawn';
+    payload: InstanceUpgradeWithdrawn;
+};
+
+/**
  * LessonCandidateRecordedEvent
  */
 export type LessonCandidateRecordedEvent = {
@@ -16082,7 +16386,13 @@ export type EventObject = ({
     type: 'home_seen';
 } & HomeSeenEvent) | ({
     type: 'parameter_set';
-} & ParameterSetEvent);
+} & ParameterSetEvent) | ({
+    type: 'instance_upgrade_requested';
+} & InstanceUpgradeRequestedEvent) | ({
+    type: 'instance_upgrade_answered';
+} & InstanceUpgradeAnsweredEvent) | ({
+    type: 'instance_upgrade_withdrawn';
+} & InstanceUpgradeWithdrawnEvent);
 
 /**
  * OutputDelta

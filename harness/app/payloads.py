@@ -1482,6 +1482,46 @@ class ParameterSetPayload(Payload):
     parameters_version: str
 
 
+class InstanceUpgradeReport(Payload):
+    # 发布检查的结果（工单 #355，发布检查设计说明第 4.4 节）：被检查的提交与基准标签、内核清单里的
+    # 改动路径与 Python 行数、是否通过，以及逐项不通过（检查项、说明与位置）
+    repository: str
+    pending_commit: str
+    base_tag: str | None
+    kernel_changes: list[str]
+    kernel_python_lines: int
+    python_lines_max: int
+    passed: bool
+    findings: list[dict[str, Any]]
+
+
+class InstanceUpgradeRequested(Payload):
+    # 决定请求「实例升级」（工单 #355）：发布检查的结果写进目录流，由用户批准或拒绝升级已安装的那一份。
+    # blocks 恒为 instance，不属于任何 run 或项目；facts 是给人看的报告全文，report 是它的结构化结果
+    kind: Literal["instance_upgrade"]
+    blocks: Literal["instance"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    report: InstanceUpgradeReport
+
+
+class InstanceUpgradeAnswered(Payload):
+    # 实例升级决定请求的回答（工单 #355）：与 run 流中的 decision_answered 同字段。
+    # 目录流中的请求不属于任何 run 或项目，回答只是记下用户的决定
+    decision_id: str
+    option: str
+    note: str | None
+    base_version: int
+
+
+class InstanceUpgradeWithdrawn(Payload):
+    # 实例升级决定请求的撤销（工单 #355）：reason 是撤销的原因，目录流中的决定不绑定 run，
+    # reason 不是停止原因（参照项目流中的 project_decision_withdrawn）
+    decision_id: str
+    reason: str
+
+
 class ProjectParameterSetPayload(Payload):
     # 项目级参数的修改（迭代底座 B3，工单 #351）：检查时限与建档单轮上限可以按项目设置。
     # old_value 是修改前这个项目的生效取值（没有设置过时是当时的全局现值），new_value 是界内核对过的新值
@@ -1577,4 +1617,7 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: RuntimeForceUpgradeRequestedPayload,
     CatalogEventType.HOME_SEEN: HomeSeenPayload,
     CatalogEventType.PARAMETER_SET: ParameterSetPayload,
+    CatalogEventType.INSTANCE_UPGRADE_REQUESTED: InstanceUpgradeRequested,
+    CatalogEventType.INSTANCE_UPGRADE_ANSWERED: InstanceUpgradeAnswered,
+    CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN: InstanceUpgradeWithdrawn,
 }
