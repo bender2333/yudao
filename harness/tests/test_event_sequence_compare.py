@@ -2,7 +2,8 @@
 # 工具结果提前到回答之前失败并写明差异。比较器见 harness/tests/event_sequence.py 末尾的 compare_documents。
 # 前三个探针直接读基准 JSON，在内存里变换事件数组的顺序后调 compare_documents：不重写基准文件，
 # 不重新走事件规整，shared 与 artifacts 的标签编号保持稳定，只断言分组比较与因果边的差异点。
-# 第四个探针用最小合成文档覆盖询问链（基准里询问链与同组事件交织，单步移动必然先碰到分组比较）。
+# 第四个探针用最小合成文档覆盖询问链（基准里询问链与同组事件交织，单步移动必然先碰到分组比较）；
+# 第五、六个探针覆盖投影比较（#541）：只改投影字段、事件与投影同时改两种情况。
 
 import copy
 import json
@@ -108,6 +109,39 @@ def test_tool_result_before_response_fails_with_diff():
         compare_documents("ask", expected, _ask_documents(moved=True))
     message = str(raised.value)
     assert "causal edges differ" in message, message
+
+
+def test_projection_difference_fails_with_fields_line():
+    # 只改投影的一个字段、事件不动（#541 步骤 3 第 1 项，把放行结果改为未完成）：投影是事件
+    # 推出来的结果，事件一致时失败应落在投影上，并在 `fields:` 一行写明是哪个键
+    expected = _load("handoff_release")
+    actual = copy.deepcopy(expected)
+    assert actual["projection"]["outcome"] == "done"
+    actual["projection"]["outcome"] = "rework"
+    with pytest.raises(AssertionError) as raised:
+        compare_documents("handoff_release", expected, actual)
+    message = str(raised.value)
+    assert "handoff_release" in message, message
+    assert "projection differs" in message, message
+    assert "fields: outcome" in message, message
+
+
+def test_event_difference_reported_before_projection():
+    # 同时改质检 qa_submitted 事件的 payload.verdict 与投影的 outcome（#541 步骤 3 第 2 项）：
+    # 两边都不一致时，信息先报事件，写明是哪个会话、会话内第几个事件与哪个字段，不报投影
+    expected = _load("handoff_release")
+    actual = copy.deepcopy(expected)
+    index = next(i for i, e in enumerate(actual["events"]) if e["type"] == "qa_submitted")
+    actual["events"][index]["payload"]["verdict"] = "rework_product"
+    actual["projection"]["outcome"] = "rework"
+    with pytest.raises(AssertionError) as raised:
+        compare_documents("handoff_release", expected, actual)
+    message = str(raised.value)
+    assert "handoff_release" in message, message
+    assert "session <ses_qua#1>" in message, message
+    assert "event #" in message, message
+    assert "payload.verdict" in message, message
+    assert "projection differs" not in message, message
 
 
 def test_payload_field_difference_fails_with_fields_line():

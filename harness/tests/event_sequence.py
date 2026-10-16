@@ -580,10 +580,6 @@ def compare_documents(name, expected, actual):
         if expected.get(field) != actual.get(field):
             raise AssertionError(f"event sequence of {name} differs from its baseline:\n"
                                  f"{field} differs: {expected.get(field)!r} != {actual.get(field)!r}")
-    if _canon(expected.get("projection")) != _canon(actual.get("projection")):
-        raise AssertionError(f"event sequence of {name} differs from its baseline:\nprojection differs:\n"
-                             + _diff_lines(_canon(expected.get("projection")).splitlines(),
-                                           _canon(actual.get("projection")).splitlines()))
     expected_groups, actual_groups = _group_records(expected), _group_records(actual)
     if set(expected_groups) != set(actual_groups):
         raise AssertionError(f"event sequence of {name} differs from its baseline:\nsessions differ: "
@@ -607,7 +603,31 @@ def compare_documents(name, expected, actual):
         unexpected = sorted(actual_edges - expected_edges)
         raise AssertionError(f"event sequence of {name} differs from its baseline:\ncausal edges differ:\n"
                              f"missing: {missing}\nunexpected: {unexpected}")
+    # 投影是事件推出来的结果：事件一致以后才比较投影，差异先写是哪一项再写 diff
+    expected_projection, actual_projection = expected.get("projection"), actual.get("projection")
+    if _canon(expected_projection) != _canon(actual_projection):
+        raise AssertionError(f"event sequence of {name} differs from its baseline:\nprojection differs:\n"
+                             + _projection_fields_line(expected_projection, actual_projection)
+                             + _diff_lines(_canon(expected_projection).splitlines(),
+                                           _canon(actual_projection).splitlines()))
 
+
+def _projection_fields_line(expected, actual):
+    # 指名投影里哪些键不同：嵌套的字典写成 <键>.<子键>，例如 product_spec.revision
+    differing = []
+
+    def walk(prefix, one, other):
+        if one == other:
+            return
+        if isinstance(one, dict) and isinstance(other, dict):
+            for name in sorted(set(one) | set(other)):
+                walk(f"{prefix}.{name}", one.get(name), other.get(name))
+            return
+        differing.append(prefix)
+
+    for field in sorted(set(expected or {}) | set(actual or {})):
+        walk(field, (expected or {}).get(field), (actual or {}).get(field))
+    return f"fields: {', '.join(differing)}\n" if differing else ""
 
 def _fields_line(expected_groups, actual_groups, key, index):
     # 指名这一条事件里哪些字段不同：载荷字段写成 payload.<键>，工具回执写成 receipt.<键>
