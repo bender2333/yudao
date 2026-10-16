@@ -7,12 +7,11 @@ from harness.environment import LocalEnvironment
 from harness.proposals import collaboration_request, product_spec
 from harness.runtime import LoopSystem
 
-REGISTRY = {"unit": {"argv": ["python", "-c", "print('ok')"], "args": ["--fast"]}}
 
 def _engineering(tmp_path):
     # 产品要求已接纳，工程部门正在工作：直接依据有效合同写文件
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
-    run_id = system.create_run("echo", registered_commands=REGISTRY, command_versions={"unit": 1})
+    run_id = system.create_run("echo")
     projection = system.activate_once(run_id)
     assert projection.phase == "ENGINEERING" and projection.effective_contract is not None
     return system, projection
@@ -75,13 +74,6 @@ def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_pa
     assert not changed.accepted
     assert changed.errors[0].message.startswith("The workspace snapshot changed")
 
-
-def test_bash_permission_has_no_command_registry_basis(tmp_path):
-    system, projection = _engineering(tmp_path)
-    permission = _permission(system, projection, "bash", {"command": "python -c \"print('ok')\""})
-    assert permission.allowed
-    # bash 不核对命令登记表，许可不再带登记执行依据
-    assert permission.command_basis == {}
 
 def test_write_permission_uses_the_canonical_path_from_the_environment(tmp_path):
     system, projection = _engineering(tmp_path)

@@ -44,9 +44,9 @@ def test_stream_lists_partition_the_registered_kinds():
     assert PROJECT_EVENT_TYPES & CATALOG_EVENT_TYPES == frozenset()
 
 def test_project_stream_records_the_projects_long_lived_facts():
-    # 项目流是项目的长期事实：项目、当前 PRD 与采纳成果、事项的存在与最终结果、项目部门设置、登记命令
+    # 项目流是项目的长期事实：项目、当前 PRD 与采纳成果、事项的存在与最终结果、项目部门设置
     assert {"project_registered", "work_item_created", "deliverable_adopted", "adoption_held",
-            "department_prompt_configured", "command_configured", "material_recorded"} <= PROJECT_EVENT_TYPES
+            "department_prompt_configured", "material_recorded"} <= PROJECT_EVENT_TYPES
 
 def test_run_stream_records_the_course_of_a_work_item():
     # 事项的进行过程属于 run 流

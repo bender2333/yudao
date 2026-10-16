@@ -1,4 +1,4 @@
-// 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、部门设置、登记命令与登记的源目录。
+// 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、部门设置与登记的源目录。
 // 数据全部来自 project.settings；每项修改提交对应的命令，基准版本取快照里的 version，
 // 过期时拒绝并提示重新读取（工单验收第 3 条）。部门设置里的模型与档位由 #95 加入，
 // 工具授权（3.2B）与机器授权（3.2C）的命令尚未登记，入口按能力清单不出现。
@@ -8,8 +8,8 @@ import type { ClientApp } from "../../contract/client-app";
 import type { Catalog, ProjectSettingsResult } from "../../api/generated/types.gen";
 import type { Route } from "../../shell/routing";
 import {
-  Checkbox, CommandFeedback, Empty, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea, TextInput,
-  formatNumberOr, hasCommand, list, pageKey, text, useDraft,
+  CommandFeedback, Empty, KeyValue, Loading, Section, SubmitButton, Table, TextArea, TextInput,
+  hasCommand, list, pageKey, text, useDraft,
 } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, useDepartmentDraft } from "./department-settings-form";
 import { SETTING_SOURCE, departmentName, label } from "./labels";
@@ -31,14 +31,13 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
       <PageHead
         eyebrow="项目设置"
         title={data ? data.name : "项目设置"}
-        subtitle="基本信息、部门设置、登记命令、源目录、工具授权、机器授权、执行位置与角色设置。"
+        subtitle="基本信息、部门设置、源目录、工具授权、机器授权、执行位置与角色设置。"
       />
       <Loading state={settings} />
       {data ? (
         <>
           <Basics app={props.app} data={data} command={command} />
           <Departments app={props.app} data={data} />
-          <CommandRegistry app={props.app} data={data} />
           <SourceDirectories app={props.app} data={data} />
           <ToolAuthorization />
           <MachineAuthorization />
@@ -277,132 +276,6 @@ function DepartmentSettingsForm(props: {
       <button type="button" onClick={props.onClose}>取消</button>
       <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
     </div>
-  );
-}
-
-// 登记命令（7.5 节第 3 项，3.2A）：登记名、固定参数、允许的额外参数、时限、输出上限、版本。
-// 每条登记命令的基准版本是它自己的 version；版本冲突时服务端以 stale_base 拒绝，页面提示重新读取
-function CommandRegistry(props: { app: ClientApp; data: ProjectSettingsResult }) {
-  const { data } = props;
-  const entries = Object.entries(data.commands);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  if (!hasCommand(props.app, "command_registration.save")) {
-    return (
-      <Section title="登记命令">
-        <Empty text="这台主机没有提供登记命令的操作" />
-      </Section>
-    );
-  }
-
-  return (
-    <Section title="登记命令" note="部门可以在房间里调用这些命令；固定参数与允许的额外参数由这里决定">
-      {entries.length === 0 ? <Empty text="还没有登记命令" /> : (
-        <Table
-          head={["登记名", "固定参数", "允许的额外参数", "时限", "输出上限", "可以重新执行", "版本", ""]}
-          rows={entries.map(([key, setting]) => [
-            setting.name,
-            setting.argv.length > 0 ? setting.argv.join(" ") : "（无）",
-            setting.args.length > 0 ? setting.args.join(" ") : "（不允许）",
-            formatNumberOr(setting.timeout_sec, " 秒"),
-            formatNumberOr(setting.output_limit, " 字节"),
-            setting.repeatable ? "是" : "否",
-            `第 ${setting.version} 版`,
-            <button
-              type="button"
-              className="y10-link link"
-              key={key}
-              onClick={() => { setEditing(setting.name); setCreating(false); }}
-            >
-              修改
-            </button>,
-          ])}
-        />
-      )}
-      {creating ? (
-        <CommandForm app={props.app} data={data} name="" onClose={() => setCreating(false)} />
-      ) : null}
-      {editing !== null ? (
-        <CommandForm app={props.app} data={data} name={editing} onClose={() => setEditing(null)} />
-      ) : null}
-      {creating || editing !== null ? null : (
-        <button type="button" onClick={() => setCreating(true)}>登记新命令</button>
-      )}
-    </Section>
-  );
-}
-
-function CommandForm(props: {
-  app: ClientApp;
-  data: ProjectSettingsResult;
-  name: string;
-  onClose: () => void;
-}) {
-  const { data } = props;
-  const existing = data.commands[props.name];
-  const scope = `settings/${data.project_id}/command/${props.name || "new"}`;
-  const [name, setName] = useDraft(`${scope}/name`, existing?.name ?? "");
-  const [argv, setArgv] = useDraft(`${scope}/argv`, existing?.argv.join(" ") ?? "");
-  const [args, setArgs] = useDraft(`${scope}/args`, existing?.args.join(" ") ?? "");
-  const [timeoutText, setTimeoutText] = useDraft(
-    `${scope}/timeout`,
-    existing === undefined ? "" : String(existing.timeout_sec),
-  );
-  const [outputText, setOutputText] = useDraft(
-    `${scope}/output`,
-    existing === undefined ? "" : String(existing.output_limit),
-  );
-  // 可以重新执行（工单 #242）：新登记默认关闭；修改时取当前登记的声明
-  const [repeatableText, setRepeatableText] = useDraft(
-    `${scope}/repeatable`,
-    existing?.repeatable === true ? "yes" : "no",
-  );
-  const command = useCommand(props.app,
-    pageKey([existing?.version, name, argv, args, timeoutText, outputText, repeatableText]));
-
-  // 时限与输出上限：留空表示不写入（服务端保留默认值），填写时需要是非负整数
-  const timeout = timeoutText === "" ? null : Number(timeoutText);
-  const output = outputText === "" ? null : Number(outputText);
-  const numbersInvalid =
-    (timeout !== null && (!Number.isInteger(timeout) || timeout < 0))
-    || (output !== null && (!Number.isInteger(output) || output < 0));
-  const canSave = name.trim() !== "" && !numbersInvalid;
-
-  return (
-    <Modal title={props.name === "" ? "登记新命令" : `修改登记命令 ${props.name}`} onClose={props.onClose}>
-      <div className="y10-form form">
-        <TextInput label="登记名" value={name} disabled={props.name !== ""} onInput={setName} />
-        <TextInput label="固定参数" value={argv} placeholder="含程序名，按空格拆分，例如 python -c print(1)" onInput={setArgv} />
-        <TextInput label="允许的额外参数" value={args} placeholder="留空表示不允许；多个用空格分开" onInput={setArgs} />
-        <TextInput label="时限（秒）" value={timeoutText} placeholder="留空表示使用默认值" onInput={setTimeoutText} />
-        <TextInput label="输出上限（字节）" value={outputText} placeholder="留空表示使用默认值" onInput={setOutputText} />
-        <Checkbox
-          label="可以重新执行"
-          checked={repeatableText === "yes"}
-          onChange={(checked) => setRepeatableText(checked ? "yes" : "no")}
-        />
-        <p className="y10-note note">登记时声明这个命令可以重新执行：动作结果未知时，核实请求按这个声明给出「重新执行一次」的选项。</p>
-        {numbersInvalid ? <p className="y10-note is-warn error">时限与输出上限需要是非负整数</p> : null}
-        <SubmitButton
-          label="保存"
-          busy={command.busy}
-          disabled={!canSave}
-          onClick={() => void command.submit("command_registration.save", {
-            project_id: data.project_id,
-            name: name.trim(),
-            base_version: existing?.version ?? 0,
-            argv: argv === "" ? [] : argv.split(" ").filter((part) => part !== ""),
-            args: args === "" ? [] : args.split(" ").filter((part) => part !== ""),
-            timeout_sec: timeout,
-            output_limit: output,
-            repeatable: repeatableText === "yes",
-          }).then((ok) => { if (ok) { props.onClose(); } })}
-        />
-        <button type="button" onClick={props.onClose}>取消</button>
-        <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
-      </div>
-    </Modal>
   );
 }
 

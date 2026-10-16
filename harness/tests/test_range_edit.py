@@ -199,29 +199,28 @@ def test_link_made_by_a_command_during_a_run_is_refused_as_a_tool_result(tmp_pat
 
     def link_then_edit(request):
         return ModelResponse(output=[
-            {"id": "cmd-link", "call_id": "cmd-link", "type": "function_call", "name": "run_command",
-             "arguments": json_dumps({"name": "make-link"})},
+            {"id": "cmd-link", "call_id": "cmd-link", "type": "function_call", "name": "bash",
+             "arguments": json_dumps({"command": "python make_link.py"})},
             _edit_call("edit-link", "src/linked.txt", 1, 1, "VALUE = 9", "VALUE = 2", None),
         ])
 
     system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(),link_then_edit]))
-    registry = {"make-link": {"argv": ["python", "make_link.py"], "args": [], "timeout_sec": 30, "output_limit": 4000}}
-    run_id = system.create_run("Edit a file that a command turned into a link",
-                               registered_commands=registry, command_versions={"make-link": 1})
+    run_id = system.create_run("Edit a file that a command turned into a link")
     workspace = system.workspace(run_id)
     workspace.write_file("make_link.py", (
         "import os\n"
         "os.makedirs('src', exist_ok=True)\n"
         f"os.symlink({str(outside)!r}, 'src/linked.txt')\n"
     ))
+
     for _ in range(3):
         system.activate_once(run_id)
     events = system.store.list_events(run_id)
     command = next(event for event in events
-                   if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "run_command")
+                   if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "bash")
     command_output = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**command.payload["output_ref"])))
     assert command.payload["ok"] is True and command_output["exit_code"] == 0, command_output
-    # 登记命令留下链接：命令的回执照常记录，主机随即核对公开树，运行以 workspace_unrepresentable 暂停，
+    # bash 命令留下链接：命令的回执照常记录，主机随即核对公开树，运行以 workspace_unrepresentable 暂停，
     # 停止说明写这个链接在工作区内的相对路径；同一回答中的其余调用不执行
     pause = next(event for event in events if event.type == EventType.RUN_PAUSED)
     assert pause.payload["stop_reason"] == "workspace_unrepresentable"

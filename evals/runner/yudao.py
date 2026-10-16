@@ -99,24 +99,6 @@ def requirement_text():
     )
 
 
-def commands():
-    """本工单为场景 3 登记的命令：按接口约定第 5 节的命令行入口。
-
-    命令在项目里登记（`command_registration.save`），工程的 `run_command` 与质检的
-    检查都在工作区上运行它们。命令行只含通用命令本身（运行程序、跑数据完整性检查），
-    不含任何隐藏检查。入口是 `python src/cli.py`，查询从标准输入读，因此运行程序的
-    命令不带需要喂输入的参数；`--check_data` 单独登记为一个命令。
-    """
-    python = _scenario_python()
-    return [
-        {"name": "run_cli", "argv": [python, "src/cli.py"],
-         "args": ["--mode", "--max_transfers", "--line_preference", "--output_file", "--format"],
-         "timeout_sec": 120},
-        {"name": "check_data", "argv": [python, "src/cli.py", "--check_data"],
-         "args": [], "timeout_sec": 120},
-    ]
-
-
 def _scenario_python():
     """场景 3 的运行环境是 uv 管理的 Python 3.13（评测场景设计第 3 节）。"""
     found = subprocess.run(["uv", "python", "find", "3.13"],
@@ -307,19 +289,6 @@ def save_department_settings(client, project_id):
                                    "provider_id": PROVIDER_ID, "model_id": MODEL_DEFINITION_ID})
         reminders[department] = list((accepted.get("refs") or {}).get("reminders") or [])
     return reminders
-
-
-def register_commands(client, project_id):
-    """按场景材料登记命令（每个场景登记的命令是运行程序、运行测试这类通用命令）。"""
-    settings = client.query("project.settings", {"project_id": project_id})["data"]["commands"]
-    for command in commands():
-        base_version = settings.get(command["name"], {}).get("version", 0)
-        client.command("command_registration.save", {
-            "base_version": base_version, "project_id": project_id, "name": command["name"],
-            "argv": command["argv"], "args": command.get("args") or [],
-            "timeout_sec": command.get("timeout_sec"),
-            "output_limit": None,
-        })
 
 
 def submit_requirement(client, project_id, text):

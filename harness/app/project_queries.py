@@ -1601,17 +1601,6 @@ class DepartmentSetting(Contract):
     department_setting_configured: bool = False
 
 
-class CommandSetting(Contract):
-    name: str
-    version: int
-    argv: list[str]
-    args: list[str]
-    timeout_sec: int
-    output_limit: int
-    # 登记时声明的「可以重新执行」（工单 #242）
-    repeatable: bool
-
-
 class SourceDirectorySetting(Contract):
     name: str
     path: str
@@ -1630,7 +1619,6 @@ class ProjectSettingsResult(Contract):
     pinned: bool
     archived: bool
     departments: dict[str, DepartmentSetting]
-    commands: dict[str, CommandSetting]
     source_directories: dict[str, SourceDirectorySetting]
     # 各部门生效模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）；
     # 生效模型按第 5.3 节解析，包括跟随部门默认的情况
@@ -1657,12 +1645,6 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
             project_id=state.project_id, name=state.name, goal=state.goal, version=state.stream_version,
             pinned=state.pinned, archived=state.archived,
             departments=settings,
-            commands={
-                name: CommandSetting(name=value.name, version=value.version, argv=list(value.argv),
-                                     args=list(value.args), timeout_sec=value.timeout_sec,
-                                     output_limit=value.output_limit, repeatable=value.repeatable)
-                for name, value in state.commands.items()
-            },
             source_directories={
                 name: SourceDirectorySetting(
                     name=value.name, path=value.path, version=value.version,
@@ -1882,7 +1864,7 @@ PROJECTS_LIST = QueryDefinition(
                 ProjectEventType.PROJECT_RESTORED, ProjectEventType.WORK_ITEM_CREATED,
                 ProjectEventType.WORK_ITEM_START_FAILED, ProjectEventType.DELIVERABLE_ADOPTED,
                 ProjectEventType.ADOPTION_HELD, ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED,
-                ProjectEventType.COMMAND_CONFIGURED, ProjectEventType.MATERIAL_RECORDED,
+                ProjectEventType.MATERIAL_RECORDED,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
                 ProjectEventType.BASELINE_ADOPTED,
@@ -1994,7 +1976,6 @@ PROJECT_SETTINGS = QueryDefinition(
     name="project.settings", request=ProjectSettings, result=ProjectSettingsResult, handle=_project_settings,
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
                 ProjectEventType.PROJECT_GOAL_CHANGED,
-                ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, ProjectEventType.COMMAND_CONFIGURED,
                 ProjectEventType.SOURCE_DIRECTORY_CONFIGURED,
                 # 目录修订（准入作废、模型变更）以后生效模型的建议能力提醒随之更新（工单 #95）
                 CatalogEventType.CATALOG_REVISED),
@@ -2111,7 +2092,7 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     state = observation_state(events, decisions.values(), terminal=terminal)
     # 已终止的 run 不再继续：未完成动作与未回答的核实请求不由恢复处理，只显示终止原因
     unfinished = [] if terminal else _unfinished_actions(
-        events, decisions.values(), run.registered_commands)
+        events, decisions.values())
     verifications = _verification_records(events, decisions.values())
     resume_requests = [] if terminal else open_resume_decisions(decisions.values())
     unknown_requests = [] if terminal else open_decisions(decisions.values(), kind="unknown_action")
@@ -2185,8 +2166,7 @@ def _unusable_target(resume_requests: list[Any]) -> UnusableTarget | None:
                               problem=str(decision.request.get("description") or decision.request.get("message") or ""))
     return None
 
-def _unfinished_actions(events: list[Any], decisions: Any,
-                        registered_commands: Any) -> list[UnfinishedAction]:
+def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAction]:
     # 未完成动作：结果未知的动作（tool_started 没有结果或核实记录）。未发送的动作由保存的模型响应
     # 给出，属于步骤驱动的补执行范围，读取侧只列出已经发出的动作
     action_ids = {identity[2] for identity in unresolved_unknown_actions(events, decisions)}
@@ -2203,8 +2183,7 @@ def _unfinished_actions(events: list[Any], decisions: Any,
             action_id=action_id, tool=tool, department=event.department, status=ACTION_UNKNOWN,
             activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), purpose=payload.get("purpose"),
-            repeatable=action_repeatable(tool, payload.get("args"),
-                                         registered_commands=registered_commands),
+            repeatable=action_repeatable(tool, payload.get("args")),
             before_snapshot_ref=payload.get("before_snapshot_ref"),
             created_at=event.created_at, started_event_id=event.event_id,
         ))

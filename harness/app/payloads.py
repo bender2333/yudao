@@ -104,16 +104,6 @@ class InputRecord(Payload):
     base_version: int | None = None
 
 
-class FrozenCommand(Payload):
-    # 事项创建时冻结的登记命令
-    argv: list[str]
-    args: list[str]
-    timeout_sec: int
-    output_limit: int
-    # 随登记一起固定的「可以重新执行」声明（工单 #242）
-    repeatable: bool = False
-
-
 class Usage(Payload):
     # 提供方上报的用量；没有上报的项为空
     input_tokens: int
@@ -269,8 +259,6 @@ class RunCreatedPayload(Payload):
     workspace_digest: str
     project_context_ref: ArtifactRef | None
     prompt_config_versions: dict[Department, int]
-    registered_commands: dict[str, FrozenCommand]
-    command_versions: dict[str, int]
     # 事项所用定义的版本（全部定义文件内容的摘要）
     definitions_version: str
     # 创建这个 run 时冻结的参数版本（全部参数现值的内容摘要，工单 #349）
@@ -1185,7 +1173,6 @@ class WorkItemCreatedPayload(Payload):
     snapshot: CodeSnapshot | None
     project_context_ref: ArtifactRef
     prompt_config_versions: dict[Department, int]
-    command_versions: dict[str, int]
     max_cycles: int
     run_time_limit_sec: int
     context_window: int
@@ -1225,19 +1212,6 @@ class DepartmentSettingsConfiguredPayload(Payload):
     # 这次保存写入的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）；
     # 没有写入模型或模型具备建议能力时为空
     reminders: list[str] = []
-
-
-class CommandConfiguredPayload(Payload):
-    name: str
-    version: int
-    argv: list[str]
-    args: list[str]
-    timeout_sec: int
-    output_limit: int
-    base_version: int
-    # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）：结果未知时「重新执行一次」的选项按这个声明提供；
-    # 自动重新执行由后续工单实现；旧事件没有这个字段，按否处理
-    repeatable: bool = False
 
 
 class MaterialRecordedPayload(Payload):
@@ -1594,7 +1568,6 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.DELIVERABLE_ADOPTED: DeliverableAdoptedPayload,
     ProjectEventType.ADOPTION_HELD: AdoptionHeldPayload,
     ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED: DepartmentSettingsConfiguredPayload,
-    ProjectEventType.COMMAND_CONFIGURED: CommandConfiguredPayload,
     ProjectEventType.MATERIAL_RECORDED: MaterialRecordedPayload,
     ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: SourceDirectoryConfiguredPayload,
     ProjectEventType.INITIAL_PRD_PROPOSED: InitialPrdProposedPayload,

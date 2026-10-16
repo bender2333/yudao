@@ -1378,82 +1378,6 @@ export type CommandCapability = {
 };
 
 /**
- * CommandRegistrationSave
- */
-export type CommandRegistrationSave = {
-    /**
-     * Command Id
-     */
-    command_id: string;
-    /**
-     * Base Version
-     */
-    base_version: number;
-    /**
-     * Project Id
-     */
-    project_id: string;
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Argv
-     */
-    argv: Array<string>;
-    /**
-     * Args
-     */
-    args?: Array<string> | null;
-    /**
-     * Timeout Sec
-     */
-    timeout_sec?: number | null;
-    /**
-     * Output Limit
-     */
-    output_limit?: number | null;
-    /**
-     * Repeatable
-     */
-    repeatable?: boolean;
-};
-
-/**
- * CommandSetting
- */
-export type CommandSetting = {
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Version
-     */
-    version: number;
-    /**
-     * Argv
-     */
-    argv: Array<string>;
-    /**
-     * Args
-     */
-    args: Array<string>;
-    /**
-     * Timeout Sec
-     */
-    timeout_sec: number;
-    /**
-     * Output Limit
-     */
-    output_limit: number;
-    /**
-     * Repeatable
-     */
-    repeatable: boolean;
-};
-
-/**
  * CredentialClearOverride
  */
 export type CredentialClearOverride = {
@@ -3415,12 +3339,6 @@ export type ProjectSettingsResult = {
      */
     departments: {
         [key: string]: DepartmentSetting;
-    };
-    /**
-     * Commands
-     */
-    commands: {
-        [key: string]: CommandSetting;
     };
     /**
      * Source Directories
@@ -6723,111 +6641,6 @@ export type CollectionScope = {
 };
 
 /**
- * CommandConfiguredEvent
- */
-export type CommandConfiguredEvent = {
-    /**
-     * Position
-     */
-    position: number;
-    /**
-     * Previous
-     */
-    previous: number;
-    /**
-     * Event Id
-     */
-    event_id: string;
-    /**
-     * At
-     */
-    at: string;
-    /**
-     * Stream
-     */
-    stream: string;
-    /**
-     * Stream Version
-     */
-    stream_version: number;
-    /**
-     * Project Id
-     */
-    project_id: string | null;
-    /**
-     * Work Item Id
-     */
-    work_item_id: string | null;
-    /**
-     * Run Id
-     */
-    run_id: string | null;
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality' | null;
-    /**
-     * Role
-     */
-    role: string | null;
-    /**
-     * Actor
-     */
-    actor: string;
-    /**
-     * Command Id
-     */
-    command_id: string | null;
-    /**
-     * Label
-     */
-    label: string;
-    /**
-     * Type
-     */
-    type: 'command_configured';
-    payload: CommandConfiguredPayload;
-};
-
-/**
- * CommandConfiguredPayload
- */
-export type CommandConfiguredPayload = {
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Version
-     */
-    version: number;
-    /**
-     * Argv
-     */
-    argv: Array<string>;
-    /**
-     * Args
-     */
-    args: Array<string>;
-    /**
-     * Timeout Sec
-     */
-    timeout_sec: number;
-    /**
-     * Output Limit
-     */
-    output_limit: number;
-    /**
-     * Base Version
-     */
-    base_version: number;
-    /**
-     * Repeatable
-     */
-    repeatable?: boolean;
-};
-
-/**
  * CompactionCheckpoint
  */
 export type CompactionCheckpoint = {
@@ -8776,32 +8589,6 @@ export type FieldError = {
      * Message
      */
     message: string;
-};
-
-/**
- * FrozenCommand
- */
-export type FrozenCommand = {
-    /**
-     * Argv
-     */
-    argv: Array<string>;
-    /**
-     * Args
-     */
-    args: Array<string>;
-    /**
-     * Timeout Sec
-     */
-    timeout_sec: number;
-    /**
-     * Output Limit
-     */
-    output_limit: number;
-    /**
-     * Repeatable
-     */
-    repeatable?: boolean;
 };
 
 /**
@@ -13170,18 +12957,6 @@ export type RunCreatedPayload = {
         [key: string]: number;
     };
     /**
-     * Registered Commands
-     */
-    registered_commands: {
-        [key: string]: FrozenCommand;
-    };
-    /**
-     * Command Versions
-     */
-    command_versions: {
-        [key: string]: number;
-    };
-    /**
      * Definitions Version
      */
     definitions_version: string;
@@ -15531,12 +15306,6 @@ export type WorkItemCreatedPayload = {
         [key: string]: number;
     };
     /**
-     * Command Versions
-     */
-    command_versions: {
-        [key: string]: number;
-    };
-    /**
      * Max Cycles
      */
     max_cycles: number;
@@ -16341,8 +16110,6 @@ export type EventObject = ({
 } & AdoptionHeldEvent) | ({
     type: 'department_prompt_configured';
 } & DepartmentPromptConfiguredEvent) | ({
-    type: 'command_configured';
-} & CommandConfiguredEvent) | ({
     type: 'material_recorded';
 } & MaterialRecordedEvent) | ({
     type: 'source_directory_configured';
@@ -16845,35 +16612,6 @@ export type CommandDepartmentSettingsSaveResponses = {
 };
 
 export type CommandDepartmentSettingsSaveResponse = CommandDepartmentSettingsSaveResponses[keyof CommandDepartmentSettingsSaveResponses];
-
-export type CommandCommandRegistrationSaveData = {
-    body: CommandRegistrationSave;
-    path?: never;
-    query?: never;
-    url: '/api/commands/command_registration.save';
-};
-
-export type CommandCommandRegistrationSaveErrors = {
-    /**
-     * 命令被拒绝，可能的原因：not_found, stale_base, project_archived, not_allowed, command_id_reused
-     */
-    409: Rejected;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type CommandCommandRegistrationSaveError = CommandCommandRegistrationSaveErrors[keyof CommandCommandRegistrationSaveErrors];
-
-export type CommandCommandRegistrationSaveResponses = {
-    /**
-     * Successful Response
-     */
-    200: AcceptedNoRefs;
-};
-
-export type CommandCommandRegistrationSaveResponse = CommandCommandRegistrationSaveResponses[keyof CommandCommandRegistrationSaveResponses];
 
 export type CommandSourceDirectorySaveData = {
     body: SourceDirectorySave;

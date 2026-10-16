@@ -211,8 +211,6 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
          "reasons": ["not_found", "run_terminal", "not_allowed", "command_id_reused"]},
         {"name": "department_settings.save",
          "reasons": ["not_found", "stale_base", "project_archived", "not_allowed", "command_id_reused"]},
-        {"name": "command_registration.save",
-         "reasons": ["not_found", "stale_base", "project_archived", "not_allowed", "command_id_reused"]},
         {"name": "source_directory.save",
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "writeback.execute", "reasons": ["not_found", "project_archived", "command_id_reused"]},

@@ -15,7 +15,7 @@ from ..projection import RunNotFoundError
 from ..providers.errors import CatalogValidationError
 from ..providers.selection import ModelSelection
 from ..projects import (
-    CommandConfigConflict, DepartmentSettingConflict, ProjectArchivedError, ProjectNotFoundError,
+    DepartmentSettingConflict, ProjectArchivedError, ProjectNotFoundError,
     SourceDirectoryConflict, WorkItemInProgressError,
 )
 from .commands import Rejection
@@ -352,38 +352,6 @@ async def _save_department_settings(application: "Application", command: Command
                         current_version=current.get("version", 0)) from conflict
 
 
-class CommandRegistrationSave(CommandRequest):
-    base_version: int
-    project_id: str
-    name: Text
-    argv: list[str]
-    args: list[str] | None = None
-    timeout_sec: int | None = None
-    output_limit: int | None = None
-    # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）：结果未知时「重新执行一次」的选项按这个声明提供
-    repeatable: bool = False
-
-
-async def _save_command_registration(application: "Application", command: Command,
-                                     request: CommandRegistrationSave) -> None:
-    try:
-        application.system.projects.configure_command(
-            request.project_id, request.name, request.argv, args=request.args,
-            timeout_sec=request.timeout_sec, output_limit=request.output_limit,
-            repeatable=request.repeatable,
-            base_version=request.base_version, command=command)
-    except ProjectNotFoundError as missing:
-        raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
-    except ProjectArchivedError as archived:
-        raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
-    except CommandConfigConflict as conflict:
-        current = conflict.current or {}
-        raise Rejection("stale_base", "登记命令已经被修改，请重新读取以后提交",
-                        current_version=current.get("version", 0)) from conflict
-    except ValueError as invalid:
-        raise Rejection("not_allowed", str(invalid)) from invalid
-
-
 class SourceDirectorySave(CommandRequest):
     # 登记与修改本项目的源目录：基准版本是该项目源目录登记的版本（初次登记为 0）
     base_version: int
@@ -483,10 +451,6 @@ DEPARTMENT_SETTINGS_SAVE = CommandDefinition(
     handle=_save_department_settings,
     derive_refs=lambda events: DepartmentSettingsSaveRefs(
         reminders=list(events[-1].payload.get("reminders") or ())),
-    reasons=("not_found", "stale_base", "project_archived", "not_allowed"))
-COMMAND_REGISTRATION_SAVE = CommandDefinition(
-    name="command_registration.save", request=CommandRegistrationSave, refs=NoRefs,
-    handle=_save_command_registration, derive_refs=_no_refs,
     reasons=("not_found", "stale_base", "project_archived", "not_allowed"))
 SOURCE_DIRECTORY_SAVE = CommandDefinition(
     name="source_directory.save", request=SourceDirectorySave, refs=NoRefs, handle=_save_source_directory,

@@ -94,8 +94,6 @@ def _produce_writeback_events(system, projects, project_id, base_version, adopti
         project_id, "src", "C:/repo/src", base_version=base_version,
         writeback_enabled=True, remote=str(remote), target_branch="main", check_commands=[],
     )
-    projects.configure_command(project_id, "smoke",
-                               [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0)
     # 本事项的基线采纳还没有合入目标分支：等待前项
     held = projects.execute_writeback(project_id, adoption_id)
     assert held.type == ProjectEventType.WRITEBACK_HELD
@@ -136,7 +134,6 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     projects.pin(project_id, True)
     projects.configure_department_settings(
         project_id, "engineering", ModelSelection(department_prompt="先写计划再写代码。"), 0)
-    projects.configure_command(project_id, "unit-tests", ["python", "-m", "unittest"], args=["-v"])
     projects.record_material(project_id, "一段原文", department="product")
     projects.record_material(project_id, "不属于部门的原文")
     projects.configure_source_directory(project_id, "src", "C:/repo/src", base_version=0)

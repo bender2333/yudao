@@ -75,7 +75,7 @@ from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS, action_repeatable, bui
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
-from .tools import normalize_registered_commands
+from .validation import ProposalDecision
 from .validation import ProposalDecision
 from .workspace import WorkspaceSnapshot
 
@@ -183,23 +183,6 @@ def _validate_run_ownership(
             raise ValueError("baseline code_tree_digest does not match the initial tree digest")
 
 
-def _validate_frozen_commands(registered_commands: dict[str, Any] | None,
-                              command_versions: dict[str, int] | None) -> tuple[dict[str, Any], dict[str, int]]:
-    # 登记命令随事项创建冻结：两份必须成对出现，键集合一致，版本号为非负整数
-    if registered_commands is None and command_versions is None:
-        return {}, {}
-    if registered_commands is None or command_versions is None:
-        raise ValueError("registered_commands and command_versions must be given together")
-    normalized = normalize_registered_commands(registered_commands)
-    if not isinstance(command_versions, dict) or any(
-            not isinstance(name, str) or type(version) is not int or version < 1
-            for name, version in command_versions.items()):
-        raise ValueError("command_versions must map command names to positive integers")
-    if set(normalized) != set(command_versions):
-        raise ValueError("registered_commands and command_versions must cover the same commands")
-    return normalized, dict(command_versions)
-
-
 class Orchestrator:
     def __init__(
         self,
@@ -272,8 +255,6 @@ class Orchestrator:
         code_snapshot: dict[str, Any] | None = None,
         project_context: str | None = None,
         prompt_config_versions: dict[str, int] | None = None,
-        registered_commands: dict[str, Any] | None = None,
-        command_versions: dict[str, int] | None = None,
         kind: str = "change",
         onboarding_basis: dict[str, Any] | None = None,
         round: int = 0,
@@ -306,7 +287,6 @@ class Orchestrator:
             project_context=project_context,
             prompt_config_versions=prompt_config_versions,
         )
-        frozen_commands = _validate_frozen_commands(registered_commands, command_versions)
         run_id = run_id or new_id("run")
         material_dir = self.materials_root / run_id
         if material_dir == self.materials_root or not material_dir.is_relative_to(self.materials_root):
@@ -358,8 +338,6 @@ class Orchestrator:
                 "workspace_digest": workspace_digest,
                 "project_context_ref": project_context_ref,
                 "prompt_config_versions": dict(prompt_config_versions or {}),
-                "registered_commands": frozen_commands[0],
-                "command_versions": frozen_commands[1],
                 "definitions_version": DEFINITIONS.version,
                 "parameters_version": parameter_values.current_version(self.store),
                 "run_event_version": RUN_EVENT_VERSION,
@@ -866,8 +844,7 @@ class Orchestrator:
                 if (info["status"] != ACTION_UNKNOWN or started is None or identity in resolved
                         or info["superseded"] or (info["auto_retry_available"]
                                                  and action_repeatable(info["tool"],
-                                                                      started.payload.get("args"),
-                                                                      registered_commands=projection.registered_commands))):
+                                                                      started.payload.get("args")))):
                     continue
                 action_id = identity[2]
                 if any(decision.request.get("kind") == UNKNOWN_ACTION.name
@@ -892,7 +869,6 @@ class Orchestrator:
                     department=projection.active_department or "",
                     facts=[started.event_id],
                     args=started.payload.get("args"),
-                    registered_commands=projection.registered_commands,
                     # 自动重新执行的机会已经用掉：新的尝试仍然结果未知，材料写明连续两次结果未知
                     repeat_attempted=not info["auto_retry_available"])
                 if comparison is not None:
@@ -1838,8 +1814,6 @@ class Orchestrator:
             project_id=project_id, work_item_id=candidate.work_item_id,
             project_context=self.artifacts.get(ArtifactRef(**prior.project_context_ref)).decode("utf-8"),
             prompt_config_versions=dict(item.prompt_config_versions),
-            registered_commands=dict(prior.registered_commands) or None,
-            command_versions=dict(prior.command_versions) or None,
             round=round_number,
             onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
                               "note_ref": note_ref},

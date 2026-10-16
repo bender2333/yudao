@@ -106,17 +106,9 @@ def resolved_by_decision(events: Sequence[Event], decisions: Iterable[Any]) -> s
 def _tool_name(event: Event) -> str:
     return str((event.payload or {}).get("name") or "")
 
-def action_repeatable(tool: str, args: Mapping[str, Any] | None = None, *,
-                      registered_commands: Mapping[str, Any] | None = None) -> bool:
+def action_repeatable(tool: str, args: Mapping[str, Any] | None = None) -> bool:
     # 一个动作能否重复执行（恢复契约第 4 节，工单 #242）：唯一的判断入口，后面三张工单共用。
     # 读取、搜索、检查与 bash 由工具契约各自声明 repeatable；没有定义或没有声明的工具为否。
-    # 已删除的 run_command 仍按这个 run 中固定的登记里的声明回答（#484 删除注册体系时连参数一并移除）。
-    if tool == "run_command":
-        name = (args or {}).get("name")
-        if not isinstance(name, str):
-            return False
-        entry = (registered_commands or {}).get(name)
-        return bool(entry is not None and entry.get("repeatable"))
     definition = DEFINITIONS.tools.get(tool)
     if definition is None:
         return False
@@ -291,7 +283,6 @@ def _compare_single_target(path: str, target: str, *, before: dict[str, str],
 
 
 def auto_retry_actions(events: Sequence[Event], decisions: Iterable[Any], *,
-                       registered_commands: Mapping[str, Any] | None = None,
                        department: str | None = None,
                        not_happened: Container[str] = ()) -> list[dict[str, Any]]:
     # 恢复契约第 4 节第 2 步（工单 #307）：要自动重新执行的结果未知动作，按事件日志的先后顺序给出。判据有四条：
@@ -308,28 +299,25 @@ def auto_retry_actions(events: Sequence[Event], decisions: Iterable[Any], *,
             and not info["superseded"] and identity not in resolved and info["auto_retry_available"]
             and (department is None or info["started_event"].department == department)
             and (info["action_id"] in not_happened
-                 or action_repeatable(info["tool"], (info["started_event"].payload or {}).get("args"),
-                                      registered_commands=registered_commands))]
+                 or action_repeatable(info["tool"], (info["started_event"].payload or {}).get("args")))]
 
 
-def resolution_options(tool: str, args: Mapping[str, Any] | None = None, *,
-                       registered_commands: Mapping[str, Any] | None = None) -> list[dict[str, str]]:
+def resolution_options(tool: str, args: Mapping[str, Any] | None = None) -> list[dict[str, str]]:
     # 「核实结果未知的动作」给出的选项：「重新执行」只在契约声明可以重复的动作上提供，
     # 「按当前实际状态继续」与「停止事项」始终可选（应用层与接口层设计说明第 3.3 节）
-    repeatable = action_repeatable(tool, args, registered_commands=registered_commands)
+    repeatable = action_repeatable(tool, args)
     return [{"id": option.id, "label": option.label} for option in UNKNOWN_ACTION.options
             if option.id != "reexecute" or repeatable]
 
 
 def build_unknown_action_request(*, action_id: str, tool: str, action_kind: str, department: str,
                                  facts: Sequence[str], args: Mapping[str, Any] | None = None,
-                                 registered_commands: Mapping[str, Any] | None = None,
                                  repeat_attempted: bool = False) -> dict[str, Any]:
     # 发一个「核实结果未知的动作」决定请求：只阻塞这个动作（blocks=action），不阻塞整个 run。
     # 决定请求的身份是 DECISION_REQUESTED 事件的编号，不由这里给出。
     # repeat_attempted 说明这个逻辑动作已经自动重新执行过一次（恢复契约第 4 节第 3 步）：
     # 新的尝试结果仍然未知时，材料写明连续两次结果未知，提醒用户可能正是这个动作导致中断
-    repeatable = action_repeatable(tool, args, registered_commands=registered_commands)
+    repeatable = action_repeatable(tool, args)
     description = (f"动作 {action_id}（{tool}）已经发出，结果没有得到确认。"
                    "重新执行只在这个动作的契约声明可以重复时提供；"
                    "按当前实际状态继续表示接受已经发生的效果；选择停止事项则运行结束。")
@@ -339,7 +327,7 @@ def build_unknown_action_request(*, action_id: str, tool: str, action_kind: str,
     return {
         "kind": UNKNOWN_ACTION.name,
         "blocks": UNKNOWN_ACTION.blocks,
-        "options": resolution_options(tool, args, registered_commands=registered_commands),
+        "options": resolution_options(tool, args),
         "description": description,
         "facts": list(facts),
         "department": department,

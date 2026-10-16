@@ -136,7 +136,6 @@ def _stub_run_once(monkeypatch, tmp_path, export):
                         lambda client, model_name: {"admitted_model": model_name})
     monkeypatch.setattr(yudao, "create_project", lambda client, name, goal: "project-1")
     monkeypatch.setattr(yudao, "save_department_settings", lambda client, project_id: {})
-    monkeypatch.setattr(yudao, "register_commands", lambda client, project_id: None)
     monkeypatch.setattr(yudao, "submit_requirement",
                         lambda client, project_id, text: ("work-item-1", "yudao-run-1"))
     monkeypatch.setattr(yudao, "wait_for_end",
@@ -205,25 +204,6 @@ def test_requirement_text_holds_no_hidden_material():
     for part in yudao.hidden_dirs().values():
         assert part not in text
         assert part.replace("\\", "/") not in text
-
-
-# ---------------------------------------------------------------------------
-# 登记命令
-
-def test_registered_commands_match_the_interface_agreement():
-    registered = {item["name"]: item for item in yudao.commands()}
-    assert set(registered) == {"run_cli", "check_data"}
-    for item in registered.values():
-        assert item["argv"][1:] == ["src/cli.py"] or item["argv"][1:] == ["src/cli.py", "--check_data"]
-    assert registered["check_data"]["argv"][-1] == "--check_data"
-
-
-def test_registered_commands_name_no_hidden_check():
-    """登记命令是通用命令，不含任何隐藏检查（第 3 节「命令」）。"""
-    for item in yudao.commands():
-        joined = " ".join(item["argv"] + item.get("args", []))
-        for part in yudao.hidden_dirs().values():
-            assert part not in joined
 
 
 # ---------------------------------------------------------------------------
