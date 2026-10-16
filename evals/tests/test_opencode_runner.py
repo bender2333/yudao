@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import shutil
 
 import pytest
 
@@ -130,6 +131,91 @@ def test_network_tool_calls_are_found():
     events = [{"type": "tool_use", "part": {"type": "tool", "tool": "write",
                                             "state": {"status": "completed", "output": "ok"}}}]
     assert opencode.network_tool_calls(opencode.tool_calls(events)) == []
+
+
+def test_upstream_repository_in_the_output_voids_the_run():
+    url = "https://github.com/" + scenario3.UPSTREAM_REPOSITORY
+    assert opencode.upstream_hits("clone " + url)
+    assert opencode.upstream_hits("clone " + url.replace("github.com/", "github.com:"))
+    # 事件里的字符串是被转义过的，转义后的形式也要找到
+    assert opencode.upstream_hits(json.dumps({"text": "clone " + url}, ensure_ascii=False))
+    assert opencode.upstream_hits("clone " + scenario3.UPSTREAM_REPOSITORY.upper()) == []
+
+
+def test_unrelated_repositories_are_not_upstream_access():
+    assert opencode.upstream_hits("clone https://github.com/openai/openai-agents-python") == []
+
+
+def test_a_tampered_check_voids_the_scoring_run(tmp_path):
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(scenario3.scenario_base(), copy)
+    (copy / "checks" / "check_harness.py").write_text(
+        (copy / "checks" / "check_harness.py").read_text(encoding="utf-8") + "\n# tampered\n",
+        encoding="utf-8")
+    reasons = opencode.digest_reasons(copy)
+    assert [reason.split("：")[1] for reason in reasons] == ["checks"], reasons
+    assert opencode.digest_reasons(scenario3.scenario_base()) == []
+
+
+def test_stray_bytecode_in_the_checks_does_not_change_the_digest(tmp_path):
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(scenario3.scenario_base(), copy,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    (copy / "checks" / "__pycache__").mkdir()
+    (copy / "checks" / "__pycache__" / "check_harness.cpython-313.pyc").write_bytes(b"x")
+    assert opencode.digest_reasons(copy) == []
+
+
+# ---------------------------------------------------------------------------
+# 运行器入口：评分之前的核对走完整条 run_once
+
+def _stub_opencode(monkeypatch, tmp_path, base):
+    """把 `run_once` 触碰的运行、评分与指标换成固定值，核对调用点保持真实。
+
+    不起 opencode 进程、不跑评分器；`opencode.digest_reasons` 与材料路径、上游仓库
+    的查找都是真代码，改动的只是场景目录指向副本。
+    """
+    run_dir = str(tmp_path / "run")
+    os.makedirs(run_dir, exist_ok=True)
+    with open(os.path.join(run_dir, "delivery.txt"), "w", encoding="utf-8") as handle:
+        handle.write("delivery")
+    monkeypatch.setattr(opencode, "create_run_dir",
+                        lambda runs_root, run_id, model, model_id, scenario_name=None: run_dir)
+    monkeypatch.setattr(opencode, "run_opencode",
+                        lambda run_dir, model, limit_seconds, **kwargs:
+                        {"returncode": 0, "timed_out": False, "stdout": "", "stderr": "",
+                         "elapsed_seconds": 1.0, "command": []})
+    monkeypatch.setattr(run_eval, "score_delivery",
+                        lambda run_dir, evidence_dir, scenario_name=None, python=None:
+                        {"checks": [], "material_version": "scenario-3@2",
+                         "scorer_version": "scorer-3@2"})
+    monkeypatch.setattr(scenario3, "scenario_base", lambda: base)
+
+
+def test_a_tampered_check_voids_the_opencode_run(runs_root, tmp_path, monkeypatch):
+    """改一份隐藏检查：`run_once` 在评分之前判这次运行无效，报告写明摘要不同。"""
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(scenario3.scenario_base(), copy)
+    target = copy / "checks" / "check_harness.py"
+    target.write_text(target.read_text(encoding="utf-8") + "\n# tampered\n", encoding="utf-8")
+    _stub_opencode(monkeypatch, tmp_path, str(copy))
+
+    run = run_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, MODEL_ID, 60)
+
+    assert run["void"] is True
+    assert run["void_reasons"] == ["材料摘要与材料版本记录不同：checks"]
+
+
+def test_clean_materials_let_the_opencode_run_score(runs_root, tmp_path, monkeypatch):
+    """材料没有改动、没有上游访问：`run_once` 不作废，评分与报告照常。"""
+    _stub_opencode(monkeypatch, tmp_path, scenario3.scenario_base())
+
+    run = run_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, MODEL_ID, 60)
+
+    assert run["void"] is False
+    assert run["void_reasons"] == []
+    assert run["score"]["scorer_version"] == "scorer-3@2"
+
 
 
 def test_metrics_count_requests_tokens_and_elapsed():

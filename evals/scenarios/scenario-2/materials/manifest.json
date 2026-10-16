@@ -37,5 +37,14 @@
     "p2p": "checks/p2p.json",
     "excluded": "checks/excluded.json",
     "note": "The hidden test files are stored as whole files. Scoring overwrites the delivery's copy, so a delivery that edits a test is scored against the material's version."
+  },
+  "digests": {
+    "algorithm": "sha256",
+    "note": "LF 规范化、递归、跳过 __pycache__ 与 *.pyc",
+    "entries": {
+      "checks": "sha256:d8d97111901cddfb80330f175837325d848c3963b404cea4009b86440dabf0d3",
+      "materials/requirement-table.json": "sha256:2321776f7ec653efc9b7a5d54d19908b2a6e1753e93f0ce2d9c0457b35dfbb29",
+      "reference": "sha256:09f42ffa75a04b0e3278c363cd940c406fcccff5a72fd71f543aa674f4e1d713"
+    }
   }
 }

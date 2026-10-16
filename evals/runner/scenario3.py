@@ -13,6 +13,16 @@ SCORER_SCRIPT = "scorer.py"
 SCORING_INPUTS = ("checks", "reference", os.path.join("materials", "requirement-table.json"))
 SCORING_IGNORES = (".git", ".opencode-config")
 
+# 任务的上游仓库（PRDBench）。运行器在输出里查找对它的访问，与材料目录的路径
+# 使用同一条作废处理：找到说明结果可能被上游答案污染。
+UPSTREAM_REPOSITORY = "AGI-Eval-Official/PRDBench"
+UPSTREAM_URLS = ("https://github.com/" + UPSTREAM_REPOSITORY,)
+
+
+def upstream_urls():
+    """任务上游仓库的地址：输出里出现时这次运行作废。"""
+    return UPSTREAM_URLS
+
 
 def scenario_base():
     return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
