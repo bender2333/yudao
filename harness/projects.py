@@ -1107,10 +1107,12 @@ class ProjectService:
         review = run.baseline_review if review_event is None else {
             **run.baseline_review, "event_id": review_event.event_id}
         round_number = run.round
+        spec = run.product_spec
+        prd_summary = f"目标：{spec.goal}；要求 {len(spec.requirements)} 条；边界 {len(spec.boundaries)} 条"
         candidate = {
             "work_item_id": item.work_item_id, "run_id": run.run_id, "round": round_number,
             "prd": {"event_id": run.product_spec.created_event_id, "content_hash": run.product_spec.content_hash,
-                    "prd_ref": asdict(run.effective_contract.prd_ref)},
+                    "prd_ref": asdict(run.effective_contract.prd_ref), "summary": prd_summary},
             "structure": {"event_id": structure["event_id"], "content_hash": structure["content_hash"],
                           "structure_ref": structure["structure_ref"],
                           "code_tree_digest": structure["code_tree_digest"]},
