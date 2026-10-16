@@ -92,6 +92,24 @@ def _setup_yudao_env(root: Path):
     return store, writes, artifacts, projects
 
 
+def _pass_command() -> str:
+    return f'"{sys.executable}" -c "import sys; sys.exit(0)"'
+
+
+def _assert_content_command(expected: str) -> str:
+    # 检查最终树里的 test_val.txt 内容是否等于 expected
+    program = (
+        "import pathlib, sys; "
+        "sys.exit(0 if pathlib.Path('test_val.txt').read_text().strip() == %r else 1)" % expected
+    )
+    return f'"{sys.executable}" -c "{program}"'
+
+
+def _sleep_command() -> str:
+    # 超过项目检查时限的检查命令
+    return f'"{sys.executable}" -c "import time; time.sleep(6)"'
+
+
 def test_writeback_three_way_merge_preserves_independent_changes(tmp_path):
     bare_path = tmp_path / "bare.git"
     src_dir = tmp_path / "src"
@@ -119,10 +137,7 @@ def test_writeback_three_way_merge_preserves_independent_changes(tmp_path):
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_ok"],
-        )
-        projects.configure_command(
-            pid, "chk_ok", [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0,
+            check_commands=[_pass_command()],
         )
 
         # Base tree
@@ -168,7 +183,7 @@ def test_writeback_three_way_merge_preserves_independent_changes(tmp_path):
                 "delivery_event_id": "d1", "qa_event_id": "q1",
                 "tree_ref": asdict(adopted_ref), "code_tree_digest": adopted_captured.digest,
                 "summary": "Delivery summary 1", "files": ["common.txt", "adopted_new.txt", "run.sh"],
-                "check_names": ["chk_ok"], "known_risks": [], "previous_adoption_id": None,
+                "check_names": [_pass_command()], "known_risks": [], "previous_adoption_id": None,
             },
             actor="user",
         )))
@@ -247,10 +262,7 @@ def test_writeback_stops_on_conflicts(tmp_path):
             projects.configure_source_directory(
                 pid, "default", str(src_dir), base_version=0,
                 writeback_enabled=True, remote=str(bare_path), target_branch="main",
-                check_commands=["chk_ok"],
-            )
-            projects.configure_command(
-                pid, "chk_ok", [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0,
+                check_commands=[_pass_command()],
             )
 
             base_files = [CapturedFile(base_key, b"base content"), CapturedFile("stable.txt", b"stable")]
@@ -284,7 +296,7 @@ def test_writeback_stops_on_conflicts(tmp_path):
                     "delivery_event_id": "d1", "qa_event_id": "q1",
                     "tree_ref": asdict(adopted_ref), "code_tree_digest": adopted_captured.digest,
                     "summary": "Conflict summary", "files": list(adopted_files.keys()),
-                    "check_names": ["chk_ok"], "known_risks": [], "previous_adoption_id": None,
+                    "check_names": [_pass_command()], "known_risks": [], "previous_adoption_id": None,
                 },
                 actor="user",
             )))
@@ -316,6 +328,8 @@ def test_writeback_stops_on_conflicts(tmp_path):
 
 
 def test_writeback_checks_execution_and_verification_failure(tmp_path):
+    # 源目录设置里写一条通过、一条失败的命令字符串：写回检查按 bash -c 运行它们，
+    # 回执写明命令字符串与退出码，失败时停止写回、不推送分支
     bare_path = tmp_path / "bare.git"
     src_dir = tmp_path / "src"
     src_dir.mkdir()
@@ -326,28 +340,17 @@ def test_writeback_checks_execution_and_verification_failure(tmp_path):
     store, writes, artifacts, projects = _setup_yudao_env(tmp_path)
     try:
         pid = projects.register("ChecksTest", "Goal")
+        assert_command = _assert_content_command("expected_final")
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_assert", "chk_timeout"],
-        )
-        # chk_assert 要求 test_val.txt 内容为 "expected_final"
-        chk_code = (
-            "import sys, pathlib; "
-            "content = pathlib.Path('test_val.txt').read_text().strip(); "
-            "sys.exit(0 if content == 'expected_final' else 1)"
-        )
-        projects.configure_command(pid, "chk_assert", [sys.executable, "-c", chk_code], base_version=0)
-        projects.configure_command(
-            pid, "chk_timeout",
-            [sys.executable, "-c", "import time; time.sleep(1)"],
-            timeout_sec=1, base_version=0,
+            check_commands=[_pass_command(), assert_command],
         )
 
         base_captured = CapturedTree((), (CapturedFile("test_val.txt", b"1"),))
         base_ref = store_tree(artifacts, "r1", base_captured)
 
-        # 1. 最终树内容错误导致核验失败（即使原采纳快照放行）
+        # 1. 最终树内容错误导致核验失败（即使原采纳快照放行）：失败的命令记入回执，后续检查不再运行
         bad_adopted = CapturedTree((), (CapturedFile("test_val.txt", b"wrong_val"),))
         bad_adopted_ref = store_tree(artifacts, "r1", bad_adopted)
 
@@ -369,7 +372,8 @@ def test_writeback_checks_execution_and_verification_failure(tmp_path):
                 "delivery_event_id": "d1", "qa_event_id": "q1",
                 "tree_ref": asdict(bad_adopted_ref), "code_tree_digest": bad_adopted.digest,
                 "summary": "Bad adoption", "files": ["test_val.txt"],
-                "check_names": ["chk_assert"], "known_risks": [], "previous_adoption_id": None,
+                "check_names": [_pass_command(), assert_command], "known_risks": [],
+                "previous_adoption_id": None,
             },
             actor="user",
         )))
@@ -379,10 +383,14 @@ def test_writeback_checks_execution_and_verification_failure(tmp_path):
         assert event.type == ProjectEventType.WRITEBACK_STOPPED
         assert event.payload["reason"] == "verification_failed"
         receipts = event.payload["check_receipts"]
-        assert len(receipts) == 1
-        assert receipts[0]["name"] == "chk_assert"
-        assert receipts[0]["exit_code"] != 0
-        assert receipts[0]["tree_digest"] == event.payload["final_tree_digest"]
+        assert len(receipts) == 2
+        assert receipts[0]["name"] == _pass_command()
+        assert receipts[0]["command"] == _pass_command()
+        assert receipts[0]["exit_code"] == 0
+        assert receipts[1]["name"] == assert_command
+        assert receipts[1]["command"] == assert_command
+        assert receipts[1]["exit_code"] != 0
+        assert receipts[1]["tree_digest"] == event.payload["final_tree_digest"]
 
         # 远端不推送
         bare_repo = pygit2.Repository(str(bare_path))
@@ -414,11 +422,12 @@ def test_writeback_checks_execution_and_verification_failure(tmp_path):
         assert event_no_chk.payload["reason"] == "verification_failed"
         assert event_no_chk.payload["check_receipts"] == []
 
-        # 3. 检查命令超时停止
+        # 3. 检查命令超过项目的检查时限：超时同样记入回执，写回停止
+        projects.set_parameter(pid, "check_timeout_sec", 2, reason="写回检查时限", modified_by="user:test")
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=2,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_timeout"],
+            check_commands=[_sleep_command()],
         )
         writes.transact(project_stream(pid), lambda tx: tx.append(NewProjectEvent(
             ProjectEventType.DELIVERABLE_ADOPTED,
@@ -427,20 +436,22 @@ def test_writeback_checks_execution_and_verification_failure(tmp_path):
                 "delivery_event_id": "d3", "qa_event_id": "q3",
                 "tree_ref": asdict(good_adopted_ref), "code_tree_digest": good_adopted.digest,
                 "summary": "Timeout", "files": ["test_val.txt"],
-                "check_names": ["chk_timeout"], "known_risks": [], "previous_adoption_id": None,
+                "check_names": [_sleep_command()], "known_risks": [], "previous_adoption_id": None,
             },
             actor="user",
         )))
         event_timeout = projects.execute_writeback(pid, "adopt_timeout")
         assert event_timeout.type == ProjectEventType.WRITEBACK_STOPPED
         assert event_timeout.payload["reason"] == "verification_failed"
+        assert event_timeout.payload["check_receipts"][0]["command"] == _sleep_command()
         assert event_timeout.payload["check_receipts"][0]["timed_out"] is True
+        assert "refs/heads/writeback/adopt_timeout" not in bare_repo.references
 
         # 4. 正确的最终树且检查通过
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=3,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_assert"],
+            check_commands=[assert_command],
         )
         writes.transact(project_stream(pid), lambda tx: tx.append(NewProjectEvent(
             ProjectEventType.DELIVERABLE_ADOPTED,
@@ -449,7 +460,7 @@ def test_writeback_checks_execution_and_verification_failure(tmp_path):
                 "delivery_event_id": "d4", "qa_event_id": "q4",
                 "tree_ref": asdict(good_adopted_ref), "code_tree_digest": good_adopted.digest,
                 "summary": "Good adoption", "files": ["test_val.txt"],
-                "check_names": ["chk_assert"], "known_risks": [], "previous_adoption_id": None,
+                "check_names": [assert_command], "known_risks": [], "previous_adoption_id": None,
             },
             actor="user",
         )))
@@ -476,25 +487,24 @@ def test_writeback_target_changed_and_retry(tmp_path):
         pid = projects.register("TargetChangedTest", "Goal")
 
         # 检查命令在运行时把远端 bare 仓库的目标分支推进一次（只在目标还没有推进过时推进）
-        hook_script = "\n".join([
+        # 命令字符串交给 bash -c：整个 python 程序用 bash 单引号包住，程序里可以照常写单引号字面量
+        hook_program = "\n".join([
             "import sys, pygit2",
             f"repo = pygit2.Repository(r'{bare_path}')",
-            "parent_id = repo.references['refs/heads/main'].target",
-            "if 'concurrent.txt' not in repo[parent_id].tree:",
-            "    sig = pygit2.Signature('Concurrent', 'c@yudao.invalid')",
-            "    tb = repo.TreeBuilder(repo[parent_id].tree)",
+            "parent = repo.references['refs/heads/main'].peel(pygit2.Commit)",
+            "tree = parent.tree",
+            "if 'concurrent.txt' not in tree:",
+            "    tb = repo.TreeBuilder(tree)",
             "    tb.insert('concurrent.txt', repo.create_blob(b'advanced'), pygit2.enums.FileMode.BLOB)",
-            "    repo.create_commit('refs/heads/main', sig, sig, 'Concurrent advance', tb.write(), [parent_id])",
+            "    repo.create_commit('refs/heads/main', pygit2.Signature('Concurrent', 'c@yudao.invalid'), "
+            "pygit2.Signature('Concurrent', 'c@yudao.invalid'), 'Concurrent advance', tb.write(), [parent.id])",
             "sys.exit(0)",
         ])
-
+        advance_command = f'"{sys.executable}" -c ' + "'" + hook_program.replace("'", "'\\''") + "'"
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["advance_target_concurrently"],
-        )
-        projects.configure_command(
-            pid, "advance_target_concurrently", [sys.executable, "-c", hook_script], base_version=0,
+            check_commands=[advance_command],
         )
 
         base_captured = CapturedTree((), (CapturedFile("file.txt", b"base"),))
@@ -521,7 +531,7 @@ def test_writeback_target_changed_and_retry(tmp_path):
                 "delivery_event_id": "d1", "qa_event_id": "q1",
                 "tree_ref": asdict(adopted_ref), "code_tree_digest": adopted_captured.digest,
                 "summary": "Target changed test", "files": ["file.txt"],
-                "check_names": ["advance_target_concurrently"], "known_risks": [], "previous_adoption_id": None,
+                "check_names": [advance_command], "known_risks": [], "previous_adoption_id": None,
             },
             actor="user",
         )))
@@ -544,9 +554,8 @@ def test_writeback_target_changed_and_retry(tmp_path):
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=1,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["normal_pass"],
+            check_commands=[_pass_command()],
         )
-        projects.configure_command(pid, "normal_pass", [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0)
 
         # 重新发起：以新目标提交核验并成功写回
         event2 = projects.execute_writeback(pid, "adopt_tc")
@@ -581,9 +590,8 @@ def test_writeback_sequential_adoptions_and_no_writeback(tmp_path):
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_ok"],
+            check_commands=[_pass_command()],
         )
-        projects.configure_command(pid, "chk_ok", [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0)
 
         # 1. 建档采纳（onboarding）：不写回
         base_captured = CapturedTree((), (CapturedFile("app.py", b"print('base')\n"),))
@@ -607,7 +615,7 @@ def test_writeback_sequential_adoptions_and_no_writeback(tmp_path):
                 "adoption_id": "adopt_base", "work_item_id": "w_onboard", "run_id": "r_onboard",
                 "candidate_event_id": "c_init",
                 "tree_ref": asdict(base_ref), "code_tree_digest": base_captured.digest,
-                "summary": "Baseline adopted", "files": ["app.py"], "check_names": ["chk_ok"],
+                "summary": "Baseline adopted", "files": ["app.py"], "check_names": [_pass_command()],
                 "known_risks": [], "previous_adoption_id": None,
                 "prd_ref": {"path": "prd"}, "product_spec_hash": "hash1",
                 "structure_ref": {"path": "struct"},
@@ -636,7 +644,7 @@ def test_writeback_sequential_adoptions_and_no_writeback(tmp_path):
                 "adoption_id": "adopt_no_op", "work_item_id": "w_no_op", "run_id": "r_no_op",
                 "delivery_event_id": "d_noop", "qa_event_id": "q_noop",
                 "tree_ref": asdict(base_ref), "code_tree_digest": base_captured.digest,
-                "summary": "No change", "files": ["app.py"], "check_names": ["chk_ok"],
+                "summary": "No change", "files": ["app.py"], "check_names": [_pass_command()],
                 "known_risks": [], "previous_adoption_id": "adopt_base",
             },
             actor="user",
@@ -667,7 +675,7 @@ def test_writeback_sequential_adoptions_and_no_writeback(tmp_path):
                 "adoption_id": "adopt_step1", "work_item_id": "w1", "run_id": "r1",
                 "delivery_event_id": "d1", "qa_event_id": "q1",
                 "tree_ref": asdict(ref1), "code_tree_digest": tree1.digest,
-                "summary": "Step 1", "files": ["app.py"], "check_names": ["chk_ok"],
+                "summary": "Step 1", "files": ["app.py"], "check_names": [_pass_command()],
                 "known_risks": [], "previous_adoption_id": "adopt_base",
             },
             actor="user",
@@ -695,7 +703,7 @@ def test_writeback_sequential_adoptions_and_no_writeback(tmp_path):
                 "adoption_id": "adopt_step2", "work_item_id": "w2", "run_id": "r2",
                 "delivery_event_id": "d2", "qa_event_id": "q2",
                 "tree_ref": asdict(ref2), "code_tree_digest": tree2.digest,
-                "summary": "Step 2", "files": ["app.py", "step2.txt"], "check_names": ["chk_ok"],
+                "summary": "Step 2", "files": ["app.py", "step2.txt"], "check_names": [_pass_command()],
                 "known_risks": [], "previous_adoption_id": "adopt_step1",
             },
             actor="user",
@@ -745,9 +753,8 @@ def test_writeback_push_unknown_outcome_and_recovery(tmp_path):
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_ok"],
+            check_commands=[_pass_command()],
         )
-        projects.configure_command(pid, "chk_ok", [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0)
 
         base_captured = CapturedTree((), (CapturedFile("app.py", b"print('init')\n"),))
         base_ref = store_tree(artifacts, "r1", base_captured)
@@ -771,7 +778,7 @@ def test_writeback_push_unknown_outcome_and_recovery(tmp_path):
                 "adoption_id": "adopt_rec", "work_item_id": "w1", "run_id": "r1",
                 "delivery_event_id": "d1", "qa_event_id": "q1",
                 "tree_ref": asdict(adopted_ref), "code_tree_digest": adopted_captured.digest,
-                "summary": "Recovery summary", "files": ["app.py"], "check_names": ["chk_ok"],
+                "summary": "Recovery summary", "files": ["app.py"], "check_names": [_pass_command()],
                 "known_risks": [], "previous_adoption_id": None,
             },
             actor="user",

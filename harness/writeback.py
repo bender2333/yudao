@@ -10,13 +10,14 @@ import tempfile
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Sequence
 
 import pygit2
 from pygit2.enums import FileMode, RepositoryInitFlag, RepositoryOpenFlag
 
 from .artifacts import ArtifactStore
 from .event_store import Command, project_stream
+from .environment import _resolve_bash
 from .models import (
     ArtifactRef,
     ProjectEvent,
@@ -24,8 +25,8 @@ from .models import (
     json_dumps,
     new_id,
 )
-from .parameters import value_for_project
 from .path_rules import TreeError, is_private_path
+from .parameters import value_for_project
 from .public_tree import CapturedFile, CapturedTree, materialize_tree
 from .tree_archive import artifact_run, load_tree, store_tree
 from .write_path import NewProjectEvent, Transaction
@@ -167,46 +168,27 @@ def is_adoption_merged_in_target(
 def run_writeback_checks(
     workspace_path: Path,
     check_commands: Sequence[str],
-    registered_commands: Mapping[str, Any],
     timeout_sec: float,
     artifacts: ArtifactStore,
     run_id: str,
     final_tree_digest: str,
 ) -> tuple[list[dict[str, Any]], bool]:
-    """Run registered writeback check commands on the check copy."""
+    """Run writeback check command strings on the check copy."""
     if not check_commands:
         return [], False
 
     receipts: list[dict[str, Any]] = []
     all_passed = True
 
-    for name in check_commands:
-        command_config = registered_commands.get(name)
-        if command_config is None:
-            receipts.append({
-                "name": name,
-                "argv": [],
-                "exit_code": -1,
-                "output_ref": None,
-                "tree_digest": final_tree_digest,
-                "timed_out": False,
-                "duration_ms": 0,
-                "error": f"command not registered: {name}",
-            })
-            all_passed = False
-            break
-
-        argv = list(command_config.argv)
-        timeout = float(getattr(command_config, "timeout_sec", timeout_sec) or timeout_sec)
-
+    for check_command in check_commands:
         start = time.monotonic()
         timed_out = False
         try:
             completed = subprocess.run(
-                argv,
+                [_resolve_bash(), "-c", check_command],
                 cwd=str(workspace_path),
                 capture_output=True,
-                timeout=timeout,
+                timeout=timeout_sec,
                 check=False,
             )
             code = completed.returncode
@@ -223,8 +205,8 @@ def run_writeback_checks(
         output_ref = artifacts.put(run_id, "check_output", output, media_type="text/plain")
 
         receipt = {
-            "name": name,
-            "argv": argv,
+            "name": check_command,
+            "command": check_command,
             "exit_code": code,
             "output_ref": _ref_dict(output_ref),
             "tree_digest": final_tree_digest,
@@ -481,12 +463,12 @@ def perform_writeback(
             )
             return not_needed_event[0] if not_needed_event else None
 
-        # 12. 在独立检查副本中执行写回检查：项目登记的写回检查与本次采纳成果登记的检查都包含在这份清单里，
-        # 覆盖本次交付与项目基线已有的检查（ADR-0034）
-        check_names = list(check_commands)
-        for name in adoption.check_names:
-            if name not in check_names:
-                check_names.append(name)
+        # 12. 在独立检查副本中执行写回检查：源目录设置里写明的写回检查命令与本次采纳成果登记的检查命令
+        # 都包含在这份清单里，覆盖本次交付与项目基线已有的检查（ADR-0034）
+        check_commands = list(check_commands)
+        for check_command in adoption.check_names:
+            if check_command not in check_commands:
+                check_commands.append(check_command)
         check_timeout = float(value_for_project(store, project_id, "check_timeout_sec") or 600)
         with tempfile.TemporaryDirectory() as check_temp:
             check_workspace = Path(check_temp) / "check_copy"
@@ -494,8 +476,7 @@ def perform_writeback(
 
             receipts, checks_passed = run_writeback_checks(
                 workspace_path=check_workspace,
-                check_commands=check_names,
-                registered_commands=project.commands,
+                check_commands=check_commands,
                 timeout_sec=check_timeout,
                 artifacts=artifacts,
                 run_id=adoption.run_id,
