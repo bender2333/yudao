@@ -76,17 +76,6 @@
     "tighten_when": "同一项目的一轮建档用时分布长期低于现值的四分之一",
     "origin": "接入已有项目设计说明第 4.2 节：建档每一轮是一个新的 run，单独计算运行时间，上限与普通事项相同"
   },
-  "command_timeout_max_sec": {
-    "value": 600,
-    "bounds": [1, 86400],
-    "kind": "parameter",
-    "form": "boundary",
-    "guards": "登记命令的时限没有上界",
-    "cost": "长时间占住执行环境的一次检查位",
-    "relax_when": "登记命令需要更长的时限时按项目设置",
-    "tighten_when": "超时以后从未取回结果的登记命令占多数",
-    "origin": "规则登记第 8 节表格，登记命令时限的最大值；bash 替代 run_command 以后登记命令没有执行入口，#484 删除注册体系时一并移除"
-  },
   "bash_timeout_default_sec": {
     "value": 300,
     "bounds": [1, 86400],

@@ -32,7 +32,6 @@ from .project_projection import (
     HeldCandidate,
     InitialPrdCandidate,
     ProjectProjection,
-    RegisteredCommand,
     SourceDirectory,
     WorkItem,
     replay_project,
@@ -42,7 +41,6 @@ from .projection import RunNotFoundError, project_run, replay_run
 from .providers.selection import ModelSelection
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
-from .tools import validate_registered_command
 from .decisions import INITIAL_PRD, KERNEL_MODIFICATION
 from .path_guard import changed_paths, kernel_diff, kernel_hits, kernel_manifest_paths
 from .streams import DRAIN_STARTED, PRIORITY_UPGRADE_RESTART, PRIORITY_USER, classify_startup_runs
@@ -75,13 +73,6 @@ class DepartmentSettingConflict(Exception):
     """所编辑的项目部门设置版本已过期；`current` 是项目当前设置的读取体。"""
     def __init__(self, current: dict[str, Any]) -> None:
         super().__init__("department setting changed since base_version")
-        self.current = current
-
-
-class CommandConfigConflict(Exception):
-    """所编辑的命令版本已过期；`current` 是项目当前命令的读取体。"""
-    def __init__(self, current: dict[str, Any]) -> None:
-        super().__init__("registered command changed since base_version")
         self.current = current
 
 
@@ -435,15 +426,6 @@ class ProjectService:
         _default_settings(state)
         return state.department_settings.get(department)
 
-    def read_commands(self, project_id: str) -> list[dict[str, Any]]:
-        return [_command_view(config) for _, config in sorted(self.projection(project_id).commands.items())]
-
-    def read_command(self, project_id: str, name: str) -> dict[str, Any]:
-        config = self.projection(project_id).commands.get(name)
-        if config is None:
-            raise ValueError(f"unknown registered command: {name}")
-        return _command_view(config)
-
     # 项目登记与状态
 
     def register(self, name: str, goal: str, *, source: str = "idea",
@@ -711,9 +693,6 @@ class ProjectService:
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
         prompt_config_versions = {department: project.department_settings[department].version
                                   for department in DEPARTMENTS}
-        # 登记命令在事项创建时冻结：之后项目再改注册表，不影响已创建事项的执行依据
-        frozen_commands = {name: config.frozen() for name, config in project.commands.items()}
-        command_versions = {name: config.version for name, config in project.commands.items()}
         context_text = project_context_text(project, title, source_run)
         # 项目上下文是该 run 的模型输入，按 run 作用域存放；内核创建 run 时会写出同一份工件。
         context_ref = self.artifacts.put(run_id, "project_context", context_text, media_type="text/markdown")
@@ -721,7 +700,6 @@ class ProjectService:
             "work_item_id": work_item_id, "title": title, "text": text, "run_id": run_id, "baseline": baseline,
             "snapshot": snapshot,
             "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
-            "command_versions": command_versions,
             "max_cycles": max_cycles, "run_time_limit_sec": run_time_limit_sec, "context_window": context_window,
             "definitions_version": DEFINITIONS.version,
             # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
@@ -734,8 +712,7 @@ class ProjectService:
                 max_cycles=max_cycles, run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 project_id=project.project_id, work_item_id=work_item_id, baseline=baseline,
                 initial_tree=initial_tree, code_snapshot=snapshot, project_context=context_text,
-                prompt_config_versions=prompt_config_versions,
-                registered_commands=frozen_commands, command_versions=command_versions, kind=kind,
+                prompt_config_versions=prompt_config_versions, kind=kind,
                 round=(1 if kind == "onboarding" else 0) if round is None else round,
                 onboarding_basis=onboarding_basis, additional_input=additional_input,
             ),
@@ -946,15 +923,6 @@ class ProjectService:
                     if baseline is not None:
                         ref = ArtifactRef(**baseline["tree_ref"])
                         tree = load_tree(self.artifacts, artifact_run(ref.path), ref)
-                # 事项记录了创建时的登记命令版本；冻结的副本按这些版本从项目当前的命令登记表取得，
-                # 版本已经变化的命令按不存在处理并拒绝补建（工作区与命令登记不一致，fast-fail）
-                commands = state.commands
-                frozen = {}
-                for name, version in item.command_versions.items():
-                    config = commands.get(name)
-                    if config is None or config.version != version:
-                        raise ValueError(f"registered command {name} changed since work item {item.work_item_id}")
-                    frozen[name] = config.frozen()
                 self.orchestrator.create_run(
                     item.text, max_cycles=item.max_cycles, run_time_limit_sec=item.run_time_limit_sec,
                     context_window=item.context_window, run_id=item.run_id,
@@ -962,8 +930,6 @@ class ProjectService:
                     baseline=item.baseline, initial_tree=tree, code_snapshot=snapshot,
                     project_context=self.artifacts.get(
                         ArtifactRef(**item.project_context_ref)).decode("utf-8"),
-                    prompt_config_versions=dict(item.prompt_config_versions),
-                    registered_commands=frozen or None, command_versions=dict(item.command_versions) or None,
                 )
                 created.append(item.run_id)
         return created
@@ -1210,37 +1176,6 @@ class ProjectService:
         unchanged = self.writes.transact(project_stream(project_id), configure, command=command)
         return unchanged or {**self.read_department_setting(project_id, department), "unchanged": False}
 
-    # 项目登记命令（3.2A 本地命令：只有登记的命令与参数范围可以执行）
-
-    def configure_command(self, project_id: str, name: str, argv: list[str], *,
-                          args: list[str] | None = None, timeout_sec: int | None = None,
-                          output_limit: int | None = None, repeatable: bool = False,
-                          base_version: int = 0,
-                          command: Command | None = None) -> dict[str, Any]:
-        if type(base_version) is not int or base_version < 0:
-            raise ValueError("base_version must be a non-negative integer")
-
-        def configure(transaction: Transaction) -> dict[str, Any] | None:
-            current = self._writable_in(transaction, project_id).commands.get(name)
-            current_version = 0 if current is None else current.version
-            if base_version != current_version:
-                raise CommandConfigConflict({} if current is None else _command_view(current))
-            normalized = validate_registered_command(name, {
-                "argv": argv, "args": [] if args is None else args,
-                "repeatable": repeatable,
-                **({} if timeout_sec is None else {"timeout_sec": timeout_sec}),
-                **({} if output_limit is None else {"output_limit": output_limit}),
-            })
-            if current is not None and current.frozen() == normalized:
-                return {**_command_view(current), "unchanged": True}
-            transaction.append(NewProjectEvent(ProjectEventType.COMMAND_CONFIGURED, {
-                "name": name, "version": current_version + 1, **normalized, "base_version": base_version,
-            }, actor="user:local"))
-            return None
-
-        unchanged = self.writes.transact(project_stream(project_id), configure, command=command)
-        return unchanged or {**self.read_command(project_id, name), "unchanged": False}
-
     # 源目录登记（#74）
 
     def configure_source_directory(self, project_id: str, name: str, path: str, *,
@@ -1377,19 +1312,6 @@ def _setting_view(setting: DepartmentSetting) -> dict[str, Any]:
         "version": setting.version,
         "updated_at": setting.updated_at,
         "source": setting.source,
-    }
-
-
-def _command_view(config: RegisteredCommand) -> dict[str, Any]:
-    return {
-        "name": config.name,
-        "argv": list(config.argv),
-        "args": list(config.args),
-        "timeout_sec": config.timeout_sec,
-        "output_limit": config.output_limit,
-        "version": config.version,
-        "repeatable": config.repeatable,
-        "updated_at": config.updated_at,
     }
 
 

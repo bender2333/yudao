@@ -27,7 +27,6 @@ def _adopted_project(data_dir):
     project_id = system.projects.register("升级项目", "核对启动时的版本核对")
     system.projects.configure_department_settings(
         project_id, "engineering", ModelSelection(department_prompt="先写计划再写代码。"), 0)
-    system.projects.configure_command(project_id, "lint", ["python", "-m", "flake8"], args=[])
     _work_item_id, run_id = system.projects.start_work_item(project_id, "第一个事项")
     system.run_until_stop(run_id)
     adopted = system.projects.settle(run_id)
@@ -99,7 +98,7 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts_the_work_it
     assert adopted is not None and adopted.type == ProjectEventType.DELIVERABLE_ADOPTED
     second_run = _unstarted_run(system, project_id)
     before = saved_project(system.store, project_id).to_dict()
-    facts_before = {key: before[key] for key in ("name", "goal", "department_settings", "commands")}
+    facts_before = {key: before[key] for key in ("name", "goal", "department_settings")}
     adoption_before = system.projects.projection(project_id).current_adoption
     end = system.store.end_position()
     system.close()
@@ -111,7 +110,6 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts_the_work_it
     assert {key: after[key] for key in facts_before} == facts_before
     project = restarted.projects.projection(project_id)
     assert project.department_settings["engineering"].source == "configured"
-    assert "lint" in project.commands
     # 第一个事项的采纳成果保留在采纳历史中，没有被改写
     assert [item["adoption_id"] for item in after["adoptions"]][:1] == [adoption_before.adoption_id]
 

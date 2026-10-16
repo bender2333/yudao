@@ -23,8 +23,6 @@ from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT
 
-REGISTRY = {"make-link": {"argv": ["python", "make_link.py"], "args": ["nested", "linked"],
-                          "timeout_sec": 30, "output_limit": 4000}}
 
 def _events(system, run_id, event_type):
     return [event for event in system.store.list_events(run_id) if event.type == event_type]
@@ -157,19 +155,21 @@ def test_second_no_tool_call_pause_after_the_first_continue_is_a_fresh_count(tmp
     assert finished.stop_reason != "no_tool_call"
     system.close()
 
+
 def _write_command_body(workspace, outside):
+    # bash 命令调用的脚本：在 node_modules 下建立指向工作区之外的链接
     workspace.write_file("make_link.py", (
         "import os, sys\n"
-        "from pathlib import Path\n"
-        f"outside = Path(r'{outside}')\n"
-        "target = Path('node_modules') / sys.argv[1]\n"
-        "target.parent.mkdir(parents=True, exist_ok=True)\n"
-        "os.symlink(outside, target)\n"
+        f"os.symlink({str(outside)!r}, os.path.join('node_modules', sys.argv[1]))\n"
     ))
 
-def _command_call(identity, name="make-link", args=None):
-    return {"id": identity, "call_id": identity, "type": "function_call", "name": "run_command",
-            "arguments": json.dumps({"name": name, "args": args or []})}
+def _command_call(identity, argument="nested"):
+    # bash 的 cwd 是工作区根，命令串里直接带上脚本参数；登记命令进程已随 run_command 删除（工单 #484），
+    # 这里证明的是同一件事：主机执行的命令在工作区里留下无法表示的链接以后 run 暂停
+    command = f'"{sys.executable.replace(chr(92), "/")}" make_link.py {argument}'
+    return {"id": identity, "call_id": identity, "type": "function_call", "name": "bash",
+            "arguments": json_dumps({"command": command})}
+
 
 def _workspace_unrepresentable_run(tmp_path, tail):
     outside = tmp_path / "outside.txt"
@@ -180,13 +180,12 @@ def _workspace_unrepresentable_run(tmp_path, tail):
         pytest.skip("symbolic links are unavailable")
 
     def link_then(request):
-        return ModelResponse(output=[_command_call("cmd-link", "make-link", ["linked"])])
+        return ModelResponse(output=[_command_call("cmd-link", "linked")])
 
     # 产品先提交产品要求，工步建立链接（node_modules/linked）导致公开树无法表示
     system = LoopSystem.for_testing(tmp_path / "data",
                                     FakeAdapter([product_spec(),link_then, tail]))
-    run_id = system.create_run("A link pauses the run", registered_commands=REGISTRY,
-                               command_versions={"make-link": 1})
+    run_id = system.create_run("A link pauses the run")
     workspace = system.workspace(run_id)
     _write_command_body(workspace, outside)
     result = system.run_until_stop(run_id)

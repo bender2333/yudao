@@ -69,7 +69,7 @@ RUN_EVENT_TYPES = frozenset({
     "decision_withdrawn",
 })
 
-# 项目流：项目的长期事实（项目、当前 PRD 与采纳成果、事项的存在、队列位置与最终结果、项目部门设置、登记命令）
+# 项目流：项目的长期事实（项目、当前 PRD 与采纳成果、事项的存在、队列位置与最终结果、项目部门设置）
 PROJECT_EVENT_TYPES = frozenset({
     "project_registered",
     "project_renamed",
@@ -82,7 +82,6 @@ PROJECT_EVENT_TYPES = frozenset({
     "deliverable_adopted",
     "adoption_held",
     "department_prompt_configured",
-    "command_configured",
     "material_recorded",
     "source_directory_configured",
     "initial_prd_proposed",

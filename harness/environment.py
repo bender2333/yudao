@@ -183,10 +183,7 @@ class _Finished:
 
 class LocalEnvironment:
     def __init__(self, workspace: Workspace,
-                 check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
-                 registered_commands: dict[str, Any] | None = None) -> None:
-        # registered_commands 已不再使用：bash 替代 run_command 后登记命令没有执行入口；参数仅为兼容
-        # orchestrator 等调用方，#484 删除注册体系时一并移除。传入值被忽略。
+                 check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> None:
         self.workspace = workspace
         self._check_timeout_sec = check_timeout_sec
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
@@ -209,11 +206,9 @@ class LocalEnvironment:
 
     @classmethod
     def open(cls, root: str | Path,
-             check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
-             registered_commands: dict[str, Any] | None = None) -> LocalEnvironment:
-        # 打开已经建立的工作区（registered_commands 兼容 #484 前的调用方，传入值被忽略）
+             check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> LocalEnvironment:
+        # 打开已经建立的工作区
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec)
-
 
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:

@@ -18,8 +18,6 @@ from harness.runtime import LoopSystem
 from harness.tools import tool_action
 from harness.tree_archive import load_tree
 
-REGISTRY = {"make-link": {"argv": ["python", "make_link.py"], "args": ["nested", "linked"],
-                          "timeout_sec": 30, "output_limit": 4000}}
 
 def _system(tmp_path, turns):
     return LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(),*turns]))
@@ -66,7 +64,7 @@ def _workspace_and_command(tmp_path):
     except OSError:
         pytest.skip("symbolic links are unavailable")
     system = _system(tmp_path, [])
-    run_id = system.create_run("probe", registered_commands=REGISTRY, command_versions={"make-link": 1})
+    run_id = system.create_run("probe")
     workspace = system.workspace(run_id)
     workspace.write_file(".gitignore", "node_modules/\n")
     _write_command_body(workspace, outside)
@@ -79,8 +77,7 @@ def test_ignored_link_does_not_pause_and_never_enters_snapshot_seal_or_delivery(
     system = _system(tmp_path, [work, delivery_turn(
         summary="with ignored dependency link", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
         checks={"smoke": 0}), review_turn("release", "ok")])
-    run_id = system.create_run("Dependencies with links do not affect the public tree",
-                               registered_commands=REGISTRY, command_versions={"make-link": 1})
+    run_id = system.create_run("Dependencies with links do not affect the public tree")
     workspace = system.workspace(run_id)
     workspace.write_file(".gitignore", "node_modules/\n")
     _write_command_body(workspace, tmp_path / "outside.txt")
@@ -120,8 +117,7 @@ def test_link_outside_ignored_paths_pauses_after_the_command_receipt(tmp_path):
         ])
 
     system = _system(tmp_path, [link_and_then])
-    run_id = system.create_run("A link outside ignore rules pauses the run",
-                               registered_commands=REGISTRY, command_versions={"make-link": 1})
+    run_id = system.create_run("A link outside ignore rules pauses the run")
     workspace = system.workspace(run_id)
     _write_command_body(workspace, outside)
     system.run_until_stop(run_id)
@@ -146,8 +142,7 @@ def test_link_during_request_assembly_pauses_with_the_same_reason(tmp_path):
         pytest.skip("symbolic links are unavailable")
 
     system = _system(tmp_path, [])
-    run_id = system.create_run("A link during request assembly pauses the run",
-                               registered_commands=REGISTRY, command_versions={"make-link": 1})
+    run_id = system.create_run("A link during request assembly pauses the run")
     workspace = system.workspace(run_id)
     # 在第一步的请求装配之前建立链接
     os.symlink(outside, workspace.root / "linked.txt")
@@ -168,8 +163,7 @@ def test_link_at_proposal_commit_pauses_with_the_same_reason(tmp_path):
     system = _system(tmp_path, [delivery_turn(
         summary="submit and pause", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
         checks={"smoke": 0})])
-    run_id = system.create_run("A link at proposal commit pauses the run",
-                               registered_commands=REGISTRY, command_versions={"make-link": 1})
+    run_id = system.create_run("A link at proposal commit pauses the run")
     workspace = system.workspace(run_id)
     # 提案提交（提交判断读取工作区事实、交付封存取得公开树）时建立链接
     from harness.tests.helpers import after_event
@@ -191,8 +185,7 @@ def test_write_to_an_ignored_path_is_refused_with_the_ignore_rule_reason(tmp_pat
     except OSError:
         pytest.skip("symbolic links are unavailable")
     system = _system(tmp_path, [])
-    run_id = system.create_run("Ignored paths refuse writes", registered_commands=REGISTRY,
-                               command_versions={"make-link": 1})
+    run_id = system.create_run("Ignored paths refuse writes")
     workspace = system.workspace(run_id)
     workspace.write_file(".gitignore", "node_modules/\n")
     environment = system.environment(run_id)
@@ -209,8 +202,7 @@ def test_read_of_an_ignored_regular_file_is_refused_with_the_ignore_rule_reason(
     except OSError:
         pytest.skip("symbolic links are unavailable")
     system = _system(tmp_path, [])
-    run_id = system.create_run("Ignored paths refuse reads", registered_commands=REGISTRY,
-                               command_versions={"make-link": 1})
+    run_id = system.create_run("Ignored paths refuse reads")
     workspace = system.workspace(run_id)
     workspace.write_file(".gitignore", "node_modules/\n")
     (workspace.root / "node_modules").mkdir()
@@ -240,8 +232,7 @@ def test_delivery_adoption_tree_excludes_ignored_directories(tmp_path):
         pytest.skip("symbolic links are unavailable")
     system = _system(tmp_path, [delivery_turn(summary="adopt", files={"src/echo.py": "print('x')\n"}),
                                  review_turn("release", "ok")])
-    run_id = system.create_run("Adoption excludes ignored directories", registered_commands=REGISTRY,
-                               command_versions={"make-link": 1})
+    run_id = system.create_run("Adoption excludes ignored directories")
     workspace = system.workspace(run_id)
     workspace.write_file(".gitignore", "node_modules/\n")
     (workspace.root / "node_modules").mkdir()

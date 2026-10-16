@@ -270,8 +270,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.workspace_digest = payload["workspace_digest"]
         state.project_context_ref = payload["project_context_ref"]
         state.prompt_config_versions = dict(payload["prompt_config_versions"])
-        state.registered_commands = dict(payload.get("registered_commands") or {})
-        state.command_versions = dict(payload.get("command_versions") or {})
         # 创建这个 run 时记录的 run 事件版本；旧事件没有这个字段时为 0，与当前版本不同（ADR-0019）
         state.run_event_version = int(payload.get("run_event_version", 0))
         # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（ADR-0014）

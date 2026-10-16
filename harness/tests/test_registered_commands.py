@@ -1,26 +1,20 @@
 import asyncio
 import json
 import re
-import sqlite3
 import sys
 import time
-import uuid
 
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from harness.adapters.fake import FakeAdapter, prompt_part
-from harness.app.application import Application
-from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
-from harness.projects import CommandConfigConflict
 from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.models import ArtifactRef, EventType, json_dumps
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.actions import Preconditions
-from harness.recovery import action_repeatable
 from harness.environment import _OUTPUT_LIMIT, _TRUNCATED_MARKER, LocalEnvironment
-from harness.tests.api_helpers import running_api
 from harness.tests.helpers import (action, happy_script, perform, recorded_context,
                                    run_tree_command, wait_for_file, wait_until_stopped)
 from harness.definitions import DEFINITIONS
@@ -296,136 +290,3 @@ def test_engineering_request_separates_action_receipts_from_delivery_check_recei
         assert ("check_names 必须对应本次激活中在当前工作区上调用 run_check 的回执；"
                 "bash 的结果不能作为检查回执，模型自报的 exit_code 无效。") in contract["notes"]
         assert not any("主机回执" in note for note in contract["notes"])
-
-def test_registry_freezes_at_work_item_creation(data_dir):
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([*happy_script(), *happy_script()]))
-    project_id = system.projects.register("Cmd", GOAL)
-    first = system.projects.configure_command(project_id, "itest", ["python", "-c", "print(1)"], base_version=0)
-    assert first["version"] == 1 and first["unchanged"] is False
-    assert first["repeatable"] is False
-    check_timeout_sec = DEFINITIONS.rule_value("check_timeout_sec")
-    tool_output_limit = DEFINITIONS.rule_value("tool_output_limit")
-    assert first["timeout_sec"] == check_timeout_sec and first["output_limit"] == tool_output_limit
-    with pytest.raises(CommandConfigConflict):
-        system.projects.configure_command(project_id, "itest", ["python", "-c", "print(9)"], base_version=0)
-    with pytest.raises(ValueError):
-        system.projects.configure_command(project_id, "bad name!", ["python", "-c", "print(1)"], base_version=0)
-    with pytest.raises(ValueError):
-        system.projects.configure_command(project_id, "empty", [], base_version=0)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "第一步")
-    run = system.project(run_id)
-    assert run.registered_commands == {
-        "itest": {"argv": ["python", "-c", "print(1)"], "args": [],
-                  "timeout_sec": check_timeout_sec, "output_limit": tool_output_limit,
-                  "repeatable": False},
-    }
-    assert run.command_versions == {"itest": 1}
-    assert system.projects.projection(project_id).work_item(work_item_id).command_versions == {"itest": 1}
-    assert system.run_until_stop(run_id).phase == "DONE"
-    second = system.projects.configure_command(
-        project_id, "itest", ["python", "-c", "print(2)"], args=["--fast"],
-        timeout_sec=60, output_limit=8000, repeatable=True, base_version=1)
-    assert second["version"] == 2 and second["unchanged"] is False and second["repeatable"] is True
-    # 已创建事项不受影响：冻结仍是创建时的版本与「可以重新执行」声明
-    assert system.project(run_id).registered_commands["itest"]["argv"] == ["python", "-c", "print(1)"]
-    assert system.project(run_id).registered_commands["itest"]["repeatable"] is False
-    assert system.project(run_id).command_versions == {"itest": 1}
-    _work_item_2, run_2 = system.projects.start_work_item(project_id, "第二步")
-    assert system.project(run_2).registered_commands["itest"]["argv"] == ["python", "-c", "print(2)"]
-    assert system.project(run_2).registered_commands["itest"]["repeatable"] is True
-    assert system.project(run_2).command_versions == {"itest": 2}
-
-def test_command_registration_commands_and_stale_base(data_dir):
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
-    application = Application(system)
-    with running_api(lambda: application) as client:
-        created = client.post("/api/commands/project.create",
-                              json={"command_id": str(uuid.uuid4()), "name": "Cmd", "goal": GOAL})
-        assert created.status_code == 200, created.text
-        project_id = created.json()["refs"]["project_id"]
-        saved = client.post("/api/commands/command_registration.save", json={
-            "command_id": str(uuid.uuid4()), "project_id": project_id, "name": "itest",
-            "argv": ["python", "-c", "print(1)"], "base_version": 0})
-        assert saved.status_code == 200, saved.text
-        settings = client.get("/api/queries/project.settings", params={"project_id": project_id}).json()["data"]
-        assert list(settings["commands"]) == ["itest"]
-        assert settings["commands"]["itest"]["argv"] == ["python", "-c", "print(1)"]
-        stale = client.post("/api/commands/command_registration.save", json={
-            "command_id": str(uuid.uuid4()), "project_id": project_id, "name": "itest",
-            "argv": ["python", "-c", "print(2)"], "base_version": 0})
-        assert stale.status_code == 409, stale.text
-        assert stale.json()["reason"] == "stale_base"
-
-def test_registering_a_command_declares_whether_it_can_repeat(data_dir):
-    # 登记时声明「可以重新执行」，经接口与事件日志读回为真；不声明时为否（工单 #242）
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
-    application = Application(system)
-    with running_api(lambda: application) as client:
-        created = client.post("/api/commands/project.create",
-                              json={"command_id": str(uuid.uuid4()), "name": "Cmd", "goal": GOAL})
-        project_id = created.json()["refs"]["project_id"]
-        repeatable = client.post("/api/commands/command_registration.save", json={
-            "command_id": str(uuid.uuid4()), "project_id": project_id, "name": "lint",
-            "argv": ["python", "-m", "flake8"], "repeatable": True, "base_version": 0})
-        assert repeatable.status_code == 200, repeatable.text
-        plain = client.post("/api/commands/command_registration.save", json={
-            "command_id": str(uuid.uuid4()), "project_id": project_id, "name": "deploy",
-            "argv": ["python", "deploy.py"], "base_version": 0})
-        assert plain.status_code == 200, plain.text
-        settings = client.get("/api/queries/project.settings", params={"project_id": project_id}).json()["data"]
-        assert settings["commands"]["lint"]["repeatable"] is True
-        assert settings["commands"]["deploy"]["repeatable"] is False
-        events = system.store.list_project_events(project_id)
-        [configured] = [event for event in events if event.type == ProjectEventType.COMMAND_CONFIGURED
-                        and event.payload["name"] == "lint"]
-        assert configured.payload["repeatable"] is True
-    system.close()
-
-def _without_repeatable(data_dir):
-    # 得到一份旧版本写入的数据目录：command_configured 事件里没有 repeatable 字段
-    connection = sqlite3.connect(data_dir / "events.sqlite")
-    try:
-        rows = connection.execute(
-            "SELECT event_id, payload_json FROM events WHERE type = ?",
-            (ProjectEventType.COMMAND_CONFIGURED,)).fetchall()
-        assert rows, "no command_configured events"
-        for event_id, payload in rows:
-            document = json.loads(payload)
-            document.pop("repeatable", None)
-            connection.execute("UPDATE events SET payload_json = ? WHERE event_id = ?",
-                               (json.dumps(document, ensure_ascii=False, sort_keys=True), event_id))
-        connection.execute("DELETE FROM projections")
-        connection.commit()
-    finally:
-        connection.close()
-
-def test_a_command_configured_event_without_the_field_reads_as_not_repeatable(data_dir):
-    # 旧版本写入的 command_configured 事件没有 repeatable：重放以后按否处理（ADR-0019）
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
-    project_id = system.projects.register("Cmd", GOAL)
-    system.projects.configure_command(project_id, "lint", ["python", "-m", "flake8"],
-                                      repeatable=True, base_version=0)
-    system.close()
-    _without_repeatable(data_dir)
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    assert restarted.projects.read_commands(project_id)[0]["repeatable"] is False
-    restarted.close()
-
-def test_run_command_actions_repeat_by_the_registration_frozen_in_the_run(data_dir):
-    # 判断入口读的是 run 中固定的登记：事项创建以后修改登记不改这个 run 的回答，新事项取新登记
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([*happy_script(), *happy_script()]))
-    project_id = system.projects.register("Cmd", GOAL)
-    system.projects.configure_command(project_id, "lint", ["python", "-m", "flake8"],
-                                      repeatable=True, base_version=0)
-    _work_item_id, first_run = system.projects.start_work_item(project_id, "第一步")
-    assert action_repeatable("run_command", {"name": "lint"},
-                             registered_commands=system.project(first_run).registered_commands) is True
-    system.projects.configure_command(project_id, "lint", ["python", "-m", "flake8"],
-                                      repeatable=False, base_version=1)
-    assert action_repeatable("run_command", {"name": "lint"},
-                             registered_commands=system.project(first_run).registered_commands) is True
-    _work_item_2, second_run = system.projects.start_work_item(project_id, "第二步")
-    assert action_repeatable("run_command", {"name": "lint"},
-                             registered_commands=system.project(second_run).registered_commands) is False
-    system.close()

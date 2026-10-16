@@ -19,9 +19,6 @@
       "tree_ref": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线的代码树取自建档快照",
       "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档基线属于建档事项"
     },
-    "command_configured": {
-      "repeatable": "旧事件没有登记「可以重新执行」这个声明（#242）；没有这个字段时按否处理，结果未知的动作不自动重新执行"
-    },
     "department_prompt_configured": {
       "department_prompt": "旧事件用 text 写部门 Prompt 原文；没有 text 与 department_prompt 时该部门没有写入 Prompt，读取时用内置默认 Prompt（版本 0）",
       "department_prompt_ref": "旧事件用 prompt_ref 写部门 Prompt 的工件引用；没有它时从 department_prompt（或 text）的原文计算内容哈希，没有原文时该部门没有写入 Prompt",
@@ -179,15 +176,6 @@
       "run_id": "string",
       "work_item_id": "string"
     },
-    "command_configured": {
-      "args": "array[string]",
-      "argv": "array[string]",
-      "base_version": "integer",
-      "name": "string",
-      "output_limit": "integer",
-      "timeout_sec": "integer",
-      "version": "integer"
-    },
     "deliverable_adopted": {
       "adoption_id": "string",
       "check_names": "array[string]",
@@ -237,7 +225,6 @@
     },
     "work_item_created": {
       "baseline": "object?",
-      "command_versions": "object",
       "context_window": "integer",
       "definitions_version": "string",
       "max_cycles": "integer",
@@ -284,16 +271,6 @@
       "summary": "string",
       "tree_ref": "object",
       "work_item_id": "string"
-    },
-    "command_configured": {
-      "args": "array[string]",
-      "argv": "array[string]",
-      "base_version": "integer",
-      "name": "string",
-      "output_limit": "integer",
-      "repeatable": "boolean",
-      "timeout_sec": "integer",
-      "version": "integer"
     },
     "deliverable_adopted": {
       "adoption_id": "string",
@@ -419,7 +396,6 @@
     },
     "work_item_created": {
       "baseline": "object?",
-      "command_versions": "object",
       "context_window": "integer",
       "definitions_version": "string",
       "kind": "string",

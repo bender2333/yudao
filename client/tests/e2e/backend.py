@@ -39,7 +39,6 @@ from harness.app.catalog_commands import (  # noqa: E402
 from harness.app.contracts import Accepted, Rejected  # noqa: E402
 from harness.app.project_commands import ProjectCreate  # noqa: E402
 from harness.app.project_and_work_item_commands import (  # noqa: E402
-    CommandRegistrationSave,
     DepartmentSettingsSave,
     MaterialRecord,
     WorkItemCreate,
@@ -252,11 +251,7 @@ async def seed(application: Application, system: LoopSystem) -> None:
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="示例项目", goal="实现一个回声工具"),
         actor="user:local")
     project_id = created.refs.project_id
-    # 项目设置页需要真实的行：登记一条命令、写入一个部门 Prompt、记录一条项目材料
-    await accept(application, "command_registration.save", CommandRegistrationSave(
-        command_id=str(uuid.uuid4()), project_id=project_id, name="smoke",
-        argv=["python", "-c", "raise SystemExit(0)"], args=["--verbose"],
-        timeout_sec=30, output_limit=4096, base_version=0))
+    # 项目设置页需要真实的行：写入一个部门 Prompt、记录一条项目材料
     await accept(application, "department_settings.save", DepartmentSettingsSave(
         command_id=str(uuid.uuid4()), project_id=project_id, department="product",
         department_prompt="产品部门先写目标与验收标准，范围以外的要求先问用户。", base_version=0))
@@ -326,10 +321,6 @@ async def seed_room(application: Application, system: LoopSystem) -> str:
         "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="房间项目", goal="观察部门房间"),
         actor="user:local")
     project_id = created.refs.project_id
-    # 项目设置页与交付检查需要真实的行：登记一条 `smoke` 命令（delivery_turn 的检查要用）
-    await accept(application, "command_registration.save", CommandRegistrationSave(
-        command_id=str(uuid.uuid4()), project_id=project_id, name="smoke",
-        argv=["python", "-c", "raise SystemExit(0)"], args=[], timeout_sec=30, output_limit=4096, base_version=0))
     item = await application.command(
         "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=project_id, text="预置的已完成事项"),
         actor="user:local")

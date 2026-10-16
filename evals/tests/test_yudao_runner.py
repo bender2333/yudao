@@ -90,25 +90,6 @@ def test_requirement_text_holds_no_hidden_material():
 
 
 # ---------------------------------------------------------------------------
-# 登记命令
-
-def test_registered_commands_match_the_interface_agreement():
-    registered = {item["name"]: item for item in yudao.commands()}
-    assert set(registered) == {"run_cli", "check_data"}
-    for item in registered.values():
-        assert item["argv"][1:] == ["src/cli.py"] or item["argv"][1:] == ["src/cli.py", "--check_data"]
-    assert registered["check_data"]["argv"][-1] == "--check_data"
-
-
-def test_registered_commands_name_no_hidden_check():
-    """登记命令是通用命令，不含任何隐藏检查（第 3 节「命令」）。"""
-    for item in yudao.commands():
-        joined = " ".join(item["argv"] + item.get("args", []))
-        for part in yudao.hidden_dirs().values():
-            assert part not in joined
-
-
-# ---------------------------------------------------------------------------
 # 结束状态与检查点
 
 def _export(outcome="released", events=None, projection=None):

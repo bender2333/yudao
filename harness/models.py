@@ -102,7 +102,6 @@ class ProjectEventType:
     ADOPTION_HELD = "adoption_held"
     # 部门设置事件跨版本保持 department_prompt_configured（ADR-0019）
     DEPARTMENT_SETTINGS_CONFIGURED = "department_prompt_configured"
-    COMMAND_CONFIGURED = "command_configured"
     MATERIAL_RECORDED = "material_recorded"
     SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
     # 建档候选（设计第 3.2 节）：记下候选引用与核验结论
@@ -674,8 +673,6 @@ class RunProjection:
     workspace_digest: str = ""
     project_context_ref: dict[str, Any] | None = None
     prompt_config_versions: dict[str, int] = field(default_factory=dict)
-    registered_commands: dict[str, Any] = field(default_factory=dict)
-    command_versions: dict[str, int] = field(default_factory=dict)
     last_event_id: str | None = None
     # 投影所反映的 run 流版本
     stream_version: int = 0

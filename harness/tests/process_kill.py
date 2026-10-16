@@ -189,8 +189,6 @@ def main() -> None:
     parser.add_argument("data_dir", type=Path)
     parser.add_argument("script", type=Path, help="脚本的 JSON 文件，每一项是一个回答")
     parser.add_argument("task", help="事项任务")
-    parser.add_argument("registered_commands", type=Path, nargs="?", default=None,
-                        help="登记注册表的 JSON 文件，没有时省略")
     parser.add_argument("--resume-only", action="store_true",
                         help="不创建事项，只让启动恢复继续已有的 run（重启已有的数据目录）")
     parser.add_argument("--run-time-limit", type=int, default=None,
@@ -218,8 +216,6 @@ def main() -> None:
     args = parser.parse_args()
 
     items = json.loads(args.script.read_text(encoding="utf-8"))
-    registry = (json.loads(args.registered_commands.read_text(encoding="utf-8"))
-                if args.registered_commands else None)
     # 挂起钩子要在系统开始运行以前注册。恢复发生在打开数据目录的时候，因此挂起时先不自动恢复，
     # 注册完钩子再恢复：这样恢复途中自动重新执行的那一次尝试也能在指定事件上停住
     system = LoopSystem.for_testing(args.data_dir, FakeAdapter(build_script(items)),
@@ -242,9 +238,6 @@ def main() -> None:
             args.project_name, args.task, "src", str(args.onboard_source))
     else:
         options = {} if args.run_time_limit is None else {"run_time_limit_sec": args.run_time_limit}
-        run_id = system.create_run(args.task, registered_commands=registry,
-                                   command_versions=None if registry is None
-                                   else {name: 1 for name in registry}, **options)
     if args.await_file is not None:
         # 工单 #308、#338：在回执写入的那一刻自己停住，等父进程来终止
         _hold_before_receipt(args.data_dir, args.await_dir, args.await_file, args.await_content,
@@ -272,7 +265,7 @@ if __name__ == "__main__":
 # ---------------------------------------------------------------------------
 # 父进程这一侧：启动、在指定位置终止、重新打开
 
-def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: Path, *,
+def _spawn(data_dir: Path, script: Path, task: str, log: Path, *,
            hold_after: str | None = None, hold_dir: Path | None = None,
            hold_action: str | None = None, workspace_files: Path | None = None,
            onboard: Path | None = None, settle: bool = False,
@@ -286,8 +279,6 @@ def _spawn(data_dir: Path, script: Path, task: str, registry: Path | None, log: 
     if resume_only:
         argv.append("--resume-only")
     argv.extend([str(data_dir), str(script), task])
-    if registry is not None:
-        argv.append(str(registry))
     if hold_after is not None:
         argv.extend(["--hold-after", hold_after, "--hold-dir", str(hold_dir)])
         if hold_action is not None:
@@ -436,7 +427,6 @@ class Interrupted:
 def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
                 tail: Sequence[dict[str, Any]] | None = None,
                 task: str = "build echo",
-                registered_commands: dict[str, Any] | None = None,
                 workspace_files: dict[str, str] | None = None,
                 started: Path | None = None,
                 hold_after: str | None = None,
@@ -445,7 +435,6 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
                 onboard: Path | None = None,
                 settle: bool = False,
                 answer_revise: str | None = None,
-                resume_after: bool = True,
                 revision: bool = False,
                 run_time_limit_sec: int | None = None) -> Interrupted:
     # resume_after 为假时 after 打开以后不走启动恢复（连续中断的场景用 restarted 的子进程恢复，
@@ -468,17 +457,13 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
 
     script_file = work / "script.json"
     script_file.write_text(json.dumps(list(script), ensure_ascii=False), encoding="utf-8")
-    registry_file = None
-    if registered_commands is not None:
-        registry_file = work / "registry.json"
-        registry_file.write_text(json.dumps(registered_commands, ensure_ascii=False), encoding="utf-8")
     files_file = None
     if workspace_files is not None:
         files_file = work / "workspace-files.json"
         files_file.write_text(json.dumps(workspace_files, ensure_ascii=False), encoding="utf-8")
 
     await_dir = None if await_file is None else data_dir / "workspaces"
-    process = _spawn(data_dir, script_file, task, registry_file, log, hold_after=hold_after,
+    process = _spawn(data_dir, script_file, task, log, hold_after=hold_after,
                      hold_dir=hold_dir, hold_action=hold_action, workspace_files=files_file,
                      onboard=onboard, settle=settle, answer_revise=answer_revise,
                      await_file=None if await_file is None else (await_file[0], await_file[1]),

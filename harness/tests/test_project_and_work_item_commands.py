@@ -146,7 +146,7 @@ def test_source_directory_save_and_project_settings(data_dir):
         assert directories["src"] == {"name": "src", "path": "C:/repo/other", "version": 2, "writeback_enabled": False, "remote": "", "target_branch": "", "check_commands": [], "credential_ref": None}
 
 
-def test_command_registration_save_and_department_settings_save(data_dir):
+def test_department_settings_save(data_dir):
     opened = _Opened(data_dir)
     with running_api(opened) as client:
         created = _post(client, "project.create", name="设置项目", goal="验证设置")
@@ -163,21 +163,6 @@ def test_command_registration_save_and_department_settings_save(data_dir):
             "command_id": str(uuid.uuid4()), "base_version": 0, "project_id": project_id,
             "department": "product", "department_prompt": "产品原则"})
         assert prompt_ok.status_code == 200
-
-        # command_registration.save：基准版本是该登记命令的版本，初次为 0
-        cmd_stale = client.post("/api/commands/command_registration.save", json={
-            "command_id": str(uuid.uuid4()), "base_version": 5, "project_id": project_id,
-            "name": "lint", "argv": ["python", "-m", "flake8"], "args": [],
-            "timeout_sec": 30, "output_limit": 1024})
-        assert cmd_stale.status_code == 409 and cmd_stale.json()["reason"] == "stale_base"
-        assert cmd_stale.json()["current_version"] == 0
-
-        cmd_ok = client.post("/api/commands/command_registration.save", json={
-            "command_id": str(uuid.uuid4()), "base_version": 0, "project_id": project_id,
-            "name": "lint", "argv": ["python", "-m", "flake8"], "args": [],
-            "timeout_sec": 30, "output_limit": 1024})
-        assert cmd_ok.status_code == 200
-        assert opened.system.projects.read_command(project_id, "lint")["argv"] == ["python", "-m", "flake8"]
 
 
 def test_work_item_append_input_accepts_changed_version_and_deduplicates(data_dir):
