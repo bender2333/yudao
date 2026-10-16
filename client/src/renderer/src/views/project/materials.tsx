@@ -1,8 +1,8 @@
 // 资料页（原型 v10 设计说明第 7.3 节，工单 #380）：只读，先按事项索引，再按 intend、PRD、
 // 交付、质检、项目材料的顺序查看。数据仍来自 project.overview 与 work_item.materials 两个已登记的查询。
 // 范围跟随顶栏的 ?w=；没有选中事项时取进行中的一项，并在索引卡上写明当前查看的是哪一项。
-// 结构说明与旧版本的执行（原型里的 mt-structure 与 mt-oldruns）在所属工作包登记查询以后加入；
-// 逐条结论表属 #154，本页不实现。
+// 接入已有项目的建档各轮（工单 #138，设计第 3.3、4.3 节）按轮列出初始 PRD、结构说明、基线核验
+// 与确认记录；旧版本的执行（原型里的 mt-oldruns）在所属工作包登记查询以后加入。
 
 import { useState, type CSSProperties } from "react";
 import type { ClientApp } from "../../contract/client-app";
@@ -21,6 +21,7 @@ const COUNT_KINDS = [
   ["delivery", "交付"],
   ["qa", "质检"],
   ["note", "材料"],
+  ["onboarding", "建档"],
 ] as const;
 
 export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate: (hash: string) => void }) {
@@ -62,6 +63,7 @@ export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate:
         <>
           <IntendBlock rows={data.inputs} />
           <VersionBlock id="mt-prd" title="PRD" note="产品部门提交并被接纳的各版本；接入已有项目的初始 PRD 标明确认记录" rows={data.contracts} empty="产品部门还没有提交 PRD" />
+          <OnboardingBlock rounds={data.onboarding_rounds} />
           <DeliveryBlock app={props.app} rows={data.deliveries} />
           <ReviewBlock rows={data.reviews} />
           <NotesBlock rows={data.materials} scoped={requested !== null} />
@@ -79,6 +81,7 @@ function countsOf(data: WorkItemMaterialsResult): Record<string, number> {
     delivery: data.deliveries.length,
     qa: data.reviews.length,
     note: data.materials.length,
+    onboarding: data.onboarding_rounds.length,
   };
 }
 
@@ -153,6 +156,115 @@ function IntendBlock(props: { rows: WorkItemMaterialsResult["inputs"] }) {
       )}
     </Section>
   );
+}
+
+// 建档各轮（工单 #138，设计第 3.3、4.3 节）：接入已有项目的每一轮候选，逐轮列出初始 PRD 与
+// 结构说明的原文、上一轮的修改意见、基线核验的各条结论与检查、这一轮的确认记录
+function OnboardingBlock(props: { rounds: WorkItemMaterialsResult["onboarding_rounds"] }) {
+  return (
+    <Section
+      id="mt-onboarding"
+      title="建档各轮"
+      note="接入已有项目的每一轮初始 PRD：原文、基线核验与这一轮的确认记录"
+      className="y10-mt"
+    >
+      {props.rounds.length === 0 ? <Empty text="这个事项不是接入已有项目的建档" /> : (
+        <ol className="y10-mt-list">
+          {props.rounds.map((round) => (
+            <li className="y10-mt-doc" key={round.candidate_event_id}>
+              <header className="y10-mt-doc-head">
+                <strong>第 {round.round} 轮</strong>
+                <Tag>建档</Tag>
+                <span className="y10-muted">run {round.run_id}</span>
+                <span className="y10-muted">提出于 {formatTime(round.proposed_at)}</span>
+              </header>
+              {round.revision_note === null || round.revision_note.trim() === "" ? null : (
+                <blockquote className="y10-mt-quote">
+                  <strong>上一轮的修改意见：</strong>{round.revision_note}
+                </blockquote>
+              )}
+              <h3 className="y10-mt-sub">初始 PRD</h3>
+              <pre className="y10-pre raw">{round.prd}</pre>
+              <h3 className="y10-mt-sub">现有结构说明</h3>
+              <pre className="y10-pre raw">{round.structure}</pre>
+              <BaselineReviewBlock review={round.baseline_review} />
+              <DecisionRecords rows={round.decisions} />
+            </li>
+          ))}
+        </ol>
+      )}
+    </Section>
+  );
+}
+
+// 某一轮基线核验的结论（工单 #138，设计第 3.2 节）：逐条结论、遗漏的能力、检查回执与其他失败
+function BaselineReviewBlock(props: { review: WorkItemMaterialsResult["onboarding_rounds"][number]["baseline_review"] }) {
+  const review = props.review;
+  return (
+    <>
+      <h3 className="y10-mt-sub">基线核验</h3>
+      <KeyValue
+        items={[
+          ["核实结果", review.conclusions.length === 0
+            ? "没有逐条结论"
+            : review.conclusions.map(conclusionRow).join("；")],
+          ["遗漏的能力", review.omissions.length === 0 ? "无" : review.omissions.map(omissionRow).join("；")],
+          ["基线检查", review.checks.length === 0 ? "无" : review.checks.map(checkRow).join("；")],
+          ["其他失败", review.other_failures.length === 0 ? "无" : review.other_failures.map(failureRow).join("；")],
+          ["指纹", show(review.content_hash, "未上报")],
+        ]}
+      />
+    </>
+  );
+}
+
+// 某一轮的确认记录（工单 #138，设计第 4.7 节）：回答与撤销各自一条
+function DecisionRecords(props: { rows: WorkItemMaterialsResult["onboarding_rounds"][number]["decisions"] }) {
+  return (
+    <>
+      <h3 className="y10-mt-sub">确认记录</h3>
+      {props.rows.length === 0 ? <Empty text="这一轮还没有确认记录" /> : (
+        <ul className="y10-mt-notes">
+          {props.rows.map((record) => (
+            <li key={record.event_id}>
+              <header className="y10-mt-doc-head">
+                <strong>{record.outcome === "answered" ? `回答：${record.option ?? "未记录选项"}` : "撤销"}</strong>
+                <span className="y10-muted">{formatTime(record.decided_at)}</span>
+              </header>
+              {record.note === null || record.note === "" ? null : <blockquote className="y10-mt-quote">{record.note}</blockquote>}
+              {record.reason === null || record.reason === "" ? null : <p className="y10-note note">原因：{record.reason}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+// 逐条结论按 要求 / 状态 / 依据 一行一条（设计第 3.2 节的「各要求核实结果」）
+function conclusionRow(value: { requirement?: string; status?: string; evidence?: string }): string {
+  return [text(value.requirement) || "未写明要求", conclusionName(text(value.status)), text(value.evidence)]
+    .filter((part) => part !== "").join(" · ");
+}
+
+const CONCLUSION_NAMES: Record<string, string> = {
+  verified: "已核实",
+  read_only: "只读",
+  existing_defect: "现有缺陷",
+  unsupported: "不支持",
+};
+
+function conclusionName(status: string): string {
+  return CONCLUSION_NAMES[status] ?? status;
+}
+
+function omissionRow(value: { capability?: string; location?: string }): string {
+  return [text(value.capability) || "未写明能力", text(value.location)]
+    .filter((part) => part !== "").join(" · ");
+}
+
+function failureRow(value: { check?: string; reason?: string }): string {
+  return [text(value.check) || "未命名检查", text(value.reason)].filter((part) => part !== "").join(" · ");
 }
 
 // PRD（原型 mt-prd）：各版本、状态与目标（摘要）

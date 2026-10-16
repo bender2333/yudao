@@ -99,6 +99,7 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
               now={now}
               names={() => ({ projectName: projectId, workItemTitle: title })}
               onNavigate={props.onNavigate}
+              viewId="recovery.decisions"
               emptyText="没有等待你回答的决定"
             />
           </Section>

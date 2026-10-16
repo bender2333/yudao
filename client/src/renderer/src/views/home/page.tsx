@@ -222,6 +222,7 @@ function DecisionNames(props: {
       })}
       onNavigate={props.onNavigate}
       targetDecision={props.targetDecision}
+      viewId="home.decisions"
       emptyText="没有等待回答的决定"
     />
   );

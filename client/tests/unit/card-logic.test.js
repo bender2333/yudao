@@ -154,3 +154,100 @@ test("要求写说明的选项在说明为空时不提交，有说明时通过",
   assert.equal(missingNoteText(confirm, ""), "");
   assert.equal(missingNoteText(confirm, "补充说明"), "");
 });
+
+// 初始 PRD 的决定卡片（工单 #138，设计第 3.2 节）：轮次、PRD 与结构说明的工件引用、
+// 基线核验汇总、快照来源；两个链接都指向资料页
+function initialPrd(overrides) {
+  const request = {
+    kind: "initial_prd",
+    blocks: "work_item",
+    options: [
+      { id: "confirm", label: "确认" },
+      { id: "revise", label: "提出修改", note_required: true },
+    ],
+    description: "确认第 2 轮建档的初始 PRD",
+    work_item_id: "w1",
+    round: 2,
+    prd: {
+      event_id: "ev1",
+      content_hash: "0123456789abcdef",
+      prd_ref: { kind: "prd", content_hash: "0123456789abcdef", path: "PRD.md", media_type: "text/markdown" },
+      summary: null,
+    },
+    structure: {
+      event_id: "ev2",
+      content_hash: "abcdef0123456789",
+      structure_ref: { kind: "structure", content_hash: "abcdef0123456789", path: "STRUCTURE.md", media_type: "text/markdown" },
+      code_tree_digest: "fedcba9876543210",
+    },
+    baseline_review: {
+      event_id: "ev3",
+      content_hash: "5f5f5f5f5f5f5f5f",
+      conclusions: [
+        { requirement: "read the project layout", status: "verified", evidence: "smoke" },
+        { requirement: "name the command", status: "existing_defect", evidence: "README 没有写" },
+        { requirement: "tests run", status: "read_only", evidence: "没有跑" },
+      ],
+      omissions: [{ capability: "logging", location: "src/echo.py" }],
+      checks: [{ name: "smoke", command: "python -m pytest", exit_code: 0, summary: "通过", snapshot_hash: "1f1f1f1f1f1f1f1f" }],
+      other_failures: [],
+    },
+    overview_ref: { kind: "overview", content_hash: "9e9e9e9e9e9e9e9e", path: "OVERVIEW.md", media_type: "text/markdown" },
+    snapshot: {
+      source: "D:/source/echo",
+      tree_digest: "2a2a2a2a2a2a2a2a",
+      files: ["README.md", "src/echo.py", "tests/test_echo.py"],
+      directories: ["src", "tests"],
+      tree_ref: { kind: "tree", content_hash: "2a2a2a2a2a2a2a2a", path: "tree.json", media_type: "application/json" },
+      provenance: { commit: "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d", branch: "main", dirty: true },
+      bytes: 1024,
+    },
+    revision_note_ref: { kind: "revision_note", content_hash: "3c3c3c3c3c3c3c3c", path: "REVISION_NOTE.md", media_type: "text/markdown" },
+    ...overrides,
+  };
+  return decision({ kind: "initial_prd", request, work_item_id: "w1" });
+}
+
+test("初始 PRD 的材料列出轮次、两个工件引用、基线核验汇总与快照来源", () => {
+  const rows = materialRows(initialPrd());
+  const map = Object.fromEntries(rows.map((row) => [row.term, row.value]));
+  assert.equal(map["轮次"], "第 2 轮");
+  // PRD 摘要在合同里可为空（后端当前不上报摘要）：界面不伪造摘要文字
+  assert.equal(map["初始 PRD 摘要"], "没有摘要");
+  assert.equal(map["PRD.md 工件"], "PRD.md");
+  assert.equal(map["PRD 指纹"], "0123456789ab");
+  assert.equal(map["现有结构说明"], "STRUCTURE.md");
+  assert.equal(map["结构说明指纹"], "fedcba987654");
+  assert.equal(map["基线核验汇总"], "核验 3 条要求；已核实 1 条；只读 1 条；现有缺陷 1 条；遗漏的能力 1 条；其他失败 0 条");
+  assert.equal(map["快照来源"], "D:/source/echo");
+  assert.equal(map["快照提交"], "git 提交 1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d（分支 main，有未提交的修改）");
+  assert.equal(map["快照规模"], "文件 3 项，目录 2 项，共 1,024 字节");
+  assert.equal(map["说明"], "确认第 2 轮建档的初始 PRD");
+  // 修改意见的工件路径是内部引用，不显示给用户；原文由卡片按事项补一行（第 138 号工单）
+  assert.equal(map["修改意见工件"], undefined);
+});
+
+test("初始 PRD 的快照没有 git 仓库时写明采集时的目录内容", () => {
+  const rows = materialRows(initialPrd({
+    snapshot: { source: "D:/source/echo", files: ["README.md"], directories: [], provenance: null, bytes: 12 },
+  }));
+  const map = Object.fromEntries(rows.map((row) => [row.term, row.value]));
+  assert.equal(map["快照提交"], "没有 git 仓库，快照采集时的目录内容");
+  assert.equal(map["快照规模"], "文件 1 项，目录 0 项，共 12 字节");
+});
+
+test("初始 PRD 的两个链接都指向资料页，「在项目中查看」也落到资料页", () => {
+  const links = decisionLinks(initialPrd());
+  assert.deepEqual(links.map((link) => link.label), ["PRD.md", "STRUCTURE.md"]);
+  assert.deepEqual(links.map((link) => link.href), ["#/p/p1/materials?w=w1", "#/p/p1/materials?w=w1"]);
+  assert.equal(viewHref(initialPrd()), "#/p/p1/materials?w=w1");
+  // 请求自己给出页面时以它为准
+  assert.equal(viewHref(initialPrd({ view: "#/p/p1/overview" })), "#/p/p1/overview");
+});
+
+test("初始 PRD 的卡片材料与给像素画面的纯文字版本共用", () => {
+  const now = new Date("2026-10-02T10:01:00Z").getTime();
+  const card = face(initialPrd(), now);
+  assert.deepEqual(card.rows, materialRows(initialPrd()));
+  assert.deepEqual(card.links.map((link) => link.label), ["PRD.md", "STRUCTURE.md"]);
+});
