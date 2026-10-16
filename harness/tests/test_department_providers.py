@@ -345,6 +345,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
             "The first delivery needs an uppercase output check." if verdict.startswith("rework") else "The repaired delivery passes.",
             checks=["smoke"],
             defects=[{"severity": "major", "summary": "Output is not uppercase."}] if verdict.startswith("rework") else [],
+            basis_delivery_spec_hash=_material_hash(body, "current_delivery_spec", "content_hash"),
         )
         payload.pop("kind")
         calls = [
@@ -370,8 +371,10 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
             payload.pop("kind")
             return _stream([_call("engineering-consultation", "submit_request", payload)],
                            response_id="b-consultation", model="b-engineering-actual")
+
         content = delivery_file if counts[department] == 2 else repaired_file
-        payload = delivery(files=["src/echo.py"], check_names=["smoke"])
+        payload = delivery(files=["src/echo.py"], check_names=["smoke"],
+                           basis_product_spec_hash=_spec_hash(body))
         payload.pop("kind")
         calls = [
             _call(f"write-{counts[department]}", "write_file", {"path": "src/echo.py", "content": content}),
