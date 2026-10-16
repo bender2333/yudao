@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 
 import pytest
 
@@ -168,7 +169,7 @@ def _command_call(identity, argument="nested"):
     # 这里证明的是同一件事：主机执行的命令在工作区里留下无法表示的链接以后 run 暂停
     command = f'"{sys.executable.replace(chr(92), "/")}" make_link.py {argument}'
     return {"id": identity, "call_id": identity, "type": "function_call", "name": "bash",
-            "arguments": json_dumps({"command": command})}
+            "arguments": json.dumps({"command": command})}
 
 
 def _workspace_unrepresentable_run(tmp_path, tail):

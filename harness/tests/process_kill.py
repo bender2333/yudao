@@ -435,6 +435,7 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
                 onboard: Path | None = None,
                 settle: bool = False,
                 answer_revise: str | None = None,
+                resume_after: bool = True,
                 revision: bool = False,
                 run_time_limit_sec: int | None = None) -> Interrupted:
     # resume_after 为假时 after 打开以后不走启动恢复（连续中断的场景用 restarted 的子进程恢复，
