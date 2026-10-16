@@ -640,3 +640,4 @@ claude-opus-5-5 / 2026-10-16 15:30 / 工单 #534 恢复 #481 第 1 轮为通过�
 omp(oro) / 2026-10-16 16:40 / 工单 #522 修复集成层第 5 次整跑剩余 7 个失败（只改 harness/tests/）：test_smoke_guidance_audit.py 的 saved_combined 夹具第 68 行裸 product_spec(...) 改为 product_spec_turn(...)（按 #471 契约从 current_product_spec 取依据版本）；test_department_providers.py 目标用例的 review(...) 与 delivery(...) 分别补 basis_delivery_spec_hash、basis_product_spec_hash，均用文件内已有的 _material_hash/_spec_hash 助手（#508 用例同款）；新增 agents_jour/522.md 记录根因、实测与三组反向验证 / #471 的「提交必须声明依据版本」校验被测试脚本绕过，7 个失败同一根因，产品代码无缺陷
 
 claude-opus-5-5 / 2026-10-16 15:05 / docs/design/test-pyramid.md 状态行：#532 追加的两句合为一句，写明第 11.1 节由 #532、#533、#534 实施，比较信息的顺序与投影字段名由 #541 完成 / #514 的最终核对；原来的第二句记录的是第 1 轮的做法
+claude-opus-5-5 / 2026-10-16 16:20 / docs/architecture-issues.md：#501 登记的 smoke 回执来源一条加处理行（#510 已完成），#462 登记的实例升级查询合同一条加处理行（建 #564） / 架构师每次会话查看未处理的架构问题
