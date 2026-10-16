@@ -8,6 +8,9 @@ from pathlib import Path
 import pygit2
 import pytest
 
+from harness.app.application import Application
+from harness.app.decision_queries import DecisionsList
+from harness.models import CatalogEventType
 from harness.release_check import (
     MANIFEST_PATH, Finding, check_repository, decision_request_payload, load_manifest, request_instance_upgrade,
 )
@@ -241,6 +244,76 @@ def test_answering_the_instance_upgrade_decision_records_the_choice(repository, 
     finally:
         system.close()
 
+def test_the_query_lists_the_instance_upgrade_request_with_its_report(repository, tmp_path):
+    # 工单 #564：决定请求「实例升级」经 decisions.list 返回，请求载荷通过应用层合同，
+    # 项目、事项与 run 都为空，阻塞范围是实例
+    report = check_repository(repository.path)
+    system = LoopSystem(tmp_path / "data")
+    try:
+        decision_id = request_instance_upgrade(system, report)
+        application = Application(system)
+        listed = application.query("decisions.list", DecisionsList())
+        [view] = [item for item in listed.data.decisions if item.decision_id == decision_id]
+        assert view.kind == "instance_upgrade"
+        assert view.blocks == "instance"
+        assert view.status == "open"
+        assert (view.project_id, view.work_item_id, view.run_id) == (None, None, None)
+        assert view.request.kind == "instance_upgrade"
+        assert view.request.blocks == "instance"
+        assert [option.id for option in view.request.options] == ["approve", "reject"]
+        assert report.text in view.request.facts
+        assert view.request.report.pending_commit == report.pending_commit
+        assert view.request.report.passed == report.passed
+    finally:
+        system.close()
+
+def test_the_kind_filter_returns_only_instance_upgrade_requests(repository, tmp_path):
+    # 工单 #564：按 kind=instance_upgrade 筛选只返回实例升级决定，run 流的决定不在其中
+    report = check_repository(repository.path)
+    system = LoopSystem(tmp_path / "data")
+    try:
+        request_instance_upgrade(system, report)
+        application = Application(system)
+        listed = application.query("decisions.list", DecisionsList(kind="instance_upgrade"))
+        assert [item.kind for item in listed.data.decisions] == ["instance_upgrade"]
+        every = application.query("decisions.list", DecisionsList())
+        assert {item.decision_id for item in every.data.decisions} == {
+            item.decision_id for item in listed.data.decisions}
+    finally:
+        system.close()
+
+def test_answering_an_instance_upgrade_request_shows_in_the_query(repository, tmp_path):
+    # 工单 #564：回答以后经 decisions.list 读到的状态是已回答，回答记录所选选项
+    import uuid
+
+    from harness.event_store import Command
+
+    report = check_repository(repository.path)
+    system = LoopSystem(tmp_path / "data")
+    try:
+        decision_id = request_instance_upgrade(system, report)
+        application = Application(system)
+        answered = system.orchestrator.answer_decision(
+            decision_id, "approve", None, base_version=1,
+            command=Command(str(uuid.uuid4()), "decision.answer", "sha256:approve:1", "user:local"))
+        assert answered is None
+        listed = application.query("decisions.list", DecisionsList())
+        [view] = [item for item in listed.data.decisions if item.decision_id == decision_id]
+        assert view.status == "answered"
+        assert view.answer is not None and view.answer.option == "approve"
+    finally:
+        system.close()
+
+def test_the_catalog_stream_decisions_mark_the_list_for_resubscription(repository, tmp_path):
+    # 工单 #564：目录流三个实例升级事件在 decisions.list 的 changed_by 里，客户端收到它们重新查询
+    system = LoopSystem(tmp_path / "data")
+    try:
+        capabilities = Application(system).capabilities("", access="local")
+        listed = next(item for item in capabilities.queries if item.name == "decisions.list")
+        assert {CatalogEventType.INSTANCE_UPGRADE_REQUESTED, CatalogEventType.INSTANCE_UPGRADE_ANSWERED,
+                CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN} <= set(listed.changed_by)
+    finally:
+        system.close()
 
 def test_the_manifest_lists_the_release_check_as_added_later():
     # 发布检查不在内核路径里（它导入 pygit2，不满足内核的导入方向），登记在 added_later

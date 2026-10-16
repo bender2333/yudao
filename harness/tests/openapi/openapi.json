@@ -6486,6 +6486,9 @@
               },
               {
                 "$ref": "#/components/schemas/KernelModificationRequested"
+              },
+              {
+                "$ref": "#/components/schemas/InstanceUpgradeRequested"
               }
             ],
             "title": "Request"
@@ -7927,6 +7930,115 @@
           "created_event_id"
         ],
         "title": "InputView"
+      },
+      "InstanceUpgradeReport": {
+        "properties": {
+          "repository": {
+            "type": "string",
+            "title": "Repository"
+          },
+          "pending_commit": {
+            "type": "string",
+            "title": "Pending Commit"
+          },
+          "base_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Tag"
+          },
+          "kernel_changes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kernel Changes"
+          },
+          "kernel_python_lines": {
+            "type": "integer",
+            "title": "Kernel Python Lines"
+          },
+          "python_lines_max": {
+            "type": "integer",
+            "title": "Python Lines Max"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "findings": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Findings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "repository",
+          "pending_commit",
+          "base_tag",
+          "kernel_changes",
+          "kernel_python_lines",
+          "python_lines_max",
+          "passed",
+          "findings"
+        ],
+        "title": "InstanceUpgradeReport"
+      },
+      "InstanceUpgradeRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "instance_upgrade",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "instance",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "report": {
+            "$ref": "#/components/schemas/InstanceUpgradeReport"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "report"
+        ],
+        "title": "InstanceUpgradeRequested"
       },
       "KernelModificationRequested": {
         "properties": {
@@ -20275,115 +20387,6 @@
           "payload"
         ],
         "title": "InstanceUpgradeAnsweredEvent",
-        "type": "object"
-      },
-      "InstanceUpgradeReport": {
-        "additionalProperties": false,
-        "properties": {
-          "repository": {
-            "title": "Repository",
-            "type": "string"
-          },
-          "pending_commit": {
-            "title": "Pending Commit",
-            "type": "string"
-          },
-          "base_tag": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Tag"
-          },
-          "kernel_changes": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Kernel Changes",
-            "type": "array"
-          },
-          "kernel_python_lines": {
-            "title": "Kernel Python Lines",
-            "type": "integer"
-          },
-          "python_lines_max": {
-            "title": "Python Lines Max",
-            "type": "integer"
-          },
-          "passed": {
-            "title": "Passed",
-            "type": "boolean"
-          },
-          "findings": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "title": "Findings",
-            "type": "array"
-          }
-        },
-        "required": [
-          "repository",
-          "pending_commit",
-          "base_tag",
-          "kernel_changes",
-          "kernel_python_lines",
-          "python_lines_max",
-          "passed",
-          "findings"
-        ],
-        "title": "InstanceUpgradeReport",
-        "type": "object"
-      },
-      "InstanceUpgradeRequested": {
-        "additionalProperties": false,
-        "properties": {
-          "kind": {
-            "const": "instance_upgrade",
-            "title": "Kind",
-            "type": "string"
-          },
-          "blocks": {
-            "const": "instance",
-            "title": "Blocks",
-            "type": "string"
-          },
-          "options": {
-            "items": {
-              "$ref": "#/components/schemas/DecisionOption"
-            },
-            "title": "Options",
-            "type": "array"
-          },
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "facts": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Facts",
-            "type": "array"
-          },
-          "report": {
-            "$ref": "#/components/schemas/InstanceUpgradeReport"
-          }
-        },
-        "required": [
-          "kind",
-          "blocks",
-          "options",
-          "description",
-          "facts",
-          "report"
-        ],
-        "title": "InstanceUpgradeRequested",
         "type": "object"
       },
       "InstanceUpgradeRequestedEvent": {

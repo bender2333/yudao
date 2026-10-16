@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import AwareDatetime, Field
 
-from ..models import DecisionRequest, EventType, ProjectEventType
+from ..models import CatalogEventType, DecisionRequest, EventType, ProjectEventType
 from ..projects import ProjectNotFoundError, project_projection
 from ..projection import saved_decisions
 from .contracts import CommandId, Contract, Snapshot
-from .payloads import DecisionRequestedPayload, ProjectDecisionRequestedPayload
+from .payloads import DecisionRequestedPayload, InstanceUpgradeRequested, ProjectDecisionRequestedPayload
 from .registry import QueryDefinition
 from .replay import ReplayRequest, check_position, decisions_through
 
@@ -57,7 +57,7 @@ class DecisionView(Contract):
     status: Literal["open", "answered", "withdrawn"]
     requested_at: AwareDatetime
     blocked: BlockedObjects | None
-    request: DecisionRequestedPayload | ProjectDecisionRequestedPayload
+    request: DecisionRequestedPayload | ProjectDecisionRequestedPayload | InstanceUpgradeRequested
     answer: DecisionAnswerRecord | None
 
 class DecisionList(Contract):
@@ -128,6 +128,8 @@ DECISIONS_LIST = QueryDefinition(
     name="decisions.list", request=DecisionsList, result=DecisionList, handle=_decisions_list,
     changed_by=(EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
-                ProjectEventType.PROJECT_DECISION_WITHDRAWN),
+                ProjectEventType.PROJECT_DECISION_WITHDRAWN,
+                CatalogEventType.INSTANCE_UPGRADE_REQUESTED, CatalogEventType.INSTANCE_UPGRADE_ANSWERED,
+                CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN),
     replayable=True,
 )
