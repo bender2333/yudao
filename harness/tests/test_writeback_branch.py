@@ -19,9 +19,12 @@ from harness.writeback import git_tree_to_captured
 from .test_writeback import _commit_to_bare_repo, _create_bare_repo, _setup_yudao_env
 
 
+_PASS_COMMAND = f'"{sys.executable}" -c "import sys; sys.exit(0)"'
+
+
 def _adopt(
     writes, artifacts, pid, work_item_id, run_id, adoption_id,
-    base_captured, adopted_captured, *, baseline_extra=None, check_names=("chk_ok",),
+    base_captured, adopted_captured, *, baseline_extra=None, check_names=(_PASS_COMMAND,),
 ):
     baseline = {"tree_ref": asdict(store_tree(artifacts, run_id, base_captured)),
                 "code_tree_digest": base_captured.digest}
@@ -65,9 +68,8 @@ def test_writeback_uses_project_target_branch(tmp_path):
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="trunk",
-            check_commands=["chk_ok"],
+            check_commands=[_PASS_COMMAND],
         )
-        projects.configure_command(pid, "chk_ok", [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0)
 
         base_captured = CapturedTree((), (CapturedFile("app.py", b"print('base')\n"),))
         adopted_captured = CapturedTree((), (CapturedFile("app.py", b"print('adopted')\n"),))
@@ -121,9 +123,8 @@ def test_writeback_executable_flag_follows_tree_manifest(tmp_path):
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_ok"],
+            check_commands=[_PASS_COMMAND],
         )
-        projects.configure_command(pid, "chk_ok", [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0)
 
         base_captured = CapturedTree((), (
             CapturedFile("run.sh", b"#!/bin/sh\nold\n"),
@@ -164,9 +165,8 @@ def test_writeback_missing_source_reference_stops(tmp_path):
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_ok"],
+            check_commands=[_PASS_COMMAND],
         )
-        projects.configure_command(pid, "chk_ok", [sys.executable, "-c", "import sys; sys.exit(0)"], base_version=0)
 
         writes.transact(project_stream(pid), lambda tx: tx.append(NewProjectEvent(
             ProjectEventType.WORK_ITEM_CREATED,
@@ -186,7 +186,7 @@ def test_writeback_missing_source_reference_stops(tmp_path):
                 "adoption_id": "adopt_missing", "work_item_id": "w1", "run_id": "r1",
                 "delivery_event_id": "d1", "qa_event_id": "q1",
                 "tree_ref": asdict(adopted_ref), "code_tree_digest": adopted_captured.digest,
-                "summary": "Missing source", "files": ["app.py"], "check_names": ["chk_ok"],
+                "summary": "Missing source", "files": ["app.py"], "check_names": [_PASS_COMMAND],
                 "known_risks": [], "previous_adoption_id": None,
             },
             actor="user",
@@ -205,44 +205,46 @@ def test_writeback_missing_source_reference_stops(tmp_path):
         gc.collect()
 
 
-def test_writeback_unregistered_check_command_stops(tmp_path):
-    # 项目设置里写了没有登记的检查命令时，写回停止并给出回执
+def test_writeback_failing_check_command_stops(tmp_path):
+    # 源目录设置与采纳成果里写的命令字符串退出码非零时，写回停止并给出回执，不推送分支
     bare_path = tmp_path / "bare.git"
     src_dir = tmp_path / "src"
     src_dir.mkdir()
     _create_bare_repo(bare_path, {"app.py": b"print('base')\n"})
 
+    fail_command = f'"{sys.executable}" -c "import sys; sys.exit(1)"'
     store, writes, artifacts, projects = _setup_yudao_env(tmp_path)
     try:
-        pid = projects.register("UnregisteredTest", "Goal")
+        pid = projects.register("FailingCheckTest", "Goal")
         projects.configure_source_directory(
             pid, "default", str(src_dir), base_version=0,
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=["chk_missing"],
+            check_commands=[fail_command],
         )
         base_captured = CapturedTree((), (CapturedFile("app.py", b"print('base')\n"),))
         adopted_captured = CapturedTree((), (CapturedFile("app.py", b"print('adopted')\n"),))
-        _adopt(writes, artifacts, pid, "w1", "r1", "adopt_unreg", base_captured, adopted_captured,
-               check_names=("chk_missing",))
+        _adopt(writes, artifacts, pid, "w1", "r1", "adopt_fail", base_captured, adopted_captured,
+               check_names=(fail_command,))
 
-        event = projects.execute_writeback(pid, "adopt_unreg")
+        event = projects.execute_writeback(pid, "adopt_fail")
         assert event.type == ProjectEventType.WRITEBACK_STOPPED
         assert event.payload["reason"] == "verification_failed"
         receipts = event.payload["check_receipts"]
         assert len(receipts) == 1
-        assert receipts[0]["name"] == "chk_missing"
-        assert receipts[0]["argv"] == []
+        assert receipts[0]["name"] == fail_command
+        assert receipts[0]["command"] == fail_command
+        assert receipts[0]["exit_code"] == 1
 
         bare_repo = pygit2.Repository(str(bare_path))
-        assert "refs/heads/writeback/adopt_unreg" not in bare_repo.references
+        assert "refs/heads/writeback/adopt_fail" not in bare_repo.references
         del bare_repo
     finally:
         store.close()
         gc.collect()
 
 
-def test_writeback_runs_adoption_registered_checks(tmp_path):
-    # 采纳成果登记的检查也进入写回检查清单：项目设置为空时仍按采纳登记的检查核验最终树
+def test_writeback_runs_adoption_check_commands(tmp_path):
+    # 采纳成果登记的检查命令也进入写回检查清单：项目设置为空时仍按采纳登记的命令核验最终树
     bare_path = tmp_path / "bare.git"
     src_dir = tmp_path / "src"
     src_dir.mkdir()
@@ -256,22 +258,20 @@ def test_writeback_runs_adoption_registered_checks(tmp_path):
             writeback_enabled=True, remote=str(bare_path), target_branch="main",
             check_commands=[],
         )
-        check_code = "\n".join([
-            "import sys, pathlib",
-            "content = pathlib.Path('value.txt').read_text().strip()",
-            "sys.exit(0 if content == 'expected' else 1)",
-        ])
-        projects.configure_command(pid, "chk_adopted", [sys.executable, "-c", check_code], base_version=0)
+        check_command = (
+            f'"{sys.executable}" -c "import pathlib, sys; '
+            "sys.exit(0 if pathlib.Path('value.txt').read_text().strip() == 'expected' else 1)\""
+        )
 
         base_captured = CapturedTree((), (CapturedFile("value.txt", b"1"),))
         adopted_captured = CapturedTree((), (CapturedFile("value.txt", b"expected"),))
         _adopt(writes, artifacts, pid, "w1", "r1", "adopt_checks",
-               base_captured, adopted_captured, check_names=("chk_adopted",))
+               base_captured, adopted_captured, check_names=(check_command,))
 
         event = projects.execute_writeback(pid, "adopt_checks")
         assert event.type == ProjectEventType.WRITEBACK_COMPLETED
         receipts = event.payload["check_receipts"]
-        assert [r["name"] for r in receipts] == ["chk_adopted"]
+        assert [r["name"] for r in receipts] == [check_command]
         assert receipts[0]["exit_code"] == 0
 
         bare_repo = pygit2.Repository(str(bare_path))
