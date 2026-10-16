@@ -930,6 +930,7 @@ class ProjectService:
                     baseline=item.baseline, initial_tree=tree, code_snapshot=snapshot,
                     project_context=self.artifacts.get(
                         ArtifactRef(**item.project_context_ref)).decode("utf-8"),
+                    prompt_config_versions=dict(item.prompt_config_versions),
                 )
                 created.append(item.run_id)
         return created
