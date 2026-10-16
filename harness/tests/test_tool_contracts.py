@@ -105,22 +105,14 @@ def test_edit_range_is_an_engineering_only_write_tool():
     assert "edit_range" not in tools_for("quality")
 
 
-def test_the_single_repeatable_judgment_answers_for_tools_and_run_commands():
+def test_the_single_repeatable_judgment_answers_for_tools():
     # 唯一的判断入口（恢复契约第 4 节）：读取、搜索、检查与 bash 由工具契约各自声明 repeatable，
-    # 写入、编辑、删除与移动不可以；已删除的 run_command 仍按这个 run 中固定的登记回答（工单 #242，
-    # #484 删除注册体系时一并移除）
-    registry = {"lint": {"repeatable": True}, "deploy": {"repeatable": False}}
+    # 写入、编辑、删除与移动不可以
     for tool in ("read_file", "list_files", "search", "read_range", "run_check", "bash"):
-        assert action_repeatable(tool, {"command": "echo hi"}, registered_commands=registry) is True, tool
+        assert action_repeatable(tool, {"command": "echo hi"}) is True, tool
     for tool in ("write_file", "edit_range", "delete_file", "move_file"):
-        assert action_repeatable(tool, {"path": "src/a.py"}, registered_commands=registry) is False, tool
-    assert action_repeatable("run_command", {"name": "lint"}, registered_commands=registry) is True
-    assert action_repeatable("run_command", {"name": "deploy"}, registered_commands=registry) is False
-    # 没有固定值、没有登记命令名或没有声明时按否
-    assert action_repeatable("run_command", {"name": "lint"}) is False
-    assert action_repeatable("run_command", {"name": "absent"}, registered_commands=registry) is False
-    assert action_repeatable("run_command", {}, registered_commands=registry) is False
-    assert action_repeatable("submit_delivery", {}, registered_commands=registry) is False
+        assert action_repeatable(tool, {"path": "src/a.py"}) is False, tool
+    assert action_repeatable("submit_delivery", {}) is False
 
 
 def test_guidance_tool_contract_lists_explained_and_requires_host_results_for_completed():

@@ -163,7 +163,6 @@ _LABELS: dict[str, str] = {
     ProjectEventType.DELIVERABLE_ADOPTED: "采纳了交付物：{summary}",
     ProjectEventType.ADOPTION_HELD: "暂缓采纳：{reason}",
     ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED: "配置了{department}的设置（第 {version} 版）",
-    ProjectEventType.COMMAND_CONFIGURED: "配置了登记命令 {name}",
     ProjectEventType.MATERIAL_RECORDED: "登记了材料：{text}",
     ProjectEventType.SOURCE_DIRECTORY_CONFIGURED: "登记了源目录：{path}",
     ProjectEventType.INITIAL_PRD_PROPOSED: "第 {round} 轮建档的初始 PRD 等待确认",

@@ -104,7 +104,6 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds):
         project_id = yudao.create_project(client, "评测 · 场景 3",
                                           "按需求原文与接口约定实现地铁换乘查询程序")
         yudao.save_department_settings(client, project_id)
-        yudao.register_commands(client, project_id)
         work_item_id, run_id_yudao = yudao.submit_requirement(client, project_id,
                                                                yudao.requirement_text())
         started = time.monotonic()

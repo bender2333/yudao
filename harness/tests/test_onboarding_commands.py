@@ -286,7 +286,7 @@ def test_old_project_stream_reads_kind_change_and_empty_provenance(data_dir, tmp
                 "baseline": None, "snapshot": legacy_snapshot,
                 "project_context_ref": asdict(artifacts.put("run_legacy", "project_context", "项目：旧项目",
                                                             media_type="text/markdown")),
-                "prompt_config_versions": {"product": 0, "engineering": 0, "quality": 0}, "command_versions": {},
+                "prompt_config_versions": {"product": 0, "engineering": 0, "quality": 0},
                 "max_cycles": 2, "run_time_limit_sec": 7200, "context_window": 32000,
                 "definitions_version": "sha256:legacy",
             }, actor="user:local"))

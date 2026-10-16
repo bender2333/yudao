@@ -50,10 +50,9 @@ class WorkBasis:
 
 @dataclass(frozen=True)
 class ToolPermission:
-    # 工具许可的三种结果：允许（登记命令附带执行依据）；拒绝并说明原因，原因作为工具结果交回模型；停止
+    # 工具许可的三种结果：允许；拒绝并说明原因，原因作为工具结果交回模型；停止
     stopped: bool = False
     reason: str | None = None
-    command_basis: dict[str, Any] = field(default_factory=dict)
 
     @property
     def allowed(self) -> bool:
@@ -72,7 +71,7 @@ def offered_tools(projection: RunProjection, department: str, *, guidance_only: 
 
 
 def facts_query(call: dict[str, Any]) -> FactsQuery:
-    # 工具许可依据的工作区事实：写入的目标路径在工作区中的规范形式，登记命令执行依据中的公开树摘要
+    # 工具许可依据的工作区事实：写入的目标路径在工作区中的规范形式，命令执行依据中的公开树摘要
     name, args = call["name"], call["args"]
     if tool_action(name) == "command":
         return FactsQuery(tree=True)

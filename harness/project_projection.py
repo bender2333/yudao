@@ -170,30 +170,6 @@ class WritebackRecord:
 
 
 @dataclass
-class RegisteredCommand:
-    name: str
-    version: int
-    argv: list[str]
-    args: list[str]
-    timeout_sec: int
-    output_limit: int
-    base_version: int | None = None
-    updated_at: str | None = None
-    event_id: str | None = None
-    # 登记时声明「可以重新执行」（恢复契约第 4 节，工单 #242）；旧事件没有这个字段时为否
-    repeatable: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        return _plain(self)
-
-    def frozen(self) -> dict[str, Any]:
-        # 事项创建时冻结进 run 的执行形态：只有固定参数与限额，没有版本管理字段
-        return {"argv": list(self.argv), "args": list(self.args),
-                "timeout_sec": self.timeout_sec, "output_limit": self.output_limit,
-                "repeatable": self.repeatable}
-
-
-@dataclass
 class WorkItem:
     work_item_id: str
     title: str
@@ -212,7 +188,6 @@ class WorkItem:
     start_error: str | None = None
     # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
     kind: str = "change"
-    command_versions: dict[str, int] = field(default_factory=dict)
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
     department: str | None = None
@@ -251,8 +226,6 @@ class ProjectProjection:
     initial_prd_candidates: list[InitialPrdCandidate] = field(default_factory=list)
     department_settings: dict[str, DepartmentSetting] = field(default_factory=dict)
     department_setting_history: list[DepartmentSetting] = field(default_factory=list)
-    commands: dict[str, RegisteredCommand] = field(default_factory=dict)
-    command_history: list[RegisteredCommand] = field(default_factory=list)
     materials: list[Material] = field(default_factory=list)
     source_directories: dict[str, SourceDirectory] = field(default_factory=dict)
     source_directory_history: list[SourceDirectory] = field(default_factory=list)
@@ -349,7 +322,6 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             work_item_id=payload["work_item_id"], title=payload["title"], text=payload["text"], run_id=payload["run_id"],
             baseline=payload["baseline"], project_context_ref=payload["project_context_ref"],
             prompt_config_versions=dict(payload["prompt_config_versions"]),
-            command_versions=dict(payload.get("command_versions") or {}),
             max_cycles=int(payload["max_cycles"]),
             run_time_limit_sec=int(payload["run_time_limit_sec"]),
             context_window=int(payload["context_window"]), created_at=event.created_at,
@@ -402,18 +374,6 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         )
         state.department_settings[department] = setting
         state.department_setting_history.append(setting)
-        return
-    if etype == ProjectEventType.COMMAND_CONFIGURED:
-        command = RegisteredCommand(
-            name=payload["name"], version=int(payload["version"]), argv=list(payload["argv"]),
-            args=list(payload["args"]), timeout_sec=int(payload["timeout_sec"]),
-            output_limit=int(payload["output_limit"]), base_version=payload["base_version"],
-            updated_at=event.created_at, event_id=event.event_id,
-            # 旧事件没有 repeatable 字段，按否处理（ADR-0019）
-            repeatable=bool(payload.get("repeatable", False)),
-        )
-        state.commands[command.name] = command
-        state.command_history.append(command)
         return
     if etype == ProjectEventType.MATERIAL_RECORDED:
         state.materials.append(Material(

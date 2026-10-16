@@ -550,8 +550,7 @@ class StepDriver:
             not_happened = {action_id: comparison for action_id, comparison in comparisons.items()
                             if comparison["verdict"] == "not_happened"}
         for info in auto_retry_actions(events, snapshot.decisions.values(),
-                                       department=self._scope.department, not_happened=set(not_happened),
-                                       registered_commands=dict(snapshot.projection.registered_commands or {})):
+                                       department=self._scope.department, not_happened=set(not_happened)):
             if not self._proceed():
                 return
             started = info["started_event"]
@@ -855,7 +854,7 @@ class StepDriver:
                     before_snapshot = _tree_snapshot(tree)
                 else:
                     before_snapshot = None
-                self._recorder.tool_started(transaction, request, call, permission.command_basis,
+                self._recorder.tool_started(transaction, request, call,
                                             before_snapshot=before_snapshot)
             return permission, facts
 

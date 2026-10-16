@@ -719,57 +719,6 @@
         }
       }
     },
-    "/api/commands/command_registration.save": {
-      "post": {
-        "tags": [
-          "commands"
-        ],
-        "summary": "command_registration.save",
-        "operationId": "command_command_registration_save",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommandRegistrationSave"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted_NoRefs_"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "命令被拒绝，可能的原因：not_found, stale_base, project_archived, not_allowed, command_id_reused",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejected"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/commands/source_directory.save": {
       "post": {
         "tags": [
@@ -6014,136 +5963,6 @@
         ],
         "title": "CommandCapability"
       },
-      "CommandRegistrationSave": {
-        "properties": {
-          "command_id": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-            "title": "Command Id"
-          },
-          "base_version": {
-            "type": "integer",
-            "title": "Base Version"
-          },
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Name"
-          },
-          "argv": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Argv"
-          },
-          "args": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Args"
-          },
-          "timeout_sec": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timeout Sec"
-          },
-          "output_limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output Limit"
-          },
-          "repeatable": {
-            "type": "boolean",
-            "title": "Repeatable",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "command_id",
-          "base_version",
-          "project_id",
-          "name",
-          "argv"
-        ],
-        "title": "CommandRegistrationSave"
-      },
-      "CommandSetting": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "version": {
-            "type": "integer",
-            "title": "Version"
-          },
-          "argv": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Argv"
-          },
-          "args": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Args"
-          },
-          "timeout_sec": {
-            "type": "integer",
-            "title": "Timeout Sec"
-          },
-          "output_limit": {
-            "type": "integer",
-            "title": "Output Limit"
-          },
-          "repeatable": {
-            "type": "boolean",
-            "title": "Repeatable"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "name",
-          "version",
-          "argv",
-          "args",
-          "timeout_sec",
-          "output_limit",
-          "repeatable"
-        ],
-        "title": "CommandSetting"
-      },
       "CredentialClearOverride": {
         "properties": {
           "command_id": {
@@ -9460,13 +9279,6 @@
             "type": "object",
             "title": "Departments"
           },
-          "commands": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/CommandSetting"
-            },
-            "type": "object",
-            "title": "Commands"
-          },
           "source_directories": {
             "additionalProperties": {
               "$ref": "#/components/schemas/SourceDirectorySetting"
@@ -9495,7 +9307,6 @@
           "pinned",
           "archived",
           "departments",
-          "commands",
           "source_directories",
           "department_reminders"
         ],
@@ -15597,199 +15408,6 @@
         "title": "CollectionScope",
         "type": "object"
       },
-      "CommandConfiguredEvent": {
-        "additionalProperties": false,
-        "properties": {
-          "position": {
-            "title": "Position",
-            "type": "integer"
-          },
-          "previous": {
-            "title": "Previous",
-            "type": "integer"
-          },
-          "event_id": {
-            "title": "Event Id",
-            "type": "string"
-          },
-          "at": {
-            "format": "date-time",
-            "title": "At",
-            "type": "string"
-          },
-          "stream": {
-            "title": "Stream",
-            "type": "string"
-          },
-          "stream_version": {
-            "title": "Stream Version",
-            "type": "integer"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
-          "work_item_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Work Item Id"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Run Id"
-          },
-          "department": {
-            "anyOf": [
-              {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department"
-          },
-          "role": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Role"
-          },
-          "actor": {
-            "title": "Actor",
-            "type": "string"
-          },
-          "command_id": {
-            "anyOf": [
-              {
-                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Command Id"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "type": {
-            "const": "command_configured",
-            "title": "Type",
-            "type": "string"
-          },
-          "payload": {
-            "$ref": "#/components/schemas/CommandConfiguredPayload"
-          }
-        },
-        "required": [
-          "position",
-          "previous",
-          "event_id",
-          "at",
-          "stream",
-          "stream_version",
-          "project_id",
-          "work_item_id",
-          "run_id",
-          "department",
-          "role",
-          "actor",
-          "command_id",
-          "label",
-          "type",
-          "payload"
-        ],
-        "title": "CommandConfiguredEvent",
-        "type": "object"
-      },
-      "CommandConfiguredPayload": {
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          },
-          "argv": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Argv",
-            "type": "array"
-          },
-          "args": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Args",
-            "type": "array"
-          },
-          "timeout_sec": {
-            "title": "Timeout Sec",
-            "type": "integer"
-          },
-          "output_limit": {
-            "title": "Output Limit",
-            "type": "integer"
-          },
-          "base_version": {
-            "title": "Base Version",
-            "type": "integer"
-          },
-          "repeatable": {
-            "default": false,
-            "title": "Repeatable",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "name",
-          "version",
-          "argv",
-          "args",
-          "timeout_sec",
-          "output_limit",
-          "base_version"
-        ],
-        "title": "CommandConfiguredPayload",
-        "type": "object"
-      },
       "CompactionCheckpoint": {
         "additionalProperties": false,
         "properties": {
@@ -19683,46 +19301,6 @@
           "message"
         ],
         "title": "FieldError",
-        "type": "object"
-      },
-      "FrozenCommand": {
-        "additionalProperties": false,
-        "properties": {
-          "argv": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Argv",
-            "type": "array"
-          },
-          "args": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Args",
-            "type": "array"
-          },
-          "timeout_sec": {
-            "title": "Timeout Sec",
-            "type": "integer"
-          },
-          "output_limit": {
-            "title": "Output Limit",
-            "type": "integer"
-          },
-          "repeatable": {
-            "default": false,
-            "title": "Repeatable",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "argv",
-          "args",
-          "timeout_sec",
-          "output_limit"
-        ],
-        "title": "FrozenCommand",
         "type": "object"
       },
       "FunctionCallOutput": {
@@ -28608,20 +28186,6 @@
             "title": "Prompt Config Versions",
             "type": "object"
           },
-          "registered_commands": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/FrozenCommand"
-            },
-            "title": "Registered Commands",
-            "type": "object"
-          },
-          "command_versions": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Command Versions",
-            "type": "object"
-          },
           "definitions_version": {
             "title": "Definitions Version",
             "type": "string"
@@ -28669,8 +28233,6 @@
           "workspace_digest",
           "project_context_ref",
           "prompt_config_versions",
-          "registered_commands",
-          "command_versions",
           "definitions_version",
           "parameters_version",
           "run_event_version"
@@ -33363,13 +32925,6 @@
             "title": "Prompt Config Versions",
             "type": "object"
           },
-          "command_versions": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Command Versions",
-            "type": "object"
-          },
           "max_cycles": {
             "title": "Max Cycles",
             "type": "integer"
@@ -33406,7 +32961,6 @@
           "snapshot",
           "project_context_ref",
           "prompt_config_versions",
-          "command_versions",
           "max_cycles",
           "run_time_limit_sec",
           "context_window",
@@ -34667,7 +34221,6 @@
             "collaboration_closed": "#/components/schemas/CollaborationClosedEvent",
             "collaboration_requested": "#/components/schemas/CollaborationRequestedEvent",
             "collaboration_responded": "#/components/schemas/CollaborationRespondedEvent",
-            "command_configured": "#/components/schemas/CommandConfiguredEvent",
             "compaction_recorded": "#/components/schemas/CompactionRecordedEvent",
             "context_assembled": "#/components/schemas/ContextAssembledEvent",
             "contract_accepted": "#/components/schemas/ContractAcceptedEvent",
@@ -34917,9 +34470,6 @@
           },
           {
             "$ref": "#/components/schemas/DepartmentPromptConfiguredEvent"
-          },
-          {
-            "$ref": "#/components/schemas/CommandConfiguredEvent"
           },
           {
             "$ref": "#/components/schemas/MaterialRecordedEvent"

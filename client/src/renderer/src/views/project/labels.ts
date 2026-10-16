@@ -122,10 +122,10 @@ export const SETTING_SOURCE: Record<string, string> = {
   default: "跟随部门默认",
 };
 
-// 输入种类的中文名（work_item.inputs 的 kind 取值：文字或登记命令）
+// 输入种类的中文名（work_item.inputs 的 kind 取值：文字，或用户在输入框里发出的命令）
 export const INPUT_KIND: Record<string, string> = {
   text: "文字",
-  command: "登记命令",
+  command: "命令",
 };
 
 export function label(map: Record<string, string>, value: string | null | undefined): string {

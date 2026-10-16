@@ -570,8 +570,8 @@ class StepRecorder:
                      "previous_compaction_event_id": result.previous_compaction_event_id}))
 
     def tool_started(self, transaction: Transaction, request: ModelRequest, call: dict[str, Any],
-                     command_basis: dict[str, Any], before_snapshot: dict[str, Any] | None = None) -> None:
-        # 工具许可允许以后、执行之前记录；登记命令带着许可时的执行依据。
+                     before_snapshot: dict[str, Any] | None = None) -> None:
+        # 工具许可允许以后、执行之前记录。
         # 动作前的公开树快照与这条事件一起写入（工单 #17，恢复契约第 4 节）：中断以后按这份快照与
         # 动作参数核对实际效果，快照放在 run 自己的对象区域，不建立提交、不改动分支索引
         scope = self.scope
@@ -582,8 +582,7 @@ class StepRecorder:
                    "context_event_id": request.context_event_id,
                    "attempt": request.attempt,
                    **scope.versions(),
-                   **scope.work_basis(),
-                   **command_basis}
+                   **scope.work_basis()}
         if before_snapshot is not None:
             before_ref = self._artifacts.put(scope.run_id, "snapshot/before", json_dumps(before_snapshot),
                                              media_type="application/json")

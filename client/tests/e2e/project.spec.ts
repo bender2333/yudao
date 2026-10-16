@@ -361,7 +361,8 @@ test.describe("项目页面（1440×900）", () => {
       console.log("STEP created");
       // work_item.materials 的 changed_by 含 MATERIAL_RECORDED：换到资料页直接读取，不需要刷新
       await gotoView(page, id, "materials");
-      const materials = await table(page, "项目材料");
+      // 项目材料是资料页的一个小节（原型 mt-notes 的 ul 列表，不是带 caption 的表）；
+      const materials = await section(page, "项目材料");
       await expect(materials).toContainText(text);
       await expect(materials).toContainText(SEEDED_MATERIAL);
       expect(errors).toEqual([]);
@@ -542,21 +543,22 @@ test.describe("项目页面（1440×900）", () => {
       const record = await section(page, "请求记录与用量");
       await expect(record.locator(".section-head .note")).toContainText("范围：整个项目");
       const all = page.locator("section.card table").first();
-      await expect(all.locator("tbody tr")).toHaveCount(4);
+      // 第一轮三部门各一次模型请求（#470 删工程计划以后没有 plan_turn）：共三条
+      await expect(all.locator("tbody tr")).toHaveCount(3);
       await expect(all.locator("tbody tr").first()).toContainText("fake-script");
       await expect(all.locator("tbody tr").first()).toContainText("未上报");
-      // 关键词筛选：命中四条（请求的模型都是 fake-script）
+      // 关键词筛选：命中三条（请求的模型都是 fake-script）
       const keyword = record.locator("label.field").filter({ hasText: "关键词" }).locator("input");
       await keyword.fill("fake");
       await record.getByRole("button", { name: "按条件筛选" }).click();
-      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(3);
       // 没有命中的关键词：写明这个范围没有请求记录
       await keyword.fill("不存在的关键词zzz");
       await record.getByRole("button", { name: "按条件筛选" }).click();
       await expect(record).toContainText("这个范围没有请求记录");
       await keyword.fill("");
       await record.getByRole("button", { name: "按条件筛选" }).click();
-      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(3);
       // Provider 配置筛选（第 7.4 节）：命中 0 条时写明没有请求记录，改回空条件以后恢复
       const providerFilter = record.locator("label.field").filter({ hasText: "Provider 配置" }).locator("input");
       await providerFilter.fill("no-such-provider");
@@ -564,7 +566,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(record).toContainText("这个范围没有请求记录");
       await providerFilter.fill("");
       await record.getByRole("button", { name: "按条件筛选" }).click();
-      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(3);
       // 请求详情：点第一行的「详情」，顶栏路径换成请求详情
       await page.locator("section.card table").first().locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / 请求详情`);
@@ -592,7 +594,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(usage.locator("h3")).toHaveText("用量统计");
       await expect(usage.locator(".y10-usage-note")).toContainText("用量只读显示，不是事项的预算");
       await expect(usage).toContainText("请求数");
-      await expect(usage).toContainText("4（上报 0）");
+      await expect(usage).toContainText("3（上报 0）");
       await expect(await table(page, "按部门")).toContainText("product");
       await expect(await table(page, "按模型")).toContainText("fake · fake-script");
       expect(errors).toEqual([]);
@@ -601,7 +603,7 @@ test.describe("项目页面（1440×900）", () => {
     }
   });
 
-  test("设置页：基本信息、部门设置、登记命令与源目录", async () => {
+  test("设置页：基本信息、部门设置与源目录", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
     const page = client.page;
@@ -632,17 +634,8 @@ test.describe("项目页面（1440×900）", () => {
       await expect(departments.getByLabel("部门 Prompt")).toHaveValue(PRODUCT_PROMPT);
       await expect(departments.getByLabel("模型")).toContainText("跟随部门默认（当前：fake-script）");
       await departments.getByRole("button", { name: "取消" }).first().click();
-      const registry = await section(page, "登记命令");
-      console.log("STEP settings");
-      await expect(registry).toContainText("smoke");
-      await expect(registry).toContainText("python -c raise SystemExit(0)");
-      await expect(registry).toContainText("--verbose");
-      await expect(registry).toContainText("30 秒");
-      await expect(registry).toContainText("第 1 版");
-      // 可以重新执行（工单 #242）：表里有一列，样例登记没有声明
-      await expect(registry.getByRole("columnheader", { name: "可以重新执行" })).toBeVisible();
-      await expect(registry.getByRole("row").filter({ hasText: "smoke" })).toContainText("否");
-      await expect(registry.getByRole("button", { name: "登记新命令" })).toBeVisible();
+      // 登记命令一节随 ADR-0038 删除：设置页上不再出现登记命令的列表与表单
+      await expect(page.getByText("登记命令")).toHaveCount(0);
       const sources = await section(page, "源目录");
       await expect(sources).toContainText("没有登记源目录");
       expect(errors).toEqual([]);
@@ -781,7 +774,7 @@ test.describe("项目页面（1440×900）", () => {
     }
   });
 
-  test("界面上的命令写入事件流：登记命令与部门指导", async () => {
+  test("界面上的命令写入事件流：部门指导", async () => {
     test.setTimeout(180_000);
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
@@ -798,36 +791,6 @@ test.describe("项目页面（1440×900）", () => {
       await gotoView(page, liveId, "dept/product");
       await expect(page.locator(".page")).toContainText("项目还没有事项，部门工作间没有内容可显示");
       await expect(page.locator(".page")).not.toContainText("正在读取数据");
-      // 设置页登记一条新命令：命令表由事件流更新，页面不刷新
-      await gotoView(page, liveId, "settings");
-      const registry = await section(page, "登记命令");
-      await expect(registry).toContainText("还没有登记命令");
-      await registry.getByRole("button", { name: "登记新命令" }).click();
-      const form = page.locator(".modal-backdrop");
-      await expect(form.locator(".modal-head h2")).toHaveText("登记新命令");
-      // 「固定参数」的提示含程序名并写明按空格拆分（工单 #295 第 2 项）：这条用例就按提示的写法登记
-      await expect(form.getByLabel("固定参数")).toHaveAttribute("placeholder", /python -c print\(1\)/);
-      await expect(form.getByLabel("固定参数")).toHaveAttribute("placeholder", /按空格拆分/);
-      // 可以重新执行（工单 #242）：新登记默认关闭
-      await expect(form.getByLabel("可以重新执行")).not.toBeChecked();
-      await form.getByLabel("登记名").fill("echo-live");
-      await form.getByLabel("固定参数").fill("python -c print(1)");
-      await form.getByRole("button", { name: "保存" }).click();
-      await expect(page.locator(".modal-backdrop")).toHaveCount(0);
-      await expect(registry).toContainText("echo-live");
-      await expect(registry).toContainText("python -c print(1)");
-      await expect(registry).toContainText("第 1 版");
-      await expect(registry.getByRole("row").filter({ hasText: "echo-live" })).toContainText("否");
-      // 修改登记并勾选「可以重新执行」，命令表由事件流更新
-      await registry.getByRole("row").filter({ hasText: "echo-live" })
-        .getByRole("button", { name: "修改" }).click();
-      const editForm = page.locator(".modal-backdrop");
-      await expect(editForm.getByLabel("可以重新执行")).not.toBeChecked();
-      await editForm.getByLabel("可以重新执行").check();
-      await editForm.getByRole("button", { name: "保存" }).click();
-      await expect(page.locator(".modal-backdrop")).toHaveCount(0);
-      await expect(registry.getByRole("row").filter({ hasText: "echo-live" })).toContainText("是");
-      await expect(registry.getByRole("row").filter({ hasText: "echo-live" })).toContainText("第 2 版");
       // 文本工具：给产品部门发一条指导，指导列表由事件流更新
       await gotoView(page, blockedId, "dept/product");
       await expect(await section(page, "产品部门")).toContainText("工程处理中");
@@ -884,11 +847,6 @@ test.describe("项目页面（1920×1080）", () => {
       await expect(page.locator(".modal-backdrop")).toBeVisible();
       await expectNoOverflow(page, "部门设置弹窗");
       await page.locator(".modal-backdrop").getByRole("button", { name: "关闭" }).click();
-      await gotoView(page, id, "settings");
-      await (await section(page, "登记命令")).getByRole("button", { name: "登记新命令" }).click();
-      await expect(page.locator(".modal-backdrop")).toBeVisible();
-      await expectNoOverflow(page, "登记新命令弹窗");
-      await page.locator(".modal-backdrop").getByRole("button", { name: "取消" }).click();
       await gotoView(page, id, "observe");
       await page.locator("section.card table").first().locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / 请求详情`);
