@@ -331,6 +331,7 @@ function FloorTextList(props: {
           onNavigate={(hash) => {
             window.location.hash = hash.startsWith("#") ? hash.slice(1) : hash;
           }}
+          viewId="floor.decisions"
           emptyText="没有等待回答的决定请求"
         />
       </details>

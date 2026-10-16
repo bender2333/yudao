@@ -22,6 +22,96 @@ export function waitedSeconds(requestedAt: string, now: number): number {
   return Math.max(0, Math.round((now - requested) / 1000));
 }
 
+// 初始 PRD 的材料（第 138 号工单，设计第 3.2 节）：PRD 摘要与工件引用、现有结构说明、
+// 基线核验汇总、快照来源与轮次。上一轮的修改意见原文由卡片按事项补一行（工单 #138），
+// 修改意见的工件路径是内部引用，不显示给用户。
+// 载荷由 InitialPrdRequested 给出，每一项都按接口合同的原样显示，没有上报的项目写「未上报」。
+function initialPrdRows(request: Payload, push: (term: string, value: unknown) => void): void {
+  const prd = (request.prd ?? {}) as Payload;
+  const structure = (request.structure ?? {}) as Payload;
+  const review = (request.baseline_review ?? {}) as Payload;
+  const snapshot = (request.snapshot ?? {}) as Payload;
+  push("轮次", `第 ${typeof request.round === "number" ? request.round : "?"} 轮`);
+  push("初始 PRD 摘要", showText(prd.summary, "没有摘要"));
+  push("PRD.md 工件", refPath(prd.prd_ref));
+  push("PRD 指纹", fingerprint(prd.content_hash));
+  push("现有结构说明", refPath(structure.structure_ref));
+  push("结构说明指纹", fingerprint(structure.code_tree_digest));
+  push("基线核验汇总", baselineSummary(review));
+  push("快照来源", showText(snapshot.source, "未上报"));
+  push("快照提交", provenanceText(snapshot.provenance));
+  push("快照规模", `文件 ${countText(snapshot.files)} 项，目录 ${countText(snapshot.directories)} 项，共 ${bytesText(snapshot.bytes)} 字节`);
+}
+
+// 工件引用给出的路径：引用的 path 就是工件的相对路径（PRD.md 与 STRUCTURE.md 按它显示）
+function refPath(value: unknown): string {
+  const ref = (value ?? {}) as Payload;
+  return showText(ref.path, "未上报");
+}
+
+// 指纹只显示前 12 位：完整值由资料页按轮的原始材料给出
+function fingerprint(value: unknown): string {
+  const shown = showText(value, "");
+  return shown === "" ? "未上报" : shown.slice(0, 12);
+}
+
+// 空值与空串写成给定的占位文字：界面不补造内容
+function showText(value: unknown, empty: string): string {
+  return typeof value === "string" && value.trim() !== "" ? value : empty;
+}
+
+// 快照的 git 来源（harness/projects.py 给项目上下文的同一份文案）：没有仓库时写明采集时的目录内容
+function provenanceText(value: unknown): string {
+  const provenance = (value ?? {}) as Payload;
+  const commit = showText(provenance.commit, "");
+  if (commit === "") {
+    return "没有 git 仓库，快照采集时的目录内容";
+  }
+  const branch = showText(provenance.branch, "未知");
+  return `git 提交 ${commit}（分支 ${branch}，${provenance.dirty ? "有未提交的修改" : "没有未提交的修改"}）`;
+}
+
+// 基线核验汇总（设计第 3.2 节）：按核实结果分组的条数、现有缺陷、遗漏的能力与其他失败
+function baselineSummary(review: Payload): string {
+  const conclusions = listOf(review.conclusions);
+  const counts: Record<string, number> = {};
+  for (const item of conclusions) {
+    const status = text(item.status);
+    if (status !== "") {
+      counts[status] = (counts[status] ?? 0) + 1;
+    }
+  }
+  const names: Record<string, string> = {
+    verified: "已核实", read_only: "只读", existing_defect: "现有缺陷", unsupported: "不支持",
+  };
+  const parts = [`核验 ${conclusions.length} 条要求`];
+  for (const status of Object.keys(names)) {
+    const count = counts[status];
+    if (count !== undefined) {
+      parts.push(`${names[status]} ${count} 条`);
+    }
+  }
+  parts.push(`遗漏的能力 ${listOf(review.omissions).length} 条`);
+  parts.push(`其他失败 ${listOf(review.other_failures).length} 条`);
+  return parts.join("；");
+}
+
+function listOf(value: unknown): Payload[] {
+  return Array.isArray(value) ? value.filter((item): item is Payload => item !== null && typeof item === "object") : [];
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function countText(value: unknown): string {
+  return Array.isArray(value) ? String(value.length) : "未上报";
+}
+
+function bytesText(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("zh-CN") : "未上报";
+}
+
 // 每种决定请求需要的材料：来源是决定请求的载荷（原型 v8 设计说明第 6 节的表）。
 // 种类在合同里以后增加时，把它的材料写在这里；未知种类返回空表，不伪造内容。
 export function materialRows(decision: DecisionView): MaterialRow[] {
@@ -67,6 +157,9 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
       push("改动的内核路径", Array.isArray(request.kernel_paths) ? request.kernel_paths.join("\n") : "");
       push("差异", request.diff);
       break;
+    case "initial_prd":
+      initialPrdRows(request, push);
+      break;
     default:
       break;
   }
@@ -86,12 +179,30 @@ export function decisionLinks(decision: DecisionView): MaterialLink[] {
       links.push({ label: "前往本项目的部门设置", href: `#/p/${decision.project_id}/settings` });
     }
   }
+  // 初始 PRD 的两个工件：PRD.md 与 STRUCTURE.md 指向资料页，资料页按轮展示的正是这两个工件的内容
+  const materials = decision.kind === "initial_prd" ? materialsHref(decision) : null;
+  if (materials !== null) {
+    for (const fileName of ["PRD.md", "STRUCTURE.md"]) {
+      links.push({ label: fileName, href: materials });
+    }
+  }
   // 请求显式给出的页面（合同以后增加时也生效）
   const target = typeof request.view === "string" ? request.view : "";
   if (target !== "") {
     links.push({ label: "在项目中查看", href: target });
   }
   return links;
+}
+
+// 初始 PRD 决定所属项目的资料页：资料页按轮列出初始 PRD 与结构说明的原文
+function materialsHref(decision: DecisionView): string | null {
+  const request = (decision.request ?? {}) as Payload;
+  if (decision.project_id === null) {
+    return null;
+  }
+  const workItem = typeof request.work_item_id === "string" ? request.work_item_id : decision.work_item_id;
+  const suffix = workItem === null || workItem === "" ? "" : `?w=${workItem}`;
+  return `#/p/${decision.project_id}/materials${suffix}`;
 }
 
 // 「在项目中查看」的目标：请求给出 view 时用它；结果未知的动作落到恢复页；其余落到项目概览
@@ -102,6 +213,10 @@ export function viewHref(decision: DecisionView): string | null {
   }
   if (decision.project_id === null) {
     return null;
+  }
+  // 初始 PRD 的确认：资料页按轮列出各轮的初始 PRD 与确认记录（工单 #138）
+  if (decision.kind === "initial_prd") {
+    return materialsHref(decision);
   }
   if (decision.work_item_id !== null) {
     return `#/p/${decision.project_id}/w/${decision.work_item_id}/recovery`;

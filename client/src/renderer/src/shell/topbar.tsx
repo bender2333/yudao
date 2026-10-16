@@ -92,6 +92,7 @@ export function Topbar(props: TopbarProps) {
               workItemTitle: decision.work_item_id ?? "",
             })}
             onNavigate={props.onNavigate}
+            viewId="topbar.decisions"
             emptyText="本项目没有等待回答的决定"
           />
         </div>

@@ -117,6 +117,7 @@ function atTimeOf(report: AwayReport | null, at: number): string | null {
 
 function Summary(props: { data: ProjectOverviewResult }) {
   const adoption = props.data.current_adoption;
+  const baseline = adoption !== null && adoption.onboarding_baseline;
   return (
     <Section id="ov-summary" className="y10-ov-summary" title="项目摘要" note={`当前读取的是项目版本 ${props.data.version}`}>
       <KeyValue
@@ -129,6 +130,13 @@ function Summary(props: { data: ProjectOverviewResult }) {
               文件 {adoption.files.length} 项，检查 {adoption.check_names.length} 项，已知风险 {adoption.known_risks.length} 项）
             </span>
           )],
+          // 接入已有项目时的建档基线（工单 #138，设计第 3.4 节）：快照来源与现有缺陷数
+          ...(baseline ? [
+            ["建档基线", "当前成果来自接入的代码快照：下面的来源与缺陷数按快照采集时的原样显示"],
+            ["快照来源", show(adoption.snapshot_source, "未上报")],
+            ["快照提交", provenanceText(adoption.snapshot_provenance)],
+            ["现有缺陷", `现有缺陷 ${adoption.existing_defect_count} 项`],
+          ] as [string, string][] : []),
           ["事项统计", `共 ${props.data.stats.total}：进行中 ${props.data.stats.in_progress}、排队中 ${props.data.stats.not_started}、已采纳 ${props.data.stats.adopted}、已放行 ${props.data.stats.released_unsettled}、已停止 ${props.data.stats.stopped}`],
         ]}
       />
@@ -136,6 +144,16 @@ function Summary(props: { data: ProjectOverviewResult }) {
       {props.data.start_point ? <p className="y10-note note">{props.data.start_point}</p> : null}
     </Section>
   );
+}
+
+// 快照的 git 来源（与决定卡片同一份文案）：没有仓库时写明采集时的目录内容
+function provenanceText(value: { [key: string]: unknown } | null): string {
+  const commit = value !== null && typeof value.commit === "string" ? value.commit : "";
+  if (commit === "") {
+    return "没有 git 仓库，快照采集时的目录内容";
+  }
+  const branch = value !== null && typeof value.branch === "string" && value.branch !== "" ? value.branch : "未知";
+  return `git 提交 ${commit}（分支 ${branch}，${value?.dirty ? "有未提交的修改" : "没有未提交的修改"}）`;
 }
 
 // 当前事项：所选事项优先，否则进行中或等待确认初始 PRD 的一项；都找不到时不显示（界面不猜）。

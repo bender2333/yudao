@@ -183,10 +183,10 @@ def room_script():
 
 
 def onboarding_script():
-    # 接入已有项目的建档脚本（工单 #137）：每轮产品写出初始 PRD、工程给出结构说明、质检核验基线；
+    # 接入已有项目的建档脚本（工单 #137、#138）：每轮产品写出初始 PRD、工程给出结构说明、质检核验基线；
     # 三个部门各先调一次读取工具，让部门房间的「阅读已有项目」动作在事件流里真实出现。
-    # 四轮供接入与重新开始建档各走一遍
-    return [turn for index in range(4) for turn in _onboarding_round(index)]
+    # 六轮供接入、重新开始建档各走一遍以外，还够一次「提出修改」的往返（第 138 号工单）
+    return [turn for index in range(6) for turn in _onboarding_round(index)]
 
 
 def _onboarding_round(index: int):

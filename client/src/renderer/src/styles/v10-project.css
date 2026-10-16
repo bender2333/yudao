@@ -277,6 +277,9 @@
 .y10-mt-doc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12.5px; }
 .y10-mt-doc-head strong { font-size: 13.5px; }
 .y10-mt-doc p { font-size: 13px; overflow-wrap: anywhere; }
+
+/* 建档各轮里的小标题（初始 PRD、结构说明、基线核验、确认记录） */
+.y10-mt-sub { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 2px 0 0; }
 .y10-mt-doc .y10-kv.is-rows > div { grid-template-columns: 5.5em minmax(0, 1fr); padding: 4px 0; }
 .y10-mt-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font-size: 11.5px; background: var(--soft-2); color: var(--muted); }
 .y10-mt-badge.is-current { background: var(--tint); color: var(--green); font-weight: 600; }
