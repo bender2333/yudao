@@ -241,26 +241,6 @@ export function TextArea(props: {
   );
 }
 
-// 布尔开关：勾选与否就是保存的值；登记命令的「可以重新执行」默认不勾选
-export function Checkbox(props: {
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <label className="y10-field is-inline field choice">
-      <input
-        type="checkbox"
-        checked={props.checked}
-        disabled={props.disabled}
-        onChange={(event) => props.onChange(event.target.checked)}
-      />
-      {props.label}
-    </label>
-  );
-}
-
 export function SubmitButton(props: {
   label: string;
   busy: boolean;
