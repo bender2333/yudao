@@ -136,6 +136,7 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds):
         json.dump(export, handle, ensure_ascii=False, indent=2)
 
     # 评分之前核对：材料目录的路径、材料摘要、对上游仓库的访问，任一命中这次运行无效
+    outcome = {"timed_out": timed_out, "elapsed_seconds": elapsed, "hidden_failures": []}
     void_reasons = yudao.void_reasons(json.dumps(export, ensure_ascii=False))
     scores = score_delivery(delivery_dir, evidence_dir)
     # 质检误放行这一项要等评分结果，先算其余指标，评分以后用同一个判断重算
