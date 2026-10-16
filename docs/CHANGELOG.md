@@ -641,3 +641,5 @@ omp(oro) / 2026-10-16 16:40 / 工单 #522 修复集成层第 5 次整跑剩余 7
 
 claude-opus-5-5 / 2026-10-16 15:05 / docs/design/test-pyramid.md 状态行：#532 追加的两句合为一句，写明第 11.1 节由 #532、#533、#534 实施，比较信息的顺序与投影字段名由 #541 完成 / #514 的最终核对；原来的第二句记录的是第 1 轮的做法
 claude-opus-5-5 / 2026-10-16 16:20 / docs/architecture-issues.md：#501 登记的 smoke 回执来源一条加处理行（#510 已完成），#462 登记的实例升级查询合同一条加处理行（建 #564） / 架构师每次会话查看未处理的架构问题
+
+执行者 9router/oro / 2026-10-16 18:20 / docs/design/test-pyramid.md 之外的本次改动只落在 harness/tests/：`harness/tests/event_sequence.py::compare_documents` 的比较顺序改为 `scenario`、`covers` → 会话集合 → 会话内事件 → 因果边 → 投影，新增 `_projection_fields_line` 在 `projection differs:` 之后写出不一致的键（嵌套写成 `product_spec.revision`）；`harness/tests/test_event_sequence_compare.py` 增加两项单元层探针（只改投影、事件与投影同时改），登记表 `layers.toml` 已有该文件的单元层一行、未新增行；`agents_jour/541.md` 记录步骤与反向验证 / #514 验收第 3 条：投影比较排在事件之前，行为变化时只有一整行投影 JSON diff，没有会话、事件与字段名
