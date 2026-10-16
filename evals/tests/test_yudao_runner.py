@@ -6,6 +6,7 @@ credentials in the environment and skip without them.
 
 import json
 import os
+import shutil
 import sys
 
 import pytest
@@ -65,6 +66,42 @@ def test_material_path_in_the_event_log_voids_the_run():
 
 def test_unrelated_paths_do_not_void_the_run():
     assert yudao.material_path_hits(json.dumps({"summary": "read notes/plan.md"})) == []
+
+
+def test_upstream_repository_in_the_event_log_voids_the_run():
+    export = _export()
+    export["events"].append({"type": "tool_called",
+                             "payload": {"name": "bash",
+                                         "output": {"command": "git ls-remote https://github.com/"
+                                                               + yudao.UPSTREAM_REPOSITORY}}})
+    reasons = yudao.void_reasons(json.dumps(export, ensure_ascii=False))
+    assert any("上游仓库" in reason for reason in reasons), reasons
+    assert any(yudao.UPSTREAM_REPOSITORY in reason for reason in reasons), reasons
+
+
+def test_a_clean_event_log_has_no_void_reasons():
+    assert yudao.void_reasons(json.dumps(_export(), ensure_ascii=False)) == []
+
+
+def test_a_tampered_check_voids_the_scoring_run(tmp_path):
+    base = yudao.scenario_base()
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(base, copy)
+    target = copy / "checks" / "check_harness.py"
+    target.write_text(target.read_text(encoding="utf-8") + "\n# tampered\n", encoding="utf-8")
+    reasons = yudao.digest_reasons(copy)
+    assert [reason.split("：")[1] for reason in reasons] == ["checks"], reasons
+    assert "摘要" in reasons[0]
+    assert yudao.digest_reasons(base) == []
+
+
+def test_stray_bytecode_in_the_checks_does_not_change_the_digest(tmp_path):
+    base = yudao.scenario_base()
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(base, copy, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    (copy / "checks" / "__pycache__").mkdir()
+    (copy / "checks" / "__pycache__" / "check_harness.cpython-313.pyc").write_bytes(b"x")
+    assert yudao.digest_reasons(copy) == []
 
 
 def test_requirement_text_carries_the_prd_and_the_agreement():

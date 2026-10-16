@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import shutil
 
 import pytest
 
@@ -130,6 +131,39 @@ def test_network_tool_calls_are_found():
     events = [{"type": "tool_use", "part": {"type": "tool", "tool": "write",
                                             "state": {"status": "completed", "output": "ok"}}}]
     assert opencode.network_tool_calls(opencode.tool_calls(events)) == []
+
+
+def test_upstream_repository_in_the_output_voids_the_run():
+    url = "https://github.com/" + scenario3.UPSTREAM_REPOSITORY
+    assert opencode.upstream_hits("clone " + url)
+    assert opencode.upstream_hits("clone " + url.replace("github.com/", "github.com:"))
+    # 事件里的字符串是被转义过的，转义后的形式也要找到
+    assert opencode.upstream_hits(json.dumps({"text": "clone " + url}, ensure_ascii=False))
+    assert opencode.upstream_hits("clone " + scenario3.UPSTREAM_REPOSITORY.upper()) == []
+
+
+def test_unrelated_repositories_are_not_upstream_access():
+    assert opencode.upstream_hits("clone https://github.com/openai/openai-agents-python") == []
+
+
+def test_a_tampered_check_voids_the_scoring_run(tmp_path):
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(scenario3.scenario_base(), copy)
+    (copy / "checks" / "check_harness.py").write_text(
+        (copy / "checks" / "check_harness.py").read_text(encoding="utf-8") + "\n# tampered\n",
+        encoding="utf-8")
+    reasons = opencode.digest_reasons(copy)
+    assert [reason.split("：")[1] for reason in reasons] == ["checks"], reasons
+    assert opencode.digest_reasons(scenario3.scenario_base()) == []
+
+
+def test_stray_bytecode_in_the_checks_does_not_change_the_digest(tmp_path):
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(scenario3.scenario_base(), copy,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    (copy / "checks" / "__pycache__").mkdir()
+    (copy / "checks" / "__pycache__" / "check_harness.cpython-313.pyc").write_bytes(b"x")
+    assert opencode.digest_reasons(copy) == []
 
 
 def test_metrics_count_requests_tokens_and_elapsed():
