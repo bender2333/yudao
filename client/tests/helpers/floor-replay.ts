@@ -11,6 +11,7 @@ import { chromium } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { adaptRecordedArg } from "./recorded-tool-names.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const clientRoot = resolve(here, "..", "..");
@@ -136,7 +137,7 @@ export async function replayScenario(serverUrl: string, scenario: RecordedScenar
       } catch (e) {
         return { failed: String((e as Error)?.stack ?? e) };
       }
-    }, { ops: scenario.ops, models, sampleMs });
+    }, { ops: scenario.ops.map((op) => ({ ...op, arg: adaptRecordedArg(op.arg) })), models, sampleMs });
     if ("failed" in result) {
       return { samples: [], errors: [...pageErrors, `驱动失败：${String(result.failed)}`] };
     }

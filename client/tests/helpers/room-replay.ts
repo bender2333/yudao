@@ -10,6 +10,7 @@ import { chromium } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { adaptRecordedArg } from "./recorded-tool-names.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const clientRoot = resolve(here, "..", "..");
@@ -124,7 +125,7 @@ export async function replayRoom(serverUrl: string, rec: RoomRecording, sampleMs
       } catch (e) {
         return { failed: String((e as Error)?.stack ?? e) };
       }
-    }, { ops: rec.ops, department: rec.department, sampleMs });
+    }, { ops: rec.ops.map((op) => ({ ...op, arg: adaptRecordedArg(op.arg) })), department: rec.department, sampleMs });
     if ("failed" in result) {
       return { samples: [], errors: [...pageErrors, `驱动失败：${String(result.failed)}`] };
     }
