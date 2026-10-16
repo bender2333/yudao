@@ -1585,7 +1585,7 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | KernelModificationRequested;
+    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | KernelModificationRequested | InstanceUpgradeRequested;
     answer: DecisionAnswerRecord | null;
 };
 
@@ -2389,6 +2389,73 @@ export type InputView = {
     git_version?: {
         [key: string]: unknown;
     } | null;
+};
+
+/**
+ * InstanceUpgradeReport
+ */
+export type InstanceUpgradeReport = {
+    /**
+     * Repository
+     */
+    repository: string;
+    /**
+     * Pending Commit
+     */
+    pending_commit: string;
+    /**
+     * Base Tag
+     */
+    base_tag: string | null;
+    /**
+     * Kernel Changes
+     */
+    kernel_changes: Array<string>;
+    /**
+     * Kernel Python Lines
+     */
+    kernel_python_lines: number;
+    /**
+     * Python Lines Max
+     */
+    python_lines_max: number;
+    /**
+     * Passed
+     */
+    passed: boolean;
+    /**
+     * Findings
+     */
+    findings: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+/**
+ * InstanceUpgradeRequested
+ */
+export type InstanceUpgradeRequested = {
+    /**
+     * Kind
+     */
+    kind: 'instance_upgrade';
+    /**
+     * Blocks
+     */
+    blocks: 'instance';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    report: InstanceUpgradeReport;
 };
 
 /**
@@ -8870,73 +8937,6 @@ export type InstanceUpgradeAnsweredEvent = {
      */
     type: 'instance_upgrade_answered';
     payload: InstanceUpgradeAnswered;
-};
-
-/**
- * InstanceUpgradeReport
- */
-export type InstanceUpgradeReport = {
-    /**
-     * Repository
-     */
-    repository: string;
-    /**
-     * Pending Commit
-     */
-    pending_commit: string;
-    /**
-     * Base Tag
-     */
-    base_tag: string | null;
-    /**
-     * Kernel Changes
-     */
-    kernel_changes: Array<string>;
-    /**
-     * Kernel Python Lines
-     */
-    kernel_python_lines: number;
-    /**
-     * Python Lines Max
-     */
-    python_lines_max: number;
-    /**
-     * Passed
-     */
-    passed: boolean;
-    /**
-     * Findings
-     */
-    findings: Array<{
-        [key: string]: unknown;
-    }>;
-};
-
-/**
- * InstanceUpgradeRequested
- */
-export type InstanceUpgradeRequested = {
-    /**
-     * Kind
-     */
-    kind: 'instance_upgrade';
-    /**
-     * Blocks
-     */
-    blocks: 'instance';
-    /**
-     * Options
-     */
-    options: Array<DecisionOption>;
-    /**
-     * Description
-     */
-    description: string;
-    /**
-     * Facts
-     */
-    facts: Array<string>;
-    report: InstanceUpgradeReport;
 };
 
 /**

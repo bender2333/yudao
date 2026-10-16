@@ -20,6 +20,11 @@ SCORING_INPUTS = ("checks", os.path.join("materials", "requirement-table.json"))
 SCORING_IGNORES = (".git", ".opencode-config")
 
 
+def upstream_urls():
+    """任务上游仓库的地址：输出里出现时这次运行作废（第 3 节「联网」）。"""
+    return (UPSTREAM_URL,)
+
+
 def scenario_base():
     return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                         "..", "scenarios", SCENARIO))

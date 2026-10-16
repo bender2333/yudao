@@ -13,6 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import material_integrity
 import metrics
 import opencode
 import report
@@ -96,10 +97,16 @@ def run_once(run_id, runs_root, evidence_root, model, model_id, limit_seconds,
     hits = opencode.material_path_hits(outcome["stdout"], scenario_name)
     if hits:
         void_reasons.append("JSON 输出中出现材料目录的路径：" + _describe_hits(hits))
+    urls = opencode.upstream_hits(outcome["stdout"], scenario_name)
+    if urls:
+        void_reasons.append("JSON 输出中出现对上游仓库的访问："
+                            + material_integrity.describe_urls(urls))
     web_calls = opencode.network_tool_calls(calls)
     if web_calls:
         void_reasons.append("JSON 输出中出现取回或搜索工具的调用："
                             + ", ".join(sorted({call["tool"] for call in web_calls})))
+    # 评分之前核对材料摘要：算在场景目录的材料原件上，被测方在运行途中改掉它才算数
+    void_reasons.extend(opencode.digest_reasons(scenario_module.scenario_base(), scenario_name))
 
     scores = score_delivery(run_dir, evidence_dir, scenario_name)
     with open(os.path.join(evidence_dir, "metrics.json"), "w", encoding="utf-8") as handle:

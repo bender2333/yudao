@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import time
+import material_integrity
 
 SCENARIO_MODULE = "scenario3"
 NETWORK_TOOLS = ("webfetch", "websearch")
@@ -202,6 +203,17 @@ def material_path_hits(text, scenario_name=None, extra_dirs=None):
             if candidate.lower() in lowered:
                 hits.append({"part": label, "path": candidate})
     return hits
+
+def upstream_hits(text, scenario_name=None):
+    """在 JSON 输出中查找对任务上游仓库的访问：找到时这次运行作废（第 3 节「联网」）。"""
+    urls = scenario(scenario_name).upstream_urls()
+    return material_integrity.upstream_hits(text, urls)
+
+
+def digest_reasons(base, scenario_name=None):
+    """场景材料的摘要与材料版本记录比较：不同时这次运行作废（第 3 节「隔离」）。"""
+    return material_integrity.digest_reasons(
+        base, set(scenario(scenario_name).SCORING_INPUTS) | {"reference"})
 
 
 def _path_variants(path):

@@ -23,8 +23,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import material_integrity
 
 SCENARIO = "scenario-3"
+
 MODEL_SERVICE_BASE_URL_ENV = "YUDAO_EVAL_BASE_URL"
 MODEL_SERVICE_API_KEY_ENV = "YUDAO_EVAL_API_KEY"
 # 场景 3 的运行模型在三个部门都使用同一条连接与同一个访问定义（评测场景设计第 3 节）
@@ -37,6 +39,7 @@ TERMINAL_PHASES = ("DONE", "PAUSED", "FAILED")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
 POLL_INTERVAL_SECONDS = 3.0
 STARTUP_TIMEOUT_SECONDS = 180.0
+
 
 
 def scenario_base():
@@ -61,6 +64,12 @@ def hidden_dirs():
         "reference": os.path.join(base, "reference"),
         "files": os.path.join(base, "files"),
     }
+
+
+# 场景 3 的任务上游仓库（PRDBench）。运行器在导出的事件日志里查找对它的访问，
+# 与材料目录的路径使用同一条作废处理（评测场景设计第 3 节「联网」）。
+UPSTREAM_REPOSITORY = "AGI-Eval-Official/PRDBench"
+UPSTREAM_URLS = ("https://github.com/" + UPSTREAM_REPOSITORY,)
 
 
 def requirement_text():
@@ -421,6 +430,39 @@ def _path_variants(path):
 
 def describe_hits(hits):
     return "、".join(sorted({hit["part"] for hit in hits}))
+
+
+def digest_reasons(base):
+    """场景 3 的材料摘要与材料版本记录比较：不同时这次运行作废（第 3 节「隔离」）。
+
+    摘要算在场景目录的材料原件上，不算评分目录里的副本：评分目录紧接在运行
+    之后从原件复制，两者相同，而真正要防的是被测方在运行途中改掉仓库里的原件。
+    """
+    import scenario3
+    return material_integrity.digest_reasons(
+        base, set(scenario3.SCORING_INPUTS) | {"reference"})
+
+
+def upstream_hits(text):
+    """在导出的事件日志中查找对任务上游仓库的访问：找到时这次运行作废。"""
+    return material_integrity.upstream_hits(text, UPSTREAM_URLS)
+
+
+def void_reasons(text):
+    """一次运行的全部作废原因：材料路径、材料摘要、上游仓库的访问。
+
+    三项都写进报告，报告逐条列出；任一项非空，这次运行不计分。
+    """
+    reasons = []
+    hits = material_path_hits(text)
+    if hits:
+        reasons.append("事件日志导出中出现材料目录的路径：" + describe_hits(hits))
+    reasons.extend(digest_reasons(scenario_base()))
+    urls = upstream_hits(text)
+    if urls:
+        reasons.append("事件日志导出中出现对上游仓库的访问："
+                       + material_integrity.describe_urls(urls))
+    return reasons
 
 
 def yudao_commit(repo_root=None):

@@ -6,6 +6,7 @@ credentials in the environment and skip without them.
 
 import json
 import os
+import shutil
 import sys
 
 import pytest
@@ -65,6 +66,122 @@ def test_material_path_in_the_event_log_voids_the_run():
 
 def test_unrelated_paths_do_not_void_the_run():
     assert yudao.material_path_hits(json.dumps({"summary": "read notes/plan.md"})) == []
+
+
+def test_upstream_repository_in_the_event_log_voids_the_run():
+    export = _export()
+    export["events"].append({"type": "tool_called",
+                             "payload": {"name": "bash",
+                                         "output": {"command": "git ls-remote https://github.com/"
+                                                               + yudao.UPSTREAM_REPOSITORY}}})
+    reasons = yudao.void_reasons(json.dumps(export, ensure_ascii=False))
+    assert any("上游仓库" in reason for reason in reasons), reasons
+    assert any(yudao.UPSTREAM_REPOSITORY in reason for reason in reasons), reasons
+
+
+def test_a_clean_event_log_has_no_void_reasons():
+    assert yudao.void_reasons(json.dumps(_export(), ensure_ascii=False)) == []
+
+
+def test_a_tampered_check_voids_the_scoring_run(tmp_path):
+    base = yudao.scenario_base()
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(base, copy)
+    target = copy / "checks" / "check_harness.py"
+    target.write_text(target.read_text(encoding="utf-8") + "\n# tampered\n", encoding="utf-8")
+    reasons = yudao.digest_reasons(copy)
+    assert [reason.split("：")[1] for reason in reasons] == ["checks"], reasons
+    assert "摘要" in reasons[0]
+    assert yudao.digest_reasons(base) == []
+
+
+def test_stray_bytecode_in_the_checks_does_not_change_the_digest(tmp_path):
+    base = yudao.scenario_base()
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(base, copy, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    (copy / "checks" / "__pycache__").mkdir()
+    (copy / "checks" / "__pycache__" / "check_harness.cpython-313.pyc").write_bytes(b"x")
+    assert yudao.digest_reasons(copy) == []
+
+
+# 运行器入口：评分之前的核对走完整条 run_once
+
+class _FakeClient:
+    """`run_once` 需要的最小客户端：只接一次重放查询。"""
+
+    def wait_ready(self):
+        return {"capabilities": []}
+
+    def query(self, name, params=None):
+        assert name == "replay.check"
+        return {"data": {"consistent": True, "differences": []}}
+
+    def stop(self):
+        return None
+
+
+def _stub_run_once(monkeypatch, tmp_path, export):
+    """把 `run_once` 触碰的服务、评分与交付换成固定值，核对调用点保持真实。
+
+    不起服务、不发模型请求、不跑评分器；`yudao.void_reasons` 与其调用的三项核对
+    都是真代码，改动的只是它们的输入（场景目录指向副本）。
+    """
+    data_dir = str(tmp_path / "data")
+    os.makedirs(data_dir, exist_ok=True)
+    monkeypatch.setattr(yudao, "data_dir_for", lambda runs_root, run_id: data_dir)
+    monkeypatch.setattr(yudao, "free_port", lambda: 0)
+    monkeypatch.setattr(yudao, "start_service",
+                        lambda data_dir, port: (None, _FakeClient()))
+    monkeypatch.setattr(yudao, "register_model",
+                        lambda client, model_name: {"admitted_model": model_name})
+    monkeypatch.setattr(yudao, "create_project", lambda client, name, goal: "project-1")
+    monkeypatch.setattr(yudao, "save_department_settings", lambda client, project_id: {})
+    monkeypatch.setattr(yudao, "submit_requirement",
+                        lambda client, project_id, text: ("work-item-1", "yudao-run-1"))
+    monkeypatch.setattr(yudao, "wait_for_end",
+                        lambda client, project_id, work_item_id, limit_seconds:
+                        ({"status": "done"}, False))
+    monkeypatch.setattr(yudao, "export_run", lambda client, run_id: export)
+    monkeypatch.setattr(yudao, "stop_service", lambda process, timeout_seconds=60: ("", ""))
+    monkeypatch.setattr(run_yudao_eval, "score_delivery",
+                        lambda delivery_dir, evidence_dir:
+                        {"checks": [], "material_version": "scenario-3@2",
+                         "scorer_version": "scorer-3@2"})
+
+
+def test_a_tampered_check_voids_the_yudao_run(runs_root, tmp_path, monkeypatch):
+    """改一份隐藏检查：`run_once` 在评分之前判这次运行无效，报告写明摘要不同。"""
+    copy = tmp_path / "scenario-3"
+    shutil.copytree(yudao.scenario_base(), copy)
+    target = copy / "checks" / "check_harness.py"
+    target.write_text(target.read_text(encoding="utf-8") + "\n# tampered\n", encoding="utf-8")
+    monkeypatch.setattr(yudao, "scenario_base", lambda: str(copy))
+    export = _export()
+    export["run_id"] = "yudao-run-1"
+    _stub_run_once(monkeypatch, tmp_path, export)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"),
+                                  MODEL, 60)
+
+    assert run["void"] is True
+    assert run["void_reason"] == "材料摘要与材料版本记录不同：checks"
+    assert run["score"]["scorer_version"] == "scorer-3@2"
+
+
+def test_clean_materials_let_the_yudao_run_score(runs_root, tmp_path, monkeypatch):
+    """材料没有改动、没有上游访问：`run_once` 不作废，评分结果照常返回。"""
+    export = _export()
+    export["run_id"] = "yudao-run-1"
+    _stub_run_once(monkeypatch, tmp_path, export)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"),
+                                  MODEL, 60)
+
+    assert run["void"] is False
+    assert run["void_reason"] == ""
+    assert run["delivery_files"] == 0
+    assert run["score"]["scorer_version"] == "scorer-3@2"
+
 
 
 def test_requirement_text_carries_the_prd_and_the_agreement():

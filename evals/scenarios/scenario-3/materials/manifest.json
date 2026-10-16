@@ -1,0 +1,47 @@
+{
+  "scenario": "scenario-3",
+  "material_version": "scenario-3@2",
+  "title": "PRDBench subway fare pathfinding",
+  "source": {
+    "dataset": "github.com/AGI-Eval-Official/PRDBench 050bbcb",
+    "record": "AGI-Eval-Official__PRDBench",
+    "upstream_repository": "AGI-Eval-Official/PRDBench",
+    "version": "v0",
+    "license": "MIT"
+  },
+  "requirement": {
+    "file": "prd.md",
+    "agreement": "interface-agreement.md",
+    "table": "requirement-table.json",
+    "origin": "PRDBench task statement, rewritten for the subway fare domain",
+    "characters": 4054
+  },
+  "starting_point": {
+    "kind": "files inside the Yudao repository",
+    "note": "The runner copies the four start files into a run directory outside the repository. The hidden checks, requirement table and reference implementation never enter the run directory."
+  },
+  "runtime": {
+    "python": "3.13",
+    "network": "No network is needed for the run itself.",
+    "test_command": "python scorer.py --delivery <dir> --checks <dir>"
+  },
+  "reference_solution": {
+    "file": "../reference",
+    "origin": "written for this scenario",
+    "files": 6
+  },
+  "hidden_checks": {
+    "checks": "checks/",
+    "fixtures": "checks/fixtures/",
+    "note": "The scorer copies the hidden checks into the scoring directory after the run ends, so a delivery that edits a check is scored against the material's version."
+  },
+  "digests": {
+    "algorithm": "sha256",
+    "note": "LF 规范化、递归、跳过 __pycache__ 与 *.pyc",
+    "entries": {
+      "checks": "sha256:d824c997c9cd7da9035c9e5dd3856e39753e9340815d5d98379e89320f9773e6",
+      "materials/requirement-table.json": "sha256:755901b6b115c7788105e6471e32a0fd78d4383a13ec380e70a4cecbe484ff1c",
+      "reference": "sha256:b0617b2d3ed50c3d5c5c166b91700f7d2c4867aeac94e9c9cb48fea698ef6ab1"
+    }
+  }
+}
