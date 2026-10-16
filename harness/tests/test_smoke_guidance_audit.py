@@ -10,7 +10,7 @@ from harness.tools import usable_when_guidance_only
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import (
     collaboration_request, delivery_turn, guidance_response,
-    product_spec, response_turn, review_turn,
+    product_spec, product_spec_turn, response_turn, review_turn,
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -65,7 +65,7 @@ def saved_combined(tmp_path_factory):
         in_flight_changes,
         remember_guidance_then_check, explain_first,
         explain_second,
-        product_spec(
+        product_spec_turn(
             requirements=["print the given argument to stdout", "print a status column in the export"],
             change_record={
                 "changed": ["The export includes a status column"],
