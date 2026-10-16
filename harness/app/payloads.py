@@ -1394,7 +1394,8 @@ class CatalogCandidatesCollectedPayload(Payload):
     source_url: str
     fetched_at: str
     # 候选逐条带上游模型 ID，以及预填值与来源（设计说明第 4.3 节）：窗口与输出上限先取上游模型列表、
-    # 其次取模型能力表；输入方式取能力表；每个预填值带来源（models_url、capability_table 或 default）
+    # 其次取模型能力表；输入方式取能力表；每个预填值带来源（models_url、capability_table 或 default），
+    # 包含预填来源说明 capability_source
     candidates: list[dict[str, Any]]
     candidate_ids: list[str]
     error: str | None

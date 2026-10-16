@@ -1903,7 +1903,7 @@ export type DocumentModelInput = {
     /**
      * Max Output Tokens
      */
-    max_output_tokens: number;
+    max_output_tokens?: number | null;
     /**
      * Capability Source
      */
@@ -2624,7 +2624,7 @@ export type ModelInput = {
     /**
      * Max Output Tokens
      */
-    max_output_tokens: number;
+    max_output_tokens?: number | null;
     /**
      * Capability Source
      */

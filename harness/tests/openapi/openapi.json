@@ -6905,8 +6905,15 @@
             "title": "Context Window"
           },
           "max_output_tokens": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Max Output Tokens"
           },
           "capability_source": {
@@ -6974,7 +6981,6 @@
           "id",
           "model",
           "protocol",
-          "max_output_tokens",
           "provider_id"
         ],
         "title": "DocumentModelInput"
@@ -8130,8 +8136,15 @@
             "title": "Context Window"
           },
           "max_output_tokens": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Max Output Tokens"
           },
           "capability_source": {
@@ -8193,8 +8206,7 @@
         "required": [
           "id",
           "model",
-          "protocol",
-          "max_output_tokens"
+          "protocol"
         ],
         "title": "ModelInput"
       },
