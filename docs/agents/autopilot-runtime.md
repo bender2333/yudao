@@ -94,8 +94,8 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 
 | 角色 | 模型 | 说明 |
 | --- | --- | --- |
-| 执行者 | omp 配置的默认模型，当前 `9router/oro` | 按配置使用 prewalk |
-| 审查者 | `9router/gemini` | 用 `--model` 指定，与执行者的模型不同 |
+| 执行者 | omp 配置的默认模型，当前 `9router/gemini` | 按配置使用 prewalk |
+| 审查者 | `9router/oro` | 用 `--model` 指定，与执行者的模型不同 |
 | 被唤醒的架构师 | `claude-opus-5-5`，effort `xhigh` | Claude Code，用 `--model` 与 `--effort` 指定 |
 | 备用链 | `9router/ds`、`9router/gemini` | 写在机器上 omp 全局配置的 `retry.fallbackChains` 中 |
 
