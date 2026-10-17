@@ -28,3 +28,12 @@ test("构造首页与概览的路径：带回放位置时带 at，回到现在�
   assert.equal(paths.overviewAt("p1", 7), "#/p/p1/overview?at=7");
   assert.equal(paths.overviewAt("p1", null), "#/p/p1/overview");
 });
+
+test("资料页建档轮次从 round 参数读出，paths.materials 支持可选的轮次与事项", () => {
+  assert.equal(parseRoute("#/p/p1/materials").round, null);
+  assert.equal(parseRoute("#/p/p1/materials?w=w1&round=2").round, 2);
+  assert.equal(parseRoute("#/p/p1/materials?round=0").round, null);
+  assert.equal(parseRoute("#/p/p1/materials?round=abc").round, null);
+  assert.equal(paths.materials("p1"), "#/p/p1/materials");
+  assert.equal(paths.materials("p1", { workItem: "w1", round: 2 }), "#/p/p1/materials?w=w1&round=2");
+});

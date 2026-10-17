@@ -4,7 +4,7 @@
 // 接入已有项目的建档各轮（工单 #138，设计第 3.3、4.3 节）按轮列出初始 PRD、结构说明、基线核验
 // 与确认记录；旧版本的执行（原型里的 mt-oldruns）在所属工作包登记查询以后加入。
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type { DeliveryFileResult, ProjectOverviewResult, WorkItemMaterialsResult,
   WorkItemCard } from "../../api/generated/types.gen";
@@ -38,6 +38,21 @@ export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate:
     work_item: chosen ?? "",
   }, chosen === null);
   const data = materials.data;
+  const targetRound = props.route.round;
+  useEffect(() => {
+    if (targetRound === null || !data) {
+      return;
+    }
+    const scrollToTarget = () => {
+      const el = document.getElementById(`onboarding-round-${targetRound}`);
+      if (el) {
+        el.scrollIntoView({ block: "start" });
+      }
+    };
+    scrollToTarget();
+    const timer = setTimeout(scrollToTarget, 50);
+    return () => clearTimeout(timer);
+  }, [targetRound, data, chosen]);
   return (
     <div className="page y10-pp y10-mt">
       <header className="y10-pp-head">
@@ -171,7 +186,7 @@ function OnboardingBlock(props: { rounds: WorkItemMaterialsResult["onboarding_ro
       {props.rounds.length === 0 ? <Empty text="这个事项不是接入已有项目的建档" /> : (
         <ol className="y10-mt-list">
           {props.rounds.map((round) => (
-            <li className="y10-mt-doc" key={round.candidate_event_id}>
+            <li className="y10-mt-doc" key={round.candidate_event_id} id={`onboarding-round-${round.round}`}>
               <header className="y10-mt-doc-head">
                 <strong>第 {round.round} 轮</strong>
                 <Tag>建档</Tag>
@@ -209,7 +224,7 @@ function BaselineReviewBlock(props: { review: WorkItemMaterialsResult["onboardin
             ? "没有逐条结论"
             : review.conclusions.map(conclusionRow).join("；")],
           ["遗漏的能力", review.omissions.length === 0 ? "无" : review.omissions.map(omissionRow).join("；")],
-          ["基线检查", review.checks.length === 0 ? "无" : review.checks.map(checkRow).join("；")],
+          ["基线检查", review.checks.length === 0 ? "无" : review.checks.map(baselineCheckRow).join("；")],
           ["其他失败", review.other_failures.length === 0 ? "无" : review.other_failures.map(failureRow).join("；")],
           ["指纹", show(review.content_hash, "未上报")],
         ]}
@@ -228,7 +243,7 @@ function DecisionRecords(props: { rows: WorkItemMaterialsResult["onboarding_roun
           {props.rows.map((record) => (
             <li key={record.event_id}>
               <header className="y10-mt-doc-head">
-                <strong>{record.outcome === "answered" ? `回答：${record.option ?? "未记录选项"}` : "撤销"}</strong>
+                <strong>{record.outcome === "answered" ? `回答：${decisionOptionLabel(record.option)}` : "撤销"}</strong>
                 <span className="y10-muted">{formatTime(record.decided_at)}</span>
               </header>
               {record.note === null || record.note === "" ? null : <blockquote className="y10-mt-quote">{record.note}</blockquote>}
@@ -241,6 +256,26 @@ function DecisionRecords(props: { rows: WorkItemMaterialsResult["onboarding_roun
   );
 }
 
+
+const ONBOARDING_DECISION_OPTIONS: Record<string, string> = {
+  confirm: "确认",
+  revise: "提出修改",
+};
+
+function decisionOptionLabel(option: string | null): string {
+  if (option === null) {
+    return "未记录选项";
+  }
+  return ONBOARDING_DECISION_OPTIONS[option] ?? option;
+}
+
+function baselineCheckRow(value: { name?: string; command?: string; exit_code?: number; summary?: string }): string {
+  const name = text(value.name) || "未命名检查";
+  const cmd = text(value.command);
+  const exit = typeof value.exit_code === "number" ? `退出状态 ${value.exit_code}` : "";
+  const summary = text(value.summary);
+  return [name, cmd, exit, summary].filter((part) => part !== "").join(" · ");
+}
 // 逐条结论按 要求 / 状态 / 依据 一行一条（设计第 3.2 节的「各要求核实结果」）
 function conclusionRow(value: { requirement?: string; status?: string; evidence?: string }): string {
   return [text(value.requirement) || "未写明要求", conclusionName(text(value.status)), text(value.evidence)]
