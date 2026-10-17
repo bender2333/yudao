@@ -87,7 +87,7 @@ def test_decision_kind_names_cover_all_decision_kinds():
 
 
 # 决定请求事件的载荷从没有 question 字段（工单 #301）：说明用 description，正文不出现英文种类名
-@pytest.mark.parametrize("kind", ["model_unavailable", "definitions_changed", "unknown_action",
+@pytest.mark.parametrize("kind", ["model_unavailable", "definitions_changed",
                                   "no_tool_call", "workspace_unrepresentable"])
 def test_decision_requested_names_the_kind_in_chinese_with_description(kind):
     text = event_label(EventType.DECISION_REQUESTED, {"kind": kind, "description": "需要人工处理"})

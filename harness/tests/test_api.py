@@ -277,7 +277,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
-    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed", "unknown_action",
+    assert capabilities["decisions"] == ["model_unavailable", "definitions_changed",
                                          "no_tool_call", "workspace_unrepresentable", "initial_prd",
                                          "instance_upgrade", "kernel_modification"]
     deployment = capabilities["deployment"]
