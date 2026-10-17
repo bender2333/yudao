@@ -73,7 +73,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
   ```bash
   git fetch origin main
   git checkout --detach origin/main
-  claude -p --model <架构师模型> --dangerously-skip-permissions --output-format json \
+  claude -p --model <架构师模型> --effort <架构师 effort> --dangerously-skip-permissions --output-format json \
     "你是被唤醒的架构师，按 CLAUDE.md「被唤醒的架构师」一节处理全部带 needs-architect 标签的工单" \
     > .tmp/architect-<日期时刻>.json
   ```
@@ -96,7 +96,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | --- | --- | --- |
 | 执行者 | omp 配置的默认模型，当前 `9router/oro` | 按配置使用 prewalk |
 | 审查者 | `9router/gemini` | 用 `--model` 指定，与执行者的模型不同 |
-| 被唤醒的架构师 | `claude-fable-5-1` | Claude Code，用 `--model` 指定 |
+| 被唤醒的架构师 | `claude-opus-5-5`，effort `xhigh` | Claude Code，用 `--model` 与 `--effort` 指定 |
 | 备用链 | `9router/ds`、`9router/gemini` | 写在机器上 omp 全局配置的 `retry.fallbackChains` 中 |
 
 `task` 子代理请求会让执行者停滞，任务评论里写明不使用子代理。
