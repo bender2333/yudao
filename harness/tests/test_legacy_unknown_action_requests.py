@@ -34,18 +34,27 @@ def _engineering_run(data_dir, script):
 
 def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-write", before=None):
     before = {"digest": "sha256:" + action_id, "files": []} if before is None else before
-    ref = system.artifacts.put(run_id, "snapshot/before", json.dumps(before, ensure_ascii=False),
-                               media_type="application/json")
-    activated = [event for event in system.store.list_events(run_id)
-                 if event.type == EventType.DEPARTMENT_ACTIVATED]
+    snap_ref = system.artifacts.put(run_id, "snapshot/before", json.dumps(before, ensure_ascii=False),
+                                    media_type="application/json")
     args = {"path": "src/a.py", "content": "A"}
+    msg_item = {"type": "function_call", "call_id": action_id, "id": action_id, "name": tool,
+                "arguments": json.dumps(args)}
+    msg_ref = system.artifacts.put(run_id, "message", json.dumps(msg_item, ensure_ascii=False),
+                                   media_type="application/json")
+    system.writes.append(run_stream(run_id), NewEvent(
+        EventType.MODEL_MESSAGE, actor="model:fake", department="engineering",
+        state_before="ENGINEERING", state_after="ENGINEERING",
+        payload={
+            "activation_id": "act_eng_1", "step_id": 1, "purpose": "work",
+            "message_ref": asdict(msg_ref),
+        }))
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
         state_before="ENGINEERING", state_after="ENGINEERING",
         payload={"id": action_id, "name": tool, "args": args,
-                 "step_id": 1, "activation_id": activated[-1].payload["activation_id"], "attempt": 1,
-                 "purpose": "work", "before_snapshot_ref": asdict(ref)}))
-    return ref
+                 "step_id": 1, "activation_id": "act_eng_1", "attempt": 1,
+                 "purpose": "work", "before_snapshot_ref": asdict(snap_ref)}))
+    return snap_ref
 
 
 def _answer(system, decision_id, option, base_version=1):

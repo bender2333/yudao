@@ -142,17 +142,6 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
       push("停止时所处阶段", typeof request.resumed_at_phase === "string" && request.resumed_at_phase !== ""
         ? label(PHASE_LABELS, request.resumed_at_phase) : "");
       break;
-    case "unknown_action":
-      push("动作", request.action_id);
-      push("工具", request.tool);
-      push("所属部门", dept(request.department));
-      push("契约是否声明可以重复", request.repeatable ? "可以重复执行" : "不能重复执行");
-      for (const fact of Array.isArray(request.facts) ? request.facts : []) {
-        if (typeof fact === "string") {
-          rows.push({ term: "事实", value: fact });
-        }
-      }
-      break;
     case "kernel_modification":
       push("改动的内核路径", Array.isArray(request.kernel_paths) ? request.kernel_paths.join("\n") : "");
       push("差异", request.diff);

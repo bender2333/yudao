@@ -9,7 +9,6 @@ import json
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from .decisions import UNKNOWN_ACTION
 from .models import ArtifactRef, DecisionRequest, Event, EventType, hash_bytes
 
 # 动作的三类处置（恢复契约第 4 节）：completed 已有结果；unknown 已经发出但结果没有得到确认，必须核实或
@@ -70,19 +69,6 @@ def classify_actions(events: Sequence[Event]) -> dict[tuple[str, int | None, str
     return actions
 
 
-
-def resolved_by_decision(events: Sequence[Event], decisions: Iterable[Any]) -> set[tuple[str, int | None, str]]:
-    # 已经被回答的「核实结果未知的动作」请求覆盖的动作：只有选择「按当前实际状态继续」才算确认完毕。
-    # 覆盖的范围包括这一次逻辑动作的全部尝试（按逻辑动作编号判断），因此不再重复发出请求
-    accepted: set[str] = set()
-    for decision in decisions:
-        if (decision.kind == UNKNOWN_ACTION.name and decision.status == "answered"
-                and (decision.answer or {}).get("option") == "continue"):
-            accepted.add(str(decision.request.get("action_id")))
-    if not accepted:
-        return set()
-    return {identity for identity, info in classify_actions(events).items()
-            if info["status"] == ACTION_UNKNOWN and info["action_id"] in accepted}
 
 def _tool_name(event: Event) -> str:
     return str((event.payload or {}).get("name") or "")
@@ -260,13 +246,10 @@ def _compare_single_target(path: str, target: str, *, before: dict[str, str],
 # 恢复观察状态（工单 #18）
 
 def unresolved_unknown_actions(events: Sequence[Event],
-                               decisions: Iterable[DecisionRequest]) -> dict[tuple[str, int | None, str], dict[str, Any]]:
-    # 还没有得到处置的结果未知动作：有 tool_started，既没有结果、也不在已经被回答的核实请求覆盖范围内。
-
-    # 已经发出、仍等待回答的核实请求由调用方从决定请求中读取
-    resolved = resolved_by_decision(events, decisions)
+                               decisions: Iterable[DecisionRequest] = ()) -> dict[tuple[str, int | None, str], dict[str, Any]]:
+    # 还没有得到处置的结果未知动作：有 tool_started，没有结果或核实记录
     return {identity: info for identity, info in classify_actions(events).items()
-            if info["status"] == ACTION_UNKNOWN and identity not in resolved}
+            if info["status"] == ACTION_UNKNOWN}
 
 def open_decisions(decisions: Iterable[DecisionRequest], *, kind: str | None = None) -> list[DecisionRequest]:
     # 未回答的决定请求；给出种类时只取该种类

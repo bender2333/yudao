@@ -34,7 +34,6 @@ DECISION_KIND_NAMES: dict[str, str] = {
     "no_tool_call": "已暂停（模型没有调用工具），等待继续",
     "workspace_unrepresentable": "已暂停（工作区无法表示），等待继续",
     "definitions_changed": "定义版本不同，等待选择",
-    "unknown_action": "动作结果未知，等待核实",
     "initial_prd": "接入已有项目的初始需求文档等待确认",
     "instance_upgrade": "实例升级等待批准",
     "kernel_modification": "交付改动了内核清单里的路径，等待批准",
@@ -66,6 +65,7 @@ WRITEBACK_REASON_NAMES = {
 }
 # 说明里出现的取值按中文写，机器标识不直接出现（暂缓采纳、用户取消决定请求、写回停止原因）
 OTHER_VALUE_NAMES = {"baseline_changed": "基线已经变化", "user_cancelled": "用户已取消",
+                     "superseded_by_hand_back": "已交还模型",
                      **WRITEBACK_REASON_NAMES}
 
 
