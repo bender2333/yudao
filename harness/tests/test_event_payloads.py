@@ -21,8 +21,11 @@ from harness.write_path import NewCatalogEvent
 # （test_event_sequence.py），这里从系统整体运行一个项目：登记、配置、材料、归档与恢复、事项开始失败、
 # 两个事项一个采纳一个保留为未采纳候选，再加一个事项走真实的采纳写回流程（#347 的五种写回事件全部产出），
 # 目录流中的实例升级三个事件（#355、#462）也在这里产出，核对日志中的每条事件。
+_PASS_COMMAND = f'"{sys.executable}" -c "import sys; sys.exit(0)"'
+
+
 def _release_script(summary, files=None):
-    return [product_spec(), delivery_turn(summary=summary, files=files),
+    return [product_spec(), delivery_turn(summary=summary, files=files, checks={_PASS_COMMAND: 0}),
             review_turn("release", f"ok {summary}")]
 
 def _release_report() -> ReleaseCheckReport:
