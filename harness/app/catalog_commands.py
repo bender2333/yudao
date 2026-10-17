@@ -13,7 +13,7 @@ from pydantic import PositiveInt
 
 from ..event_store import Command, catalog_stream
 from ..models import CatalogEventType
-from ..providers import CatalogValidationError, DEFAULT_TIMEOUT_SEC, ProviderError, SUPPORTED_PROTOCOLS, format_capability_source, suggested
+from ..providers import CatalogValidationError, DEFAULT_TIMEOUT_SEC, ProviderError, SUPPORTED_PROTOCOLS, suggested
 from ..write_path import NewCatalogEvent
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Text
@@ -24,6 +24,31 @@ if TYPE_CHECKING:
 
 # 与 Provider 模块支持的协议同一份清单
 ProtocolName = Literal[tuple(sorted(SUPPORTED_PROTOCOLS))]
+
+_PREFILL_SOURCE_LABELS: Mapping[str, str] = {
+    "models_url": "上游模型列表",
+    "capability_table": "能力表",
+    "preset_default": "服务方案默认",
+    "default": "默认",
+}
+
+
+def _format_candidate_source(candidate: Mapping[str, Any]) -> str:
+    parts: list[str] = []
+    proto_src = candidate.get("protocol_source")
+    if proto_src:
+        parts.append(f"协议：{_PREFILL_SOURCE_LABELS.get(str(proto_src), str(proto_src))}")
+    window_src = candidate.get("context_window_source")
+    if window_src:
+        parts.append(f"窗口：{_PREFILL_SOURCE_LABELS.get(str(window_src), str(window_src))}")
+    output_src = candidate.get("max_output_tokens_source")
+    if output_src:
+        parts.append(f"输出上限：{_PREFILL_SOURCE_LABELS.get(str(output_src), str(output_src))}")
+    modalities_src = candidate.get("input_modalities_source")
+    if modalities_src:
+        parts.append(f"输入方式：{_PREFILL_SOURCE_LABELS.get(str(modalities_src), str(modalities_src))}")
+    return " · ".join(parts)
+
 
 
 class ProviderInput(Contract):
@@ -47,7 +72,6 @@ class ModelInput(Contract):
     context_window: int | None = None
     max_output_tokens: PositiveInt | None = None
     capability_source: str = ""
-    capacity_confirmed: bool = False
     accepts_required_tool_call: bool = True
     # 输入方式（设计说明第 4.3 节）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
     # 模型测试不核实它，修改以后准入保持，从下一次模型请求起使用新值
@@ -85,7 +109,7 @@ class ModelInput(Contract):
         elif candidate.get("capability_source"):
             source = str(candidate["capability_source"])
         else:
-            source = format_capability_source(candidate)
+            source = _format_candidate_source(candidate)
         modalities = candidate.get("input_modalities") or ["text"]
         return cls(
             id=entry_id,
@@ -94,7 +118,6 @@ class ModelInput(Contract):
             context_window=window,
             max_output_tokens=output,
             capability_source=source,
-            capacity_confirmed=True,
             accepts_required_tool_call=accepts_required_tool_call,
             input_modalities=[item for item in modalities if item in ("text", "image")],
             reasoning_levels=list(reasoning_levels),
@@ -383,10 +406,7 @@ async def _save_document(application: Application, command: Command, request: Ca
     previous = facade.to_document()
     document = {
         "providers": [item.model_dump() for item in request.document.providers],
-        # 目录文档不含逐行容量确认标记：确认只发生在 catalog.connection.save（工单 #86），
-        # 文档中的定义带容量值即视为已确认
-        "models": [{key: value for key, value in item.model_dump().items() if key != "capacity_confirmed"}
-                   for item in request.document.models],
+        "models": [item.model_dump() for item in request.document.models],
         "bindings": {key: item.model_dump() for key, item in request.document.bindings.items()},
     }
     try:

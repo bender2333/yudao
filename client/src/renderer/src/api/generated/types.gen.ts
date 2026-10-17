@@ -1909,10 +1909,6 @@ export type DocumentModelInput = {
      */
     capability_source?: string;
     /**
-     * Capacity Confirmed
-     */
-    capacity_confirmed?: boolean;
-    /**
      * Accepts Required Tool Call
      */
     accepts_required_tool_call?: boolean;
@@ -2629,10 +2625,6 @@ export type ModelInput = {
      * Capability Source
      */
     capability_source?: string;
-    /**
-     * Capacity Confirmed
-     */
-    capacity_confirmed?: boolean;
     /**
      * Accepts Required Tool Call
      */

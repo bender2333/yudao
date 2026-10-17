@@ -6921,11 +6921,6 @@
             "title": "Capability Source",
             "default": ""
           },
-          "capacity_confirmed": {
-            "type": "boolean",
-            "title": "Capacity Confirmed",
-            "default": false
-          },
           "accepts_required_tool_call": {
             "type": "boolean",
             "title": "Accepts Required Tool Call",
@@ -8151,11 +8146,6 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
-          },
-          "capacity_confirmed": {
-            "type": "boolean",
-            "title": "Capacity Confirmed",
-            "default": false
           },
           "accepts_required_tool_call": {
             "type": "boolean",

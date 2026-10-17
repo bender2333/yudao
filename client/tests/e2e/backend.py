@@ -384,7 +384,7 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
         models=[ModelInput(
             id="glm-4.6", model="glm-4.6", protocol="responses",
             context_window=200000, max_output_tokens=32000,
-            capability_source="能力表", capacity_confirmed=True,
+            capability_source="能力表",
             accepts_required_tool_call=True, input_modalities=["text"],
             reasoning_levels=["low", "high"], default_reasoning_level="low", reasoning_mode="effort",
         )],
@@ -416,7 +416,7 @@ async def seed_catalog(application: Application, upstream_base: str, models_url:
             models=[ModelInput(
                 id="glm-rejected", model="glm-rejected", protocol="responses",
                 context_window=200000, max_output_tokens=32000,
-                capability_source="能力表", capacity_confirmed=True, input_modalities=["text"],
+                capability_source="能力表", input_modalities=["text"],
             )],
         ), actor="user:local")
         if isinstance(rejected, Rejected):

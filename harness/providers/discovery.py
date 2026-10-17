@@ -110,32 +110,6 @@ def effective_models_url(provider: ProviderDefinition, override: str | None = No
     return provider.base_url.rstrip("/") + "/models"
 
 
-PREFILL_SOURCE_LABELS: Mapping[str, str] = {
-    "models_url": "上游模型列表",
-    "capability_table": "能力表",
-    "preset_default": "服务方案默认",
-    "default": "默认",
-}
-
-
-def format_capability_source(candidate: Mapping[str, Any]) -> str:
-    # 预填值的来源标注（设计说明第 4.3 节「界面标明每个预填值的来源」）
-    parts: list[str] = []
-    proto_src = candidate.get("protocol_source")
-    if proto_src:
-        parts.append(f"协议：{PREFILL_SOURCE_LABELS.get(proto_src, proto_src)}")
-    window_src = candidate.get("context_window_source")
-    if window_src:
-        parts.append(f"窗口：{PREFILL_SOURCE_LABELS.get(window_src, window_src)}")
-    output_src = candidate.get("max_output_tokens_source")
-    if output_src:
-        parts.append(f"输出上限：{PREFILL_SOURCE_LABELS.get(output_src, output_src)}")
-    modalities_src = candidate.get("input_modalities_source")
-    if modalities_src:
-        parts.append(f"输入方式：{PREFILL_SOURCE_LABELS.get(modalities_src, modalities_src)}")
-    return " · ".join(parts)
-
-
 def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
     # 候选带预填值与来源（设计说明第 4.3 节）：协议先取能力表（来源 capability_table），
     # 其次取服务方案的默认协议（来源 preset_default），自定义服务预填 Chat Completions（来源 default）；
@@ -183,7 +157,6 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
             modalities = ["text", "image"]
         candidate["input_modalities"] = modalities
         candidate["input_modalities_source"] = "capability_table" if entry is not None else "default"
-        candidate["capability_source"] = format_capability_source(candidate)
         candidates.append(candidate)
     candidates.sort(key=lambda entry: entry["id"])
     return candidates
@@ -230,4 +203,4 @@ def _unknown(provider: ProviderDefinition, source_url: str, fetched_at: str, err
     }
 
 
-__all__ = ["PREFILL_SOURCE_LABELS", "effective_models_url", "format_capability_source", "probe_connection", "refresh_candidates"]
+__all__ = ["effective_models_url", "probe_connection", "refresh_candidates"]

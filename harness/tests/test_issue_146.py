@@ -95,10 +95,10 @@ def _document_model(model_id, provider_id="provider-a", *, upstream="upstream-a"
     return entry
 
 def _command_model(model_id, *, upstream="upstream-a", input_modalities=None,
-                   context_window=32000, max_output_tokens=4096, capacity_confirmed=True, protocol="responses"):
+                   context_window=32000, max_output_tokens=4096, protocol="responses"):
     return {"id": model_id, "model": upstream, "protocol": protocol, "context_window": context_window,
             "max_output_tokens": max_output_tokens, "capability_source": "",
-            "capacity_confirmed": capacity_confirmed, "input_modalities": input_modalities or ["text"]}
+            "input_modalities": input_modalities or ["text"]}
 
 class _Opened:
     def __init__(self, tmp_path, document) -> None:

@@ -453,7 +453,6 @@ test("提交的形状：档位与输入方式按声明写入，默认档位不�
   assert.equal(input.max_output_tokens, 100);
   assert.deepEqual(input.input_modalities, ["text", "image"]);
   assert.equal(input.default_reasoning_level, "high");
-  assert.equal(input.capacity_confirmed, true);
   // 默认档位不属于支持档位时交回 null（默认档位只能从已选的支持档位中选择）
   assert.equal(rowToModelInput({ ...row, default_reasoning_level: "max" }).default_reasoning_level, null);
   // 不支持图像时只有文本

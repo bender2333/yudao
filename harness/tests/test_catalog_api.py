@@ -26,15 +26,12 @@ def _provider(provider_id="p1", *, base_url=UPSTREAM_BASE, models_url=""):
 
 def _model(model_id="m1", *, model="model-x", protocol="responses"):
     # 连接保存用的模型访问定义：所属连接由命令参数给出，调用协议必填（ADR-0033）；
-    # 每一行带容量确认（工单 #86）
-    return {"id": model_id, "model": model, "protocol": protocol, "capacity_confirmed": True,
+    return {"id": model_id, "model": model, "protocol": protocol,
             "context_window": 32000, "max_output_tokens": 2048}
 
 
 def _document_model(provider_id, model_id="m1"):
-    # 目录文档中的定义自己带上所属连接；文档不带逐行容量确认标记（工单 #86）
-    return {key: value for key, value in {**_model(model_id), "provider_id": provider_id}.items()
-            if key != "capacity_confirmed"}
+    return {**_model(model_id), "provider_id": provider_id}
 
 
 def _document(*, provider_id="p1", model_id="m1", base_url=UPSTREAM_BASE, models_url="", bindings=None):

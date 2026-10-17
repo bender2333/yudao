@@ -63,15 +63,12 @@ def _provider(base_url, *, models_url=""):
 
 
 def _model():
-    # 保存命令用的定义：每行带容量确认
-    return {"id": "m384", "model": "upstream-384", "protocol": "responses", "capacity_confirmed": True,
+    return {"id": "m384", "model": "upstream-384", "protocol": "responses",
             "context_window": 32000, "max_output_tokens": 2048}
 
 
 def _document_model():
-    # 目录文件里的定义：带上所属连接，不带命令用的逐行确认标记
-    return {key: value for key, value in {**_model(), "provider_id": PROVIDER_ID}.items()
-            if key != "capacity_confirmed"}
+    return {**_model(), "provider_id": PROVIDER_ID}
 
 
 def _document(base_url, *, models_url=""):

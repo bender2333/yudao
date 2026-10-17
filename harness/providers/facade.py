@@ -398,7 +398,6 @@ class ProviderFacade:
                 for item in models_raw:
                     nested = dict(item)
                     nested["provider_id"] = provider_id
-                    nested.pop("capacity_confirmed", None)
                     models.append(nested)
             merged = {"providers": providers, "models": models, "bindings": document["bindings"]}
             _parse_document(merged, self._startup_mode)
@@ -408,7 +407,6 @@ class ProviderFacade:
                 for item in models_raw:
                     nested = dict(item)
                     nested["provider_id"] = provider_id
-                    nested.pop("capacity_confirmed", None)
                     self._store.save_model(nested)
                     submitted.add(str(nested.get("id")))
                 self._prune_admissions(str(provider_id), submitted)

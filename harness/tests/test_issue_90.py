@@ -191,8 +191,7 @@ def test_connection_address_change_lists_impact_and_returns_definitions_to_candi
                                    "protocol": item.get("protocol", "responses"),
                                    "context_window": item.get("context_window"),
                                    "max_output_tokens": item["max_output_tokens"],
-                                   "capability_source": item.get("capability_source", ""),
-                                   "capacity_confirmed": True}
+                                   "capability_source": item.get("capability_source", "")}
                                   for item in document["models"]
                                   if item["provider_id"] == "provider-a"])
             assert saved.status_code == 200, saved.text
@@ -258,8 +257,7 @@ def test_provider_delete_lists_definitions_and_deletes_unreferenced_ones(tmp_pat
                       provider=_provider("provider-b", "http://127.0.0.1:1/v1", "KEY_B"),
                       models=[{"id": "model-b", "model": "upstream-b", "protocol": "responses",
                                "context_window": 32000,
-                               "max_output_tokens": 2048, "capability_source": "",
-                               "capacity_confirmed": True}])
+                               "max_output_tokens": 2048, "capability_source": ""}])
         assert saved.status_code == 200, saved.text
         _set_model(client, project_id, "engineering", provider_id="provider-b", model_id="model-b")
 

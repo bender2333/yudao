@@ -60,24 +60,6 @@ def test_model_without_output_cap_is_rejected():
         ProviderStore.from_dict({"providers": [_provider()], "models": [payload]})
     assert any(issue.location.endswith("max_output_tokens") for issue in exc.value.issues)
 
-def test_connection_save_requires_per_row_capacity_confirmation(tmp_path):
-    # catalog.connection.save 中每一行带容量确认，没有确认的行不能保存
-    from harness.app.catalog_commands import CatalogConnectionSave
-
-    unconfirmed = CatalogConnectionSave.model_validate({
-        "command_id": str(uuid.uuid4()), "base_version": 1, "provider": _provider(),
-        "models": [{"id": "m1", "model": "model-x", "protocol": "responses", "context_window": 32000,
-                    "max_output_tokens": 2048}],
-    })
-    assert unconfirmed.models[0].capacity_confirmed is False
-
-    confirmed = CatalogConnectionSave.model_validate({
-        "command_id": str(uuid.uuid4()), "base_version": 1, "provider": _provider(),
-        "models": [{"id": "m1", "model": "model-x", "protocol": "responses", "context_window": 32000,
-                    "max_output_tokens": 2048, "capacity_confirmed": True}],
-    })
-    assert confirmed.models[0].capacity_confirmed is True
-
 def test_editing_capacity_in_json_counts_as_confirmation(tmp_path):
     # 在 JSON 中修改容量等同于确认：目录文档中的定义带容量即视为已确认
     facade = _facade(tmp_path)

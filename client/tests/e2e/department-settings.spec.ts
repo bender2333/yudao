@@ -326,7 +326,7 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
           id: definition!.id, model: definition!.model, protocol: definition!.protocol,
           context_window: definition!.context_window,
           max_output_tokens: definition!.max_output_tokens, capability_source: definition!.capability_source,
-          capacity_confirmed: true, accepts_required_tool_call: definition!.accepts_required_tool_call,
+          accepts_required_tool_call: definition!.accepts_required_tool_call,
           input_modalities: definition!.input_modalities, reasoning_levels: definition!.reasoning_levels,
           default_reasoning_level: definition!.default_reasoning_level, reasoning_mode: definition!.reasoning_mode,
         }],

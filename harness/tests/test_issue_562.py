@@ -334,3 +334,35 @@ def test_modifying_window_keeps_admission(tmp_path: Any) -> None:
             assert model_after["context_window"] == 256000
     finally:
         upstream.close()
+
+
+def test_plain_row_with_full_capacity_without_confirmation_marker_saves_successfully(tmp_path: Any) -> None:
+    # 验收第 2 条：提交不带确认标记、容量齐全的新增行能保存
+    #（把确认门槛加回去时这一项变红，区分「预填直接采用」与「行内确认」）
+    upstream = _ModelsServer({"data": []})
+    try:
+        opened = _Opened(tmp_path, _document(upstream.base))
+        with running_api(opened) as client:
+            current = _catalog(client)["revision"]
+            plain_model = {
+                "id": "model-plain",
+                "model": "upstream-plain",
+                "protocol": "chat_completions",
+                "context_window": 64000,
+                "max_output_tokens": 4096,
+                "capability_source": "手动",
+            }
+            saved = _command(
+                client,
+                "catalog.connection.save",
+                base_version=current,
+                provider=_provider(upstream.base),
+                models=[plain_model],
+            )
+            assert saved.status_code == 200, saved.text
+            catalog_data = _catalog(client)
+            saved_model = next(item for item in catalog_data["models"] if item["id"] == "model-plain")
+            assert saved_model["context_window"] == 64000
+            assert saved_model["max_output_tokens"] == 4096
+    finally:
+        upstream.close()
