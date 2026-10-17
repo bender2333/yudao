@@ -1,13 +1,12 @@
 # 动作核实与恢复（工单 #17、#18、#307，恢复契约第 1、4 节）。动作的身份是（激活、步骤、模型给出的调用编号）三元组：
 # tool_started 在工具许可允许以后、执行之前写入，tool_called/tool_skipped 在执行以后写入。根据这两类事件、
 # 以及保存的模型响应中尚未得到处置的工具调用，把每个动作分成三类：未发送、已完成、结果未知。
-
 # 恢复观察状态（工单 #18）由 run 的事实与未回答的决定请求得出，不读取时钟、不调用模型。
 
 from __future__ import annotations
 
 import json
-from collections.abc import Container, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from .decisions import UNKNOWN_ACTION

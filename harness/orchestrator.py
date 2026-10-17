@@ -889,6 +889,7 @@ class Orchestrator:
             state_before=phase, state_after=phase, parent_event_id=started.event_id,
             payload=event_payload,
         )
+
     def _auto_verified(self, started: Any, phase: str, comparison: dict[str, Any]) -> NewEvent:
         # 自动核实（工单 #308）：对比确认动作已经完成时记一条核实记录，不补造原来的 tool_called 回执。
         # 结果进入部门历史：input_item 按原来的动作编号给出，与同一条结果的其它记录共享这个编号
