@@ -12,6 +12,8 @@ export type Route = {
   // 回放位置（全局位置，设计说明第 3.3 节写在 ?at= 中）：刷新、后退与分享链接都回到同一位置；
   // 为 null 时是实时画面
   at: number | null;
+  // 资料页选中的建档轮次（工单 #573，设计第 3.4 节写在 ?round= 中）：进入资料页时滚到对应轮次
+  round: number | null;
 };
 
 const SYSTEM_PAGES: Record<string, string> = {
@@ -26,7 +28,7 @@ export function parseRoute(hash: string): Route {
   const [pathPart, queryPart] = text.split("?", 2);
   const query = new URLSearchParams(queryPart ?? "");
   const segments = pathPart.split("/").filter(Boolean);
-  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, systemPage: null, attemptId: null, runId: null, at: replayPosition(query) };
+  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, systemPage: null, attemptId: null, runId: null, at: replayPosition(query), round: parseRound(query) };
   if (segments.length === 0 || segments[0] === "home") {
     route.name = "home";
     return route;
@@ -77,6 +79,15 @@ function replayPosition(query: URLSearchParams): number | null {
   return Number(text);
 }
 
+// 路径参数里的建档轮次：正整数才认
+function parseRound(query: URLSearchParams): number | null {
+  const text = query.get("round");
+  if (text === null || !/^[1-9]\d*$/.test(text)) {
+    return null;
+  }
+  return Number(text);
+}
+
 // 每个页面的路径（原型 v8 设计说明第 3.3 节）
 export const paths = {
   home: () => "#/home",
@@ -85,7 +96,17 @@ export const paths = {
   overview: (projectId: string) => `#/p/${projectId}/overview`,
   dept: (projectId: string, department: string) => `#/p/${projectId}/dept/${department}`,
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
-  materials: (projectId: string) => `#/p/${projectId}/materials`,
+  materials: (projectId: string, options: { workItem?: string | null; round?: number | null } = {}) => {
+    const query = new URLSearchParams();
+    if (options.workItem) {
+      query.set("w", options.workItem);
+    }
+    if (options.round) {
+      query.set("round", String(options.round));
+    }
+    const suffix = query.toString();
+    return `#/p/${projectId}/materials${suffix ? `?${suffix}` : ""}`;
+  },
   observe: (projectId: string) => `#/p/${projectId}/observe`,
   // 请求详情：事项范围（w）与 run 标识（r）都写在参数里，刷新、后退与直接输入路径都能读回
   observeDetail: (projectId: string, attemptId: string, options: { workItem?: string | null; runId?: string | null } = {}) => {

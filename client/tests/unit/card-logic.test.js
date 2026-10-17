@@ -236,11 +236,14 @@ test("初始 PRD 的快照没有 git 仓库时写明采集时的目录内容", (
   assert.equal(map["快照规模"], "文件 1 项，目录 0 项，共 12 字节");
 });
 
-test("初始 PRD 的两个链接都指向资料页，「在项目中查看」也落到资料页", () => {
+test("初始 PRD 的两个链接都指向资料页并带上轮次，「在项目中查看」也落到资料页", () => {
   const links = decisionLinks(initialPrd());
   assert.deepEqual(links.map((link) => link.label), ["PRD.md", "STRUCTURE.md"]);
-  assert.deepEqual(links.map((link) => link.href), ["#/p/p1/materials?w=w1", "#/p/p1/materials?w=w1"]);
-  assert.equal(viewHref(initialPrd()), "#/p/p1/materials?w=w1");
+  assert.deepEqual(links.map((link) => link.href), ["#/p/p1/materials?w=w1&round=2", "#/p/p1/materials?w=w1&round=2"]);
+  assert.equal(viewHref(initialPrd()), "#/p/p1/materials?w=w1&round=2");
+  // 没有轮次时链接不带 round
+  const noRound = decision({ kind: "initial_prd", request: { work_item_id: "w1" }, work_item_id: "w1" });
+  assert.equal(viewHref(noRound), "#/p/p1/materials?w=w1");
   // 请求自己给出页面时以它为准
   assert.equal(viewHref(initialPrd({ view: "#/p/p1/overview" })), "#/p/p1/overview");
 });

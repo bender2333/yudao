@@ -208,7 +208,7 @@ test.describe("初始 PRD 的修改往返（1440×900）", () => {
 });
 
 test.describe("初始 PRD 的资料（1440×900）", () => {
-  test("1440×900：资料页按轮列出初始 PRD 与确认记录，结构说明、基线核验与基线检查都在", async () => {
+  test("1440×900：提出修改等到第二轮后，资料页按轮列出第 1、2 轮与确认记录，链接定位到第 2 轮", async () => {
     const project = "修改往返资料页";
     test.setTimeout(300_000);
     const client = await openClient({ width: 1440, height: 900 });
@@ -216,29 +216,64 @@ test.describe("初始 PRD 的资料（1440×900）", () => {
     const page = client.page;
     try {
       await onboardAndWaitFirstCard(page, project);
-      const card = overviewCard(page);
+      const card1 = overviewCard(page);
 
-      // 两个链接跳到资料页：PRD.md 与 STRUCTURE.md 指向同一个事项的资料（资料页按轮展示原文）
-      await card.getByRole("button", { name: "PRD.md" }).click();
+      // 提出一次修改，等到第二轮的决定卡片（验收第 1 条）
+      await card1.getByLabel("说明（可选）").fill(NOTE);
+      await card1.getByRole("button", { name: "提出修改" }).click();
+      await expect(card1).toContainText("已提交，等待控制主机确认");
+      await expect(overviewCard(page)).toContainText("第 2 轮");
+      await expect(overviewCard(page)).toContainText("上一轮修改意见");
+      await expect(overviewCard(page)).toContainText(NOTE);
+      const card2 = overviewCard(page);
+
+      // 从第 2 轮卡片的 PRD.md 链接进入资料页，页面定位到第 2 轮
+      await card2.getByRole("button", { name: "PRD.md" }).click();
       await waitUntil(async () => (await bodyText(page)).includes("建档各轮"), page, "资料页显示建档各轮");
       const materials = page.locator(".page.y10-mt");
       await expect(materials).toContainText("建档各轮");
       await expect(materials).toContainText("第 1 轮");
-      await expect(materials).toContainText("初始 PRD");
-      await expect(materials).toContainText("结构说明");
-      await expect(materials).toContainText("基线核验");
-      await expect(materials).toContainText("确认记录");
+      await expect(materials).toContainText("第 2 轮");
 
-      // 按轮列出：第 1 轮的原文、结构说明与基线核验的条目（设计第 3.2、4.3 节）
-      const first = materials.locator("li.y10-mt-doc").filter({ hasText: "第 1 轮" }).first();
-      await expect(first).toContainText("PRD");
-      await expect(first).toContainText("# 现有结构说明");
-      await expect(first).toContainText("要求所在的位置");
-      // 建档脚本的模型调用队列在本文件内共享，第几条用例接入决定用到第几轮的要求文案，这里只核对接入
-      await expect(first).toContainText(/read the project layout at step \d+/);
-      await expect(first).toContainText("已核实");
+      const round1 = page.locator("#onboarding-round-1");
+      const round2 = page.locator("#onboarding-round-2");
 
-      // STRUCTURE.md 链接同样跳到资料页
+      // 第 2 轮卡片链接进入时，页面定位到第 2 轮的初始 PRD 与结构说明（在可见区域内）
+      await expect(round2.getByRole("heading", { name: "初始 PRD" })).toBeInViewport();
+      await expect(round2.getByRole("heading", { name: "现有结构说明" })).toBeInViewport();
+
+      // 第 1 轮：初始 PRD 原文、结构说明原文、基线核验逐条结论、基线检查（名称、命令、退出状态）与其他失败
+      await expect(round1).toContainText("初始 PRD");
+      await expect(round1).toContainText("# 现有结构说明");
+      await expect(round1).toContainText("要求所在的位置");
+      await expect(round1).toContainText("已核实");
+      await expect(round1).toContainText("smoke");
+      await expect(round1).toContainText("python");
+      await expect(round1).toContainText("退出状态 0");
+      await expect(round1).toContainText("其他失败");
+      // 第 1 轮的确认记录是「提出修改」与修改意见原文
+      await expect(round1).toContainText("回答：提出修改");
+      await expect(round1).toContainText(NOTE);
+
+      // 第 2 轮：写出上一轮的修改意见
+      await expect(round2).toContainText("上一轮的修改意见：");
+      await expect(round2).toContainText(NOTE);
+      // 第 2 轮的 PRD 原文是第二轮 ProductSpec 的内容（要求与第 1 轮不同）
+      const firstPrd = await round1.locator("pre.raw").first().innerText();
+      const secondPrd = await round2.locator("pre.raw").first().innerText();
+      expect(firstPrd).toContain("read the project layout at step ");
+      expect(secondPrd).toContain("read the project layout at step ");
+      expect(secondPrd).not.toEqual(firstPrd);
+      // 结构说明原文、基线核验逐条结论、基线检查（名称、命令、退出状态）与其他失败
+      await expect(round2).toContainText("# 现有结构说明");
+      await expect(round2).toContainText("要求所在的位置");
+      await expect(round2).toContainText("已核实");
+      await expect(round2).toContainText("smoke");
+      await expect(round2).toContainText("python");
+      await expect(round2).toContainText("退出状态 0");
+      await expect(round2).toContainText("其他失败");
+
+      // 从第 2 轮卡片的 STRUCTURE.md 链接进入，同样定位到第 2 轮的初始 PRD 与结构说明
       await page.evaluate(() => {
         window.location.hash = "#/home";
       });
@@ -246,8 +281,11 @@ test.describe("初始 PRD 的资料（1440×900）", () => {
       const home = page.locator(".page.home article.decision-card")
         .filter({ hasText: "接入已有项目的初始需求文档等待确认" }).first();
       await waitUntil(async () => (await home.count()) > 0, page, "回到首页的决定卡片");
+      await expect(home).toContainText("第 2 轮");
       await home.getByRole("button", { name: "STRUCTURE.md" }).click();
       await waitUntil(async () => (await bodyText(page)).includes("建档各轮"), page, "STRUCTURE.md 跳到资料页");
+      await expect(round2.getByRole("heading", { name: "初始 PRD" })).toBeInViewport();
+      await expect(round2.getByRole("heading", { name: "现有结构说明" })).toBeInViewport();
 
       expect(errors).toEqual([]);
     } finally {
