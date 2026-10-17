@@ -4,7 +4,6 @@
 import pytest
 
 from harness.definitions import DEFINITIONS
-from harness.recovery import action_repeatable
 from harness.tools import offers_with_input, tool_action, tool_kind, tools_for
 
 TOOLS = DEFINITIONS.tools
@@ -104,15 +103,6 @@ def test_edit_range_is_an_engineering_only_write_tool():
     assert "edit_range" not in tools_for("product")
     assert "edit_range" not in tools_for("quality")
 
-
-def test_the_single_repeatable_judgment_answers_for_tools():
-    # 唯一的判断入口（恢复契约第 4 节）：读取、搜索、检查与 bash 由工具契约各自声明 repeatable，
-    # 写入、编辑、删除与移动不可以
-    for tool in ("read_file", "list_files", "search", "read_range", "run_check", "bash"):
-        assert action_repeatable(tool, {"command": "echo hi"}) is True, tool
-    for tool in ("write_file", "edit_range", "delete_file", "move_file"):
-        assert action_repeatable(tool, {"path": "src/a.py"}) is False, tool
-    assert action_repeatable("submit_delivery", {}) is False
 
 
 def test_guidance_tool_contract_lists_explained_and_requires_host_results_for_completed():

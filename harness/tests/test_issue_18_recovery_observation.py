@@ -106,7 +106,6 @@ def test_an_unknown_action_is_observed_as_pending_verification(data_dir):
     assert [item.action_id for item in recovery.unfinished_actions] == ["lost-write"]
     action = recovery.unfinished_actions[0]
     assert action.status == "unknown" and action.tool == "write_file"
-    assert action.repeatable is False
     assert action.before_snapshot_ref["content_hash"]
     assert action.started_event_id
     restarted.close()
@@ -243,36 +242,30 @@ def test_project_loop_reports_the_recovery_observation_per_work_item(data_dir):
     _lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     loop = _query(application, PROJECT_LOOP, ProjectLoop(project_id=project_id))
     item = next(entry for entry in loop.work_items if entry.run_id == run_id)
-    assert item.recovery_state == "pending_verification", item
+    assert item.recovery_state in ("interrupted", "running"), item
     restarted.close()
 
 def test_run_recovery_describes_the_verification_record_and_next_legal_action(data_dir):
-    # 等待核实时查询返回已确认位置、未完成动作、核实依据与下一项合法操作：用户按当前实际状态继续以后，
-    # 核实记录出现，未完成动作消失，下一个合法操作回到继续
+    # 交还以后查询返回核实记录：未完成动作消失，核实记录写出依据与结果
     system, _project_id, run_id = _engineering_run(data_dir, [product_spec(),])
     _lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    assert recovery.state == "pending_verification"
-    request = _decision_events(restarted, run_id, kind="unknown_action")[0]
-    _answer(restarted, request.event_id, "continue", note="确认写入已经生效")
-
-    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    # 动作得到处置：未完成动作消失，核实记录写出依据与结果
+    # 动作得到交还处置：未完成动作消失，核实记录写出依据与结果
     assert recovery.unfinished_actions == []
     assert len(recovery.verifications) == 1
     record = recovery.verifications[0]
     assert record.action_id == "lost-write"
-    assert record.basis and record.result and record.decided_by == "user"
-    assert record.note == "确认写入已经生效"
-    assert record.decision_id == request.event_id
+    assert record.basis and record.result
     assert recovery.next_legal_action in ("continue", "none")
     restarted.close()
 

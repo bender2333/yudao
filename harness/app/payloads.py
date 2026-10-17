@@ -567,11 +567,9 @@ class ToolStartedPayload(AttemptIdentity, Versions, WorkBasis):
     snapshot_hash: str | None = None
     # 动作前的公开树快照（工单 #17）：许可以后、执行之前写入，中断后按它与动作参数核对实际效果
     before_snapshot_ref: ArtifactRef | None = None
-    # 自动重新执行（工单 #307）：这次尝试是同一个逻辑动作的上一次尝试因为结果未知而重新执行的。
-    # 记被重新执行的 tool_started 事件编号；首次尝试没有这个字段
+    # 自动重新执行（工单 #307）：旧事件保留，新版本不再写
     auto_retry_of: str | None = None
-    # 自动重新执行的依据（工单 #308）：not_happened 表示自动核实确认上一次尝试没有发生，
-    # 由这次尝试重新执行；契约声明可以重复的动作没有这个字段
+    # 自动重新执行的依据（工单 #308）：旧事件保留，新版本不再写
     verification_reason: Literal["not_happened"] | None = None
 
 
@@ -591,22 +589,28 @@ class FileActionComparison(Payload):
     detail: dict[str, Any]
 
 
-class ActionVerifiedPayload(ToolRecord):
+class ActionVerifiedPayload(Payload):
     # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
-    # resolution 为 continue 表示用户选择按当前实际状态继续（工单 #17）；auto_reexecute 表示契约声明
-    # 可以重复、自动重新执行了一次（工单 #307）；auto_verify 表示自动核实确认动作已经完成
-    # （工单 #308）。两次尝试分别记录，不补造原来那次尝试的 tool_called 回执
+    # resolution 为 continue 表示用户选择按当前实际状态继续（旧事件保留，新版本不再写，工单 #582）；
+    # handed_back 表示交还会话由模型处置（工单 #581）；
+    # auto_verify 表示自动核实确认动作已经完成（工单 #308）。
+    # 两次尝试分别记录，不补造原来那次尝试的 tool_called 回执
     # input_item 让这条结果进入部门历史，模型据此继续
+    id: str
+    name: str
+    step_id: int | None = None
+    activation_id: str | None = None
+    purpose: Purpose = "work"
+    input_item: FunctionCallOutput
     ok: bool
     error: str | None = None
-    resolution: Literal["auto_reexecute", "auto_verify", "continue"]
-    # 自动重新执行时记被重新执行的 tool_started 事件编号；自动核实与用户决定时为空
+    resolution: Literal["auto_verify", "continue", "handed_back"]
+    # 自动重新执行（工单 #307）：旧事件保留，新版本不再写
     auto_retry_of: str | None = None
     # 自动核实的依据（工单 #308）：动作前快照、动作参数与当前公开树的对比结论
     verification: FileActionComparison | None = None
     note: str | None = None
     decision_id: str | None = None
-
 
 class ProposalSubmittedPayload(Payload):
     kind: str | None
@@ -1017,12 +1021,7 @@ class PauseRequested(Payload):
 
 
 class UnknownActionRequested(Payload):
-    # 工单 #17：动作核实与一致边界。恢复时发现未确认的动作，请求用户决定如何处理。
-    # 只阻塞该动作（blocks="action"），不阻塞整个 run。
-    # facts 列出涉及的事件编号（tool_started/tool_called 对）；options 按工具是否可重复决定是否包含 reexecute；
-    # repeat_attempted 表示这个逻辑动作已经自动重新执行过一次，连续两次结果未知（工单 #307）
-    # verification 是文件动作的自动核实结论（工单 #308）：另有改动或目标内容不符时写明对比结果；
-    # 不是文件动作、没有动作前快照或读不到当前公开树时没有这个字段
+    # 旧事件保留，新版本不再写（工单 #582）
     kind: Literal["unknown_action"]
     blocks: Literal["action"]
     options: list[DecisionOption]
@@ -1092,7 +1091,7 @@ class KernelModificationRequested(Payload):
     diff: str
     held_adoption: DeliverableAdoptedPayload
 
-# 决定请求的载荷：以 kind 区分的各种决定请求
+# 决定请求的载荷：以 kind 区分的各种决定请求（UnknownActionRequested 为旧事件保留，新版本不再写）
 DecisionRequestedPayload = (ModelUnavailableRequested | UnknownActionRequested | PauseRequested
                             | InitialPrdRequested)
 # 项目流中的决定请求（工单 #136、#354）：写在项目流中的那几种，run 流中没有它们
@@ -1107,10 +1106,13 @@ class DecisionAnsweredPayload(Payload):
     base_version: int
 
 
+DecisionWithdrawReason = StopReason | Literal["superseded_by_hand_back"]
+
+
 class DecisionWithdrawnPayload(Payload):
-    # 运行结束时撤销未回答的请求；reason 是结束运行的停止原因
+    # 运行结束时撤销未回答的请求；reason 是结束运行的停止原因或交还模型
     decision_id: str
-    reason: StopReason
+    reason: DecisionWithdrawReason
 
 class RunResumedPayload(Payload):
     # 中断的 run 在启动时自动继续（工单 #16）：basis 记录中断位置与继续的依据，

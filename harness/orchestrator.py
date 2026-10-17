@@ -28,9 +28,9 @@ from .compaction import response_reserve
 from .contracts import current_contract_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION,
+    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
     DecisionClosed,
-    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_activation, blocks_run,
+    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_run,
 )
 from .environment import (
     LocalEnvironment, cleanup_inspection_workspace, inspection_root, workspace_tree,
@@ -70,8 +70,8 @@ from .providers.selection import ModelSelection
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
-from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS, action_repeatable, build_unknown_action_request,
-                       classify_actions, file_action_comparisons, resolved_by_decision)
+from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS,
+                       classify_actions, file_action_comparisons)
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
@@ -815,21 +815,33 @@ class Orchestrator:
         self.writes.transact(run_stream(run_id), request)
 
     def _await_unknown_actions(self, run_id: str) -> None:
-        # 工单 #17、#307、#308（恢复契约第 4 节）：恢复时找出结果未知的动作。文件工具（写入、编辑、
-        # 删除、移动）先按动作前的公开树快照与当前公开树核实（工单 #308）：
-        # 已经完成的记一条自动核实记录，不补造原来的回执；没有发生的由步骤驱动自动重新执行一次，
-        # 由它决定这次恢复发出哪些「核实结果未知的动作」决定请求。请求只阻塞这个动作（blocks=action），
-        # 不阻塞整个 run；「重新执行」只在动作契约声明可以重复时给出。
-        # 跳过三种动作：已经被后来的尝试取代的那一次、由新的尝试接手的动作、契约声明可以重复而且还有
-        # 自动重新执行机会的动作（步骤驱动会先自动重新执行一次，用户不必回答）。
-        # 同一个动作只发一次请求：已经有它未回答的请求时不再发
+        # 工单 #581（ADR-0038，恢复契约第 4 节）：恢复时找出结果未知的动作。
+        # 文件动作（写入、编辑、删除、移动）先按动作前的公开树快照与当前公开树自动核实：
+        # 已经完成的记一条 resolution="auto_verify" 的核实记录；没有发生的记一条 resolution="handed_back"
+        # 的核实记录，说明核实确认没有发生；unclear 或无法核实的按非文件动作处理。
+        # 其余结果未知的动作（命令、检查、读取等）记一条 resolution="handed_back" 的核实记录交还会话，
+        # 说明执行被中断、结果未知，由模型检查后决定是否重新执行。
+        # 不再发出任何 unknown_action 决定请求，事项直接继续。
         def request(transaction: Transaction) -> None:
             projection = transaction.projection
             if projection.phase in TERMINAL_PHASES:
                 return
+            for decision in transaction.decisions.values():
+                if decision.status == "open" and decision.kind == "unknown_action":
+                    transaction.append(NewEvent(
+                        EventType.DECISION_WITHDRAWN,
+                        actor="system",
+                        department=decision.request.get("department") or projection.active_department,
+                        parent_event_id=decision.decision_id,
+                        state_before=projection.phase,
+                        state_after=projection.phase,
+                        payload={
+                            "decision_id": decision.decision_id,
+                            "reason": "superseded_by_hand_back",
+                        },
+                    ))
             events = transaction.events()
             actions = classify_actions(events)
-            resolved = resolved_by_decision(events, transaction.decisions.values())
             # 文件动作的对比结论一次算完（工单 #308）：当前公开树在这一个事务里读一次
             comparisons: dict[str, dict[str, Any]] = {}
             if any(info["status"] == ACTION_UNKNOWN and info["tool"] in FILE_ACTION_TOOLS
@@ -841,46 +853,55 @@ class Orchestrator:
                         current_entries=list(zip(tree.files, tree.hashes)))
             for identity, info in actions.items():
                 started = info["started_event"]
-                if (info["status"] != ACTION_UNKNOWN or started is None or identity in resolved
-                        or info["superseded"] or (info["auto_retry_available"]
-                                                 and action_repeatable(info["tool"],
-                                                                      started.payload.get("args")))):
+                if info["status"] != ACTION_UNKNOWN or started is None:
                     continue
                 action_id = identity[2]
-                if any(decision.request.get("kind") == UNKNOWN_ACTION.name
-                       and decision.request.get("action_id") == action_id
-                       and decision.status == "open"
-                       for decision in transaction.decisions.values()):
-                    continue
                 comparison = comparisons.get(action_id)
                 if comparison is not None and comparison["verdict"] == "completed":
                     transaction.append(self._auto_verified(started, projection.phase, comparison))
                     continue
-                if (comparison is not None and comparison["verdict"] == "not_happened"
-                        and info["auto_retry_available"]):
-                    # 自动核实确认动作没有发生，还有重新执行的机会：步骤驱动按新的尝试重新执行一次，
-                    # 不发决定请求；这次记录由 run.recovery 按「自动核实（没有发生，重新执行）」给出。
-                    # 机会用掉以后核实仍然判没有发生，按 #307 第 3 步交给用户决定
+                if comparison is not None and comparison["verdict"] == "not_happened":
+                    transaction.append(self._handed_back_action(
+                        started, projection.phase,
+                        error="执行被中断，核实确认没有发生",
+                        comparison=comparison,
+                    ))
                     continue
-                tool_def = DEFINITIONS.tools.get(info["tool"])
-                payload = build_unknown_action_request(
-                    action_id=action_id, tool=info["tool"],
-                    action_kind="" if tool_def is None or tool_def.action is None else tool_def.action,
-                    department=projection.active_department or "",
-                    facts=[started.event_id],
-                    args=started.payload.get("args"),
-                    # 自动重新执行的机会已经用掉：新的尝试仍然结果未知，材料写明连续两次结果未知
-                    repeat_attempted=not info["auto_retry_available"])
-                if comparison is not None:
-                    payload = {**payload, "verification": comparison}
-                transaction.append(NewEvent(
-                    EventType.DECISION_REQUESTED, actor="system", department=projection.active_department,
-                    state_before=projection.phase, state_after=projection.phase,
-                    payload=payload,
+                transaction.append(self._handed_back_action(
+                    started, projection.phase,
+                    error="执行被中断，结果未知，由模型检查以后决定是否重新执行；没有收到输出",
+                    comparison=comparison,
                 ))
-            transaction.on_commit(lambda: self._wake(run_id))
 
         self.writes.transact(run_stream(run_id), request)
+
+    def _handed_back_action(self, started: Any, phase: str, *,
+                            error: str,
+                            comparison: dict[str, Any] | None = None) -> NewEvent:
+        # 结果未知的动作交还会话（工单 #581）：写一条 resolution="handed_back" 的核实记录，
+        # input_item 带原动作的调用编号进入部门历史，模型下一次运行时读到并决定如何处理
+        payload = started.payload or {}
+        action_id = str(payload.get("id") or "")
+        result = {"ok": False, "output": None, "error": error}
+        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
+        event_payload: dict[str, Any] = {
+            "id": action_id,
+            "name": str(payload.get("name") or ""),
+            "step_id": payload.get("step_id"),
+            "activation_id": payload.get("activation_id"),
+            "purpose": payload.get("purpose", "work"),
+            "input_item": input_item,
+            "ok": False,
+            "error": error,
+            "resolution": "handed_back",
+        }
+        if comparison is not None:
+            event_payload["verification"] = comparison
+        return NewEvent(
+            EventType.ACTION_VERIFIED, actor="system", department=started.department,
+            state_before=phase, state_after=phase, parent_event_id=started.event_id,
+            payload=event_payload,
+        )
 
     def _auto_verified(self, started: Any, phase: str, comparison: dict[str, Any]) -> NewEvent:
         # 自动核实（工单 #308）：对比确认动作已经完成时记一条核实记录，不补造原来的 tool_called 回执。
@@ -950,7 +971,7 @@ class Orchestrator:
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
                     return await asyncio.to_thread(self._settled, run_id)
-                if blocks_run(snapshot.decisions.values()) or blocks_activation(snapshot.decisions.values()):
+                if blocks_run(snapshot.decisions.values()):
                     return projection
                 await self._activate_once(run_id, connections)
         finally:
@@ -1105,7 +1126,7 @@ class Orchestrator:
         self._resume_run_clock(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
-        if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):
+        if blocks_run(transaction.decisions.values()):
             # 等待用户回答阻塞 run 或某个动作的决定请求：不开始新的激活，什么也不写
             return None
         projection = self._close_obsolete_request(transaction)
@@ -1701,15 +1722,10 @@ class Orchestrator:
                     return None
                 return transaction.projection.run_id
             return None
-        if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name,
-                                                  UNKNOWN_ACTION.name):
+        if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
             self._fail(transaction, "cancelled", "run stopped by the user's decision")
             return None
-        if decision.kind == UNKNOWN_ACTION.name and option == "continue":
-            # 工单 #17：用户选择按当前实际状态继续——写一条核实记录，不改写原来的观察；它让这个动作
-            # 得到处置，也进入部门历史，模型据此继续。选择重新执行时不写核实记录，由步骤驱动补执行
-            self._verify_unknown_action(transaction, decision, note)
-        if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):
+        if blocks_run(transaction.decisions.values()):
             return None
         return projection.run_id
 
@@ -1838,29 +1854,6 @@ class Orchestrator:
                      "resumed_at_phase": resumed_at_phase},
         ))
         transaction.on_commit(lambda: self._wake(projection.run_id))
-
-    def _verify_unknown_action(self, transaction: Transaction, decision: DecisionRequest,
-                               note: str | None) -> None:
-        # 核实结果未知的动作（工单 #17）：用户选择按当前实际状态继续时追加一条核实记录。不改写原来的
-        # tool_started 观察；动作身份与上下文取自决定请求的载荷与原始 tool_started 事件
-        action_id = str(decision.request.get("action_id") or "")
-        started = next((event for event in transaction.events()
-                        if event.type == EventType.TOOL_STARTED
-                        and str((event.payload or {}).get("id")) == action_id), None)
-        if started is None:
-            return
-        payload = started.payload
-        result = {"ok": True, "output": {"resolved": "continue", "note": note}, "error": None}
-        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
-        transaction.append(NewEvent(
-            EventType.ACTION_VERIFIED, actor="system", department=started.department,
-            state_before=transaction.projection.phase, state_after=transaction.projection.phase,
-            parent_event_id=started.event_id,
-            payload={"id": action_id, "name": str(payload.get("name") or ""), "step_id": payload.get("step_id"),
-                     "activation_id": payload.get("activation_id"),
-                     "purpose": payload.get("purpose", "work"), "input_item": input_item,
-                     "ok": True, "resolution": "continue", "note": note, "decision_id": decision.decision_id},
-        ))
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
         # 新的输入或指导：user_input_received 与 department_guidance_received 由用户提出，

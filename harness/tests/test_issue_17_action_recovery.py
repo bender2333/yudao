@@ -62,131 +62,23 @@ def _answer(system, decision_id, option, base_version=1):
         command_id=str(uuid.uuid4()), decision_id=decision_id, option=option, base_version=base_version,
         note=None), actor="user"))
 
-def test_a_lost_write_action_asks_the_user_and_is_not_blindly_redone(data_dir):
-    # 窄场景一：工具效果已经写入、完成确认没有保存。恢复不会盲目重做写入，而是发出「核实结果未知的动作」请求
+def test_a_lost_write_action_is_handed_back_and_is_not_blindly_redone(data_dir):
+    # 工具效果尚未确认。恢复不会盲目重做写入，而是交还发出它的会话，不发决定请求
     system, run_id = _engineering_run(data_dir, [product_spec(),])
     _append_lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    requests = _decisions(restarted, run_id, kind="unknown_action")
-    assert len(requests) == 1
-    payload = requests[0].payload
-    assert payload["tool"] == "write_file" and payload["action_id"] == "lost-write"
-    assert payload["blocks"] == "action"
-    # 契约声明写入不可重复：「重新执行」不出现，「按当前实际状态继续」与「停止事项」始终可选
-    assert [option["id"] for option in payload["options"]] == ["continue", "stop"]
-    # 没有发生盲目重做：动作仍然只有一条 tool_started，没有补出 tool_called
-    restarted.close()
-    reopened = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    assert len([event for event in reopened.store.list_events(run_id)
-                if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-write"]) == 1
-    assert [event for event in reopened.store.list_events(run_id)
-            if event.type == EventType.TOOL_CALLED and event.payload.get("id") == "lost-write"] == []
-    reopened.close()
-
-def _append_retry(system, run_id, previous, *, tool="run_check", action_id="lost-check"):
-    # 追加自动重新执行的那一次尝试：同样的调用编号，auto_retry_of 写明它取代的那次 tool_started 事件编号，
-    # 没有结果——表示进程在新的尝试执行到一半时再次中断
-    system.writes.append(run_stream(run_id), NewEvent(
-        EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
-        payload={"id": action_id, "name": tool, "args": dict(previous.payload.get("args") or {}),
-                 "step_id": previous.payload.get("step_id"), "activation_id": previous.payload.get("activation_id"),
-                 "attempt": 1, "purpose": "work", "auto_retry_of": previous.event_id}))
-
-def test_a_lost_repeatable_action_is_automatically_retried_once(data_dir):
-    # 契约声明可以重复的动作（检查）：恢复时自动重新执行一次，不询问用户（工单 #307，恢复契约第 4 节第 2 步）
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
-    _append_lost_write(system, run_id, tool="run_check", action_id="lost-check")
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted.orchestrator.resume_incomplete_run(run_id)
     assert _decisions(restarted, run_id, kind="unknown_action") == []
-    retried = [event for event in restarted.store.list_events(run_id)
-               if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-check"]
-    assert len(retried) == 2 and retried[1].payload["auto_retry_of"] == retried[0].event_id
-    restarted.close()
-
-def test_a_retried_action_still_unknown_asks_the_user_with_repeat_attempted(data_dir):
-    # 新的尝试仍然结果未知（自动重新执行的机会已经用掉）：恢复不再重新执行，只发出决定请求，
-    # 材料写明连续两次结果未知，「重新执行」照旧提供（恢复契约第 4 节第 3 步）
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
-    _append_lost_write(system, run_id, tool="run_check", action_id="lost-check")
-    [previous] = [event for event in system.store.list_events(run_id)
-                  if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-check"]
-    _append_retry(system, run_id, previous)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    started = [event for event in restarted.store.list_events(run_id)
-               if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-check"]
-    assert len(started) == 2, "the automatic retry happens once per logical action"
-    [request] = _decisions(restarted, run_id, kind="unknown_action")
-    assert [option["id"] for option in request.payload["options"]] == ["reexecute", "continue", "stop"]
-    assert request.payload["repeat_attempted"] is True
-    restarted.close()
-
-def test_an_open_unknown_action_blocks_the_next_activation(data_dir):
-    # 未知副作用没有解决以前，依赖它的下一步不继续：run 不进入新的激活，也不重新调用模型
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
-    _append_lost_write(system, run_id)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    assert restarted.project(run_id).phase == "ENGINEERING"
-    # 模型脚本为空：一旦开始新的激活就会失败，这里的相位与终态说明没有开始
-    frames = [event for event in restarted.store.list_events(run_id)
-              if event.type == EventType.MODEL_REQUEST_SERIALIZED]
-    before = len(frames)
-    assert restarted.project(run_id).stop_reason is None
-    assert len([event for event in restarted.store.list_events(run_id)
-                if event.type == EventType.MODEL_REQUEST_SERIALIZED]) == before
-    restarted.close()
-
-def test_taking_over_does_not_write_the_workspace_concurrently(data_dir):
-    # 窄场景二：旧执行者失联时接管。接管时不与未知旧写者同时改同一工作区：在这个动作得到核实以前，
-    # 工作区不被改动，run 也不推进
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
-    _append_lost_write(system, run_id, tool="write_file", action_id="lost-write")
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    assert restarted.workspace(run_id).list_files() == []
-    assert restarted.project(run_id).phase == "ENGINEERING"
-    restarted.close()
-
-def test_answering_continue_records_a_verification_and_unblocks(data_dir):
-    # 用户通过 decision.answer 回答；回答被接受以后流程编排按回答解除阻塞，重放使用记录的回答
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
-    _append_lost_write(system, run_id)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    [request] = _decisions(restarted, run_id, kind="unknown_action")
-    result = _answer(restarted, request.event_id, "continue")
-    assert result.refs.run_id == run_id
-
-    verified = [event for event in restarted.store.list_events(run_id)
-                if event.type == EventType.ACTION_VERIFIED]
+    verified = [e for e in restarted.store.list_events(run_id) if e.type == EventType.ACTION_VERIFIED]
     assert len(verified) == 1
-    assert verified[0].payload["resolution"] == "continue"
-    assert verified[0].payload["id"] == "lost-write"
-    # 回答已经记录：再次回答被拒绝
-    again = _answer(restarted, request.event_id, "continue")
-    assert again.reason == "decision_closed"
-    restarted.close()
-
-def test_answering_stop_ends_the_run(data_dir):
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
-    _append_lost_write(system, run_id)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    [request] = _decisions(restarted, run_id, kind="unknown_action")
-    _answer(restarted, request.event_id, "stop")
-    projection = restarted.project(run_id)
-    assert projection.phase == "FAILED" and projection.stop_reason == "cancelled"
+    assert verified[0].payload["resolution"] == "handed_back"
+    # 没有发生盲目重做：动作仍然只有一条 tool_started，没有补出 tool_called
+    assert len([event for event in restarted.store.list_events(run_id)
+                if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-write"]) == 1
+    assert [event for event in restarted.store.list_events(run_id)
+            if event.type == EventType.TOOL_CALLED and event.payload.get("id") == "lost-write"] == []
     restarted.close()
 
 def test_run_actions_reports_unknown_with_snapshots(data_dir):
@@ -195,7 +87,8 @@ def test_run_actions_reports_unknown_with_snapshots(data_dir):
     _append_lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted.orchestrator.resume_incomplete_run(run_id)
     actions = Application(restarted).query("run.actions", RunActions(run_id=run_id)).data.actions
     lost = [action for action in actions if action.action_id == "lost-write"]
     assert len(lost) == 1

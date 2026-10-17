@@ -56,29 +56,6 @@ test("待恢复的决定：材料列出部门、模型与具体问题", () => {
   assert.equal(map["说明"], "工程部门的模型引用无法使用");
 });
 
-test("结果未知的动作：材料写明契约是否声明可以重复", () => {
-  const rows = materialRows(
-    decision({
-      kind: "unknown_action",
-      blocks: "action",
-      request: {
-        kind: "unknown_action",
-        blocks: "action",
-        options: [{ id: "re_execute", label: "重新执行" }],
-        description: "动作结果未知",
-        facts: ["evt_1"],
-        department: "engineering",
-        action_id: "act_9",
-        tool: "bash",
-        action_kind: "command",
-        repeatable: true,
-      },
-    }),
-  );
-  const map = Object.fromEntries(rows.map((row) => [row.term, row.value]));
-  assert.equal(map["动作"], "act_9");
-  assert.equal(map["契约是否声明可以重复"], "可以重复执行");
-});
 
 test("挡住的对象：写明被阻塞的事项与排在后面的事项数量", () => {
   assert.deepEqual(blockedText(decision()), { text: "挡住「w1」，同一项目中排在它后面的事项 2 个", muted: false });

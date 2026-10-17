@@ -41,7 +41,7 @@ def _settle() -> dict:
 
 def test_a_write_that_never_happened_is_retried_once_without_asking_the_user(tmp_path):
     # 验收一（没有发生）：写入执行前终止进程，重启以后工作区与动作前快照相同，
-    # 以新的尝试重新执行一次，没有决定请求
+    # 记一条 action_verified（resolution=handed_back），交还模型，没有决定请求
     data_dir = tmp_path / "data"
     script = [{"proposal": product_spec()},
               {"output": [_write("call-write", "src/note.txt", "hello\n")]}]
@@ -49,21 +49,15 @@ def test_a_write_that_never_happened_is_retried_once_without_asking_the_user(tmp
     with killed.interrupted(data_dir, script, tail=[_settle()],
                             hold_after="tool_started", hold_action="call-write") as run:
         attempts = killed.tool_attempts(run.after, run.run_id, "call-write")
+        assert len(attempts) == 1, "没有发生时交还模型，不再自动重新执行"
+        assert attempts[0]["result_type"] is None
 
-        assert len(attempts) == 2, "工作区与动作前相同，应当以新的尝试重新执行一次"
-        assert attempts[0]["result_type"] is None, "终止前的第一次写入没有落盘结果"
-        assert attempts[1]["auto_retry_of"] == attempts[0]["event_id"], "新的一次尝试指向被取代的那次"
-        assert attempts[1]["verification_reason"] == "not_happened", "依据是自动核实确认没有发生"
-        assert attempts[1]["result_type"] == "tool_called", "重新执行写入了文件"
-
-        assert killed.unknown_action_requests(run.after, run.run_id) == [], "核实确认没有发生，不必问用户"
-
-        records = [record for record in killed.run_recovery(run.after, run.run_id).verifications
-                   if record.action_id == "call-write"]
-        assert len(records) == 1
-        assert records[0].basis == "自动核实（没有发生，重新执行）"
-        assert records[0].decided_by == "system"
-
+        verified = killed.events(run.after, run.run_id, "action_verified")
+        assert len(verified) == 1
+        assert verified[0].payload["resolution"] == "handed_back"
+        assert verified[0].payload["ok"] is False
+        assert verified[0].payload["verification"]["verdict"] == "not_happened"
+        assert killed.unknown_action_requests(run.after, run.run_id) == []
 def test_a_write_that_happened_is_recorded_as_auto_verified(tmp_path):
     # 验收二（已完成）：写入已经落盘、回执还没写的时候进程终止。重启以后只有目标路径变成目标内容，
     # 记一条 action_verified（resolution=auto_verify），不补造原来的 tool_called，也不问用户
@@ -99,32 +93,25 @@ def test_a_write_that_happened_is_recorded_as_auto_verified(tmp_path):
         assert records[0].decided_by == "system"
 
 def test_other_changes_after_the_snapshot_ask_the_user(tmp_path):
-    # 验收三（另有改动）：中断以后工作区里除了目标路径还有别的变化（这里直接改工作区，
-    # 模拟动作发生以后模型之外的人改了同一个工作区），核实无法断定动作是否发生，
-    # 恢复时发决定请求，材料里写明对比结果
+    # 验收三（另有改动）：中断以后工作区里除了目标路径还有别的变化，核实无法断定动作是否发生（unclear），
+    # 按非文件动作交还模型处理，没有决定请求
     data_dir = tmp_path / "data"
     script = [{"proposal": product_spec()},
               {"output": [_write("call-write", "src/note.txt", "hello\n")]}]
     with killed.interrupted(data_dir, script, tail=[_settle()], resume_after=False,
                             hold_after="tool_started", hold_action="call-write") as run:
-        # 恢复之前先让工作区多出一个文件：目标路径没有变，但公开树已经不是动作前的样子
-        # （模拟动作发生以后同一个工作区被别处改动）
         run.before.workspace(run.run_id).write_file("src/other.txt", "someone else\n")
         run.after.resume_startup_runs()
 
-        requests = killed.unknown_action_requests(run.after, run.run_id)
-        assert len(requests) == 1, "另有改动，核实不判断，交给用户决定"
-        payload = requests[0]
-        assert payload["action_id"] == "call-write"
-        assert payload["tool"] == "write_file"
-        assert payload["verification"]["verdict"] == "unclear", "材料写明对比结果"
-        assert payload["verification"]["detail"], "对比材料给出判断的依据"
-
+        assert killed.unknown_action_requests(run.after, run.run_id) == []
         attempts = killed.tool_attempts(run.after, run.run_id, "call-write")
-        assert len(attempts) == 1, "没有结论就不重新执行"
+        assert len(attempts) == 1
 
         verified = killed.events(run.after, run.run_id, "action_verified")
-        assert verified == [], "交给用户决定时不记自动核实记录"
+        assert len(verified) == 1
+        assert verified[0].payload["resolution"] == "handed_back"
+        assert verified[0].payload["ok"] is False
+        assert verified[0].payload["verification"]["verdict"] == "unclear"
 
 def test_an_edit_delete_and_move_are_verified_the_same_way(tmp_path):
     # 验收三续：编辑、删除、移动与写入走同一条对比判断。
@@ -166,38 +153,25 @@ def test_an_edit_delete_and_move_are_verified_the_same_way(tmp_path):
     assert unclear["verdict"] == "unclear", "只有目标路径变化才能确认，另有改动交给用户"
 
 def test_a_retry_that_stays_unknown_after_the_chance_is_gone_asks_the_user(tmp_path):
-    # 验收四：第一次写入执行前终止（没有发生）；第二次启动自动重新执行一次，这一次也在
-    # tool_started 以后被终止（结果仍然未知）；第三次启动机会已经用掉，
-    # 核实仍然判「没有发生」也不再重新执行，按 #307 第 3 步发决定请求，
-    # 材料的对比结果写明工作区与动作前相同、连续两次结果未知
+    # 改写为新行为：写入没有发生时交还会话，没有自动重新执行，不发决定请求
     data_dir = tmp_path / "data"
     script = [{"proposal": product_spec()},
               {"output": [_write("call-write", "src/note.txt", "hello\n")]}]
 
-    # 第一次：写入执行前终止，公开树仍然是动作前的样子
     first = killed.interrupted(data_dir, script, tail=[], hold_after="tool_started",
                                hold_action="call-write", resume_after=False)
     attempts = killed.tool_attempts(first.before, first.run_id, "call-write")
     assert len(attempts) == 1
-    assert attempts[0]["result_type"] is None, "第一次尝试没有落盘结果"
+    assert attempts[0]["result_type"] is None
 
-    # 第二次启动：自动重新执行一次；这一次同样在 tool_started 以后被终止
-    second = killed.restarted(data_dir, [_settle()], resume_after=False, hold_after="tool_started",
-                              hold_action="call-write")
-    attempts = killed.tool_attempts(second.before, second.run_id, "call-write")
-    assert len(attempts) == 2, "自动重新执行一次，尝试次数是两次"
-    assert attempts[1]["auto_retry_of"] == attempts[0]["event_id"]
-    assert attempts[1]["result_type"] is None, "第二次尝试也是结果未知"
+    # 第二次启动：恢复入口直接交还，写 action_verified(resolution="handed_back")
+    second = killed.restarted(data_dir, [_settle()], resume_after=False)
+    assert killed.unknown_action_requests(second.after, first.run_id) == []
+    verified = [e for e in killed.events(second.after, first.run_id, "action_verified")
+                if (e.payload or {}).get("id") == "call-write"]
+    assert len(verified) == 1
+    assert verified[0].payload["resolution"] == "handed_back"
+    assert verified[0].payload["ok"] is False
 
-    # 第三次启动：机会已经用掉，出现决定请求，没有第三次尝试
-    third = killed.restarted(data_dir, [], restart_round=3)
-    assert len(killed.tool_attempts(third.after, third.run_id, "call-write")) == 2, \
-        "上限只算一次，没有第三次尝试"
-    requests = killed.unknown_action_requests(third.after, third.run_id)
-    assert len(requests) == 1, "机会用掉以后新的尝试仍然结果未知，交给用户决定"
-    assert requests[0]["repeat_attempted"] is True, "材料写明连续两次结果未知"
-    assert requests[0]["verification"]["verdict"] == "not_happened", "材料写明对比结果"
-
-    third.close()
     second.close()
     first.close()

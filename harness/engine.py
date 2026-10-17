@@ -37,7 +37,6 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
                                  event_call_target)
 from .providers.selection import ModelSelection
 from .recording import ActivationScope, StepRecorder
-from .recovery import action_repeatable, auto_retry_actions, classify_actions, file_action_comparisons
 from .tools import proposal_kind, tool_action, tool_kind
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
@@ -160,9 +159,6 @@ class _RecoveredCall:
     attempt_started_at: str | None = None
     attempt_started_monotonic: float | None = None
     attempt_finished_monotonic: float | None = None
-    # 自动重新执行（工单 #307）：这一次尝试取代的那次 tool_started 事件编号，首次尝试与补执行为空。
-    # 它只进入 tool_started 的载荷，记录重新执行的链，工具许可与事实查询都不读这个字段
-    auto_retry_of: str | None = None
 
 
 def recovered_call_target(events: Sequence[Any], activation_id: str, step_id: int) -> dict[str, Any]:
@@ -181,27 +177,6 @@ def recovered_call_target(events: Sequence[Any], activation_id: str, step_id: in
         raise ValueError("recovery needs a resolved call target; missing: " + ", ".join(missing))
     return {key: basis.get(key) for key in CALL_TARGET_FIELDS + ("selection_source",)}
 
-
-def auto_retry_request(scope: ActivationScope, started: Any, events: Sequence[Any]) -> _RecoveredCall:
-    # 自动重新执行时的请求身份（工单 #307）：同一个逻辑动作（模型给出的调用编号 id 与它所在的 step_id），
-    # 作为新的一次尝试记在本次激活里，因此 run.actions 列出两次尝试；它取代的那次 tool_started 事件编号
-    # 记在 auto_retry_of 上，这条链是「同一个逻辑动作只自动重新执行一次」的依据
-    payload = started.payload or {}
-    activation_id = str(payload.get("activation_id") or "")
-    step_id = int(payload.get("step_id") or 0)
-    return _RecoveredCall(
-        run_id=scope.run_id, department=scope.department, session_id=scope.session_id,
-        activation_id=scope.activation_id, step_id=step_id,
-        context_event_id=payload.get("context_event_id") or "",
-        request_id=payload.get("collaboration_request_id"),
-        effective_contract_hash=scope.basis.effective_contract_hash,
-        call_target=recovered_call_target(events, activation_id, step_id),
-        purpose=str(payload.get("purpose") or "work"),
-        attempt=int(payload.get("attempt") or 1),
-        attempt_id=f"{scope.activation_id}:{payload.get('id')}:auto-retry",
-        logical_call_id=f"{scope.activation_id}:{payload.get('id')}",
-        auto_retry_of=str(started.event_id),
-    )
 
 
 class StepDriver:
@@ -339,9 +314,6 @@ class StepDriver:
 
     async def _steps(self) -> StepResult:
         limits = self._limits
-        # 工单 #307（恢复契约第 4 节第 2 步）：结果未知、契约声明可以重复的逻辑动作先自动重新执行一次，
-        # 不询问用户；每个逻辑动作只有这一次机会，机会用掉以后新的尝试仍然结果未知才交给用户
-        await self._auto_reexecute_unknown_actions()
         # 工单 #17：上一次激活的完整模型响应里还有没执行的合法动作时，先补执行这些动作，不重新调用模型
         # （恢复契约第 4、5 节）。补执行以后照常进入步骤循环，下一次模型请求带上这些工具结果
         await self._continue_unexecuted_calls()
@@ -531,36 +503,6 @@ class StepDriver:
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
 
-    async def _auto_reexecute_unknown_actions(self) -> None:
-        # 自动重新执行结果未知的动作（工单 #307、#308，恢复契约第 4 节第 2 步）：在步骤循环之前，把契约声明
-        # 可以重复、而且还没有用掉这一次机会的逻辑动作各重新执行一次，不询问用户。自动核实确认没有发生的
-        # 文件动作（工单 #308）同样重新执行一次，与契约声明可以重复的动作共用这一次机会。
-        # 新的尝试是同一个逻辑动作的新一次尝试（同样的调用编号与步骤编号，记在本次激活里），
-        # 因此 run.actions 列出两次尝试；机会的上限取自事件日志，进程重启以后仍然只算一次
-        snapshot = self._writes.read(self._stream)
-        events = snapshot.events()
-        # 没有发生的文件动作由动作前的快照判出（工单 #308）：当前公开树向执行环境查询，
-        # 读不到时按通常路径处理（只有契约声明可以重复的动作仍然重新执行）
-        not_happened: dict[str, Any] = {}
-        current = self._environment.query(FactsQuery(tree=True)).tree
-        if current is not None:
-            comparisons = file_action_comparisons(
-                events, artifacts=self._artifacts, run_id=self._scope.run_id,
-                current_entries=list(zip(current.files, current.hashes)))
-            not_happened = {action_id: comparison for action_id, comparison in comparisons.items()
-                            if comparison["verdict"] == "not_happened"}
-        for info in auto_retry_actions(events, snapshot.decisions.values(),
-                                       department=self._scope.department, not_happened=set(not_happened)):
-            if not self._proceed():
-                return
-            started = info["started_event"]
-            args = (started.payload or {}).get("args") or {}
-            await self._execute_call(auto_retry_request(self._scope, started, events),
-                                     {"id": info["action_id"], "name": info["tool"],
-                                      "arguments": json_dumps(args),
-                                      "verification_reason": ("not_happened"
-                                                             if info["action_id"] in not_happened else None)})
-
     async def _continue_unexecuted_calls(self) -> None:
         # 工单 #17（恢复契约第 4、5 节）：上一次激活的完整模型响应里，有 Function Call 既没有 tool_started，
         # 也没有 tool_called 或 tool_skipped——进程在把整个响应执行完之前退出。这里补执行这些动作，
@@ -621,9 +563,6 @@ class StepDriver:
 
     async def _execute_call(self, request: "_RecoveredCall", item: dict[str, Any]) -> None:
         # 执行一个没有处置的工具调用并记录结果：与 _steps 的工具循环走同一条路径（工具许可、环境执行、记录）。
-        # 自动重新执行的这一次尝试（request.auto_retry_of 非空，工单 #307）额外在 tool_started 上记下它取代的
-        # 那一次事件编号；结果的依据由 run.actions 与 run.recovery 按这条链读出，不另写核实记录，
-        # 因为同一个调用编号在部门历史里只能有一条结果
         identity = str(item.get("id") or "")
         name = str(item.get("name") or "")
         raw_args = item.get("arguments")
@@ -637,13 +576,6 @@ class StepDriver:
             ok, output, error = False, None, f"invalid tool arguments: {exc}"
         else:
             call = {"id": identity, "name": name, "args": args, "step_id": request.step_id}
-            if request.auto_retry_of:
-                # 这一次尝试取代中断时那一次：链上的关系写进 tool_started，上限由它判定
-                call["auto_retry_of"] = request.auto_retry_of
-                if item.get("verification_reason") is not None:
-                    # 自动核实确认上一次尝试没有发生（工单 #308）：依据写进 tool_started，
-                    # run.recovery 的核实记录按它说明这次重新执行的来源
-                    call["verification_reason"] = item["verification_reason"]
             permission, facts = self._begin_tool(request, call)
             if permission.stopped or not permission.allowed:
                 return
@@ -651,7 +583,7 @@ class StepDriver:
                 ok, output, error = True, _run_host_tool(name, args), None
             else:
                 receipt = await self._perform(Action(
-                    action_id=f"{request.activation_id}:{'auto-retry' if request.auto_retry_of else 'recovered'}:{identity}",
+                    action_id=f"{request.activation_id}:recovered:{identity}",
                     kind=tool_action(name),
                     tool=name, department=request.department, input=args,
                     preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),

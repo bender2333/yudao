@@ -217,7 +217,7 @@ export type ActionView = {
     /**
      * Status
      */
-    status: 'running' | 'completed' | 'failed' | 'unknown' | 'superseded';
+    status: 'running' | 'completed' | 'failed' | 'unknown';
     /**
      * Activation Id
      */
@@ -251,14 +251,6 @@ export type ActionView = {
     after_snapshot_ref?: {
         [key: string]: unknown;
     } | null;
-    /**
-     * Auto Retry Of
-     */
-    auto_retry_of?: string | null;
-    /**
-     * Verification Reason
-     */
-    verification_reason?: string | null;
 };
 
 /**
@@ -4489,10 +4481,6 @@ export type UnfinishedAction = {
      */
     purpose: string | null;
     /**
-     * Repeatable
-     */
-    repeatable: boolean;
-    /**
      * Before Snapshot Ref
      */
     before_snapshot_ref: {
@@ -5200,130 +5188,6 @@ export type ActionVerifiedEvent = {
  */
 export type ActionVerifiedPayload = {
     /**
-     * Provider Config Id
-     */
-    provider_config_id: string | null;
-    /**
-     * Model Id
-     */
-    model_id: string | null;
-    /**
-     * Provider Name
-     */
-    provider_name: string;
-    /**
-     * Protocol
-     */
-    protocol: string;
-    /**
-     * Base Url
-     */
-    base_url: string | null;
-    /**
-     * Requested Provider
-     */
-    requested_provider: string;
-    /**
-     * Requested Protocol
-     */
-    requested_protocol: string;
-    /**
-     * Requested Model
-     */
-    requested_model: string;
-    /**
-     * Credential Ref
-     */
-    credential_ref: string | null;
-    /**
-     * Credential Version
-     */
-    credential_version: string | null;
-    /**
-     * Context Window
-     */
-    context_window: number | null;
-    /**
-     * Configured Max Output Tokens
-     */
-    configured_max_output_tokens: number | null;
-    /**
-     * Accepts Required Tool Call
-     */
-    accepts_required_tool_call: boolean | null;
-    /**
-     * Input Modalities
-     */
-    input_modalities: Array<string>;
-    /**
-     * Selection Source
-     */
-    selection_source: string | null;
-    /**
-     * Requested Tier
-     */
-    requested_tier: string | null;
-    /**
-     * Sent Tier
-     */
-    sent_tier: string | null;
-    /**
-     * Reasoning Levels
-     */
-    reasoning_levels: Array<string>;
-    /**
-     * Default Reasoning Level
-     */
-    default_reasoning_level: string | null;
-    /**
-     * Reasoning Mode
-     */
-    reasoning_mode: string | null;
-    /**
-     * Input Version
-     */
-    input_version: number;
-    /**
-     * Prompt Version
-     */
-    prompt_version: number;
-    /**
-     * Prompt Hash
-     */
-    prompt_hash: string | null;
-    /**
-     * Guidance Ids
-     */
-    guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
-     * Effective Contract Hash
-     */
-    effective_contract_hash: string | null;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
-     * Attempt Id
-     */
-    attempt_id: string;
-    /**
-     * Logical Call Id
-     */
-    logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
-    /**
-     * Context Event Id
-     */
-    context_event_id: string;
-    /**
      * Id
      */
     id: string;
@@ -5334,16 +5198,16 @@ export type ActionVerifiedPayload = {
     /**
      * Step Id
      */
-    step_id: number;
-    input_item: FunctionCallOutput;
+    step_id?: number | null;
     /**
      * Activation Id
      */
-    activation_id: string;
+    activation_id?: string | null;
     /**
      * Purpose
      */
-    purpose: 'work' | 'compaction';
+    purpose?: 'work' | 'compaction';
+    input_item: FunctionCallOutput;
     /**
      * Ok
      */
@@ -5355,7 +5219,7 @@ export type ActionVerifiedPayload = {
     /**
      * Resolution
      */
-    resolution: 'auto_reexecute' | 'auto_verify' | 'continue';
+    resolution: 'auto_verify' | 'continue' | 'handed_back';
     /**
      * Auto Retry Of
      */
@@ -7702,7 +7566,7 @@ export type DecisionWithdrawnPayload = {
     /**
      * Reason
      */
-    reason: 'released' | 'baseline_verified' | 'max_cycles' | 'model_steps_exhausted' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed';
+    reason: 'released' | 'baseline_verified' | 'max_cycles' | 'model_steps_exhausted' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed' | 'superseded_by_hand_back';
 };
 
 /**
