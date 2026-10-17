@@ -523,9 +523,10 @@ class EventStore:
         try:
             connection = self._idle.get_nowait()
         except queue.Empty:
-            source = f"file:{self.path.as_posix()}?mode=ro" if self.read_only else str(self.path)
-            connection = sqlite3.connect(source, uri=self.read_only, check_same_thread=False, isolation_level=None,
-                                         timeout=30)
+            source = str(self.path)
+            connection = sqlite3.connect(source, check_same_thread=False, isolation_level=None, timeout=30)
+            if self.read_only:
+                connection.execute("PRAGMA query_only = ON")
             connection.row_factory = sqlite3.Row
             self._opened.append(connection)
         try:

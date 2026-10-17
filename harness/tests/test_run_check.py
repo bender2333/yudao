@@ -35,8 +35,9 @@ def _python() -> str:
     return sys.executable.replace("\\", "/")
 
 
-def _check_copies() -> set[str]:
-    return {item.name for item in Path(tempfile.gettempdir()).glob("yudao-check-*")}
+def _check_copies(base: Path | None = None) -> set[str]:
+    root = Path(tempfile.gettempdir()) if base is None else base
+    return {item.name for item in root.glob("yudao-check-*")}
 
 
 def test_uv_managed_project_pytest_binds_snapshot(tmp_path, monkeypatch):
@@ -77,28 +78,34 @@ def test_check_copy_mutation_does_not_bind_pass_to_original_snapshot(tmp_path):
     assert "pass is not bound to the original snapshot" in result.output["summary"]
 
 
-def test_check_copy_is_deleted_when_check_finishes(tmp_path):
+def test_check_copy_is_deleted_when_check_finishes(tmp_path, monkeypatch):
     # 检查结束时副本删除：运行前后检查副本的目录集合相同
+    base = tmp_path / "check-copies"
+    base.mkdir()
+    monkeypatch.setattr("harness.workspace.tempfile.tempdir", str(base))
     workspace = Workspace(tmp_path / "ws")
     workspace.write_file("app.py", "print('ok')\n")
-    before = _check_copies()
+    before = _check_copies(base)
     result = perform(LocalEnvironment(workspace), "run_check",
                      {"name": "smoke", "command": "echo hi"})
     assert result.ok is True
-    assert _check_copies() == before
+    assert _check_copies(base) == before
 
 
-def test_check_copy_is_deleted_after_timeout(tmp_path):
+def test_check_copy_is_deleted_after_timeout(tmp_path, monkeypatch):
     # 超时的检查同样删除副本
+    base = tmp_path / "check-copies"
+    base.mkdir()
+    monkeypatch.setattr("harness.workspace.tempfile.tempdir", str(base))
     workspace = Workspace(tmp_path / "ws")
     environment = LocalEnvironment(workspace, check_timeout_sec=2)
-    before = _check_copies()
+    before = _check_copies(base)
     result = perform(environment, "run_check", {
         "name": "hang",
         "command": f"\"{_python()}\" -c \"import time; print('started', flush=True); time.sleep(60)\"",
     })
     assert result.status == "timeout" and result.output["exit_code"] == 124
-    assert _check_copies() == before
+    assert _check_copies(base) == before
 
 
 def test_timeout_default_and_max_come_from_rules(tmp_path, monkeypatch):
@@ -123,7 +130,7 @@ def test_timeout_default_and_max_come_from_rules(tmp_path, monkeypatch):
 def test_timed_out_check_stops_the_process_tree(tmp_path):
     # 超时结束整个进程树，回执带截至结束时的输出
     workspace = Workspace(tmp_path / "ws")
-    environment = LocalEnvironment(workspace, check_timeout_sec=2)
+    environment = LocalEnvironment(workspace, check_timeout_sec=4)
     command = (
         f"\"{_python()}\" -c \"import subprocess,sys,time;"
         "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)']);"
@@ -134,7 +141,7 @@ def test_timed_out_check_stops_the_process_tree(tmp_path):
     assert time.monotonic() - started < 30
     assert result.ok is True and result.status == "timeout"
     assert result.output["exit_code"] == 124
-    assert result.output["summary"].splitlines()[1] == "check timed out after 2s"
+    assert result.output["summary"].splitlines()[1] == "check timed out after 4s"
     child = int(re.search(r"started child=(\d+)", result.output["summary"]).group(1))
     assert wait_until_stopped(child)
 

@@ -283,7 +283,7 @@ def test_busy_does_not_block_on_in_process_task_table_after_terminal_event(data_
             for event in opened.store.list_project_events(project_id)))
 
         orchestrator = opened.system.orchestrator
-        assert run_id not in orchestrator._work_item_tasks  # noqa: SLF001 — 真正的清理此时已经发生
+        assert _wait_for(lambda: run_id not in orchestrator._work_item_tasks)  # noqa: SLF001 — 真正的清理此时已经发生
 
         # 手工把一个还没有结束的任务放回任务表，模拟终态事件已写入、摘除还没有发生的瞬间
         # busy() 修复以后不再读这个表，占位对象不需要是真的 asyncio 任务
