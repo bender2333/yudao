@@ -4,6 +4,7 @@
 
 import { expect, test } from "@playwright/test";
 import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { once } from "node:events";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
@@ -196,7 +197,7 @@ for (const size of [
     }
   });
 
-  test(`${label}：编辑表单恢复服务方案与协议，选方案与协议自动填入请求基址，未接受容量的行不能保存`, async () => {
+  test(`${label}：编辑表单恢复服务方案与协议，选方案与协议自动填入请求基址，缺少容量的行不能保存`, async () => {
     test.setTimeout(300_000);
     const { backend, client } = await openModels(size);
     const errors = watchErrors(client);
@@ -232,7 +233,7 @@ for (const size of [
       // Key 输入框始终为空，不回填
       await expect(form.getByTestId("credential-secret")).toHaveValue("");
 
-      // 候选加入一行：容量未「接受」以前不能保存
+      // 候选加入一行：预填容量直接采用，来源标明
       await setKey(client, backend, "OPENCODE_GO_KEY");
       await form.getByRole("button", { name: "获取模型列表" }).click();
       await form.getByTestId("admit-candidate-vision-model").click();
@@ -240,11 +241,9 @@ for (const size of [
       // 加入时预填调用协议并标明来源：这个模型不在能力表里，预填服务方案的默认协议（工单 #383）
       await expect(form.getByTestId("model-row-vision-model")).toContainText("协议：服务方案默认");
       await expect(form.getByTestId("row-protocol-vision-model")).toHaveValue("chat_completions");
-      await expect(form.getByTestId("capacity-confirmed-vision-model")).toHaveCount(0);
-      // 手动添加的一行两项容量都空着：界面写明缺哪两项，「接受容量」不可用（工单 #294）
+      // 手动添加的一行两项容量都空着：界面写明缺哪两项（工单 #294）
       await form.getByTestId("add-model-row").click();
       await expect(form.locator('[data-testid^="capacity-issue-"]').last()).toHaveText("缺少窗口与输出上限");
-      await expect(form.locator('button[data-testid^="accept-capacity-"]').last()).toBeDisabled();
       // 已保存的行清空窗口：界面写明「缺少窗口」，提交按同一份判断被拦下（与目录文档校验一致）
       await form.getByTestId("row-window-glm-4.6").fill("");
       await expect(form.getByTestId("capacity-issue-glm-4.6")).toHaveText("缺少窗口");
@@ -254,11 +253,6 @@ for (const size of [
       await expect(form.getByTestId("form-status")).toContainText("不能保存");
       await form.getByTestId("row-window-glm-4.6").fill("200000");
       await expect(form.getByTestId("capacity-issue-glm-4.6")).toHaveCount(0);
-      // 提交时被拦下：候选那一行还没有「接受」
-      await form.getByTestId("submit-provider").click();
-      await expect(form.getByTestId("form-status")).toContainText("没有「接受」或修改的行不能保存");
-      await form.getByTestId("accept-capacity-vision-model").click();
-      await expect(form.getByTestId("capacity-confirmed-vision-model")).toBeVisible();
 
       // 推理参数方式只列出与该行协议相符的选项：新建的行预填 Chat Completions，
       // 换到 Anthropic Messages 只列出 Messages 的两种方式，换回来才有 effort（第 7.4 节）
@@ -593,7 +587,7 @@ for (const size of [
 
   // 工单 #302 的验收：第一次配置「自定义」服务方案的完整路径。候选取自测试内的真实 HTTP 上游，
   // 其中一条上游模型 ID 带「/」（走查里真实遇到的写法），上游只给窗口不给输出上限
-  test(`${label}：自定义方案添加连接、获取候选、预填的 ID 保存成功；缺一项容量不显示「容量已确认」；添加与保存都有成功提示`, async () => {
+  test(`${label}：自定义方案添加连接、获取候选、预填的 ID 保存成功；缺一项容量写明缺少且不能保存；添加与保存都有成功提示`, async () => {
     test.setTimeout(300_000);
     const { backend, client } = await openModels(size);
     const errors = watchErrors(client);
@@ -643,15 +637,14 @@ for (const size of [
       await expect(row.getByTestId(`id-differs-${rowKey}`))
         .toHaveText(`发给上游的是「cbcn/deepseek-v4.1-flash」，ID「${rowKey}」只在本系统内使用。`);
 
-      // 只预填到窗口：显示「缺少输出上限」，没有「容量已确认」，「接受容量」不可用
+      // 只预填到窗口：显示「缺少输出上限」，缺容量不能保存
       await expect(row.getByTestId(`capacity-issue-${rowKey}`)).toHaveText("缺少输出上限");
-      await expect(row.getByTestId(`capacity-confirmed-${rowKey}`)).toHaveCount(0);
-      await expect(row.getByTestId(`accept-capacity-${rowKey}`)).toBeDisabled();
+      await row.getByTestId("submit-provider").click();
+      await expect(row.getByTestId("form-status")).toContainText("不能保存");
 
-      // 补上输出上限：修改容量即视为确认（设计说明第 4.3 节），此时才显示「容量已确认」
+      // 补上输出上限：问题提示消失
       await row.getByTestId(`row-output-${rowKey}`).fill("16000");
       await expect(row.getByTestId(`capacity-issue-${rowKey}`)).toHaveCount(0);
-      await expect(row.getByTestId(`capacity-confirmed-${rowKey}`)).toBeVisible();
 
       // 保存：预填的 ID 被后端接受（带斜杠的写法会被拒为「必须是非空简单标识符」），
       // 表单收起的同时页面给出「已保存」，模型表里出现这条定义
@@ -806,5 +799,147 @@ test("从项目页进入模型管理，点「返回原界面」回到项目页",
   } finally {
     await client.close();
     await backend.stop();
+  }
+});
+// 工单 #385 / #563 验收第 1 条：勾选两个模型加入后自动测试通过并进入部门默认
+test("新建自定义连接，获取候选，勾选两个模型（带容量与就地填写）点加入，自动测试通过并进入部门默认", async () => {
+  test.setTimeout(300_000);
+  const { backend, client } = await openModels({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  try {
+    const { chatBaseUrl, modelsUrl } = await client.page.evaluate(async (address: string) => {
+      const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
+      const preset = (listed.data.presets.presets as { id: string; base_urls: Record<string, string> }[])
+        .find((item) => item.id === "opencode-go");
+      const provider = (listed.data.providers as { id: string; models_url: string }[])
+        .find((item) => item.id === "opencode-go");
+      return { chatBaseUrl: preset!.base_urls.chat_completions, modelsUrl: provider!.models_url };
+    }, backend.address);
+
+    // 新建自定义连接，只粘贴 Key、填基址与模型列表地址，点「添加」
+    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+    const form = client.page.locator(".mm-form");
+    await form.getByTestId("provider-models-url").fill(modelsUrl);
+    await form.getByTestId("provider-base-url").fill(chatBaseUrl);
+    await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("custom-p");
+    await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("自定义测试");
+    await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("CUSTOM_P_KEY");
+    await form.getByTestId("credential-secret").fill("custom-secret-key");
+    await form.getByTestId("submit-provider").click();
+    await expect(form).toHaveCount(0);
+    await expect(client.page.getByTestId("page-notice")).toHaveText("已添加 Provider 配置。");
+
+    // 展开连接，获取模型列表
+    const providerCard = client.page.getByTestId("provider-custom-p");
+    await providerCard.getByRole("button", { name: "展开" }).click();
+    await providerCard.getByTestId("collect-custom-p").click();
+    const candidates = providerCard.getByTestId("candidates-custom-p");
+    await expect(candidates).toBeVisible();
+
+    // 勾选两个模型：vision-model（列表带容量）与 cbcn/deepseek-v4.1-flash（缺少容量并在就地填写）
+    await candidates.getByTestId("candidate-check-vision-model").check();
+    await candidates.getByTestId("candidate-check-cbcn/deepseek-v4.1-flash").check();
+
+    // 未补齐容量前，「加入」按钮不可用，并提示缺少输出上限
+    await expect(candidates.getByTestId("candidates-issue-custom-p")).toHaveText("缺少输出上限");
+    await expect(candidates.getByTestId("join-candidates-custom-p")).toBeDisabled();
+
+    // 就地填写缺少的输出上限
+    await candidates.getByTestId("candidate-output-cbcn/deepseek-v4.1-flash").fill("16000");
+    await expect(candidates.getByTestId("candidates-issue-custom-p")).toHaveCount(0);
+    await expect(candidates.getByTestId("join-candidates-custom-p")).toBeEnabled();
+
+    // 点一次「加入」：保存后自动执行模型测试并通过
+    await candidates.getByTestId("join-candidates-custom-p").click();
+
+    // 两个模型在模型表中出现，且自动模型测试通过
+    await expect(providerCard.getByTestId("model-vision-model")).toBeVisible();
+    await expect(providerCard.getByTestId("model-cbcn-deepseek-v4.1-flash")).toBeVisible();
+    await expect(providerCard.getByTestId("model-result-vision-model")).toContainText("模型测试通过");
+    await expect(providerCard.getByTestId("model-result-cbcn-deepseek-v4.1-flash")).toContainText("模型测试通过");
+
+    // 两个模型均已准入并出现在部门默认的下拉选项中
+    await expect(client.page.getByTestId("default-model-product").locator('option[value="vision-model"]')).toBeAttached();
+    await expect(client.page.getByTestId("default-model-product").locator('option[value="cbcn-deepseek-v4.1-flash"]')).toBeAttached();
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+    await backend.stop();
+  }
+});
+
+// 工单 #385 / #563 验收第 2 条：手动添加模型保存后自动测试一次，失败留在候选，修正后通过
+test("手动添加一个模型并保存自动测试一次；上游返回错误该行显示原因并留在候选，修正后测试通过", async () => {
+  test.setTimeout(300_000);
+  let failUpstream = true;
+  const upstream = createServer((_request, response) => {
+    if (failUpstream) {
+      response.writeHead(500, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: { message: "upstream internal failure", type: "server_error" } }));
+    } else {
+      response.writeHead(200, { "Content-Type": "text/event-stream" });
+      const chunk = `data: ${JSON.stringify({
+        id: "chat-1",
+        object: "chat.completion.chunk",
+        created: 1,
+        model: "manual-failing-model",
+        choices: [{ index: 0, delta: { content: "pong" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      })}\n\n`;
+      const done = "data: [DONE]\n\n";
+      response.end(chunk + done);
+    }
+  });
+
+  const address = await new Promise<string>((resolve) => {
+    upstream.listen(0, "127.0.0.1", () => {
+      const port = (upstream.address() as AddressInfo).port;
+      resolve(`http://127.0.0.1:${port}/v1`);
+    });
+  });
+
+  const { backend, client } = await openModels({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  try {
+    // 新建连接指向测试内可控上游
+    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+    const form = client.page.locator(".mm-form");
+    await form.getByTestId("provider-base-url").fill(address);
+    await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("fail-test-p");
+    await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("可控上游连接");
+    await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("FAIL_TEST_KEY");
+    await form.getByTestId("credential-secret").fill("secret");
+
+    // 手动添加一个模型定义并保存
+    await form.getByTestId("add-model-row").click();
+    await form.getByTestId("row-id-model-1").fill("manual-fail");
+    await form.getByTestId("row-model-manual-fail").fill("manual-failing-model");
+    await form.getByTestId("row-window-manual-fail").fill("100000");
+    await form.getByTestId("row-output-manual-fail").fill("4096");
+    await form.getByTestId("submit-provider").click();
+    await expect(form).toHaveCount(0);
+    await expect(client.page.getByTestId("page-notice")).toHaveText("已添加 Provider 配置。");
+
+    // 展开连接：保存后自动测试一次，上游返回错误，该行显示原因并留在候选
+    const card = client.page.getByTestId("provider-fail-test-p");
+    await card.getByRole("button", { name: "展开" }).click();
+    await expect(card.getByTestId("model-manual-fail")).toBeVisible();
+    await expect(card.getByTestId("model-result-manual-fail")).toContainText("模型测试未通过：Model provider returned HTTP 500");
+    await expect(card.getByTestId("model-manual-fail")).toContainText("候选");
+    // 未准入的模型不在部门默认下拉中
+    await expect(client.page.getByTestId("default-model-product").locator("option", { hasText: "manual-fail" })).toHaveCount(0);
+
+    // 修正上游错误，再次测试通过
+    failUpstream = false;
+    await card.getByTestId("row-test-manual-fail").click();
+    await expect(card.getByTestId("model-result-manual-fail")).toContainText("模型测试通过");
+    await expect(card.getByTestId("model-manual-fail")).toContainText("已准入");
+    // 准入后出现在部门默认选项中
+    await expect(client.page.getByTestId("default-model-product").locator("option", { hasText: "manual-fail" })).toBeAttached();
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+    await backend.stop();
+    upstream.close();
   }
 });

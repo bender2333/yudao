@@ -19,19 +19,26 @@ import { ProviderForm } from "./form";
 import {
   CONFIG_STATE_LABELS,
   DEPARTMENT_LABELS,
+  PREFILL_SOURCE_LABELS,
   PROTOCOL_LABELS,
   STALE_ADMISSION_LABEL,
   admissionLabel,
   admissionOf,
   admissionSummary,
   admittedModels,
+  canJoinCandidates,
+  candidateToRow,
+  capacityIssueText,
   collectImpact,
   confirmImpactText,
   credentialStatusLabel,
   emptyFormState,
   formDocumentValid,
   formStateFromProvider,
+  intFromInput,
   modelRemoveReferrers,
+  numberToText,
+  prefillModel,
   presetById,
   providerDeleteConfirmation,
   providerInputFromForm,
@@ -39,10 +46,12 @@ import {
   rowFromManual,
   rowToModelInput,
   rowsSavable,
+  sanitizeModelId,
   saveSuccessText,
   testKeyOf,
   testText,
   tierOptions,
+  type CandidateCustomCapacity,
   type CandidateState,
   type FormState,
   type ModelImpact,
@@ -70,6 +79,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState<{ mode: "add" | "edit"; state: FormState } | null>(null);
   const [candidates, setCandidates] = useState<Record<string, CandidateState>>({});
+  const [selectedCandidates, setSelectedCandidates] = useState<Record<string, Record<string, boolean>>>({});
+  const [candidateCapacity, setCandidateCapacity] = useState<Record<string, Record<string, CandidateCustomCapacity>>>({});
   const [collecting, setCollecting] = useState<string | null>(null);
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [tests, setTests] = useState<Record<string, string>>({});
@@ -197,8 +208,24 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setForm({ mode: "add", state: emptyFormState(current.default_timeout_sec) });
   }, []);
 
+  const testModel = useCallback(async (providerId: string, modelId: string) => {
+    setTesting((current) => ({ ...current, [`model:${modelId}`]: true }));
+    const result = await submit("catalog.model.test", { provider_id: providerId, model_id: modelId });
+    if (!result.ok) {
+      setTesting((current) => ({ ...current, [`model:${modelId}`]: false }));
+      setNotice({ kind: "error", message: result.message });
+    }
+  }, [submit]);
+
   const runSave = useCallback(async (body: Record<string, unknown>, successMessage: string,
     state: FormState, secret: string, persist: boolean) => {
+    const previousModelIds = new Set(
+      catalogRef.current?.providers.find((item) => item.id === state.id)?.models.map((m) => m.id) ?? []
+    );
+    const newModelIds = ((body.models as { id: string }[]) || [])
+      .map((m) => m.id)
+      .filter((id) => !previousModelIds.has(id));
+
     setBusy(true);
     const saved = await submit("catalog.connection.save", body);
     let result = saved;
@@ -215,16 +242,68 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? successMessage : result.message });
     if (result.ok) {
       setForm(null);
+      for (const id of newModelIds) {
+        await testModel(state.id, id);
+      }
     } else {
       setFormStatus({ kind: "error", message: result.message });
     }
-  }, [submit, props]);
+  }, [submit, props, testModel]);
+
+  const joinCandidates = useCallback(async (providerId: string) => {
+    const curCatalog = catalogRef.current;
+    if (!curCatalog) return;
+    const provider = curCatalog.providers.find((p) => p.id === providerId);
+    if (!provider) return;
+    const candState = candidates[providerId];
+    if (!candState || candState.status !== "ok") return;
+
+    const checkedMap = selectedCandidates[providerId] || {};
+    const checkedIds = Object.keys(checkedMap).filter((id) => checkedMap[id]);
+    if (checkedIds.length === 0) return;
+
+    const capMap = candidateCapacity[providerId] || {};
+    const preset = presetById(presets, provider.preset_id);
+
+    const newRows = checkedIds.map((id) => {
+      const candidate = candState.candidates.find((c) => c.id === id) || { id };
+      return candidateToRow(candidate, capMap[id], curCatalog.capability_table, provider.preset_id, preset);
+    });
+
+    const existingRows = formStateFromProvider(provider).rows;
+    const existingIds = new Set(existingRows.map((r) => r.id));
+    const uniqueNewRows = newRows.filter((r) => !existingIds.has(r.id));
+    if (uniqueNewRows.length === 0) return;
+
+    const allModels = [...existingRows, ...uniqueNewRows].map(rowToModelInput);
+    const providerInput = providerInputFromForm(formStateFromProvider(provider));
+
+    setBusy(true);
+    const saved = await submit("catalog.connection.save", {
+      provider: providerInput,
+      models: allModels,
+    });
+    setBusy(false);
+
+    if (!saved.ok) {
+      setNotice({ kind: "error", message: saved.message });
+      return;
+    }
+
+    setNotice({ kind: "ok", message: "已保存 Provider 配置。" });
+    setSelectedCandidates((current) => ({ ...current, [providerId]: {} }));
+    setCandidateCapacity((current) => ({ ...current, [providerId]: {} }));
+
+    for (const row of uniqueNewRows) {
+      await testModel(providerId, row.id);
+    }
+  }, [candidates, selectedCandidates, candidateCapacity, presets, submit, testModel]);
 
   const submitForm = useCallback(async (secret: string, persist: boolean) => {
     if (!form) return;
     const rows = form.state.rows;
     if (!rowsSavable(rows)) {
-      setFormStatus({ kind: "error", message: "窗口与输出上限没有「接受」或修改的行不能保存。" });
+      setFormStatus({ kind: "error", message: "窗口或输出上限缺少或无效的行不能保存。" });
       return;
     }
     const body = { provider: providerInputFromForm(form.state), models: rows.map(rowToModelInput) };
@@ -288,14 +367,6 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     }
   }, [submit]);
 
-  const testModel = useCallback(async (providerId: string, modelId: string) => {
-    setTesting((current) => ({ ...current, [`model:${modelId}`]: true }));
-    const result = await submit("catalog.model.test", { provider_id: providerId, model_id: modelId });
-    if (!result.ok) {
-      setTesting((current) => ({ ...current, [`model:${modelId}`]: false }));
-      setNotice({ kind: "error", message: result.message });
-    }
-  }, [submit]);
 
   const collectCandidates = useCallback(async (providerId: string, modelsUrl: string) => {
     setCollecting(providerId);
@@ -379,7 +450,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
 
   // 编辑表单的拟议修改：打开 catalog.change_impact 视图取回影响（设计说明第 4.4 节）。
   // 参数用编辑中的表单内容序列化，表单内容变化时重开视图；查询只读，不写入任何内容。
-  // 查询的文档形状与目录文档一致（不含 capacity_confirmed 这类只属于保存命令的字段）
+  // 查询的文档形状与目录文档一致
   const formImpactParams = useMemo(() => {
     if (!form || form.mode !== "edit") {
       return null;
@@ -489,35 +560,182 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                   <div className="y10-candidates mm-candidates" data-testid={`candidates-${provider.id}`}>
                     {candidates[provider.id].status === "unknown" ? (
                       <p className="y10-warn-text mm-warn" role="status">请求 {candidates[provider.id].source_url || "（没有模型列表地址）"} 时候选未知：{candidates[provider.id].error || "上游模型列表不可用"}</p>
-                    ) : (
-                      <>
-                        <p className="y10-small y10-muted mm-meta">
-                          来源 {candidates[provider.id].source_url} · 采集时间 {candidates[provider.id].fetched_at}
-                        </p>
-                        <ul className="y10-chip-row">
-                          {candidates[provider.id].candidates.map((item) => (
-                            <li key={item.id}>
-                              <code>{item.id}</code>
-                              <button type="button" className="y10-chip" data-testid={`add-candidate-${provider.id}-${item.id}`}
-                                      onClick={() => {
-                                        setFormStatus(null);
-                                        setForm((current) => {
-                                          const base = current ?? {
-                                            mode: "edit" as const,
-                                            state: formStateFromProvider(provider),
-                                          };
-                                          const row = rowFromCandidate(item, catalog.capability_table, provider.preset_id,
-                                                                       presetById(presets, provider.preset_id));
-                                          return { mode: "edit", state: { ...base.state, rows: [...base.state.rows, row] } };
-                                        });
-                                      }}>
-                                建立访问定义
+                    ) : (() => {
+                      const candState = candidates[provider.id];
+                      const checkedMap = selectedCandidates[provider.id] || {};
+                      const checkedIds = Object.keys(checkedMap).filter((id) => checkedMap[id]);
+                      const capMap = candidateCapacity[provider.id] || {};
+                      const preset = presetById(presets, provider.preset_id);
+                      const joinStatus = canJoinCandidates(
+                        checkedIds,
+                        candState.candidates,
+                        capMap,
+                        catalog.capability_table,
+                        provider.preset_id,
+                        preset,
+                      );
+                      const existingIds = new Set(provider.models.map((m) => m.id));
+
+                      return (
+                        <>
+                          <div className="y10-row mm-candidates-meta">
+                            <p className="y10-small y10-muted mm-meta">
+                              来源 {candState.source_url} · 采集时间 {candState.fetched_at}
+                            </p>
+                            <div className="y10-row mm-actions y10-candidates-actions">
+                              <button
+                                type="button"
+                                className="y10-btn primary small"
+                                data-testid={`join-candidates-${provider.id}`}
+                                disabled={!joinStatus.ok || busy}
+                                onClick={() => void joinCandidates(provider.id)}
+                              >
+                                加入
                               </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
+                              {joinStatus.issue !== "" && (
+                                <span className="y10-warn-text mm-warn" role="status" data-testid={`candidates-issue-${provider.id}`}>
+                                  {joinStatus.issue}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ul className="y10-candidate-grid mm-candidates-list">
+                            {candState.candidates.map((item) => {
+                              const prefill = prefillModel(item.id, item, catalog.capability_table, provider.preset_id, preset);
+                              const isChecked = Boolean(checkedMap[item.id]);
+                              const isAdded = existingIds.has(sanitizeModelId(item.id) || item.id);
+                              const customCap = capMap[item.id];
+                              const winVal = customCap?.context_window !== undefined
+                                ? customCap.context_window
+                                : numberToText(prefill.context_window);
+                              const outVal = customCap?.max_output_tokens !== undefined
+                                ? customCap.max_output_tokens
+                                : numberToText(prefill.max_output_tokens);
+                              const candIssue = capacityIssueText({
+                                context_window: intFromInput(winVal),
+                                max_output_tokens: intFromInput(outVal),
+                              });
+
+                              return (
+                                <li key={item.id} className="y10-candidate-card mm-candidate-card" data-testid={`candidate-${item.id}`}>
+                                  <label className="y10-candidate-head">
+                                    <input
+                                      type="checkbox"
+                                      disabled={isAdded}
+                                      checked={isChecked}
+                                      data-testid={`candidate-check-${item.id}`}
+                                      onChange={(e) => {
+                                        setSelectedCandidates((current) => ({
+                                          ...current,
+                                          [provider.id]: {
+                                            ...(current[provider.id] || {}),
+                                            [item.id]: e.target.checked,
+                                          },
+                                        }));
+                                      }}
+                                    />
+                                    <code className="mm-candidate-id">{item.id}</code>
+                                    {isAdded && <span className="y10-small mm-ok">已加入</span>}
+                                  </label>
+                                  <div className="y10-candidate-fields">
+                                    <span className="y10-small mm-meta" data-testid={`candidate-protocol-${item.id}`}>
+                                      协议：{PROTOCOL_LABELS[prefill.protocol] ?? prefill.protocol}（{PREFILL_SOURCE_LABELS[prefill.sources.protocol] ?? prefill.sources.protocol}）
+                                    </span>
+                                    {prefill.context_window !== null ? (
+                                      <span className="y10-small mm-meta" data-testid={`candidate-window-${item.id}`}>
+                                        窗口：{prefill.context_window}（{PREFILL_SOURCE_LABELS[prefill.sources.context_window ?? ""] ?? prefill.sources.context_window}）
+                                      </span>
+                                    ) : (
+                                      <label className="y10-field mm-field-inline">
+                                        <span className="mm-label">窗口</span>
+                                        <input
+                                          className="y10-input small"
+                                          type="number"
+                                          min="1"
+                                          placeholder="填写窗口"
+                                          data-testid={`candidate-window-${item.id}`}
+                                          value={winVal}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setCandidateCapacity((current) => ({
+                                              ...current,
+                                              [provider.id]: {
+                                                ...(current[provider.id] || {}),
+                                                [item.id]: {
+                                                  ...(current[provider.id]?.[item.id] || {}),
+                                                  context_window: val,
+                                                },
+                                              },
+                                            }));
+                                          }}
+                                        />
+                                      </label>
+                                    )}
+                                    {prefill.max_output_tokens !== null ? (
+                                      <span className="y10-small mm-meta" data-testid={`candidate-output-${item.id}`}>
+                                        输出上限：{prefill.max_output_tokens}（{PREFILL_SOURCE_LABELS[prefill.sources.max_output_tokens ?? ""] ?? prefill.sources.max_output_tokens}）
+                                      </span>
+                                    ) : (
+                                      <label className="y10-field mm-field-inline">
+                                        <span className="mm-label">输出上限</span>
+                                        <input
+                                          className="y10-input small"
+                                          type="number"
+                                          min="1"
+                                          placeholder="填写输出上限"
+                                          data-testid={`candidate-output-${item.id}`}
+                                          value={outVal}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setCandidateCapacity((current) => ({
+                                              ...current,
+                                              [provider.id]: {
+                                                ...(current[provider.id] || {}),
+                                                [item.id]: {
+                                                  ...(current[provider.id]?.[item.id] || {}),
+                                                  max_output_tokens: val,
+                                                },
+                                              },
+                                            }));
+                                          }}
+                                        />
+                                      </label>
+                                    )}
+                                    <span className="y10-small mm-meta">
+                                      输入方式：{prefill.input_modalities.includes("image") ? "文本与图像" : "文本"}（{PREFILL_SOURCE_LABELS[prefill.sources.input_modalities] ?? prefill.sources.input_modalities}）
+                                    </span>
+                                  </div>
+                                  {isChecked && candIssue !== "" && (
+                                    <span className="y10-warn-text mm-warn" role="status" data-testid={`candidate-issue-${item.id}`}>
+                                      {candIssue}
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="y10-chip"
+                                    data-testid={`add-candidate-${provider.id}-${item.id}`}
+                                    onClick={() => {
+                                      setFormStatus(null);
+                                      setForm((current) => {
+                                        const base = current ?? {
+                                          mode: "edit" as const,
+                                          state: formStateFromProvider(provider),
+                                        };
+                                        const row = rowFromCandidate(item, catalog.capability_table, provider.preset_id,
+                                                                     presetById(presets, provider.preset_id));
+                                        return { mode: "edit", state: { ...base.state, rows: [...base.state.rows, row] } };
+                                      });
+                                    }}
+                                  >
+                                    建立访问定义
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -828,7 +1046,7 @@ function providerInputOf(provider: Catalog["providers"][number]): Record<string,
   };
 }
 
-// 一条模型访问定义按目录文档形状提交：catalog.change_impact 的拟议修改用它（不含 capacity_confirmed）
+// 一条模型访问定义按目录文档形状提交：catalog.change_impact 的拟议修改用它
 function modelDocumentFromDefinition(model: Catalog["models"][number]): Record<string, unknown> {
   return {
     id: model.id, model: model.model, protocol: model.protocol, context_window: model.context_window,

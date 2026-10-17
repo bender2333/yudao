@@ -142,7 +142,7 @@ export function admissionLabel(admission: CatalogAdmission | null): string {
 type CapacityValues = { context_window: number | null; max_output_tokens: number | null };
 
 // 容量的问题文字：缺少哪一项或哪一项的关系不成立就写明哪一项，没有问题时为空（工单 #294）
-// 界面在「接受容量」旁显示它，目录文档校验用同一个判断，两处的规则不再分开
+// 界面在容量输入或候选旁显示它，目录文档校验用同一个判断，两处的规则不再分开
 export function capacityIssueText(row: CapacityValues): string {
   const window = row.context_window;
   const output = row.max_output_tokens;
@@ -169,9 +169,9 @@ export function rowCapacityValid(row: CapacityValues): boolean {
   return capacityIssueText(row) === "";
 }
 
-// 未「接受」或修改的行不能保存：这一行的容量必须已确认且有效
-export function canSaveRows(rows: { context_window: number | null; max_output_tokens: number | null; capacity_confirmed: boolean }[]): boolean {
-  return rows.every((row) => row.capacity_confirmed && rowCapacityValid(row));
+// 能否保存只看容量是否齐全且有效（设计说明第 4.3 节）
+export function canSaveRows(rows: { context_window: number | null; max_output_tokens: number | null }[]): boolean {
+  return rows.every(rowCapacityValid);
 }
 
 // 表单能否构成一份合法的目录文档（第 4.6 节的必填项与容量关系）：影响查询只对合法的拟议修改发问。
@@ -467,10 +467,9 @@ export type FormRow = {
   model: string;
   // 调用协议属于访问定义（ADR-0033），新建的定义预填 Chat Completions
   protocol: string;
-  // 窗口与输出上限保存为文本，空字符串表示没有值（未「接受」时留空）
+  // 窗口与输出上限保存为文本，空字符串表示没有值
   context_window: string;
   max_output_tokens: string;
-  capacity_confirmed: boolean;
   accepts_required_tool_call: boolean;
   image_input: boolean;
   reasoning_levels: string[];
@@ -478,7 +477,6 @@ export type FormRow = {
   reasoning_mode: string;
   // 能力来源的标注：预填值来自哪里就写哪里（第 4.3 节「界面标明每个预填值的来源」）
   capability_source: string;
-  // 已保存的行提交时带着容量值即视为已确认；新增行必须由用户点「接受」
   saved: boolean;
 };
 
@@ -527,28 +525,96 @@ export function prefillSourceText(prefill: PrefillValue): string {
   return parts.join(" · ");
 }
 
-// 点击候选建立的一行：协议、容量与输入方式按第 4.3 节预填并标明来源，容量未经用户「接受」以前不能保存。
-// 访问定义 ID 预填为符合规则的写法（上游模型 ID 带「/」时换成「-」，工单 #302），
-// 上游模型 ID 保持上游写法原样：请求发往上游时用的就是它
-export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCapabilityTable, presetId: string,
-                                 preset: ServicePreset | null): FormRow {
+export type CandidateCustomCapacity = {
+  context_window?: string;
+  max_output_tokens?: string;
+};
+
+export function candidateToRow(
+  candidate: UpstreamCandidate,
+  custom: CandidateCustomCapacity | undefined,
+  table: CatalogCapabilityTable,
+  presetId: string,
+  preset: ServicePreset | null,
+): FormRow {
   const prefill = prefillModel(candidate.id, candidate, table, presetId, preset);
+  const winText = custom?.context_window !== undefined && custom.context_window.trim() !== ""
+    ? custom.context_window
+    : numberToText(prefill.context_window);
+  const outText = custom?.max_output_tokens !== undefined && custom.max_output_tokens.trim() !== ""
+    ? custom.max_output_tokens
+    : numberToText(prefill.max_output_tokens);
+
+  const parts: string[] = [];
+  parts.push(`协议：${PREFILL_SOURCE_LABELS[prefill.sources.protocol] ?? prefill.sources.protocol}`);
+  if (prefill.sources.context_window && (custom?.context_window === undefined || custom.context_window === "")) {
+    parts.push(`窗口：${PREFILL_SOURCE_LABELS[prefill.sources.context_window] ?? prefill.sources.context_window}`);
+  } else if (winText) {
+    parts.push(`窗口：手动`);
+  }
+  if (prefill.sources.max_output_tokens && (custom?.max_output_tokens === undefined || custom.max_output_tokens === "")) {
+    parts.push(`输出上限：${PREFILL_SOURCE_LABELS[prefill.sources.max_output_tokens] ?? prefill.sources.max_output_tokens}`);
+  } else if (outText) {
+    parts.push(`输出上限：手动`);
+  }
+  parts.push(`输入方式：${PREFILL_SOURCE_LABELS[prefill.sources.input_modalities] ?? prefill.sources.input_modalities}`);
+
   return {
     key: newCommandId(),
     id: sanitizeModelId(candidate.id) || candidate.id,
     model: candidate.id,
     protocol: prefill.protocol,
-    context_window: numberToText(prefill.context_window),
-    max_output_tokens: numberToText(prefill.max_output_tokens),
-    capacity_confirmed: false,
+    context_window: winText,
+    max_output_tokens: outText,
     accepts_required_tool_call: true,
     image_input: prefill.input_modalities.includes("image"),
     reasoning_levels: [],
     default_reasoning_level: "",
     reasoning_mode: "",
-    capability_source: prefillSourceText(prefill),
+    capability_source: parts.join(" · "),
     saved: false,
   };
+}
+
+// 检查勾选的候选能否加入：有勾选项，且每个勾选项的容量齐全且有效
+export function canJoinCandidates(
+  candidateIds: string[],
+  candidates: UpstreamCandidate[],
+  customCapacities: Record<string, CandidateCustomCapacity | undefined>,
+  table: CatalogCapabilityTable,
+  presetId: string,
+  preset: ServicePreset | null,
+): { ok: boolean; issue: string } {
+  if (candidateIds.length === 0) {
+    return { ok: false, issue: "" };
+  }
+  for (const id of candidateIds) {
+    const candidate = candidates.find((item) => item.id === id);
+    if (!candidate) {
+      continue;
+    }
+    const prefill = prefillModel(candidate.id, candidate, table, presetId, preset);
+    const custom = customCapacities[id];
+    const win = custom?.context_window !== undefined && custom.context_window.trim() !== ""
+      ? intFromInput(custom.context_window)
+      : prefill.context_window;
+    const out = custom?.max_output_tokens !== undefined && custom.max_output_tokens.trim() !== ""
+      ? intFromInput(custom.max_output_tokens)
+      : prefill.max_output_tokens;
+    const issue = capacityIssueText({ context_window: win, max_output_tokens: out });
+    if (issue !== "") {
+      return { ok: false, issue };
+    }
+  }
+  return { ok: true, issue: "" };
+}
+
+// 点击候选建立的一行：协议、容量与输入方式按第 4.3 节预填并标明来源，容量齐全且有效即可保存。
+// 访问定义 ID 预填为符合规则的写法（上游模型 ID 带「/」时换成「-」，工单 #302），
+// 上游模型 ID 保持上游写法原样：请求发往上游时用的就是它
+export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCapabilityTable, presetId: string,
+                                 preset: ServicePreset | null): FormRow {
+  return candidateToRow(candidate, undefined, table, presetId, preset);
 }
 
 // 手动添加的一行：没有预填，容量留空，来源标为手动
@@ -560,7 +626,6 @@ export function rowFromManual(index: number): FormRow {
     protocol: DEFAULT_PROTOCOL,
     context_window: "",
     max_output_tokens: "",
-    capacity_confirmed: false,
     accepts_required_tool_call: true,
     image_input: false,
     reasoning_levels: [],
@@ -629,7 +694,6 @@ export function formStateFromProvider(provider: CatalogProvider): FormState {
       protocol: model.protocol,
       context_window: numberToText(model.context_window),
       max_output_tokens: numberToText(model.max_output_tokens),
-      capacity_confirmed: true,
       accepts_required_tool_call: model.accepts_required_tool_call,
       image_input: model.input_modalities.includes("image"),
       reasoning_levels: [...model.reasoning_levels],
@@ -641,23 +705,21 @@ export function formStateFromProvider(provider: CatalogProvider): FormState {
   };
 }
 
-// 一行是否可保存：容量有值且有效，且已确认（新增行要点「接受」，已保存的行带着容量值即视为已确认）
+// 一行是否可保存：容量齐全且有效
 export function rowSavable(row: FormRow): boolean {
-  const capacity = {
+  return rowCapacityValid({
     context_window: intFromInput(row.context_window),
     max_output_tokens: intFromInput(row.max_output_tokens),
-  };
-  const confirmed = row.saved || row.capacity_confirmed;
-  return canSaveRows([{ ...capacity, capacity_confirmed: confirmed }]);
+  });
 }
 
 export function rowsSavable(rows: FormRow[]): boolean {
   return rows.every(rowSavable);
 }
 
-// 用户修改窗口或输出上限：视为已确认；新增行的来源标注改成手动（预填值已被替换）
+// 用户修改窗口或输出上限：新增行的来源标注改成手动（预填值已被替换）
 export function patchRowCapacity(row: FormRow, field: "context_window" | "max_output_tokens", text: string): Partial<FormRow> {
-  const patch: Partial<FormRow> = { capacity_confirmed: true };
+  const patch: Partial<FormRow> = {};
   patch[field] = text;
   if (!row.saved) {
     patch.capability_source = "手动";

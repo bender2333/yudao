@@ -1,6 +1,6 @@
 // 添加与编辑 Provider 配置的表单（模型管理设计说明第 9.1 节，工单 #93）。
 // 表单就地展开，高级选项折叠；标题为「添加 Provider 配置」「编辑 Provider 配置」。
-// 模型访问定义表在这里行内编辑：窗口与输出上限逐行「接受」或修改，推理档位声明三项，
+// 模型访问定义表在这里行内编辑：容量逐行填写或修改，齐全且有效即可保存，推理档位声明三项，
 // 输入方式为「支持图像输入」勾选框，准入列只读。Key 输入框始终为空，不回填。
 // 取值与判断都在 model-logic.ts 里，这个文件只做渲染。
 
@@ -299,7 +299,6 @@ export function ProviderForm(props: ProviderFormProps) {
             context_window: intFromInput(row.context_window),
             max_output_tokens: intFromInput(row.max_output_tokens),
           });
-          const capacityConfirmed = (row.saved || row.capacity_confirmed) && capacityIssue === "";
           return (
             <fieldset className="y10-block is-compact mm-row" key={row.key} data-testid={`model-row-${rowKey}`}>
               <legend>{row.id || "新的定义"}</legend>
@@ -338,15 +337,6 @@ export function ProviderForm(props: ProviderFormProps) {
                        onChange={(event) => props.onPatchRow(row.key, patchRowCapacity(row, "max_output_tokens", event.target.value))} />
               </label>
               <div className="y10-row y10-row-actions mm-actions mm-row-actions">
-                {capacityConfirmed
-                  ? <span className="y10-small mm-ok" data-testid={`capacity-confirmed-${rowKey}`}>容量已确认</span>
-                  : (
-                    <button type="button" className="y10-btn small" data-testid={`accept-capacity-${rowKey}`}
-                            disabled={capacityIssue !== ""}
-                            onClick={() => props.onPatchRow(row.key, { capacity_confirmed: true })}>
-                      接受容量
-                    </button>
-                  )}
                 {capacityIssue !== "" && (
                   <span className="y10-warn-text mm-warn" role="status" data-testid={`capacity-issue-${rowKey}`}>
                     {capacityIssue}

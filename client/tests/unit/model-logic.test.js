@@ -48,6 +48,8 @@ import {
   admissionLabel,
   rowCapacityValid,
   canSaveRows,
+  candidateToRow,
+  canJoinCandidates,
   sanitizeModelId,
   saveSuccessText,
 } from "../../src/renderer/src/views/models/model-logic.ts";
@@ -173,14 +175,14 @@ test("准入列显示测试时间与实际返回的模型；候选与作废各�
   assert.equal(admissionFor({ id: "m2", provider_id: "p1" }, admissions), null);
 });
 
-test("容量逐行确认：未接受或无效的行不能保存（验收第 3 项）", () => {
+test("容量有效性：缺少或无效的行不能保存（验收第 3 项）", () => {
   assert.equal(rowCapacityValid({ context_window: null, max_output_tokens: 100 }), false);
   assert.equal(rowCapacityValid({ context_window: 1000, max_output_tokens: null }), false);
   assert.equal(rowCapacityValid({ context_window: 1000, max_output_tokens: 2000 }), false);
   assert.equal(rowCapacityValid({ context_window: 1000, max_output_tokens: 1000 }), true);
   const rows = [
-    { context_window: 1000, max_output_tokens: 100, capacity_confirmed: true },
-    { context_window: 1000, max_output_tokens: 100, capacity_confirmed: false },
+    { context_window: 1000, max_output_tokens: 100 },
+    { context_window: 1000, max_output_tokens: null },
   ];
   assert.equal(canSaveRows(rows), false);
   assert.equal(canSaveRows([rows[0]]), true);
@@ -333,10 +335,10 @@ test("表单能否构成合法目录文档：必填项与容量关系（第 4.6 
   const provider = { id: "p1", name: "P", base_url: "https://x/v1" };
   const row = {
     ...rowFromManual(0),
-    id: "m1", model: "glm", context_window: "1000", max_output_tokens: "100", capacity_confirmed: true,
+    id: "m1", model: "glm", context_window: "1000", max_output_tokens: "100",
   };
   assert.equal(formDocumentValid(provider, [row]), true);
-  // 窗口必须与「接受容量」一致：留空时不构成合法文档（工单 #294，与 rowCapacityValid 同一规则）
+  // 窗口留空时不构成合法文档（工单 #294，与 rowCapacityValid 同一规则）
   assert.equal(formDocumentValid(provider, [{ ...row, context_window: "" }]), false);
   // 输出上限必须有值且为正，且不大于窗口
   assert.equal(formDocumentValid(provider, [{ ...row, max_output_tokens: "" }]), false);
@@ -392,28 +394,25 @@ test("添加时的表单为空，编辑时恢复服务方案、协议与已保�
   assert.equal(state.rows[0].context_window, "1000");
   assert.equal(state.rows[0].image_input, true);
   assert.equal(state.rows[0].saved, true);
-  // 已保存的行带着容量值提交即视为已确认
+  // 已保存的行带着容量值即视为可保存
   assert.equal(rowSavable(state.rows[0]), true);
 });
 
-test("点击候选预填并标明来源；未「接受」的行不能保存（验收第 3 项）", () => {
+test("点击候选预填并标明来源；缺少容量的行不能保存（验收第 3 项）", () => {
   const row = rowFromCandidate({ id: "deepseek-v4-flash", context_window: 500000, max_output_tokens: 64000 },
                                TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
   assert.equal(row.id, "deepseek-v4-flash");
   assert.equal(row.protocol, "chat_completions");
   assert.equal(row.model, "deepseek-v4-flash");
   assert.equal(row.context_window, "500000");
-  assert.equal(row.capacity_confirmed, false);
-  assert.equal(rowSavable(row), false);
-  assert.equal(rowsSavable([row]), false);
+  assert.equal(rowSavable(row), true);
+  assert.equal(rowsSavable([row]), true);
   // 来源标注：窗口与输出上限来自上游模型列表，输入方式来自能力表
   assert.match(row.capability_source, /窗口：上游模型列表/);
   assert.match(row.capability_source, /输出上限：上游模型列表/);
   assert.match(row.capability_source, /输入方式：能力表/);
-  // 点击「接受」以后可以保存
-  assert.equal(rowsSavable([{ ...row, capacity_confirmed: true }]), true);
-  // 修改窗口同样视为已确认，来源改为手动
-  assert.deepEqual(patchRowCapacity(row, "context_window", "123"), { capacity_confirmed: true, context_window: "123", capability_source: "手动" });
+  // 修改窗口，来源改为手动
+  assert.deepEqual(patchRowCapacity(row, "context_window", "123"), { context_window: "123", capability_source: "手动" });
 
   // 能力表里有图像输入的模型：预填为文本与图像
   const vision = rowFromCandidate({ id: "vision-model" }, TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
@@ -429,20 +428,82 @@ test("点击候选预填并标明来源；未「接受」的行不能保存（�
                                    presetById(PRESETS, "opencode-go"));
   assert.equal(unknown.context_window, "");
   assert.equal(unknown.protocol, "chat_completions");
-  assert.equal(rowSavable({ ...unknown, capacity_confirmed: true }), false);
+  assert.equal(rowSavable(unknown), false);
 
   // 手动添加的行：没有预填，来源为手动
   const manual = rowFromManual(0);
   assert.equal(manual.capability_source, "手动");
   assert.equal(manual.id, "model-1");
-  assert.equal(manual.capacity_confirmed, false);
+  assert.equal(rowSavable(manual), false);
 });
+test("候选就地填写容量并构造行（设计说明第 4.3、9.1 节）", () => {
+  const raw = { id: "no-limits-model" };
+  // 缺少容量时就地填写
+  const row = candidateToRow(raw, { context_window: "128000", max_output_tokens: "4096" },
+                             TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
+  assert.equal(row.id, "no-limits-model");
+  assert.equal(row.context_window, "128000");
+  assert.equal(row.max_output_tokens, "4096");
+  assert.match(row.capability_source, /窗口：手动/);
+  assert.match(row.capability_source, /输出上限：手动/);
+  assert.equal(rowSavable(row), true);
+
+  // 列表带容量时直接采用预填值，来源写明
+  const prefilled = candidateToRow({ id: "deepseek-v4-flash", context_window: 500000, max_output_tokens: 64000 },
+                                   undefined, TABLE, "opencode-go", presetById(PRESETS, "opencode-go"));
+  assert.equal(prefilled.context_window, "500000");
+  assert.equal(prefilled.max_output_tokens, "64000");
+  assert.match(prefilled.capability_source, /窗口：上游模型列表/);
+  assert.match(prefilled.capability_source, /输出上限：上游模型列表/);
+});
+
+test("勾选候选的加入门槛校验：缺少或无效时写明哪一项（设计说明第 9.1 节）", () => {
+  const candidates = [
+    { id: "full-model", context_window: 100000, max_output_tokens: 4000 },
+    { id: "missing-out", context_window: 100000 },
+    { id: "no-limits" },
+  ];
+  const preset = presetById(PRESETS, "opencode-go");
+  // 未勾选任何候选：不可加入
+  assert.deepEqual(canJoinCandidates([], candidates, {}, TABLE, "opencode-go", preset), { ok: false, issue: "" });
+
+  // 勾选带容量的候选：可加入
+  assert.deepEqual(canJoinCandidates(["full-model"], candidates, {}, TABLE, "opencode-go", preset), { ok: true, issue: "" });
+
+  // 勾选缺输出上限的候选：提示缺少输出上限，不可加入
+  assert.deepEqual(canJoinCandidates(["missing-out"], candidates, {}, TABLE, "opencode-go", preset),
+                   { ok: false, issue: "缺少输出上限" });
+
+  // 勾选两项都缺的候选：提示缺少窗口与输出上限
+  assert.deepEqual(canJoinCandidates(["no-limits"], candidates, {}, TABLE, "opencode-go", preset),
+                   { ok: false, issue: "缺少窗口与输出上限" });
+
+  // 填上错误的容量（输出上限大于窗口）：提示不能大于窗口
+  assert.deepEqual(
+    canJoinCandidates(["no-limits"], candidates, { "no-limits": { context_window: "1000", max_output_tokens: "2000" } },
+                      TABLE, "opencode-go", preset),
+    { ok: false, issue: "输出上限不能大于窗口" },
+  );
+
+  // 填上正确的容量：可加入
+  assert.deepEqual(
+    canJoinCandidates(["no-limits"], candidates, { "no-limits": { context_window: "128000", max_output_tokens: "4096" } },
+                      TABLE, "opencode-go", preset),
+    { ok: true, issue: "" },
+  );
+
+  // 多个候选同时勾选：其中一个缺少容量时整体不可加入并指明该问题
+  assert.deepEqual(
+    canJoinCandidates(["full-model", "missing-out"], candidates, {}, TABLE, "opencode-go", preset),
+    { ok: false, issue: "缺少输出上限" },
+  );
+});
+
 
 test("提交的形状：档位与输入方式按声明写入，默认档位不在支持档位时为未选择（验收第 4 项）", () => {
   const row = {
     ...rowFromCandidate({ id: "m1", context_window: 1000, max_output_tokens: 100 }, TABLE, "opencode-go",
                         presetById(PRESETS, "opencode-go")),
-    capacity_confirmed: true,
     image_input: true,
     reasoning_levels: ["low", "high"],
     default_reasoning_level: "high",
