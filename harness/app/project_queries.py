@@ -1074,11 +1074,16 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
         )
     payload = result_event.payload or {}
     if result_event.type == EventType.ACTION_VERIFIED:
+        resolution = payload.get("resolution")
+        started_payload = {} if started_event is None else (started_event.payload or {})
         return ActionView(
-            action_id=action_id, tool=str(payload.get("name") or ""), department=result_event.department,
-            status="completed", activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
+            action_id=action_id, tool=str(payload.get("name") or started_payload.get("name") or ""),
+            department=result_event.department,
+            status="unknown" if resolution == "handed_back" else "completed",
+            activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
             created_at=result_event.created_at, receipt=None,
+            before_snapshot_ref=started_payload.get("before_snapshot_ref"),
         )
     ok = bool(payload.get("ok"))
     started_payload = {} if started_event is None else (started_event.payload or {})

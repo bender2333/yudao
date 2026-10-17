@@ -160,6 +160,7 @@
 "test_tools.py" = "integration"
 "test_tree_archive.py" = "module"
 "test_undefined_names.py" = "module"
+"test_unknown_action_handed_back.py" = "integration"
 "test_user_facing_labels.py" = "unit"
 "test_workspace_boundary.py" = "unit"
 "test_workspace_delivery.py" = "integration"
