@@ -661,3 +661,4 @@ claude-opus-5-5 / 2026-10-16 16:20 / docs/architecture-issues.md：#501 登记�
 claude-fable-5-1 / 2026-10-17 22:55 / 新增 docs/stage-3/autopilot-retrospective-2026-10-17.md：自主推进的复盘纪要，含数字、七类触发架构师会话的原因、已做出的决定、建议的六条规则与让流程自己迭代的五处、实现层面与架构需求两份待讨论清单、第一批动作 / 用户要求把复盘与建议整理成纪要，作为与架构师讨论流程规则实现与后续设计的输入
 claude-opus-5-5 / 2026-10-17 23:40 / docs/stage-3/autopilot-retrospective-2026-10-17.md：第 3 节加第二轮讨论的决定，第 7 节第 1 条标为已做，新增第 8 节实现方案（对建议的修正、五批、第 2 批逐个文件的规则修改、唤醒工作流的做法） / 用户读完纪要以后讨论怎样实现
 claude-opus-5-5 / 2026-10-17 23:55 / docs/stage-3/autopilot-retrospective-2026-10-17.md：第 3 节加「被唤醒的架构师用用户账号、签名 claude-架构师」，第 8.1、8.3、8.4 节改为单任务工作流与同一份 CLAUDE.md，删去第三个 App 与路径检查 / 用户决定架构师不用权限限制
+claude-opus-5-5 / 2026-10-18 00:10 / docs/stage-3/autopilot-retrospective-2026-10-17.md：唤醒架构师改为派发的电脑上由派发者启动，不用 GitHub Actions，删去凭据与工作流，原第 3 批并入第 2 批（第 3 节、8.2 至 8.4 节） / 用户指出本机已登录 gh 与 Claude Code
