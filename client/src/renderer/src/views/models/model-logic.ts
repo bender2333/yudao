@@ -678,7 +678,6 @@ export function rowToModelInput(row: FormRow): Record<string, unknown> {
     context_window: intFromInput(row.context_window),
     max_output_tokens: intFromInput(row.max_output_tokens),
     capability_source: row.capability_source,
-    capacity_confirmed: row.capacity_confirmed,
     accepts_required_tool_call: row.accepts_required_tool_call,
     input_modalities: row.image_input ? ["text", "image"] : ["text"],
     reasoning_levels: row.reasoning_levels,

@@ -393,23 +393,20 @@ class ProviderFacade:
             else:
                 if not isinstance(models_raw, list):
                     raise CatalogValidationError((ValidationIssue("models", "应为数组"),))
+                _require_capacity(models_raw, provider_id, set(self._store.models))
                 models = [item for item in document["models"] if item.get("provider_id") != provider_id]
                 for item in models_raw:
                     nested = dict(item)
                     nested["provider_id"] = provider_id
-                    nested.pop("capacity_confirmed", None)
                     models.append(nested)
             merged = {"providers": providers, "models": models, "bindings": document["bindings"]}
             _parse_document(merged, self._startup_mode)
-            if models_raw is not None:
-                _require_capacity(models_raw, provider_id, set(self._store.models))
             self._store.save_provider(entry)
             if models_raw is not None:
                 submitted: set[str] = set()
                 for item in models_raw:
                     nested = dict(item)
                     nested["provider_id"] = provider_id
-                    nested.pop("capacity_confirmed", None)
                     self._store.save_model(nested)
                     submitted.add(str(nested.get("id")))
                 self._prune_admissions(str(provider_id), submitted)
@@ -1546,9 +1543,8 @@ def _require_bound_admissions(bindings: Mapping[str, Mapping[str, str]],
 
 def _require_capacity(rows: Sequence[Mapping[str, Any]], provider_id: Any,
                       known_ids: Container[str]) -> None:
-    # 表单每一行都必须填写窗口与输出上限；新增行还必须有容量确认标记，
-    # 已存在的行带着容量值提交即等同 JSON 中修改容量视为确认（工单 #86）
-    # 窗口与输出上限的大小关系由目录校验判定，这里只管必填与确认标记
+    # 表单每一行都必须填写窗口与输出上限；从候选建立或保存直接采用预填容量（工单 #562）
+    # 缺少容量时写明缺少的字段，窗口与输出上限的大小关系由目录校验判定
     issues: list[ValidationIssue] = []
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
@@ -1557,14 +1553,10 @@ def _require_capacity(rows: Sequence[Mapping[str, Any]], provider_id: Any,
         location = f"models[{index}]"
         if isinstance(model_id, str) and model_id.strip():
             location = f"models.{model_id}"
-        if row.get("context_window") is None or row.get("max_output_tokens") is None:
-            issues.append(ValidationIssue(f"{location}.context_window",
-                                          "每行模型访问定义都必须填写窗口与输出上限"))
-            continue
-        if isinstance(model_id, str) and model_id not in known_ids \
-                and row.get("capacity_confirmed") is not True:
-            issues.append(ValidationIssue(f"{location}.capacity_confirmed",
-                                          f"新增的模型访问定义 {model_id} 需要容量确认"))
+        if row.get("context_window") is None:
+            issues.append(ValidationIssue(f"{location}.context_window", "缺少 context_window"))
+        if row.get("max_output_tokens") is None:
+            issues.append(ValidationIssue(f"{location}.max_output_tokens", "缺少 max_output_tokens"))
     if issues:
         raise CatalogValidationError(issues)
 

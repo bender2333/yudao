@@ -391,7 +391,6 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     }
     const models = form.state.rows.map((row) => {
       const input = rowToModelInput(row);
-      delete input.capacity_confirmed;
       return input;
     });
     return JSON.stringify({

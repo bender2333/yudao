@@ -257,7 +257,7 @@ def register_model(client, model_name):
     models.append({
         "id": MODEL_DEFINITION_ID, "provider_id": PROVIDER_ID, "model": model_name,
         "context_window": CONTEXT_WINDOW, "max_output_tokens": MAX_OUTPUT_TOKENS,
-        "capacity_confirmed": True, "accepts_required_tool_call": True,
+        "accepts_required_tool_call": True,
         "input_modalities": ["text", "image"], "reasoning_levels": [],
         "default_reasoning_level": None, "reasoning_mode": "",
     })

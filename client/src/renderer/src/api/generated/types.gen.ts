@@ -1903,15 +1903,11 @@ export type DocumentModelInput = {
     /**
      * Max Output Tokens
      */
-    max_output_tokens: number;
+    max_output_tokens?: number | null;
     /**
      * Capability Source
      */
     capability_source?: string;
-    /**
-     * Capacity Confirmed
-     */
-    capacity_confirmed?: boolean;
     /**
      * Accepts Required Tool Call
      */
@@ -2624,15 +2620,11 @@ export type ModelInput = {
     /**
      * Max Output Tokens
      */
-    max_output_tokens: number;
+    max_output_tokens?: number | null;
     /**
      * Capability Source
      */
     capability_source?: string;
-    /**
-     * Capacity Confirmed
-     */
-    capacity_confirmed?: boolean;
     /**
      * Accepts Required Tool Call
      */

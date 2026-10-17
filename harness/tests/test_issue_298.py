@@ -116,7 +116,7 @@ def _provider(base_url: str) -> dict:
 
 
 def _model() -> dict:
-    return {"id": MODEL_ID, "model": "upstream-298", "protocol": "responses", "capacity_confirmed": True,
+    return {"id": MODEL_ID, "model": "upstream-298", "protocol": "responses",
             "context_window": 32000, "max_output_tokens": 2048}
 
 

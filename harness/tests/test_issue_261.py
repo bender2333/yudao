@@ -1,6 +1,6 @@
 # 工单 #261：catalog.change_impact 对结构非法的拟议目录文档返回 422。
 # 从运行系统整体测试：真实启动 FastAPI 应用，目录文件与 .env 是真实文件，事件日志是真实 SQLite。
-# 拟议文档缺少必填项（max_output_tokens）或带有保存命令才有的字段（capacity_confirmed）时都不再是 500：
+# 拟议文档缺少必填项（max_output_tokens）或带有未知字段（extra_field）时都不再是 500：
 # 应用层把 Provider 模块的 CatalogValidationError 转成 CatalogQueryInvalid，接口层映射为 422，
 # 响应体沿用查询错误的形状 {"error": <原因>}，原因写出字段位置（与命令被拒绝时 catalog_invalid 的字段位置同一写法）；
 # 查询只读取，事件日志末尾不变。
@@ -23,13 +23,13 @@ def _model(model_id: str, provider_id: str) -> dict[str, Any]:
     return {"id": model_id, "provider_id": provider_id, "model": f"upstream-{model_id}",
             "protocol": "responses",
             "context_window": 32000, "max_output_tokens": 2048, "capability_source": ""}
-def _document_of(*, capacity_confirmed: bool = False, missing_required: bool = False) -> dict[str, Any]:
+def _document_of(*, extra_field: bool = False, missing_required: bool = False) -> dict[str, Any]:
     model = _model("model-a", "provider-a")
     if missing_required:
         # max_output_tokens 是模型访问定义的必填项（store._parse_model）
         model.pop("max_output_tokens")
-    if capacity_confirmed:
-        model["capacity_confirmed"] = True
+    if extra_field:
+        model["extra_field"] = True
     return {"providers": [_provider("provider-a", "http://127.0.0.1:1/v1", "KEY_A")],
             "models": [model],
             "bindings": {department: {"provider_id": "provider-a", "model_id": "model-a"}
@@ -50,16 +50,16 @@ def test_change_impact_refuses_a_document_missing_a_required_field(tmp_path):
         assert "models[0].max_output_tokens" in response.json()["error"]
         assert opened.system.store.end_position() == end
 
-def test_change_impact_refuses_a_document_with_a_save_only_field(tmp_path):
-    # 拟议文档带有保存命令才有的 capacity_confirmed：返回 422，响应体写出 models[0].capacity_confirmed
+def test_change_impact_refuses_a_document_with_an_unknown_field(tmp_path):
+    # 拟议文档带有合同外的 extra_field：返回 422，响应体写出 models[0].extra_field
     opened = _Opened(tmp_path)
     with running_api(opened) as client:
         opened.admit(("provider-a", "model-a"))
-        document = json.dumps(_document_of(capacity_confirmed=True), ensure_ascii=False)
+        document = json.dumps(_document_of(extra_field=True), ensure_ascii=False)
         end = opened.system.store.end_position()
         response = _impact(client, kind="document", document=document)
         assert response.status_code == 422, response.text
-        assert "models[0].capacity_confirmed" in response.json()["error"]
+        assert "models[0].extra_field" in response.json()["error"]
         assert opened.system.store.end_position() == end
 
 def test_change_impact_refuses_an_invalid_connection_document(tmp_path):
@@ -71,12 +71,12 @@ def test_change_impact_refuses_an_invalid_connection_document(tmp_path):
                                  "base_url": "http://127.0.0.1:2/v1", "credential_ref": "KEY_A",
                                  "timeout_sec": 20, "preset_id": "", "models_url": ""},
                     "models": [{"id": "model-a", "model": "upstream-a", "protocol": "responses",
-                                "max_output_tokens": 2048, "capacity_confirmed": True}]}
+                                "max_output_tokens": 2048, "extra_field": True}]}
         document = json.dumps(proposed, ensure_ascii=False)
         end = opened.system.store.end_position()
         response = _impact(client, kind="connection", provider_id="provider-a", document=document)
         assert response.status_code == 422, response.text
-        assert "capacity_confirmed" in response.json()["error"]
+        assert "extra_field" in response.json()["error"]
         assert opened.system.store.end_position() == end
 
 def test_change_impact_keeps_working_for_a_valid_document(tmp_path):

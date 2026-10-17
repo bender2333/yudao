@@ -6905,19 +6905,21 @@
             "title": "Context Window"
           },
           "max_output_tokens": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Max Output Tokens"
           },
           "capability_source": {
             "type": "string",
             "title": "Capability Source",
             "default": ""
-          },
-          "capacity_confirmed": {
-            "type": "boolean",
-            "title": "Capacity Confirmed",
-            "default": false
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -6974,7 +6976,6 @@
           "id",
           "model",
           "protocol",
-          "max_output_tokens",
           "provider_id"
         ],
         "title": "DocumentModelInput"
@@ -8130,19 +8131,21 @@
             "title": "Context Window"
           },
           "max_output_tokens": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Max Output Tokens"
           },
           "capability_source": {
             "type": "string",
             "title": "Capability Source",
             "default": ""
-          },
-          "capacity_confirmed": {
-            "type": "boolean",
-            "title": "Capacity Confirmed",
-            "default": false
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -8193,8 +8196,7 @@
         "required": [
           "id",
           "model",
-          "protocol",
-          "max_output_tokens"
+          "protocol"
         ],
         "title": "ModelInput"
       },

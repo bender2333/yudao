@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Sequence
 
 from pydantic import PositiveInt
 
@@ -25,6 +25,31 @@ if TYPE_CHECKING:
 # 与 Provider 模块支持的协议同一份清单
 ProtocolName = Literal[tuple(sorted(SUPPORTED_PROTOCOLS))]
 
+_PREFILL_SOURCE_LABELS: Mapping[str, str] = {
+    "models_url": "上游模型列表",
+    "capability_table": "能力表",
+    "preset_default": "服务方案默认",
+    "default": "默认",
+}
+
+
+def _format_candidate_source(candidate: Mapping[str, Any]) -> str:
+    parts: list[str] = []
+    proto_src = candidate.get("protocol_source")
+    if proto_src:
+        parts.append(f"协议：{_PREFILL_SOURCE_LABELS.get(str(proto_src), str(proto_src))}")
+    window_src = candidate.get("context_window_source")
+    if window_src:
+        parts.append(f"窗口：{_PREFILL_SOURCE_LABELS.get(str(window_src), str(window_src))}")
+    output_src = candidate.get("max_output_tokens_source")
+    if output_src:
+        parts.append(f"输出上限：{_PREFILL_SOURCE_LABELS.get(str(output_src), str(output_src))}")
+    modalities_src = candidate.get("input_modalities_source")
+    if modalities_src:
+        parts.append(f"输入方式：{_PREFILL_SOURCE_LABELS.get(str(modalities_src), str(modalities_src))}")
+    return " · ".join(parts)
+
+
 
 class ProviderInput(Contract):
     # 一份 Provider 配置：一条服务连接，不声明协议（ADR-0033）；
@@ -39,16 +64,14 @@ class ProviderInput(Contract):
 
 
 class ModelInput(Contract):
-    # 一条模型访问定义；调用协议必填（ADR-0033），容量逐行在这条命令中确认（窗口与输出上限）。
-    # capacity_confirmed 是这一行的容量确认标记：新增行必须显式确认才能保存；
-    # 目录文档中的定义带容量即视为已确认，确认标记只存在于这条命令（工单 #86）
+    # 一条模型访问定义；调用协议必填（ADR-0033），从候选建立时直接采用预填容量（工单 #562）。
+    # 两处都没有窗口或输出上限的候选，必须在请求里给出才能保存，否则拒绝并写明缺少哪一项。
     id: Text
     model: Text
     protocol: ProtocolName
     context_window: int | None = None
-    max_output_tokens: PositiveInt
+    max_output_tokens: PositiveInt | None = None
     capability_source: str = ""
-    capacity_confirmed: bool = False
     accepts_required_tool_call: bool = True
     # 输入方式（设计说明第 4.3 节）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
     # 模型测试不核实它，修改以后准入保持，从下一次模型请求起使用新值
@@ -58,6 +81,52 @@ class ModelInput(Contract):
     default_reasoning_level: str | None = None
     reasoning_mode: str = ""
 
+    @classmethod
+    def from_candidate(
+        cls,
+        candidate: Mapping[str, Any],
+        *,
+        id: str | None = None,
+        context_window: int | None = None,
+        max_output_tokens: int | None = None,
+        protocol: ProtocolName | None = None,
+        capability_source: str | None = None,
+        accepts_required_tool_call: bool = True,
+        reasoning_levels: Sequence[str] = (),
+        default_reasoning_level: str | None = None,
+        reasoning_mode: str = "",
+    ) -> ModelInput:
+        # 从候选建立模型访问定义（工单 #562，设计说明第 4.3 节）：
+        # 窗口、输出上限与协议取候选的预填值，来源随定义保存（以后可以修改）；
+        # 两处都没有窗口或输出上限的候选，必须在请求里给出才能保存
+        raw_id = str(candidate.get("id") or "").strip()
+        entry_id = str(id).strip() if id is not None else raw_id
+        proto = protocol or candidate.get("protocol") or "chat_completions"
+        window = context_window if context_window is not None else candidate.get("context_window")
+        output = max_output_tokens if max_output_tokens is not None else candidate.get("max_output_tokens")
+        if capability_source is not None:
+            source = capability_source
+        elif candidate.get("capability_source"):
+            source = str(candidate["capability_source"])
+        else:
+            source = _format_candidate_source(candidate)
+        modalities = candidate.get("input_modalities") or ["text"]
+        return cls(
+            id=entry_id,
+            model=raw_id,
+            protocol=proto,
+            context_window=window,
+            max_output_tokens=output,
+            capability_source=source,
+            accepts_required_tool_call=accepts_required_tool_call,
+            input_modalities=[item for item in modalities if item in ("text", "image")],
+            reasoning_levels=list(reasoning_levels),
+            default_reasoning_level=default_reasoning_level,
+            reasoning_mode=reasoning_mode,
+        )
+
+
+model_input_from_candidate = ModelInput.from_candidate
 
 class DocumentModelInput(ModelInput):
     # 目录文档中的定义自己带上所属连接
@@ -337,10 +406,7 @@ async def _save_document(application: Application, command: Command, request: Ca
     previous = facade.to_document()
     document = {
         "providers": [item.model_dump() for item in request.document.providers],
-        # 目录文档不含逐行容量确认标记：确认只发生在 catalog.connection.save（工单 #86），
-        # 文档中的定义带容量值即视为已确认
-        "models": [{key: value for key, value in item.model_dump().items() if key != "capacity_confirmed"}
-                   for item in request.document.models],
+        "models": [item.model_dump() for item in request.document.models],
         "bindings": {key: item.model_dump() for key, item in request.document.bindings.items()},
     }
     try:
