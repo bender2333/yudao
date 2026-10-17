@@ -567,11 +567,9 @@ class ToolStartedPayload(AttemptIdentity, Versions, WorkBasis):
     snapshot_hash: str | None = None
     # 动作前的公开树快照（工单 #17）：许可以后、执行之前写入，中断后按它与动作参数核对实际效果
     before_snapshot_ref: ArtifactRef | None = None
-    # 自动重新执行（工单 #307）：这次尝试是同一个逻辑动作的上一次尝试因为结果未知而重新执行的。
-    # 记被重新执行的 tool_started 事件编号；首次尝试没有这个字段
+    # 自动重新执行（工单 #307）：旧事件保留，新版本不再写
     auto_retry_of: str | None = None
-    # 自动重新执行的依据（工单 #308）：not_happened 表示自动核实确认上一次尝试没有发生，
-    # 由这次尝试重新执行；契约声明可以重复的动作没有这个字段
+    # 自动重新执行的依据（工单 #308）：旧事件保留，新版本不再写
     verification_reason: Literal["not_happened"] | None = None
 
 
@@ -593,14 +591,14 @@ class FileActionComparison(Payload):
 
 class ActionVerifiedPayload(ToolRecord):
     # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
-    # resolution 为 continue 表示用户选择按当前实际状态继续（工单 #17）；auto_reexecute 表示契约声明
-    # 可以重复、自动重新执行了一次（工单 #307）；auto_verify 表示自动核实确认动作已经完成
-    # （工单 #308）。两次尝试分别记录，不补造原来那次尝试的 tool_called 回执
+    # resolution 为 continue 表示用户选择按当前实际状态继续（工单 #17）；handed_back 表示交还
+    # 会话由模型处置（工单 #581）；auto_verify 表示自动核实确认动作已经完成（工单 #308）。
+    # 两次尝试分别记录，不补造原来那次尝试的 tool_called 回执
     # input_item 让这条结果进入部门历史，模型据此继续
     ok: bool
     error: str | None = None
-    resolution: Literal["auto_reexecute", "auto_verify", "continue"]
-    # 自动重新执行时记被重新执行的 tool_started 事件编号；自动核实与用户决定时为空
+    resolution: Literal["auto_verify", "continue", "handed_back"]
+    # 自动重新执行（工单 #307）：旧事件保留，新版本不再写
     auto_retry_of: str | None = None
     # 自动核实的依据（工单 #308）：动作前快照、动作参数与当前公开树的对比结论
     verification: FileActionComparison | None = None

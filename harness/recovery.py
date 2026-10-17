@@ -1,19 +1,15 @@
 # 动作核实与恢复（工单 #17、#18、#307，恢复契约第 1、4 节）。动作的身份是（激活、步骤、模型给出的调用编号）三元组：
 # tool_started 在工具许可允许以后、执行之前写入，tool_called/tool_skipped 在执行以后写入。根据这两类事件、
 # 以及保存的模型响应中尚未得到处置的工具调用，把每个动作分成三类：未发送、已完成、结果未知。
-# 契约声明可以重复的结果未知动作自动重新执行一次：重新执行是同一个逻辑动作的新尝试，记一条 tool_started，
-# 它的 auto_retry_of 写明它取代的那次 tool_started 的事件编号。这条链就是「同一个逻辑动作只自动重新执行一次」的依据，
-# 计数取自事件日志，重启以后仍然成立。
 # 恢复观察状态（工单 #18）由 run 的事实与未回答的决定请求得出，不读取时钟、不调用模型。
 
 from __future__ import annotations
 
 import json
-from collections.abc import Container, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from .decisions import UNKNOWN_ACTION
-from .definitions import DEFINITIONS
 from .models import ArtifactRef, DecisionRequest, Event, EventType, hash_bytes
 
 # 动作的三类处置（恢复契约第 4 节）：completed 已有结果；unknown 已经发出但结果没有得到确认，必须核实或
@@ -39,15 +35,6 @@ def action_identity(event: Event) -> tuple[str, int | None, str]:
     return (str(payload.get("activation_id") or ""), step_id if isinstance(step_id, int) else None,
             str(payload.get("id") or event.event_id))
 
-def retry_chain_successors(events: Iterable[Event]) -> dict[str, Event]:
-    # 自动重新执行的链（工单 #307）：重新执行的那一次尝试记一条 tool_started，auto_retry_of 写明它取代的
-    # 上一次 tool_started 的事件编号。返回「被取代的那次事件编号 → 取代它的尝试」。
-    successors: dict[str, Event] = {}
-    for event in events:
-        source = (event.payload or {}).get("auto_retry_of") if event.type == EventType.TOOL_STARTED else None
-        if isinstance(source, str) and source:
-            successors.setdefault(source, event)
-    return successors
 
 def _result_events(events: Iterable[Event]) -> dict[tuple[str, int | None, str], Event]:
     # 已经有结果的动作：tool_called、tool_skipped 与核实记录都表示这次工具调用已经得到处置
@@ -61,7 +48,7 @@ def classify_actions(events: Sequence[Event]) -> dict[tuple[str, int | None, str
     # 按已经持久化的工具事件分类：有 tool_started 且没有结果或核实记录的事件是 unknown；有结果的是
     # completed。没有 tool_started 的调用需要保存的模型响应才知道，由步骤驱动补执行，不在这里分类
     actions: dict[tuple[str, int | None, str], dict[str, Any]] = {}
-    successors = retry_chain_successors(events)
+
     results = _result_events(events)
     for event in events:
         if event.type != EventType.TOOL_STARTED:
@@ -76,13 +63,7 @@ def classify_actions(events: Sequence[Event]) -> dict[tuple[str, int | None, str
             "step_id": payload.get("step_id"),
             "activation_id": payload.get("activation_id"),
             "action_id": str(payload.get("id") or ""),
-            # 这一次尝试取代的上一次尝试（自动重新执行时记被取代的 tool_started 事件编号，首次尝试为空）
-            "auto_retry_of": payload.get("auto_retry_of"),
-            # 这个逻辑动作还有没有自动重新执行的机会（一次的上限，工单 #307）：链尾那一次尝试带着
-            # auto_retry_of，说明这个逻辑动作已经用掉机会；已被取代的那一次由新的尝试接手
-            "auto_retry_available": event.event_id not in successors and not payload.get("auto_retry_of"),
-            # 这一次尝试有没有被后来的尝试取代：被取代的那一次不再等待核实
-            "superseded": event.event_id in successors,
+
             "started_event": event,
             "result_event": result,
         }
@@ -105,14 +86,6 @@ def resolved_by_decision(events: Sequence[Event], decisions: Iterable[Any]) -> s
 
 def _tool_name(event: Event) -> str:
     return str((event.payload or {}).get("name") or "")
-
-def action_repeatable(tool: str, args: Mapping[str, Any] | None = None) -> bool:
-    # 一个动作能否重复执行（恢复契约第 4 节，工单 #242）：唯一的判断入口，后面三张工单共用。
-    # 读取、搜索、检查与 bash 由工具契约各自声明 repeatable；没有定义或没有声明的工具为否。
-    definition = DEFINITIONS.tools.get(tool)
-    if definition is None:
-        return False
-    return definition.repeatable
 
 
 FILE_ACTION_TOOLS = ("write_file", "edit_range", "delete_file", "move_file")
@@ -282,62 +255,6 @@ def _compare_single_target(path: str, target: str, *, before: dict[str, str],
     return {"verdict": "unclear", "detail": {"reason": "目标内容相符，但另有改动"}}
 
 
-def auto_retry_actions(events: Sequence[Event], decisions: Iterable[Any], *,
-                       department: str | None = None,
-                       not_happened: Container[str] = ()) -> list[dict[str, Any]]:
-    # 恢复契约第 4 节第 2 步（工单 #307）：要自动重新执行的结果未知动作，按事件日志的先后顺序给出。判据有四条：
-    # - 这一次尝试的结果未知（有 tool_started、没有结果或核实记录），没有被后来的尝试取代，也没有被
-    #   已经回答的「按当前实际状态继续」覆盖；
-    # - 这个逻辑动作还没有用掉自动重新执行的一次机会（重新执行链上还没有带 auto_retry_of 的尝试）；
-    # - 契约声明可以重复（入口是 action_repeatable），或者自动核实确认这个文件动作没有发生
-    #   （工单 #308，调用方给出这些动作的编号）——两者共用这一次机会；
-    # - 给出 department 时只取这个部门的动作。
-    # 返回的是 classify_actions 的那一条，started_event 是这一次尝试的 tool_started 事件
-    resolved = resolved_by_decision(events, decisions)
-    return [info for identity, info in classify_actions(events).items()
-            if info["status"] == ACTION_UNKNOWN and info["started_event"] is not None
-            and not info["superseded"] and identity not in resolved and info["auto_retry_available"]
-            and (department is None or info["started_event"].department == department)
-            and (info["action_id"] in not_happened
-                 or action_repeatable(info["tool"], (info["started_event"].payload or {}).get("args")))]
-
-
-def resolution_options(tool: str, args: Mapping[str, Any] | None = None) -> list[dict[str, str]]:
-    # 「核实结果未知的动作」给出的选项：「重新执行」只在契约声明可以重复的动作上提供，
-    # 「按当前实际状态继续」与「停止事项」始终可选（应用层与接口层设计说明第 3.3 节）
-    repeatable = action_repeatable(tool, args)
-    return [{"id": option.id, "label": option.label} for option in UNKNOWN_ACTION.options
-            if option.id != "reexecute" or repeatable]
-
-
-def build_unknown_action_request(*, action_id: str, tool: str, action_kind: str, department: str,
-                                 facts: Sequence[str], args: Mapping[str, Any] | None = None,
-                                 repeat_attempted: bool = False) -> dict[str, Any]:
-    # 发一个「核实结果未知的动作」决定请求：只阻塞这个动作（blocks=action），不阻塞整个 run。
-    # 决定请求的身份是 DECISION_REQUESTED 事件的编号，不由这里给出。
-    # repeat_attempted 说明这个逻辑动作已经自动重新执行过一次（恢复契约第 4 节第 3 步）：
-    # 新的尝试结果仍然未知时，材料写明连续两次结果未知，提醒用户可能正是这个动作导致中断
-    repeatable = action_repeatable(tool, args)
-    description = (f"动作 {action_id}（{tool}）已经发出，结果没有得到确认。"
-                   "重新执行只在这个动作的契约声明可以重复时提供；"
-                   "按当前实际状态继续表示接受已经发生的效果；选择停止事项则运行结束。")
-    if repeat_attempted:
-        description += ("这个逻辑动作已经自动重新执行过一次，新的尝试结果仍然未知，"
-                        "连续两次结果未知；中断可能是这个动作本身导致的。")
-    return {
-        "kind": UNKNOWN_ACTION.name,
-        "blocks": UNKNOWN_ACTION.blocks,
-        "options": resolution_options(tool, args),
-        "description": description,
-        "facts": list(facts),
-        "department": department,
-        "action_id": action_id,
-        "tool": tool,
-        "action_kind": action_kind,
-        "repeatable": repeatable,
-        "repeat_attempted": repeat_attempted,
-    }
-
 
 # ---------------------------------------------------------------------------
 # 恢复观察状态（工单 #18）
@@ -345,12 +262,11 @@ def build_unknown_action_request(*, action_id: str, tool: str, action_kind: str,
 def unresolved_unknown_actions(events: Sequence[Event],
                                decisions: Iterable[DecisionRequest]) -> dict[tuple[str, int | None, str], dict[str, Any]]:
     # 还没有得到处置的结果未知动作：有 tool_started，既没有结果、也不在已经被回答的核实请求覆盖范围内。
-    # 已经被后来的尝试取代的那一次不再列入（工单 #307）：它由新的尝试替代，取代关系由 auto_retry_of 记在
-    # 事件日志里；否则它在每一次重新执行以后都仍然「结果未知」，运行会一直停在待核实。
+
     # 已经发出、仍等待回答的核实请求由调用方从决定请求中读取
     resolved = resolved_by_decision(events, decisions)
     return {identity: info for identity, info in classify_actions(events).items()
-            if info["status"] == ACTION_UNKNOWN and not info["superseded"] and identity not in resolved}
+            if info["status"] == ACTION_UNKNOWN and identity not in resolved}
 
 def open_decisions(decisions: Iterable[DecisionRequest], *, kind: str | None = None) -> list[DecisionRequest]:
     # 未回答的决定请求；给出种类时只取该种类

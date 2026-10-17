@@ -3863,8 +3863,7 @@
               "running",
               "completed",
               "failed",
-              "unknown",
-              "superseded"
+              "unknown"
             ],
             "title": "Status"
           },
@@ -3949,28 +3948,6 @@
               }
             ],
             "title": "After Snapshot Ref"
-          },
-          "auto_retry_of": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Auto Retry Of"
-          },
-          "verification_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Verification Reason"
           }
         },
         "additionalProperties": false,
@@ -11209,10 +11186,6 @@
             ],
             "title": "Purpose"
           },
-          "repeatable": {
-            "type": "boolean",
-            "title": "Repeatable"
-          },
           "before_snapshot_ref": {
             "anyOf": [
               {
@@ -11245,7 +11218,6 @@
           "step_id",
           "input_version",
           "purpose",
-          "repeatable",
           "before_snapshot_ref",
           "created_at",
           "started_event_id"
@@ -12809,9 +12781,9 @@
           },
           "resolution": {
             "enum": [
-              "auto_reexecute",
               "auto_verify",
-              "continue"
+              "continue",
+              "handed_back"
             ],
             "title": "Resolution",
             "type": "string"

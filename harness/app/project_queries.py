@@ -26,8 +26,8 @@ from ..projects import ProjectNotFoundError, project_projection
 from ..replay_check import ReplayIntegrityError, verify_replay
 from ..recovery import (
     ACTION_UNKNOWN, OBSERVATION_INTERRUPTED, OBSERVATION_PENDING_VERIFICATION, OBSERVATION_RUNNING,
-    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity, action_repeatable, observation_state,
-    open_decisions, open_resume_decisions, retry_chain_successors, unresolved_unknown_actions,
+    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity, observation_state,
+    open_decisions, open_resume_decisions, unresolved_unknown_actions,
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
@@ -972,8 +972,7 @@ class ActionView(Contract):
     action_id: str
     tool: str
     department: str | None
-    # superseded：这次尝试的结果仍然未知，但已经由另一次尝试接手（工单 #307），不再等待核实
-    status: Literal["running", "completed", "failed", "unknown", "superseded"]
+    status: Literal["running", "completed", "failed", "unknown"]
     activation_id: str | None
     step_id: int | None
     input_version: int | None
@@ -982,12 +981,6 @@ class ActionView(Contract):
     receipt: ActionReceipt | None
     before_snapshot_ref: dict[str, Any] | None = None
     after_snapshot_ref: dict[str, Any] | None = None
-    # 自动重新执行（工单 #307）：这一次尝试取代的那一次 tool_started 事件编号；首次尝试为空。
-    # 核实依据（自动重新执行或用户决定）由 run.recovery 给出，run.actions 给的是两次尝试的先后与关系
-    auto_retry_of: str | None = None
-    # 自动核实时这次尝试自己的依据（工单 #308）：重新执行时是「上一次尝试没有发生」，
-    # 自动核实确认已完成时是那次对比；由 run.recovery 展开
-    verification_reason: str | None = None
 
 
 class RunActionsResult(Contract):
@@ -1000,7 +993,6 @@ def _run_actions(application: Application, request: RunActions) -> Snapshot[RunA
     events = _tool_events(store, request.run_id)
     actions: list[ActionView] = []
     started: dict[tuple[str, int | None, str], Any] = {}
-    successors = retry_chain_successors(events)
     for event in events:
         payload = event.payload or {}
         if event.type not in (EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
@@ -1018,8 +1010,7 @@ def _run_actions(application: Application, request: RunActions) -> Snapshot[RunA
     # 的时候是运行中，否则是结果未知，等待核实
     live = _live_activations(events)
     for identity, event in started.items():
-        actions.append(_action_view(None, identity, event, live=identity[0] in live,
-                                    superseded=event.event_id in successors))
+        actions.append(_action_view(None, identity, event, live=identity[0] in live))
     actions.sort(key=lambda item: item.created_at)
     return Snapshot[RunActionsResult](position=store.end_position(), data=RunActionsResult(actions=actions))
 
@@ -1052,33 +1043,33 @@ def _tool_events(store: Any, run_id: str) -> list[Any]:
 
 
 def _action_view(result_event: Any | None, identity: tuple[str, int | None, str],
-                 started_event: Any | None, *, live: bool = False,
-                 superseded: bool = False) -> ActionView:
+                 started_event: Any | None, *, live: bool = False) -> ActionView:
     # 一个动作的读取视图（工单 #17）：状态、回执，以及动作前后的快照引用（动作前取自 tool_started，
     # 动作后取自 tool_called）。result_event 为空表示只有 tool_started、还没有结果。
-    # 自动重新执行（工单 #307）：取代关系写在取代那一次的 tool_started 上，这里原样给出；
-    # 被取代的那一次不再等待核实，状态是 superseded
     action_id = identity[2]
     if result_event is None:
         payload = {} if started_event is None else (started_event.payload or {})
         return ActionView(
             action_id=action_id, tool=str(payload.get("name") or ""),
             department=None if started_event is None else started_event.department,
-            status=("superseded" if superseded else ("running" if live else "unknown")),
+            status=("running" if live else "unknown"),
             activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
             created_at="" if started_event is None else started_event.created_at, receipt=None,
             before_snapshot_ref=payload.get("before_snapshot_ref"),
-            auto_retry_of=payload.get("auto_retry_of"),
-            verification_reason=payload.get("verification_reason"),
         )
     payload = result_event.payload or {}
     if result_event.type == EventType.ACTION_VERIFIED:
+        resolution = payload.get("resolution")
+        started_payload = {} if started_event is None else (started_event.payload or {})
         return ActionView(
-            action_id=action_id, tool=str(payload.get("name") or ""), department=result_event.department,
-            status="completed", activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
+            action_id=action_id, tool=str(payload.get("name") or started_payload.get("name") or ""),
+            department=result_event.department,
+            status="unknown" if resolution == "handed_back" else "completed",
+            activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
             created_at=result_event.created_at, receipt=None,
+            before_snapshot_ref=started_payload.get("before_snapshot_ref"),
         )
     ok = bool(payload.get("ok"))
     started_payload = {} if started_event is None else (started_event.payload or {})
@@ -1098,8 +1089,7 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
         ),
         before_snapshot_ref=started_payload.get("before_snapshot_ref"),
         after_snapshot_ref=payload.get("after_snapshot_ref"),
-        auto_retry_of=started_payload.get("auto_retry_of"),
-        verification_reason=started_payload.get("verification_reason"),
+
     )
 
 
@@ -2007,7 +1997,6 @@ class UnfinishedAction(Contract):
     step_id: int | None
     input_version: int | None
     purpose: str | None
-    repeatable: bool
     before_snapshot_ref: dict[str, Any] | None
     created_at: str
     started_event_id: str
@@ -2183,7 +2172,6 @@ def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAct
             action_id=action_id, tool=tool, department=event.department, status=ACTION_UNKNOWN,
             activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), purpose=payload.get("purpose"),
-            repeatable=action_repeatable(tool, payload.get("args")),
             before_snapshot_ref=payload.get("before_snapshot_ref"),
             created_at=event.created_at, started_event_id=event.event_id,
         ))
@@ -2198,8 +2186,7 @@ def _verification_records(events: list[Any], decisions: Any) -> list[Verificatio
     # - 用户选择按当前实际状态继续（工单 #17）：action_verified 事件里带着决定请求的编号
     answers = {decision.decision_id: decision for decision in decisions
                if decision.kind == "unknown_action" and decision.status == "answered"}
-    records: list[VerificationRecord] = [_auto_retry_record(events, attempt)
-                                         for attempt in retry_chain_successors(events).values()]
+    records: list[VerificationRecord] = []
     for event in events:
         if event.type != EventType.ACTION_VERIFIED:
             continue
@@ -2220,31 +2207,6 @@ def _verification_records(events: list[Any], decisions: Any) -> list[Verificatio
     records.sort(key=lambda item: item.at)
     return records
 
-
-def _auto_retry_record(events: list[Any], attempt: Any) -> VerificationRecord:
-    # 自动重新执行的核实记录（工单 #307、#308）：依据是契约声明可以重复或自动核实确认动作没有发生，
-    # 不询问用户，因此没有决定请求覆盖它。中断时那一次尝试的结果仍然未知，不补造它的回执，
-    # 也不把它写成已完成；结果取自这一次尝试自己写下的回执，这一条记录说明的是「由这一次尝试接手」
-    payload = attempt.payload or {}
-    result = next((event for event in events
-                   if event.type == EventType.TOOL_CALLED
-                   and str((event.payload or {}).get("id")) == str(payload.get("id"))
-                   and str((event.payload or {}).get("activation_id")) == str(payload.get("activation_id"))),
-                  None)
-    if result is None:
-        outcome = "新的尝试结果仍然未知，等待核实"
-    elif (result.payload or {}).get("ok"):
-        outcome = "新的尝试已经得到结果，动作以这一次尝试的回执为准"
-    else:
-        outcome = "新的尝试的回执报告失败，动作以这一次尝试的回执为准"
-    # 这一次尝试由自动核实确认没有发生而来时，依据写明这次对比（工单 #308）
-    verified = payload.get("verification_reason") == "not_happened"
-    return VerificationRecord(
-        action_id=str(payload.get("id") or attempt.event_id), tool=str(payload.get("name") or ""),
-        basis="自动核实（没有发生，重新执行）" if verified else "契约声明可以重复，自动重新执行",
-        result=outcome, decided_by="system", note=None,
-        decision_id=None, at=attempt.created_at, event_id=attempt.event_id,
-    )
 
 def _activation_count(events: list[Any]) -> int:
     return len([event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED])

@@ -217,7 +217,7 @@ export type ActionView = {
     /**
      * Status
      */
-    status: 'running' | 'completed' | 'failed' | 'unknown' | 'superseded';
+    status: 'running' | 'completed' | 'failed' | 'unknown';
     /**
      * Activation Id
      */
@@ -251,14 +251,6 @@ export type ActionView = {
     after_snapshot_ref?: {
         [key: string]: unknown;
     } | null;
-    /**
-     * Auto Retry Of
-     */
-    auto_retry_of?: string | null;
-    /**
-     * Verification Reason
-     */
-    verification_reason?: string | null;
 };
 
 /**
@@ -4489,10 +4481,6 @@ export type UnfinishedAction = {
      */
     purpose: string | null;
     /**
-     * Repeatable
-     */
-    repeatable: boolean;
-    /**
      * Before Snapshot Ref
      */
     before_snapshot_ref: {
@@ -5355,7 +5343,7 @@ export type ActionVerifiedPayload = {
     /**
      * Resolution
      */
-    resolution: 'auto_reexecute' | 'auto_verify' | 'continue';
+    resolution: 'auto_verify' | 'continue' | 'handed_back';
     /**
      * Auto Retry Of
      */
