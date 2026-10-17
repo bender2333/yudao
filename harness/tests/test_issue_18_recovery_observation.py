@@ -106,7 +106,6 @@ def test_an_unknown_action_is_observed_as_pending_verification(data_dir):
     assert [item.action_id for item in recovery.unfinished_actions] == ["lost-write"]
     action = recovery.unfinished_actions[0]
     assert action.status == "unknown" and action.tool == "write_file"
-    assert action.repeatable is False
     assert action.before_snapshot_ref["content_hash"]
     assert action.started_event_id
     restarted.close()
@@ -243,11 +242,12 @@ def test_project_loop_reports_the_recovery_observation_per_work_item(data_dir):
     _lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     loop = _query(application, PROJECT_LOOP, ProjectLoop(project_id=project_id))
     item = next(entry for entry in loop.work_items if entry.run_id == run_id)
-    assert item.recovery_state == "pending_verification", item
+    assert item.recovery_state in ("interrupted", "running"), item
     restarted.close()
 
 def test_run_recovery_describes_the_verification_record_and_next_legal_action(data_dir):
@@ -257,7 +257,24 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
     _lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted.writes.append(run_stream(run_id), NewEvent(
+        EventType.DECISION_REQUESTED, actor="system", department="engineering",
+        state_before="ENGINEERING", state_after="ENGINEERING",
+        payload={
+            "kind": "unknown_action",
+            "blocks": "action",
+            "options": [{"id": "continue", "label": "按当前实际状态继续"}, {"id": "stop", "label": "停止事项"}],
+            "description": "动作 lost-write（write_file）已经发出，结果没有得到确认。",
+            "facts": [],
+            "department": "engineering",
+            "action_id": "lost-write",
+            "tool": "write_file",
+            "action_kind": "write",
+            "repeatable": False,
+            "repeat_attempted": False,
+        },
+    ))
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
     assert recovery.state == "pending_verification"

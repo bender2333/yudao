@@ -840,8 +840,7 @@ class Orchestrator:
                         current_entries=list(zip(tree.files, tree.hashes)))
             for identity, info in actions.items():
                 started = info["started_event"]
-                if (info["status"] != ACTION_UNKNOWN or started is None or identity in resolved
-                        or info["superseded"]):
+                if info["status"] != ACTION_UNKNOWN or started is None or identity in resolved:
                     continue
                 action_id = identity[2]
                 comparison = comparisons.get(action_id)

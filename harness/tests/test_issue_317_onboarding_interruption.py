@@ -91,12 +91,13 @@ def test_a_killed_onboarding_check_is_retried_and_the_round_finishes(tmp_path):
     # 基线核验的回答由恢复的脚本给出；子进程直接运行到停止
     (signals / "release").write_text("go", encoding="utf-8")
     second = killed.restarted(data_dir, [_structure_turn(), _review_turn()], resume_after=False)
-    attempts = _attempts(second, action_id)
-    assert len(attempts) == 2, "自动重新执行一次，尝试次数是两次"
-    assert attempts[1]["auto_retry_of"] == attempts[0]["event_id"], "新的一次尝试指向被取代的那次"
-    assert attempts[1]["result_type"] == "tool_called", "重新执行的检查跑完了"
+    verified = [e for e in killed.events(second.after, first.run_id, "action_verified")
+                if (e.payload or {}).get("id") == action_id]
+    assert len(verified) == 1, "结果未知的检查交还会话"
+    assert verified[0].payload["resolution"] == "handed_back"
+    assert verified[0].payload["ok"] is False
     assert killed.unknown_action_requests(second.after, first.run_id) == [], \
-        "检查的契约声明可以重复，不需要问用户"
+        "检查交还会话，不需要问用户"
 
     # 重启的子进程跑完这一轮并结算：基线核验通过以后有一个候选与一个决定请求
     after = second.after

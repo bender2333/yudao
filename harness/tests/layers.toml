@@ -86,7 +86,6 @@
 "test_issue_266.py" = "integration"
 "test_issue_298.py" = "integration"
 "test_issue_299.py" = "integration"
-"test_issue_307_auto_reexecute.py" = "integration"
 "test_issue_308_file_action_verification.py" = "integration"
 "test_issue_317_onboarding_interruption.py" = "integration"
 "test_issue_317_onboarding_upgrade.py" = "integration"

@@ -155,9 +155,6 @@ class Tool(_Definition):
     kind: Literal["host", "environment"]
     # 环境工具的动作类别：读取、写入、检查、登记的本地命令；许可规则按动作类别适用
     action: Literal["read", "write", "check", "command"] | None = None
-    # 结果未知时这个动作能否重新执行（恢复契约第 4 节：「重新执行」只在契约声明可以重复的动作上提供）：
-    # 只读、检查与不改变工作区外的命令可以重复，写入与有外部副作用的命令不能；主机工具不产生动作，不使用这一项
-    repeatable: bool = False
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
     # 声明这个工具需要图像输入（设计说明第 5.6 节与浏览器设计第 6.1 节）：调用目标不含图像时

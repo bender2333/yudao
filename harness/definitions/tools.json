@@ -16,8 +16,7 @@
       "required": [
         "path"
       ]
-    },
-    "repeatable": true
+    }
   },
   "list_files": {
     "kind": "environment",
@@ -33,8 +32,7 @@
         }
       },
       "additionalProperties": false
-    },
-    "repeatable": true
+    }
   },
   "search": {
     "kind": "environment",
@@ -74,8 +72,7 @@
       "required": [
         "pattern"
       ]
-    },
-    "repeatable": true
+    }
   },
   "read_range": {
     "kind": "environment",
@@ -113,8 +110,7 @@
         "path",
         "start_line"
       ]
-    },
-    "repeatable": true
+    }
   },
   "write_file": {
     "kind": "environment",
@@ -138,8 +134,7 @@
         "path",
         "content"
       ]
-    },
-    "repeatable": false
+    }
   },
   "edit_range": {
     "kind": "environment",
@@ -185,8 +180,7 @@
         "expected_text",
         "new_text"
       ]
-    },
-    "repeatable": false
+    }
   },
   "delete_file": {
     "kind": "environment",
@@ -209,8 +203,7 @@
         "path",
         "reason"
       ]
-    },
-    "repeatable": false
+    }
   },
   "move_file": {
     "kind": "environment",
@@ -237,8 +230,7 @@
         "destination",
         "reason"
       ]
-    },
-    "repeatable": false
+    }
   },
   "run_check": {
     "kind": "environment",
@@ -269,8 +261,7 @@
         "name",
         "command"
       ]
-    },
-    "repeatable": true
+    }
   },
   "bash": {
     "kind": "environment",
@@ -301,8 +292,7 @@
       },
       "additionalProperties": false,
       "required": []
-    },
-    "repeatable": true
+    }
   },
   "submit_product_spec": {
     "kind": "host",
@@ -439,8 +429,7 @@
         "requirements",
         "acceptance_criteria"
        ]
-      },
-    "repeatable": false
+      }
   },
   "submit_product_decision": {
     "kind": "host",
@@ -462,8 +451,7 @@
         "statement",
         "rationale"
       ]
-    },
-    "repeatable": false
+    }
   },
   "submit_request": {
     "kind": "host",
@@ -520,8 +508,7 @@
         "expected_result",
         "action"
       ]
-    },
-    "repeatable": false
+    }
   },
   "submit_response": {
     "kind": "host",
@@ -561,8 +548,7 @@
         "text",
         "result_event_ids"
       ]
-    },
-    "repeatable": false
+    }
   },
   "submit_guidance_response": {
     "kind": "host",
@@ -602,8 +588,7 @@
         "text",
         "result_event_ids"
       ]
-    },
-    "repeatable": false
+    }
   },
   "submit_delivery": {
     "kind": "host",
@@ -652,8 +637,7 @@
         "files",
         "check_names"
        ]
-      },
-    "repeatable": false
+      }
   },
   "submit_review": {
     "kind": "host",
