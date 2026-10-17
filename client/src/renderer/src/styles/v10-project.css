@@ -269,6 +269,7 @@
 .y10-mt-switch { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .y10-mt-list, .y10-mt-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .y10-mt-doc, .y10-mt-notes li { padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); min-width: 0; display: grid; gap: 8px; }
+.y10-mt-doc { scroll-margin-top: 76px; }
 .y10-mt-doc.is-current { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
 .y10-mt-doc.is-old { background: var(--surface); }
 .y10-mt-doc.is-old .y10-mt-doc-head strong { color: var(--muted); }
@@ -280,6 +281,7 @@
 
 /* 建档各轮里的小标题（初始 PRD、结构说明、基线核验、确认记录） */
 .y10-mt-sub { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 2px 0 0; }
+.y10-mt-doc .y10-pre { max-height: 240px; overflow: auto; }
 .y10-mt-doc .y10-kv.is-rows > div { grid-template-columns: 5.5em minmax(0, 1fr); padding: 4px 0; }
 .y10-mt-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font-size: 11.5px; background: var(--soft-2); color: var(--muted); }
 .y10-mt-badge.is-current { background: var(--tint); color: var(--green); font-weight: 600; }

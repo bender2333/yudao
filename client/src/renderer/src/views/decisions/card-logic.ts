@@ -194,15 +194,24 @@ export function decisionLinks(decision: DecisionView): MaterialLink[] {
   return links;
 }
 
-// 初始 PRD 决定所属项目的资料页：资料页按轮列出初始 PRD 与结构说明的原文
+// 初始 PRD 决定所属项目的资料页：资料页按轮列出初始 PRD 与结构说明的原文，
+// 带上卡片的轮次供资料页定位（工单 #573）
 function materialsHref(decision: DecisionView): string | null {
   const request = (decision.request ?? {}) as Payload;
   if (decision.project_id === null) {
     return null;
   }
   const workItem = typeof request.work_item_id === "string" ? request.work_item_id : decision.work_item_id;
-  const suffix = workItem === null || workItem === "" ? "" : `?w=${workItem}`;
-  return `#/p/${decision.project_id}/materials${suffix}`;
+  const round = typeof request.round === "number" ? request.round : null;
+  const query = new URLSearchParams();
+  if (workItem !== null && workItem !== "") {
+    query.set("w", workItem);
+  }
+  if (round !== null) {
+    query.set("round", String(round));
+  }
+  const suffix = query.toString();
+  return `#/p/${decision.project_id}/materials${suffix ? `?${suffix}` : ""}`;
 }
 
 // 「在项目中查看」的目标：请求给出 view 时用它；结果未知的动作落到恢复页；其余落到项目概览
