@@ -39,6 +39,11 @@
 .y10-level.is-default { background: var(--tint); color: var(--green); font-weight: 600; }
 
 .y10-candidates { margin-top: 4px; }
+.y10-candidates-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.y10-candidate-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; list-style: none; padding: 0; }
+.y10-candidate-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); flex-wrap: wrap; }
+.y10-candidate-head { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+.y10-candidate-fields { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .y10-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .y10-chip {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 6px; font-family: var(--mono); font-size: 12px;

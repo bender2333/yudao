@@ -299,7 +299,6 @@ export function ProviderForm(props: ProviderFormProps) {
             context_window: intFromInput(row.context_window),
             max_output_tokens: intFromInput(row.max_output_tokens),
           });
-          const capacityConfirmed = (row.saved || row.capacity_confirmed) && capacityIssue === "";
           return (
             <fieldset className="y10-block is-compact mm-row" key={row.key} data-testid={`model-row-${rowKey}`}>
               <legend>{row.id || "新的定义"}</legend>
@@ -338,15 +337,6 @@ export function ProviderForm(props: ProviderFormProps) {
                        onChange={(event) => props.onPatchRow(row.key, patchRowCapacity(row, "max_output_tokens", event.target.value))} />
               </label>
               <div className="y10-row y10-row-actions mm-actions mm-row-actions">
-                {capacityConfirmed
-                  ? <span className="y10-small mm-ok" data-testid={`capacity-confirmed-${rowKey}`}>容量已确认</span>
-                  : (
-                    <button type="button" className="y10-btn small" data-testid={`accept-capacity-${rowKey}`}
-                            disabled={capacityIssue !== ""}
-                            onClick={() => props.onPatchRow(row.key, { capacity_confirmed: true })}>
-                      接受容量
-                    </button>
-                  )}
                 {capacityIssue !== "" && (
                   <span className="y10-warn-text mm-warn" role="status" data-testid={`capacity-issue-${rowKey}`}>
                     {capacityIssue}
