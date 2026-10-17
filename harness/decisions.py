@@ -46,14 +46,6 @@ WORKSPACE_UNREPRESENTABLE = DecisionKind("workspace_unrepresentable", "run",
 # 暂停的 run 在回答以后继续的两种决定种类；由暂停的停止原因得到对应的种类
 RESUMABLE_PAUSE_KINDS = {NO_TOOL_CALL.name: NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE.name: WORKSPACE_UNREPRESENTABLE}
 
-# 结果未知的动作（工单 #17，恢复契约第 4 节）：工具已发出但结果未确认，由用户决定如何处理。
-# 阻塞范围为动作（不是 run），其他合法动作可以继续；「重新执行」只在契约声明该动作可以重复时提供，
-# 创建决定请求时按动作的 repeatable 属性过滤选项
-UNKNOWN_ACTION = DecisionKind("unknown_action", "action",
-                              (Option("reexecute", "重新执行"),
-                               Option("continue", "按当前实际状态继续"),
-                               Option("stop", "停止事项")))
-
 # 确认接入已有项目的初始 PRD（工单 #136，接入已有项目设计说明第 3.2 节）：建档 run 已经结束，
 # 请求写在项目流中，阻塞建档事项与同一项目中排在它后面的事项，不属于任何 run。
 # 「提出修改」必须附说明：说明为空的回答由服务端以 not_allowed 拒绝
@@ -70,7 +62,7 @@ KERNEL_MODIFICATION = DecisionKind("kernel_modification", "run",
 INSTANCE_UPGRADE = DecisionKind("instance_upgrade", "instance",
                                 (Option("approve", "批准升级"), Option("reject", "拒绝")))
 
-DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED, UNKNOWN_ACTION,
+DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED,
                                                NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE, INITIAL_PRD,
                                                INSTANCE_UPGRADE,
                                                KERNEL_MODIFICATION)}
@@ -80,10 +72,6 @@ def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:
     # 有未回答、阻塞整个 run 的决定请求
     return any(decision.status == "open" and decision.blocks == "run" for decision in decisions)
 
-def blocks_activation(decisions: Iterable[DecisionRequest]) -> bool:
-    # 有未回答的「核实结果未知的动作」请求：在它得到回答以前，依赖这个动作的下一步不继续。
-    # 动作级阻塞与 run 级阻塞一样不让流程编排开始新的激活，区别只在决定请求的阻塞范围标注为动作
-    return any(decision.status == "open" and decision.kind == UNKNOWN_ACTION.name for decision in decisions)
 
 
 class DecisionNotFound(KeyError):

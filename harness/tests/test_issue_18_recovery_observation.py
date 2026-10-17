@@ -251,45 +251,21 @@ def test_project_loop_reports_the_recovery_observation_per_work_item(data_dir):
     restarted.close()
 
 def test_run_recovery_describes_the_verification_record_and_next_legal_action(data_dir):
-    # 等待核实时查询返回已确认位置、未完成动作、核实依据与下一项合法操作：用户按当前实际状态继续以后，
-    # 核实记录出现，未完成动作消失，下一个合法操作回到继续
+    # 交还以后查询返回核实记录：未完成动作消失，核实记录写出依据与结果
     system, _project_id, run_id = _engineering_run(data_dir, [product_spec(),])
     _lost_write(system, run_id)
     system.close()
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
-    restarted.writes.append(run_stream(run_id), NewEvent(
-        EventType.DECISION_REQUESTED, actor="system", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
-        payload={
-            "kind": "unknown_action",
-            "blocks": "action",
-            "options": [{"id": "continue", "label": "按当前实际状态继续"}, {"id": "stop", "label": "停止事项"}],
-            "description": "动作 lost-write（write_file）已经发出，结果没有得到确认。",
-            "facts": [],
-            "department": "engineering",
-            "action_id": "lost-write",
-            "tool": "write_file",
-            "action_kind": "write",
-            "repeatable": False,
-            "repeat_attempted": False,
-        },
-    ))
+    restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    assert recovery.state == "pending_verification"
-    request = _decision_events(restarted, run_id, kind="unknown_action")[0]
-    _answer(restarted, request.event_id, "continue", note="确认写入已经生效")
-
-    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    # 动作得到处置：未完成动作消失，核实记录写出依据与结果
+    # 动作得到交还处置：未完成动作消失，核实记录写出依据与结果
     assert recovery.unfinished_actions == []
     assert len(recovery.verifications) == 1
     record = recovery.verifications[0]
     assert record.action_id == "lost-write"
-    assert record.basis and record.result and record.decided_by == "user"
-    assert record.note == "确认写入已经生效"
-    assert record.decision_id == request.event_id
+    assert record.basis and record.result
     assert recovery.next_legal_action in ("continue", "none")
     restarted.close()
 

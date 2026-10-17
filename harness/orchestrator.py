@@ -28,9 +28,9 @@ from .compaction import response_reserve
 from .contracts import current_contract_hash
 from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, UNKNOWN_ACTION,
+    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
     DecisionClosed,
-    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_activation, blocks_run,
+    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_run,
 )
 from .environment import (
     LocalEnvironment, cleanup_inspection_workspace, inspection_root, workspace_tree,
@@ -71,7 +71,7 @@ from .projection import RunNotFoundError, RunProjection, project_run, saved_deci
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
 from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS,
-                       classify_actions, file_action_comparisons, resolved_by_decision)
+                       classify_actions, file_action_comparisons)
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
@@ -826,9 +826,22 @@ class Orchestrator:
             projection = transaction.projection
             if projection.phase in TERMINAL_PHASES:
                 return
+            for decision in transaction.decisions.values():
+                if decision.status == "open" and decision.kind == "unknown_action":
+                    transaction.append(NewEvent(
+                        EventType.DECISION_WITHDRAWN,
+                        actor="system",
+                        department=decision.request.get("department") or projection.active_department,
+                        parent_event_id=decision.decision_id,
+                        state_before=projection.phase,
+                        state_after=projection.phase,
+                        payload={
+                            "decision_id": decision.decision_id,
+                            "reason": "superseded_by_hand_back",
+                        },
+                    ))
             events = transaction.events()
             actions = classify_actions(events)
-            resolved = resolved_by_decision(events, transaction.decisions.values())
             # 文件动作的对比结论一次算完（工单 #308）：当前公开树在这一个事务里读一次
             comparisons: dict[str, dict[str, Any]] = {}
             if any(info["status"] == ACTION_UNKNOWN and info["tool"] in FILE_ACTION_TOOLS
@@ -840,7 +853,7 @@ class Orchestrator:
                         current_entries=list(zip(tree.files, tree.hashes)))
             for identity, info in actions.items():
                 started = info["started_event"]
-                if info["status"] != ACTION_UNKNOWN or started is None or identity in resolved:
+                if info["status"] != ACTION_UNKNOWN or started is None:
                     continue
                 action_id = identity[2]
                 comparison = comparisons.get(action_id)
@@ -958,7 +971,7 @@ class Orchestrator:
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
                     return await asyncio.to_thread(self._settled, run_id)
-                if blocks_run(snapshot.decisions.values()) or blocks_activation(snapshot.decisions.values()):
+                if blocks_run(snapshot.decisions.values()):
                     return projection
                 await self._activate_once(run_id, connections)
         finally:
@@ -1113,7 +1126,7 @@ class Orchestrator:
         self._resume_run_clock(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
-        if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):
+        if blocks_run(transaction.decisions.values()):
             # 等待用户回答阻塞 run 或某个动作的决定请求：不开始新的激活，什么也不写
             return None
         projection = self._close_obsolete_request(transaction)
@@ -1709,15 +1722,10 @@ class Orchestrator:
                     return None
                 return transaction.projection.run_id
             return None
-        if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name,
-                                                  UNKNOWN_ACTION.name):
+        if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
             self._fail(transaction, "cancelled", "run stopped by the user's decision")
             return None
-        if decision.kind == UNKNOWN_ACTION.name and option == "continue":
-            # 工单 #17：用户选择按当前实际状态继续——写一条核实记录，不改写原来的观察；它让这个动作
-            # 得到处置，也进入部门历史，模型据此继续。选择重新执行时不写核实记录，由步骤驱动补执行
-            self._verify_unknown_action(transaction, decision, note)
-        if blocks_run(transaction.decisions.values()) or blocks_activation(transaction.decisions.values()):
+        if blocks_run(transaction.decisions.values()):
             return None
         return projection.run_id
 
@@ -1846,29 +1854,6 @@ class Orchestrator:
                      "resumed_at_phase": resumed_at_phase},
         ))
         transaction.on_commit(lambda: self._wake(projection.run_id))
-
-    def _verify_unknown_action(self, transaction: Transaction, decision: DecisionRequest,
-                               note: str | None) -> None:
-        # 核实结果未知的动作（工单 #17）：用户选择按当前实际状态继续时追加一条核实记录。不改写原来的
-        # tool_started 观察；动作身份与上下文取自决定请求的载荷与原始 tool_started 事件
-        action_id = str(decision.request.get("action_id") or "")
-        started = next((event for event in transaction.events()
-                        if event.type == EventType.TOOL_STARTED
-                        and str((event.payload or {}).get("id")) == action_id), None)
-        if started is None:
-            return
-        payload = started.payload
-        result = {"ok": True, "output": {"resolved": "continue", "note": note}, "error": None}
-        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
-        transaction.append(NewEvent(
-            EventType.ACTION_VERIFIED, actor="system", department=started.department,
-            state_before=transaction.projection.phase, state_after=transaction.projection.phase,
-            parent_event_id=started.event_id,
-            payload={"id": action_id, "name": str(payload.get("name") or ""), "step_id": payload.get("step_id"),
-                     "activation_id": payload.get("activation_id"),
-                     "purpose": payload.get("purpose", "work"), "input_item": input_item,
-                     "ok": True, "resolution": "continue", "note": note, "decision_id": decision.decision_id},
-        ))
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
         # 新的输入或指导：user_input_received 与 department_guidance_received 由用户提出，
