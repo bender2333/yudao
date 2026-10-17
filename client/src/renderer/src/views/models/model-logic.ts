@@ -525,8 +525,6 @@ export function prefillSourceText(prefill: PrefillValue): string {
   return parts.join(" · ");
 }
 
-// 点击候选建立的一行：协议、容量与输入方式按第 4.3 节预填并标明来源，容量未经用户「接受」以前不能保存。
-// 访问定义 ID 预填为符合规则的写法（上游模型 ID 带「/」时换成「-」，工单 #302），
 export type CandidateCustomCapacity = {
   context_window?: string;
   max_output_tokens?: string;
@@ -611,6 +609,9 @@ export function canJoinCandidates(
   return { ok: true, issue: "" };
 }
 
+// 点击候选建立的一行：协议、容量与输入方式按第 4.3 节预填并标明来源，容量齐全且有效即可保存。
+// 访问定义 ID 预填为符合规则的写法（上游模型 ID 带「/」时换成「-」，工单 #302），
+// 上游模型 ID 保持上游写法原样：请求发往上游时用的就是它
 export function rowFromCandidate(candidate: UpstreamCandidate, table: CatalogCapabilityTable, presetId: string,
                                  preset: ServicePreset | null): FormRow {
   return candidateToRow(candidate, undefined, table, presetId, preset);

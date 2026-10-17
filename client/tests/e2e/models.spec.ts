@@ -849,7 +849,7 @@ test("新建自定义连接，获取候选，勾选两个模型（带容量与�
     await expect(candidates.getByTestId("candidates-issue-custom-p")).toHaveCount(0);
     await expect(candidates.getByTestId("join-candidates-custom-p")).toBeEnabled();
 
-    // 点一次「加入」：无需点「接受容量」或「模型测试」，自动测试通过
+    // 点一次「加入」：保存后自动执行模型测试并通过
     await candidates.getByTestId("join-candidates-custom-p").click();
 
     // 两个模型在模型表中出现，且自动模型测试通过
