@@ -19,6 +19,8 @@ from harness.proposals import product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 
+from harness.tests.helpers import after_event
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 GOAL = "把文本按行处理清楚"
 
 
@@ -68,7 +70,7 @@ class _BlockingPartialAdapter:
         yield ModelStreamEvent(kind="message", id=item["id"], payload=item, text="PARTIAL_OUTPUT",
                                provider=self.name, model=self.model)
         self.started.set()
-        self.release.wait(5)
+        self.release.wait(WAIT_FOR_HOST_WORK_SEC)
         yield ModelResponse(
             finish_reason="aborted", error="aborted",
             provider=self.name, model=self.model,
@@ -111,11 +113,13 @@ def test_cancelled_attempt_is_independently_filterable(tmp_path: Path):
     adapter = _BlockingPartialAdapter()
     system = LoopSystem.for_testing(tmp_path, adapter)
     application, project_id, work_item_id, run_id = _project_run(system, "cancelled attempt")
+    msg_event = threading.Event()
+    after_event(system, EventType.MODEL_MESSAGE, lambda _: msg_event.set())
     worker = threading.Thread(target=system.activate_once, args=(run_id,), daemon=True)
     worker.start()
-    assert adapter.started.wait(3)
+    assert msg_event.wait(WAIT_FOR_HOST_WORK_SEC)
     system.cancel(run_id)
-    worker.join(timeout=3)
+    worker.join(timeout=WAIT_FOR_HOST_WORK_SEC)
     assert not worker.is_alive()
 
     row = _attempts(application, project_id, work_item_id).data.attempts[0]
@@ -130,9 +134,11 @@ def test_running_partial_output_is_in_attempt_detail_and_is_observation_only(tmp
     adapter = _BlockingPartialAdapter()
     system = LoopSystem.for_testing(tmp_path, adapter)
     application, project_id, work_item_id, run_id = _project_run(system, "partial attempt")
+    msg_event = threading.Event()
+    after_event(system, EventType.MODEL_MESSAGE, lambda _: msg_event.set())
     worker = threading.Thread(target=system.activate_once, args=(run_id,), daemon=True)
     worker.start()
-    assert adapter.started.wait(3)
+    assert msg_event.wait(WAIT_FOR_HOST_WORK_SEC)
 
     row = _attempts(application, project_id, work_item_id).data.attempts[0]
     assert row.status == "running"
@@ -144,7 +150,7 @@ def test_running_partial_output_is_in_attempt_detail_and_is_observation_only(tmp
     assert detail.data.response is None
 
     system.cancel(run_id)
-    worker.join(timeout=3)
+    worker.join(timeout=WAIT_FOR_HOST_WORK_SEC)
     assert not worker.is_alive()
     cancelled = application.query("run.attempt", RunAttempt(run_id=run_id, attempt_id=row.attempt_id))
     assert cancelled.data.attempt["status"] == "cancelled"

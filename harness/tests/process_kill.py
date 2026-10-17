@@ -317,6 +317,8 @@ def _kill(process: subprocess.Popen, signals: Path | None = None) -> None:
     else:
         os.kill(process.pid, signal.SIGKILL)
     process.wait(STARTUP_TIMEOUT_SEC)
+    from harness.tests.helpers import wait_until_stopped
+    wait_until_stopped(process.pid)
     if child is None:
         return
     if os.name == "nt":
@@ -327,6 +329,7 @@ def _kill(process: subprocess.Popen, signals: Path | None = None) -> None:
             os.kill(child, signal.SIGKILL)
         except OSError:
             pass
+    wait_until_stopped(child)
 
 
 def _child_pid(signals: Path | None) -> int | None:

@@ -163,15 +163,16 @@ def test_a_retry_that_stays_unknown_after_the_chance_is_gone_asks_the_user(tmp_p
     attempts = killed.tool_attempts(first.before, first.run_id, "call-write")
     assert len(attempts) == 1
     assert attempts[0]["result_type"] is None
+    run_id = first.run_id
+    first.close()
 
     # 第二次启动：恢复入口直接交还，写 action_verified(resolution="handed_back")
     second = killed.restarted(data_dir, [_settle()], resume_after=False)
-    assert killed.unknown_action_requests(second.after, first.run_id) == []
-    verified = [e for e in killed.events(second.after, first.run_id, "action_verified")
+    assert killed.unknown_action_requests(second.after, run_id) == []
+    verified = [e for e in killed.events(second.after, run_id, "action_verified")
                 if (e.payload or {}).get("id") == "call-write"]
     assert len(verified) == 1
     assert verified[0].payload["resolution"] == "handed_back"
     assert verified[0].payload["ok"] is False
 
     second.close()
-    first.close()
