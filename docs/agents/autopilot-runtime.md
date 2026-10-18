@@ -15,6 +15,8 @@ doctor（Hermes）在这台 Windows 电脑上担任派发者，执行者、审�
 | 被唤醒的架构师的 worktree | `D:\codes\yudao-worktrees\architect`，不建分支，每次启动前检出 main 的当前提交 |
 | 较长的评论与审查（`--body-file`） | 工单 worktree 的 `.tmp\` 下，文件名带工单号，`--body-file` 给这个绝对路径 |
 
+集成层与被唤醒的架构师的 worktree 长期保留，不存在时在主工作区用 `git worktree add --detach <路径> origin/main` 建立。工单的 worktree 在工单关闭以后删除（第 3 节）。除这三类以外不另建目录。
+
 ### 1.2 架构师的 Windows 电脑
 
 Claude 担任派发者时使用这里的路径。
@@ -33,6 +35,8 @@ Claude 担任派发者时使用这里的路径。
 ### 1.3 两台机器共同的约束
 
 PowerShell 的测试终端先设置 `$env:PYTHONUTF8='1'`，让 Python 及其测试子进程统一输出 UTF-8；pytester 的子进程输出按 UTF-8 读取。
+
+各角色只使用第 1 节列出的目录。架构师在会话中临时建的 worktree，会话结束之前删除。
 
 机器上同时运行着多个执行者、审查者与集成层测试。只能结束自己启动、并且记下了进程号的进程（`kill <进程号>`），不允许按进程名结束进程（例如 `taskkill /IM python.exe`），也不允许结束不是自己启动的进程。
 
@@ -88,7 +92,19 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
   uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
   ```
 
-工单合并以后，派发者删除工单的 worktree（`git worktree remove`）。重新派发同一张工单之前先清掉残留目录（只剩 `.tmp` 与 `.venv` 的目录会被当作已有工作区，执行者会在空目录里运行）。
+- 清理工单的 worktree（派发者每次派发之前）。在主工作区运行，不要在要删的目录里运行；`<worktree 目录>` 是第 1 节工单 worktree 的上级目录，例如 `D:/codes/yudao-worktrees`。只删已经关闭的工单，分支保留。Windows 上有进程占用目录时，`git worktree remove` 只删掉内容、留下空目录，所以接着删除目录本身：
+
+  ```bash
+  for dir in <worktree 目录>/issue-*; do
+    number=${dir##*issue-}
+    [ "$(gh issue view "$number" --json state --jq .state)" = CLOSED ] || continue
+    git worktree remove --force "$dir" 2>/dev/null
+    rm -rf "$dir"
+  done
+  git worktree prune
+  ```
+
+  删除失败（文件被占用）的目录留到下一次。重新派发同一张工单之前，先清掉它的残留目录：只剩 `.tmp` 与 `.venv` 的目录会被当作已有工作区，执行者会在空目录里运行。
 
 ## 4. 模型
 
@@ -98,8 +114,21 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 审查者 | `9router/oro` | 用 `--model` 指定，与执行者的模型不同 |
 | 被唤醒的架构师 | `claude-opus-5-5`，effort `xhigh` | Claude Code，用 `--model` 与 `--effort` 指定 |
 | 备用链 | `9router/ds`| 写在机器上 omp 全局配置的 `retry.fallbackChains` 中 |
+| 真实模型测试与评测 | `ag/gemini-3.8-flash-medium`（9router，Chat Completions） | 见下面 |
 
 `task` 子代理请求会让执行者停滞，任务评论里写明不使用子代理。
+
+需要真实模型的测试、真实模型 smoke 与评测工作线使用同一套设置，放在派发机器的用户环境变量中（用户提供，2026-10-18）：
+
+| 变量 | 内容 |
+| --- | --- |
+| `YUDAO_EVAL_BASE_URL` | 9router 的地址 |
+| `YUDAO_EVAL_API_KEY` | 凭据，不写进仓库、工单、PR、日志与日记 |
+| `YUDAO_EVAL_MODEL` | 模型名，与上表一致；换模型时两处一起改 |
+
+- 不用 9router 上 `cc/` 分组的模型（用户，2026-10-18）。
+- 不放进 CI：CI 没有这三个变量，需要模型的测试在 CI 中不运行。
+- 用户级的环境变量只对设置以后启动的进程生效；修改以后，派发者重新启动，执行者与审查者从下一次派发起读到。
 
 ## 5. CI
 

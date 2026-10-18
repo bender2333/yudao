@@ -88,6 +88,8 @@
 
 `desktop` 测试只在明确选择时运行（`-m desktop`）：执行者与审查者处理 #150、#155 等改动桌面会话的工单时运行本工单涉及的 `desktop` 测试，架构师在里程碑交给用户试用之前运行全部 `desktop` 测试；这些工单派发之前与里程碑交付之前，架构师先在对话中问用户什么时间可以交出桌面，按用户给的时间运行。
 
+需要真实模型的测试（`real_model`）同样只在明确选择时运行（`-m real_model`）：凭据在环境中本身不触发运行，选择了而变量缺失时跳过，并写明缺哪个变量。执行者与审查者只在工单要求时运行，CI 没有凭据，不运行这类测试。地址、凭据与模型见运行配置第 4 节（2026-10-18；标记由 #593 加入）。
+
 ### 4.1 常用命令
 
 ```bash
@@ -97,6 +99,7 @@ cd client && npm test
 cd client && npm run test:e2e
 uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
 uv run python -m pytest -m desktop   # 只在用户同意的时间运行
+uv run python -m pytest <测试文件> -m real_model   # 只在工单要求时运行
 ```
 
 集成层的多进程命令只由派发者在合并之前、架构师在试用之前使用；桌面命令只在用户同意的时间使用。
