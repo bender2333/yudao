@@ -40,6 +40,7 @@ from .resolve import (
 )
 from ..definitions import DEFINITIONS
 from .responses import ProviderConnections
+from .sdk import prepare_protocols
 from .selection import ModelSelection, SelectionResolution, merge_selection
 from .suggested import reminders as _suggested_reminders
 from .store import (
@@ -71,6 +72,7 @@ class ProviderFacade:
         if startup_mode not in STARTUP_MODES:
             raise ValueError("startup_mode 只能是 " + "、".join(STARTUP_MODES))
         self._store = store if store is not None else ProviderStore.empty()
+        prepare_protocols(model.protocol for model in self._store.models.values())
         if isinstance(credentials, CredentialChain):
             self._credentials = credentials
         elif isinstance(credentials, Mapping):
@@ -185,6 +187,8 @@ class ProviderFacade:
         if refresh_state:
             self._config_state = ("loaded" if (self._store.providers or self._store.models
                                                or self._bindings) else "empty")
+        # 模型目录用到的协议在这里准备 SDK（第一次请求之前，不计入请求时限）
+        prepare_protocols(model.protocol for model in self._store.models.values())
         self._revision += 1
         return self._revision
 
