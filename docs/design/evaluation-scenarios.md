@@ -63,7 +63,7 @@
 
 | 条件 | 规则 |
 | --- | --- |
-| 模型 | 两边使用同一个模型，由用户提供，具有视觉能力；Yudao 三个部门都绑定这个模型，模型与服务写进报告。2026-09-30 用户指定 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），经用户的模型服务调用：OpenAI 兼容接口，只返回流式回复，地址与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中，不写进仓库、工单与日志 |
+| 模型 | 两边使用同一个模型，由用户提供，具有视觉能力；Yudao 三个部门都绑定这个模型，模型与服务写进报告。2026-09-30 用户指定 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），经用户的模型服务调用：OpenAI 兼容接口，只返回流式回复，地址与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中，不写进仓库、工单与日志。2026-10-18 这个模型已经不在 9router 的列表中，用户改为 `ag/gemini-3.8-flash-medium`（9router，Chat Completions），模型名放在用户环境变量 `YUDAO_EVAL_MODEL` 中（[运行配置](../agents/autopilot-runtime.md)第 4 节）。模型变了，以前的结果不能和以后的直接比较：评测工作线恢复时，两边的基础分用新模型重新运行 |
 | 输入 | 同一份需求原文加同一份接口约定；Yudao 从正常入口作为用户原始意图提交，OpenCode 作为 `opencode run` 的消息 |
 | 设置 | Yudao 使用当前版本的规则登记中的暂定默认值与参数，不为场景调整，结果记录定义版本与参数版本；OpenCode 固定版本号，使用默认 agent |
 | 联网 | 两边都不联网：任务来自公开仓库，联网取回可能直接取回上游的答案。运行器以关闭取回的启动参数启动被测的 Yudao，评测项目不设置 MCP 服务器，部门没有这两类工具（[网络取回与 MCP 工具设计说明](network-and-mcp.md)第 5.1 节）；OpenCode 的运行配置关闭取回与搜索工具，运行器检查 JSON 输出中没有这两类工具的调用，报告写明这一条。两边的命令都能访问网络，运行器在 OpenCode 的 JSON 输出与 Yudao 的事件日志导出中查找对任务上游仓库的访问，找到时这次运行无效并写进报告。建立环境时的联网（GitHub 与 PyPI）由运行器在评测前完成，不属于模型的工具 |

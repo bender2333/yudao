@@ -43,7 +43,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
   - 只用单进程运行，不加 `-n`。集成层全部在合并之前运行（`docs/design/test-pyramid.md` 第 4.2 节），执行者与审查者不运行全量测试：不运行 `harness/tests` 整个目录，也不把全部测试文件分批逐个运行一遍；单条命令不超过 10 分钟。
   - 先看结尾的计数与失败清单；需要细节时，只对失败的那一项加 `--tb=short` 重新运行，或者用 `--lf` 重新运行上次失败的测试。
   - 终端环境与进程的约束见运行配置第 1 节。
-- 真实模型 smoke：`uv run python -m harness smoke --provider-config .yudao/providers.json`，需要环境变量 `YUDAO_OPENCODE_GO_KEY`。凭据不写入代码、事件、日志与提交；`provider.md` 与 `.yudao/` 已被 git 忽略，不提交。
+- 真实模型：地址、凭据与模型在派发机器的用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`、`YUDAO_EVAL_MODEL` 中（运行配置第 4 节），只在工单要求时使用。需要模型的测试标 `real_model`，只在明确选择时运行（`-m real_model`）；真实模型 smoke 是 `uv run python -m harness smoke`，不给 `--provider-config` 时从这三个变量取模型。这两项由 #593 实现，它合并以前，运行 `evals/tests` 之前先在本终端删掉 `YUDAO_EVAL_API_KEY`，需要模型的用例随之跳过。凭据不写入代码、事件、日志、提交与 PR 评论；`provider.md` 与 `.yudao/` 已被 git 忽略，不提交。
 
 ## GitHub Issues 规则
 系统使用 GitHub CLI（`gh`）管理任务工单，仓库自动识别为 `bender2333/yudao`。工单与 `docs/` 的分工见共同规则「文档与记录」。
