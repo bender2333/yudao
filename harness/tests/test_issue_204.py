@@ -7,6 +7,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -173,6 +175,11 @@ def _command_call(identity, argument="nested"):
             "arguments": json.dumps({"command": command})}
 
 
+def _short_data_dir(tmp_path):
+    # 数据目录放在比 tmp_path 更短的路径下：忽略规则探测库建在检查工作区旁边，libgit2 在 Windows 上
+    # 对这个仓库路径的长度上限约 190 个字符；运行机的 pytest 临时目录（popen-gw 加长用例名）会超过它
+    return Path(tempfile.mkdtemp(prefix="d", dir=tmp_path.parent)) / "data"
+
 def _workspace_unrepresentable_run(tmp_path, tail):
     outside = tmp_path / "outside.txt"
     outside.write_text("VALUE = 9\n", encoding="utf-8")
@@ -185,7 +192,7 @@ def _workspace_unrepresentable_run(tmp_path, tail):
         return ModelResponse(output=[_command_call("cmd-link", "linked")])
 
     # 产品先提交产品要求，工步建立链接（node_modules/linked）导致公开树无法表示
-    system = LoopSystem.for_testing(tmp_path / "data",
+    system = LoopSystem.for_testing(_short_data_dir(tmp_path),
                                     FakeAdapter([product_spec(),link_then, tail]))
     run_id = system.create_run("A link pauses the run")
     workspace = system.workspace(run_id)

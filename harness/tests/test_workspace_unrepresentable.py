@@ -5,6 +5,8 @@ import asyncio
 import json
 import os
 import sys
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -19,8 +21,13 @@ from harness.tools import tool_action
 from harness.tree_archive import load_tree
 
 
+def _short_data_dir(tmp_path):
+    # 数据目录放在比 tmp_path 更短的路径下：忽略规则探测库建在检查工作区旁边，libgit2 在 Windows 上
+    # 对这个仓库路径的长度上限约 190 个字符；运行机的 pytest 临时目录（popen-gw 加长用例名）会超过它
+    return Path(tempfile.mkdtemp(prefix="d", dir=tmp_path.parent)) / "data"
+
 def _system(tmp_path, turns):
-    return LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(),*turns]))
+    return LoopSystem.for_testing(_short_data_dir(tmp_path), FakeAdapter([product_spec(),*turns]))
 
 def _write_command_body(workspace, outside):
     # bash 命令调用的脚本：在 node_modules 下建立指向工作区之外的目录链接
