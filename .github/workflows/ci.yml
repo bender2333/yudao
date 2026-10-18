@@ -1,4 +1,6 @@
 # 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/dispatcher.md）。
+# 测试按时机分层（docs/design/test-pyramid.md 第 4 节）：PR 只运行 check；合并到 main 以后另外运行 integration，
+# 不挡合并；手动触发两项都运行。
 # 本文件由架构师维护，修改前经用户确认；执行者使用的开发 App 没有 workflows 权限。
 name: CI
 
@@ -6,10 +8,17 @@ on:
   pull_request:
   push:
     branches: [main]
+    # 只改文档与日记的推送（架构师经常直接推送）不运行；PR 上不跳过，check 是合并必须通过的检查
+    paths-ignore:
+      - "docs/**"
+      - "agents_jour/**"
+      - "claude_jour.md"
   workflow_dispatch:
 
+# PR 与手动触发：同一分支的新运行取消旧运行。main 的推送：每个合并提交各自运行到底，
+# 失败能对应到一次合并
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -53,11 +62,6 @@ jobs:
       - name: 单元层与模块层
         run: uv run python -m pytest -m "unit or module"
 
-      # evals/ 的测试不在 harness 的分层登记里，单独运行；CI 没有模型凭据，需要模型的用例跳过
-      - name: 评测工作线的测试
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: uv run python -m pytest evals/tests
-
       # room-screen-switch 等测试用 Playwright 启动 Chromium 挂载页面
       - name: 安装 Chromium
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -82,9 +86,10 @@ jobs:
         working-directory: client
         run: npm run typecheck
 
-  # 集成层全部（docs/design/test-pyramid.md 第 4 节），与 check 并行。
-  # 量出运行时间、加进 main 的规则以前，不是合并必须通过的检查，派发者照旧按派发者规则第 5 节运行集成层
+  # 集成层全部（docs/design/test-pyramid.md 第 4.2 节）。不是合并必须通过的检查：
+  # main 的每次推送（每次合并以后）与手动触发时运行，PR 上不运行。失败由派发者按派发者规则第 5 节处理
   integration:
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: windows-latest
     timeout-minutes: 60
     env:
