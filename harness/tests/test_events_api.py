@@ -185,10 +185,15 @@ def test_event_stream_resumes_after_the_last_received_position(data_dir):
         _record(client, project_id, 2)
         first = _read_stream(client, "/api/events?after=0", limit=2)
         last = int(first[-1][1])
-        resumed = _read_stream(client, f"/api/events?after={last}", limit=10)
+        # 只读到日志末尾为止：limit 大于剩余事件数时，连接空闲后每 5 秒发一次检查点，也计作帧，要等很久
+        remaining = opened.applications[0].system.store.end_position() - last
+        assert remaining >= 1, "续读点之后还有事件可读"
+        resumed = _read_stream(client, f"/api/events?after={last}", limit=remaining)
 
     assert all(int(identity) > last for _, identity, _ in resumed)
     assert resumed[0][2]["previous"] == last
+    # 没有遗漏与重复：位置从 last 之后连续排到日志末尾
+    assert [int(identity) for _, identity, _ in resumed] == list(range(last + 1, last + 1 + remaining))
 
 def test_last_event_id_header_takes_priority_over_the_after_parameter(data_dir):
     # Last-Event-ID 请求头优先于 after 参数：after 给 0，请求头给最后一条的位置，只应收到之后的新事件

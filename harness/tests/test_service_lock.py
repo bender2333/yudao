@@ -109,32 +109,60 @@ def _stop(process: subprocess.Popen) -> None:
     process.wait(STARTUP_TIMEOUT_SEC)
 
 
+def _race(workdir: Path, data_dir: Path, name: str) -> tuple[subprocess.Popen, int, Path]:
+    # 两个服务进程同时启动，竞争同一个数据目录：恰好一个取得锁并报告端口，另一个以退出码 1 退出并说明
+    # 数据目录被占用。一个进程启动要导入模型 SDK 约 9 秒，同时启动让「被拒绝」与「正常启动」两段重叠，
+    # 不必先等第一个就绪再启动第二个。锁没有排他时两个进程都会报告端口，此时立刻判失败，不等到上限
+    logs = [workdir / f"{name}-{index}.log" for index in range(2)]
+    processes = [_start(workdir, "api", data_dir, 0, log) for log in logs]
+    try:
+        deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
+        while time.monotonic() < deadline:
+            ports = [next((line[len(PORT_LINE):].strip() for line in _lines(log) if line.startswith(PORT_LINE)),
+                          None) for log in logs]
+            exited = [process.poll() is not None for process in processes]
+            assert not all(port is not None for port in ports), f"两个服务进程都取得了同一个数据目录：{ports}"
+            if any(exited):
+                break
+            time.sleep(0.1)
+        else:
+            raise TimeoutError("neither service process exited or reported its port")
+        loser = 0 if exited[0] else 1
+        winner = 1 - loser
+        assert processes[loser].wait(STARTUP_TIMEOUT_SEC) == 1, _lines(logs[loser])
+        assert IN_USE in logs[loser].read_text(encoding="utf-8", errors="replace")
+        port = _bound_port(processes[winner], logs[winner])
+        return processes[winner], port, logs[winner]
+    except BaseException:
+        for process in processes:
+            if process.poll() is None:
+                _stop(process)
+        raise
+
+
 def test_two_service_processes_cannot_use_the_same_data_directory(tmp_path):
     data_dir = tmp_path / "data"
-    api, api_port = _started(tmp_path, "api", data_dir, tmp_path / "api.log")
+    # 第二个服务进程不能使用同一个数据目录；另一个数据目录不受影响，选项写在子命令之前同样有效。
+    # 三个进程同时启动
+    other = _start(tmp_path, "api", tmp_path / "other", 0, tmp_path / "other.log", options_first=True)
     try:
-        _wait_until_serving(api, f"http://127.0.0.1:{api_port}/api/queries/system.status", tmp_path / "api.log")
-        # 新接口运行期间，第二个新接口不能使用同一个数据目录
-        second = _start(tmp_path, "api", data_dir, 0, tmp_path / "second.log")
-        assert IN_USE in _refused(second, tmp_path / "second.log")
-        # 另一个数据目录不受影响；选项写在子命令之前同样有效
-        other, other_port = _started(tmp_path, "api", tmp_path / "other", tmp_path / "other.log",
-                                     options_first=True)
+        api, api_port, api_log = _race(tmp_path, data_dir, "first")
         try:
+            _wait_until_serving(api, f"http://127.0.0.1:{api_port}/api/queries/system.status",
+                                api_log)
+            other_port = _bound_port(other, tmp_path / "other.log")
             _wait_until_serving(other, f"http://127.0.0.1:{other_port}/api/capabilities", tmp_path / "other.log")
             assert (tmp_path / "other" / "events.sqlite").is_file() and (tmp_path / "other" / "service.lock").exists()
         finally:
-            _stop(other)
+            _stop(api)
     finally:
-        _stop(api)
+        _stop(other)
 
-    # 服务进程退出以后锁被释放：新的服务进程可以启动
-    restarted, restarted_port = _started(tmp_path, "api", data_dir, tmp_path / "restarted.log")
+    # 服务进程退出以后锁被释放：再同时启动两个，恰好一个启动，另一个被拒绝
+    restarted, restarted_port, restarted_log = _race(tmp_path, data_dir, "second")
     try:
         _wait_until_serving(restarted, f"http://127.0.0.1:{restarted_port}/api/queries/system.status",
-                            tmp_path / "restarted.log")
-        refused = _start(tmp_path, "api", data_dir, 0, tmp_path / "refused.log")
-        assert IN_USE in _refused(refused, tmp_path / "refused.log")
+                            restarted_log)
     finally:
         _stop(restarted)
 
