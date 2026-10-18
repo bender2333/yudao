@@ -205,7 +205,7 @@ jobs:
         run: |
           python3 scripts/ci_layers.py summary --layers harness/tests/layers.toml \
             --junit unit=.tmp/test-results/unit.xml --junit module=.tmp/test-results/module.xml \
-            --junit evals=.tmp/test-results/evals.xml --pending integration >> "$GITHUB_STEP_SUMMARY"
+            --junit evals=.tmp/test-results/evals.xml --pending integration | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: 四项都通过
         run: |
@@ -243,6 +243,7 @@ jobs:
           uv sync --frozen
           uv run python -m pytest harness/tests evals/tests --collect-only -p no:cacheprovider \
             -m "real_model or not real_model" > .tmp/inventory/head.txt || true
+          tail -n 2 .tmp/inventory/head.txt
 
       - name: 收集合并前的用例
         run: |
@@ -252,6 +253,7 @@ jobs:
           uv sync --frozen
           uv run python -m pytest harness/tests evals/tests --collect-only -p no:cacheprovider \
             -m "real_model or not real_model" > "$GITHUB_WORKSPACE/.tmp/inventory/base.txt" || true
+          tail -n 2 "$GITHUB_WORKSPACE/.tmp/inventory/base.txt"
 
       - name: 用例变化
         if: ${{ !cancelled() }}
@@ -259,7 +261,7 @@ jobs:
           uv run --no-sync python scripts/ci_layers.py inventory \
             --base .tmp/inventory/base.txt --head .tmp/inventory/head.txt \
             --base-layers .tmp/inventory/base-layers.toml --head-layers harness/tests/layers.toml \
-            >> "$GITHUB_STEP_SUMMARY"
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
   # ③ 集成层全部（docs/design/test-pyramid.md 第 4.2 节）。不是合并必须通过的检查：
   # main 的每次推送（每次合并以后）与手动触发时运行，PR 上不运行。失败由派发者按派发者规则第 5 节处理
@@ -295,7 +297,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           uv run --no-sync python scripts/ci_layers.py summary --layers harness/tests/layers.toml \
-            --junit integration=.tmp/test-results/integration.xml >> "$GITHUB_STEP_SUMMARY"
+            --junit integration=.tmp/test-results/integration.xml | tee -a "$GITHUB_STEP_SUMMARY"
 
       # 失败时从这份结果读出失败项名称，用于单进程重新运行（docs/design/test-pyramid.md 第 6 节）
       - name: 保存结果
