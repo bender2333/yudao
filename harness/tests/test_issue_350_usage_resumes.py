@@ -20,10 +20,10 @@ from harness.tests import process_kill as killed
 ECHO = "import sys\nprint(sys.argv[1])\n"
 CHECKS = {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}
 # 短的运行时间上限与跨过上限的那次检查：中断以前那次激活不跑检查，累计只有这一次的激活时间，
-# 离上限足够远；上限取 10 秒，重启以后的检查睡满 12 秒，这一次检查本身就越过上限，
+# 离上限足够远；上限取 3 秒，重启以后的检查睡满 4 秒（中断前那次激活实测不到 0.2 秒），这一次检查本身就越过上限，
 # 因此「达到上限」由这一次检查保证，与中断前经过了多长时间、机器快慢都无关（工单 #410）
-TIME_LIMIT_SEC = 10
-SLOW_CHECK = {"slow": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"import time; time.sleep(12)\""}}
+TIME_LIMIT_SEC = 3
+SLOW_CHECK = {"slow": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"import time; time.sleep(4)\""}}
 
 def _call(identity, name, arguments):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,

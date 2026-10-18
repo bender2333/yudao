@@ -5,6 +5,8 @@ import asyncio
 import json
 import os
 import sys
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -19,8 +21,13 @@ from harness.tools import tool_action
 from harness.tree_archive import load_tree
 
 
+def _short_data_dir(tmp_path):
+    # 数据目录放在比 tmp_path 更短的路径下：忽略规则探测库建在检查工作区旁边，libgit2 在 Windows 上
+    # 对这个仓库路径的长度上限约 190 个字符；运行机的 pytest 临时目录（popen-gw 加长用例名）会超过它
+    return Path(tempfile.mkdtemp(prefix="d", dir=tmp_path.parent)) / "data"
+
 def _system(tmp_path, turns):
-    return LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(),*turns]))
+    return LoopSystem.for_testing(_short_data_dir(tmp_path), FakeAdapter([product_spec(),*turns]))
 
 def _write_command_body(workspace, outside):
     # bash 命令调用的脚本：在 node_modules 下建立指向工作区之外的目录链接
@@ -41,6 +48,12 @@ def _command_call(identity, name="make-link", args=None):
 def _called(events, name):
     return [event for event in events
             if event.type == EventType.TOOL_CALLED and event.payload.get("name") == name]
+
+def _failure_message(system, run_id):
+    # 失败时把 run_failed 的说明带进断言信息，运行机上的失败才查得出原因
+    failed = next((event for event in system.store.list_events(run_id)
+                   if event.type == EventType.RUN_FAILED), None)
+    return None if failed is None else failed.payload.get("message")
 
 def _paused(events):
     return next((event for event in events if event.type == EventType.RUN_PAUSED), None)
@@ -82,7 +95,8 @@ def test_ignored_link_does_not_pause_and_never_enters_snapshot_seal_or_delivery(
     workspace.write_file(".gitignore", "node_modules/\n")
     _write_command_body(workspace, tmp_path / "outside.txt")
     (tmp_path / "outside.txt").write_text("secret", encoding="utf-8")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    result = system.run_until_stop(run_id)
+    assert result.phase == "DONE", (result.phase, result.stop_reason, _failure_message(system, run_id))
     events = system.store.list_events(run_id)
     assert _paused(events) is None
     # 快照、封存与交付都不包含 node_modules
@@ -239,6 +253,7 @@ def test_delivery_adoption_tree_excludes_ignored_directories(tmp_path):
     (workspace.root / "node_modules" / "dep.js").write_text("// dependency\n", encoding="utf-8")
     (workspace.root / "src").mkdir()
     (workspace.root / "src" / "echo.py").write_text("print('x')\n", encoding="utf-8")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    result = system.run_until_stop(run_id)
+    assert result.phase == "DONE", (result.phase, result.stop_reason, _failure_message(system, run_id))
     tree = capture_public_tree(workspace.root, True)
     assert [item.path for item in tree.files] == [".gitignore", "src/echo.py"]

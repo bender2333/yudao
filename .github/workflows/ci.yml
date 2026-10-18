@@ -1,7 +1,7 @@
 # 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/dispatcher.md）。
 # 测试按时机分层（docs/design/test-pyramid.md 第 4 节）：PR 只运行 check；合并到 main 以后另外运行 integration，
 # 不挡合并；手动触发两项都运行。
-# 本文件由架构师维护，修改前经用户确认；执行者使用的开发 App 没有 workflows 权限。
+# 本文件由用户在场时的架构师维护，执行者与被唤醒的架构师不修改；执行者使用的开发 App 没有 workflows 权限。
 name: CI
 
 on:
@@ -61,6 +61,12 @@ jobs:
       # 包括两项固定检查（test_layers.py 在单元层，test_openapi_snapshot.py 在模块层）
       - name: 单元层与模块层
         run: uv run python -m pytest -m "unit or module"
+
+      # 评测工具的测试。需要真实模型的用例标 real_model，默认不选（docs/design/test-pyramid.md 第 4 节），
+      # CI 上没有模型服务的凭据
+      - name: 评测工具
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run python -m pytest evals/tests
 
       # room-screen-switch 等测试用 Playwright 启动 Chromium 挂载页面
       - name: 安装 Chromium

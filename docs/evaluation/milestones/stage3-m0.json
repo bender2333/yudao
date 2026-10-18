@@ -1,0 +1,3645 @@
+{
+  "milestone": "Stage 3 · M0 三部门的循环结构与命令执行",
+  "collected_at": "2026-10-18T05:30:40Z",
+  "issues": [
+    {
+      "number": 463,
+      "title": "[集成层] 5 个用例在并行下失败、单进程通过",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-12T08:45:59Z",
+      "closed_at": "2026-10-17T21:19:14Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/463",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T08:46:00Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T16:41:48Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T16:41:48Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T17:49:46Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T17:49:46Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T20:48:15Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T20:48:15Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T21:06:06Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T21:06:06Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T21:19:14Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T21:19:35Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 466,
+      "title": "[循环结构] 三个部门同时运行，询问是嵌套的调用",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T15:18:31Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/466",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:18:32Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:36Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:36Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 467,
+      "title": "[Stage 3 · M0 试用] 三部门的循环结构与命令执行",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T15:20:40Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/467",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:20:41Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 469,
+      "title": "[循环结构] 假模型按会话取用脚本，事件序列基准按会话比较",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-12T15:26:58Z",
+      "closed_at": "2026-10-13T00:08:04Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/469",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:00Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:56:29Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:56:29Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T23:39:48Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T23:39:48Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:06:56Z",
+          "event": "labeled",
+          "label": "review-passed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:06:57Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:08:05Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:08:17Z",
+          "event": "unlabeled",
+          "label": "review-passed"
+        }
+      ]
+    },
+    {
+      "number": 470,
+      "title": "[循环结构] 删除工程计划：工程直接写入，交付只绑定 PRD 版本与快照",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-12T15:27:02Z",
+      "closed_at": "2026-10-13T02:14:19Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/470",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:03Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T18:01:56Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T18:01:56Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:33:29Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:33:30Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:37:17Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:37:17Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T01:44:02Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T01:44:02Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:13:18Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:13:18Z",
+          "event": "labeled",
+          "label": "review-passed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:14:19Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:14:32Z",
+          "event": "unlabeled",
+          "label": "review-passed"
+        }
+      ]
+    },
+    {
+      "number": 471,
+      "title": "[循环结构] 正式成果写明依据的版本，过期的提交被拒绝",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-12T15:27:06Z",
+      "closed_at": "2026-10-13T09:31:13Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/471",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:08Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T04:19:00Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:17:32Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:17:32Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:47:49Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:47:49Z",
+          "event": "labeled",
+          "label": "review-failed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:47:49Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:49:12Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:49:12Z",
+          "event": "unlabeled",
+          "label": "review-failed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T09:27:50Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T09:27:51Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T09:31:13Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T09:31:36Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 472,
+      "title": "[循环结构] 询问是一次工具调用：询问分支、回答与问题回答的记录",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T15:27:10Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/472",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:12Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:43Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:44Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 473,
+      "title": "[循环结构] 嵌套询问与询问链",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T15:27:15Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/473",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:17Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 474,
+      "title": "[循环结构] 部门按关注的成果开始工作，三个部门同时运行",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T15:27:19Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/474",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:20Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:47Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:47Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 475,
+      "title": "[循环结构] 重新启动以后同时运行的会话都继续",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T15:27:23Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/475",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:25Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 476,
+      "title": "[循环结构] 指导是接收部门关注的成果：通知或开始一轮工作",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T15:27:28Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/476",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:29Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:50Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:50Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 477,
+      "title": "[循环结构] 界面：询问、指导的三种状态与同时工作的部门",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T15:27:32Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/477",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T15:27:34Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 478,
+      "title": "[命令执行] 任意命令与检查，结果未知交还模型",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T16:37:05Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/478",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T16:37:07Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:40Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:40Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 479,
+      "title": "[命令执行] 工程用 bash 在运行工作区运行任意命令",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-12T16:41:30Z",
+      "closed_at": "2026-10-12T22:48:54Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/479",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T16:41:33Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T18:02:21Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T18:02:21Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T20:21:46Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T20:21:47Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T21:07:00Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T21:07:00Z",
+          "event": "labeled",
+          "label": "review-failed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T21:08:45Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T21:08:45Z",
+          "event": "unlabeled",
+          "label": "review-failed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:07:40Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:07:40Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:36:02Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:36:03Z",
+          "event": "labeled",
+          "label": "review-failed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:36:15Z",
+          "event": "unlabeled",
+          "label": "review-failed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:36:15Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:46:52Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:46:53Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:48:55Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T22:49:08Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 480,
+      "title": "[命令执行] run_check 接受命令字符串，在快照的全新副本中用 bash 运行",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-12T16:41:53Z",
+      "closed_at": "2026-10-13T03:05:36Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/480",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T16:41:55Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:09:51Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T00:09:51Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T01:57:58Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T01:57:58Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:24:04Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:24:04Z",
+          "event": "labeled",
+          "label": "review-passed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:25:19Z",
+          "event": "unlabeled",
+          "label": "review-passed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:25:19Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:54:11Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:54:11Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:57:03Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:57:03Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:59:31Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T02:59:31Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T03:05:36Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T03:05:50Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 481,
+      "title": "[命令执行] 每个会话一个检查工作区",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-12T16:41:57Z",
+      "closed_at": "2026-10-13T13:31:08Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/481",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T16:41:59Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T04:20:46Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:16:25Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:16:25Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:16:59Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:41:25Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:41:25Z",
+          "event": "labeled",
+          "label": "review-failed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:43:19Z",
+          "event": "unlabeled",
+          "label": "review-failed"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T07:43:19Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T10:58:14Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T10:58:14Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T10:59:47Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T10:59:48Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T11:46:16Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T11:46:16Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T13:31:08Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-13T13:31:21Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 482,
+      "title": "[命令执行] bash 的后台命令",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T16:42:01Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/482",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T16:42:03Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:54Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:54Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 483,
+      "title": "[命令执行] 结果未知的动作交还发出它的会话",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T16:42:06Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/483",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T16:42:08Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:57Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:17:57Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 484,
+      "title": "[命令执行] 删除项目的命令登记",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T16:42:19Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/484",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T16:42:21Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:18:00Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:18:01Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 485,
+      "title": "[命令执行] 质检的测试材料：带版本，放进检查工作区与检查副本",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-12T16:42:24Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/485",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-12T16:42:25Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:18:04Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:18:04Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 514,
+      "title": "[测试] 事件序列基准只比较事件与关键字段，工具说明与部门提示放进一份快照",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-14T09:22:35Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/514",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-14T09:22:37Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T02:19:46Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T02:19:46Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T06:24:35Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T06:24:36Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 520,
+      "title": "[循环结构] PRD 新版本的通知、同时互相询问与检查工作区按会话保留",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-14T10:57:23Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/520",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-14T10:57:25Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:18:07Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:18:07Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 532,
+      "title": "[测试] 事件序列基准按关键字段写，部门提示与工具说明放进一份快照",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-15T14:45:44Z",
+      "closed_at": "2026-10-15T19:02:00Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/532",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:45:46Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:53:59Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:53:59Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T15:05:42Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T15:05:42Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-15T16:40:37Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-15T16:40:37Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T17:14:10Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T17:14:10Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-15T18:40:01Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-15T18:40:01Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T19:02:00Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T19:02:26Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 533,
+      "title": "[测试] 依赖说明总长度的测试按固定材料设置窗口，token 估算有单元测试",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-15T14:45:48Z",
+      "closed_at": "2026-10-15T16:50:12Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/533",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:45:50Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:54:03Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:54:03Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T15:06:11Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T15:06:11Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-15T16:29:14Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-15T16:29:14Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T16:50:12Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T16:50:50Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 534,
+      "title": "[命令执行] 恢复 bash 工具说明：环境变量与密钥替换、超时取消结束进程树",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-15T14:45:53Z",
+      "closed_at": "2026-10-15T19:41:18Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/534",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:45:55Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:54:08Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T14:54:08Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T19:02:57Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T19:02:57Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-15T19:30:16Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-15T19:30:16Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T19:41:19Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-15T19:41:58Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 541,
+      "title": "[测试] 事件序列比较先报事件再报投影，投影差异写明字段名",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-16T06:29:53Z",
+      "closed_at": "2026-10-16T08:21:32Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/541",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T06:29:54Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T06:34:31Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T06:34:31Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:34:22Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:34:22Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-16T08:12:37Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-16T08:12:37Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T08:21:32Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T08:22:19Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 542,
+      "title": "[命令执行] 采纳写回的检查直接运行命令字符串",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-16T06:55:01Z",
+      "closed_at": "2026-10-16T15:37:42Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/542",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T06:55:03Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:19:37Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:19:37Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T08:23:11Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T08:23:11Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T09:44:46Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T09:44:46Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T13:47:15Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T13:47:15Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-16T15:25:35Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-16T15:25:36Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T15:37:42Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T15:38:27Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 543,
+      "title": "[命令执行] 删除项目的命令登记：应用层、项目流、run、恢复与残留",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-16T06:55:18Z",
+      "closed_at": "2026-10-16T22:27:45Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/543",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T06:55:19Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:19:46Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:19:46Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T15:39:25Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T15:39:25Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T19:42:09Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T19:42:09Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T20:07:00Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T20:07:00Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T20:09:05Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T20:09:06Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-16T22:07:24Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-16T22:07:24Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T22:27:46Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T22:40:02Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 544,
+      "title": "[命令执行] 界面：项目设置删除命令登记",
+      "state": "CLOSED",
+      "state_reason": "NOT_PLANNED",
+      "created_at": "2026-10-16T06:55:41Z",
+      "closed_at": "2026-10-16T20:06:45Z",
+      "labels": [
+        "wontfix"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/544",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T06:55:43Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:19:54Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:19:54Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T20:06:46Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T20:06:48Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T20:06:48Z",
+          "event": "labeled",
+          "label": "wontfix"
+        }
+      ]
+    },
+    {
+      "number": 545,
+      "title": "[命令执行] 结果未知的动作交还会话：删除自动重新执行、核实决定与待核实状态",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T06:58:29Z",
+      "closed_at": null,
+      "labels": [
+        "needs-triage"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/545",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T06:58:31Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:04Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:04Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:46:57Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:46:57Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 546,
+      "title": "[命令执行] 界面：删除核实决定的卡片与待核实状态",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T06:58:55Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/546",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T06:58:57Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:10Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:10Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 547,
+      "title": "[命令执行] 质检测试材料：固定目录、保存为版本、放进检查工作区与检查副本",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:01:34Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/547",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:01:36Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:18Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:18Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 548,
+      "title": "[命令执行] 质检回执绑定测试材料版本，放行核对当前测试材料",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:01:51Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/548",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:01:52Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:26Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:26Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 549,
+      "title": "[命令执行] bash 后台运行、按编号读取输出与结束，截断输出按编号取回",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:03:53Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/549",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:03:55Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:29Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:29Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 550,
+      "title": "[命令执行] 后台命令的事项运行与部门动作列表",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:04:07Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/550",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:04:09Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:38Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:38Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 551,
+      "title": "[循环结构] 询问工具与一层询问分支：回答作为工具结果，产品可附 PRD 修订",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:07:56Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/551",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:07:58Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:46Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:46Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 552,
+      "title": "[循环结构] 删除协作请求，查询提供询问",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:08:07Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/552",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:08:09Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:49Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:49Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 553,
+      "title": "[循环结构] 询问分支的用量上限、没能回答与重新启动",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:08:19Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/553",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:08:20Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:57Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:20:58Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 554,
+      "title": "[循环结构] 工程与质检问答的事实与解释",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:08:29Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/554",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:08:30Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:06Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:06Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 555,
+      "title": "[循环结构] 质检的结论只有缺陷记录与放行，要求有问题时询问产品",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:11:10Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/555",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:11:11Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:10Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:10Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 556,
+      "title": "[循环结构] 部门按关注的成果开始工作，删除阶段状态机",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:11:40Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/556",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:11:42Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:19Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:19Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 557,
+      "title": "[循环结构] 一个事项内多个会话同时运行与预测性探索",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:12:09Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/557",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:12:11Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:22Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:22Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 558,
+      "title": "[循环结构] 新版本作为通知送达，检查工作区按会话保留",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:14:15Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/558",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:14:17Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:25Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:25Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 559,
+      "title": "[循环结构] 同时互相询问、多个分支、PRD 版本冲突与各自的检查工作区",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:14:34Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/559",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:14:36Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:33Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:33Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 560,
+      "title": "[循环结构] 指导的四种送达与顺序",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:14:57Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/560",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:14:59Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:41Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:41Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 561,
+      "title": "[循环结构] 删除指导的正式回应，放行等发给产品的输入处理完，指导的三种状态",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T07:15:07Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/561",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:15:09Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:49Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T07:21:49Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 569,
+      "title": "[评测] test_release_binding_passes_when_qa_review_and_delivery_match 在 main 上失败",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-16T18:02:08Z",
+      "closed_at": null,
+      "labels": [
+        "bug",
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/569",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T18:02:09Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-16T18:02:09Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T15:09:05Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T15:09:05Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 581,
+      "title": "[命令执行] 结果未知的动作交还会话：删除自动重新执行与 repeatable 声明",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-17T11:43:39Z",
+      "closed_at": "2026-10-17T13:49:13Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/581",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:43:41Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:47:00Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:47:00Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:50:36Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:50:36Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T12:52:41Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T12:52:41Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T13:16:02Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T13:16:02Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T13:39:48Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T13:39:48Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T13:49:13Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T13:50:59Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 582,
+      "title": "[命令执行] 删除「核实结果未知的动作」决定，旧数据中的请求按交还处理",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-17T11:43:47Z",
+      "closed_at": "2026-10-17T15:04:50Z",
+      "labels": [],
+      "url": "https://github.com/bender2333/yudao/issues/582",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:43:49Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:47:08Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:47:08Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T13:53:48Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T13:53:48Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T14:28:05Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T14:28:05Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T15:04:51Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T15:05:40Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 583,
+      "title": "[命令执行] 删除恢复观察状态「待核实」与相关查询字段",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-17T11:43:50Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/583",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:43:51Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:47:11Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:47:11Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 584,
+      "title": "[集成层] test_event_payloads：writeback_stopped 对 writeback_completed（既有失败）",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-10-17T11:50:41Z",
+      "closed_at": "2026-10-17T17:09:01Z",
+      "labels": [
+        "bug"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/584",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:50:43Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T11:50:43Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T15:09:00Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T15:09:01Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T16:41:12Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T16:41:12Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T16:56:44Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T16:56:44Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T17:09:01Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "executor-home[bot]",
+          "created_at": "2026-10-17T17:10:15Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 588,
+      "title": "[仓库维护] 统一仓库中的换行符：加入 .gitattributes，转换仍以 CRLF 保存的文件",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-17T14:43:15Z",
+      "closed_at": null,
+      "labels": [
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/588",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-17T14:43:17Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 593,
+      "title": "[评测] 真实模型测试只在明确选择时运行，模型取自环境变量；smoke 用同一套",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-18T02:06:51Z",
+      "closed_at": null,
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/593",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T02:06:53Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T02:06:53Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:40:59Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:40:59Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 596,
+      "title": "[集成层] 符号链接的 7 个用例在能建符号链接的机器上失败",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-18T04:06:35Z",
+      "closed_at": null,
+      "labels": [
+        "bug",
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/596",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:06:37Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:06:37Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:41:03Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:41:03Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 597,
+      "title": "[集成层] 4 个用例只在 GitHub 运行机上失败：凭据、uv 缓存、建档检查、发布构建",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-18T04:06:39Z",
+      "closed_at": null,
+      "labels": [
+        "bug",
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/597",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:06:40Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:06:41Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:41:07Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T04:41:07Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        }
+      ]
+    },
+    {
+      "number": 599,
+      "title": "[测试提速] harness 启动时不导入模型 SDK，只在模型目录用到某个协议时导入",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-18T05:03:58Z",
+      "closed_at": null,
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/599",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T05:03:59Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T05:04:00Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 600,
+      "title": "[测试提速] 发布脚本的测试复用一份仓库副本",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-18T05:04:01Z",
+      "closed_at": null,
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/600",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T05:04:03Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T05:04:03Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 601,
+      "title": "[测试提速] 三个用例的长等待：事件流续读、服务锁、重启后的运行时间上限",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-18T05:04:05Z",
+      "closed_at": null,
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/601",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T05:04:07Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T05:04:07Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    },
+    {
+      "number": 602,
+      "title": "[迭代底座] 里程碑关闭时导出工单记录：轮数、审查、耗时、改动文件数、基准变化数、架构师介入次数",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-18T05:08:06Z",
+      "closed_at": null,
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/602",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T05:08:08Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-18T05:08:08Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        }
+      ]
+    }
+  ],
+  "pull_requests": [
+    {
+      "number": 487,
+      "closes": [
+        479
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-12T22:48:18Z",
+      "merged_at": "2026-10-12T22:48:53Z",
+      "branch": "issue-479",
+      "files": [
+        "agents_jour/479.md",
+        "client/src/renderer/src/pixel/room/decl.ts",
+        "client/src/renderer/src/pixel/room/driver.ts",
+        "client/src/renderer/src/pixel/world/floor-decl.ts",
+        "client/src/renderer/src/pixel/world/say.ts",
+        "client/tests/unit/card-logic.test.js",
+        "client/tests/unit/pixel-floor.test.ts",
+        "client/tests/unit/pixel-room.test.ts",
+        "harness/adjudication.py",
+        "harness/definitions/proposal_contracts.json",
+        "harness/definitions/roles.json",
+        "harness/definitions/rules.json",
+        "harness/definitions/tools.json",
+        "harness/definitions/work_items.json",
+        "harness/environment.py",
+        "harness/recovery.py",
+        "harness/tests/event_scenarios.py",
+        "harness/tests/event_sequences/activation_start_unavailable.json",
+        "harness/tests/event_sequences/bash_is_not_a_check_receipt.json",
+        "harness/tests/event_sequences/cancel_during_model_call.json",
+        "harness/tests/event_sequences/cancel_while_bash_runs.json",
+        "harness/tests/event_sequences/cancel_while_check_runs.json",
+        "harness/tests/event_sequences/collaboration_request_answer.json",
+        "harness/tests/event_sequences/guidance_response_explained.json",
+        "harness/tests/event_sequences/handoff_release.json",
+        "harness/tests/event_sequences/http_chat_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_chat_handoff.json",
+        "harness/tests/event_sequences/http_messages_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_messages_handoff.json",
+        "harness/tests/event_sequences/http_responses_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_responses_handoff.json",
+        "harness/tests/event_sequences/proposal_rejected.json",
+        "harness/tests/event_sequences/quality_rework.json",
+        "harness/tests/event_sequences/request_time_unavailable.json",
+        "harness/tests/event_sequences/request_time_unavailable_cancel.json",
+        "harness/tests/event_sequences/request_time_unavailable_stop.json",
+        "harness/tests/event_sequences/tool_denied_guidance_only.json",
+        "harness/tests/event_sequences/tool_denied_outside_plan.json",
+        "harness/tests/event_sequences/tool_denied_unregistered_command.json",
+        "harness/tests/layers.toml",
+        "harness/tests/test_adjudication.py",
+        "harness/tests/test_bash.py",
+        "harness/tests/test_definition_rules.py",
+        "harness/tests/test_definitions.py",
+        "harness/tests/test_tool_contracts.py",
+        "harness/validation.py"
+      ],
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 490,
+      "closes": [
+        469
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-13T00:06:26Z",
+      "merged_at": "2026-10-13T00:08:03Z",
+      "branch": "issue-469",
+      "files": [
+        "agents_jour/469.md",
+        "harness/adapters/fake.py",
+        "harness/tests/event_scenarios.py",
+        "harness/tests/event_sequence.py",
+        "harness/tests/layers.toml",
+        "harness/tests/test_event_sequence_compare.py"
+      ],
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 492,
+      "closes": [
+        470
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-13T02:12:48Z",
+      "merged_at": "2026-10-13T02:14:18Z",
+      "branch": "issue-470",
+      "files": [
+        "agents_jour/470.md",
+        "client/src/renderer/src/api/generated/index.ts",
+        "client/src/renderer/src/api/generated/types.gen.ts",
+        "client/src/renderer/src/pixel/room/decl.ts",
+        "client/src/renderer/src/pixel/room/driver.ts",
+        "client/src/renderer/src/pixel/world/say.ts",
+        "client/src/renderer/src/views/project/materials.tsx",
+        "client/tests/e2e/backend.py",
+        "client/tests/e2e/project.spec.ts",
+        "client/tests/fixtures/floor/recordings.json",
+        "client/tests/fixtures/room/recordings.json",
+        "client/tests/unit/pixel-room.test.ts",
+        "docs/design/evaluation-scenarios.md",
+        "docs/evaluation/scenario-3-yudao.json",
+        "docs/evaluation/scenario-3-yudao.md",
+        "evals/README.md",
+        "evals/data/scenario-3-yudao-historical.json",
+        "evals/runner/regen_scenario3.py",
+        "evals/runner/yudao_metrics.py",
+        "evals/runner/yudao_report.py",
+        "evals/tests/test_regen_scenario3.py",
+        "evals/tests/test_yudao_runner.py",
+        "harness/actions.py",
+        "harness/adapters/base.py",
+        "harness/adjudication.py",
+        "harness/app/labels.py",
+        "harness/app/payloads.py",
+        "harness/app/project_queries.py",
+        "harness/assembly.py",
+        "harness/collaboration.py",
+        "harness/compare.py",
+        "harness/context.py",
+        "harness/contracts.py",
+        "harness/definitions/__init__.py",
+        "harness/definitions/kernel-manifest.json",
+        "harness/definitions/organization.json",
+        "harness/definitions/proposal_contracts.json",
+        "harness/definitions/roles.json",
+        "harness/definitions/tools.json",
+        "harness/definitions/work_items.json",
+        "harness/demo.py",
+        "harness/engine.py",
+        "harness/environment.py",
+        "harness/git_audit.py",
+        "harness/models.py",
+        "harness/orchestrator.py",
+        "harness/path_rules.py",
+        "harness/projection.py",
+        "harness/proposals.py",
+        "harness/public_tree.py",
+        "harness/recording.py",
+        "harness/smoke.py",
+        "harness/streams.py",
+        "harness/submissions.py",
+        "harness/tests/event_scenarios.py",
+        "harness/tests/event_sequences/activation_start_unavailable.json",
+        "harness/tests/event_sequences/bash_is_not_a_check_receipt.json",
+        "harness/tests/event_sequences/cancel_during_model_call.json",
+        "harness/tests/event_sequences/cancel_while_bash_runs.json",
+        "harness/tests/event_sequences/cancel_while_check_runs.json",
+        "harness/tests/event_sequences/collaboration_request_answer.json",
+        "harness/tests/event_sequences/compaction_failed.json",
+        "harness/tests/event_sequences/compaction_success.json",
+        "harness/tests/event_sequences/context_overflow.json",
+        "harness/tests/event_sequences/guidance_response_explained.json",
+        "harness/tests/event_sequences/handoff_release.json",
+        "harness/tests/event_sequences/history_exceeds_the_window.json",
+        "harness/tests/event_sequences/http_chat_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_chat_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_chat_handoff.json",
+        "harness/tests/event_sequences/http_chat_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_messages_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_messages_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_messages_handoff.json",
+        "harness/tests/event_sequences/http_messages_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_responses_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_responses_handoff.json",
+        "harness/tests/event_sequences/http_responses_retry_after_then_success.json",
+        "harness/tests/event_sequences/http_responses_server_error_then_success.json",
+        "harness/tests/event_sequences/http_responses_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_timeout_then_success.json",
+        "harness/tests/event_sequences/invalid_tool_arguments.json",
+        "harness/tests/event_sequences/model_steps_exhausted.json",
+        "harness/tests/event_sequences/no_tool_call_pause.json",
+        "harness/tests/event_sequences/proposal_rejected.json",
+        "harness/tests/event_sequences/quality_rework.json",
+        "harness/tests/event_sequences/request_time_unavailable.json",
+        "harness/tests/event_sequences/request_time_unavailable_cancel.json",
+        "harness/tests/event_sequences/request_time_unavailable_stop.json",
+        "harness/tests/event_sequences/retry_after_too_long.json",
+        "harness/tests/event_sequences/retry_exhausted.json",
+        "harness/tests/event_sequences/retry_then_success.json",
+        "harness/tests/event_sequences/stop_command.json",
+        "harness/tests/event_sequences/text_only_reply.json",
+        "harness/tests/event_sequences/time_limit.json",
+        "harness/tests/event_sequences/tool_denied_guidance_only.json",
+        "harness/tests/event_sequences/tool_denied_outside_plan.json",
+        "harness/tests/helpers.py",
+        "harness/tests/kernel/test_limits_survive_restart.py"
+      ],
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 493,
+      "closes": [
+        480
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-13T02:23:32Z",
+      "merged_at": "2026-10-13T03:05:35Z",
+      "branch": "issue-480",
+      "files": [
+        "agents_jour/480.md",
+        "client/src/renderer/src/api/generated/types.gen.ts",
+        "harness/adapters/fake.py",
+        "harness/app/payloads.py",
+        "harness/contracts.py",
+        "harness/definitions/proposal_contracts.json",
+        "harness/definitions/rules.json",
+        "harness/definitions/tools.json",
+        "harness/definitions/work_items.json",
+        "harness/demo.py",
+        "harness/environment.py",
+        "harness/projects.py",
+        "harness/proposals.py",
+        "harness/tests/event_scenarios.py",
+        "harness/tests/event_sequences/activation_start_unavailable.json",
+        "harness/tests/event_sequences/bash_is_not_a_check_receipt.json",
+        "harness/tests/event_sequences/cancel_during_model_call.json",
+        "harness/tests/event_sequences/cancel_while_bash_runs.json",
+        "harness/tests/event_sequences/cancel_while_check_runs.json",
+        "harness/tests/event_sequences/collaboration_request_answer.json",
+        "harness/tests/event_sequences/compaction_failed.json",
+        "harness/tests/event_sequences/compaction_success.json",
+        "harness/tests/event_sequences/guidance_response_explained.json",
+        "harness/tests/event_sequences/handoff_release.json",
+        "harness/tests/event_sequences/http_chat_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_chat_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_chat_handoff.json",
+        "harness/tests/event_sequences/http_chat_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_messages_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_messages_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_messages_handoff.json",
+        "harness/tests/event_sequences/http_messages_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_responses_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_responses_handoff.json",
+        "harness/tests/event_sequences/http_responses_retry_after_then_success.json",
+        "harness/tests/event_sequences/http_responses_server_error_then_success.json",
+        "harness/tests/event_sequences/http_responses_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_timeout_then_success.json",
+        "harness/tests/event_sequences/invalid_tool_arguments.json",
+        "harness/tests/event_sequences/model_steps_exhausted.json",
+        "harness/tests/event_sequences/no_tool_call_pause.json",
+        "harness/tests/event_sequences/proposal_rejected.json",
+        "harness/tests/event_sequences/quality_rework.json",
+        "harness/tests/event_sequences/request_time_unavailable.json",
+        "harness/tests/event_sequences/request_time_unavailable_cancel.json",
+        "harness/tests/event_sequences/request_time_unavailable_stop.json",
+        "harness/tests/event_sequences/retry_after_too_long.json",
+        "harness/tests/event_sequences/retry_exhausted.json",
+        "harness/tests/event_sequences/retry_then_success.json",
+        "harness/tests/event_sequences/stop_command.json",
+        "harness/tests/event_sequences/text_only_reply.json",
+        "harness/tests/event_sequences/time_limit.json",
+        "harness/tests/event_sequences/tool_denied_guidance_only.json",
+        "harness/tests/helpers.py",
+        "harness/tests/layers.toml",
+        "harness/tests/openapi/openapi.json",
+        "harness/tests/provider_replies.py",
+        "harness/tests/test_definition_rules.py",
+        "harness/tests/test_department_providers.py",
+        "harness/tests/test_issue_17_action_recovery.py",
+        "harness/tests/test_issue_307_auto_reexecute.py",
+        "harness/tests/test_issue_308_file_action_verification.py",
+        "harness/tests/test_issue_317_onboarding_interruption.py",
+        "harness/tests/test_issue_350_usage_resumes.py",
+        "harness/tests/test_onboarding.py",
+        "harness/tests/test_range_edit.py",
+        "harness/tests/test_run_check.py",
+        "harness/tests/test_snapshot.py",
+        "harness/tests/test_tool_contracts.py",
+        "harness/tests/test_tools.py",
+        "harness/validation.py"
+      ],
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 496,
+      "closes": [
+        471
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-13T09:30:39Z",
+      "merged_at": "2026-10-13T09:31:11Z",
+      "branch": "issue-471",
+      "files": [
+        "agents_jour/471.md",
+        "harness/definitions/proposal_contracts.json",
+        "harness/definitions/tools.json",
+        "harness/demo.py",
+        "harness/proposals.py",
+        "harness/tests/event_scenarios.py",
+        "harness/tests/event_sequences/activation_start_unavailable.json",
+        "harness/tests/event_sequences/bash_is_not_a_check_receipt.json",
+        "harness/tests/event_sequences/cancel_during_model_call.json",
+        "harness/tests/event_sequences/cancel_while_bash_runs.json",
+        "harness/tests/event_sequences/cancel_while_check_runs.json",
+        "harness/tests/event_sequences/collaboration_request_answer.json",
+        "harness/tests/event_sequences/compaction_failed.json",
+        "harness/tests/event_sequences/compaction_success.json",
+        "harness/tests/event_sequences/guidance_response_explained.json",
+        "harness/tests/event_sequences/handoff_release.json",
+        "harness/tests/event_sequences/http_chat_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_chat_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_chat_handoff.json",
+        "harness/tests/event_sequences/http_chat_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_messages_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_messages_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_messages_handoff.json",
+        "harness/tests/event_sequences/http_messages_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_responses_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_responses_handoff.json",
+        "harness/tests/event_sequences/http_responses_retry_after_then_success.json",
+        "harness/tests/event_sequences/http_responses_server_error_then_success.json",
+        "harness/tests/event_sequences/http_responses_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_timeout_then_success.json",
+        "harness/tests/event_sequences/invalid_tool_arguments.json",
+        "harness/tests/event_sequences/model_steps_exhausted.json",
+        "harness/tests/event_sequences/no_tool_call_pause.json",
+        "harness/tests/event_sequences/proposal_rejected.json",
+        "harness/tests/event_sequences/quality_rework.json",
+        "harness/tests/event_sequences/request_time_unavailable.json",
+        "harness/tests/event_sequences/request_time_unavailable_cancel.json",
+        "harness/tests/event_sequences/request_time_unavailable_stop.json",
+        "harness/tests/event_sequences/retry_after_too_long.json",
+        "harness/tests/event_sequences/retry_exhausted.json",
+        "harness/tests/event_sequences/retry_then_success.json",
+        "harness/tests/event_sequences/stop_command.json",
+        "harness/tests/event_sequences/text_only_reply.json",
+        "harness/tests/event_sequences/time_limit.json",
+        "harness/tests/event_sequences/tool_denied_guidance_only.json",
+        "harness/tests/layers.toml",
+        "harness/tests/provider_replies.py",
+        "harness/tests/test_basis_hash_rules.py",
+        "harness/tests/test_collaboration_engine.py",
+        "harness/tests/test_context.py",
+        "harness/tests/test_orchestrator.py",
+        "harness/tests/test_proposal_version_check.py",
+        "harness/validation.py"
+      ],
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 497,
+      "closes": [
+        481
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-13T13:30:25Z",
+      "merged_at": "2026-10-13T13:31:07Z",
+      "branch": "issue-481",
+      "files": [
+        "agents_jour/481.md",
+        "harness/definitions/roles.json",
+        "harness/definitions/tools.json",
+        "harness/definitions/work_items.json",
+        "harness/environment.py",
+        "harness/orchestrator.py",
+        "harness/runtime.py",
+        "harness/sessions.py",
+        "harness/tests/event_sequences/activation_start_unavailable.json",
+        "harness/tests/event_sequences/bash_is_not_a_check_receipt.json",
+        "harness/tests/event_sequences/cancel_during_model_call.json",
+        "harness/tests/event_sequences/cancel_while_bash_runs.json",
+        "harness/tests/event_sequences/cancel_while_check_runs.json",
+        "harness/tests/event_sequences/collaboration_request_answer.json",
+        "harness/tests/event_sequences/compaction_failed.json",
+        "harness/tests/event_sequences/compaction_success.json",
+        "harness/tests/event_sequences/guidance_response_explained.json",
+        "harness/tests/event_sequences/handoff_release.json",
+        "harness/tests/event_sequences/http_chat_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_chat_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_chat_handoff.json",
+        "harness/tests/event_sequences/http_chat_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_messages_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_messages_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_messages_handoff.json",
+        "harness/tests/event_sequences/http_messages_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_responses_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_responses_handoff.json",
+        "harness/tests/event_sequences/http_responses_retry_after_then_success.json",
+        "harness/tests/event_sequences/http_responses_server_error_then_success.json",
+        "harness/tests/event_sequences/http_responses_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_timeout_then_success.json",
+        "harness/tests/event_sequences/invalid_tool_arguments.json",
+        "harness/tests/event_sequences/model_steps_exhausted.json",
+        "harness/tests/event_sequences/no_tool_call_pause.json",
+        "harness/tests/event_sequences/proposal_rejected.json",
+        "harness/tests/event_sequences/quality_rework.json",
+        "harness/tests/event_sequences/request_time_unavailable.json",
+        "harness/tests/event_sequences/request_time_unavailable_cancel.json",
+        "harness/tests/event_sequences/request_time_unavailable_stop.json",
+        "harness/tests/event_sequences/retry_after_too_long.json",
+        "harness/tests/event_sequences/retry_exhausted.json",
+        "harness/tests/event_sequences/retry_then_success.json",
+        "harness/tests/event_sequences/stop_command.json",
+        "harness/tests/event_sequences/text_only_reply.json",
+        "harness/tests/event_sequences/time_limit.json",
+        "harness/tests/event_sequences/tool_denied_guidance_only.json",
+        "harness/tests/layers.toml",
+        "harness/tests/test_compaction_engine.py",
+        "harness/tests/test_inspection_workspace.py",
+        "harness/tests/test_orchestrator.py"
+      ],
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 536,
+      "closes": [
+        533
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-15T16:24:02Z",
+      "merged_at": "2026-10-15T16:50:10Z",
+      "branch": "issue-533",
+      "files": [
+        "agents_jour/533.md",
+        "harness/tests/helpers.py",
+        "harness/tests/test_compaction.py",
+        "harness/tests/test_compaction_engine.py",
+        "harness/tests/test_context.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-15T16:28:59Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-15T16:43:54Z"
+        }
+      ]
+    },
+    {
+      "number": 537,
+      "closes": [
+        532
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-15T16:34:44Z",
+      "merged_at": "2026-10-15T19:01:58Z",
+      "branch": "issue-532",
+      "files": [
+        "agents_jour/532.md",
+        "docs/CHANGELOG.md",
+        "docs/design/test-pyramid.md",
+        "harness/tests/conftest.py",
+        "harness/tests/event_scenarios.py",
+        "harness/tests/event_sequence.py",
+        "harness/tests/event_sequences/activation_start_unavailable.json",
+        "harness/tests/event_sequences/bash_is_not_a_check_receipt.json",
+        "harness/tests/event_sequences/cancel_during_model_call.json",
+        "harness/tests/event_sequences/cancel_while_bash_runs.json",
+        "harness/tests/event_sequences/cancel_while_check_runs.json",
+        "harness/tests/event_sequences/collaboration_request_answer.json",
+        "harness/tests/event_sequences/compaction_failed.json",
+        "harness/tests/event_sequences/compaction_success.json",
+        "harness/tests/event_sequences/context_overflow.json",
+        "harness/tests/event_sequences/guidance_response_explained.json",
+        "harness/tests/event_sequences/handoff_release.json",
+        "harness/tests/event_sequences/history_exceeds_the_window.json",
+        "harness/tests/event_sequences/http_chat_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_chat_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_chat_handoff.json",
+        "harness/tests/event_sequences/http_chat_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_messages_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_messages_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_messages_handoff.json",
+        "harness/tests/event_sequences/http_messages_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_cancel_while_provider_holds.json",
+        "harness/tests/event_sequences/http_responses_credential_rejected_then_continue.json",
+        "harness/tests/event_sequences/http_responses_handoff.json",
+        "harness/tests/event_sequences/http_responses_retry_after_then_success.json",
+        "harness/tests/event_sequences/http_responses_server_error_then_success.json",
+        "harness/tests/event_sequences/http_responses_stream_broken_then_success.json",
+        "harness/tests/event_sequences/http_responses_timeout_then_success.json",
+        "harness/tests/event_sequences/invalid_tool_arguments.json",
+        "harness/tests/event_sequences/model_steps_exhausted.json",
+        "harness/tests/event_sequences/no_tool_call_pause.json",
+        "harness/tests/event_sequences/proposal_rejected.json",
+        "harness/tests/event_sequences/quality_rework.json",
+        "harness/tests/event_sequences/request_time_unavailable.json",
+        "harness/tests/event_sequences/request_time_unavailable_cancel.json",
+        "harness/tests/event_sequences/request_time_unavailable_stop.json",
+        "harness/tests/event_sequences/retry_after_too_long.json",
+        "harness/tests/event_sequences/retry_exhausted.json",
+        "harness/tests/event_sequences/retry_then_success.json",
+        "harness/tests/event_sequences/stop_command.json",
+        "harness/tests/event_sequences/text_only_reply.json",
+        "harness/tests/event_sequences/time_limit.json",
+        "harness/tests/event_sequences/tool_denied_guidance_only.json",
+        "harness/tests/prompt_snapshot.json",
+        "harness/tests/test_event_sequence.py",
+        "harness/tests/test_event_sequence_compare.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-15T16:40:23Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        },
+        {
+          "created_at": "2026-10-15T18:39:35Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 2 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "CHANGES_REQUESTED",
+          "submitted_at": "2026-10-15T17:12:46Z"
+        },
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-15T19:00:19Z"
+        }
+      ]
+    },
+    {
+      "number": 538,
+      "closes": [
+        534
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-15T19:24:38Z",
+      "merged_at": "2026-10-15T19:41:17Z",
+      "branch": "issue-534",
+      "files": [
+        "agents_jour/534.md",
+        "docs/CHANGELOG.md",
+        "harness/definitions/tools.json",
+        "harness/tests/prompt_snapshot.json",
+        "harness/tests/test_tool_contracts.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-15T19:30:05Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-15T19:39:55Z"
+        }
+      ]
+    },
+    {
+      "number": 565,
+      "closes": [
+        541
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-16T08:05:34Z",
+      "merged_at": "2026-10-16T08:21:30Z",
+      "branch": "issue-541",
+      "files": [
+        "agents_jour/541.md",
+        "docs/CHANGELOG.md",
+        "harness/tests/event_sequence.py",
+        "harness/tests/test_event_sequence_compare.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-16T08:12:22Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-16T08:21:01Z"
+        }
+      ]
+    },
+    {
+      "number": 566,
+      "closes": [
+        542
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-16T15:19:20Z",
+      "merged_at": "2026-10-16T15:37:40Z",
+      "branch": "issue-542",
+      "files": [
+        "agents_jour/542.md",
+        "docs/CHANGELOG.md",
+        "harness/tests/test_writeback.py",
+        "harness/tests/test_writeback_branch.py",
+        "harness/writeback.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-16T15:25:15Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-16T15:34:06Z"
+        }
+      ]
+    },
+    {
+      "number": 571,
+      "closes": [
+        543
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-16T18:57:05Z",
+      "merged_at": "2026-10-16T22:27:44Z",
+      "branch": "issue-543",
+      "files": [
+        "agents_jour/543.md",
+        "client/src/renderer/src/api/generated/index.ts",
+        "client/src/renderer/src/api/generated/sdk.gen.ts",
+        "client/src/renderer/src/api/generated/types.gen.ts",
+        "client/src/renderer/src/views/project/common.tsx",
+        "client/src/renderer/src/views/project/labels.ts",
+        "client/src/renderer/src/views/project/settings.tsx",
+        "client/tests/e2e/backend.py",
+        "client/tests/e2e/project.spec.ts",
+        "docs/CHANGELOG.md",
+        "docs/architecture-issues.md",
+        "evals/runner/run_yudao_eval.py",
+        "evals/runner/yudao.py",
+        "evals/tests/test_yudao_runner.py",
+        "harness/adjudication.py",
+        "harness/app/application.py",
+        "harness/app/labels.py",
+        "harness/app/payloads.py",
+        "harness/app/project_and_work_item_commands.py",
+        "harness/app/project_queries.py",
+        "harness/definitions/rules.json",
+        "harness/engine.py",
+        "harness/environment.py",
+        "harness/models.py",
+        "harness/orchestrator.py",
+        "harness/project_projection.py",
+        "harness/projection.py",
+        "harness/projects.py",
+        "harness/recording.py",
+        "harness/recovery.py",
+        "harness/streams.py",
+        "harness/tests/layers.toml",
+        "harness/tests/openapi/openapi.json",
+        "harness/tests/process_kill.py",
+        "harness/tests/project_stream_fields.json",
+        "harness/tests/test_adjudication.py",
+        "harness/tests/test_api.py",
+        "harness/tests/test_commands_without_registration.py",
+        "harness/tests/test_event_classification.py",
+        "harness/tests/test_event_payloads.py",
+        "harness/tests/test_issue_204.py",
+        "harness/tests/test_onboarding_commands.py",
+        "harness/tests/test_project_and_work_item_commands.py",
+        "harness/tests/test_range_edit.py",
+        "harness/tests/test_registered_commands.py",
+        "harness/tests/test_startup_run_version.py",
+        "harness/tests/test_tool_contracts.py",
+        "harness/tests/test_workspace_unrepresentable.py",
+        "harness/tools.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-16T22:07:20Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 2 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-16T22:27:17Z"
+        }
+      ]
+    },
+    {
+      "number": 585,
+      "closes": [
+        581
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-17T12:46:15Z",
+      "merged_at": "2026-10-17T13:49:11Z",
+      "branch": "issue-581",
+      "files": [
+        "agents_jour/581.md",
+        "client/src/renderer/src/api/generated/types.gen.ts",
+        "docs/CHANGELOG.md",
+        "harness/app/payloads.py",
+        "harness/app/project_queries.py",
+        "harness/definitions/__init__.py",
+        "harness/definitions/tools.json",
+        "harness/engine.py",
+        "harness/orchestrator.py",
+        "harness/recovery.py",
+        "harness/tests/layers.toml",
+        "harness/tests/openapi/openapi.json",
+        "harness/tests/test_issue_17_action_recovery.py",
+        "harness/tests/test_issue_18_recovery_observation.py",
+        "harness/tests/test_issue_307_auto_reexecute.py",
+        "harness/tests/test_issue_308_file_action_verification.py",
+        "harness/tests/test_issue_317_onboarding_interruption.py",
+        "harness/tests/test_tool_contracts.py",
+        "harness/tests/test_unknown_action_handed_back.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-17T12:52:29Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        },
+        {
+          "created_at": "2026-10-17T13:39:38Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 2 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "CHANGES_REQUESTED",
+          "submitted_at": "2026-10-17T13:14:42Z"
+        },
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-17T13:48:01Z"
+        }
+      ]
+    },
+    {
+      "number": 587,
+      "closes": [
+        582
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-17T14:21:11Z",
+      "merged_at": "2026-10-17T15:04:49Z",
+      "branch": "issue-582",
+      "files": [
+        "agents_jour/582.md",
+        "client/src/renderer/src/api/generated/types.gen.ts",
+        "client/src/renderer/src/views/decisions/card-logic.ts",
+        "client/tests/unit/card-logic.test.js",
+        "docs/CHANGELOG.md",
+        "harness/app/labels.py",
+        "harness/app/payloads.py",
+        "harness/decisions.py",
+        "harness/orchestrator.py",
+        "harness/recovery.py",
+        "harness/tests/layers.toml",
+        "harness/tests/openapi/openapi.json",
+        "harness/tests/test_api.py",
+        "harness/tests/test_issue_17_action_recovery.py",
+        "harness/tests/test_issue_18_recovery_observation.py",
+        "harness/tests/test_legacy_unknown_action_requests.py",
+        "harness/tests/test_user_facing_labels.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-17T14:27:57Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "DISMISSED",
+          "submitted_at": "2026-10-17T14:51:55Z"
+        },
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-17T15:04:25Z"
+        }
+      ]
+    },
+    {
+      "number": 591,
+      "closes": [
+        584
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-17T16:51:19Z",
+      "merged_at": "2026-10-17T17:09:00Z",
+      "branch": "issue-584",
+      "files": [
+        "agents_jour/584.md",
+        "docs/CHANGELOG.md",
+        "harness/tests/test_event_payloads.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-17T16:56:37Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-17T17:08:52Z"
+        }
+      ]
+    },
+    {
+      "number": 592,
+      "closes": [
+        463
+      ],
+      "state": "MERGED",
+      "created_at": "2026-10-17T17:21:57Z",
+      "merged_at": "2026-10-17T21:19:12Z",
+      "branch": "issue-463",
+      "files": [
+        "agents_jour/463.md",
+        "docs/CHANGELOG.md",
+        "harness/event_store.py",
+        "harness/tests/layers.toml",
+        "harness/tests/process_kill.py",
+        "harness/tests/test_event_store_read_only.py",
+        "harness/tests/test_issue_308_file_action_verification.py",
+        "harness/tests/test_observability_module.py",
+        "harness/tests/test_project_and_work_item_commands.py",
+        "harness/tests/test_run_check.py",
+        "harness/tests/test_run_time_limit.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-10-17T17:49:21Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 1 轮"
+        },
+        {
+          "created_at": "2026-10-17T18:55:12Z",
+          "author": "bender2333",
+          "first_line": "派发者：集成层（PR 合并提交 72588766，父 main 419e2fe8 + 分支 ebdcac31，`-n 4`）：`12 failed, 1165 passed, 13 skipped, 4 errors in 2639.73s (0:43:59)`。整层耗时是平时的 3 倍多，同一时间审查者在跑测试，机器负载高。"
+        },
+        {
+          "created_at": "2026-10-17T21:05:58Z",
+          "author": "executor-home",
+          "first_line": "DELIVERY: 第 2 轮"
+        }
+      ],
+      "reviews": [
+        {
+          "author": "reviewer-home",
+          "state": "CHANGES_REQUESTED",
+          "submitted_at": "2026-10-17T20:46:49Z"
+        },
+        {
+          "author": "reviewer-home",
+          "state": "APPROVED",
+          "submitted_at": "2026-10-17T21:11:45Z"
+        }
+      ]
+    }
+  ]
+}

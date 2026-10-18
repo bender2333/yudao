@@ -14,6 +14,7 @@ from harness.tests.onboarding_project import (
     ONBOARDING_REQUIREMENT as REQUIREMENT,
     OpenedFake as _Opened,
     onboarding_source as _source,
+    open_initial_prd,
     post_command as _post,
     wait_until as _wait_for,
 )
@@ -49,6 +50,10 @@ def test_decisions_list_returns_the_baseline_checks_with_their_command(data_dir,
         refs = accepted.json()["refs"]
         assert _wait_for(lambda: opened.system.project(refs["run_id"]).phase == "DONE"), \
             "the onboarding run did not stop"
+        # 运行到 DONE 与主机结算（写出建档候选和决定请求）是两步：结算在 DONE 之后才发生，
+        # 读决定之前要等它出现，不能假定 DONE 时已经有
+        assert _wait_for(lambda: open_initial_prd(client, refs["project_id"]) is not None), \
+            "the initial PRD decision was not requested"
         listed = client.get(f"/api/queries/decisions.list?project_id={refs['project_id']}")
         assert listed.status_code == 200, listed.text
         decisions = listed.json()["data"]["decisions"]

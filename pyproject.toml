@@ -63,5 +63,5 @@ allowed_importers = ["harness.api", "harness.__main__", "harness.demo", "harness
 testpaths = ["harness/tests"]
 pythonpath = ["."]
 addopts = "-q --tb=line -rfE -p no:warnings"
-markers = ["unit: 内存数据与纯规则的测试", "module: 单个模块连同真实依赖的测试", "integration: 完整循环与服务进程的测试"]
+markers = ["unit: 内存数据与纯规则的测试", "module: 单个模块连同真实依赖的测试", "integration: 完整循环与服务进程的测试", "real_model: 需要真实模型服务的测试，只在明确选择（-m real_model）时运行"]
 strict_markers = true

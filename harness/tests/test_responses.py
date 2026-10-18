@@ -206,7 +206,8 @@ def _mock_transport(monkeypatch, handler):
     def client_factory(**kwargs):
         return httpx.AsyncClient(transport=httpx.MockTransport(handler), **kwargs)
 
-    monkeypatch.setattr("harness.providers.responses.DefaultAsyncHttpxClient", client_factory)
+    # responses.py 在建立客户端时才从 openai 取这两个名字（#599），所以替换 openai 上的名字
+    monkeypatch.setattr("openai.DefaultAsyncHttpxClient", client_factory)
 
 
 async def _trace_failure(request, event_name, error):
@@ -918,7 +919,7 @@ def test_sdk_connection_error_with_local_protocol_cause_is_not_retryable(monkeyp
         async def __aexit__(self, *_args):
             return False
 
-    monkeypatch.setattr("harness.providers.responses.AsyncOpenAI", FailingClient)
+    monkeypatch.setattr("openai.AsyncOpenAI", FailingClient)
     with pytest.raises(ProviderError) as caught:
         ResponsesAdapter(ResponsesConfig(model="local-model", api_key=KEY)).complete(_request())
     assert caught.value.retryable is False

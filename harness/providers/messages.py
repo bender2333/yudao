@@ -5,9 +5,9 @@ import json
 import time
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 
-# anthropic 在第一次请求时才导入资源模块；随 Provider 模块导入，这项一次性工作在服务启动时完成（D09）
+# anthropic 在第一次请求时才导入资源模块；本模块在模型目录用到 messages 协议时导入（sdk.prepare_protocols），
+# 这项一次性工作不计入请求时限（D09）
 import anthropic.resources.messages
 from anthropic import (
     APIConnectionError,
@@ -44,6 +44,7 @@ from .responses import (
     _sdk_json,
     _transport_diagnostics,
 )
+from .sdk import anthropic_base_url
 from .tls import ssl_context
 
 _build_sdk_models(RawMessageStreamEvent)
@@ -59,16 +60,6 @@ class _MessagesInvocation:
     emit: Emit
     # 输出片段（设计说明第 5.6 节）：按通道保存已发出的字数，作为下一段的起始位置
     channel_offsets: dict[str, int] = field(default_factory=dict)
-
-
-def anthropic_base_url(base_url: str) -> str:
-    # 服务方案给的是到 /v1 的地址，Anthropic SDK 自己会补 /v1/messages，
-    # 这里去掉重复的 /v1，避免出现 /v1/v1/messages
-    parts = urlsplit(base_url)
-    path = parts.path.rstrip("/")
-    if path.endswith("/v1"):
-        path = path[: -len("/v1")]
-    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
 
 async def invoke_messages(

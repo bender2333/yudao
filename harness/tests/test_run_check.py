@@ -40,22 +40,46 @@ def _check_copies(base: Path | None = None) -> set[str]:
     return {item.name for item in root.glob("yudao-check-*")}
 
 
+def _write_local_wheel(directory: Path) -> str:
+    # 手工打一个只含一个模块的纯 Python wheel，作为小项目的依赖：uv 从本地文件安装它，
+    # 不需要网络，也不需要机器上的 uv 缓存里碰巧有哪个包
+    import zipfile
+
+    name = "minidep-1.0-py3-none-any.whl"
+    files = {
+        "minidep/__init__.py": "VALUE = 2\n",
+        "minidep-1.0.dist-info/METADATA": "Metadata-Version: 2.1\nName: minidep\nVersion: 1.0\n",
+        "minidep-1.0.dist-info/WHEEL": ("Wheel-Version: 1.0\nGenerator: test\n"
+                                        "Root-Is-Purelib: true\nTag: py3-none-any\n"),
+    }
+    files["minidep-1.0.dist-info/RECORD"] = "".join(f"{path},,\n" for path in files) \
+        + "minidep-1.0.dist-info/RECORD,,\n"
+    with zipfile.ZipFile(directory / name, "w") as archive:
+        for path, text in files.items():
+            archive.writestr(path, text)
+    return name
+
+
 def test_uv_managed_project_pytest_binds_snapshot(tmp_path, monkeypatch):
-    # 带依赖的小项目：run_check 运行 uv run pytest 成功，回执绑定检查时的快照
-    pytest.importorskip("pytest")
+    # 带依赖的小项目：run_check 在 uv 管理的项目里运行测试成功，回执绑定检查时的快照。
+    # 依赖是本地 wheel，uv 缓存用空目录：用例不依赖运行它的机器上缓存里有什么包
     monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(tmp_path / "outside-copy-venv"))
+    monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "empty-uv-cache"))
     workspace = Workspace(tmp_path / "ws")
+    wheel = _write_local_wheel(workspace.root)
     workspace.write_file("pyproject.toml",
                          "[project]\nname = \"mini\"\nversion = \"0\"\n"
-                         "requires-python = \">=3.11\"\ndependencies = [\"pytest\"]\n")
-    workspace.write_file("test_mini.py", "def test_ok():\n    assert 1 + 1 == 2\n")
-    subprocess.run(["uv", "lock", "--offline"], cwd=workspace.root, check=True,  # noqa: S603
-                   env={**os.environ, "UV_PROJECT_ENVIRONMENT": str(tmp_path / "outside-copy-venv")})
+                         "requires-python = \">=3.11\"\ndependencies = [\"minidep\"]\n"
+                         f"[tool.uv]\npackage = false\n[tool.uv.sources]\nminidep = {{ path = \"{wheel}\" }}\n")
+    workspace.write_file("test_mini.py",
+                         "import unittest\n\nimport minidep\n\n\nclass MiniTest(unittest.TestCase):\n"
+                         "    def test_ok(self):\n        self.assertEqual(minidep.VALUE, 2)\n")
+    subprocess.run(["uv", "lock", "--offline"], cwd=workspace.root, check=True)  # noqa: S603,S607
     digest = workspace.digest()
     result = perform(LocalEnvironment(workspace), "run_check",
-                     {"name": "pytest", "command": "uv run --offline pytest -q -p no:cacheprovider"})
+                     {"name": "unittest", "command": "uv run --offline python -m unittest -q"})
     assert result.output["tree_changed"] is False
-    receipt = workspace.snapshot().facts.latest_check("engineering", "pytest")
+    receipt = workspace.snapshot().facts.latest_check("engineering", "unittest")
     assert receipt is not None and receipt.exit_code == 0
     assert receipt.snapshot_hash == digest
     assert digest in receipt.summary or "host-executed" in receipt.summary
