@@ -245,6 +245,7 @@ class CheckReceipt:
     activation_id: str | None = None
     tree_changed: bool = False
     effective_contract_hash: str | None = None
+    qa_tests_hash: str | None = None
 
 @dataclass(frozen=True)
 class ProductSpec:

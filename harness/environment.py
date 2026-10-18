@@ -651,6 +651,11 @@ class LocalEnvironment:
             summary = redact_text(
                 f"host-executed command={command} exit={exit_code}\n{output}".strip()
             )
+            qa_tests_hash = None
+            if action.department == "quality":
+                qa_tree = self.capture_qa_tests()
+                if qa_tree.files or qa_tree.directories:
+                    qa_tests_hash = qa_tree.digest
             receipt = self.workspace.record_check(
                 action.department,
                 name,
@@ -658,6 +663,7 @@ class LocalEnvironment:
                 summary,
                 snapshot_hash=snapshot_hash,
                 tree_changed=tree_changed,
+                qa_tests_hash=qa_tests_hash,
             )
             return {
                 "name": receipt.name,
@@ -670,6 +676,7 @@ class LocalEnvironment:
                 "product_spec_hash": receipt.product_spec_hash,
                 "delivery_spec_hash": receipt.delivery_spec_hash,
                 "effective_contract_hash": receipt.effective_contract_hash,
+                "qa_tests_hash": receipt.qa_tests_hash,
             }, finished.status
 
 

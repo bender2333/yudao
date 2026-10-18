@@ -58,6 +58,7 @@ class CheckReceipt(Payload):
     effective_contract_hash: str | None
     snapshot_hash: str
     summary: str
+    qa_tests_hash: str | None = None
 
 
 class YieldedWork(Payload):

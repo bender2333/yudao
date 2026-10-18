@@ -767,6 +767,7 @@
    },
    "receipt": {
     "exit_code": 130,
+    "qa_tests_hash": null,
     "tree_changed": false
    }
   },
