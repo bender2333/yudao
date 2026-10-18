@@ -463,6 +463,13 @@ def test_release_checkpoint_fails_on_a_provider_error():
 def test_release_binding_passes_when_qa_review_and_delivery_match():
     """第二项：放行引用的快照与最后一次封存一致；recheck_ratio 只在冻结参数可识别时核对。"""
     export = _load_fixture("handoff_release.json")
+    # 事件序列基准只保留关键字段（#537），qa_submitted 的 checks 不在其中：
+    # 这里按质检本次激活补上一条回执，再核对绑定。
+    review = next(e for e in export["events"] if e["type"] == "qa_submitted")
+    quality_activation = next(e["payload"]["activation_id"] for e in export["events"]
+                              if e["type"] == "department_activated" and e["department"] == "quality")
+    review["payload"]["checks"] = [{"name": "smoke", "activation_id": quality_activation,
+                                    "snapshot_hash": review["payload"]["code_snapshot_hash"]}]
     params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
         "parameters_version")
     collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
