@@ -206,9 +206,9 @@ def test_worktree_stays_clean_after_the_build(release_build):
     # 验收：构建完成以后工作区仍然干净（发布资源、页面构建输出与 wheel 输出目录被 git 忽略）
     assert _git(["status", "--porcelain"], release_build["source"]) == ""
 
-def test_script_rejects_a_dirty_worktree(release_build, tmp_path):
-    # 验收：工作区不干净时脚本拒绝并写明原因
-    source = release_build["source"]
+def test_script_rejects_a_dirty_worktree(release_template, tmp_path):
+    # 验收：工作区不干净时脚本拒绝并写明原因。用自己的克隆，不动 release_build 的工作副本
+    source, _remote = _clone_checkout(release_template, tmp_path)
     stray = source / "stray.txt"
     stray.write_text("dirty", encoding="utf-8")
     try:
@@ -229,9 +229,9 @@ def test_script_rejects_an_already_released_version(release_template, tmp_path):
     assert result.returncode != 0
     assert f"v{version}" in result.stderr and "已经存在" in result.stderr
 
-def test_script_rejects_a_commit_outside_main(release_build, tmp_path):
-    # 验收：当前提交不在 main 上时脚本拒绝并写明原因。切到另一个分支
-    source = release_build["source"]
+def test_script_rejects_a_commit_outside_main(release_template, tmp_path):
+    # 验收：当前提交不在 main 上时脚本拒绝并写明原因。在自己的克隆里切到另一个分支
+    source, _remote = _clone_checkout(release_template, tmp_path)
     _git(["checkout", "-q", "-b", "feature"], source)
     try:
         result = _run_release(source, tmp_path / "dist-branch")
