@@ -2,7 +2,15 @@
 
 [![CI](https://github.com/bender2333/yudao/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/bender2333/yudao/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
-徽章显示 main 上最近一次合并以后的 CI 结果，包括 `check`（单元层、模块层、客户端测试与构建）与 `integration`（集成层），分层见[测试分层](docs/design/test-pyramid.md)第 4 节。只改 `docs/` 与日记的提交不运行 CI，徽章保持上一次的结果。
+徽章显示 main 上最近一次合并以后的 CI 结果。测试分三层，按时机运行（[测试分层](docs/design/test-pyramid.md)第 4 节）：
+
+| 时机 | CI 作业 | 挡什么 |
+| --- | --- | --- |
+| 每次推送到 PR | ① 单元层、② 模块层、评测工具、客户端（并行），`check` 汇总 | 挡合并 |
+| 每次合并到 main 以后 | ③ 集成层 | 不挡；失败交回引入它的工单 |
+| 里程碑发布之前 | 不在 CI：真实模型冒烟、桌面测试 | 挡发布 |
+
+每次运行的摘要页列出各层的文件数、用例数与结果；PR 上的「用例变化」列出合并前后各层用例的增减。只改 `docs/` 与日记的提交不运行 CI，徽章保持上一次的结果。
 
 面向自治系统研发者的三部门原生循环运行时。产品、工程、质检共同构成 Yudao 的 Agent loop：内核逐步装配上下文、调用模型、执行工具并决定部门交接。模型自然语言不能结束任务；只有绑定当前有效合同、计划、交付和完整代码树的 QA release 才能进入 `DONE`。
 

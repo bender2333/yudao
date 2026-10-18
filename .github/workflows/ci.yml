@@ -1,6 +1,9 @@
 # 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/dispatcher.md）。
-# 测试按时机分层（docs/design/test-pyramid.md 第 4 节）：PR 只运行 check；合并到 main 以后另外运行 integration，
-# 不挡合并；手动触发两项都运行。
+# 测试按层与时机运行（docs/design/test-pyramid.md 第 4 节）：
+#   合并前（PR、main 的推送与手动触发）：① 单元层、② 模块层、评测工具、客户端四个作业并行，check 汇总四项的结果
+#     并在运行摘要里写出各层的表；PR 上另有「用例变化」，列出合并前后各层用例的增减，只显示，不挡合并
+#   合并以后（main 的推送与手动触发）：③ 集成层，不挡合并
+#   发布之前（架构师手动运行，不在 CI 中）：真实模型冒烟与桌面测试
 # 本文件由用户在场时的架构师维护，执行者与被唤醒的架构师不修改；执行者使用的开发 App 没有 workflows 权限。
 name: CI
 
@@ -22,11 +25,122 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  unit:
+    name: ① 单元层
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     env:
       PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - name: 安装依赖
+        run: uv sync --frozen
+
+      # 包括固定检查 test_layers.py
+      - name: 单元层
+        run: uv run python -m pytest -m unit --junitxml=.tmp/test-results/unit.xml
+
+      - name: 保存结果
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-results
+          path: .tmp/test-results/unit.xml
+          if-no-files-found: ignore
+
+  module:
+    name: ② 模块层
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      # test_openapi_snapshot.py 用 openapi-ts 按快照重新生成客户端类型
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: harness/tests/openapi/package-lock.json
+
+      - name: git 身份（测试会建仓库并提交）
+        run: |
+          git config --global user.name "Yudao CI"
+          git config --global user.email "ci@yudao.invalid"
+
+      - name: 安装依赖
+        run: |
+          uv sync --frozen
+          npm ci --prefix harness/tests/openapi
+
+      # 包括固定检查 test_openapi_snapshot.py
+      - name: 模块层
+        run: uv run python -m pytest -m module --junitxml=.tmp/test-results/module.xml
+
+      - name: 保存结果
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-results
+          path: .tmp/test-results/module.xml
+          if-no-files-found: ignore
+
+  evals:
+    name: 评测工具
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - name: git 身份（测试会建仓库并提交）
+        run: |
+          git config --global user.name "Yudao CI"
+          git config --global user.email "ci@yudao.invalid"
+
+      - name: 安装依赖
+        run: uv sync --frozen
+
+      # 需要真实模型的用例标 real_model，默认不选（docs/design/test-pyramid.md 第 4 节），CI 上没有模型服务的凭据
+      - name: 评测工具
+        run: uv run python -m pytest evals/tests --junitxml=.tmp/test-results/evals.xml
+
+      - name: 保存结果
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: evals-results
+          path: .tmp/test-results/evals.xml
+          if-no-files-found: ignore
+
+  client:
+    name: 客户端
+    runs-on: windows-latest
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -41,36 +155,15 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: |
-            client/package-lock.json
-            harness/tests/openapi/package-lock.json
-
-      - name: git 身份（测试会建仓库并提交）
-        run: |
-          git config --global user.name "Yudao CI"
-          git config --global user.email "ci@yudao.invalid"
+          cache-dependency-path: client/package-lock.json
 
       - name: 安装依赖
         id: install
-        run: |
-          uv sync --frozen
-          npm ci --prefix client
-          npm ci --prefix harness/tests/openapi
+        run: npm ci --prefix client
 
       # 安装以后的各项检查互不依赖：前一项失败时后面的照样运行，一次给出全部结果
-      # 包括两项固定检查（test_layers.py 在单元层，test_openapi_snapshot.py 在模块层）
-      - name: 单元层与模块层
-        run: uv run python -m pytest -m "unit or module"
-
-      # 评测工具的测试。需要真实模型的用例标 real_model，默认不选（docs/design/test-pyramid.md 第 4 节），
-      # CI 上没有模型服务的凭据
-      - name: 评测工具
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: uv run python -m pytest evals/tests
-
       # room-screen-switch 等测试用 Playwright 启动 Chromium 挂载页面
       - name: 安装 Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client
         run: npx playwright install chromium
 
@@ -92,9 +185,88 @@ jobs:
         working-directory: client
         run: npm run typecheck
 
-  # 集成层全部（docs/design/test-pyramid.md 第 4.2 节）。不是合并必须通过的检查：
+  # 合并必须通过的检查（main 的规则要求名为 check 的检查）：上面四个作业都成功才成功。
+  # 无论四个作业结果如何都运行，在运行摘要里写出各层的表
+  check:
+    if: ${{ always() }}
+    needs: [unit, module, evals, client]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-results"
+          path: .tmp/test-results
+          merge-multiple: true
+
+      - name: 各层的结果
+        run: |
+          python3 scripts/ci_layers.py summary --layers harness/tests/layers.toml \
+            --junit unit=.tmp/test-results/unit.xml --junit module=.tmp/test-results/module.xml \
+            --junit evals=.tmp/test-results/evals.xml --pending integration | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: 四项都通过
+        run: |
+          echo "① 单元层：${{ needs.unit.result }}；② 模块层：${{ needs.module.result }}；评测工具：${{ needs.evals.result }}；客户端：${{ needs.client.result }}"
+          test "${{ needs.unit.result }}" = success
+          test "${{ needs.module.result }}" = success
+          test "${{ needs.evals.result }}" = success
+          test "${{ needs.client.result }}" = success
+
+  # PR 合并前后的用例清单（只收集，不运行），按层列出新增、删除与换层（docs/design/test-pyramid.md 第 4.4 节）。
+  # 只显示，不是合并必须通过的检查；删除的用例由审查者与交付说明逐条核对
+  inventory:
+    name: 用例变化
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # PR 的检出是合并提交，它的第一个父提交就是合并前的 main
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - name: 收集合并后的用例
+        run: |
+          mkdir -p .tmp/inventory
+          uv sync --frozen
+          uv run python -m pytest harness/tests evals/tests --collect-only -p no:cacheprovider \
+            -m "real_model or not real_model" > .tmp/inventory/head.txt || true
+          tail -n 2 .tmp/inventory/head.txt
+
+      - name: 收集合并前的用例
+        run: |
+          git worktree add --detach ../base HEAD^1
+          cp ../base/harness/tests/layers.toml .tmp/inventory/base-layers.toml
+          cd ../base
+          uv sync --frozen
+          uv run python -m pytest harness/tests evals/tests --collect-only -p no:cacheprovider \
+            -m "real_model or not real_model" > "$GITHUB_WORKSPACE/.tmp/inventory/base.txt" || true
+          tail -n 2 "$GITHUB_WORKSPACE/.tmp/inventory/base.txt"
+
+      - name: 用例变化
+        if: ${{ !cancelled() }}
+        run: |
+          uv run --no-sync python scripts/ci_layers.py inventory \
+            --base .tmp/inventory/base.txt --head .tmp/inventory/head.txt \
+            --base-layers .tmp/inventory/base-layers.toml --head-layers harness/tests/layers.toml \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # ③ 集成层全部（docs/design/test-pyramid.md 第 4.2 节）。不是合并必须通过的检查：
   # main 的每次推送（每次合并以后）与手动触发时运行，PR 上不运行。失败由派发者按派发者规则第 5 节处理
   integration:
+    name: ③ 集成层
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: windows-latest
     timeout-minutes: 60
@@ -120,6 +292,12 @@ jobs:
 
       - name: 集成层
         run: uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
+
+      - name: 集成层的结果
+        if: ${{ !cancelled() }}
+        run: |
+          uv run --no-sync python scripts/ci_layers.py summary --layers harness/tests/layers.toml \
+            --junit integration=.tmp/test-results/integration.xml | tee -a "$GITHUB_STEP_SUMMARY"
 
       # 失败时从这份结果读出失败项名称，用于单进程重新运行（docs/design/test-pyramid.md 第 6 节）
       - name: 保存结果
