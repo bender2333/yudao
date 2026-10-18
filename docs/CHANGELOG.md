@@ -692,3 +692,5 @@ claude-opus-5-5 / 2026-10-18 15:47 / docs/stage-3/autopilot-retrospective-2026-1
 
 claude-opus-5-5 / 2026-10-18 16:15 / docs/design/test-pyramid.md 第 4 节表格、新增第 4.3 节「CI 中的分层」与第 4.4 节「用例的变化」、第 10 节第 5 条；docs/agents/autopilot-runtime.md 第 5 节；docs/decision.md 新增「CI 中显出分层；用例的变化怎样配合流程」 / 用户要求分层在 CI 中看得见，并确认用例变化与流程的配合方式
 
+claude-opus-5-5 / 2026-10-18 16:41 / docs/decision.md 新增「修复模式结束，派发者恢复」 / main 1b23af76 全绿，基线稳定
+
