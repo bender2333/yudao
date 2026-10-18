@@ -678,3 +678,5 @@ claude-opus-5-5 / 2026-10-18 10:08 / docs/agents/dispatcher.md 第 1 节与第 3
 claude-opus-5-5 / 2026-10-18 12:00 / .github/workflows/ci.yml：新增 integration 作业（集成层全部，-n 4，结果文件作为附件），只在 main 的推送与手动触发时运行，不是合并必须通过的检查；main 的推送按提交分组、不互相取消，只改文档与日记的推送不运行；加手动触发。docs/agents/dispatcher.md 第 3 节第 2、6 步与流程图、第 5 节改为「集成层在合并以后的失败」（重新运行一次，与前一个合并提交比较，有新的失败项才重新打开那张工单，不暂停合并）；docs/agents/autopilot-runtime.md 第 3、5 节；docs/design/test-pyramid.md 状态行与第 4、4.1、4.2 节（测试按时机分层）；AGENTS.md 集成层一句与手动触发命令；CLAUDE.md 自主推进第 5 条（发布之前的核对）；docs/agents/acceptance-evidence.md 第 3 节一句；docs/design/web-interface-and-release.md 发布条件；docs/decision.md 加一条；docs/stage-3/autopilot-retrospective-2026-10-17.md 第 8.2 节第 3 批 / 第一次在运行机上测得集成层 23 分钟；用户不希望每次推送都跑、也不希望集成层挡住派发，决定按时机分层、只用 main
 
 claude-opus-5-5 / 2026-10-18 13:05 / docs/requirements/execution-limits.md：SDK 的一次性初始化改为在服务启动或修改模型目录时、第一次请求之前完成，只初始化模型目录中用到的协议；docs/decision.md 新增「派发者暂停期间架构师直接改代码，先把基线做稳」 / 用户确认 #598 第一批的模型 SDK 推迟导入，以及派发者暂停期间由架构师直接修基线
+
+claude-opus-5-5 / 2026-10-18 13:25 / docs/decision.md 新增「里程碑的工单记录与复盘」；docs/stage-3/autopilot-retrospective-2026-10-17.md 第 8.2 节第 4 批写明用户的决定（CLAUDE.md 工作流程第 7 步同时加复盘一句） / 复盘纪要第 4 批：记录的位置、复盘的位置与参数修改的确认由用户决定
