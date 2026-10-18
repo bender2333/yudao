@@ -262,7 +262,8 @@ def test_unset_variables_pass_through_to_the_real_binaries(tmp_path):
     assert git_record.read_text(encoding="utf-8").splitlines() == ["push origin HEAD "]
 
 
-def _run_shell(command: str, environment: dict, stdin: str = "") -> subprocess.CompletedProcess:
+def _run_shell(command: str, environment: dict, stdin: str = "",
+               cwd: Path | None = None) -> subprocess.CompletedProcess:
     # Windows 上经 cmd /c 运行命令：shell 的 PATH 查找带 PATHEXT，命中放在最前面的
     # .cmd 入口；Linux 与 macOS 上用 sh -c，命中同目录下无扩展名的入口。
     # stdin 直接传给子进程：cmd 的重定向不支持带引号的路径，凭据助手协议的输入
@@ -270,10 +271,10 @@ def _run_shell(command: str, environment: dict, stdin: str = "") -> subprocess.C
     if os.name == "nt":
         return subprocess.run(["cmd", "/c", command], env=environment, input=stdin,
                               capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=120)
+                              errors="replace", timeout=120, cwd=cwd)
     return subprocess.run(["sh", "-c", command], env=environment, input=stdin,
                           capture_output=True, text=True, encoding="utf-8",
-                          errors="replace", timeout=120)
+                          errors="replace", timeout=120, cwd=cwd)
 
 
 def test_missing_key_file_names_the_variable_and_the_path(key, tmp_path):
@@ -281,10 +282,25 @@ def test_missing_key_file_names_the_variable_and_the_path(key, tmp_path):
     bin_dir = tmp_path / "bin"
     _write_fake_gh(bin_dir)
     missing = tmp_path / "not-here" / "key.pem"
+    # git push 在一个临时仓库里运行，远端是不属于本项目的公开仓库：不依赖运行它的
+    # 机器的状态。GitHub 运行机上 actions/checkout 把 github-actions[bot] 的凭据写在
+    # 检出仓库的 http.extraheader 里，git 带着它请求，不会再向凭据助手要凭据，
+    # 测试就走不到「缺私钥文件」的报错，还会真的向仓库推送（403）。
+    workdir = tmp_path / "push-repo"
+    workdir.mkdir()
+    for git_args in (["init", "-q"], ["remote", "add", "origin", "https://github.com/octocat/Hello-World.git"],
+                     ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q",
+                      "--allow-empty", "-m", "init"]):
+        subprocess.run(["git", *git_args], cwd=workdir, check=True, env=_env(), capture_output=True)
     env = {**_configured_env(tmp_path, "http://127.0.0.1:1"),
-           "YUDAO_GH_APP_KEY_FILE": str(missing)}
+           "YUDAO_GH_APP_KEY_FILE": str(missing),
+           # 再把全局与系统配置里可能带的 github.com 授权头清空（空值覆盖更低层级的配置）
+           "GIT_CONFIG_COUNT": "1",
+           "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
+           "GIT_CONFIG_VALUE_0": ""}
+    env.pop("GIT_CONFIG_PARAMETERS", None)
     for command in ("gh --version", "git push origin HEAD"):
-        result = _run_shell(command, {**env, "PATH": _front_path(APP_DIR, bin_dir)})
+        result = _run_shell(command, {**env, "PATH": _front_path(APP_DIR, bin_dir)}, cwd=workdir)
         assert result.returncode != 0, result.stdout + result.stderr
         assert "YUDAO_GH_APP_KEY_FILE" in result.stderr
         assert str(missing) in result.stderr
