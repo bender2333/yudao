@@ -22,6 +22,7 @@ TREE_FORMAT = "yudao-public-tree-v1"
 _HASH = re.compile(r"sha256:[0-9a-f]{64}")
 # 工作区忽略规则探测用的 Git 目录：放在工作区自身之外，避免它成为公开树的条目
 IGNORE_PROBE_DIR = ".yudao-ignore-probe.git"
+QA_TESTS_DIR = ".yudao-qa-tests"
 _GIT_DIR_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
@@ -296,7 +297,7 @@ def _scan(base: Path, *, respect_ignore_rules: bool = False) -> dict[str, os.sta
         with os.scandir(directory) as scanning:
             for entry in scanning:
                 relative = f"{relative_directory}/{entry.name}" if relative_directory else entry.name
-                if is_private_path(relative):
+                if is_private_path(relative) or relative.split("/")[0] == QA_TESTS_DIR:
                     continue
                 validate_public_path(relative)
                 path = directory / entry.name

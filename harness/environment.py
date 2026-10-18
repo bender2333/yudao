@@ -27,7 +27,7 @@ from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .models import hash_bytes, json_dumps
-from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
+from .public_tree import QA_TESTS_DIR, CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
 from .path_rules import TreeError
 from .redact import redact_text
@@ -228,6 +228,12 @@ class LocalEnvironment:
         # （UnrepresentableWorkspace），按原样传出，由步骤驱动以 workspace_unrepresentable 暂停运行
         process = self._processes.get(action.tool)
         handler = None if process is not None else self._handlers[action.tool]
+        if action.department != "quality" and action.tool in self._handlers:
+            for key in ("path", "source", "destination", "prefix"):
+                val = action.input.get(key)
+                if isinstance(val, str) and (val.replace("\\", "/").strip("/").split("/")[0] == QA_TESTS_DIR):
+                    return ActionReceipt(action_id=action.action_id, status="failed",
+                                         error=f"拒绝访问 {val}：这是质检的测试材料")
         stop = asyncio.Event()
         with self._lock:
             if action.action_id in self._cancelled:
@@ -591,6 +597,10 @@ class LocalEnvironment:
         snapshot = self.workspace.snapshot()
         original_digest = snapshot.digest
         with self.workspace.check_copy(snapshot.tree) as copy_root:
+            if action.department == "quality":
+                qa_source = self.workspace.root / QA_TESTS_DIR
+                if qa_source.exists():
+                    shutil.copytree(qa_source, copy_root / QA_TESTS_DIR, dirs_exist_ok=True)
             finished = await _run_process(
                 [_resolve_bash(), "-c", command], copy_root,
                 {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},

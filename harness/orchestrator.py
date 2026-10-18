@@ -33,7 +33,7 @@ from .decisions import (
     DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_run,
 )
 from .environment import (
-    LocalEnvironment, cleanup_inspection_workspace, inspection_root, workspace_tree,
+    LocalEnvironment, QA_TESTS_DIR, cleanup_inspection_workspace, inspection_root, workspace_tree,
 )
 from .deltas import DeltaChannel
 from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog_stream, is_run_stream,
@@ -68,7 +68,7 @@ from .models import (
 from .providers import ProviderConnections, ProviderFacade
 from .providers.selection import ModelSelection
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
-from .public_tree import CapturedTree, UnrepresentableWorkspace
+from .public_tree import CapturedTree, UnrepresentableWorkspace, materialize_tree
 from .recording import ActivationScope
 from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS,
                        classify_actions, file_action_comparisons)
@@ -452,8 +452,19 @@ class Orchestrator:
         if root.exists():
             cleanup_inspection_workspace(run_root, department)
         tree = self._inspection_source_tree(department, projection)
-        return LocalEnvironment.establish(
+        env = LocalEnvironment.establish(
             root, tree, check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
+        if department == "quality":
+            qa_dir = root / QA_TESTS_DIR
+            if projection.qa_tests_archive_ref is not None:
+                ref = projection.qa_tests_archive_ref
+                if isinstance(ref, dict):
+                    ref = ArtifactRef(**ref)
+                qa_tree = load_tree(self.artifacts, artifact_run(ref.path), ref)
+                materialize_tree(qa_tree, qa_dir)
+            else:
+                qa_dir.mkdir(parents=True, exist_ok=True)
+        return env
 
     def _environment_for(self, run_id: str, department: str, *, refresh: bool = False) -> LocalEnvironment:
         # 给定部门在当前阶段下的执行环境：持有交接的工程使用运行工作区，其他会话使用检查工作区。

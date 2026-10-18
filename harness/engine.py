@@ -14,7 +14,7 @@ import math
 import time
 from collections.abc import Sequence
 from contextlib import aclosing
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from threading import Event
 from typing import Any, Protocol
 
@@ -26,11 +26,11 @@ from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .compaction import CompactionError
 from .definitions import DEFINITIONS
 from .deltas import DeltaChannel, DeltaScope
-from .environment import LocalEnvironment
+from .environment import LocalEnvironment, QA_TESTS_DIR
 from .event_store import run_stream
 from .write_path import Transaction, WritePath
 from .models import TERMINAL_PHASES, ArtifactRef, DepartmentPrompt, EventType, RunProjection, json_dumps
-from .public_tree import UnrepresentableWorkspace
+from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
@@ -38,6 +38,7 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
 from .providers.selection import ModelSelection
 from .recording import ActivationScope, StepRecorder
 from .tools import proposal_kind, tool_action, tool_kind
+from .tree_archive import store_tree
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
 COMPACTION_REQUEST_TIER = "minimal"
@@ -440,6 +441,7 @@ class StepDriver:
                 name = str(item.get("name") or "")
                 raw_args = item.get("arguments")
                 after_snapshot = None
+                qa_tests_saved = None
                 try:
                     args = json.loads(raw_args)
                     if not isinstance(args, dict):
@@ -480,11 +482,12 @@ class StepDriver:
                             after_snapshot = _tree_snapshot(self._environment.query(FactsQuery(tree=True)).tree)
                         except UnrepresentableWorkspace:
                             after_snapshot = None
+                        qa_tests_saved = self._save_qa_tests_if_changed(request)
                 input_item = {"type": "function_call_output", "call_id": identity,
                               "output": json_dumps({"ok": ok, "output": output, "error": error})}
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
-                self._recorder.tool_called(request, call, after_snapshot=after_snapshot)
+                self._recorder.tool_called(request, call, after_snapshot=after_snapshot, qa_tests_saved=qa_tests_saved)
                 # 登记命令结束后主机核对公开树发现无法表示的条目：回执已记录，运行在这里暂停
                 if isinstance(output, dict) and output.get("workspace_unrepresentable"):
                     failure = output["workspace_unrepresentable"]
@@ -567,6 +570,7 @@ class StepDriver:
         name = str(item.get("name") or "")
         raw_args = item.get("arguments")
         after_snapshot = None
+        qa_tests_saved = None
         try:
             args = json.loads(raw_args)
             if not isinstance(args, dict):
@@ -593,12 +597,35 @@ class StepDriver:
                     after_snapshot = _tree_snapshot(self._environment.query(FactsQuery(tree=True)).tree)
                 except UnrepresentableWorkspace:
                     after_snapshot = None
+                qa_tests_saved = self._save_qa_tests_if_changed(request)
         input_item = {"type": "function_call_output", "call_id": identity,
                       "output": json_dumps({"ok": ok, "output": output, "error": error})}
         self._recorder.tool_called(request,
                                    {"id": identity, "name": name, "args": args, "ok": ok, "output": output,
                                     "error": error, "step_id": request.step_id, "input_item": input_item},
-                                   after_snapshot=after_snapshot)
+                                   after_snapshot=after_snapshot,
+                                   qa_tests_saved=qa_tests_saved)
+
+    def _save_qa_tests_if_changed(self, request: ModelRequest | _RecoveredCall) -> dict[str, Any] | None:
+        if request.department != "quality":
+            return None
+        qa_dir = self._environment.workspace.root / QA_TESTS_DIR
+        if qa_dir.is_dir():
+            tree = capture_public_tree(qa_dir)
+        else:
+            tree = CapturedTree((), ())
+        projection = self._writes.read(self._stream).projection
+        if tree.digest == projection.qa_tests_hash:
+            return None
+        if len(tree.files) == 0 and len(tree.directories) == 0 and projection.qa_tests_version == 0:
+            return None
+        ref = store_tree(self._artifacts, self._scope.run_id, tree)
+        return {
+            "version": projection.qa_tests_version + 1,
+            "content_hash": tree.digest,
+            "archive_ref": asdict(ref),
+            "activation_id": request.activation_id,
+        }
 
     def _tool_choice(self, purpose: str, tools: list[dict[str, Any]], replies_without_tool_call: int) -> str:
         # 最后一次主机提示之后的工作请求要求调用工具；调用目标声明不接受时照常为自动（#102）
@@ -776,6 +803,10 @@ class StepDriver:
                 projection, call, department=scope.department, guidance_only=scope.guidance_only,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
             )
+            if not permission.allowed and scope.department == "quality" and call["name"] == "write_file":
+                rel = str(call.get("args", {}).get("path") or "")
+                if rel.replace("\\", "/").strip("/").split("/")[0] == QA_TESTS_DIR:
+                    permission = ToolPermission()
             if permission.allowed:
                 # 动作前的公开树快照（工单 #17）：许可允许以后、执行之前查询，与事件一起写入。
                 # 主机工具（提交）不产生动作，不需要快照；事实查询原本只为许可取需要的路径，快照单独查一次公开树

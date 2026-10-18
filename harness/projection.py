@@ -458,7 +458,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
     if etype == EventType.TOOL_CALLED:
         if payload.get("name") != "provider_usage":
             state.tool_count += 1
-            if payload.get("ok") and payload.get("name") in {"write_file", "delete_file", "move_file"}:
+            if (payload.get("ok") and payload.get("name") in {"write_file", "delete_file", "move_file"}
+                    and event.department != "quality"):
                 _supersede_active_deliveries(state, "workspace_changed")
         else:
             state.token_used += int(payload.get("tokens_charged", 0))
@@ -640,6 +641,12 @@ def apply_event(state: RunProjection, event: Event) -> None:
                 "product_spec_hash": review.product_spec_hash,
             }
         )
+        return
+
+    if etype == EventType.QA_TESTS_SAVED:
+        state.qa_tests_version = int(payload["version"])
+        state.qa_tests_hash = payload["content_hash"]
+        state.qa_tests_archive_ref = payload["archive_ref"]
         return
 
     if etype == EventType.TRANSITION:

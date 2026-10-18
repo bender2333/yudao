@@ -371,14 +371,24 @@ class StepRecorder:
         self._record(*drafts)
 
     def tool_called(self, request: ModelRequest, call: dict[str, Any],
-                    after_snapshot: dict[str, Any] | None = None) -> None:
+                    after_snapshot: dict[str, Any] | None = None,
+                    qa_tests_saved: dict[str, Any] | None = None) -> None:
         # 动作后的公开树快照与结果一起写入（工单 #17）：与动作前的快照、动作参数一起构成核实依据，
         # 放在 run 自己的对象区域，不建立提交、不改动分支索引
         if after_snapshot is not None:
             after_ref = self._artifacts.put(request.run_id, "snapshot/after", json_dumps(after_snapshot),
                                             media_type="application/json")
             call["after_snapshot_ref"] = asdict(after_ref)
-        self._record(*self._observe(request, _Observation(call["id"], "tool", call)))
+        drafts = []
+        if qa_tests_saved is not None:
+            drafts.append(self._draft(
+                EventType.QA_TESTS_SAVED,
+                provider=self._event_provider(request),
+                artifact_hashes=[qa_tests_saved["archive_ref"]["content_hash"]],
+                payload=qa_tests_saved,
+            ))
+        drafts.extend(self._observe(request, _Observation(call["id"], "tool", call)))
+        self._record(*drafts)
 
     def tool_skipped(self, request: ModelRequest, call: dict[str, Any]) -> None:
         self._record(*self._observe(request, _Observation(call["id"], "skipped_tool", call)))
