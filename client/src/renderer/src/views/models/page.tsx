@@ -10,12 +10,14 @@ import type { Rejected } from "../../api/generated/types.gen";
 import type { ViewSync } from "../../contract/view-sync";
 import type {
   Catalog,
+  CatalogCredential,
   CatalogDocument,
   ChangeImpact,
   EventObject,
 } from "../../api/generated/types.gen";
 import { JsonDialog } from "./json-dialog";
-import { ProviderForm } from "./form";
+import { credentialText, ProviderForm } from "./form";
+import { Block, Icon, PageHead, StatusMark } from "../../shell/kit";
 import {
   CONFIG_STATE_LABELS,
   DEPARTMENT_LABELS,
@@ -109,6 +111,45 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     () => (catalog ? admittedModels(catalog.models, catalog.providers, catalog.admissions) : []),
     [catalog],
   );
+  const [pageCredRef, setPageCredRef] = useState("");
+  const [pageCredSecret, setPageCredSecret] = useState("");
+  const [pageCredPersist, setPageCredPersist] = useState(false);
+
+  const capabilityRows = useMemo(() => {
+    if (!catalog?.capability_table?.presets) return [];
+    const list: { presetId: string; presetName: string; id: string; image: boolean }[] = [];
+    const seen = new Set<string>();
+    for (const [presetId, entries] of Object.entries(catalog.capability_table.presets)) {
+      if (!Array.isArray(entries)) continue;
+      const presetName = presets.find((p) => p.id === presetId)?.name ?? presetId;
+      for (const entry of entries) {
+        const item = entry as { model?: string; input_modalities?: string[]; image_input?: boolean };
+        const modelId = typeof item.model === "string" ? item.model : "";
+        if (!modelId || seen.has(`${presetId}:${modelId}`)) continue;
+        seen.add(`${presetId}:${modelId}`);
+        const modalities = Array.isArray(item.input_modalities) ? item.input_modalities : [];
+        list.push({
+          presetId,
+          presetName,
+          id: modelId,
+          image: modalities.includes("image") || Boolean(item.image_input),
+        });
+      }
+    }
+    return list;
+  }, [catalog, presets]);
+
+  const credentialsList = useMemo(() => {
+    if (!catalog) return [];
+    const map = new Map<string, { ref: string; credential: CatalogCredential | null }>();
+    for (const provider of catalog.providers) {
+      const ref = provider.credential_ref;
+      if (!ref || map.has(ref)) continue;
+      map.set(ref, { ref, credential: provider.credential ?? null });
+    }
+    return Array.from(map.values());
+  }, [catalog]);
+
 
   useEffect(() => {
     if (!views) {
@@ -490,48 +531,109 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   }
 
   return (
-    <div className="y10-content mm-page">
-      <div className="y10-page-head mm-head">
-        <h1>模型管理</h1>
-        <p className="y10-small y10-muted mm-meta">
-          目录修订 {catalog.revision} · 配置状态 {CONFIG_STATE_LABELS[catalog.config_state] ?? catalog.config_state}
-          {catalog.reload_error && <span className="y10-warn-text mm-warn"> · 文件更新未生效：{catalog.reload_error}</span>}
+    <div className="y10-content y10-sys-models mm-page">
+      <PageHead
+        title="模型管理"
+        actions={
+          <div className="y10-row mm-actions">
+            <button type="button" className="y10-btn" onClick={props.onBack}>
+              返回原界面
+            </button>
+          </div>
+        }
+      />
+      {notice && (
+        <p className={notice.kind === "ok" ? "y10-note mm-ok" : "y10-note is-warn mm-warn"} role="status" data-testid="page-notice">
+          {notice.message}
         </p>
-        <div className="y10-row mm-actions">
-          <button type="button" className="y10-btn primary" onClick={openAdd}>添加 Provider 配置</button>
-          <button type="button" className="y10-btn" data-testid="reload" disabled={busy} onClick={() => void reload()}>重新读取</button>
-          <button type="button" className="y10-btn" data-testid="edit-json" onClick={() => setJsonOpen(true)}>编辑 JSON</button>
-          <button type="button" className="y10-btn" onClick={props.onBack}>返回原界面</button>
-        </div>
-        {notice && (
-          <p className={notice.kind === "ok" ? "y10-small mm-ok" : "y10-warn-text mm-warn"} role="status" data-testid="page-notice">
-            {notice.message}
-          </p>
-        )}
-      </div>
-
-      {catalog.providers.length === 0 && (
-        <p className="y10-small y10-muted mm-hint">还没有 Provider 配置。添加一份连接，选择服务方案与协议，保存以后再获取模型列表。</p>
       )}
 
-      {catalog.providers.map((provider) => {
-        const summary = admissionSummary(provider, catalog.admissions);
-        const preset = presetById(presets, provider.preset_id);
-        const open = expanded[provider.id] === true;
-        return (
-          <section className="y10-conn-card mm-card" key={provider.id} data-testid={`provider-${provider.id}`}>
-            <div className="y10-conn-summary mm-summary">
-              <button type="button" className="y10-btn small mm-toggle" aria-expanded={open}
-                      onClick={() => setExpanded((current) => ({ ...current, [provider.id]: !open }))}>
-                {open ? "收起" : "展开"}
-              </button>
-              <span className="y10-conn-name mm-name">{provider.name}</span>
-              <span className="y10-small y10-muted mm-meta">
-                服务方案 {preset?.name ?? "自定义"} · {provider.base_url || "（没有地址）"}
-              </span>
-              <span className="y10-conn-cred y10-small y10-muted mm-meta">凭据：{credentialStatusLabel(provider.credential)}</span>
-              <span className="y10-conn-count mm-count">已准入 {summary.admitted} · 候选 {summary.candidates}</span>
+      <Block
+        title="模型目录文件"
+        actions={
+          <div className="y10-row mm-actions">
+            <button
+              type="button"
+              className="y10-btn small"
+              data-testid="reload"
+              disabled={busy}
+              onClick={() => void reload()}
+            >
+              重新读取
+            </button>
+          </div>
+        }
+      >
+        <div className="y10-file-row">
+          <dl className="y10-kv is-inline">
+            <div>
+              <dt>目录修订</dt>
+              <dd><code>{catalog.revision}</code></dd>
             </div>
+            <div>
+              <dt>配置状态</dt>
+              <dd>
+                <span className="mm-meta">
+                  配置状态 {CONFIG_STATE_LABELS[catalog.config_state] ?? catalog.config_state}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>重读错误</dt>
+              <dd>
+                {catalog.reload_error ? (
+                  <span className="y10-warn-text mm-warn">{catalog.reload_error}</span>
+                ) : (
+                  <span className="y10-muted">无</span>
+                )}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </Block>
+
+      <Block
+        title="Provider 配置"
+        subtitle="连接提供请求基址与凭据；模型访问定义声明上游模型与调用协议"
+        actions={
+          <button type="button" className="y10-btn small primary" onClick={openAdd}>
+            添加 Provider 配置
+          </button>
+        }
+      >
+        {catalog.providers.length === 0 && (
+          <p className="y10-empty y10-small y10-muted mm-hint">还没有 Provider 配置。添加一份连接，选择服务方案与协议，保存以后再获取模型列表。</p>
+        )}
+        <div className="y10-conn-list">
+          {catalog.providers.map((provider) => {
+            const summary = admissionSummary(provider, catalog.admissions);
+            const preset = presetById(presets, provider.preset_id);
+            const open = expanded[provider.id] === true;
+            return (
+              <section className={`y10-conn-card mm-card${open ? " is-open" : ""}`} key={provider.id} data-testid={`provider-${provider.id}`}>
+                <button
+                  type="button"
+                  className="y10-conn-summary mm-summary"
+                  aria-expanded={open}
+                  aria-label={open ? "收起" : "展开"}
+                  onClick={() => setExpanded((current) => ({ ...current, [provider.id]: !open }))}
+                >
+                  <span className="y10-conn-name mm-name">
+                    <strong>{provider.name}</strong>
+                    <small>{preset?.name ?? "自定义"}</small>
+                  </span>
+                  <span className="y10-conn-url">
+                    <code>{provider.base_url || "（没有地址）"}</code>
+                  </span>
+                  <span className="y10-conn-cred y10-small y10-muted mm-meta">
+                    <StatusMark kind={provider.credential?.configured ? "admitted" : "unusable"} text={provider.credential?.configured ? "已就绪" : "凭据缺失"} />
+                    <small>凭据：{credentialStatusLabel(provider.credential)}</small>
+                  </span>
+                  <span className="y10-conn-count mm-count">
+                    已准入 {summary.admitted} · 候选 {summary.candidates}
+                  </span>
+                  <Icon name="chevron" className="y10-icon y10-chevron" />
+                </button>
 
             {open && (
               <div className="y10-def-table mm-body">
@@ -793,7 +895,9 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             )}
           </section>
         );
-      })}
+          })}
+        </div>
+      </Block>
 
       {form && (
         <ProviderForm
@@ -852,9 +956,188 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         />
       )}
 
-      <section className="y10-block mm-defaults" data-testid="department-defaults">
-        <h2 className="y10-block-title">部门默认</h2>
-        <p className="y10-small y10-muted mm-hint">从各部门下一次模型请求起生效，没有另选模型的项目同样生效，包括进行中的事项。</p>
+      <Block
+        title="模型能力表"
+        subtitle={`来源 ${catalog.capability_table.source} · 版本 ${catalog.capability_table.revision}；模型访问定义的「支持图像输入」默认取自能力表，可以手动改写`}
+      >
+        <div className="y10-table-wrap">
+          <table className="y10-table">
+            <thead>
+              <tr>
+                <th>方案</th>
+                <th>上游模型</th>
+                <th>支持图像输入</th>
+              </tr>
+            </thead>
+            <tbody>
+              {capabilityRows.map((row) => (
+                <tr key={`${row.presetId}-${row.id}`}>
+                  <td>{row.presetName}</td>
+                  <td><code>{row.id}</code></td>
+                  <td>{row.image ? "是" : "否"}</td>
+                </tr>
+              ))}
+              {capabilityRows.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="y10-muted" style={{ textAlign: "center" }}>能力表没有记录</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Block>
+
+      <Block
+        title="凭据"
+        subtitle="Key 只写入内存或 .yudao/.env，不进入界面数据、事件与提交"
+      >
+        <div className="y10-grid-cred">
+          <div className="y10-table-wrap">
+            <table className="y10-table">
+              <thead>
+                <tr>
+                  <th>凭据引用</th>
+                  <th>状态</th>
+                  <th>版本</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {credentialsList.map((row) => (
+                  <tr key={row.ref}>
+                    <td><code>{row.ref}</code></td>
+                    <td>{row.credential ? credentialText(row.credential) : "没有任何来源"}</td>
+                    <td>{row.credential?.version ?? "—"}</td>
+                    <td className="y10-col-actions">
+                      <div className="y10-row">
+                        {row.credential?.has_override && (
+                          <button
+                            type="button"
+                            className="y10-btn small"
+                            disabled={busy}
+                            onClick={() => void credentialAction("clear_override", row.ref, row.credential!.version)}
+                          >
+                            清除内存覆盖
+                          </button>
+                        )}
+                        {row.credential?.source === "dotenv" && (
+                          <button
+                            type="button"
+                            className="y10-btn small danger"
+                            disabled={busy}
+                            onClick={() => void credentialAction("remove_persisted", row.ref, row.credential!.version)}
+                          >
+                            删除持久凭据
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {credentialsList.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="y10-muted" style={{ textAlign: "center" }}>暂无凭据记录</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="y10-cred-form">
+            <h3 className="y10-h3">写入凭据</h3>
+            <label className="y10-field">
+              <span>凭据引用</span>
+              <input
+                className="y10-input"
+                type="text"
+                list="y10-cred-refs-list"
+                value={pageCredRef}
+                placeholder="例如 OPENCODE_GO_KEY"
+                onChange={(e) => setPageCredRef(e.target.value)}
+              />
+              <datalist id="y10-cred-refs-list">
+                {credentialsList.map((c) => (
+                  <option key={c.ref} value={c.ref} />
+                ))}
+              </datalist>
+            </label>
+            <label className="y10-field">
+              <span>API Key</span>
+              <input
+                className="y10-input"
+                type="password"
+                autoComplete="new-password"
+                value={pageCredSecret}
+                placeholder="Key 不回填，也不进入事件"
+                onChange={(e) => setPageCredSecret(e.target.value)}
+              />
+            </label>
+            <fieldset className="y10-field">
+              <legend>写入方式</legend>
+              <div className="y10-radio-row">
+                <label>
+                  <input
+                    type="radio"
+                    name="page-cred-persist"
+                    checked={!pageCredPersist}
+                    onChange={() => setPageCredPersist(false)}
+                  />
+                  <span>只在本进程有效</span>
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="page-cred-persist"
+                    checked={pageCredPersist}
+                    onChange={() => setPageCredPersist(true)}
+                  />
+                  <span>写入 .env</span>
+                </label>
+              </div>
+            </fieldset>
+            <button
+              type="button"
+              className="y10-btn primary"
+              disabled={busy || !pageCredRef.trim() || !pageCredSecret.trim()}
+              onClick={() => {
+                const cred = credentialsList.find((c) => c.ref === pageCredRef.trim())?.credential;
+                void saveCredential(pageCredRef.trim(), pageCredSecret.trim(), pageCredPersist, cred?.version ?? 0);
+                setPageCredSecret("");
+              }}
+            >
+              保存凭据
+            </button>
+          </div>
+        </div>
+      </Block>
+
+      <Block
+        title="目录文档（编辑 JSON）"
+        actions={
+          <button type="button" className="y10-btn small" data-testid="edit-json" onClick={() => setJsonOpen(true)}>
+            编辑 JSON
+          </button>
+        }
+      >
+        <dl className="y10-kv is-inline">
+          <div>
+            <dt>文档内容</dt>
+            <dd>连接、模型访问定义与部门默认</dd>
+          </div>
+          <div>
+            <dt>不含</dt>
+            <dd>API Key、准入记录、项目部门设置与项目角色设置</dd>
+          </div>
+        </dl>
+      </Block>
+
+      <Block
+        id="department-defaults"
+        data-testid="department-defaults"
+        className="mm-defaults"
+        title="部门默认"
+        subtitle="从各部门下一次模型请求起生效，没有另选模型的项目同样生效，包括进行中的事项；全局只有一份，所有项目共用"
+      >
         <div className="y10-dept-grid mm-defaults-grid">
           {DEPARTMENTS.map((department) => {
             const choice = editingDefaults[department] ?? { modelId: "", tier: "" };
@@ -928,7 +1211,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             {defaultsStatus.message}
           </p>
         )}
-      </section>
+      </Block>
 
       {pendingSave && (
         <div className="y10-modal-backdrop modal-backdrop" role="presentation" onClick={() => setPendingSave(null)}>
