@@ -5,7 +5,6 @@ import json
 import time
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 
 # anthropic 在第一次请求时才导入资源模块；本模块在模型目录用到 messages 协议时导入（sdk.prepare_protocols），
 # 这项一次性工作不计入请求时限（D09）
