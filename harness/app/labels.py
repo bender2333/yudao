@@ -140,6 +140,7 @@ _LABELS: dict[str, str] = {
     EventType.PRODUCT_DECISION_ACCEPTED: "采纳了产品决策（{kind}）",
     EventType.DELIVERY_ACCEPTED: "采纳了交付（第 {revision} 版）：{summary}",
     EventType.QA_SUBMITTED: "质检提交了结论：{verdict}",
+    EventType.QA_TESTS_SAVED: "保存了质检的测试材料（第 {version} 版）",
     EventType.STRUCTURE_ACCEPTED: "采纳了现有结构说明（第 {revision} 版）",
     EventType.BASELINE_REVIEW_ACCEPTED: "质检提交了基线核验：{verdict}",
     EventType.LESSON_CANDIDATE_RECORDED: "记下了一条经验候选：{suggestion}",

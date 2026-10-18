@@ -160,6 +160,7 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "qa_submitted": ("code_snapshot_hash", "content_hash", "delivery_spec_hash", "effective_contract_hash", "id",
                      "issuer", "kind", "parent_hash", "product_spec_hash", "request_id", "revision", "status",
                      "verdict"),
+    "qa_tests_saved": ("activation_id", "content_hash", "version"),
     "structure_accepted": ("content_hash", "code_tree_digest", "id", "issuer", "kind", "parent_hash",
                            "product_spec_hash", "request_id", "revision", "status"),
     "baseline_review_accepted": ("code_snapshot_hash", "content_hash", "id", "issuer", "kind", "parent_hash",

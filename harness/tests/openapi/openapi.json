@@ -27389,6 +27389,172 @@
         "title": "QaSubmittedPayload",
         "type": "object"
       },
+      "QaTestsSavedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "qa_tests_saved",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/QaTestsSavedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "QaTestsSavedEvent",
+        "type": "object"
+      },
+      "QaTestsSavedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "archive_ref": {
+            "$ref": "#/components/schemas/ArtifactRef"
+          },
+          "activation_id": {
+            "title": "Activation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "content_hash",
+          "archive_ref",
+          "activation_id"
+        ],
+        "title": "QaTestsSavedPayload",
+        "type": "object"
+      },
       "ReviewObservation": {
         "additionalProperties": false,
         "properties": {
@@ -33958,6 +34124,7 @@
             "proposal_rejected": "#/components/schemas/ProposalRejectedEvent",
             "proposal_submitted": "#/components/schemas/ProposalSubmittedEvent",
             "qa_submitted": "#/components/schemas/QaSubmittedEvent",
+            "qa_tests_saved": "#/components/schemas/QaTestsSavedEvent",
             "run_continued": "#/components/schemas/RunContinuedEvent",
             "run_created": "#/components/schemas/RunCreatedEvent",
             "run_done": "#/components/schemas/RunDoneEvent",
@@ -34091,6 +34258,9 @@
           },
           {
             "$ref": "#/components/schemas/QaSubmittedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/QaTestsSavedEvent"
           },
           {
             "$ref": "#/components/schemas/StructureAcceptedEvent"

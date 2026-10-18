@@ -793,6 +793,12 @@ class QaSubmittedPayload(Payload):
     git_version: GitVersion
 
 
+class QaTestsSavedPayload(Payload):
+    version: int
+    content_hash: str
+    archive_ref: ArtifactRef
+    activation_id: str
+
 class StructureModule(Payload):
     # 现有结构说明中的一个模块
     path: str
@@ -1547,6 +1553,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,
     EventType.DELIVERY_ACCEPTED: DeliveryAcceptedPayload,
     EventType.QA_SUBMITTED: QaSubmittedPayload,
+    EventType.QA_TESTS_SAVED: QaTestsSavedPayload,
     EventType.STRUCTURE_ACCEPTED: StructureAcceptedPayload,
     EventType.BASELINE_REVIEW_ACCEPTED: BaselineReviewAcceptedPayload,
     EventType.LESSON_CANDIDATE_RECORDED: LessonCandidateRecordedPayload,

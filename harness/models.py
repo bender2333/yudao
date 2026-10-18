@@ -76,6 +76,7 @@ class EventType:
     PRODUCT_DECISION_ACCEPTED = "product_decision_accepted"
     DELIVERY_ACCEPTED = "delivery_accepted"
     QA_SUBMITTED = "qa_submitted"
+    QA_TESTS_SAVED = "qa_tests_saved"
     STRUCTURE_ACCEPTED = "structure_accepted"
     BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
@@ -682,6 +683,9 @@ class RunProjection:
     definitions_version: str = ""
     # 创建这个 run 时冻结的参数版本（工单 #349）：运行中不跟随参数修改
     parameters_version: str = ""
+    qa_tests_version: int = 0
+    qa_tests_hash: str | None = None
+    qa_tests_archive_ref: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return json.loads(json_dumps(self))

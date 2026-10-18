@@ -12556,6 +12556,92 @@ export type QaSubmittedPayload = {
 };
 
 /**
+ * QaTestsSavedEvent
+ */
+export type QaTestsSavedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'qa_tests_saved';
+    payload: QaTestsSavedPayload;
+};
+
+/**
+ * QaTestsSavedPayload
+ */
+export type QaTestsSavedPayload = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    archive_ref: ArtifactRef;
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+};
+
+/**
  * ReviewObservation
  */
 export type ReviewObservation = {
@@ -15904,6 +15990,8 @@ export type EventObject = ({
 } & DeliveryAcceptedEvent) | ({
     type: 'qa_submitted';
 } & QaSubmittedEvent) | ({
+    type: 'qa_tests_saved';
+} & QaTestsSavedEvent) | ({
     type: 'structure_accepted';
 } & StructureAcceptedEvent) | ({
     type: 'baseline_review_accepted';

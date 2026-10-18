@@ -128,6 +128,7 @@
 "test_provider_tls.py" = "integration"
 "test_providers_module.py" = "integration"
 "test_public_tree.py" = "module"
+"test_qa_test_materials.py" = "integration"
 "test_range_edit.py" = "integration"
 "test_release_archive_integrity.py" = "module"
 "test_release_script.py" = "integration"
