@@ -498,7 +498,7 @@ html.is-annotate .y10-block { outline: 1.5px dashed color-mix(in srgb, var(--vio
 
 .y10-cards { display: grid; gap: 12px; }
 .y10-card { border: 1px solid var(--line); border-left: 4px solid var(--amber); border-radius: 10px; background: var(--surface); padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
-.y10-card.is-waiting_resume, .y10-card.is-unknown_action { border-left-color: var(--orange); }
+.y10-card.is-waiting_resume { border-left-color: var(--orange); }
 .y10-card.is-rollback_restore, .y10-card.is-repair_stopped { border-left-color: var(--red); }
 .y10-card.is-provider_wait, .y10-card.is-rework_reminder { border-left-color: var(--blue); }
 .y10-card.is-submitted { opacity: .75; }

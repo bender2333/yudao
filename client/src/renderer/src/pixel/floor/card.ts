@@ -66,7 +66,6 @@ export interface DecisionCard {
 /** 卡片左边的色条：需要马上处理的种类偏橙，会造成损失的偏红，通知类偏蓝，其余是琥珀色。 */
 const KIND_COLOR: Record<string, string> = {
   model_unavailable: PAL.orange2,
-  unknown_action: PAL.orange2,
   rollback_restore: PAL.red2,
   repair_stopped: PAL.red2,
   no_tool_call: PAL.blue2,

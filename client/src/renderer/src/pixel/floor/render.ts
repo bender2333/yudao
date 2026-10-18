@@ -26,13 +26,13 @@ const TUBE_D = "#3f86b0";
 
 const STATUS_TEXT: Record<string, string> = {
   queued: "排队中", waiting_slot: "等待执行槽位", running: "运行中", asking: "询问中", waiting_provider: "等待模型服务", paused: "已暂停",
-  failed: "失败", done: "已完成", cancelled: "已取消", interrupted: "中断", pending_verification: "待核实", waiting_resume: "待恢复",
+  failed: "失败", done: "已完成", cancelled: "已取消", interrupted: "中断", waiting_resume: "待恢复",
   stopped: "已停止", stopped_for_upgrade: "因升级停止", adopted: "已采纳", waiting_decision: "等待你的决定", released_unsettled: "已放行",
 };
 const STATUS_CHIP: Record<string, string> = {
   waiting_decision: PAL.yellow2,
   running: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, waiting_slot: PAL.grey2, waiting_provider: PAL.grey3, paused: PAL.blue1,
-  failed: PAL.red2, done: PAL.green1, cancelled: PAL.grey2, interrupted: PAL.grey3, pending_verification: PAL.yellow2,
+  failed: PAL.red2, done: PAL.green1, cancelled: PAL.grey2, interrupted: PAL.grey3,
   stopped: PAL.grey3, waiting_resume: PAL.yellow2, stopped_for_upgrade: PAL.orange2, adopted: PAL.green3, released_unsettled: PAL.green3,
 };
 
@@ -425,7 +425,7 @@ export class FloorRenderer {
     const info = ch.roleInfo;
     if (info && primary && primary !== ch) return info.status === "working" ? "code" : "idle";
     const it = ch.item;
-    return it && it.status === "running" ? "code" : it && it.status === "failed" ? "error" : it && it.status === "pending_verification" ? "alert" : "idle";
+    return it && it.status === "running" ? "code" : it && it.status === "failed" ? "error" : "idle";
   }
 
   private door(c: CanvasRenderingContext2D, r: Room): void {
@@ -553,12 +553,6 @@ export class FloorRenderer {
         c.fillStyle = "rgba(40,44,60,0.25)";
         c.fillRect(r.x, 50, r.w, 164);
       }
-      if (here.some((it) => it.status === "pending_verification")) {
-        const k = this.scene.reduced ? 0.14 : 0.1 + 0.08 * Math.sin(t / 240);
-        c.fillStyle = `rgba(255,196,40,${k.toFixed(3)})`;
-        c.fillRect(r.x, 50, r.w, 164);
-        paint.beacon(c, r.x + r.w - 14, 54, { on: true }, t);
-      }
       const fl = this.driver.state.flash[r.id];
       if (fl && fl.until > this.scene.realT) {
         c.fillStyle = rgbaOf(fl.color, Math.min(0.35, ((fl.until - this.scene.realT) / 900) * 0.35));
@@ -648,7 +642,7 @@ export class FloorRenderer {
       for (const e of (data.entries ?? []) as { department: string; text: string; state: string }[]) {
         const r = roomOf(world, e.department);
         if (!r) continue;
-        label(e.department, r.x + r.w / 2, 94, e.text, e.state === "pending_verification" ? PAL.yellow1 : PAL.white);
+        label(e.department, r.x + r.w / 2, 94, e.text, PAL.white);
       }
     } else if (overlay.id === "context_usage") {
       for (const e of (data.entries ?? []) as { department: string; role: string; ratio: number }[]) {

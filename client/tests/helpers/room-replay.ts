@@ -185,7 +185,7 @@ export function compareRoomStates(recorded: RoomSample[], replayed: RoomSample[]
 }
 
 /** 起一个开发服务器，回放全部录下的部门房间调用序列，返回每份的比较结果。 */
-export async function replayAllRooms(options: { only?: string[] } = {}): Promise<RoomCompareResult[]> {
+export async function replayAllRooms(options: { only?: string[]; exclude?: string[] } = {}): Promise<RoomCompareResult[]> {
   const recording = loadRoomRecordings();
   const server = await createServer({
     root: join(clientRoot, "src", "renderer"),
@@ -201,6 +201,7 @@ export async function replayAllRooms(options: { only?: string[] } = {}): Promise
   try {
     for (const rec of recording.scenarios) {
       if (options.only && !options.only.includes(rec.id)) continue;
+      if (options.exclude && options.exclude.includes(rec.id)) continue;
       const replayed = await replayRoom(address, rec, recording.sampleMs);
       results.push({
         scenario: rec.id,

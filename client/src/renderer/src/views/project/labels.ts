@@ -29,7 +29,6 @@ export const WORK_ITEM_STATUS_KIND: Record<string, string> = {
 export const RECOVERY_STATE: Record<string, string> = {
   running: "运行中",
   interrupted: "中断",
-  pending_verification: "待核实",
   waiting_resume: "待恢复",
   terminated: "已终止",
 };
@@ -99,7 +98,6 @@ export const DECISION_KIND: Record<string, string> = {
   no_tool_call: "已暂停（模型没有调用工具），等待继续",
   workspace_unrepresentable: "已暂停（工作区无法表示），等待继续",
   definitions_changed: "定义版本不同，等待选择",
-  unknown_action: "动作结果未知，等待核实",
   initial_prd: "接入已有项目的初始需求文档等待确认",
   kernel_modification: "交付改动了内核路径，等待批准",
 };

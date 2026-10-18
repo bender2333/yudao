@@ -408,7 +408,6 @@ export function signStyle(text: string): SignStyle {
   const s = String(text || "");
   if (/中断/.test(s)) return { bg: "#3d4250", fg: PAL.white, stripe: PAL.grey2 };
   if (/待恢复/.test(s)) return { bg: PAL.yellow2, fg: PAL.ink, stripe: PAL.orange2 };
-  if (/待核实/.test(s)) return { bg: PAL.yellow1, fg: PAL.ink, stripe: PAL.yellow3 };
   if (/暂停/.test(s)) return { bg: PAL.blue1, fg: PAL.ink, stripe: PAL.blue2 };
   if (/失败|不通过/.test(s)) return { bg: PAL.red2, fg: PAL.white, stripe: PAL.red3 };
   if (/完成|通过|放行/.test(s)) return { bg: PAL.green2, fg: PAL.white, stripe: PAL.green3 };
