@@ -30,9 +30,9 @@ export interface BuildingItemRow {
 
 const DEPARTMENTS = ["product", "engineering", "quality", "operations"] as const;
 /** 会待在房间里的状态（原型 scenes.js 的 IN_ROOM）：用户停止的事项不再待在房间里。 */
-const IN_ROOM = ["running", "asking", "waiting_provider", "paused", "failed", "done", "cancelled", "interrupted", "pending_verification", "waiting_resume", "waiting_decision", "stopped_for_upgrade"];
+const IN_ROOM = ["running", "asking", "waiting_provider", "paused", "failed", "done", "cancelled", "interrupted", "waiting_resume", "waiting_decision", "stopped_for_upgrade"];
 /** 亮灯对应的活跃状态（原型 scenes.js 的 ROOM_STATUS）。 */
-const ACTIVE = ["running", "asking", "pending_verification"];
+const ACTIVE = ["running", "asking"];
 
 /** 按「置顶在上，其余按最近活动，归档不显示」排列项目（原型 projects.list 的排序）。 */
 export function sortBuildingProjects(rows: BuildingProjectRow[]): BuildingProjectRow[] {
@@ -44,7 +44,7 @@ export function sortBuildingProjects(rows: BuildingProjectRow[]): BuildingProjec
 
 /** 一条事项在画面上的状态：与原型 sceneStatus 的口径一致（按客户端的状态词与恢复观察状态映射）。 */
 export function sceneStatus(item: BuildingItemRow): string | null {
-  if (item.recovery_state === "interrupted" || item.recovery_state === "pending_verification" || item.recovery_state === "waiting_resume") {
+  if (item.recovery_state === "interrupted" || item.recovery_state === "waiting_resume") {
     return item.recovery_state;
   }
   switch (item.status) {
@@ -66,12 +66,11 @@ export function sceneStatus(item: BuildingItemRow): string | null {
   }
 }
 
-/** 楼层的状态灯：按原型 markerOf 的优先级取第一个命中（等待恢复、待核实、中断、已停止、等待你的决定、等待模型服务、等待执行槽位、运行中、排队中，否则空闲）。 */
+/** 楼层的状态灯：按原型 markerOf 的优先级取第一个命中（等待恢复、中断、已停止、等待你的决定、等待模型服务、等待执行槽位、运行中、排队中，否则空闲）。 */
 export function floorStatus(items: BuildingItemRow[]): string {
   const statuses = items.map((it) => sceneStatus(it));
   const has = (s: string): boolean => statuses.includes(s);
   if (has("waiting_resume")) return "waiting_resume";
-  if (has("pending_verification")) return "pending_verification";
   if (has("interrupted")) return "interrupted";
   if (has("stopped")) return "stopped";
   if (has("waiting_decision")) return "waiting_decision";

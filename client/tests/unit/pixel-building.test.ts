@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { buildCatalog } from "../../src/renderer/src/pixel/world/floor-decl.ts";
 import { createScene } from "../../src/renderer/src/pixel/world/scene.ts";
 import { buildingWalkerState, createBuildingDriver, BUILDING_GEO, SPEED_ROAM, SPEED_WORK } from "../../src/renderer/src/pixel/world/building.ts";
+import { floorStatus, sceneStatus } from "../../src/renderer/src/pixel/building/model.ts";
 import type { BuildingFloor, BuildingModel } from "../../src/renderer/src/pixel/world/building.ts";
 
 // 与原型 walkers.js 一致：确定的随机数序列
@@ -136,4 +137,10 @@ test("楼里的小人：竖井管道随用着机器的楼层流动", () => {
   h.driver.setModel(model([floor("p-a")]));
   h.step(1600);
   assert.equal(h.driver.world.links["floor:p-a>basement"], undefined, "去掉机器以后不再声明这根管线");
+});
+
+test("楼层状态灯不包含待核实", () => {
+  const item = { work_item_id: "w1", status: "unknown", department: "engineering", color_index: 0, recovery_state: "pending_verification" };
+  assert.equal(sceneStatus(item), null);
+  assert.equal(floorStatus([item]), "idle");
 });

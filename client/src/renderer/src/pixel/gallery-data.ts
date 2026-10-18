@@ -136,7 +136,7 @@ export const GALLERY_MEMBERS: GalleryMember[] = [
   { name: "ROLE_NAMES", kind: "data", note: "角色的中文名称", sample: dataSample(Object.keys(ROLE_NAMES).length, Object.values(ROLE_NAMES), "角色名称") },
   { name: "SKINS", kind: "data", note: "肤色表（每种两个色：主色与暗色）", sample: dataSample(SKINS.length, SKINS.map((s, i) => `肤色 ${i} ${s[0]}`), "肤色") },
   { name: "SPRITE_LEVELS", kind: "data", note: "角色标识的档位（ui 界面工作线 / S4 / S5）", sample: dataSample(Object.keys(SPRITE_LEVELS).length, Object.entries(SPRITE_LEVELS).slice(0, 8).map(([k, v]) => `${k}：${v}`), "角色档位") },
-  { name: "STATUS_ACTIONS", kind: "data", note: "运行状态到动作的映射（暂停、失败、完成、取消、待核实、待恢复）", sample: dataSample(Object.keys(STATUS_ACTIONS).length, Object.entries(STATUS_ACTIONS).map(([k, v]) => `${k} → ${v}`), "状态 → 动作") },
+  { name: "STATUS_ACTIONS", kind: "data", note: "运行状态到动作的映射（暂停、失败、完成、取消、待恢复）", sample: dataSample(Object.keys(STATUS_ACTIONS).length, Object.entries(STATUS_ACTIONS).map(([k, v]) => `${k} → ${v}`), "状态 → 动作") },
   { name: "VIGNETTES", kind: "data", note: "每个动作的循环小画面脚本：走位、播放动作、等待、拿物件、转头、图标、坐下、淡入淡出", sample: dataSample(Object.keys(VIGNETTE_SPRITES).length, Object.keys(VIGNETTE_SPRITES).slice(0, 12), "小画面脚本") },
   { name: "VIGNETTE_SPRITES", kind: "data", note: "每个动作小画面默认用哪个小人", sample: dataSample(Object.keys(VIGNETTE_SPRITES).length, Object.entries(VIGNETTE_SPRITES).slice(0, 8).map(([k, v]) => `${k} → ${v}`), "小画面小人") },
   { name: "ease", kind: "data", note: "缓动曲线：linear、inOut、out、in、outBack、bounce（小画面移动用）", sample: dataSample(Object.keys(EASE).length, Object.keys(EASE).map((k) => `${k}(0.5) = ${ease(k, 0.5).toFixed(4)}`), "缓动曲线") },

@@ -194,7 +194,7 @@ export function compareStates(recorded: RecordedSample[], replayed: RecordedSamp
 }
 
 /** 起一个开发服务器，回放全部录下的场景，返回每个场景的比较结果。 */
-export async function replayAll(options: { only?: string[] } = {}): Promise<CompareResult[]> {
+export async function replayAll(options: { only?: string[]; exclude?: string[] } = {}): Promise<CompareResult[]> {
   const recording = loadRecordings();
   const server = await createServer({
     root: join(clientRoot, "src", "renderer"),
@@ -210,6 +210,7 @@ export async function replayAll(options: { only?: string[] } = {}): Promise<Comp
   try {
     for (const scenario of recording.scenarios) {
       if (options.only && !options.only.includes(scenario.id)) continue;
+      if (options.exclude && options.exclude.includes(scenario.id)) continue;
       const replayed = await replayScenario(address, scenario, recording.models, recording.sampleMs);
       results.push({
         scenario: scenario.id,

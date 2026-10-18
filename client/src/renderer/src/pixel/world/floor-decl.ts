@@ -74,8 +74,6 @@ export const deptRest: RestFn = (ctx, d, it) => {
       return { spot: "stand", pose: "cheer" };
     case "cancelled":
       return { spot: "stand", pose: "idle" };
-    case "pending_verification":
-      return seat("sit_scratch", "question");
     case "waiting_resume":
       return seat("sit_wait", "text", "待恢复");
     case "waiting_decision":

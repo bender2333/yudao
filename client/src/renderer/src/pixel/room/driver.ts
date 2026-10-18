@@ -256,10 +256,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   function applyLights(): void {
     const s = effStatus();
     const target = s === "interrupted" ? 0.74 : waitingProvider() ? 0.42
-      : (s === "working" || s === "asking" || s === "pending_verification" || s === "done") ? 0 : 0.36;
+      : (s === "working" || s === "asking" || s === "done") ? 0 : 0.36;
     state.darkTarget = target;
     state.dark = target;
-    state.yellow = s === "pending_verification";
+    state.yellow = false;
     scene.frozen = s === "interrupted";
   }
   function syncRoles(): void {
@@ -332,7 +332,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       for (const a of roleActors()) {
         if (s === "interrupted") continue;
         const actor = actorOf(a.id);
-        if (actor?.script && (s === "waiting_resume" || s === "pending_verification" || s === "asking" || prev === "asking")) scene.cancel(actor);
+        if (actor?.script && (s === "waiting_resume" || s === "asking" || prev === "asking")) scene.cancel(actor);
         if (s !== "working") { a.persist = null; a.queue = []; }
       }
       if (s !== "failed") for (const a of roleActors()) { if (!a.persist) ds(a).redLamp = false; }
@@ -346,12 +346,6 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     const isPrim = a === primary();
     const seatRest = (anim: string, extra?: Partial<RestSpec>): RestSpec => ({ x: d.seatX, y: d.seatY, seat: d, anim, facing: 1, ...(extra ?? {}) });
     const standRest = (x: number, y: number, anim: string, extra?: Partial<RestSpec>): RestSpec => ({ x, y, seat: null, anim, ...(extra ?? {}) });
-    if (s === "pending_verification" && isPrim) {
-      const spot = toolSpot(state.eventTool || model.pending_tool);
-      if (spot === "desk") return seatRest("sit_scratch", { icon: { kind: "question" } });
-      const sp = SPOT[spot] as [number, number, number];
-      return standRest(sp[0], sp[1], "puzzled", { icon: { kind: "question" }, facing: sp[2] || 1 });
-    }
     if (s === "waiting_resume" && isPrim) {
       return standRest(SPOT.center[0], SPOT.center[1], "hold_sign", { sign: model.hold_card || state.eventCard || "待恢复" });
     }
@@ -943,7 +937,6 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       applyLights();
     },
     puzzled(ev) {
-      state.eventStatus = "pending_verification";
       state.eventTool = ((ev.payload as Record<string, unknown>)?.tool as string) || ev.tool || "bash";
       state.lastPendingTool = state.eventTool;
       scene.frozen = false;

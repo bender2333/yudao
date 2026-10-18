@@ -109,7 +109,6 @@ function RoomInfoArea(props: { data: DepartmentWorkspaceResult }) {
           ["已用时间 / 上限", "—"],
           ["执行机器", room.machine ? room.machine : "—"],
           ["信箱", `${room.mailbox} 封未读指导`],
-          ["待核实动作", room.pending_tool ? room.pending_tool : "没有"],
         ]}
       />
       {room.roles && room.roles.length > 0 ? (

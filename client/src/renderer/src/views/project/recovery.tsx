@@ -26,7 +26,6 @@ import { useSnapshot } from "./use-snapshot";
 const STATE_KIND: Record<string, string> = {
   running: "running",
   interrupted: "interrupted",
-  pending_verification: "pending",
   waiting_resume: "waiting",
   terminated: "cancelled",
 };
@@ -185,7 +184,7 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
             ["自动继续时间", <span className="y10-muted" key="at">还没有自动继续</span>],
           ]}
         />
-        <p className="y10-note note">按持久事实核对：已开始但没有回执的动作进入待核实；没有未完成动作时自动继续。</p>
+        <p className="y10-note note">按持久事实核对：没有未完成动作时自动继续。</p>
       </Section>
     );
   }

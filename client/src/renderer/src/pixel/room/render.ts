@@ -208,7 +208,7 @@ export class RoomRenderer {
       w: L.crt.w, h: L.crt.h, lines, power: status === "interrupted" ? 0 : 1,
       boot: this.driver.state.crtBoot < 1 ? this.driver.state.crtBoot : undefined,
       dim: status === "idle", cursor: status === "working",
-      alert: status === "pending_verification" || status === "waiting_resume",
+      alert: status === "waiting_resume",
       label: `${(DEPTS as Record<string, Shell>)[this.driver.model.department].name} CRT`,
     };
   }
