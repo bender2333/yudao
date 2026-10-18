@@ -694,3 +694,5 @@ claude-opus-5-5 / 2026-10-18 16:15 / docs/design/test-pyramid.md 第 4 节表格
 
 claude-opus-5-5 / 2026-10-18 16:41 / docs/decision.md 新增「修复模式结束，派发者恢复」 / main 1b23af76 全绿，基线稳定
 
+执行者 9router/ag/gemini-3.8-flash-high / 2026-10-18 16:50 / 工单 #588 [仓库维护] 统一仓库中的换行符：根目录新建 .gitattributes（* text=auto），经 git add --renormalize . 将剩余 11 个以 CRLF 保存的文件规范化为 LF / 架构问题 #127
+
