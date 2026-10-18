@@ -1295,6 +1295,12 @@ class Orchestrator:
         projection = self.project(run_id)
         try:
             environment = self._environment_for(run_id, department, refresh=True)
+        except UnrepresentableWorkspace as exc:
+            # 非质检会话的检查工作区从运行工作区建立，建立源里的无法表示条目与激活开始后发现的同类：
+            # 以 workspace_unrepresentable 暂停，而不是当作存储故障终止
+            self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version,
+                          facts=list(exc.paths))
+            return
         except (ValueError, OSError) as exc:
             # 检查工作区的建立源读不出来（质检的封存交付归档缺失或损坏）：不退回运行工作区
             # （ADR-0038 与 local-tools 第 2 节：检查工作区从封存的交付建立）。这次激活无法开始，
