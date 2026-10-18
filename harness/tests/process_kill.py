@@ -30,6 +30,7 @@ import argparse
 import json
 import os
 import signal
+import sqlite3
 import subprocess
 import sys
 import time
@@ -382,11 +383,25 @@ def _onboarding_run_id(store: EventStore, revision: bool) -> str:
     return str(created[-1].payload["run_id"])
 
 
+def _open_after_kill(path: Path) -> EventStore:
+    # 进程刚被终止时，GitHub 的 Windows 运行机上事件库的文件还会被别的进程短暂占用（2026-10-18
+    # run 39103301202：终止以后立刻只读打开，10 个用例都报 disk I/O error；原先 _kill 里按进程号
+    # 探测的等待总是等满 10 秒，掩盖了这一点）。在等待上限内重试，能读出来就继续
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
+    while True:
+        try:
+            return EventStore(path, read_only=True)
+        except sqlite3.OperationalError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.2)
+
+
 def _observe(data_dir: Path, onboarding: bool, revision: bool) -> dict[str, Any]:
     # 只读地读出终止以后、任何系统打开它以前的事件与决定请求：LoopSystem 打开数据目录时会补做结算与补建
     # 缺少的 run，「补做之前」的状态只能这样取得。读出的是一份快照，连接随即关闭，之后回读它得到的
     # 仍然是补做以后的状态
-    store = EventStore(Path(data_dir) / "events.sqlite", read_only=True)
+    store = _open_after_kill(Path(data_dir) / "events.sqlite")
     try:
         run_id = _onboarding_run_id(store, revision) if onboarding else _first_run_id(store)
         project_ids = store.list_project_ids()
