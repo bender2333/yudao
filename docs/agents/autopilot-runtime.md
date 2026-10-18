@@ -92,6 +92,13 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
   uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
   ```
 
+- 导出里程碑的工单记录（架构师在里程碑达到时，`CLAUDE.md` 工作流程第 7 步）。`<短名>` 例如 `stage3-m1`；有上一个里程碑的记录时加 `--previous`：
+
+  ```bash
+  uv run python evals/baseline/milestone.py collect --milestone "<里程碑标题>" --data docs/evaluation/milestones/<短名>.json
+  uv run python evals/baseline/milestone.py report --data docs/evaluation/milestones/<短名>.json     --report docs/evaluation/milestones/<短名>.md --previous docs/evaluation/milestones/<上一个短名>.json
+  ```
+
 - 清理工单的 worktree（派发者每次派发之前）。在主工作区运行，不要在要删的目录里运行；`<worktree 目录>` 是第 1 节工单 worktree 的上级目录，例如 `D:/codes/yudao-worktrees`。只删已经关闭的工单，分支保留。Windows 上有进程占用目录时，`git worktree remove` 只删掉内容、留下空目录，所以接着删除目录本身：
 
   ```bash
@@ -133,8 +140,8 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 ## 5. CI
 
 - 定义：`.github/workflows/ci.yml`，由用户在场时的架构师维护，执行者与被唤醒的架构师不修改。
-- 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上运行检查 `check`：安装依赖，单元层与模块层（包括两项固定检查），客户端的类型检查与单元测试（逐场景回放测试除外，按 `AGENTS.md` 单独运行），编译页面与 wheel。
-- main 的每次推送（每次合并以后）另外运行 `integration`：集成层全部（`-n 4`，2026-10-18 测得约 23 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由派发者按派发者规则第 5 节处理。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
+- 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上运行检查 `check`：安装依赖，单元层与模块层（包括两项固定检查），评测工具的测试（`evals/tests`，`real_model` 的用例默认不选），客户端的类型检查与单元测试（逐场景回放测试除外，按 `AGENTS.md` 单独运行），编译页面与 wheel。
+- main 的每次推送（每次合并以后）另外运行 `integration`：集成层全部（`-n 4`，2026-10-18 在 main 上测得约 15 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由派发者按派发者规则第 5 节处理。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
 - 手动触发（`check` 与 `integration` 都运行）：`gh workflow run CI --ref <分支>`，例如工单要在 GitHub 的运行机上验证集成层时 `gh workflow run CI --ref issue-<编号>`；之后用 `gh run list --workflow CI --branch <分支> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果。
 - main 上的结果：`gh run list --workflow CI --branch main --event push --limit 10`；某次运行的失败项：`gh run view <运行编号> --log-failed | grep FAILED`。
 - 查看 PR 的结果：`gh pr checks <PR>`；重新运行失败的作业：`gh run rerun <运行编号> --failed`。
