@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import os
 import tempfile
 import uuid
 from dataclasses import asdict
@@ -35,6 +36,17 @@ from .tree_archive import load_tree
 
 
 DEFAULT_DIR = Path(".yudao") / "native-validation"
+
+# 没有给出 --provider-config 时，真实模型 smoke 用这三个环境变量建立 Provider 目录（运行配置第 4 节）：
+# 一个连接（凭据只写引用，取值留在环境里）、一个模型访问定义，三个部门的默认绑定都指向它。
+EVAL_BASE_URL_ENV = "YUDAO_EVAL_BASE_URL"
+EVAL_API_KEY_ENV = "YUDAO_EVAL_API_KEY"
+EVAL_MODEL_ENV = "YUDAO_EVAL_MODEL"
+EVAL_ENV_NAMES = (EVAL_BASE_URL_ENV, EVAL_API_KEY_ENV, EVAL_MODEL_ENV)
+EVAL_PROVIDER_ID = "yudao-eval"
+EVAL_MODEL_DEFINITION_ID = "yudao-eval-model"
+EVAL_CONTEXT_WINDOW = 128_000
+EVAL_MAX_OUTPUT_TOKENS = 8_192
 
 MODEL_ATTEMPT_FAILED = EventType.MODEL_ATTEMPT_FAILED
 MODEL_RETRY_SCHEDULED = EventType.MODEL_RETRY_SCHEDULED
@@ -75,16 +87,27 @@ def run_smoke(
         raise ValueError("unknown smoke scenario")
     config_path = (Path(provider_config) if provider_config is not None
                    else default_provider_config(data_dir))
+    from_env = provider_config is None and not missing_eval_variables()
+    if provider_config is None and not from_env and not config_path.is_file():
+        return _unavailable_report(
+            data_dir, config_path,
+            "没有给出 --provider-config，数据目录里也没有 providers.json，环境变量缺少："
+            + "、".join(missing_eval_variables()), stop_reason="provider_config_missing")
     report: dict[str, Any] = {
-        "provider_config": str(config_path),
+        "provider_config": "环境变量" if from_env else str(config_path),
         "available": False,
         "scenarios": {},
     }
     # 短命 CLI 执行前读取一致版本，缺可用配置明确失败，不偷换 Fake；
     # 默认以 normal 启动读取目录，fake 连接被拒绝（工单 #86）
     facade = ProviderFacade(startup_mode=startup_mode)
-    facade.configure_paths(config_path, None if dotenv_path is None else Path(dotenv_path))
-    facade.reload()
+    if from_env:
+        failure = _load_eval_catalog(facade)
+        if failure is not None:
+            return _unavailable_report(data_dir, config_path, failure, provider_config="环境变量")
+    else:
+        facade.configure_paths(config_path, None if dotenv_path is None else Path(dotenv_path))
+        facade.reload()
     system = LoopSystem(data_dir, facade=facade)
     status = system.provider_status()
     report.update({
@@ -101,6 +124,62 @@ def run_smoke(
         return report
     for name in selected:
         report["scenarios"][name] = _run_scenario(system, name)
+    _write_report(data_dir, report)
+    return report
+
+
+def missing_eval_variables(env: dict[str, str] | os._Environ[str] | None = None) -> list[str]:
+    source = os.environ if env is None else env
+    return [name for name in EVAL_ENV_NAMES if not (source.get(name) or "").strip()]
+
+
+def eval_catalog_document(env: dict[str, str] | os._Environ[str] | None = None) -> dict[str, Any]:
+    """用三个环境变量写出 Provider 目录文档；凭据只以引用出现。缺变量时抛出 ValueError 并写明变量名。"""
+    source = os.environ if env is None else env
+    missing = missing_eval_variables(source)
+    if missing:
+        raise ValueError("缺少环境变量：" + "、".join(missing))
+    return {
+        "revision": 1,
+        "providers": [{
+            "id": EVAL_PROVIDER_ID, "name": "Yudao eval",
+            "base_url": source[EVAL_BASE_URL_ENV].strip().rstrip("/"), "credential_ref": EVAL_API_KEY_ENV,
+            "timeout_sec": 600.0, "preset_id": "", "models_url": "",
+        }],
+        "models": [{
+            "id": EVAL_MODEL_DEFINITION_ID, "provider_id": EVAL_PROVIDER_ID,
+            "model": source[EVAL_MODEL_ENV].strip(), "protocol": "chat_completions",
+            "context_window": EVAL_CONTEXT_WINDOW, "max_output_tokens": EVAL_MAX_OUTPUT_TOKENS,
+            "accepts_required_tool_call": True, "input_modalities": ["text", "image"],
+            "reasoning_levels": [], "default_reasoning_level": None, "reasoning_mode": "",
+        }],
+        "bindings": {department: {"provider_id": EVAL_PROVIDER_ID, "model_id": EVAL_MODEL_DEFINITION_ID}
+                     for department in ("product", "engineering", "quality")},
+    }
+
+
+def _load_eval_catalog(facade: ProviderFacade) -> str | None:
+    """把环境变量建立的目录读入 facade，并经连接测试与模型测试准入。返回 None 表示可用，否则返回原因。
+    目录与准入记录只在内存里，不写文件。"""
+    facade.configure_paths(None, None)
+    facade.store_document(eval_catalog_document())
+    connection = facade.test_connection(EVAL_PROVIDER_ID)
+    if not connection.get("ok"):
+        return "连接测试未通过：" + str(connection.get("message") or connection.get("reason"))
+    tested = facade.model_test(EVAL_PROVIDER_ID, EVAL_MODEL_DEFINITION_ID)
+    if not tested.get("admitted"):
+        return "模型测试未准入：" + str(tested.get("error") or "容量未确认")
+    return None
+
+
+def _unavailable_report(data_dir: Path, config_path: Path, message: str, *,
+                        stop_reason: str = "provider_unavailable", provider_config: str | None = None) -> dict[str, Any]:
+    report: dict[str, Any] = {
+        "provider_config": provider_config or str(config_path),
+        "available": False, "scenarios": {}, "provider_bindings": {},
+        "provider": None, "model": None, "adapter": "directory",
+        "error": message, "stop_reason": stop_reason,
+    }
     _write_report(data_dir, report)
     return report
 

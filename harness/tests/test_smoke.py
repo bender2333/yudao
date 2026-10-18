@@ -13,7 +13,7 @@ from harness.proposals import (product_spec, delivery, delivery_turn, review, re
 from harness.providers import ProviderFacade
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
-from harness.smoke import isolation_fields, run_smoke, smoke_exit_code, summarize_run
+from harness.smoke import EVAL_ENV_NAMES, isolation_fields, run_smoke, smoke_exit_code, summarize_run
 from harness.tests.helpers import compacted_runner, happy_script, recorded_context, run_scripted, system_on_copy
 from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_event, rewrite_saved_events,
                                          rewrite_saved_projection)
@@ -579,10 +579,12 @@ def test_smoke_markdown_reports_model_input_audit(tmp_path):
     assert f"host receipts verified: `{scenario['check_receipts_verified']}`" in text
     assert "omp" not in text.lower()
 
-def test_smoke_reads_the_catalog_in_its_data_directory(tmp_path):
+def test_smoke_reads_the_catalog_in_its_data_directory(tmp_path, monkeypatch):
     # 没有明确给目录文件时 smoke 在自己的数据目录内读取（设计说明第 3.4 节）：
     # 同一目录先以空态报告缺失，写入目录文件后读取成功，证明读的位置随数据目录移动
     data_dir = tmp_path / "smoke"
+    for name in EVAL_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
     missing = run_smoke(data_dir, scenarios=["happy"])
     assert missing["available"] is False and missing["stop_reason"] == "provider_config_missing"
     assert Path(missing["provider_config"]) == data_dir / "providers.json"

@@ -21,17 +21,16 @@ import yudao
 import yudao_metrics
 import yudao_report
 
-MODEL = "deepseek-v4.1-flash"
+# 不需要模型服务的用例使用的占位名；真实模型用例在运行时取 YUDAO_EVAL_MODEL（见 real_model_name）。
+MODEL = "test-model"
 REPO_ROOT = EVALS_DIR
 
-
-def model_credentials_present():
-    return bool(os.environ.get(yudao.MODEL_SERVICE_BASE_URL_ENV)
-                and os.environ.get(yudao.MODEL_SERVICE_API_KEY_ENV))
+# 需要真实模型的用例：默认不选，`-m real_model` 才运行；三个变量缺哪个由根目录 conftest.py 跳过并写明。
+real_model = pytest.mark.real_model
 
 
-needs_model = pytest.mark.skipif(not model_credentials_present(),
-                                 reason="model service credentials are not in the environment")
+def real_model_name():
+    return os.environ["YUDAO_EVAL_MODEL"]
 
 
 @pytest.fixture
@@ -463,6 +462,13 @@ def test_release_checkpoint_fails_on_a_provider_error():
 def test_release_binding_passes_when_qa_review_and_delivery_match():
     """第二项：放行引用的快照与最后一次封存一致；recheck_ratio 只在冻结参数可识别时核对。"""
     export = _load_fixture("handoff_release.json")
+    # 事件序列基准只保留关键字段（#537），qa_submitted 的 checks 不在其中：
+    # 这里按质检本次激活补上一条回执，再核对绑定。
+    review = next(e for e in export["events"] if e["type"] == "qa_submitted")
+    quality_activation = next(e["payload"]["activation_id"] for e in export["events"]
+                              if e["type"] == "department_activated" and e["department"] == "quality")
+    review["payload"]["checks"] = [{"name": "smoke", "activation_id": quality_activation,
+                                    "snapshot_hash": review["payload"]["code_snapshot_hash"]}]
     params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
         "parameters_version")
     collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
@@ -752,15 +758,15 @@ def test_process_exit_failure_is_not_a_release():
     assert collected["end_reason"] != yudao_metrics.MODEL_SERVICE_FAILURE
 
 # ---------------------------------------------------------------------------
-# 真实运行（需要模型服务凭据）
+# 真实运行（`-m real_model`，需要 YUDAO_EVAL_BASE_URL、YUDAO_EVAL_API_KEY、YUDAO_EVAL_MODEL）
 
-@needs_model
+@real_model
 def test_real_run_produces_metrics_a_score_and_a_report(runs_root, tmp_path):
     """真实运行一次 Yudao：指标、五项过程检查点、评分与报告都在。"""
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO,
                                  "yudao-tests")
     run = run_yudao_eval.run_once("yudao-real-1", runs_root, evidence_root,
-                                  MODEL, 90 * 60)
+                                  real_model_name(), 90 * 60)
     assert run["metrics"]["model_requests"] > 0
     assert run["metrics"]["elapsed_seconds"] > 0
     assert set(run["metrics"]["checkpoints"]) == {
@@ -771,13 +777,13 @@ def test_real_run_produces_metrics_a_score_and_a_report(runs_root, tmp_path):
     assert 0.0 <= run["score"]["completion"] <= 1.0
 
 
-@needs_model
+@real_model
 def test_time_limit_ends_the_run_and_marks_it(runs_root):
     """时间上限到达时事项被结束，按结束时的交付评分并标记超时。"""
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO,
                                  "yudao-tests")
     run = run_yudao_eval.run_once("yudao-limit-1", runs_root, evidence_root,
-                                  MODEL, 120.0)
+                                  real_model_name(), 120.0)
     assert run["metrics"]["timed_out"] is True
     assert run["metrics"]["end_reason"] == yudao_metrics.TIME_LIMIT
     assert 0.0 <= run["score"]["completion"] <= 1.0
