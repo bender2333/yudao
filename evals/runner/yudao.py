@@ -250,12 +250,12 @@ def register_model(client, model_name):
     providers = [item for item in document["providers"] if item["id"] != PROVIDER_ID]
     models = [item for item in document["models"] if item["id"] != MODEL_DEFINITION_ID]
     providers.append({
-        "id": PROVIDER_ID, "name": "Yudao eval", "protocol": PROTOCOL,
+        "id": PROVIDER_ID, "name": "Yudao eval",
         "base_url": model_service_url(), "credential_ref": MODEL_SERVICE_API_KEY_ENV,
         "timeout_sec": 600.0, "preset_id": "", "models_url": "",
     })
     models.append({
-        "id": MODEL_DEFINITION_ID, "provider_id": PROVIDER_ID, "model": model_name,
+        "id": MODEL_DEFINITION_ID, "provider_id": PROVIDER_ID, "model": model_name, "protocol": PROTOCOL,
         "context_window": CONTEXT_WINDOW, "max_output_tokens": MAX_OUTPUT_TOKENS,
         "accepts_required_tool_call": True,
         "input_modalities": ["text", "image"], "reasoning_levels": [],
