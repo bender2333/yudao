@@ -9159,10 +9159,6 @@
             "type": "integer",
             "title": "Interrupted Count"
           },
-          "pending_verification_count": {
-            "type": "integer",
-            "title": "Pending Verification Count"
-          },
           "waiting_resume_count": {
             "type": "integer",
             "title": "Waiting Resume Count"
@@ -9189,7 +9185,6 @@
           "current_adoption",
           "onboarding_status",
           "interrupted_count",
-          "pending_verification_count",
           "waiting_resume_count"
         ],
         "title": "ProjectRow"
@@ -9447,26 +9442,16 @@
             "type": "integer",
             "title": "Auto Resumed"
           },
-          "pending_verification": {
-            "type": "integer",
-            "title": "Pending Verification"
-          },
           "waiting_resume": {
             "type": "integer",
             "title": "Waiting Resume"
-          },
-          "unknown_actions": {
-            "type": "integer",
-            "title": "Unknown Actions"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "auto_resumed",
-          "pending_verification",
-          "waiting_resume",
-          "unknown_actions"
+          "waiting_resume"
         ],
         "title": "RecoveryStatus"
       },
@@ -10239,7 +10224,6 @@
             "enum": [
               "running",
               "interrupted",
-              "pending_verification",
               "waiting_resume",
               "terminated"
             ],
@@ -10344,10 +10328,6 @@
             },
             "type": "array",
             "title": "Late Results"
-          },
-          "has_unknown_actions": {
-            "type": "boolean",
-            "title": "Has Unknown Actions"
           }
         },
         "additionalProperties": false,
@@ -10368,8 +10348,7 @@
           "unusable",
           "limits",
           "owner",
-          "late_results",
-          "has_unknown_actions"
+          "late_results"
         ],
         "title": "RunRecoveryResult"
       },

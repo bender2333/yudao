@@ -3259,10 +3259,6 @@ export type ProjectRow = {
      */
     interrupted_count: number;
     /**
-     * Pending Verification Count
-     */
-    pending_verification_count: number;
-    /**
      * Waiting Resume Count
      */
     waiting_resume_count: number;
@@ -3457,17 +3453,9 @@ export type RecoveryStatus = {
      */
     auto_resumed: number;
     /**
-     * Pending Verification
-     */
-    pending_verification: number;
-    /**
      * Waiting Resume
      */
     waiting_resume: number;
-    /**
-     * Unknown Actions
-     */
-    unknown_actions: number;
 };
 
 /**
@@ -3943,7 +3931,7 @@ export type RunRecoveryResult = {
     /**
      * State
      */
-    state: 'running' | 'interrupted' | 'pending_verification' | 'waiting_resume' | 'terminated';
+    state: 'running' | 'interrupted' | 'waiting_resume' | 'terminated';
     /**
      * Reason
      */
@@ -3987,10 +3975,6 @@ export type RunRecoveryResult = {
      * Late Results
      */
     late_results: Array<LateResult>;
-    /**
-     * Has Unknown Actions
-     */
-    has_unknown_actions: boolean;
 };
 
 /**

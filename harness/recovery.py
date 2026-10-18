@@ -16,10 +16,9 @@ from .models import ArtifactRef, DecisionRequest, Event, EventType, hash_bytes
 ACTION_COMPLETED = "completed"
 ACTION_UNKNOWN = "unknown"
 
-# 恢复观察状态（工单 #18，v8 设计说明第 7.2 节）：运行中、中断、待核实、待恢复、已终止。
+# 恢复观察状态（工单 #18，v8 设计说明第 7.2 节）：运行中、中断、待恢复、已终止。
 OBSERVATION_RUNNING = "running"
 OBSERVATION_INTERRUPTED = "interrupted"
-OBSERVATION_PENDING_VERIFICATION = "pending_verification"
 OBSERVATION_WAITING_RESUME = "waiting_resume"
 OBSERVATION_TERMINATED = "terminated"
 
@@ -245,12 +244,6 @@ def _compare_single_target(path: str, target: str, *, before: dict[str, str],
 # ---------------------------------------------------------------------------
 # 恢复观察状态（工单 #18）
 
-def unresolved_unknown_actions(events: Sequence[Event],
-                               decisions: Iterable[DecisionRequest] = ()) -> dict[tuple[str, int | None, str], dict[str, Any]]:
-    # 还没有得到处置的结果未知动作：有 tool_started，没有结果或核实记录
-    return {identity: info for identity, info in classify_actions(events).items()
-            if info["status"] == ACTION_UNKNOWN}
-
 def open_decisions(decisions: Iterable[DecisionRequest], *, kind: str | None = None) -> list[DecisionRequest]:
     # 未回答的决定请求；给出种类时只取该种类
     return [decision for decision in decisions
@@ -278,11 +271,10 @@ def _live_activation(events: Sequence[Event]) -> bool:
 
 def observation_state(events: Sequence[Event], decisions: Iterable[DecisionRequest], *,
                       terminal: bool) -> str:
-    # 一个 run 的恢复观察状态（v8 设计说明第 7.2 节）：已终止、待恢复、待核实、运行中、中断。
+    # 一个 run 的恢复观察状态（v8 设计说明第 7.2 节）：已终止、待恢复、运行中、中断。
     # 判据只取持久事件、决定请求与投影中的终态，不读时钟，不调用模型：
     # - 已终止：run 已经结束（完成、暂停、失败）；由调用方从投影的 phase 给出；
     # - 待恢复：有未回答、阻塞整个 run 的待恢复请求（模型引用无法使用或定义版本不同）；
-    # - 待核实：有结果未知的动作（有 tool_started、没有结果或核实记录）；
     # - 运行中：进程正在执行（有一次没有结束的激活）；
     # - 中断：其余情况，进程在步骤之间退出，等待启动时自动继续
     decision_list = list(decisions)
@@ -290,8 +282,6 @@ def observation_state(events: Sequence[Event], decisions: Iterable[DecisionReque
         return OBSERVATION_TERMINATED
     if open_resume_decisions(decision_list):
         return OBSERVATION_WAITING_RESUME
-    if unresolved_unknown_actions(events, decision_list):
-        return OBSERVATION_PENDING_VERIFICATION
     if _live_activation(events):
         return OBSERVATION_RUNNING
     return OBSERVATION_INTERRUPTED

@@ -91,23 +91,22 @@ def test_the_interrupted_state_is_reported_with_the_last_confirmed_position(data
     restarted.close()
 
 def test_an_unknown_action_is_observed_as_pending_verification(data_dir):
-    # 待核实：有结果未知的动作（tool_started 没有结果），恢复时发出核实请求
+    # 重新启动以后结果未知的动作已交还，状态是中断或运行中，verifications 有一条交还记录
     system, _project_id, run_id = _engineering_run(data_dir, [product_spec(),])
     _lost_write(system, run_id)
     system.close()
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    assert recovery.state == "pending_verification", recovery
-    assert recovery.has_unknown_actions is True
-    assert recovery.can_continue is False
-    assert recovery.next_legal_action == "verify_action"
-    assert [item.action_id for item in recovery.unfinished_actions] == ["lost-write"]
-    action = recovery.unfinished_actions[0]
-    assert action.status == "unknown" and action.tool == "write_file"
-    assert action.before_snapshot_ref["content_hash"]
-    assert action.started_event_id
+    assert recovery.state in ("interrupted", "running"), recovery
+    assert recovery.unfinished_actions == []
+    assert len(recovery.verifications) == 1
+    record = recovery.verifications[0]
+    assert record.action_id == "lost-write"
+    assert "交还" in record.basis
+    assert record.basis == "重新启动时结果未知，交还发出它的会话"
     restarted.close()
 
 def test_an_unavailable_model_is_observed_as_waiting_resume(data_dir):
@@ -200,8 +199,7 @@ def test_the_event_stream_reconnect_only_adds_observation(data_dir):
     system.close()
 
 def test_system_status_counts_match_the_event_log(data_dir):
-    # system.status 的恢复汇总：服务重启后自动继续的事项数、待核实与待恢复的事项数、结果未知的动作数
-    # 与事件日志一致
+    # system.status 的恢复汇总：服务重启后自动继续的事项数、待恢复的事项数与事件日志一致
     system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
     _project_id, _work_item_id, run_id = _work_item_run(system, "中断的事项")
     system.activate_once(run_id)
@@ -212,15 +210,13 @@ def test_system_status_counts_match_the_event_log(data_dir):
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
     application = _application(restarted)
     status = _query(application, SYSTEM_STATUS, SystemStatusRequest())
-    assert status.recovery.pending_verification == 1
-    assert status.recovery.unknown_actions == 1
     assert status.recovery.waiting_resume == 0
     # 没有重启后自动继续的事项：重新打开时 resume_on_startup=False
     assert status.recovery.auto_resumed == 0
     restarted.close()
 
 def test_projects_list_reports_interruption_pending_and_resume_markers(data_dir):
-    # projects.list 返回每个项目的中断、待核实与待恢复标记（计数），为零时仍是 0
+    # projects.list 返回每个项目的中断与待恢复标记（计数），为零时仍是 0
     system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
     project_id, _work_item_id, run_id = _work_item_run(system, "中断的事项")
     system.activate_once(run_id)
@@ -232,7 +228,6 @@ def test_projects_list_reports_interruption_pending_and_resume_markers(data_dir)
     rows = _query(application, PROJECTS_LIST, ProjectsList())
     row = next(item for item in rows.projects if item.project_id == project_id)
     assert row.interrupted_count == 1
-    assert row.pending_verification_count == 0
     assert row.waiting_resume_count == 0
     restarted.close()
 
@@ -265,7 +260,8 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
     assert len(recovery.verifications) == 1
     record = recovery.verifications[0]
     assert record.action_id == "lost-write"
-    assert record.basis and record.result
+    assert record.basis == "重新启动时结果未知，交还发出它的会话"
+    assert record.result
     assert recovery.next_legal_action in ("continue", "none")
     restarted.close()
 
