@@ -1,0 +1,511 @@
+{
+ "milestone": "Stage 3 · M0 三部门的循环结构与命令执行",
+ "collected_at": "2026-10-18T05:30:40Z",
+ "issues": [
+  {
+   "number": 463,
+   "title": "[集成层] 5 个用例在并行下失败、单进程通过",
+   "state": "CLOSED",
+   "state_reason": "COMPLETED",
+   "created_at": "2026-10-12T08:45:59Z",
+   "closed_at": "2026-10-17T21:19:14Z",
+   "labels": [],
+   "url": "https://github.com/bender2333/yudao/issues/463",
+   "timeline": [
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-12T08:46:00Z",
+     "event": "labeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T16:41:48Z",
+     "event": "unlabeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T16:41:48Z",
+     "event": "labeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-17T17:49:46Z",
+     "event": "unlabeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-17T17:49:46Z",
+     "event": "labeled",
+     "label": "needs-review"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T20:48:15Z",
+     "event": "labeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T20:48:15Z",
+     "event": "unlabeled",
+     "label": "needs-review"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-17T21:06:06Z",
+     "event": "unlabeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-17T21:06:06Z",
+     "event": "labeled",
+     "label": "needs-review"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T21:19:14Z",
+     "event": "closed",
+     "label": null
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T21:19:35Z",
+     "event": "unlabeled",
+     "label": "needs-review"
+    }
+   ]
+  },
+  {
+   "number": 466,
+   "title": "[循环结构] 三个部门同时运行，询问是嵌套的调用",
+   "state": "OPEN",
+   "state_reason": "",
+   "created_at": "2026-10-12T15:18:31Z",
+   "closed_at": null,
+   "labels": [
+    "needs-triage"
+   ],
+   "url": "https://github.com/bender2333/yudao/issues/466",
+   "timeline": [
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-12T15:18:32Z",
+     "event": "labeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-16T07:17:36Z",
+     "event": "unlabeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-16T07:17:36Z",
+     "event": "labeled",
+     "label": "needs-triage"
+    }
+   ]
+  },
+  {
+   "number": 532,
+   "title": "[测试] 事件序列基准按关键字段写，部门提示与工具说明放进一份快照",
+   "state": "CLOSED",
+   "state_reason": "COMPLETED",
+   "created_at": "2026-10-15T14:45:44Z",
+   "closed_at": "2026-10-15T19:02:00Z",
+   "labels": [],
+   "url": "https://github.com/bender2333/yudao/issues/532",
+   "timeline": [
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T14:45:46Z",
+     "event": "labeled",
+     "label": "needs-triage"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T14:53:59Z",
+     "event": "unlabeled",
+     "label": "needs-triage"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T14:53:59Z",
+     "event": "labeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T15:05:42Z",
+     "event": "unlabeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T15:05:42Z",
+     "event": "labeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-15T16:40:37Z",
+     "event": "labeled",
+     "label": "needs-review"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-15T16:40:37Z",
+     "event": "unlabeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T17:14:10Z",
+     "event": "labeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T17:14:10Z",
+     "event": "unlabeled",
+     "label": "needs-review"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-15T18:40:01Z",
+     "event": "labeled",
+     "label": "needs-review"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-15T18:40:01Z",
+     "event": "unlabeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T19:02:00Z",
+     "event": "closed",
+     "label": null
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-15T19:02:26Z",
+     "event": "unlabeled",
+     "label": "needs-review"
+    }
+   ]
+  },
+  {
+   "number": 544,
+   "title": "[命令执行] 界面：项目设置删除命令登记",
+   "state": "CLOSED",
+   "state_reason": "NOT_PLANNED",
+   "created_at": "2026-10-16T06:55:41Z",
+   "closed_at": "2026-10-16T20:06:45Z",
+   "labels": [
+    "wontfix"
+   ],
+   "url": "https://github.com/bender2333/yudao/issues/544",
+   "timeline": [
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-16T06:55:43Z",
+     "event": "labeled",
+     "label": "needs-triage"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-16T07:19:54Z",
+     "event": "unlabeled",
+     "label": "needs-triage"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-16T07:19:54Z",
+     "event": "labeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-16T20:06:46Z",
+     "event": "closed",
+     "label": null
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-16T20:06:48Z",
+     "event": "unlabeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-16T20:06:48Z",
+     "event": "labeled",
+     "label": "wontfix"
+    }
+   ]
+  },
+  {
+   "number": 582,
+   "title": "[命令执行] 删除「核实结果未知的动作」决定，旧数据中的请求按交还处理",
+   "state": "CLOSED",
+   "state_reason": "COMPLETED",
+   "created_at": "2026-10-17T11:43:47Z",
+   "closed_at": "2026-10-17T15:04:50Z",
+   "labels": [],
+   "url": "https://github.com/bender2333/yudao/issues/582",
+   "timeline": [
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T11:43:49Z",
+     "event": "labeled",
+     "label": "needs-triage"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T11:47:08Z",
+     "event": "unlabeled",
+     "label": "needs-triage"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T11:47:08Z",
+     "event": "labeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T13:53:48Z",
+     "event": "labeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T13:53:48Z",
+     "event": "unlabeled",
+     "label": "ready-for-agent"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-17T14:28:05Z",
+     "event": "labeled",
+     "label": "needs-review"
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-17T14:28:05Z",
+     "event": "unlabeled",
+     "label": "in-progress"
+    },
+    {
+     "actor": "bender2333",
+     "created_at": "2026-10-17T15:04:51Z",
+     "event": "closed",
+     "label": null
+    },
+    {
+     "actor": "executor-home[bot]",
+     "created_at": "2026-10-17T15:05:40Z",
+     "event": "unlabeled",
+     "label": "needs-review"
+    }
+   ]
+  }
+ ],
+ "pull_requests": [
+  {
+   "number": 537,
+   "closes": [
+    532
+   ],
+   "state": "MERGED",
+   "created_at": "2026-10-15T16:34:44Z",
+   "merged_at": "2026-10-15T19:01:58Z",
+   "branch": "issue-532",
+   "files": [
+    "agents_jour/532.md",
+    "docs/CHANGELOG.md",
+    "docs/design/test-pyramid.md",
+    "harness/tests/conftest.py",
+    "harness/tests/event_scenarios.py",
+    "harness/tests/event_sequence.py",
+    "harness/tests/event_sequences/activation_start_unavailable.json",
+    "harness/tests/event_sequences/bash_is_not_a_check_receipt.json",
+    "harness/tests/event_sequences/cancel_during_model_call.json",
+    "harness/tests/event_sequences/cancel_while_bash_runs.json",
+    "harness/tests/event_sequences/cancel_while_check_runs.json",
+    "harness/tests/event_sequences/collaboration_request_answer.json",
+    "harness/tests/event_sequences/compaction_failed.json",
+    "harness/tests/event_sequences/compaction_success.json",
+    "harness/tests/event_sequences/context_overflow.json",
+    "harness/tests/event_sequences/guidance_response_explained.json",
+    "harness/tests/event_sequences/handoff_release.json",
+    "harness/tests/event_sequences/history_exceeds_the_window.json",
+    "harness/tests/event_sequences/http_chat_cancel_while_provider_holds.json",
+    "harness/tests/event_sequences/http_chat_credential_rejected_then_continue.json",
+    "harness/tests/event_sequences/http_chat_handoff.json",
+    "harness/tests/event_sequences/http_chat_stream_broken_then_success.json",
+    "harness/tests/event_sequences/http_messages_cancel_while_provider_holds.json",
+    "harness/tests/event_sequences/http_messages_credential_rejected_then_continue.json",
+    "harness/tests/event_sequences/http_messages_handoff.json",
+    "harness/tests/event_sequences/http_messages_stream_broken_then_success.json",
+    "harness/tests/event_sequences/http_responses_cancel_while_provider_holds.json",
+    "harness/tests/event_sequences/http_responses_credential_rejected_then_continue.json",
+    "harness/tests/event_sequences/http_responses_handoff.json",
+    "harness/tests/event_sequences/http_responses_retry_after_then_success.json",
+    "harness/tests/event_sequences/http_responses_server_error_then_success.json",
+    "harness/tests/event_sequences/http_responses_stream_broken_then_success.json",
+    "harness/tests/event_sequences/http_responses_timeout_then_success.json",
+    "harness/tests/event_sequences/invalid_tool_arguments.json",
+    "harness/tests/event_sequences/model_steps_exhausted.json",
+    "harness/tests/event_sequences/no_tool_call_pause.json",
+    "harness/tests/event_sequences/proposal_rejected.json",
+    "harness/tests/event_sequences/quality_rework.json",
+    "harness/tests/event_sequences/request_time_unavailable.json",
+    "harness/tests/event_sequences/request_time_unavailable_cancel.json",
+    "harness/tests/event_sequences/request_time_unavailable_stop.json",
+    "harness/tests/event_sequences/retry_after_too_long.json",
+    "harness/tests/event_sequences/retry_exhausted.json",
+    "harness/tests/event_sequences/retry_then_success.json",
+    "harness/tests/event_sequences/stop_command.json",
+    "harness/tests/event_sequences/text_only_reply.json",
+    "harness/tests/event_sequences/time_limit.json",
+    "harness/tests/event_sequences/tool_denied_guidance_only.json",
+    "harness/tests/prompt_snapshot.json",
+    "harness/tests/test_event_sequence.py",
+    "harness/tests/test_event_sequence_compare.py"
+   ],
+   "comments": [
+    {
+     "created_at": "2026-10-15T16:40:23Z",
+     "author": "executor-home",
+     "first_line": "DELIVERY: 第 1 轮"
+    },
+    {
+     "created_at": "2026-10-15T18:39:35Z",
+     "author": "executor-home",
+     "first_line": "DELIVERY: 第 2 轮"
+    }
+   ],
+   "reviews": [
+    {
+     "author": "reviewer-home",
+     "state": "CHANGES_REQUESTED",
+     "submitted_at": "2026-10-15T17:12:46Z"
+    },
+    {
+     "author": "reviewer-home",
+     "state": "APPROVED",
+     "submitted_at": "2026-10-15T19:00:19Z"
+    }
+   ]
+  },
+  {
+   "number": 587,
+   "closes": [
+    582
+   ],
+   "state": "MERGED",
+   "created_at": "2026-10-17T14:21:11Z",
+   "merged_at": "2026-10-17T15:04:49Z",
+   "branch": "issue-582",
+   "files": [
+    "agents_jour/582.md",
+    "client/src/renderer/src/api/generated/types.gen.ts",
+    "client/src/renderer/src/views/decisions/card-logic.ts",
+    "client/tests/unit/card-logic.test.js",
+    "docs/CHANGELOG.md",
+    "harness/app/labels.py",
+    "harness/app/payloads.py",
+    "harness/decisions.py",
+    "harness/orchestrator.py",
+    "harness/recovery.py",
+    "harness/tests/layers.toml",
+    "harness/tests/openapi/openapi.json",
+    "harness/tests/test_api.py",
+    "harness/tests/test_issue_17_action_recovery.py",
+    "harness/tests/test_issue_18_recovery_observation.py",
+    "harness/tests/test_legacy_unknown_action_requests.py",
+    "harness/tests/test_user_facing_labels.py"
+   ],
+   "comments": [
+    {
+     "created_at": "2026-10-17T14:27:57Z",
+     "author": "executor-home",
+     "first_line": "DELIVERY: 第 1 轮"
+    }
+   ],
+   "reviews": [
+    {
+     "author": "reviewer-home",
+     "state": "DISMISSED",
+     "submitted_at": "2026-10-17T14:51:55Z"
+    },
+    {
+     "author": "reviewer-home",
+     "state": "APPROVED",
+     "submitted_at": "2026-10-17T15:04:25Z"
+    }
+   ]
+  },
+  {
+   "number": 592,
+   "closes": [
+    463
+   ],
+   "state": "MERGED",
+   "created_at": "2026-10-17T17:21:57Z",
+   "merged_at": "2026-10-17T21:19:12Z",
+   "branch": "issue-463",
+   "files": [
+    "agents_jour/463.md",
+    "docs/CHANGELOG.md",
+    "harness/event_store.py",
+    "harness/tests/layers.toml",
+    "harness/tests/process_kill.py",
+    "harness/tests/test_event_store_read_only.py",
+    "harness/tests/test_issue_308_file_action_verification.py",
+    "harness/tests/test_observability_module.py",
+    "harness/tests/test_project_and_work_item_commands.py",
+    "harness/tests/test_run_check.py",
+    "harness/tests/test_run_time_limit.py"
+   ],
+   "comments": [
+    {
+     "created_at": "2026-10-17T17:49:21Z",
+     "author": "executor-home",
+     "first_line": "DELIVERY: 第 1 轮"
+    },
+    {
+     "created_at": "2026-10-17T18:55:12Z",
+     "author": "bender2333",
+     "first_line": "派发者：集成层（PR 合并提交 72588766，父 main 419e2fe8 + 分支 ebdcac31，`-n 4`）：`12 failed, 1165 passed, 13 skipped, 4 errors in 2639.73s (0:43:59)`。整层耗时是平时的 3 倍多，同一时间审查者在跑测试，机器负载高。"
+    },
+    {
+     "created_at": "2026-10-17T21:05:58Z",
+     "author": "executor-home",
+     "first_line": "DELIVERY: 第 2 轮"
+    }
+   ],
+   "reviews": [
+    {
+     "author": "reviewer-home",
+     "state": "CHANGES_REQUESTED",
+     "submitted_at": "2026-10-17T20:46:49Z"
+    },
+    {
+     "author": "reviewer-home",
+     "state": "APPROVED",
+     "submitted_at": "2026-10-17T21:11:45Z"
+    }
+   ]
+  }
+ ]
+}
