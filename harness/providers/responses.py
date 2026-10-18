@@ -4,7 +4,6 @@ import asyncio
 import email.utils
 import json
 import math
-import platform
 import re
 import time
 import typing
@@ -17,17 +16,9 @@ from urllib.parse import urlsplit
 import httpx
 import httpx2
 import pydantic
-# openai 在第一次请求时才导入资源模块；随 Provider 模块导入，这项一次性工作在服务启动时完成（D09）
-import openai.resources.responses
-from openai import (
-    APIConnectionError,
-    APIError,
-    APIStatusError,
-    APITimeoutError,
-    AsyncOpenAI,
-    DefaultAsyncHttpxClient,
-)
-from openai.types.responses import ResponseStreamEvent
+
+if typing.TYPE_CHECKING:
+    import openai
 
 from .call import ModelDelta
 from .errors import CancelledError, ProviderError
@@ -40,13 +31,22 @@ from .tls import certificate_verification_failed, service_address, ssl_context
 
 
 def _build_sdk_models(root: Any) -> None:
-    # SDK 的一次性初始化在服务启动时完成（D09）：openai 与 anthropic 的 pydantic 模型推迟到第一次解析时才构建，
-    # 第一次请求解析流事件时要构建几百个模型。协议模块导入时（服务启动）从流事件的类型出发全部构建：
+    # SDK 的一次性初始化在模型目录用到这个协议时完成（D09，见 sdk.py）：openai 与 anthropic 的 pydantic 模型推迟到第一次解析时才构建，
+    # 第一次请求解析流事件时要构建几百个模型。准备协议时从流事件的类型出发全部构建：
     # 先构建字段中出现的模型，再构建引用它们的模型，后者直接使用前者已经构建的结果
     order: list[type[pydantic.BaseModel]] = []
     _collect_models(root, set(), order)
     for model in order:
         model.model_rebuild(force=True)
+
+
+def prepare_responses_sdk() -> None:
+    # 由 sdk.prepare_protocols 在模型目录用到 responses 时调用：导入 openai 的资源模块并构建流事件的模型。
+    # 本模块的其余部分不依赖 SDK，模型目录没有用到 responses 时不导入 openai
+    import openai.resources.responses
+    from openai.types.responses import ResponseStreamEvent
+
+    _build_sdk_models(ResponseStreamEvent)
 
 
 def _collect_models(annotation: Any, seen: set[type], order: list[type[pydantic.BaseModel]]) -> None:
@@ -62,11 +62,6 @@ def _collect_models(annotation: Any, seen: set[type], order: list[type[pydantic.
         _collect_models(argument, seen, order)
 
 
-_build_sdk_models(ResponseStreamEvent)
-
-# 两个 SDK 在每个客户端的第一次请求之前识别平台（platform.system 与 platform.platform），进程内第一次识别要查询
-# 系统信息；服务启动时先识别一次，之后读取标准库的缓存
-platform.platform()
 
 
 @dataclass(frozen=True)
@@ -196,13 +191,15 @@ class ProviderConnections:
     # drain_timeout_sec：收到终态以后读完回复剩余部分的时限，读完的连接才能复用；不计入请求时限
     def __init__(self, *, drain_timeout_sec: float = 0.1) -> None:
         self.drain_timeout_sec = drain_timeout_sec
-        self._clients: dict[tuple[Any, ...], AsyncOpenAI] = {}
+        self._clients: dict[tuple[Any, ...], openai.AsyncOpenAI] = {}
         self._request_context: ContextVar[_RequestContext | None] = ContextVar(
             "yudao_providers_responses_request_context", default=None,
         )
         self._closed = False
 
-    async def client_for(self, config: ResponsesConfig) -> AsyncOpenAI:
+    async def client_for(self, config: ResponsesConfig) -> openai.AsyncOpenAI:
+        from openai import AsyncOpenAI, DefaultAsyncHttpxClient
+
         if self._closed:
             raise RuntimeError("Provider connections are closed")
         # The credential is an in-memory connection identity only; it is never logged or persisted.
@@ -285,6 +282,8 @@ async def invoke_responses(
     connections: ProviderConnections | None = None,
 ) -> InvokeResult:
     # 单次 Responses 调用，SDK 内部重试关闭
+    from openai import APIConnectionError, APIError, APIStatusError, APITimeoutError
+
     config = ResponsesConfig(
         model=frozen_target.model,
         api_key=frozen_target.api_key,
@@ -403,6 +402,8 @@ class _ResponsesInvoker:
             await trace.attach(http_request)
             await _emit_request(invocation, http_request, observation_errors, clock)
 
+        from openai import AsyncOpenAI, DefaultAsyncHttpxClient
+
         http_client = DefaultAsyncHttpxClient(
             timeout=invocation.config.timeout_sec, verify=ssl_context(),
             event_hooks={"request": [observe_request], "response": [clock.response_started]},
@@ -445,7 +446,7 @@ class _ResponsesInvoker:
         invocation: _InvokeRequest,
         trace: _TransportTrace,
         observation_errors: list[BaseException],
-        client: AsyncOpenAI,
+        client: openai.AsyncOpenAI,
         started: float,
         clock: _ProviderClock,
     ) -> InvokeResult:
@@ -750,7 +751,7 @@ def _sanitized_error_param(value: Any) -> str | None:
 
 
 def _http_status_diagnostics(
-    exc: APIStatusError,
+    exc: openai.APIStatusError,
     observation_id: str,
     *,
     secrets: tuple[str, ...] = (),

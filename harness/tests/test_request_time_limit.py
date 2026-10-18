@@ -41,10 +41,22 @@ def _close(server) -> None:
     server.server_close()
 
 
-# 新进程中只导入 Provider 模块（服务启动），列出解析流事件要用的 SDK 模型是否已经构建
-SDK_MODELS_BUILT = """
+# 新进程中创建 Provider 门面并读入模型目录（服务启动），目录用到三种协议；
+# 列出解析流事件要用的 SDK 模型是否已经构建
+CATALOG_WITH_THE_THREE_PROTOCOLS = """
+from harness.providers import ProviderFacade
+ProviderFacade().store_document({
+    "providers": [{"id": "go", "name": "Go", "base_url": "http://127.0.0.1:1/v1",
+                   "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": ""}],
+    "models": [{"id": "m-" + protocol, "provider_id": "go", "model": "target-model", "protocol": protocol,
+                "context_window": 32000, "max_output_tokens": 2048, "capability_source": "preset-v1"}
+               for protocol in ("responses", "chat_completions", "messages")],
+    "bindings": {},
+})
+"""
+
+SDK_MODELS_BUILT = CATALOG_WITH_THE_THREE_PROTOCOLS + """
 import json
-import harness.providers
 from anthropic.types import RawContentBlockDeltaEvent, RawMessageStartEvent
 from openai.types.chat import ChatCompletionChunk
 from openai.types.responses import (
@@ -58,7 +70,7 @@ print(json.dumps({model.__name__: isinstance(model.__pydantic_validator__, Schem
 """
 
 
-def test_sdk_stream_models_are_built_when_the_provider_module_is_imported():
+def test_sdk_stream_models_are_built_when_the_catalog_uses_the_protocol():
     completed = subprocess.run([sys.executable, "-c", SDK_MODELS_BUILT], cwd=REPOSITORY,
                                capture_output=True, text=True, timeout=300)
     assert completed.returncode == 0, completed.stderr
@@ -66,17 +78,16 @@ def test_sdk_stream_models_are_built_when_the_provider_module_is_imported():
     assert built and all(built.values()), built
 
 
-# 新进程中只导入 Provider 模块（服务启动），再按两个 SDK 的方式识别平台（platform.system 与 platform.platform），
+# 新进程中读入用到三种协议的模型目录（服务启动），再按两个 SDK 的方式识别平台（platform.system 与 platform.platform），
 # 打印识别期间查询系统版本（platform.win32_ver）的次数
-PLATFORM_IDENTIFIED = """
+PLATFORM_IDENTIFIED = CATALOG_WITH_THE_THREE_PROTOCOLS + """
 import platform
-import harness.providers
 from harness.tests.helpers import calls_during as _calls_during
 print(_calls_during(platform.win32_ver, lambda: (platform.system(), platform.platform())))
 """
 
 
-def test_platform_is_identified_when_the_provider_module_is_imported():
+def test_platform_is_identified_when_the_catalog_uses_the_protocol():
     # 两个 SDK 在每个客户端的第一次请求之前识别平台，进程内第一次识别在 Windows 上要查询系统版本（约 0.4 秒）；
     # 这项一次性工作在服务启动时完成
     completed = subprocess.run([sys.executable, "-c", PLATFORM_IDENTIFIED], cwd=REPOSITORY,
