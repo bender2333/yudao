@@ -4,7 +4,6 @@
     {
       "id": "opencode-go-responses",
       "name": "OpenCode Go（Responses）",
-      "protocol": "responses",
       "base_url": "https://opencode.ai/zen/go/v1",
       "credential_ref": "YUDAO_OPENCODE_GO_KEY",
       "timeout_sec": 600,
@@ -14,7 +13,6 @@
     {
       "id": "opencode-go-chat",
       "name": "OpenCode Go（Chat Completions）",
-      "protocol": "chat_completions",
       "base_url": "https://opencode.ai/zen/go/v1",
       "credential_ref": "YUDAO_OPENCODE_GO_KEY",
       "timeout_sec": 600,
@@ -24,7 +22,6 @@
     {
       "id": "custom-compatible",
       "name": "自定义兼容服务",
-      "protocol": "responses",
       "base_url": "https://gateway.example/v1",
       "credential_ref": "YUDAO_CUSTOM_KEY",
       "timeout_sec": 600,
@@ -37,6 +34,7 @@
       "id": "go-luna-responses",
       "provider_id": "opencode-go-responses",
       "model": "gpt-5.6-luna",
+      "protocol": "responses",
       "context_window": 128000,
       "max_output_tokens": 8192,
       "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证"
@@ -45,6 +43,7 @@
       "id": "go-glm-chat",
       "provider_id": "opencode-go-chat",
       "model": "glm-5.1",
+      "protocol": "chat_completions",
       "context_window": 128000,
       "max_output_tokens": 8192,
       "capability_source": "预置提示：官方端点示例（2026-09-19），未经真实验证"
@@ -53,6 +52,7 @@
       "id": "custom-responses",
       "provider_id": "custom-compatible",
       "model": "your-model-id",
+      "protocol": "responses",
       "context_window": 64000,
       "max_output_tokens": 4096,
       "capability_source": "自定义连接：按服务实际能力填写"
