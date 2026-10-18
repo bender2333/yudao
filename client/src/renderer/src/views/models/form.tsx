@@ -443,7 +443,7 @@ export function ProviderForm(props: ProviderFormProps) {
 }
 
 // 凭据状态与来源（设计说明第 9.1 节）：缺失，或来源为内存、环境、.env
-function credentialText(credential: CatalogCredential): string {
+export function credentialText(credential: CatalogCredential): string {
   if (!credential.configured) {
     return "缺失，请填写 API Key";
   }

@@ -112,10 +112,16 @@ export function Block(props: {
   actions?: ReactNode;
   className?: string;
   compact?: boolean;
+  "data-testid"?: string;
+  dataTestId?: string;
   children: ReactNode;
 }) {
   return (
-    <section id={props.id} className={`y10-block${props.className ? ` ${props.className}` : ""}${props.compact ? " is-compact" : ""}`}>
+    <section
+      id={props.id}
+      data-testid={props["data-testid"] ?? props.dataTestId}
+      className={`y10-block${props.className ? ` ${props.className}` : ""}${props.compact ? " is-compact" : ""}`}
+    >
       {props.title || props.actions ? (
         <header className="y10-block-head">
           <div className="y10-block-titles">
