@@ -21,17 +21,16 @@ import yudao
 import yudao_metrics
 import yudao_report
 
-MODEL = "deepseek-v4.1-flash"
+# 不需要模型服务的用例使用的占位名；真实模型用例在运行时取 YUDAO_EVAL_MODEL（见 real_model_name）。
+MODEL = "test-model"
 REPO_ROOT = EVALS_DIR
 
-
-def model_credentials_present():
-    return bool(os.environ.get(yudao.MODEL_SERVICE_BASE_URL_ENV)
-                and os.environ.get(yudao.MODEL_SERVICE_API_KEY_ENV))
+# 需要真实模型的用例：默认不选，`-m real_model` 才运行；三个变量缺哪个由根目录 conftest.py 跳过并写明。
+real_model = pytest.mark.real_model
 
 
-needs_model = pytest.mark.skipif(not model_credentials_present(),
-                                 reason="model service credentials are not in the environment")
+def real_model_name():
+    return os.environ["YUDAO_EVAL_MODEL"]
 
 
 @pytest.fixture
@@ -759,15 +758,15 @@ def test_process_exit_failure_is_not_a_release():
     assert collected["end_reason"] != yudao_metrics.MODEL_SERVICE_FAILURE
 
 # ---------------------------------------------------------------------------
-# 真实运行（需要模型服务凭据）
+# 真实运行（`-m real_model`，需要 YUDAO_EVAL_BASE_URL、YUDAO_EVAL_API_KEY、YUDAO_EVAL_MODEL）
 
-@needs_model
+@real_model
 def test_real_run_produces_metrics_a_score_and_a_report(runs_root, tmp_path):
     """真实运行一次 Yudao：指标、五项过程检查点、评分与报告都在。"""
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO,
                                  "yudao-tests")
     run = run_yudao_eval.run_once("yudao-real-1", runs_root, evidence_root,
-                                  MODEL, 90 * 60)
+                                  real_model_name(), 90 * 60)
     assert run["metrics"]["model_requests"] > 0
     assert run["metrics"]["elapsed_seconds"] > 0
     assert set(run["metrics"]["checkpoints"]) == {
@@ -778,13 +777,13 @@ def test_real_run_produces_metrics_a_score_and_a_report(runs_root, tmp_path):
     assert 0.0 <= run["score"]["completion"] <= 1.0
 
 
-@needs_model
+@real_model
 def test_time_limit_ends_the_run_and_marks_it(runs_root):
     """时间上限到达时事项被结束，按结束时的交付评分并标记超时。"""
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO,
                                  "yudao-tests")
     run = run_yudao_eval.run_once("yudao-limit-1", runs_root, evidence_root,
-                                  MODEL, 120.0)
+                                  real_model_name(), 120.0)
     assert run["metrics"]["timed_out"] is True
     assert run["metrics"]["end_reason"] == yudao_metrics.TIME_LIMIT
     assert 0.0 <= run["score"]["completion"] <= 1.0

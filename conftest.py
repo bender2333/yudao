@@ -30,6 +30,10 @@ MODULE_DENIED = ("socket.connect", "socket.bind")
 # 按地址放行会放过测试里绑定 127.0.0.1:0 起服务的写法，所以看调用栈。
 _SOCKET_STDLIB = str(Path(os.__file__).parent / "socket.py")
 
+# 真实模型测试：模型服务的地址、凭据与模型名取自这三个变量（运行配置第 4 节）。
+REAL_MODEL = "real_model"
+REAL_MODEL_ENV = ("YUDAO_EVAL_BASE_URL", "YUDAO_EVAL_API_KEY", "YUDAO_EVAL_MODEL")
+
 REWRITE_OPTIONS = ("--write-event-baselines", "--write-openapi-snapshot")
 
 _LAYER_KEY = pytest.StashKey[str]()
@@ -118,7 +122,19 @@ def _refuse_outside_integration(workers: int, outside: list[str]) -> None:
         raise pytest.UsageError(f"多进程（-n {workers}）只能运行集成层测试，以下选中的测试不是集成层：\n{shown}{extra}")
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:  # noqa: ARG001
+def _deselect_real_model(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """没有明确选择 `-m real_model` 时，真实模型测试不进入本次运行（凭据在环境中也不运行）。"""
+    if REAL_MODEL in (config.getoption("markexpr", "") or ""):
+        return
+    kept = [item for item in items if item.get_closest_marker(REAL_MODEL) is None]
+    dropped = [item for item in items if item.get_closest_marker(REAL_MODEL) is not None]
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = kept
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    _deselect_real_model(config, items)
     registry = _load_registry()
     for item in items:
         path = getattr(item, "path", None)
@@ -164,6 +180,10 @@ def _tmp_fixtures(item: pytest.Item) -> list[str]:
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
+    if item.get_closest_marker(REAL_MODEL) is not None:
+        missing = [name for name in REAL_MODEL_ENV if not os.environ.get(name)]
+        if missing:
+            pytest.skip("真实模型测试缺少环境变量：" + "、".join(missing))
     layer = item.stash.get(_LAYER_KEY, None)
     if layer is None:
         return

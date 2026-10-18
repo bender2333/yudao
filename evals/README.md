@@ -62,6 +62,15 @@ uv run python evals/scorer/scorer.py --delivery <交付目录> --result <结果�
 uv run python -m pytest evals/tests
 ```
 
+需要真实模型的用例带 `real_model` 标记，只在明确选择时运行：变量在环境里也不会触发它们，上面的命令不运行它们。三个变量（`YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`、`YUDAO_EVAL_MODEL`）都设置以后：
+
+```bash
+uv run python -m pytest evals/tests -m real_model                                    # 全部，单项最长 90 分钟
+uv run python -m pytest evals/tests/test_yudao_runner.py -m real_model -k time_limit # 最短的一项
+```
+
+选择了而变量缺失时这些用例跳过，原因写明缺哪个变量。
+
 ## 运行一次评测
 
 模型服务的地址与凭据只从环境变量读，不写入代码、事件、日志与提交：
@@ -69,6 +78,7 @@ uv run python -m pytest evals/tests
 ```bash
 export YUDAO_EVAL_BASE_URL=<模型服务地址>
 export YUDAO_EVAL_API_KEY=<凭据>
+export YUDAO_EVAL_MODEL=<模型名>
 uv run python evals/runner/run_eval.py \
     --scenario scenario3 \
     --model yudao-eval/<模型名> \

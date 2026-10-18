@@ -2,8 +2,9 @@
 
 They run the real opencode binary with a real model, build real run
 directories outside the repository and score the real delivery. No mock is
-used: the model service credentials come from the user's environment
-variables, so the tests are skipped when they are absent.
+used: the model service settings come from the user's environment
+variables. The tests that need the model carry the `real_model` marker: they
+run only with `-m real_model`, and are skipped when a variable is missing.
 """
 
 import json
@@ -25,19 +26,20 @@ import report
 import run_eval
 import scenario3
 
-MODEL = "yudao-eval/cbcn/deepseek-v4.1-flash"
-MODEL_ID = "cbcn/deepseek-v4.1-flash"
+# 不需要模型服务的用例使用的占位名；真实模型用例在运行时取 YUDAO_EVAL_MODEL（见 real_model_names）。
+MODEL_ID = "test-model"
+MODEL = "yudao-eval/" + MODEL_ID
 SCENARIO = scenario3
 REPO_ROOT = EVALS_DIR
 
-
-def model_credentials_present():
-    return bool(os.environ.get(opencode.MODEL_SERVICE_BASE_URL_ENV)
-                and os.environ.get(opencode.MODEL_SERVICE_API_KEY_ENV))
+# 需要真实模型的用例：默认不选，`-m real_model` 才运行；三个变量缺哪个由根目录 conftest.py 跳过并写明。
+real_model = pytest.mark.real_model
 
 
-needs_model = pytest.mark.skipif(not model_credentials_present(),
-                                 reason="model service credentials are not in the environment")
+def real_model_names():
+    """opencode 一侧的 `provider/model` 写法与模型名，由 YUDAO_EVAL_MODEL 拼出。"""
+    model_id = os.environ["YUDAO_EVAL_MODEL"]
+    return "yudao-eval/" + model_id, model_id
 
 
 @pytest.fixture
@@ -104,8 +106,14 @@ def test_message_points_at_the_same_materials_the_run_directory_has(runs_root):
         assert handle.read() == delivered_prd
 
 
-def test_command_line_fits_the_windows_limit(runs_root):
-    """Windows 的命令行有长度上限，材料全文放进命令行会被系统拒绝。"""
+def test_command_line_fits_the_windows_limit(runs_root, monkeypatch):
+    """Windows 的命令行有长度上限，材料全文放进命令行会被系统拒绝。
+
+    只核对命令行的长度，不起 opencode：可执行文件的查找换成一个典型的安装路径，
+    运行机上有没有 opencode 都能运行。
+    """
+    monkeypatch.setattr(opencode.shutil, "which",
+                        lambda name: "C:/Users/runner/AppData/Roaming/npm/" + name + ".cmd")
     run_dir = opencode.create_run_dir(runs_root, "limits", MODEL, MODEL_ID)
     command = opencode.build_command(run_dir, MODEL)
     length = sum(len(item) for item in command)
@@ -306,7 +314,7 @@ def test_result_records_the_environment_and_the_no_network_rule():
         assert result["host_environment"][key]
 
 
-@needs_model
+@real_model
 def test_real_run_delivers_into_the_run_directory(runs_root, tmp_path):
     """真实运行一次：交付落在运行目录，取回与搜索工具没有调用。"""
     outcome = _run_with_cap(runs_root, "real")
@@ -342,7 +350,7 @@ def _inside(path, parent):
     return path == parent or path.startswith(parent + os.sep)
 
 
-@needs_model
+@real_model
 def test_real_run_is_scored_by_the_scorer(runs_root, tmp_path):
     outcome = _run_with_cap(runs_root, "scored")
     evidence = str(tmp_path / "evidence")
@@ -366,20 +374,22 @@ def _run_with_cap(runs_root, run_id):
     场景 3 的完整实现超过这个上限，所以这里断言的是运行器保证的部分：
     事件流、取回与搜索工具没有调用、交付落在运行目录。
     """
-    run_dir = opencode.create_run_dir(runs_root, run_id, MODEL, MODEL_ID)
-    outcome = opencode.run_opencode(run_dir, MODEL, 180)
+    model, model_id = real_model_names()
+    run_dir = opencode.create_run_dir(runs_root, run_id, model, model_id)
+    outcome = opencode.run_opencode(run_dir, model, 180)
     outcome["run_dir"] = run_dir
     return outcome
 
 
-@needs_model
+@real_model
 def test_time_limit_ends_the_run(runs_root, tmp_path):
     """时间上限到达时运行被结束，按结束时的目录评分并标记超时。"""
-    run_dir = opencode.create_run_dir(runs_root, "timeout", MODEL, MODEL_ID)
-    started = opencode.create_run_dir(runs_root, "timeout-control", MODEL, MODEL_ID)
+    model, model_id = real_model_names()
+    run_dir = opencode.create_run_dir(runs_root, "timeout", model, model_id)
+    started = opencode.create_run_dir(runs_root, "timeout-control", model, model_id)
     assert os.path.isdir(run_dir) and os.path.isdir(started)
 
-    outcome = opencode.run_opencode(run_dir, MODEL, 20)
+    outcome = opencode.run_opencode(run_dir, model, 20)
     assert outcome["timed_out"] is True
     # 到上限以后进程已经结束，没有残留
     collected = metrics.collect(outcome, opencode.parse_events(outcome["stdout"]))

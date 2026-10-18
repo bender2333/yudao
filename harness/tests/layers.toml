@@ -147,6 +147,7 @@
 "test_single_write_path.py" = "unit"
 "test_smoke.py" = "integration"
 "test_smoke_guidance_audit.py" = "integration"
+"test_smoke_eval_settings.py" = "module"
 "test_smoke_retries.py" = "unit"
 "test_snapshot.py" = "integration"
 "test_startup_reload.py" = "integration"
