@@ -26,6 +26,7 @@
 "test_basis_hash_rules.py" = "unit"
 "test_call_target_per_request.py" = "integration"
 "test_catalog_api.py" = "integration"
+"test_ci_layers.py" = "unit"
 "test_cli_entry.py" = "module"
 "test_collaboration_engine.py" = "module"
 "test_collaboration_responded_parties.py" = "integration"
