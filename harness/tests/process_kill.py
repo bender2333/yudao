@@ -316,9 +316,10 @@ def _kill(process: subprocess.Popen, signals: Path | None = None) -> None:
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     else:
         os.kill(process.pid, signal.SIGKILL)
+    # process.wait 返回就是进程已经退出。不再用进程号探测：Windows 上父进程还握着这个进程的句柄，
+    # 按进程号打开总能成功，探测会一直等满 10 秒才放弃
     process.wait(STARTUP_TIMEOUT_SEC)
     from harness.tests.helpers import wait_until_stopped
-    wait_until_stopped(process.pid)
     if child is None:
         return
     if os.name == "nt":
