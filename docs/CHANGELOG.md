@@ -680,3 +680,5 @@ claude-opus-5-5 / 2026-10-18 12:00 / .github/workflows/ci.yml：新增 integrati
 claude-opus-5-5 / 2026-10-18 13:05 / docs/requirements/execution-limits.md：SDK 的一次性初始化改为在服务启动或修改模型目录时、第一次请求之前完成，只初始化模型目录中用到的协议；docs/decision.md 新增「派发者暂停期间架构师直接改代码，先把基线做稳」 / 用户确认 #598 第一批的模型 SDK 推迟导入，以及派发者暂停期间由架构师直接修基线
 
 claude-opus-5-5 / 2026-10-18 13:25 / docs/decision.md 新增「里程碑的工单记录与复盘」；docs/stage-3/autopilot-retrospective-2026-10-17.md 第 8.2 节第 4 批写明用户的决定（CLAUDE.md 工作流程第 7 步同时加复盘一句） / 复盘纪要第 4 批：记录的位置、复盘的位置与参数修改的确认由用户决定
+
+claude-opus-5-5 / 2026-10-18 13:10 / docs/agents/autopilot-runtime.md 第 5 节：CI 工作流改为由用户在场时的架构师维护，执行者与被唤醒的架构师不修改；docs/decision.md 新增「架构师的权限」（CLAUDE.md 同时修改「角色」「自主推进模式」「被唤醒的架构师」） / 用户提出：用户在场时架构师与用户一体，可以改规则；被唤醒时可以改架构与需求，不能改规则

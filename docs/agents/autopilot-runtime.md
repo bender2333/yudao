@@ -132,7 +132,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 
 ## 5. CI
 
-- 定义：`.github/workflows/ci.yml`，由架构师维护，修改前经用户确认。
+- 定义：`.github/workflows/ci.yml`，由用户在场时的架构师维护，执行者与被唤醒的架构师不修改。
 - 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上运行检查 `check`：安装依赖，单元层与模块层（包括两项固定检查），客户端的类型检查与单元测试（逐场景回放测试除外，按 `AGENTS.md` 单独运行），编译页面与 wheel。
 - main 的每次推送（每次合并以后）另外运行 `integration`：集成层全部（`-n 4`，2026-10-18 测得约 23 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由派发者按派发者规则第 5 节处理。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
 - 手动触发（`check` 与 `integration` 都运行）：`gh workflow run CI --ref <分支>`，例如工单要在 GitHub 的运行机上验证集成层时 `gh workflow run CI --ref issue-<编号>`；之后用 `gh run list --workflow CI --branch <分支> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果。
