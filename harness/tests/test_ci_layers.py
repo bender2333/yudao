@@ -84,6 +84,15 @@ def test_inventory_counts_added_removed_and_moved_tests_per_layer():
     assert "- ③ 集成层：`harness/tests/test_c.py::test_new`" in lines
 
 
+def test_a_failed_collection_is_reported_instead_of_no_change():
+    head = "harness/tests/test_a.py::test_x\n1 test collected in 0.10s\n"
+    failed = "ERROR harness/tests/test_a.py - ImportError: boom\n1 error in 0.20s\n"
+    text = ci.inventory_from_outputs(failed, head, LAYERS, LAYERS)
+    assert "没有收集到合并前的用例" in text and "ImportError: boom" in text
+    assert "用例没有变化" not in text
+    assert "没有收集到合并后的用例" in ci.inventory_from_outputs(head, None, LAYERS, LAYERS)
+
+
 def test_inventory_says_so_when_nothing_changed():
     ids = {"harness/tests/test_a.py::test_x"}
     text = ci.inventory_markdown(ids, ids, LAYERS, LAYERS)

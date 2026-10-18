@@ -181,14 +181,22 @@ def _summary(args: argparse.Namespace) -> str:
     return summary_markdown(results, layers, args.pending)
 
 
+def inventory_from_outputs(base: str | None, head: str | None, base_layers: dict[str, str],
+                           head_layers: dict[str, str]) -> str:
+    # 一边没有收集到任何用例（收集失败、输出缺失）时不比较，写出那一边输出的末尾，不报「没有变化」
+    collected = {"合并前": parse_nodeids(base or ""), "合并后": parse_nodeids(head or "")}
+    for side, output in (("合并前", base), ("合并后", head)):
+        if not collected[side]:
+            tail = "\n".join((output or "（没有输出）").splitlines()[-15:])
+            return (f"### 用例变化\n\n没有收集到{side}的用例，这次不比较。收集输出的末尾：\n\n"
+                    f"```\n{tail}\n```\n")
+    return inventory_markdown(collected["合并前"], collected["合并后"], base_layers, head_layers)
+
+
 def _inventory(args: argparse.Namespace) -> str:
-    base, head = _read(args.base), _read(args.head)
-    if base is None or head is None:
-        missing = "合并前" if base is None else "合并后"
-        return f"### 用例变化\n\n没有收集到{missing}的用例清单，这次不比较。\n"
-    return inventory_markdown(parse_nodeids(base), parse_nodeids(head),
-                              load_layers(_read(args.base_layers) or ""),
-                              load_layers(_read(args.head_layers) or ""))
+    return inventory_from_outputs(_read(args.base), _read(args.head),
+                                  load_layers(_read(args.base_layers) or ""),
+                                  load_layers(_read(args.head_layers) or ""))
 
 
 def main(argv: list[str] | None = None) -> int:
