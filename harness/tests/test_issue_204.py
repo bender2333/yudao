@@ -161,6 +161,7 @@ def _write_command_body(workspace, outside):
     # bash 命令调用的脚本：在 node_modules 下建立指向工作区之外的链接
     workspace.write_file("make_link.py", (
         "import os, sys\n"
+        "os.makedirs('node_modules', exist_ok=True)\n"
         f"os.symlink({str(outside)!r}, os.path.join('node_modules', sys.argv[1]))\n"
     ))
 
