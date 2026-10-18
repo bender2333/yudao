@@ -1,4 +1,6 @@
-# 每个 PR 与 main 的每次推送都运行。合并 main 要求 check 通过（docs/agents/dispatcher.md）。
+# 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/dispatcher.md）。
+# 测试按时机分层（docs/design/test-pyramid.md 第 4 节）：PR 只运行 check；合并到 main 以后另外运行 integration，
+# 不挡合并；手动触发两项都运行。
 # 本文件由架构师维护，修改前经用户确认；执行者使用的开发 App 没有 workflows 权限。
 name: CI
 
@@ -6,9 +8,17 @@ on:
   pull_request:
   push:
     branches: [main]
+    # 只改文档与日记的推送（架构师经常直接推送）不运行；PR 上不跳过，check 是合并必须通过的检查
+    paths-ignore:
+      - "docs/**"
+      - "agents_jour/**"
+      - "claude_jour.md"
+  workflow_dispatch:
 
+# PR 与手动触发：同一分支的新运行取消旧运行。main 的推送：每个合并提交各自运行到底，
+# 失败能对应到一次合并
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -75,3 +85,41 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client
         run: npm run typecheck
+
+  # 集成层全部（docs/design/test-pyramid.md 第 4.2 节）。不是合并必须通过的检查：
+  # main 的每次推送（每次合并以后）与手动触发时运行，PR 上不运行。失败由派发者按派发者规则第 5 节处理
+  integration:
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - name: git 身份（测试会建仓库并提交）
+        run: |
+          git config --global user.name "Yudao CI"
+          git config --global user.email "ci@yudao.invalid"
+
+      - name: 安装依赖
+        run: uv sync --frozen
+
+      - name: 集成层
+        run: uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
+
+      # 失败时从这份结果读出失败项名称，用于单进程重新运行（docs/design/test-pyramid.md 第 6 节）
+      - name: 保存结果
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-results
+          path: .tmp/test-results/integration.xml
+          if-no-files-found: ignore

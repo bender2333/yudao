@@ -40,7 +40,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
   - 测试的写法见 `docs/design/test-pyramid.md` 第 10 节：提案用 `harness/proposals.py` 的构造函数生成；断言结果，不数模型调用的次数，次数本身是被测的行为时除外；测试不决定产品的文字。行为已被 ADR 或本工单删除的用例可以删除，交付说明逐条列出用例名与依据。
   - 前端测试：`cd client && npm test`（客户端单元）；端到端为 `cd client && npm run test:e2e`。只在本次改动涉及 `client/` 或接口合同时运行，并且只运行相关的测试文件；客户端单元里的逐场景回放测试单独运行。
   - 两项固定检查：`uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`，检查整个仓库的模块导入关系与接口合同，CI 每次都运行；改动模块导入或接口合同时本地也运行。`test_openapi_snapshot.py` 里的两项检查分别核对运行中的服务与 `harness/tests/openapi/openapi.json` 相同、按快照重新生成的客户端类型与提交的 `client/src/renderer/src/api/generated/` 逐文件相同；它需要 `harness/tests/openapi` 与 `client` 各安装一次依赖（各自的 `npm install`），未安装时报错写明缺少哪个文件。改动接口合同的工单在用 `--write-openapi-snapshot` 重写快照以后，在 `client` 中运行 `npm run generate:api` 重新生成客户端类型并提交，两项检查才会都通过。
-  - 只用单进程运行，不加 `-n`。集成层全部在合并之前运行（`docs/design/test-pyramid.md` 第 4.2 节），执行者与审查者不运行全量测试：不运行 `harness/tests` 整个目录，也不把全部测试文件分批逐个运行一遍；单条命令不超过 10 分钟。
+  - 只用单进程运行，不加 `-n`。集成层全部由 CI 在每次合并以后运行（`docs/design/test-pyramid.md` 第 4.2 节），执行者与审查者不运行全量测试：不运行 `harness/tests` 整个目录，也不把全部测试文件分批逐个运行一遍；单条命令不超过 10 分钟。
   - 先看结尾的计数与失败清单；需要细节时，只对失败的那一项加 `--tb=short` 重新运行，或者用 `--lf` 重新运行上次失败的测试。
   - 终端环境与进程的约束见运行配置第 1 节。
 - 真实模型：地址、凭据与模型在派发机器的用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`、`YUDAO_EVAL_MODEL` 中（运行配置第 4 节），只在工单要求时使用。需要模型的测试标 `real_model`，只在明确选择时运行（`-m real_model`）；真实模型 smoke 是 `uv run python -m harness smoke`，不给 `--provider-config` 时从这三个变量取模型。这两项由 #593 实现，它合并以前，运行 `evals/tests` 之前先在本终端删掉 `YUDAO_EVAL_API_KEY`，需要模型的用例随之跳过。凭据不写入代码、事件、日志、提交与 PR 评论；`provider.md` 与 `.yudao/` 已被 git 忽略，不提交。
@@ -52,6 +52,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 - 查看工单与评论：`gh issue view <编号> --comments`
 - 查看工单的 PR（交付说明与审查）：`gh pr view issue-<编号> --comments`；只取最近一次审查：`gh pr view issue-<编号> --json reviews --jq '.reviews[-1]'`
 - 等待 CI 的结果：`gh pr checks issue-<编号> --watch`
+- 在 GitHub 的运行机上运行集成层（只在工单要求，或要修的失败只出现在运行机上时）：`gh workflow run CI --ref issue-<编号>`，再用 `gh run list --workflow CI --branch issue-<编号> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果，失败项用 `gh run view <运行编号> --log-failed | grep FAILED` 读取。一次约 23 分钟。
 - 认领工单：`gh issue edit <编号> --add-assignee @me`
 - 筛选已就绪工单：`gh issue list --state open --label "ready-for-agent"`
 - 追加进展评论：`gh issue comment <编号> --body "<进展说明与测试证据>"`
