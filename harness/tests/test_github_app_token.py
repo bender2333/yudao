@@ -282,13 +282,14 @@ def test_missing_key_file_names_the_variable_and_the_path(key, tmp_path):
     bin_dir = tmp_path / "bin"
     _write_fake_gh(bin_dir)
     missing = tmp_path / "not-here" / "key.pem"
-    # git push 在一个临时仓库里运行，远端是不属于本项目的公开仓库：不依赖运行它的
+    # git push 在一个临时仓库里运行，远端是本项目所有者名下一个不存在的仓库：GitHub 对它同样
+    # 要求凭据，凭据助手因此被调用；万一取得了凭据，推送也只会得到「仓库不存在」。不依赖运行它的
     # 机器的状态。GitHub 运行机上 actions/checkout 把 github-actions[bot] 的凭据写在
     # 检出仓库的 http.extraheader 里，git 带着它请求，不会再向凭据助手要凭据，
     # 测试就走不到「缺私钥文件」的报错，还会真的向仓库推送（403）。
     workdir = tmp_path / "push-repo"
     workdir.mkdir()
-    for git_args in (["init", "-q"], ["remote", "add", "origin", "https://github.com/octocat/Hello-World.git"],
+    for git_args in (["init", "-q"], ["remote", "add", "origin", "https://github.com/bender2333/yudao-push-target-does-not-exist.git"],
                      ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q",
                       "--allow-empty", "-m", "init"]):
         subprocess.run(["git", *git_args], cwd=workdir, check=True, env=_env(), capture_output=True)
