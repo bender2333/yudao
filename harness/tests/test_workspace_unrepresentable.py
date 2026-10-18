@@ -42,6 +42,12 @@ def _called(events, name):
     return [event for event in events
             if event.type == EventType.TOOL_CALLED and event.payload.get("name") == name]
 
+def _failure_message(system, run_id):
+    # 失败时把 run_failed 的说明带进断言信息，运行机上的失败才查得出原因
+    failed = next((event for event in system.store.list_events(run_id)
+                   if event.type == EventType.RUN_FAILED), None)
+    return None if failed is None else failed.payload.get("message")
+
 def _paused(events):
     return next((event for event in events if event.type == EventType.RUN_PAUSED), None)
 
@@ -82,7 +88,8 @@ def test_ignored_link_does_not_pause_and_never_enters_snapshot_seal_or_delivery(
     workspace.write_file(".gitignore", "node_modules/\n")
     _write_command_body(workspace, tmp_path / "outside.txt")
     (tmp_path / "outside.txt").write_text("secret", encoding="utf-8")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    result = system.run_until_stop(run_id)
+    assert result.phase == "DONE", (result.phase, result.stop_reason, _failure_message(system, run_id))
     events = system.store.list_events(run_id)
     assert _paused(events) is None
     # 快照、封存与交付都不包含 node_modules
@@ -239,6 +246,7 @@ def test_delivery_adoption_tree_excludes_ignored_directories(tmp_path):
     (workspace.root / "node_modules" / "dep.js").write_text("// dependency\n", encoding="utf-8")
     (workspace.root / "src").mkdir()
     (workspace.root / "src" / "echo.py").write_text("print('x')\n", encoding="utf-8")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    result = system.run_until_stop(run_id)
+    assert result.phase == "DONE", (result.phase, result.stop_reason, _failure_message(system, run_id))
     tree = capture_public_tree(workspace.root, True)
     assert [item.path for item in tree.files] == [".gitignore", "src/echo.py"]
