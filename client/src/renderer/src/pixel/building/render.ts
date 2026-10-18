@@ -20,7 +20,6 @@ export const BUILDING_STATUS: Record<string, { text: string; color: string }> = 
   queued: { text: "排队中", color: PAL.grey2 },
   waiting_slot: { text: "等待执行槽位", color: PAL.orange2 },
   waiting_provider: { text: "等待模型服务", color: PAL.grey3 },
-  pending_verification: { text: "待核实", color: PAL.yellow2 },
   waiting_resume: { text: "待恢复", color: PAL.yellow2 },
   waiting_decision: { text: "等待你的决定", color: PAL.yellow2 },
   interrupted: { text: "中断", color: PAL.grey4 },
@@ -29,7 +28,7 @@ export const BUILDING_STATUS: Record<string, { text: string; color: string }> = 
 };
 
 /** 每分钟闪烁的状态灯（原型 drawFloor 的判据）。 */
-const BLINK = ["running", "waiting_slot", "pending_verification", "waiting_resume"];
+const BLINK = ["running", "waiting_slot", "waiting_resume"];
 
 /** 楼的绘制：屋顶、每层的楼层、通往机房的管线、包裹与小人。 */
 export class BuildingRenderer {

@@ -15,6 +15,7 @@ import {
   viewHref,
   waitedSeconds,
 } from "../../src/renderer/src/views/decisions/card-logic.ts";
+import { DECISION_KIND, RECOVERY_STATE } from "../../src/renderer/src/views/project/labels.ts";
 
 function decision(overrides) {
   return {
@@ -230,4 +231,9 @@ test("初始 PRD 的卡片材料与给像素画面的纯文字版本共用", () 
   const card = face(initialPrd(), now);
   assert.deepEqual(card.rows, materialRows(initialPrd()));
   assert.deepEqual(card.links.map((link) => link.label), ["PRD.md", "STRUCTURE.md"]);
+});
+
+test("界面不再包含已删除的 unknown_action 与 pending_verification", () => {
+  assert.equal(DECISION_KIND.unknown_action, undefined);
+  assert.equal(RECOVERY_STATE.pending_verification, undefined);
 });

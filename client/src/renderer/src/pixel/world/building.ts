@@ -15,7 +15,7 @@ import type { Catalog, Character, Pipe, SceneLike, World } from "./types.ts";
 export interface BuildingFloor {
   project_id: string;
   name: string;
-  /** 楼层的状态灯：运行中、排队中、等待执行槽位、等待模型服务、待核实、待恢复、等待你的决定、中断、空闲。 */
+  /** 楼层的状态灯：运行中、排队中、等待执行槽位、等待模型服务、待恢复、等待你的决定、中断、空闲。 */
   status: string;
   /** 四个部门房间的灯：亮灯表示该部门正在工作。 */
   lit: { product: boolean; engineering: boolean; quality: boolean; operations: boolean };

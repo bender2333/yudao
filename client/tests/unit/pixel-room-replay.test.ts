@@ -6,10 +6,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadRoomRecordings, replayAllRooms } from "../helpers/room-replay.ts";
 
+// ADR-0038 与 docs/prototypes/CHANGELOG.md 待办：v10 原型中录下的「待核实」状态在真实系统中不再实现，
+// 回放测试里这些状态不再出现（sc-metro-ask__quality、sc-metro-compact__engineering、sc-metro-offline__engineering）
+const PENDING_VERIFICATION_ROOM_SCENARIOS = [
+  "sc-metro-ask__quality",
+  "sc-metro-compact__engineering",
+  "sc-metro-offline__engineering",
+];
+
 test("回放：录下的部门房间调用序列送进客户端的画面零错误，状态与原型的记录相同", async () => {
   const recording = loadRoomRecordings();
   assert.ok(recording.scenarios.length >= 12, `录下的场景 ${recording.scenarios.length} 份`);
-  const results = await replayAllRooms();
+  const results = await replayAllRooms({ exclude: PENDING_VERIFICATION_ROOM_SCENARIOS });
   const failed = results.filter((r) => r.mismatches.length > 0 || r.clientErrors.length > 0);
   const detail = failed.map((r) => `${r.scenario}：\n  ${[...r.mismatches.slice(0, 6), ...r.clientErrors.slice(0, 3)].join("\n  ")}`).join("\n");
   assert.deepEqual(failed.map((r) => r.scenario), [], `回放不一致：\n${detail}`);

@@ -50,13 +50,13 @@ export const SPOT: Record<string, [number, number] | [number, number, number]> =
 /** 部门状态的文字（原型 room.js 的 STATUS_TEXT）。 */
 export const STATUS_TEXT: Record<string, string> = {
   idle: "未工作", working: "工作中", asking: "等待回答", paused: "已暂停", failed: "失败", done: "已完成",
-  cancelled: "已取消", interrupted: "中断", pending_verification: "待核实", waiting_resume: "待恢复",
+  cancelled: "已取消", interrupted: "中断", waiting_resume: "待恢复",
 };
 
 /** 部门状态的颜色（原型 room.js 的 STATUS_COLOR；未登记的取屏幕暗色）。 */
 export const STATUS_COLOR: Record<string, string> = {
   working: PAL.screen3, asking: PAL.blue1, paused: PAL.blue1, failed: PAL.red1, done: PAL.green1,
-  cancelled: PAL.grey1, interrupted: PAL.grey2, pending_verification: PAL.yellow2, waiting_resume: PAL.yellow2,
+  cancelled: PAL.grey1, interrupted: PAL.grey2, waiting_resume: PAL.yellow2,
   idle: PAL.screen2,
 };
 

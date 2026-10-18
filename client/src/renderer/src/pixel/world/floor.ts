@@ -15,9 +15,9 @@ import type {
 import { createWorld } from "./declare.ts";
 
 /** 会待在房间内的事项状态（原型 floor.js 的 IN_ROOM）。 */
-export const IN_ROOM = ["running", "asking", "waiting_provider", "paused", "failed", "done", "cancelled", "interrupted", "pending_verification", "waiting_resume", "waiting_decision", "stopped_for_upgrade"];
+export const IN_ROOM = ["running", "asking", "waiting_provider", "paused", "failed", "done", "cancelled", "interrupted", "waiting_resume", "waiting_decision", "stopped_for_upgrade"];
 /** 房间亮灯与管道流动对应的活跃事项状态。 */
-export const ACTIVE = ["running", "asking", "pending_verification"];
+export const ACTIVE = ["running", "asking"];
 
 const PIPE_Y = 138;
 const TOP = 50;
