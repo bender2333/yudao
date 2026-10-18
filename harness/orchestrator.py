@@ -68,7 +68,7 @@ from .models import (
 from .providers import ProviderConnections, ProviderFacade
 from .providers.selection import ModelSelection
 from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
-from .public_tree import CapturedTree, UnrepresentableWorkspace, materialize_tree
+from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
 from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS,
                        classify_actions, file_action_comparisons)
@@ -455,15 +455,14 @@ class Orchestrator:
         env = LocalEnvironment.establish(
             root, tree, check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
         if department == "quality":
-            qa_dir = root / QA_TESTS_DIR
             if projection.qa_tests_archive_ref is not None:
                 ref = projection.qa_tests_archive_ref
                 if isinstance(ref, dict):
                     ref = ArtifactRef(**ref)
                 qa_tree = load_tree(self.artifacts, artifact_run(ref.path), ref)
-                materialize_tree(qa_tree, qa_dir)
+                env.place_qa_tests(qa_tree)
             else:
-                qa_dir.mkdir(parents=True, exist_ok=True)
+                env.place_qa_tests(None)
         return env
 
     def _environment_for(self, run_id: str, department: str, *, refresh: bool = False) -> LocalEnvironment:

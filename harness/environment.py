@@ -223,6 +223,19 @@ class LocalEnvironment:
         if self.workspace.snapshot().tree.manifest != snapshot.tree.manifest:
             raise TreeError("Public tree does not match the complete recorded manifest")
 
+    def capture_qa_tests(self) -> CapturedTree:
+        qa_dir = self.workspace.root / QA_TESTS_DIR
+        if qa_dir.is_dir():
+            return capture_public_tree(qa_dir)
+        return CapturedTree((), ())
+
+    def place_qa_tests(self, tree: CapturedTree | None) -> None:
+        qa_dir = self.workspace.root / QA_TESTS_DIR
+        if tree is not None:
+            materialize_tree(tree, qa_dir)
+        else:
+            qa_dir.mkdir(parents=True, exist_ok=True)
+
     async def perform(self, action: Action) -> ActionReceipt:
         # 工具的执行出错时回执为 failed，错误说明交回模型；工作区出现公开树无法表示的条目时
         # （UnrepresentableWorkspace），按原样传出，由步骤驱动以 workspace_unrepresentable 暂停运行

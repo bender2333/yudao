@@ -30,7 +30,7 @@ from .environment import LocalEnvironment, QA_TESTS_DIR
 from .event_store import run_stream
 from .write_path import Transaction, WritePath
 from .models import TERMINAL_PHASES, ArtifactRef, DepartmentPrompt, EventType, RunProjection, json_dumps
-from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree
+from .public_tree import UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
@@ -609,11 +609,7 @@ class StepDriver:
     def _save_qa_tests_if_changed(self, request: ModelRequest | _RecoveredCall) -> dict[str, Any] | None:
         if request.department != "quality":
             return None
-        qa_dir = self._environment.workspace.root / QA_TESTS_DIR
-        if qa_dir.is_dir():
-            tree = capture_public_tree(qa_dir)
-        else:
-            tree = CapturedTree((), ())
+        tree = self._environment.capture_qa_tests()
         projection = self._writes.read(self._stream).projection
         if tree.digest == projection.qa_tests_hash:
             return None
