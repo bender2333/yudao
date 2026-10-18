@@ -1,5 +1,9 @@
 # Yudao Loop System
 
+[![CI](https://github.com/bender2333/yudao/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/bender2333/yudao/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+
+徽章显示 main 上最近一次合并以后的 CI 结果，包括 `check`（单元层、模块层、客户端测试与构建）与 `integration`（集成层），分层见[测试分层](docs/design/test-pyramid.md)第 4 节。只改 `docs/` 与日记的提交不运行 CI，徽章保持上一次的结果。
+
 面向自治系统研发者的三部门原生循环运行时。产品、工程、质检共同构成 Yudao 的 Agent loop：内核逐步装配上下文、调用模型、执行工具并决定部门交接。模型自然语言不能结束任务；只有绑定当前有效合同、计划、交付和完整代码树的 QA release 才能进入 `DONE`。
 
 ## 当前状态
