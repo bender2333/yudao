@@ -682,3 +682,5 @@ claude-opus-5-5 / 2026-10-18 13:05 / docs/requirements/execution-limits.md：SDK
 claude-opus-5-5 / 2026-10-18 13:25 / docs/decision.md 新增「里程碑的工单记录与复盘」；docs/stage-3/autopilot-retrospective-2026-10-17.md 第 8.2 节第 4 批写明用户的决定（CLAUDE.md 工作流程第 7 步同时加复盘一句） / 复盘纪要第 4 批：记录的位置、复盘的位置与参数修改的确认由用户决定
 
 claude-opus-5-5 / 2026-10-18 13:10 / docs/agents/autopilot-runtime.md 第 5 节：CI 工作流改为由用户在场时的架构师维护，执行者与被唤醒的架构师不修改；docs/decision.md 新增「架构师的权限」（CLAUDE.md 同时修改「角色」「自主推进模式」「被唤醒的架构师」） / 用户提出：用户在场时架构师与用户一体，可以改规则；被唤醒时可以改架构与需求，不能改规则
+
+claude-opus-5-5 / 2026-10-18 13:24 / docs/decision.md「派发者暂停期间架构师直接改代码」一条：改为修复模式不做合并前的审查，六张工单由子代理分别实现、合成一个 PR / 用户决定
