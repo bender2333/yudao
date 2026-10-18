@@ -684,3 +684,6 @@ claude-opus-5-5 / 2026-10-18 13:25 / docs/decision.md 新增「里程碑的工�
 claude-opus-5-5 / 2026-10-18 13:10 / docs/agents/autopilot-runtime.md 第 5 节：CI 工作流改为由用户在场时的架构师维护，执行者与被唤醒的架构师不修改；docs/decision.md 新增「架构师的权限」（CLAUDE.md 同时修改「角色」「自主推进模式」「被唤醒的架构师」） / 用户提出：用户在场时架构师与用户一体，可以改规则；被唤醒时可以改架构与需求，不能改规则
 
 claude-opus-5-5 / 2026-10-18 13:24 / docs/decision.md「派发者暂停期间架构师直接改代码」一条：改为修复模式不做合并前的审查，六张工单由子代理分别实现、合成一个 PR / 用户决定
+
+claude-opus-5-5 / 2026-10-18 14:13 / docs/agents/autopilot-runtime.md 第 3 节补里程碑工单记录的导出命令（#602），第 5 节 check 加评测工具的测试、集成层在 main 上的用时改为约 15 分钟；docs/evaluation/milestones/ 新增 stage3-m0 的数据与报告（#602，M0 未关闭，截止 2026-10-18） / 基线修复的合并 PR（#596、#597、#599、#600、#601、#602、#569、#593）
+
