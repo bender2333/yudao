@@ -43,9 +43,6 @@ function statusMarks(project: ProjectRow, decisions: DecisionView[]): { kind: st
   if (project.interrupted_count > 0) {
     marks.push({ kind: "interrupted", text: `中断 ${project.interrupted_count}` });
   }
-  if (project.pending_verification_count > 0) {
-    marks.push({ kind: "unknown", text: `待核实 ${project.pending_verification_count}` });
-  }
   if (project.waiting_resume_count > 0) {
     marks.push({ kind: "waiting", text: `待恢复 ${project.waiting_resume_count}` });
   }

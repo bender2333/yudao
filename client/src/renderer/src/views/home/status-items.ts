@@ -18,9 +18,8 @@ export type StatusItem = {
 };
 
 // 状态项的一排（设计说明第 4.1 节的表格）：
-// 「待你决定」的数量取自 decisions.list 中等待回答的数量，与托盘使用同一份数据；
-// 「结果未知的动作」的个数取自 system.status 的恢复汇总，点击打开第一个这类动作所属事项的恢复页
-export function statusItems(status: SystemStatus | null, decisions: DecisionView[]): StatusItem[] {
+// 「待你决定」的数量取自 decisions.list 中等待回答的数量，与托盘使用同一份数据。
+export function statusItems(_status: SystemStatus | null, decisions: DecisionView[]): StatusItem[] {
   const items: StatusItem[] = [
     {
       id: "decisions",
@@ -33,33 +32,5 @@ export function statusItems(status: SystemStatus | null, decisions: DecisionView
       anchor: "home-decisions",
     },
   ];
-  if (status === null) {
-    return items;
-  }
-  const unknown = status.recovery.unknown_actions;
-  if (unknown > 0) {
-    items.push({
-      id: "unknown_actions",
-      label: "结果未知的动作",
-      icon: "unknown",
-      count: unknown,
-      text: null,
-      lit: true,
-      href: recoveryPath(decisions),
-      anchor: null,
-    });
-  }
   return items;
-}
-
-// 第一个结果未知的动作所属事项的恢复页：system.status 只给出汇总数量，
-// 具体位置由等待中的决定请求解析；解析不到时状态项亮起但不可点击
-function recoveryPath(decisions: DecisionView[]): string | null {
-  const first = decisions.find((decision) => decision.kind === "unknown_action");
-  if (first === undefined || first.project_id === null) {
-    return null;
-  }
-  return first.work_item_id === null
-    ? `#/p/${first.project_id}/overview`
-    : `#/p/${first.project_id}/w/${first.work_item_id}/recovery`;
 }

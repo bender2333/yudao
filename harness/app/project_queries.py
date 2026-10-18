@@ -25,9 +25,9 @@ from ..projection import RunNotFoundError, project_run, replay_decisions, replay
 from ..projects import ProjectNotFoundError, project_projection
 from ..replay_check import ReplayIntegrityError, verify_replay
 from ..recovery import (
-    ACTION_UNKNOWN, OBSERVATION_INTERRUPTED, OBSERVATION_PENDING_VERIFICATION, OBSERVATION_RUNNING,
-    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity, observation_state,
-    open_decisions, open_resume_decisions, unresolved_unknown_actions,
+    ACTION_UNKNOWN, OBSERVATION_INTERRUPTED, OBSERVATION_RUNNING,
+    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity,
+    classify_actions, observation_state, open_decisions, open_resume_decisions,
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
@@ -118,10 +118,9 @@ class ProjectRow(Contract):
     # 建档状态标记：项目由接入已有项目建立且还没有基线时，建档中为 onboarding，等待确认初始 PRD 为
     # awaiting_initial_prd，等待建档（建档停止、还没有基线）为 awaiting_onboarding；其余为空
     onboarding_status: str | None
-    # 中断、待核实与待恢复的标记（工单 #18）：本项目里处于这些恢复观察状态的事项数；
+    # 中断与待恢复的标记（工单 #18）：本项目里处于这些恢复观察状态的事项数；
     # 为零时仍是 0，不省略
     interrupted_count: int
-    pending_verification_count: int
     waiting_resume_count: int
 
 
@@ -150,7 +149,6 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             current_adoption=None if state.current_adoption is None else state.current_adoption.adoption_id,
             onboarding_status=_onboarding_status(state),
             interrupted_count=observations.count(OBSERVATION_INTERRUPTED),
-            pending_verification_count=observations.count(OBSERVATION_PENDING_VERIFICATION),
             waiting_resume_count=observations.count(OBSERVATION_WAITING_RESUME),
         ))
     return Snapshot[ProjectList](position=_snapshot_position(store, through), data=ProjectList(projects=rows))
@@ -309,7 +307,7 @@ class WorkItemLoop(Contract):
     pending_question: str | None
     run_id: str
     adoption_id: str | None
-    # 恢复观察状态（工单 #18）：运行中、中断、待核实、待恢复、已终止；run 没有创建时没有
+    # 恢复观察状态（工单 #18）：运行中、中断、待恢复、已终止；run 没有创建时没有
     recovery_state: str | None
     # 事项的版本：取消事项等命令的基准版本
     version: int
@@ -716,7 +714,7 @@ def _effective_model(application: Application, setting: Any, department: str) ->
 ROOM_STATUS_TEXT = {
     "idle": "未工作", "working": "工作中", "asking": "等待回答", "paused": "已暂停", "failed": "失败",
     "done": "已完成", "cancelled": "已取消", "interrupted": "中断",
-    "pending_verification": "待核实", "waiting_resume": "待恢复",
+    "waiting_resume": "待恢复",
 }
 # 钉在指导板上的指导状态（原型 PINNED）
 ROOM_PINNED_GUIDANCE = frozenset({"in_input", "explained", "completed", "declined", "needs_work"})
@@ -724,15 +722,12 @@ ROOM_PINNED_GUIDANCE = frozenset({"in_input", "explained", "completed", "decline
 def _room_status(run: Any, department: str, observation: str | None) -> str:
     # 房间状态（原型 roomStatus）：本部门正在工作时按恢复观察状态、未回答的询问、run 阶段取值；
     # 本部门参与过这次 run 时按 run 的终态；否则未工作。
-    # 恢复观察状态只取待恢复与待核实这两种由决定请求与未完成动作给出的事实；进程存活性给出的
-    # 「中断」与项目楼层画面一致：当前档还没有来源，房间不显示这个状态。
+    # 恢复观察状态只取待恢复这种由决定请求给出的事实；进程存活性给出的
     if run is None:
         return "idle"
     if run.active_department == department:
         if observation == OBSERVATION_WAITING_RESUME:
             return "waiting_resume"
-        if observation == OBSERVATION_PENDING_VERIFICATION:
-            return "pending_verification"
         if any(request.recipient == department and request.status == "open" for request in run.requests):
             return "asking"
         if run.phase == "PAUSED":
@@ -1805,21 +1800,17 @@ def _recovery_observation(application: Application, run_id: str) -> str | None:
 
 class RecoveryStatus(Contract):
     # 恢复观察的汇总（工单 #18，设计说明第 4.3 节 system.status 的 3.1 部分）：服务重启后自动继续的事项数、
-    # 待核实与待恢复的事项数、结果未知的动作数。数字取自事件日志与决定请求，
+    # 待恢复的事项数。数字取自事件日志与决定请求，
     # 与 run.recovery、projects.list 用同一份事实
     auto_resumed: int
-    pending_verification: int
     waiting_resume: int
-    unknown_actions: int
 
 def recovery_status(application: Application) -> RecoveryStatus:
     # 恢复观察的汇总（工单 #18，system.status 的 recovery）：全部 run 按恢复观察状态计数，
-    # 结果未知的动作数按未完成动作累加，自动继续的事项数取本次启动自动继续的 run（工单 #16）。
+    # 自动继续的事项数取本次启动自动继续的 run（工单 #16）。
     # 只读取事件日志与决定请求，不写入，不调用模型
     store = application.system.store
-    pending_verification = 0
     waiting_resume = 0
-    unknown_actions = 0
     for run_id in store.list_run_ids():
         run = _optional_run(application, run_id)
         if run is None:
@@ -1827,17 +1818,12 @@ def recovery_status(application: Application) -> RecoveryStatus:
         events = store.list_events(run_id)
         decisions = _run_decisions(application, run_id)
         state = observation_state(events, decisions.values(), terminal=run.phase in TERMINAL_PHASES)
-        if state == OBSERVATION_PENDING_VERIFICATION:
-            pending_verification += 1
-        elif state == OBSERVATION_WAITING_RESUME:
+        if state == OBSERVATION_WAITING_RESUME:
             waiting_resume += 1
-        unknown_actions += len(unresolved_unknown_actions(events, decisions.values()))
     resumed = getattr(application.system, "resumed_runs", None)
     return RecoveryStatus(
         auto_resumed=0 if not resumed else len(resumed),
-        pending_verification=pending_verification,
         waiting_resume=waiting_resume,
-        unknown_actions=unknown_actions,
     )
 
 
@@ -2046,7 +2032,7 @@ class RunRecoveryResult(Contract):
     # 核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果
     work_item_id: str
     run_id: str
-    state: Literal["running", "interrupted", "pending_verification", "waiting_resume", "terminated"]
+    state: Literal["running", "interrupted", "waiting_resume", "terminated"]
     reason: str | None
     executable: bool
     last_confirmed_position: int
@@ -2060,13 +2046,11 @@ class RunRecoveryResult(Contract):
     limits: RecoveryLimits
     owner: RecoveryOwner | None
     late_results: list[LateResult]
-    has_unknown_actions: bool
 
 # 一个事项的恢复观察状态对应的下一项合法操作（v8 设计说明第 7.2 节）
 _NEXT_ACTION = {
     OBSERVATION_RUNNING: "none",
     OBSERVATION_INTERRUPTED: "continue",
-    OBSERVATION_PENDING_VERIFICATION: "verify_action",
     OBSERVATION_WAITING_RESUME: "repair_and_resume",
     OBSERVATION_TERMINATED: None,
 }
@@ -2080,11 +2064,9 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     terminal = run.phase in TERMINAL_PHASES
     state = observation_state(events, decisions.values(), terminal=terminal)
     # 已终止的 run 不再继续：未完成动作与未回答的核实请求不由恢复处理，只显示终止原因
-    unfinished = [] if terminal else _unfinished_actions(
-        events, decisions.values())
+    unfinished = [] if terminal else _unfinished_actions(events)
     verifications = _verification_records(events, decisions.values())
     resume_requests = [] if terminal else open_resume_decisions(decisions.values())
-    unknown_requests = [] if terminal else open_decisions(decisions.values(), kind="unknown_action")
     return Snapshot[RunRecoveryResult](
         position=store.end_position(),
         data=RunRecoveryResult(
@@ -2100,12 +2082,11 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
             limits=RecoveryLimits(activations=_activation_count(events),
                                   model_steps=_model_step_count(events),
                                   retries=_retry_count(events), cycle_count=run.cycle_count),
-            owner=_owner(run, events, unknown_requests),
+            owner=_owner(run, events),
             # 迟到结果：3.1 的执行权在写入口拦住旧执行者的写入（write_path 的 claim_execution_right 与
             # StaleExecutionRight），被拒的写入不落盘，因此 3.1 没有迟到结果可列。远程执行代理上的迟到回执
             # 由 3.2C 在 run.actions 上补齐
             late_results=[],
-            has_unknown_actions=bool(unfinished) or bool(unknown_requests),
         ),
     )
 
@@ -2120,8 +2101,6 @@ def _recovery_reason(run: Any, state: str, resume_requests: list[Any]) -> str | 
         return f"进程在 {run.phase} 阶段停止，等待启动时自动继续"
     if state == OBSERVATION_WAITING_RESUME and resume_requests:
         return str(resume_requests[0].request.get("description") or resume_requests[0].kind)
-    if state == OBSERVATION_PENDING_VERIFICATION:
-        return "有结果未知的动作，等待核实的决定请求回答"
     if state == OBSERVATION_TERMINATED:
         return f"运行以 {run.stop_reason or run.outcome} 结束"
     return None
@@ -2138,8 +2117,6 @@ def _cannot_continue_reason(run: Any, state: str, terminal: bool, resume_request
         return f"运行已经结束：{run.stop_reason or run.outcome}"
     if state == OBSERVATION_WAITING_RESUME:
         return "模型引用无法使用或定义版本不同，等待用户回答决定请求"
-    if state == OBSERVATION_PENDING_VERIFICATION:
-        return "有结果未知的动作，等待核实以后继续"
     if state == OBSERVATION_INTERRUPTED:
         return "进程中断，等待启动时自动继续"
     return None
@@ -2155,10 +2132,11 @@ def _unusable_target(resume_requests: list[Any]) -> UnusableTarget | None:
                               problem=str(decision.request.get("description") or decision.request.get("message") or ""))
     return None
 
-def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAction]:
-    # 未完成动作：结果未知的动作（tool_started 没有结果或核实记录）。未发送的动作由保存的模型响应
-    # 给出，属于步骤驱动的补执行范围，读取侧只列出已经发出的动作
-    action_ids = {identity[2] for identity in unresolved_unknown_actions(events, decisions)}
+def _unfinished_actions(events: list[Any]) -> list[UnfinishedAction]:
+    # 未完成动作：还没有交还或核实结果的动作（只在进程正在执行这个动作时出现）。
+    # 未发送的动作由保存的模型响应给出，属于步骤驱动的补执行范围，读取侧只列出已经发出的动作
+    actions = classify_actions(events)
+    action_ids = {identity[2] for identity, info in actions.items() if info["status"] == ACTION_UNKNOWN}
     unfinished: list[UnfinishedAction] = []
     for event in events:
         if event.type != EventType.TOOL_STARTED:
@@ -2181,9 +2159,9 @@ def _unfinished_actions(events: list[Any], decisions: Any) -> list[UnfinishedAct
 
 def _verification_records(events: list[Any], decisions: Any) -> list[VerificationRecord]:
     # 核实记录有三条来源，都不改写原始观察：
-    # - 自动重新执行（工单 #307）：记录追加在取代那一次尝试之后，依据是契约声明可以重复；
     # - 自动核实（工单 #308）：对比确认动作已经完成，记 action_verified，依据是这次对比；
-    # - 用户选择按当前实际状态继续（工单 #17）：action_verified 事件里带着决定请求的编号
+    # - 交还会话（工单 #581）：重新启动时结果未知，交还发出它的会话；
+    # - 用户选择按当前实际状态继续（旧事件，工单 #17、#582）：action_verified 事件里带着决定请求的编号
     answers = {decision.decision_id: decision for decision in decisions
                if decision.kind == "unknown_action" and decision.status == "answered"}
     records: list[VerificationRecord] = []
@@ -2191,15 +2169,26 @@ def _verification_records(events: list[Any], decisions: Any) -> list[Verificatio
         if event.type != EventType.ACTION_VERIFIED:
             continue
         payload = event.payload or {}
+        resolution = payload.get("resolution")
         decision_id = payload.get("decision_id")
         answer = answers.get(decision_id) if isinstance(decision_id, str) else None
+        if resolution == "auto_verify":
+            basis = "自动核实（已完成）"
+            result = "动作效果按参数里的目标内容确认完成"
+            decided_by = "system"
+        elif resolution == "handed_back":
+            basis = "重新启动时结果未知，交还发出它的会话"
+            result = str(payload.get("error") or "交还发出它的会话处置")
+            decided_by = "system"
+        else:
+            basis = "用户选择按当前实际状态继续"
+            result = "动作效果按当前实际状态接受"
+            decided_by = "user"
         records.append(VerificationRecord(
             action_id=str(payload.get("id") or event.event_id), tool=str(payload.get("name") or ""),
-            basis="自动核实（已完成）" if payload.get("resolution") == "auto_verify"
-                  else "用户选择按当前实际状态继续",
-            result="动作效果按参数里的目标内容确认完成" if payload.get("resolution") == "auto_verify"
-                   else "动作效果按当前实际状态接受",
-            decided_by="system" if payload.get("resolution") == "auto_verify" else "user",
+            basis=basis,
+            result=result,
+            decided_by=decided_by,
             note=None if answer is None else (answer.answer or {}).get("note"),
             decision_id=decision_id if isinstance(decision_id, str) else None,
             at=event.created_at, event_id=event.event_id,
@@ -2217,15 +2206,14 @@ def _model_step_count(events: list[Any]) -> int:
 def _retry_count(events: list[Any]) -> int:
     return len([event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED])
 
-def _owner(run: Any, events: list[Any], unknown_requests: list[Any]) -> RecoveryOwner | None:
+def _owner(run: Any, events: list[Any]) -> RecoveryOwner | None:
     # 执行所有权：最后一次取得执行权的事件（run_resumed）给出编号与时间；没有恢复过时没有执行者。
-    # 结果未知的动作还等待回答时不占用执行槽位（它没有在推进）
     resumed = [event for event in events if event.type == EventType.RUN_RESUMED]
     if not resumed:
         return None
     last = resumed[-1]
     return RecoveryOwner(epoch=int(last.payload.get("acquired_epoch") or 0), since=last.created_at,
-                         holds_slot=not unknown_requests)
+                         holds_slot=True)
 
 RUN_RECOVERY = QueryDefinition(
     name="run.recovery", request=RunRecovery, result=RunRecoveryResult, handle=_run_recovery,
