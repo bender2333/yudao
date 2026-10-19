@@ -23,6 +23,7 @@
 "test_api.py" = "integration"
 "test_assembly.py" = "module"
 "test_bash.py" = "integration"
+"test_bash_jobs.py" = "integration"
 "test_basis_hash_rules.py" = "unit"
 "test_call_target_per_request.py" = "integration"
 "test_catalog_api.py" = "integration"

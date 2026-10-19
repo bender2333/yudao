@@ -257,21 +257,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -647,21 +647,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -1106,21 +1106,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -1472,21 +1472,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -1686,21 +1686,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",

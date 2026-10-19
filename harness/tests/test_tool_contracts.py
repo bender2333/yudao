@@ -16,7 +16,7 @@ def test_tools_are_host_tools_or_environment_actions():
     assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
         "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
         "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
-        "run_check": "check", "bash": "command",
+        "run_check": "check", "bash": "command", "read_output": "command", "stop_job": "command",
     }
 
 
@@ -46,6 +46,12 @@ def test_bash_description_separates_action_receipts_from_delivery_check_receipts
     assert "inherits the Yudao process's full environment" in text
     assert "replaces the value of any known secret with its name" in text
     assert "the whole process tree is stopped" in text
+    assert "Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output" in text
+    assert "Background commands (background=true) return immediately with a job_id" in text
+    assert "cursor" not in TOOLS["bash"].parameters["properties"]
+    assert "background" in TOOLS["bash"].parameters["properties"]
+    assert "job_id" in TOOLS["read_output"].parameters["properties"]
+    assert "job_id" in TOOLS["stop_job"].parameters["properties"]
 
 
 def test_write_tool_descriptions_state_engineering_only():
