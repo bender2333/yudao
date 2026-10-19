@@ -1,0 +1,174 @@
+"""场景 1 评分器与材料的分层测试。
+
+不需要模型与浏览器的用例（材料摘要、用例表的结构、空目录交付全部记为没有做、
+交付启动失败的处理、运行器配置）在 CI check 中运行；
+需要界面智能体或浏览器的用例带 real_model 标记，只在明确选择时（-m real_model）运行。
+"""
+
+import json
+import os
+import sys
+
+import pytest
+
+import importlib.util
+
+EVALS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCORER_DIR = os.path.join(EVALS_DIR, "scorer")
+RUNNER_DIR = os.path.join(EVALS_DIR, "runner")
+SCENARIO1_DIR = os.path.join(EVALS_DIR, "scenarios", "scenario-1")
+for p in (SCORER_DIR, RUNNER_DIR):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+import material_integrity
+
+def _load_module(name, file_path):
+    spec = importlib.util.spec_from_file_location(name, file_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+scorer_scenario1 = _load_module("evals_scorer_scenario1", os.path.join(SCORER_DIR, "scenario1.py"))
+runner_scenario1 = _load_module("evals_runner_scenario1", os.path.join(RUNNER_DIR, "scenario1.py"))
+
+real_model = pytest.mark.real_model
+
+
+def test_material_manifest_and_digests():
+    """核对场景 1 材料版本与 manifest 登记的摘要一致。"""
+    manifest_path = os.path.join(SCENARIO1_DIR, "materials", "manifest.json")
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    assert manifest["scenario"] == "scenario-1"
+    assert manifest["material_version"] == "scenario-1@1"
+
+    entries = {"checks", "reference", "materials/requirement-table.json"}
+    reasons = material_integrity.digest_reasons(SCENARIO1_DIR, entries)
+    assert reasons == []
+
+
+def test_requirement_table_and_cases_consistency():
+    """核对 8 个需求条目与 8 条用例的一致对应关系。"""
+    table_path = os.path.join(SCENARIO1_DIR, "materials", "requirement-table.json")
+    cases_path = os.path.join(SCENARIO1_DIR, "checks", "cases.json")
+
+    with open(table_path, "r", encoding="utf-8") as f:
+        table = json.load(f)
+    with open(cases_path, "r", encoding="utf-8") as f:
+        cases = json.load(f)
+
+    assert len(table["requirements"]) == 8
+    assert len(cases) == 8
+
+    req_ids = [r["id"] for r in table["requirements"]]
+    expected_req_ids = [f"R{i}" for i in range(1, 9)]
+    assert req_ids == expected_req_ids
+
+    case_ids = [c["id"] for c in cases]
+    expected_case_ids = [f"case_{i}" for i in range(1, 9)]
+    assert case_ids == expected_case_ids
+
+    # 检查每个需求条目下的 checks 与用例 ID 一致
+    for req in table["requirements"]:
+        assert len(req["checks"]) == 1
+        cid = req["checks"][0]
+        matching_case = next((c for c in cases if c["id"] == cid), None)
+        assert matching_case is not None
+        assert matching_case["requirement_id"] == req["id"]
+
+
+def test_empty_delivery_scores_all_not_done(tmp_path):
+    """空目录的交付 8 条用例都记为「没有做」，不需要模型与浏览器。"""
+    empty_dir = str(tmp_path / "empty_delivery")
+    os.makedirs(empty_dir)
+
+    result = scorer_scenario1.score(empty_dir)
+
+    assert result["scenario"] == "scenario-1"
+    assert result["material_version"] == "scenario-1@1"
+    assert result["scorer_version"] == "scorer-1@1"
+    assert result["ui_agent_model"] == "ag/gemini-3.8-flash-high"
+    assert result["completion"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["not_done_count"] == 8
+    assert result["wrong_count"] == 0
+    assert len(result["not_done"]) == 8
+    assert result["wrong"] == []
+
+    for check in result["checks"]:
+        assert check["status"] == "not_done"
+        assert check["score"] == 0.0
+        assert check["verdict"] == "NOT_DONE"
+
+
+def test_failed_start_delivery_scores_all_not_done(tmp_path):
+    """交付启动失败时 8 条用例都记为「没有做」，不需要模型与浏览器。"""
+    fail_dir = str(tmp_path / "fail_delivery")
+    os.makedirs(fail_dir)
+    package_json = os.path.join(fail_dir, "package.json")
+    with open(package_json, "w", encoding="utf-8") as f:
+        json.dump({"scripts": {"start": "node -e \"process.exit(1)\""}}, f)
+
+    result = scorer_scenario1.score(fail_dir)
+
+    assert result["completion"] == 0.0
+    assert result["correctness"] == 0.0
+    assert result["not_done_count"] == 8
+    assert result["wrong_count"] == 0
+    assert result["startup_error"] is not None
+    assert "Failed to start delivery server" in result["startup_error"]
+
+    for check in result["checks"]:
+        assert check["status"] == "not_done"
+        assert check["score"] == 0.0
+
+
+def test_runner_scenario1_interface_and_run_dir(tmp_path):
+    """核对 scenario1 运行器模块接口与运行目录起点装配。"""
+    assert runner_scenario1.SCENARIO == "scenario-1"
+    assert runner_scenario1.SCORER_SCRIPT == "scenario1.py"
+    assert "requirement.md" in runner_scenario1.START_FILES
+    assert "interface-agreement.md" in runner_scenario1.START_FILES
+
+    urls = runner_scenario1.upstream_urls()
+    assert any("mnluzimu/WebGen-Bench" in u for u in urls)
+
+    run_dir = str(tmp_path / "run_test")
+    os.makedirs(run_dir)
+    runner_scenario1.fill_run_dir(run_dir)
+
+    files = runner_scenario1.message_files(run_dir)
+    basenames = [os.path.basename(f) for f in files]
+    assert "requirement.md" in basenames
+    assert "interface-agreement.md" in basenames
+
+    msg = runner_scenario1.message()
+    assert "requirement.md" in msg
+    assert "interface-agreement.md" in msg
+
+    cmd = runner_scenario1.scorer_command(sys.executable, str(tmp_path / "scoring"), str(tmp_path / "delivery"))
+    assert sys.executable in cmd
+    assert any("scenario1.py" in arg for arg in cmd)
+
+
+@real_model
+def test_reference_solution_all_pass(tmp_path):
+    """参考解法通过全部 8 条用例（需要真实模型与浏览器）。"""
+    reference_dir = os.path.join(SCENARIO1_DIR, "reference")
+    work_dir = str(tmp_path / "reference_work")
+
+    result = scorer_scenario1.score(reference_dir, work_dir=work_dir)
+
+    assert result["scenario"] == "scenario-1"
+    assert result["material_version"] == "scenario-1@1"
+    assert result["scorer_version"] == "scorer-1@1"
+    assert result["completion"] == 1.0
+    assert result["correctness"] == 1.0
+    assert result["not_done_count"] == 0
+    assert result["wrong_count"] == 0
+    assert len(result["checks"]) == 8
+    for check in result["checks"]:
+        assert check["status"] == "passed"
+        assert check["score"] == 1.0

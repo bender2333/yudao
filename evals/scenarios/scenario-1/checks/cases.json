@@ -1,0 +1,58 @@
+[
+  {
+    "id": "case_1",
+    "requirement_id": "R1",
+    "name": "新建",
+    "task": "Create a new task by filling out the \"Add Task\" form and submitting it.",
+    "expected_result": "The new task appears in the list of to-do items with the correct details and is visible under the user's account."
+  },
+  {
+    "id": "case_2",
+    "requirement_id": "R2",
+    "name": "编辑",
+    "task": "Edit an existing task by changing its description and saving the changes.",
+    "expected_result": "The task's description is updated in the list and reflects the changes accurately."
+  },
+  {
+    "id": "case_3",
+    "requirement_id": "R3",
+    "name": "标记完成",
+    "task": "Mark a specific task as completed on the to-do list.",
+    "expected_result": "The task is visibly marked as completed, often indicated by a strikethrough, checkbox, or similar visual cue."
+  },
+  {
+    "id": "case_4",
+    "requirement_id": "R4",
+    "name": "删除",
+    "task": "Delete a task from the list by selecting the \"Delete\" option next to it.",
+    "expected_result": "The selected task is removed from the list and is no longer visible in the account."
+  },
+  {
+    "id": "case_5",
+    "requirement_id": "R5",
+    "name": "搜索",
+    "task": "Use the search functionality to find a specific task by its title or keywords.",
+    "expected_result": "The search returns a relevant list of tasks that match the query, displaying intended search criteria clearly."
+  },
+  {
+    "id": "case_6",
+    "requirement_id": "R6",
+    "name": "按完成状态筛选",
+    "task": "Filter tasks to show only completed or uncompleted tasks.",
+    "expected_result": "The task list updates to display only tasks that match the selected filter criteria without affecting the unfiltered tasks' status."
+  },
+  {
+    "id": "case_7",
+    "requirement_id": "R7",
+    "name": "页面导航",
+    "task": "Verify the site's navigation by clicking the provided menu items or links in the user interface.",
+    "expected_result": "Each navigation element correctly redirects the user to the intended page without errors, maintaining user session details."
+  },
+  {
+    "id": "case_8",
+    "requirement_id": "R8",
+    "name": "配色",
+    "task": "Verify that the website uses 'lavender' as the background color and 'indigo' as the component color, as specified in the design requirements.",
+    "expected_result": "The website has a background color of 'lavender' and components (such as buttons, cards, headers, etc.) are styled with the color 'indigo', accurately reflecting the design instruction."
+  }
+]

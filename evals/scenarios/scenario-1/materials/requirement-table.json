@@ -1,0 +1,54 @@
+{
+  "scenario": "scenario-1",
+  "title": "WebGen-Bench 000080 advanced to-do list web application",
+  "requirements": [
+    {
+      "id": "R1",
+      "name": "新建",
+      "description": "Create a new task by filling out the 'Add Task' form and submitting it.",
+      "checks": ["case_1"]
+    },
+    {
+      "id": "R2",
+      "name": "编辑",
+      "description": "Edit an existing task by changing its description and saving the changes.",
+      "checks": ["case_2"]
+    },
+    {
+      "id": "R3",
+      "name": "标记完成",
+      "description": "Mark a specific task as completed on the to-do list.",
+      "checks": ["case_3"]
+    },
+    {
+      "id": "R4",
+      "name": "删除",
+      "description": "Delete a task from the list by selecting the 'Delete' option next to it.",
+      "checks": ["case_4"]
+    },
+    {
+      "id": "R5",
+      "name": "搜索",
+      "description": "Use the search functionality to find a specific task by its title or keywords.",
+      "checks": ["case_5"]
+    },
+    {
+      "id": "R6",
+      "name": "按完成状态筛选",
+      "description": "Filter tasks to show only completed or uncompleted tasks.",
+      "checks": ["case_6"]
+    },
+    {
+      "id": "R7",
+      "name": "页面导航",
+      "description": "Verify the site's navigation by clicking the provided menu items or links in the user interface.",
+      "checks": ["case_7"]
+    },
+    {
+      "id": "R8",
+      "name": "配色",
+      "description": "Verify that the website uses 'lavender' as the background color and 'indigo' as the component color, as specified in the design requirements.",
+      "checks": ["case_8"]
+    }
+  ]
+}
