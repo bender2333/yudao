@@ -1,10 +1,9 @@
 # bash 工具的持久行为：管道与重定向、非零退出码、超时与取消的进程树结束、
-# 超时缺省与钳位、环境继承与凭据脱敏、超限截断的游标取回、bash 缺失的报错、
+# 超时缺省与钳位、环境继承与凭据脱敏、超限截断的回执与按编号取回、bash 缺失的报错、
 # 以及调用 argv 不带 -l。这些结论 spawn 真实子进程，登记为集成层。
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
 import secrets

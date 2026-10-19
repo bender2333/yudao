@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from .environment import BackgroundJobTable, cleanup_inspection_workspace
 from .models import DEPARTMENTS, new_id
@@ -28,6 +27,8 @@ class DepartmentSession:
 
     def close(self, status: str = "closed") -> None:
         self.status = status
+
+
 class SessionFactory:
     # 会话在内存中按 run 维护；会话结束（DONE / PAUSED / FAILED / 取消）时按部门删除其检查工作区。
     # workspace_root 由编排器在创建时给出，回调在同一线程中执行；回调抛错时把它留在调用方（编排器已经

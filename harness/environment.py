@@ -174,7 +174,6 @@ class _Job:
     def __init__(
         self,
         job_id: str,
-        command: str,
         output_path: Path,
         process: subprocess.Popen[Any] | None = None,
         file_handle: Any = None,
@@ -185,7 +184,6 @@ class _Job:
         workspace_root: Path | None = None,
     ) -> None:
         self.job_id = job_id
-        self.command = command
         self.output_path = output_path
         self.process = process
         self.file_handle = file_handle
@@ -223,17 +221,41 @@ class _Job:
             "exit_code": self.exit_code,
         }
 
-    def stop(self) -> None:
+    def stop(self) -> dict[str, Any]:
+        if self.status == "running" and self.process is not None:
+            ret = self.process.poll()
+            if ret is not None:
+                self.status = "exited"
+                self.exit_code = ret
+            else:
+                _kill_process_tree_sync(self.process.pid)
+                self.status = "stopped"
+        elif self.status == "running":
+            self.status = "stopped"
+
         if self.timer is not None:
             self.timer.cancel()
             self.timer = None
-        if self.status == "running":
-            self.status = "stopped"
-            if self.process is not None and self.process.poll() is None:
-                _kill_process_tree_sync(self.process.pid)
-            if self.file_handle is not None:
-                self.file_handle.close()
-                self.file_handle = None
+        if self.file_handle is not None:
+            self.file_handle.close()
+            self.file_handle = None
+
+        if self.status == "exited":
+            output_msg = f"job {self.job_id} has already exited"
+            if self.exit_code is not None:
+                output_msg += f" with exit code {self.exit_code}"
+            return {
+                "job_id": self.job_id,
+                "output": output_msg,
+                "status": self.status,
+                "exit_code": self.exit_code,
+            }
+        return {
+            "job_id": self.job_id,
+            "output": f"job {self.job_id} was stopped; the process tree was stopped",
+            "status": self.status,
+            "exit_code": self.exit_code,
+        }
 
 
 class BackgroundJobTable:
@@ -256,9 +278,8 @@ class BackgroundJobTable:
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None or job.session_id != session_id:
-                return {"job_id": job_id, "status": "ended", "output": f"job {job_id} has ended"}
-            job.stop()
-            return {"job_id": job_id, "status": "stopped", "output": f"job {job_id} was stopped; the process tree was stopped"}
+                return {"job_id": job_id, "output": f"job {job_id} has ended", "status": "ended", "exit_code": None}
+            return job.stop()
 
     def stop_for_sessions(self, session_ids: Iterable[str]) -> None:
         targets = set(session_ids)
@@ -311,9 +332,6 @@ class LocalEnvironment:
         self._processes: dict[str, Callable[[Action, asyncio.Event], Awaitable[tuple[Any, str]]]] = {
             name: getattr(self, method) for name, method in _PROCESSES.items()}
 
-    def close(self) -> None:
-        pass
-
     @classmethod
     def establish(
         cls,
@@ -341,6 +359,7 @@ class LocalEnvironment:
     ) -> LocalEnvironment:
         # 打开已经建立的工作区
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id)
+
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:
         # 这次激活的运行状态身份随检查回执记录，供 U 判断回执是否属于当前有效的合同与快照
@@ -672,7 +691,6 @@ class LocalEnvironment:
             )
             job = _Job(
                 job_id=job_id,
-                command=command,
                 output_path=output_path,
                 process=process,
                 file_handle=file_handle,
@@ -726,7 +744,6 @@ class LocalEnvironment:
         page, cut = _bash_slice(text, 0)
         job = _Job(
             job_id=job_id,
-            command=command,
             output_path=path,
             process=None,
             file_handle=None,
@@ -762,8 +779,9 @@ class LocalEnvironment:
         if not isinstance(job_id, str) or not job_id.strip():
             raise ValueError("job_id is required")
         if self._jobs is None or self._session_id is None:
-            return {"job_id": job_id, "status": "ended", "output": f"job {job_id} has ended"}
+            return {"job_id": job_id, "output": f"job {job_id} has ended", "status": "ended", "exit_code": None}
         return self._jobs.stop_job(job_id, self._session_id)
+
     async def _run_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         args = action.input
         name = str(args.get("name") or "").strip()

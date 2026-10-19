@@ -5,21 +5,17 @@
 # 真实子进程与端口监听，登记为集成层。
 from __future__ import annotations
 
-import asyncio
-import os
 import re
 import socket
 import sys
 import time
 from pathlib import Path
 
-import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.definitions import DEFINITIONS
 from harness.environment import BackgroundJobTable, LocalEnvironment
 from harness.runtime import LoopSystem
-from harness.tests.helpers import action, happy_script, perform, wait_for_file, wait_until_stopped
+from harness.tests.helpers import happy_script, perform, wait_for_file, wait_until_stopped
 from harness.workspace import Workspace
 
 
@@ -110,7 +106,7 @@ def test_background_job_port_access_read_output_and_stop(tmp_path: Path):
     assert stop_receipt.ok is True and stop_receipt.status == "completed"
     assert stop_receipt.output["status"] == "stopped"
 
-    # 停止后无法再连接
+
 def test_cross_activation_read_output_stop_job_and_department_isolation(tmp_path: Path):
     from harness.proposals import product_spec
     system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter([product_spec()]))
@@ -160,6 +156,8 @@ def test_cross_activation_read_output_stop_job_and_department_isolation(tmp_path
     # stop_job 以后进程树不存在
     stop_res = perform(env2, "stop_job", {"job_id": job_id})
     assert stop_res.ok is True and stop_res.output["status"] == "stopped"
+
+
 def test_inspection_workspace_rebuild_stops_jobs_and_returns_ended(tmp_path: Path):
     system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter([]))
     run_id = system.create_run("qa inspection test")
@@ -257,6 +255,8 @@ def test_recreate_loop_system_returns_ended_for_old_job_id(tmp_path: Path):
     assert stop_receipt.ok is True and stop_receipt.status == "completed"
     assert stop_receipt.output["status"] == "ended"
     sys2.close()
+
+
 def test_environment_without_session_context_rejects_background_and_truncation(tmp_path: Path):
     # 只用于查询树的环境不带 session_id / jobs，启动后台命令或截断输出直接报错
     env = LocalEnvironment(Workspace(tmp_path / "ws"))
@@ -268,3 +268,32 @@ def test_environment_without_session_context_rejects_background_and_truncation(t
     trunc_res = perform(env, "bash", {"command": command})
     assert trunc_res.ok is False
     assert "session context" in trunc_res.error
+
+
+def test_stop_job_on_already_exited_process_preserves_exit_code_and_receipt_shape(tmp_path: Path):
+    environment = _environment(tmp_path)
+    receipt = perform(
+        environment, "bash",
+        {"command": f'"{_python()}" -c "import sys; sys.exit(3)"', "background": True},
+    )
+    assert receipt.ok is True
+    job_id = receipt.output["job_id"]
+
+    for _ in range(50):
+        time.sleep(0.05)
+        if environment._jobs and environment._jobs.get_status(job_id) == "exited":
+            break
+
+    stop_res = perform(environment, "stop_job", {"job_id": job_id})
+    assert stop_res.ok is True and stop_res.status == "completed"
+    assert stop_res.output["job_id"] == job_id
+    assert stop_res.output["status"] == "exited"
+    assert stop_res.output["exit_code"] == 3
+    assert "exited" in stop_res.output["output"]
+    assert "3" in stop_res.output["output"]
+
+    # 再次调用 stop_job 依然返回 exited 与 exit_code
+    again = perform(environment, "stop_job", {"job_id": job_id})
+    assert again.ok is True and again.status == "completed"
+    assert again.output["status"] == "exited"
+    assert again.output["exit_code"] == 3
