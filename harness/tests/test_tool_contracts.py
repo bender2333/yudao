@@ -19,6 +19,15 @@ def test_tools_are_host_tools_or_environment_actions():
         "run_check": "check", "bash": "command", "read_output": "command", "stop_job": "command",
     }
 
+def test_answer_prd_revision_parameter_definitions_match_submit_product_spec():
+    # answer 中附带的 PRD 修订参数定义必须与 submit_product_spec 对应参数完全一致
+    answer_props = TOOLS["answer"].parameters["properties"]
+    spec_props = TOOLS["submit_product_spec"].parameters["properties"]
+    for param_name, spec_def in spec_props.items():
+        assert param_name in answer_props, f"{param_name} missing from answer parameters"
+        assert answer_props[param_name] == spec_def, f"{param_name} definition mismatch"
+
+
 
 def test_submit_review_description_rejects_engineering_receipts_as_quality_evidence():
     review = TOOLS["submit_review"]

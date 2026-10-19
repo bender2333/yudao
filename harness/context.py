@@ -182,7 +182,7 @@ class ContextAssembler:
                 item for item in projection.request_results if item["request_id"] == request.id
             ])))
         if projection.active_ask is not None:
-            ask = projection.active_ask if isinstance(projection.active_ask, dict) else projection.active_ask.__dict__
+            ask = projection.active_ask
             if ask.get("recipient") == department:
                 parts.append(ContextPart("pending_ask", ask.get("branch_session_id"), json_dumps(ask)))
         pending_for_results = [item for item in projection.department_guidance
@@ -435,7 +435,7 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
                 f"预期结果：{request.expected_result}。完成正常动作或形成意见后用 submit_response 回应；"
                 "已经正式接纳的结果会列在 request_results 中，回复不能替代正常需求或交付接纳。")
     if projection.active_ask is not None:
-        ask = projection.active_ask if isinstance(projection.active_ask, dict) else projection.active_ask.__dict__
+        ask = projection.active_ask
         if ask.get("recipient") == department:
             work = (f"回答来自 {ask.get('requester')} 的询问：{ask.get('question')}。"
                     f"背景：{ask.get('background', '')}。期望结果：{ask.get('expected', '')}。"

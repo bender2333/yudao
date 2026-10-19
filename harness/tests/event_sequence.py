@@ -48,7 +48,7 @@ PARAMETERS_VERSION = initial_version()
 # 10. 只保留关键字段：载荷只保留 KEY_FIELDS 按事件种类列出的键，工具回执只保留 receipt 里的四项，
 #     投影只保留 PROJECTION_KEY_FIELDS 列出的字段。先筛选、后规整：编号只按保留下来的字段的出现顺序产生。
 #     增删表以外的字段不改动基准；表以内的字段变化必须让对应的场景失败。
-# 11. prompt_snapshot.json 按 <部门>/<用途>[/guidance|/guidance_only|/request] 收同一个场景里的请求：
+# 11. prompt_snapshot.json 按 <部门>/<用途>[/guidance|/guidance_only|/request|/ask] 收同一个场景里的请求：
 #     工作请求记 department_rules、work_item_guidance、input_handling、professional_completion、
 #     collaboration_rules、proposal_contract、allowed_tools 七个提示正文与这次请求带的工具说明；
 #     压缩请求只记摘要提示词，其中两个限额写成占位。部门提示与工具说明本身不再逐字进基准。
@@ -395,6 +395,10 @@ def prompt_entries(system: Any, run_id: str) -> dict[str, dict[str, Any]]:
             key += "/guidance"
         if payload.get("request_id"):
             key += "/request"
+        elif str(payload.get("session_id", "")).startswith("ses_ask_") or any(
+            item.get("source") == "pending_ask" for item in payload.get("injected", [])
+        ):
+            key += "/ask"
         existing = entries.setdefault(key, entry)
         if existing != entry:
             raise AssertionError(f"prompt snapshot key {key} differs between requests in run {run_id}")

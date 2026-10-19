@@ -117,7 +117,7 @@ def _evaluate_proposal(
         return ProposalDecision(False, [FieldError("issuer", f"unknown department: {department}")])
     allowed = allowed_proposal_kinds(projection, department)
     if projection.active_ask is not None:
-        rec = projection.active_ask.get("recipient") if projection.active_ask else None
+        rec = projection.active_ask.get("recipient")
         if department == rec and department == "product":
             allowed = allowed | {"product_spec"}
     if kind not in allowed:

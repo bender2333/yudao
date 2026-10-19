@@ -1556,6 +1556,154 @@
    }
   ]
  },
+ "product/work/ask": {
+  "parts": {
+   "allowed_tools": "[\"answer\"]",
+   "collaboration_rules": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
+   "department_rules": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。自然语言中的“完成”不会改变任务状态。你在会话检查工作区中读写与运行命令（从当前运行工作区建立），改动不进入运行工作区与交付，会话结束即删除。",
+   "input_handling": "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。",
+   "professional_completion": "常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 由主机从接纳结果生成；模型不能直接改写它。",
+   "proposal_contract": "{\"kinds\":{\"collaboration_request\":{\"action\":[\"inspect\",\"check\",\"revise_requirements\",\"revise_delivery\"],\"request_type\":[\"consultation\",\"action\"],\"required\":[\"recipient\",\"request_type\",\"question\",\"background\",\"expected_result\"]},\"collaboration_response\":{\"required\":[\"request_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"actual host event ids from request_results, never model call ids\",\"status\":[\"answered\",\"completed\",\"declined\",\"needs_work\"]},\"department_guidance_response\":{\"bind\":[\"the target department guidance id and current host results\"],\"required\":[\"guidance_id\",\"status\",\"text\",\"result_event_ids\"],\"result_event_ids\":\"optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action\",\"status\":[\"explained\",\"completed\",\"declined\",\"needs_work\"]},\"product_decision\":{\"bind\":[\"current_product_spec.content_hash\"],\"required\":[\"kind=product_decision\",\"statement\",\"rationale\"]},\"product_spec\":{\"basis_product_spec_hash\":\"content hash of the ProductSpec this revision is based on; null for the first spec; the host rejects the submission if it does not equal the current effective ProductSpec content_hash\",\"change_record\":{\"changed\":[\"changed behavior\"],\"rationale\":\"reason for the revision\",\"retained\":[\"still valid behavior\"],\"retired\":[\"legitimately removed behavior\"],\"when\":\"required for every revision of an existing ProductSpec\"},\"decision_changes\":[{\"decision_hash\":\"every current decision\",\"disposition\":\"retain|integrate|retire\",\"rationale\":\"reason\"}],\"optional\":[\"boundaries\",\"constraints\",\"fatal_conditions\",\"non_goals\",\"decision_changes\",\"change_record\"],\"required\":[\"kind=product_spec\",\"goal\",\"requirements\",\"acceptance_criteria\",\"basis_product_spec_hash\"],\"when\":[\"PRODUCT_SPEC\",\"REWORK_PRODUCT\"]}},\"notes\":[\"普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。\",\"控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。\"],\"submit_tools\":[\"submit_product_spec\",\"submit_product_decision\",\"submit_request\",\"submit_response\",\"submit_guidance_response\"]}",
+   "work_item_guidance": "普通事项中，产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交。你看到的是这次会话的检查工作区，从当前运行工作区快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。"
+  },
+  "tools": [
+   {
+    "description": "Submit an answer to the current ask question, ending this branch session. Product may optionally include PRD revision parameters to update requirements.",
+    "name": "answer",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "acceptance_criteria": {
+       "description": "Must contain at least one item",
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "answer": {
+       "type": "string"
+      },
+      "basis_product_spec_hash": {
+       "description": "Content hash of the ProductSpec this revision is based on. Pass the current effective ProductSpec content_hash; pass null only for the first spec. The host rejects the submission if this value does not equal the current effective ProductSpec content_hash.",
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "boundaries": {
+       "description": "Optional",
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "change_record": {
+       "additionalProperties": false,
+       "description": "Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec.",
+       "properties": {
+        "changed": {
+         "description": "Requirements added or changed in this revision",
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        "rationale": {
+         "minLength": 1,
+         "type": "string"
+        },
+        "retained": {
+         "description": "Requirements explicitly preserved",
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        "retired": {
+         "description": "Requirements explicitly removed",
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        }
+       },
+       "required": [
+        "changed",
+        "retained",
+        "retired",
+        "rationale"
+       ],
+       "type": "object"
+      },
+      "constraints": {
+       "description": "Optional",
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "decision_changes": {
+       "description": "When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec.",
+       "items": {
+        "additionalProperties": false,
+        "properties": {
+         "decision_hash": {
+          "type": "string"
+         },
+         "disposition": {
+          "enum": [
+           "retain",
+           "integrate",
+           "retire"
+          ],
+          "type": "string"
+         },
+         "rationale": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "decision_hash",
+         "disposition",
+         "rationale"
+        ],
+        "type": "object"
+       },
+       "type": "array"
+      },
+      "fatal_conditions": {
+       "description": "Optional",
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "goal": {
+       "type": "string"
+      },
+      "non_goals": {
+       "description": "Optional",
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "requirements": {
+       "description": "Must contain at least one item",
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      }
+     },
+     "required": [
+      "answer"
+     ],
+     "type": "object"
+    }
+   }
+  ]
+ },
  "product/work/request": {
   "parts": {
    "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"read_output\",\"stop_job\",\"run_check\",\"ask\",\"submit_response\"]",
