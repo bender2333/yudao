@@ -76,8 +76,7 @@ from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS,
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
-from .validation import ProposalDecision
-from .validation import ProposalDecision
+from .validation import PRD_REVISION_FIELDS, ProposalDecision, evaluate_proposal
 from .workspace import WorkspaceSnapshot
 
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
@@ -1471,41 +1470,32 @@ class Orchestrator:
             revision = None
             new_contract_hash = None
 
-            if recipient == "product" and (ans_args.get("requirements") is not None or ans_args.get("basis_product_spec_hash") is not None):
+            if recipient == "product" and any(ans_args.get(f) is not None for f in PRD_REVISION_FIELDS):
                 def commit_prd_revision(transaction: Transaction) -> tuple[int, str]:
                     projection = transaction.projection
-                    parent = projection.product_spec.content_hash if projection.product_spec else None
-                    rev = (projection.product_spec.revision + 1) if projection.product_spec else 1
                     env = self._new_inspection_environment(scope.run_id, "product", session_id=branch_session_id)
-                    spec_payload = {
-                        "goal": ans_args.get("goal") or (projection.product_spec.goal if projection.product_spec else "build an echo CLI"),
-                        "requirements": [item.strip() for item in ans_args.get("requirements", [])],
-                        "boundaries": [item.strip() for item in (ans_args.get("boundaries") or (projection.product_spec.boundaries if projection.product_spec else []))],
-                        "constraints": [item.strip() for item in (ans_args.get("constraints") or (projection.product_spec.constraints if projection.product_spec else []))],
-                        "acceptance_criteria": [item.strip() for item in ans_args.get("acceptance_criteria", [])],
-                        "fatal_conditions": [item.strip() for item in (ans_args.get("fatal_conditions") or (projection.product_spec.fatal_conditions if projection.product_spec else []))],
-                        "non_goals": [item.strip() for item in (ans_args.get("non_goals") or (projection.product_spec.non_goals if projection.product_spec else []))],
-                        "decision_changes": [{"decision_hash": item["decision_hash"], "disposition": item["disposition"], "rationale": item["rationale"].strip()} for item in ans_args.get("decision_changes", [])],
-                        "change_record": None if ans_args.get("change_record") is None else {
-                            **{field: [item.strip() for item in ans_args["change_record"].get(field, [])] for field in ("changed", "retained", "retired")},
-                            "rationale": ans_args["change_record"].get("rationale", "").strip(),
-                        },
-                        "input_version": projection.input_version,
+                    spec_proposal = {
+                        **{k: v for k, v in ans_args.items() if k not in ("answer", "text") and v is not None},
                         "kind": "product_spec",
                         "issuer": "product",
-                        "parent_hash": parent,
-                        "revision": rev,
-                        "status": "active",
                     }
-                    spec_hash = spec_content_hash("product_spec", spec_payload, parent_hash=parent, revision=rev)
-                    spec_payload["content_hash"] = spec_hash
+                    decision = evaluate_proposal(
+                        phase=projection.phase,
+                        department="product",
+                        proposal=spec_proposal,
+                        projection=projection,
+                        facts=env.query(FactsQuery(tree=True)).tree,
+                        events=transaction.events(),
+                    )
+                    if not decision.accepted:
+                        raise RuntimeError(f"invalid prd revision: {decision.errors}")
 
                     self._commit_accepted(
                         transaction,
                         department="product",
                         snapshot=env.snapshot(),
                         environment=env,
-                        artifact=spec_payload,
+                        artifact=decision.artifact,
                         transitions=[],
                         parent_event_id=scope.parent_event_id,
                         session_id=branch_session_id,
@@ -1513,7 +1503,7 @@ class Orchestrator:
                         model=result.response.model,
                     )
                     curr = transaction.projection
-                    return rev, current_contract_hash(curr)
+                    return decision.artifact["revision"], current_contract_hash(curr)
 
                 revision, new_contract_hash = self.writes.transact(run_stream(scope.run_id), commit_prd_revision)
                 with_spec_revision = True

@@ -44,6 +44,8 @@ def test_ask_answer_with_spec_revision_continuous_work(tmp_path: Path):
                       change_record={
                           "changed": ["print the given argument in uppercase to stdout"],
                           "retained": ["single file implementation"],
+                          "retired": [],
+                          "rationale": "Clarification revision.",
                       },
                       basis_product_spec_hash=json.loads(
                           next(item["content"] for item in call.input_items
@@ -200,3 +202,124 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         facts=WorkspaceFacts(),
     )
     assert not perm_prod_read.allowed
+
+
+def test_ask_answer_requirements_only_rejected_and_cannot_lose_acceptance_criteria(tmp_path: Path):
+    # 1.1: 只带 requirements 的回答被拒收（不能让 rev2 丢 acceptance_criteria），重答带完整规格后接纳
+    def product_branch_steps(call):
+        current_spec = json.loads(
+            next(item["content"] for item in call.input_items
+                 if "[current_product_spec]" in item.get("content", ""))
+            .split("[current_product_spec]\n")[1]
+            .split("\n\n")[0]
+        )
+        # 检查是否收到上一步 answer 被拒的错误回执
+        has_err = any(
+            item.get("type") == "function_call_output" and "ans-err" in item.get("call_id", "")
+            for item in call.input_items
+        )
+        if not has_err:
+            # 第一步：只带 requirements（缺失 goal, acceptance_criteria, change_record 等），绕过规则应被拒
+            return ModelResponse(output=[
+                _call("ans-err", "answer",
+                      answer="Yes, print in uppercase.",
+                      requirements=["print the given argument in uppercase to stdout"],
+                      basis_product_spec_hash=current_spec["content_hash"]),
+            ])
+        # 第二步：收到错误后提供完整有效的修订规格
+        return ModelResponse(output=[
+            _call("ans-ok", "answer",
+                  answer="Yes, print in uppercase.",
+                  goal="build an echo CLI",
+                  requirements=["print the given argument in uppercase to stdout"],
+                  acceptance_criteria=["running the program with a word prints that word in uppercase"],
+                  change_record={
+                      "changed": ["print the given argument in uppercase to stdout"],
+                      "retained": ["single file implementation"],
+                      "retired": [],
+                      "rationale": "Clarification revision.",
+                  },
+                  basis_product_spec_hash=current_spec["content_hash"]),
+        ])
+
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _call("ask-1", "ask", recipient="product", question="Should output be uppercase?",
+                      background="Clarification needed", expected="Specification update"),
+            ]),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
+        ],
+        "product:ask": [product_branch_steps, product_branch_steps],
+        "quality": [review_turn("release", "valid uppercase implementation")],
+    }
+    adapter = FakeAdapter(scripts)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo")
+    system.run_until_stop(run_id)
+
+    projection = system.project(run_id)
+    assert projection.outcome == "done"
+    assert projection.product_spec.revision == 2
+    assert projection.product_spec.acceptance_criteria == ["running the program with a word prints that word in uppercase"]
+
+    events = system.store.list_events(run_id)
+    tool_calls = [e for e in events if e.type == EventType.TOOL_CALLED and e.payload.get("name") == "answer"]
+    # 第一次 answer 调用失败并带有字段错误
+    err_calls = [e for e in tool_calls if e.payload.get("id") == "ans-err"]
+    assert len(err_calls) == 1
+    assert err_calls[0].payload["ok"] is False
+    assert "acceptance_criteria" in (err_calls[0].payload.get("error") or "")
+    # 第二次 answer 成功
+    ok_calls = [e for e in tool_calls if e.payload.get("id") == "ans-ok"]
+    assert len(ok_calls) == 1
+    assert ok_calls[0].payload["ok"] is True
+
+
+def test_ask_answer_echoing_only_basis_hash_creates_no_revision(tmp_path: Path):
+    # 1.1: 只回显 basis_product_spec_hash（不带修订字段）不出新版本
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _call("ask-1", "ask", recipient="product", question="Should output be uppercase?",
+                      background="Clarification needed", expected="Specification update"),
+            ]),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        ],
+        "product:ask": [
+            lambda call: ModelResponse(output=[
+                _call("ans-1", "answer",
+                      answer="No, keep existing behavior unchanged.",
+                      basis_product_spec_hash=json.loads(
+                          next(item["content"] for item in call.input_items
+                               if "[current_product_spec]" in item.get("content", ""))
+                          .split("[current_product_spec]\n")[1]
+                          .split("\n\n")[0]
+                      )["content_hash"]),
+            ]),
+        ],
+        "quality": [review_turn("release", "valid echo implementation")],
+    }
+    adapter = FakeAdapter(scripts)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo")
+    system.run_until_stop(run_id)
+
+    projection = system.project(run_id)
+    assert projection.outcome == "done"
+    # 没有出新版本，仍然是 rev 1
+    assert projection.product_spec.revision == 1
+    assert len(projection.product_spec.requirements) >= 1
+    assert len(projection.product_spec.acceptance_criteria) >= 1
+
+    events = system.store.list_events(run_id)
+    # SPEC_ACCEPTED 只有初始的 1 次
+    spec_accepted_events = [e for e in events if e.type == EventType.SPEC_ACCEPTED]
+    assert len(spec_accepted_events) == 1
+    # ASK_ANSWERED 标明没有规格修订
+    ask_answered_events = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    assert len(ask_answered_events) == 1
+    assert ask_answered_events[0].payload["with_spec_revision"] is False
+    assert ask_answered_events[0].payload["revision"] is None

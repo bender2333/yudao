@@ -334,7 +334,10 @@ def answer_turn(
                 declared = json.loads(raw).get("content_hash") if raw else None
             args["basis_product_spec_hash"] = declared
             if change_record is not None:
-                args["change_record"] = change_record
+                cr = dict(change_record)
+                cr.setdefault("retired", [])
+                cr.setdefault("rationale", "Clarification revision.")
+                args["change_record"] = cr
             for k in ("boundaries", "constraints", "fatal_conditions", "non_goals", "decision_changes"):
                 if k in extra:
                     args[k] = extra[k]

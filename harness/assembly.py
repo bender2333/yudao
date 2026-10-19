@@ -168,8 +168,7 @@ class ContextAssembly:
                     continue
 
             if event.type == EventType.ASK_ANSWERED:
-                recipient = event.payload.get("recipient") or event.department
-                if recipient == department:
+                if event.department == department:
                     q = event.payload.get("question")
                     if not q:
                         for prev in events:

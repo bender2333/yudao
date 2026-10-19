@@ -38,7 +38,7 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
 from .providers.selection import ModelSelection
 from .recording import ActivationScope, StepRecorder
 from .tools import proposal_kind, tool_action, tool_kind
-from .validation import _basis_hash_errors
+from .validation import PRD_REVISION_FIELDS, evaluate_proposal
 from .tree_archive import store_tree
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
@@ -492,14 +492,30 @@ class StepDriver:
                         text = args.get("answer") or args.get("text") or ""
                         if not isinstance(text, str) or not text.strip():
                             ok, output, error = False, None, "answer must be a non-empty string"
-                        elif args.get("requirements") is not None or args.get("basis_product_spec_hash") is not None:
-                            projection = self._writes.read(self._stream).projection
-                            current_hash = None if projection.product_spec is None else projection.product_spec.content_hash
-                            basis_errors = _basis_hash_errors(args, "basis_product_spec_hash", current_hash)
-                            if basis_errors:
-                                ok, output, error = False, None, basis_errors[0].message
+                        elif any(args.get(field) is not None for field in PRD_REVISION_FIELDS):
+                            if request.department != "product":
+                                ok, output, error = False, None, "only product can revise product_spec"
                             else:
-                                ok, output, error = True, text, None
+                                projection = self._writes.read(self._stream).projection
+                                spec_proposal = {
+                                    **{k: v for k, v in args.items() if k not in ("answer", "text") and v is not None},
+                                    "kind": "product_spec",
+                                    "issuer": "product",
+                                }
+                                facts = self._environment.query(FactsQuery(tree=True)).tree
+                                events = self._writes.read(self._stream).events()
+                                decision = evaluate_proposal(
+                                    phase=projection.phase,
+                                    department="product",
+                                    proposal=spec_proposal,
+                                    projection=projection,
+                                    facts=facts,
+                                    events=events,
+                                )
+                                if not decision.accepted:
+                                    ok, output, error = False, None, "; ".join(e.message for e in decision.errors)
+                                else:
+                                    ok, output, error = True, text, None
                         else:
                             ok, output, error = True, text, None
                     elif tool_kind(name) == "host":

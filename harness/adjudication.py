@@ -63,7 +63,7 @@ def _ask_branch_permission(projection: RunProjection, department: str, name: str
         if name == "answer":
             return ToolPermission(reason="answer tool is only available in an ask branch session")
         return None
-    recipient = projection.active_ask.get("recipient") if isinstance(projection.active_ask, dict) else getattr(projection.active_ask, "recipient", None)
+    recipient = projection.active_ask.get("recipient")
     if department != recipient:
         return None
     if name == "answer":
@@ -89,7 +89,7 @@ def offered_tools(projection: RunProjection, department: str, *, guidance_only: 
     # 最后按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具（设计说明第 5.6 节）
     available = tools_for(department, projection.kind)
     if projection.active_ask is not None:
-        recipient = projection.active_ask.get("recipient") if isinstance(projection.active_ask, dict) else getattr(projection.active_ask, "recipient", None)
+        recipient = projection.active_ask.get("recipient")
         if department == recipient:
             if department == "product":
                 return ["answer"]

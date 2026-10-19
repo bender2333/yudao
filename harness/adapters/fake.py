@@ -55,7 +55,7 @@ def pending_request_id(call: ModelCall) -> str | None:
 
 def session_key(call: ModelCall) -> str:
     # 会话身份：主线按部门区分，询问分支按所属询问区分
-    if call.session_id.startswith("ses_ask_") or ":ask" in call.session_id:
+    if call.session_id.startswith("ses_ask_"):
         return f"{call.department}:ask"
     return call.department
 
