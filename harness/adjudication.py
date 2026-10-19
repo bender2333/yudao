@@ -58,12 +58,44 @@ class ToolPermission:
     def allowed(self) -> bool:
         return not self.stopped and self.reason is None
 
+def _ask_branch_permission(projection: RunProjection, department: str, name: str) -> ToolPermission | None:
+    if projection.active_ask is None:
+        if name == "answer":
+            return ToolPermission(reason="answer tool is only available in an ask branch session")
+        return None
+    recipient = projection.active_ask.get("recipient") if isinstance(projection.active_ask, dict) else getattr(projection.active_ask, "recipient", None)
+    if department != recipient:
+        return None
+    if name == "answer":
+        return ToolPermission()
+    if department == "product":
+        return ToolPermission(reason="Product ask branch can only submit answer")
+    if name == "ask":
+        return ToolPermission(reason="Nested asks are not allowed in a branch session")
+    if _is_write(name):
+        return ToolPermission(reason="The branch session cannot modify files in the running workspace")
+    if name == "submit_delivery":
+        return ToolPermission(reason="The branch session cannot submit delivery")
+    if name == "submit_review":
+        return ToolPermission(reason="The branch session cannot submit QA review")
+    if proposal_kind(name) is not None:
+        return ToolPermission(reason=f"The branch session cannot submit proposal {name}")
+    return None
+
 
 def offered_tools(projection: RunProjection, department: str, *, guidance_only: bool = False,
                   input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
     # 请求中提供给模型的工具：部门的工具，只能回应指导时限于回应指导的范围，再去掉当前工作不允许的提交，
     # 最后按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具（设计说明第 5.6 节）
     available = tools_for(department, projection.kind)
+    if projection.active_ask is not None:
+        recipient = projection.active_ask.get("recipient") if isinstance(projection.active_ask, dict) else getattr(projection.active_ask, "recipient", None)
+        if department == recipient:
+            if department == "product":
+                return ["answer"]
+            allowed = [name for name in available
+                       if name != "ask" and not _is_write(name) and proposal_kind(name) is None]
+            return allowed + ["answer"]
     if guidance_only:
         available = [name for name in available if usable_when_guidance_only(name)]
     return [name for name in offers_with_input(available, input_modalities)
@@ -94,6 +126,9 @@ def tool_permission(
     if projection.phase in TERMINAL_PHASES or aborted or basis.changed(projection, department):
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
+    branch_perm = _ask_branch_permission(projection, department, name)
+    if branch_perm is not None:
+        return branch_perm
     if not has_tool(department, name, projection.kind):
         return ToolPermission(reason=f"{department} cannot use {name}")
     if guidance_only and not usable_when_guidance_only(name):
@@ -134,7 +169,7 @@ def commit_decision(
     if (current.phase != started.phase
             or now.input_version != basis.input_version
             or now.guidance_version != basis.guidance_version
-            or now.effective_contract_hash != before.effective_contract_hash
+            or now.effective_contract_hash != basis.effective_contract_hash
             or now.request_id != before.request_id
             or request_basis(current) != request_basis(evaluated)):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])

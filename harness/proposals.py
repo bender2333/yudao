@@ -286,3 +286,64 @@ def review_turn(
         )
 
     return factory
+def ask_turn(
+    recipient: str = "product",
+    question: str = "Should the output format be revised?",
+    *,
+    background: str = "Clarification needed during implementation.",
+    expected: str = "Clarified requirement or spec revision.",
+    call_id: str = "ask-1",
+) -> Any:
+    from .providers.call import ModelResponse
+    return ModelResponse(output=[{
+        "id": call_id,
+        "call_id": call_id,
+        "type": "function_call",
+        "name": "ask",
+        "arguments": json.dumps({
+            "recipient": recipient,
+            "question": question,
+            "background": background,
+            "expected": expected,
+        }),
+    }])
+
+
+def answer_turn(
+    answer: str = "Clarification given.",
+    *,
+    goal: str | None = None,
+    requirements: list[str] | None = None,
+    acceptance: list[str] | None = None,
+    basis_product_spec_hash: str | None = None,
+    change_record: dict[str, Any] | None = None,
+    call_id: str = "ans-1",
+    **extra: Any,
+) -> Callable[[Any], Any]:
+    from .providers.call import ModelResponse
+
+    def factory(call: Any) -> ModelResponse:
+        args: dict[str, Any] = {"answer": answer}
+        if requirements is not None:
+            args["requirements"] = requirements
+            args["goal"] = goal or "build an echo CLI"
+            args["acceptance_criteria"] = acceptance or ["prints the argument"]
+            declared = basis_product_spec_hash
+            if declared is None:
+                raw = prompt_part(call, "current_product_spec")
+                declared = json.loads(raw).get("content_hash") if raw else None
+            args["basis_product_spec_hash"] = declared
+            if change_record is not None:
+                args["change_record"] = change_record
+            for k in ("boundaries", "constraints", "fatal_conditions", "non_goals", "decision_changes"):
+                if k in extra:
+                    args[k] = extra[k]
+        return ModelResponse(output=[{
+            "id": call_id,
+            "call_id": call_id,
+            "type": "function_call",
+            "name": "answer",
+            "arguments": json.dumps(args),
+        }])
+
+    return factory

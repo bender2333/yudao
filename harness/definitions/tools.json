@@ -491,6 +491,167 @@
       ]
     }
   },
+  "ask": {
+    "kind": "host",
+    "guidance_only": false,
+    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "recipient": {
+          "type": "string",
+          "enum": [
+            "product",
+            "engineering",
+            "quality"
+          ]
+        },
+        "question": {
+          "type": "string"
+        },
+        "background": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "recipient",
+        "question",
+        "background",
+        "expected"
+      ]
+    }
+  },
+  "answer": {
+    "kind": "host",
+    "guidance_only": false,
+    "description": "Submit an answer to the current ask question, ending this branch session. Product may optionally include PRD revision parameters to update requirements.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "answer": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "boundaries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fatal_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "change_record": {
+          "type": "object",
+          "properties": {
+            "changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "retained": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "retired": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "requirement": {
+                    "type": "string"
+                  },
+                  "rationale": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "requirement",
+                  "rationale"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "decision_changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decision_hash": {
+                "type": "string"
+              },
+              "disposition": {
+                "type": "string",
+                "enum": [
+                  "retain",
+                  "integrate",
+                  "retire"
+                ]
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "decision_hash",
+              "disposition",
+              "rationale"
+            ]
+          }
+        },
+        "basis_product_spec_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "answer"
+      ]
+    }
+  },
   "submit_request": {
     "kind": "host",
     "proposal": "collaboration_request",

@@ -746,6 +746,21 @@ class CollaborationClosedPayload(Payload):
     return_phase: Phase
     return_work_valid: bool
 
+class AskStartedPayload(Payload):
+    requester: Department
+    recipient: Department
+    question: str
+    branch_session_id: str
+    background: str | None = None
+    expected: str | None = None
+
+
+class AskAnsweredPayload(Payload):
+    answer: str
+    with_spec_revision: bool = False
+    revision: int | None = None
+
+
 
 class DeliveryAcceptedPayload(Payload):
     summary: str
@@ -1551,6 +1566,8 @@ PAYLOADS: dict[str, Any] = {
     EventType.COLLABORATION_REQUESTED: CollaborationRequestedPayload,
     EventType.COLLABORATION_RESPONDED: CollaborationRespondedPayload,
     EventType.COLLABORATION_CLOSED: CollaborationClosedPayload,
+    EventType.ASK_STARTED: AskStartedPayload,
+    EventType.ASK_ANSWERED: AskAnsweredPayload,
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,
     EventType.DELIVERY_ACCEPTED: DeliveryAcceptedPayload,
     EventType.QA_SUBMITTED: QaSubmittedPayload,

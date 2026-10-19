@@ -137,9 +137,18 @@ class ContextAssembly:
         self.artifacts = artifacts
         self.assembler = ContextAssembler(artifacts, store)
 
-    def department_history(self, events: list[Event], department: str) -> list[dict[str, Any]]:
+    def department_history(self, events: list[Event], department: str, *, session_id: str | None = None) -> list[dict[str, Any]]:
         # 部门历史按事件顺序排列：本部门的工作消息、模型输出、主机提示与工具结果；
-        # 失败尝试的模型输出与工具结果、压缩请求的输出不进入历史
+        # 失败尝试的模型输出与工具结果、压缩请求的输出不进入历史。
+        # 询问分支的内部读取过程不进入部门后续历史，分支结束后只增加一条问题与回答的记录
+        branch_starts = {
+            event.payload["branch_session_id"]: event
+            for event in events
+            if event.type == EventType.ASK_STARTED and "branch_session_id" in event.payload
+        }
+        is_branch = session_id is not None and session_id in branch_starts
+        branch_start_event = branch_starts.get(session_id) if is_branch else None
+
         failed_steps = {
             (event.payload.get("activation_id"), event.payload.get("step_id"))
             for event in events
@@ -147,6 +156,40 @@ class ContextAssembly:
         }
         records: list[dict[str, Any]] = []
         for event in events:
+            if is_branch:
+                if event.session_id in branch_starts and event.session_id != session_id:
+                    continue
+                if event.session_id != session_id and branch_start_event is not None and event.stream_version >= branch_start_event.stream_version:
+                    continue
+                if event.session_id not in branch_starts and event.department != department:
+                    continue
+            else:
+                if event.session_id in branch_starts and event.type != EventType.ASK_ANSWERED:
+                    continue
+
+            if event.type == EventType.ASK_ANSWERED:
+                recipient = event.payload.get("recipient") or event.department
+                if recipient == department:
+                    q = event.payload.get("question")
+                    if not q:
+                        for prev in events:
+                            if prev.type == EventType.ASK_STARTED and prev.payload.get("branch_session_id") == event.session_id:
+                                q = prev.payload.get("question")
+                                break
+                    ans = event.payload.get("answer", "")
+                    item = {"role": "user", "content": f"询问：{q}\n回答：{ans}"}
+                    records.append({
+                        "event_id": event.event_id,
+                        "seq": event.stream_version,
+                        "activation_id": event.payload.get("activation_id", ""),
+                        "step_id": event.payload.get("step_id", 1),
+                        "type": event.type,
+                        "item": item,
+                        "item_digest": canonical_hash(item),
+                        "target": {key: event.payload.get(key) for key in TARGET_KEYS},
+                    })
+                continue
+
             if event.department != department:
                 continue
             if event.type in {EventType.MODEL_REASONING, EventType.MODEL_MESSAGE,

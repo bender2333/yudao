@@ -12,7 +12,7 @@ import json
 import time
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Condition, Event
 from typing import Any
@@ -40,7 +40,7 @@ from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog
                           project_stream, run_stream)
 from .write_path import NewCatalogEvent, NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
 from .tree_archive import artifact_run, load_tree
-from .engine import Judgment, StepDriver, StepLimits, Stopped
+from .engine import Answered, Judgment, StepDriver, StepLimits, Stopped
 from .streams import (
     RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
 )
@@ -64,6 +64,7 @@ from .models import (
     department_for_phase,
     json_dumps,
     new_id,
+    spec_content_hash,
 )
 from .providers import ProviderConnections, ProviderFacade
 from .providers.selection import ModelSelection
@@ -129,6 +130,9 @@ class _SafeNode:
     def department_prompt(self, department: str) -> DepartmentPrompt:
         projection = self._orchestrator.project(self._activation.run_id)
         return self._orchestrator._department_prompt(projection, department)
+    async def ask(self, scope: ActivationScope, call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None]:
+        return await self._orchestrator._execute_ask(self._activation, scope, call)
+
 
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
@@ -414,6 +418,8 @@ class Orchestrator:
         # 询问分支与产品要求都由各自的部门在检查工作区里回答，它们才是 local-tools 第 2 节
         # 「在询问分支里回答的工程」那一格
         if department != "engineering":
+            return False
+        if projection.active_ask is not None:
             return False
         request = projection.pending_request
         return (department == department_for_phase(projection.phase)
@@ -1404,8 +1410,8 @@ class Orchestrator:
                 ref = self.artifacts.put(run_id, "transcript", submission.transcript, media_type="text/plain")
                 transcript_ref = ref.__dict__
             self._apply_proposal(
-                run_id, department=department, projection=projection, proposal=submission.proposal,
-                basis=scope.basis,
+                run_id, department=department, projection=current, proposal=submission.proposal,
+                basis=activation.scope.basis,
                 transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
                 session_id=scope.session_id,
                 yielded_work=activation.yielded_work,
@@ -1417,6 +1423,222 @@ class Orchestrator:
             self._end_run(activation, "workspace_unrepresentable", str(exc), None, facts=list(exc.paths))
         except Exception as exc:
             self._end_run(activation, "host_commit_error", f"{type(exc).__name__}: {exc}", None)
+    async def _execute_ask(
+        self,
+        activation: _Activation,
+        scope: ActivationScope,
+        call: dict[str, Any],
+    ) -> tuple[bool, Any, str | None, str | None]:
+        args = call.get("args") or {}
+        recipient = args.get("recipient")
+        question = args.get("question")
+        background = args.get("background", "")
+        expected = args.get("expected", "")
+
+        if recipient not in ("product", "engineering", "quality") or recipient == scope.department:
+            return False, None, f"invalid recipient {recipient}", None
+        if not isinstance(question, str) or not question.strip():
+            return False, None, "question must be a non-empty string", None
+
+        branch_session_id = new_id(f"ses_ask_{recipient[:3]}")
+
+        def start_ask(transaction: Transaction) -> None:
+            transaction.append(NewEvent(
+                EventType.ASK_STARTED,
+                actor=f"department:{scope.department}",
+                department=scope.department,
+                parent_event_id=scope.parent_event_id,
+                session_id=scope.session_id,
+                state_before=transaction.projection.phase,
+                state_after=transaction.projection.phase,
+                payload={
+                    "requester": scope.department,
+                    "recipient": recipient,
+                    "question": question,
+                    "background": background,
+                    "expected": expected,
+                    "branch_session_id": branch_session_id,
+                },
+            ))
+
+        self.writes.transact(run_stream(scope.run_id), start_ask)
+
+        result = await self._run_ask_branch(activation, scope.run_id, recipient, branch_session_id, question, parent_event_id=scope.parent_event_id)
+        if isinstance(result, Answered):
+            ans_args = result.args
+            ans_text = ans_args.get("answer") or ans_args.get("text") or ""
+            with_spec_revision = False
+            revision = None
+            new_contract_hash = None
+
+            if recipient == "product" and (ans_args.get("requirements") is not None or ans_args.get("basis_product_spec_hash") is not None):
+                def commit_prd_revision(transaction: Transaction) -> tuple[int, str]:
+                    projection = transaction.projection
+                    parent = projection.product_spec.content_hash if projection.product_spec else None
+                    rev = (projection.product_spec.revision + 1) if projection.product_spec else 1
+                    env = self._new_inspection_environment(scope.run_id, "product", session_id=branch_session_id)
+                    spec_payload = {
+                        "goal": ans_args.get("goal") or (projection.product_spec.goal if projection.product_spec else "build an echo CLI"),
+                        "requirements": [item.strip() for item in ans_args.get("requirements", [])],
+                        "boundaries": [item.strip() for item in (ans_args.get("boundaries") or (projection.product_spec.boundaries if projection.product_spec else []))],
+                        "constraints": [item.strip() for item in (ans_args.get("constraints") or (projection.product_spec.constraints if projection.product_spec else []))],
+                        "acceptance_criteria": [item.strip() for item in ans_args.get("acceptance_criteria", [])],
+                        "fatal_conditions": [item.strip() for item in (ans_args.get("fatal_conditions") or (projection.product_spec.fatal_conditions if projection.product_spec else []))],
+                        "non_goals": [item.strip() for item in (ans_args.get("non_goals") or (projection.product_spec.non_goals if projection.product_spec else []))],
+                        "decision_changes": [{"decision_hash": item["decision_hash"], "disposition": item["disposition"], "rationale": item["rationale"].strip()} for item in ans_args.get("decision_changes", [])],
+                        "change_record": None if ans_args.get("change_record") is None else {
+                            **{field: [item.strip() for item in ans_args["change_record"].get(field, [])] for field in ("changed", "retained", "retired")},
+                            "rationale": ans_args["change_record"].get("rationale", "").strip(),
+                        },
+                        "input_version": projection.input_version,
+                        "kind": "product_spec",
+                        "issuer": "product",
+                        "parent_hash": parent,
+                        "revision": rev,
+                        "status": "active",
+                    }
+                    spec_hash = spec_content_hash("product_spec", spec_payload, parent_hash=parent, revision=rev)
+                    spec_payload["content_hash"] = spec_hash
+
+                    self._commit_accepted(
+                        transaction,
+                        department="product",
+                        snapshot=env.snapshot(),
+                        environment=env,
+                        artifact=spec_payload,
+                        transitions=[],
+                        parent_event_id=scope.parent_event_id,
+                        session_id=branch_session_id,
+                        provider=result.response.provider or self._activation_provider(activation.adapter),
+                        model=result.response.model,
+                    )
+                    curr = transaction.projection
+                    return rev, current_contract_hash(curr)
+
+                revision, new_contract_hash = self.writes.transact(run_stream(scope.run_id), commit_prd_revision)
+                with_spec_revision = True
+                activation.scope = replace(activation.scope, basis=replace(activation.scope.basis, effective_contract_hash=new_contract_hash))
+
+            def record_ask_answered(transaction: Transaction) -> None:
+                transaction.append(NewEvent(
+                    EventType.ASK_ANSWERED,
+                    actor=f"department:{recipient}",
+                    department=recipient,
+                    parent_event_id=scope.parent_event_id,
+                    session_id=branch_session_id,
+                    state_before=transaction.projection.phase,
+                    state_after=transaction.projection.phase,
+                    payload={
+                        "answer": ans_text,
+                        "with_spec_revision": with_spec_revision,
+                        "revision": revision,
+                    },
+                ))
+
+            self.writes.transact(run_stream(scope.run_id), record_ask_answered)
+            return True, ans_text, None, new_contract_hash
+        elif isinstance(result, Stopped):
+            return False, None, f"branch stopped: {result.reason}", None
+        else:
+            return False, None, "branch failed to answer", None
+
+    async def _run_ask_branch(
+        self,
+        activation: _Activation,
+        run_id: str,
+        department: str,
+        session_id: str,
+        question: str,
+        parent_event_id: str,
+    ) -> StepResult:
+        projection = self.project(run_id)
+        prompt = self._department_prompt(projection, department)
+        basis = WorkBasis.current(projection, department)
+        activation_id = new_id("act_ask")
+
+        def activate_branch(transaction: Transaction) -> Event:
+            events = transaction.append(NewEvent(
+                EventType.DEPARTMENT_ACTIVATED,
+                actor="system",
+                department=department,
+                parent_event_id=parent_event_id,
+                state_before=transaction.projection.phase,
+                state_after=transaction.projection.phase,
+                session_id=session_id,
+                payload={
+                    "activation_id": activation_id,
+                    "cycle": transaction.projection.cycle_count,
+                    "effective_contract_hash": current_contract_hash(transaction.projection),
+                    "input_version": transaction.projection.input_version,
+                    "guidance_version": guidance_version(transaction.projection, department),
+                    "prompt_version": prompt.version,
+                    "prompt_hash": prompt.prompt_ref.content_hash,
+                    "request_id": None,
+                    "guidance_ids": [],
+                    "guidance_only": False,
+                    "yielded_work": None,
+                },
+            ))
+            return events[0]
+
+        act_event = self.writes.transact(run_stream(run_id), activate_branch)
+
+        branch_scope = ActivationScope(
+            run_id, department, session_id, activation_id, act_event.event_id,
+            prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash,
+            guidance_ids=[], guidance_only=False, basis=basis,
+            provider=self._activation_provider(activation.adapter),
+        )
+
+        environment = self._new_inspection_environment(run_id, department, session_id=session_id)
+        environment.bind_check(
+            activation_id=activation_id,
+            product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
+            delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
+            effective_contract_hash=basis.effective_contract_hash,
+        )
+
+        branch_activation = _Activation(branch_scope, prompt, Event(), activation.adapter, None, projection.stream_version)
+        driver = StepDriver.start(
+            branch_scope, prompt, writes=self.writes, artifacts=self.artifacts,
+            assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
+            environment=environment,
+            nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.abort_flag,
+            limits=self.step_limits, deltas=self.deltas,
+        )
+        started = time.monotonic()
+        try:
+            result = await driver.result()
+        finally:
+            def finish_branch(transaction: Transaction) -> None:
+                happened = transaction.events()
+                activations = len([e for e in happened if e.type == EventType.DEPARTMENT_ACTIVATED and e.session_id == session_id])
+                model_steps = len([e for e in happened if e.type == EventType.MODEL_REQUESTED and e.session_id == session_id])
+                transaction.append(NewEvent(
+                    EventType.ACTIVATION_FINISHED,
+                    actor="system",
+                    department=department,
+                    parent_event_id=act_event.event_id,
+                    state_before=transaction.projection.phase,
+                    state_after=transaction.projection.phase,
+                    session_id=session_id,
+                    payload={
+                        "activation_id": activation_id,
+                        **branch_scope.versions(),
+                        "latency_ms": int((time.monotonic() - started) * 1000),
+                        "elapsed_ms": 0,
+                        "activations": activations,
+                        "model_steps": model_steps,
+                        "stop_reason": None,
+                    },
+                ))
+            self.writes.transact(run_stream(run_id), finish_branch)
+            try:
+                cleanup_inspection_workspace(self.workspace_root / run_id, department)
+            except Exception:
+                pass
+        return result
+
 
     def _apply_proposal(
         self,
