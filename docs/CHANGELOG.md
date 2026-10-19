@@ -703,3 +703,5 @@ claude-opus-5-5 / 2026-10-18 16:41 / docs/decision.md 新增「修复模式结�
 claude-opus-5-5 / 2026-10-19 11:52 / 新增复盘 skill `.claude/skills/retro/SKILL.md`：先核对上一次改动的预期，从原始记录（标签时间线、运行记录、CI 日志、git 差异）重建经过，度量时间去向、返工、漏过的缺陷与审查的作用，归因配顺利的对照工单，改动写预期、撤回条件与证明方式，报告经独立复核以后写进 `docs/evaluation/milestones/<短名>-retro-<日期>.md`；CLAUDE.md 工作流程第 7 步的复盘改为指向这个 skill，比较的指标与改动的优先次序移进 skill / 用户要求复盘有固定的做法，并能用下一次的数字检验改动
 
 claude-fable-5-1 / 2026-10-19 14:20 / 新增复盘报告 `docs/evaluation/milestones/stage3-m0-retro-2026-10-19.md`：范围 2026-10-17 15:40Z（规则 PR #589 合并）到 2026-10-19 04:30Z，覆盖 omp 交付的 8 张工单与修复模式的 8 张；核对上一次复盘的 11 项改动（都保留，4 项证据不够），度量时间去向、返工、漏过的缺陷与审查的作用，归因 4 个问题（派发者动作不连续与最后两张 PR 没开自动合并、「只改」漏登记文件、运行机上的不稳定项、运行记录读不到），提出 C1 至 C9，需要用户决定 3 件事 / CLAUDE.md 工作流程第 7 步，第一次按 retro skill 复盘
+
+claude-opus-5-5 / 2026-10-19 15:10 / 复盘报告改发 GitHub Discussions：`.claude/skills/retro/SKILL.md` 新增「复盘帖子」一节（Announcements 分类、只采信 `bender2333`、找上一篇、读正文与评论、发帖、改状态的命令），第 1 步从上一篇帖子定范围并读用户的评论，第 9 步草稿写进 `.tmp/retro/report.md`，第 10 步改为发帖并在变更记录与日记里写帖子链接；`CLAUDE.md` 工作流程第 7 步随之修改；`docs/decision.md` 加 2026-10-19 一条；2026-10-19 的复盘已发为 https://github.com/bender2333/yudao/discussions/613 / 用户要求复盘报告发到 Discussions

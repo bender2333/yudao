@@ -786,3 +786,14 @@
 - 决策（用户确认）：修复模式结束，架构师不再直接改 `harness/` 的代码，回到按工单交给执行者；派发者读取更新后的规则，恢复自主推进 M0。
 - 影响：派发者从 M0 的 `ready-for-agent` 工单继续；`needs-triage` 的（包括 #604）等架构师分诊。
 
+
+## 2026-10-19 - 复盘报告发在 GitHub Discussions
+
+- 背景：2026-10-18「里程碑的工单记录与复盘」一条把复盘写在 `docs/evaluation/milestones/` 的报告里。用户要求复盘报告发到仓库的 Discussions。
+- 决策（用户提出）：
+  - 复盘报告发在 Discussions 的 Announcements 分类，标题以 `复盘：` 开头。选这个分类是因为只有维护者能在里面发帖：仓库是公开的，下一次复盘从这里读上一篇的「改动与预期」表，只采信 `bender2333` 的帖子与评论。
+  - 改动的状态（提议、用户确认、已生效）改在帖子正文的表里，不另发评论，只保留一份。
+  - 里程碑的工单记录（`milestone.py` 的数据文件与报告）仍放在 `docs/evaluation/milestones/`，第 4 步的比较依赖它。
+  - 2026-10-19 的复盘已发为 [#613](https://github.com/bender2333/yudao/discussions/613)，仓库中的副本 `docs/evaluation/milestones/stage3-m0-retro-2026-10-19.md` 暂留。
+- 没有采纳的：新建「复盘」分类（GitHub 不能用接口新建分类；用户在网页上建了以后，把 skill 里的分类编号与名字换掉即可）。
+- 影响：`.claude/skills/retro/SKILL.md`（新增「复盘帖子」一节，第 1、9、10 步）；`CLAUDE.md` 工作流程第 7 步。

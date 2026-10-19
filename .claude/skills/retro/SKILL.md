@@ -8,7 +8,7 @@ argument-hint: "[里程碑标题 | 工单编号列表 | 起止日期]，省略�
 
 复盘是一次试验的读数：上一次改了什么、预期什么、实际发生了什么，据此保留或撤回；再从这段时间的原始记录里找出时间和返工花在哪里，提出下一次的改动，并写明下一次复盘用哪个数字检验它。它是近期阶段目标「改一处，运行真实任务，看到结果，决定保留还是撤回」中看结果、做决定的那一步。
 
-你以架构师身份复盘，以 `CLAUDE.md`、`AGENTS.md`、`docs/agents/` 为对照基准。产出是一份报告和日记；规则、参数、设计说明与工单的修改写成提议，由用户确认。
+你以架构师身份复盘，以 `CLAUDE.md`、`AGENTS.md`、`docs/agents/` 为对照基准。产出是 GitHub Discussions 上的一篇复盘帖子和日记；规则、参数、设计说明与工单的修改写成提议，由用户确认。
 
 ## 三条读法
 
@@ -27,12 +27,42 @@ argument-hint: "[里程碑标题 | 工单编号列表 | 起止日期]，省略�
 | git 历史 | `git log --stat <起>..<止>`；每个 PR 的差异与工单「只改」清单比较；`git log --diff-filter=D -- harness/tests client/src` | 改动是否超出工单、删掉的测试是否对应删掉的行为、哪些改动后来被删掉 |
 | 设计说明的改动 | 每张工单的「依据」行：`git log <依据提交>..<合并提交> -- <设计说明>` | 放出以后设计有没有变 |
 | main 的豁免记录 | 运行配置第 6 节 | 绕过 CI 与审查的合并 |
-| 用户的反馈 | 试用工单的评论、`docs/requirements/` 中的用户原话 | 交付是不是用户要的 |
+| 用户的反馈 | 试用工单的评论、`docs/requirements/` 中的用户原话、上一篇复盘帖子下 `bender2333` 的评论 | 交付是不是用户要的、用户对上一次改动的决定 |
 | Yudao 自己的运行 | 评测场景与自举运行经 `run.export` 导出的事件日志，评分在 `docs/evaluation/` | 三个部门的循环是否收敛、停在哪一层 |
+
+## 复盘帖子
+
+报告发在 GitHub Discussions 的 Announcements 分类，标题以 `复盘：` 开头。这个分类只有维护者能发帖；仓库是公开的，只采信作者是 `bender2333` 的帖子与评论。仓库编号 `R_kgDOSpFnRw`，分类编号 `DIC_kwDOSpFnR84DIxLU`。
+
+- 找上一篇，输出的第一行是最近一篇：
+
+  ```bash
+  gh api graphql -f query='query { repository(owner:"bender2333", name:"yudao") { discussions(first:50, orderBy:{field:CREATED_AT, direction:DESC}) { nodes { number title url author { login } category { name } } } } }' --jq '.data.repository.discussions.nodes[] | select(.category.name=="Announcements" and .author.login=="bender2333" and (.title|startswith("复盘："))) | "\(.number)\t\(.url)\t\(.title)"'
+  ```
+
+- 读正文与评论（`id` 在改状态时用）：
+
+  ```bash
+  gh api graphql -F n=<编号> -f query='query($n:Int!) { repository(owner:"bender2333", name:"yudao") { discussion(number:$n) { id body comments(first:100) { nodes { author { login } createdAt body } } } } }'
+  ```
+
+- 发帖：报告的第一行 `# 复盘：<范围>` 去掉 `# ` 写进 `.tmp/retro/title.txt`，其余写进 `.tmp/retro/body.md`。链接写完整地址 `https://github.com/bender2333/yudao/blob/<提交>/<路径>`，帖子里的相对链接打不开。
+
+  ```bash
+  gh api graphql -f query='mutation($repo:ID!,$cat:ID!,$title:String!,$body:String!){ createDiscussion(input:{repositoryId:$repo, categoryId:$cat, title:$title, body:$body}) { discussion { number url } } }' -f repo=R_kgDOSpFnRw -f cat=DIC_kwDOSpFnR84DIxLU -F title=@.tmp/retro/title.txt -F body=@.tmp/retro/body.md
+  ```
+
+- 改状态：用户确认或否决一项改动、改动生效以后，取回正文写进 `.tmp/retro/body.md`，改「改动与预期」表的状态列，再写回。这张表是下一次复盘的起点，只保留帖子正文这一份。
+
+  ```bash
+  gh api graphql -f query='mutation($id:ID!,$body:String!){ updateDiscussion(input:{discussionId:$id, body:$body}) { discussion { url } } }' -f id=<帖子的 id> -F body=@.tmp/retro/body.md
+  ```
+
+- 编号失效时重新查：`gh api graphql -f query='query { repository(owner:"bender2333", name:"yudao") { id discussionCategories(first:20) { nodes { id name } } } }'`。
 
 ## 步骤
 
-1. **定范围与对照基准。** 参数给了里程碑、编号或日期就用它；省略时，取 `docs/evaluation/milestones/` 下最近一份 `*-retro-*.md` 的截止时间到现在。读上一份复盘的「改动与预期」表；没有上一份时，从 `docs/decision.md`、`docs/CHANGELOG.md` 与 `git log -- CLAUDE.md AGENTS.md docs/agents .github/workflows` 列出范围开始以来对规则、参数、CI 与流程的修改，每项当作没有写明预期的改动。完成标准：工单清单（编号、状态、PR），加一份改动清单，每项带日期与位置。
+1. **定范围与对照基准。** 参数给了里程碑、编号或日期就用它；省略时，取上一篇复盘帖子（「复盘帖子」一节）的截止时间到现在。读它的「改动与预期」表与帖子下用户的评论；没有上一份时，从 `docs/decision.md`、`docs/CHANGELOG.md` 与 `git log -- CLAUDE.md AGENTS.md docs/agents .github/workflows` 列出范围开始以来对规则、参数、CI 与流程的修改，每项当作没有写明预期的改动。完成标准：工单清单（编号、状态、PR），加一份改动清单，每项带日期与位置。
 
 2. **取原始记录，写覆盖表。** 按上表取记录。完成标准：覆盖表写明每类记录覆盖多少张工单、缺哪些、为什么缺。缺失本身是发现，写明它让哪些结论无法得出。
 
@@ -75,6 +105,6 @@ argument-hint: "[里程碑标题 | 工单编号列表 | 起止日期]，省略�
    - 撤回条件：数字到什么程度就撤回；
    - 证明方式：能做成检查的，写成工单提议，验收要求这项检查在出过问题的历史提交上失败、在修复以后通过；其余由下一次复盘的数字证明。
 
-9. **独立复核。** 派一个新的 subagent（sonnet），只给它报告草稿与原始记录的位置，不给你的推理过程，要它逐条反驳：证据是否支持结论，对照工单是否真的顺利，有没有反例。按它的结果处理每条发现：成立的保留，不成立的删除，证据不够的改成「待定」。
+9. **独立复核。** 报告草稿写进 `.tmp/retro/report.md`。派一个新的 subagent（sonnet），只给它草稿与原始记录的位置，不给你的推理过程，要它逐条反驳：证据是否支持结论，对照工单是否真的顺利，有没有反例。按它的结果处理每条发现：成立的保留，不成立的删除，证据不够的改成「待定」。
 
-10. **写报告与日记。** 报告写到 `docs/evaluation/milestones/<里程碑短名>-retro-<YYYY-MM-DD>.md`（范围跨几个里程碑时用正在派发的那个），顺序：覆盖表 → 上一次改动的结论 → 时间去向与度量 → 按改动层分组的问题（问题、原因链、证据、对照工单、影响的后续工单）→ 项目目标 → 改动与预期表 → 需要用户决定的事项。没有问题的层略过。改动与预期表的列：编号、改动、层、位置、预期、撤回条件、证明方式、状态（提议 / 用户确认 / 已生效及日期），下一次复盘从这张表开始。`docs/CHANGELOG.md` 与 `claude_jour.md` 各追加一行：时间到分钟、范围、报告路径、需要用户决定的事项数。在会话自己的 worktree 中提交，`git push origin HEAD:main`。回复用户：报告路径、上一次改动的结论、需要用户决定的事项。
+10. **发帖子与写日记。** 报告第一行是 `# 复盘：<范围>`，顺序：覆盖表 → 上一次改动的结论 → 时间去向与度量 → 按改动层分组的问题（问题、原因链、证据、对照工单、影响的后续工单）→ 项目目标 → 改动与预期表 → 需要用户决定的事项。没有问题的层略过。改动与预期表的列：编号、改动、层、位置、预期、撤回条件、证明方式、状态（提议 / 用户确认 / 已生效及日期），下一次复盘从这张表开始。按「复盘帖子」一节发帖，读回帖子核对标题、分类与正文长度。`docs/CHANGELOG.md` 与 `claude_jour.md` 各追加一行：时间到分钟、范围、帖子链接、需要用户决定的事项数。在会话自己的 worktree 中提交变更记录、日记与第 4 步生成的里程碑记录，`git push origin HEAD:main`。回复用户：帖子链接、上一次改动的结论、需要用户决定的事项。
