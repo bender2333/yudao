@@ -399,10 +399,14 @@ class Orchestrator:
             bindings.setdefault(department, {"provider_id": provider_id, "model_id": model_id})
         self.facade.store_document({"providers": providers, "models": models, "bindings": bindings})
 
-    def _environment(self, run_id: str) -> LocalEnvironment:
+    def _environment(self, run_id: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
         # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351），不跟随之后的修改
-        return LocalEnvironment.open(self.workspace_root / run_id,
-                                     check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
+        return LocalEnvironment.open(
+            self.workspace_root / run_id,
+            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id),
+            jobs=jobs,
+            session_id=session_id,
+        )
 
     def _is_handoff_session(self, department: str, projection: RunProjection) -> bool:
         # 持有交接的工程：工程部门，且这次激活产出的东西进入运行工作区——当前阶段属于工程，
@@ -435,25 +439,47 @@ class Orchestrator:
             return CapturedTree(directories=(), files=())
         return workspace_tree(self.workspace_root / projection.run_id)
 
-    def _inspection_environment(self, run_id: str, department: str) -> LocalEnvironment:
+    def _inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
         # 会话的检查工作区（工单 #481）：根在运行工作区以外，激活开始时从当前源
         # （质检从最新交付，其他从当前运行工作区）建立；提案提交按同一根打开，
         # 不重新建立，激活里写入的文件与检查回执在提交判断时仍然可见
         root = inspection_root(self.workspace_root / run_id, department)
         return LocalEnvironment.open(
-            root, check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
+            root,
+            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id),
+            jobs=jobs,
+            session_id=session_id,
+        )
 
-    def _new_inspection_environment(self, run_id: str, department: str) -> LocalEnvironment:
+    def _new_inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
         # 激活开始：旧的检查工作区按工单的重试清理删除，再按当前源建立；
         # 源可能在上一次激活后被新交付覆盖，质检必须看到最新交付而不是上一次的副本
         projection = self.project(run_id)
         run_root = self.workspace_root / run_id
         root = inspection_root(run_root, department)
+        if session_id is None and self.sessions is not None:
+            try:
+                session_id = self.sessions.get(run_id, department).session_id
+            except KeyError:
+                ids = {item.department: item.session_id for item in projection.sessions.values()} if projection.sessions else None
+                sessions = self.sessions.create_run_sessions(run_id, ids)
+                session_id = sessions[department].session_id
+        if jobs is None and self.sessions is not None:
+            jobs = getattr(self.sessions, "jobs", None)
+
+        if session_id is not None and jobs is not None:
+            jobs.stop_and_remove_for_workspace(session_id, root)
+
         if root.exists():
             cleanup_inspection_workspace(run_root, department)
         tree = self._inspection_source_tree(department, projection)
         env = LocalEnvironment.establish(
-            root, tree, check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id))
+            root,
+            tree,
+            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id),
+            jobs=jobs,
+            session_id=session_id,
+        )
         if department == "quality":
             if projection.qa_tests_archive_ref is not None:
                 ref = projection.qa_tests_archive_ref
@@ -470,11 +496,23 @@ class Orchestrator:
         # refresh 只在激活开始时为真：按当前源重新建立检查工作区；提案提交时为假，
         # 沿用激活内的同一份工作区，使写入与检查回执在提交判断时仍然可见
         projection = self.project(run_id)
+        session_id = None
+        jobs = None
+        if self.sessions is not None:
+            try:
+                session = self.sessions.get(run_id, department)
+            except KeyError:
+                ids = {item.department: item.session_id for item in projection.sessions.values()} if projection.sessions else None
+                sessions = self.sessions.create_run_sessions(run_id, ids)
+                session = sessions[department]
+            session_id = session.session_id
+            jobs = getattr(self.sessions, "jobs", None)
+
         if self._is_handoff_session(department, projection):
-            return self._environment(run_id)
+            return self._environment(run_id, session_id=session_id, jobs=jobs)
         if refresh:
-            return self._new_inspection_environment(run_id, department)
-        return self._inspection_environment(run_id, department)
+            return self._new_inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
+        return self._inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
 
     def add_input(self, run_id: str, text: str, *, base_version: int | None = None,
                   command: Command | None = None) -> RunProjection:

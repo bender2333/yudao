@@ -1,7 +1,7 @@
 {
  "engineering/work": {
   "parts": {
-   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"write_file\",\"edit_range\",\"delete_file\",\"move_file\",\"run_check\",\"bash\",\"submit_request\",\"submit_delivery\"]",
+   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"write_file\",\"edit_range\",\"delete_file\",\"move_file\",\"run_check\",\"bash\",\"read_output\",\"stop_job\",\"submit_request\",\"submit_delivery\"]",
    "collaboration_rules": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
    "department_rules": "你是工程部门。依据当前有效产品合同开展工作，不能自报检查结果，一律以主机执行的 run_check 为准，不能宣布任务完成。",
    "input_handling": "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。",
@@ -257,21 +257,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -282,6 +282,40 @@
       }
      },
      "required": [],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Read new output produced since the last read for a background command or a truncated command. Returns the output chunk, status (running, exited, stopped, ended), and exit_code.",
+    "name": "read_output",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Stop a running background command and its entire process tree. Returns receipt stating the process tree was stopped.",
+    "name": "stop_job",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
      "type": "object"
     }
    },
@@ -391,7 +425,7 @@
  },
  "engineering/work/guidance": {
   "parts": {
-   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"write_file\",\"edit_range\",\"delete_file\",\"move_file\",\"run_check\",\"bash\",\"submit_request\",\"submit_guidance_response\",\"submit_delivery\"]",
+   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"write_file\",\"edit_range\",\"delete_file\",\"move_file\",\"run_check\",\"bash\",\"read_output\",\"stop_job\",\"submit_request\",\"submit_guidance_response\",\"submit_delivery\"]",
    "collaboration_rules": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
    "department_rules": "你是工程部门。依据当前有效产品合同开展工作，不能自报检查结果，一律以主机执行的 run_check 为准，不能宣布任务完成。",
    "input_handling": "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。",
@@ -647,21 +681,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -672,6 +706,40 @@
       }
      },
      "required": [],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Read new output produced since the last read for a background command or a truncated command. Returns the output chunk, status (running, exited, stopped, ended), and exit_code.",
+    "name": "read_output",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Stop a running background command and its entire process tree. Returns receipt stating the process tree was stopped.",
+    "name": "stop_job",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
      "type": "object"
     }
    },
@@ -991,7 +1059,7 @@
  },
  "product/work": {
   "parts": {
-   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"run_check\",\"submit_product_spec\",\"submit_request\"]",
+   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"read_output\",\"stop_job\",\"run_check\",\"submit_product_spec\",\"submit_request\"]",
    "collaboration_rules": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
    "department_rules": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。自然语言中的“完成”不会改变任务状态。你在会话检查工作区中读写与运行命令（从当前运行工作区建立），改动不进入运行工作区与交付，会话结束即删除。",
    "input_handling": "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。",
@@ -1106,21 +1174,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -1131,6 +1199,40 @@
       }
      },
      "required": [],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Read new output produced since the last read for a background command or a truncated command. Returns the output chunk, status (running, exited, stopped, ended), and exit_code.",
+    "name": "read_output",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Stop a running background command and its entire process tree. Returns receipt stating the process tree was stopped.",
+    "name": "stop_job",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
      "type": "object"
     }
    },
@@ -1357,7 +1459,7 @@
  },
  "product/work/request": {
   "parts": {
-   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"run_check\",\"submit_response\"]",
+   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"read_output\",\"stop_job\",\"run_check\",\"submit_response\"]",
    "collaboration_rules": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
    "department_rules": "你是产品部门。只定义目标、用户价值、范围、约束、验收标准和不可接受结果。不能修改交付代码，不能直接放行任务。专家回答只是意见。自然语言中的“完成”不会改变任务状态。你在会话检查工作区中读写与运行命令（从当前运行工作区建立），改动不进入运行工作区与交付，会话结束即删除。",
    "input_handling": "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。",
@@ -1472,21 +1574,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -1497,6 +1599,40 @@
       }
      },
      "required": [],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Read new output produced since the last read for a background command or a truncated command. Returns the output chunk, status (running, exited, stopped, ended), and exit_code.",
+    "name": "read_output",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Stop a running background command and its entire process tree. Returns receipt stating the process tree was stopped.",
+    "name": "stop_job",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
      "type": "object"
     }
    },
@@ -1571,7 +1707,7 @@
  },
  "quality/work": {
   "parts": {
-   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"run_check\",\"submit_request\",\"submit_review\"]",
+   "allowed_tools": "[\"read_file\",\"list_files\",\"search\",\"read_range\",\"bash\",\"read_output\",\"stop_job\",\"run_check\",\"submit_request\",\"submit_review\"]",
    "collaboration_rules": "一次只有一个未结专家请求，不嵌套。咨询用answered给意见，不直接改变合同或放行。动作应先通过本部门正常提交和真实工具取得结果，再用completed及request_results中的真实事件ID回应。不能完成时用declined或needs_work说明原因，不伪造结果。每次submit结束本次激活；请求处理完毕后由主机判断原工作是否仍适用。",
    "department_rules": "你是质检部门。独立核实产品要求与实际结果是否一致，不能修改交付代码，不能只凭文字放行，必须亲自运行检查。自然语言中的“完成”不会改变任务状态。你在会话检查工作区中读写与运行命令（从封存交付建立），改动不进入运行工作区与交付，会话结束时删除。测试写在检查工作区的 .yudao-qa-tests/，检查时自动带上，不进入交付。",
    "input_handling": "新增用户原文必须由产品提交完整有效ProductSpec处理；普通回应或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。",
@@ -1686,21 +1822,21 @@
     }
    },
    {
-    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Long output is stored as an artifact. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
+    "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "name": "bash",
     "parameters": {
      "additionalProperties": false,
      "properties": {
+      "background": {
+       "description": "Optional boolean; when true, start the command in the background and return immediately with a job_id",
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
-      },
-      "cursor": {
-       "description": "Previous next_cursor, for the next page",
-       "type": [
-        "string",
-        "null"
-       ]
       },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
@@ -1711,6 +1847,40 @@
       }
      },
      "required": [],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Read new output produced since the last read for a background command or a truncated command. Returns the output chunk, status (running, exited, stopped, ended), and exit_code.",
+    "name": "read_output",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
+     "type": "object"
+    }
+   },
+   {
+    "description": "Stop a running background command and its entire process tree. Returns receipt stating the process tree was stopped.",
+    "name": "stop_job",
+    "parameters": {
+     "additionalProperties": false,
+     "properties": {
+      "job_id": {
+       "description": "Job identifier returned by bash",
+       "type": "string"
+      }
+     },
+     "required": [
+      "job_id"
+     ],
      "type": "object"
     }
    },

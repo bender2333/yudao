@@ -5,9 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .environment import cleanup_inspection_workspace
+from .environment import BackgroundJobTable, cleanup_inspection_workspace
 from .models import DEPARTMENTS, new_id
-
 
 @dataclass
 class DepartmentSession:
@@ -17,7 +16,6 @@ class DepartmentSession:
     status: str = "idle"
     activations: int = 0
     last_activation_id: str | None = None
-
     def activate(self, activation_id: str) -> None:
         self.status = "active"
         self.activations += 1
@@ -38,6 +36,7 @@ class SessionFactory:
     def __init__(self, workspace_root: str | Path | None = None) -> None:
         self._sessions: dict[str, dict[str, DepartmentSession]] = {}
         self._workspace_root = Path(workspace_root) if workspace_root is not None else None
+        self.jobs = BackgroundJobTable()
 
     def create_run_sessions(self, run_id: str, session_ids: dict[str, str] | None = None) -> dict[str, DepartmentSession]:
         ids = session_ids or {department: new_id(f"ses_{department[:3]}") for department in DEPARTMENTS}
@@ -56,6 +55,8 @@ class SessionFactory:
     def cleanup_run(self, run_id: str) -> list[Exception]:
         # 删除 run 的全部会话检查工作区；返回未删除部门的错误清单，由调用方决定如何处理。
         # 没有 workspace_root（纯内存测试）时直接返回空
+        session_ids = [s.session_id for s in self._sessions.get(run_id, {}).values()]
+        self.jobs.stop_for_sessions(session_ids)
         errors: list[Exception] = []
         if self._workspace_root is None:
             return errors
@@ -68,7 +69,8 @@ class SessionFactory:
 
     def close_run(self, run_id: str) -> list[Exception]:
         # 关闭 run 的所有会话并清理检查工作区；保留原副作用关闭会话，清理错误作为返回值由编排器写到事件
+        session_ids = [s.session_id for s in self._sessions.get(run_id, {}).values()]
+        self.jobs.stop_for_sessions(session_ids)
         for session in self._sessions.get(run_id, {}).values():
             session.close("closed")
         return self.cleanup_run(run_id)
-

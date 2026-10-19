@@ -16,7 +16,7 @@ def test_tools_are_host_tools_or_environment_actions():
     assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
         "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
         "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
-        "run_check": "check", "bash": "command",
+        "run_check": "check", "bash": "command", "read_output": "command", "stop_job": "command",
     }
 
 
@@ -46,6 +46,12 @@ def test_bash_description_separates_action_receipts_from_delivery_check_receipts
     assert "inherits the Yudao process's full environment" in text
     assert "replaces the value of any known secret with its name" in text
     assert "the whole process tree is stopped" in text
+    assert "Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output" in text
+    assert "Background commands (background=true) return immediately with a job_id" in text
+    assert "cursor" not in TOOLS["bash"].parameters["properties"]
+    assert "background" in TOOLS["bash"].parameters["properties"]
+    assert "job_id" in TOOLS["read_output"].parameters["properties"]
+    assert "job_id" in TOOLS["stop_job"].parameters["properties"]
 
 
 def test_write_tool_descriptions_state_engineering_only():
@@ -102,6 +108,12 @@ def test_edit_range_is_an_engineering_only_write_tool():
     assert "edit_range" in tools_for("engineering")
     assert "edit_range" not in tools_for("product")
     assert "edit_range" not in tools_for("quality")
+
+def test_read_output_and_stop_job_are_offered_to_all_departments():
+    for department in ("product", "engineering", "quality"):
+        tools = tools_for(department)
+        assert "read_output" in tools
+        assert "stop_job" in tools
 
 
 

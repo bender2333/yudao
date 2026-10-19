@@ -17,6 +17,7 @@ import re
 import shutil
 import signal
 import subprocess
+import threading
 
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
@@ -26,13 +27,12 @@ from threading import Lock
 from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
-from .models import hash_bytes, json_dumps
+from .models import hash_bytes, json_dumps, new_id
 from .public_tree import QA_TESTS_DIR, CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
 from .path_rules import TreeError
 from .redact import redact_text
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
-
 # 一次工具结果的输出上限，取规则登记中的现值
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
 # 单页默认命中数；单页输出同样受 _OUTPUT_LIMIT 约束
@@ -49,22 +49,10 @@ _CHECK_TIMEOUT_MAX = DEFINITIONS.rule_value("check_timeout_max_sec")
 
 _BASH_PATH: str | None = None
 _BASH_OUTPUT_SUBDIR = "tool-output"
-_SAFE_OUTPUT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.json")
 INSPECTIONS_DIR = "inspections"
 # Windows 句柄占用时清理目录的退避：3 次尝试，间隔按毫秒级递增（工单 #479 教训）
 _CLEANUP_ATTEMPTS = 3
 _CLEANUP_INITIAL_BACKOFF_SEC = 0.05
-
-_TRUNCATED_MARKER = (
-    f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is saved, "
-    "pass \"next_cursor\" back to bash as \"cursor\" to read the rest"
-)
-
-
-def _safe_output_name(action_id: str) -> str:
-    # 存档文件名只留安全字符：游标回读时按同规则核对，防止路径穿越
-
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", action_id)[:80] or "output"
 
 
 def inspection_root(run_root: str | Path, department: str) -> Path:
@@ -162,6 +150,8 @@ _HANDLERS = {
     "edit_range": "_edit_range",
     "delete_file": "_delete_file",
     "move_file": "_move_file",
+    "read_output": "_read_output",
+    "stop_job": "_stop_job",
 }
 _PROCESSES = {"run_check": "_run_check", "bash": "_bash"}
 
@@ -180,12 +170,159 @@ class _Finished:
     stdout: str
     stderr: str
 
+class _Job:
+    def __init__(
+        self,
+        job_id: str,
+        output_path: Path,
+        process: subprocess.Popen[Any] | None = None,
+        file_handle: Any = None,
+        status: str = "running",
+        exit_code: int | None = None,
+        timer: threading.Timer | None = None,
+        session_id: str | None = None,
+        workspace_root: Path | None = None,
+    ) -> None:
+        self.job_id = job_id
+        self.output_path = output_path
+        self.process = process
+        self.file_handle = file_handle
+        self.status = status
+        self.exit_code = exit_code
+        self.timer = timer
+        self.session_id = session_id
+        self.workspace_root = workspace_root
+        self.read_offset = 0
+
+    def read(self) -> dict[str, Any]:
+        if self.status == "running" and self.process is not None:
+            ret = self.process.poll()
+            if ret is not None:
+                self.status = "exited"
+                self.exit_code = ret
+                if self.timer is not None:
+                    self.timer.cancel()
+                    self.timer = None
+                if self.file_handle is not None:
+                    self.file_handle.close()
+                    self.file_handle = None
+
+        chunk = ""
+        if self.output_path.exists():
+            full_text = redact_text(_text(self.output_path.read_bytes()))
+            if self.read_offset < len(full_text):
+                chunk = full_text[self.read_offset:]
+                self.read_offset = len(full_text)
+
+        return {
+            "job_id": self.job_id,
+            "output": chunk,
+            "status": self.status,
+            "exit_code": self.exit_code,
+        }
+
+    def stop(self) -> dict[str, Any]:
+        if self.status == "running" and self.process is not None:
+            ret = self.process.poll()
+            if ret is not None:
+                self.status = "exited"
+                self.exit_code = ret
+            else:
+                _kill_process_tree_sync(self.process.pid)
+                self.status = "stopped"
+        elif self.status == "running":
+            self.status = "stopped"
+
+        if self.timer is not None:
+            self.timer.cancel()
+            self.timer = None
+        if self.file_handle is not None:
+            self.file_handle.close()
+            self.file_handle = None
+
+        if self.status == "exited":
+            output_msg = f"job {self.job_id} has already exited"
+            if self.exit_code is not None:
+                output_msg += f" with exit code {self.exit_code}"
+            return {
+                "job_id": self.job_id,
+                "output": output_msg,
+                "status": self.status,
+                "exit_code": self.exit_code,
+            }
+        return {
+            "job_id": self.job_id,
+            "output": f"job {self.job_id} was stopped; the process tree was stopped",
+            "status": self.status,
+            "exit_code": self.exit_code,
+        }
+
+
+class BackgroundJobTable:
+    def __init__(self) -> None:
+        self._jobs: dict[str, _Job] = {}
+        self._lock = Lock()
+
+    def register(self, job: _Job) -> None:
+        with self._lock:
+            self._jobs[job.job_id] = job
+
+    def read_output(self, job_id: str, session_id: str) -> dict[str, Any]:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.session_id != session_id:
+                return {"job_id": job_id, "output": "", "status": "ended", "exit_code": None}
+            return job.read()
+
+    def stop_job(self, job_id: str, session_id: str) -> dict[str, Any]:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.session_id != session_id:
+                return {"job_id": job_id, "output": f"job {job_id} has ended", "status": "ended", "exit_code": None}
+            return job.stop()
+
+    def stop_for_sessions(self, session_ids: Iterable[str]) -> None:
+        targets = set(session_ids)
+        with self._lock:
+            for job in list(self._jobs.values()):
+                if job.session_id in targets:
+                    job.stop()
+
+    def stop_and_remove_for_workspace(self, session_id: str, workspace_root: Path | str) -> None:
+        target_root = Path(workspace_root).resolve()
+        with self._lock:
+            matching = [
+                job_id for job_id, job in self._jobs.items()
+                if job.session_id == session_id and job.workspace_root is not None and job.workspace_root.resolve() == target_root
+            ]
+            for job_id in matching:
+                job = self._jobs.pop(job_id)
+                job.stop()
+
+    def get_status(self, job_id: str) -> str | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return None
+            if job.status == "running" and job.process is not None:
+                if job.process.poll() is not None:
+                    return "exited"
+            return job.status
+
 
 class LocalEnvironment:
-    def __init__(self, workspace: Workspace,
-                 check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> None:
+    def __init__(
+        self,
+        workspace: Workspace,
+        check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
+        *,
+        jobs: BackgroundJobTable | None = None,
+        session_id: str | None = None,
+    ) -> None:
         self.workspace = workspace
         self._check_timeout_sec = check_timeout_sec
+        self._jobs = jobs
+        self._session_id = session_id
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
         self._lock = Lock()
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -196,19 +333,32 @@ class LocalEnvironment:
             name: getattr(self, method) for name, method in _PROCESSES.items()}
 
     @classmethod
-    def establish(cls, root: str | Path, tree: CapturedTree | None, *,
-                  check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> LocalEnvironment:
+    def establish(
+        cls,
+        root: str | Path,
+        tree: CapturedTree | None,
+        *,
+        check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
+        jobs: BackgroundJobTable | None = None,
+        session_id: str | None = None,
+    ) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
             Path(root).parent.mkdir(parents=True, exist_ok=True)
             materialize_tree(tree, root)
-        return cls(Workspace(root), check_timeout_sec=check_timeout_sec)
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id)
 
     @classmethod
-    def open(cls, root: str | Path,
-             check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec")) -> LocalEnvironment:
+    def open(
+        cls,
+        root: str | Path,
+        *,
+        check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
+        jobs: BackgroundJobTable | None = None,
+        session_id: str | None = None,
+    ) -> LocalEnvironment:
         # 打开已经建立的工作区
-        return cls(Workspace(root), check_timeout_sec=check_timeout_sec)
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id)
 
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:
@@ -504,10 +654,6 @@ class LocalEnvironment:
 
     async def _bash(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str, str | None]:
         args = action.input
-        cursor_arg = args.get("cursor")
-        if cursor_arg not in (None, ""):
-            # 继续取回上次截断的完整输出：只读主机私有的存档，不启动新进程，不核对公开树
-            return self._bash_continuation(str(cursor_arg)), "completed", None
         command = args.get("command")
         if not isinstance(command, str) or not command.strip():
             raise ValueError("bash requires a non-empty command string")
@@ -518,14 +664,47 @@ class LocalEnvironment:
             if type(timeout_sec) is not int or timeout_sec < 1:
                 raise ValueError("timeout_sec must be a positive integer")
             timeout_sec = min(timeout_sec, _BASH_TIMEOUT_MAX)
-        # 模型自报 exit_code 不是证据：这里只读主机执行结果，从不读取该字段
         snapshot = self.workspace.snapshot()
-        # 前置条件：工具许可所依据的公开树没有改变
         expected = action.preconditions.tree_digest
         if expected is not None and snapshot.digest != expected:
             raise ValueError("the workspace changed after the tool permission; call bash again")
-        # 每次调用都是新进程，不保留 shell 状态；进程继承 Yudao 进程的完整环境。
-        # 不用 -l：登录 shell 会读用户 profile，环境不可复现。
+
+        if args.get("background") is True:
+            if self._jobs is None or self._session_id is None:
+                raise RuntimeError("background commands require an environment with a session context")
+            job_id = new_id("job")
+            directory = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR
+            directory.mkdir(parents=True, exist_ok=True)
+            output_path = directory / f"{job_id}.output"
+            file_handle = open(output_path, "wb")
+
+            spawn: dict[str, Any] = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+                                     else {"start_new_session": True})
+            process = subprocess.Popen(
+                [_resolve_bash(), "-c", command],
+                cwd=str(self.workspace.root),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                stdin=subprocess.DEVNULL,
+                stdout=file_handle,
+                stderr=subprocess.STDOUT,
+                **spawn,
+            )
+            job = _Job(
+                job_id=job_id,
+                output_path=output_path,
+                process=process,
+                file_handle=file_handle,
+                status="running",
+                session_id=self._session_id,
+                workspace_root=self.workspace.root,
+            )
+            timer = threading.Timer(timeout_sec, job.stop)
+            timer.daemon = True
+            timer.start()
+            job.timer = timer
+            self._jobs.register(job)
+            return {"job_id": job_id, "status": "running"}, "completed", None
+
         finished = await _run_process(
             [_resolve_bash(), "-c", command], self.workspace.root,
             {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}, timeout_sec, stop,
@@ -543,53 +722,65 @@ class LocalEnvironment:
         text = redact_text(text)
         meta = {"command": command, "exit_code": exit_code, "status": status,
                 "snapshot_hash": snapshot.digest, "executor": "host"}
-        output, truncated, next_cursor = self._bash_page(action.action_id, meta, text)
-        # 命令结束后主机立即取的公开树核对。命令留下无法表示的条目（例如链接）时，核对结果随回执
-        # 交回，步骤驱动在回执照常记录之后以 workspace_unrepresentable 暂停；被忽略的条目不进入
-        # 公开树，核对通过
+
         workspace_error = None
         try:
             self.workspace.snapshot()
         except UnrepresentableWorkspace as exc:
             workspace_error = {"message": str(exc), "paths": list(exc.paths)}
-        return {**meta, "output": output, "truncated": truncated, "next_cursor": next_cursor}, finished.status, workspace_error
 
-    def _bash_page(self, action_id: str, meta: dict[str, Any], full: str) -> tuple[str, bool, str | None]:
-        # 完整输出的第一页：超限时全文存主机私有的存档（公开树之外，不进入快照与交付），
-        # 回执只带截断页与继续取回的游标；各页按字符直接拼接与原文逐字相等
-        if len(full) <= _OUTPUT_LIMIT:
-            return full, False, None
+        if len(text) <= _OUTPUT_LIMIT:
+            return {**meta, "output": text, "truncated": False}, finished.status, workspace_error
+
+        if self._jobs is None or self._session_id is None:
+            raise RuntimeError("truncated output requires an environment with a session context")
+
+        job_id = new_id("job")
         directory = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR
         directory.mkdir(parents=True, exist_ok=True)
-        path = directory / (_safe_output_name(action_id) + ".json")
-        path.write_bytes(json.dumps({**meta, "full": full}, ensure_ascii=False).encode("utf-8"))
-        page, next_start = _bash_slice(full, 0)
-        if next_start is None:
-            return page, False, None
-        cursor = _encode_cursor({"kind": "bash_output", "name": path.name, "offset": next_start})
-        return page + _TRUNCATED_MARKER, True, cursor
+        path = directory / f"{job_id}.output"
+        path.write_text(text, encoding="utf-8")
 
-    def _bash_continuation(self, cursor: str) -> dict[str, Any]:
-        payload = _decode_cursor(cursor, kind="bash_output")
-        name = payload.get("name")
-        offset = payload.get("offset")
-        if (not isinstance(name, str) or not _SAFE_OUTPUT_NAME.fullmatch(name)
-                or type(offset) is not int or offset < 0):
-            raise ValueError("invalid bash output cursor")
-        path = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR / name
-        try:
-            saved = json.loads(path.read_bytes().decode("utf-8"))
-        except (OSError, ValueError) as exc:
-            raise ValueError(f"saved bash output is no longer available: {name}") from exc
-        full = saved.get("full")
-        if not isinstance(full, str) or offset >= len(full):
-            raise ValueError(f"saved bash output is no longer available: {name}")
-        meta = {key: saved[key] for key in ("command", "exit_code", "status", "snapshot_hash", "executor")}
-        page, next_start = _bash_slice(full, offset)
-        if next_start is None:
-            return {**meta, "output": page, "truncated": False, "next_cursor": None}
-        next_cursor = _encode_cursor({"kind": "bash_output", "name": name, "offset": next_start})
-        return {**meta, "output": page + _TRUNCATED_MARKER, "truncated": True, "next_cursor": next_cursor}
+        page, cut = _bash_slice(text, 0)
+        job = _Job(
+            job_id=job_id,
+            output_path=path,
+            process=None,
+            file_handle=None,
+            status="exited",
+            exit_code=exit_code,
+            session_id=self._session_id,
+            workspace_root=self.workspace.root,
+        )
+        job.read_offset = cut
+        self._jobs.register(job)
+
+        truncated_marker = (
+            f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is saved, "
+            f"use read_output with job_id {job_id!r} to read the rest"
+        )
+        return {
+            **meta,
+            "job_id": job_id,
+            "output": page + truncated_marker,
+            "truncated": True,
+        }, finished.status, workspace_error
+
+    def _read_output(self, args: dict[str, Any]) -> dict[str, Any]:
+        job_id = args.get("job_id")
+        if not isinstance(job_id, str) or not job_id.strip():
+            raise ValueError("job_id is required")
+        if self._jobs is None or self._session_id is None:
+            return {"job_id": job_id, "output": "", "status": "ended", "exit_code": None}
+        return self._jobs.read_output(job_id, self._session_id)
+
+    def _stop_job(self, args: dict[str, Any]) -> dict[str, Any]:
+        job_id = args.get("job_id")
+        if not isinstance(job_id, str) or not job_id.strip():
+            raise ValueError("job_id is required")
+        if self._jobs is None or self._session_id is None:
+            return {"job_id": job_id, "output": f"job {job_id} has ended", "status": "ended", "exit_code": None}
+        return self._jobs.stop_job(job_id, self._session_id)
 
     async def _run_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         args = action.input
@@ -707,19 +898,21 @@ async def _run_process(argv: list[str], cwd: Path, env: dict[str, str], timeout_
     return _Finished(status, process.returncode, _text(stdout), _text(stderr))
 
 
-async def _kill_process_tree(process: asyncio.subprocess.Process) -> None:
-    # Windows 用 taskkill 按树结束；POSIX 结束整个会话的进程组，进程组已经不存在时没有需要结束的进程
+def _kill_process_tree_sync(pid: int) -> None:
     if os.name == "nt":
-        killer = await asyncio.create_subprocess_exec(
-            "taskkill", "/PID", str(process.pid), "/T", "/F",
-            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
-        await killer.wait()
     else:
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+
+
+async def _kill_process_tree(process: asyncio.subprocess.Process) -> None:
+    _kill_process_tree_sync(process.pid)
 
 
 def _text(raw: bytes) -> str:

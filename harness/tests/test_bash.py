@@ -1,10 +1,9 @@
 # bash 工具的持久行为：管道与重定向、非零退出码、超时与取消的进程树结束、
-# 超时缺省与钳位、环境继承与凭据脱敏、超限截断的游标取回、bash 缺失的报错、
+# 超时缺省与钳位、环境继承与凭据脱敏、超限截断的回执与按编号取回、bash 缺失的报错、
 # 以及调用 argv 不带 -l。这些结论 spawn 真实子进程，登记为集成层。
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
 import secrets
@@ -21,6 +20,8 @@ from harness.workspace import Workspace
 
 
 def _environment(path, **kwargs) -> LocalEnvironment:
+    kwargs.setdefault("session_id", "test-session")
+    kwargs.setdefault("jobs", environment_module.BackgroundJobTable())
     return LocalEnvironment(Workspace(path / "ws"), **kwargs)
 
 
@@ -117,32 +118,26 @@ def test_environment_inherited_and_secrets_redacted(tmp_path, monkeypatch):
     assert "${MY_SECRET_TOKEN}" in leaked.output["output"]
 
 
-def _read_all_pages(environment, first) -> str:
-    pages = [first.output["output"].split("\n...output truncated")[0]]
-    receipt = first
-    while receipt.output["truncated"]:
-        assert receipt.output["next_cursor"]
-        receipt = perform(environment, "bash", {"cursor": receipt.output["next_cursor"]})
-        assert receipt.ok is True and receipt.status == "completed"
-        pages.append(receipt.output["output"].split("\n...output truncated")[0])
-        assert receipt.output["command"] == first.output["command"]
-        assert receipt.output["exit_code"] == first.output["exit_code"]
-    assert receipt.output["next_cursor"] is None
-    return "".join(pages)
-
-
 def test_truncated_output_pages_back_exactly(tmp_path):
     environment = _environment(tmp_path)
     command = f'"{_python()}" -c "for i in range(2000): print(\'line-%05d-\' % i + \'x\' * 40)"'
     first = perform(environment, "bash", {"command": command})
     assert first.ok is True and first.status == "completed"
     assert first.output["status"] == "ok" and first.output["truncated"] is True
-    assert "pass \"next_cursor\" back to bash as \"cursor\"" in first.output["output"]
-    full = _read_all_pages(environment, first)
+    assert "use read_output with job_id" in first.output["output"]
+    job_id = first.output.get("job_id")
+    assert job_id
+
+    rest = perform(environment, "read_output", {"job_id": job_id})
+    assert rest.ok is True and rest.status == "completed"
+    assert rest.output["status"] == "exited"
+    assert rest.output["exit_code"] == 0
+
+    first_page = first.output["output"].split("\n...output truncated")[0]
+    full = first_page + rest.output["output"]
     assert len(full) > DEFINITIONS.rule_value("tool_output_limit")
     expected = "\n".join(f"line-{i:05d}-" + "x" * 40 for i in range(2000))
     assert full == expected
-
 
 def test_missing_bash_reports_the_cause(tmp_path, monkeypatch):
     monkeypatch.setattr(environment_module, "_BASH_PATH", None)
@@ -175,8 +170,8 @@ def test_saved_output_stays_outside_the_public_tree(tmp_path):
     assert first.output["truncated"] is True
     files = perform(environment, "list_files", {"path": "."}).output
     assert not any(name.startswith(".checks") for name in files)
-    saved = list((tmp_path / "ws" / ".checks" / "tool-output").glob("*.json"))
+    saved = list((tmp_path / "ws" / ".checks" / "tool-output").glob("*.output"))
     assert len(saved) == 1
-    stored = json.loads(saved[0].read_text(encoding="utf-8"))
+    stored = saved[0].read_text(encoding="utf-8")
     expected = "\n".join(f"line-{i:05d}-" + "x" * 40 for i in range(2000))
-    assert stored["full"] == expected
+    assert stored == expected
