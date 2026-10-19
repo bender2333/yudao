@@ -69,7 +69,7 @@ def registered_files(tests):
 
 
 def run_tests(delivery_dir, tests, junit_path):
-    """按登记的测试命令运行用例清单，结果写到 junit。
+    """按材料里写明的测试命令运行用例清单，结果写到 junit。
 
     `--project` 指向交付自己：环境由运行器在建好之后放在交付里，评分直接用它，
     不让 uv 向上找到 Yudao 仓库的环境。
