@@ -713,3 +713,5 @@ claude-opus-5-5 / 2026-10-19 16:16 / `docs/stage-3-plan.md` 第 9 节注明 M1 �
 claude-opus-5-5 / 2026-10-19 16:28 / `docs/design/evaluation-scenarios.md` 第 9 节「测试命令登记为使用 Python 3.13 运行」改为「测试命令用 Python 3.13 运行（命令不登记，ADR-0038）」 / 父工单验收时查出的过期写法，属于与 ADR-0038 的一致性修正
 
 claude-opus-5-5 / 2026-10-19 16:37 / 里程碑发布之前的检查加入全部客户端端到端测试：`docs/design/test-pyramid.md` 第 4 节表格、导言、流程图与新增一段（CI 不运行端到端，看过第一次运行再定），`docs/design/web-interface-and-release.md` 第 6.4 节，`CLAUDE.md` 自主推进第 5 条；`docs/decision.md` 加 2026-10-19 一条 / 用户在 #621 选择端到端放到发布前运行
+
+claude-opus-5-5 / 2026-10-19 16:46 / D30（`docs/requirements/web-game-frontend.md`）、`docs/design/web-interface-and-release.md` 第 5.3 节、`docs/design/app-and-interface.md` 第 5.7 节注明磁盘空间不足的通知在 Stage 4 加入；`docs/architecture-issues.md` 中 8 条已处理的条目移到 `docs/archive/architecture-issues-2026-10-19.md`，登记文件的归档链接列出两个归档文件；`docs/decision.md` 加 2026-10-19 一条 / 用户确认架构师的两项建议
