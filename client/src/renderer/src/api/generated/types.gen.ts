@@ -5438,6 +5438,188 @@ export type AdoptionHeldPayload = {
 };
 
 /**
+ * AskAnsweredEvent
+ */
+export type AskAnsweredEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'ask_answered';
+    payload: AskAnsweredPayload;
+};
+
+/**
+ * AskAnsweredPayload
+ */
+export type AskAnsweredPayload = {
+    /**
+     * Answer
+     */
+    answer: string;
+    /**
+     * With Spec Revision
+     */
+    with_spec_revision?: boolean;
+    /**
+     * Revision
+     */
+    revision?: number | null;
+};
+
+/**
+ * AskStartedEvent
+ */
+export type AskStartedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'ask_started';
+    payload: AskStartedPayload;
+};
+
+/**
+ * AskStartedPayload
+ */
+export type AskStartedPayload = {
+    /**
+     * Requester
+     */
+    requester: 'product' | 'engineering' | 'quality';
+    /**
+     * Recipient
+     */
+    recipient: 'product' | 'engineering' | 'quality';
+    /**
+     * Question
+     */
+    question: string;
+    /**
+     * Branch Session Id
+     */
+    branch_session_id: string;
+    /**
+     * Background
+     */
+    background?: string | null;
+    /**
+     * Expected
+     */
+    expected?: string | null;
+};
+
+/**
  * Baseline
  */
 export type Baseline = {
@@ -15988,6 +16170,10 @@ export type EventObject = ({
 } & CollaborationRespondedEvent) | ({
     type: 'collaboration_closed';
 } & CollaborationClosedEvent) | ({
+    type: 'ask_started';
+} & AskStartedEvent) | ({
+    type: 'ask_answered';
+} & AskAnsweredEvent) | ({
     type: 'product_decision_accepted';
 } & ProductDecisionAcceptedEvent) | ({
     type: 'delivery_accepted';

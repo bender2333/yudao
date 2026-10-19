@@ -137,6 +137,8 @@ _LABELS: dict[str, str] = {
     EventType.COLLABORATION_REQUESTED: "{requester}向{recipient}提出请求：{question}",
     EventType.COLLABORATION_RESPONDED: "{recipient}回应了协作请求：{status}",
     EventType.COLLABORATION_CLOSED: "关闭了协作请求：{status}",
+    EventType.ASK_STARTED: "{requester}向{recipient}发问：{question}",
+    EventType.ASK_ANSWERED: "回答了询问",
     EventType.PRODUCT_DECISION_ACCEPTED: "采纳了产品决策（{kind}）",
     EventType.DELIVERY_ACCEPTED: "采纳了交付（第 {revision} 版）：{summary}",
     EventType.QA_SUBMITTED: "质检提交了结论：{verdict}",

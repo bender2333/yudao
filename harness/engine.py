@@ -38,6 +38,7 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
 from .providers.selection import ModelSelection
 from .recording import ActivationScope, StepRecorder
 from .tools import proposal_kind, tool_action, tool_kind
+from .validation import PRD_REVISION_FIELDS, evaluate_proposal
 from .tree_archive import store_tree
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
@@ -83,6 +84,10 @@ class SafeNode(Protocol):
     def department_prompt(self, department: str) -> DepartmentPrompt:
         # 部门 Prompt 每次请求从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）
         ...
+    async def ask(self, scope: ActivationScope, call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None]:
+        # 开一个询问分支，等待分支回答，返回 (ok, output, error, new_contract_hash)
+        ...
+
 
 
 @dataclass(frozen=True)
@@ -124,9 +129,16 @@ class Stopped:
     message: str = ""
     target: dict[str, Any] | None = None
     facts: list[str] | None = None
+@dataclass(frozen=True)
+class Answered:
+    # 询问分支提交了回答：回答参数、带来回答的模型响应与发言
+    args: dict[str, Any]
+    response: ModelResponse
+    transcript: str
 
 
-StepResult = Submitted | Stopped
+
+StepResult = Submitted | Stopped | Answered
 
 
 @dataclass(frozen=True)
@@ -462,6 +474,50 @@ class StepDriver:
                         return Stopped(self._version)
                     if not permission.allowed:
                         ok, output, error = False, None, permission.reason
+                    elif name == "ask":
+                        ask_call = {"id": identity, "name": name, "args": args, "step_id": step_id}
+                        ask_ok, ask_output, ask_error, new_contract_hash = await self._nodes.ask(self._scope, ask_call)
+                        ok, output, error = ask_ok, ask_output, ask_error
+                        if ok and new_contract_hash is not None:
+                            self._scope = replace(self._scope, basis=replace(self._scope.basis, effective_contract_hash=new_contract_hash))
+                            self._frame = replace(self._frame, effective_contract_hash=new_contract_hash)
+                            projection = self._writes.read(self._stream).projection
+                            self._environment.bind_check(
+                                activation_id=self._scope.activation_id,
+                                product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
+                                delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
+                                effective_contract_hash=new_contract_hash,
+                            )
+                    elif name == "answer":
+                        text = args.get("answer") or args.get("text") or ""
+                        if not isinstance(text, str) or not text.strip():
+                            ok, output, error = False, None, "answer must be a non-empty string"
+                        elif any(args.get(field) is not None for field in PRD_REVISION_FIELDS):
+                            if request.department != "product":
+                                ok, output, error = False, None, "only product can revise product_spec"
+                            else:
+                                projection = self._writes.read(self._stream).projection
+                                spec_proposal = {
+                                    **{k: v for k, v in args.items() if k not in ("answer", "text") and v is not None},
+                                    "kind": "product_spec",
+                                    "issuer": "product",
+                                }
+                                facts = self._environment.query(FactsQuery(tree=True)).tree
+                                events = self._writes.read(self._stream).events()
+                                decision = evaluate_proposal(
+                                    phase=projection.phase,
+                                    department="product",
+                                    proposal=spec_proposal,
+                                    projection=projection,
+                                    facts=facts,
+                                    events=events,
+                                )
+                                if not decision.accepted:
+                                    ok, output, error = False, None, "; ".join(e.message for e in decision.errors)
+                                else:
+                                    ok, output, error = True, text, None
+                        else:
+                            ok, output, error = True, text, None
                     elif tool_kind(name) == "host":
                         ok, output, error = True, _run_host_tool(name, args), None
                     else:
@@ -503,6 +559,10 @@ class StepDriver:
                                "Not executed because the department already submitted its proposal.")
                     proposal = output if ok else {**args, "kind": kind}
                     return Submitted(proposal, response, self._recorder.transcript)
+                if name == "answer" and ok:
+                    self._skip(request, response.output[index + 1:],
+                               "Not executed because the branch session already submitted its answer.")
+                    return Answered(args, response, self._recorder.transcript)
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
 
@@ -669,7 +729,7 @@ class StepDriver:
             department_input = pinned.department_input
             if department_input is not None:
                 self._recorder.department_input(transaction, step_id, department_input)
-            history = self._assembly.department_history(transaction.events(), scope.department)
+            history = self._assembly.department_history(transaction.events(), scope.department, session_id=scope.session_id)
             try:
                 step = self._assembly.request(pinned, history)
             except UnrepresentableWorkspace as exc:

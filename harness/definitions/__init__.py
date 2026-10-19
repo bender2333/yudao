@@ -172,7 +172,7 @@ class Tool(_Definition):
     def _category(self) -> Tool:
         if self.kind == "environment" and (self.action is None or self.proposal is not None):
             raise ValueError("an environment tool requires action and has no proposal")
-        if self.kind == "host" and (self.proposal is None or self.action is not None):
+        if self.kind == "host" and self.action is not None:
             raise ValueError("a host tool requires proposal and has no action")
         return self
 
@@ -591,12 +591,12 @@ def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], t
     for name, own in contracts.roles.items():
         if name not in roles:
             continue
-        usable = [tool for tool in roles[name].tools if tool in tools and tools[tool].kind == "host"]
+        usable = [tool for tool in roles[name].tools if tool in tools and tools[tool].kind == "host" and tools[tool].proposal is not None]
         for kind, definition in work_items.kinds.items():
             work = definition.departments.get(name)
             if work is None:
                 continue
-            usable.extend(tool for tool in work.tools if tool in tools and tools[tool].kind == "host")
+            usable.extend(tool for tool in work.tools if tool in tools and tools[tool].kind == "host" and tools[tool].proposal is not None)
         host_tools = sorted(set(usable))
         submit_tools = [*own.submit_tools, *contracts.shared.submit_tools]
         if len(submit_tools) != len(set(submit_tools)) or sorted(submit_tools) != host_tools:

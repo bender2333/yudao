@@ -17,6 +17,7 @@
             "run_check",
             "submit_product_spec",
             "submit_product_decision",
+            "ask",
             "submit_request",
             "submit_response",
             "submit_guidance_response"
@@ -41,6 +42,7 @@
             "bash",
             "read_output",
             "stop_job",
+            "ask",
             "submit_request",
             "submit_response",
             "submit_guidance_response",
@@ -62,6 +64,7 @@
             "read_output",
             "stop_job",
             "run_check",
+            "ask",
             "submit_request",
             "submit_response",
             "submit_guidance_response",
@@ -95,6 +98,7 @@
             "stop_job",
             "run_check",
             "submit_product_spec",
+            "ask",
             "submit_request",
             "submit_response",
             "submit_guidance_response"
@@ -109,6 +113,7 @@
             "read_range",
             "run_check",
             "submit_structure",
+            "ask",
             "submit_request",
             "submit_response",
             "submit_guidance_response"
@@ -126,6 +131,7 @@
             "stop_job",
             "run_check",
             "submit_baseline_review",
+            "ask",
             "submit_request",
             "submit_response",
             "submit_guidance_response"
