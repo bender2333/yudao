@@ -843,3 +843,15 @@
 - 用户原话：「确认清单」。
 - 没有决定的：发布时机仍按上午的决定，M0 与 M1 一起发布（架构师列出了代价：下一个能试的版本要等 M0 剩下的工单，没有改推荐）；派发者的运行方式（复盘 C5）仍等用户说明。
 - 影响：`.github/workflows/ci.yml` 集成层命令；`docs/agents/dispatcher.md` 第 5 节；`docs/design/test-pyramid.md` 第 4.2 节；`README.md`；`docs/current-baseline.md`；`docs/program-roadmap.md` 第 1 节表格；`docs/stage-3-plan.md` 页首；工单 #549、#550、#551、#614、#467。
+
+## 2026-10-19 - 后台命令的记录随 Yudao 进程存在，按会话归属（#549，被唤醒的架构师）
+
+- 背景：PR #615 的审查交回两个问题。一是 `read_output`、`stop_job` 没有加进任何部门的工具清单（`roles.json`、`work_items.json` 不在工单的「只改」里）；二是每次激活新建 `LocalEnvironment`（`orchestrator.py` 的 `_environment_for(..., refresh=True)`），后台命令记在环境实例上，下一次激活读不到也结束不了，进程继续运行。架构师在 main f0fba2bb 上核对，两条都属实。另外查出：检查工作区在激活开始时删除重建（`_new_inspection_environment`），里面有后台进程时，Windows 上删除会因为句柄占用失败，POSIX 上进程在删掉的目录里继续运行。
+- 决策：
+  1. 后台命令的记录属于执行环境一层，随执行环境的进程存在，与激活无关：本机是 Yudao 进程内一份，由会话的管理者 `SessionFactory` 建立并持有，编排器每次建立 `LocalEnvironment` 时把它和使用这个环境的会话身份交进去；远程是执行代理进程内一份。重新启动以后记录是空的，旧编号回答「已经结束」。
+  2. 编号只对启动它的会话有效，别的会话用这个编号得到「已经结束」：部门的可见范围对 Yudao 提供的工具有效。
+  3. 结束有三个时机：会话结束、事项暂停或取消（都经过 `SessionFactory.close_run`），以及删除工作区，包括检查工作区重建之前。
+  4. 三个部门在每一处有 `bash` 的工具清单里都加上这两个工具。
+  - 执行环境服务设计说明第 4.1 节增加「结束会话的后台命令」，读取与结束带会话身份，删除工作区一行写明先结束其中的后台进程；第 4.6 节的路径同步。本地通用工具设计说明的命令一行已经写明会话结束、暂停、取消时结束，这次不改（它是 #616 的依据）。
+- 没有采纳的：模块级的全局表（测试里几个编排器共用一张，模拟不了重新启动）；记在 `DepartmentSession` 上（会话一层不持有进程，3.2C 以后后台进程在执行代理进程里）。
+- 影响：`docs/design/execution-environment.md` 第 4.1、4.6 节；#549 的任务评论（「只改」加 `roles.json`、`work_items.json`、`orchestrator.py`）；#550 的正文（是否运行中以后台命令的记录为准，「只改」加 `harness/environment.py`）；#558 加 `touches-core`。
