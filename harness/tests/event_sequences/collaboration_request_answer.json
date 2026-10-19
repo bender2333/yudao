@@ -1378,6 +1378,7 @@
    },
    "receipt": {
     "exit_code": 0,
+    "qa_tests_hash": null,
     "tree_changed": false
    }
   },
@@ -1821,6 +1822,7 @@
    },
    "receipt": {
     "exit_code": 0,
+    "qa_tests_hash": null,
     "tree_changed": false
    }
   },

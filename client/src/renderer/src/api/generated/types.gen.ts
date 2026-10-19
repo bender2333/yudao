@@ -6102,6 +6102,10 @@ export type CheckReceipt = {
      * Summary
      */
     summary: string;
+    /**
+     * Qa Tests Hash
+     */
+    qa_tests_hash?: string | null;
 };
 
 /**

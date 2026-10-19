@@ -14303,6 +14303,17 @@
           "summary": {
             "title": "Summary",
             "type": "string"
+          },
+          "qa_tests_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Tests Hash"
           }
         },
         "required": [

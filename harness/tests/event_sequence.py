@@ -45,7 +45,7 @@ PARAMETERS_VERSION = initial_version()
 #    写成 <definitions>，其他值（缺少、空或旧的版本）原样保留，与基准不同。
 # 9. 参数的版本（parameters_version 字段）是全部参数现值的内容摘要：等于定义的初始参数版本时写成 <parameters>，
 #    参数被修改过的值按摘要编号，与基准不同。
-# 10. 只保留关键字段：载荷只保留 KEY_FIELDS 按事件种类列出的键，工具回执只保留 receipt 里的三项，
+# 10. 只保留关键字段：载荷只保留 KEY_FIELDS 按事件种类列出的键，工具回执只保留 receipt 里的四项，
 #     投影只保留 PROJECTION_KEY_FIELDS 列出的字段。先筛选、后规整：编号只按保留下来的字段的出现顺序产生。
 #     增删表以外的字段不改动基准；表以内的字段变化必须让对应的场景失败。
 # 11. prompt_snapshot.json 按 <部门>/<用途>[/guidance|/guidance_only|/request] 收同一个场景里的请求：
@@ -190,8 +190,8 @@ _PROJECTION_NESTED = {
     "last_review": ("revision", "status", "verdict", "content_hash"),
     "effective_contract": ("revision", "content_hash"),
 }
-# 工具回执保留的三项：从 output_ref 指向的工件内容里取，工件内容不是 JSON 对象时不记回执
-_RECEIPT_KEYS = ("exit_code", "status", "tree_changed")
+# 工具回执保留的四项：从 output_ref 指向的工件内容里取，工件内容不是 JSON 对象时不记回执
+_RECEIPT_KEYS = ("exit_code", "qa_tests_hash", "status", "tree_changed")
 _RECEIPT_TYPES = frozenset({"tool_called", "tool_skipped"})
 
 

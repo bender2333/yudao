@@ -144,6 +144,7 @@ class Workspace:
         *,
         snapshot_hash: str | None = None,
         tree_changed: bool = False,
+        qa_tests_hash: str | None = None,
     ) -> CheckReceipt:
         receipt = CheckReceipt(
             name=name,
@@ -156,6 +157,7 @@ class Workspace:
             activation_id=self.check_activation_id,
             tree_changed=bool(tree_changed),
             effective_contract_hash=self.check_effective_contract_hash,
+            qa_tests_hash=qa_tests_hash,
         )
         self._receipts_path.parent.mkdir(parents=True, exist_ok=True)
         with self._receipts_path.open("a", encoding="utf-8") as handle:
@@ -182,6 +184,7 @@ class Workspace:
                     activation_id=data.get("activation_id"),
                     tree_changed=bool(data.get("tree_changed", False)),
                     effective_contract_hash=data.get("effective_contract_hash"),
+                    qa_tests_hash=data.get("qa_tests_hash"),
                 )
             )
         return items
@@ -202,4 +205,5 @@ def _receipt_dict(receipt: CheckReceipt) -> dict[str, object]:
         "summary": receipt.summary,
         "tree_changed": receipt.tree_changed,
         "effective_contract_hash": receipt.effective_contract_hash,
+        "qa_tests_hash": receipt.qa_tests_hash,
     }

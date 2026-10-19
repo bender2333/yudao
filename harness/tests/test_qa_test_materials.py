@@ -57,6 +57,9 @@ def test_qa_writes_test_and_runs_check(tmp_path: Path) -> None:
     assert check_called.payload.get("ok") is True
     output = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**check_called.payload["output_ref"])))
     assert "QA_SMOKE_PASS" in output.get("summary", "")
+    assert output.get("qa_tests_hash") == saved.payload["content_hash"]
+    qa_sub = next(e for e in events if e.type == EventType.QA_SUBMITTED)
+    assert qa_sub.payload["checks"][0]["qa_tests_hash"] == saved.payload["content_hash"]
 
 
 def test_next_session_has_saved_test_materials(tmp_path: Path) -> None:
@@ -308,3 +311,71 @@ def test_no_event_when_unchanged_or_empty_initial(tmp_path: Path) -> None:
     saved_2 = [e for e in events_2 if e.type == EventType.QA_TESTS_SAVED]
     assert len(saved_2) == 1, "Exactly 1 qa_tests_saved should be written (version 1), smoke check did not change it"
     assert saved_2[0].payload["version"] == 1
+
+
+def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_rerun(tmp_path: Path) -> None:
+    test_py = f"{QA_TESTS_DIR}/test_check.py"
+    content_v1 = "import sys\nprint('V1')\nsys.exit(0)\n"
+    content_v2 = "import sys\nprint('V2')\nsys.exit(0)\n"
+    python_exe = sys.executable.replace("\\", "/")
+    cmd = f'"{python_exe}" {test_py}'
+
+    def qa_step_1(call):
+        return FakeTurn(
+            writes={test_py: content_v1},
+            checks={"qa_check": {"name": "qa_check", "command": cmd}},
+            transcript="wrote v1 and ran check",
+        )
+
+    def qa_step_2(call):
+        turn = review_turn("release", "attempt release with v1 receipt",
+                           checks={"qa_check": {"name": "qa_check", "command": cmd}})(call)
+        return FakeTurn(
+            writes={test_py: content_v2},
+            proposal=turn.proposal,
+            transcript="wrote v2 and proposed release",
+        )
+
+    def qa_step_3(call):
+        turn = review_turn("release", "release with rerun check",
+                           checks={"qa_check": {"name": "qa_check", "command": cmd}})(call)
+        return FakeTurn(
+            checks={"qa_check": {"name": "qa_check", "command": cmd}},
+            proposal=turn.proposal,
+            transcript="reran check and proposed release",
+        )
+
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
+        product_spec(),
+        delivery_turn(),
+        qa_step_1,
+        qa_step_2,
+        qa_step_3,
+    ]))
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)  # product
+    system.activate_once(run_id)  # engineering
+    proj_qa1 = system.activate_once(run_id)  # quality steps 1 and 2
+
+    # Verify step 2's proposal was rejected because test materials changed
+    events = system.writes.read(f"run:{run_id}").events()
+    rejected_events = [e for e in events if e.type == EventType.PROPOSAL_REJECTED]
+    assert len(rejected_events) == 1
+    rejected = rejected_events[0]
+    errors = rejected.payload.get("errors", [])
+    assert any(err.get("field") == "checks" and "测试材料已经改变，用当前的测试材料重新运行检查" in err.get("message", "")
+               for err in errors), f"Expected checks error message, got: {errors}"
+    assert proj_qa1.phase == "QUALITY"
+
+    # Now step 3 runs in next activation: reruns check and release is accepted
+    proj_qa2 = system.activate_once(run_id)
+    assert proj_qa2.phase == "DONE"
+
+    events_final = system.writes.read(f"run:{run_id}").events()
+    qa_submitted_events = [e for e in events_final if e.type == EventType.QA_SUBMITTED]
+    assert len(qa_submitted_events) == 1
+    qa_sub = qa_submitted_events[0]
+    checks = qa_sub.payload.get("checks", [])
+    assert len(checks) == 1
+    assert checks[0]["qa_tests_hash"] == proj_qa2.qa_tests_hash
+    assert checks[0]["qa_tests_hash"] is not None

@@ -583,6 +583,8 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
             errors.append(FieldError("checks", "release requires all quality checks to exit 0"))
         if not bound_checks:
             errors.append(FieldError("checks", "release requires quality-run evidence bound to the current snapshot"))
+        if any(item.get("qa_tests_hash") != projection.qa_tests_hash for item in bound_checks):
+            errors.append(FieldError("checks", "测试材料已经改变，用当前的测试材料重新运行检查"))
     defects, defect_errors = _qa_defects(proposal)
     errors.extend(defect_errors)
     if errors:
@@ -821,6 +823,7 @@ def _receipt_evidence(receipt: Any) -> dict[str, Any]:
         "effective_contract_hash": receipt.effective_contract_hash,
         "snapshot_hash": receipt.snapshot_hash,
         "summary": receipt.summary,
+        "qa_tests_hash": getattr(receipt, "qa_tests_hash", None),
     }
 
 
