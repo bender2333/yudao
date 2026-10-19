@@ -812,3 +812,11 @@
 - 用户原话：「采纳推荐」「使用ag/gemini-3.8-flash-high吧，把被测模型换成qhub/Qwen3.8-Flash」「派发机器的环境变量告诉我，我来让doctor做」。
 - 没有采纳的：保持 `needs-triage` 只做清理（清理以后仍有约 66 张，看不出哪张要处理）；父工单不带分诊标签（只能去掉 17 张）；现在按 M1 发布 0.1.2 单独试用，或只把模型管理单独试用；#604 新增停止原因或记为 `workspace_unrepresentable`；#604 放进 M0。
 - 影响：`docs/agents/triage-labels.md`「等前提条件的工单」一节与流程标签一段；`CLAUDE.md` 工作流程第 7 步、工单规范；`docs/stage-3-plan.md` 自举工作线一行；`docs/stage-3/trial-acceptance-contract.md` 第 3 节；`docs/requirements/stage-requirements-overview.md` computer use 一条；`docs/program-roadmap.md` 第 5.2 节；`docs/agents/autopilot-runtime.md` 第 4 节模型表；`docs/design/evaluation-scenarios.md` 第 3、4.3、9 节的模型；`docs/requirements/comparison-experiment.md` 评测模型一条；`docs/current-baseline.md` M1 一条。
+
+## 2026-10-19 - 客户端端到端测试在里程碑发布之前运行
+
+- 背景：父工单验收时查出，客户端端到端测试（`client/tests/e2e/`，21 个文件）没有人整套运行：CI 的客户端作业只有类型检查、单元测试与编译，执行者只运行与改动相关的文件，里程碑发布之前的检查是集成层、真实模型冒烟与桌面测试。工单 #621 给出三种时机：(a) 里程碑发布之前、(b) 每次合并以后的 CI、(c) 每次推送到 PR 的 `check`；架构师建议 (b)。
+- 决策（用户决定）：先采用 (a)。架构师在里程碑发布之前在要发布的提交上运行全部客户端端到端测试，失败时不发布；CI 不运行。看过第一次运行（M0 与 M1 合并发布之前）的用时与结果以后，再决定是否放进合并以后的 CI。
+- 用户原话：「端到端先放到发布前再测吧」。
+- 没有采纳的：(b)、(c)。(a) 的代价是失败要到发布前才发现。
+- 影响：`CLAUDE.md` 自主推进第 5 条；测试分层设计说明第 4 节（表格、导言、流程图与新增一段）；网页界面与发布设计说明第 6.4 节的发布前测试。

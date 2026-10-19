@@ -711,3 +711,5 @@ claude-opus-5-5 / 2026-10-19 15:55 / 新增标签 `waiting`（等前提条件）
 claude-opus-5-5 / 2026-10-19 16:16 / `docs/stage-3-plan.md` 第 9 节注明 M1 不单独发布、与 M0 合并为一次发布与试用（#370 等不稳定测试 #614 完成以后关闭）；`docs/current-baseline.md` M1 一条改为 2026-10-19 的状态 / 父工单验收的结果：#371、#83 等 9 张关闭，#370 按测试分层设计说明第 4.2 节等 #614
 
 claude-opus-5-5 / 2026-10-19 16:28 / `docs/design/evaluation-scenarios.md` 第 9 节「测试命令登记为使用 Python 3.13 运行」改为「测试命令用 Python 3.13 运行（命令不登记，ADR-0038）」 / 父工单验收时查出的过期写法，属于与 ADR-0038 的一致性修正
+
+claude-opus-5-5 / 2026-10-19 16:37 / 里程碑发布之前的检查加入全部客户端端到端测试：`docs/design/test-pyramid.md` 第 4 节表格、导言、流程图与新增一段（CI 不运行端到端，看过第一次运行再定），`docs/design/web-interface-and-release.md` 第 6.4 节，`CLAUDE.md` 自主推进第 5 条；`docs/decision.md` 加 2026-10-19 一条 / 用户在 #621 选择端到端放到发布前运行
