@@ -139,4 +139,4 @@ Stage 3 待讨论的专题（TODO，2026-09-30 记录；背景见[决策记录](
 4. **computer use**（[D34](browser-and-computer-use.md)，专题讨论，2026-10-07 用户决定移出 Stage 3，放在哪个阶段在专题中确定）：
    - 已有的设计：2026-10-02 的决定（[决策记录](../decision.md)同日「computer use 在控制主机的交互桌面上进行」一条、[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)、[设计说明](../design/browser-and-computer-use.md)中 computer use 的部分）：只考虑 Windows，桌面程序在控制主机上、用户的交互桌面上用真实输入试用，开始前经用户同意，整台控制主机同一时刻只有一个桌面会话。调研见 [computer use 调研](../archive/research/computer-use-without-containers.md)。
    - 要重新确定的事项：界面改为网页以后（[ADR-0032](../adr/0032-interface-served-as-web-pages.md)），桌面会话期间的提示框（置顶、不出现在截图中）与「停止使用桌面」由谁提供；Stage 4 把 Yudao 服务做成系统服务以后，系统服务看不到用户的交互桌面。
-   - 工单 #150、#246、#247 不属于任何里程碑，标为 needs-triage，专题讨论以后按结论重写或关闭。
+   - 工单 #150 不属于任何里程碑，标为 `waiting`，作为专题的占位；#246、#247 于 2026-10-19 关闭，专题讨论以后按结论重新拆分。
