@@ -30,7 +30,8 @@ def test_event_sequence_matches_its_baseline(name, data_dir, request):
 # harness/tests/prompt_snapshot.json 比较。快照集中记录发出去的部门材料与工具说明，
 # 事件序列基准里不再出现它们的全文。故意改变时用 --write-event-baselines 重写。
 SNAPSHOT_SCENARIOS = ("handoff_release", "compaction_success", "collaboration_request_answer",
-                      "guidance_response_explained", "tool_denied_guidance_only")
+                      "guidance_response_explained", "tool_denied_guidance_only",
+                      "ask_answer_with_spec_revision")
 
 
 def _snapshot_entries(request) -> dict[str, dict]:

@@ -491,6 +491,176 @@
       ]
     }
   },
+  "ask": {
+    "kind": "host",
+    "guidance_only": false,
+    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "recipient": {
+          "type": "string",
+          "enum": [
+            "product",
+            "engineering",
+            "quality"
+          ]
+        },
+        "question": {
+          "type": "string"
+        },
+        "background": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "recipient",
+        "question",
+        "background",
+        "expected"
+      ]
+    }
+  },
+  "answer": {
+    "kind": "host",
+    "guidance_only": false,
+    "description": "Submit an answer to the current ask question, ending this branch session. Product may optionally include PRD revision parameters to update requirements.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "answer": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Must contain at least one item"
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Must contain at least one item"
+        },
+        "boundaries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        },
+        "fatal_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional"
+        },
+        "change_record": {
+          "type": "object",
+          "properties": {
+            "changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Requirements added or changed in this revision"
+            },
+            "retained": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Requirements explicitly preserved"
+            },
+            "retired": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Requirements explicitly removed"
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "changed",
+            "retained",
+            "retired",
+            "rationale"
+          ],
+          "description": "Required when replacing a ProductSpec. Submit the complete new requirements and explain changed, retained, and retired behavior. A complete ProductSpec processes user input; a response or product decision does not. Omit on the first spec."
+        },
+        "decision_changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decision_hash": {
+                "type": "string"
+              },
+              "disposition": {
+                "type": "string",
+                "enum": [
+                  "retain",
+                  "integrate",
+                  "retire"
+                ]
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "decision_hash",
+              "disposition",
+              "rationale"
+            ]
+          },
+          "description": "When replacing a spec, explicitly retain, integrate, or retire every effective product decision. Empty for the first spec."
+        },
+        "basis_product_spec_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Content hash of the ProductSpec this revision is based on. Pass the current effective ProductSpec content_hash; pass null only for the first spec. The host rejects the submission if this value does not equal the current effective ProductSpec content_hash."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "answer"
+      ]
+    }
+  },
   "submit_request": {
     "kind": "host",
     "proposal": "collaboration_request",

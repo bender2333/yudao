@@ -54,7 +54,9 @@ def pending_request_id(call: ModelCall) -> str | None:
 
 
 def session_key(call: ModelCall) -> str:
-    # 会话身份：主线按部门区分，询问分支按所属询问区分（分支事件落地以后扩展这里）
+    # 会话身份：主线按部门区分，询问分支按所属询问区分
+    if call.session_id.startswith("ses_ask_"):
+        return f"{call.department}:ask"
     return call.department
 
 
@@ -87,7 +89,7 @@ class FakeAdapter:
         if call.attempt_id in self.cancelled:
             yield self._aborted()
             return
-        queue = self.scripts.get(session_key(call), self.script) if self.scripts else self.script
+        queue = self.scripts.get(session_key(call), self.scripts.get(call.session_id, self.scripts.get(call.department, self.script))) if self.scripts else self.script
         if not queue:
             raise ProviderError("fake adapter script exhausted")
         item = queue.pop(0)

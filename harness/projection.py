@@ -568,6 +568,21 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.phase = payload["return_phase"]
         state.active_department = department_for_phase(state.phase)
         return
+    if etype == EventType.ASK_STARTED:
+        state.active_ask = {
+            "requester": payload["requester"],
+            "recipient": payload["recipient"],
+            "question": payload["question"],
+            "branch_session_id": payload["branch_session_id"],
+            "background": payload.get("background"),
+            "expected": payload.get("expected"),
+        }
+        return
+
+    if etype == EventType.ASK_ANSWERED:
+        state.active_ask = None
+        return
+
 
     if etype == EventType.PRODUCT_DECISION_ACCEPTED:
         _clear_feedback(state, event.department)

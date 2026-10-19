@@ -49,6 +49,19 @@ class FieldError:
         return {"field": self.field, "message": self.message}
 
 
+PRD_REVISION_FIELDS = frozenset({
+    "goal",
+    "requirements",
+    "acceptance_criteria",
+    "boundaries",
+    "constraints",
+    "fatal_conditions",
+    "non_goals",
+    "change_record",
+    "decision_changes",
+})
+
+
 @dataclass
 class ProposalDecision:
     accepted: bool
@@ -103,6 +116,10 @@ def _evaluate_proposal(
     if department not in DEPARTMENTS:
         return ProposalDecision(False, [FieldError("issuer", f"unknown department: {department}")])
     allowed = allowed_proposal_kinds(projection, department)
+    if projection.active_ask is not None:
+        rec = projection.active_ask.get("recipient")
+        if department == rec and department == "product":
+            allowed = allowed | {"product_spec"}
     if kind not in allowed:
         return ProposalDecision(False, [FieldError("kind", f"{department} cannot issue {kind} in the current work")])
 
@@ -421,7 +438,7 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
         "status": "active",
         "content_hash": spec_content_hash("product_spec", payload, parent_hash=parent, revision=revision),
     }
-    if projection.pending_request is not None:
+    if projection.pending_request is not None or projection.active_ask is not None:
         return ProposalDecision(True, artifact=artifact)
     if phase in {"PRODUCT_SPEC", "REWORK_PRODUCT"}:
         transitions = [(phase, "ENGINEERING")]

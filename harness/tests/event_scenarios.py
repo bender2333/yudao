@@ -22,6 +22,7 @@ from harness.event_store import Command
 from harness.models import EventType, Usage, json_dumps
 from harness.providers.call import ModelCall, ModelResponse
 from harness.proposals import (
+    answer_turn, ask_turn,
     collaboration_request, delivery, delivery_turn, guidance_response,
     product_spec, response_turn, review, review_turn,
 )
@@ -194,6 +195,25 @@ def collaboration_request_answer(data_dir):
         response_turn("answered", "The existing contract covers unknown flags: print them as given."),
         _deliver(), _release(),
     ])
+    system.run_until_stop(run_id)
+    return system, run_id, {}
+
+
+def ask_answer_with_spec_revision(data_dir):
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn("product", "Should output be uppercase?", background="Clarification needed", expected="Specification update"),
+            _deliver(),
+        ],
+        "product:ask": [
+            answer_turn("Yes, print in uppercase.",
+                        requirements=["print the given argument in uppercase to stdout"],
+                        change_record={"changed": ["print the given argument in uppercase to stdout"],
+                                       "retained": ["single file implementation"]}),
+        ],
+        "quality": [_release()],
+    })
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -623,6 +643,9 @@ SCENARIOS: dict[str, Scenario] = {
     "collaboration_request_answer": Scenario(
         "工程部门向产品部门提出咨询，产品部门回答（answered），工程部门继续交付，质检放行。",
         collaboration_request_answer),
+    "ask_answer_with_spec_revision": Scenario(
+        "工程询问产品，产品在分支里修订 PRD 并回答，工程收到回答与 PRD 新版本，接着交付，质检放行。",
+        ask_answer_with_spec_revision),
     "guidance_response_explained": Scenario(
         "产品规格接纳后用户给工程部门写指导：指导在请求之前写入并标记已进入输入，工程部门回应指导（explained），之后交付并放行。",
         guidance_response_explained),

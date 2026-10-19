@@ -73,6 +73,8 @@ class EventType:
     COLLABORATION_REQUESTED = "collaboration_requested"
     COLLABORATION_RESPONDED = "collaboration_responded"
     COLLABORATION_CLOSED = "collaboration_closed"
+    ASK_STARTED = "ask_started"
+    ASK_ANSWERED = "ask_answered"
     PRODUCT_DECISION_ACCEPTED = "product_decision_accepted"
     DELIVERY_ACCEPTED = "delivery_accepted"
     QA_SUBMITTED = "qa_submitted"
@@ -636,6 +638,7 @@ class RunProjection:
     effective_contract: EffectiveContract | None = None
     delivery_spec: DeliverySpec | None = None
     pending_request: CollaborationRequest | None = None
+    active_ask: dict[str, Any] | None = None
     last_review: QAReview | None = None
     # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧 run 的事件没有这个字段时为 change
     kind: str = "change"
