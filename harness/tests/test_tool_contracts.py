@@ -109,6 +109,12 @@ def test_edit_range_is_an_engineering_only_write_tool():
     assert "edit_range" not in tools_for("product")
     assert "edit_range" not in tools_for("quality")
 
+def test_read_output_and_stop_job_are_offered_to_all_departments():
+    for department in ("product", "engineering", "quality"):
+        tools = tools_for(department)
+        assert "read_output" in tools
+        assert "stop_job" in tools
+
 
 
 def test_guidance_tool_contract_lists_explained_and_requires_host_results_for_completed():

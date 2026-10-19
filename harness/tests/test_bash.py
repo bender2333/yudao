@@ -21,6 +21,8 @@ from harness.workspace import Workspace
 
 
 def _environment(path, **kwargs) -> LocalEnvironment:
+    kwargs.setdefault("session_id", "test-session")
+    kwargs.setdefault("jobs", environment_module.BackgroundJobTable())
     return LocalEnvironment(Workspace(path / "ws"), **kwargs)
 
 

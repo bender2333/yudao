@@ -18,7 +18,6 @@ import shutil
 import signal
 import subprocess
 import threading
-import weakref
 
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
@@ -50,16 +49,11 @@ _CHECK_TIMEOUT_MAX = DEFINITIONS.rule_value("check_timeout_max_sec")
 
 _BASH_PATH: str | None = None
 _BASH_OUTPUT_SUBDIR = "tool-output"
-_SAFE_OUTPUT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.json")
 INSPECTIONS_DIR = "inspections"
 # Windows 句柄占用时清理目录的退避：3 次尝试，间隔按毫秒级递增（工单 #479 教训）
 _CLEANUP_ATTEMPTS = 3
 _CLEANUP_INITIAL_BACKOFF_SEC = 0.05
 
-_TRUNCATED_MARKER = (
-    f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is saved, "
-    "use read_output with job_id to read the rest"
-)
 
 def inspection_root(run_root: str | Path, department: str) -> Path:
     # 每个部门会话的检查工作区根：<运行工作区同级>/inspections/<run_id>/<部门>。
@@ -187,8 +181,8 @@ class _Job:
         status: str = "running",
         exit_code: int | None = None,
         timer: threading.Timer | None = None,
-        run_id: str | None = None,
         session_id: str | None = None,
+        workspace_root: Path | None = None,
     ) -> None:
         self.job_id = job_id
         self.command = command
@@ -198,8 +192,8 @@ class _Job:
         self.status = status
         self.exit_code = exit_code
         self.timer = timer
-        self.run_id = run_id
         self.session_id = session_id
+        self.workspace_root = workspace_root
         self.read_offset = 0
 
     def read(self) -> dict[str, Any]:
@@ -212,21 +206,15 @@ class _Job:
                     self.timer.cancel()
                     self.timer = None
                 if self.file_handle is not None:
-                    try:
-                        self.file_handle.close()
-                    except Exception:
-                        pass
+                    self.file_handle.close()
                     self.file_handle = None
 
         chunk = ""
         if self.output_path.exists():
-            try:
-                full_text = redact_text(_text(self.output_path.read_bytes()))
-                if self.read_offset < len(full_text):
-                    chunk = full_text[self.read_offset:]
-                    self.read_offset = len(full_text)
-            except Exception:
-                pass
+            full_text = redact_text(_text(self.output_path.read_bytes()))
+            if self.read_offset < len(full_text):
+                chunk = full_text[self.read_offset:]
+                self.read_offset = len(full_text)
 
         return {
             "job_id": self.job_id,
@@ -244,39 +232,76 @@ class _Job:
             if self.process is not None and self.process.poll() is None:
                 _kill_process_tree_sync(self.process.pid)
             if self.file_handle is not None:
-                try:
-                    self.file_handle.close()
-                except Exception:
-                    pass
+                self.file_handle.close()
                 self.file_handle = None
 
 
-_RUN_JOBS: dict[str, set[_Job]] = {}
-_ACTIVE_ENVIRONMENTS: weakref.WeakSet[LocalEnvironment] = weakref.WeakSet()
+class BackgroundJobTable:
+    def __init__(self) -> None:
+        self._jobs: dict[str, _Job] = {}
+        self._lock = Lock()
 
+    def register(self, job: _Job) -> None:
+        with self._lock:
+            self._jobs[job.job_id] = job
 
-def register_run_job(run_id: str, job: _Job) -> None:
-    _RUN_JOBS.setdefault(run_id, set()).add(job)
+    def read_output(self, job_id: str, session_id: str) -> dict[str, Any]:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.session_id != session_id:
+                return {"job_id": job_id, "output": "", "status": "ended", "exit_code": None}
+            return job.read()
 
+    def stop_job(self, job_id: str, session_id: str) -> dict[str, Any]:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.session_id != session_id:
+                return {"job_id": job_id, "status": "ended", "output": f"job {job_id} has ended"}
+            job.stop()
+            return {"job_id": job_id, "status": "stopped", "output": f"job {job_id} was stopped; the process tree was stopped"}
 
-def stop_jobs_for_run(run_id: str) -> None:
-    jobs = _RUN_JOBS.pop(run_id, set())
-    for job in jobs:
-        job.stop()
-    for env in list(_ACTIVE_ENVIRONMENTS):
-        if env._matches_run(run_id):
-            env.stop_jobs()
+    def stop_for_sessions(self, session_ids: Iterable[str]) -> None:
+        targets = set(session_ids)
+        with self._lock:
+            for job in list(self._jobs.values()):
+                if job.session_id in targets:
+                    job.stop()
+
+    def stop_and_remove_for_workspace(self, session_id: str, workspace_root: Path | str) -> None:
+        target_root = Path(workspace_root).resolve()
+        with self._lock:
+            matching = [
+                job_id for job_id, job in self._jobs.items()
+                if job.session_id == session_id and job.workspace_root is not None and job.workspace_root.resolve() == target_root
+            ]
+            for job_id in matching:
+                job = self._jobs.pop(job_id)
+                job.stop()
+
+    def get_status(self, job_id: str) -> str | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return None
+            if job.status == "running" and job.process is not None:
+                if job.process.poll() is not None:
+                    return "exited"
+            return job.status
 
 
 class LocalEnvironment:
-    def __init__(self, workspace: Workspace,
-                 check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
-                 session: Any | None = None) -> None:
+    def __init__(
+        self,
+        workspace: Workspace,
+        check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
+        *,
+        jobs: BackgroundJobTable | None = None,
+        session_id: str | None = None,
+    ) -> None:
         self.workspace = workspace
         self._check_timeout_sec = check_timeout_sec
-        self.session = session
-        self._jobs: dict[str, _Job] = {}
-        _ACTIVE_ENVIRONMENTS.add(self)
+        self._jobs = jobs
+        self._session_id = session_id
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
         self._lock = Lock()
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -286,55 +311,36 @@ class LocalEnvironment:
         self._processes: dict[str, Callable[[Action, asyncio.Event], Awaitable[tuple[Any, str]]]] = {
             name: getattr(self, method) for name, method in _PROCESSES.items()}
 
-    def _run_id_from_workspace(self) -> str | None:
-        root = self.workspace.root
-        if root.parent.name == INSPECTIONS_DIR:
-            return None
-        if root.parent.parent.name == INSPECTIONS_DIR:
-            return root.parent.name
-        return root.name
-
-    def _matches_run(self, run_id: str) -> bool:
-        if self.session is not None and getattr(self.session, "run_id", None) == run_id:
-            return True
-        extracted = self._run_id_from_workspace()
-        if extracted == run_id:
-            return True
-        return run_id in str(self.workspace.root)
-
-    def _register_job(self, job: _Job) -> None:
-        self._jobs[job.job_id] = job
-        if self.session is not None and hasattr(self.session, "register_job"):
-            self.session.register_job(job)
-        run_id = job.run_id or (getattr(self.session, "run_id", None) if self.session else None) or self._run_id_from_workspace()
-        if run_id:
-            job.run_id = run_id
-            register_run_job(run_id, job)
-
-    def stop_jobs(self) -> None:
-        for job in list(self._jobs.values()):
-            job.stop()
-        self._jobs.clear()
-
     def close(self) -> None:
-        self.stop_jobs()
+        pass
 
     @classmethod
-    def establish(cls, root: str | Path, tree: CapturedTree | None, *,
-                  check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
-                  session: Any | None = None) -> LocalEnvironment:
+    def establish(
+        cls,
+        root: str | Path,
+        tree: CapturedTree | None,
+        *,
+        check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
+        jobs: BackgroundJobTable | None = None,
+        session_id: str | None = None,
+    ) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
             Path(root).parent.mkdir(parents=True, exist_ok=True)
             materialize_tree(tree, root)
-        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, session=session)
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id)
 
     @classmethod
-    def open(cls, root: str | Path,
-             check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
-             session: Any | None = None) -> LocalEnvironment:
+    def open(
+        cls,
+        root: str | Path,
+        *,
+        check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
+        jobs: BackgroundJobTable | None = None,
+        session_id: str | None = None,
+    ) -> LocalEnvironment:
         # 打开已经建立的工作区
-        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, session=session)
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id)
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:
         # 这次激活的运行状态身份随检查回执记录，供 U 判断回执是否属于当前有效的合同与快照
@@ -645,6 +651,8 @@ class LocalEnvironment:
             raise ValueError("the workspace changed after the tool permission; call bash again")
 
         if args.get("background") is True:
+            if self._jobs is None or self._session_id is None:
+                raise RuntimeError("background commands require an environment with a session context")
             job_id = new_id("job")
             directory = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR
             directory.mkdir(parents=True, exist_ok=True)
@@ -669,12 +677,14 @@ class LocalEnvironment:
                 process=process,
                 file_handle=file_handle,
                 status="running",
+                session_id=self._session_id,
+                workspace_root=self.workspace.root,
             )
             timer = threading.Timer(timeout_sec, job.stop)
             timer.daemon = True
             timer.start()
             job.timer = timer
-            self._register_job(job)
+            self._jobs.register(job)
             return {"job_id": job_id, "status": "running"}, "completed", None
 
         finished = await _run_process(
@@ -704,6 +714,9 @@ class LocalEnvironment:
         if len(text) <= _OUTPUT_LIMIT:
             return {**meta, "output": text, "truncated": False}, finished.status, workspace_error
 
+        if self._jobs is None or self._session_id is None:
+            raise RuntimeError("truncated output requires an environment with a session context")
+
         job_id = new_id("job")
         directory = self.workspace.root / CHECKS_DIR / _BASH_OUTPUT_SUBDIR
         directory.mkdir(parents=True, exist_ok=True)
@@ -719,9 +732,11 @@ class LocalEnvironment:
             file_handle=None,
             status="exited",
             exit_code=exit_code,
+            session_id=self._session_id,
+            workspace_root=self.workspace.root,
         )
         job.read_offset = cut
-        self._register_job(job)
+        self._jobs.register(job)
 
         truncated_marker = (
             f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is saved, "
@@ -738,20 +753,17 @@ class LocalEnvironment:
         job_id = args.get("job_id")
         if not isinstance(job_id, str) or not job_id.strip():
             raise ValueError("job_id is required")
-        job = self._jobs.get(job_id)
-        if job is None:
+        if self._jobs is None or self._session_id is None:
             return {"job_id": job_id, "output": "", "status": "ended", "exit_code": None}
-        return job.read()
+        return self._jobs.read_output(job_id, self._session_id)
 
     def _stop_job(self, args: dict[str, Any]) -> dict[str, Any]:
         job_id = args.get("job_id")
         if not isinstance(job_id, str) or not job_id.strip():
             raise ValueError("job_id is required")
-        job = self._jobs.get(job_id)
-        if job is None:
+        if self._jobs is None or self._session_id is None:
             return {"job_id": job_id, "status": "ended", "output": f"job {job_id} has ended"}
-        job.stop()
-        return {"job_id": job_id, "status": "stopped", "output": f"job {job_id} was stopped; the process tree was stopped"}
+        return self._jobs.stop_job(job_id, self._session_id)
     async def _run_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         args = action.input
         name = str(args.get("name") or "").strip()

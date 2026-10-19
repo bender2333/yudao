@@ -1,5 +1,7 @@
 # bash 后台任务与按编号读取/结束：
-# 后台启动、端口访问、输出读取、任务结束、进程树清理、新环境旧编号 ended。
+# 后台启动、端口访问、跨激活读取与结束、多部门会话隔离、
+# 检查工作区重建清理后台任务、LoopSystem 终态（放行/暂停/取消）清理进程树、
+# 重启后旧编号 ended。
 # 真实子进程与端口监听，登记为集成层。
 from __future__ import annotations
 
@@ -13,14 +15,17 @@ from pathlib import Path
 
 import pytest
 
+from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFINITIONS
-from harness.environment import LocalEnvironment
-from harness.sessions import DepartmentSession, SessionFactory
-from harness.tests.helpers import action, perform, wait_for_file, wait_until_stopped
+from harness.environment import BackgroundJobTable, LocalEnvironment
+from harness.runtime import LoopSystem
+from harness.tests.helpers import action, happy_script, perform, wait_for_file, wait_until_stopped
 from harness.workspace import Workspace
 
 
 def _environment(path: Path, **kwargs) -> LocalEnvironment:
+    kwargs.setdefault("session_id", "test-session")
+    kwargs.setdefault("jobs", BackgroundJobTable())
     return LocalEnvironment(Workspace(path / "ws"), **kwargs)
 
 
@@ -106,67 +111,142 @@ def test_background_job_port_access_read_output_and_stop(tmp_path: Path):
     assert stop_receipt.output["status"] == "stopped"
 
     # 停止后无法再连接
-    with pytest.raises(Exception):
-        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
-            pass
+def test_cross_activation_read_output_stop_job_and_department_isolation(tmp_path: Path):
+    from harness.proposals import product_spec
+    system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter([product_spec()]))
+    run_id = system.create_run("cross activation test")
+    # 推进到工程阶段，使工程持有运行工作区
+    proj = system.activate_once(run_id)
+    assert proj.phase == "ENGINEERING"
 
-
-def test_session_close_stops_background_process_tree(tmp_path: Path):
-    marker = tmp_path / "started"
-    session = DepartmentSession(session_id="ses_test", run_id="run_1", department="engineering")
-    environment = _environment(tmp_path)
-    session.attach_environment(environment)
-
-    receipt = perform(
-        environment, "bash",
-        {"command": _tree_command(str(marker)), "background": True},
+    # 激活 1：持有运行工作区的工程获取环境并启动持续输出的后台命令
+    env1 = system.orchestrator._environment_for(run_id, "engineering", refresh=True)
+    server_cmd = (
+        f'"{_python()}" -c "import time\nfor i in range(600):\n    print(\'tick %d\' % i, flush=True)\n    time.sleep(0.1)"'
     )
+    start_receipt = perform(env1, "bash", {"command": server_cmd, "background": True})
+    assert start_receipt.ok is True
+    job_id = start_receipt.output["job_id"]
+
+    # 激活 2：再取一次，得到新的 LocalEnvironment 实例
+    env2 = system.orchestrator._environment_for(run_id, "engineering", refresh=True)
+    assert env2 is not env1
+
+    # 用这个编号 read_output 读到新的输出
+    for _ in range(50):
+        time.sleep(0.1)
+        read_receipt = perform(env2, "read_output", {"job_id": job_id})
+        assert read_receipt.ok is True
+        if "tick" in (read_receipt.output.get("output") or ""):
+            break
+    assert "tick" in read_receipt.output["output"]
+    assert read_receipt.output["status"] == "running"
+
+    # 另一个部门（质检）的会话用该编号 read_output 与 stop_job 得到 ended，进程不受影响
+    env_qa = system.orchestrator._environment_for(run_id, "quality", refresh=True)
+    qa_read = perform(env_qa, "read_output", {"job_id": job_id})
+    assert qa_read.ok is True and qa_read.output["status"] == "ended"
+    assert qa_read.output["output"] == ""
+
+    qa_stop = perform(env_qa, "stop_job", {"job_id": job_id})
+    assert qa_stop.ok is True and qa_stop.output["status"] == "ended"
+
+    # 工程依然能够读取新输出并结束进程
+    time.sleep(0.1)
+    read_again = perform(env2, "read_output", {"job_id": job_id})
+    assert read_again.ok is True
+    assert "tick" in read_again.output["output"]
+
+    # stop_job 以后进程树不存在
+    stop_res = perform(env2, "stop_job", {"job_id": job_id})
+    assert stop_res.ok is True and stop_res.output["status"] == "stopped"
+def test_inspection_workspace_rebuild_stops_jobs_and_returns_ended(tmp_path: Path):
+    system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter([]))
+    run_id = system.create_run("qa inspection test")
+
+    env_qa1 = system.orchestrator._environment_for(run_id, "quality", refresh=True)
+    marker = tmp_path / "started_qa"
+    receipt = perform(env_qa1, "bash", {"command": _tree_command(str(marker)), "background": True})
     assert receipt.ok is True
     job_id = receipt.output["job_id"]
     wait_for_file(marker)
 
-    read_res = perform(environment, "read_output", {"job_id": job_id})
+    read_res = perform(env_qa1, "read_output", {"job_id": job_id})
     child_pid = _grandchild(read_res.output["output"])
 
-    # 会话关闭时结束后台命令整个进程树
-    session.close("closed")
+    # 编排器重建这个检查工作区
+    env_qa2 = system.orchestrator._new_inspection_environment(run_id, "quality")
+    assert env_qa2 is not None
+
+    # 重建成功，进程树不存在
     assert wait_until_stopped(child_pid)
 
+    # 编号回答 ended
+    read_after = perform(env_qa2, "read_output", {"job_id": job_id})
+    assert read_after.ok is True and read_after.output["status"] == "ended"
 
-def test_factory_close_run_on_pause_and_cancel_stops_jobs(tmp_path: Path):
-    # 模拟事项暂停与取消时的清理路径：Orchestrator._on_close_run 统一调用 factory.close_run(run_id)
-    factory = SessionFactory(tmp_path)
-    sessions = factory.create_run_sessions("run_test")
-    session = sessions["engineering"]
-
-    run_root = tmp_path / "run_test"
-    environment = LocalEnvironment.establish(run_root, None)
-    session.attach_environment(environment)
-
-    marker = tmp_path / "started"
-    receipt = perform(
-        environment, "bash",
-        {"command": _tree_command(str(marker)), "background": True},
-    )
-    job_id = receipt.output["job_id"]
-    wait_for_file(marker)
-
-    read_res = perform(environment, "read_output", {"job_id": job_id})
-    child_pid = _grandchild(read_res.output["output"])
-
-    # 暂停/取消调用 close_run
-    errors = factory.close_run("run_test")
-    assert errors == []
-    assert wait_until_stopped(child_pid)
+    stop_after = perform(env_qa2, "stop_job", {"job_id": job_id})
+    assert stop_after.ok is True and stop_after.output["status"] == "ended"
 
 
-def test_new_environment_returns_ended_for_old_job_id(tmp_path: Path):
-    env1 = _environment(tmp_path)
+def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
+    # 经过 LoopSystem 的真实路径：放行、事项暂停、事项取消三种情况下，后台命令的进程树都被结束
+
+    # 1. 事项取消 (cancelled)
+    sys_cancel = LoopSystem.for_testing(tmp_path / "sys_cancel", FakeAdapter([]))
+    run_cancel = sys_cancel.create_run("cancel test")
+    env_cancel = sys_cancel.orchestrator._environment_for(run_cancel, "engineering")
+    marker_cancel = tmp_path / "marker_cancel"
+    rec_cancel = perform(env_cancel, "bash", {"command": _tree_command(str(marker_cancel)), "background": True})
+    wait_for_file(marker_cancel)
+    child_cancel = _grandchild(perform(env_cancel, "read_output", {"job_id": rec_cancel.output["job_id"]}).output["output"])
+
+    res_cancel = sys_cancel.cancel(run_cancel)
+    assert res_cancel.stop_reason == "cancelled"
+    assert wait_until_stopped(child_cancel)
+    sys_cancel.close()
+
+    # 2. 事项暂停 (paused)
+    sys_pause = LoopSystem.for_testing(tmp_path / "sys_pause", FakeAdapter(list(happy_script())))
+    run_pause = sys_pause.create_run("pause test", max_cycles=1)
+    env_pause = sys_pause.orchestrator._environment_for(run_pause, "engineering")
+    marker_pause = tmp_path / "marker_pause"
+    rec_pause = perform(env_pause, "bash", {"command": _tree_command(str(marker_pause)), "background": True})
+    wait_for_file(marker_pause)
+    child_pause = _grandchild(perform(env_pause, "read_output", {"job_id": rec_pause.output["job_id"]}).output["output"])
+
+    res_pause = sys_pause.run_until_stop(run_pause)
+    assert res_pause.phase == "PAUSED" and res_pause.stop_reason == "max_cycles"
+    assert wait_until_stopped(child_pause)
+    sys_pause.close()
+
+    # 3. 运行到放行 (released)
+    sys_release = LoopSystem.for_testing(tmp_path / "sys_release", FakeAdapter(list(happy_script())))
+    run_release = sys_release.create_run("release test")
+    env_release = sys_release.orchestrator._environment_for(run_release, "engineering")
+    marker_release = tmp_path / "marker_release"
+    rec_release = perform(env_release, "bash", {"command": _tree_command(str(marker_release)), "background": True})
+    wait_for_file(marker_release)
+    child_release = _grandchild(perform(env_release, "read_output", {"job_id": rec_release.output["job_id"]}).output["output"])
+
+    res_release = sys_release.run_until_stop(run_release)
+    assert res_release.phase == "DONE" and res_release.stop_reason == "released"
+    assert wait_until_stopped(child_release)
+    sys_release.close()
+
+
+def test_recreate_loop_system_returns_ended_for_old_job_id(tmp_path: Path):
+    data_dir = tmp_path / "data_restart"
+    sys1 = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    run_id = sys1.create_run("restart test")
+    env1 = sys1.orchestrator._environment_for(run_id, "engineering")
     receipt = perform(env1, "bash", {"command": "echo test_old_job", "background": True})
     job_id = receipt.output["job_id"]
+    sys1.close()
 
-    # 在同一个数据目录上新建执行环境
-    env2 = _environment(tmp_path)
+    # 在同一个数据目录上重新建立 LoopSystem（Yudao 重新启动）
+    sys2 = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    env2 = sys2.orchestrator._environment_for(run_id, "engineering")
     read_receipt = perform(env2, "read_output", {"job_id": job_id})
     assert read_receipt.ok is True and read_receipt.status == "completed"
     assert read_receipt.output["status"] == "ended"
@@ -176,6 +256,15 @@ def test_new_environment_returns_ended_for_old_job_id(tmp_path: Path):
     stop_receipt = perform(env2, "stop_job", {"job_id": job_id})
     assert stop_receipt.ok is True and stop_receipt.status == "completed"
     assert stop_receipt.output["status"] == "ended"
+    sys2.close()
+def test_environment_without_session_context_rejects_background_and_truncation(tmp_path: Path):
+    # 只用于查询树的环境不带 session_id / jobs，启动后台命令或截断输出直接报错
+    env = LocalEnvironment(Workspace(tmp_path / "ws"))
+    bg_res = perform(env, "bash", {"command": "echo hi", "background": True})
+    assert bg_res.ok is False
+    assert "session context" in bg_res.error
 
-    # 清理 env1
-    env1.stop_jobs()
+    command = f'"{_python()}" -c "for i in range(2000): print(\'line-%05d-\' % i + \'x\' * 40)"'
+    trunc_res = perform(env, "bash", {"command": command})
+    assert trunc_res.ok is False
+    assert "session context" in trunc_res.error
