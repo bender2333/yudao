@@ -23,6 +23,8 @@ from pathlib import Path
 from harness.data_directory import LOG_DIR, LOG_FILE
 
 import pytest
+# 全模块用例共用夹具且涉及真实 npm/Vite/uv 构建，固定在同一个 xdist worker 运行避免并发构建耗尽资源崩溃（#614）
+pytestmark = pytest.mark.xdist_group("release_build")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_SCRIPT = REPO_ROOT / "scripts" / "release.py"
