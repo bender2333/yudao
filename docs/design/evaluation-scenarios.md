@@ -186,7 +186,7 @@ flowchart LR
 ## 9. 前提与未决事项
 
 - 场景 1 的 Yudao 一侧需要质检部门的浏览器工具，按 PRD 自行生成测试并操作页面。浏览器工具由 Stage 3 的 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）；评测使用的模型具有视觉能力。工程按接口约定在交付说明中写启动方式，端口从 `PORT` 读取；质检按交付说明启动交付的网页（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 3.3 节）。OpenCode 基础分与 Yudao 的场景 2、3 不依赖它。
-- 场景 2 的 Yudao 一侧依赖 3.8 接入已有项目：运行器用 `project.onboard` 接入仓库在基准提交的代码，建档完成以后由运行器回答初始 PRD 的确认，再新建事项提交需求；测试命令登记为使用 Python 3.13 运行，例如 `uv run --python 3.13 pytest …`。建档的用量与耗时在报告中单独列出，与事项的指标分开（第 5.2 节；[接入已有项目设计说明](existing-project-onboarding.md)第 12 节第 1 项，2026-09-29 用户决定）。
+- 场景 2 的 Yudao 一侧依赖 3.8 接入已有项目：运行器用 `project.onboard` 接入仓库在基准提交的代码，建档完成以后由运行器回答初始 PRD 的确认，再新建事项提交需求；测试命令用 Python 3.13 运行（命令不登记，ADR-0038），例如 `uv run --python 3.13 pytest …`。建档的用量与耗时在报告中单独列出，与事项的指标分开（第 5.2 节；[接入已有项目设计说明](existing-project-onboarding.md)第 12 节第 1 项，2026-09-29 用户决定）。
 - 界面智能体与裁判使用的模型由用户提供：要能看图、版本固定、与被测模型不同。2026-09-30 用户指定的三个模型（第 3 节、第 4.3 节）都经核对能读出网页截图中的文字；2026-10-19 换用的 `qhub/Qwen3.8-Flash` 与 `ag/gemini-3.8-flash-high` 同样经过核对。
 
 ## 10. 实施顺序
