@@ -290,8 +290,9 @@ jobs:
       - name: 安装依赖
         run: uv sync --frozen
 
+      # --dist loadgroup：带同一个 xdist_group 标记的用例在同一个 worker 里运行（#614），没有标记的照常分配
       - name: 集成层
-        run: uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
+        run: uv run python -m pytest -m integration -n 4 --dist loadgroup --junitxml=.tmp/test-results/integration.xml
 
       - name: 集成层的结果
         if: ${{ !cancelled() }}

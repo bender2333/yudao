@@ -8,20 +8,29 @@
 | --- | --- | --- |
 | 每次推送到 PR | ① 单元层、② 模块层、评测工具、客户端（并行），`check` 汇总 | 挡合并 |
 | 每次合并到 main 以后 | ③ 集成层 | 不挡；失败交回引入它的工单 |
-| 里程碑发布之前 | 不在 CI：真实模型冒烟、桌面测试 | 挡发布 |
+| 里程碑发布之前 | 不在 CI：真实模型冒烟、客户端端到端、桌面测试 | 挡发布 |
 
 每次运行的摘要页列出各层的文件数、用例数与结果；PR 上的「用例变化」列出合并前后各层用例的增减。只改 `docs/` 与日记的提交不运行 CI，徽章保持上一次的结果。
 
-面向自治系统研发者的三部门原生循环运行时。产品、工程、质检共同构成 Yudao 的 Agent loop：内核逐步装配上下文、调用模型、执行工具并决定部门交接。模型自然语言不能结束任务；只有绑定当前有效合同、计划、交付和完整代码树的 QA release 才能进入 `DONE`。
+面向自治系统研发者的三部门原生循环运行时。产品、工程、质检共同构成 Yudao 的 Agent loop：内核逐步装配上下文、调用模型、执行工具并决定部门交接。模型自然语言不能结束任务；只有绑定当前有效合同、交付和完整代码树的 QA release 才能进入 `DONE`。
 
 ## 当前状态
 
 - **Stage 1（可信交付）**: ✅ 已完成。三部门循环、压缩、Git 版本、重试、完整封存已验收通过。
 - **Stage 2（三部门 Harness 基线）**: 2.1–2.6 按 2026-09-15 合同关闭；**2.7 统一 Provider 层、无配置启动与 OpenCode Go 接入**已实现并通过本地回归，真实 Go 覆盖 Responses 与 Chat Completions 两个协议并各自完成三部门任务（Anthropic Messages 对当前两个模型受区域与端点限制）。历史十场为 9 次完成、1 次计划取消，不外推复杂任务成功率。
-- **Stage 3（通用工具、可靠恢复与并行）**: 设计中。当前版本基线 → 本地通用工具 → 单机恢复 → 恢复验收通过后隔离并行。
+- **Stage 3（通用工具、可靠恢复与执行环境）**: 进行中，按 GitHub 里程碑推进（2026-10-19）：
+  - M0 三部门的循环结构与命令执行：进行中，36 张工单关闭、26 张打开。命令执行一线（bash、检查、质检的测试材料、结果未知的动作交还会话）已合并，还剩 bash 后台命令（#549、#550）与两张修正（#616、#617）；循环结构一线（询问、部门同时运行、PRD 新版本的通知）从 #551 开始依次进行。
+  - M1 网页界面与模型管理：代码已完成，没有单独发布，与 M0 一起发布。
+  - M2 至 M5 排在 M0 之后。
 - **持续改进工作线 / Stage 7 系统演化**: 后续。已有离线分析与经验候选，尚无经验验证、采用、失效的完整学习闭环。
 
-当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 2.7 计划](docs/archive/stage-2-provider-plan.md)、[Provider 设计说明与交互图](docs/design/provider-layer.md)。后续见 [当前验收基线](docs/current-baseline.md) 与 [Stage 3 计划](docs/stage-3-plan.md)。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
+### 现在能试什么
+
+- 最新的发布是 [v0.1.1](https://github.com/bender2333/yudao/releases/tag/v0.1.1)（2026-10-06），早于网页界面。
+- 下一个发布是 M0 与 M1 一起的 0.1.2，附试用指南。发布之前要完成 M0 剩下的工单，并修好发布构建测试的崩溃（#614）。
+- 想先看 main 上的网页界面：在与 origin/main 一致、没有未提交改动的检出上运行 `uv run python scripts/release.py`（需要 Node 22.12 以上；只构建 wheel，不发布），再按下面「安装与启动」安装它输出的 wheel。直接从源码运行服务时没有页面文件，页面只返回「没有页面文件」。
+
+当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 3 计划](docs/stage-3-plan.md)、[当前验收基线](docs/current-baseline.md)；进度看 GitHub 的里程碑。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
 
 ## 分层
 
