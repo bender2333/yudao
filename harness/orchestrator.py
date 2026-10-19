@@ -40,7 +40,7 @@ from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog
                           project_stream, run_stream)
 from .write_path import NewCatalogEvent, NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
 from .tree_archive import artifact_run, load_tree
-from .engine import Answered, Judgment, StepDriver, StepLimits, Stopped
+from .engine import Answered, Judgment, StepDriver, StepLimits, StepResult, Stopped
 from .streams import (
     RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
 )

@@ -52,6 +52,8 @@ RUN_EVENT_TYPES = frozenset({
     "collaboration_requested",
     "collaboration_responded",
     "collaboration_closed",
+    "ask_started",
+    "ask_answered",
     "product_decision_accepted",
     "delivery_accepted",
     "qa_submitted",

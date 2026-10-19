@@ -10,7 +10,7 @@ from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .collaboration import request_basis, tool_error
 from .contracts import current_contract_hash
 from .models import TERMINAL_PHASES, Event, RunProjection
-from .tools import has_tool, offers_with_input, tool_action, tools_for, usable_when_guidance_only
+from .tools import has_tool, offers_with_input, proposal_kind, tool_action, tools_for, usable_when_guidance_only
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 
 _STALE_BASIS = ("The input, contract, or current work changed after this activation began; "
