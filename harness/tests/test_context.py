@@ -467,27 +467,29 @@ def _work_assemblies(system, run_id):
             if event.type == EventType.CONTEXT_ASSEMBLED and event.payload["purpose"] == "work"]
 
 def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_path):
-    # 窗口由固定材料（部门提示、规则、提案合同、工具清单）的实测 token 数推出：窗口 = n + 4096 + 512。
-    # 模型声明的输出上限取 4096，于是「窗口减去输入」落在 4096 附近，请求花掉全部声明上限；
-    # 旧的固定预留 response_reserve(window, 4096) 只有 window//2，给不到声明的 4096
+    # 窗口由固定材料（部门提示、规则、提案合同、工具清单）的实测 token 数推出：窗口 = n + output_limit + 512。
+    # 模型声明的输出上限取 8192（须大于 n + 512，保证在窗口留足输入与声明上限后，旧的固定预留 window//2 仍然给不到声明上限）；
+    # 于是「窗口减去输入」落在 8192 附近，请求花掉全部声明上限；
+    # 旧的固定预留 response_reserve(window, output_limit) 只有 window//2，给不到声明的 output_limit
+    output_limit = 8192
     # 先用一个宽窗口的系统测固定材料的实测估算；它只装配不激活，单独的数据目录避免与下面的运行混在一起
-    with _bound_system(tmp_path / "pinned", context_window=1_000_000, max_output_tokens=4096) as (system, _):
+    with _bound_system(tmp_path / "pinned", context_window=1_000_000, max_output_tokens=output_limit) as (system, _):
         run_id = system.create_run("build echo")
         n = pinned_input_tokens(system, run_id)
-        window = n + 4096 + 512
-    with _bound_system(tmp_path, context_window=window, max_output_tokens=4096) as (system, capture):
+        window = n + output_limit + 512
+    with _bound_system(tmp_path, context_window=window, max_output_tokens=output_limit) as (system, capture):
         run_id = system.create_run("build echo")
         result = system.activate_once(run_id)
 
     assert result.phase == "ENGINEERING", result.error
     [payload] = _work_assemblies(system, run_id)
-    assert payload["effective_context_window"] == window and payload["configured_max_output_tokens"] == 4096
+    assert payload["effective_context_window"] == window and payload["configured_max_output_tokens"] == output_limit
     # 固定材料的实测估算加上请求本身新增的少量内容（工具调用与提案），写成区间
     assert n <= payload["input_token_estimate"] <= n + 1024
     # The request keeps whatever the window leaves after its input, up to the declared limit:
     # the old fixed reserve would have allowed less than the declared limit here.
-    assert payload["max_output_tokens"] == min(4096, window - payload["input_token_estimate"]) == 4096
-    assert payload["max_output_tokens"] > response_reserve(window, 4096)
+    assert payload["max_output_tokens"] == min(output_limit, window - payload["input_token_estimate"]) == output_limit
+    assert payload["max_output_tokens"] > response_reserve(window, output_limit)
     assert payload["output_reserve_tokens"] == payload["max_output_tokens"]
     assert payload["admitted"] is True
     assert capture.requests[0]["max_output_tokens"] == payload["max_output_tokens"]
