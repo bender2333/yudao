@@ -10,9 +10,9 @@ TOOLS = DEFINITIONS.tools
 
 
 def test_tools_are_host_tools_or_environment_actions():
-    # 主机工具只有提交类工具；其余工具是环境工具，各有动作类别
+    # 主机工具由控制核心处理（提交类工具与询问/回答工具）；其余工具是环境工具，各有动作类别
     assert {name for name, tool in TOOLS.items() if tool.kind == "host"} == {
-        name for name in TOOLS if name.startswith("submit_")}
+        *{name for name in TOOLS if name.startswith("submit_")}, "ask", "answer"}
     assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
         "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
         "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
