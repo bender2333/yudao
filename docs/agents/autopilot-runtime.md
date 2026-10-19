@@ -121,7 +121,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 审查者 | `9router/oro` | 用 `--model` 指定，与执行者的模型不同 |
 | 被唤醒的架构师 | `claude-opus-5-5`，effort `xhigh` | Claude Code，用 `--model` 与 `--effort` 指定 |
 | 备用链 | `9router/ds`| 写在机器上 omp 全局配置的 `retry.fallbackChains` 中 |
-| 真实模型测试与评测 | `ag/gemini-3.8-flash-medium`（9router，Chat Completions） | 见下面 |
+| 真实模型测试与评测 | `qhub/Qwen3.8-Flash`（9router，Chat Completions，2026-10-19） | 见下面；评测的界面智能体与裁判见[评测场景设计](../design/evaluation-scenarios.md)第 4.3 节 |
 
 `task` 子代理请求会让执行者停滞，任务评论里写明不使用子代理。
 

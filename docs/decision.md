@@ -797,3 +797,18 @@
   - 2026-10-19 的复盘已发为 [#613](https://github.com/bender2333/yudao/discussions/613)，仓库中的副本 `docs/evaluation/milestones/stage3-m0-retro-2026-10-19.md` 暂留。
 - 没有采纳的：新建「复盘」分类（GitHub 不能用接口新建分类；用户在网页上建了以后，把 skill 里的分类编号与名字换掉即可）。
 - 影响：`.claude/skills/retro/SKILL.md`（新增「复盘帖子」一节，第 1、9、10 步）；`CLAUDE.md` 工作流程第 7 步。
+
+## 2026-10-19 - needs-triage 分诊：等前提条件的工单改用 waiting，M1 与 M0 合并试用，Stage 5 子工单关闭，评测换模型
+
+- 背景：用户要求处理 GitHub 上带 `needs-triage` 的工单。122 张中真正等评估的只有 #604，其余在等子工单（17 张父工单）、等里程碑（7 张试用与收尾）、等 M0 完成以后重写（35 张）、等评测模型（7 张），另有 Stage 5 暂缓的 40 张与 computer use 专题的 3 张；8 张父工单的子工单已全部关闭，等架构师验收。M1 的 85 张工单已关闭，剩下的 #370、#371 子工单也全部关闭。架构师用 grill 讨论三轮，用户回答「采纳推荐」，评测模型一项由用户指定。
+- 决策（用户确认）：
+  1. 这次只做分诊与收尾；排在 M0 之后的工单不重写正文，到各里程碑开始派发前按当时的 main 重写（M0 还在改控制核心与工具，现在写的文件与行号到时会失效）。
+  2. 新增标签 `waiting`：等前提条件的工单（试用工单、子工单未全部关闭的父工单、排在正在派发的里程碑之后的工单、等用户提供条件的工单、阶段收尾、暂缓阶段与专题的占位、试点前的自举工单）标 `waiting`，条件写在最后一条架构师评论里；`needs-triage` 只用于新报告等评估、新子工单核对规格期间、架构师退回改写正文期间。#357、#239、#182、#152、#147 原来是 `ready-for-agent`，正文写于 M0 之前、被 M0 以后重写的工单阻塞，一并改为 `waiting`。
+  3. 子工单全部关闭的父工单由架构师按现行设计逐条核对验收标准，满足的关闭。
+  4. M1 不单独发布：M0 达到时发布一个版本，试用指南覆盖 #183 与 #467 两条路径，两张一起交给用户，复盘也做一次。
+  5. Stage 5 的 37 张子工单（#22 下除 #98 以外的 22 张、#50 下 15 张）与 computer use 的 #246、#247 以「not planned」关闭；进入 Stage 5 或专题讨论以后按设计说明重新拆分。#22、#50、#98、#150 保留作占位。
+  6. #604：忽略规则无法判断时，所有位置统一以 `host_commit_error` 停止（现在同一个错误按出现的位置有 `context_overflow`、`provider_error`、`host_commit_error`、失败回执与只记录五种结局），处理说明补「或者工作区无法按忽略规则读取」；探测库的位置不动，README 的数据目录说明写明路径长度的上限（约 110 个字符），探测库随所在工作区一起删除（现在删检查工作区时留下探测库，`inspections/run_N` 一直留着），一个测试固定这个深度。不另加停止原因，不在服务启动时检查数据目录长度，不自己解析 `.gitignore`（ADR-0024）。放进 M2，M0 完成以后按当时的代码写「只改」再放出；设计说明到那时再改，避免 M0 工单依据的本地工具设计说明在冻结期变动。
+  7. 评测工作线的 OpenCode 一侧（#191、#193、#196）现在恢复，Yudao 一侧（#195、#197、#198、#324）仍等 M0。被测模型改为 `qhub/Qwen3.8-Flash`，界面智能体与裁判都用 `ag/gemini-3.8-flash-high`；被测模型仍与真实模型 smoke、`real_model` 测试共用 `YUDAO_EVAL_MODEL`，派发机器上的变量由用户让 doctor 修改。架构师核对：两个模型都能读出截图中的中英文字，`qhub/Qwen3.8-Flash` 在流式与非流式回复中都能调用工具；推荐过的 `xai/grok-4.7` 没有采用。
+- 用户原话：「采纳推荐」「使用ag/gemini-3.8-flash-high吧，把被测模型换成qhub/Qwen3.8-Flash」「派发机器的环境变量告诉我，我来让doctor做」。
+- 没有采纳的：保持 `needs-triage` 只做清理（清理以后仍有约 66 张，看不出哪张要处理）；父工单不带分诊标签（只能去掉 17 张）；现在按 M1 发布 0.1.2 单独试用，或只把模型管理单独试用；#604 新增停止原因或记为 `workspace_unrepresentable`；#604 放进 M0。
+- 影响：`docs/agents/triage-labels.md`「等前提条件的工单」一节与流程标签一段；`CLAUDE.md` 工作流程第 7 步、工单规范；`docs/stage-3-plan.md` 自举工作线一行；`docs/stage-3/trial-acceptance-contract.md` 第 3 节；`docs/requirements/stage-requirements-overview.md` computer use 一条；`docs/program-roadmap.md` 第 5.2 节；`docs/agents/autopilot-runtime.md` 第 4 节模型表；`docs/design/evaluation-scenarios.md` 第 3、4.3、9 节的模型；`docs/requirements/comparison-experiment.md` 评测模型一条；`docs/current-baseline.md` M1 一条。

@@ -121,7 +121,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 4. 拆分：`/to-tickets` 把父工单拆成可以独立验证的子工单，写明阻塞关系，添加 `ready-for-agent` 标签。
 5. 执行：执行者按 `AGENTS.md` 领取子工单，实现、自测、推送并开 PR，CI 通过以后交付；审查者在 PR 上批准或要求修改，GitHub 在 main 的规则满足时合并。
 6. 验收：子工单全部关闭后，架构师核对父工单的验收标准，关闭父工单，并更新路线图、验收基线，以及需求索引（`docs/requirements/README.md`）与设计索引（`docs/design/README.md`）中对应条目的状态。
-7. 试用：阶段内的工单按试用里程碑（GitHub Milestone）分组，每个里程碑有一张试用工单，在里程碑达到之前标 `needs-triage`。里程碑达到以后，架构师先用 `/retro <里程碑标题>` 复盘（[复盘 skill](.claude/skills/retro/SKILL.md)），报告发在 GitHub Discussions 的 Announcements 分类；提出的改动中，参数与规则句子的修改先经用户确认。然后架构师发布版本并按试用指南走查，再把试用工单改为 `ready-for-human` 交给用户；步骤见 `docs/design/web-interface-and-release.md` 第 6.4 至 6.6 节。试用期间继续推进下一个里程碑。
+7. 试用：阶段内的工单按试用里程碑（GitHub Milestone）分组，每个里程碑有一张试用工单，在里程碑达到之前标 `waiting`。里程碑达到以后，架构师先用 `/retro <里程碑标题>` 复盘（[复盘 skill](.claude/skills/retro/SKILL.md)），报告发在 GitHub Discussions 的 Announcements 分类；提出的改动中，参数与规则句子的修改先经用户确认。然后架构师发布版本并按试用指南走查，再把试用工单改为 `ready-for-human` 交给用户；步骤见 `docs/design/web-interface-and-release.md` 第 6.4 至 6.6 节。试用期间继续推进下一个里程碑。
 
 第 1 至 4 步在同一个上下文窗口中完成，`/to-tickets` 完成之前不清空、不压缩上下文。
 
@@ -163,7 +163,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - GitHub Issues 是工作队列，记录状态、领取、阻塞与验收清单。长篇设计、计划与证据放在 `docs/`，工单正文只写摘要，并链接到对应文档。
 - 标题格式：`[阶段或工作包] 动作与交付目标`，例如 `[3.1] 恢复入口与执行权限`。
 - 正文结构以 `/to-spec`、`/to-tickets` 的模板为准，使用中文；设计文档链接写在「What to build」中。
-- 每个工单带一个分诊标签：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`，含义见 `docs/agents/triage-labels.md`。`bug`、`enhancement` 等类型标签可以同时使用。
+- 每个工单带一个分诊标签：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`，或者表示等前提条件的 `waiting`，含义见 `docs/agents/triage-labels.md`。`bug`、`enhancement` 等类型标签可以同时使用。
 - 阻塞关系使用 GitHub 原生的工单依赖。`gh` 命令写法见 `docs/agents/issue-tracker.md`。
 - 依据：「What to build」开头写一行 `依据：<设计说明路径>（main <提交>）`，几份设计说明用顿号分开，提交是放出工单时核对过的 main 提交。派发者与执行者用它判断设计说明在放出以后有没有改动。
 - 大小：「只改」一段列出要改的文件，手写文件的个数不超过运行配置第 7 节的上限，超过时先拆。一张工单是一次执行者会话能做完、CI 能全部通过的纵向切片。

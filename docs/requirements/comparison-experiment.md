@@ -67,6 +67,7 @@
 - 实验结果决定 Stage 5 中语义系统、部门内多角色等工作的先后。部门内多角色的对照（[D26](department-roles.md)）使用同一组场景。新增一组对照使用 DeepSeek V4.1 Flash，让部门共享可见范围并同时采用先判断后看解释，其余条件相同；隔离组复用 3.9 的运行；结论对可见范围与先判断后看解释两项一起适用。
 - 评测使用的模型（2026-09-30）：被测模型为 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），界面智能体为 `gh/gemini-3.8-flash`，裁判为 `qdcn/qmodel_38max`；三者经用户的模型服务调用（OpenAI 兼容接口，只返回流式回复），地址与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中。三者都经核对能读出网页截图中的文字。
 - 评测使用的模型（2026-10-18）：用户提供新的 9router 凭据（Chat Completions），不用 `cc/` 分组的模型。上面三个模型都已不在 9router 的列表中。被测模型改为 `ag/gemini-3.8-flash-medium`，与真实模型测试共用，模型名放在用户环境变量 `YUDAO_EVAL_MODEL` 中。界面智能体与裁判的模型等评测工作线恢复时由用户重新指定。
+- 评测使用的模型（2026-10-19）：评测工作线的 OpenCode 一侧恢复。被测模型改为 `qhub/Qwen3.8-Flash`，仍与真实模型测试共用 `YUDAO_EVAL_MODEL`；界面智能体与裁判都用 `ag/gemini-3.8-flash-high`。用户原话：「使用ag/gemini-3.8-flash-high吧，把被测模型换成qhub/Qwen3.8-Flash」。
 
 ## 实现状态
 
