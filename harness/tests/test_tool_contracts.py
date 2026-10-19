@@ -156,3 +156,9 @@ def test_scope_matches_files_and_directory_boundaries():
     assert not path_in_scope(".checks/receipts.jsonl", ["."])
     assert not path_in_scope(" src/main.py", ["src/"])
     assert not path_in_scope("src/main.py ", ["src/"])
+
+
+def test_quality_prompt_mentions_qa_tests_dir():
+    from harness.public_tree import QA_TESTS_DIR
+
+    assert QA_TESTS_DIR in DEFINITIONS.roles["quality"].prompt

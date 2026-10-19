@@ -26,7 +26,7 @@ from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .compaction import CompactionError
 from .definitions import DEFINITIONS
 from .deltas import DeltaChannel, DeltaScope
-from .environment import LocalEnvironment, QA_TESTS_DIR
+from .environment import LocalEnvironment, QA_TESTS_DIR, qa_tests_digest
 from .event_store import run_stream
 from .write_path import Transaction, WritePath
 from .models import TERMINAL_PHASES, ArtifactRef, DepartmentPrompt, EventType, RunProjection, json_dumps
@@ -610,15 +610,16 @@ class StepDriver:
         if request.department != "quality":
             return None
         tree = self._environment.capture_qa_tests()
+        digest = qa_tests_digest(tree)
         projection = self._writes.read(self._stream).projection
-        if tree.digest == projection.qa_tests_hash:
+        if digest == projection.qa_tests_hash:
             return None
-        if len(tree.files) == 0 and len(tree.directories) == 0 and projection.qa_tests_version == 0:
+        if digest is None and projection.qa_tests_version == 0:
             return None
         ref = store_tree(self._artifacts, self._scope.run_id, tree)
         return {
             "version": projection.qa_tests_version + 1,
-            "content_hash": tree.digest,
+            "content_hash": digest,
             "archive_ref": asdict(ref),
             "activation_id": request.activation_id,
         }

@@ -378,6 +378,9 @@ class LocalEnvironment:
         if qa_dir.is_dir():
             return capture_public_tree(qa_dir)
         return CapturedTree((), ())
+    def qa_tests_digest(self) -> str | None:
+        return qa_tests_digest(self.capture_qa_tests())
+
 
     def place_qa_tests(self, tree: CapturedTree | None) -> None:
         qa_dir = self.workspace.root / QA_TESTS_DIR
@@ -844,9 +847,7 @@ class LocalEnvironment:
             )
             qa_tests_hash = None
             if action.department == "quality":
-                qa_tree = self.capture_qa_tests()
-                if qa_tree.files or qa_tree.directories:
-                    qa_tests_hash = qa_tree.digest
+                qa_tests_hash = qa_tests_digest(self.capture_qa_tests())
             receipt = self.workspace.record_check(
                 action.department,
                 name,
@@ -919,6 +920,11 @@ def _text(raw: bytes) -> str:
     # 与文本方式读取子进程输出相同：UTF-8 解码（无法解码的字节换成替换字符），换行统一为 \n
     return io.TextIOWrapper(io.BytesIO(raw), encoding="utf-8", errors="replace", newline=None).read()
 
+
+def qa_tests_digest(tree: CapturedTree | None) -> str | None:
+    if tree is not None and (tree.files or tree.directories):
+        return tree.digest
+    return None
 
 def _require_reason(args: dict[str, Any]) -> None:
     reason = args.get("reason")

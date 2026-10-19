@@ -10,6 +10,7 @@ from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment, QA_TESTS_DIR, inspection_root
 from harness.event_store import Command
 from harness.models import ArtifactRef, EventType, new_id
+from harness.providers.call import ModelResponse
 from harness.projection import saved_decisions
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.public_tree import capture_public_tree
@@ -379,3 +380,59 @@ def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_reru
     assert len(checks) == 1
     assert checks[0]["qa_tests_hash"] == proj_qa2.qa_tests_hash
     assert checks[0]["qa_tests_hash"] is not None
+
+
+def test_qa_emptying_test_materials_allows_release(tmp_path: Path) -> None:
+    test_py = f"{QA_TESTS_DIR}/test_check.py"
+    content = "import sys\nprint('PASS')\nsys.exit(0)\n"
+    python_exe = sys.executable.replace("\\", "/")
+    cmd = f'"{python_exe}" {test_py}'
+    pass_cmd = f'"{python_exe}" -c "import sys; sys.exit(0)"'
+    clean_cmd = f'"{python_exe}" -c "import os; os.remove(\'{test_py}\')"'
+    def qa_step_1(call):
+        return FakeTurn(
+            writes={test_py: content},
+            checks={"qa_check": {"name": "qa_check", "command": cmd}},
+            transcript="wrote test and ran check",
+        )
+
+    def qa_step_2(call):
+        turn = review_turn("release", "release after emptying qa tests",
+                           checks={"pass_check": {"name": "pass_check", "command": pass_cmd}})(call)
+        c1 = {"id": "c1", "call_id": "c1", "type": "function_call", "name": "bash",
+              "arguments": json.dumps({"command": clean_cmd})}
+        c2 = {"id": "c2", "call_id": "c2", "type": "function_call", "name": "run_check",
+              "arguments": json.dumps({"name": "pass_check", "command": pass_cmd})}
+        submit_args = {k: v for k, v in turn.proposal.items() if k != "kind"}
+        c3 = {"id": "c3", "call_id": "c3", "type": "function_call", "name": "submit_review",
+              "arguments": json.dumps(submit_args)}
+        return ModelResponse(
+            output=[c1, c2, c3],
+            provider="fake",
+            model="fake-script",
+        )
+
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
+        product_spec(),
+        delivery_turn(),
+        qa_step_1,
+        qa_step_2,
+    ]))
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)  # product
+    system.activate_once(run_id)  # engineering
+    proj = system.activate_once(run_id)  # quality step 1 & 2
+
+    assert proj.phase == "DONE"
+
+    events = system.writes.read(f"run:{run_id}").events()
+    saved_events = [e for e in events if e.type == EventType.QA_TESTS_SAVED]
+    assert len(saved_events) == 2, f"Expected 2 qa_tests_saved events, got {len(saved_events)}"
+    assert saved_events[0].payload["version"] == 1
+    assert saved_events[0].payload["content_hash"] is not None
+    assert saved_events[1].payload["version"] == 2
+    assert saved_events[1].payload["content_hash"] is None
+    assert proj.qa_tests_hash is None
+
+    qa_sub = next(e for e in events if e.type == EventType.QA_SUBMITTED)
+    assert qa_sub.payload["checks"][0]["qa_tests_hash"] is None
