@@ -146,7 +146,7 @@ function StateBlock(props: { title: string; data: RunRecoveryResult; startedAt: 
 }
 
 // 待恢复原因、中断位置与已终止（原型 rc-reason）：按状态给出不同内容。
-// 已终止的 run 不再继续，未完成动作与未回答的核实请求不由恢复处理，只显示终止原因与所在部门
+// 已终止的 run 不再继续，未完成动作不由恢复处理，只显示终止原因与所在部门
 function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null }) {
   const data = props.data;
   if (data.state === "waiting_resume") {
@@ -198,7 +198,7 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
             ["所在部门", item?.department ? departmentName(item.department) : "没有在部门里执行"],
           ]}
         />
-        <p className="y10-note note">已终止的执行不再继续；未完成动作与未回答的核实请求不由恢复处理。</p>
+        <p className="y10-note note">已终止的执行不再继续；未完成动作不由恢复处理。</p>
       </Section>
     );
   }
