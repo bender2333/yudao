@@ -98,7 +98,7 @@ class StepLimits:
     max_provider_attempts: int = DEFINITIONS.rule_value("max_provider_attempts")
     max_model_steps: int = DEFINITIONS.rule_value("max_model_steps")
     department_max_model_steps: Mapping[str, int] = field(default_factory=dict)
-
+    department_max_time_sec: Mapping[str, float] = field(default_factory=dict)
 
 def tool_call_required_text(count: int) -> str:
     limit = DEFINITIONS.rule_value("tool_call_required_limit")
@@ -683,6 +683,7 @@ class StepDriver:
                     )
             elif tool_kind(name) == "host":
                 ok, output, error = True, _run_host_tool(name, args), None
+            else:
                 receipt = await self._perform(Action(
                     action_id=f"{request.activation_id}:recovered:{identity}",
                     kind=tool_action(name),

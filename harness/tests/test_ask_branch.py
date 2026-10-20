@@ -483,3 +483,126 @@ def test_ask_branch_no_tool_call_ends_with_unable(tmp_path: Path):
     assert tool_calls[0].payload["ok"] is False
     assert "without calling a tool" in (tool_calls[0].payload.get("error") or "")
     assert system.project(run_id).outcome == "done"
+
+
+def test_ask_branch_exhausted_by_department_time_limit_ends_with_unable(tmp_path: Path):
+    # 分支声明时间耗尽：以 unable 结束，写明时间上限原因，提问方接着工作
+    import time
+    from harness.engine import StepLimits
+
+    def product_branch_slow(call):
+        time.sleep(0.4)
+        return ModelResponse(output=[_call("ans-1", "answer", answer="too late")])
+
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _call("ask-1", "ask", recipient="product", question="Clarify something?",
+                      background="Bg", expected="Exp"),
+            ]),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        ],
+        "product:ask": [product_branch_slow],
+        "quality": [review_turn("release", "ok")],
+    }
+    adapter = FakeAdapter(scripts)
+    step_limits = StepLimits(department_max_time_sec={"product": 0.2})
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
+    run_id = system.create_run("build echo")
+    system.run_until_stop(run_id)
+
+    events = system.store.list_events(run_id)
+    ask_answered_events = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    assert len(ask_answered_events) == 1
+    payload = ask_answered_events[0].payload
+    assert payload["status"] == "unable"
+    assert "time limit" in payload["reason"].lower()
+
+    tool_calls = [e for e in events if e.type == EventType.TOOL_CALLED and e.payload.get("name") == "ask"]
+    assert len(tool_calls) == 1
+    assert tool_calls[0].payload["ok"] is False
+    assert "time limit" in (tool_calls[0].payload.get("error") or "").lower()
+    assert system.project(run_id).outcome == "done"
+
+
+def test_ask_branch_exhausted_by_run_time_limit_ends_with_unable(tmp_path: Path):
+    # 事项整条 run 的时间上限耗尽：分支在 unable 结束时写明时间上限原因（而非通用兜底）
+    import time
+
+    def product_branch_slow(call):
+        time.sleep(1.5)
+        return ModelResponse(output=[_call("ans-1", "answer", answer="too late")])
+
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _call("ask-1", "ask", recipient="product", question="Clarify something?",
+                      background="Bg", expected="Exp"),
+            ]),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        ],
+        "product:ask": [product_branch_slow],
+        "quality": [review_turn("release", "ok")],
+    }
+    adapter = FakeAdapter(scripts)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo", run_time_limit_sec=1)
+    system.run_until_stop(run_id)
+
+    events = system.store.list_events(run_id)
+    ask_answered_events = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    assert len(ask_answered_events) == 1
+    payload = ask_answered_events[0].payload
+    assert payload["status"] == "unable"
+    assert "time limit" in payload["reason"].lower()
+    assert system.project(run_id).stop_reason == "time_limit"
+
+
+def test_ask_branch_zero_remaining_time_does_not_open_branch(tmp_path: Path):
+    # 剩余或声明时间 <= 0 时不开启分支，直接以 unable 结束并写明时间上限
+    from harness.engine import StepLimits
+
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _call("ask-1", "ask", recipient="product", question="Clarify something?",
+                      background="Bg", expected="Exp"),
+            ]),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        ],
+        "product:ask": [ModelResponse(output=[_call("ans-1", "answer", answer="Clarified.")])],
+        "quality": [review_turn("release", "ok")],
+    }
+    adapter = FakeAdapter(scripts)
+    step_limits = StepLimits(department_max_time_sec={"product": 0.0})
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
+    run_id = system.create_run("build echo")
+    system.run_until_stop(run_id)
+
+    events = system.store.list_events(run_id)
+    ask_answered_events = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    assert len(ask_answered_events) == 1
+    payload = ask_answered_events[0].payload
+    assert payload["status"] == "unable"
+    assert "time limit" in payload["reason"].lower()
+
+    # 不开启分支：没有分支 session 的激活与请求
+    branch_activations = len([
+        e for e in events
+        if e.type == EventType.DEPARTMENT_ACTIVATED and (e.session_id or "").startswith("ses_ask")
+    ])
+    branch_steps = len([
+        e for e in events
+        if e.type == EventType.MODEL_REQUESTED and (e.session_id or "").startswith("ses_ask")
+    ])
+    assert branch_activations == 0
+    assert branch_steps == 0
+
+    tool_calls = [e for e in events if e.type == EventType.TOOL_CALLED and e.payload.get("name") == "ask"]
+    assert len(tool_calls) == 1
+    assert tool_calls[0].payload["ok"] is False
+    assert "time limit" in (tool_calls[0].payload.get("error") or "").lower()
+    assert system.project(run_id).outcome == "done"
