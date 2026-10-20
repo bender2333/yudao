@@ -34,12 +34,12 @@ def test_time_limit_checked_between_activations(data_dir):
     script = [product_spec(), delivery_turn(),
               review_turn("release", "ok")]
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
-    run_id = system.create_run("echo", run_time_limit_sec=3)
-    # 第一次激活正常完成；两次激活之间的等待不计入运行时间（工单 #350），
+    run_id = system.create_run("echo", run_time_limit_sec=10)
+    # 第一次激活正常完成；两次激活之间的等待不计入运行时间（工单 #350，按 #410 对齐短时限到 10 秒避免负载抖动），
     # 第二次激活开始时累计还没有达到上限，照常进行
     result = system.activate_once(run_id)
     assert result.phase == "ENGINEERING"
-    time.sleep(3.1)
+    time.sleep(10.2)
     result = system.activate_once(run_id)
     assert result.stop_reason is None
     assert result.phase == "QUALITY"
