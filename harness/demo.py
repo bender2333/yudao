@@ -12,10 +12,15 @@ from .app.contracts import Rejected
 from .app.project_and_work_item_commands import WorkItemAppendInput, WorkItemCreate
 from .app.project_commands import ProjectCreate
 from .definitions import DEFINITIONS
-from .proposals import (collaboration_request, delivery_turn, product_spec, product_spec_turn,
-                        response_turn, review_turn)
+from .proposals import (ask_turn, answer_turn, delivery_turn, product_spec,
+                        product_spec_turn, review_turn)
+from .providers.call import ModelResponse, ModelStreamEvent
 from .providers.selection import ModelSelection
 from .runtime import LoopSystem
+
+def _pause_generator(_call):
+    yield ModelStreamEvent(kind="stream_event", id="evt-pause")
+    return ModelResponse(output=[])
 
 DEMO_TASK = "Build a local echo CLI that prints its argument and follows product decisions on flags."
 DEMO_CHANGE = "\n  Change direction: treat every single argument, including --unknown, as ordinary text and echo it unchanged. Retire unknown-flag rejection. Keep ordinary echo and missing-argument usage with exit 2.\r\n"
@@ -85,55 +90,92 @@ def demo_script():
         "    raise SystemExit(2)\n"
         "print(sys.argv[1])\n"
     )
-    return [
-        collaboration_request("engineering", "Is a single-file local Python CLI appropriate?",
-                              background="The initial product requirements are being prepared.",
-                              expected_result="Confirm implementation feasibility without changing files."),
-        response_turn("answered", "Python's standard library supports this CLI without external dependencies."),
-        V1,
-        collaboration_request(
-            question="How should unknown flags be handled?",
-            request_type="action", action="revise_requirements",
-            expected_result="Publish requirements for invalid flags and missing arguments.",
-        ),
-        V2,
-        response_turn("completed", "The revised product requirements define flags and usage.",
-                      result_types=["spec_accepted"]),
-        V3,
-        delivery_turn(
-            "first delivery treats dash-prefixed input as ordinary text",
-            files={"src/echo.py": echo_flags},
-            checks={"smoke": {"command": "python src/echo.py hello"}},
-            transcript="implemented the user's revised argument behavior",
-        ),
-        collaboration_request("engineering", "Where is the CLI entry point?",
-                              background="Quality is preparing its independent checks.",
-                              expected_result="Identify the existing executable path without changing the delivery."),
-        response_turn("answered", "Run python src/echo.py with the intended arguments."),
-        review_turn(
-            "rework_engineering",
-            "Missing usage text when no argument is provided.",
-            checks={"usage": quality_checks["usage"]},
-            defects=[{"severity": "major", "summary": "no usage text on empty argv"}],
-        ),
-        delivery_turn(
-            "added usage text",
-            files={"src/echo.py": echo_help},
-            checks={"smoke": {"command": "python src/echo.py hello"}},
-            transcript="added usage",
-        ),
-        review_turn(
-            "release",
-            "Quality independently verified preserved ordinary echo and usage, plus the newly accepted dash-prefixed argument behavior.",
-            checks=quality_checks,
-        ),
-    ]
+    return {
+        "product": [
+            ask_turn(
+                recipient="engineering",
+                question="Is a single-file local Python CLI appropriate?",
+                background="The initial product requirements are being prepared.",
+                expected="Confirm implementation feasibility without changing files.",
+            ),
+            V1,
+            V3,
+        ],
+        "engineering": [
+            ask_turn(
+                recipient="product",
+                question="How should unknown flags be handled?",
+                background="Clarification needed on flags.",
+                expected="Publish requirements for invalid flags and missing arguments.",
+            ),
+            _pause_generator,
+            delivery_turn(
+                "first delivery treats dash-prefixed input as ordinary text",
+                files={"src/echo.py": echo_flags},
+                checks={"smoke": {"command": "python src/echo.py hello"}},
+                transcript="implemented the user's revised argument behavior",
+            ),
+            delivery_turn(
+                "added usage text",
+                files={"src/echo.py": echo_help},
+                checks={"smoke": {"command": "python src/echo.py hello"}},
+                transcript="added usage",
+            ),
+        ],
+        "quality": [
+            ask_turn(
+                recipient="engineering",
+                question="Where is the CLI entry point?",
+                background="Quality is preparing its independent checks.",
+                expected="Identify the existing executable path without changing the delivery.",
+            ),
+            review_turn(
+                "rework_engineering",
+                "Missing usage text when no argument is provided.",
+                checks={"usage": quality_checks["usage"]},
+                defects=[{"severity": "major", "summary": "no usage text on empty argv"}],
+            ),
+            review_turn(
+                "release",
+                "Quality independently verified preserved ordinary echo and usage, plus the newly accepted dash-prefixed argument behavior.",
+                checks=quality_checks,
+            ),
+        ],
+        "product:ask": [
+            answer_turn(
+                answer="The revised product requirements define flags and usage.",
+                goal="Build a local echo CLI with strict flags",
+                requirements=[
+                    "Print the given argument to stdout",
+                    "Unknown flags must be rejected",
+                    "Missing arguments must print usage and exit 2",
+                ],
+                acceptance=[
+                    "echo hello prints hello",
+                    "unknown flags exit 2",
+                    "missing arguments print usage and exit 2",
+                ],
+                constraints=["single file implementation", "no third-party packages"],
+                non_goals=["network access", "configuration files"],
+                change_record={
+                    "changed": ["Unknown flags exit 2", "Missing arguments print usage and exit 2"],
+                    "retained": ["Ordinary input is printed unchanged", "No network or configuration files"],
+                    "retired": [],
+                    "rationale": "Resolve the engineering request by explicitly deciding invalid-input behavior.",
+                },
+            ),
+        ],
+        "engineering:ask": [
+            answer_turn(answer="Python's standard library supports this CLI without external dependencies."),
+            answer_turn(answer="Run python src/echo.py with the intended arguments."),
+        ],
+    }
 
 
 def run_demo(data_dir: str | Path) -> tuple[LoopSystem, str]:
     # demo 经应用层的命令新建项目与事项（应用层与接口层设计说明第 7.4 节）：
     # 事项由流程编排在接口进程的事件循环中作为任务运行，run 结束时由流程编排结算
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(demo_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(demo_script(), stream_gap_sec=0.05))
     application = Application(system)
     return asyncio.run(_run_demo(application, system))
 
@@ -150,8 +192,7 @@ async def _run_demo(application: Application, system: LoopSystem) -> tuple[LoopS
     assert task is not None, "work_item.create did not start the run task"
     # 等到修订要求的协作请求已关闭（V2 接纳且 engineering 回复 completed），再追加变更：
     # 主分支上这笔输入在首次计划接纳后才追加；删计划后等价点是请求关闭后，V3 消费它
-    await _wait_for(lambda: (len(system.project(run_id).effective_contracts) >= 2
-                             and system.project(run_id).pending_request is None))
+    await _wait_for(lambda: len(system.project(run_id).effective_contracts) >= 2)
     await _command(application, "work_item.append_input",
                    WorkItemAppendInput(command_id=str(uuid.uuid4()), work_item_id=work_item_id, text=DEMO_CHANGE))
     system.projects.configure_department_settings(

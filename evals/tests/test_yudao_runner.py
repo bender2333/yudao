@@ -275,8 +275,8 @@ def test_timeout_run_is_reported_with_the_time_limit_reason():
 def test_metrics_read_cycles_rework_requests_and_usage():
     export = _export(projection={"outcome": "released", "cycle_count": 4, "rework_count": 2,
                                  "request_count": 11})
-    export["events"] = [{"type": "collaboration_requested"}, {"type": "collaboration_requested"},
-                        {"type": "collaboration_requested"}]
+    export["events"] = [{"type": "ask_started"}, {"type": "ask_started"},
+                        {"type": "ask_started"}]
     export["usage"] = {"totals": {"attempts": 11, "input_tokens": 1000, "output_tokens": 250,
                                   "total_tokens": 1250, "cost": 0.5, "latency_ms": 40_000}}
     collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 12.3,

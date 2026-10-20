@@ -29,6 +29,7 @@ from harness.app.project_queries import (
     ProjectsList,
     ReplayCheck,
     RunActions,
+    RunAsks,
     RunAttempt,
     RunExport,
     WorkItemInputs,
@@ -41,7 +42,7 @@ from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import (
     product_spec, delivery_turn, review_turn,
-    collaboration_request, response_turn,
+    collaboration_request, response_turn, ask_turn, answer_turn,
 )
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
@@ -136,6 +137,7 @@ def _all_requests(system, project_id, work_item_id, run_id):
         ("department.workspace", DepartmentWorkspace(project_id=project_id, department="product",
                                                      work_item=work_item_id)),
         ("run.actions", RunActions(run_id=run_id)),
+        ("run.asks", RunAsks(run_id=run_id)),
         ("work_item.materials", WorkItemMaterials(project_id=project_id, work_item=work_item_id)),
         ("delivery.file", DeliveryFile(event_id=delivery_event_id, path="src/echo.py")),
         ("project.attempts", ProjectAttempts(project_id=project_id)),
@@ -244,6 +246,7 @@ def test_query_time_does_not_grow_with_unrelated_history(data_dir):
         ("department.workspace", DepartmentWorkspace(project_id=project_id, department="product",
                                                      work_item=work_item_id)),
         ("run.actions", RunActions(run_id=run_id)),
+        ("run.asks", RunAsks(run_id=run_id)),
         ("work_item.materials", WorkItemMaterials(project_id=project_id, work_item=work_item_id)),
         ("delivery.file", DeliveryFile(event_id=projection.delivery_spec.created_event_id, path="src/echo.py")),
         ("project.attempts", ProjectAttempts(project_id=project_id, limit=5)),
@@ -368,46 +371,104 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
     exported = application.query("run.export", RunExport(run_id=run_id))
     assert any(event["type"] == EventType.RUN_CREATED for event in exported.data.events)
 
-def test_department_workspace_room_reflects_the_run_state(data_dir):
-    # 部门房间的画面数据随 run 的状态变化（原型 roomStatus 与房间数据）：
-    # 工程向产品发出询问时，产品房间为等待回答（asking）、工程房间为工作中（working），
-    # 询问的未回答数记在传信管口
-    system = _system(data_dir, [
-        product_spec(), collaboration_request("product"),
-    ])
-    project_id = system.projects.register("房间", GOAL)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "看看房间")
-    assert system.activate_once(run_id).product_spec is not None
-    pending = system.activate_once(run_id)
-    assert pending.pending_request is not None
-    application = _application(system)
+def test_run_asks_returns_in_progress_answered_and_unable(data_dir):
+    # run.asks 查询返回进行中、已回答、没能回答三种状态的询问：
+    # 包含提问方、被询问部门、问题、状态、回答或原因、开始与结束位置
+    from harness.definitions import DEFINITIONS
 
-    product_room = application.query("department.workspace", DepartmentWorkspace(
-        project_id=project_id, department="product", work_item=work_item_id)).data.room
-    assert product_room.status == "asking"
-    assert product_room.crt.target == "看看房间"
-    assert product_room.crt.status == "等待回答"
-    assert product_room.pipes.letters_waiting == 1
-    assert product_room.pipes.out == "idle"
+    limit = DEFINITIONS.rule_value("tool_call_required_limit")
+    captured: dict[str, Any] = {}
 
-    engineering_room = application.query("department.workspace", DepartmentWorkspace(
-        project_id=project_id, department="engineering", work_item=work_item_id)).data.room
-    # 工程发出询问以后在等产品的回答：它已经交出了当前步骤，房间回到未工作的持续状态
-    assert engineering_room.status == "idle"
-    assert engineering_room.pipes.letters_waiting == 0
-    # 问询不影响质检房间：它没有参与这次 run
-    quality_room = application.query("department.workspace", DepartmentWorkspace(
-        project_id=project_id, department="quality", work_item=work_item_id)).data.room
-    assert quality_room.status == "idle"
-    assert quality_room.roles[0].id == "quality-agent"
-    assert quality_room.crt.target == "看看房间"
+    def branch_turn_in_progress(call: ModelCall) -> Any:
+        app = Application(system)
+        in_prog = app.query("run.asks", RunAsks(run_id=call.run_id))
+        captured["in_progress_asks"] = in_prog.data.asks
+        return answer_turn("已回答问题二")(call)
 
-    checked = application.query("replay.check", ReplayCheck(run_id=run_id))
-    assert checked.data.consistent is True
-    assert checked.data.differences == []
-    project_checked = application.query("replay.check", ReplayCheck(project_id=project_id))
-    assert project_checked.data.consistent is True
+    system = _system(data_dir, {
+        "product": [
+            ask_turn(recipient="engineering", question="Python 单文件 CLI 是否可行？",
+                     background="准备初始规格", expected="确认可行性", call_id="ask-1"),
+            product_spec(),
+        ],
+        "engineering": [
+            ask_turn(recipient="product", question="参数错误如何处理？",
+                     background="实现中需要明确", expected="规格澄清", call_id="ask-2"),
+            delivery_turn(),
+        ],
+        "quality": [
+            ask_turn(recipient="engineering", question="执行入口在哪里？",
+                     background="质检核对", expected="指出入口", call_id="ask-3"),
+            review_turn("release", "验收通过"),
+        ],
+        "engineering:ask": [
+            answer_turn("标准库支持该实现，无需外部依赖。"),
+            *(ModelResponse(output=[{"id": f"plain-{i}", "type": "message", "role": "assistant",
+                                     "content": [{"type": "output_text", "text": "普通文本，未调用工具。"}]}])
+              for i in range(limit + 1)),
+        ],
+        "product:ask": [
+            branch_turn_in_progress,
+        ],
+    })
+    project_id = system.projects.register("询问查询", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "验证 run.asks")
+    system.run_until_stop(run_id)
 
+    app = Application(system)
+
+    in_prog_asks = captured["in_progress_asks"]
+    assert len(in_prog_asks) == 2
+    assert in_prog_asks[0].status == "已回答"
+    assert in_prog_asks[0].requester == "product"
+    assert in_prog_asks[0].recipient == "engineering"
+    assert in_prog_asks[0].question == "Python 单文件 CLI 是否可行？"
+    assert in_prog_asks[0].answer == "标准库支持该实现，无需外部依赖。"
+    assert in_prog_asks[0].reason is None
+    assert in_prog_asks[0].start_position > 0
+    assert in_prog_asks[0].end_position is not None
+    assert in_prog_asks[0].end_position > in_prog_asks[0].start_position
+
+    assert in_prog_asks[1].status == "进行中"
+    assert in_prog_asks[1].requester == "engineering"
+    assert in_prog_asks[1].recipient == "product"
+    assert in_prog_asks[1].question == "参数错误如何处理？"
+    assert in_prog_asks[1].answer is None
+    assert in_prog_asks[1].reason is None
+    assert in_prog_asks[1].start_position > in_prog_asks[0].end_position
+    assert in_prog_asks[1].end_position is None
+
+    final_query = app.query("run.asks", RunAsks(run_id=run_id))
+    asks = final_query.data.asks
+    assert len(asks) == 3
+
+    assert asks[0].status == "已回答"
+    assert asks[0].requester == "product"
+    assert asks[0].recipient == "engineering"
+    assert asks[0].question == "Python 单文件 CLI 是否可行？"
+    assert asks[0].answer == "标准库支持该实现，无需外部依赖。"
+    assert asks[0].reason is None
+    assert asks[0].start_position > 0
+    assert asks[0].end_position > asks[0].start_position
+
+    assert asks[1].status == "已回答"
+    assert asks[1].requester == "engineering"
+    assert asks[1].recipient == "product"
+    assert asks[1].question == "参数错误如何处理？"
+    assert asks[1].answer == "已回答问题二"
+    assert asks[1].reason is None
+    assert asks[1].start_position > asks[0].end_position
+    assert asks[1].end_position > asks[1].start_position
+
+    assert asks[2].status == "没能回答"
+    assert asks[2].requester == "quality"
+    assert asks[2].recipient == "engineering"
+    assert asks[2].question == "执行入口在哪里？"
+    assert asks[2].answer is None
+    assert asks[2].reason is not None
+    assert "without calling a tool" in asks[2].reason
+    assert asks[2].start_position > asks[1].end_position
+    assert asks[2].end_position > asks[2].start_position
 def test_flow_records_cover_handoff_delivery_problem_and_rework(data_dir):
     system = _system(data_dir, _rework_script())
     project_id = system.projects.register("流转", GOAL)
@@ -430,17 +491,29 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
     # 工单 #415 的场景：质检在工程退回事项的结论之前向工程提出询问并得到回答，
     # engineering 一侧与 quality 一侧因此在 quality→engineering 上留下「咨询」「问题反馈」与「返工」。
     # 期望直接写出应有的记录条数与种类，不复用画面侧的分组公式：分组若改变，这段断言照样成立
-    system = _system(data_dir, [
-        product_spec(),delivery_turn(),
-        collaboration_request("engineering", "Which acceptance line governs the rework?",
-                              background="Quality is preparing its verdict.",
-                              expected_result="Name the acceptance line to follow."),
-        response_turn("answered", "Follow the acceptance line recorded in the requirement."),
-        review_turn("rework_engineering", "质检退回",
-                    defects=[{"severity": "minor", "summary": "空输入需要处理"}]),
-        delivery_turn(summary="处理空输入"),
-        review_turn("release", "revised delivery checked"),
-    ])
+    system = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [
+            delivery_turn(),
+            delivery_turn(summary="处理空输入"),
+        ],
+        "quality": [
+            ask_turn(
+                recipient="engineering",
+                question="Which acceptance line governs the rework?",
+                background="Quality is preparing its verdict.",
+                expected="Name the acceptance line to follow.",
+            ),
+            review_turn(
+                "rework_engineering", "质检退回",
+                defects=[{"severity": "minor", "summary": "空输入需要处理"}],
+            ),
+            review_turn("release", "revised delivery checked"),
+        ],
+        "engineering:ask": [
+            answer_turn("Follow the acceptance line recorded in the requirement."),
+        ],
+    })
     project_id = system.projects.register("同对部门", GOAL)
     work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
     system.run_until_stop(run_id)
@@ -450,12 +523,11 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
     rows = [record for record in flow.data.records
             if record.direction_from == "quality" and record.direction_to == "engineering"]
     assert len(rows) == 3
-    assert sorted(record.kind for record in rows) == ["咨询", "返工", "问题反馈"]
+    assert sorted(record.kind for record in rows) == ["询问", "返工", "问题反馈"]
     by_kind = {record.kind: record for record in rows}
-    assert by_kind["咨询"].status == "已回应"
+    assert by_kind["询问"].status == "已回答"
     assert by_kind["问题反馈"].status == "已退回"
     assert by_kind["返工"].status == "已退回"
-
 def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
     system = _system(data_dir, _release_script())
     project_id = system.projects.register("工件", GOAL)

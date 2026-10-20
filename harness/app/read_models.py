@@ -31,8 +31,7 @@ ATTEMPT_TYPES = frozenset({
 })
 # 流转记录吸收的事件种类：阶段迁移、部门之间的请求与回答、质检退回
 FLOW_TYPES = frozenset({
-    EventType.TRANSITION, EventType.COLLABORATION_REQUESTED, EventType.COLLABORATION_RESPONDED,
-    EventType.COLLABORATION_CLOSED, EventType.QA_SUBMITTED,
+    EventType.TRANSITION, EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED,
 })
 DELIVERY_PHASE = "DELIVERY"
 # 质检退回的判定到承接部门的对应；与项目流使用的退回判定必须是同一个集合，启动时核对
@@ -99,11 +98,8 @@ _TRANSITION_DEPARTMENTS = {
     "ENGINEERING": "engineering", "REWORK_ENGINEERING": "engineering",
     "QUALITY": "quality", DELIVERY_PHASE: "quality",
 }
-_CONSULTATION_STATUS = {
-    "answered": "已回应", "declined": "已拒绝", "needs_work": "需要返工", "completed": "已完成",
-}
-_CLOSED_STATUS = {
-    "superseded": "已取代", "stopped": "已停止", "cancelled": "已取消", "timed_out": "已超时",
+_ASK_STATUS = {
+    "answered": "已回答", "unable": "没能回答",
 }
 
 
@@ -377,20 +373,16 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
                  "direction_to": _TRANSITION_DEPARTMENTS.get(event.state_after) or event.state_after,
                  "status": "已退回" if kind == "返工" else "已完成",
                  "content": f"{phase_name(event.state_before)} → {phase_name(event.state_after)}"}]
-    if event.type == EventType.COLLABORATION_REQUESTED:
-        return [{**base, "flow_id": payload["id"], "kind": "咨询",
+    if event.type == EventType.ASK_STARTED:
+        return [{**base, "flow_id": payload["branch_session_id"], "kind": "询问",
                  "direction_from": payload["requester"], "direction_to": payload["recipient"],
-                 "status": "等待回答", "content": payload["question"]}]
-    if event.type == EventType.COLLABORATION_RESPONDED:
-        # 回答方回应发问方：两端从载荷取出；旧事件没有这两个字段时方向留空（工单 #275）
-        return [{**base, "flow_id": payload["request_id"], "kind": "咨询",
-                 "direction_from": payload.get("recipient"), "direction_to": payload.get("requester"),
-                 "status": _CONSULTATION_STATUS.get(payload["status"], payload["status"]),
-                 "content": payload["text"]}]
-    if event.type == EventType.COLLABORATION_CLOSED:
-        return [{**base, "flow_id": payload["request_id"], "kind": "咨询", "direction_from": None,
-                 "direction_to": None, "status": _CLOSED_STATUS.get(payload["status"], payload["status"]),
-                 "content": payload["reason"]}]
+                 "status": "进行中", "content": payload["question"]}]
+    if event.type == EventType.ASK_ANSWERED:
+        status = _ASK_STATUS.get(payload.get("status"), payload.get("status"))
+        content = payload.get("answer", "") if payload.get("status") == "answered" else payload.get("reason", "")
+        return [{**base, "flow_id": event.session_id, "kind": "询问",
+                 "direction_from": payload.get("requester"), "direction_to": payload.get("recipient"),
+                 "status": status, "content": content}]
     if event.type == EventType.QA_SUBMITTED and payload.get("verdict") in _REWORK_DEPARTMENTS:
         return [{**base, "flow_id": event.event_id, "kind": "问题反馈",
                  "direction_from": "quality", "direction_to": _REWORK_DEPARTMENTS[payload["verdict"]],
