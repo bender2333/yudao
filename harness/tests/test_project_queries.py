@@ -5,11 +5,12 @@ import sys
 import time
 from dataclasses import asdict, replace
 from pathlib import Path
-
+from typing import Any
 import pytest
 from filelock import FileLock
 
 from harness.__main__ import main
+from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
