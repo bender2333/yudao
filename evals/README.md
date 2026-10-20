@@ -1,6 +1,6 @@
 # 评测工具
 
-本目录是与 `harness/` 分开的评测工具，只通过公开接口观察 Yudao（[评测场景设计](../docs/design/evaluation-scenarios.md)第 7 节）。场景 3 是从较长的 PRD 新建项目，场景 2 是在已有代码上加功能。
+本目录是与 `harness/` 分开的评测工具，只通过公开接口观察 Yudao（[评测场景设计](../docs/design/evaluation-scenarios.md)第 7 节）。场景 3 是从较长的 PRD 新建项目，场景 2 是在已有代码上加功能，场景 1 是网页应用（WebGen-Bench 000080 待办清单）。
 
 ## 目录结构
 
@@ -19,6 +19,12 @@ flowchart TD
 - `scenarios/scenario-2/checks/`：8 条 F2P（`f2p.json`）、331 条 P2P（`p2p.json`）、登记的排除用例（`excluded.json`）、隐藏测试文件（`tests/`，按交付里的相对路径存放）与清单模块（`pytest_checks.py`）。
 - `scenarios/scenario-2/reference/gold.patch`：参考实现，FeatBench 记录的 gold patch。
 - `scenarios/scenario-2/validate.py`：核对材料本身——套上参考实现应当 8 条 F2P 全通过且 P2P 失败 0 条，原样的仓库 8 条全不通过且 P2P 失败 0 条。
+- `scenarios/scenario-1/materials/`：需求原文（`requirement.md`，WebGen-Bench 000080 原文）、接口约定（`interface-agreement.md`）、需求条目表（`requirement-table.json`）、材料来源与运行环境（`manifest.json`）。
+- `scenarios/scenario-1/checks/cases.json`：8 条用例（新建、编辑、删除、标记完成、按完成状态筛选、搜索、页面导航、配色）。
+- `scenarios/scenario-1/reference/`：参考实现（Node.js 待办应用）。
+- `scorer/ui_agent.py`：界面智能体，使用 Playwright 操作 Chromium 在浏览器中按可见内容执行用例并截图。
+- `scorer/scenario1.py`：场景 1 评分器，启动交付服务、由界面智能体执行用例并记分。
+- `runner/scenario1.py`：场景 1 在 OpenCode 一侧的运行器模块。
 - `scenarios/scenario-3/materials/`：需求原文（`prd.md`，PRD 的英文译本）、接口约定（`interface-agreement.md`）、需求条目表（`requirement-table.json`）、交给被测方的起点（`start/files/`）。这些是公开部分，运行时交给被测方。
 - `scenarios/scenario-3/files/`：题目数据文件 `subway_data.json`，运行器放到起点。
 - `scenarios/scenario-3/checks/`：隐藏检查。只有评分器读取，不进入被测方的运行目录，运行结束以后才复制到评分目录。
@@ -33,12 +39,18 @@ flowchart TD
 
 ## 材料版本
 
-场景 3 的材料版本是 `scenario-3@2`，场景 2 的是 `scenario-2@1`。修改需求原文、需求条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
+场景 3 的材料版本是 `scenario-3@2`，场景 2 的是 `scenario-2@1`，场景 1 的是 `scenario-1@1`。修改需求原文、需求条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
 
 评分之前运行器还要核对材料摘要：隐藏检查、条目表与参考实现的摘要登记在各自的 `materials/manifest.json` 的 `digests` 块里，算出来的摘要与登记值不同时这次运行无效，报告写明「材料摘要与材料版本记录不同」。摘要按 LF 规范化的字节流递归计算，跳过 `__pycache__` 与 `*.pyc`，因此在 Windows 与 Linux 签出上一致，测试或评分写下的字节码也不会让摘要失效。改动材料以后用下面这条命令重新生成摘要，随改动一起提交：
 
 ```bash
 uv run python -c "import sys; sys.path.insert(0, 'evals/runner'); import material_integrity as m, scenario3; print(m.write_digests(scenario3.scenario_base(), {'checks', 'reference', 'materials/requirement-table.json'}))"
+```
+
+场景 1 的摘要生成：
+
+```bash
+uv run python -c "import sys; sys.path.insert(0, 'evals/runner'); import material_integrity as m, scenario1; print(m.write_digests(scenario1.scenario_base(), {'checks', 'reference', 'materials/requirement-table.json'}))"
 ```
 
 
@@ -48,6 +60,8 @@ uv run python -c "import sys; sys.path.insert(0, 'evals/runner'); import materia
 
 场景 2 有 6 个需求条目与 8 条 F2P 的对应，见 `scenarios/scenario-2/materials/requirement-table.json`。8 条 F2P 计入完成度与正确性；331 条 P2P 是原有功能测试，失败条数单独报告，不影响完成度（[评测场景设计](../docs/design/evaluation-scenarios.md)第 4.2 节）。隐藏测试文件以文件形态放在 `checks/tests/` 下，评分时盖掉交付里的同名文件，被测方改测试不改变评分。
 
+场景 1 有 8 个需求条目与 8 条用例，见 `scenarios/scenario-1/materials/requirement-table.json` 与 `checks/cases.json`。由界面智能体在浏览器中按可见内容执行，每条最多 15 步，给出通过（1）、部分通过（0.5）、不通过（0）；找不到对应元素或入口时记为「没有做」（0）。
+
 ## 运行评分器
 
 ```bash
@@ -55,6 +69,12 @@ uv run python evals/scorer/scorer.py --delivery <交付目录> --result <结果�
 ```
 
 场景 3 的评分器把交付当作一个带 `src/` 子目录的项目。场景 2 的评分器针对一份仓库：`--delivery` 指向交付副本，评分器把隐藏测试文件盖上去，再用交付自带的 Python 3.13 环境运行 F2P 与 P2P 两份清单。
+
+场景 1 的评分器针对一份待办应用交付：`--delivery` 指向交付目录，评分器启动服务并将端口通过 `PORT` 传入，服务就绪后由界面智能体在 Chromium 中执行 8 条用例并截图：
+
+```bash
+uv run python evals/scorer/scenario1.py --delivery <交付目录> --result <结果文件>
+```
 
 ## 运行评分器自己的测试
 
@@ -70,6 +90,12 @@ uv run python -m pytest evals/tests/test_yudao_runner.py -m real_model -k time_l
 ```
 
 选择了而变量缺失时这些用例跳过，原因写明缺哪个变量。
+
+场景 1 需要安装 Chromium：
+
+```bash
+uv run playwright install chromium
+```
 
 ## 运行一次评测
 
@@ -88,7 +114,7 @@ uv run python evals/runner/run_eval.py \
     --report docs/evaluation/scenario-3-opencode.md
 ```
 
-场景 2 用 `--scenario scenario2`，结果写到 `scenario-2-opencode.json` 与 `scenario-2-opencode.md`。它的运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
+场景 2 用 `--scenario scenario2`，场景 1 用 `--scenario scenario1`，结果写到对应的 `scenario-X-opencode.json` 与 `scenario-X-opencode.md`。场景 2 运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
 Yudao 一侧用同一个模型、同一个环境变量：
 
 ```bash
@@ -131,7 +157,7 @@ Yudao 一侧当前的起点缺口与模型行为记录在 `docs/architecture-iss
 - 隐藏检查、条目表与参考实现不进入运行目录；它们在运行结束以后才复制到评分目录。场景 2 的运行目录是仓库，材料只把需求原文放进去，隐藏测试文件与两份清单都不进去。
 - 取回与搜索工具（`webfetch`、`websearch`）在运行配置里关闭，运行器另外检查 JSON 输出里没有这两类工具的调用。
 - 消息用短指示加上材料附件（`prd.md`、`interface-agreement.md`、`subway_data.json`），不把需求全文放进命令行。
-- 评分之前做三项核对，任一命中这次运行作废（`void`），不计入结果；这类运行在报告的第六节列出：JSON 输出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、JSON 输出中出现对任务上游仓库的访问（场景 2 是 `openai/openai-agents-python`，场景 3 是 `AGI-Eval-Official/PRDBench`）。
+- 评分之前做三项核对，任一命中这次运行作废（`void`），不计入结果；这类运行在报告的第六节列出：JSON 输出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、JSON 输出中出现对任务上游仓库的访问（场景 1 是 `mnluzimu/WebGen-Bench`，场景 2 是 `openai/openai-agents-python`，场景 3 是 `AGI-Eval-Official/PRDBench`）。
 - 到达墙钟上限时结束进程，按结束时的目录评分并标记超时，不因为没有跑完而作废。
 
 原始证据（交付副本、输出、评分日志）在 `.yudao/evals/` 下，不进入 Git。
@@ -159,4 +185,4 @@ uv run python evals/baseline/compute.py --data docs/evaluation/baseline-omp-stag
 
 ## 运行环境
 
-两个场景的运行环境都是 uv 管理的 Python 3.13。场景 3 的评分器与隐藏检查在被测交付的目录之外运行，不在交付目录中写入除导出文件与探测脚本以外的内容。场景 2 的评分器在交付副本的副本里运行，用交付自带的虚拟环境（`uv run --project <交付> --no-sync`），不重新建立依赖。
+场景 2、3 的运行环境是 uv 管理的 Python 3.13。场景 1 的运行环境为 Node.js、uv 管理的 Python 3.13 与 Playwright 安装的 Chromium。场景 3 的评分器与隐藏检查在被测交付的目录之外运行，不在交付目录中写入除导出文件与探测脚本以外的内容。场景 2 的评分器在交付副本的副本里运行，用交付自带的虚拟环境（`uv run --project <交付> --no-sync`），不重新建立依赖。场景 1 的评分器在交付副本里启动 Node.js 服务并通过环境变量 PORT 传入端口，由界面智能体经浏览器操作。

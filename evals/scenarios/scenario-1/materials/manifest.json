@@ -1,0 +1,48 @@
+{
+  "scenario": "scenario-1",
+  "material_version": "scenario-1@1",
+  "title": "WebGen-Bench 000080 advanced to-do list web application",
+  "source": {
+    "dataset": "github.com/mnluzimu/WebGen-Bench c89e074; data HF luzimu/WebGen-Bench c061fe8",
+    "record": "000080",
+    "upstream_repository": "mnluzimu/WebGen-Bench",
+    "version": "c89e074",
+    "license": "MIT"
+  },
+  "requirement": {
+    "file": "requirement.md",
+    "agreement": "interface-agreement.md",
+    "table": "requirement-table.json",
+    "origin": "WebGen-Bench 000080 instruction, verbatim",
+    "characters": 441
+  },
+  "starting_point": {
+    "kind": "empty directory",
+    "note": "The runner creates an empty directory outside the repository and copies requirement.md and interface-agreement.md into it."
+  },
+  "runtime": {
+    "node": "v24",
+    "python": "3.13",
+    "browser": "Playwright Chromium",
+    "network": "No network is needed for the run itself.",
+    "test_command": "python scenario1.py --delivery <dir> --checks <dir>"
+  },
+  "reference_solution": {
+    "file": "../reference",
+    "origin": "written for this scenario according to requirements",
+    "files": 3
+  },
+  "hidden_checks": {
+    "cases": "checks/cases.json",
+    "note": "The scorer copies hidden checks into the scoring directory after the run ends."
+  },
+  "digests": {
+    "algorithm": "sha256",
+    "note": "LF 规范化、递归、跳过 __pycache__ 与 *.pyc",
+    "entries": {
+      "checks": "sha256:78684d4af3142787f12d31a2c0e8130b980db2e7f641e389d5280c976b54a1f5",
+      "materials/requirement-table.json": "sha256:4222a760180f6863f9799b752b4a2883d63e6c0c04a85b632daa0c29ed2146b3",
+      "reference": "sha256:2d2c69d4180979cc174fb48e8191428b2c64c5047b55b1ac0c265d0a0f922ee1"
+    }
+  }
+}
