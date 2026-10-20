@@ -15,7 +15,8 @@ from harness.tests.helpers import calls_during as _calls_during
 from harness.tests.protocol_helpers import bound_target, facade_with, invoke, model_call, provider_system, serve
 from harness.tests.provider_replies import HTTP_REPLIES, HTTP_SCRIPT
 
-# 单次模型请求的时限只计算等待模型提供方的时间（D09）：从请求发出开始，到收到最后一段输出为止；
+# 单次模型请求的时限只计算等待模型提供方的时间，按多久没有收到新数据计算（D09）：从请求发出到收到第一段回复、
+# 以及之后相邻两段数据之间，各段等待分别与时限比较，回复持续输出时不按总时长切断。
 # SDK 的一次性初始化、请求发出前的记录与输出片段的记录都不计入。三种协议相同。
 
 PROTOCOLS = ["responses", "chat_completions", "messages"]
@@ -178,9 +179,9 @@ def test_caller_handling_of_each_observation_is_outside_the_limit(protocol):
 
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)
-def test_provider_waits_add_up_across_the_stream(protocol):
+def test_stream_completes_when_total_time_exceeds_limit_but_intervals_do_not(protocol):
     # 收到请求 0.8 秒以后送出回复头，再过 0.8 秒送出回复体：两段等待都短于 1 秒的时限，合计超过时限。
-    # 两段等待期间主机都没有要处理的输出
+    # 回复持续输出且各段间隔小于时限，请求正常完成，不记 provider_timeout
     body = _reply(protocol)
 
     def responder(_body):
@@ -196,9 +197,36 @@ def test_provider_waits_add_up_across_the_stream(protocol):
     try:
         facade = facade_with(base + "/v1", protocol=protocol)
         target = replace(bound_target(facade), timeout_sec=1.0)
+        response = invoke(facade, target, model_call([{"role": "user", "content": "write the spec"}],
+                                                     max_output_tokens=256))
+        assert [item["name"] for item in response.output] == ["submit_product_spec"]
+    finally:
+        _close(server)
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
+def test_delay_between_stream_chunks_beyond_the_limit_is_a_provider_timeout(protocol):
+    # 两段数据之间的等待超过时限时，记 provider_timeout，按 D17 重试
+    body = _reply(protocol)
+    first_chunk, separator, remaining_body = body.partition(b"\n\n")
+
+    def responder(_body):
+        def slow_body():
+            yield first_chunk + separator
+            time.sleep(1.2)
+            yield remaining_body
+
+        return 200, "text/event-stream", slow_body()
+
+    server, capture, base = serve(responder)
+    try:
+        facade = facade_with(base + "/v1", protocol=protocol)
+        target = replace(bound_target(facade), timeout_sec=1.0)
         with pytest.raises(ProviderError) as caught:
             invoke(facade, target, model_call([{"role": "user", "content": "write the spec"}],
                                               max_output_tokens=256))
+        assert caught.value.reason == "provider_timeout"
+        assert caught.value.retryable is True
     finally:
         _close(server)
-    assert caught.value.reason == "provider_timeout"
+    assert len(capture.requests) == 1
