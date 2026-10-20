@@ -6,7 +6,7 @@ import pytest
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
-from harness.proposals import (collaboration_request, delivery_turn, product_spec, response_turn,
+from harness.proposals import (delivery_turn, product_spec,
                                review, review_turn)
 from harness.public_tree import capture_public_tree
 from harness.environment import LocalEnvironment
@@ -329,32 +329,28 @@ def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
     adapter = FakeAdapter([
         product_spec(),
         delivery_turn(),
-        FakeTurn(proposal=collaboration_request(
-            "engineering", "The implementation does not match the requirement.",
-            request_type="action", action="revise_delivery")),
+        review_turn("rework_engineering", "The implementation does not match the requirement.",
+                    defects=[{"severity": "minor", "summary": "needs revision"}]),
         delivery_turn("revised echo", files={"src/echo.py": "import sys\nprint(str(sys.argv[1]))\n"}),
-        response_turn("completed", "The revised delivery is ready.",
-                      result_types=[EventType.DELIVERY_ACCEPTED]),
         stale_release,
     ])
 
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
-    for _ in range(3):
+    for _ in range(2):
         pending = system.activate_once(run_id)
-    assert pending.phase == "QUALITY" and pending.pending_request is not None
+    assert pending.phase == "QUALITY"
     original = pending.delivery_spec.content_hash
     original_digest = pending.delivery_spec.code_tree_digest
+    rework = system.activate_once(run_id)
+    assert rework.phase == "ENGINEERING"
     delivered = system.activate_once(run_id)
-    assert delivered.phase == "QUALITY" and delivered.active_department == "engineering"
+    assert delivered.phase == "QUALITY" and delivered.active_department == "quality"
     assert delivered.delivery_spec.content_hash != original
     assert delivered.delivery_spec.code_tree_digest != original_digest
-    response = system.activate_once(run_id)
-    assert response.phase == "QUALITY" and response.active_department == "quality"
-    assert response.pending_request is None
     result = system.activate_once(run_id)
     assert result.phase == "QUALITY", result.error
-    assert result.last_review is None
+    assert result.last_review.verdict == "rework_engineering"
     errors = result.rejections[-1]["errors"]
     assert [error["field"] for error in errors] == ["basis_delivery_spec_hash"]
     assert f"submitted artifact is based on {original!r}" in errors[0]["message"]
@@ -362,7 +358,8 @@ def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
     # 拒绝的原因不是缺少检查：这一次激活里质检真实跑过 smoke，回执绑的是新交付快照
     assert not any(error["field"] == "checks" for error in errors)
     events = system.store.list_events(run_id)
-    assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in events)
+    assert not any(event.type == EventType.RUN_DONE for event in events)
+    assert not any(event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") == "release" for event in events)
     rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
     assert rejected
     assert result.canonical_state() == system.replay(run_id).canonical_state()

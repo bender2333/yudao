@@ -888,7 +888,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     raise ValueError("model input does not carry the verbatim task followed by current work")
                 if items[pinned_index] != pinned.context.input_items[0]:
                     raise ValueError("pinned developer input differs from current allowed materials")
-                records = assembly.department_history(before, event.department)
+                records = assembly.department_history(before, event.department, session_id=event.session_id)
                 expected = assembly.request(pinned, records)
                 manifest = expected.context.manifest
                 if payload.get("compaction_event_id") != manifest.compaction_event_id:

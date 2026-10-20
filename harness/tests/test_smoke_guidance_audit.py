@@ -9,8 +9,8 @@ from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.tools import usable_when_guidance_only
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import (
-    collaboration_request, delivery_turn, guidance_response,
-    product_spec, product_spec_turn, response_turn, review_turn,
+    answer_turn, ask_turn, delivery_turn, guidance_response,
+    product_spec, product_spec_turn, review_turn,
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -74,10 +74,10 @@ def saved_combined(tmp_path_factory):
                 "rationale": "The user's additional original input asks for a status column.",
             },
         ),
-        collaboration_request("product", "Is the status column part of the acceptance criteria?",
-                              background="Engineering is planning the export.",
-                              expected_result="Confirm the acceptance basis without changing files."),
-        response_turn("answered", "The status column is part of the accepted requirements."),
+        ask_turn("product", "Is the status column part of the acceptance criteria?",
+                 background="Engineering is planning the export.",
+                 expected="Confirm the acceptance basis without changing files."),
+        answer_turn("The status column is part of the accepted requirements."),
         delivery_turn(files={"src/echo.py": "# export-format: csv\nimport sys\nprint(sys.argv[1])\n"}),
         review_turn("release", "Independent quality check passed on the current delivery."),
     ])
@@ -102,8 +102,9 @@ def test_combined_run_shape(combined_run):
     assert projection.input_version == projection.processed_input_version == 2
     assert projection.product_spec.revision == 2
     assert [item.status for item in projection.department_guidance] == ["explained", "explained"]
-    assert [item.status for item in projection.responses] == ["answered"]
     events = system.store.list_events(run_id)
+    ask_answered = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    assert len(ask_answered) == 1 and ask_answered[0].payload["status"] == "answered"
     assert any(event.type == EventType.TOOL_SKIPPED for event in events)
     guidance_only = [request for request in invocations
                      if recorded_context(system, request).manifest.guidance_only]
@@ -119,8 +120,8 @@ def test_model_input_audit_verifies_combined_run(combined_run):
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["model_input_audit"]["status"] == "verified", fields["model_input_audit"]["notes"]
     assert fields["context_isolated"] is True
-    # 产品 / 工程让出 / 两次 guidance_only / 产品处理 v2 / 工程发起协作 / 产品回应 / 工程交付 / 质检
-    assert fields["model_input_audit"]["activation_count"] == 9
+    # 产品 / 工程让出 / 两次 guidance_only / 产品处理 v2 / 工程询问与交付 / 产品分支回应 / 质检
+    assert fields["model_input_audit"]["activation_count"] == 8
 
 def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_path):
     """写操作之后、下一次检查之前仍有待处理指导且检查结果可认领：审计靠记录下来的快照重建，而不是推断。"""

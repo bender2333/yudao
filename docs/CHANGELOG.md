@@ -755,3 +755,5 @@ claude-opus-5-5 / 2026-10-21 01:25 / docs/decision.md 新增 2026-10-21 一条�
 执行者 9router/ag/gemini-3.8-flash-high / 2026-10-20 22:15 / 工单 #553 [循环结构] 询问分支的用量上限、没能回答与重新启动（第 3 轮）：harness/orchestrator.py 删除全仓无写入点的 remaining_time 入参读取，还原 evaluate_proposal 闭括号格式；harness/engine.py 恢复路径对齐 self._consumed_steps 引用；harness/tests/test_ask_branch.py 补充提问方剩余步数生效无法回答用例、补充 run 时间上限耗尽对照声明值用例、补充恢复路径 tool_started 与 ask_started 唯一性断言、补充分支结束重启恢复累计时间包含分支时段且单调不减用例 / 响应第 2 轮审查意见
 
 执行者 9router/ag/gemini-3.8-flash-high / 2026-10-21 02:30 / 工单 #553 [循环结构] 询问分支的用量上限、没能回答与重新启动（第 4 轮）：harness/orchestrator.py 分支激活增加 deadline 并在安全节点统一检查期限与事项运行时间，删除 asyncio.wait_for 硬超时与吞异常逻辑，Answered 直接交回；_recover_run_usage 还原为 main 写法取最后一个 activation_finished 累计值；harness/tests/test_ask_branch.py 调整 run 时间耗尽用例等待时长以消除墙钟余量不足抖动，删除已废弃的提前结束用例 test_ask_branch_zero_remaining_time_does_not_open_branch / 落实架构师第 4 轮处理与 2026-10-21 决策记录
+
+执行者 9router/ag/gemini-3.8-flash-high / 2026-10-21 04:20 / 工单 #633 [循环结构] 借用协作请求的测试改用询问（第二次派发）：docs/architecture-issues.md 追加架构师处理说明 / 落实架构师指令与工单要求

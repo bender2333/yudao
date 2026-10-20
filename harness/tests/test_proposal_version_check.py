@@ -4,8 +4,8 @@ from dataclasses import replace
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
 from harness.models import EventType, json_dumps
-from harness.proposals import (collaboration_request, delivery, delivery_turn, product_spec,
-                                product_spec_turn, response_turn, review, review_turn)
+from harness.proposals import (delivery, delivery_turn, product_spec,
+                                product_spec_turn, review, review_turn)
 from harness.runtime import LoopSystem
 from harness.tests.helpers import from_another_thread
 from harness.validation import evaluate_proposal

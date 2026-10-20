@@ -6,7 +6,7 @@ import pytest
 
 from harness.__main__ import main
 from harness.adapters.base import ProviderError
-from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
@@ -24,8 +24,8 @@ from harness.projects import (
     project_projection,
 )
 from harness.proposals import (
-    collaboration_request, delivery_turn, product_spec,
-    response_turn, review_turn,
+    delivery_turn, product_spec,
+    review_turn,
 )
 from harness.projection import RunNotFoundError, saved_decision, saved_decisions
 from harness.providers.call import ModelResponse
@@ -389,12 +389,12 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
                 "content": [{"type": "output_text", "text": "Product memory: prior evidence was read."}],
             }])
         if request.department != "product":
-            return collaboration_request()
+            return delivery_turn()
         if request.step_id == 1:
             identity = f"read-{request.activation_id}-{request.step_id}"
             return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call",
                                           "name": "read_file", "arguments": json_dumps({"path": "large.txt"})}])
-        return product_spec() if pending_request_id(request) is None else response_turn("answered", "Still applicable.")(request)
+        return product_spec()
 
     adapter = FakeAdapter([respond] * 100)
     system = LoopSystem.for_testing(data_dir, adapter, step_limits=StepLimits(max_model_steps=32))
@@ -618,10 +618,10 @@ def test_work_item_title_defaults_to_first_line_truncated(data_dir):
 
 def test_work_item_derived_fields_follow_the_run(data_dir):
     script = [
-        product_spec(), collaboration_request(question="边界怎么定？"), response_turn(),
-delivery_turn(summary="v1"),
+        product_spec(),
+        delivery_turn(summary="v1"),
         review_turn("rework_engineering", "命名不符", defects=[{"severity": "minor", "summary": "naming"}]),
-delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"}),
+        delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"}),
         review_turn("release", "ok"),
     ]
     system = _system(data_dir, script)
@@ -635,9 +635,7 @@ delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"}),
     system.activate_once(run_id)
     system.activate_once(run_id)
     item = system.projects.projection(project_id).work_item(work_item_id)
-    assert item.status == "in_progress" and item.pending_question == "边界怎么定？"
-    overview_pending = [entry for entry in _overview(system, project_id)["pending"] if entry["work_item_id"] == work_item_id]
-    assert overview_pending[0]["question"] == "边界怎么定？"
+    assert item.status == "in_progress"
     assert system.run_until_stop(run_id).phase == "DONE"
     item = system.projects.projection(project_id).work_item(work_item_id)
     assert item.status == "released_unsettled" and item.department is None and item.phase == "DONE"

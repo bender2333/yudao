@@ -6,7 +6,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, EventType, canonical_hash, estimate_tokens, json_dumps
-from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
+from harness.proposals import answer_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import (FAST_RETRIES, after_event, recorded_context,
@@ -230,12 +230,29 @@ def test_original_intend_is_preserved_verbatim_outside_the_delivery_tree(tmp_pat
 def test_reactivated_department_restores_its_received_work_outputs_and_complete_submit_pairs(tmp_path):
     private = {"id": "product-private", "type": "reasoning", "summary": [], "encrypted_content": "PRODUCT_PRIVATE"}
     skipped = _call("skip-read", "read_file", path="never-read.txt")
-    adapter = FakeAdapter([
-        ModelResponse(output=[private, _submit(), skipped]),
-        FakeTurn(proposal=collaboration_request(), transcript="ENGINEERING_PRIVATE"),
-        response_turn("answered", "The existing requirements define the current behavior."),
-        delivery_turn(), review_turn("release", "valid host evidence"),
-    ])
+    scripts = {
+        "product": [
+            ModelResponse(output=[private, _submit(), skipped]),
+        ],
+        "engineering": [
+            ModelResponse(output=[
+                {"id": "eng-msg", "type": "message", "role": "assistant",
+                 "content": [{"type": "output_text", "text": "ENGINEERING_PRIVATE"}]},
+                _call("ask-1", "ask", recipient="product",
+                      question="Need clarification?",
+                      background="Clarification",
+                      expected="The existing requirements define the current behavior."),
+            ]),
+            delivery_turn(),
+        ],
+        "product:ask": [
+            answer_turn("The existing requirements define the current behavior."),
+        ],
+        "quality": [
+            review_turn("release", "valid host evidence"),
+        ],
+    }
+    adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("Original intent")
     system.activate_once(run_id)
@@ -254,8 +271,8 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     assert "PRODUCT_PRIVATE" not in json_dumps(history)
     assert "ENGINEERING_PRIVATE" not in json_dumps(history)
     assert history[-1]["role"] == "user"
-    assert "[pending_request]" in history[-1]["content"]
-    assert "submit_response" in history[-1]["content"]
+    assert "[pending_ask]" in history[-1]["content"]
+    assert "answer" in history[-1]["content"]
     assert history[-2]["type"] == "function_call_output"
     assert any(item.get("call_id") == "submit" and item["type"] == "function_call_output" for item in history)
     skipped_result = next(item for item in history if item.get("call_id") == "skip-read" and item["type"] == "function_call_output")
@@ -267,10 +284,11 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     engineering = adapter.invocations[3]
     assert "ENGINEERING_PRIVATE" in json_dumps(engineering.input_items)
     assert "PRODUCT_PRIVATE" not in json_dumps(engineering.input_items)
-    assert engineering.input_items[-1]["role"] == "user"
-    assert "[current_product_decisions]" not in engineering.input_items[-1]["content"]
-    assert "The existing requirements define the current behavior." in engineering.input_items[-1]["content"]
-    assert engineering.input_items[-2]["type"] == "function_call_output"
+    assert engineering.input_items[-1]["type"] == "function_call_output"
+    assert engineering.input_items[-1]["call_id"] == "ask-1"
+    assert "The existing requirements define the current behavior." in engineering.input_items[-1]["output"]
+    assert engineering.input_items[-2]["type"] == "function_call"
+    assert engineering.input_items[-2]["name"] == "ask"
     events = reloaded.store.list_events(run_id)
     assert any(event.type == EventType.TOOL_SKIPPED and event.payload["id"] == "skip-read" for event in events)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "skip-read" for event in events)
