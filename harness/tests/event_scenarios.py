@@ -218,6 +218,22 @@ def ask_answer_with_spec_revision(data_dir):
     return system, run_id, {}
 
 
+def ask_branch_exhausted(data_dir):
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn("product", "Should output be uppercase?", background="Clarification needed", expected="Specification update"),
+            _deliver(),
+        ],
+        "product:ask": [
+            ModelResponse(output=[_call("ans-err", "answer", {"answer": ""})]),
+        ],
+        "quality": [_release()],
+    }, step_limits=StepLimits(max_model_steps=4, department_max_model_steps={"product": 1}))
+    system.run_until_stop(run_id)
+    return system, run_id, {}
+
+
 def guidance_response_explained(data_dir):
     system, adapter, run_id = _system(data_dir, [product_spec()])
     system.activate_once(run_id)
@@ -646,6 +662,9 @@ SCENARIOS: dict[str, Scenario] = {
     "ask_answer_with_spec_revision": Scenario(
         "工程询问产品，产品在分支里修订 PRD 并回答，工程收到回答与 PRD 新版本，接着交付，质检放行。",
         ask_answer_with_spec_revision),
+    "ask_branch_exhausted": Scenario(
+        "分支达到上限时以没能回答结束（unable），提问方收到原因后接着工作，事项运行到放行。",
+        ask_branch_exhausted),
     "guidance_response_explained": Scenario(
         "产品规格接纳后用户给工程部门写指导：指导在请求之前写入并标记已进入输入，工程部门回应指导（explained），之后交付并放行。",
         guidance_response_explained),

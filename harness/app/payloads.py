@@ -756,7 +756,11 @@ class AskStartedPayload(Payload):
 
 
 class AskAnsweredPayload(Payload):
-    answer: str
+    requester: Department
+    recipient: Department
+    status: Literal["answered", "unable"]
+    answer: str = ""
+    reason: str = ""
     with_spec_revision: bool = False
     revision: int | None = None
 
