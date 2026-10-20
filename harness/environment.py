@@ -300,6 +300,7 @@ class BackgroundJobTable:
                 job.stop()
 
     def get_status(self, job_id: str) -> str | None:
+        # 只读状态查询：不读取输出、不移动 read_output 读取位置
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
