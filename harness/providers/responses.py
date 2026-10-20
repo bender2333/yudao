@@ -121,26 +121,25 @@ class _TransportTrace:
 
 
 class _ProviderClock:
-    # 单次请求的时限只计算等待模型提供方的时间（D09）：请求发出时开始走时，收到回复头时暂停，之后只在读取回复体的
-    # 每一段时走时；SDK 解析流事件、主机处理与交回观察（调用方记录）都不计入。收到终态以后停止；
-    # 各段等待累计到时限时请求超时。两个方法作为 httpx 的请求钩子与回复钩子挂在调用使用的客户端上
+    # 单次请求的时限只计算等待模型提供方的时间，按多久没有收到新数据计算（D09）：请求发出时开始走时，
+    # 收到回复头时暂停；之后读取回复体的每一段期间走时，收到一段暂停一段。SDK 解析流事件、
+    # 主机处理与交回观察（调用方记录）都不计入。每段等待单独与时限比较，超过就超时；
+    # 回复持续输出时不按总时长切断。收到终态以后停止。两个方法作为 httpx 的请求钩子与回复钩子挂在调用使用的客户端上
     def __init__(self, timeout: asyncio.Timeout, limit_sec: float) -> None:
         self._timeout = timeout
-        self._remaining = float(limit_sec)
+        self._limit_sec = float(limit_sec)
         self._stopped = False
 
     def resume(self) -> None:
         timeout = self._timeout
         if self._stopped or timeout.expired() or timeout.when() is not None:
             return
-        timeout.reschedule(asyncio.get_running_loop().time() + self._remaining)
+        timeout.reschedule(asyncio.get_running_loop().time() + self._limit_sec)
 
     def pause(self) -> None:
         timeout = self._timeout
-        when = timeout.when()
-        if timeout.expired() or when is None:
+        if timeout.expired() or timeout.when() is None:
             return
-        self._remaining = max(0.0, when - asyncio.get_running_loop().time())
         timeout.reschedule(None)
 
     def stop(self) -> None:
