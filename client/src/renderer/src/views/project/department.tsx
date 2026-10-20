@@ -6,6 +6,7 @@
 import { useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
+  BackgroundCommandView,
   DepartmentWorkspaceResult,
   EventDetailResult,
   ProjectOverviewResult,
@@ -294,9 +295,11 @@ function Actions(props: { app: ClientApp; runId: string | null }) {
     return <p className="y10-note note">正在读取动作列表</p>;
   }
   const rows = actions.data?.actions ?? [];
+  const backgroundCommands = actions.data?.background_commands ?? [];
 
   return (
     <>
+      <RunningBackgroundCommands commands={backgroundCommands} />
       {rows.length === 0 ? <Empty text="这次运行没有记录动作" /> : (
         <Table
           head={["工具", "部门", "状态", "登记名", "结果", "输出引用", "时间"]}
@@ -326,6 +329,26 @@ function Actions(props: { app: ClientApp; runId: string | null }) {
         />
       )}
       {openEvent ? <EventDetail eventId={openEvent} onClose={() => setOpenEvent(null)} snapshot={detail} /> : null}
+    </>
+  );
+}
+
+export function RunningBackgroundCommands(props: { commands: BackgroundCommandView[] }) {
+  const running = props.commands.filter((cmd) => cmd.status === "running");
+  if (running.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      <h3 className="y10-h3 sub">正在运行的后台命令（{running.length} 条）</h3>
+      <Table
+        head={["命令原文", "开始时间", "状态"]}
+        rows={running.map((cmd) => [
+          cmd.command,
+          formatTime(cmd.started_at),
+          "运行中",
+        ])}
+      />
     </>
   );
 }

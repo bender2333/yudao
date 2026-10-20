@@ -472,6 +472,24 @@ export type AwayReport = {
 };
 
 /**
+ * BackgroundCommandView
+ */
+export type BackgroundCommandView = {
+    /**
+     * Command
+     */
+    command: string;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Status
+     */
+    status: 'running' | 'ended';
+};
+
+/**
  * BaselineCheck
  */
 export type BaselineCheck = {
@@ -3826,6 +3844,10 @@ export type RunActionsResult = {
      * Actions
      */
     actions: Array<ActionView>;
+    /**
+     * Background Commands
+     */
+    background_commands: Array<BackgroundCommandView>;
 };
 
 /**

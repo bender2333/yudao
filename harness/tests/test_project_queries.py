@@ -1,14 +1,16 @@
 import base64
 import json
 import sqlite3
+import sys
 import time
 from dataclasses import asdict, replace
 from pathlib import Path
-
+from typing import Any
 import pytest
 from filelock import FileLock
 
 from harness.__main__ import main
+from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
@@ -42,6 +44,7 @@ from harness.proposals import (
     collaboration_request, response_turn,
 )
 from harness.providers.selection import ModelSelection
+from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tests.saved_rewrite import rewrite_saved_event
@@ -711,3 +714,200 @@ def _files(data_dir: Path) -> dict[str, bytes]:
         for path in data_dir.rglob("*")
         if path.is_file() and not path.name.endswith(("-wal", "-shm"))
     }
+
+
+def test_run_actions_background_commands_running_and_ended(data_dir: Path):
+    interpreter = sys.executable.replace("\\", "/")
+    server_cmd = f'"{interpreter}" -c "import time; time.sleep(60)"'
+    captured: dict[str, Any] = {}
+
+    def _extract_job_id(call: ModelCall) -> str:
+        for item in reversed(call.input_items):
+            if item.get("type") == "function_call_output":
+                try:
+                    data = json.loads(item["output"])
+                    if isinstance(data, dict) and data.get("ok"):
+                        out = data.get("output")
+                        if isinstance(out, dict) and "job_id" in out:
+                            return out["job_id"]
+                except Exception:
+                    pass
+        raise ValueError(f"job_id not found in input_items: {call.input_items}")
+
+    def eng_step1(call: ModelCall) -> ModelResponse:
+        identity = f"call-bg-start-{call.activation_id}"
+        return ModelResponse(output=[{
+            "id": identity, "call_id": identity, "type": "function_call",
+            "name": "bash", "arguments": json.dumps({"command": server_cmd, "background": True}),
+        }])
+
+    def eng_step2(call: ModelCall) -> ModelResponse:
+        job_id = _extract_job_id(call)
+        captured["job_id"] = job_id
+        app = Application(system)
+        res = app.query("run.actions", RunActions(run_id=call.run_id))
+        captured["running_actions"] = res.data
+
+        identity = f"call-stop-job-{call.activation_id}"
+        return ModelResponse(output=[{
+            "id": identity, "call_id": identity, "type": "function_call",
+            "name": "stop_job", "arguments": json.dumps({"job_id": job_id}),
+        }])
+
+    def eng_step3(call: ModelCall) -> ModelResponse:
+        app = Application(system)
+        res = app.query("run.actions", RunActions(run_id=call.run_id))
+        captured["stopped_actions"] = res.data
+        return ModelResponse(output=[])
+
+    script = [
+        product_spec(),
+        eng_step1,
+        eng_step2,
+        eng_step3,
+        delivery_turn(),
+        review_turn("release", "ok"),
+    ]
+
+    system = _system(data_dir, script)
+    run_id = system.create_run("bg action test")
+    system.run_until_stop(run_id)
+
+    running_data = captured["running_actions"]
+    assert hasattr(running_data, "background_commands")
+    assert len(running_data.background_commands) == 1
+    bg_cmd = running_data.background_commands[0]
+    assert bg_cmd.command == server_cmd
+    assert bg_cmd.started_at
+    assert bg_cmd.status == "running"
+
+    stopped_data = captured["stopped_actions"]
+    assert len(stopped_data.background_commands) == 1
+    assert stopped_data.background_commands[0].command == server_cmd
+    assert stopped_data.background_commands[0].status == "ended"
+
+    system.close()
+
+
+def test_run_actions_background_commands_cancelled_and_restarted(tmp_path: Path):
+    interpreter = sys.executable.replace("\\", "/")
+    server_cmd = f'"{interpreter}" -c "import time; time.sleep(60)"'
+
+    # A. 取消事项后状态为已结束
+    data_cancel = tmp_path / "cancel"
+    def eng_cancel_step1(call: ModelCall) -> ModelResponse:
+        identity = f"call-bg-start-{call.activation_id}"
+        return ModelResponse(output=[{
+            "id": identity, "call_id": identity, "type": "function_call",
+            "name": "bash", "arguments": json.dumps({"command": server_cmd, "background": True}),
+        }])
+
+    def eng_cancel_step2(call: ModelCall) -> ModelResponse:
+        sys_cancel.cancel(call.run_id)
+        return ModelResponse(output=[])
+
+    sys_cancel = _system(data_cancel, [product_spec(), eng_cancel_step1, eng_cancel_step2])
+    run_cancel = sys_cancel.create_run("cancel test")
+    sys_cancel.run_until_stop(run_cancel)
+    app_cancel = Application(sys_cancel)
+    res_cancel = app_cancel.query("run.actions", RunActions(run_id=run_cancel))
+    assert res_cancel.data.background_commands[0].status == "ended"
+    sys_cancel.close()
+
+    # B. 重建 LoopSystem（服务重启）后状态为已结束
+    data_restart = tmp_path / "restart"
+    captured: dict[str, Any] = {}
+    def eng_restart_step1(call: ModelCall) -> ModelResponse:
+        identity = f"call-bg-start-{call.activation_id}"
+        return ModelResponse(output=[{
+            "id": identity, "call_id": identity, "type": "function_call",
+            "name": "bash", "arguments": json.dumps({"command": server_cmd, "background": True}),
+        }])
+
+    def eng_restart_step2(call: ModelCall) -> ModelResponse:
+        app1 = Application(sys_restart1)
+        captured["running"] = app1.query("run.actions", RunActions(run_id=call.run_id)).data.background_commands[0].status
+        raise ProviderError("service stopped for restart", reason="provider_error")
+
+    sys_restart1 = _system(data_restart, [product_spec(), eng_restart_step1, eng_restart_step2])
+    run_restart = sys_restart1.create_run("restart test")
+    sys_restart1.run_until_stop(run_restart)
+    assert captured["running"] == "running"
+    sys_restart1.close()
+    sys_restart2 = LoopSystem.for_testing(data_restart, FakeAdapter([]), resume_on_startup=False)
+    app2 = Application(sys_restart2)
+    res_restart = app2.query("run.actions", RunActions(run_id=run_restart))
+    assert res_restart.data.background_commands[0].status == "ended"
+    sys_restart2.close()
+
+
+def test_background_job_status_query_does_not_affect_read_output(data_dir: Path):
+    interpreter = sys.executable.replace("\\", "/")
+    code = "import time; print('LINE_ONE', flush=True); time.sleep(0.1); print('LINE_TWO', flush=True); time.sleep(60)"
+    server_cmd = f'"{interpreter}" -c "{code}"'
+    captured: dict[str, Any] = {}
+
+    def _extract_job_id(call: ModelCall) -> str:
+        for item in reversed(call.input_items):
+            if item.get("type") == "function_call_output":
+                try:
+                    data = json.loads(item["output"])
+                    if isinstance(data, dict) and data.get("ok"):
+                        out = data.get("output")
+                        if isinstance(out, dict) and "job_id" in out:
+                            return out["job_id"]
+                except Exception:
+                    pass
+        raise ValueError(f"job_id not found in input_items: {call.input_items}")
+
+    def eng_step1(call: ModelCall) -> ModelResponse:
+        identity = f"call-bg-start-{call.activation_id}"
+        return ModelResponse(output=[{
+            "id": identity, "call_id": identity, "type": "function_call",
+            "name": "bash", "arguments": json.dumps({"command": server_cmd, "background": True}),
+        }])
+
+    def eng_step2(call: ModelCall) -> ModelResponse:
+        job_id = _extract_job_id(call)
+        captured["job_id"] = job_id
+        time.sleep(0.3)
+        app = Application(system)
+        actions = app.query("run.actions", RunActions(run_id=call.run_id))
+        assert actions.data.background_commands[0].status == "running"
+        identity = f"call-read-output-{call.activation_id}"
+        return ModelResponse(output=[{
+            "id": identity, "call_id": identity, "type": "function_call",
+            "name": "read_output", "arguments": json.dumps({"job_id": job_id}),
+        }])
+
+    def eng_step3(call: ModelCall) -> ModelResponse:
+        for item in reversed(call.input_items):
+            if item.get("type") == "function_call_output":
+                data = json.loads(item["output"])
+                if isinstance(data, dict) and data.get("ok"):
+                    captured["read_output"] = data["output"]["output"]
+                    break
+
+        job_id = captured["job_id"]
+        identity = f"call-stop-job-{call.activation_id}"
+        return ModelResponse(output=[{
+            "id": identity, "call_id": identity, "type": "function_call",
+            "name": "stop_job", "arguments": json.dumps({"job_id": job_id}),
+        }])
+
+    script = [
+        product_spec(),
+        eng_step1,
+        eng_step2,
+        eng_step3,
+        delivery_turn(),
+        review_turn("release", "ok"),
+    ]
+
+    system = _system(data_dir, script)
+    run_id = system.create_run("read_output query test")
+    system.run_until_stop(run_id)
+
+    assert "LINE_ONE" in captured["read_output"]
+    assert "LINE_TWO" in captured["read_output"]
+    system.close()
