@@ -13,3 +13,5 @@
 ---
 
 已处理的条目归档在 [docs/archive/architecture-issues-2026-09-10.md](archive/architecture-issues-2026-09-10.md)（2026-09-26 至 2026-10-11）与 [docs/archive/architecture-issues-2026-10-19.md](archive/architecture-issues-2026-10-19.md)（2026-10-01 至 2026-10-17）。
+
+9router/ag/gemini-3.8-flash-high / 2026-10-20 14:00 / 工单 #552 / 删除协作请求工具与投影涉及未列出的 roles.json、work_items.json、adjudication.py、__main__.py，且手写文件数（31个）远超单张工单 15 个上限 / 无法在单次执行者会话中合规完成，建议拆分为后端清理、查询合同与客户端评测等子工单
