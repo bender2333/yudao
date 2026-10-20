@@ -3,7 +3,7 @@ from dataclasses import asdict
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, json_dumps
-from harness.proposals import collaboration_request, delivery_turn, product_spec
+from harness.proposals import delivery_turn, product_spec
 from harness.public_tree import capture_public_tree, materialize_tree
 from harness.runtime import LoopSystem
 from harness.tree_archive import load_tree
@@ -14,7 +14,7 @@ def _call(identity, name, **arguments):
 
 def _engineering(tmp_path, actions):
     script = [product_spec()]
-    script.extend([ModelResponse(output=actions), collaboration_request()])
+    script.extend([ModelResponse(output=actions), delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, FakeAdapter(script))
     run_id = system.create_run("Refactor the echo implementation")
     system.activate_once(run_id)
@@ -75,7 +75,7 @@ def test_delete_and_move_share_the_current_contract_and_record_their_actual_acti
     system, run_id, workspace = _engineering(tmp_path, actions)
     before = system.project(run_id)
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING" and result.pending_request, result.error
+    assert result.phase == "QUALITY", result.error
     assert not (workspace.root / "src" / "old.py").exists()
     assert not (workspace.root / "src" / "keep.py").exists()
     assert workspace.read_file("src/new.py") == "preserved source"
@@ -122,7 +122,7 @@ def test_leading_space_paths_stay_literal_paths(tmp_path):
     workspace.write_file(" src/old.py", "spaced old source")
     workspace.write_file(" src/keep.py", "spaced preserved source")
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING" and result.pending_request, result.error
+    assert result.phase == "QUALITY", result.error
     assert workspace.read_file("src/old.py") == "old source"
     assert workspace.read_file("src/keep.py") == "preserved source"
     assert not (workspace.root / " src" / "old.py").exists()
