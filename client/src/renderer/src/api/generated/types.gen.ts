@@ -5531,9 +5531,25 @@ export type AskAnsweredEvent = {
  */
 export type AskAnsweredPayload = {
     /**
+     * Requester
+     */
+    requester: 'product' | 'engineering' | 'quality';
+    /**
+     * Recipient
+     */
+    recipient: 'product' | 'engineering' | 'quality';
+    /**
+     * Status
+     */
+    status: 'answered' | 'unable';
+    /**
      * Answer
      */
-    answer: string;
+    answer?: string;
+    /**
+     * Reason
+     */
+    reason?: string;
     /**
      * With Spec Revision
      */

@@ -13177,8 +13177,40 @@
       "AskAnsweredPayload": {
         "additionalProperties": false,
         "properties": {
+          "requester": {
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Requester",
+            "type": "string"
+          },
+          "recipient": {
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Recipient",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "answered",
+              "unable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
           "answer": {
+            "default": "",
             "title": "Answer",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
             "type": "string"
           },
           "with_spec_revision": {
@@ -13199,7 +13231,9 @@
           }
         },
         "required": [
-          "answer"
+          "requester",
+          "recipient",
+          "status"
         ],
         "title": "AskAnsweredPayload",
         "type": "object"

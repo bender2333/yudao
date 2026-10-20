@@ -155,7 +155,7 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
                                 "result_event_ids", "return_phase", "return_work_valid", "status"),
     "collaboration_closed": ("request_id", "return_phase", "return_work_valid", "status"),
     "ask_started": ("branch_session_id", "question", "recipient", "requester"),
-    "ask_answered": ("answer", "revision", "with_spec_revision"),
+    "ask_answered": ("answer", "reason", "recipient", "requester", "revision", "status", "with_spec_revision"),
     "product_decision_accepted": ("content_hash", "id", "kind", "product_spec_hash", "request_id"),
     "delivery_accepted": ("check_names", "code_tree_digest", "content_hash", "effective_contract_hash", "id",
                           "issuer", "kind", "parent_hash", "product_spec_hash", "request_id", "revision", "status"),

@@ -139,6 +139,54 @@ def _append_partial_response(system, run_id, *, executed, remaining):
                          "input_item": {"type": "function_call_output", "call_id": identity,
                                         "output": json.dumps({"ok": True})}}))
 
+def test_a_partial_model_response_executes_remaining_host_tool(data_dir):
+    # 恢复路径覆盖主机工具：未处置的主机调用（如 submit_delivery）在恢复时正常执行并记录 tool_called
+    system, run_id = _engineering_run(data_dir, [product_spec()])
+    product_spec_hash = system.project(run_id).product_spec.content_hash
+    from harness.models import json_dumps
+
+    item_write = {
+        "id": "hw1", "call_id": "hw1", "type": "function_call", "name": "write_file",
+        "arguments": json_dumps({"path": "src/echo.py", "content": "print('ok')"})
+    }
+    item_submit = {
+        "id": "hs1", "call_id": "hs1", "type": "function_call", "name": "submit_delivery",
+        "arguments": json_dumps({
+            "summary": "deliver echo", "files": ["src/echo.py"], "check_names": [],
+            "basis_product_spec_hash": product_spec_hash,
+        })
+    }
+    for index, item in enumerate((item_write, item_submit)):
+        ref = system.artifacts.put(run_id, "model_message", json.dumps(item, ensure_ascii=False),
+                                   media_type="application/json")
+        system.writes.append(run_stream(run_id), NewEvent(
+            EventType.MODEL_MESSAGE, actor="department:planning", department="engineering",
+            state_before="ENGINEERING", state_after="ENGINEERING",
+            payload={"message_ref": asdict(ref), "message_index": index + 1,
+                     "activation_id": "act_partial_host", "step_id": 1, "purpose": "work"}))
+    for event_type in (EventType.TOOL_STARTED, EventType.TOOL_CALLED):
+        system.writes.append(run_stream(run_id), NewEvent(
+            event_type, actor="department:planning", department="engineering",
+            state_before="ENGINEERING", state_after="ENGINEERING",
+            payload={"id": "hw1", "name": "write_file",
+                     "args": {"path": "src/echo.py", "content": "print('ok')"},
+                     "step_id": 1, "activation_id": "act_partial_host", "attempt": 1, "purpose": "work",
+                     "ok": True,
+                     "input_item": {"type": "function_call_output", "call_id": "hw1",
+                                    "output": json.dumps({"ok": True})}}))
+    system.close()
+
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    tool_called_events = [
+        event for event in restarted.store.list_events(run_id)
+        if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("id") == "hs1"
+    ]
+    assert len(tool_called_events) == 1
+    assert tool_called_events[0].payload["name"] == "submit_delivery"
+    assert tool_called_events[0].payload["ok"] is True
+    restarted.close()
+
+
 def test_an_adoption_settlement_is_idempotent_across_recovery(data_dir):
     # 窄场景三：交付与质检已接纳、项目采纳前进程退出；恢复补一次合法采纳，重复恢复不再补第二次
     from harness.proposals import delivery_turn, review_turn
