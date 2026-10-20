@@ -95,6 +95,7 @@ class _Activation:
     version: int
     driver: StepDriver | None = None
     wakeup: tuple[asyncio.AbstractEventLoop, asyncio.Event] | None = None
+    deadline: float | None = None
 
     @property
     def run_id(self) -> str:
@@ -663,6 +664,7 @@ class Orchestrator:
         def judge(transaction: Transaction) -> Judgment:
             projection = transaction.projection
             if not (activation.abort_flag.is_set()
+                    or (activation.deadline is not None and time.monotonic() >= activation.deadline)
                     or time_used_up(projection, self._elapsed_sec(activation.run_id))):
                 projection = self._assign_new_inputs(transaction)
             stop = self._stop_requested(activation, projection, transaction.decisions.values())
@@ -676,6 +678,7 @@ class Orchestrator:
         # 只读取，不写入
         basis = activation.scope.basis
         return (activation.abort_flag.is_set()
+                or (activation.deadline is not None and time.monotonic() >= activation.deadline)
                 or time_used_up(projection, self._elapsed_sec(activation.run_id))
                 or projection.phase in TERMINAL_PHASES or blocks_run(decisions)
                 or projection.input_version != basis.input_version
@@ -714,7 +717,7 @@ class Orchestrator:
         elapsed_ms = 0
         for event in events:
             if event.type == EventType.ACTIVATION_FINISHED:
-                elapsed_ms = max(elapsed_ms, int((event.payload or {}).get("elapsed_ms", 0) or 0))
+                elapsed_ms = int((event.payload or {}).get("elapsed_ms", 0) or 0)
         self._run_elapsed_ms[run_id] = elapsed_ms
 
     def _time_left(self, run_id: str, projection: RunProjection) -> float:
@@ -1493,13 +1496,6 @@ class Orchestrator:
         )
         branch_max_steps = min(declared_steps, remaining_steps)
 
-        projection = self.project(scope.run_id)
-        remaining_time = max(0.0, self._time_left(scope.run_id, projection))
-        declared_time = self.step_limits.department_max_time_sec.get(
-            recipient, float(projection.run_time_limit_sec)
-        )
-        branch_max_time = min(declared_time, remaining_time)
-
         if branch_max_steps <= 0:
             reason = "department reached the model step limit without submitting a proposal"
             def record_ask_unable(transaction: Transaction) -> None:
@@ -1524,47 +1520,22 @@ class Orchestrator:
             self.writes.transact(run_stream(scope.run_id), record_ask_unable)
             return False, None, reason, None, 0
 
-        if branch_max_time <= 0:
-            reason = "department reached the time limit without submitting an answer"
-            def record_ask_unable(transaction: Transaction) -> None:
-                transaction.append(NewEvent(
-                    EventType.ASK_ANSWERED,
-                    actor=f"department:{recipient}",
-                    department=recipient,
-                    parent_event_id=scope.parent_event_id,
-                    session_id=branch_session_id,
-                    state_before=transaction.projection.phase,
-                    state_after=transaction.projection.phase,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "status": "unable",
-                        "answer": "",
-                        "reason": reason,
-                        "with_spec_revision": False,
-                        "revision": None,
-                    },
-                ))
-            self.writes.transact(run_stream(scope.run_id), record_ask_unable)
-            return False, None, reason, None, 0
+        projection = self.project(scope.run_id)
+        declared_time = self.step_limits.department_max_time_sec.get(
+            recipient, float(projection.run_time_limit_sec)
+        )
+        deadline = time.monotonic() + declared_time
 
-        started_ask = time.monotonic()
         result = await self._run_ask_branch(
             activation, scope.run_id, recipient, branch_session_id, question,
             parent_event_id=scope.parent_event_id,
             max_model_steps=branch_max_steps,
-            max_time_sec=branch_max_time,
+            deadline=deadline,
         )
         events_after = self.writes.read(run_stream(scope.run_id)).events()
         branch_steps = len([e for e in events_after if e.type == EventType.MODEL_REQUESTED and e.session_id == branch_session_id])
 
-        time_exhausted = (
-            (isinstance(result, Stopped) and result.reason == "time_limit")
-            or (branch_max_time is not None and time.monotonic() - started_ask >= branch_max_time)
-            or time_used_up(self.project(scope.run_id), self._elapsed_sec(scope.run_id))
-        )
-
-        if isinstance(result, Answered) and not time_exhausted:
+        if isinstance(result, Answered):
             ans_args = result.args
             ans_text = ans_args.get("answer") or ans_args.get("text") or ""
             with_spec_revision = False
@@ -1633,6 +1604,10 @@ class Orchestrator:
             self.writes.transact(run_stream(scope.run_id), record_ask_answered)
             return True, ans_text, None, new_contract_hash, branch_steps
         else:
+            time_exhausted = (
+                time.monotonic() >= deadline
+                or time_used_up(self.project(scope.run_id), self._elapsed_sec(scope.run_id))
+            )
             if time_exhausted:
                 reason = "department reached the time limit without submitting an answer"
             elif isinstance(result, Stopped) and result.message:
@@ -1672,7 +1647,7 @@ class Orchestrator:
         question: str,
         parent_event_id: str,
         max_model_steps: int | None = None,
-        max_time_sec: float | None = None,
+        deadline: float | None = None,
     ) -> StepResult:
         projection = self.project(run_id)
         prompt = self._department_prompt(projection, department)
@@ -1721,7 +1696,10 @@ class Orchestrator:
             effective_contract_hash=basis.effective_contract_hash,
         )
 
-        branch_activation = _Activation(branch_scope, prompt, Event(), activation.adapter, None, projection.stream_version)
+        branch_activation = _Activation(
+            branch_scope, prompt, Event(), activation.adapter, None, projection.stream_version,
+            deadline=deadline,
+        )
         driver = StepDriver.start(
             branch_scope, prompt, writes=self.writes, artifacts=self.artifacts,
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
@@ -1736,28 +1714,7 @@ class Orchestrator:
         )
         started = time.monotonic()
         try:
-            if max_time_sec is not None:
-                try:
-                    result = await asyncio.wait_for(driver.result(), timeout=max_time_sec)
-                except asyncio.TimeoutError:
-                    driver.cancel()
-                    try:
-                        await driver.result()
-                    except (asyncio.CancelledError, Exception):
-                        pass
-                    result = Stopped(
-                        self.project(run_id).stream_version,
-                        reason="time_limit",
-                        message="department reached the time limit without submitting an answer",
-                    )
-            else:
-                result = await driver.result()
-            if max_time_sec is not None and (time.monotonic() - started >= max_time_sec):
-                result = Stopped(
-                    self.project(run_id).stream_version,
-                    reason="time_limit",
-                    message="department reached the time limit without submitting an answer",
-                )
+            result = await driver.result()
         finally:
             def finish_branch(transaction: Transaction) -> None:
                 happened = transaction.events()
