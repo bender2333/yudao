@@ -21,6 +21,8 @@ flowchart TD
 - `scenarios/scenario-2/validate.py`：核对材料本身——套上参考实现应当 8 条 F2P 全通过且 P2P 失败 0 条，原样的仓库 8 条全不通过且 P2P 失败 0 条。
 - `scenarios/scenario-1/materials/`：需求原文（`requirement.md`，WebGen-Bench 000080 原文）、接口约定（`interface-agreement.md`）、需求条目表（`requirement-table.json`）、材料来源与运行环境（`manifest.json`）。
 - `scenarios/scenario-1/checks/cases.json`：8 条用例（新建、编辑、删除、标记完成、按完成状态筛选、搜索、页面导航、配色）。
+- `scenarios/scenario-1/checks/richness.json`：10 项丰富程度清单（来源于 ArtifactsBench `88c968b` 1278 号题）。
+- `scorer/judge.py`：多模态裁判（`ag/gemini-3.8-flash-high`），按 10 项清单为交付的代码与用例关键状态截图打分。
 - `scenarios/scenario-1/reference/`：参考实现（Node.js 待办应用）。
 - `scorer/ui_agent.py`：界面智能体，使用 Playwright 操作 Chromium 在浏览器中按可见内容执行用例并截图。
 - `scorer/scenario1.py`：场景 1 评分器，启动交付服务、由界面智能体执行用例并记分。
@@ -39,7 +41,7 @@ flowchart TD
 
 ## 材料版本
 
-场景 3 的材料版本是 `scenario-3@2`，场景 2 的是 `scenario-2@1`，场景 1 的是 `scenario-1@1`。修改需求原文、需求条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
+场景 3 的材料版本是 `scenario-3@2`，场景 2 的是 `scenario-2@1`，场景 1 的是 `scenario-1@2`。修改需求原文、需求条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
 
 评分之前运行器还要核对材料摘要：隐藏检查、条目表与参考实现的摘要登记在各自的 `materials/manifest.json` 的 `digests` 块里，算出来的摘要与登记值不同时这次运行无效，报告写明「材料摘要与材料版本记录不同」。摘要按 LF 规范化的字节流递归计算，跳过 `__pycache__` 与 `*.pyc`，因此在 Windows 与 Linux 签出上一致，测试或评分写下的字节码也不会让摘要失效。改动材料以后用下面这条命令重新生成摘要，随改动一起提交：
 
@@ -60,8 +62,7 @@ uv run python -c "import sys; sys.path.insert(0, 'evals/runner'); import materia
 
 场景 2 有 6 个需求条目与 8 条 F2P 的对应，见 `scenarios/scenario-2/materials/requirement-table.json`。8 条 F2P 计入完成度与正确性；331 条 P2P 是原有功能测试，失败条数单独报告，不影响完成度（[评测场景设计](../docs/design/evaluation-scenarios.md)第 4.2 节）。隐藏测试文件以文件形态放在 `checks/tests/` 下，评分时盖掉交付里的同名文件，被测方改测试不改变评分。
 
-场景 1 有 8 个需求条目与 8 条用例，见 `scenarios/scenario-1/materials/requirement-table.json` 与 `checks/cases.json`。由界面智能体在浏览器中按可见内容执行，每条最多 15 步，给出通过（1）、部分通过（0.5）、不通过（0）；找不到对应元素或入口时记为「没有做」（0）。
-
+场景 1 有 8 个需求条目与 8 条用例，见 `scenarios/scenario-1/materials/requirement-table.json` 与 `checks/cases.json`。由界面智能体在浏览器中按可见内容执行，每条最多 15 步，给出通过（1）、部分通过（0.5）、不通过（0）；找不到对应元素或入口时记为「没有做」（0）。此外，多模态裁判（`ag/gemini-3.8-flash-high`）按 ArtifactsBench 1278 号题的 10 项丰富程度清单（`checks/richness.json`）结合代码与各用例关键截图打 0 至 10 分（满分 100）。
 ## 运行评分器
 
 ```bash
@@ -113,9 +114,19 @@ uv run python evals/runner/run_eval.py \
     --result docs/evaluation/scenario-3-opencode.json \
     --report docs/evaluation/scenario-3-opencode.md
 ```
+场景 1 的运行命令（单次运行写到 `.tmp/` 或正式运行写到 `docs/evaluation/`）：
 
-场景 2 用 `--scenario scenario2`，场景 1 用 `--scenario scenario1`，结果写到对应的 `scenario-X-opencode.json` 与 `scenario-X-opencode.md`。场景 2 运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
-Yudao 一侧用同一个模型、同一个环境变量：
+```bash
+uv run python evals/runner/run_eval.py \
+    --scenario scenario1 \
+    --model yudao-eval/<模型名> \
+    --runs 3 \
+    --runs-root <Yudao 仓库之外的目录> \
+    --result docs/evaluation/scenario-1-opencode.json \
+    --report docs/evaluation/scenario-1-opencode.md
+```
+
+场景 2 用 `--scenario scenario2`，结果写到对应的 `scenario-2-opencode.json` 与 `scenario-2-opencode.md`。场景 2 运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
 
 ```bash
 uv run python evals/runner/run_yudao_eval.py \

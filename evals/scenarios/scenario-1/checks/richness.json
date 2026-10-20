@@ -1,0 +1,70 @@
+{
+  "source": {
+    "repository": "github.com/Tencent-Hunyuan/ArtifactsBenchmark",
+    "commit": "88c968b",
+    "task_index": 1278,
+    "task_title": "to-do list mini program"
+  },
+  "checklist": [
+    {
+      "id": 0,
+      "title": "Is the basic CRUD functionality of the to-do list properly implemented?",
+      "description": "Check whether the code accurately implements the four basic operations (Create, Read, Update, Delete) for to-do items. The creation function should support adding new tasks with at least title and status properties. The read function should display all tasks clearly. The update function should allow modification of task properties (status, title, etc.). The delete function should remove tasks completely. Score 0 if core CRUD functionality is missing, 5 if only partial functionality works, 10 if all operations are fully implemented.",
+      "maxScore": 10
+    },
+    {
+      "id": 1,
+      "title": "Is the task prioritization and categorization system included?",
+      "description": "Evaluate whether the to-do list allows users to prioritize tasks (e.g., high, medium, low) and categorize them (e.g., work, personal, shopping). Check if the tasks can be sorted or filtered based on these attributes. Deduct 5 points if prioritization is missing, 3 points if categorization is missing, and 5 points if sorting/filtering functionality is absent. The full score is 10 points.",
+      "maxScore": 10
+    },
+    {
+      "id": 2,
+      "title": "Are persistent storage and data synchronization implemented?",
+      "description": "Check whether the application implements data persistence using localStorage, IndexedDB, or a backend database. Verify if the data survives page refreshes and browser restarts. For multi-device synchronization, check if a mechanism is implemented to handle data conflicts. Deduct 5 points if no persistence is implemented, 3 points if only temporary storage is used, and 5 points if no synchronization mechanism exists. The full score is 10 points.",
+      "maxScore": 10
+    },
+    {
+      "id": 3,
+      "title": "Is there a task scheduling and notification system?",
+      "description": "Evaluate whether the to-do list includes date/time scheduling for tasks with due dates and reminder functionality. Check if the application can send notifications for upcoming tasks. Verify if recurring tasks can be set up (daily, weekly, monthly). Deduct 3 points if scheduling is missing, 3 points if notification capability is absent, and 4 points if recurring tasks aren't supported. The full score is 10 points.",
+      "maxScore": 10
+    },
+    {
+      "id": 4,
+      "title": "Is the code robust?",
+      "description": "Evaluate whether the code can handle common abnormal situations (such as invalid input, network interruption, data corruption, etc.) and provide friendly error prompts or recovery mechanisms. Check for input validation, error handling, and graceful degradation when features aren't available. Code with strong robustness should be able to effectively handle these edge cases, giving 10 points. If the robustness is average, give 5 points, and if no exceptions are handled, give 0 points.",
+      "maxScore": 10
+    },
+    {
+      "id": 5,
+      "title": "Are there any innovative features that are eye-catching?",
+      "description": "Check whether the code includes surprise features that enhance the experience (e.g., 1. Productivity statistics/analytics 2. Natural language input for quick task creation 3. Task templates for common activities 4. Gamification elements like streaks or achievements). Add 3 points for each practical innovative feature implemented (maximum 10 points).",
+      "maxScore": 10
+    },
+    {
+      "id": 6,
+      "title": "Are there any redundant features?",
+      "description": "Strictly check three types of redundancy: 1. Redundant implementation of similar functions (e.g., multiple ways to delete tasks) 2. Function modules unrelated to to-do list management (e.g., a built-in calculator) 3. Fancy effects that affect performance (e.g., excessive animations). Deduct 3 points for each redundancy found, and directly deduct 10 points if the core functions are interfered with by redundant code.",
+      "maxScore": 10
+    },
+    {
+      "id": 7,
+      "title": "Does the code have engineering quality?",
+      "description": "Review modular design (such as separating data/view/controller layers), code organization, and maintainability. Check for consistent naming conventions, appropriate comments, and clean code practices. Deduct 5 points if global state pollution is found or design patterns are not used; deduct 5 points if the code duplication rate is too high (over 30%); deduct 5 points if there are no tests or documentation. The full score is 10 points.",
+      "maxScore": 10
+    },
+    {
+      "id": 8,
+      "title": "Does the interface vision meet professional design standards?",
+      "description": "Evaluate whether the overall design follows modern design principles: 1) Harmonious color matching (no more than 3 primary colors) 2) Proper layout spacing (element spacing follows the 8px multiple principle) 3) Professional font system (body font size ≥ 14px, line height over 1.5 times) 4) Clear visual hierarchy between completed and pending tasks. Deduct 3 points for each crowded visual element, 5 points for a glaring color combination, and 5 points for chaotic text-image layout. The full score is 10 points.",
+      "maxScore": 10
+    },
+    {
+      "id": 9,
+      "title": "Is the dynamic interaction smooth and seamless?",
+      "description": "Judge whether the dynamic effects conform to human perception characteristics: 1) Immediate visual feedback when marking tasks complete 2) Smooth transitions when adding/removing tasks 3) Clear visual focus guidance 4) Intuitive drag-and-drop for reordering tasks. Deduct 5 points for each operation without feedback, 3 points for janky animations during interactions, and 5 points for hard-to-find key function buttons. The full score is 10 points.",
+      "maxScore": 10
+    }
+  ]
+}

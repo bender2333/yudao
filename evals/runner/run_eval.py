@@ -135,7 +135,7 @@ def _describe_hits(hits):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="OpenCode evaluation for one scenario")
     parser.add_argument("--scenario", default="scenario3",
-                        help="场景：scenario3 或 scenario2")
+                        help="场景：scenario1、scenario2 或 scenario3")
     parser.add_argument("--model", required=True, help="被测模型，provider/model")
     parser.add_argument("--model-id", help="模型服务里的模型名，默认取 --model 的 model 部分")
     parser.add_argument("--runs", type=int, default=1, help="运行次数（每个场景每边 3 次）")
