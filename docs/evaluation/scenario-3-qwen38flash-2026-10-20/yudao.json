@@ -1,0 +1,869 @@
+{
+  "scenario": "scenario-3",
+  "material_version": "scenario-3@2",
+  "scorer_version": "scorer-3@2",
+  "side": "yudao",
+  "model": "auto",
+  "yudao_commit": "2959f3fd",
+  "network": {
+    "allowed": false,
+    "note": "Yudao 的评测项目不登记取回来源与 MCP 服务器，运行中也没有这两类工具的调用。"
+  },
+  "host_environment": {
+    "system": "Windows 11 (AMD64)",
+    "python": "3.14.7",
+    "uv": "uv 0.11.14 (3fdfdc7d4 2026-05-12 x86_64-pc-windows-msvc)",
+    "node": "v24.14.0",
+    "opencode": "1.18.33",
+    "git": "git version 2.53.0.windows.1"
+  },
+  "run_count": 3,
+  "void_runs": [],
+  "model_service_failures": [],
+  "notes": [
+    "起点：按 #324 的写法经 project.create 的 initial_directory 带入题目的 subway_data.json（起始文件夹只含这个文件，在运行目录之外），事项文字去掉了请工程自己写出数据文件的一段；这一处由补跑脚本替换，运行器代码没有改。"
+  ],
+  "summary": {
+    "cycles": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 4.666666666666667,
+      "min": 3.0,
+      "max": 7.0
+    },
+    "rework": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "collaboration": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 0.3333333333333333,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "model_requests": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 117.33333333333333,
+      "min": 1.0,
+      "max": 210.0
+    },
+    "input_tokens": {
+      "count": 3,
+      "unknown": 3,
+      "unknown_reason": "模型服务未上报输入用量"
+    },
+    "output_tokens": {
+      "count": 3,
+      "unknown": 3,
+      "unknown_reason": "模型服务未上报输出用量"
+    },
+    "total_tokens": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 12154938.333333334,
+      "min": 10034931.0,
+      "max": 15819250.0
+    },
+    "cost": {
+      "count": 3,
+      "unknown": 3,
+      "unknown_reason": "模型服务未上报费用，或材料版本未登记单价"
+    },
+    "elapsed_seconds": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 5402.400000000001,
+      "min": 5402.0,
+      "max": 5403.2
+    }
+  },
+  "runs": [
+    {
+      "run_id": "yudao-q38f-start-1",
+      "yudao_run_id": "run_48a0b07ae14b40d5",
+      "served_model": "auto",
+      "data_dir": "C:\\project\\yudao-evals\\s3-qwen38flash-20261019\\yudao-start\\yudao-q38f-start-1\\data",
+      "evidence_dir": "C:\\project\\yudao-worktrees\\architect\\.yudao\\evals\\scenario-3\\yudao\\yudao-q38f-start-1",
+      "metrics": {
+        "end_status": "ended",
+        "end_reason": "time_limit",
+        "outcome": "failed",
+        "stop_reason": "cancelled",
+        "phase": "FAILED",
+        "cycles": 3,
+        "rework": 0,
+        "collaboration": 0,
+        "model_requests": 141,
+        "input_tokens": null,
+        "output_tokens": null,
+        "cache_read_tokens": null,
+        "cache_write_tokens": null,
+        "total_tokens": 10034931,
+        "cost": null,
+        "model_latency_ms": 5022582,
+        "elapsed_seconds": 5403.2,
+        "timed_out": true,
+        "model_service_failure": false,
+        "empty_model_responses": 0,
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": false,
+            "detail": "运行未通过放行判定：运行到时间上限，被运行器结束；阶段不是 DONE（实际为 FAILED）；停止原因不是 released（实际为 cancelled）；没有当前交付快照的质检放行"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": false,
+            "detail": "没有质检提交或没有封存的交付",
+            "recheck_ratio": null,
+            "self_run": 0,
+            "checks_total": 0,
+            "recheck_ratio_status": "unverified",
+            "recheck_ratio_note": "没有质检提交或交付，无法核对"
+          },
+          "replay_consistent": {
+            "passed": true,
+            "detail": "重放结果与记录一致"
+          },
+          "no_false_release": {
+            "passed": true,
+            "detail": "本次没有放行，不存在误放行；隐藏检查的失败条目：unit_2_5"
+          },
+          "release_coverage": {
+            "passed": true,
+            "applicable": false,
+            "detail": "本次没有放行，本项不适用",
+            "covered_ratio": null,
+            "model_read_count": null,
+            "open_loop_count": null
+          }
+        }
+      },
+      "delivery_files": 13,
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@2",
+        "scorer_version": "scorer-3@2",
+        "completion": 0.8571428571428571,
+        "correctness": 0.9583333333333334,
+        "not_done_count": 0,
+        "wrong_count": 1,
+        "not_done": [],
+        "wrong": [
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 9,
+            "total": 9,
+            "score": 1.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']; Fengtai East Street->Xidan preferred ['Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']; Fengtai East Street->Xidan preferred ['Line 2', 'Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "yudao-q38f-start-2",
+      "yudao_run_id": "run_70ed3c780ad8473b",
+      "served_model": "auto",
+      "data_dir": "C:\\project\\yudao-evals\\s3-qwen38flash-20261019\\yudao-start\\yudao-q38f-start-2\\data",
+      "evidence_dir": "C:\\project\\yudao-worktrees\\architect\\.yudao\\evals\\scenario-3\\yudao\\yudao-q38f-start-2",
+      "metrics": {
+        "end_status": "ended",
+        "end_reason": "time_limit",
+        "outcome": "failed",
+        "stop_reason": "cancelled",
+        "phase": "FAILED",
+        "cycles": 7,
+        "rework": 0,
+        "collaboration": 1,
+        "model_requests": 1,
+        "input_tokens": null,
+        "output_tokens": null,
+        "cache_read_tokens": null,
+        "cache_write_tokens": null,
+        "total_tokens": 10610634,
+        "cost": null,
+        "model_latency_ms": 3974209,
+        "elapsed_seconds": 5402.0,
+        "timed_out": true,
+        "model_service_failure": false,
+        "empty_model_responses": 0,
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": false,
+            "detail": "运行未通过放行判定：运行到时间上限，被运行器结束；阶段不是 DONE（实际为 FAILED）；停止原因不是 released（实际为 cancelled）；没有当前交付快照的质检放行"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": false,
+            "detail": "没有质检提交或没有封存的交付",
+            "recheck_ratio": null,
+            "self_run": 0,
+            "checks_total": 0,
+            "recheck_ratio_status": "unverified",
+            "recheck_ratio_note": "没有质检提交或交付，无法核对"
+          },
+          "replay_consistent": {
+            "passed": true,
+            "detail": "重放结果与记录一致"
+          },
+          "no_false_release": {
+            "passed": true,
+            "detail": "本次没有放行，不存在误放行；隐藏检查的失败条目：cmd_0_1、unit_2_5"
+          },
+          "release_coverage": {
+            "passed": true,
+            "applicable": false,
+            "detail": "本次没有放行，本项不适用",
+            "covered_ratio": null,
+            "model_read_count": null,
+            "open_loop_count": null
+          }
+        }
+      },
+      "delivery_files": 13,
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@2",
+        "scorer_version": "scorer-3@2",
+        "completion": 0.8412698412698413,
+        "correctness": 0.9166666666666666,
+        "not_done_count": 0,
+        "wrong_count": 2,
+        "not_done": [],
+        "wrong": [
+          "cmd_0_1",
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 8,
+            "total": 9,
+            "score": 0.8888888888888888
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "wrong",
+            "detail": "the program starts without an input prompt describing the query format"
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']; Fengtai East Street->Xidan preferred ['Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']; Fengtai East Street->Xidan preferred ['Line 2', 'Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "yudao-q38f-start-3",
+      "yudao_run_id": "run_da71f0cf627f47e1",
+      "served_model": "auto",
+      "data_dir": "C:\\project\\yudao-evals\\s3-qwen38flash-20261019\\yudao-start\\yudao-q38f-start-3\\data",
+      "evidence_dir": "C:\\project\\yudao-worktrees\\architect\\.yudao\\evals\\scenario-3\\yudao\\yudao-q38f-start-3",
+      "metrics": {
+        "end_status": "ended",
+        "end_reason": "time_limit",
+        "outcome": "failed",
+        "stop_reason": "cancelled",
+        "phase": "FAILED",
+        "cycles": 4,
+        "rework": 0,
+        "collaboration": 0,
+        "model_requests": 210,
+        "input_tokens": null,
+        "output_tokens": null,
+        "cache_read_tokens": null,
+        "cache_write_tokens": null,
+        "total_tokens": 15819250,
+        "cost": null,
+        "model_latency_ms": 5065516,
+        "elapsed_seconds": 5402.0,
+        "timed_out": true,
+        "model_service_failure": false,
+        "empty_model_responses": 0,
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": false,
+            "detail": "运行未通过放行判定：运行到时间上限，被运行器结束；阶段不是 DONE（实际为 FAILED）；停止原因不是 released（实际为 cancelled）；没有当前交付快照的质检放行"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": false,
+            "detail": "没有质检提交或没有封存的交付",
+            "recheck_ratio": null,
+            "self_run": 0,
+            "checks_total": 0,
+            "recheck_ratio_status": "unverified",
+            "recheck_ratio_note": "没有质检提交或交付，无法核对"
+          },
+          "replay_consistent": {
+            "passed": true,
+            "detail": "重放结果与记录一致"
+          },
+          "no_false_release": {
+            "passed": true,
+            "detail": "本次没有放行，不存在误放行；隐藏检查的失败条目：cmd_0_1、unit_2_5"
+          },
+          "release_coverage": {
+            "passed": true,
+            "applicable": false,
+            "detail": "本次没有放行，本项不适用",
+            "covered_ratio": null,
+            "model_read_count": null,
+            "open_loop_count": null
+          }
+        }
+      },
+      "delivery_files": 15,
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@2",
+        "scorer_version": "scorer-3@2",
+        "completion": 0.8412698412698413,
+        "correctness": 0.9166666666666666,
+        "not_done_count": 0,
+        "wrong_count": 2,
+        "not_done": [],
+        "wrong": [
+          "cmd_0_1",
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 8,
+            "total": 9,
+            "score": 0.8888888888888888
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "wrong",
+            "detail": "the program starts without an input prompt describing the query format"
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']; Fengtai East Street->Xidan preferred ['Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']; Fengtai East Street->Xidan preferred ['Line 2', 'Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ]
+      }
+    }
+  ]
+}
