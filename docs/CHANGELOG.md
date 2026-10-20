@@ -738,3 +738,5 @@ claude-opus-5-5 / 2026-10-20 14:40 / `docs/design/department-loop.md` 新增第 
 
 claude-opus-5-5 / 2026-10-20 14:54 / `docs/decision.md` 新增「2026-10-20 - 删除协作请求拆成八张子工单，询问结束事件写明结果与双方」：#552 改为父工单，拆出 #632 至 #639；#553 不再等 #552，加入 `ask_answered` 的双方、结果与原因；#554 加等 #639 / 被唤醒的架构师处理 #552，按「被唤醒的架构师」第 2 条记录架构与需求的修改
 执行者 9router/ag/gemini-3.8-flash-high / 2026-10-20 13:40 / 工单 #193 [评测工作线] 场景 1 的丰富程度与报告：新增 evals/scenarios/scenario-1/checks/richness.json（ArtifactsBench 88c968b 1278 号题 10 项清单）、新增 evals/scorer/judge.py（多模态裁判 ag/gemini-3.8-flash-high）、新增 evals/tests/test_judge.py；evals/scorer/scenario1.py 接入裁判与丰富程度评分，材料版本升至 scenario-1@2、评分器版本升至 scorer-1@2；evals/scenarios/scenario-1/materials/manifest.json 材料版本加一并更新 checks 摘要；evals/runner/report.py 接入场景 1 标题、逐条用例（通过/部分通过/不通过/没有做、得分与相对仓库根目录截图位置）及丰富程度表格；evals/runner/run_eval.py 完善 --scenario 帮助；evals/tests/test_scenario1_scorer.py 完善空目录报告断言；evals/README.md 补充场景 1 评测命令与丰富程度打分说明；完成参考解法与 OpenCode 真实运行（qhub/Qwen3.8-Flash）/ 完成工单 #193 验收标准
+
+claude-opus-5-5 / 2026-10-20 17:04 / docs/agents/autopilot-runtime.md 第 7 节「唤醒架构师」改为关 / 用户确认诊断的提议 A 至 H，用户在场的会话修改设计、需求与工单期间按规则关掉，做完改回
