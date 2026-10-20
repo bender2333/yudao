@@ -46,7 +46,8 @@ def aggregate(runs):
         counts.append(run)
     summary = {}
     for name in AGGREGATED_METRICS:
-        values = [float(run["metrics"][name]) for run in counts]
+        values = [float(run["metrics"][name]) for run in counts
+                  if name in run.get("metrics", {}) and run["metrics"][name] is not None]
         if not values:
             continue
         summary[name] = {
@@ -89,7 +90,8 @@ def write_result(result, path):
 
 
 def _scenario_title(scenario):
-    return {"scenario-2": "场景 2：在已有代码上加功能",
+    return {"scenario-1": "场景 1：网页应用",
+            "scenario-2": "场景 2：在已有代码上加功能",
             "scenario-3": "场景 3：从较长的 PRD 新建项目"}[scenario]
 
 
@@ -159,6 +161,10 @@ def run_section(run, scores):
     lines.append("| 耗时（秒） | " + _number(run["metrics"]["elapsed_seconds"]) + " |")
     lines.append("| 完成度 | " + _number(scores["completion"]) + " |")
     lines.append("| 正确性 | " + _number(scores["correctness"]) + " |")
+    if "richness" in scores and scores["richness"] is not None:
+        richness_data = scores["richness"]
+        r_score = richness_data.get("score") if isinstance(richness_data, dict) else richness_data
+        lines.append("| 丰富程度 | " + _number(r_score) + " |")
     lines.append("| 这次运行是否作废 | " + ("是" if run.get("void") else "否") + " |")
     lines.append("")
     if run.get("void_reasons"):
@@ -174,6 +180,25 @@ def run_section(run, scores):
         lines.append("| " + name + " | " + str(item["passed"]) + " | "
                      + str(item["total"]) + " | " + _number(item["score"]) + " |")
     lines.append("")
+    has_screenshots = any("screenshots" in item for item in scores.get("checks", []))
+    if has_screenshots:
+        lines.append("逐条用例：")
+        lines.append("")
+        lines.append("| 用例 | 条目 | 结论 | 得分 | 截图位置 |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for item in scores["checks"]:
+            conclusion = _conclusion(item)
+            score_val = _number(item.get("score", 0))
+            shots = item.get("screenshots") or []
+            if shots:
+                shot_dir = _relative_to_repo(os.path.dirname(shots[-1]))
+                last_shot = _relative_to_repo(shots[-1])
+                loc = f"目录：{shot_dir}，最后截图：{last_shot}"
+            else:
+                loc = "无"
+            lines.append(f"| {item['id']} | {item.get('requirement', '')} | {conclusion} | {score_val} | {loc} |")
+        lines.append("")
+
     failed = [item for item in scores["checks"] if item["status"] != "pass"]
     if failed:
         lines.append("失败条目：")
@@ -203,6 +228,19 @@ def run_section(run, scores):
             for item in regression["failures"]:
                 lines.append("| " + item["id"] + " | " + item["detail"].replace("|", "/") + " |")
             lines.append("")
+    richness = scores.get("richness")
+    if richness is not None:
+        items = richness.get("items") if isinstance(richness, dict) else richness
+        lines.append("丰富程度：")
+        lines.append("")
+        lines.append("| 检查项 | 得分 | 理由 |")
+        lines.append("| --- | --- | --- |")
+        for item in items:
+            title = item.get("title", "")
+            score_val = _number(item.get("score", 0))
+            reason = str(item.get("reason") or item.get("comment") or "").replace("|", "/")
+            lines.append(f"| {title} | {score_val} | {reason} |")
+        lines.append("")
     return lines
 
 
@@ -256,3 +294,24 @@ def default_evidence_dir():
     root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
     return os.path.join(root, ".yudao", "evals")
 
+def _conclusion(item):
+    if item.get("status") == "pass" or item.get("verdict") == "YES":
+        return "通过"
+    if item.get("score") == 0.5 or item.get("verdict") == "PARTIAL":
+        return "部分通过"
+    if item.get("status") == "not_done" or item.get("verdict") == "NOT_DONE":
+        return "没有做"
+    return "不通过"
+
+
+def _relative_to_repo(path):
+    if not path:
+        return ""
+    p = os.path.abspath(path).replace("\\", "/")
+    root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")).replace("\\", "/")
+    if p.startswith(root):
+        return os.path.relpath(p, root).replace("\\", "/")
+    idx = p.find(".yudao/evals/")
+    if idx != -1:
+        return p[idx:]
+    return p

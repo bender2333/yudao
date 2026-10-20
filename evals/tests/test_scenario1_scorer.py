@@ -17,9 +17,8 @@ EVALS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCORER_DIR = os.path.join(EVALS_DIR, "scorer")
 RUNNER_DIR = os.path.join(EVALS_DIR, "runner")
 SCENARIO1_DIR = os.path.join(EVALS_DIR, "scenarios", "scenario-1")
-for p in (SCORER_DIR, RUNNER_DIR):
-    if p not in sys.path:
-        sys.path.insert(0, p)
+if RUNNER_DIR not in sys.path:
+    sys.path.append(RUNNER_DIR)
 
 import material_integrity
 
@@ -42,7 +41,7 @@ def test_material_manifest_and_digests():
         manifest = json.load(f)
 
     assert manifest["scenario"] == "scenario-1"
-    assert manifest["material_version"] == "scenario-1@1"
+    assert manifest["material_version"] == "scenario-1@2"
 
     entries = {"checks", "reference", "materials/requirement-table.json"}
     reasons = material_integrity.digest_reasons(SCENARIO1_DIR, entries)
@@ -87,9 +86,12 @@ def test_empty_delivery_scores_all_not_done(tmp_path):
     result = scorer_scenario1.score(empty_dir)
 
     assert result["scenario"] == "scenario-1"
-    assert result["material_version"] == "scenario-1@1"
-    assert result["scorer_version"] == "scorer-1@1"
+    assert result["material_version"] == "scenario-1@2"
+    assert result["scorer_version"] == "scorer-1@2"
     assert result["ui_agent_model"] == "ag/gemini-3.8-flash-high"
+    assert result["judge_model"] == "ag/gemini-3.8-flash-high"
+    assert result["richness"]["score"] == 0.0
+    assert len(result["richness"]["items"]) == 10
     assert result["completion"] == 0.0
     assert result["correctness"] == 0.0
     assert result["not_done_count"] == 8
@@ -159,7 +161,7 @@ def test_runner_scenario1_interface_and_run_dir(tmp_path):
 
 
 def test_empty_delivery_report_run_section(tmp_path):
-    """空目录交付评分结果交给 report.run_section，8 条都分类为没有做。"""
+    """空目录交付写出的报告有场景 1 标题，8 条用例都列为没有做，丰富程度 10 项都是 0 分并写明原因。"""
     empty_dir = str(tmp_path / "empty_delivery_report")
     os.makedirs(empty_dir)
 
@@ -176,6 +178,9 @@ def test_empty_delivery_report_run_section(tmp_path):
             "request_count": 0,
             "input_tokens": 0,
             "output_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "cost": 0.0,
             "elapsed_seconds": 1.0,
             "model_service_failure": False,
         },
@@ -188,16 +193,41 @@ def test_empty_delivery_report_run_section(tmp_path):
 
     import report
     lines = report.run_section(run, result)
-    text = "\n".join(lines)
+    report_result = report.build_result(
+        scenario="scenario-1",
+        material_version=result["material_version"],
+        scorer_version=result["scorer_version"],
+        model="test-model",
+        runs=[run],
+    )
+    report_path = str(tmp_path / "report.md")
+    report.write_report(report_result, report_path, [lines])
 
-    assert "失败条目：" in text
+    with open(report_path, "r", encoding="utf-8") as f:
+        text = f.read()
+
+    # 报告包含场景 1 的标题
+    assert "# 场景 1：网页应用 · OpenCode 一侧评测报告" in text
+
+    # 8 条用例都列为「没有做」
     cases = scorer_scenario1.load_cases(scorer_scenario1.CHECKS_DIR)
+    assert len(cases) == 8
     for c in cases:
         cid = c["id"]
         req = c["requirement_id"]
         expected = f"| {cid} | {req} | 没有做 |"
         assert expected in text
 
+    # 丰富程度 10 项都是 0 分并写明原因
+    richness = result["richness"]
+    assert richness is not None
+    assert richness["score"] == 0.0
+    assert len(richness["items"]) == 10
+    assert "丰富程度：" in text
+    for item in richness["items"]:
+        assert item["score"] == 0.0
+        assert len(item["reason"]) > 0
+        assert f"| {item['title']} | 0 |" in text
 
 def test_server_startup_with_heavy_logging(tmp_path, monkeypatch):
     """启动时打印几百行的交付能被启动并判定就绪，不需要模型与浏览器。"""
@@ -260,8 +290,11 @@ def test_reference_solution_all_pass(tmp_path):
     result = scorer_scenario1.score(reference_dir, work_dir=work_dir)
 
     assert result["scenario"] == "scenario-1"
-    assert result["material_version"] == "scenario-1@1"
-    assert result["scorer_version"] == "scorer-1@1"
+    assert result["material_version"] == "scenario-1@2"
+    assert result["scorer_version"] == "scorer-1@2"
+    assert result["judge_model"] == "ag/gemini-3.8-flash-high"
+    assert 0 <= result["richness"]["score"] <= 100
+    assert len(result["richness"]["items"]) == 10
     assert result["completion"] == 1.0
     assert result["correctness"] == 1.0
     assert result["not_done_count"] == 0

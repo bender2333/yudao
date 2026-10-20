@@ -1,6 +1,6 @@
 {
   "scenario": "scenario-1",
-  "material_version": "scenario-1@1",
+  "material_version": "scenario-1@2",
   "title": "WebGen-Bench 000080 advanced to-do list web application",
   "source": {
     "dataset": "github.com/mnluzimu/WebGen-Bench c89e074; data HF luzimu/WebGen-Bench c061fe8",
@@ -40,7 +40,7 @@
     "algorithm": "sha256",
     "note": "LF 规范化、递归、跳过 __pycache__ 与 *.pyc",
     "entries": {
-      "checks": "sha256:78684d4af3142787f12d31a2c0e8130b980db2e7f641e389d5280c976b54a1f5",
+      "checks": "sha256:5c6f29e33cd3f9685b473d899fab07e84e54df1e258eccdd8980cacf7e351e39",
       "materials/requirement-table.json": "sha256:4222a760180f6863f9799b752b4a2883d63e6c0c04a85b632daa0c29ed2146b3",
       "reference": "sha256:2d2c69d4180979cc174fb48e8191428b2c64c5047b55b1ac0c265d0a0f922ee1"
     }

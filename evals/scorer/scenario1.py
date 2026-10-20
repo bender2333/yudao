@@ -6,8 +6,8 @@
 找不到对应元素或入口时记为「没有做」（not_done，0）。
 若交付目录为空或无法启动，全部用例直接记为「没有做」。
 
-界面智能体模型固定为 ag/gemini-3.8-flash-high，评分器版本为 scorer-1@1，
-材料版本为 scenario-1@1。
+界面智能体模型固定为 ag/gemini-3.8-flash-high，裁判模型固定为 ag/gemini-3.8-flash-high，
+评分器版本为 scorer-1@2，材料版本为 scenario-1@2。
 """
 
 import argparse
@@ -21,14 +21,19 @@ import urllib.error
 import urllib.request
 
 SCENARIO = "scenario-1"
-MATERIAL_VERSION = "scenario-1@1"
-SCORER_VERSION = "scorer-1@1"
+MATERIAL_VERSION = "scenario-1@2"
+SCORER_VERSION = "scorer-1@2"
 UI_AGENT_MODEL = "ag/gemini-3.8-flash-high"
+JUDGE_MODEL = "ag/gemini-3.8-flash-high"
 STARTUP_TIMEOUT = 15.0
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHECKS_DIR = os.path.join(HERE, "..", "scenarios", SCENARIO, "checks")
 MATERIALS_DIR = os.path.join(HERE, "..", "scenarios", SCENARIO, "materials")
+
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+from judge import JUDGE_MODEL, load_richness_checklist, make_zero_richness, judge_richness
 
 
 def find_free_port():
@@ -84,7 +89,7 @@ def load_requirements(table_path):
         return data.get("requirements", [])
 
 
-def aggregate(records, requirements, startup_error=None):
+def aggregate(records, requirements, startup_error=None, richness=None):
     """计算完成度、正确性与需求得分。"""
     req_ids = [r["id"] if isinstance(r, dict) else r for r in requirements]
 
@@ -118,6 +123,7 @@ def aggregate(records, requirements, startup_error=None):
         "material_version": MATERIAL_VERSION,
         "scorer_version": SCORER_VERSION,
         "ui_agent_model": UI_AGENT_MODEL,
+        "judge_model": JUDGE_MODEL,
         "completion": completion,
         "correctness": correctness,
         "not_done_count": len(not_done),
@@ -126,6 +132,7 @@ def aggregate(records, requirements, startup_error=None):
         "wrong": wrong,
         "requirements": requirement_scores,
         "checks": records,
+        "richness": richness,
         "startup_error": startup_error,
     }
 
@@ -240,6 +247,11 @@ def score(delivery_dir, checks_dir=CHECKS_DIR, table_path=None, work_dir=None):
     cases = load_cases(checks_dir)
     requirements = load_requirements(table_path)
 
+    richness_path = os.path.join(checks_dir, "richness.json")
+    if not os.path.isfile(richness_path):
+        richness_path = os.path.join(CHECKS_DIR, "richness.json")
+    richness_checklist = load_richness_checklist(richness_path)
+
     port = find_free_port()
     proc, log_file, start_err = prepare_and_start_server(delivery_dir, work_dir, port)
 
@@ -254,7 +266,8 @@ def score(delivery_dir, checks_dir=CHECKS_DIR, table_path=None, work_dir=None):
             "detail": start_err,
             "screenshots": []
         } for c in cases]
-        return aggregate(records, requirements, startup_error=start_err)
+        richness = make_zero_richness(richness_checklist, reason=f"交付为空或无法启动：{start_err}")
+        return aggregate(records, requirements, startup_error=start_err, richness=richness)
 
     base_url = f"http://127.0.0.1:{port}/"
     ready = wait_for_server(base_url, timeout=STARTUP_TIMEOUT, proc=proc)
@@ -274,7 +287,8 @@ def score(delivery_dir, checks_dir=CHECKS_DIR, table_path=None, work_dir=None):
             "detail": startup_err,
             "screenshots": []
         } for c in cases]
-        return aggregate(records, requirements, startup_error=startup_err)
+        richness = make_zero_richness(richness_checklist, reason=f"交付服务启动失败：{startup_err}")
+        return aggregate(records, requirements, startup_error=startup_err, richness=richness)
 
     try:
         from ui_agent import run_ui_eval
@@ -283,7 +297,9 @@ def score(delivery_dir, checks_dir=CHECKS_DIR, table_path=None, work_dir=None):
         stop_process(proc)
         log_file.close()
 
-    return aggregate(records, requirements)
+    screenshots = [r["screenshots"][-1] for r in records if r.get("screenshots")]
+    richness = judge_richness(delivery_dir, screenshots, richness_checklist)
+    return aggregate(records, requirements, richness=richness)
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Scenario 1 scorer")
     parser.add_argument("--delivery", required=True, help="交付目录")
