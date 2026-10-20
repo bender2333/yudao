@@ -665,11 +665,10 @@ class StepDriver:
                     "name": name,
                     "args": args,
                     "step_id": request.step_id,
-                    "remaining_steps": max(0, self._limits.max_model_steps - getattr(self, "_consumed_steps", 0)),
+                    "remaining_steps": max(0, self._limits.max_model_steps - self._consumed_steps),
                 }
                 ask_ok, ask_output, ask_error, new_contract_hash, branch_steps = await self._nodes.ask(self._scope, ask_call)
-                if hasattr(self, "_consumed_steps"):
-                    self._consumed_steps += branch_steps
+                self._consumed_steps += branch_steps
                 ok, output, error = ask_ok, ask_output, ask_error
                 if ok and new_contract_hash is not None:
                     self._scope = replace(self._scope, basis=replace(self._scope.basis, effective_contract_hash=new_contract_hash))

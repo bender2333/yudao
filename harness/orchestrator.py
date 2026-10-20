@@ -1495,8 +1495,6 @@ class Orchestrator:
 
         projection = self.project(scope.run_id)
         remaining_time = max(0.0, self._time_left(scope.run_id, projection))
-        if call.get("remaining_time") is not None:
-            remaining_time = min(remaining_time, float(call["remaining_time"]))
         declared_time = self.step_limits.department_max_time_sec.get(
             recipient, float(projection.run_time_limit_sec)
         )
@@ -1589,7 +1587,7 @@ class Orchestrator:
                         projection=projection,
                         facts=env.query(FactsQuery(tree=True)).tree,
                         events=transaction.events(),
-                     )
+                    )
                     if not decision.accepted:
                         raise RuntimeError(f"invalid prd revision: {decision.errors}")
 
