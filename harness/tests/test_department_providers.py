@@ -16,7 +16,7 @@ from openai import DEFAULT_CONNECTION_LIMITS
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade, ResponsesConfig
-from harness.proposals import collaboration_request, collaboration_response, delivery, product_spec, review
+from harness.proposals import delivery, product_spec, review
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
 from harness.tests.protocol_helpers import preset_base_urls
@@ -248,10 +248,6 @@ def _department(body: dict[str, Any]) -> str:
     assert raw is not None
     return json.loads(raw)["department"]
 
-def _pending_request_id(body: dict[str, Any]) -> str | None:
-    raw = _part(body, "pending_request")
-    return None if raw is None else json.loads(raw)["id"]
-
 def _contract_hash(body: dict[str, Any]) -> str:
     raw = _part(body, "current_contract")
     assert raw is not None
@@ -318,7 +314,7 @@ def _public_run_data(system: LoopSystem, run_id: str) -> str:
     events = [event.__dict__ for event in system.store.list_events(run_id)]
     return json_dumps({"projection": system.project(run_id), "events": events})
 
-def test_http_provider_bindings_route_full_consultation_and_engineering_rework(tmp_path):
+def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
     counts = {"product": 0, "engineering": 0, "quality": 0}
     delivery_file = "import sys\nprint(sys.argv[1])\n"
     repaired_file = "import sys\nprint(sys.argv[1].upper())\n"
@@ -328,16 +324,14 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert department in {"product", "quality"}
         counts[department] += 1
         if department == "product":
-            request_id = _pending_request_id(body)
-            if request_id is not None:
-                payload = collaboration_response(request_id, "answered", "The output check should cover a normal argument.")
+            if counts[department] == 1:
+                payload = product_spec()
                 payload.pop("kind")
-                return _stream([_call(f"product-response-{counts[department]}", "submit_response", payload)],
-                               response_id=f"a-product-response-{counts[department]}", model="a-product-actual")
-            payload = product_spec()
-            payload.pop("kind")
-            return _stream([_call("product-spec", "submit_product_spec", payload)],
-                           response_id="a-product-spec", model="a-product-actual")
+                return _stream([_call("product-spec", "submit_product_spec", payload)],
+                               response_id="a-product-spec", model="a-product-actual")
+            payload = {"answer": "The output check should cover a normal argument."}
+            return _stream([_call(f"product-answer-{counts[department]}", "answer", payload)],
+                           response_id=f"a-product-answer-{counts[department]}", model="a-product-actual")
 
         verdict = "rework_engineering" if counts[department] == 1 else "release"
         payload = review(
@@ -363,14 +357,14 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert department == "engineering"
         counts[department] += 1
         if counts[department] == 1:
-            payload = collaboration_request(
-                "product",
-                "What should the smoke check cover?",
-                expected_result="Give the minimum acceptance behavior.",
-            )
-            payload.pop("kind")
-            return _stream([_call("engineering-consultation", "submit_request", payload)],
-                           response_id="b-consultation", model="b-engineering-actual")
+            payload = {
+                "recipient": "product",
+                "question": "What should the smoke check cover?",
+                "background": "Need clarification for check.",
+                "expected": "Give the minimum acceptance behavior.",
+            }
+            return _stream([_call("engineering-ask", "ask", payload)],
+                           response_id="b-ask", model="b-engineering-actual")
 
         content = delivery_file if counts[department] == 2 else repaired_file
         payload = delivery(files=["src/echo.py"], check_names=["smoke"],
@@ -400,7 +394,7 @@ def test_http_provider_bindings_route_full_consultation_and_engineering_rework(t
         assert config_a.base_url != config_b.base_url
         assert result.phase == "DONE", result.error
         assert result.rework_count == 1
-        assert result.requests[-1].status == "answered"
+        assert any(event.type == EventType.ASK_ANSWERED for event in system.store.list_events(run_id))
         assert counts == {"product": 2, "engineering": 3, "quality": 2}
         assert [item["path"] for item in captures_a] == ["/v1/responses"] * len(captures_a)
         assert [item["path"] for item in captures_b] == ["/v1/responses"] * len(captures_b)

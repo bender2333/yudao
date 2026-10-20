@@ -2,17 +2,17 @@ from dataclasses import asdict
 
 from harness.adapters.fake import FakeAdapter
 from harness.contracts import contract_payload, render_prd
-from harness.models import EventType
-from harness.proposals import (collaboration_request, delivery_turn,
-                               product_decision, product_spec, response_turn, review_turn)
+from harness.proposals import (delivery_turn, product_decision, product_spec, review_turn)
 from harness.runtime import LoopSystem
 
 def test_prd_and_delivery_bind_the_same_accepted_contract(tmp_path):
     adapter = FakeAdapter([
-        product_spec(), collaboration_request(request_type="action", action="revise_requirements"),
+        product_spec(),
+        delivery_turn(),
+        review_turn("rework_product", "need decision", defects=[{"severity": "major", "summary": "need decision"}]),
         product_decision("Treat unknown flags as an error.", "Unknown flags must not silently change the command."),
-        response_turn("completed", result_types=[EventType.PRODUCT_DECISION_ACCEPTED]),
-        delivery_turn(), review_turn("release", "Verified the current requirements"),
+        delivery_turn(),
+        review_turn("release", "Verified the current requirements"),
     ])
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")

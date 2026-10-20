@@ -8,8 +8,8 @@ from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.department_prompts import save_department_prompt
 from harness.models import DepartmentPrompt, EventType, RunProjection, SessionRecord
-from harness.proposals import (collaboration_request, delivery_turn, product_decision, product_spec,
-                                product_spec_turn, response_turn, review_turn)
+from harness.proposals import (answer_turn, ask_turn, delivery_turn, product_decision, product_spec,
+                                product_spec_turn, review_turn)
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
@@ -28,13 +28,12 @@ def _sources(call) -> list[str]:
 def test_context_is_reassembled_from_projection_not_transcript(data_dir):
     marker = "PRODUCT_PRIVATE_MARKER_DO_NOT_LEAK"
     adapter = FakeAdapter(
-        [
-            FakeTurn(proposal=product_spec(), transcript=marker),
-            collaboration_request(),
-            response_turn("answered", "The existing contract covers this input."),
-            delivery_turn(),
-            review_turn("release", "ok"),
-        ]
+        {
+            "product": [FakeTurn(proposal=product_spec(), transcript=marker)],
+            "engineering": [ask_turn(), delivery_turn()],
+            "product:ask": [answer_turn("The existing contract covers this input.")],
+            "quality": [review_turn("release", "ok")],
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
@@ -54,19 +53,25 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
 
 def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
     unique = "UNIQUE_GOAL_V1_MUST_NOT_LEAK"
-    v2 = product_spec_turn(goal="Build echo v2", acceptance=["v2 works"], change_record={
-        "changed": ["Use the v2 goal and acceptance criteria"], "retained": ["The echo CLI scope"],
-        "retired": ["The original goal and acceptance criteria"], "rationale": "The requested revision replaces v1.",
-    })
+    v2_answer = answer_turn(
+        answer="Updated the contract.",
+        goal="Build echo v2",
+        requirements=["print the given argument in uppercase to stdout"],
+        acceptance=["v2 works"],
+        change_record={
+            "changed": ["Use the v2 goal and acceptance criteria"],
+            "retained": ["The echo CLI scope"],
+            "retired": ["The original goal and acceptance criteria"],
+            "rationale": "The requested revision replaces v1.",
+        },
+    )
     adapter = FakeAdapter(
-        [
-            product_spec(goal=unique),
-            collaboration_request(request_type="action", action="revise_requirements"),
-            v2,
-            response_turn("completed", "Updated the contract.", result_types=["spec_accepted"]),
-            delivery_turn(),
-            review_turn("release", "v2"),
-        ]
+        {
+            "product": [product_spec(goal=unique)],
+            "engineering": [ask_turn(), delivery_turn()],
+            "product:ask": [v2_answer],
+            "quality": [review_turn("release", "v2")],
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
@@ -112,7 +117,11 @@ def test_quality_runs_its_checks_through_run_check(data_dir):
     assert checks == ["run_check"]
 
 def test_requests_carry_no_remaining_cycles_while_the_host_enforces_the_limit(data_dir):
-    adapter = FakeAdapter([product_spec(), collaboration_request(), response_turn()])
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [ask_turn(), delivery_turn()],
+        "product:ask": [answer_turn()],
+    })
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=2)
     projection = system.run_until_stop(run_id)
@@ -158,12 +167,12 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(),
-            collaboration_request(question="First canary choice?", request_type="action", action="revise_requirements"),
+            delivery_turn(),
+            review_turn("rework_product", "need decision A", defects=[{"severity": "major", "summary": "defect A"}]),
             product_decision("Use DECISION_CANARY_A.", "The first requirement needs this exact output."),
-            response_turn("completed", "Published the first decision.", result_types=["product_decision_accepted"]),
-            collaboration_request(question="Second canary choice?", request_type="action", action="revise_requirements"),
+            delivery_turn(),
+            review_turn("rework_product", "need decision C", defects=[{"severity": "major", "summary": "defect C"}]),
             product_decision("Use DECISION_CANARY_C.", "The second requirement needs this exact output."),
-            response_turn("completed", "Published the second decision.", result_types=["product_decision_accepted"]),
             delivery_turn(),
             review_turn("release", "accepted both product decisions"),
         ]
@@ -193,17 +202,13 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
         assert "DECISION_CANARY_A" in developer_text(request)
         assert "DECISION_CANARY_C" in developer_text(request)
 
-def test_effective_decision_keeps_explicit_requirement_and_request_source(data_dir):
+def test_effective_decision_keeps_explicit_requirement(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(),
-            collaboration_request(
-                question="采用背景中描述的方案吗？",
-                background="Actual required output token is BACKGROUND_CANARY",
-                request_type="action", action="revise_requirements",
-            ),
+            delivery_turn(),
+            review_turn("rework_product", "need decision", defects=[{"severity": "major", "summary": "need decision"}]),
             product_decision("Print BACKGROUND_CANARY for the selected mode.", "IMPACT_CANARY identifies the required public behavior."),
-            response_turn("completed", "The behavior has been published.", result_types=["product_decision_accepted"]),
             delivery_turn(),
             review_turn("release", "accepted the described approach"),
         ]
@@ -216,7 +221,6 @@ def test_effective_decision_keeps_explicit_requirement_and_request_source(data_d
     decision = projection.effective_decisions[0]
     assert decision.statement == "Print BACKGROUND_CANARY for the selected mode."
     assert decision.rationale == "IMPACT_CANARY identifies the required public behavior."
-    assert decision.request_id == projection.requests[0].id
     engineering = [item for item in adapter.invocations if item.department == "engineering"][-1]
     quality = [item for item in adapter.invocations if item.department == "quality"][-1]
     for request in (engineering, quality):
@@ -224,7 +228,6 @@ def test_effective_decision_keeps_explicit_requirement_and_request_source(data_d
         assert decisions is not None
         assert len(decisions) == 1
         assert decisions[0]["statement"] == decision.statement
-        assert decisions[0]["request_id"] == decision.request_id
         assert "BACKGROUND_CANARY" in developer_text(request)
         assert "IMPACT_CANARY" in developer_text(request)
 
@@ -245,9 +248,9 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(acceptance=["old behavior"]),
-            collaboration_request(question="Publish the canary requirement?", request_type="action", action="revise_requirements"),
+            delivery_turn(summary="INITIAL_DELIVERY"),
+            review_turn("rework_product", "need decision", defects=[{"severity": "major", "summary": "need decision"}]),
             product_decision(stale, "This is the initial product requirement."),
-            response_turn("completed", "Published the requirement.", result_types=["product_decision_accepted"]),
             delivery_turn(summary="OLD_DELIVERY_CANARY"),
             review_turn(
                 "rework_product",

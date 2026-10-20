@@ -4,7 +4,7 @@ from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import WorkBasis, commit_decision, facts_query, proposal_decision, tool_permission
 from harness.environment import LocalEnvironment
-from harness.proposals import collaboration_request, product_spec
+from harness.proposals import delivery, product_spec
 from harness.runtime import LoopSystem
 
 
@@ -51,7 +51,17 @@ def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
 def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_path):
     system, projection = _engineering(tmp_path)
     environment = _environment(system, projection)
-    proposal = collaboration_request()
+    ws = system.workspace(projection.run_id)
+    ws.bind_check(
+        activation_id=projection.last_activations.get("engineering"),
+        product_spec_hash=projection.product_spec.content_hash,
+        delivery_spec_hash=None,
+        effective_contract_hash=projection.effective_contract.content_hash,
+    )
+    ws.write_file("src/echo.py", "print(1)\n")
+    ws.record_check("engineering", "pytest", 0, "ok")
+    proposal = delivery(files=["src/echo.py"], check_names=["pytest"],
+                        basis_product_spec_hash=projection.product_spec.content_hash)
     facts = environment.query(FactsQuery(tree=True)).tree
     events = system.store.list_events(projection.run_id)
     first = proposal_decision(projection, department="engineering", proposal=proposal, facts=facts,
