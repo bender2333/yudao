@@ -27,6 +27,7 @@ Claude 担任派发者时使用这里的路径。
 | 集成层的 worktree | `C:\project\yudao-worktrees\integration` |
 | 被唤醒的架构师的 worktree | `C:\project\yudao-worktrees\architect`，不建分支，每次启动前检出 main 的当前提交 |
 | 较长的评论与审查（`--body-file`） | `C:\project\yudao-worktrees\issue-<编号>\.tmp\` 下，文件名带工单号，`--body-file` 给这个绝对路径 |
+| 真实评测 | `C:\project\yudao-worktrees\eval-<提交前 8 位>`：检出被测的提交，运行期间不切换，结束以后删除；运行目录与原始证据在仓库之外；长时间运行用 `Start-Process pwsh -File <脚本>` 启动，不用会话里的后台命令（会话空闲、内存不足时会被结束） |
 | OMP（oh-my-pi） | `C:\project\codes\oh-my-pi` |
 | OpenCode | `C:\project\codes\opencode` |
 | semantica | `C:\project\codes\semantica` |

@@ -68,6 +68,7 @@
 - 评测使用的模型（2026-09-30）：被测模型为 DeepSeek V4.1 Flash（`cbcn/deepseek-v4.1-flash`），界面智能体为 `gh/gemini-3.8-flash`，裁判为 `qdcn/qmodel_38max`；三者经用户的模型服务调用（OpenAI 兼容接口，只返回流式回复），地址与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中。三者都经核对能读出网页截图中的文字。
 - 评测使用的模型（2026-10-18）：用户提供新的 9router 凭据（Chat Completions），不用 `cc/` 分组的模型。上面三个模型都已不在 9router 的列表中。被测模型改为 `ag/gemini-3.8-flash-medium`，与真实模型测试共用，模型名放在用户环境变量 `YUDAO_EVAL_MODEL` 中。界面智能体与裁判的模型等评测工作线恢复时由用户重新指定。
 - 评测使用的模型（2026-10-19）：评测工作线的 OpenCode 一侧恢复。被测模型改为 `qhub/Qwen3.8-Flash`，仍与真实模型测试共用 `YUDAO_EVAL_MODEL`；界面智能体与裁判都用 `ag/gemini-3.8-flash-high`。用户原话：「使用ag/gemini-3.8-flash-high吧，把被测模型换成qhub/Qwen3.8-Flash」。
+- 对照的条件与「高于」的判法（2026-10-20，用户确认[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)第 9 节的提议，原话「好，我同意你的提议」）：两边的起点相同，Yudao 新建项目时经起始文件夹带入题目给的文件；两边的上下文窗口与单次输出上限相同，取模型服务的模型列表为这个模型报告的值；每次运行的时间上限两边都是 120 分钟（暂定默认值，属于评价标准）；Yudao 的第一次交付与最终交付都评分。是否高于单个 agent 按 [D38](system-intent.md) 的 N-G1 判定，只看质检这一段带来的提高；两边的完成度逐次并排列出，不单独据此判定。
 
 ## 实现状态
 
