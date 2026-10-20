@@ -977,10 +977,15 @@ class ActionView(Contract):
     before_snapshot_ref: dict[str, Any] | None = None
     after_snapshot_ref: dict[str, Any] | None = None
 
+class BackgroundCommandView(Contract):
+    command: str
+    started_at: str
+    status: Literal["running", "ended"]
+
 
 class RunActionsResult(Contract):
     actions: list[ActionView]
-
+    background_commands: list[BackgroundCommandView]
 
 def _run_actions(application: Application, request: RunActions) -> Snapshot[RunActionsResult]:
     store = application.system.store
@@ -988,6 +993,13 @@ def _run_actions(application: Application, request: RunActions) -> Snapshot[RunA
     events = _tool_events(store, request.run_id)
     actions: list[ActionView] = []
     started: dict[tuple[str, int | None, str], Any] = {}
+    background_commands: list[BackgroundCommandView] = []
+    jobs_table = None
+    orchestrator = getattr(application.system, "orchestrator", None)
+    if orchestrator is not None:
+        sessions = getattr(orchestrator, "sessions", None)
+        if sessions is not None:
+            jobs_table = getattr(sessions, "jobs", None)
     for event in events:
         payload = event.payload or {}
         if event.type not in (EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
@@ -1001,13 +1013,41 @@ def _run_actions(application: Application, request: RunActions) -> Snapshot[RunA
             continue
         started_event = started.pop(identity, None)
         actions.append(_action_view(event, identity, started_event))
+        if event.type == EventType.TOOL_CALLED and payload.get("name") == "bash":
+            started_payload = {} if started_event is None else (started_event.payload or {})
+            args = dict(payload.get("args") or started_payload.get("args") or {})
+            if args.get("background") is True and payload.get("ok"):
+                job_id = None
+                output_ref = payload.get("output_ref")
+                if output_ref:
+                    try:
+                        raw = application.system.artifacts.get_for_run(request.run_id, ArtifactRef(**output_ref))
+                        output_data = json.loads(raw)
+                        if isinstance(output_data, dict):
+                            job_id = output_data.get("job_id")
+                    except Exception:
+                        job_id = None
+                status: Literal["running", "ended"] = "ended"
+                if job_id and jobs_table is not None:
+                    if jobs_table.get_status(job_id) == "running":
+                        status = "running"
+                started_at = started_event.created_at if started_event is not None else event.created_at
+                background_commands.append(BackgroundCommandView(
+                    command=str(args.get("command") or ""),
+                    started_at=started_at,
+                    status=status,
+                ))
     # 有 tool_started、还没有结果的动作用运行状态区分（工单 #17，恢复契约第 1 节）：这次激活仍在进行
     # 的时候是运行中，否则是结果未知，等待核实
     live = _live_activations(events)
     for identity, event in started.items():
         actions.append(_action_view(None, identity, event, live=identity[0] in live))
     actions.sort(key=lambda item: item.created_at)
-    return Snapshot[RunActionsResult](position=store.end_position(), data=RunActionsResult(actions=actions))
+    background_commands.sort(key=lambda item: item.started_at)
+    return Snapshot[RunActionsResult](
+        position=store.end_position(),
+        data=RunActionsResult(actions=actions, background_commands=background_commands),
+    )
 
 
 def _live_activations(events: list[Any]) -> set[str]:

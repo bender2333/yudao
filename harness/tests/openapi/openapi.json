@@ -4393,6 +4393,34 @@
         ],
         "title": "AwayReport"
       },
+      "BackgroundCommandView": {
+        "properties": {
+          "command": {
+            "type": "string",
+            "title": "Command"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "ended"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command",
+          "started_at",
+          "status"
+        ],
+        "title": "BackgroundCommandView"
+      },
       "BaselineCheck": {
         "properties": {
           "name": {
@@ -10083,12 +10111,20 @@
             },
             "type": "array",
             "title": "Actions"
+          },
+          "background_commands": {
+            "items": {
+              "$ref": "#/components/schemas/BackgroundCommandView"
+            },
+            "type": "array",
+            "title": "Background Commands"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "actions"
+          "actions",
+          "background_commands"
         ],
         "title": "RunActionsResult"
       },
