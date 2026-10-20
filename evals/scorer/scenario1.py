@@ -23,7 +23,7 @@ import urllib.request
 SCENARIO = "scenario-1"
 MATERIAL_VERSION = "scenario-1@1"
 SCORER_VERSION = "scorer-1@1"
-DEFAULT_MODEL = "ag/gemini-3.8-flash-high"
+UI_AGENT_MODEL = "ag/gemini-3.8-flash-high"
 STARTUP_TIMEOUT = 15.0
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -84,20 +84,28 @@ def load_requirements(table_path):
         return data.get("requirements", [])
 
 
-def aggregate(records, requirements, model=DEFAULT_MODEL, startup_error=None):
+def aggregate(records, requirements, startup_error=None):
     """计算完成度、正确性与需求得分。"""
-    requirement_map = {}
-    for req in requirements:
-        requirement_map[req["id"]] = [c for c in records if c.get("requirement_id") == req["id"]]
+    req_ids = [r["id"] if isinstance(r, dict) else r for r in requirements]
+
+    requirement_checks = {rid: [] for rid in req_ids}
+    for c in records:
+        rid = c.get("requirement") or c.get("requirement_id")
+        if rid in requirement_checks:
+            requirement_checks[rid].append(c)
 
     requirement_scores = {}
-    for req_id, req_checks in requirement_map.items():
-        if not req_checks:
-            requirement_scores[req_id] = 0.0
-        else:
-            requirement_scores[req_id] = sum(c["score"] for c in req_checks) / len(req_checks)
+    for rid in req_ids:
+        items = requirement_checks[rid]
+        passed = sum(1 for item in items if item["status"] == "pass")
+        req_score = sum(item["score"] for item in items) / len(items) if items else 0.0
+        requirement_scores[rid] = {
+            "passed": passed,
+            "total": len(items),
+            "score": req_score,
+        }
 
-    completion = sum(requirement_scores.values()) / len(requirement_scores) if requirement_scores else 0.0
+    completion = sum(item["score"] for item in requirement_scores.values()) / len(requirement_scores) if requirement_scores else 0.0
 
     attempted = [c for c in records if c["status"] != "not_done"]
     correctness = sum(c["score"] for c in attempted) / len(attempted) if attempted else 0.0
@@ -109,7 +117,7 @@ def aggregate(records, requirements, model=DEFAULT_MODEL, startup_error=None):
         "scenario": SCENARIO,
         "material_version": MATERIAL_VERSION,
         "scorer_version": SCORER_VERSION,
-        "ui_agent_model": model,
+        "ui_agent_model": UI_AGENT_MODEL,
         "completion": completion,
         "correctness": correctness,
         "not_done_count": len(not_done),
@@ -121,41 +129,106 @@ def aggregate(records, requirements, model=DEFAULT_MODEL, startup_error=None):
         "startup_error": startup_error,
     }
 
+def _read_last_lines(file_path, count=10):
+    """读取文件末尾若干行。"""
+    if not os.path.exists(file_path):
+        return ""
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+            return "".join(lines[-count:])
+    except Exception:
+        return ""
 
-def determine_start_command(delivery_dir):
-    """按约定推断启动交付的命令。"""
+
+def prepare_and_start_server(delivery_dir, work_dir, port):
+    """按接口约定准备依赖并启动服务进程。返回 (proc, log_file, error_message)。"""
     if not os.path.isdir(delivery_dir):
-        return None
+        return None, None, "Empty delivery directory or not a directory"
 
-    package_json = os.path.join(delivery_dir, "package.json")
-    if os.path.isfile(package_json):
+    log_path = os.path.join(work_dir, "server.log")
+    log_file = open(log_path, "a", encoding="utf-8", errors="replace")
+
+    package_json_path = os.path.join(delivery_dir, "package.json")
+    cmd = None
+
+    if os.path.isfile(package_json_path):
         try:
-            with open(package_json, "r", encoding="utf-8") as f:
+            with open(package_json_path, "r", encoding="utf-8") as f:
                 pkg = json.load(f)
-            scripts = pkg.get("scripts", {})
-            if "dev" in scripts:
-                return ["npm", "run", "dev"]
-            elif "start" in scripts:
-                return ["npm", "run", "start"]
-            else:
-                return ["npm", "start"]
-        except Exception:
-            return ["npm", "start"]
+        except Exception as exc:
+            log_file.close()
+            return None, None, f"Failed to parse package.json: {exc}"
 
-    if os.path.isfile(os.path.join(delivery_dir, "server.js")):
-        return ["node", "server.js"]
-    if os.path.isfile(os.path.join(delivery_dir, "index.js")):
-        return ["node", "index.js"]
-    if os.path.isfile(os.path.join(delivery_dir, "index.html")):
-        code = ("const http=require('http'),fs=require('fs');"
-                "const port=process.env.PORT||3000;"
-                "http.createServer((q,s)=>{fs.readFile('index.html',(e,d)=>{s.writeHead(200,{'Content-Type':'text/html'});s.end(d)})}).listen(port);")
-        return ["node", "-e", code]
+        # 运行 npm install
+        log_file.write(f"=== Running npm install in {delivery_dir} ===\n")
+        log_file.flush()
+        use_shell = (os.name == "nt")
+        install_cmd = "npm install --no-package-lock" if use_shell else ["npm", "install", "--no-package-lock"]
+        try:
+            res = subprocess.run(
+                install_cmd,
+                cwd=delivery_dir,
+                shell=use_shell,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                timeout=120,
+            )
+            if res.returncode != 0:
+                log_file.close()
+                last_lines = _read_last_lines(log_path, 10)
+                return None, None, f"npm install failed with exit code {res.returncode}:\n{last_lines}".strip()
+        except subprocess.TimeoutExpired:
+            log_file.close()
+            return None, None, "npm install timed out after 120 seconds"
+        except Exception as exc:
+            log_file.close()
+            return None, None, f"Failed to execute npm install: {exc}"
 
-    return None
+        scripts = pkg.get("scripts", {})
+        if "dev" in scripts:
+            cmd = ["npm", "run", "dev"]
+        elif "start" in scripts:
+            cmd = ["npm", "run", "start"]
+        elif os.path.isfile(os.path.join(delivery_dir, "server.js")):
+            cmd = ["node", "server.js"]
+        elif os.path.isfile(os.path.join(delivery_dir, "index.js")):
+            cmd = ["node", "index.js"]
+        else:
+            log_file.close()
+            return None, None, "No dev or start script in package.json, and neither server.js nor index.js exists"
+    else:
+        if os.path.isfile(os.path.join(delivery_dir, "server.js")):
+            cmd = ["node", "server.js"]
+        elif os.path.isfile(os.path.join(delivery_dir, "index.js")):
+            cmd = ["node", "index.js"]
+        else:
+            log_file.close()
+            return None, None, "No package.json, server.js, or index.js found in delivery directory"
+
+    log_file.write(f"=== Starting server: {cmd} with PORT={port} ===\n")
+    log_file.flush()
+
+    env = dict(os.environ)
+    env["PORT"] = str(port)
+    use_shell = (os.name == "nt" and cmd[0] == "npm")
+
+    try:
+        proc = subprocess.Popen(
+            cmd if not use_shell else " ".join(cmd),
+            cwd=delivery_dir,
+            env=env,
+            shell=use_shell,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+        )
+        return proc, log_file, None
+    except Exception as exc:
+        log_file.close()
+        return None, None, f"Failed to spawn server process: {exc}"
 
 
-def score(delivery_dir, checks_dir=CHECKS_DIR, table_path=None, work_dir=None, model=DEFAULT_MODEL):
+def score(delivery_dir, checks_dir=CHECKS_DIR, table_path=None, work_dir=None):
     """在交付上运行 8 条用例并返回评分结果。"""
     delivery_dir = os.path.abspath(delivery_dir)
     checks_dir = os.path.abspath(checks_dir)
@@ -167,66 +240,50 @@ def score(delivery_dir, checks_dir=CHECKS_DIR, table_path=None, work_dir=None, m
     cases = load_cases(checks_dir)
     requirements = load_requirements(table_path)
 
-    # 1. 检查交付是否为空或不存在启动入口
-    cmd = determine_start_command(delivery_dir)
-    if cmd is None:
+    port = find_free_port()
+    proc, log_file, start_err = prepare_and_start_server(delivery_dir, work_dir, port)
+
+    if start_err is not None:
         records = [{
             "id": c["id"],
-            "requirement_id": c.get("requirement_id"),
+            "requirement": c.get("requirement_id"),
             "name": c.get("name"),
             "score": 0.0,
             "status": "not_done",
             "verdict": "NOT_DONE",
-            "reason": "Empty delivery directory or no web entry point found",
+            "detail": start_err,
             "screenshots": []
         } for c in cases]
-        return aggregate(records, requirements, model=model,
-                         startup_error="Empty delivery directory or no web entry point found")
-
-    # 2. 分配端口并启动服务
-    port = find_free_port()
-    env = dict(os.environ)
-    env["PORT"] = str(port)
-
-    # Windows 上 npm 需要通过 shell 执行
-    use_shell = (os.name == "nt" and cmd[0] == "npm")
-    proc = subprocess.Popen(
-        cmd if not use_shell else " ".join(cmd),
-        cwd=delivery_dir,
-        env=env,
-        shell=use_shell,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+        return aggregate(records, requirements, startup_error=start_err)
 
     base_url = f"http://127.0.0.1:{port}/"
     ready = wait_for_server(base_url, timeout=STARTUP_TIMEOUT, proc=proc)
 
     if not ready:
         stop_process(proc)
-        err = proc.stderr.read().decode("utf-8", errors="replace") if proc.stderr else ""
-        startup_err = f"Failed to start delivery server (exit code: {proc.poll()}). {err}".strip()
+        log_file.close()
+        last_lines = _read_last_lines(os.path.join(work_dir, "server.log"), 10)
+        startup_err = f"Failed to start delivery server (exit code: {proc.poll()}).\n{last_lines}".strip()
         records = [{
             "id": c["id"],
-            "requirement_id": c.get("requirement_id"),
+            "requirement": c.get("requirement_id"),
             "name": c.get("name"),
             "score": 0.0,
             "status": "not_done",
             "verdict": "NOT_DONE",
-            "reason": startup_err,
+            "detail": startup_err,
             "screenshots": []
         } for c in cases]
-        return aggregate(records, requirements, model=model, startup_error=startup_err)
+        return aggregate(records, requirements, startup_error=startup_err)
 
     try:
         from ui_agent import run_ui_eval
-        records = run_ui_eval(base_url, cases, screenshots_dir, model=model)
+        records = run_ui_eval(base_url, cases, screenshots_dir)
     finally:
         stop_process(proc)
+        log_file.close()
 
-    return aggregate(records, requirements, model=model)
-
-
+    return aggregate(records, requirements)
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Scenario 1 scorer")
     parser.add_argument("--delivery", required=True, help="交付目录")
@@ -234,11 +291,11 @@ def main(argv=None):
     parser.add_argument("--table", help="需求条目表路径")
     parser.add_argument("--result", help="输出机器可读结果路径")
     parser.add_argument("--work-dir", help="工作与截图目录")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="界面智能体模型名")
+    # 界面智能体模型固定在评分器中，不提供外部命令行选项
     args = parser.parse_args(argv)
 
     table_path = args.table or os.path.join(MATERIALS_DIR, "requirement-table.json")
-    result = score(args.delivery, args.checks, table_path, args.work_dir, model=args.model)
+    result = score(args.delivery, args.checks, table_path, args.work_dir)
     text = json.dumps(result, ensure_ascii=False, indent=2)
 
     if args.result:

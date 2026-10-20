@@ -101,8 +101,13 @@ def test_empty_delivery_scores_all_not_done(tmp_path):
         assert check["status"] == "not_done"
         assert check["score"] == 0.0
         assert check["verdict"] == "NOT_DONE"
+        assert check["requirement"].startswith("R")
+        assert check["detail"] is not None
 
-
+    for req_id, req_score in result["requirements"].items():
+        assert req_score["passed"] == 0
+        assert req_score["total"] == 1
+        assert req_score["score"] == 0.0
 def test_failed_start_delivery_scores_all_not_done(tmp_path):
     """交付启动失败时 8 条用例都记为「没有做」，不需要模型与浏览器。"""
     fail_dir = str(tmp_path / "fail_delivery")
@@ -153,6 +158,99 @@ def test_runner_scenario1_interface_and_run_dir(tmp_path):
     assert any("scenario1.py" in arg for arg in cmd)
 
 
+def test_empty_delivery_report_run_section(tmp_path):
+    """空目录交付评分结果交给 report.run_section，8 条都分类为没有做。"""
+    empty_dir = str(tmp_path / "empty_delivery_report")
+    os.makedirs(empty_dir)
+
+    result = scorer_scenario1.score(empty_dir)
+
+    run = {
+        "run_id": "test-run-1",
+        "run_dir": empty_dir,
+        "evidence_dir": str(tmp_path / "evidence"),
+        "metrics": {
+            "status": "completed",
+            "reason": "normal",
+            "timed_out": False,
+            "request_count": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_seconds": 1.0,
+            "model_service_failure": False,
+        },
+        "tool_calls": [],
+        "void": False,
+        "void_reasons": [],
+        "model_service_failure": False,
+        "score": result,
+    }
+
+    import report
+    lines = report.run_section(run, result)
+    text = "\n".join(lines)
+
+    assert "失败条目：" in text
+    cases = scorer_scenario1.load_cases(scorer_scenario1.CHECKS_DIR)
+    for c in cases:
+        cid = c["id"]
+        req = c["requirement_id"]
+        expected = f"| {cid} | {req} | 没有做 |"
+        assert expected in text
+
+
+def test_server_startup_with_heavy_logging(tmp_path, monkeypatch):
+    """启动时打印几百行的交付能被启动并判定就绪，不需要模型与浏览器。"""
+    delivery_dir = str(tmp_path / "heavy_log_delivery")
+    os.makedirs(delivery_dir)
+    package_json = os.path.join(delivery_dir, "package.json")
+    with open(package_json, "w", encoding="utf-8") as f:
+        json.dump({"scripts": {"start": "node server.js"}}, f)
+
+    server_js = os.path.join(delivery_dir, "server.js")
+    with open(server_js, "w", encoding="utf-8") as f:
+        f.write("""
+const http = require('http');
+for (let i = 0; i < 500; i++) {
+    console.log('Startup log line ' + i);
+    console.error('Startup stderr line ' + i);
+}
+const port = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+    res.writeHead(200, {'Content-Type': 'text/plain'});
+    res.end('OK');
+});
+server.listen(port, '127.0.0.1');
+""")
+
+    work_dir = str(tmp_path / "work_heavy")
+    cases = scorer_scenario1.load_cases(scorer_scenario1.CHECKS_DIR)
+    mock_records = [{
+        "id": c["id"],
+        "requirement": c.get("requirement_id"),
+        "status": "pass",
+        "detail": "mocked pass",
+        "score": 1.0,
+        "screenshots": [],
+        "verdict": "YES",
+    } for c in cases]
+
+    import ui_agent
+    monkeypatch.setattr(ui_agent, "run_ui_eval", lambda url, cases, s_dir: mock_records)
+
+    result = scorer_scenario1.score(delivery_dir, work_dir=work_dir)
+    assert result["startup_error"] is None
+    assert result["completion"] == 1.0
+    assert result["correctness"] == 1.0
+
+    log_file = os.path.join(work_dir, "server.log")
+    assert os.path.isfile(log_file)
+    with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+    assert "Startup log line 499" in content
+    assert "Startup stderr line 499" in content
+
+
 @real_model
 def test_reference_solution_all_pass(tmp_path):
     """参考解法通过全部 8 条用例（需要真实模型与浏览器）。"""
@@ -170,5 +268,5 @@ def test_reference_solution_all_pass(tmp_path):
     assert result["wrong_count"] == 0
     assert len(result["checks"]) == 8
     for check in result["checks"]:
-        assert check["status"] == "passed"
+        assert check["status"] == "pass"
         assert check["score"] == 1.0
