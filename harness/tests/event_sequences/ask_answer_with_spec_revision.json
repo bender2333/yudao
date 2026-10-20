@@ -964,7 +964,11 @@
    "error": null,
    "payload": {
     "answer": "Yes, print in uppercase.",
+    "reason": "",
+    "recipient": "product",
+    "requester": "engineering",
     "revision": 2,
+    "status": "answered",
     "with_spec_revision": true
    }
   },

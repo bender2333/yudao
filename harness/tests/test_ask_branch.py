@@ -323,3 +323,163 @@ def test_ask_answer_echoing_only_basis_hash_creates_no_revision(tmp_path: Path):
     assert len(ask_answered_events) == 1
     assert ask_answered_events[0].payload["with_spec_revision"] is False
     assert ask_answered_events[0].payload["revision"] is None
+
+
+def test_ask_answered_payload_parties_and_status(tmp_path: Path):
+    # AC3: ask_answered 标明 requester, recipient, status="answered", reason=""
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _call("ask-1", "ask", recipient="product", question="Clarify something?",
+                      background="Bg", expected="Exp"),
+            ]),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        ],
+        "product:ask": [
+            lambda call: ModelResponse(output=[
+                _call("ans-1", "answer", answer="Clarification given."),
+            ]),
+        ],
+        "quality": [review_turn("release", "ok")],
+    }
+    adapter = FakeAdapter(scripts)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo")
+    system.run_until_stop(run_id)
+
+    events = system.store.list_events(run_id)
+    ask_answered_events = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    assert len(ask_answered_events) == 1
+    payload = ask_answered_events[0].payload
+    assert payload["requester"] == "engineering"
+    assert payload["recipient"] == "product"
+    assert payload["status"] == "answered"
+    assert payload["reason"] == ""
+    assert payload["answer"] == "Clarification given."
+
+
+def test_ask_branch_exhausted_ends_with_unable_and_usage_charged(tmp_path: Path):
+    # AC1 & AC4: 分支达到上限以 unable 结束，提问方的工具结果写明原因；分支的用量计入提问方
+    from harness.engine import StepLimits
+
+    def product_branch_invalid(call):
+        return ModelResponse(output=[
+            _call("ans-err", "answer", answer=""),
+        ])
+
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _call("ask-1", "ask", recipient="product", question="Clarify something?",
+                      background="Bg", expected="Exp"),
+            ]),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        ],
+        "product:ask": [product_branch_invalid],
+        "quality": [review_turn("release", "ok")],
+    }
+    adapter = FakeAdapter(scripts)
+    # 提问方上限 4 步，被询问部门声明上限 1 步
+    step_limits = StepLimits(max_model_steps=4, department_max_model_steps={"product": 1})
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
+    run_id = system.create_run("build echo")
+    system.run_until_stop(run_id)
+
+    events = system.store.list_events(run_id)
+    ask_answered_events = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    assert len(ask_answered_events) == 1
+    payload = ask_answered_events[0].payload
+    assert payload["requester"] == "engineering"
+    assert payload["recipient"] == "product"
+    assert payload["status"] == "unable"
+    assert payload["answer"] == ""
+    assert "step limit" in payload["reason"]
+
+    # 提问方的工具结果写明原因
+    tool_calls = [e for e in events if e.type == EventType.TOOL_CALLED and e.payload.get("name") == "ask"]
+    assert len(tool_calls) == 1
+    assert tool_calls[0].payload["ok"] is False
+    assert "step limit" in (tool_calls[0].payload.get("error") or "")
+
+    # 提问方投影的已用量包含分支的步骤
+    finished_events = [e for e in events if e.type == EventType.ACTIVATION_FINISHED and e.department == "engineering"]
+    assert finished_events[0].payload["model_steps"] == 4
+    assert system.project(run_id).outcome == "done"
+
+
+def test_ask_branch_resumes_across_system_restart(tmp_path: Path):
+    # AC2 & AC5: 分支进行中重新启动 Yudao，分支继续，回答交回提问方，事项运行到放行
+    import sys
+    from harness.tests import process_kill as killed
+    from harness.proposals import delivery, review
+
+    data_dir = tmp_path / "data"
+    script = [
+        {"proposal": {"kind": "product_spec", "goal": "build an echo CLI",
+                      "requirements": ["echo input"], "acceptance_criteria": ["prints arg"]}},
+        {"output": [
+            _call("ask-1", "ask", recipient="product", question="Is lowercase ok?",
+                  background="Bg", expected="Exp"),
+        ]},
+    ]
+    checks = {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}
+    tail = [
+        {"output": [
+            _call("ans-1", "answer", answer="Yes, lowercase is ok."),
+        ]},
+        {"proposal": delivery(check_names=["smoke"]),
+         "writes": {"src/echo.py": "import sys\nprint(sys.argv[1].lower())\n"},
+         "checks": checks},
+        {"proposal": review("release", "checks passed on the current snapshot"),
+         "checks": checks},
+    ]
+
+    with killed.interrupted(data_dir, script, hold_after=EventType.ASK_STARTED, tail=tail) as run:
+        events_after = run.after.store.list_events(run.run_id)
+        ask_answered_events = [e for e in events_after if e.type == EventType.ASK_ANSWERED]
+        assert len(ask_answered_events) == 1
+        assert ask_answered_events[0].payload["status"] == "answered"
+        assert ask_answered_events[0].payload["answer"] == "Yes, lowercase is ok."
+        assert run.after.project(run.run_id).phase == "DONE"
+
+
+def test_ask_branch_no_tool_call_ends_with_unable(tmp_path: Path):
+    # AC1 & AC2: 模型反复不提交回答（连续只回复文字），分支以 unable 结束，提问方接着工作
+    from harness.definitions import DEFINITIONS
+    limit = DEFINITIONS.rule_value("tool_call_required_limit")
+
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _call("ask-1", "ask", recipient="product", question="Clarify something?",
+                      background="Bg", expected="Exp"),
+            ]),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        ],
+        "product:ask": [
+            ModelResponse(output=[{"id": f"msg-{i}", "type": "message", "role": "assistant",
+                                  "content": [{"type": "output_text", "text": "Just plain text."}]}])
+            for i in range(limit + 1)
+        ],
+        "quality": [review_turn("release", "ok")],
+    }
+    adapter = FakeAdapter(scripts)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo")
+    system.run_until_stop(run_id)
+
+    events = system.store.list_events(run_id)
+    ask_answered_events = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    assert len(ask_answered_events) == 1
+    payload = ask_answered_events[0].payload
+    assert payload["status"] == "unable"
+    assert "without calling a tool" in payload["reason"]
+
+    tool_calls = [e for e in events if e.type == EventType.TOOL_CALLED and e.payload.get("name") == "ask"]
+    assert len(tool_calls) == 1
+    assert tool_calls[0].payload["ok"] is False
+    assert "without calling a tool" in (tool_calls[0].payload.get("error") or "")
+    assert system.project(run_id).outcome == "done"

@@ -12,9 +12,9 @@ import asyncio
 import json
 import math
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import aclosing
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from threading import Event
 from typing import Any, Protocol
 
@@ -84,8 +84,8 @@ class SafeNode(Protocol):
     def department_prompt(self, department: str) -> DepartmentPrompt:
         # 部门 Prompt 每次请求从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）
         ...
-    async def ask(self, scope: ActivationScope, call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None]:
-        # 开一个询问分支，等待分支回答，返回 (ok, output, error, new_contract_hash)
+    async def ask(self, scope: ActivationScope, call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None, int]:
+        # 开一个询问分支，等待分支回答，返回 (ok, output, error, new_contract_hash, branch_steps)
         ...
 
 
@@ -97,6 +97,7 @@ class StepLimits:
     retry_max_delay_sec: float = DEFINITIONS.rule_value("retry_max_delay_sec")
     max_provider_attempts: int = DEFINITIONS.rule_value("max_provider_attempts")
     max_model_steps: int = DEFINITIONS.rule_value("max_model_steps")
+    department_max_model_steps: Mapping[str, int] = field(default_factory=dict)
 
 
 def tool_call_required_text(count: int) -> str:
@@ -327,6 +328,7 @@ class StepDriver:
 
     async def _steps(self) -> StepResult:
         limits = self._limits
+        self._consumed_steps = 0
         # 工单 #17：上一次激活的完整模型响应里还有没执行的合法动作时，先补执行这些动作，不重新调用模型
         # （恢复契约第 4、5 节）。补执行以后照常进入步骤循环，下一次模型请求带上这些工具结果
         await self._continue_unexecuted_calls()
@@ -334,7 +336,10 @@ class StepDriver:
         root_step_id = 1
         retry_of_step_id = None
         replies_without_tool_call = 0
-        for step_id in range(1, limits.max_model_steps + 1):
+        step_id = 0
+        while self._consumed_steps < limits.max_model_steps:
+            step_id += 1
+            self._consumed_steps += 1
             if not self._proceed():
                 return Stopped(self._version)
             prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id,
@@ -374,14 +379,14 @@ class StepDriver:
                 can_retry = (
                     retry_error.retryable
                     and attempt < limits.max_provider_attempts
-                    and step_id < limits.max_model_steps
+                    and self._consumed_steps < limits.max_model_steps
                 )
                 will_retry = can_retry and self._proceed()
                 self._recorder.attempt_failed(request, retry_error, will_retry)
                 if not self._proceed():
                     return Stopped(self._version)
                 if not will_retry:
-                    if retry_error.retryable and step_id >= limits.max_model_steps:
+                    if retry_error.retryable and self._consumed_steps >= limits.max_model_steps:
                         raise ProviderError(
                             "department reached the model step limit during provider retries",
                             reason="model_steps_exhausted",
@@ -475,8 +480,15 @@ class StepDriver:
                     if not permission.allowed:
                         ok, output, error = False, None, permission.reason
                     elif name == "ask":
-                        ask_call = {"id": identity, "name": name, "args": args, "step_id": step_id}
-                        ask_ok, ask_output, ask_error, new_contract_hash = await self._nodes.ask(self._scope, ask_call)
+                        ask_call = {
+                            "id": identity,
+                            "name": name,
+                            "args": args,
+                            "step_id": step_id,
+                            "remaining_steps": max(0, limits.max_model_steps - self._consumed_steps),
+                        }
+                        ask_ok, ask_output, ask_error, new_contract_hash, branch_steps = await self._nodes.ask(self._scope, ask_call)
+                        self._consumed_steps += branch_steps
                         ok, output, error = ask_ok, ask_output, ask_error
                         if ok and new_contract_hash is not None:
                             self._scope = replace(self._scope, basis=replace(self._scope.basis, effective_contract_hash=new_contract_hash))
@@ -588,11 +600,15 @@ class StepDriver:
             payload = event.payload or {}
             if event.department != self._scope.department or payload.get("purpose") == "compaction":
                 continue
-            if event.type in (EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
-                              EventType.ACTION_VERIFIED):
+            if event.type in (EventType.TOOL_CALLED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED):
                 identity = payload.get("id")
                 if identity:
                     dispositioned.add(str(identity))
+            elif event.type == EventType.TOOL_STARTED:
+                if payload.get("name") != "ask":
+                    identity = payload.get("id")
+                    if identity:
+                        dispositioned.add(str(identity))
             elif event.type == EventType.MODEL_MESSAGE and payload.get("message_ref"):
                 key = (str(payload.get("activation_id") or ""), int(payload.get("step_id") or 0))
                 if key not in responses:
@@ -643,9 +659,30 @@ class StepDriver:
             permission, facts = self._begin_tool(request, call)
             if permission.stopped or not permission.allowed:
                 return
-            if tool_kind(name) == "host":
+            if name == "ask":
+                ask_call = {
+                    "id": identity,
+                    "name": name,
+                    "args": args,
+                    "step_id": request.step_id,
+                    "remaining_steps": max(0, self._limits.max_model_steps - getattr(self, "_consumed_steps", 0)),
+                }
+                ask_ok, ask_output, ask_error, new_contract_hash, branch_steps = await self._nodes.ask(self._scope, ask_call)
+                if hasattr(self, "_consumed_steps"):
+                    self._consumed_steps += branch_steps
+                ok, output, error = ask_ok, ask_output, ask_error
+                if ok and new_contract_hash is not None:
+                    self._scope = replace(self._scope, basis=replace(self._scope.basis, effective_contract_hash=new_contract_hash))
+                    self._frame = replace(self._frame, effective_contract_hash=new_contract_hash)
+                    projection = self._writes.read(self._stream).projection
+                    self._environment.bind_check(
+                        activation_id=self._scope.activation_id,
+                        product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
+                        delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
+                        effective_contract_hash=new_contract_hash,
+                    )
+            elif tool_kind(name) == "host":
                 ok, output, error = True, _run_host_tool(name, args), None
-            else:
                 receipt = await self._perform(Action(
                     action_id=f"{request.activation_id}:recovered:{identity}",
                     kind=tool_action(name),
@@ -865,17 +902,20 @@ class StepDriver:
                 if rel.replace("\\", "/").strip("/").split("/")[0] == QA_TESTS_DIR:
                     permission = ToolPermission()
             if permission.allowed:
-                # 动作前的公开树快照（工单 #17）：许可允许以后、执行之前查询，与事件一起写入。
-                # 主机工具（提交）不产生动作，不需要快照；事实查询原本只为许可取需要的路径，快照单独查一次公开树
-                if tool_kind(call["name"]) != "host":
-                    tree = facts.tree
-                    if tree is None:
-                        tree = self._environment.query(FactsQuery(tree=True)).tree
-                    before_snapshot = _tree_snapshot(tree)
-                else:
-                    before_snapshot = None
-                self._recorder.tool_started(transaction, request, call,
-                                            before_snapshot=before_snapshot)
+                already_started = any(
+                    e.type == EventType.TOOL_STARTED and (e.payload or {}).get("id") == call["id"]
+                    for e in transaction.events()
+                )
+                if not already_started:
+                    if tool_kind(call["name"]) != "host":
+                        tree = facts.tree
+                        if tree is None:
+                            tree = self._environment.query(FactsQuery(tree=True)).tree
+                        before_snapshot = _tree_snapshot(tree)
+                    else:
+                        before_snapshot = None
+                    self._recorder.tool_started(transaction, request, call,
+                                                before_snapshot=before_snapshot)
             return permission, facts
 
         return self._writes.transact(self._stream, begin)
