@@ -790,3 +790,5 @@ minimax-M3.1-Flash / 2026-10-22 03:10 / docs/user-session-log.md 补 U11（事�
 minimax-M3.1-Flash / 2026-10-22 03:35 / docs/user-session-log.md 补 U12（观测页「共 N 条记录」是已加载的行数不是请求总数）与三条记下备查的事实：十二个页面在普通 Chromium 里都渲染正常、设置页的「状态」只有已归档/进行中两档 / 继续以用户身份使用系统，用 Playwright 逐页走了一遍界面并读出页面文字，发现的问题先记录再交工单：#665
 
 minimax-M3.1-Flash / 2026-10-22 03:55 / docs/user-session-log.md 补两条记下备查的事实：观测页两个页签对同一批请求给出两个数（50 与 115）、界面上点得动的地方都点得动（项目菜单、事项范围、加载更多、两个页签、资料页条目、首页楼层） / 继续以用户身份使用系统，用 Playwright 把界面的可点路径点了一遍，没有发现点击无效的地方；同一屏上「50」与「115」并存的证据补到 #665 的评论
+
+执行者 minimax-M3.1-Flash / 2026-10-22 04:00 / 工单 #657 取消的事项不再写「执行失败」：client/src/renderer/src/views/project/labels.ts 增加 phaseLabel（停止原因是 cancelled 时不写阶段名，其余照旧翻成阶段名，阶段词表本身不动），overview.tsx 的状态行改用它；新增 client/tests/unit/cancelled-item-status.test.ts 五项 / 用户走查 U06：用户点「取消事项」停止的事项，概览页的状态行写着「已停止 · 执行失败」，而取消是用户自己的决定
