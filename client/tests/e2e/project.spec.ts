@@ -166,6 +166,19 @@ async function waitUntil(check: () => Promise<boolean>, page: Page, description:
   }
 }
 
+// 用户主动停止的事项会改变服务端状态，这条用例用自己的一份后端，共用的那份不受影响
+async function withOwnBackend<T>(run: () => Promise<T>): Promise<T> {
+  const previous = backend;
+  const own = await startBackend();
+  backend = own;
+  try {
+    return await run();
+  } finally {
+    backend = previous;
+    await own.stop();
+  }
+}
+
 async function section(page: Page, heading: string) {
   return page.locator("section.card").filter({ has: page.getByRole("heading", { name: heading, exact: true }) }).first();
 }
@@ -369,6 +382,65 @@ test.describe("项目页面（1440×900）", () => {
     } finally {
       await client.close();
     }
+  });
+
+  // 工单 #652：「记录原文」与「新的要求」各有各的状态与草稿。
+  // 这条用例新建事项（改变服务端状态），用自己的一份后端，共用的那份不受影响。
+  test("概览：记录原文与新的要求各有各的状态，提交记录原文不影响新的要求", async () => {
+    test.setTimeout(300_000);
+    await withOwnBackend(async () => {
+      const client = await startClient(backend, { width: 1440, height: 900 });
+      const errors = watchErrors(client);
+      const page = client.page;
+      try {
+        const id = await projectId(page, SAMPLE);
+        // 执行槽位只有一个：「文本工具」项目里那个等待回答的事项占着它，
+        // 槽位空出来以后才能新建事项（应用层「已有事项正在执行」一条）
+        const blocked = await projectId(page, BLOCKED);
+        const decisions = await openDecisions(page);
+        if (decisions.length > 0) {
+          await expectAccepted(page, "decision.answer", {
+            decision_id: decisions[0].decision_id, option: "stop", base_version: decisions[0].version,
+          });
+          await waitUntil(async () => {
+            const data = await fetchQuery<{ work_items: { status: string }[] }>(page, "project.overview", { project_id: blocked });
+            return data.work_items.every((item) => item.status !== "in_progress");
+          }, page, "执行槽位空出来");
+        }
+        await gotoView(page, id, "overview");
+        const current = await section(page, "当前事项");
+        await expect(current).toContainText("项目没有进行中的事项");
+
+        const material = "概览里记录的材料文字";
+        const requirement = "概览里写下的新要求";
+        const recordBox = current.getByLabel("记录原文（保存为本项目的材料）");
+        const requirementBox = current.getByLabel("新的要求");
+        await recordBox.fill(material);
+        await requirementBox.fill(requirement);
+        // 两个框各自装各自的内容：一个框里的文字不出现在另一个框里
+        expect(await recordBox.inputValue()).toBe(material);
+        expect(await requirementBox.inputValue()).toBe(requirement);
+
+        // 提交「记录原文」：只清它自己那个框，「新的要求」里的文字留着
+        await current.getByRole("button", { name: "记录原文" }).click();
+        await waitUntil(async () => (await recordBox.inputValue()) === "", page, "记录原文提交以后那个框清空");
+        expect(await requirementBox.inputValue()).toBe(requirement);
+
+        // 提交「作为新事项开始」：新事项真的建起来了
+        // 事项统计在摘要的「事项统计」那一行里，标题本身不变，要看整行的文字
+        const statsLine = (await section(page, "项目摘要")).locator(".line").filter({ hasText: "事项统计" }).first();
+        const stats = await statsLine.innerText();
+        await current.getByRole("button", { name: "作为新事项开始" }).click();
+        await waitUntil(
+          async () => (await statsLine.innerText()) !== stats,
+          page,
+          "新事项建起来以后事项统计改变",
+        );
+        expect(errors).toEqual([]);
+      } finally {
+        await client.close();
+      }
+    });
   });
 
   test("部门工作间：标题区、检查区页签、部门消息与部门设置弹窗", async () => {
