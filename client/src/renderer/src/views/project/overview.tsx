@@ -177,58 +177,16 @@ function CurrentItem(props: {
     work_item: item?.work_item_id ?? "",
   }, item === null);
   const [appendText, setAppendText] = useDraft(`input/${props.projectId}/${item?.work_item_id ?? "none"}/append`);
-  const [recordText, setRecordText] = useDraft(`input/${props.projectId}/${item?.work_item_id ?? "none"}/record`);
-  const [newTitle, setNewTitle] = useState("");
 
   if (item === null) {
     return (
       <Section title="当前事项" note="项目没有进行中的事项，顶栏也没有选中事项">
-        <div className="y10-ov-composer composer">
-          <TextArea label="记录原文（保存为本项目的材料）" value={recordText} onInput={setRecordText} />
-          {hasCommand(props.app, "material.record") ? (
-            <SubmitButton
-              label="记录原文"
-              busy={props.command.busy}
-              disabled={recordText.trim() === ""}
-              onClick={() => {
-                void props.command.submit("material.record", { project_id: props.projectId, text: recordText.trim() })
-                  .then((ok) => { if (ok) setRecordText(""); });
-              }}
-            />
-          ) : <p className="y10-note note">这台主机没有提供记录原文的操作</p>}
-        </div>
-        <div className="y10-ov-composer composer">
-          <TextArea label="新的要求" value={recordText} onInput={setRecordText} />
-          <TextInput label="事项标题（可以留空）" value={newTitle} onInput={setNewTitle} />
-          {hasCommand(props.app, "work_item.create") ? (
-            <SubmitButton
-              label="作为新事项开始"
-              busy={props.command.busy}
-              disabled={recordText.trim() === ""}
-              onClick={() => {
-                const body: Record<string, unknown> = { project_id: props.projectId, text: recordText.trim() };
-                if (newTitle.trim() !== "") {
-                  body.title = newTitle.trim();
-                }
-                void props.command.submit("work_item.create", body).then((ok) => { if (ok) { setRecordText(""); setNewTitle(""); } });
-              }}
-            />
-          ) : <p className="y10-note note">这台主机没有提供新建事项的操作</p>}
-          <p className="y10-note note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
-          <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
-          {(() => {
-            const links = rejectionLinks(props.command.rejection, props.projectId);
-            return links.length > 0 ? (
-              <div className="y10-row row-actions">
-                {links.map((link) => (
-                  <button key={link.hash} type="button" className="y10-link link" onClick={() => { window.location.hash = link.hash; }}>
-                    {link.label}
-                  </button>
-                ))}
-              </div>
-            ) : null;
-          })()}
-        </div>
+        <NewItemComposer
+          projectId={props.projectId}
+          command={props.command}
+          canRecord={hasCommand(props.app, "material.record")}
+          canCreate={hasCommand(props.app, "work_item.create")}
+        />
       </Section>
     );
   }
@@ -284,6 +242,71 @@ function CurrentItem(props: {
         </div>
       ) : null}
     </Section>
+  );
+}
+
+// 没有进行中的事项时的两个输入框：「记录原文」把文字存成本项目的材料，
+// 「新的要求」用它开始一个新事项。两个框各有各的草稿与各自的状态：
+// 写在一个框里的文字不会出现在另一个框里，提交一个框只清空那个框（工单 #652）。
+export function NewItemComposer(props: {
+  projectId: string;
+  command: CommandState;
+  canRecord: boolean;
+  canCreate: boolean;
+}) {
+  const [recordText, setRecordText] = useDraft(`input/${props.projectId}/none/record`);
+  const [requirementText, setRequirementText] = useDraft(`input/${props.projectId}/none/requirement`);
+  const [newTitle, setNewTitle] = useState("");
+
+  return (
+    <>
+      <div className="y10-ov-composer composer">
+        <TextArea label="记录原文（保存为本项目的材料）" value={recordText} onInput={setRecordText} />
+        {props.canRecord ? (
+          <SubmitButton
+            label="记录原文"
+            busy={props.command.busy}
+            disabled={recordText.trim() === ""}
+            onClick={() => {
+              void props.command.submit("material.record", { project_id: props.projectId, text: recordText.trim() })
+                .then((ok) => { if (ok) setRecordText(""); });
+            }}
+          />
+        ) : <p className="y10-note note">这台主机没有提供记录原文的操作</p>}
+      </div>
+      <div className="y10-ov-composer composer">
+        <TextArea label="新的要求" value={requirementText} onInput={setRequirementText} />
+        <TextInput label="事项标题（可以留空）" value={newTitle} onInput={setNewTitle} />
+        {props.canCreate ? (
+          <SubmitButton
+            label="作为新事项开始"
+            busy={props.command.busy}
+            disabled={requirementText.trim() === ""}
+            onClick={() => {
+              const body: Record<string, unknown> = { project_id: props.projectId, text: requirementText.trim() };
+              if (newTitle.trim() !== "") {
+                body.title = newTitle.trim();
+              }
+              void props.command.submit("work_item.create", body).then((ok) => { if (ok) { setRequirementText(""); setNewTitle(""); } });
+            }}
+          />
+        ) : <p className="y10-note note">这台主机没有提供新建事项的操作</p>}
+        <p className="y10-note note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
+        <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
+        {(() => {
+          const links = rejectionLinks(props.command.rejection, props.projectId);
+          return links.length > 0 ? (
+            <div className="y10-row row-actions">
+              {links.map((link) => (
+                <button key={link.hash} type="button" className="y10-link link" onClick={() => { window.location.hash = link.hash; }}>
+                  {link.label}
+                </button>
+              ))}
+            </div>
+          ) : null;
+        })()}
+      </div>
+    </>
   );
 }
 
