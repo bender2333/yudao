@@ -6,12 +6,12 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import type { ClientApp } from "../../contract/client-app";
-import type { DeliveryFileResult, ProjectOverviewResult, WorkItemMaterialsResult,
+import type { DeliveryFileResult, EventDetailResult, ProjectOverviewResult, WorkItemMaterialsResult,
   WorkItemCard } from "../../api/generated/types.gen";
 import type { Route } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import { ITEM_COLORS } from "../../pixel/registry";
-import { Empty, KeyValue, Loading, Section, Tag, list, show, text } from "./common";
+import { Empty, KeyValue, Loading, Section, Tag, dict, list, show, text } from "./common";
 import { departmentName, formatTime, label, WORK_ITEM_STATUS, WORK_ITEM_STATUS_KIND } from "./labels";
 import { useSnapshot } from "./use-snapshot";
 
@@ -77,7 +77,7 @@ export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate:
       {data ? (
         <>
           <IntendBlock rows={data.inputs} />
-          <VersionBlock id="mt-prd" title="PRD" note="产品部门提交并被接纳的各版本；接入已有项目的初始 PRD 标明确认记录" rows={data.contracts} empty="产品部门还没有提交 PRD" />
+          <VersionBlock app={props.app} id="mt-prd" title="PRD" note="产品部门提交并被接纳的各版本；接入已有项目的初始 PRD 标明确认记录" rows={data.contracts} empty="产品部门还没有提交 PRD" />
           <OnboardingBlock rounds={data.onboarding_rounds} />
           <DeliveryBlock app={props.app} rows={data.deliveries} />
           <ReviewBlock rows={data.reviews} />
@@ -302,14 +302,25 @@ function failureRow(value: { check?: string; reason?: string }): string {
   return [text(value.check) || "未命名检查", text(value.reason)].filter((part) => part !== "").join(" · ");
 }
 
-// PRD（原型 mt-prd）：各版本、状态与目标（摘要）
+// PRD（原型 mt-prd）：各版本、状态与目标（摘要）；点「查看原文」用 event.detail 取合同原文
 function VersionBlock(props: {
+  app: ClientApp;
   id: string;
   title: string;
   note: string;
   rows: WorkItemMaterialsResult["contracts"];
   empty: string;
 }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const detail = useSnapshot<EventDetailResult>(
+    props.app,
+    open === null ? "page.materials.prd.none" : `page.materials.prd.${open}`,
+    "event.detail",
+    { event_id: open ?? "" },
+    open === null,
+  );
+  const original = detail.data === null ? null : text(dict(detail.data.artifacts).prd);
+
   return (
     <Section id={props.id} title={props.title} note={props.note} className="y10-mt">
       {props.rows.length === 0 ? <Empty text={props.empty} /> : (
@@ -320,11 +331,22 @@ function VersionBlock(props: {
                 <strong>{props.title} {entry.revision === null ? "未编号" : `第 ${entry.revision} 版`}</strong>
                 <Tag>{entry.status}</Tag>
                 <span className="y10-muted">指纹 {show(entry.content_hash, "未上报")}</span>
+                <button type="button" className="y10-link link" onClick={() => setOpen(entry.event_id)}>查看原文</button>
               </header>
-              <p className="y10-clamp">{show(entry.summary, "没有摘要")}</p>
+              <p className="y10-clamp">{show(entry.summary, "（这一版没有摘要，点「查看原文」看合同）")}</p>
             </li>
           ))}
         </ol>
+      )}
+      {open === null ? null : (
+        <div className="y10-block card">
+          <div className="y10-block-head section-head">
+            <h2>合同原文</h2>
+            <button type="button" onClick={() => setOpen(null)}>收起</button>
+          </div>
+          {detail.loading && detail.data === null ? <p className="y10-note note">正在读取原文</p> : null}
+          {original === null ? <p className="y10-note note">这一版没有留下原文</p> : <pre className="y10-pre raw">{original}</pre>}
+        </div>
       )}
     </Section>
   );
