@@ -413,6 +413,10 @@ export interface OpsView {
   auto_repair_stopped?: boolean;
 }
 
+/** 原型 v10 的传信事件名：像素层用它表示部门之间的一次询问与它的回答（接口合同的事件种类里没有这两个）。 */
+export const LETTER_ASKED_TYPE = "collaboration_requested";
+export const LETTER_ANSWERED_TYPE = "collaboration_responded";
+
 /** 项目楼层收到的事件（事件流里本项目的事件）。 */
 export interface PixelFloorEvent {
   type: string;

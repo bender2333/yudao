@@ -318,9 +318,9 @@ def _has_pending_guidance(projection: RunProjection, department: str) -> bool:
 
 def _diverted_guidance_kinds(department: str, projection: RunProjection) -> set[str]:
     if department != "product":
-        return {"department_guidance_response", "collaboration_request"}
-    # 产品被提前安排时仍然可以处理需求：可提交的种类按本事项种类的定义取，再补上回应指导与提出请求
-    allowed = {"collaboration_request", "department_guidance_response"} | (
+        return {"department_guidance_response"}
+    # 产品被提前安排时仍然可以处理需求：可提交的种类按本事项种类的定义取，再补上回应指导
+    allowed = {"department_guidance_response"} | (
         proposal_kinds(department, projection.kind) & {"product_spec", "product_decision"})
     if projection.input_version > projection.processed_input_version:
         return allowed - {"product_decision"}

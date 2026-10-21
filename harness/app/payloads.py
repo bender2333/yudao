@@ -693,52 +693,6 @@ class ProductDecisionAcceptedPayload(Payload):
     git_version: GitVersion | None = None
 
 
-class CollaborationBasis(Payload):
-    intend_hash: str
-    effective_contract_hash: str | None
-    delivery_spec_hash: str | None
-    phase: Phase
-
-
-class CollaborationRequestedPayload(Payload):
-    requester: Department
-    recipient: Department
-    request_type: Literal["consultation", "action"]
-    action: Literal["inspect", "check", "revise_requirements", "revise_delivery"] | None
-    question: str
-    background: str
-    expected_result: str
-    basis: CollaborationBasis
-    return_phase: Phase
-    status: Literal["open"]
-    kind: Literal["collaboration_request"]
-    content_hash: str
-    id: str
-
-
-class CollaborationRespondedPayload(Payload):
-    # 发问方与回答方：写入回答事件时由控制核心从对应请求取出，与请求里的值相同。
-    # 旧事件（工单 #275 之前）没有这两个字段，缺省含义为未知：读取时按 request_id 查找对应请求补齐（见 projection.py）
-    requester: Department | None = None
-    recipient: Department | None = None
-    request_id: str
-    status: Literal["answered", "declined", "needs_work", "completed"]
-    text: str
-    result_event_ids: list[str]
-    return_phase: Phase
-    return_work_valid: bool
-    kind: Literal["collaboration_response"]
-    content_hash: str
-    id: str
-
-
-class CollaborationClosedPayload(Payload):
-    request_id: str
-    status: Literal["superseded", "stopped", "cancelled", "timed_out"]
-    reason: str
-    return_phase: Phase
-    return_work_valid: bool
-
 class AskStartedPayload(Payload):
     requester: Department
     recipient: Department
@@ -1556,9 +1510,6 @@ PAYLOADS: dict[str, Any] = {
     EventType.SPEC_ACCEPTED: SpecAcceptedPayload,
     EventType.SPEC_SUPERSEDED: SpecSupersededPayload,
     EventType.CONTRACT_ACCEPTED: ContractAcceptedPayload,
-    EventType.COLLABORATION_REQUESTED: CollaborationRequestedPayload,
-    EventType.COLLABORATION_RESPONDED: CollaborationRespondedPayload,
-    EventType.COLLABORATION_CLOSED: CollaborationClosedPayload,
     EventType.ASK_STARTED: AskStartedPayload,
     EventType.ASK_ANSWERED: AskAnsweredPayload,
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,

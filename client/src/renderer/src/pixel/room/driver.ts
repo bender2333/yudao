@@ -1362,14 +1362,6 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       transition(ev);
       return;
     }
-    if (ev.type === "collaboration_closed") {
-      for (const x of roleActors()) {
-        const actor = actorOf(x.id);
-        if (actor?.script && actor.anim === "wait") scene.cancel(actor);
-      }
-      if (state.eventStatus === "asking") state.eventStatus = null;
-      return;
-    }
     let action = resolveAction(ev);
     // 建档事项（3.8）中读取与搜索工具的 tool_started 播放「阅读已有项目」
     if (model.existing_read && (action === "read" || action === "search")) action = "read_existing";

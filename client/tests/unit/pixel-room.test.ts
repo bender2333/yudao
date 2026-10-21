@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 import { createRoomDriver } from "../../src/renderer/src/pixel/room/driver.ts";
 import { emptyRoomModel, letterSides, quoted } from "../../src/renderer/src/pixel/room/room.ts";
-import { collaborationSides, layoutDesks, poseAnim, resolveAction, spriteForRole, toolSpot } from "../../src/renderer/src/pixel/room/decl.ts";
+import { layoutDesks, poseAnim, resolveAction, spriteForRole, toolSpot } from "../../src/renderer/src/pixel/room/decl.ts";
 import { say, sayMs } from "../../src/renderer/src/pixel/world/say.ts";
 import { eventActionTypes, sayCatalogTypes } from "../../src/renderer/src/pixel/world/floor-decl.ts";
 import type { RoomModel } from "../../src/renderer/src/pixel/room/room.ts";
@@ -324,10 +324,6 @@ test("询问的两端：真实事件用 requester 与 recipient 经适配函数�
   // floorEventOf: 非本项目事件过滤
   assert.equal(floorEventOf(askStarted, "p2"), null);
   assert.equal(floorEventOf(askAnswered, "p2"), null);
-
-  // collaborationSides: 只读原型形状 from / to，不再读 requester / recipient 与 request_id
-  assert.deepEqual(collaborationSides("collaboration_requested", { from: "engineering", to: "product" }), { from: "engineering", to: "product" });
-  assert.equal(collaborationSides("collaboration_requested", { requester: "engineering", recipient: "product" }), null);
 });
 
 // 原型 room.js 的 setModel：状态一变就清掉排队动作（传信与交接不例外）

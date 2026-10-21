@@ -17,7 +17,8 @@ from .models import TERMINAL_PHASES
 # 版本 3：activation_finished 新增累计已用量字段 elapsed_ms、activations、model_steps（#350）
 # 版本 4：删除事件种类 plan_accepted 与工程计划工具的提交与接纳（#470）
 # 版本 5：删除工作依据、调用记录、上下文清单与正式成果里的协作请求编号（#637）
-RUN_EVENT_VERSION = 5
+# 版本 6：删除协作请求与协作回答的事件种类（#552）
+RUN_EVENT_VERSION = 6
 
 # run 流：事项的进行过程（每次 run 的交接、询问、尝试与动作）
 RUN_EVENT_TYPES = frozenset({
@@ -50,9 +51,6 @@ RUN_EVENT_TYPES = frozenset({
     "spec_accepted",
     "spec_superseded",
     "contract_accepted",
-    "collaboration_requested",
-    "collaboration_responded",
-    "collaboration_closed",
     "ask_started",
     "ask_answered",
     "product_decision_accepted",

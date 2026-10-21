@@ -149,7 +149,7 @@ def test_every_event_declares_its_actor_and_the_department_lives_in_the_departme
     user_events = {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED}
     system_events = {EventType.RUN_CREATED, EventType.TRANSITION, EventType.DEPARTMENT_ACTIVATED,
                      EventType.ACTIVATION_FINISHED, EventType.PRODUCT_INPUT_ASSIGNED,
-                     EventType.COLLABORATION_CLOSED, EventType.RUN_DONE, EventType.RUN_PAUSED,
+                     EventType.RUN_DONE, EventType.RUN_PAUSED,
                      EventType.RUN_FAILED, EventType.DECISION_REQUESTED}
     system_projects = {ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
                        ProjectEventType.WORK_ITEM_START_FAILED}

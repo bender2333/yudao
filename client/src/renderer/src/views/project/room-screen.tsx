@@ -7,9 +7,10 @@ import type { DepartmentWorkspaceResult } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { createRafClock, type Clock } from "../../pixel/clock";
 import { createRoomView, type RoomModel, type RoomView } from "../../pixel/room/view";
-import { collaborationSides, handoffOf } from "../../pixel/room/decl";
+import { handoffOf } from "../../pixel/room/decl";
 import { StreamBubble } from "../../pixel/room/stream";
 import type { PixelFloorEvent } from "../../pixel/world/types";
+import { LETTER_ANSWERED_TYPE, LETTER_ASKED_TYPE } from "../../pixel/world/types";
 
 /** 把 department.workspace 的 room 结果组装成房间画面数据（字段与原型 roomModel 一一对应）。 */
 export function roomModelOf(workspace: DepartmentWorkspaceResult): RoomModel {
@@ -45,7 +46,7 @@ export function roomModelOf(workspace: DepartmentWorkspaceResult): RoomModel {
  *  交接与询问的载荷在真实系统里不是部门，这里统一补成原型的 from/to 形状，画面与说话目录按同一份数据工作。 */
 export function roomEventOf(event: EventObject, department: string): PixelFloorEvent | null {
   const raw = event.payload as unknown as Record<string, unknown>;
-  let type = event.type;
+  let type: string = event.type;
   let payload = raw;
   let eventDept: string | null = event.department;
   if (event.type === "transition") {
@@ -58,7 +59,7 @@ export function roomEventOf(event: EventObject, department: string): PixelFloorE
     const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
     if (!requester || !recipient) return null;
     if (requester !== department && recipient !== department) return null;
-    type = "collaboration_requested";
+    type = LETTER_ASKED_TYPE;
     payload = { ...raw, from: requester, to: recipient };
     if (!eventDept) eventDept = requester;
   } else if (event.type === "ask_answered") {
@@ -66,14 +67,9 @@ export function roomEventOf(event: EventObject, department: string): PixelFloorE
     const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
     if (!requester || !recipient) return null;
     if (requester !== department && recipient !== department) return null;
-    type = "collaboration_responded";
+    type = LETTER_ANSWERED_TYPE;
     payload = { ...raw, from: recipient, to: requester };
     if (!eventDept) eventDept = recipient;
-  } else if (event.type === "collaboration_requested" || event.type === "collaboration_responded") {
-    const sides = collaborationSides(event.type, raw);
-    if (!sides) return null;
-    if (sides.from !== department && sides.to !== department) return null;
-    payload = { ...raw, from: sides.from, to: sides.to };
   } else {
     const from = typeof raw?.from === "string" ? raw.from : undefined;
     const to = typeof raw?.to === "string" ? raw.to : undefined;
