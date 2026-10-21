@@ -404,12 +404,17 @@ class WritebackExecute(CommandRequest):
 async def _execute_writeback(application: "Application", command: Command,
                              request: WritebackExecute) -> None:
     try:
-        application.system.projects.execute_writeback(
+        result = application.system.projects.execute_writeback(
             request.project_id, adoption_id=request.adoption_id, command=command)
     except ProjectNotFoundError as missing:
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     except ProjectArchivedError as archived:
         raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
+    if result is None:
+        # 没有可写回的对象是一种正常情况，按设计不写回（工单 #661）：
+        # 以前这里什么都不做，命令没有在写路径上登记，接口层回 500，用户看不到理由。
+        raise Rejection("not_allowed", "没有可写回的东西：源目录没有打开写回、没有可以写回的采纳，"
+                                       "或者最近一次采纳是建档采纳（按设计不写回）")
 
 # ---------------------------------------------------------------------------
 # 登记
@@ -457,4 +462,4 @@ SOURCE_DIRECTORY_SAVE = CommandDefinition(
     derive_refs=_no_refs, reasons=("not_found", "stale_base", "project_archived"))
 WRITEBACK_EXECUTE = CommandDefinition(
     name="writeback.execute", request=WritebackExecute, refs=NoRefs, handle=_execute_writeback,
-    derive_refs=_no_refs, reasons=("not_found", "project_archived"))
+    derive_refs=_no_refs, reasons=("not_found", "project_archived", "not_allowed"))
