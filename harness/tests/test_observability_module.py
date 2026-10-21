@@ -117,9 +117,10 @@ def _raw_usage(artifacts: ArtifactStore, usage: dict) -> dict:
     return {"kind": ref.kind, "content_hash": ref.content_hash, "path": ref.path}
 
 
-def test_usage_summary_fills_the_fields_the_raw_usage_does_not_have(tmp_path: Path):
-    # 上游原文只报了总数，规范化摘要里有分项：摘要逐字段补齐（工单 #656）。
-    # 以前原文一读到就把整个摘要跳过，输入、输出与缓存全是「未上报」。
+def test_the_raw_usage_decides_which_items_were_reported(tmp_path: Path):
+    # 原文是提供方自己的报告：它报了哪些项就是哪些项（工单 #656）。
+    # 原文没报的项保持「未上报」，不用摘要里的缺省 0 顶上——
+    # 摘要是适配器把同一份原文规范化出来的，它的 0 是「这一项没有报」。
     artifacts = ArtifactStore(tmp_path / "artifacts")
     record = {
         "raw_usage_ref": _raw_usage(artifacts, {"total_tokens": 9168}),
@@ -128,17 +129,17 @@ def test_usage_summary_fills_the_fields_the_raw_usage_does_not_have(tmp_path: Pa
         "duration_ms": 12196,
     }
     usage = attempt_usage(artifacts, "run_1", record)
-    assert usage["input_tokens"] == 7556
-    assert usage["output_tokens"] == 1612
-    assert usage["cache_read_tokens"] == 8960
-    assert usage["cache_write_tokens"] == 0
     assert usage["total_tokens"] == 9168
+    assert usage["input_tokens"] is None
+    assert usage["output_tokens"] is None
+    assert usage["cache_read_tokens"] is None
+    assert usage["cache_write_tokens"] is None
     assert usage["source"] == "reported"
-    assert usage["coverage"]["input_tokens"] == "reported"
 
 
 def test_chat_completions_raw_usage_names_are_read(tmp_path: Path):
-    # Chat Completions 协议的原文用 prompt_tokens 与 completion_tokens（工单 #656）
+    # Chat Completions 协议的原文用 prompt_tokens 与 completion_tokens，缓存明细在 prompt_tokens_details 里
+    # （工单 #656）：这些键名也读得到，输入、输出与缓存就不是「未上报」。
     artifacts = ArtifactStore(tmp_path / "artifacts")
     record = {"raw_usage_ref": _raw_usage(artifacts, {
         "prompt_tokens": 7556, "completion_tokens": 1612, "total_tokens": 9168,
@@ -152,11 +153,28 @@ def test_chat_completions_raw_usage_names_are_read(tmp_path: Path):
     assert usage["source"] == "reported"
 
 
-def test_fields_filled_from_a_summary_that_does_not_report_stay_unknown(tmp_path: Path):
-    # 摘要自己说没有上报时，补齐出来的分项是「未知」，不是「已上报」（工单 #656）
+def test_the_summary_is_used_when_the_raw_usage_is_gone(tmp_path: Path):
+    # 原文整个读不到（工件不在了）时，按事件里保存的规范化摘要读取
     artifacts = ArtifactStore(tmp_path / "artifacts")
     record = {
-        "raw_usage_ref": _raw_usage(artifacts, {}),
+        "raw_usage_ref": {"kind": "raw_usage", "content_hash": "sha256:none", "path": "run_1/none"},
+        "usage_summary": {"input_tokens": 7556, "output_tokens": 1612, "cache_read_tokens": 8960,
+                          "cache_write_tokens": 0, "total_tokens": 9168, "cost": None, "reported": True},
+    }
+    usage = attempt_usage(artifacts, "run_1", record)
+    assert usage["input_tokens"] == 7556
+    assert usage["output_tokens"] == 1612
+    assert usage["cache_read_tokens"] == 8960
+    assert usage["cache_write_tokens"] == 0
+    assert usage["total_tokens"] == 9168
+    assert usage["source"] == "reported"
+
+
+def test_a_summary_that_does_not_report_stays_unknown(tmp_path: Path):
+    # 摘要自己说没有上报时，来源是「未知」，不是「已上报」
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    record = {
+        "raw_usage_ref": {"kind": "raw_usage", "content_hash": "sha256:none", "path": "run_1/none"},
         "usage_summary": {"input_tokens": 7556, "reported": False},
     }
     usage = attempt_usage(artifacts, "run_1", record)
