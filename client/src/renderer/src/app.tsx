@@ -95,7 +95,7 @@ export function App() {
   }, [drawerOpen]);
   // 连接断开时窗口整体变灰（工单 #296）：原型样式按 body.is-disconnected 给 .y10-app 加灰度，
   // 数据保留最后一次的
-  const disconnected = state.kind === "connected" && state.streamConnected === false;
+  const disconnected = state.kind === "connected" && state.stream.kind === "interrupted";
   useEffect(() => {
     document.body.classList.toggle("is-disconnected", disconnected);
     return () => {
@@ -295,8 +295,7 @@ export function App() {
           path={pathLabel(route, projects)}
           pending={pending}
           projectDecisions={projectDecisions}
-          streamConnected={state.streamConnected}
-          disconnectedAt={state.disconnectedAt}
+          stream={state.stream}
           onPendingClick={() => navigate(paths.home())}
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
           onNavigate={navigate}

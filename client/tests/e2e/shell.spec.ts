@@ -238,6 +238,29 @@ test("事件流断开时窗口整体变灰并写明断开的时间，重新连�
   }
 });
 
+// 初次连接期间顶栏写「连接中」，不写「连接中断」与「刚刚断开」（工单 #653）
+test("初次连接期间顶栏写连接中，事件流连上以后写已连接", async () => {
+  test.setTimeout(240_000);
+  // 这个用例自己起服务：事件流的请求要在页面里延后，别的用例的时序不受影响
+  const own = await startBackend();
+  const client = await startClient(own, { width: 1440, height: 900 });
+  try {
+    // 事件流的请求延后几秒：能力清单读完到事件流连上之间这一段，页面处于「连接中」
+    await client.page.route("**/api/events**", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await route.continue();
+    });
+    await client.page.reload();
+    await expect(client.page.locator(".connection")).toHaveText(/连接中/, { timeout: 60_000 });
+    await expect(client.page.locator(".connection")).not.toContainText("连接中断");
+    await expect(client.page.locator(".connection")).not.toContainText("刚刚");
+    await expect(client.page.locator(".connection")).toHaveText("已连接", { timeout: 90_000 });
+  } finally {
+    await client.close();
+    await own.stop();
+  }
+});
+
 test("订阅位置超过日志末尾时服务端发送 resync，客户端据此重新同步快照", async () => {
   // 事件流的缺口与 resync 是「断线以后恢复」的触发条件（设计说明第 5.5 节）：
   // 客户端按位置续传，位置超过日志末尾时服务端发送 resync 并关闭连接，客户端重新查询快照再订阅。

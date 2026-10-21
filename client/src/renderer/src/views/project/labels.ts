@@ -1,6 +1,8 @@
 // 页面显示用的名称（原型 v8 设计说明第 14 节用词；取值来自应用层的查询结果，未知值原样显示，不做猜测）。
 // 单一来源：harness/app/labels.py 里的部门、阶段与状态名称，客户端按生成的合同取值对应显示。
 
+import type { StreamState } from "../../contract/stream-state";
+
 export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   product: { name: "产品", role: "把用户的要求整理成有效需求" },
   engineering: { name: "工程", role: "按有效需求实现并封存交付" },
@@ -133,6 +135,20 @@ export function label(map: Record<string, string>, value: string | null | undefi
   return map[value] ?? value;
 }
 
+// 事项状态行里的阶段名（工单 #657）。
+// 后端把用户取消的终态记成 phase=FAILED 配 stop_reason=cancelled，真正失败时也是 FAILED，
+// 区别只在停止原因上。取消是用户自己的决定，页面上不该说失败，
+// 因此取消的事项不写阶段名（状态行已经写着「已停止」，下一行的停止原因写着「运行已被取消」）。
+export function phaseLabel(phase: string | null | undefined, stopReason: string | null | undefined): string | null {
+  if (!phase) {
+    return null;
+  }
+  if (stopReason === "cancelled") {
+    return null;
+  }
+  return label(PHASE_LABELS, phase);
+}
+
 export function departmentName(value: string | null | undefined): string {
   if (!value) {
     // 事项停止后没有在处理的部门；调用处按位置决定写「没有」还是省略这一格
@@ -177,4 +193,17 @@ export function formatDuration(seconds: number | null | undefined): string {
     return `${Math.floor(total / 60)} 分 ${total % 60} 秒`;
   }
   return `${Math.floor(total / 3600)} 小时 ${Math.floor((total % 3600) / 60)} 分`;
+}
+
+// 顶栏的连接状态文字（工单 #653）：三档由事件流的状态本身给出。
+// 「连接中断」只在事件流建立过以后断开时出现，断开的时间是那一刻的真实时刻，
+// 不用「刚刚」兜底；初次连接期间说「连接中」，不声称断开过。
+export function connectionText(stream: StreamState): string {
+  if (stream.kind === "connecting") {
+    return "连接中 · 正在建立事件流";
+  }
+  if (stream.kind === "connected") {
+    return "已连接";
+  }
+  return `连接中断 · ${formatTime(stream.disconnectedAt)}断开，正在重新连接`;
 }
