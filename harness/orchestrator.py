@@ -26,7 +26,7 @@ from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
 from .contracts import current_contract_hash
-from .collaboration import guidance_resume_phase, request_still_applicable, resume_phase
+from .collaboration import guidance_target_phase
 from .decisions import (
     DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
     DecisionClosed,
@@ -116,7 +116,7 @@ class _SafeNode:
         return self._orchestrator._at_safe_node(self._activation)
 
     def settle(self, transaction: Transaction) -> RunProjection:
-        return self._orchestrator._close_obsolete_request(transaction)
+        return self._orchestrator._assign_new_inputs(transaction)
 
     async def wait(self, seconds: float) -> Judgment:
         return await self._orchestrator._wait_at_safe_node(self._activation, seconds)
@@ -413,17 +413,14 @@ class Orchestrator:
         )
 
     def _is_handoff_session(self, department: str, projection: RunProjection) -> bool:
-        # 持有交接的工程：工程部门，且这次激活产出的东西进入运行工作区——当前阶段属于工程，
-        # 或者挂起的请求要求工程重新交付（_run_workspace 是这次交付的唯一写入者）。
+        # 持有交接的工程：工程部门，且这次激活产出的东西进入运行工作区——当前阶段属于工程。
         # 询问分支与产品要求都由各自的部门在检查工作区里回答，它们才是 local-tools 第 2 节
         # 「在询问分支里回答的工程」那一格
         if department != "engineering":
             return False
         if projection.active_ask is not None and projection.active_ask.get("recipient") == department:
             return False
-        request = projection.pending_request
-        return (department == department_for_phase(projection.phase)
-                or bool(request and request.action == "revise_delivery"))
+        return department == department_for_phase(projection.phase)
 
     def _inspection_source_tree(self, department: str, projection: RunProjection) -> CapturedTree:
         # 每个会话检查工作区的建立源：质检从它当前面对的快照建立——最新的封存交付，
@@ -649,9 +646,6 @@ class Orchestrator:
         projection = transaction.projection
         if projection.phase in TERMINAL_PHASES or projection.input_version <= projection.product_work_input_version:
             return projection
-        projection = self._close_request(transaction, status="superseded",
-                                         reason="New user input requires updated product work.",
-                                         return_phase="PRODUCT_SPEC", return_work_valid=False)
         transaction.append(NewEvent(
             EventType.PRODUCT_INPUT_ASSIGNED, actor="system", department="product",
             state_before=projection.phase, state_after="PRODUCT_SPEC",
@@ -762,35 +756,6 @@ class Orchestrator:
         errors = self.sessions.close_run(run_id)
         if errors:
             self._close_errors.setdefault(run_id, []).extend(errors)
-
-    def _close_request(self, transaction: Transaction, *, status: str, reason: str,
-                       return_phase: str, return_work_valid: bool) -> RunProjection:
-        projection = transaction.projection
-        request = projection.pending_request
-        if request is None:
-            return projection
-        transaction.append(NewEvent(
-            EventType.COLLABORATION_CLOSED, actor="system", department=request.recipient,
-            parent_event_id=request.created_event_id, state_before=projection.phase, state_after=return_phase,
-            session_id=projection.sessions[request.recipient].session_id,
-            payload={"request_id": request.id, "status": status, "reason": reason,
-                     "return_phase": return_phase, "return_work_valid": return_work_valid},
-        ))
-        return transaction.projection
-
-    def _close_obsolete_request(self, transaction: Transaction) -> RunProjection:
-        # 分派新输入，关闭因此或因依据改变而过时的协作请求，交回事务中当前的运行状态
-        projection = self._assign_new_inputs(transaction)
-        request = projection.pending_request
-        if request is None or projection.phase in TERMINAL_PHASES:
-            return projection
-        events = transaction.events()
-        if request_still_applicable(request, projection, events):
-            return projection
-        tree = self._environment(projection.run_id).query(FactsQuery(tree=True)).tree
-        phase, _valid = resume_phase(request, projection, events, snapshot_hash=tree.digest)
-        return self._close_request(transaction, status="superseded", reason="The request basis changed outside its authorized work.",
-                                   return_phase=phase, return_work_valid=False)
 
     def cancel(self, run_id: str, *, command: Command | None = None) -> RunProjection:
         # 已经结束的运行不变；否则先中止运行（之后的核对都得到停止）并写入取消，再取消正在进行的步骤：
@@ -1187,7 +1152,7 @@ class Orchestrator:
         if blocks_run(transaction.decisions.values()):
             # 等待用户回答阻塞 run 或某个动作的决定请求：不开始新的激活，什么也不写
             return None
-        projection = self._close_obsolete_request(transaction)
+        projection = self._assign_new_inputs(transaction)
         if projection.phase in TERMINAL_PHASES:
             return None
         bound = activation_bound(projection, self._elapsed_sec(run_id))
@@ -1197,12 +1162,12 @@ class Orchestrator:
             else:
                 self._pause(transaction, bound)
             return None
-        normal_department = projection.pending_request.recipient if projection.pending_request else department_for_phase(projection.phase)
+        normal_department = department_for_phase(projection.phase)
         waiting_guidance = [item for item in projection.department_guidance if item.status in PENDING_GUIDANCE]
         guidance_only = False
         department = normal_department
         yielded_work = None
-        if projection.pending_request is None and waiting_guidance:
+        if waiting_guidance:
             if normal_department is None or waiting_guidance[0].department != normal_department:
                 department = waiting_guidance[0].department
                 guidance_only = department != "product"
@@ -1808,7 +1773,7 @@ class Orchestrator:
         current = transaction.projection
         if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
             return
-        current = self._close_obsolete_request(transaction)
+        current = self._assign_new_inputs(transaction)
         snapshot = environment.snapshot()
         judged = commit_decision(
             decision, department=department, proposal=proposal, basis=basis, started=started,
@@ -1930,7 +1895,7 @@ class Orchestrator:
             return
         if current.phase in TERMINAL_PHASES:
             return
-        target = guidance_resume_phase(basis, current)
+        target = guidance_target_phase(basis, current)
         if target == current.phase:
             return
         transaction.append(NewEvent(
@@ -2277,8 +2242,6 @@ class Orchestrator:
             return
         department = projection.active_department
         paused_at_phase = projection.phase
-        projection = self._close_request(transaction, status="stopped", reason=reason,
-                                         return_phase=projection.phase, return_work_valid=False)
         self._withdraw_decisions(transaction, reason)
         transaction.append(NewEvent(
             EventType.RUN_PAUSED, actor="system", department=department,
@@ -2331,9 +2294,6 @@ class Orchestrator:
         if projection.phase in TERMINAL_PHASES:
             return
         department = projection.active_department
-        status = "cancelled" if reason == "cancelled" else "timed_out" if reason == "provider_timeout" else "stopped"
-        projection = self._close_request(transaction, status=status, reason=reason,
-                                         return_phase=projection.phase, return_work_valid=False)
         self._withdraw_decisions(transaction, reason)
         source_event = transaction.append(NewEvent(
             EventType.RUN_FAILED, actor="system", department=department,

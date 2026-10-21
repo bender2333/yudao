@@ -197,8 +197,6 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
         ]
     if awaiting_initial_prd:
         item.pending_question = f"等待你确认第 {run.round} 轮的初始 PRD"
-    elif run.pending_request is not None:
-        item.pending_question = run.pending_request.question
     elif run.phase in TERMINAL_PHASES:
         item.pending_question = run.human_action
     else:

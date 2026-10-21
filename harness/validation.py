@@ -431,7 +431,7 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
         "status": "active",
         "content_hash": spec_content_hash("product_spec", payload, parent_hash=parent, revision=revision),
     }
-    if projection.pending_request is not None or projection.active_ask is not None:
+    if projection.active_ask is not None:
         return ProposalDecision(True, artifact=artifact)
     if phase in {"PRODUCT_SPEC", "REWORK_PRODUCT"}:
         transitions = [(phase, "ENGINEERING")]
@@ -453,7 +453,7 @@ def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection
     content_hash = canonical_hash(payload)
     if any(item.content_hash == content_hash for item in projection.product_decisions):
         return ProposalDecision(False, [FieldError("statement", "this product decision has already been accepted")])
-    transitions = [] if projection.pending_request else [(projection.phase, "ENGINEERING")]
+    transitions = [(projection.phase, "ENGINEERING")]
     return ProposalDecision(True, artifact={**payload, "kind": "product_decision", "content_hash": content_hash}, transitions=transitions)
 
 
@@ -517,7 +517,7 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
     return ProposalDecision(
         True,
         artifact=artifact,
-        transitions=[] if projection.pending_request else [(from_phase, "DELIVERY"), ("DELIVERY", "QUALITY")],
+        transitions=[(from_phase, "DELIVERY"), ("DELIVERY", "QUALITY")],
     )
 
 

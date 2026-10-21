@@ -242,7 +242,6 @@ def test_time_limit_stops_the_onboarding_item_and_restart_is_available(data_dir,
     result = system.run_until_stop(run_id)
     assert result.phase == "FAILED"
     assert result.stop_reason == "time_limit"
-    assert result.pending_request is None
     item = system.projects.projection(project_id).work_item(work_item_id)
     assert item.status == "stopped"
     # onboarding.restart 可用并开始新的建档事项

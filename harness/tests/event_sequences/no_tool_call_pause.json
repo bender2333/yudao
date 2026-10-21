@@ -718,7 +718,6 @@
   "human_action": "部门模型连续多次只回复文字，没有调用工具或提交提案。检查这几次模型输出后，调整任务或更换部门模型并新建运行。",
   "cycle_count": 1,
   "rework_count": 0,
-  "request_count": 0,
   "round": 0,
   "input_version": 1,
   "processed_input_version": 0,

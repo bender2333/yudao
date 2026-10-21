@@ -765,7 +765,6 @@
   "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
   "cycle_count": 1,
   "rework_count": 0,
-  "request_count": 0,
   "round": 0,
   "input_version": 1,
   "processed_input_version": 0,

@@ -11,12 +11,9 @@ from typing import Any, Protocol
 
 from pydantic import TypeAdapter
 
-from .definitions import DEFINITIONS
 from .event_store import EventStore, SavedDecision, SavedProjection, run_stream
 from .models import (
-    CollaborationRequest,
     CatalogEventType,
-    CollaborationResponse,
     DecisionRequest,
     DepartmentGuidance,
     ArtifactRef,
@@ -196,11 +193,8 @@ def replay_decisions(events: list[Event] | list[ProjectEvent]) -> dict[str, Deci
 
 
 def _settle_run_state(state: RunProjection) -> None:
-    # 由阶段、停止原因与待处理的协作请求得出的字段；可以重复计算，结果只取决于这些字段
+    # 由阶段与停止原因得出的字段；可以重复计算，结果只取决于这两个字段
     state.waiting_reason = waiting_reason_for(state.phase, state.stop_reason)
-    if state.pending_request is not None:
-        labels = DEFINITIONS.department_labels
-        state.waiting_reason = f"{labels[state.pending_request.recipient]}部门正在处理来自{labels[state.pending_request.requester]}部门的请求"
     if state.phase in TERMINAL_PHASES:
         state.outcome = {"DONE": "done", "PAUSED": "paused", "FAILED": "failed"}[state.phase]
         state.active_department = None
@@ -216,14 +210,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         if state.git_version is None or revision["commit"] != state.git_version["commit"]:
             state.git_versions.append({"event_id": event.event_id, "type": etype, **revision})
         state.git_version = revision
-    if payload.get("request_id") and etype in {
-        EventType.TOOL_CALLED, EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED,
-        EventType.DELIVERY_ACCEPTED, EventType.CONTRACT_ACCEPTED,
-    } and payload.get("name") != "provider_usage":
-        state.request_results.append({"event_id": event.event_id, "type": etype, "request_id": payload["request_id"],
-                                      "department": event.department, "name": payload.get("name"),
-                                      "ok": payload.get("ok"),
-                                      "content_hash": payload.get("content_hash")})
     if event.provider and etype not in {
             EventType.DEPARTMENT_ACTIVATED,
             EventType.CONTEXT_ASSEMBLED,
@@ -533,40 +519,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.effective_contract = contract
         return
 
-    if etype == EventType.COLLABORATION_REQUESTED:
-        _clear_feedback(state, event.department)
-        request = CollaborationRequest(
-            id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
-            requester=payload["requester"], recipient=payload["recipient"], request_type=payload["request_type"],
-            action=payload["action"], question=payload["question"], background=payload["background"],
-            expected_result=payload["expected_result"], basis=payload["basis"], return_phase=payload["return_phase"], status="open",
-        )
-        state.requests.append(request)
-        state.pending_request = request
-        state.active_department = request.recipient
-        state.request_count += 1
-        return
-
-    if etype in {EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED}:
-        _clear_feedback(state, event.department)
-        if etype == EventType.COLLABORATION_RESPONDED:
-            # 发问方与回答方：旧事件没有这两个字段，按 request_id 查找对应请求（工单 #275）
-            request = next((item for item in state.requests if item.id == payload["request_id"]), None)
-            state.responses.append(CollaborationResponse(
-                id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
-                requester=payload.get("requester") or (request.requester if request else None),
-                recipient=payload.get("recipient") or (request.recipient if request else None),
-                request_id=payload["request_id"], status=payload["status"], text=payload["text"],
-                result_event_ids=list(payload["result_event_ids"]), return_phase=payload["return_phase"],
-                return_work_valid=payload["return_work_valid"],
-            ))
-        state.requests = [replace(item, status=payload["status"]) if item.id == payload["request_id"] else item
-                          for item in state.requests]
-        if state.pending_request and state.pending_request.id == payload["request_id"]:
-            state.pending_request = None
-        state.phase = payload["return_phase"]
-        state.active_department = department_for_phase(state.phase)
-        return
     if etype == EventType.ASK_STARTED:
         state.active_ask = {
             "requester": payload["requester"],
@@ -670,7 +622,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         if payload.get("yielded_work_resolved"):
             state.yielded_work = None
         if event.state_after not in TERMINAL_PHASES:
-            state.active_department = state.pending_request.recipient if state.pending_request else department_for_phase(event.state_after)
+            state.active_department = department_for_phase(event.state_after)
         return
 
     if etype == EventType.RUN_DONE:

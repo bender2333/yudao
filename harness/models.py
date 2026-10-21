@@ -272,41 +272,6 @@ class ProductSpec:
 
 
 @dataclass(frozen=True)
-class CollaborationRequest:
-    id: str
-    run_id: str
-    content_hash: str
-    created_event_id: str
-    requester: str
-    recipient: str
-    request_type: str
-    action: str | None
-    question: str
-    background: str
-    expected_result: str
-    basis: dict[str, Any]
-    return_phase: str
-    status: str
-
-
-@dataclass(frozen=True)
-class CollaborationResponse:
-    id: str
-    run_id: str
-    content_hash: str
-    created_event_id: str
-    request_id: str
-    status: str
-    text: str
-    result_event_ids: list[str]
-    return_phase: str
-    return_work_valid: bool
-    # 发问方与回答方：旧版本的保存投影没有这两个字段，缺省为 None（未知），读取时按 request_id 查找对应请求
-    requester: str | None = None
-    recipient: str | None = None
-
-
-@dataclass(frozen=True)
 class ProductDecision:
     id: str
     run_id: str
@@ -617,7 +582,6 @@ class RunProjection:
     latency_ms: int = 0
     tool_count: int = 0
     rework_count: int = 0
-    request_count: int = 0
     provider: str = "fake"
     adapter: str = "fake"
     model: str | None = None
@@ -635,7 +599,6 @@ class RunProjection:
     product_spec: ProductSpec | None = None
     effective_contract: EffectiveContract | None = None
     delivery_spec: DeliverySpec | None = None
-    pending_request: CollaborationRequest | None = None
     active_ask: dict[str, Any] | None = None
     last_review: QAReview | None = None
     # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧 run 的事件没有这个字段时为 change
@@ -653,9 +616,6 @@ class RunProjection:
     product_specs: list[ProductSpec] = field(default_factory=list)
     effective_contracts: list[EffectiveContract] = field(default_factory=list)
     delivery_specs: list[DeliverySpec] = field(default_factory=list)
-    requests: list[CollaborationRequest] = field(default_factory=list)
-    responses: list[CollaborationResponse] = field(default_factory=list)
-    request_results: list[dict[str, Any]] = field(default_factory=list)
     product_decisions: list[ProductDecision] = field(default_factory=list)
     reviews: list[QAReview] = field(default_factory=list)
     structures: list[dict[str, Any]] = field(default_factory=list)

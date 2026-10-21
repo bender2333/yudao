@@ -494,7 +494,6 @@
   "human_action": "模型服务失败。查看错误事件后，作为新事项重新开始或更换模型服务。",
   "cycle_count": 1,
   "rework_count": 0,
-  "request_count": 0,
   "round": 0,
   "input_version": 1,
   "processed_input_version": 0,
