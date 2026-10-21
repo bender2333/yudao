@@ -23,7 +23,7 @@
         }
       },
       "notes": [
-        "普通专家回应不更新PRD；产品决定和需求正文经正常接纳后才生效。",
+        "不带 PRD 修订的回答不更新PRD；产品决定和需求正文经正常接纳后才生效。",
         "控制层校验失败会返回字段级错误，下一轮按 validation_feedback 修正。"
       ]
     },
@@ -107,18 +107,8 @@
     }
   },
   "shared": {
-    "submit_tools": ["submit_request", "submit_response", "submit_guidance_response"],
+    "submit_tools": ["submit_guidance_response"],
     "kinds": {
-      "collaboration_request": {
-        "required": ["recipient", "request_type", "question", "background", "expected_result"],
-        "request_type": ["consultation", "action"],
-        "action": ["inspect", "check", "revise_requirements", "revise_delivery"]
-      },
-      "collaboration_response": {
-        "required": ["request_id", "status", "text", "result_event_ids"],
-        "status": ["answered", "completed", "declined", "needs_work"],
-        "result_event_ids": "actual host event ids from request_results, never model call ids"
-      },
       "department_guidance_response": {
         "required": ["guidance_id", "status", "text", "result_event_ids"],
         "status": ["explained", "completed", "declined", "needs_work"],

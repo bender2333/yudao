@@ -43,7 +43,7 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
     if request is not None:
         if request.status != "open" or department != request.recipient:
             return set()
-        allowed = {"collaboration_response"}
+        allowed: set[str] = set()
         if request.request_type == "action" and request.action == "revise_requirements":
             allowed.update({"product_spec", "product_decision"})
         if request.request_type == "action" and request.action == "revise_delivery":
@@ -54,49 +54,12 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
     if department != department_for_phase(projection.phase):
         return _diverted_guidance_kinds(department, projection) if has_guidance else set()
     # 本部门在这种事项种类中可以提交的提案种类由定义给出（工单 #134）：普通事项与建档事项的清单不同
-    allowed = {"collaboration_request"} | (proposal_kinds(department, projection.kind)
-                                           - {"collaboration_request", "collaboration_response",
-                                              "department_guidance_response"})
+    allowed = proposal_kinds(department, projection.kind) - {"department_guidance_response"}
     if has_guidance:
         allowed.add("department_guidance_response")
     if projection.input_version > projection.processed_input_version:
         return allowed - {"product_decision"} if department == "product" else set()
     return allowed
-
-
-def request_errors(proposal: dict[str, Any], projection: RunProjection,
-                   department: str) -> list[dict[str, str]]:
-    errors = []
-    if projection.pending_request is not None:
-        errors.append(_error("request", "finish the pending request before starting another request"))
-    if department not in DEPARTMENTS:
-        errors.append(_error("requester", "only the current working department can start a request"))
-    elif (department != department_for_phase(projection.phase)
-          and not _has_pending_guidance(projection, department)):
-        errors.append(_error("requester", "only the current working department can start a request"))
-    recipient = proposal.get("recipient")
-    if recipient not in DEPARTMENTS or recipient == department:
-        errors.append(_error("recipient", "recipient must be a different department"))
-    for field in ("question", "background", "expected_result"):
-        if not isinstance(proposal.get(field), str) or not proposal[field].strip():
-            errors.append(_error(field, f"{field} must be a non-empty string"))
-    request_type, action = proposal.get("request_type"), proposal.get("action")
-    if request_type not in {"consultation", "action"}:
-        errors.append(_error("request_type", "request_type must be consultation or action"))
-    elif request_type == "consultation":
-        if action is not None:
-            errors.append(_error("action", "a consultation cannot authorize an action"))
-    elif action not in {"inspect", "check", "revise_requirements", "revise_delivery"}:
-        errors.append(_error("action", "an action request requires a supported action"))
-    elif action in {"revise_requirements", "revise_delivery"}:
-        expected = "product" if action == "revise_requirements" else "engineering"
-        if recipient != expected:
-            errors.append(_error("recipient", f"{action} requires the {expected} department"))
-        if projection.effective_contract is None:
-            errors.append(_error("effective_contract", "revision requires an existing effective contract"))
-        if projection.input_version > projection.processed_input_version:
-            errors.append(_error("input_version", "accept the pending user input in a complete ProductSpec before revising downstream work"))
-    return errors
 
 
 def tool_error(projection: RunProjection, department: str, name: str,
@@ -149,54 +112,6 @@ def request_still_applicable(request: CollaborationRequest, projection: RunProje
                 return False
             expected["delivery_spec_hash"] = None
     return expected == request_basis(projection)
-
-
-def response_errors(proposal: dict[str, Any], projection: RunProjection, department: str,
-                    events: list[Event], *, snapshot_hash: str) -> list[dict[str, str]]:
-    request = projection.pending_request
-    if request is None:
-        return [_error("request_id", "there is no open request")]
-    errors = []
-    if proposal.get("request_id") != request.id or department != request.recipient:
-        errors.append(_error("request_id", "the response must belong to this request and its recipient"))
-    if not request_still_applicable(request, projection, events):
-        errors.append(_error("request_id", "the request is closed or its work basis has been superseded"))
-    statuses = {"answered", "declined", "needs_work"} if request.request_type == "consultation" else {
-        "completed", "declined", "needs_work"
-    }
-    status = proposal.get("status")
-    if status not in statuses:
-        errors.append(_error("status", f"this request requires one of: {', '.join(sorted(statuses))}"))
-    if not isinstance(proposal.get("text"), str) or not proposal["text"].strip():
-        errors.append(_error("text", "a response explanation is required"))
-    references = proposal.get("result_event_ids")
-    if not isinstance(references, list) or any(not isinstance(item, str) or not item for item in references):
-        return errors + [_error("result_event_ids", "result_event_ids must be a list of event IDs")]
-    if len(references) != len(set(references)):
-        errors.append(_error("result_event_ids", "result event IDs must be unique"))
-    creation = _creation(request, events)
-    indexed = {event.event_id: event for event in events}
-    results = []
-    for reference in references:
-        event = indexed.get(reference)
-        if event is None or creation is None or not _owned(event, request, creation):
-            errors.append(_error("result_event_ids", f"{reference} is not a result of this request's recipient"))
-            continue
-        if event.type == EventType.TOOL_CALLED:
-            result = _tool_result(event, request, creation, events)
-            if result is None:
-                errors.append(_error("result_event_ids", f"{reference} has no matching host tool execution"))
-                continue
-            if status in {"completed", "answered"} and not _usable_tool_result(event, result, projection, snapshot_hash):
-                errors.append(_error("result_event_ids", f"{reference} is failed, changed, or no longer bound to the current work"))
-                continue
-        elif event.type not in _ACCEPTED_RESULTS or not _authorized_result(event.type, request):
-            errors.append(_error("result_event_ids", f"{reference} is not an accepted result allowed by this request"))
-            continue
-        results.append(event)
-    if status == "completed" and not _has_completed_action(request, projection, results, snapshot_hash):
-        errors.append(_error("result_event_ids", "completed requires a current host result for the requested action"))
-    return errors
 
 
 def guidance_response_errors(proposal: dict[str, Any], projection: RunProjection, department: str,
@@ -340,26 +255,6 @@ def resume_phase(request: CollaborationRequest, projection: RunProjection, event
     if delivery_current:
         return "QUALITY", False
     return "ENGINEERING", False
-
-
-def _has_completed_action(request: CollaborationRequest, projection: RunProjection,
-                          results: list[Event], snapshot_hash: str) -> bool:
-    if request.action in {"inspect", "check"}:
-        names = _READS if request.action == "inspect" else _CHECKS
-        return any(event.type == EventType.TOOL_CALLED and event.payload.get("name") in names for event in results)
-    if request.action == "revise_requirements":
-        return any(
-            event.type == EventType.SPEC_ACCEPTED and event.payload.get("content_hash") == _content_hash(projection.product_spec)
-            or event.type == EventType.PRODUCT_DECISION_ACCEPTED and any(
-                event.payload.get("content_hash") == item.content_hash for item in projection.effective_decisions
-            ) for event in results
-        )
-    delivery = projection.delivery_spec
-    return bool(request.action == "revise_delivery" and delivery
-                and delivery.code_tree_digest == snapshot_hash
-                and delivery.effective_contract_hash == _content_hash(projection.effective_contract)
-                and any(event.type == EventType.DELIVERY_ACCEPTED
-                        and event.payload.get("content_hash") == delivery.content_hash for event in results))
 
 
 def _tool_result(event: Event, request: CollaborationRequest, creation: Event,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import sys
 from collections.abc import AsyncIterator, Callable, Generator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -45,12 +44,6 @@ def prompt_parts(call: ModelCall) -> dict[str, str]:
 
 def prompt_part(call: ModelCall, source: str) -> str | None:
     return prompt_parts(call).get(source)
-
-
-def pending_request_id(call: ModelCall) -> str | None:
-    # 请求中写明的待处理协作请求
-    pending = prompt_part(call, "pending_request")
-    return None if pending is None else json.loads(pending)["id"]
 
 
 def session_key(call: ModelCall) -> str:

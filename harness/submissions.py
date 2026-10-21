@@ -62,11 +62,7 @@ class SubmissionWriter:
         request_id = None if projection.pending_request is None else projection.pending_request.id
 
         def append(event_type: str, payload: dict[str, Any], hashes: list[str] | None = None) -> int:
-            if event_type not in {
-                EventType.COLLABORATION_REQUESTED,
-                EventType.COLLABORATION_RESPONDED,
-                EventType.DEPARTMENT_GUIDANCE_RESPONDED,
-            }:
+            if event_type != EventType.DEPARTMENT_GUIDANCE_RESPONDED:
                 payload = {**payload, "request_id": request_id}
             prepared.append((event_type, payload, hashes or []))
             event = Event(event_id="uncommitted", run_id=run_id, type=event_type, role=None, **metadata,
@@ -92,14 +88,6 @@ class SubmissionWriter:
         elif kind == "product_decision":
             artifact["id"] = new_id("decision")
             event = append(EventType.PRODUCT_DECISION_ACCEPTED, artifact, [artifact["content_hash"]])
-        elif kind == "collaboration_request":
-            artifact["id"] = new_id("request")
-            event = append(EventType.COLLABORATION_REQUESTED, artifact, [artifact["content_hash"]])
-        elif kind == "collaboration_response":
-            artifact["id"] = new_id("response")
-            metadata["state_after"] = artifact["return_phase"]
-            environment.verify_tree(snapshot)
-            event = append(EventType.COLLABORATION_RESPONDED, artifact, [artifact["content_hash"]])
         elif kind == "department_guidance_response":
             event = append(EventType.DEPARTMENT_GUIDANCE_RESPONDED, artifact, [artifact["content_hash"]])
         elif kind == "delivery_spec":

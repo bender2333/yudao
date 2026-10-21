@@ -153,17 +153,6 @@
     "tighten_when": "对照中出现范围外修改",
     "origin": "harness/adjudication.py 的写入许可校验；规则登记第 8 节表格"
   },
-  "organization.single_open_request": {
-    "value": true,
-    "bounds": [0, 1],
-    "kind": "structure",
-    "form": "admission",
-    "guards": "询问链失去控制",
-    "cost": "不能同时发出多个询问",
-    "relax_when": "询问次数与等待时间的记录显示它成为等待的主要原因",
-    "tighten_when": "嵌套请求的等待时间长期占满",
-    "origin": "organization.json 的 collaboration_rules；D31 同一事项同一时刻一个未结请求，不嵌套"
-  },
   "roles.product.visibility": {
     "value": ["qa_defects"],
     "bounds": [0, 4],

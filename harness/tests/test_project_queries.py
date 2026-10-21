@@ -42,7 +42,7 @@ from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import (
     product_spec, delivery_turn, review_turn,
-    collaboration_request, response_turn, ask_turn, answer_turn,
+    ask_turn, answer_turn,
 )
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse

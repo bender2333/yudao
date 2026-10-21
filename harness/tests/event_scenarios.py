@@ -23,8 +23,8 @@ from harness.models import EventType, Usage, json_dumps
 from harness.providers.call import ModelCall, ModelResponse
 from harness.proposals import (
     answer_turn, ask_turn,
-    collaboration_request, delivery, delivery_turn, guidance_response,
-    product_spec, response_turn, review, review_turn,
+    delivery, delivery_turn, guidance_response,
+    product_spec, review, review_turn,
 )
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
@@ -184,16 +184,6 @@ def tool_denied_guidance_only(data_dir):
                                        text="指导不能授权修改交付，写文件被拒绝。"),
         ),
         _release(),
-    ])
-    system.run_until_stop(run_id)
-    return system, run_id, {}
-
-
-def collaboration_request_answer(data_dir):
-    system, _, run_id = _system(data_dir, [
-        product_spec(), collaboration_request(),
-        response_turn("answered", "The existing contract covers unknown flags: print them as given."),
-        _deliver(), _release(),
     ])
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -656,9 +646,6 @@ SCENARIOS: dict[str, Scenario] = {
     "tool_denied_guidance_only": Scenario(
         "质检阶段收到给工程部门的指导：工程部门以只能回应指导的方式激活，写文件被工具许可拒绝，回应指导（explained）后回到质检并放行。",
         tool_denied_guidance_only),
-    "collaboration_request_answer": Scenario(
-        "工程部门向产品部门提出咨询，产品部门回答（answered），工程部门继续交付，质检放行。",
-        collaboration_request_answer),
     "ask_answer_with_spec_revision": Scenario(
         "工程询问产品，产品在分支里修订 PRD 并回答，工程收到回答与 PRD 新版本，接着交付，质检放行。",
         ask_answer_with_spec_revision),
