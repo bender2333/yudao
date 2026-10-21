@@ -446,7 +446,7 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
         assert audit["context_isolated"] is True
         assert audit["replay_consistent"] is True
         assert audit["fake_used"] is False
-        assert audit["collaboration_audit"]["status"] == "verified", audit["collaboration_audit"]
+        assert audit["ask_audit"]["status"] == "verified", audit["ask_audit"]
 
 def test_each_run_resolves_credentials_from_its_own_source(tmp_path):
     def product_response(body: dict[str, Any], count: int) -> _Reply:
