@@ -443,6 +443,53 @@ test.describe("项目页面（1440×900）", () => {
     });
   });
 
+  // 工单 #672：勾上「显示归档的项目」以后，已归档的项目出现在侧栏里，能从它的菜单里恢复。
+  // 这条用例改变服务端状态（归档与恢复项目），用自己的一份后端，共用的那份不受影响。
+  test("侧栏：显示归档的项目以后能取回归档的项目", async () => {
+    test.setTimeout(300_000);
+    const own = await startBackend();
+    try {
+      const client = await startClient(own, { width: 1440, height: 900 });
+      const errors = watchErrors(client);
+      const page = client.page;
+      try {
+        const entry = page.locator("li.project-entry").filter({ hasText: SAMPLE }).first();
+        await entry.getByRole("button", { name: `${SAMPLE} 的项目操作` }).click();
+        await page.getByRole("button", { name: "归档项目" }).click();
+        await waitUntil(
+          async () => (await page.locator("li.project-entry").filter({ hasText: SAMPLE }).count()) === 0,
+          page, "归档以后项目从列表里消失");
+
+        // 勾上「显示归档的项目」：它重新出现，并带「已归档」标记
+        await page.getByLabel("显示归档的项目").check();
+        const archived = page.locator("li.project-entry").filter({ hasText: SAMPLE }).first();
+        await expect(archived).toBeVisible();
+        await expect(archived).toContainText("已归档");
+
+        // 取消勾选以后已归档的项目重新消失
+        await page.getByLabel("显示归档的项目").uncheck();
+        await waitUntil(
+          async () => (await page.locator("li.project-entry").filter({ hasText: SAMPLE }).count()) === 0,
+          page, "取消勾选以后已归档的项目重新消失");
+
+        // 再勾上，从它的菜单里恢复：项目回到列表里
+        await page.getByLabel("显示归档的项目").check();
+        const again = page.locator("li.project-entry").filter({ hasText: SAMPLE }).first();
+        await expect(again).toBeVisible();
+        await again.getByRole("button", { name: `${SAMPLE} 的项目操作` }).click();
+        await page.getByRole("button", { name: "恢复项目" }).click();
+        await waitUntil(
+          async () => (await page.locator("li.project-entry").filter({ hasText: SAMPLE }).count()) === 1,
+          page, "恢复以后项目回到列表里");
+        expect(errors).toEqual([]);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      await own.stop();
+    }
+  });
+
   test("部门工作间：标题区、检查区页签、部门消息与部门设置弹窗", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);

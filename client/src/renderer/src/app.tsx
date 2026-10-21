@@ -24,6 +24,7 @@ import { ObserveDetailPage, ObservePage } from "./views/project/observe";
 import { OverviewPage } from "./views/project/overview";
 import { RecoveryPage } from "./views/project/recovery";
 import { SettingsPage } from "./views/project/settings";
+import { projectsListParams } from "./views/project/project-list";
 import { departmentName } from "./views/project/labels";
 
 // 图鉴页只在开发时用到；用动态导入把它挡在正式包之外
@@ -104,14 +105,25 @@ export function App() {
   }, [disconnected]);
   // 已连接以后读取项目列表与系统状态；这些视图按事件种类重新查询
   const connected = state.kind === "connected" ? state : null;
+  // 侧栏「显示归档的项目」开关：项目列表按它取数，勾上时已归档的项目也在列表里（工单 #672）
+  const [includeArchived, setIncludeArchived] = useState(false);
   useEffect(() => {
     const views = app.viewSync;
     if (!connected || !views) {
       return;
     }
-    void views.open<ProjectList>("shell.projects", { query: "projects.list", params: {} }, (data) => {
+    void views.open<ProjectList>("shell.projects", { query: "projects.list", params: projectsListParams(includeArchived) }, (data) => {
       setProjects(data.projects);
     });
+    return () => {
+      views.close("shell.projects");
+    };
+  }, [app, connected, includeArchived]);
+  useEffect(() => {
+    const views = app.viewSync;
+    if (!connected || !views) {
+      return;
+    }
     void views.open<DecisionList>("shell.decisions", { query: "decisions.list", params: { status: ["open"] } }, (data) => {
       const grouped: Record<string, number> = {};
       for (const decision of data.decisions) {
@@ -126,7 +138,6 @@ export function App() {
       setSystemStatus(data);
     });
     return () => {
-      views.close("shell.projects");
       views.close("shell.decisions");
       views.close("shell.status");
     };
@@ -281,6 +292,8 @@ export function App() {
         activeProjectId={route.projectId}
         activeName={route.name}
         pendingByProject={pendingByProject}
+        includeArchived={includeArchived}
+        onIncludeArchivedChange={setIncludeArchived}
         onNavigate={navigate}
       />
       {drawerOpen ? (
