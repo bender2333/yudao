@@ -42,34 +42,51 @@ export function roomModelOf(workspace: DepartmentWorkspaceResult): RoomModel {
 }
 
 /** 把事件流里的事件转成部门房间的事件（只保留本部门相关的事件）。
- *  交接与传信的载荷在真实系统里不是部门（交接是工作阶段，传信写 requester/recipient），
- *  这里统一补成原型的 from/to 形状，画面与说话目录按同一份数据工作。 */
-export function roomEventOf(event: EventObject, department: string,
-                            requests?: Map<string, { requester: string; recipient: string }>): PixelFloorEvent | null {
+ *  交接与询问的载荷在真实系统里不是部门，这里统一补成原型的 from/to 形状，画面与说话目录按同一份数据工作。 */
+export function roomEventOf(event: EventObject, department: string): PixelFloorEvent | null {
   const raw = event.payload as unknown as Record<string, unknown>;
+  let type = event.type;
   let payload = raw;
+  let eventDept: string | null = event.department;
   if (event.type === "transition") {
     const handoff = handoffOf(raw);
     if (!handoff) return null;
     if (handoff.from !== department && handoff.to !== department) return null;
     payload = { ...raw, from: handoff.from, to: handoff.to, artifact: handoff.artifact };
+  } else if (event.type === "ask_started") {
+    const requester = typeof raw?.requester === "string" ? raw.requester : null;
+    const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
+    if (!requester || !recipient) return null;
+    if (requester !== department && recipient !== department) return null;
+    type = "collaboration_requested";
+    payload = { ...raw, from: requester, to: recipient };
+    if (!eventDept) eventDept = requester;
+  } else if (event.type === "ask_answered") {
+    const requester = typeof raw?.requester === "string" ? raw.requester : null;
+    const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
+    if (!requester || !recipient) return null;
+    if (requester !== department && recipient !== department) return null;
+    type = "collaboration_responded";
+    payload = { ...raw, from: recipient, to: requester };
+    if (!eventDept) eventDept = recipient;
   } else if (event.type === "collaboration_requested" || event.type === "collaboration_responded") {
-    const sides = collaborationSides(event.type, raw, event.department, requests);
+    const sides = collaborationSides(event.type, raw);
     if (!sides) return null;
     if (sides.from !== department && sides.to !== department) return null;
     payload = { ...raw, from: sides.from, to: sides.to };
   } else {
-    const from = raw?.from as string | undefined;
-    const to = raw?.to as string | undefined;
+    const from = typeof raw?.from === "string" ? raw.from : undefined;
+    const to = typeof raw?.to === "string" ? raw.to : undefined;
     const related = event.department === null || event.department === department
       || from === department || to === department;
     if (!related) return null;
   }
+  const toolVal = typeof payload?.tool === "string" ? payload.tool : typeof payload?.name === "string" ? payload.name : null;
   return {
-    type: event.type,
-    department: event.department,
+    type,
+    department: eventDept,
     role: event.role,
-    tool: (payload.tool as string | null) ?? (payload.name as string | null) ?? null,
+    tool: toolVal,
     label: event.label,
     work_item_id: event.work_item_id,
     project_id: event.project_id,
@@ -181,17 +198,8 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
 
   useEffect(() => {
     const bubble = bubbleRef.current;
-    // 本次连接内见过的询问：旧事件的回答里没有两端时按 request_id 回退查找
-    const requests = new Map<string, { requester: string; recipient: string }>();
     const off = props.app.subscribeEvents((event) => {
-      const seen = event.payload as unknown as Record<string, unknown>;
-      if (event.type === "collaboration_requested") {
-        const id = typeof seen.request_id === "string" ? seen.request_id : null;
-        const requester = typeof seen.requester === "string" ? seen.requester : null;
-        const recipient = typeof seen.recipient === "string" ? seen.recipient : null;
-        if (id && requester && recipient) requests.set(id, { requester, recipient });
-      }
-      const roomEvent = roomEventOf(event, department, requests);
+      const roomEvent = roomEventOf(event, department);
       if (roomEvent) viewRef.current?.playEvent(roomEvent);
       // 流式输出：模型请求开始时先查询 attempt.live 得到已收到的文字，之后再按 offset 接上片段
       const payload = event.payload as unknown as Record<string, unknown>;
