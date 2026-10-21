@@ -781,3 +781,5 @@ minimax-M3.1-Flash / 2026-10-22 01:25 / docs/user-session-log.md 补「项目级
 minimax-M3.1-Flash / 2026-10-22 01:45 / docs/user-session-log.md 补 U09（写回命令在没有可写回对象时返回 500 内部错误）与三条记下备查的观察：写回在界面上还没有入口（源目录设置页没有写回开关，也没有写回按钮）、最新采纳被前一次挡住时写回没有可操作的出路、源目录保存的 remote 与 target_branch 合同最小长度 1 与默认值空串矛盾 / 继续以用户身份使用系统，走「写回」这条路径，发现的问题先记录再交工单：#661
 
 minimax-M3.1-Flash / 2026-10-22 02:05 / docs/user-session-log.md 补四条确认正常的行为：项目菜单的重命名、置顶、归档与恢复都按设计工作（归档后默认列表不列出、恢复后回来）、基准版本过期时命令被拒并给出当前版本、首页「已读」标记可用、源目录保存的合同矛盾对客户端不生效 / 继续以用户身份使用系统，把项目菜单与首页标记这两条路径走完
+
+执行者 minimax-M3.1-Flash / 2026-10-22 02:10 / 工单 #653 顶栏的连接状态分三档：新增 client/src/renderer/src/contract/stream-state.ts（事件流的三档状态与状态迁移，没有依赖的小模块）；client-app.ts 的 ClientState 把 streamConnected 与 disconnectedAt 两个字段换成 stream: StreamState，握手完成后先报「连接中」，建立过以后断开才变成「连接中断」并带上那一刻；labels.ts 增加 connectionText 给三档的中文写法；topbar.tsx 与 app.tsx 按新的状态显示与判断窗口变灰 / 用户走查 U02：页面刚打开的几秒里顶栏写「连接中断 · 刚刚断开」，而这一次连接从未建立过
