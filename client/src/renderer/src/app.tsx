@@ -294,6 +294,7 @@ export function App() {
         pendingByProject={pendingByProject}
         includeArchived={includeArchived}
         onIncludeArchivedChange={setIncludeArchived}
+        drainState={systemStatus === null ? null : systemStatus.drain.state}
         onNavigate={navigate}
       />
       {drawerOpen ? (

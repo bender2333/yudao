@@ -8,6 +8,7 @@ import type { Capabilities, DecisionView, ProjectRow, Rejected } from "../api/ge
 import type { ClientApp } from "../contract/client-app";
 import { useCommand } from "../views/project/use-snapshot";
 import { visibleProjects } from "../views/project/project-list";
+import { drainNoticeText } from "../views/system/drain-text";
 import { Icon, StatusMark } from "./kit";
 import { onboardingRejectionText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
 
@@ -22,6 +23,8 @@ export type SidebarProps = {
   // 侧栏「显示归档的项目」开关：项目列表的查询按它取数（工单 #672）
   includeArchived: boolean;
   onIncludeArchivedChange: (value: boolean) => void;
+  // 排空状态：排空期间新的事项只排队不开始，侧栏给出提示（工单 #663）
+  drainState: string | null;
   onNavigate: (hash: string) => void;
 };
 
@@ -66,6 +69,8 @@ export function Sidebar(props: SidebarProps) {
   // 项目列表由外壳打开（viewId "shell.projects"）：命令被接受以后事件到达，列表按事件种类重新查询
   const markKey = useMemo(() => JSON.stringify(props.decisions.map((decision) => [decision.decision_id, decision.status])), [props.decisions]);
   const command = useCommand(props.app, JSON.stringify(props.projects) + markKey);
+  // 排空期间新的事项只排队不开始：用户在这里就能看出原因（工单 #663）
+  const drainNotice = drainNoticeText(props.drainState);
   const visible = useMemo(
     () => visibleProjects(props.projects, { search, includeArchived: props.includeArchived }),
     [props.projects, search, props.includeArchived],
@@ -133,6 +138,9 @@ export function Sidebar(props: SidebarProps) {
           <span>项目</span>
           <span className="y10-count count">{props.projects.length}</span>
         </div>
+        {drainNotice === null ? null : (
+          <p className="y10-note note" role="status">{drainNotice}</p>
+        )}
         <ul className="y10-project-list nav-group">
           {visible.map((project) => {
             const marks = statusMarks(project, props.decisions);

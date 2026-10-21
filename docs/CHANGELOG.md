@@ -850,3 +850,5 @@ minimax-M3.1-Flash / 2026-10-22 12:05 / docs/user-session-log.md 补 U22（#664 
 执行者 minimax-M3.1-Flash / 2026-10-22 14:05 / 工单 #672 勾上「显示归档的项目」以后已归档的项目重新出现：开关的状态从侧栏提到外壳（app.tsx），项目列表的视图按它打开（include_archived 参数），新增 client/src/renderer/src/views/project/project-list.ts 给查询参数与可见性；新增 client/tests/unit/project-list.test.ts 四项与 client/tests/e2e/project.spec.ts 一条端到端用例（归档、勾上、取消勾选、恢复） / 用户走查 U17：界面上写着「已归档的项目不列出，可用「恢复项目」取回」，但「恢复项目」只在已归档项目的菜单里出现，这条路走不通
 
 执行者 minimax-M3.1-Flash / 2026-10-22 16:45 / 修正工单 #656 的用量合并规则：harness/observability.py 的 attempt_usage 回到「原文在场时由原文决定，原文整个读不到时才按摘要读取」，并保留各协议自己的键名（prompt_tokens、completion_tokens、prompt_tokens_details）；摘要里的 0 是「这一项没有报」的缺省值，不再拿来补原文缺的项；harness/tests/test_observability_module.py 里 #656 的三项按修正后的规则改写并加一项 / #656 合并以后 main 上每次合并以后的集成层有两项失败：逐字段合并把摘要的缺省 0 补成了「报了 0」，与工单自己的验收标准第 4 条相反
+
+执行者 minimax-M3.1-Flash / 2026-10-22 05:05 / 工单 #663 「开始排空」先确认再执行：新增 client/src/renderer/src/views/system/drain-text.ts 给确认框的措辞与排空期间的提示，runtime.tsx 的「开始排空」先开确认框（写明不再开始新事项、这一步回不去、剩下的是强制升级），sidebar.tsx 与 app.tsx 在排空期间于侧栏项目列表上方给出提示；新增 client/tests/unit/drain-text.test.ts 四项 / 用户走查 U10：「开始排空」不可逆，界面上既没有确认也没有说明回不去
