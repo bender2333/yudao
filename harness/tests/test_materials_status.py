@@ -1,0 +1,51 @@
+# 资料页的 PRD 一节显示各版真实状态（工单 #654）：当前有效的一版标 active，
+# 被取代的旧版标 superseded；同一页的交付一节用同一套词。
+#
+# 场景：产品提交第一版 PRD，工程发问，产品在回答里修订 PRD（第二版并重新接纳），
+# 工程交付，质检放行。这样这个 run 里有两版 PRD 与两份有效合同。
+
+from harness.adapters.fake import FakeAdapter
+from harness.app.application import Application
+from harness.app.project_queries import WorkItemMaterials
+from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
+from harness.runtime import LoopSystem
+
+GOAL = "把文本按行处理清楚"
+
+
+def _scripts() -> dict[str, list]:
+    return {
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn("product", "Should output be uppercase?",
+                     background="Clarification needed", expected="Specification update"),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
+        ],
+        "product:ask": [
+            answer_turn("Yes, print in uppercase.",
+                        requirements=["print the given argument in uppercase to stdout"],
+                        change_record={"changed": ["print the given argument in uppercase to stdout"],
+                                       "retained": ["single file implementation"],
+                                       "retired": [],
+                                       "rationale": "Clarification revision."}),
+        ],
+        "quality": [review_turn("release", "valid uppercase implementation")],
+    }
+
+
+def test_materials_prd_versions_carry_their_real_status(tmp_path):
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(_scripts()))
+    project_id = system.projects.register("资料页的 PRD 状态", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+
+    # 投影里两版 PRD：旧的被取代，新的当前有效
+    projection = system.project(run_id)
+    assert [spec.status for spec in projection.product_specs] == ["superseded", "active"]
+
+    application = Application(system)
+    materials = application.query("work_item.materials", WorkItemMaterials(
+        project_id=project_id, work_item=work_item_id))
+    assert [entry.status for entry in materials.data.contracts] == ["superseded", "active"]
+    # 交付一节用同一套词
+    assert [entry.status for entry in materials.data.deliveries][-1] == "active"

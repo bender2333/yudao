@@ -822,3 +822,5 @@ minimax-M3.1-Flash / 2026-10-22 09:00 / docs/user-session-log.md 补一条确认
 minimax-M3.1-Flash / 2026-10-22 09:15 / docs/user-session-log.md 开头补「这一轮走查的概览」：范围（3 个项目、8 个事项、12 个页面）、15 张工单的分组（已修复并确认 / 已分诊 / 等分诊）、最要紧的 #664 与 #672 各一句话 / 让下一个人接得上：走查的范围、结论与待办一次看清
 
 minimax-M3.1-Flash / 2026-10-22 09:35 / docs/user-session-log.md 补两条确认正常的行为：资料页的「按事项查看」点标题按钮能切换到那个事项的资料（并显示它自己的条数）、「建档各轮」两轮记得齐全（PRD、结构说明、仓库概况、基线核验、决定记录，第二轮带着上次的修改意见原文） / 继续以用户身份使用系统：核对了资料页的事项切换与建档各轮的记录，顺便记下一条自己的教训——卡片不是可点的，得点标题按钮
+
+执行者 minimax-M3.1-Flash / 2026-10-22 09:45 / 工单 #654 资料页的 PRD 各版显示真实状态：harness/app/project_queries.py 里合同（PRD）各版的状态改为取 run.product_specs 中那一版 PRD 的真实状态（按合同的 product_spec_hash 对应），当前有效的一版是 active、被取代的旧版是 superseded，与交付一节用同一套词；新增 harness/tests/test_materials_status.py 并在 layers.toml 登记 / 用户走查 U03：资料页的 PRD 一节把每一版都标成 active，看不出哪一版已被取代，而同一页的交付一节标得是对的
