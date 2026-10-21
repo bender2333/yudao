@@ -98,10 +98,9 @@ def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():
         "delivery_archive": {"status": "verified"},
         "git_audit": {"status": "verified"},
         "fake_used": False,
-        "request_count": 2,
-        "collaboration_audit": {"status": "verified", "pre_spec_consultation": True, "requirements_action": True},
+        "ask_audit": {"status": "verified", "pre_spec_ask": True, "requirements_revision": True},
     }
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": done, "collaboration": done}}) == 0
+    assert smoke_exit_code({"available": True, "scenarios": {"happy": done, "ask": done}}) == 0
     fake = dict(done, fake_used=True)
     assert smoke_exit_code({"available": True, "scenarios": {"happy": fake}}) == 2
     no_receipts = dict(done, check_receipts=[])

@@ -5,7 +5,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.compaction import SUMMARY_OUTPUT_TOKENS
 from harness.models import EventType, canonical_hash, json_dumps
 from harness.engine import StepLimits
-from harness.proposals import collaboration_request, product_spec
+from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import (
@@ -80,14 +80,12 @@ def test_changed_contract_rebuilds_compaction_from_preserved_original_sources(tm
     source = next(event for event in system.store.list_events(run_id)
                   if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
     original = system.artifacts.get_text(source.payload["output_ref"]["content_hash"])
-    system.activate_once(run_id)
-    engineering = next(request for request in adapter.invocations if request.department == "engineering")
-    assert "department_memory" not in json_dumps(engineering.input_items)
-    assert "FIRST_TOOL_ORIGINAL" not in json_dumps(engineering.input_items)
     system.workspace(run_id).write_file("large.txt", "SECOND_TOOL_ORIGINAL " * 2200)
     reloaded = LoopSystem.for_testing(tmp_path, adapter, resume_on_startup=False)
     result = reloaded.activate_once(run_id)
-    assert result.phase == "ENGINEERING", result.error
+    engineering = next(request for request in adapter.invocations if request.department == "engineering")
+    assert "department_memory" not in json_dumps(engineering.input_items)
+    assert "FIRST_TOOL_ORIGINAL" not in json_dumps(engineering.input_items)
     previous_ids = {item["source_event_id"] for item in first.compactions}
     later = [record for record in result.compactions if record["source_event_id"] not in previous_ids]
     assert later and later[0]["previous_compaction_event_id"] is None
@@ -97,7 +95,8 @@ def test_changed_contract_rebuilds_compaction_from_preserved_original_sources(tm
     assert system.artifacts.get_text(source.payload["output_ref"]["content_hash"]) == original
     assert original.count("FIRST_TOOL_ORIGINAL") == 2200
     assert later[-1]["checkpoint"]["boundary"]
-    assert recorded_context(reloaded, adapter.invocations[-1]).manifest.compaction_event_id == later[-1]["source_event_id"]
+    product_invocations = [r for r in adapter.invocations if r.department == "product"]
+    assert recorded_context(reloaded, product_invocations[-1]).manifest.compaction_event_id == later[-1]["source_event_id"]
     assert result.canonical_state() == reloaded.replay(run_id).canonical_state()
 
 
@@ -257,7 +256,7 @@ def test_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path):
             # 返回空摘要
             return ModelResponse(output=[_message(request, "")])
         if request.department == "engineering":
-            return collaboration_request()
+            return delivery_turn()(request)
         if invocation_count <= 2:
             return _read(request, "large.txt")
         return product_spec()
@@ -295,7 +294,7 @@ def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path):
                 return ModelResponse(output=[_message(request, "")])
             return ModelResponse(output=[_message(request, "Product memory: prior evidence was read.")])
         if request.department == "engineering":
-            return collaboration_request()
+            return delivery_turn()(request)
         return _read(request, "large.txt") if current_activation[0] <= 1 else product_spec()
 
     adapter = FakeAdapter([respond] * 200)

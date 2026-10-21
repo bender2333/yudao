@@ -4,8 +4,8 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactRef
 from harness.definitions import DEFINITIONS
-from harness.proposals import (collaboration_request, delivery_turn, product_spec, product_spec_turn,
-                                response_turn, review, review_turn)
+from harness.proposals import (delivery_turn, product_spec, product_spec_turn,
+                                review, review_turn)
 from harness.runtime import LoopSystem
 from harness.tests.helpers import department_history, happy_script, run_scripted
 
@@ -40,79 +40,6 @@ def test_happy_path_requires_quality_release(data_dir):
     assert projection.last_review.verdict == "release"
     assert projection.last_review.product_spec_hash == projection.product_spec.content_hash
     assert projection.last_review.code_snapshot_hash == projection.delivery_spec.code_tree_digest
-
-def test_consultation_response_returns_to_engineering(data_dir):
-    script = [
-        product_spec(),
-        collaboration_request(),
-        response_turn("answered", "The existing requirements already define ordinary input."),
-        delivery_turn(),
-        review_turn("release", "accepted path is implemented"),
-    ]
-    _, projection = run_scripted(data_dir, script)
-    assert projection.phase == "DONE"
-    assert projection.request_count == 1
-    assert projection.requests[0].requester == "engineering"
-    assert projection.requests[0].recipient == "product"
-    assert projection.responses[0].status == "answered"
-    assert projection.responses[0].return_phase == "ENGINEERING"
-    assert projection.effective_decisions == []
-    assert projection.product_spec.revision == 1
-
-def test_requested_requirements_revision_creates_normal_spec_before_response(data_dir):
-    updated = product_spec_turn(
-        goal="Build echo with strict flags", acceptance=["unknown flags exit 2"],
-        change_record={
-            "changed": ["Unknown flags must exit 2"],
-            "retained": ["Print the given argument to stdout", "Single-file implementation without file reads or network access"],
-            "retired": [],
-            "rationale": "Resolve the engineering action request by defining previously unspecified flag behavior.",
-        },
-    )
-    script = [
-        product_spec(),
-        collaboration_request(request_type="action", action="revise_requirements"),
-        updated,
-        response_turn("completed", "Unknown flags must fail.", result_types=["spec_accepted"]),
-        delivery_turn(),
-        review_turn("release", "reply applied"),
-    ]
-    _, projection = run_scripted(data_dir, script)
-    assert projection.phase == "DONE"
-    assert projection.responses[0].status == "completed"
-    assert projection.responses[0].result_event_ids == [projection.product_spec.created_event_id]
-    assert projection.product_spec.revision == 2
-    assert projection.product_spec.goal == "Build echo with strict flags"
-    assert projection.product_specs[0].status == "superseded"
-    assert projection.delivery_spec.product_spec_hash == projection.product_spec.content_hash
-
-def test_consultation_answer_is_not_a_product_decision(data_dir):
-    script = [
-        product_spec(),
-        collaboration_request(),
-        response_turn("answered", "A possible future requirement would reject unknown flags."),
-        delivery_turn(),
-        review_turn("release", "ok"),
-    ]
-    _, projection = run_scripted(data_dir, script)
-    assert projection.phase == "DONE"
-    assert projection.effective_decisions == []
-    assert len(projection.effective_contracts) == 1
-    assert projection.product_spec.revision == 1
-
-def test_declined_request_keeps_engineering_on_current_spec(data_dir):
-    script = [
-        product_spec(),
-        collaboration_request(),
-        response_turn("declined", "No requirements revision is needed for the current task."),
-        delivery_turn(),
-        review_turn("release", "rejected alternative"),
-    ]
-    _, projection = run_scripted(data_dir, script)
-    assert projection.phase == "DONE"
-    assert projection.responses[0].status == "declined"
-    assert projection.product_spec.revision == 1
-    assert projection.responses[0].return_phase == "ENGINEERING"
 
 def test_quality_rework_routes_to_engineering(data_dir):
     script = [
@@ -200,7 +127,11 @@ def test_natural_language_completion_does_not_finish(data_dir):
     assert projection.last_review is None
 
 def test_max_cycles_pauses_with_human_action(data_dir):
-    script = [product_spec(), collaboration_request(), response_turn()]
+    script = [
+        product_spec(),
+        delivery_turn(),
+        review_turn("rework_engineering", "defect found", defects=[{"severity": "major", "summary": "fix"}]),
+    ]
     _, projection = run_scripted(data_dir, script, max_cycles=2)
     assert projection.phase == "PAUSED"
     assert projection.stop_reason == "max_cycles"

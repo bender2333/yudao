@@ -6,14 +6,13 @@ from pathlib import Path
 import pytest
 
 import harness.interactions as interactions
-from harness.adapters.fake import FakeAdapter, FakeTurn, pending_request_id
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.compaction import visible_history
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
 from harness.proposals import (
-    collaboration_request, collaboration_response, delivery_turn,
-    product_decision, product_spec, product_spec_turn, response_turn,
+    delivery_turn, product_decision, product_spec, product_spec_turn,
     review_turn,
 )
 from harness.providers.call import ModelResponse
@@ -158,38 +157,6 @@ def test_only_complete_product_spec_can_process_received_input(tmp_path):
     prd = system.artifacts.get_for_run(run_id, accepted.effective_contract.prd_ref).decode("utf-8")
     assert "Accepted user input through version: 2" in prd
     assert CHANGE_RECORD["rationale"] in prd and old.product_spec.content_hash in prd
-
-def test_product_can_consult_while_current_inputs_still_wait_for_requirement_acceptance(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), collaboration_request("quality", "How should uppercase output be verified?"),
-        response_turn("answered", "Check mixed-case input against uppercase output."), _revision(),
-    ]))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)
-    system.add_input(run_id, "Print uppercase")
-    pending = system.activate_once(run_id)
-    assert pending.pending_request.recipient == "quality"
-    assert pending.processed_input_version == 1 and pending.product_work_input_version == 2
-    returned = system.activate_once(run_id)
-    assert returned.pending_request is None and returned.phase == "PRODUCT_SPEC"
-    assert returned.processed_input_version == 1 and returned.responses[-1].return_work_valid
-    assert len(_events(system, run_id, EventType.PRODUCT_INPUT_ASSIGNED)) == 1
-    assert system.activate_once(run_id).processed_input_version == 2
-
-def test_new_input_during_pre_prd_consultation_supersedes_old_request_and_response(tmp_path):
-    def reply(request):
-        system.add_input(request.run_id, "Make the output uppercase")
-        return collaboration_response(pending_request_id(request), "answered", "Advice for the earlier input")
-
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([collaboration_request("engineering"), reply, product_spec()]))
-    run_id = system.create_run("build echo")
-    pending = system.activate_once(run_id)
-    current = system.activate_once(run_id)
-    assert current.phase == "PRODUCT_SPEC" and current.pending_request is None
-    assert current.requests[-1].status == "superseded" and current.requests[-1].basis == pending.pending_request.basis
-    assert current.responses == [] and current.processed_input_version == 0
-    assert _events(system, run_id, EventType.TOOL_SKIPPED)[-1].payload["name"] == "submit_response"
-    assert system.activate_once(run_id).product_spec.input_version == 2
 
 def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_path):
     def old_spec(request):
@@ -354,7 +321,7 @@ def test_project_department_prompt_changes_apply_from_the_next_model_request(tmp
         return ModelResponse(output=[_call("inspect", "list_files")])
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), update,collaboration_request("product"),
+        product_spec(), update, delivery_turn(),
     ]))
     project_id["value"] = system.projects.register("P", "验证部门 Prompt 生效时机")
     _work_item_id, run_id = system.projects.start_work_item(project_id["value"], "build echo")

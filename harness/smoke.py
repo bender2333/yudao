@@ -60,14 +60,14 @@ HAPPY_TASK = (
     "Quality must independently have the host run a check before release."
 )
 
-COLLABORATION_TASK = (
+ASK_TASK = (
     "Implement a local Python CLI at src/echo.py that prints its first argument. "
     "The product spec must leave unspecified whether arguments starting with '-' "
     "are unknown flags or ordinary text. "
-    "Before the initial product spec, Product must consult Engineering about feasibility using submit_request. "
-    "Engineering must answer with submit_response and return to Product's initial requirements work. "
-    "Later Engineering must request a revise_requirements action from Product for the flag decision. "
-    "Product must publish a product decision or a revised product spec, then submit a completed response citing its accepted event. "
+    "Before the initial product spec, Product must consult Engineering about feasibility using ask. "
+    "Engineering must answer in the branch and return to Product's initial requirements work. "
+    "Later Engineering must ask Product about the unspecified trade-off using ask. "
+    "Product must revise the product spec in its answer. "
     "Quality independently checks the delivered CLI."
 )
 
@@ -82,8 +82,8 @@ def run_smoke(
 ) -> dict[str, Any]:
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
-    selected = scenarios or ["happy", "collaboration"]
-    if any(name not in {"happy", "collaboration"} for name in selected):
+    selected = scenarios or ["happy", "ask"]
+    if any(name not in {"happy", "ask"} for name in selected):
         raise ValueError("unknown smoke scenario")
     config_path = (Path(provider_config) if provider_config is not None
                    else default_provider_config(data_dir))
@@ -187,7 +187,7 @@ def _unavailable_report(data_dir: Path, config_path: Path, message: str, *,
 def _run_scenario(system: LoopSystem, name: str) -> dict[str, Any]:
     # smoke 经应用层的命令新建项目与事项（应用层与接口层设计说明第 7.4 节）：
     # run 结束时由流程编排结算（采纳）
-    task = HAPPY_TASK if name == "happy" else COLLABORATION_TASK
+    task = HAPPY_TASK if name == "happy" else ASK_TASK
     application = Application(system)
     try:
         _work_item_id, run_id = asyncio.run(_create_and_run(application, task))
@@ -263,9 +263,7 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "actual_model": projection.actual_model,
         "route": list(projection.transitions),
         "request_count": projection.request_count,
-        "collaboration_requests": [asdict(item) for item in projection.requests],
-        "collaboration_responses": [asdict(item) for item in projection.responses],
-        "collaboration_audit": _collaboration_evidence(system, run_id),
+        "ask_audit": _ask_evidence(system, run_id),
         "rework_count": projection.rework_count,
         "cycle_count": projection.cycle_count,
         "token_used": projection.token_used,
@@ -347,46 +345,69 @@ def _read_artifact(artifacts: ArtifactStore, run_id: str, ref: dict[str, Any]) -
     return json.loads(artifacts.get_for_run(run_id, ArtifactRef(**ref)))
 
 
-def _collaboration_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
-    projection = system.project(run_id)
-    events = {event.event_id: event for event in system.store.list_events(run_id)}
-    responses = {item.request_id: item for item in projection.responses}
+def _ask_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
+    events = system.store.list_events(run_id)
+    starts = [e for e in events if e.type == EventType.ASK_STARTED]
+    answers = [e for e in events if e.type == EventType.ASK_ANSWERED]
     notes, directions = [], []
-    pre_spec_consultation = requirements_action = False
-    for request in projection.requests:
-        source = events.get(request.created_event_id)
-        response = responses.get(request.id)
-        result = events.get(response.created_event_id) if response else None
-        if (source is None or source.type != EventType.COLLABORATION_REQUESTED
-                or source.department != request.requester or source.run_id != run_id
-                or response is None or result is None or result.type != EventType.COLLABORATION_RESPONDED
-                or result.department != request.recipient or result.run_id != run_id
-                or result.stream_version <= source.stream_version
-                or result.payload.get("request_id") != request.id):
-            notes.append(f"request {request.id}: missing or unrelated recipient response")
-            continue
-        directions.append(f"{request.requester}->{request.recipient}")
-        results = [events.get(event_id) for event_id in response.result_event_ids]
-        if any(event is None or event.run_id != run_id or event.department != request.recipient
-               or event.payload.get("request_id") != request.id
-               or not source.stream_version < event.stream_version < result.stream_version
-               for event in results):
-            notes.append(f"request {request.id}: result is not bound to its recipient work")
-            continue
-        if (request.requester == "product" and request.recipient == "engineering"
-                and request.request_type == "consultation" and response.status == "answered"
-                and not any(event.type == EventType.SPEC_ACCEPTED and event.stream_version < source.stream_version
-                            for event in events.values())):
-            pre_spec_consultation = True
-        if (request.requester == "engineering" and request.recipient == "product"
-                and request.action == "revise_requirements" and response.status == "completed"
-                and any(event.type in {EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED} for event in results)):
-            requirements_action = True
-    if projection.pending_request is not None:
-        notes.append("a collaboration request is still pending")
-    return {"status": "unverified" if notes else "verified", "directions": directions,
-            "pre_spec_consultation": pre_spec_consultation, "requirements_action": requirements_action, "notes": notes}
+    pre_spec_ask = requirements_revision = False
+    first_spec = next((e for e in events if e.type == EventType.SPEC_ACCEPTED), None)
+    first_spec_version = first_spec.stream_version if first_spec is not None else float("inf")
 
+    if not starts:
+        notes.append("no ask events recorded")
+
+    answered_sessions = set()
+    for start in starts:
+        payload = start.payload or {}
+        branch_session_id = payload.get("branch_session_id")
+        requester = payload.get("requester")
+        recipient = payload.get("recipient")
+        if start.run_id != run_id or not branch_session_id:
+            notes.append(f"ask start event {start.stream_version}: invalid run or branch_session_id")
+            continue
+        matching = [a for a in answers if a.session_id == branch_session_id]
+        if not matching:
+            notes.append(f"ask {branch_session_id}: still in progress")
+            continue
+        if len(matching) > 1:
+            notes.append(f"ask {branch_session_id}: multiple answer events")
+            continue
+        answer = matching[0]
+        answered_sessions.add(branch_session_id)
+        ans_payload = answer.payload or {}
+        if answer.run_id != run_id:
+            notes.append(f"ask {branch_session_id}: answer run_id does not match")
+            continue
+        if answer.stream_version <= start.stream_version:
+            notes.append(f"ask {branch_session_id}: answer stream_version is not after start")
+            continue
+        if ans_payload.get("requester") != requester or ans_payload.get("recipient") != recipient:
+            notes.append(f"ask {branch_session_id}: parties do not match start event")
+            continue
+        directions.append(f"{requester}->{recipient}")
+        if (requester == "product" and recipient == "engineering"
+                and ans_payload.get("status") == "answered"
+                and start.stream_version < first_spec_version):
+            pre_spec_ask = True
+        if (requester == "engineering" and recipient == "product"
+                and ans_payload.get("status") == "answered"
+                and ans_payload.get("with_spec_revision")
+                and any(e.type == EventType.SPEC_ACCEPTED and start.stream_version < e.stream_version < answer.stream_version
+                        for e in events)):
+            requirements_revision = True
+
+    for answer in answers:
+        if answer.session_id not in answered_sessions:
+            notes.append(f"ask answer for session {answer.session_id} has no matching ask_started")
+
+    return {
+        "status": "unverified" if notes else "verified",
+        "directions": directions,
+        "pre_spec_ask": pre_spec_ask,
+        "requirements_revision": requirements_revision,
+        "notes": notes,
+    }
 
 def _archive_evidence(system: LoopSystem, run_id: str) -> dict[str, Any]:
     delivery = system.project(run_id).delivery_spec
@@ -560,7 +581,7 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
 def _expected_guidance_only(projection: RunProjection, department: str) -> bool:
     """部门因待处理指导被提前安排（不是该阶段的正常部门）时只拿只读与回应工具；产品照常处理。"""
 
-    if projection.pending_request is not None or department == "product":
+    if department == "product":
         return False
     pending = [item for item in projection.department_guidance if item.status in PENDING_GUIDANCE]
     return bool(pending) and pending[0].department == department and department != department_for_phase(projection.phase)
@@ -653,8 +674,11 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
         activation = payload.get("activation_id")
         work_basis = {
             "effective_contract_hash": current_contract_hash(current_work),
-            "request_id": None if current_work.pending_request is None else current_work.pending_request.id,
         }
+        if event.type == EventType.CONTRACT_ACCEPTED:
+            for b in activation_bases.values():
+                b["effective_contract_hash"] = current_contract_hash(current_work)
+            continue
         if event.type in {EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED}:
             try:
                 item = payload["initial_input"] if event.type == EventType.RUN_CREATED else payload
@@ -1178,7 +1202,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"- host receipts verified: `{scenario.get('check_receipts_verified')}`",
                 f"- delivery archive: `{(scenario.get('delivery_archive') or {}).get('status', 'unverified')}`",
                 f"- Git versions: `{(scenario.get('git_audit') or {}).get('status', 'unverified')}`",
-                f"- collaboration audit: `{(scenario.get('collaboration_audit') or {}).get('status', 'unverified')}`",
+                f"- ask audit: `{(scenario.get('ask_audit') or {}).get('status', 'unverified')}`",
                 f"- fake used: `{scenario.get('fake_used')}`",
                 f"- delivery files: `{', '.join(scenario.get('delivery_files') or [])}`",
                 f"- qa verdict: `{scenario.get('qa_verdict')}`",
@@ -1196,8 +1220,8 @@ def _markdown(report: dict[str, Any]) -> str:
             lines.append(f"- receipt note: {note}")
         for note in (scenario.get("delivery_archive") or {}).get("notes", []):
             lines.append(f"- archive note: {note}")
-        for note in (scenario.get("collaboration_audit") or {}).get("notes", []):
-            lines.append(f"- collaboration note: {note}")
+        for note in (scenario.get("ask_audit") or {}).get("notes", []):
+            lines.append(f"- ask note: {note}")
         receipts = scenario.get("check_receipts") or []
         if receipts:
             lines.append("检查回执：")
@@ -1238,10 +1262,11 @@ def smoke_exit_code(report: dict[str, Any]) -> int:
             return 1
         if (scenario.get("git_audit") or {}).get("status") != "verified":
             return 1
-    collaboration = scenarios.get("collaboration")
-    if collaboration is not None:
-        audit = collaboration.get("collaboration_audit") or {}
-        if (collaboration.get("request_count", 0) < 2 or audit.get("status") != "verified"
-                or not audit.get("pre_spec_consultation") or not audit.get("requirements_action")):
+    ask = scenarios.get("ask")
+    if ask is not None:
+        audit = ask.get("ask_audit") or {}
+        if (audit.get("status") != "verified"
+                or not audit.get("pre_spec_ask")
+                or not audit.get("requirements_revision")):
             return 1
     return 0
