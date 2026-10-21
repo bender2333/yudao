@@ -31,6 +31,14 @@ export const ONBOARDING_REJECTION_REASONS: Record<string, string> = {
   provider_unavailable: "模型服务现在不可用",
 };
 
+/**
+ * 接入与建档被拒绝时的中文说明：按拒绝原因给出中文说法与服务端列出的路径。
+ * 内部原因标识不写进页面（工单 #319 第 5 项、工单 #671）。
+ */
+export function onboardingRejectionText(rejection: Rejected): string {
+  return ONBOARDING_REJECTION_REASONS[rejection.reason] ?? "命令被拒绝";
+}
+
 /** 项目行里的建档标记：状态取自 projects.list，等待确认初始 PRD 由本项目的决定请求给出。 */
 export function projectOnboardingMark(
   project: Pick<ProjectRow, "onboarding_status" | "project_id">,

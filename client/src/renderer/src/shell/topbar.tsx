@@ -7,7 +7,7 @@ import type { ClientApp } from "../contract/client-app";
 import type { StreamState } from "../contract/stream-state";
 import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
 import { PAGE_RELEASE } from "../contract/page-release";
-import { useCommand, useSnapshot } from "../views/project/use-snapshot";
+import { rejectionLabel, useCommand, useSnapshot } from "../views/project/use-snapshot";
 import { Icon } from "./kit";
 import { useTheme, type ThemeChoice } from "./theme";
 import { WORK_ITEM_STATUS, connectionText, label } from "../views/project/labels";
@@ -211,7 +211,7 @@ function MenuFeedback(props: { submitted: boolean; rejection: Rejected | null })
   if (props.rejection) {
     return (
       <p className="error" role="status">
-        {props.rejection.message}（原因 {props.rejection.reason}）
+        {rejectionLabel(props.rejection)}
       </p>
     );
   }
