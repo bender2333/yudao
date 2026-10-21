@@ -315,7 +315,6 @@
   "human_action": "运行时间已达上限。检查事件记录后，提高运行时间上限并作为新事项继续，或在当前阶段人工介入。",
   "cycle_count": 1,
   "rework_count": 0,
-  "request_count": 0,
   "round": 0,
   "input_version": 1,
   "processed_input_version": 0,

@@ -183,7 +183,7 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
 
 # 投影在基准里保留的字段；带下划线的四项各自再保留下面列出的键
 PROJECTION_KEY_FIELDS = ("phase", "stop_reason", "outcome", "error", "waiting_reason", "active_department",
-                         "human_action", "cycle_count", "rework_count", "request_count", "round", "input_version",
+                         "human_action", "cycle_count", "rework_count", "round", "input_version",
                          "processed_input_version", "product_work_input_version", "run_event_version",
                          "stream_version", "definitions_version", "parameters_version")
 _PROJECTION_NESTED = {

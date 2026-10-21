@@ -7,11 +7,11 @@ from collections.abc import Callable
 from typing import Any
 
 from .models import (
-    DEPARTMENTS, PRODUCT_ACTIVE, QUALITY_ACTIVE, TERMINAL_PHASES, CollaborationRequest, Event,
+    DEPARTMENTS, QUALITY_ACTIVE, TERMINAL_PHASES, Event,
     EventType, RunProjection, department_for_phase, hash_bytes, json_dumps,
 )
 from .definitions import DEFINITIONS
-from .tools import proposal_kind, proposal_kinds, tool_action
+from .tools import proposal_kind, proposal_kinds
 
 
 # 写入与检查的工具按定义中的动作类别；inspect 请求只认读取整个文件与列出文件这两种读取的结果
@@ -22,35 +22,14 @@ _CLAIMABLE_TOOLS = _MUTATIONS | _CHECKS
 _ACCEPTED_RESULTS = {
     EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED, EventType.DELIVERY_ACCEPTED,
 }
-_GUIDANCE_ACCEPTED = _ACCEPTED_RESULTS | {EventType.COLLABORATION_REQUESTED}
+_GUIDANCE_ACCEPTED = _ACCEPTED_RESULTS
 _GUIDANCE_RESPONSE_STATUSES = {"explained", "completed", "declined", "needs_work"}
-
-
-def request_basis(projection: RunProjection) -> dict[str, Any]:
-    return {
-        "intend_hash": hash_bytes(projection.task.encode("utf-8")),
-        "effective_contract_hash": _content_hash(projection.effective_contract),
-        "delivery_spec_hash": _content_hash(projection.delivery_spec),
-        "phase": projection.phase,
-    }
 
 
 def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[str]:
     if projection.phase in TERMINAL_PHASES or department not in DEPARTMENTS:
         return set()
-    request = projection.pending_request
     has_guidance = _has_pending_guidance(projection, department)
-    if request is not None:
-        if request.status != "open" or department != request.recipient:
-            return set()
-        allowed: set[str] = set()
-        if request.request_type == "action" and request.action == "revise_requirements":
-            allowed.update({"product_spec", "product_decision"})
-        if request.request_type == "action" and request.action == "revise_delivery":
-            allowed.update({"delivery_spec"})
-        if has_guidance:
-            allowed.add("department_guidance_response")
-        return allowed
     if department != department_for_phase(projection.phase):
         return _diverted_guidance_kinds(department, projection) if has_guidance else set()
     # 本部门在这种事项种类中可以提交的提案种类由定义给出（工单 #134）：普通事项与建档事项的清单不同
@@ -67,51 +46,7 @@ def tool_error(projection: RunProjection, department: str, name: str,
     kind = proposal_kind(name)
     if kind is not None and kind not in allowed_proposal_kinds(projection, department):
         return "This proposal is not permitted in the current department work."
-    request = projection.pending_request
-    if request is None:
-        return None
-    if request.status != "open" or department != request.recipient or projection.phase in TERMINAL_PHASES:
-        return "Only the recipient of the open request may act."
-    if tool_action(name) == "write" and not (
-        request.request_type == "action" and request.action == "revise_delivery"
-    ):
-        return "This request permits reading and checking, but does not authorize file changes."
     return None
-
-
-def request_still_applicable(request: CollaborationRequest, projection: RunProjection,
-                             events: list[Event]) -> bool:
-    creation = _creation(request, events)
-    if (creation is None or request.status != "open" or request.run_id != projection.run_id
-            or projection.phase in TERMINAL_PHASES or projection.pending_request is None
-            or projection.pending_request.id != request.id):
-        return False
-    expected = dict(request.basis)
-    for event in sorted(events, key=lambda item: item.stream_version):
-        if event.run_id != request.run_id or event.stream_version <= creation.stream_version:
-            continue
-        payload = event.payload
-        if (event.type in {EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED}
-                and payload.get("request_id") == request.id):
-            return False
-        if event.type in _ACCEPTED_RESULTS | {EventType.CONTRACT_ACCEPTED}:
-            if not _owned(event, request, creation) or not _authorized_result(event.type, request):
-                return False
-            if event.type == EventType.CONTRACT_ACCEPTED:
-                if expected["effective_contract_hash"] != payload.get("content_hash"):
-                    expected["delivery_spec_hash"] = None
-                expected["effective_contract_hash"] = payload.get("content_hash")
-            elif event.type == EventType.SPEC_ACCEPTED:
-                expected["delivery_spec_hash"] = None
-            elif event.type == EventType.DELIVERY_ACCEPTED:
-                expected["delivery_spec_hash"] = payload.get("content_hash")
-        elif event.type == EventType.TOOL_CALLED and payload.get("name") in _MUTATIONS and payload.get("ok"):
-            if not _owned(event, request, creation) or request.action != "revise_delivery":
-                return False
-            if _tool_result(event, request, creation, events) is None:
-                return False
-            expected["delivery_spec_hash"] = None
-    return expected == request_basis(projection)
 
 
 def guidance_response_errors(proposal: dict[str, Any], projection: RunProjection, department: str,
@@ -220,7 +155,7 @@ def guidance_result_summaries(projection: RunProjection, department: str, events
     ]
 
 
-def guidance_resume_phase(yielded: dict[str, Any], projection: RunProjection) -> str:
+def guidance_target_phase(yielded: dict[str, Any], projection: RunProjection) -> str:
     current = {
         "effective_contract_hash": _content_hash(projection.effective_contract),
         "delivery_spec_hash": _content_hash(projection.delivery_spec),
@@ -238,29 +173,6 @@ def guidance_resume_phase(yielded: dict[str, Any], projection: RunProjection) ->
             and delivery.effective_contract_hash == current["effective_contract_hash"]):
         return "QUALITY"
     return "ENGINEERING"
-
-
-def resume_phase(request: CollaborationRequest, projection: RunProjection, events: list[Event],
-                 *, snapshot_hash: str) -> tuple[str, bool]:
-    if projection.phase in TERMINAL_PHASES:
-        return projection.phase, False
-    delivery = projection.delivery_spec
-    delivery_current = bool(delivery and delivery.code_tree_digest == snapshot_hash
-                            and delivery.effective_contract_hash == _content_hash(projection.effective_contract))
-    unchanged = request.basis == request_basis(projection)
-    if unchanged and (delivery is None or delivery_current) and request_still_applicable(request, projection, events):
-        return request.return_phase, True
-    if projection.phase in PRODUCT_ACTIVE:
-        return projection.phase, False
-    if delivery_current:
-        return "QUALITY", False
-    return "ENGINEERING", False
-
-
-def _tool_result(event: Event, request: CollaborationRequest, creation: Event,
-                 events: list[Event]) -> dict[str, Any] | None:
-    return _host_tool_result(
-        event, events, owned=lambda item: _owned(item, request, creation), after_version=creation.stream_version)
 
 
 def _host_tool_result(event: Event, events: list[Event], *, owned: Callable[[Event], bool],
@@ -306,26 +218,6 @@ def _usable_tool_result(event: Event, result: dict[str, Any], projection: RunPro
             and output.get("product_spec_hash") == _content_hash(projection.product_spec))
 
 
-def _authorized_result(event_type: str, request: CollaborationRequest) -> bool:
-    if request.request_type != "action":
-        return False
-    if request.action == "revise_requirements":
-        return event_type in {EventType.SPEC_ACCEPTED, EventType.PRODUCT_DECISION_ACCEPTED, EventType.CONTRACT_ACCEPTED}
-    return request.action == "revise_delivery" and event_type == EventType.DELIVERY_ACCEPTED
-
-
-def _creation(request: CollaborationRequest, events: list[Event]) -> Event | None:
-    return next((event for event in events if event.event_id == request.created_event_id
-                 and event.run_id == request.run_id and event.type == EventType.COLLABORATION_REQUESTED
-                 and event.department == request.requester and event.payload.get("id") == request.id
-                 and event.payload.get("content_hash") == request.content_hash), None)
-
-
-def _owned(event: Event, request: CollaborationRequest, creation: Event) -> bool:
-    return (event.run_id == request.run_id and event.stream_version > creation.stream_version
-            and event.department == request.recipient and event.payload.get("request_id") == request.id)
-
-
 def _guidance_owned(event: Event, projection: RunProjection, department: str) -> bool:
     return event.run_id == projection.run_id and event.department == department
 
@@ -364,9 +256,6 @@ def _current_guidance_result(event: Event, projection: RunProjection, snapshot_h
                     and payload.get("content_hash") == delivery.content_hash
                     and delivery.code_tree_digest == snapshot_hash
                     and delivery.effective_contract_hash == _content_hash(projection.effective_contract))
-    pending = projection.pending_request
-    return bool(event.type == EventType.COLLABORATION_REQUESTED and pending is not None
-                and pending.created_event_id == event.event_id and pending.requester == event.department)
 
 
 def _applied_activation_ids(guidance_id: str, projection: RunProjection, events: list[Event]) -> set[str]:

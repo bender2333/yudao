@@ -134,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"demo run: {run_id}")
         print(f"phase={projection.phase} outcome={projection.outcome} stop={projection.stop_reason}")
         print(f"transitions: {' | '.join(projection.transitions)}")
-        print(f"requests={projection.request_count} reworks={projection.rework_count} events={projection.stream_version}")
+        print(f"reworks={projection.rework_count} events={projection.stream_version}")
         print(f"api: yudao api --data-dir {args.data_dir}")
         return 0
     if command == "api":

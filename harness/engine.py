@@ -320,7 +320,7 @@ class StepDriver:
         return judgment.proceed
 
     def _settle(self, transaction: Transaction) -> RunProjection:
-        # 在这个事务中分派新输入并关闭过时的协作请求；随后的判断依据这时的运行状态
+        # 在这个事务中分派新输入；随后的判断依据这时的运行状态
         projection = self._nodes.settle(transaction)
         self._version = projection.stream_version
         return projection

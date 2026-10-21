@@ -7,15 +7,30 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
-from .collaboration import request_basis, tool_error
+from .collaboration import tool_error
 from .contracts import current_contract_hash
-from .models import TERMINAL_PHASES, Event, RunProjection
+from .models import TERMINAL_PHASES, Event, RunProjection, hash_bytes
 from .tools import has_tool, offers_with_input, proposal_kind, tool_action, tools_for, usable_when_guidance_only
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 
 _STALE_BASIS = ("The input, contract, or current work changed after this activation began; "
                 "stale results cannot be rebound.")
 _STALE_SNAPSHOT = "The workspace snapshot changed after this activation began; stale results cannot be rebound."
+
+
+def submission_basis(projection: RunProjection) -> dict[str, Any]:
+    # 一次提交所依据的东西：用户的意图、当前有效合同、当前交付与阶段。
+    # 校验以后这几样里任何一样变了，这次提交就不能再按原来的依据接纳
+    return {
+        "intend_hash": hash_bytes(projection.task.encode("utf-8")),
+        "effective_contract_hash": _content_hash(projection.effective_contract),
+        "delivery_spec_hash": _content_hash(projection.delivery_spec),
+        "phase": projection.phase,
+    }
+
+
+def _content_hash(value: Any) -> str | None:
+    return None if value is None else value.content_hash
 
 
 def guidance_version(projection: RunProjection, department: str) -> int:
@@ -167,7 +182,7 @@ def commit_decision(
             or now.input_version != basis.input_version
             or now.guidance_version != basis.guidance_version
             or now.effective_contract_hash != basis.effective_contract_hash
-            or request_basis(current) != request_basis(evaluated)):
+            or submission_basis(current) != submission_basis(evaluated)):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
     if current_facts != facts:
         return ProposalDecision(False, [FieldError("execution_basis", _STALE_SNAPSHOT)])
