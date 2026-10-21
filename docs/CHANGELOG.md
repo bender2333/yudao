@@ -851,4 +851,4 @@ minimax-M3.1-Flash / 2026-10-22 12:05 / docs/user-session-log.md 补 U22（#664 
 
 执行者 minimax-M3.1-Flash / 2026-10-22 16:45 / 修正工单 #656 的用量合并规则：harness/observability.py 的 attempt_usage 回到「原文在场时由原文决定，原文整个读不到时才按摘要读取」，并保留各协议自己的键名（prompt_tokens、completion_tokens、prompt_tokens_details）；摘要里的 0 是「这一项没有报」的缺省值，不再拿来补原文缺的项；harness/tests/test_observability_module.py 里 #656 的三项按修正后的规则改写并加一项 / #656 合并以后 main 上每次合并以后的集成层有两项失败：逐字段合并把摘要的缺省 0 补成了「报了 0」，与工单自己的验收标准第 4 条相反
 
-执行者 minimax-M3.1-Flash / 2026-10-22 17:35 / 工单 #668 资料页的 PRD 各版给出内容摘要与原文入口：harness/app/project_queries.py 给合同填那一版 PRD 的摘要（目标、要求几条、边界几条，说法与建档候选一致），client/src/renderer/src/views/project/materials.tsx 给「查看原文」按钮并把兜底文案换成不误导的一句；harness/tests/test_project_queries.py 加核对 / 用户走查 U13：普通事项的 PRD 只有指纹与「没有摘要」，读不到有效合同写了什么
+执行者 minimax-M3.1-Flash / 2026-10-22 05:05 / 工单 #663 「开始排空」先确认再执行：新增 client/src/renderer/src/views/system/drain-text.ts 给确认框的措辞与排空期间的提示，runtime.tsx 的「开始排空」先开确认框（写明不再开始新事项、这一步回不去、剩下的是强制升级），sidebar.tsx 与 app.tsx 在排空期间于侧栏项目列表上方给出提示；新增 client/tests/unit/drain-text.test.ts 四项 / 用户走查 U10：「开始排空」不可逆，界面上既没有确认也没有说明回不去

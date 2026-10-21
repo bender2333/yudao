@@ -4,12 +4,14 @@
 // 原型里「正在执行的事项」与「等待队列」的明细来自 runtime.slots，后端还没有这一条查询，
 // 因此只写 system.status 给出的数量，不画一张取不到数据的表。
 
+import { useState } from "react";
 import type { RuleEntry, SystemStatus } from "../../api/generated/types.gen";
 import { newCommandId } from "../../contract/command-id.ts";
 import type { ClientApp } from "../../contract/client-app";
 import { Block } from "../../shell/kit";
-import { KeyValue, Loading, hasCommand } from "../project/common";
+import { KeyValue, Loading, Modal, hasCommand } from "../project/common";
 import { useCommand, useSnapshot } from "../project/use-snapshot";
+import { DRAIN_CONFIRM_CANCEL, DRAIN_CONFIRM_CONFIRM, DRAIN_CONFIRM_LINES, DRAIN_CONFIRM_TITLE } from "./drain-text";
 
 // 排空状态（ADR-0019）：未排空、排空中、已排空可以升级
 const DRAIN_LABELS: Record<string, string> = { idle: "未排空", draining: "排空中", ready: "已排空，可以升级" };
@@ -79,6 +81,8 @@ function DrainBlock(props: { app: ClientApp; status: SystemStatus }) {
   const command = useCommand(props.app, `${drain.state}/${drain.version}`);
   const canStart = drain.state === "idle" && hasCommand(props.app, "runtime.start_drain");
   const canForce = drain.state === "draining" && hasCommand(props.app, "runtime.force_upgrade");
+  // 「开始排空」不可逆：点下去以前先确认，把后果与剩下的那条路说清楚（工单 #663）
+  const [confirming, setConfirming] = useState(false);
 
   const submit = (name: string) => {
     void props.app.command(name, { command_id: newCommandId(), base_version: drain.version });
@@ -98,10 +102,31 @@ function DrainBlock(props: { app: ClientApp; status: SystemStatus }) {
       />
       {canStart ? (
         <p className="y10-row">
-          <button type="button" className="y10-btn danger" disabled={command.busy} onClick={() => submit("runtime.start_drain")}>
+          <button type="button" className="y10-btn danger" disabled={command.busy} onClick={() => setConfirming(true)}>
             开始排空
           </button>
         </p>
+      ) : null}
+      {confirming ? (
+        <Modal title={DRAIN_CONFIRM_TITLE} onClose={() => setConfirming(false)}>
+          {DRAIN_CONFIRM_LINES.map((line) => <p key={line} className="y10-note note">{line}</p>)}
+          <p className="y10-row">
+            <button
+              type="button"
+              className="y10-btn danger"
+              disabled={command.busy}
+              onClick={() => {
+                setConfirming(false);
+                submit("runtime.start_drain");
+              }}
+            >
+              {DRAIN_CONFIRM_CONFIRM}
+            </button>
+            <button type="button" className="y10-btn" onClick={() => setConfirming(false)}>
+              {DRAIN_CONFIRM_CANCEL}
+            </button>
+          </p>
+        </Modal>
       ) : null}
       {canForce ? (
         <p className="y10-row">
