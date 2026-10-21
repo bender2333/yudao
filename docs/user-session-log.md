@@ -27,6 +27,9 @@
 | U10 | 「开始排空」是不可逆的，界面上没有确认也没有说明。 | 系统 / 运行与执行槽位页 → 「排空」一节 → 点「开始排空」 | 按钮在 `client/src/renderer/src/views/system/runtime.tsx` 第 99 至 105 行，只要排空状态是 `idle` 就显示（危险样式），点击直接发 `runtime.start_drain`，没有确认。排空状态由目录流里最后一条 `DRAIN_STARTED` 事件决定（`harness/runtime.py` 第 201 至 204 行），事件写入以后状态再也不会回到 `idle`（第 191 至 199 行只给 `draining` 或 `ready`）。排空期间 `work_item.create` 走 `harness/app/project_and_work_item_commands.py` 第 184 至 187 行，事项被登记成排队但不开始；命令清单里没有「取消排空」，界面上也没有别的出路，剩下只有「强制升级」。[ADR-0019](https://github.com/bender2333/yudao/blob/main/docs/adr/0019-project-stream-across-versions.md) 里排空是升级路径上的一步 | 工单 [#663](https://github.com/bender2333/yudao/issues/663) |
 | U11 | 事件种类漏登记中文说明，整条事件流会断掉并一直重连。 | 改过一次项目级参数以后 → 打开页面 → 看顶栏与浏览器控制台 | `project_parameter_set`（项目级参数修改）没有登记中文说明，`harness/app/labels.py` 第 86 行的 `event_label` 直接抛 KeyError；`harness/app/event_stream.py` 第 219 行的 `_event_message` 调用它，异常沿异步生成器往上抛，接口层没机会正常收尾，SSE 响应被截断（浏览器控制台 `net::ERR_INCOMPLETE_CHUNKED_ENCODING`）。每条连接都播到这条事件就死，客户端带着上一次的位置重连，又死在同一处，永远过不去。用客户端自己的规则在 Node 里连真实服务 45 秒：43 次 open、43 次 error，位置停在 2603，没有缺口也没有 resync 帧 | 工单 [#664](https://github.com/bender2333/yudao/issues/664) |
 | U12 | 观测页标题里的「共 N 条记录」是已经加载出来的行数，不是请求总数。 | 观测页 → 看标题 | 页面写「0 个请求进行中 · 共 50 条记录」，而这个项目实际有 115 次模型请求（`project.usage` 的 `totals.attempts` 是 115）。`observe.tsx` 第 115 行写的是 `共 ${rows.length} 条记录`，`rows` 是「已经翻到的页累加起来」的当前行数（第 99 至 105 行），50 是 `PAGE_SIZE`（第 23 行）。`project.attempts` 的返回只有 `attempts` 与 `cursor`，没有总数，所以页面拿不到真实总数；同页「用量统计」页签有（`totals.attempts`），两个页签用同一组筛选 | 工单 [#665](https://github.com/bender2333/yudao/issues/665) |
+| U13 | 资料页上普通事项的 PRD 只有指纹，读不到有效合同的内容。 | 资料页 → 选一个普通事项 → 看「PRD」一节 | 每个版本写「第 1 版 / active / 指纹 sha256:… / 没有摘要」。`harness/app/project_queries.py` 第 1290 至 1291 行给合同填的摘要是写死的 `None`、文件清单是空列表；客户端 `client/src/renderer/src/views/project/materials.tsx` 第 324 行按 `show(entry.summary, "没有摘要")` 显示，于是每个 PRD 版本都写「没有摘要」——这句话还容易被读成「这份合同是空的」。界面上别处也读不到：决定卡片只在建档时给摘要，部门工作间的「上下文」给的是注入清单（来源、版本、token 数、指纹），概览页的「当前成果」给的是交付摘要。同一页的「交付」一节每个版本都有摘要、文件还能「查看内容」 | 工单 [#668](https://github.com/bender2333/yudao/issues/668) |
+| U14 | `run_created` 事件里带着 `context_window`，记的是不再生效的旧值。 | 观测页 → 打开一条请求的详情 → 读 `run_created` 事件载荷 | 详情页写「窗口 1,000,000 token」（取自模型访问定义），事件载荷里却是 `"context_window": 32000`（创建事项时冻结的事项级默认）。`harness/assembly.py` 第 62 至 67 行的注释写明「事项级 context_window 不再参与，字段的删除由 #74 完成」，`harness/engine.py` 第 755 行取的是调用目标的窗口；#74 已关闭，字段却还在。归档的架构问题第 6 条与[应用层与接口层设计说明](https://github.com/bender2333/yudao/blob/main/docs/design/app-and-interface.md)第 211 行都要求删掉这个字段（命令合同里已经删了，事件载荷里还在）。事件日志是长期记录，读事件的人会按 32k 去判断阈值与压缩时机 | 工单 [#669](https://github.com/bender2333/yudao/issues/669) |
+| U15 | 部门工作间的「部门消息」列表里，每一条都写「（这条事件没有文字摘要）」。 | 部门工作间 → 「部门消息」一栏 | 22 条消息（`department_input` 与 `model_message`）没有一条有文字。`harness/app/project_queries.py` 第 900 至 906 行取的是事件载荷里的 `text` 或 `summary`，而这两类载荷里这两个字段都是空的：`department_input` 只有 `input_ref`（内容在工件里），`model_message` 的 `summary` 是空串（内容在 `message_ref` 指向的工件里）。内容其实拿得到：`event.detail` 查询会把工件内容一起返回（我核对了一条 `department_input`，它的 `input` 工件里就是交给工程部门的那份材料原文），装配上下文时也是按引用取工件的（`harness/assembly.py` 第 206 至 207 行）。另外 `harness/app/labels.py` 第 120 行 `MODEL_MESSAGE` 的模板是「模型给出了一条回复（第 {step_id} 步）：{summary}」，`summary` 为空时事件流里的说明也变成一个空的冒号尾巴 | 工单 [#670](https://github.com/bender2333/yudao/issues/670) |
 
 核对过但不成立（2026-10-21）：曾怀疑首页把同一个项目显示成两种名字。查 `projects.list` 与 `project.overview` 的原始数据，项目名只有「Demo 项目」一处，侧栏、楼层与表格一致，不是问题。
 
@@ -54,7 +57,7 @@
 - 项目级参数能设而且生效：把新项目的 `check_timeout_sec` 从全局默认 600 收到 300（带理由与修改人），随后在这个项目里新建的事项，run 的 `check_timeout_sec` 就是 300。取值超出界限时被拒，理由写明「参数 check_timeout_sec 的取值 99999 超出界限 [1, 86400]」。
 - 项目级部门设置能写而且生效：给新项目的质检部门加一条「核验时还要确认 README 的示例命令与实际输出一致」，保存后读回来是 `version=1`、`source=configured`，文本尾部就是新加的那句。
 - 改文档这类小事项也走同一套循环：README 补一节「Windows 上的注意事项」，产品交底 → 工程改文件 → 质检核验，3 轮就放行采纳，没有额外的返工。
-- 这次走查一共 172 次模型请求、约 480 万 token（第一个项目 85 次、209 万，第二个项目 87 次、273 万），单次请求平均约 2.7 万输入 token（上下文窗口 32k）。观测页只显示这个总数，输入、输出与缓存分别是多少仍然显示「未上报」（#656）。
+- 这次走查一共 172 次模型请求、约 480 万 token（第一个项目 85 次、209 万，第二个项目 87 次、273 万），单次请求平均约 2.7 万输入 token。观测页只显示这个总数，输入、输出与缓存分别是多少仍然显示「未上报」（#656）。生效的窗口是模型访问定义里声明的 1,000,000 token（请求详情页写的「窗口 1,000,000 token」），`run_created` 事件里的 `context_window: 32000` 是不生效的旧值（#669）。
 - 写回这条能力在接口层已经能用，界面上还没有入口：源目录设置页只能改名称与路径（没有写回开关），也没有写回按钮；`writeback.execute` 只出现在生成的客户端里，没有任何页面调用它。记在这里备查，入口要不要做、什么时候做由架构师决定。
 - 写回的过程本身按设计工作：打开写回并登记远端与目标分支以后，命令返回 200，把「等待前项合入」「最终树核验没有通过」分别记成 `writeback_held` 与 `writeback_stopped` 事件，没有异常。但最新一次采纳被前一次挡住时，命令默认取的就是最新采纳，界面上也没有让用户选要写回哪一次，用户看不到可操作的出路。
 - 源目录保存的命令合同里，`remote` 与 `target_branch` 写着最小长度 1、默认值却是空串，所以直接回传当前值会拿到 422；客户端不传这两个字段，界面上碰不到。记下来备查。
@@ -70,6 +73,12 @@
 - 设置页的「状态」只有两档：已归档写「已归档」，其余一律写「进行中」——项目里没有事项在跑的时候也写「进行中」（`settings.tsx` 第 120 行）。这个说法容易被读成「有事在跑」，记下来备查。
 - 观测页上「请求记录」与「用量统计」两个页签对同一批请求给出两个数：前者写「共 50 条记录」（已加载的行数，点「加载更多」变成 100），后者写「请求数 115（上报 113）」（`totals.attempts`，真实总数）。同一屏上两个数指的是同一件事，#665。
 - 界面上点得动的地方都点得动：顶栏的项目菜单（项目设置 / 置顶 / 归档项目）、事项范围选择器、观测页的「加载更多」与两个页签、资料页的事项条目、首页的项目楼层（点了会跳到项目概览）。这一轮没有发现点击无效的地方。
+- 决定卡片在首页看得见：种类（接入已有项目的初始需求文档等待确认）、阻塞范围、项目与事项、已经等了多久、挡住哪个事项，以及材料（第几轮、初始 PRD 摘要、要求几条、边界几条、PRD.md 工件）。
+- 「提出修改」这条路径在页面上走得通：说明为空时点「提出修改」会被拦（提示要在说明里写明修改意见），写了说明再点就提交成功，决定变成 answered，建档事项进入修改轮（新的 run，产品按意见重写 PRD，工程与质检照常进行），改完再问一次。
+- 修改意见真的进了产品：改后的 PRD 写成「统计 <word> 以整词形式出现的次数（出现位置左右两侧都不是字母数字）」，明确 `--ignore-case` 只影响比较时的大小写处理、不改变输出格式；产品还把现有实现用 `str.count` 做子串计数记成「现有缺陷交质检」（`cat category` 现在输出 2，要求是 1），并指出 README 里「The count is a plain substring count」与新要求相反、要一并改。
+- 第二轮的决定卡片带「上一轮修改意见」原文（设计说明第 3.2 节要求的那一项），确认以后基线采纳，当前成果是「第 2 轮建档的初始 PRD 已确认」。
+- 事件流断了的直接后果之一：答完决定以后，页面上的卡片不会自己更新（要刷新才从等待列表里消失）。这是 #664 的用户可见影响。
+- 按改后的 PRD 提的变更 3 轮放行采纳：wordcount.py 新增 `count_whole_word()`，用 `str.find` 逐位查找并用相邻字符 `isalnum()` 判边界（非字母数字才算边界）；`--ignore-case` 仍然只作用于 `str.lower()`，输出、退出码、usage/error 格式都没变；README 删掉「plain substring count」改成整词语义。质检独立读代码交叉检查了边界判定与 `--ignore-case`，跑了六项检查 exit 0 以后放行。
 
 ## 过渡期的现象（不另开工单）
 
