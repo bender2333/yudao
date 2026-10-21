@@ -23,6 +23,7 @@
 | U05 | 观测页的用量统计只显示 token 总数，输入 token、输出 token、缓存 token 全是「未上报」。事件里其实有这些数。 | 项目观测页 → 用量统计 | `harness/observability.py` 第 159 至 212 行的 `attempt_usage` 合并两个来源：上游原文（`raw_usage_ref`）与规范化摘要（`usage_summary`）。第 187 行的条件是 `raw is None`，**只有原文整个读不到时才用摘要**。这次原文读到了（Chat Completions 协议的 `prompt_tokens`/`completion_tokens`），于是正确的摘要被跳过；第 170 至 180 行只认 Responses 的 `input_tokens`/`output_tokens`，取到 None；`total_tokens` 两个协议同名，所以有值，`source` 判定为 reported（81）。缓存 token 走 `input_tokens_details`，Chat Completions 在 `prompt_tokens_details`，同样取不到 | 工单 [#656](https://github.com/bender2333/yudao/issues/656) |
 | U06 | 用户主动取消的事项，在概览页「当前事项」的状态行写着「已停止 · 执行失败」。取消是用户自己的决定，没有失败。 | 概览页 → 顶栏「范围」选「增加 --count-only 选项（已停止）」→ 看「当前事项」的状态行 | 后端把取消的终态记为 `phase=FAILED` + `stop_reason=cancelled`（`harness/projection.py` 第 705 行设 FAILED；`harness/tests/test_projects.py` 第 173 行钉住这个组合）。客户端 `client/src/renderer/src/views/project/overview.tsx` 第 248 行无条件把 phase 翻成阶段名，`labels.ts` 第 45 行把 FAILED 译成「执行失败」。同一套数据在别处已经分开了：部门页 `department.tsx` 第 154 行对 stopped 写「已停止」（工单 #319）；后端 `_room_status`（`harness/app/project_queries.py` 第 741 行）按 `stop_reason=cancelled` 给出房间的 `cancelled`（「已取消」）。只有概览页这一处没按停止原因区分 | 工单 [#657](https://github.com/bender2333/yudao/issues/657) |
 | U08 | 浏览器里新开的标签页打开 Yudao，页面外壳出来以后一直停在初始状态：侧栏「项目 0 · 没有符合的项目」、顶栏「连接中断 · 刚刚断开，正在重新连接」、主区「正在读取数据」。同一浏览器里最早打开的那个标签页正常。 | 浏览器新开一个标签页 → 打开 `http://127.0.0.1:8765/` → 观察十几分钟 | 服务端日志里页面发出的查询都到了也都答了 200，数据在服务端是有的；但页面约每 10 秒又发一轮 `capabilities` + 全部视图查询 + `/api/events?after=0&live=1`，这一轮的形状是客户端 `client-app.ts` 第 185 行的 `resync()`（重读能力清单 → `refreshAll()` 重查所有视图 → 重新订阅事件流），而重新订阅的位置又是 0，等于每次重拉两千多条事件（5.2 MB）。事件流本身是好的：同一个 npm `eventsource` 包、同一个 URL，在 Node 里连 20 秒收到 2015 条事件、3 个检查点、641 个片段，`previous` 链没有断点也没有错误。服务端在请求带 `Last-Event-ID` 且值不是非负整数时会立刻回 `resync` 并关闭连接（`harness/api/app.py` 第 202 至 211 行），用 `curl -H 'Last-Event-ID: undefined'` 能稳定复现。页面版本与服务版本都是 0.1.1，不是版本不符重载；日志里也没有重新加载页面时会有的 `GET /`（静态资源的请求在日志里是有记录的，所以这条排除是硬的）。补查：页面大约每 10 秒重走一遍启动流程（`capabilities` → 全部视图查询 → 重新订阅事件流），滚动一下页面会闪回整页的「连接中…」（`app.tsx` 第 242 行），页面上的 DOM 引用几秒就失效；最早那个标签页的事件流在 23:22:41 断开以后四十四分钟没有重连过 | 工单 [#659](https://github.com/bender2333/yudao/issues/659) |
+| U09 | 「写回」命令在没有可写回对象时返回 500 内部错误，页面上拿不到任何理由。 | 对一个已经建档并采纳过、源目录没有打开写回的项目发 `POST /api/commands/writeback.execute` | 服务端 `harness/writeback.py` 第 286 至 288 行（没有打开写回的源目录）、第 295 至 297 行（采纳标识找不到）、第 299 至 302 行（建档采纳不写回）都直接 `return None`；`harness/projects.py` 第 838 至 858 行把它原样传上来，命令处理只捕获两种异常，于是「正常地什么都不做」被当成异常，最后 `harness/app/commands.py` 第 60 行抛出 `RuntimeError: command writeback.execute returned without registering ... at the write path` → 500 | 工单 [#661](https://github.com/bender2333/yudao/issues/661) |
 
 核对过但不成立（2026-10-21）：曾怀疑首页把同一个项目显示成两种名字。查 `projects.list` 与 `project.overview` 的原始数据，项目名只有「Demo 项目」一处，侧栏、楼层与表格一致，不是问题。
 
@@ -51,6 +52,9 @@
 - 项目级部门设置能写而且生效：给新项目的质检部门加一条「核验时还要确认 README 的示例命令与实际输出一致」，保存后读回来是 `version=1`、`source=configured`，文本尾部就是新加的那句。
 - 改文档这类小事项也走同一套循环：README 补一节「Windows 上的注意事项」，产品交底 → 工程改文件 → 质检核验，3 轮就放行采纳，没有额外的返工。
 - 这次走查一共 172 次模型请求、约 480 万 token（第一个项目 85 次、209 万，第二个项目 87 次、273 万），单次请求平均约 2.7 万输入 token（上下文窗口 32k）。观测页只显示这个总数，输入、输出与缓存分别是多少仍然显示「未上报」（#656）。
+- 写回这条能力在接口层已经能用，界面上还没有入口：源目录设置页只能改名称与路径（没有写回开关），也没有写回按钮；`writeback.execute` 只出现在生成的客户端里，没有任何页面调用它。记在这里备查，入口要不要做、什么时候做由架构师决定。
+- 写回的过程本身按设计工作：打开写回并登记远端与目标分支以后，命令返回 200，把「等待前项合入」「最终树核验没有通过」分别记成 `writeback_held` 与 `writeback_stopped` 事件，没有异常。但最新一次采纳被前一次挡住时，命令默认取的就是最新采纳，界面上也没有让用户选要写回哪一次，用户看不到可操作的出路。
+- 源目录保存的命令合同里，`remote` 与 `target_branch` 写着最小长度 1、默认值却是空串，所以直接回传当前值会拿到 422；客户端不传这两个字段，界面上碰不到。记下来备查。
 
 ## 过渡期的现象（不另开工单）
 
