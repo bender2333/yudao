@@ -72,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     # 写在 smoke 之前或之后的 --data-dir 与 --provider-config 都有效，两处都没有给出时由 _data_dir 求出
     smoke = sub.add_parser("smoke", help="run a real-provider three-department smoke test")
     smoke.add_argument("--data-dir", default=argparse.SUPPRESS)
-    smoke.add_argument("--scenario", choices=("happy", "collaboration", "all"), default="all")
+    smoke.add_argument("--scenario", choices=("happy", "ask", "all"), default="all")
     smoke.add_argument("--provider-config", default=argparse.SUPPRESS)
     project = sub.add_parser("project", help="read-only project queries")
     project_sub = project.add_subparsers(dest="project_command", required=True)
@@ -171,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
         lock = _lock_data_dir(args.data_dir)
         if lock is None:
             return 1
-        scenarios = ["happy", "collaboration"] if args.scenario == "all" else [args.scenario]
+        scenarios = ["happy", "ask"] if args.scenario == "all" else [args.scenario]
         report = run_smoke(
             args.data_dir,
             provider_config=args.provider_config,

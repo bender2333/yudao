@@ -8,8 +8,8 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
-from harness.proposals import (product_spec, delivery, delivery_turn, review, review_turn,
-                               collaboration_request, response_turn)
+from harness.proposals import (answer_turn, ask_turn, delivery, delivery_turn,
+                               product_spec, review, review_turn)
 from harness.providers import ProviderFacade
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
@@ -55,10 +55,9 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
         "delivery_archive": {"status": "verified"},
         "git_audit": {"status": "verified"},
         "fake_used": False,
-        "request_count": 2,
-        "collaboration_audit": {"status": "verified", "pre_spec_consultation": True, "requirements_action": True},
+        "ask_audit": {"status": "verified", "pre_spec_ask": True, "requirements_revision": True},
     }
-    assert smoke_exit_code({"available": True, "scenarios": {"happy": base, "collaboration": base}}) == 0
+    assert smoke_exit_code({"available": True, "scenarios": {"happy": base, "ask": base}}) == 0
     assert smoke_exit_code({"available": False, "scenarios": {}}) == 2
     assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, fake_used=True)}}) == 2
     for change in (
@@ -68,32 +67,31 @@ def test_smoke_requires_current_input_audit_and_host_receipts():
         {"git_audit": None}, {"git_audit": {"status": "unverified"}},
     ):
         assert smoke_exit_code({"available": True, "scenarios": {"happy": dict(base, **change)}}) == 1
-    assert smoke_exit_code({"available": True, "scenarios": {"collaboration": dict(base, request_count=0)}}) == 1
-    for audit in (None, {"status": "unverified"}, {"status": "verified", "pre_spec_consultation": True},
-                  {"status": "verified", "requirements_action": True}):
+    for audit in (None, {"status": "unverified"}, {"status": "verified", "pre_spec_ask": True},
+                  {"status": "verified", "requirements_revision": True}):
         assert smoke_exit_code({"available": True, "scenarios": {
-            "collaboration": dict(base, collaboration_audit=audit),
+            "ask": dict(base, ask_audit=audit),
         }}) == 1
 
 @pytest.fixture(scope="module")
-def saved_collaboration(tmp_path_factory):
+def saved_ask(tmp_path_factory):
     from harness.demo import run_demo
 
-    system, run_id = run_demo(tmp_path_factory.mktemp("collaboration"))
+    system, run_id = run_demo(tmp_path_factory.mktemp("ask"))
     # 记录装配上下文的检查要按 run 读回每一次请求：请求本身在调用清单里，清单随数据目录保存
     invocations = list(system.test_adapter.invocations)
     system.close()
     return system.data_dir, run_id, invocations
 
 @pytest.fixture
-def collaboration_run(saved_collaboration, tmp_path):
-    saved, run_id, _invocations = saved_collaboration
-    return system_on_copy(saved, tmp_path / "collaboration"), run_id
+def ask_run(saved_ask, tmp_path):
+    saved, run_id, _invocations = saved_ask
+    return system_on_copy(saved, tmp_path / "ask"), run_id
 
 @pytest.fixture
-def collaboration_invocations(saved_collaboration):
+def ask_invocations(saved_ask):
     # 保存的运行里每一次模型请求：检查装配上下文时按请求读回同一份清单
-    _saved, _run_id, invocations = saved_collaboration
+    _saved, _run_id, invocations = saved_ask
     return invocations
 
 def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
@@ -196,26 +194,59 @@ def test_archive_audit_rejects_unrelated_delivery_digest(native_run):
     rewrite_saved_projection(system.store, run_id, replace(projection, delivery_spec=delivery))
     assert summarize_run(system, run_id, scenario="happy")["delivery_archive"]["status"] == "unverified"
 
-def test_collaboration_audit_requires_actual_consultation_and_accepted_action_results(collaboration_run):
-    system, run_id = collaboration_run
-    audit = summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]
+def test_ask_audit_verifies_ask_pairs_and_revisions(ask_run):
+    system, run_id = ask_run
+    audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
     assert audit["status"] == "verified", audit
-    assert audit["pre_spec_consultation"] is True
-    assert audit["requirements_action"] is True
+    assert audit["pre_spec_ask"] is True
+    assert audit["requirements_revision"] is True
     assert audit["directions"] == ["product->engineering", "engineering->product", "quality->engineering"]
 
-def test_model_input_audit_tracks_new_input_and_prompt_versions(collaboration_run, collaboration_invocations):
-    system, run_id = collaboration_run
-    summary = summarize_run(system, run_id, scenario="collaboration")
+
+def test_ask_audit_rejects_missing_pre_spec_ask(ask_run):
+    system, run_id = ask_run
+    events = _saved_events(system, run_id)
+    first_ask_start = next(e for e in events if e.type == EventType.ASK_STARTED)
+    first_ask_ans = next(e for e in events if e.type == EventType.ASK_ANSWERED and e.session_id == first_ask_start.payload.get("branch_session_id"))
+    delete_saved_events(system.store, [first_ask_start.event_id, first_ask_ans.event_id])
+    audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
+    assert audit["pre_spec_ask"] is False
+    assert smoke_exit_code({"available": True, "scenarios": {"ask": {"phase": "DONE", "stop_reason": "released", "replay_consistent": True, "context_isolated": True, "model_input_audit": {"status": "verified"}, "check_receipts": [{"name": "smoke"}], "check_receipts_verified": True, "delivery_archive": {"status": "verified"}, "git_audit": {"status": "verified"}, "fake_used": False, "ask_audit": audit}}}) == 1
+
+
+def test_ask_audit_rejects_missing_revision_in_answer(ask_run):
+    system, run_id = ask_run
+    events = _saved_events(system, run_id)
+    second_ask_ans = [e for e in events if e.type == EventType.ASK_ANSWERED][1]
+    second_ask_ans.payload["with_spec_revision"] = False
+    rewrite_saved_event(system.store, second_ask_ans)
+    audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
+    assert audit["requirements_revision"] is False
+    assert smoke_exit_code({"available": True, "scenarios": {"ask": {"phase": "DONE", "stop_reason": "released", "replay_consistent": True, "context_isolated": True, "model_input_audit": {"status": "verified"}, "check_receipts": [{"name": "smoke"}], "check_receipts_verified": True, "delivery_archive": {"status": "verified"}, "git_audit": {"status": "verified"}, "fake_used": False, "ask_audit": audit}}}) == 1
+
+
+def test_ask_audit_rejects_mismatched_ask_parties_or_events(ask_run):
+    system, run_id = ask_run
+    events = _saved_events(system, run_id)
+    ans = [e for e in events if e.type == EventType.ASK_ANSWERED][0]
+    ans.payload["recipient"] = "other"
+    rewrite_saved_event(system.store, ans)
+    audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
+    assert audit["status"] == "unverified"
+    assert any("parties do not match" in note for note in audit["notes"])
+
+
+def test_model_input_audit_tracks_new_input_and_prompt_versions(ask_run, ask_invocations):
+    system, run_id = ask_run
+    summary = summarize_run(system, run_id, scenario="ask")
     assert summary["model_input_audit"]["status"] == "verified", summary["model_input_audit"]
     assert summary["check_receipts_verified"] is True
     assert summary["delivery_archive"]["status"] == "verified"
     manifests = [(request.department, recorded_context(system, request).manifest)
-                 for request in collaboration_invocations]
+                 for request in ask_invocations]
     assert {manifest.input_version for _department, manifest in manifests} == {1, 2}
     # demo 在事项进行中修改产品部门的部门 Prompt：修改前的请求用内置默认（版本 0），之后用项目设置（版本 1）
     assert {manifest.prompt_version for department, manifest in manifests if department == "product"} == {0, 1}
-
 @pytest.mark.parametrize("field", ["input_version", "prompt_version", "prompt_hash"])
 @pytest.mark.parametrize("event_type", [EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED,
                                       EventType.MODEL_MESSAGE, EventType.TOOL_CALLED])
@@ -231,8 +262,8 @@ def test_model_input_audit_rejects_forged_adopted_versions(native_run, field, ev
     assert any(field in note for note in audit["notes"])
 
 @pytest.mark.parametrize("field", ["text", "byte_start", "byte_end"])
-def test_model_input_audit_rejects_changed_received_original(collaboration_run, field):
-    system, run_id = collaboration_run
+def test_model_input_audit_rejects_changed_received_original(ask_run, field):
+    system, run_id = ask_run
     events = _saved_events(system, run_id)
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = next(item for item in events if item.type == EventType.USER_INPUT_RECEIVED)
@@ -258,36 +289,20 @@ def test_model_input_audit_uses_the_project_department_prompt(tmp_path):
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "verified", audit
 
-def test_collaboration_audit_rejects_results_from_another_request(collaboration_run):
-    system, run_id = collaboration_run
-    assert summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]["status"] == "verified"
-    projection = system.project(run_id)
-    result_id = projection.responses[1].result_event_ids[0]
-    result = next(item for item in _saved_events(system, run_id) if item.event_id == result_id)
-    result.payload["request_id"] = "unrelated-request"
-    rewrite_saved_event(system.store, result)
-    audit = summarize_run(system, run_id, scenario="collaboration")["collaboration_audit"]
-    assert audit["status"] == "unverified"
-    assert audit["requirements_action"] is False
-    assert any("result is not bound" in note for note in audit["notes"])
-
 @pytest.mark.parametrize("event_type", [EventType.DEPARTMENT_ACTIVATED, EventType.CONTEXT_ASSEMBLED])
-@pytest.mark.parametrize("field", ["request_id", "effective_contract_hash", "all"])
-def test_model_input_audit_rejects_changed_work_basis(collaboration_run, event_type, field):
-    system, run_id = collaboration_run
+def test_model_input_audit_rejects_changed_work_basis(ask_run, event_type):
+    system, run_id = ask_run
     events = _saved_events(system, run_id)
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
-    event = next(item for item in events if item.type == event_type and item.payload.get("request_id"))
-    fields = ["request_id", "effective_contract_hash"] if field == "all" else [field]
-    for name in fields:
-        event.payload[name] = "wrong-" + name
+    event = next(item for item in events if item.type == event_type and item.payload.get("effective_contract_hash"))
+    event.payload["effective_contract_hash"] = "wrong-effective_contract_hash"
     rewrite_saved_event(system.store, event)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
-    assert any(any(name in note for name in fields) for note in audit["notes"])
+    assert any("effective_contract_hash" in note for note in audit["notes"])
 
-def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(collaboration_run):
-    system, run_id = collaboration_run
+def test_model_input_audit_rejects_private_material_in_rehashed_pinned_text(ask_run):
+    system, run_id = ask_run
     events = _saved_events(system, run_id)
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     event = [item for item in events if item.type == EventType.CONTEXT_ASSEMBLED and item.department == "quality"][-1]
@@ -426,8 +441,11 @@ def test_audit_does_not_replace_missing_run_artifact_with_another_runs_copy(nati
 
 # 同一个脚本被两项检查共用：请求让出以后回到产品部门，两项检查各在自己的副本上改写与检查
 _PRODUCT_RETURN_SCRIPT = [
-    product_spec(), collaboration_request(), response_turn("answered", "The existing requirements do not distinguish flags."),
-delivery_turn(), review_turn("release", "host checks passed"),
+    product_spec(),
+    ask_turn(recipient="product", question="Clarify flags?"),
+    answer_turn("The existing requirements do not distinguish flags."),
+    delivery_turn(),
+    review_turn("release", "host checks passed"),
 ]
 
 @pytest.fixture(scope="module")
@@ -446,7 +464,7 @@ def test_audit_preserves_department_history_when_request_returns_to_product(prod
     system, run_id = product_return_run
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is True, fields["model_input_audit"]["notes"]
-    assert fields["model_input_audit"]["activation_count"] == 5
+    assert fields["model_input_audit"]["activation_count"] == 4
 
 def test_audit_rejects_missing_new_work_message_after_product_reactivation(product_return_run):
     system, run_id = product_return_run

@@ -223,7 +223,7 @@ cd harness/tests/openapi && npm ci && npm run check
 ```bash
 uv run python -m harness smoke --provider-config .yudao/providers.json --data-dir .yudao/native-validation
 uv run python -m harness smoke --provider-config .yudao/providers.json --scenario happy
-uv run python -m harness smoke --provider-config .yudao/providers.json --scenario collaboration
+uv run python -m harness smoke --provider-config .yudao/providers.json --scenario ask
 ```
 
 报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性、Git 版本及逐步模型输入审计。Git 审计缺失或未通过时不能返回验收成功。每次只记录本次选择的场景，不继承上次报告中的验收结果。

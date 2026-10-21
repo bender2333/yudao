@@ -30,8 +30,6 @@
 "test_catalog_api.py" = "integration"
 "test_ci_layers.py" = "unit"
 "test_cli_entry.py" = "module"
-"test_collaboration_engine.py" = "module"
-"test_collaboration_responded_parties.py" = "integration"
 "test_collaboration_rules.py" = "unit"
 "test_compaction.py" = "unit"
 "test_compaction_engine.py" = "module"

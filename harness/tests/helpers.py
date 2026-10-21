@@ -14,14 +14,14 @@ from pathlib import Path
 from typing import Any
 
 from harness.actions import Action, ActionReceipt, Preconditions
-from harness.adapters.fake import FakeAdapter, pending_request_id
+from harness.adapters.fake import FakeAdapter
 from harness.assembly import ContextAssembly
 from harness.context import ContextAssembler, ContextPart
 from harness.definitions import DEFINITIONS
 from harness.department_prompts import save_department_prompt
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, ContextManifest, DepartmentPrompt, Event, json_dumps
-from harness.proposals import collaboration_request, delivery_turn, product_spec, response_turn, review_turn
+from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.environment import LocalEnvironment
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
@@ -257,13 +257,40 @@ def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=Fals
         count = work_counts.get(request.activation_id, 0)
         work_counts[request.activation_id] = count + 1
         if request.department == "engineering":
-            return collaboration_request()
+            if count == 0:
+                call_id = f"ask-{request.activation_id}-{request.step_id}"
+                return ModelResponse(output=[{
+                    "id": call_id,
+                    "call_id": call_id,
+                    "type": "function_call",
+                    "name": "ask",
+                    "arguments": json_dumps({
+                        "recipient": "product",
+                        "question": "Clarify requirements",
+                        "background": "Engineering question",
+                        "expected": "Confirmation",
+                    }),
+                }])
+            return delivery_turn()(request)
+        if request.department == "quality":
+            return review_turn("release", "host checks passed")(request)
         if count == 0:
             return read_file_call(request, "large.txt")
+        if request.session_id.startswith("ses_ask_"):
+            call_id = f"ans-{request.activation_id}-{request.step_id}"
+            return ModelResponse(output=[{
+                "id": call_id,
+                "call_id": call_id,
+                "type": "function_call",
+                "name": "answer",
+                "arguments": json_dumps({
+                    "answer": "The original requirements remain applicable.",
+                }),
+            }])
         if reject_first_spec and not rejected_spec:
             rejected_spec = True
             return product_spec() | {"acceptance_criteria": []}
-        return product_spec() if pending_request_id(request) is None else response_turn("answered", "The original requirements remain applicable.")(request)
+        return product_spec()
 
     adapter = FakeAdapter([respond] * 100)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
