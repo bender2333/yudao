@@ -27,7 +27,6 @@ def test_demo_fills_four_views(demo_run):
     system, run_id = demo_run
     projection = system.project(run_id)
     assert projection.phase == "DONE"
-    assert projection.request_count == 3
     assert projection.rework_count == 1
     assert projection.product_spec.revision == 3
     assert projection.input_version == projection.processed_input_version == 2
@@ -45,14 +44,14 @@ def test_demo_fills_four_views(demo_run):
     assert all(item["exit_code"] == 0 for item in projection.last_review.checks)
     assert projection.delivery_specs
     assert projection.manifests
-    assert any(event.type == "collaboration_requested" for event in system.store.list_events(run_id))
-    assert any(event.type == "collaboration_responded" for event in system.store.list_events(run_id))
+    assert any(event.type == "ask_started" for event in system.store.list_events(run_id))
+    assert any(event.type == "ask_answered" for event in system.store.list_events(run_id))
     # demo 的四个界面内容经应用层查询取得：流转的咨询记录、材料里的质检、部门工作间的上下文清单
     application = Application(system)
     flow = application.query("project.flow", ProjectFlow(
         project_id=projection.project_id, work_item=projection.work_item_id))
-    consultations = [record for record in flow.data.records if record.kind == "咨询"]
-    assert {record.status for record in consultations} == {"已回应", "已完成"}
+    consultations = [record for record in flow.data.records if record.kind == "询问"]
+    assert {record.status for record in consultations} == {"已回答"}
     assert {record.direction_from for record in consultations} == {"product", "engineering", "quality"}
     materials = application.query("work_item.materials", WorkItemMaterials(
         project_id=projection.project_id, work_item=projection.work_item_id))

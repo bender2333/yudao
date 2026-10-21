@@ -248,7 +248,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert capabilities["queries"][-2] == {
         "name": "home.away_report", "replayable": False,
         "changed_by": sorted([
-            "transition", "collaboration_requested", "collaboration_responded", "collaboration_closed",
+            "transition", "ask_started", "ask_answered",
             "qa_submitted", "run_done", "run_paused", "run_failed", "decision_requested", "decision_answered",
             "deliverable_adopted", "work_item_created",
         ]) + ["model_attempt_finished", "home_seen"],
@@ -260,7 +260,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
-        "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions",
+        "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions", "run.asks",
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "run.export", "replay.check", "run.recovery", "catalog", "catalog.document",
         "catalog.change_impact", "home.away_report", "rules.registry",

@@ -43,7 +43,7 @@ def collect(export, outcome, replay=None, parameters_version=None):
         "phase": projection.get("phase"),
         "cycles": int(projection.get("cycle_count") or 0),
         "rework": int(projection.get("rework_count") or 0),
-        "collaboration": _count(events, "collaboration_requested"),
+        "collaboration": _count(events, "ask_started"),
         "model_requests": _requests(export),
         # 用量字段缺失为未知（设计第 5.2 节）：缺失不参与均值与噪声
         "input_tokens": _usage(export, "input_tokens"),

@@ -728,8 +728,6 @@ def _room_status(run: Any, department: str, observation: str | None) -> str:
     if run.active_department == department:
         if observation == OBSERVATION_WAITING_RESUME:
             return "waiting_resume"
-        if any(request.recipient == department and request.status == "open" for request in run.requests):
-            return "asking"
         if run.phase == "PAUSED":
             return "paused"
         if run.phase == "FAILED":
@@ -779,9 +777,6 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
     role_name = f"{_department_label(department)}部门 Agent"
     pose = {"role_id": role_id, "action": "typing"} if status == "working" else None
     letters_waiting = 0
-    if run is not None:
-        letters_waiting = sum(1 for request in run.requests
-                              if request.recipient == department and request.status == "open")
     waiting_provider = False
     scrolls = 0
     if run is not None and department == "product":
@@ -1127,6 +1122,74 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
 
     )
 
+
+# ---------------------------------------------------------------------------
+# run.asks
+
+
+class RunAsks(Contract):
+    run_id: str
+
+
+class AskView(Contract):
+    requester: str
+    recipient: str
+    question: str
+    status: Literal["进行中", "已回答", "没能回答"]
+    answer: str | None = None
+    reason: str | None = None
+    start_position: int
+    end_position: int | None = None
+
+
+class RunAsksResult(Contract):
+    asks: list[AskView]
+
+
+def _run_asks(application: Application, request: RunAsks) -> Snapshot[RunAsksResult]:
+    store = application.system.store
+    _run(application, request.run_id)
+    events = store.list_events(request.run_id)
+    asks: list[AskView] = []
+    for event in events:
+        if event.type != EventType.ASK_STARTED:
+            continue
+        payload = event.payload or {}
+        branch_session_id = payload.get("branch_session_id")
+        answer_event = next(
+            (e for e in events if e.type == EventType.ASK_ANSWERED and e.session_id == branch_session_id),
+            None,
+        )
+        if answer_event is not None:
+            ans_payload = answer_event.payload or {}
+            if ans_payload.get("status") == "answered":
+                status: Literal["进行中", "已回答", "没能回答"] = "已回答"
+                answer = ans_payload.get("answer")
+                reason = None
+            else:
+                status = "没能回答"
+                answer = None
+                reason = ans_payload.get("reason")
+            end_position = answer_event.position
+        else:
+            status = "进行中"
+            answer = None
+            reason = None
+            end_position = None
+        asks.append(AskView(
+            requester=payload.get("requester") or "",
+            recipient=payload.get("recipient") or "",
+            question=payload.get("question") or "",
+            status=status,
+            answer=answer,
+            reason=reason,
+            start_position=event.position,
+            end_position=end_position,
+        ))
+    return Snapshot[RunAsksResult](
+        position=store.end_position(),
+        data=RunAsksResult(asks=asks),
+    )
 
 # ---------------------------------------------------------------------------
 # work_item.materials
@@ -1897,11 +1960,12 @@ PROJECT_OVERVIEW = QueryDefinition(
                 ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_CONTINUED,
-                EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED, EventType.COLLABORATION_REQUESTED,
+                EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
+                EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
                 ProjectEventType.BASELINE_ADOPTED,
-                EventType.COLLABORATION_RESPONDED, EventType.DECISION_REQUESTED),
+                EventType.DECISION_REQUESTED),
 )
 
 PROJECT_LOOP = QueryDefinition(
@@ -1910,7 +1974,7 @@ PROJECT_LOOP = QueryDefinition(
     changed_by=(ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
                 EventType.TRANSITION, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
                 EventType.RUN_PAUSED, EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.DEPARTMENT_ACTIVATED,
-                EventType.COLLABORATION_REQUESTED, EventType.TOOL_STARTED, EventType.TOOL_CALLED,
+                EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.TOOL_STARTED, EventType.TOOL_CALLED,
                 EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED,
                 EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
@@ -1920,8 +1984,8 @@ PROJECT_LOOP = QueryDefinition(
 
 PROJECT_FLOW = QueryDefinition(
     name="project.flow", request=ProjectFlow, result=ProjectFlowResult, handle=_project_flow,
-    changed_by=(EventType.TRANSITION, EventType.COLLABORATION_REQUESTED, EventType.COLLABORATION_RESPONDED,
-                EventType.COLLABORATION_CLOSED, EventType.QA_SUBMITTED),
+    changed_by=(EventType.TRANSITION, EventType.ASK_STARTED, EventType.ASK_ANSWERED,
+                EventType.QA_SUBMITTED),
 )
 
 WORK_ITEM_INPUTS = QueryDefinition(
@@ -1943,8 +2007,8 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 EventType.DEPARTMENT_INPUT,
                 ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
                 EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
-                EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.COLLABORATION_REQUESTED,
-                EventType.COLLABORATION_RESPONDED, EventType.COLLABORATION_CLOSED,
+                EventType.RUN_CONTINUED, EventType.RUN_RESUMED,
+                EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 # 本项目的部门设置修改以后生效模型与来源随之更新（工单 #95 的验收）；
                 # 目录修订（准入作废、连接修改）以后引用可用性随之更新
                 ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, CatalogEventType.CATALOG_REVISED),
@@ -1954,6 +2018,11 @@ RUN_ACTIONS = QueryDefinition(
     name="run.actions", request=RunActions, result=RunActionsResult, handle=_run_actions,
     changed_by=(EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
                 EventType.ACTION_VERIFIED, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED),
+)
+
+RUN_ASKS = QueryDefinition(
+    name="run.asks", request=RunAsks, result=RunAsksResult, handle=_run_asks,
+    changed_by=(EventType.ASK_STARTED, EventType.ASK_ANSWERED),
 )
 
 WORK_ITEM_MATERIALS = QueryDefinition(
@@ -2265,6 +2334,6 @@ RUN_RECOVERY = QueryDefinition(
 
 PROJECT_QUERIES = (
     PROJECTS_LIST, PROJECT_OVERVIEW, PROJECT_LOOP, PROJECT_FLOW, WORK_ITEM_INPUTS, EVENT_DETAIL,
-    DEPARTMENT_WORKSPACE, RUN_ACTIONS, WORK_ITEM_MATERIALS, DELIVERY_FILE, PROJECT_ATTEMPTS, PROJECT_USAGE,
+    DEPARTMENT_WORKSPACE, RUN_ACTIONS, RUN_ASKS, WORK_ITEM_MATERIALS, DELIVERY_FILE, PROJECT_ATTEMPTS, PROJECT_USAGE,
     RUN_ATTEMPT, PROJECT_SETTINGS, RUN_EXPORT, REPLAY_CHECK, RUN_RECOVERY,
 )

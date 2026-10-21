@@ -2349,6 +2349,48 @@
         }
       }
     },
+    "/api/queries/run.asks": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "run.asks",
+        "operationId": "query_run_asks",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_RunAsksResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/work_item.materials": {
       "get": {
         "tags": [
@@ -4123,6 +4165,78 @@
           "media_type"
         ],
         "title": "ArtifactRef"
+      },
+      "AskView": {
+        "properties": {
+          "requester": {
+            "type": "string",
+            "title": "Requester"
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "进行中",
+              "已回答",
+              "没能回答"
+            ],
+            "title": "Status"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "start_position": {
+            "type": "integer",
+            "title": "Start Position"
+          },
+          "end_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Position"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requester",
+          "recipient",
+          "question",
+          "status",
+          "start_position"
+        ],
+        "title": "AskView"
       },
       "AttemptView": {
         "properties": {
@@ -10128,6 +10242,23 @@
         ],
         "title": "RunActionsResult"
       },
+      "RunAsksResult": {
+        "properties": {
+          "asks": {
+            "items": {
+              "$ref": "#/components/schemas/AskView"
+            },
+            "type": "array",
+            "title": "Asks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "asks"
+        ],
+        "title": "RunAsksResult"
+      },
       "RunAttemptResult": {
         "properties": {
           "attempt": {
@@ -10763,6 +10894,24 @@
           "data"
         ],
         "title": "Snapshot[RunActionsResult]"
+      },
+      "Snapshot_RunAsksResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunAsksResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[RunAsksResult]"
       },
       "Snapshot_RunAttemptResult_": {
         "properties": {

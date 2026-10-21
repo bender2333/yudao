@@ -33,7 +33,6 @@
 "test_collaboration_engine.py" = "module"
 "test_collaboration_responded_parties.py" = "integration"
 "test_collaboration_rules.py" = "unit"
-"test_collaboration_views.py" = "integration"
 "test_compaction.py" = "unit"
 "test_compaction_engine.py" = "module"
 "test_commands_without_registration.py" = "integration"

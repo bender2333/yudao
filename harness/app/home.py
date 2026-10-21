@@ -27,8 +27,8 @@ RANGE_SECONDS = {"24h": 24 * 3600, "7d": 7 * 24 * 3600}
 # 范围内的关键事实种类（设计说明第 4.3 节）：交接、询问与回答、返工、放行、采纳、决定请求的发出与回答。
 # 故障、修复、部署与回滚、进入与离开等待属于 Stage 4，所属工作包完成之前没有数据
 FACT_TYPES: frozenset[str] = frozenset({
-    EventType.TRANSITION, EventType.COLLABORATION_REQUESTED, EventType.COLLABORATION_RESPONDED,
-    EventType.COLLABORATION_CLOSED, EventType.QA_SUBMITTED, EventType.RUN_DONE, EventType.RUN_PAUSED,
+    EventType.TRANSITION, EventType.ASK_STARTED, EventType.ASK_ANSWERED,
+    EventType.QA_SUBMITTED, EventType.RUN_DONE, EventType.RUN_PAUSED,
     EventType.RUN_FAILED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
     ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.WORK_ITEM_CREATED,
 })
@@ -39,8 +39,8 @@ REWORK_VERDICTS = frozenset({"rework_product", "rework_engineering"})
 # 故障、修复、部署与回滚、进入与离开等待属于 Stage 4，事件种类登记以后在这里补上
 FACT_KINDS: dict[str, str] = {
     EventType.TRANSITION: "handoff",
-    EventType.COLLABORATION_REQUESTED: "ask",
-    EventType.COLLABORATION_RESPONDED: "answer",
+    EventType.ASK_STARTED: "ask",
+    EventType.ASK_ANSWERED: "answer",
     EventType.RUN_DONE: "release",
     EventType.RUN_PAUSED: "release",
     EventType.RUN_FAILED: "release",

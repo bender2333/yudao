@@ -344,6 +344,44 @@ export type ArtifactRef = {
 };
 
 /**
+ * AskView
+ */
+export type AskView = {
+    /**
+     * Requester
+     */
+    requester: string;
+    /**
+     * Recipient
+     */
+    recipient: string;
+    /**
+     * Question
+     */
+    question: string;
+    /**
+     * Status
+     */
+    status: '进行中' | '已回答' | '没能回答';
+    /**
+     * Answer
+     */
+    answer?: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Start Position
+     */
+    start_position: number;
+    /**
+     * End Position
+     */
+    end_position?: number | null;
+};
+
+/**
  * AttemptView
  */
 export type AttemptView = {
@@ -3851,6 +3889,16 @@ export type RunActionsResult = {
 };
 
 /**
+ * RunAsksResult
+ */
+export type RunAsksResult = {
+    /**
+     * Asks
+     */
+    asks: Array<AskView>;
+};
+
+/**
  * RunAttemptResult
  */
 export type RunAttemptResult = {
@@ -4223,6 +4271,17 @@ export type SnapshotRunActionsResult = {
      */
     position: number;
     data: RunActionsResult;
+};
+
+/**
+ * Snapshot[RunAsksResult]
+ */
+export type SnapshotRunAsksResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: RunAsksResult;
 };
 
 /**
@@ -17697,6 +17756,36 @@ export type QueryRunActionsResponses = {
 };
 
 export type QueryRunActionsResponse = QueryRunActionsResponses[keyof QueryRunActionsResponses];
+
+export type QueryRunAsksData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    url: '/api/queries/run.asks';
+};
+
+export type QueryRunAsksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryRunAsksError = QueryRunAsksErrors[keyof QueryRunAsksErrors];
+
+export type QueryRunAsksResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotRunAsksResult;
+};
+
+export type QueryRunAsksResponse = QueryRunAsksResponses[keyof QueryRunAsksResponses];
 
 export type QueryWorkItemMaterialsData = {
     body?: never;
