@@ -852,3 +852,5 @@ minimax-M3.1-Flash / 2026-10-22 12:05 / docs/user-session-log.md 补 U22（#664 
 执行者 minimax-M3.1-Flash / 2026-10-22 16:45 / 修正工单 #656 的用量合并规则：harness/observability.py 的 attempt_usage 回到「原文在场时由原文决定，原文整个读不到时才按摘要读取」，并保留各协议自己的键名（prompt_tokens、completion_tokens、prompt_tokens_details）；摘要里的 0 是「这一项没有报」的缺省值，不再拿来补原文缺的项；harness/tests/test_observability_module.py 里 #656 的三项按修正后的规则改写并加一项 / #656 合并以后 main 上每次合并以后的集成层有两项失败：逐字段合并把摘要的缺省 0 补成了「报了 0」，与工单自己的验收标准第 4 条相反
 
 执行者 minimax-M3.1-Flash / 2026-10-22 05:05 / 工单 #663 「开始排空」先确认再执行：新增 client/src/renderer/src/views/system/drain-text.ts 给确认框的措辞与排空期间的提示，runtime.tsx 的「开始排空」先开确认框（写明不再开始新事项、这一步回不去、剩下的是强制升级），sidebar.tsx 与 app.tsx 在排空期间于侧栏项目列表上方给出提示；新增 client/tests/unit/drain-text.test.ts 四项 / 用户走查 U10：「开始排空」不可逆，界面上既没有确认也没有说明回不去
+
+执行者 minimax-M3.1-Flash / 2026-10-22 05:45 / 工单 #659 重新订阅不再退回位置 0：client/src/renderer/src/contract/view-sync.ts 的 refreshAll 取视图位置最小值时跳过 0（0 表示「这个视图还没有快照」），并新增 resubscribePosition 给出起点（视图位置与事件流已读到的位置里更晚的那个），client-app.ts 的 resync 用它重订阅；新增 client/tests/unit/resubscribe-position.test.ts 四项 / 用户走查 U08：新开的标签页一直停在「正在读取数据」；每十秒一轮的重新订阅把起点拖回 0，服务重放整段历史后 previous 对不上又触发下一轮

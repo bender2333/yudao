@@ -134,7 +134,20 @@ export class ViewSync {
   async refreshAll(): Promise<number> {
     const ids = [...this.entries.keys()];
     await Promise.all(ids.map((id) => this.refresh(id)));
-    const positions = ids.map((id) => this.entries.get(id)?.position).filter((value): value is number => value !== undefined);
+    // 位置 0 表示「这个视图还没有快照」：不参与取最小值，
+    // 否则一个刚打开或查询失败的视图会把重新订阅拖回 0（工单 #659）
+    const positions = ids.map((id) => this.entries.get(id)?.position ?? 0).filter((value) => value > 0);
     return positions.length === 0 ? 0 : Math.min(...positions);
   }
+}
+
+/**
+ * 重新订阅事件流的起点（工单 #659）。
+ * 视图位置里 0 表示「还没有快照」，不算；也不能比事件流已经读到的位置更早——
+ * 退回去会让服务重放整段历史，页面在重放期间拿不到稳定的数据，
+ * 还会因为 previous 对不上再次重新同步，形成反复重订阅。
+ */
+export function resubscribePosition(viewPosition: number, streamPosition: number): number {
+  const earliest = viewPosition > 0 ? viewPosition : 0;
+  return Math.max(earliest, streamPosition);
 }
