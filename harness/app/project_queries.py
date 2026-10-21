@@ -876,6 +876,8 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
 MESSAGE_TYPES = (EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_INPUT, EventType.MODEL_MESSAGE,
                  EventType.DEPARTMENT_GUIDANCE_RECEIVED)
 MESSAGE_LIMIT = 100
+# 部门消息的正文长度上限：太长时给一段，长文本由用户点时间打开原始事件看（工单 #670）
+MESSAGE_TEXT_LIMIT = 200
 DISCARDED_ATTEMPT_STATUSES = ("failed", "cancelled")
 
 
@@ -901,10 +903,68 @@ def _department_messages(application: Application, run_id: str, department: str)
         {
             "event_id": event.event_id, "position": event.position, "seq": event.stream_version,
             "type": event.type, "department": event.department, "created_at": event.created_at,
-            "text": event.payload.get("text") or event.payload.get("summary") or "",
+            "text": _message_text(application, run_id, event),
         }
         for event in kept[-MESSAGE_LIMIT:]
     ]
+
+
+def _message_text(application: Application, run_id: str, event: Any) -> str:
+    # 一条部门消息的文字（工单 #670）：载荷里的正文优先；
+    # 这两类事件的正文在工件里（department_input 的 input_ref、model_message 的 message_ref），
+    # 按引用取工件给一段摘要，取不到就留空由界面说清去哪里看。
+    payload = event.payload
+    text = payload.get("text") or payload.get("summary") or ""
+    if isinstance(text, str) and text != "":
+        return _truncate(text)
+    for key in ("message_ref", "input_ref"):
+        ref = payload.get(key)
+        if not isinstance(ref, dict):
+            continue
+        try:
+            raw = application.system.artifacts.get_for_run(run_id, ArtifactRef(**ref))
+        except (FileNotFoundError, KeyError, TypeError, ValueError):
+            continue
+        try:
+            item = json.loads(raw)
+        except (TypeError, ValueError):
+            return raw.decode("utf-8", errors="replace")
+        summary = _item_summary(item)
+        if summary != "":
+            return _truncate(summary)
+    return ""
+
+
+def _truncate(text: str) -> str:
+    # 正文太长时给一段，长文本由用户点时间打开原始事件看（工单 #670）
+    if len(text) <= MESSAGE_TEXT_LIMIT:
+        return text
+    return text[:MESSAGE_TEXT_LIMIT] + "…"
+
+def _item_summary(item: Any) -> str:
+    # 工件里的一条内容：给一段能看懂的摘要（工单 #670）
+    if isinstance(item, str):
+        return item
+    if isinstance(item, list):
+        parts = [_item_summary(entry) for entry in item]
+        return "；".join(part for part in parts if part != "")
+    if not isinstance(item, dict):
+        return ""
+    for key in ("text", "content", "summary"):
+        value = item.get(key)
+        if isinstance(value, str) and value != "":
+            return value
+        if isinstance(value, list):
+            parts = [_item_summary(entry) for entry in value]
+            joined = "；".join(part for part in parts if part != "")
+            if joined != "":
+                return joined
+    name = item.get("name")
+    if isinstance(name, str) and name != "":
+        arguments = item.get("arguments")
+        detail = json.dumps(arguments, ensure_ascii=False) if arguments else ""
+        return f"调用工具 {name}" + (f"：{detail}" if detail != "" else "")
+    return ""
 
 
 def _discarded_attempts(application: Application, run_id: str) -> set[str]:
