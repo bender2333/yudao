@@ -236,6 +236,58 @@ def test_ask_audit_rejects_mismatched_ask_parties_or_events(ask_run):
     assert any("parties do not match" in note for note in audit["notes"])
 
 
+def test_ask_audit_rejects_ask_still_in_progress(ask_run):
+    system, run_id = ask_run
+    events = _saved_events(system, run_id)
+    last_start = [e for e in events if e.type == EventType.ASK_STARTED][-1]
+    last_answer = next(e for e in events if e.type == EventType.ASK_ANSWERED
+                       and e.session_id == last_start.payload["branch_session_id"])
+    delete_saved_events(system.store, [last_answer.event_id])
+
+    audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
+    assert audit["status"] == "unverified"
+    assert any("still in progress" in note for note in audit["notes"])
+    assert _ask_smoke_exit_code(audit) == 1
+
+
+def test_ask_audit_rejects_answer_before_start(ask_run):
+    system, run_id = ask_run
+    events = _saved_events(system, run_id)
+    starts = [e for e in events if e.type == EventType.ASK_STARTED]
+    answers = [e for e in events if e.type == EventType.ASK_ANSWERED]
+    starts[-1].payload["branch_session_id"] = answers[0].session_id
+    rewrite_saved_event(system.store, starts[-1])
+
+    audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
+    assert audit["status"] == "unverified"
+    assert any("answer stream_version is not after start" in note for note in audit["notes"])
+    assert _ask_smoke_exit_code(audit) == 1
+
+
+def test_ask_audit_rejects_revision_outside_ask_window(ask_run):
+    system, run_id = ask_run
+    events = _saved_events(system, run_id)
+    second_start = [e for e in events if e.type == EventType.ASK_STARTED][1]
+    second_answer = [e for e in events if e.type == EventType.ASK_ANSWERED][1]
+    accepted = next(e for e in events if e.type == EventType.SPEC_ACCEPTED
+                    and second_start.stream_version < e.stream_version < second_answer.stream_version)
+    delete_saved_events(system.store, [accepted.event_id])
+
+    audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
+    assert audit["requirements_revision"] is False
+    assert _ask_smoke_exit_code(audit) == 1
+
+
+def _ask_smoke_exit_code(audit):
+    return smoke_exit_code({"available": True, "scenarios": {"ask": {
+        "phase": "DONE", "stop_reason": "released", "replay_consistent": True,
+        "context_isolated": True, "model_input_audit": {"status": "verified"},
+        "check_receipts": [{"name": "smoke"}], "check_receipts_verified": True,
+        "delivery_archive": {"status": "verified"}, "git_audit": {"status": "verified"},
+        "fake_used": False, "ask_audit": audit,
+    }}})
+
+
 def test_model_input_audit_tracks_new_input_and_prompt_versions(ask_run, ask_invocations):
     system, run_id = ask_run
     summary = summarize_run(system, run_id, scenario="ask")
