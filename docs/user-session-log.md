@@ -8,11 +8,11 @@
 
 环境：main `a49165a4`，从源码运行 `uv run python -m harness api --no-browser`，数据目录 `%LOCALAPPDATA%\Yudao`，真实模型 9router 的 `ds`（deepseek-v4.1-flash，Chat Completions），三部门绑定同一模型。页面版本 0.1.1。
 
-走过的路径：从想法新建项目 → 填长期目标 → 进入项目概览 → 以新事项开始 → 观察三部门循环 → 第二个事项 → 发指导 → 停服务再启动 → 记录原文 → 第三个事项 → 追加需求 → 取消事项 → 资料页、观测页、部门页 → 模型管理页 → 接入已有项目 → 确认初始 PRD。
+走过的路径：从想法新建项目 → 填长期目标 → 进入项目概览 → 以新事项开始 → 观察三部门循环 → 第二个事项 → 发指导 → 停服务再启动 → 记录原文 → 第三个事项 → 追加需求 → 取消事项 → 资料页、观测页、部门页 → 模型管理页 → 接入已有项目 → 确认初始 PRD → 在建档好的项目上提一个变更 → 质检退回返工 → 放行采纳。
 
 工单 #629 的走查记录（含各段用时、质检结论与一致性）写在它的评论里。
 
-本次一共跑了四个事项：两个走到质检放行并采纳，一个由用户主动取消，一个是接入已有项目的建档事项（走完 9 轮，等用户确认初始 PRD 后采纳）。
+本次一共跑了五个事项，分在两个项目里：「文本统计工具」里三个（两个走到质检放行并采纳，一个由用户主动取消），「文本统计工具（接入已有项目）」里两个（建档事项走完 9 轮后采纳，一个变更事项经过一次返工后采纳）。
 
 | 编号 | 现象 | 复现步骤 | 初判 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -22,11 +22,13 @@
 | U04 | 部门工作间「动作与回执」表格的「登记名」一列，每一条都是「没有回执」。三十多条动作没有一条有值。 | 工程或质检部门页面 → 动作与回执表格 | 登记机制已按 ADR-0038 删除（#543 删了登记本身，#544 删了设置页的表单），但表格还留着这一列。`client/src/renderer/src/views/project/department.tsx` 第 305 行的表头有「登记名」，第 313 行显示 `receipt.registered_name`；后端 `harness/app/payloads.py` 第 559 行的注释写着这个字段「只在登记命令获准执行时出现」，`harness/app/project_queries.py` 第 951 行的 `ActionReceipt.registered_name` 现在恒为 None。原型待办里已经写了「动作列表中『登记命令』的显示改为命令原文」，这一条没有工单覆盖 | 工单 [#655](https://github.com/bender2333/yudao/issues/655) |
 | U05 | 观测页的用量统计只显示 token 总数，输入 token、输出 token、缓存 token 全是「未上报」。事件里其实有这些数。 | 项目观测页 → 用量统计 | `harness/observability.py` 第 159 至 212 行的 `attempt_usage` 合并两个来源：上游原文（`raw_usage_ref`）与规范化摘要（`usage_summary`）。第 187 行的条件是 `raw is None`，**只有原文整个读不到时才用摘要**。这次原文读到了（Chat Completions 协议的 `prompt_tokens`/`completion_tokens`），于是正确的摘要被跳过；第 170 至 180 行只认 Responses 的 `input_tokens`/`output_tokens`，取到 None；`total_tokens` 两个协议同名，所以有值，`source` 判定为 reported（81）。缓存 token 走 `input_tokens_details`，Chat Completions 在 `prompt_tokens_details`，同样取不到 | 工单 [#656](https://github.com/bender2333/yudao/issues/656) |
 | U06 | 用户主动取消的事项，在概览页「当前事项」的状态行写着「已停止 · 执行失败」。取消是用户自己的决定，没有失败。 | 概览页 → 顶栏「范围」选「增加 --count-only 选项（已停止）」→ 看「当前事项」的状态行 | 后端把取消的终态记为 `phase=FAILED` + `stop_reason=cancelled`（`harness/projection.py` 第 705 行设 FAILED；`harness/tests/test_projects.py` 第 173 行钉住这个组合）。客户端 `client/src/renderer/src/views/project/overview.tsx` 第 248 行无条件把 phase 翻成阶段名，`labels.ts` 第 45 行把 FAILED 译成「执行失败」。同一套数据在别处已经分开了：部门页 `department.tsx` 第 154 行对 stopped 写「已停止」（工单 #319）；后端 `_room_status`（`harness/app/project_queries.py` 第 741 行）按 `stop_reason=cancelled` 给出房间的 `cancelled`（「已取消」）。只有概览页这一处没按停止原因区分 | 工单 [#657](https://github.com/bender2333/yudao/issues/657) |
-| U08 | 浏览器里新开的标签页打开 Yudao，页面外壳出来以后一直停在初始状态：侧栏「项目 0 · 没有符合的项目」、顶栏「连接中断 · 刚刚断开，正在重新连接」、主区「正在读取数据」。同一浏览器里最早打开的那个标签页正常。 | 浏览器新开一个标签页 → 打开 `http://127.0.0.1:8765/` → 观察十几分钟 | 服务端日志里页面发出的查询都到了也都答了 200，数据在服务端是有的；但页面约每 10 秒又发一轮 `capabilities` + 全部视图查询 + `/api/events?after=0&live=1`，这一轮的形状是客户端 `client-app.ts` 第 185 行的 `resync()`（重读能力清单 → `refreshAll()` 重查所有视图 → 重新订阅事件流），而重新订阅的位置又是 0，等于每次重拉两千多条事件（5.2 MB）。事件流本身是好的：同一个 npm `eventsource` 包、同一个 URL，在 Node 里连 20 秒收到 2015 条事件、3 个检查点、641 个片段，`previous` 链没有断点也没有错误。服务端在请求带 `Last-Event-ID` 且值不是非负整数时会立刻回 `resync` 并关闭连接（`harness/api/app.py` 第 202 至 211 行），用 `curl -H 'Last-Event-ID: undefined'` 能稳定复现。页面版本与服务版本都是 0.1.1，不是版本不符重载；日志里也没有重新加载页面时会有的 `GET /` | 工单 [#659](https://github.com/bender2333/yudao/issues/659) |
+| U08 | 浏览器里新开的标签页打开 Yudao，页面外壳出来以后一直停在初始状态：侧栏「项目 0 · 没有符合的项目」、顶栏「连接中断 · 刚刚断开，正在重新连接」、主区「正在读取数据」。同一浏览器里最早打开的那个标签页正常。 | 浏览器新开一个标签页 → 打开 `http://127.0.0.1:8765/` → 观察十几分钟 | 服务端日志里页面发出的查询都到了也都答了 200，数据在服务端是有的；但页面约每 10 秒又发一轮 `capabilities` + 全部视图查询 + `/api/events?after=0&live=1`，这一轮的形状是客户端 `client-app.ts` 第 185 行的 `resync()`（重读能力清单 → `refreshAll()` 重查所有视图 → 重新订阅事件流），而重新订阅的位置又是 0，等于每次重拉两千多条事件（5.2 MB）。事件流本身是好的：同一个 npm `eventsource` 包、同一个 URL，在 Node 里连 20 秒收到 2015 条事件、3 个检查点、641 个片段，`previous` 链没有断点也没有错误。服务端在请求带 `Last-Event-ID` 且值不是非负整数时会立刻回 `resync` 并关闭连接（`harness/api/app.py` 第 202 至 211 行），用 `curl -H 'Last-Event-ID: undefined'` 能稳定复现。页面版本与服务版本都是 0.1.1，不是版本不符重载；日志里也没有重新加载页面时会有的 `GET /`（静态资源的请求在日志里是有记录的，所以这条排除是硬的）。补查：页面大约每 10 秒重走一遍启动流程（`capabilities` → 全部视图查询 → 重新订阅事件流），滚动一下页面会闪回整页的「连接中…」（`app.tsx` 第 242 行），页面上的 DOM 引用几秒就失效；最早那个标签页的事件流在 23:22:41 断开以后四十四分钟没有重连过 | 工单 [#659](https://github.com/bender2333/yudao/issues/659) |
 
 核对过但不成立（2026-10-21）：曾怀疑首页把同一个项目显示成两种名字。查 `projects.list` 与 `project.overview` 的原始数据，项目名只有「Demo 项目」一处，侧栏、楼层与表格一致，不是问题。
 
 核对过但不成立（2026-10-21）：曾怀疑概览页「已放行（0）」说明事项没有放行。看 `project.overview` 的原始数据，该事项 `stop_reason=released`、`phase=DONE`、`status=adopted`；看板的「已放行」列对应 `released_unsettled`（已放行但未采纳），放行并采纳的事项归到「已采纳」列，`board.ts` 第 21 至 43 行的分列逻辑正确。标签容易误读，但不是错误。
+
+核对过但不成立（2026-10-22）：曾怀疑新项目的「流转记录」里混进了别的项目的记录（新项目 00:06:09 建立，第一条流转记录却是 00:07:22 之前的一次「需求交接」，看着像别的项目的）。逐个项目比对 `project.flow` 的 flow_id，三个项目之间没有重复；那条记录确实是本项目建档 run 的第一次交接（产品复盘中 → 工程处理中）。不是串项目。
 
 ## 走查中确认正常、值得记下的行为
 
@@ -42,6 +44,9 @@
 - 产品读现有代码时用的是真读：初始 PRD 里 11 条要求、5 条边界，每一条都能在快照里的 README 与代码上核对到；验收条目还记下了本机 `python3` 是 Windows 应用别名、调用即退出 49，改用 venv 的 python 这种环境事实。
 - 初始 PRD 的边界写得很克制：可 import 的稳定接口、测试套件与 CI 都明确写成「设计中，未实施」，README 里的 sample.txt 明确不作为随附素材承诺；需求只描述快照里已经能观察到的行为。
 - 源目录不合法时的拒绝理由是准的：第一次接入时源目录指向了 Yudao 自己的工作区（里面有宿主的私有目录 `.checks`），接口回的是 `source_invalid` 与「宿主私有路径不能进入公开快照：.checks」，指明了是哪一条路径、为什么不能进快照，换一个干净的源目录就通过了。
+- 在建档好的项目上做变更，走的是同一套循环：产品交底 → 工程读现有代码、改代码、跑检查 → 交付 → 质检独立核验。工程的动作序列是 `list_files`、`read_file`、`edit_range`、`read_range`、`write_file`、`run_check`、`submit_delivery`，改的是既有文件而不是另起一份。
+- 质检在既有代码上抓到真缺陷并退回了：argparse 默认 `allow_abbrev=True`，`--count`、`--c`、`--count-o`、`--count-onl`、`--js` 这些前缀会被静默接受（退出码 0），而合同与 README 都要求未知选项退出 2。质检自己写了回归用例 `.yudao-qa-tests`（5 过 1 挂：test_no_long_option_abbreviation），以「缺陷未关不放行」把交付退回工程；工程改成 `allow_abbrev=False` 重新交付，质检复核后放行并采纳（交付快照里前一次是 `superseded`，后一次是 `active`）。
+- 一次执行槽位是当前的约束，不是缺陷：在另一个项目里新建事项被拒，理由是 `busy`「已有事项正在执行，等它结束以后才能新建」（`harness/app/project_and_work_item_commands.py` 第 188 至 190 行写着「3.4A 之前只有一个执行槽位」；多项目并行是 M3 的内容）。这条理由没说是哪个项目在跑，用户在别的项目里看到会不知道该等谁，记在这里备查。
 
 ## 过渡期的现象（不另开工单）
 
