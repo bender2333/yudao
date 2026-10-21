@@ -16866,7 +16866,7 @@ export type CommandWritebackExecuteData = {
 
 export type CommandWritebackExecuteErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, project_archived, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, project_archived, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
