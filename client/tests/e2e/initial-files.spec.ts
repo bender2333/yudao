@@ -193,6 +193,9 @@ test.describe("起始文件夹（1440×900）", () => {
         "部门工作间出现列出工作区文件的成功动作", 180_000);
       await expect(readRow.filter({ hasText: "成功" })).toBeVisible();
 
+      // 表格里没有「登记名」一列：命令登记按 ADR-0038 删除以后，这一列恒为「没有回执」（工单 #655）
+      await expect(actions.locator("thead th").filter({ hasText: "登记名" })).toHaveCount(0);
+
       // 列出文件的回执里是起始文件夹里的文件：点时间看这条事件的原始载荷
       await listRow.locator("button.link").click();
       const modal = page.locator(".modal-backdrop");
