@@ -787,6 +787,7 @@ minimax-M3.1-Flash / 2026-10-22 02:40 / docs/user-session-log.md 补 U10（「�
 
 minimax-M3.1-Flash / 2026-10-22 03:10 / docs/user-session-log.md 补 U11（事件种类漏登记中文说明，整条事件流断掉并一直重连）与两条记下备查的事实：事件种类清单与标签表之间没有约束（85 条标签、50 种 run 事件，只缺一种）、用普通 Chromium（Playwright）对照比在宿主内置浏览器里猜要快 / 继续以用户身份使用系统，顺着「新开标签页卡住」查到一条确定的成因（event_label 抛 KeyError 把 SSE 响应截断），已开工单：#664
 
+执行者 minimax-M3.1-Flash / 2026-10-22 03:15 / 工单 #655 动作与回执表格去掉「登记名」一列：新增 client/src/renderer/src/views/project/action-table.ts（表格的表头与每一行的文字，没有运行期依赖的模块），表头六列（工具、部门、状态、结果、输出引用、时间），客户端不再读回执里的登记名；新增 client/tests/unit/action-table.test.ts 六项；client/tests/e2e/initial-files.spec.ts 补「表头里没有登记名」的核对 / 用户走查 U04：命令登记按 ADR-0038 删除以后，动作列表的「登记名」一列每一条都是「没有回执」，是一列残骸
 minimax-M3.1-Flash / 2026-10-22 03:35 / docs/user-session-log.md 补 U12（观测页「共 N 条记录」是已加载的行数不是请求总数）与三条记下备查的事实：十二个页面在普通 Chromium 里都渲染正常、设置页的「状态」只有已归档/进行中两档 / 继续以用户身份使用系统，用 Playwright 逐页走了一遍界面并读出页面文字，发现的问题先记录再交工单：#665
 
 minimax-M3.1-Flash / 2026-10-22 03:55 / docs/user-session-log.md 补两条记下备查的事实：观测页两个页签对同一批请求给出两个数（50 与 115）、界面上点得动的地方都点得动（项目菜单、事项范围、加载更多、两个页签、资料页条目、首页楼层） / 继续以用户身份使用系统，用 Playwright 把界面的可点路径点了一遍，没有发现点击无效的地方；同一屏上「50」与「115」并存的证据补到 #665 的评论

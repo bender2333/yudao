@@ -16,7 +16,8 @@ import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, useDepartmentDraft } from "./department-settings-form";
-import { ACTION_STATUS, DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, SETTING_SOURCE, departmentName, formatTime, label } from "./labels";
+import { DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, SETTING_SOURCE, departmentName, formatTime, label } from "./labels";
+import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
@@ -302,19 +303,11 @@ function Actions(props: { app: ClientApp; runId: string | null }) {
       <RunningBackgroundCommands commands={backgroundCommands} />
       {rows.length === 0 ? <Empty text="这次运行没有记录动作" /> : (
         <Table
-          head={["工具", "部门", "状态", "登记名", "结果", "输出引用", "时间"]}
+          head={ACTION_TABLE_HEAD}
           rows={rows.map((action) => {
-            const receipt = action.receipt;
-            const eventId = receipt === null ? null : receipt.event_id;
+            const eventId = action.receipt === null ? null : action.receipt.event_id;
             return [
-              action.tool,
-              departmentName(action.department),
-              label(ACTION_STATUS, action.status),
-              show(receipt === null ? null : receipt.registered_name, "没有回执"),
-              receipt === null
-                ? "没有回执"
-                : (receipt.ok ? "成功" : show(receipt.error, "失败")),
-              receipt?.output_ref ? "有（见原始事件）" : "无",
+              ...actionCells(action),
               <button
                 type="button"
                 className="y10-link link"
