@@ -24,6 +24,7 @@
 | U06 | 用户主动取消的事项，在概览页「当前事项」的状态行写着「已停止 · 执行失败」。取消是用户自己的决定，没有失败。 | 概览页 → 顶栏「范围」选「增加 --count-only 选项（已停止）」→ 看「当前事项」的状态行 | 后端把取消的终态记为 `phase=FAILED` + `stop_reason=cancelled`（`harness/projection.py` 第 705 行设 FAILED；`harness/tests/test_projects.py` 第 173 行钉住这个组合）。客户端 `client/src/renderer/src/views/project/overview.tsx` 第 248 行无条件把 phase 翻成阶段名，`labels.ts` 第 45 行把 FAILED 译成「执行失败」。同一套数据在别处已经分开了：部门页 `department.tsx` 第 154 行对 stopped 写「已停止」（工单 #319）；后端 `_room_status`（`harness/app/project_queries.py` 第 741 行）按 `stop_reason=cancelled` 给出房间的 `cancelled`（「已取消」）。只有概览页这一处没按停止原因区分 | 工单 [#657](https://github.com/bender2333/yudao/issues/657) |
 | U08 | 浏览器里新开的标签页打开 Yudao，页面外壳出来以后一直停在初始状态：侧栏「项目 0 · 没有符合的项目」、顶栏「连接中断 · 刚刚断开，正在重新连接」、主区「正在读取数据」。同一浏览器里最早打开的那个标签页正常。 | 浏览器新开一个标签页 → 打开 `http://127.0.0.1:8765/` → 观察十几分钟 | 服务端日志里页面发出的查询都到了也都答了 200，数据在服务端是有的；但页面约每 10 秒又发一轮 `capabilities` + 全部视图查询 + `/api/events?after=0&live=1`，这一轮的形状是客户端 `client-app.ts` 第 185 行的 `resync()`（重读能力清单 → `refreshAll()` 重查所有视图 → 重新订阅事件流），而重新订阅的位置又是 0，等于每次重拉两千多条事件（5.2 MB）。事件流本身是好的：同一个 npm `eventsource` 包、同一个 URL，在 Node 里连 20 秒收到 2015 条事件、3 个检查点、641 个片段，`previous` 链没有断点也没有错误。服务端在请求带 `Last-Event-ID` 且值不是非负整数时会立刻回 `resync` 并关闭连接（`harness/api/app.py` 第 202 至 211 行），用 `curl -H 'Last-Event-ID: undefined'` 能稳定复现。页面版本与服务版本都是 0.1.1，不是版本不符重载；日志里也没有重新加载页面时会有的 `GET /`（静态资源的请求在日志里是有记录的，所以这条排除是硬的）。补查：页面大约每 10 秒重走一遍启动流程（`capabilities` → 全部视图查询 → 重新订阅事件流），滚动一下页面会闪回整页的「连接中…」（`app.tsx` 第 242 行），页面上的 DOM 引用几秒就失效；最早那个标签页的事件流在 23:22:41 断开以后四十四分钟没有重连过 | 工单 [#659](https://github.com/bender2333/yudao/issues/659) |
 | U09 | 「写回」命令在没有可写回对象时返回 500 内部错误，页面上拿不到任何理由。 | 对一个已经建档并采纳过、源目录没有打开写回的项目发 `POST /api/commands/writeback.execute` | 服务端 `harness/writeback.py` 第 286 至 288 行（没有打开写回的源目录）、第 295 至 297 行（采纳标识找不到）、第 299 至 302 行（建档采纳不写回）都直接 `return None`；`harness/projects.py` 第 838 至 858 行把它原样传上来，命令处理只捕获两种异常，于是「正常地什么都不做」被当成异常，最后 `harness/app/commands.py` 第 60 行抛出 `RuntimeError: command writeback.execute returned without registering ... at the write path` → 500 | 工单 [#661](https://github.com/bender2333/yudao/issues/661) |
+| U10 | 「开始排空」是不可逆的，界面上没有确认也没有说明。 | 系统 / 运行与执行槽位页 → 「排空」一节 → 点「开始排空」 | 按钮在 `client/src/renderer/src/views/system/runtime.tsx` 第 99 至 105 行，只要排空状态是 `idle` 就显示（危险样式），点击直接发 `runtime.start_drain`，没有确认。排空状态由目录流里最后一条 `DRAIN_STARTED` 事件决定（`harness/runtime.py` 第 201 至 204 行），事件写入以后状态再也不会回到 `idle`（第 191 至 199 行只给 `draining` 或 `ready`）。排空期间 `work_item.create` 走 `harness/app/project_and_work_item_commands.py` 第 184 至 187 行，事项被登记成排队但不开始；命令清单里没有「取消排空」，界面上也没有别的出路，剩下只有「强制升级」。[ADR-0019](https://github.com/bender2333/yudao/blob/main/docs/adr/0019-project-stream-across-versions.md) 里排空是升级路径上的一步 | 工单 [#663](https://github.com/bender2333/yudao/issues/663) |
 
 核对过但不成立（2026-10-21）：曾怀疑首页把同一个项目显示成两种名字。查 `projects.list` 与 `project.overview` 的原始数据，项目名只有「Demo 项目」一处，侧栏、楼层与表格一致，不是问题。
 
@@ -58,6 +59,9 @@
 - 项目菜单的几个动作都按设计工作：重命名、置顶、归档、恢复都能用；归档以后项目从默认列表里消失（带 `include_archived` 才列出来，侧栏给「已归档」标记），恢复以后回到列表。
 - 基准版本过期时命令被拒，并给出当前版本：「项目已经被修改，请重新读取以后提交」（`current_version` 是 17）。这条提示在用户改过项目设置以后是必要的（项目版本会随每一次设置改动往前走），改完重新读一次再提交就行。
 - 首页的「已读」标记可用：标记以后「自上次查看」的范围从标记的位置起算。
+- 产品会自己把含糊处定下来：第七个事项「统计结果里带上输入文件的路径」留了一个真问题（路径放哪儿、完整路径还是文件名），产品没有发问也没有卡住，直接定成「成功时单独一行写 stderr、用原始参数路径、不做规范化」，stdout 的三个数字与 `--json` 的字节保持不变；质检按这个合同核验后放行。
+- 部门房间的数据是对的：工程不工作的时候房间状态是「未工作」，CRT 上仍有目标、模型、协议与轮次，角色状态与房间状态一致（工单 #650 记的房间里那两句看不到是另一回事，这里只核对数据本身）。
+- 运行与执行槽位页的数据是对的：排空状态、正在执行与排队中的事项数、模型服务是否可用、磁盘可用空间都能读到。
 
 ## 过渡期的现象（不另开工单）
 
