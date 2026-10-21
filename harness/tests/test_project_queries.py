@@ -349,6 +349,10 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
         project_id=project_id, work_item=work_item_id,
     ))
     assert materials.data.contracts
+    # PRD 各版带一段摘要（工单 #668）：目标是哪件事、要求与边界各有几条
+    assert materials.data.contracts[0].summary is not None
+    assert "目标" in materials.data.contracts[0].summary
+    assert "要求" in materials.data.contracts[0].summary
     assert materials.data.deliveries[0].summary == "implemented echo CLI"
 
     delivery_event = projection.delivery_spec.created_event_id

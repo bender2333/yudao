@@ -850,3 +850,5 @@ minimax-M3.1-Flash / 2026-10-22 12:05 / docs/user-session-log.md 补 U22（#664 
 执行者 minimax-M3.1-Flash / 2026-10-22 14:05 / 工单 #672 勾上「显示归档的项目」以后已归档的项目重新出现：开关的状态从侧栏提到外壳（app.tsx），项目列表的视图按它打开（include_archived 参数），新增 client/src/renderer/src/views/project/project-list.ts 给查询参数与可见性；新增 client/tests/unit/project-list.test.ts 四项与 client/tests/e2e/project.spec.ts 一条端到端用例（归档、勾上、取消勾选、恢复） / 用户走查 U17：界面上写着「已归档的项目不列出，可用「恢复项目」取回」，但「恢复项目」只在已归档项目的菜单里出现，这条路走不通
 
 执行者 minimax-M3.1-Flash / 2026-10-22 16:45 / 修正工单 #656 的用量合并规则：harness/observability.py 的 attempt_usage 回到「原文在场时由原文决定，原文整个读不到时才按摘要读取」，并保留各协议自己的键名（prompt_tokens、completion_tokens、prompt_tokens_details）；摘要里的 0 是「这一项没有报」的缺省值，不再拿来补原文缺的项；harness/tests/test_observability_module.py 里 #656 的三项按修正后的规则改写并加一项 / #656 合并以后 main 上每次合并以后的集成层有两项失败：逐字段合并把摘要的缺省 0 补成了「报了 0」，与工单自己的验收标准第 4 条相反
+
+执行者 minimax-M3.1-Flash / 2026-10-22 17:35 / 工单 #668 资料页的 PRD 各版给出内容摘要与原文入口：harness/app/project_queries.py 给合同填那一版 PRD 的摘要（目标、要求几条、边界几条，说法与建档候选一致），client/src/renderer/src/views/project/materials.tsx 给「查看原文」按钮并把兜底文案换成不误导的一句；harness/tests/test_project_queries.py 加核对 / 用户走查 U13：普通事项的 PRD 只有指纹与「没有摘要」，读不到有效合同写了什么
