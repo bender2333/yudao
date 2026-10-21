@@ -835,3 +835,5 @@ minimax-M3.1-Flash / 2026-10-22 11:00 / docs/user-session-log.md 补两条确认
 minimax-M3.1-Flash / 2026-10-22 11:05 / docs/user-session-log.md 补 U19（交付快照的文件清单可以少列工作区里的文件，主机只核对清单里的存在，不核对清单覆盖整棵树）与 U20（一条漏登记中文说明的事件把事件流对所有客户端永久堵死；断线重连的退避被清零，变成每秒一轮的请求风暴），概览里工单数改成 17 张并补上 #677 与 #679，另补三条确认正常的行为（毒事件之前事件流的 previous 链接得上、五个查询接口都答 200 且 position 与日志末尾一致、服务端没有泄漏连接） / 继续以用户身份使用系统时实测出来的：从位置 0 订阅的事件流恰好停在第 2604 条上，此后的事件任何客户端都读不到；刷新首页后页面显示「项目 0」，新开的标签页停在「连接中…」启动画面且服务端收不到它的任何请求
 
 执行者 minimax-M3.1-Flash / 2026-10-22 11:35 / 工单 #656 用量统计逐字段补齐：harness/observability.py 的 attempt_usage 把「原文整个读不到时才用摘要」改成逐字段补齐（摘要里某个字段有值就补上），原文分支同时认 Chat Completions 协议的键名（prompt_tokens、completion_tokens、prompt_tokens_details），来源按补齐后的值重新判定；新增 harness/tests/test_observability_module.py 三项 / 用户走查 U05：Chat Completions 协议下观测页只显示 token 总数，输入、输出与缓存全是「未上报」，而事件里的规范化摘要里其实有这些数
+
+执行者 minimax-M3.1-Flash / 2026-10-22 13:15 / 工单 #671 拒绝提示里不再露出内部原因标识：侧栏接入表单改用新增的 onboardingRejectionText（只给中文说明与服务端列出的路径），顶栏项目菜单改用项目各页已有的 rejectionLabel；新增 client/tests/unit/rejection-text.test.ts 六项，其中一项扫描渲染进程的源文件，不让「（原因 xxx）」这种写法再出现 / 用户走查 U16：接入已有项目时被拒绝的提示写着「源目录不能作为代码快照的来源（原因 source_invalid）」，内部标识对用户没有用处

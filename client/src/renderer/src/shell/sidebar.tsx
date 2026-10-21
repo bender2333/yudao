@@ -8,7 +8,7 @@ import type { Capabilities, DecisionView, ProjectRow, Rejected } from "../api/ge
 import type { ClientApp } from "../contract/client-app";
 import { useCommand } from "../views/project/use-snapshot";
 import { Icon, StatusMark } from "./kit";
-import { ONBOARDING_REJECTION_REASONS, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
+import { onboardingRejectionText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
 
 export type SidebarProps = {
   app: ClientApp;
@@ -302,8 +302,7 @@ function NewProject(props: {
         {props.rejection ? (
           <div className="rejection" role="status">
             <p className="error">
-              {ONBOARDING_REJECTION_REASONS[props.rejection.reason] ?? "命令被拒绝"}
-              （原因 {props.rejection.reason}）
+              {onboardingRejectionText(props.rejection)}
             </p>
             <ul className="rejection-paths y10-list">
               {sourceInvalidLines(props.rejection).map((line) => <li key={line}>{line}</li>)}
