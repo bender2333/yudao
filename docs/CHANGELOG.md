@@ -759,3 +759,5 @@ claude-opus-5-5 / 2026-10-21 01:25 / docs/decision.md 新增 2026-10-21 一条�
 执行者 9router/ag/gemini-3.8-flash-high / 2026-10-21 04:20 / 工单 #633 [循环结构] 借用协作请求的测试改用询问（第二次派发）：docs/architecture-issues.md 追加架构师处理说明 / 落实架构师指令与工单要求
 
 执行者 9router/ag/gemini-3.8-flash-high / 2026-10-21 04:50 / 工单 #632 [循环结构] 查询提供询问：run.asks，流转记录、首页关键事实与评测指标读取询问事件：harness/app/project_queries.py 新增 run.asks 查询合同与实现（支持进行中、已回答、没能回答三种状态及相应问答与原因字段），将其注册至 PROJECT_QUERIES；PROJECT_OVERVIEW、PROJECT_LOOP、PROJECT_FLOW 与 DEPARTMENT_WORKSPACE 的 changed_by 移除协作事件并替换为询问事件；部门房间移除对 run.requests 的 asking 状态判定与 letters_waiting 计数；read_models.py 流转记录与 home.py 首页关键事实改为读取 ask_started 与 ask_answered 事件；evals/runner/yudao_metrics.py 指标 collaboration 改为统计 ask_started；harness/demo.py 协作请求改用询问分支脚本并移除 pending_request 判定；更新 openapi 快照并在 client 重新生成接口类型；删除 test_collaboration_views.py 与 layers.toml 登记；更新 test_project_queries.py、test_api.py、test_demo.py 与 evals 测试 / 完成工单 #632 验收标准
+
+claude-opus-5-5 / 2026-10-21 21:40 / docs/decision.md 新增 2026-10-21 一条：房间端到端的两项既有失败另立 #650 等用户决定原型的取舍，#635 的验收不含它们 / #635 执行者交回，核对后后端脚本没有问题，两项在 main 4b0c98e5 上同样失败
