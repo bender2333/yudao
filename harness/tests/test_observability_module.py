@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace, ProjectAttempts, ProjectUsage, RunAttempt, WorkItemMaterials
 from harness.artifacts import ArtifactStore
 from harness.models import EventType, Usage
+from harness.observability import attempt_usage
 from harness.proposals import product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
@@ -107,6 +109,60 @@ def test_invalid_usage_numbers_in_saved_usage_summaries_are_unknown(tmp_path: Pa
     assert normalized["cost"] is None
     assert normalized["cache_read_tokens"] == 0
     assert normalized["cache_write_tokens"] == 0
+
+
+def _raw_usage(artifacts: ArtifactStore, usage: dict) -> dict:
+    # 上游原文的工件引用：读取侧按 kind、content_hash 与 path 取回
+    ref = artifacts.put("run_1", "raw_usage", json.dumps({"usage": usage}))
+    return {"kind": ref.kind, "content_hash": ref.content_hash, "path": ref.path}
+
+
+def test_usage_summary_fills_the_fields_the_raw_usage_does_not_have(tmp_path: Path):
+    # 上游原文只报了总数，规范化摘要里有分项：摘要逐字段补齐（工单 #656）。
+    # 以前原文一读到就把整个摘要跳过，输入、输出与缓存全是「未上报」。
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    record = {
+        "raw_usage_ref": _raw_usage(artifacts, {"total_tokens": 9168}),
+        "usage_summary": {"input_tokens": 7556, "output_tokens": 1612, "cache_read_tokens": 8960,
+                          "cache_write_tokens": 0, "total_tokens": 9168, "cost": None, "reported": True},
+        "duration_ms": 12196,
+    }
+    usage = attempt_usage(artifacts, "run_1", record)
+    assert usage["input_tokens"] == 7556
+    assert usage["output_tokens"] == 1612
+    assert usage["cache_read_tokens"] == 8960
+    assert usage["cache_write_tokens"] == 0
+    assert usage["total_tokens"] == 9168
+    assert usage["source"] == "reported"
+    assert usage["coverage"]["input_tokens"] == "reported"
+
+
+def test_chat_completions_raw_usage_names_are_read(tmp_path: Path):
+    # Chat Completions 协议的原文用 prompt_tokens 与 completion_tokens（工单 #656）
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    record = {"raw_usage_ref": _raw_usage(artifacts, {
+        "prompt_tokens": 7556, "completion_tokens": 1612, "total_tokens": 9168,
+        "prompt_tokens_details": {"cached_tokens": 8960},
+    })}
+    usage = attempt_usage(artifacts, "run_1", record)
+    assert usage["input_tokens"] == 7556
+    assert usage["output_tokens"] == 1612
+    assert usage["cache_read_tokens"] == 8960
+    assert usage["total_tokens"] == 9168
+    assert usage["source"] == "reported"
+
+
+def test_fields_filled_from_a_summary_that_does_not_report_stay_unknown(tmp_path: Path):
+    # 摘要自己说没有上报时，补齐出来的分项是「未知」，不是「已上报」（工单 #656）
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    record = {
+        "raw_usage_ref": _raw_usage(artifacts, {}),
+        "usage_summary": {"input_tokens": 7556, "reported": False},
+    }
+    usage = attempt_usage(artifacts, "run_1", record)
+    assert usage["input_tokens"] == 7556
+    assert usage["source"] == "unknown"
+    assert usage["coverage"]["input_tokens"] == "unknown"
 
 
 def test_cancelled_attempt_is_independently_filterable(tmp_path: Path):

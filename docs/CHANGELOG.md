@@ -828,3 +828,5 @@ minimax-M3.1-Flash / 2026-10-22 09:50 / docs/user-session-log.md 补 U18（改�
 minimax-M3.1-Flash / 2026-10-22 10:10 / docs/user-session-log.md 概览里把 #655 移到「已修复并由走查的人在页面上确认」一组，并补记 #655 修好后的样子（动作与回执表格六列，「登记名」与「没有回执」都不见了） / 继续以用户身份使用系统：重建页面文件以后验证走查提出并已修复的第四条问题（#655）
 
 minimax-M3.1-Flash / 2026-10-22 11:00 / docs/user-session-log.md 补两条确认正常的行为：在概览页上用「作为新事项开始」建的事项走完一轮并放行采纳（交付给 README 增了一节 Install）、「放弃本次建档 → 重新开始建档」整条路走通（服务端生效、页面刷新后出现重新开始建档一节、点它真的开始新的建档事项） / 继续以用户身份使用系统：把最常用的建事项动作与建档放弃/重启这两条路径都在页面上点了一遍
+
+执行者 minimax-M3.1-Flash / 2026-10-22 11:35 / 工单 #656 用量统计逐字段补齐：harness/observability.py 的 attempt_usage 把「原文整个读不到时才用摘要」改成逐字段补齐（摘要里某个字段有值就补上），原文分支同时认 Chat Completions 协议的键名（prompt_tokens、completion_tokens、prompt_tokens_details），来源按补齐后的值重新判定；新增 harness/tests/test_observability_module.py 三项 / 用户走查 U05：Chat Completions 协议下观测页只显示 token 总数，输入、输出与缓存全是「未上报」，而事件里的规范化摘要里其实有这些数

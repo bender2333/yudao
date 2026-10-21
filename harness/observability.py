@@ -157,7 +157,7 @@ def artifact_json(artifacts: ArtifactStore, run_id: str, ref: Any) -> Any:
 
 
 def attempt_usage(artifacts: ArtifactStore, run_id: str, record: dict[str, Any]) -> dict[str, Any]:
-    # 一次尝试的用量：上游原文按引用读取，标准化的汇总只补齐原文里没有的字段
+    # 一次尝试的用量：上游原文按引用读取，标准化的汇总逐字段补齐原文里没有的字段（工单 #656）
     raw = artifact_json(artifacts, run_id, record.get("raw_usage_ref"))
     if isinstance(raw, dict) and isinstance(raw.get("usage"), dict):
         raw = raw["usage"]
@@ -165,10 +165,15 @@ def attempt_usage(artifacts: ArtifactStore, run_id: str, record: dict[str, Any])
     values: dict[str, Any] = {field: None for field in USAGE_FIELDS}
     currency = None
     cost_source = None
-    source = "missing"
+    raw_reported = False
     if isinstance(raw, dict):
         values["input_tokens"] = _count_value(raw.get("input_tokens"))
+        if values["input_tokens"] is None:
+            # Chat Completions 协议的原文用 prompt_tokens（工单 #656）
+            values["input_tokens"] = _count_value(raw.get("prompt_tokens"))
         details = raw.get("input_tokens_details")
+        if not isinstance(details, dict):
+            details = raw.get("prompt_tokens_details")
         if isinstance(details, dict):
             values["cache_read_tokens"] = _count_value(details.get("cached_tokens"))
             values["cache_write_tokens"] = _count_value(
@@ -177,27 +182,38 @@ def attempt_usage(artifacts: ArtifactStore, run_id: str, record: dict[str, Any])
             )
         values["cache_write_tokens"] = values["cache_write_tokens"] if values["cache_write_tokens"] is not None else _count_value(raw.get("cache_write_tokens"))
         values["output_tokens"] = _count_value(raw.get("output_tokens"))
+        if values["output_tokens"] is None:
+            # Chat Completions 协议的原文用 completion_tokens（工单 #656）
+            values["output_tokens"] = _count_value(raw.get("completion_tokens"))
         values["total_tokens"] = _count_value(raw.get("total_tokens"))
         values["cost"] = _cost_value(raw.get("cost"))
         currency = raw.get("currency") or raw.get("cost_currency")
         cost_source = raw.get("cost_source") or ("provider" if values["cost"] is not None else None)
         if values["cost"] is not None and not isinstance(currency, str):
             values["cost"] = None
-        source = "reported" if _has_usage_values(values) else "missing"
-    if raw is None and isinstance(summary, dict):
-        # Persisted normalized summaries are used only for fields absent
-        # from the raw provider usage object.
+        raw_reported = _has_usage_values(values)
+    if isinstance(summary, dict):
+        # 摘要逐字段补齐原文里没有的字段（工单 #656）：原文读到了也照样补。
+        # Chat Completions 原文里的分项在原文分支读不到，靠这里的规范化取值补上。
         for field in USAGE_FIELDS:
             if values[field] is None and summary.get(field) is not None:
                 values[field] = _cost_value(summary[field]) if field == "cost" else (
                     _count_value(summary[field]) if field != "latency_ms" else _count_value(summary[field])
                 )
-        currency = summary.get("currency")
-        cost_source = summary.get("cost_source")
+        if not isinstance(currency, str) and isinstance(summary.get("currency"), str):
+            currency = summary["currency"]
+        if not isinstance(cost_source, str) and isinstance(summary.get("cost_source"), str):
+            cost_source = summary["cost_source"]
         if values["cost"] is not None and not isinstance(currency, str):
             values["cost"] = None
-        if _has_usage_values(values):
-            source = "reported" if summary["reported"] else "unknown"
+    # 来源按补齐后的值重新判定（工单 #656）：原文报了就是原文，
+    # 补齐出来的分项跟着摘要自己说的算（摘要说已上报才是已上报，否则是未知）
+    if raw_reported:
+        source = "reported"
+    elif _has_usage_values(values):
+        source = "reported" if isinstance(summary, dict) and summary.get("reported") else "unknown"
+    else:
+        source = "missing"
     values["latency_ms"] = record.get("duration_ms")
     return {
         **values,
