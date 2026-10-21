@@ -7,6 +7,8 @@
 
 ---
 
+Codex / 2026-10-21 22:11 / 工单 #635 客户端适配与端到端脚本改用询问事件，执行记录新增 agents_jour/635.md / 像素房间与楼层按 ask_started、ask_answered 传信；两个既有房间端到端失败已由架构师在 main 复现并登记为 #650
+
 claude-3-7-sonnet / 2026-09-24 14:20 / 建立 docs/archive/ 目录，将历史阶段任务文档（grok-*.md、stage-1-*.md、stage-2-*.md、早期 MVP 与临时报告）归档，建立 docs/CHANGELOG.md 变更记录 / 整理活动文档结构，将已废弃或历史文件与活跃文档隔离，减少智能体无意义的上下文消耗
 
 claude-3-7-sonnet / 2026-09-24 14:26 / 新增 docs/architecture-issues.md 架构执行问题记录文档 / 为智能体在执行架构计划时遇到的冲突、设计缺漏与阻塞事项提供独立的登记场所

@@ -36,15 +36,15 @@ const afterColon = (label: unknown): string => {
 /** 提案的种类（真实系统的 proposal 字段）。 */
 const PROPOSAL: Record<string, string> = {
   product_spec: "产品规格", product_decision: "产品决定", delivery_spec: "交付说明",
-  qa_review: "质检结论", collaboration_request: "询问", collaboration_response: "回答", department_guidance_response: "指导回复",
+  qa_review: "质检结论", ask: "询问", answer: "回答", department_guidance_response: "指导回复",
 };
 const DEFAULT_PROPOSAL: Record<string, string> = { product: "产品规格", engineering: "交付说明", quality: "质检结论", operations: "运维记录" };
 const ARTIFACT: Record<string, string> = { prd: "PRD", box: "交付箱", defect: "返工单", release: "放行单", letter: "信件" };
 // 交出类工具的说话：真实系统的 submit_* 与提案事件的 kind 共用一套名字（harness 的提案合同）
 const SUBMIT_NAME: Record<string, string> = {
   submit_product_spec: "产品规格", submit_product_decision: "产品决定",
-  submit_delivery: "交付说明", submit_review: "质检结论", submit_request: "询问",
-  submit_response: "回答", submit_guidance_response: "指导回复",
+  submit_delivery: "交付说明", submit_review: "质检结论", ask: "询问",
+  answer: "回答", submit_guidance_response: "指导回复",
 };
 function proposalName(ev: PixelFloorEvent, pl: Record<string, unknown>): string {
   if (PROPOSAL[pl.kind as string]) return PROPOSAL[pl.kind as string];
@@ -151,19 +151,22 @@ export const SAY_CATALOG: Record<string, SayRule> = {
   qa_started: () => "现在开始检查",
   qa_submitted: (_ev, pl) => (pl.verdict === "release" ? "现在盖放行章" : "现在盖返工章"),
   collaboration_requested: (ev, pl, x) => {
-    // 真实载荷的发问方是 requester、收方是 recipient（harness/app/payloads.py 的 CollaborationRequestedPayload）
-    const asker = (pl.requester as string) || (pl.from as string) || ev.department;
-    const q = (pl.question as string) || afterColon(ev.label);
+    const fromStr = typeof pl.from === "string" ? pl.from : null;
+    const asker = fromStr || ev.department;
+    const qStr = typeof pl.question === "string" ? pl.question : null;
+    const q = qStr || afterColon(ev.label);
     const tail = q ? `：${cut(q, 14)}` : "";
     if (x.side === "to" || (x.dept && x.dept !== asker)) return `收到${deptName(asker)}的询问${tail}`;
-    return `现在向${deptName((pl.recipient as string) ?? (pl.to as string))}发出询问${tail}`;
+    const toStr = typeof pl.to === "string" ? pl.to : null;
+    return `现在向${deptName(toStr)}发出询问${tail}`;
   },
   collaboration_responded: (ev, pl, x) => {
-    // 真实载荷给出 requester（发问方）与 recipient（回答方）；原型载荷用 from 与 to，从是回答方
-    const answerer = ev.department || (pl.recipient as string) || (pl.from as string);
-    const asker = (pl.requester as string)
-      ?? ((pl.from as string) === answerer ? (pl.to as string) : (pl.from as string));
-    const a = (pl.text as string) || (pl.answer as string) || afterColon(ev.label);
+    const fromStr = typeof pl.from === "string" ? pl.from : null;
+    const toStr = typeof pl.to === "string" ? pl.to : null;
+    const answerer = fromStr || ev.department;
+    const asker = toStr;
+    const aStr = typeof pl.answer === "string" ? pl.answer : typeof pl.text === "string" ? pl.text : null;
+    const a = aStr || afterColon(ev.label);
     const tail = a ? `：${cut(a, 14)}` : "";
     if (x.side === "to" || (x.dept && x.dept !== answerer)) return `收到${deptName(answerer)}的回答${tail}`;
     return `现在回答${deptName(asker)}的询问`;
