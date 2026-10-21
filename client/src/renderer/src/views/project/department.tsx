@@ -441,7 +441,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
                       </button>
                       <span className="y10-ws-src msg-type">{msgType}</span>
                     </div>
-                    <p className="y10-ws-log p msg-text">{show(text(message.text), "（这条事件没有文字摘要）")}</p>
+                    <p className="y10-ws-log p msg-text">{show(text(message.text), "（这条消息没有正文，点上面的时间看原始事件）")}</p>
                   </li>
                 );
               })}

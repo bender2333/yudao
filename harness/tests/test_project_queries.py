@@ -317,6 +317,13 @@ def test_current_queries_cover_the_old_read_scenarios(data_dir):
     workspace = application.query("department.workspace", DepartmentWorkspace(
         project_id=project_id, department="product", work_item=work_item_id,
     ))
+    # 部门消息的文字：正文在工件里时按引用取出来（工单 #670）
+    messages = workspace.data.messages
+    assert messages, "部门消息为空"
+    by_type = {message["type"]: message for message in messages}
+    assert EventType.MODEL_MESSAGE in by_type, [message["type"] for message in messages]
+    assert by_type[EventType.MODEL_MESSAGE]["text"] != "", by_type[EventType.MODEL_MESSAGE]
+    assert all(message["text"] != "" for message in messages), [message["text"] for message in messages]
     assert workspace.data.department_setting.configured_version == 1
     assert workspace.data.department_setting.department_setting_configured is True
     # 实际采用的版本来自该部门最近一次模型请求事件（run 内没有 Prompt 副本）

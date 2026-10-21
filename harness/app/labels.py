@@ -137,7 +137,7 @@ _LABELS: dict[str, str] = {
     EventType.ACTIVATION_FINISHED: "结束这次激活：{stop_reason}",
     EventType.CONTEXT_ASSEMBLED: "装配了{department}的上下文（第 {step_id} 步，尝试 {attempt}）",
     EventType.MODEL_REQUEST_SERIALIZED: "记录了发往模型的请求（第 {step_id} 步，尝试 {attempt}）",
-    EventType.MODEL_MESSAGE: "模型给出了一条回复（第 {step_id} 步）：{summary}",
+    EventType.MODEL_MESSAGE: "模型给出了一条回复（第 {step_id} 步）",
     EventType.MODEL_REQUESTED: "向模型发出请求（第 {step_id} 步，尝试 {attempt}，目标 {requested_model}）",
     EventType.MODEL_STREAM_PROGRESS: "模型流式输出进入阶段 {stage}（第 {step_id} 步，尝试 {attempt}）",
     EventType.MODEL_ATTEMPT_FINISHED: "模型调用完成（第 {step_id} 步，尝试 {attempt}，用时 {duration_ms} 毫秒）",

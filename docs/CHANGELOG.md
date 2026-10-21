@@ -839,3 +839,5 @@ minimax-M3.1-Flash / 2026-10-22 11:05 / docs/user-session-log.md 补 U19（交�
 执行者 minimax-M3.1-Flash / 2026-10-22 12:40 / 工单 #664 事件种类漏登记中文说明不再让事件流断掉：harness/app/labels.py 给 project_parameter_set 补上说明，event_label 在没有登记说明的种类或载荷缺字段时退回一句通用说明（一条事件不再能把整条流断掉），工单 #319 的「载荷没有的字段直接失败」改为测试期核对；harness/tests/test_event_classification.py 加两条核对（每种事件都要有说明、说明用到的字段都要在载荷里），harness/tests/test_event_stream.py 加一条（没有说明的事件不会让连接中断） / 用户走查 U11：改过一次项目级参数以后，事件流播到那条事件就抛 KeyError 把响应截断，客户端每秒重连一次，永远过不去
 
 执行者 minimax-M3.1-Flash / 2026-10-22 13:45 / 工单 #665 观测页副标题不再把已加载的行数说成总数：新增 client/src/renderer/src/views/project/attempts-summary.ts 给计数说法（总数取同页已在取的 project.usage 的 totals.attempts，已显示的行数另算，还有下一页时写明可以继续加载），observe.tsx 的副标题改用它；新增 client/tests/unit/attempts-summary.test.ts 四项 / 用户走查 U12：观测页写「共 50 条记录」，而这个范围实际有 115 次模型请求，50 是第一页的行数
+
+执行者 minimax-M3.1-Flash / 2026-10-22 15:05 / 工单 #670 部门工作间的「部门消息」显示正文：harness/app/project_queries.py 按载荷里的工件引用（message_ref、input_ref）取正文并给一段摘要（超过 200 字截断），harness/app/labels.py 的 MODEL_MESSAGE 说明去掉恒为空的 {summary}，客户端兜底文案换成「（这条消息没有正文，点上面的时间看原始事件）」；harness/tests/test_project_queries.py 加三条核对 / 用户走查 U15：22 条部门消息的文字一栏全是「（这条事件没有文字摘要）」，内容其实在工件里
