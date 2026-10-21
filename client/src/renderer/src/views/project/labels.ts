@@ -135,6 +135,20 @@ export function label(map: Record<string, string>, value: string | null | undefi
   return map[value] ?? value;
 }
 
+// 事项状态行里的阶段名（工单 #657）。
+// 后端把用户取消的终态记成 phase=FAILED 配 stop_reason=cancelled，真正失败时也是 FAILED，
+// 区别只在停止原因上。取消是用户自己的决定，页面上不该说失败，
+// 因此取消的事项不写阶段名（状态行已经写着「已停止」，下一行的停止原因写着「运行已被取消」）。
+export function phaseLabel(phase: string | null | undefined, stopReason: string | null | undefined): string | null {
+  if (!phase) {
+    return null;
+  }
+  if (stopReason === "cancelled") {
+    return null;
+  }
+  return label(PHASE_LABELS, phase);
+}
+
 export function departmentName(value: string | null | undefined): string {
   if (!value) {
     // 事项停止后没有在处理的部门；调用处按位置决定写「没有」还是省略这一格

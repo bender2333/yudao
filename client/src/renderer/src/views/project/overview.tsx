@@ -22,7 +22,7 @@ import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, Submit
 import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { ticksOf } from "../timeline/logic";
-import { INPUT_KIND, PHASE_LABELS, STOP_REASON, WORK_ITEM_STATUS, departmentName, formatTime, label } from "./labels";
+import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, formatTime, label, phaseLabel } from "./labels";
 import { RestartOnboarding } from "./restart-onboarding";
 import { BOARD_TITLES, boardColumns } from "./board";
 import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
@@ -199,11 +199,13 @@ function CurrentItem(props: {
   // 停止的事项没有在处理的部门，这一项不写进去
   const department = departmentName(item.department);
   const note = `${item.title}（事项标识 ${item.work_item_id}，第 ${item.round} 轮${department === "" ? "" : `，部门 ${department}`}）`;
+  // 阶段名：用户取消的事项不写「执行失败」（工单 #657）
+  const phase = phaseLabel(item.phase, item.stop_reason);
   return (
     <Section id="ov-current" title="当前事项" note={note}>
       <KeyValue
         items={[
-          ["状态", <span key="status" className="y10-row">{itemStatus(item.status)}{item.phase ? <span className="y10-muted"> · {label(PHASE_LABELS, item.phase)}</span> : null}</span>],
+          ["状态", <span key="status" className="y10-row">{itemStatus(item.status)}{phase === null ? null : <span className="y10-muted"> · {phase}</span>}</span>],
           ["待决问题", show(item.pending_question, "没有")],
           ["停止原因", item.stop_reason === null || item.stop_reason === "" ? "没有" : label(STOP_REASON, item.stop_reason)],
           ["未能开始", show(item.start_error, "没有")],
