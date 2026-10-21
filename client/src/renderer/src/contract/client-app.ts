@@ -8,15 +8,17 @@ import type { Capabilities, DecisionList, EventObject, OutputDelta } from "../ap
 import { connect, interfaceFor, type Interface } from "./connection";
 import { EventStreamClient } from "./event-stream";
 import { callCommand, type CommandOutcome } from "./invoke";
+import { nextStreamState, type StreamState } from "./stream-state";
 import { ViewSync } from "./view-sync";
 
 export type ClientState =
   | { kind: "connecting" }
   | { kind: "outdated"; address: string; clientVersion: number; serverVersion: number; serverRelease: string }
   | { kind: "failed"; address: string; message: string }
-  // disconnectedAt 是事件流断开的时间（ISO）：断开时窗口整体变灰、顶栏写明断开的时间（工单 #296）；
-  // 重新连上以后清空
-  | { kind: "connected"; address: string; capabilities: Capabilities; streamConnected: boolean; disconnectedAt: string | null }
+  // connected 是服务已经连上；事件流本身有三种状态（工单 #653）：
+  // connecting 是还没连上（正在建立），connected 是连上了，interrupted 是连上以后断开的。
+  // interrupted 自己带着断开的时间：界面分「还没连上过」与「连上以后断了」不靠猜。
+  | { kind: "connected"; address: string; capabilities: Capabilities; stream: StreamState }
   // unauthorized 是局域网访问方式下没有令牌或令牌无效（第 6.3 节）：页面显示填写令牌的表单
   | { kind: "unauthorized"; address: string };
 
@@ -35,6 +37,8 @@ export class ClientApp {
   private views: ViewSync | null = null;
   private boot: string | null = null;
   private capabilities: Capabilities | null = null;
+  // 事件流的状态：连接中、已连接、连上以后断开（工单 #653）
+  private streamState: StreamState = { kind: "connecting" };
   // 局域网访问方式的访问令牌（第 6.3 节）：查询、命令与事件流都在请求头里带上它
   private token = "";
   // 页面级的事件订阅：视图同步之外，页面还需要测试与候选等事件的结果内容（工单 #93），
@@ -103,9 +107,10 @@ export class ClientApp {
     this.capabilities = result.capabilities;
     this.boot = result.capabilities.deployment.boot_id;
     this.views = new ViewSync((name, params) => this.query(name, params), result.capabilities);
+    // 事件流还没有开始：这一段是「连接中」，不是「刚刚断开」（工单 #653）
+    this.streamState = { kind: "connecting" };
     this.listeners.onState({
-      kind: "connected", address: result.address, capabilities: result.capabilities,
-      streamConnected: false, disconnectedAt: null,
+      kind: "connected", address: result.address, capabilities: result.capabilities, stream: this.streamState,
     });
     await this.refreshPendingDecisions();
     this.startStream(0);
@@ -145,12 +150,17 @@ export class ClientApp {
   }
 
   private setStreamConnected(connected: boolean): void {
-    if (this.capabilities) {
-      this.listeners.onState({
-        kind: "connected", address: this.iface!.baseUrl, capabilities: this.capabilities, streamConnected: connected,
-        disconnectedAt: connected ? null : new Date().toISOString(),
-      });
+    if (!this.capabilities) {
+      return;
     }
+    const next = nextStreamState(this.streamState, connected, new Date().toISOString());
+    if (next === this.streamState) {
+      return;
+    }
+    this.streamState = next;
+    this.listeners.onState({
+      kind: "connected", address: this.iface!.baseUrl, capabilities: this.capabilities, stream: this.streamState,
+    });
   }
 
   private onEvent(event: EventObject): void {

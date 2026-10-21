@@ -26,6 +26,7 @@
 | U09 | 「写回」命令在没有可写回对象时返回 500 内部错误，页面上拿不到任何理由。 | 对一个已经建档并采纳过、源目录没有打开写回的项目发 `POST /api/commands/writeback.execute` | 服务端 `harness/writeback.py` 第 286 至 288 行（没有打开写回的源目录）、第 295 至 297 行（采纳标识找不到）、第 299 至 302 行（建档采纳不写回）都直接 `return None`；`harness/projects.py` 第 838 至 858 行把它原样传上来，命令处理只捕获两种异常，于是「正常地什么都不做」被当成异常，最后 `harness/app/commands.py` 第 60 行抛出 `RuntimeError: command writeback.execute returned without registering ... at the write path` → 500 | 工单 [#661](https://github.com/bender2333/yudao/issues/661) |
 | U10 | 「开始排空」是不可逆的，界面上没有确认也没有说明。 | 系统 / 运行与执行槽位页 → 「排空」一节 → 点「开始排空」 | 按钮在 `client/src/renderer/src/views/system/runtime.tsx` 第 99 至 105 行，只要排空状态是 `idle` 就显示（危险样式），点击直接发 `runtime.start_drain`，没有确认。排空状态由目录流里最后一条 `DRAIN_STARTED` 事件决定（`harness/runtime.py` 第 201 至 204 行），事件写入以后状态再也不会回到 `idle`（第 191 至 199 行只给 `draining` 或 `ready`）。排空期间 `work_item.create` 走 `harness/app/project_and_work_item_commands.py` 第 184 至 187 行，事项被登记成排队但不开始；命令清单里没有「取消排空」，界面上也没有别的出路，剩下只有「强制升级」。[ADR-0019](https://github.com/bender2333/yudao/blob/main/docs/adr/0019-project-stream-across-versions.md) 里排空是升级路径上的一步 | 工单 [#663](https://github.com/bender2333/yudao/issues/663) |
 | U11 | 事件种类漏登记中文说明，整条事件流会断掉并一直重连。 | 改过一次项目级参数以后 → 打开页面 → 看顶栏与浏览器控制台 | `project_parameter_set`（项目级参数修改）没有登记中文说明，`harness/app/labels.py` 第 86 行的 `event_label` 直接抛 KeyError；`harness/app/event_stream.py` 第 219 行的 `_event_message` 调用它，异常沿异步生成器往上抛，接口层没机会正常收尾，SSE 响应被截断（浏览器控制台 `net::ERR_INCOMPLETE_CHUNKED_ENCODING`）。每条连接都播到这条事件就死，客户端带着上一次的位置重连，又死在同一处，永远过不去。用客户端自己的规则在 Node 里连真实服务 45 秒：43 次 open、43 次 error，位置停在 2603，没有缺口也没有 resync 帧 | 工单 [#664](https://github.com/bender2333/yudao/issues/664) |
+| U12 | 观测页标题里的「共 N 条记录」是已经加载出来的行数，不是请求总数。 | 观测页 → 看标题 | 页面写「0 个请求进行中 · 共 50 条记录」，而这个项目实际有 115 次模型请求（`project.usage` 的 `totals.attempts` 是 115）。`observe.tsx` 第 115 行写的是 `共 ${rows.length} 条记录`，`rows` 是「已经翻到的页累加起来」的当前行数（第 99 至 105 行），50 是 `PAGE_SIZE`（第 23 行）。`project.attempts` 的返回只有 `attempts` 与 `cursor`，没有总数，所以页面拿不到真实总数；同页「用量统计」页签有（`totals.attempts`），两个页签用同一组筛选 | 工单 [#665](https://github.com/bender2333/yudao/issues/665) |
 
 核对过但不成立（2026-10-21）：曾怀疑首页把同一个项目显示成两种名字。查 `projects.list` 与 `project.overview` 的原始数据，项目名只有「Demo 项目」一处，侧栏、楼层与表格一致，不是问题。
 
@@ -65,6 +66,10 @@
 - 运行与执行槽位页的数据是对的：排空状态、正在执行与排队中的事项数、模型服务是否可用、磁盘可用空间都能读到。
 - 事件种类清单与标签表之间没有约束：把 `harness/app/labels.py` 的标签表与 `EventType`、`ProjectEventType`、`CatalogEventType` 三个清单对了一遍，85 条标签、50 种 run 事件，只有 `project_parameter_set` 这一种缺说明。新增事件种类时漏登记一次，整条事件流就断（#664）。
 - 用普通 Chromium（Playwright）对照很便宜：`client/node_modules` 里已经装了 Playwright，直接 `chromium.launch()` 打开本机服务就能拿到控制台错误、请求计数与页面文字。同一时刻内置浏览器里整个页面卡住，普通 Chromium 里页面数据是正常的、只有顶栏一直「连接中断」——所以 #659 的复现要写明用的是哪个浏览器。
+- 十二个页面在普通 Chromium 里都渲染正常、数据都对：首页、概览、三个部门房间、资料、观测、设置、两个项目的资料页、系统运行页、模型管理。唯一控制台报错是事件流那一条（#664）。
+- 设置页的「状态」只有两档：已归档写「已归档」，其余一律写「进行中」——项目里没有事项在跑的时候也写「进行中」（`settings.tsx` 第 120 行）。这个说法容易被读成「有事在跑」，记下来备查。
+- 观测页上「请求记录」与「用量统计」两个页签对同一批请求给出两个数：前者写「共 50 条记录」（已加载的行数，点「加载更多」变成 100），后者写「请求数 115（上报 113）」（`totals.attempts`，真实总数）。同一屏上两个数指的是同一件事，#665。
+- 界面上点得动的地方都点得动：顶栏的项目菜单（项目设置 / 置顶 / 归档项目）、事项范围选择器、观测页的「加载更多」与两个页签、资料页的事项条目、首页的项目楼层（点了会跳到项目概览）。这一轮没有发现点击无效的地方。
 
 ## 过渡期的现象（不另开工单）
 
