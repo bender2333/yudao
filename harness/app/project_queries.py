@@ -1343,9 +1343,9 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
     item = _work_item(state, request.work_item)
     run = _run(application, item.run_id)
     versions = {entry["event_id"]: entry for entry in run.git_versions}
-    # PRD 各版显示真实状态（工单 #654）：每一版 PRD 在投影里有自己的状态，
-    # 被取代的旧版是 superseded，当前有效的那一版是 active。
-    # 有效合同由 PRD 接纳而成，按合同上的 product_spec_hash 找到那一版 PRD 取它的状态。
+    # PRD 各版显示真实状态（工单 #654）与一句摘要（工单 #668）：
+    # 每一版 PRD 在投影里有自己的状态与内容，有效合同按 product_spec_hash 找到那一版。
+    specs = {spec.content_hash: spec for spec in run.product_specs}
     spec_status = {spec.content_hash: spec.status for spec in run.product_specs}
     return Snapshot[WorkItemMaterialsResult](
         position=store.end_position(),
@@ -1353,7 +1353,8 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
             work_item_id=item.work_item_id, run_id=run.run_id,
             contracts=[_version_entry(value.created_event_id, "contract",
                                       spec_status.get(value.product_spec_hash, "active"),
-                                      value.revision, value.content_hash, None, [])
+                                      value.revision, value.content_hash,
+                                      _prd_summary(specs.get(value.product_spec_hash)), [])
                        for value in run.effective_contracts],
             deliveries=[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
                                        value.content_hash, value.summary, list(value.files))
@@ -1454,6 +1455,14 @@ def _artifact_text(application: Application, run_id: str, ref: dict[str, Any]) -
         return application.system.artifacts.get_for_run(run_id, ArtifactRef(**ref)).decode("utf-8")
     except (FileNotFoundError, KeyError):
         return f"（工件已不在工件存储中：{ref.get('path')}）"
+
+
+def _prd_summary(spec: Any) -> str | None:
+    # 有效合同对应的那一版 PRD 的摘要（工单 #668）：目标是哪件事、要求与边界各有几条。
+    # 与建档候选的 PRD 摘要同一套说法（harness/projects.py 的 prd_summary）。
+    if spec is None:
+        return None
+    return f"目标：{spec.goal}；要求 {len(spec.requirements)} 条；边界 {len(spec.boundaries)} 条"
 
 
 def _version_entry(event_id: str, kind: str, status: str, revision: int, content_hash: str,
