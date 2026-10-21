@@ -153,7 +153,7 @@ def test_tool_categories_and_references_are_checked(tmp_path):
         ("work_items.json", "kinds.onboarding.departments.quality.tools[4]", "工具 bash 没有定义"),
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
         ("proposal_contracts.json", "roles.quality.kinds",
-         "与共同部分合起来必须恰好说明这些提案种类：collaboration_request、collaboration_response、delivery_spec、department_guidance_response、qa_review"),
+         "与共同部分合起来必须恰好说明这些提案种类：delivery_spec、department_guidance_response、qa_review"),
     )
 
 
@@ -176,12 +176,12 @@ def test_proposal_contracts_must_match_the_submit_tools_of_each_role(tmp_path):
 def test_a_role_and_the_shared_part_cannot_describe_the_same_proposal_kind(tmp_path):
     directory = _copy(tmp_path)
     contracts = _read(directory, "proposal_contracts.json")
-    contracts["roles"]["product"]["kinds"]["collaboration_request"] = {"required": ["recipient"]}
+    contracts["roles"]["product"]["kinds"]["department_guidance_response"] = {"required": ["guidance_id"]}
     _write(directory, "proposal_contracts.json", contracts)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     assert raised.value.issues == (
-        ("proposal_contracts.json", "roles.product.kinds", "与共同部分重复说明 collaboration_request"),)
+        ("proposal_contracts.json", "roles.product.kinds", "与共同部分重复说明 department_guidance_response"),)
 
 
 def test_loaded_definitions_are_read_only_and_hand_out_plain_copies(tmp_path):
@@ -425,12 +425,12 @@ def test_work_item_creation_model_requests_and_proposal_decisions_record_the_def
 
 
 @pytest.mark.parametrize("names", [
-    ("handoff_release", "quality_rework", "collaboration_request_answer", "guidance_response_explained",
+    ("handoff_release", "quality_rework", "ask_answer_with_spec_revision", "guidance_response_explained",
      "tool_denied_guidance_only", "compaction_success", "proposal_rejected"),
     ("http_responses_handoff", "http_chat_handoff", "http_messages_handoff"),
 ])
 def test_no_code_path_changes_the_loaded_definitions(tmp_path, names):
-    # 走完交接、退回、协作请求、指导、压缩与三种协议的真实请求以后，已加载的定义与重新读取文件的结果相同
+    # 走完交接、退回、询问、指导、压缩与三种协议的真实请求以后，已加载的定义与重新读取文件的结果相同
     from harness.tests.event_scenarios import SCENARIOS
 
     for name in names:

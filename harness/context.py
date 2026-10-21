@@ -175,12 +175,6 @@ class ContextAssembler:
         if projection.effective_contract is not None:
             parts.append(ContextPart("current_contract", projection.effective_contract.content_hash,
                                      json_dumps(projection.effective_contract)))
-        if projection.pending_request is not None:
-            request = projection.pending_request
-            parts.append(ContextPart("pending_request", request.id, json_dumps(request)))
-            parts.append(ContextPart("request_results", request.id, json_dumps([
-                item for item in projection.request_results if item["request_id"] == request.id
-            ])))
         if projection.active_ask is not None:
             ask = projection.active_ask
             if ask.get("recipient") == department:
@@ -193,10 +187,6 @@ class ContextAssembler:
                 None,
                 json_dumps(guidance_result_summaries(projection, department, events, snapshot_hash or "")),
             ))
-        prior_request = next((item for item in reversed(projection.requests) if item.requester == department and item.status != "open"), None)
-        if prior_request is not None:
-            response = next((item for item in reversed(projection.responses) if item.request_id == prior_request.id), None)
-            parts.append(ContextPart("latest_response", prior_request.id, json_dumps({"request": prior_request, "response": response})))
         if projection.product_spec and projection.product_spec.status == "active":
             spec = projection.product_spec
             parts.append(
@@ -429,11 +419,6 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
                 else "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。")
     elif department == "engineering" and projection.effective_decisions:
         work = "依据 current_product_decisions 中已正式接纳的有效决定继续当前工程工作。"
-    if projection.pending_request is not None and projection.pending_request.recipient == department:
-        request = projection.pending_request
-        work = (f"处理来自 {request.requester} 的请求 {request.id}：{request.question}。"
-                f"预期结果：{request.expected_result}。完成正常动作或形成意见后用 submit_response 回应；"
-                "已经正式接纳的结果会列在 request_results 中，回复不能替代正常需求或交付接纳。")
     if projection.active_ask is not None:
         ask = projection.active_ask
         if ask.get("recipient") == department:
@@ -491,10 +476,6 @@ def _causal_chain(projection: RunProjection) -> list[dict[str, str]]:
                 "id": spec.id,
             }
         )
-    for request in projection.requests[-3:]:
-        chain.append({"kind": "collaboration_request", "id": request.id, "hash": request.content_hash, "status": request.status})
-    for response in projection.responses[-3:]:
-        chain.append({"kind": "collaboration_response", "status": response.status, "hash": response.content_hash, "id": response.id})
     for delivery in projection.delivery_specs[-3:]:
         item = {
             "kind": "delivery_spec",

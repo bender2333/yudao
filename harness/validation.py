@@ -7,8 +7,7 @@ from typing import Any
 
 from .contracts import current_contract_hash, normalize_scope
 from .collaboration import (
-    allowed_proposal_kinds, guidance_bound_result_ids, guidance_response_errors, request_basis,
-    request_errors, response_errors, resume_phase,
+    allowed_proposal_kinds, guidance_bound_result_ids, guidance_response_errors,
 )
 from .models import (
     BASELINE_STATUSES,
@@ -129,10 +128,6 @@ def _evaluate_proposal(
 
     if kind == "product_spec":
         return _accept_product_spec(phase, proposal, projection)
-    if kind == "collaboration_request":
-        return _accept_request(proposal, projection, department)
-    if kind == "collaboration_response":
-        return _accept_response(proposal, projection, department, events, facts)
     if kind == "department_guidance_response":
         return _accept_guidance_response(proposal, projection, department, events, facts)
     if kind == "product_decision":
@@ -149,8 +144,6 @@ def _evaluate_proposal(
 
 
 def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
-    if kind in {"collaboration_request", "collaboration_response"}:
-        return []
     if kind == "department_guidance_response":
         errors = _require_text(proposal, "guidance_id") + _require_text(proposal, "text")
         if proposal.get("status") not in {"explained", "completed", "declined", "needs_work"}:
@@ -450,30 +443,6 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
     if has_product_guidance:
         return ProposalDecision(True, artifact=artifact)
     return ProposalDecision(False, [FieldError("kind", "product_spec not expected")])
-
-
-def _accept_request(proposal: dict[str, Any], projection: RunProjection, department: str) -> ProposalDecision:
-    errors = request_errors(proposal, projection, department)
-    if errors:
-        return ProposalDecision(False, [FieldError(**item) for item in errors])
-    payload = {"requester": department, "recipient": proposal["recipient"], "request_type": proposal["request_type"],
-               "action": proposal.get("action"), "question": proposal["question"].strip(),
-               "background": proposal["background"].strip(), "expected_result": proposal["expected_result"].strip(),
-               "basis": request_basis(projection), "return_phase": projection.phase, "status": "open"}
-    return ProposalDecision(True, artifact={**payload, "kind": "collaboration_request", "content_hash": canonical_hash(payload)})
-
-
-def _accept_response(proposal: dict[str, Any], projection: RunProjection, department: str,
-                     events: list[Event], facts: TreeFacts) -> ProposalDecision:
-    errors = response_errors(proposal, projection, department, events, snapshot_hash=facts.digest)
-    if errors:
-        return ProposalDecision(False, [FieldError(**item) for item in errors])
-    phase, valid = resume_phase(projection.pending_request, projection, events, snapshot_hash=facts.digest)
-    # 发问方与回答方从对应请求取出，与请求里的值相同（工单 #275）
-    payload = {"requester": projection.pending_request.requester, "recipient": projection.pending_request.recipient,
-               "request_id": projection.pending_request.id, "status": proposal["status"], "text": proposal["text"].strip(),
-               "result_event_ids": list(proposal.get("result_event_ids", [])), "return_phase": phase, "return_work_valid": valid}
-    return ProposalDecision(True, artifact={**payload, "kind": "collaboration_response", "content_hash": canonical_hash(payload)})
 
 
 def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:

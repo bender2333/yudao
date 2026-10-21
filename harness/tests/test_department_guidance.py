@@ -10,8 +10,8 @@ from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace
 from harness.models import EventType
 from harness.proposals import (
-    collaboration_request, delivery_turn, guidance_response,
-    product_spec, product_spec_turn, response_turn, review_turn,
+    delivery_turn, guidance_response,
+    product_spec, product_spec_turn, review_turn,
 )
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
@@ -85,7 +85,7 @@ def test_guidance_for_previous_department_gets_a_read_only_activation_before_rel
     assert result.department_guidance[0].status == "explained"
     request = adapter.invocations[-1]
     assert _tool_names(request) == [
-        "read_file", "list_files", "run_check", "submit_request", "submit_guidance_response",
+        "read_file", "list_files", "run_check", "submit_guidance_response",
     ]
 
 def test_guidance_received_during_model_request_invalidates_old_submission(tmp_path):
@@ -272,33 +272,6 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     assert adapter.invocations[-1].department == "engineering"
     assert next_work.delivery_spec is not None
 
-def test_guidance_only_engineering_can_request_product(tmp_path):
-    adapter = FakeAdapter([product_spec(),delivery_turn()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("echo")
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    assert system.project(run_id).phase == "QUALITY"
-
-    system.add_guidance(run_id, "engineering", "验收需要产品确认未知参数的处理。")
-    adapter.script.append(collaboration_request(
-        "product", "未知参数应如何写入验收？",
-        request_type="action", action="revise_requirements",
-        background="Quality-phase engineering guidance cannot change the product contract.",
-        expected_result="Product updates the effective requirements if needed.",
-    ))
-    result = system.activate_once(run_id)
-    request = adapter.invocations[-1]
-    names = _tool_names(request)
-    assert request.department == "engineering"
-    assert _guidance_only(system, request) is True
-    assert "submit_request" in names
-    assert "write_file" not in names
-    assert "submit_delivery" not in names
-    assert result.pending_request is not None
-    assert result.pending_request.recipient == "product"
-    assert result.department_guidance[0].status in {"received", "in_input"}
-
 def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
     adapter = FakeAdapter([product_spec(),delivery_turn()])
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -422,26 +395,6 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     assert adapter.invocations[-1].department == "engineering"
     assert next_work.delivery_spec is not None
     assert next_work.last_review.verdict == "rework_engineering"
-
-def test_open_collaboration_blocks_cross_department_guidance_schedule(tmp_path):
-    adapter = FakeAdapter([collaboration_request("engineering")])
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("echo")
-    pending = system.activate_once(run_id)
-    assert pending.pending_request.recipient == "engineering"
-
-    system.add_guidance(run_id, "quality", "请先核对此次交付的验收边界。")
-    adapter.script.append(response_turn("answered", "Keep the original acceptance as written."))
-    result = system.activate_once(run_id)
-    assert adapter.invocations[-1].department == "engineering"
-    activated = [event for event in system.store.list_events(run_id)
-                 if event.type == EventType.DEPARTMENT_ACTIVATED]
-    assert activated[-1].department == "engineering"
-    assert not any(event.department == "quality" for event in activated)
-    assert result.department_guidance[0].department == "quality"
-    assert result.department_guidance[0].status == "received"
-    assert result.pending_request is None
-    assert result.responses[-1].status == "answered"
 
 def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
     adapter = FakeAdapter([product_spec()])

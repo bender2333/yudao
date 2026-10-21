@@ -473,7 +473,7 @@
     "kind": "host",
     "proposal": "product_decision",
     "guidance_only": false,
-    "description": "Publish an explicit product requirement decision with its rationale. This changes the effective contract. A consultation response alone does not change product requirements.",
+    "description": "Publish an explicit product requirement decision with its rationale. This changes the effective contract.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -658,103 +658,6 @@
       "additionalProperties": false,
       "required": [
         "answer"
-      ]
-    }
-  },
-  "submit_request": {
-    "kind": "host",
-    "proposal": "collaboration_request",
-    "guidance_only": true,
-    "description": "Ask another department for consultation or a concrete action. The recipient responds before the requester resumes. Only one request may be pending; consultation does not authorize delivery changes.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "recipient": {
-          "type": "string",
-          "enum": [
-            "product",
-            "engineering",
-            "quality"
-          ]
-        },
-        "request_type": {
-          "type": "string",
-          "enum": [
-            "consultation",
-            "action"
-          ]
-        },
-        "question": {
-          "type": "string"
-        },
-        "background": {
-          "type": "string"
-        },
-        "expected_result": {
-          "type": "string"
-        },
-        "action": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "enum": [
-            null,
-            "inspect",
-            "check",
-            "revise_requirements",
-            "revise_delivery"
-          ]
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "recipient",
-        "request_type",
-        "question",
-        "background",
-        "expected_result",
-        "action"
-      ]
-    }
-  },
-  "submit_response": {
-    "kind": "host",
-    "proposal": "collaboration_response",
-    "guidance_only": false,
-    "description": "Respond to the pending request addressed to your department. For completed actions, first produce normal accepted artifacts or host checks and cite their actual event IDs. Do not invent evidence or use a response as a product decision.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "request_id": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "answered",
-            "completed",
-            "declined",
-            "needs_work"
-          ]
-        },
-        "text": {
-          "type": "string"
-        },
-        "result_event_ids": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Actual accepted result or host tool event IDs for this request"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "request_id",
-        "status",
-        "text",
-        "result_event_ids"
       ]
     }
   },
