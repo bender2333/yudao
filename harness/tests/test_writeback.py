@@ -839,6 +839,14 @@ def test_writeback_command_dispatch_and_rejections(tmp_path):
         with pytest.raises(Rejection) as exc_archived:
             asyncio.run(_execute_writeback(app, cmd, WritebackExecute(command_id="00000000-0000-0000-0000-000000000002", project_id=pid)))
         assert exc_archived.value.reason == "project_archived"
+
+        # 没有可写回的对象：正常情况，按设计不写回，命令给出一个能看懂的理由（工单 #661）
+        # 以前这里什么都不做，命令没有在写路径上登记，接口层回 500
+        open_pid = projects.register("OpenProj", "Goal")
+        with pytest.raises(Rejection) as exc_nothing:
+            asyncio.run(_execute_writeback(app, cmd, WritebackExecute(command_id="00000000-0000-0000-0000-000000000003", project_id=open_pid)))
+        assert exc_nothing.value.reason == "not_allowed"
+        assert "没有可写回的东西" in exc_nothing.value.message
     finally:
         store.close()
         gc.collect()

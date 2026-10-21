@@ -799,7 +799,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：not_found, project_archived, command_id_reused",
+            "description": "命令被拒绝，可能的原因：not_found, project_archived, not_allowed, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
