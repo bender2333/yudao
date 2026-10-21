@@ -7,8 +7,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { Capabilities, DecisionView, ProjectRow, Rejected } from "../api/generated/types.gen";
 import type { ClientApp } from "../contract/client-app";
 import { useCommand } from "../views/project/use-snapshot";
+import { visibleProjects } from "../views/project/project-list";
 import { Icon, StatusMark } from "./kit";
-import { ONBOARDING_REJECTION_REASONS, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
+import { onboardingRejectionText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
 
 export type SidebarProps = {
   app: ClientApp;
@@ -18,6 +19,9 @@ export type SidebarProps = {
   activeProjectId: string | null;
   activeName: string;
   pendingByProject: Record<string, number>;
+  // 侧栏「显示归档的项目」开关：项目列表的查询按它取数（工单 #672）
+  includeArchived: boolean;
+  onIncludeArchivedChange: (value: boolean) => void;
   onNavigate: (hash: string) => void;
 };
 
@@ -56,25 +60,16 @@ export function Sidebar(props: SidebarProps) {
   const has = (name: string) => props.capabilities.queries.some((query) => query.name === name);
   const can = (name: string) => props.capabilities.commands.some((command) => command.name === name);
   const [search, setSearch] = useState("");
-  const [includeArchived, setIncludeArchived] = useState(false);
   const [creating, setCreating] = useState<null | "idea" | "existing">(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
 
   // 项目列表由外壳打开（viewId "shell.projects"）：命令被接受以后事件到达，列表按事件种类重新查询
   const markKey = useMemo(() => JSON.stringify(props.decisions.map((decision) => [decision.decision_id, decision.status])), [props.decisions]);
   const command = useCommand(props.app, JSON.stringify(props.projects) + markKey);
-  const visible = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return props.projects.filter((project) => {
-      if (!includeArchived && project.archived) {
-        return false;
-      }
-      if (needle === "") {
-        return true;
-      }
-      return project.name.toLowerCase().includes(needle) || project.goal.toLowerCase().includes(needle);
-    });
-  }, [props.projects, search, includeArchived]);
+  const visible = useMemo(
+    () => visibleProjects(props.projects, { search, includeArchived: props.includeArchived }),
+    [props.projects, search, props.includeArchived],
+  );
 
   const send = (name: string, body: Record<string, unknown>) => {
     void command.submit(name, body).then((ok) => {
@@ -176,11 +171,11 @@ export function Sidebar(props: SidebarProps) {
         </ul>
         {visible.length === 0 ? <p className="y10-note note" role="status">没有符合的项目</p> : null}
         <label className="y10-check checkbox">
-          <input type="checkbox" checked={includeArchived} onChange={(event) => setIncludeArchived(event.target.checked)} />
+          <input type="checkbox" checked={props.includeArchived} onChange={(event) => props.onIncludeArchivedChange(event.target.checked)} />
           <span>显示归档的项目</span>
         </label>
         <p className="y10-note note" role="status">
-          {includeArchived ? "正在显示归档的项目" : "已归档的项目不列出，可用「恢复项目」取回"}
+          {props.includeArchived ? "正在显示归档的项目" : "已归档的项目不列出，可用「恢复项目」取回"}
         </p>
       </div>
       <div className="y10-side-bottom nav-group">
@@ -302,8 +297,7 @@ function NewProject(props: {
         {props.rejection ? (
           <div className="rejection" role="status">
             <p className="error">
-              {ONBOARDING_REJECTION_REASONS[props.rejection.reason] ?? "命令被拒绝"}
-              （原因 {props.rejection.reason}）
+              {onboardingRejectionText(props.rejection)}
             </p>
             <ul className="rejection-paths y10-list">
               {sourceInvalidLines(props.rejection).map((line) => <li key={line}>{line}</li>)}
