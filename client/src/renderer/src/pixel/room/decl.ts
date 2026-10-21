@@ -163,16 +163,4 @@ export function handoffOf(pl: Record<string, unknown>): Handoff | null {
   return { from, to, artifact: from === "product" ? "prd" : from === "engineering" ? "box" : "release" };
 }
 
-/** 一次跨部门的传信：发问方与收信方（原型 collaboration 事件载荷的 from/to 两个字段）。 */
-export function collaborationSides(
-  _evType: string,
-  pl: Record<string, unknown>,
-  _department?: string | null,
-): { from: string; to: string } | null {
-  // 原型形状（录制数据）：from/to 已经是部门
-  const from = typeof pl.from === "string" ? pl.from : null;
-  const to = typeof pl.to === "string" ? pl.to : null;
-  return from && to ? { from, to } : null;
-}
-
 export { TOOL_ORDER };

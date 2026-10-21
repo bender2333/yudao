@@ -171,7 +171,6 @@ export const SAY_CATALOG: Record<string, SayRule> = {
     if (x.side === "to" || (x.dept && x.dept !== answerer)) return `收到${deptName(answerer)}的回答${tail}`;
     return `现在回答${deptName(asker)}的询问`;
   },
-  collaboration_closed: () => null,
   department_guidance_received: () => "收到用户的指导",
   department_guidance_applied: () => "现在阅读指导",
   department_guidance_responded: () => "现在写指导的回复",

@@ -343,7 +343,6 @@ def _public_attempt(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": record.get("id"),
         "logical_call_id": record.get("logical_call_id"),
-        "collaboration_request_id": record.get("collaboration_request_id"),
         "provider_response_id": record.get("provider_response_id"),
         "context_event_id": record.get("context_event_id"),
         "activation_id": record.get("activation_id"),
@@ -406,7 +405,6 @@ def _new_attempt(attempt_id: str, event: Event, payload: dict[str, Any]) -> dict
     return {
         "id": attempt_id,
         "logical_call_id": logical,
-        "collaboration_request_id": payload.get("collaboration_request_id", payload.get("request_id")),
         "provider_response_id": None,
         "context_event_id": payload.get("context_event_id"),
         "activation_id": payload.get("activation_id"),
@@ -662,7 +660,7 @@ def _validate_context_parts(parts: list[Any], injected: Any) -> None:
 
 def search_text(record: dict[str, Any]) -> str:
     return " ".join(str(record.get(key) or "") for key in (
-        "id", "logical_call_id", "collaboration_request_id", "context_event_id",
+        "id", "logical_call_id", "context_event_id",
         "department", "purpose", "requested_provider", "requested_model",
         "actual_provider", "actual_model", "provider_response_id", "status",
     )).casefold()

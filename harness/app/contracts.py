@@ -144,7 +144,8 @@ AccessMode = Literal["local", "lan"]
 # 版本 3：调用协议从连接移到模型访问定义（ADR-0033，#382）：CatalogProvider 去掉 protocol，
 # CatalogModel 增加 protocol，保存连接的命令在每个访问定义上带 protocol
 # 版本 4：删除工作依据、调用记录、上下文清单与正式成果里的协作请求编号（#637）
-API_VERSION = 4
+# 版本 5：删除协作请求与协作回答的事件种类（#552）
+API_VERSION = 5
 
 
 class Deployment(Contract):

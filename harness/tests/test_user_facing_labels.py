@@ -133,8 +133,3 @@ def test_adoption_line_shows_the_adopted_result_instead_of_a_missing_version():
     payload = {field: field for field in _payload_fields(ProjectEventType.DELIVERABLE_ADOPTED)}
     payload["summary"] = "把首页换成公司动态"
     assert event_label(ProjectEventType.DELIVERABLE_ADOPTED, payload) == "采纳了交付物：把首页换成公司动态"
-
-
-def test_collaboration_line_names_both_departments_in_chinese():
-    payload = {"requester": "product", "recipient": "engineering", "question": "接口定不下来"}
-    assert event_label(EventType.COLLABORATION_REQUESTED, payload) == "产品部门向工程部门提出请求：接口定不下来"

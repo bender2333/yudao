@@ -12,6 +12,7 @@ import { createRafClock, type Clock } from "../../pixel/clock";
 import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
 import type { DecisionAnswer, DecisionResult } from "../../pixel/floor/card";
 import type { FloorModel, LoopItem, PixelFloorEvent } from "../../pixel/world/types";
+import { LETTER_ANSWERED_TYPE, LETTER_ASKED_TYPE } from "../../pixel/world/types";
 import { itemColor } from "../../pixel/world/floor.ts";
 import { face, sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
@@ -83,21 +84,21 @@ export function floorEventOf(event: EventObject, projectId: string): PixelFloorE
   // 事件的公共字段（ADR-0019 的事件信封）：项目、部门、角色、说明与载荷都是登记在接口合同里的。
   if (event.project_id !== null && event.project_id !== projectId) return null;
   const raw = event.payload as unknown as Record<string, unknown>;
-  let type = event.type;
+  let type: string = event.type;
   let payload = raw;
   let eventDept: string | null = event.department;
   if (event.type === "ask_started") {
     const requester = typeof raw?.requester === "string" ? raw.requester : null;
     const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
     if (!requester || !recipient) return null;
-    type = "collaboration_requested";
+    type = LETTER_ASKED_TYPE;
     payload = { ...raw, from: requester, to: recipient };
     if (!eventDept) eventDept = requester;
   } else if (event.type === "ask_answered") {
     const requester = typeof raw?.requester === "string" ? raw.requester : null;
     const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
     if (!requester || !recipient) return null;
-    type = "collaboration_responded";
+    type = LETTER_ANSWERED_TYPE;
     payload = { ...raw, from: recipient, to: requester };
     if (!eventDept) eventDept = recipient;
   }
