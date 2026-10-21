@@ -27,6 +27,7 @@
 | U10 | 「开始排空」是不可逆的，界面上没有确认也没有说明。 | 系统 / 运行与执行槽位页 → 「排空」一节 → 点「开始排空」 | 按钮在 `client/src/renderer/src/views/system/runtime.tsx` 第 99 至 105 行，只要排空状态是 `idle` 就显示（危险样式），点击直接发 `runtime.start_drain`，没有确认。排空状态由目录流里最后一条 `DRAIN_STARTED` 事件决定（`harness/runtime.py` 第 201 至 204 行），事件写入以后状态再也不会回到 `idle`（第 191 至 199 行只给 `draining` 或 `ready`）。排空期间 `work_item.create` 走 `harness/app/project_and_work_item_commands.py` 第 184 至 187 行，事项被登记成排队但不开始；命令清单里没有「取消排空」，界面上也没有别的出路，剩下只有「强制升级」。[ADR-0019](https://github.com/bender2333/yudao/blob/main/docs/adr/0019-project-stream-across-versions.md) 里排空是升级路径上的一步 | 工单 [#663](https://github.com/bender2333/yudao/issues/663) |
 | U11 | 事件种类漏登记中文说明，整条事件流会断掉并一直重连。 | 改过一次项目级参数以后 → 打开页面 → 看顶栏与浏览器控制台 | `project_parameter_set`（项目级参数修改）没有登记中文说明，`harness/app/labels.py` 第 86 行的 `event_label` 直接抛 KeyError；`harness/app/event_stream.py` 第 219 行的 `_event_message` 调用它，异常沿异步生成器往上抛，接口层没机会正常收尾，SSE 响应被截断（浏览器控制台 `net::ERR_INCOMPLETE_CHUNKED_ENCODING`）。每条连接都播到这条事件就死，客户端带着上一次的位置重连，又死在同一处，永远过不去。用客户端自己的规则在 Node 里连真实服务 45 秒：43 次 open、43 次 error，位置停在 2603，没有缺口也没有 resync 帧 | 工单 [#664](https://github.com/bender2333/yudao/issues/664) |
 | U12 | 观测页标题里的「共 N 条记录」是已经加载出来的行数，不是请求总数。 | 观测页 → 看标题 | 页面写「0 个请求进行中 · 共 50 条记录」，而这个项目实际有 115 次模型请求（`project.usage` 的 `totals.attempts` 是 115）。`observe.tsx` 第 115 行写的是 `共 ${rows.length} 条记录`，`rows` 是「已经翻到的页累加起来」的当前行数（第 99 至 105 行），50 是 `PAGE_SIZE`（第 23 行）。`project.attempts` 的返回只有 `attempts` 与 `cursor`，没有总数，所以页面拿不到真实总数；同页「用量统计」页签有（`totals.attempts`），两个页签用同一组筛选 | 工单 [#665](https://github.com/bender2333/yudao/issues/665) |
+| U13 | 资料页上普通事项的 PRD 只有指纹，读不到有效合同的内容。 | 资料页 → 选一个普通事项 → 看「PRD」一节 | 每个版本写「第 1 版 / active / 指纹 sha256:… / 没有摘要」。`harness/app/project_queries.py` 第 1290 至 1291 行给合同填的摘要是写死的 `None`、文件清单是空列表；客户端 `client/src/renderer/src/views/project/materials.tsx` 第 324 行按 `show(entry.summary, "没有摘要")` 显示，于是每个 PRD 版本都写「没有摘要」——这句话还容易被读成「这份合同是空的」。界面上别处也读不到：决定卡片只在建档时给摘要，部门工作间的「上下文」给的是注入清单（来源、版本、token 数、指纹），概览页的「当前成果」给的是交付摘要。同一页的「交付」一节每个版本都有摘要、文件还能「查看内容」 | 工单 [#668](https://github.com/bender2333/yudao/issues/668) |
 
 核对过但不成立（2026-10-21）：曾怀疑首页把同一个项目显示成两种名字。查 `projects.list` 与 `project.overview` 的原始数据，项目名只有「Demo 项目」一处，侧栏、楼层与表格一致，不是问题。
 
@@ -75,6 +76,7 @@
 - 修改意见真的进了产品：改后的 PRD 写成「统计 <word> 以整词形式出现的次数（出现位置左右两侧都不是字母数字）」，明确 `--ignore-case` 只影响比较时的大小写处理、不改变输出格式；产品还把现有实现用 `str.count` 做子串计数记成「现有缺陷交质检」（`cat category` 现在输出 2，要求是 1），并指出 README 里「The count is a plain substring count」与新要求相反、要一并改。
 - 第二轮的决定卡片带「上一轮修改意见」原文（设计说明第 3.2 节要求的那一项），确认以后基线采纳，当前成果是「第 2 轮建档的初始 PRD 已确认」。
 - 事件流断了的直接后果之一：答完决定以后，页面上的卡片不会自己更新（要刷新才从等待列表里消失）。这是 #664 的用户可见影响。
+- 按改后的 PRD 提的变更 3 轮放行采纳：wordcount.py 新增 `count_whole_word()`，用 `str.find` 逐位查找并用相邻字符 `isalnum()` 判边界（非字母数字才算边界）；`--ignore-case` 仍然只作用于 `str.lower()`，输出、退出码、usage/error 格式都没变；README 删掉「plain substring count」改成整词语义。质检独立读代码交叉检查了边界判定与 `--ignore-case`，跑了六项检查 exit 0 以后放行。
 
 ## 过渡期的现象（不另开工单）
 
