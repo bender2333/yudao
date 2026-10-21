@@ -48,7 +48,6 @@ class ModelRequest:
     # 是否要求调用工具：最后一次主机提示之后的工作请求为 required（#102）
     tool_choice: str = "auto"
     effective_contract_hash: str | None = None
-    request_id: str | None = None
     input_version: int = 0
     guidance_version: int = 0
     guidance_ids: list[str] = field(default_factory=list)

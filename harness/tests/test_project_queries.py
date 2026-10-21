@@ -201,7 +201,7 @@ def test_attempt_pages_stay_inside_the_first_page_position(data_dir):
         EventType.MODEL_ATTEMPT_FINISHED, state_before="DONE", state_after="DONE", actor="system",
         department="product",
         payload={
-            "attempt_id": "late-attempt", "logical_call_id": "late", "collaboration_request_id": None,
+            "attempt_id": "late-attempt", "logical_call_id": "late",
             "context_event_id": "ctx", "activation_id": "late", "step_id": 1, "root_step_id": 1,
             "retry_of_step_id": None, "attempt": 1, "purpose": "work", "started_at": "2026-09-29T00:00:00+00:00",
             "finished_at": "2026-09-29T00:00:01+00:00", "duration_ms": 1, "duration_source": "monotonic",

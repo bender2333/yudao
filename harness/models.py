@@ -315,7 +315,6 @@ class ProductDecision:
     product_spec_hash: str
     statement: str
     rationale: str
-    request_id: str | None
 
 
 @dataclass(frozen=True)
@@ -427,7 +426,6 @@ class ContextManifest:
     max_output_tokens: int | None = None
     compaction_event_id: str | None = None
     effective_contract_hash: str | None = None
-    request_id: str | None = None
     input_version: int = 0
     prompt_version: int = 0
     prompt_hash: str | None = None

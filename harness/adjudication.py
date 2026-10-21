@@ -27,7 +27,6 @@ def guidance_version(projection: RunProjection, department: str) -> int:
 class WorkBasis:
     # 激活开始时采用的工作依据；依据改变以后，这次激活不能再开始模型请求与工具
     effective_contract_hash: str | None
-    request_id: str | None
     input_version: int
     guidance_version: int
 
@@ -35,7 +34,6 @@ class WorkBasis:
     def current(cls, projection: RunProjection, department: str) -> WorkBasis:
         return cls(
             effective_contract_hash=current_contract_hash(projection),
-            request_id=None if projection.pending_request is None else projection.pending_request.id,
             input_version=projection.input_version,
             guidance_version=guidance_version(projection, department),
         )
@@ -43,7 +41,6 @@ class WorkBasis:
     def changed(self, projection: RunProjection, department: str) -> bool:
         current = WorkBasis.current(projection, department)
         return (current.effective_contract_hash != self.effective_contract_hash
-                or current.request_id != self.request_id
                 or current.input_version != self.input_version
                 or current.guidance_version > self.guidance_version)
 
@@ -163,14 +160,13 @@ def commit_decision(
     current_facts: TreeFacts,
     events: list[Event],
 ) -> ProposalDecision:
-    # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。激活开始以后输入、指导、合同、
-    # 协作请求或当前工作改变，或者校验以后工作区改变，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验
-    before, now = WorkBasis.current(started, department), WorkBasis.current(current, department)
+    # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。激活开始以后输入、指导、合同或当前工作改变，
+    # 或者校验以后工作区改变，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验
+    now = WorkBasis.current(current, department)
     if (current.phase != started.phase
             or now.input_version != basis.input_version
             or now.guidance_version != basis.guidance_version
             or now.effective_contract_hash != basis.effective_contract_hash
-            or now.request_id != before.request_id
             or request_basis(current) != request_basis(evaluated)):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
     if current_facts != facts:

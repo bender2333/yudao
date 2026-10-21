@@ -84,18 +84,18 @@ def test_handoff_edge_reversed_fails_with_diff():
 
 
 def _ask_documents(moved=False):
-    # 最小的询问链文档：工程询问 → 产品分支开始 → 产品回答 → 工程工具结果
-    requested = {"event": "e1", "type": "collaboration_requested", "session_id": "eng",
-                 "payload": {"id": "<request#1>"}}
-    start = {"event": "e2", "type": "department_activated", "session_id": "pro",
-             "payload": {"request_id": "<request#1>"}}
-    answer = {"event": "e3", "type": "collaboration_responded", "session_id": "pro",
-              "payload": {"request_id": "<request#1>"}}
+    # 最小的询问链文档：工程询问 → 产品分支的第一条事件 → 产品回答 → 工程工具结果
+    asked = {"event": "e1", "type": "ask_started", "session_id": "eng",
+             "payload": {"branch_session_id": "pro-branch"}}
+    start = {"event": "e2", "type": "department_activated", "session_id": "pro-branch",
+             "payload": {}}
+    answer = {"event": "e3", "type": "ask_answered", "session_id": "pro-branch",
+              "payload": {"status": "answered"}}
     tool = {"event": "e4", "type": "tool_called", "session_id": "eng",
-            "payload": {"collaboration_request_id": "<request#1>", "name": "submit_plan"}}
-    events = [requested, start, answer, tool]
+            "payload": {"name": "ask"}}
+    events = [asked, start, answer, tool]
     if moved:
-        events = [requested, start, tool, answer]
+        events = [asked, start, tool, answer]
     return {"scenario": "ask", "covers": "ask", "projection": {},
             "events": [dict(e) for e in events]}
 

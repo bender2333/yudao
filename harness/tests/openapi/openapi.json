@@ -6963,7 +6963,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 3
+            "example": 4
           },
           "contract_digest": {
             "type": "string",
@@ -14101,17 +14101,6 @@
             "title": "Id",
             "type": "string"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "git_version": {
             "$ref": "#/components/schemas/GitVersion"
           }
@@ -14132,7 +14121,6 @@
           "status",
           "content_hash",
           "id",
-          "request_id",
           "git_version"
         ],
         "title": "BaselineReviewAcceptedPayload",
@@ -16069,17 +16057,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -16194,7 +16171,6 @@
           "default_reasoning_level",
           "reasoning_mode",
           "effective_contract_hash",
-          "request_id",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -16604,17 +16580,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -16797,17 +16762,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           }
         },
         "required": [
@@ -16832,7 +16786,6 @@
           "default_reasoning_level",
           "reasoning_mode",
           "effective_contract_hash",
-          "request_id",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -16865,8 +16818,7 @@
           "effective_context_window",
           "snapshot_hash",
           "attempt_id",
-          "logical_call_id",
-          "collaboration_request_id"
+          "logical_call_id"
         ],
         "title": "ContextAssembledPayload",
         "type": "object"
@@ -17100,17 +17052,6 @@
           "prd_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "git_version": {
             "$ref": "#/components/schemas/GitVersion"
           }
@@ -17122,7 +17063,6 @@
           "content_hash",
           "revision",
           "prd_ref",
-          "request_id",
           "git_version"
         ],
         "title": "ContractAcceptedPayload",
@@ -18232,17 +18172,6 @@
           "tree_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "git_version": {
             "$ref": "#/components/schemas/GitVersion"
           }
@@ -18264,7 +18193,6 @@
           "content_hash",
           "id",
           "tree_ref",
-          "request_id",
           "git_version"
         ],
         "title": "DeliveryAcceptedPayload",
@@ -18422,17 +18350,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -18488,7 +18405,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "request_id",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -19241,17 +19157,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -19296,7 +19201,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "request_id",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -21114,17 +21018,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "provider_config_id": {
             "anyOf": [
               {
@@ -21340,17 +21233,6 @@
             "title": "Logical Call Id",
             "type": "string"
           },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
-          },
           "context_event_id": {
             "title": "Context Event Id",
             "type": "string"
@@ -21559,7 +21441,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "request_id",
           "provider_config_id",
           "model_id",
           "provider_name",
@@ -21587,7 +21468,6 @@
           "guidance_only",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "activation_id",
           "step_id",
@@ -21977,17 +21857,6 @@
             "title": "Logical Call Id",
             "type": "string"
           },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
-          },
           "context_event_id": {
             "title": "Context Event Id",
             "type": "string"
@@ -22198,7 +22067,6 @@
           "guidance_only",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "activation_id",
           "step_id",
@@ -22586,17 +22454,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -22604,17 +22461,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           },
           "context_event_id": {
             "title": "Context Event Id",
@@ -22697,10 +22543,8 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "request_id",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "message_ref",
           "message_index",
@@ -23073,17 +22917,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -23091,17 +22924,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           },
           "context_event_id": {
             "title": "Context Event Id",
@@ -23154,10 +22976,8 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "request_id",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "reasoning_ref",
           "activation_id",
@@ -23526,17 +23346,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -23544,17 +23353,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           },
           "context_event_id": {
             "title": "Context Event Id",
@@ -23635,10 +23433,8 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "request_id",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "activation_id",
           "step_id",
@@ -24012,17 +23808,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -24030,17 +23815,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           },
           "context_event_id": {
             "title": "Context Event Id",
@@ -24152,10 +23926,8 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "request_id",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "activation_id",
           "step_id",
@@ -24534,17 +24306,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -24552,17 +24313,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           },
           "context_event_id": {
             "title": "Context Event Id",
@@ -24655,10 +24405,8 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "request_id",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "activation_id",
           "step_id",
@@ -24855,17 +24603,6 @@
             "title": "Logical Call Id",
             "type": "string"
           },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
-          },
           "context_event_id": {
             "title": "Context Event Id",
             "type": "string"
@@ -24965,7 +24702,6 @@
           "guidance_only",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "activation_id",
           "step_id",
@@ -25519,17 +25255,6 @@
             "title": "Product Spec Hash",
             "type": "string"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "kind": {
             "const": "product_decision",
             "title": "Kind",
@@ -25558,7 +25283,6 @@
           "statement",
           "rationale",
           "product_spec_hash",
-          "request_id",
           "kind",
           "content_hash",
           "id"
@@ -27948,17 +27672,6 @@
             "title": "Id",
             "type": "string"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "git_version": {
             "$ref": "#/components/schemas/GitVersion"
           }
@@ -27980,7 +27693,6 @@
           "status",
           "content_hash",
           "id",
-          "request_id",
           "git_version"
         ],
         "title": "QaSubmittedPayload",
@@ -30189,17 +29901,6 @@
             "title": "Id",
             "type": "string"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "git_version": {
             "$ref": "#/components/schemas/GitVersion"
           }
@@ -30222,7 +29923,6 @@
           "status",
           "content_hash",
           "id",
-          "request_id",
           "git_version"
         ],
         "title": "SpecAcceptedPayload",
@@ -30376,23 +30076,11 @@
           "revision": {
             "title": "Revision",
             "type": "integer"
-          },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
           }
         },
         "required": [
           "content_hash",
-          "revision",
-          "request_id"
+          "revision"
         ],
         "title": "SpecSupersededPayload",
         "type": "object"
@@ -30626,17 +30314,6 @@
           "structure_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "git_version": {
             "$ref": "#/components/schemas/GitVersion"
           }
@@ -30658,7 +30335,6 @@
           "content_hash",
           "id",
           "structure_ref",
-          "request_id",
           "git_version"
         ],
         "title": "StructureAcceptedPayload",
@@ -30914,17 +30590,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -30993,7 +30658,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "request_id",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -31232,17 +30896,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -31250,17 +30903,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           },
           "context_event_id": {
             "title": "Context Event Id",
@@ -31361,10 +31003,8 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "request_id",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "id",
           "name",
@@ -31884,17 +31524,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -31902,17 +31531,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           },
           "context_event_id": {
             "title": "Context Event Id",
@@ -31982,10 +31600,8 @@
           "guidance_ids",
           "guidance_only",
           "effective_contract_hash",
-          "request_id",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "id",
           "name",
@@ -32151,17 +31767,6 @@
             ],
             "title": "Effective Contract Hash"
           },
-          "request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Request Id"
-          },
           "input_version": {
             "title": "Input Version",
             "type": "integer"
@@ -32199,17 +31804,6 @@
           "logical_call_id": {
             "title": "Logical Call Id",
             "type": "string"
-          },
-          "collaboration_request_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collaboration Request Id"
           },
           "context_event_id": {
             "title": "Context Event Id",
@@ -32312,7 +31906,6 @@
         },
         "required": [
           "effective_contract_hash",
-          "request_id",
           "input_version",
           "prompt_version",
           "prompt_hash",
@@ -32320,7 +31913,6 @@
           "guidance_only",
           "attempt_id",
           "logical_call_id",
-          "collaboration_request_id",
           "context_event_id",
           "id",
           "name",

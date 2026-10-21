@@ -307,7 +307,6 @@ class ContextAssembler:
             step_id=step_id,
             compaction_event_id=compaction_event_id,
             effective_contract_hash=current_contract_hash(projection),
-            request_id=None if projection.pending_request is None else projection.pending_request.id,
             input_version=projection.input_version,
             prompt_version=prompt.version,
             prompt_hash=prompt.prompt_ref.content_hash,
@@ -387,7 +386,6 @@ class ContextAssembler:
             budget=pinned.manifest.budget, digest=canonical_hash(request), purpose="compaction",
             max_output_tokens=max_output_tokens, compaction_event_id=compaction_event_id,
             effective_contract_hash=pinned.manifest.effective_contract_hash,
-            request_id=pinned.manifest.request_id,
             input_version=pinned.manifest.input_version,
             prompt_version=pinned.manifest.prompt_version,
             prompt_hash=pinned.manifest.prompt_hash,
@@ -453,7 +451,6 @@ def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
         "delivery_spec_id": None if delivery is None else delivery.id,
         "delivery_spec_hash": None if delivery is None else delivery.content_hash,
         "delivery_code_tree_digest": None if delivery is None else delivery.code_tree_digest,
-        "request_id": None if projection.pending_request is None else projection.pending_request.id,
         "effective_decision_count": len(projection.effective_decisions),
         "pending_guidance_ids": [item.id for item in projection.department_guidance
                                  if item.department == department and item.status in {"received", "in_input"}],
