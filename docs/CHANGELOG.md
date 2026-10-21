@@ -824,6 +824,8 @@ minimax-M3.1-Flash / 2026-10-22 09:15 / docs/user-session-log.md 开头补「这
 minimax-M3.1-Flash / 2026-10-22 09:35 / docs/user-session-log.md 补两条确认正常的行为：资料页的「按事项查看」点标题按钮能切换到那个事项的资料（并显示它自己的条数）、「建档各轮」两轮记得齐全（PRD、结构说明、仓库概况、基线核验、决定记录，第二轮带着上次的修改意见原文） / 继续以用户身份使用系统：核对了资料页的事项切换与建档各轮的记录，顺便记下一条自己的教训——卡片不是可点的，得点标题按钮
 
 执行者 minimax-M3.1-Flash / 2026-10-22 10:05 / 工单 #673 集成层失败项修好：harness/tests/test_department_providers.py 第 449 行改读运行摘要里的 ask_audit（#634 把 collaboration_audit 换成了 ask_audit，测试没跟着改，main 上每次合并以后的集成层都因此失败一项） / 主线上的既有失败：#634 改了运行摘要的键名，测试还读旧键名，集成层在 main 上一直红着
+执行者 minimax-M3.1-Flash / 2026-10-22 09:45 / 工单 #654 资料页的 PRD 各版显示真实状态：harness/app/project_queries.py 里合同（PRD）各版的状态改为取 run.product_specs 中那一版 PRD 的真实状态（按合同的 product_spec_hash 对应），当前有效的一版是 active、被取代的旧版是 superseded，与交付一节用同一套词；新增 harness/tests/test_materials_status.py 并在 layers.toml 登记 / 用户走查 U03：资料页的 PRD 一节把每一版都标成 active，看不出哪一版已被取代，而同一页的交付一节标得是对的
+
 minimax-M3.1-Flash / 2026-10-22 09:50 / docs/user-session-log.md 补 U18（改了部门设置以后项目设置页不更新：查询的 changed_by 里没有 department_prompt_configured，与事件流无关）与一条确认正常的行为（改项目名称服务端生效、刷新后页面才对） / 继续以用户身份使用系统：在页面上改项目名与部门设置，核对「服务端生效、页面不动」的两种不同成因，发现的问题先记录再交工单：#674
 
 minimax-M3.1-Flash / 2026-10-22 10:10 / docs/user-session-log.md 概览里把 #655 移到「已修复并由走查的人在页面上确认」一组，并补记 #655 修好后的样子（动作与回执表格六列，「登记名」与「没有回执」都不见了） / 继续以用户身份使用系统：重建页面文件以后验证走查提出并已修复的第四条问题（#655）

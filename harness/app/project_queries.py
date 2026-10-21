@@ -1283,12 +1283,18 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
     item = _work_item(state, request.work_item)
     run = _run(application, item.run_id)
     versions = {entry["event_id"]: entry for entry in run.git_versions}
+    # PRD 各版显示真实状态（工单 #654）：每一版 PRD 在投影里有自己的状态，
+    # 被取代的旧版是 superseded，当前有效的那一版是 active。
+    # 有效合同由 PRD 接纳而成，按合同上的 product_spec_hash 找到那一版 PRD 取它的状态。
+    spec_status = {spec.content_hash: spec.status for spec in run.product_specs}
     return Snapshot[WorkItemMaterialsResult](
         position=store.end_position(),
         data=WorkItemMaterialsResult(
             work_item_id=item.work_item_id, run_id=run.run_id,
-            contracts=[_version_entry(value.created_event_id, "contract", "active", value.revision,
-                                      value.content_hash, None, []) for value in run.effective_contracts],
+            contracts=[_version_entry(value.created_event_id, "contract",
+                                      spec_status.get(value.product_spec_hash, "active"),
+                                      value.revision, value.content_hash, None, [])
+                       for value in run.effective_contracts],
             deliveries=[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
                                        value.content_hash, value.summary, list(value.files))
                         for value in run.delivery_specs],
