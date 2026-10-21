@@ -9,7 +9,7 @@ import { connect, interfaceFor, type Interface } from "./connection";
 import { EventStreamClient } from "./event-stream";
 import { callCommand, type CommandOutcome } from "./invoke";
 import { nextStreamState, type StreamState } from "./stream-state";
-import { ViewSync } from "./view-sync";
+import { ViewSync, resubscribePosition } from "./view-sync";
 
 export type ClientState =
   | { kind: "connecting" }
@@ -207,7 +207,9 @@ export class ClientApp {
         this.boot = result.capabilities.deployment.boot_id;
         this.capabilities = result.capabilities;
       }
-      const position = await this.views!.refreshAll();
+      // 重新订阅的起点：视图位置与事件流已读到的位置里更晚的那个（工单 #659），
+      // 不往回退——退回去会重放整段历史，页面反复重新同步
+      const position = resubscribePosition(await this.views!.refreshAll(), this.stream?.position ?? 0);
       this.closeStream();
       this.startStream(position);
       // 画面回到查询给出的状态，不补播已经播放过的动作
