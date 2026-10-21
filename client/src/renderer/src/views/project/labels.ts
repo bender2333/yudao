@@ -1,6 +1,8 @@
 // 页面显示用的名称（原型 v8 设计说明第 14 节用词；取值来自应用层的查询结果，未知值原样显示，不做猜测）。
 // 单一来源：harness/app/labels.py 里的部门、阶段与状态名称，客户端按生成的合同取值对应显示。
 
+import type { StreamState } from "../../contract/stream-state";
+
 export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   product: { name: "产品", role: "把用户的要求整理成有效需求" },
   engineering: { name: "工程", role: "按有效需求实现并封存交付" },
@@ -177,4 +179,17 @@ export function formatDuration(seconds: number | null | undefined): string {
     return `${Math.floor(total / 60)} 分 ${total % 60} 秒`;
   }
   return `${Math.floor(total / 3600)} 小时 ${Math.floor((total % 3600) / 60)} 分`;
+}
+
+// 顶栏的连接状态文字（工单 #653）：三档由事件流的状态本身给出。
+// 「连接中断」只在事件流建立过以后断开时出现，断开的时间是那一刻的真实时刻，
+// 不用「刚刚」兜底；初次连接期间说「连接中」，不声称断开过。
+export function connectionText(stream: StreamState): string {
+  if (stream.kind === "connecting") {
+    return "连接中 · 正在建立事件流";
+  }
+  if (stream.kind === "connected") {
+    return "已连接";
+  }
+  return `连接中断 · ${formatTime(stream.disconnectedAt)}断开，正在重新连接`;
 }

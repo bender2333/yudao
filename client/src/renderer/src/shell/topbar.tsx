@@ -4,12 +4,13 @@
 
 import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
+import type { StreamState } from "../contract/stream-state";
 import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
 import { PAGE_RELEASE } from "../contract/page-release";
 import { useCommand, useSnapshot } from "../views/project/use-snapshot";
 import { Icon } from "./kit";
 import { useTheme, type ThemeChoice } from "./theme";
-import { WORK_ITEM_STATUS, formatTime, label } from "../views/project/labels";
+import { WORK_ITEM_STATUS, connectionText, label } from "../views/project/labels";
 import { list, text } from "../views/project/common";
 import { DecisionCardList } from "../views/decisions/card";
 import { sortByRequested } from "../views/decisions/card-logic";
@@ -23,9 +24,8 @@ export type TopbarProps = {
   pending: number;
   // 本项目的等待回答的决定请求（标签栏右侧的「待你决定」）
   projectDecisions: DecisionView[];
-  streamConnected: boolean;
-  // 事件流断开的时间（ISO）：断开时顶栏写明断开的时间与正在重新连接（工单 #296）
-  disconnectedAt: string | null;
+  // 事件流的三种状态（工单 #653）：顶栏按它显示连接中、已连接或连接中断
+  stream: StreamState;
   onPendingClick: () => void;
   onToggleDrawer: () => void;
   onNavigate: (hash: string) => void;
@@ -72,9 +72,9 @@ export function Topbar(props: TopbarProps) {
           </button>
           <ThemeSwitch />
           <span className="y10-service note" title="页面版本">{PAGE_RELEASE}</span>
-          <span className={`y10-service connection${props.streamConnected ? "" : " interrupted"}`} role="status">
+          <span className={`y10-service connection${props.stream.kind === "interrupted" ? " interrupted" : ""}`} role="status">
             <span className="y10-dot" />
-            {props.streamConnected ? "已连接" : `连接中断 · ${props.disconnectedAt === null ? "刚刚" : formatTime(props.disconnectedAt)}断开，正在重新连接`}
+            {connectionText(props.stream)}
           </span>
         </div>
       </div>
