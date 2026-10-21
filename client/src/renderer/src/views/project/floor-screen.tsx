@@ -82,14 +82,33 @@ export function floorModelOf(input: {
 export function floorEventOf(event: EventObject, projectId: string): PixelFloorEvent | null {
   // 事件的公共字段（ADR-0019 的事件信封）：项目、部门、角色、说明与载荷都是登记在接口合同里的。
   if (event.project_id !== null && event.project_id !== projectId) return null;
-  const payload = event.payload as unknown as Record<string, unknown>;
+  const raw = event.payload as unknown as Record<string, unknown>;
+  let type = event.type;
+  let payload = raw;
+  let eventDept: string | null = event.department;
+  if (event.type === "ask_started") {
+    const requester = typeof raw?.requester === "string" ? raw.requester : null;
+    const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
+    if (!requester || !recipient) return null;
+    type = "collaboration_requested";
+    payload = { ...raw, from: requester, to: recipient };
+    if (!eventDept) eventDept = requester;
+  } else if (event.type === "ask_answered") {
+    const requester = typeof raw?.requester === "string" ? raw.requester : null;
+    const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
+    if (!requester || !recipient) return null;
+    type = "collaboration_responded";
+    payload = { ...raw, from: recipient, to: requester };
+    if (!eventDept) eventDept = recipient;
+  }
+  const toolVal = typeof payload?.tool === "string" ? payload.tool : typeof payload?.name === "string" ? payload.name : null;
   return {
-    type: event.type,
+    type,
     event_id: event.event_id,
-    department: event.department,
+    department: eventDept,
     role: event.role,
     // 工具类事件的工具名写在载荷的 name 字段（真实系统的 tool_started/tool_called），说话目录按 tool 取
-    tool: (payload.tool as string | null) ?? (payload.name as string | null) ?? null,
+    tool: toolVal,
     label: event.label,
     work_item_id: event.work_item_id,
     project_id: event.project_id,

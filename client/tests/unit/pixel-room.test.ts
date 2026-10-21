@@ -16,6 +16,27 @@ import { eventActionTypes, sayCatalogTypes } from "../../src/renderer/src/pixel/
 import type { RoomModel } from "../../src/renderer/src/pixel/room/room.ts";
 import type { RoomRole } from "../../src/renderer/src/pixel/room/layout.ts";
 import type { PixelFloorEvent } from "../../src/renderer/src/pixel/world/types.ts";
+import type { EventObject } from "../../src/renderer/src/api/generated/types.gen.ts";
+import { createRequire } from "node:module";
+import fs from "node:fs";
+import path from "node:path";
+
+const req = createRequire(import.meta.url);
+const ts = req("typescript");
+function tsxLoader(module: NodeJS.Module, filename: string) {
+  let code = fs.readFileSync(filename, "utf8");
+  code = code.replaceAll("import.meta.env", "({ DEV: false })");
+  const js = ts.transpileModule(code, {
+    compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const fileReq = createRequire(filename);
+  const fn = new Function("exports", "require", "module", "__filename", "__dirname", js);
+  fn(module.exports, fileReq, module, filename, path.dirname(filename));
+}
+req.extensions[".tsx"] = tsxLoader;
+req.extensions[".ts"] = tsxLoader;
+const { roomEventOf } = req("../../src/renderer/src/views/project/room-screen.tsx");
+const { floorEventOf } = req("../../src/renderer/src/views/project/floor-screen.tsx");
 
 function seeded(): () => number {
   let seed = 246813579;
@@ -213,15 +234,100 @@ test("询问信的两端：从事件载荷读出，回答方是事件所在的�
   assert.deepEqual(letterSides(res), { asker: "engineering", answerer: "product" });
 });
 
-test("传信的两端：真实事件用 requester 与 recipient，旧事件按 request_id 回退查找", () => {
-  const requests = new Map([["q1", { requester: "engineering", recipient: "product" }]]);
-  const asked = collaborationSides("collaboration_requested", { requester: "engineering", recipient: "product", request_id: "q1" }, "engineering");
-  assert.deepEqual(asked, { from: "engineering", to: "product" });
-  // 旧事件没有 requester/recipient：从见过的请求补齐，回答方是事件所在的部门
-  const oldReply = collaborationSides("collaboration_responded", { request_id: "q1" }, "product", requests);
-  assert.deepEqual(oldReply, { from: "engineering", to: "product" });
-  // 找不到对应请求时不给两端，调用方因此不显示这个事件
-  assert.equal(collaborationSides("collaboration_responded", { request_id: "q9" }, "product", requests), null);
+test("询问的两端：真实事件用 requester 与 recipient 经适配函数得到发信与回信两端", () => {
+  const askStarted = {
+    type: "ask_started",
+    department: "engineering",
+    role: null,
+    label: "工程向产品询问：线路偏好是否改变最短距离",
+    work_item_id: "w1",
+    project_id: "p1",
+    position: 10,
+    event_id: "e10",
+    actor: "department:engineering",
+    command_id: null,
+    payload: {
+      requester: "engineering",
+      recipient: "product",
+      question: "线路偏好是否改变最短距离",
+      branch_session_id: "s1",
+    },
+  } as EventObject;
+
+  const askAnswered = {
+    type: "ask_answered",
+    department: "product",
+    role: null,
+    label: "产品回答工程：最短距离不乘 0.8",
+    work_item_id: "w1",
+    project_id: "p1",
+    position: 20,
+    event_id: "e20",
+    actor: "department:product",
+    command_id: null,
+    payload: {
+      requester: "engineering",
+      recipient: "product",
+      answer: "最短距离不乘 0.8",
+      status: "answered",
+    },
+  } as EventObject;
+
+  // roomEventOf: ask_started 转为 collaboration_requested，from 为提问方，to 为被询问部门
+  const roomReqEng = roomEventOf(askStarted, "engineering");
+  assert.ok(roomReqEng);
+  assert.equal(roomReqEng.type, "collaboration_requested");
+  assert.equal(roomReqEng.payload.from, "engineering");
+  assert.equal(roomReqEng.payload.to, "product");
+  assert.equal(roomReqEng.payload.question, "线路偏好是否改变最短距离");
+
+  const roomReqPro = roomEventOf(askStarted, "product");
+  assert.ok(roomReqPro);
+  assert.equal(roomReqPro.type, "collaboration_requested");
+  assert.equal(roomReqPro.payload.from, "engineering");
+  assert.equal(roomReqPro.payload.to, "product");
+
+  // 与本部门无关的询问不进入房间画面
+  assert.equal(roomEventOf(askStarted, "quality"), null);
+
+  // roomEventOf: ask_answered 转为 collaboration_responded，from 为被询问部门，to 为提问方
+  const roomResEng = roomEventOf(askAnswered, "engineering");
+  assert.ok(roomResEng);
+  assert.equal(roomResEng.type, "collaboration_responded");
+  assert.equal(roomResEng.payload.from, "product");
+  assert.equal(roomResEng.payload.to, "engineering");
+  assert.equal(roomResEng.payload.answer, "最短距离不乘 0.8");
+
+  const roomResPro = roomEventOf(askAnswered, "product");
+  assert.ok(roomResPro);
+  assert.equal(roomResPro.type, "collaboration_responded");
+  assert.equal(roomResPro.payload.from, "product");
+  assert.equal(roomResPro.payload.to, "engineering");
+
+  assert.equal(roomEventOf(askAnswered, "quality"), null);
+
+  // floorEventOf: 楼层画面的询问事件转换
+  const floorReq = floorEventOf(askStarted, "p1");
+  assert.ok(floorReq);
+  assert.equal(floorReq.type, "collaboration_requested");
+  assert.equal(floorReq.payload.from, "engineering");
+  assert.equal(floorReq.payload.to, "product");
+  assert.equal(floorReq.payload.question, "线路偏好是否改变最短距离");
+
+  const floorRes = floorEventOf(askAnswered, "p1");
+  assert.ok(floorRes);
+  assert.equal(floorRes.type, "collaboration_responded");
+  assert.equal(floorRes.payload.from, "product");
+  assert.equal(floorRes.payload.to, "engineering");
+  assert.equal(floorRes.payload.answer, "最短距离不乘 0.8");
+
+  // floorEventOf: 非本项目事件过滤
+  assert.equal(floorEventOf(askStarted, "p2"), null);
+  assert.equal(floorEventOf(askAnswered, "p2"), null);
+
+  // collaborationSides: 只读原型形状 from / to，不再读 requester / recipient 与 request_id
+  assert.deepEqual(collaborationSides("collaboration_requested", { from: "engineering", to: "product" }), { from: "engineering", to: "product" });
+  assert.equal(collaborationSides("collaboration_requested", { requester: "engineering", recipient: "product" }), null);
 });
 
 // 原型 room.js 的 setModel：状态一变就清掉排队动作（传信与交接不例外）
@@ -341,7 +447,8 @@ test("工具类：真实载荷的名字与参数说出是哪件事", () => {
 });
 test("工具类：交出类工具说出交的是哪一份，名称与提案事件一致", () => {
   assert.equal(say(real({ payload: { name: "submit_delivery", args: {} } })), "现在提交交付说明");
-  assert.equal(say(real({ payload: { name: "submit_request", args: {} } })), "现在提交询问");
+  assert.equal(say(real({ payload: { name: "ask", args: {} } })), "现在提交询问");
+  assert.equal(say(real({ payload: { name: "answer", args: {} } })), "现在提交回答");
 });
 
 test("工具类：工具调用排在取信之后，事件成串时头顶显示最后排到的那一句", () => {
@@ -380,16 +487,16 @@ test("动作解析：原型没登记的四个工具也解析到动作", () => {
   assert.equal(resolveAction(real({ payload: { name: "bash" } })), "run_command");
 });
 
-test("协作：真实载荷用 requester 与 recipient，两端各说一句", () => {
+test("询问：像素层按 from 与 to 读出两端", () => {
   const req: PixelFloorEvent = {
     type: "collaboration_requested", department: "engineering", work_item_id: "w1",
-    payload: { requester: "engineering", recipient: "product", question: "线路偏好是否改变" },
+    payload: { from: "engineering", to: "product", question: "线路偏好是否改变" },
   };
   assert.equal(say(req, { dept: "engineering" }), "现在向产品发出询问：线路偏好是否改变");
   assert.equal(say(req, { dept: "product" }), "收到工程的询问：线路偏好是否改变");
   const res: PixelFloorEvent = {
     type: "collaboration_responded", department: "product", work_item_id: "w1",
-    payload: { requester: "engineering", recipient: "product", text: "不改变" },
+    payload: { from: "product", to: "engineering", answer: "不改变" },
   };
   assert.equal(say(res, { dept: "product" }), "现在回答工程的询问");
   assert.equal(say(res, { dept: "engineering" }), "收到产品的回答：不改变");

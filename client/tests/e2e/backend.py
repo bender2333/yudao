@@ -46,7 +46,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
 from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
-    baseline_review_turn, collaboration_request, delivery_turn, product_spec, response_turn,
+    answer_turn, ask_turn, baseline_review_turn, delivery_turn, product_spec,
     review_turn, structure_turn,
 )
 from harness.providers.call import ModelResponse  # noqa: E402
@@ -79,18 +79,18 @@ def script():
         # 第二个项目（交付历史）：一轮包含询问与回答、返工、放行与采纳的运行，
         # 供首页与概览的时间轴核对交接、返工、询问与回答、采纳都有关键事实（工单 #180 的验收）
         product_spec(),
+        # 工程向产品提出询问，产品回答（ask_started / ask_answered）
+        ask_turn("product", "How should unknown flags be handled?",
+                 background="Engineering is preparing its independent delivery.",
+                 expected="Explain the intended behavior without changing files."),
+        answer_turn("Print the argument as defined in the current requirement."),
         delivery_turn(),
-        # 工程向产品提出询问，产品回答（collaboration_requested / collaboration_responded）
-        collaboration_request("product", "How should unknown flags be handled?",
-                              background="Engineering is preparing its independent delivery.",
-                              expected_result="Explain the intended behavior without changing files."),
-        response_turn("answered", "Print the argument as defined in the current requirement."),
-        # 质检向工程提出询问，工程回答（工单 #415）：quality→engineering 因此有「咨询」与
+        # 质检向工程提出询问，工程回答（工单 #415）：quality→engineering 因此有「询问」与
         # 「问题反馈」两种非返工流转，与「返工」一起构成同一对部门上的三种流转
-        collaboration_request("engineering", "Which acceptance line governs the rework?",
-                             background="Quality is preparing its verdict on the current delivery.",
-                             expected_result="Name the acceptance line to follow."),
-        response_turn("answered", "Follow the acceptance line recorded in the requirement."),
+        ask_turn("engineering", "Which acceptance line governs the rework?",
+                 background="Quality is preparing its verdict on the current delivery.",
+                 expected="Name the acceptance line to follow."),
+        answer_turn("Follow the acceptance line recorded in the requirement."),
         # 质检退回工程（qa_submitted 的结论为 rework_engineering，返工）
         review_turn("rework_engineering", "Missing usage text when no argument is provided.",
                     defects=[{"severity": "major", "summary": "no usage text on empty argv"}]),
@@ -131,20 +131,23 @@ def room_script():
     # 之后产品向工程发出一次询问（工程收到并回答），再走完交付与质检放行。端到端测试在请求
     # 进行中打开产品房间核对思考气泡，在交接与询问发生时核对两端的小人各说一句。
     from harness.providers.call import ModelDelta, ModelResponse, ModelStreamEvent
-    from harness.adapters.fake import pending_request_id
-    from harness.models import json_dumps
+    def answer_stream(call):
+        for seq, text in enumerate(("正在阅读问题", "正在核对条件")):
+            yield ModelStreamEvent(kind="stream_event", id=f"stream-ans-{seq}",
+                                   payload={"type": "response.output_text.delta", "delta": text},
+                                   text=text, sequence=seq, stage="output", source="provider_sdk",
+                                   deltas=(ModelDelta(channel="output", offset=0, text=text),))
+        fn = answer_turn("按需求里的验收条件实现即可")
+        return fn(call) if callable(fn) else fn
 
-    def answer_turn(request_id_from_call):
-        # 收到询问的一方：把回答作为 submit_response 交回
-        def turn(call):
-            request_id = request_id_from_call(call) if callable(request_id_from_call) else request_id_from_call
-            identity = f"call-{call.activation_id}-{call.step_id}-answer"
-            return ModelResponse(output=[{
-                "id": identity, "call_id": identity, "type": "function_call", "name": "submit_response",
-                "arguments": json_dumps({"request_id": request_id, "status": "answered",
-                                         "text": "按需求里的验收条件实现即可", "result_event_ids": []}),
-            }])
-        return turn
+    def review_stream(call):
+        for seq, text in enumerate(("正在检查交付", "正在核对验收")):
+            yield ModelStreamEvent(kind="stream_event", id=f"stream-rev-{seq}",
+                                   payload={"type": "response.output_text.delta", "delta": text},
+                                   text=text, sequence=seq, stage="output", source="provider_sdk",
+                                   deltas=(ModelDelta(channel="output", offset=0, text=text),))
+        fn = review_turn("release", "checks passed on the current snapshot")
+        return fn(call) if callable(fn) else fn
 
     def product_stream(call):
         # 一个轮次：分三段返回流式输出。每段是一条解码后的流事件（kind="stream_event"），带 output 通道
@@ -163,23 +166,22 @@ def room_script():
             offset += len(text)
         return product_spec()
 
-    return [
-        # 预置的已完成事项：走完一轮，给项目留下一个已完成的事项，部门工作间默认选中它时房间照常渲染
-        product_spec(),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-        # 端到端测试开始的事项：产品分三段流式请求（思考气泡），工程向质检发出一次询问
-        # （传信的两端），质检回答，工程交付（交接的两端）、质检放行
-        product_stream,
-        # 工单 #319 第 3 项：工程先列出工作区里的文件再直接交付，房间事件流里因此有 tool_started
-        # （工具类说明「现在看看有什么文件」）。盖章类的 spec_accepted、qa_started
-        # 与 qa_submitted 由这一轮本身产生
-        read_turn("list-workspace", "list_files", {}),
-        collaboration_request("quality", "交付前需要确认哪一条验收条件"),
-        answer_turn(pending_request_id),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    return {
+        # 预置事项与端到端测试事项都按部门会话推进；询问回答单独走 quality:ask。
+        "product": [product_spec(), product_stream],
+        "engineering": [
+            delivery_turn(),
+            # 工单 #319 第 3 项：列出工作区文件后再询问并交付。
+            read_turn("list-workspace", "list_files", {}),
+            ask_turn("quality", "交付前需要确认哪一条验收条件"),
+            delivery_turn(),
+        ],
+        "quality": [
+            review_turn("release", "checks passed on the current snapshot"),
+            review_stream,
+        ],
+        "quality:ask": [answer_stream],
+    }
 
 
 def onboarding_script():
