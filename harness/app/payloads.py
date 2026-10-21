@@ -146,9 +146,8 @@ class Versions(Payload):
     guidance_only: bool
 
 class WorkBasis(Payload):
-    # 激活开始时的有效合同与协作请求
+    # 激活开始时的有效合同
     effective_contract_hash: str | None
-    request_id: str | None
 
 
 class CallTarget(Payload):
@@ -182,7 +181,6 @@ class AttemptIdentity(Payload):
     # 调用尝试的身份
     attempt_id: str
     logical_call_id: str
-    collaboration_request_id: str | None
     context_event_id: str
 
 
@@ -388,7 +386,6 @@ class ContextAssembledPayload(Versions, WorkBasis, CallTarget):
     snapshot_hash: str
     attempt_id: str
     logical_call_id: str
-    collaboration_request_id: str | None
 
 
 class ModelRequestSerializedPayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
@@ -639,7 +636,6 @@ class ProposalRejectedPayload(Payload):
 class SpecSupersededPayload(Payload):
     content_hash: str
     revision: int
-    request_id: str | None
 
 
 class DecisionChange(Payload):
@@ -673,7 +669,6 @@ class SpecAcceptedPayload(Payload):
     status: Literal["active"]
     content_hash: str
     id: str
-    request_id: str | None
     git_version: GitVersion
 
 
@@ -684,7 +679,6 @@ class ContractAcceptedPayload(Payload):
     content_hash: str
     revision: int
     prd_ref: ArtifactRef
-    request_id: str | None
     git_version: GitVersion
 
 
@@ -693,7 +687,6 @@ class ProductDecisionAcceptedPayload(Payload):
     statement: str
     rationale: str
     product_spec_hash: str
-    request_id: str | None
     kind: Literal["product_decision"]
     content_hash: str
     id: str
@@ -783,7 +776,6 @@ class DeliveryAcceptedPayload(Payload):
     content_hash: str
     id: str
     tree_ref: ArtifactRef
-    request_id: str | None
     git_version: GitVersion
 
 
@@ -809,7 +801,6 @@ class QaSubmittedPayload(Payload):
     status: Literal["active"]
     content_hash: str
     id: str
-    request_id: str | None
     git_version: GitVersion
 
 
@@ -861,7 +852,6 @@ class StructureAcceptedPayload(Payload):
     content_hash: str
     id: str
     structure_ref: ArtifactRef
-    request_id: str | None
     git_version: GitVersion
 
 
@@ -898,7 +888,6 @@ class BaselineReviewAcceptedPayload(Payload):
     status: Literal["active"]
     content_hash: str
     id: str
-    request_id: str | None
     git_version: GitVersion
 
 

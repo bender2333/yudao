@@ -84,71 +84,71 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "department_guidance_responded": ("content_hash", "department", "guidance_created_event_id", "guidance_id",
                                       "guidance_version", "issuer", "kind", "result_event_ids", "status"),
     "department_activated": ("activation_id", "cycle", "effective_contract_hash", "guidance_ids", "guidance_only",
-                             "guidance_version", "input_version", "prompt_version", "request_id"),
+                             "guidance_version", "input_version", "prompt_version"),
     "department_input": ("activation_id", "effective_contract_hash", "guidance_ids", "guidance_only",
-                         "input_version", "prompt_version", "request_id", "step_id"),
+                         "input_version", "prompt_version", "step_id"),
     "tool_call_required": ("activation_id", "attempt_id", "context_event_id", "count", "effective_contract_hash",
                            "guidance_ids", "guidance_only", "input_version", "limit", "prompt_version",
-                           "purpose", "request_id", "step_id"),
+                           "purpose", "step_id"),
     "activation_finished": ("activation_id", "activations", "guidance_ids", "guidance_only", "input_version",
                             "model_steps", "prompt_version", "stop_reason"),
-    "context_assembled": ("activation_id", "admitted", "attempt", "attempt_id", "collaboration_request_id",
+    "context_assembled": ("activation_id", "admitted", "attempt", "attempt_id",
                           "compaction_event_id", "department", "effective_contract_hash", "guidance_ids",
                           "guidance_only", "input_version", "logical_call_id", "prompt_version", "purpose",
-                          "request_id", "retry_of_step_id", "source_event_id", "step_id"),
-    "model_request_serialized": ("activation_id", "attempt", "attempt_id", "collaboration_request_id",
+                          "retry_of_step_id", "source_event_id", "step_id"),
+    "model_request_serialized": ("activation_id", "attempt", "attempt_id",
                                  "context_event_id", "effective_contract_hash", "guidance_ids", "guidance_only",
-                                 "input_version", "logical_call_id", "prompt_version", "purpose", "request_id",
+                                 "input_version", "logical_call_id", "prompt_version", "purpose",
                                  "retry_of_step_id", "step_id"),
-    "model_reasoning": ("activation_id", "attempt_id", "collaboration_request_id", "context_event_id",
+    "model_reasoning": ("activation_id", "attempt_id", "context_event_id",
                         "effective_contract_hash", "guidance_ids", "guidance_only", "input_version",
-                        "logical_call_id", "prompt_version", "purpose", "request_id", "step_id"),
-    "model_message": ("activation_id", "attempt_id", "collaboration_request_id", "context_event_id",
+                        "logical_call_id", "prompt_version", "purpose", "step_id"),
+    "model_message": ("activation_id", "attempt_id", "context_event_id",
                       "effective_contract_hash", "guidance_ids", "guidance_only", "input_version",
-                      "logical_call_id", "prompt_version", "purpose", "request_id", "step_id", "stop_reason"),
-    "model_requested": ("activation_id", "attempt", "attempt_id", "attempted", "collaboration_request_id",
+                      "logical_call_id", "prompt_version", "purpose", "step_id", "stop_reason"),
+    "model_requested": ("activation_id", "attempt", "attempt_id", "attempted",
                         "context_event_id", "definitions_version", "effective_contract_hash", "guidance_ids",
                         "guidance_only", "input_version", "logical_call_id", "max_attempts", "parameters_version",
-                        "prompt_version", "purpose", "request_id", "retry_of_step_id", "step_id"),
-    "model_stream_progress": ("activation_id", "attempt", "attempt_id", "collaboration_request_id",
+                        "prompt_version", "purpose", "retry_of_step_id", "step_id"),
+    "model_stream_progress": ("activation_id", "attempt", "attempt_id",
                               "context_event_id", "guidance_ids", "guidance_only", "input_version",
                               "logical_call_id", "prompt_version", "purpose", "step_id"),
-    "model_attempt_finished": ("activation_id", "attempt", "attempt_id", "collaboration_request_id",
+    "model_attempt_finished": ("activation_id", "attempt", "attempt_id",
                                "context_event_id", "guidance_ids", "guidance_only", "input_version",
                                "logical_call_id", "prompt_version", "purpose", "retry_of_step_id", "status",
                                "step_id"),
-    "model_attempt_failed": ("activation_id", "attempt", "attempt_id", "collaboration_request_id",
-                             "context_event_id", "effective_contract_hash", "guidance_ids", "guidance_only",
-                             "input_version", "logical_call_id", "max_attempts", "prompt_version", "purpose",
-                             "reason", "request_id", "retry_of_step_id", "retryable", "status", "step_id",
+    "model_attempt_failed": ("activation_id", "attempt", "attempt_id", "context_event_id",
+                             "effective_contract_hash", "guidance_ids", "guidance_only", "input_version",
+                             "logical_call_id", "max_attempts", "prompt_version", "purpose",
+                             "reason", "retry_of_step_id", "retryable", "status", "step_id",
                              "will_retry"),
-    "model_retry_scheduled": ("activation_id", "attempt", "attempt_id", "collaboration_request_id",
-                              "context_event_id", "delay_sec", "effective_contract_hash", "guidance_ids",
-                              "guidance_only", "input_version", "logical_call_id", "max_attempts", "next_attempt",
-                              "next_step_id", "prompt_version", "purpose", "reason", "request_id",
+    "model_retry_scheduled": ("activation_id", "attempt", "attempt_id", "context_event_id",
+                              "delay_sec", "effective_contract_hash", "guidance_ids", "guidance_only",
+                              "input_version", "logical_call_id", "max_attempts", "next_attempt",
+                              "next_step_id", "prompt_version", "purpose", "reason",
                               "retry_of_step_id", "retryable", "step_id"),
     "compaction_recorded": ("activation_id", "department", "effective_contract_hash", "guidance_ids",
                             "guidance_only", "input_version", "previous_compaction_event_id", "prompt_version",
-                            "purpose", "request_id", "step_id"),
-    "tool_called": ("activation_id", "attempt_id", "collaboration_request_id", "context_event_id",
+                            "purpose", "step_id"),
+    "tool_called": ("activation_id", "attempt_id", "context_event_id",
                     "effective_contract_hash", "error", "guidance_ids", "guidance_only", "id", "input_version",
-                    "logical_call_id", "name", "ok", "prompt_version", "purpose", "request_id", "step_id"),
-    "tool_started": ("activation_id", "attempt", "attempt_id", "collaboration_request_id", "context_event_id",
+                    "logical_call_id", "name", "ok", "prompt_version", "purpose", "step_id"),
+    "tool_started": ("activation_id", "attempt", "attempt_id", "context_event_id",
                      "effective_contract_hash", "guidance_ids", "guidance_only", "id", "input_version",
-                     "logical_call_id", "name", "prompt_version", "request_id", "step_id"),
-    "tool_skipped": ("activation_id", "attempt_id", "collaboration_request_id", "context_event_id",
+                     "logical_call_id", "name", "prompt_version", "step_id"),
+    "tool_skipped": ("activation_id", "attempt_id", "context_event_id",
                      "effective_contract_hash", "error", "guidance_ids", "guidance_only", "id", "input_version",
-                     "logical_call_id", "name", "ok", "prompt_version", "purpose", "request_id", "step_id"),
-    "action_verified": ("activation_id", "attempt_id", "collaboration_request_id", "context_event_id",
+                     "logical_call_id", "name", "ok", "prompt_version", "purpose", "step_id"),
+    "action_verified": ("activation_id", "attempt_id", "context_event_id",
                         "decision_id", "error", "guidance_ids", "guidance_only", "id", "input_version",
-                        "logical_call_id", "name", "ok", "prompt_version", "purpose", "request_id", "resolution",
+                        "logical_call_id", "name", "ok", "prompt_version", "purpose", "resolution",
                         "step_id"),
     "proposal_submitted": ("definitions_version", "input_version", "kind", "parameters_version"),
     "proposal_rejected": ("definitions_version", "errors", "input_version", "kind", "parameters_version"),
-    "spec_accepted": ("content_hash", "id", "input_version", "issuer", "kind", "parent_hash", "request_id",
+    "spec_accepted": ("content_hash", "id", "input_version", "issuer", "kind", "parent_hash",
                       "revision", "status"),
-    "spec_superseded": ("content_hash", "revision", "request_id"),
-    "contract_accepted": ("content_hash", "input_version", "product_spec_hash", "request_id", "revision"),
+    "spec_superseded": ("content_hash", "revision"),
+    "contract_accepted": ("content_hash", "input_version", "product_spec_hash", "revision"),
     "collaboration_requested": ("action", "content_hash", "id", "kind", "recipient", "requester", "return_phase",
                                 "status"),
     "collaboration_responded": ("content_hash", "id", "kind", "recipient", "request_id", "requester",
@@ -156,17 +156,17 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "collaboration_closed": ("request_id", "return_phase", "return_work_valid", "status"),
     "ask_started": ("branch_session_id", "question", "recipient", "requester"),
     "ask_answered": ("answer", "reason", "recipient", "requester", "revision", "status", "with_spec_revision"),
-    "product_decision_accepted": ("content_hash", "id", "kind", "product_spec_hash", "request_id"),
+    "product_decision_accepted": ("content_hash", "id", "kind", "product_spec_hash"),
     "delivery_accepted": ("check_names", "code_tree_digest", "content_hash", "effective_contract_hash", "id",
-                          "issuer", "kind", "parent_hash", "product_spec_hash", "request_id", "revision", "status"),
+                          "issuer", "kind", "parent_hash", "product_spec_hash", "revision", "status"),
     "qa_submitted": ("code_snapshot_hash", "content_hash", "delivery_spec_hash", "effective_contract_hash", "id",
-                     "issuer", "kind", "parent_hash", "product_spec_hash", "request_id", "revision", "status",
+                     "issuer", "kind", "parent_hash", "product_spec_hash", "revision", "status",
                      "verdict"),
     "qa_tests_saved": ("activation_id", "content_hash", "version"),
     "structure_accepted": ("content_hash", "code_tree_digest", "id", "issuer", "kind", "parent_hash",
-                           "product_spec_hash", "request_id", "revision", "status"),
+                           "product_spec_hash", "revision", "status"),
     "baseline_review_accepted": ("code_snapshot_hash", "content_hash", "id", "issuer", "kind", "parent_hash",
-                                 "product_spec_hash", "request_id", "revision", "status", "verdict"),
+                                 "product_spec_hash", "revision", "status", "verdict"),
     "lesson_candidate_recorded": ("delivery_spec_hash", "id", "kind", "product_spec_hash", "source_event_id",
                                   "status"),
     "transition": ("from", "route", "to"),
@@ -393,9 +393,7 @@ def prompt_entries(system: Any, run_id: str) -> dict[str, dict[str, Any]]:
             key += "/guidance_only"
         elif payload.get("guidance_ids"):
             key += "/guidance"
-        if payload.get("request_id"):
-            key += "/request"
-        elif str(payload.get("session_id", "")).startswith("ses_ask_") or any(
+        if str(payload.get("session_id", "")).startswith("ses_ask_") or any(
             item.get("source") == "pending_ask" for item in payload.get("injected", [])
         ):
             key += "/ask"
@@ -519,23 +517,16 @@ def _group_records(document):
     return records
 
 
-def _request_ref(payload):
-    return str(payload.get("request_id") or payload.get("collaboration_request_id")
-               or payload.get("id") or "")
-
-
 def _event_key(event, group, ordinal):
-    payload = event.get("payload") or {}
-    return f"{group} {event.get('type')} {_request_ref(payload)} #{ordinal}".replace("  ", " ")
+    return f"{group} {event.get('type')} #{ordinal}"
 
 
 def _causal_edges(events):
-    groups = _session_groups(events)
     group_of = [event.get("session_id") or RUN_GROUP for event in events]
     ordinals = {}
     keys = {}
     for position, event in enumerate(events):
-        slot = (group_of[position], event.get("type"), _request_ref(event.get("payload") or {}))
+        slot = (group_of[position], event.get("type"))
         ordinals[slot] = ordinals.get(slot, 0) + 1
         keys[position] = _event_key(event, group_of[position], ordinals[slot])
     edges = set()
@@ -549,13 +540,12 @@ def _causal_edges(events):
         link(0, activations[0])
     for position, event in enumerate(events):
         payload = event.get("payload") or {}
-        if event.get("type") == "collaboration_requested" and payload.get("id"):
-            request_id = str(payload["id"])
-            starts = [pos for pos in activations
-                      if pos > position and str((events[pos].get("payload") or {}).get("request_id")) == request_id]
+        if event.get("type") == "ask_started":
+            # 询问的因果边：提问方发出询问 → 分支会话的第一条事件 → 分支里的回答 → 提问方随后的工具结果
+            branch = str(payload.get("branch_session_id") or "")
+            starts = [pos for pos in range(position + 1, len(events)) if group_of[pos] == branch]
             answers = [pos for pos, other in enumerate(events)
-                       if other.get("type") == "collaboration_responded"
-                       and str((other.get("payload") or {}).get("request_id")) == request_id and pos > position]
+                       if other.get("type") == "ask_answered" and group_of[pos] == branch]
             if starts and answers:
                 link(position, starts[0])
                 link(starts[0], answers[0])

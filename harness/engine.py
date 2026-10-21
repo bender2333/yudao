@@ -157,7 +157,6 @@ class _RecoveredCall:
     session_id: str
     activation_id: str
     step_id: int
-    request_id: str | None
     context_event_id: str | None
     effective_contract_hash: str | None
     call_target: dict[str, Any]
@@ -635,7 +634,7 @@ class StepDriver:
         return pending, _RecoveredCall(
             run_id=self._scope.run_id, department=self._scope.department, session_id=self._scope.session_id,
             activation_id=self._scope.activation_id, step_id=int(payload.get("step_id") or 0),
-            request_id=payload.get("collaboration_request_id"), context_event_id=payload.get("context_event_id"),
+            context_event_id=payload.get("context_event_id"),
             effective_contract_hash=self._scope.basis.effective_contract_hash,
             call_target=dict(self._call_public or {}), purpose="work",
         )
@@ -791,7 +790,6 @@ class StepDriver:
                                    tool_choice=self._tool_choice(assembled.manifest.purpose, assembled.tools,
                                                                  replies_without_tool_call),
                                    effective_contract_hash=scope.basis.effective_contract_hash,
-                                   request_id=scope.basis.request_id,
                                    attempt=attempt, root_step_id=root_step_id,
                                    retry_of_step_id=retry_of_step_id,
                                    attempt_id=f"{logical_call_id}:attempt-{attempt}",

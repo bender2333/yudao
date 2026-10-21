@@ -56,8 +56,7 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_version": 0,
-    "request_id": null
+    "prompt_version": 0
    }
   },
   {
@@ -78,7 +77,6 @@
     "guidance_only": false,
     "input_version": 1,
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -98,7 +96,6 @@
     "admitted": true,
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "compaction_event_id": null,
     "department": "product",
     "effective_contract_hash": null,
@@ -108,7 +105,6 @@
     "logical_call_id": "<act#1>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "source_event_id": null,
     "step_id": 1
@@ -130,7 +126,6 @@
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "attempted": true,
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "definitions_version": "<definitions>",
     "effective_contract_hash": null,
@@ -142,7 +137,6 @@
     "parameters_version": "<parameters>",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -162,7 +156,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
     "guidance_ids": [],
@@ -173,7 +166,6 @@
     "prompt_version": 0,
     "purpose": "work",
     "reason": "retry_after_too_long",
-    "request_id": null,
     "retry_of_step_id": null,
     "retryable": false,
     "status": "failed",
@@ -255,7 +247,7 @@
   "input_version": 1,
   "processed_input_version": 0,
   "product_work_input_version": 1,
-  "run_event_version": 4,
+  "run_event_version": 5,
   "stream_version": 10,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"

@@ -16,7 +16,8 @@ from .models import TERMINAL_PHASES
 # 版本 2：删除事件种类 department_prompt_updated 与 run_created 的 department_prompts 字段（#89）
 # 版本 3：activation_finished 新增累计已用量字段 elapsed_ms、activations、model_steps（#350）
 # 版本 4：删除事件种类 plan_accepted 与工程计划工具的提交与接纳（#470）
-RUN_EVENT_VERSION = 4
+# 版本 5：删除工作依据、调用记录、上下文清单与正式成果里的协作请求编号（#637）
+RUN_EVENT_VERSION = 5
 
 # run 流：事项的进行过程（每次 run 的交接、询问、尝试与动作）
 RUN_EVENT_TYPES = frozenset({

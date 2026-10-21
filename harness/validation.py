@@ -449,8 +449,7 @@ def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "a product decision requires an active ProductSpec")])
     payload = {"statement": proposal["statement"].strip(), "rationale": proposal["rationale"].strip(),
-               "product_spec_hash": projection.product_spec.content_hash,
-               "request_id": None if projection.pending_request is None else projection.pending_request.id}
+               "product_spec_hash": projection.product_spec.content_hash}
     content_hash = canonical_hash(payload)
     if any(item.content_hash == content_hash for item in projection.product_decisions):
         return ProposalDecision(False, [FieldError("statement", "this product decision has already been accepted")])

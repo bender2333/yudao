@@ -59,11 +59,8 @@ class SubmissionWriter:
         updates: dict[str, bytes | None] = {}
         materials: dict[str, bytes] = {}
         current = deepcopy(projection)
-        request_id = None if projection.pending_request is None else projection.pending_request.id
 
         def append(event_type: str, payload: dict[str, Any], hashes: list[str] | None = None) -> int:
-            if event_type != EventType.DEPARTMENT_GUIDANCE_RESPONDED:
-                payload = {**payload, "request_id": request_id}
             prepared.append((event_type, payload, hashes or []))
             event = Event(event_id="uncommitted", run_id=run_id, type=event_type, role=None, **metadata,
                           payload=payload,

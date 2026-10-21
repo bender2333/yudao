@@ -56,8 +56,7 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_version": 0,
-    "request_id": null
+    "prompt_version": 0
    }
   },
   {
@@ -134,7 +133,7 @@
   "input_version": 1,
   "processed_input_version": 0,
   "product_work_input_version": 1,
-  "run_event_version": 4,
+  "run_event_version": 5,
   "stream_version": 6,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"

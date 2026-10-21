@@ -399,7 +399,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "retry_of_step_id": payload.get("retry_of_step_id"),
             "attempt_id": payload.get("attempt_id"),
             "logical_call_id": payload.get("logical_call_id"),
-            "collaboration_request_id": payload.get("collaboration_request_id", payload.get("request_id")),
             "context_event_id": payload.get("context_event_id"),
             "purpose": payload.get("purpose"),
             "provider_config_id": payload.get("provider_config_id"),
@@ -589,7 +588,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.product_decisions.append(ProductDecision(
             id=payload["id"], run_id=event.run_id, content_hash=payload["content_hash"], created_event_id=event.event_id,
             product_spec_hash=payload["product_spec_hash"], statement=payload["statement"],
-            rationale=payload["rationale"], request_id=payload["request_id"],
+            rationale=payload["rationale"],
         ))
         _refresh_effective_decisions(state)
         return
@@ -746,7 +745,6 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         max_output_tokens=payload["max_output_tokens"],
         compaction_event_id=payload["compaction_event_id"],
         effective_contract_hash=payload.get("effective_contract_hash"),
-        request_id=payload.get("request_id"),
         input_version=payload["input_version"],
         prompt_version=payload["prompt_version"],
         prompt_hash=payload["prompt_hash"],

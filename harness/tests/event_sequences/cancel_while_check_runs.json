@@ -56,8 +56,7 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_version": 0,
-    "request_id": null
+    "prompt_version": 0
    }
   },
   {
@@ -78,7 +77,6 @@
     "guidance_only": false,
     "input_version": 1,
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -98,7 +96,6 @@
     "admitted": true,
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "compaction_event_id": null,
     "department": "product",
     "effective_contract_hash": null,
@@ -108,7 +105,6 @@
     "logical_call_id": "<act#1>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "source_event_id": null,
     "step_id": 1
@@ -130,7 +126,6 @@
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "attempted": true,
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "definitions_version": "<definitions>",
     "effective_contract_hash": null,
@@ -142,7 +137,6 @@
     "parameters_version": "<parameters>",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -161,7 +155,6 @@
    "payload": {
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
     "guidance_ids": [],
@@ -170,7 +163,6 @@
     "logical_call_id": "<act#1>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": null
    }
@@ -213,7 +205,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -241,7 +232,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
     "guidance_ids": [],
@@ -251,7 +241,6 @@
     "logical_call_id": "<act#1>:root-1:work",
     "name": "submit_product_spec",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -269,7 +258,6 @@
    "payload": {
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
     "error": null,
@@ -282,7 +270,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -322,7 +309,6 @@
     "issuer": "product",
     "kind": "product_spec",
     "parent_hash": null,
-    "request_id": null,
     "revision": 1,
     "status": "active"
    }
@@ -342,7 +328,6 @@
     "content_hash": "<sha256#25>",
     "input_version": 1,
     "product_spec_hash": "<sha256#24>",
-    "request_id": null,
     "revision": 1
    }
   },
@@ -404,8 +389,7 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_version": 0,
-    "request_id": null
+    "prompt_version": 0
    }
   },
   {
@@ -426,7 +410,6 @@
     "guidance_only": false,
     "input_version": 1,
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -446,7 +429,6 @@
     "admitted": true,
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "compaction_event_id": null,
     "department": "engineering",
     "effective_contract_hash": "<sha256#25>",
@@ -456,7 +438,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "source_event_id": null,
     "step_id": 1
@@ -478,7 +459,6 @@
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
     "attempted": true,
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "definitions_version": "<definitions>",
     "effective_contract_hash": "<sha256#25>",
@@ -490,7 +470,6 @@
     "parameters_version": "<parameters>",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -509,7 +488,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "effective_contract_hash": "<sha256#25>",
     "guidance_ids": [],
@@ -518,7 +496,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": null
    }
@@ -537,7 +514,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "effective_contract_hash": "<sha256#25>",
     "guidance_ids": [],
@@ -546,7 +522,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": null
    }
@@ -565,7 +540,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "effective_contract_hash": "<sha256#25>",
     "guidance_ids": [],
@@ -574,7 +548,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": null
    }
@@ -617,7 +590,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -645,7 +617,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "effective_contract_hash": "<sha256#25>",
     "guidance_ids": [],
@@ -655,7 +626,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "name": "write_file",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -673,7 +643,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "effective_contract_hash": "<sha256#25>",
     "error": null,
@@ -686,7 +655,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -705,7 +673,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "effective_contract_hash": "<sha256#25>",
     "guidance_ids": [],
@@ -715,7 +682,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "name": "run_check",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -749,7 +715,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "effective_contract_hash": "<sha256#25>",
     "error": null,
@@ -762,7 +727,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    },
    "receipt": {
@@ -785,7 +749,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#19>",
     "effective_contract_hash": "<sha256#25>",
     "error": "Not executed because this activation ended or its input changed after the current tool.",
@@ -798,7 +761,6 @@
     "ok": false,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -840,7 +802,7 @@
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
-  "run_event_version": 4,
+  "run_event_version": 5,
   "stream_version": 32,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"

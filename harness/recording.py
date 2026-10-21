@@ -60,8 +60,7 @@ class ActivationScope:
                 "guidance_only": self.guidance_only}
 
     def work_basis(self) -> dict[str, Any]:
-        return {"effective_contract_hash": self.basis.effective_contract_hash,
-                "request_id": self.basis.request_id}
+        return {"effective_contract_hash": self.basis.effective_contract_hash}
 
 
 @dataclass
@@ -247,8 +246,7 @@ class StepRecorder:
                        output_reserve_tokens=step.output_reserve_tokens,
                        parts_ref=asdict(parts_ref),
                        snapshot_hash=snapshot_hash)
-        payload.update(attempt_id=request.attempt_id, logical_call_id=request.logical_call_id,
-                       collaboration_request_id=scope.basis.request_id)
+        payload.update(attempt_id=request.attempt_id, logical_call_id=request.logical_call_id)
         [event] = self._record_in(transaction, self._draft(
             EventType.CONTEXT_ASSEMBLED, provider=self._event_provider(request), context_digest=assembled.manifest.digest,
             artifact_hashes=[ref.content_hash, parts_ref.content_hash], payload=payload))
@@ -283,11 +281,9 @@ class StepRecorder:
                      "attempt_id": request.attempt_id,
                      "logical_call_id": request.logical_call_id,
                      "context_event_id": request.context_event_id,
-                     "collaboration_request_id": request.request_id,
                      "started_at": request.attempt_started_at,
                      "attempted": True, "purpose": request.purpose,
                      "effective_contract_hash": request.effective_contract_hash,
-                     "request_id": scope.basis.request_id,
                      **self._call_target(request),
                      "effective_context_window": request.context.manifest.budget,
                      "max_output_tokens": request.max_output_tokens,
@@ -328,7 +324,6 @@ class StepRecorder:
                 "reasoning_ref": asdict(ref),
                 "attempt_id": request.attempt_id,
                 "logical_call_id": request.logical_call_id,
-                "collaboration_request_id": request.request_id,
                 "context_event_id": request.context_event_id,
                 "activation_id": request.activation_id,
                 "step_id": request.step_id,
@@ -424,7 +419,6 @@ class StepRecorder:
         payload = {
             "attempt_id": request.attempt_id,
             "logical_call_id": request.logical_call_id,
-            "collaboration_request_id": request.request_id,
             "context_event_id": request.context_event_id,
             "activation_id": request.activation_id,
             "step_id": request.step_id,
@@ -478,7 +472,6 @@ class StepRecorder:
             payload={
                 "attempt_id": request.attempt_id,
                 "logical_call_id": request.logical_call_id,
-                "collaboration_request_id": request.request_id,
                 "context_event_id": request.context_event_id,
                 "activation_id": request.activation_id,
                 "step_id": request.step_id,
@@ -506,7 +499,6 @@ class StepRecorder:
                 "usage": _usage_summary(capture.usage or self._step_usage),
                 "raw_usage_ref": capture.usage_ref or self._raw_usage_ref,
                 "effective_contract_hash": request.effective_contract_hash,
-                "request_id": request.request_id,
                 "reason": error.reason,
                 "retryable": error.retryable,
                 "will_retry": will_retry,
@@ -542,12 +534,10 @@ class StepRecorder:
                 "attempt_id": request.attempt_id,
                 "logical_call_id": request.logical_call_id,
                 "context_event_id": request.context_event_id,
-                "collaboration_request_id": request.request_id,
                 "next_step_id": next_step_id,
                 "next_attempt": request.attempt + 1,
                 "purpose": request.purpose,
                 "effective_contract_hash": request.effective_contract_hash,
-                "request_id": request.request_id,
                 "reason": error.reason,
                 "retryable": True,
                 "delay_sec": delay,
@@ -588,7 +578,6 @@ class StepRecorder:
         payload = {**call, "activation_id": request.activation_id,
                    "attempt_id": request.attempt_id,
                    "logical_call_id": request.logical_call_id,
-                   "collaboration_request_id": request.request_id,
                    "context_event_id": request.context_event_id,
                    "attempt": request.attempt,
                    **scope.versions(),
@@ -678,7 +667,6 @@ class StepRecorder:
             payload = {
                 "attempt_id": request.attempt_id,
                 "logical_call_id": request.logical_call_id,
-                "collaboration_request_id": request.request_id,
                 "context_event_id": request.context_event_id,
                 "activation_id": request.activation_id,
                 "step_id": request.step_id,
@@ -793,7 +781,6 @@ class StepRecorder:
             raise ValueError(f"unknown adapter observation: {observation.kind}")
         payload["attempt_id"] = request.attempt_id
         payload["logical_call_id"] = request.logical_call_id
-        payload["collaboration_request_id"] = request.request_id
         payload["context_event_id"] = request.context_event_id
         payload["activation_id"] = request.activation_id
         payload["step_id"] = request.step_id
@@ -831,7 +818,6 @@ class StepRecorder:
             payload={
                 "attempt_id": request.attempt_id,
                 "logical_call_id": request.logical_call_id,
-                "collaboration_request_id": request.request_id,
                 "context_event_id": request.context_event_id,
                 "activation_id": request.activation_id,
                 "step_id": request.step_id,

@@ -5999,10 +5999,6 @@ export type BaselineReviewAcceptedPayload = {
      * Id
      */
     id: string;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     git_version: GitVersion;
 };
 
@@ -6949,10 +6945,6 @@ export type CompactionRecordedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Input Version
      */
     input_version: number;
@@ -7215,10 +7207,6 @@ export type ContextAssembledPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Input Version
      */
     input_version: number;
@@ -7344,10 +7332,6 @@ export type ContextAssembledPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
 };
 
 /**
@@ -7478,10 +7462,6 @@ export type ContractAcceptedPayload = {
      */
     revision: number;
     prd_ref: ArtifactRef;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     git_version: GitVersion;
 };
 
@@ -8049,10 +8029,6 @@ export type DeliveryAcceptedPayload = {
      */
     id: string;
     tree_ref: ArtifactRef;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     git_version: GitVersion;
 };
 
@@ -8131,10 +8107,6 @@ export type DepartmentActivatedPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     /**
      * Input Version
      */
@@ -8545,10 +8517,6 @@ export type DepartmentInputPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     /**
      * Input Version
      */
@@ -9489,10 +9457,6 @@ export type ModelAttemptFailedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Provider Config Id
      */
     provider_config_id: string | null;
@@ -9600,10 +9564,6 @@ export type ModelAttemptFailedPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -9889,10 +9849,6 @@ export type ModelAttemptFinishedPayload = {
      */
     logical_call_id: string;
     /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
-    /**
      * Context Event Id
      */
     context_event_id: string;
@@ -10151,10 +10107,6 @@ export type ModelMessagePayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -10162,10 +10114,6 @@ export type ModelMessagePayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -10377,10 +10325,6 @@ export type ModelReasoningPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -10388,10 +10332,6 @@ export type ModelReasoningPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -10587,10 +10527,6 @@ export type ModelRequestSerializedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -10598,10 +10534,6 @@ export type ModelRequestSerializedPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -10817,10 +10749,6 @@ export type ModelRequestedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -10828,10 +10756,6 @@ export type ModelRequestedPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -11070,10 +10994,6 @@ export type ModelRetryScheduledPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -11081,10 +11001,6 @@ export type ModelRetryScheduledPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -11238,10 +11154,6 @@ export type ModelStreamProgressPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -11592,10 +11504,6 @@ export type ProductDecisionAcceptedPayload = {
      * Product Spec Hash
      */
     product_spec_hash: string;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     /**
      * Kind
      */
@@ -12831,10 +12739,6 @@ export type QaSubmittedPayload = {
      * Id
      */
     id: string;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     git_version: GitVersion;
 };
 
@@ -13946,10 +13850,6 @@ export type SpecAcceptedPayload = {
      * Id
      */
     id: string;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     git_version: GitVersion;
 };
 
@@ -14032,10 +13932,6 @@ export type SpecSupersededPayload = {
      * Revision
      */
     revision: number;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
 };
 
 /**
@@ -14170,10 +14066,6 @@ export type StructureAcceptedPayload = {
      */
     id: string;
     structure_ref: ArtifactRef;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     git_version: GitVersion;
 };
 
@@ -14317,10 +14209,6 @@ export type ToolCallRequiredPayload = {
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
-    /**
-     * Request Id
-     */
-    request_id: string | null;
     /**
      * Input Version
      */
@@ -14481,10 +14369,6 @@ export type ToolCallResult = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -14492,10 +14376,6 @@ export type ToolCallResult = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -14785,10 +14665,6 @@ export type ToolSkippedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -14796,10 +14672,6 @@ export type ToolSkippedPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */
@@ -14911,10 +14783,6 @@ export type ToolStartedPayload = {
      */
     effective_contract_hash: string | null;
     /**
-     * Request Id
-     */
-    request_id: string | null;
-    /**
      * Input Version
      */
     input_version: number;
@@ -14942,10 +14810,6 @@ export type ToolStartedPayload = {
      * Logical Call Id
      */
     logical_call_id: string;
-    /**
-     * Collaboration Request Id
-     */
-    collaboration_request_id: string | null;
     /**
      * Context Event Id
      */

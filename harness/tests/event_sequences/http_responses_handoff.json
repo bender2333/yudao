@@ -56,8 +56,7 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_version": 0,
-    "request_id": null
+    "prompt_version": 0
    }
   },
   {
@@ -78,7 +77,6 @@
     "guidance_only": false,
     "input_version": 1,
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -98,7 +96,6 @@
     "admitted": true,
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "compaction_event_id": null,
     "department": "product",
     "effective_contract_hash": null,
@@ -108,7 +105,6 @@
     "logical_call_id": "<act#1>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "source_event_id": null,
     "step_id": 1
@@ -130,7 +126,6 @@
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "attempted": true,
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "definitions_version": "<definitions>",
     "effective_contract_hash": null,
@@ -142,7 +137,6 @@
     "parameters_version": "<parameters>",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -162,7 +156,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
     "guidance_ids": [],
@@ -171,7 +164,6 @@
     "logical_call_id": "<act#1>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -191,7 +183,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -217,7 +208,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -242,7 +232,6 @@
    "payload": {
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
     "guidance_ids": [],
@@ -251,7 +240,6 @@
     "logical_call_id": "<act#1>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": "completed"
    }
@@ -271,7 +259,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -320,7 +307,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -348,7 +334,6 @@
     "activation_id": "<act#1>",
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
     "guidance_ids": [],
@@ -358,7 +343,6 @@
     "logical_call_id": "<act#1>:root-1:work",
     "name": "submit_product_spec",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -376,7 +360,6 @@
    "payload": {
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#5>",
     "effective_contract_hash": null,
     "error": null,
@@ -389,7 +372,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -429,7 +411,6 @@
     "issuer": "product",
     "kind": "product_spec",
     "parent_hash": null,
-    "request_id": null,
     "revision": 1,
     "status": "active"
    }
@@ -449,7 +430,6 @@
     "content_hash": "<sha256#29>",
     "input_version": 1,
     "product_spec_hash": "<sha256#28>",
-    "request_id": null,
     "revision": 1
    }
   },
@@ -511,8 +491,7 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_version": 0,
-    "request_id": null
+    "prompt_version": 0
    }
   },
   {
@@ -533,7 +512,6 @@
     "guidance_only": false,
     "input_version": 1,
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -553,7 +531,6 @@
     "admitted": true,
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "compaction_event_id": null,
     "department": "engineering",
     "effective_contract_hash": "<sha256#29>",
@@ -563,7 +540,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "source_event_id": null,
     "step_id": 1
@@ -585,7 +561,6 @@
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
     "attempted": true,
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "definitions_version": "<definitions>",
     "effective_contract_hash": "<sha256#29>",
@@ -597,7 +572,6 @@
     "parameters_version": "<parameters>",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -617,7 +591,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -626,7 +599,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -646,7 +618,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -672,7 +643,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -697,7 +667,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -706,7 +675,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": "completed"
    }
@@ -725,7 +693,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -734,7 +701,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": "completed"
    }
@@ -753,7 +719,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -762,7 +727,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": "completed"
    }
@@ -782,7 +746,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -831,7 +794,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -859,7 +821,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -869,7 +830,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "name": "write_file",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -887,7 +847,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "error": null,
@@ -900,7 +859,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -919,7 +877,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -929,7 +886,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "name": "run_check",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -947,7 +903,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "error": null,
@@ -960,7 +915,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    },
    "receipt": {
@@ -984,7 +938,6 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -994,7 +947,6 @@
     "logical_call_id": "<act#2>:root-1:work",
     "name": "submit_delivery",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -1012,7 +964,6 @@
    "payload": {
     "activation_id": "<act#2>",
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#23>",
     "effective_contract_hash": "<sha256#29>",
     "error": null,
@@ -1025,7 +976,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -1070,7 +1020,6 @@
     "kind": "delivery_spec",
     "parent_hash": null,
     "product_spec_hash": "<sha256#28>",
-    "request_id": null,
     "revision": 1,
     "status": "active"
    }
@@ -1150,8 +1099,7 @@
     "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
-    "prompt_version": 0,
-    "request_id": null
+    "prompt_version": 0
    }
   },
   {
@@ -1172,7 +1120,6 @@
     "guidance_only": false,
     "input_version": 1,
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -1192,7 +1139,6 @@
     "admitted": true,
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "compaction_event_id": null,
     "department": "quality",
     "effective_contract_hash": "<sha256#29>",
@@ -1202,7 +1148,6 @@
     "logical_call_id": "<act#3>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "source_event_id": null,
     "step_id": 1
@@ -1224,7 +1169,6 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "attempted": true,
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "definitions_version": "<definitions>",
     "effective_contract_hash": "<sha256#29>",
@@ -1236,7 +1180,6 @@
     "parameters_version": "<parameters>",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -1256,7 +1199,6 @@
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -1265,7 +1207,6 @@
     "logical_call_id": "<act#3>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "retry_of_step_id": null,
     "step_id": 1
    }
@@ -1285,7 +1226,6 @@
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -1311,7 +1251,6 @@
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -1336,7 +1275,6 @@
    "payload": {
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -1345,7 +1283,6 @@
     "logical_call_id": "<act#3>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": "completed"
    }
@@ -1364,7 +1301,6 @@
    "payload": {
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -1373,7 +1309,6 @@
     "logical_call_id": "<act#3>:root-1:work",
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1,
     "stop_reason": "completed"
    }
@@ -1393,7 +1328,6 @@
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -1442,7 +1376,6 @@
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -1470,7 +1403,6 @@
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -1480,7 +1412,6 @@
     "logical_call_id": "<act#3>:root-1:work",
     "name": "run_check",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -1498,7 +1429,6 @@
    "payload": {
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "effective_contract_hash": "<sha256#29>",
     "error": null,
@@ -1511,7 +1441,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    },
    "receipt": {
@@ -1535,7 +1464,6 @@
     "activation_id": "<act#3>",
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "effective_contract_hash": "<sha256#29>",
     "guidance_ids": [],
@@ -1545,7 +1473,6 @@
     "logical_call_id": "<act#3>:root-1:work",
     "name": "submit_review",
     "prompt_version": 0,
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -1563,7 +1490,6 @@
    "payload": {
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "collaboration_request_id": null,
     "context_event_id": "<evt#47>",
     "effective_contract_hash": "<sha256#29>",
     "error": null,
@@ -1576,7 +1502,6 @@
     "ok": true,
     "prompt_version": 0,
     "purpose": "work",
-    "request_id": null,
     "step_id": 1
    }
   },
@@ -1619,7 +1544,6 @@
     "kind": "qa_review",
     "parent_hash": null,
     "product_spec_hash": "<sha256#28>",
-    "request_id": null,
     "revision": 1,
     "status": "active",
     "verdict": "release"
@@ -1695,7 +1619,7 @@
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
-  "run_event_version": 4,
+  "run_event_version": 5,
   "stream_version": 65,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
