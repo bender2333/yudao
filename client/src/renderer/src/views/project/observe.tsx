@@ -15,6 +15,7 @@ import type {
 import { paths, type Route } from "../../shell/routing";
 import { PageHead } from "../../shell/kit";
 import { failureRows } from "./attempt-failure";
+import { attemptsSummary } from "./attempts-summary";
 import { Empty, KeyValue, Loading, Section, Table, Tabs, dict, formatNumberOr, list, numberValue, optionalText, pageKey, show, text } from "./common";
 import { ATTEMPT_STATUS, DEPARTMENTS, departmentName, formatTime, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
@@ -112,7 +113,12 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
       <PageHead
         eyebrow={`观测 · ${workItem === null ? "整个项目" : "事项范围"}`}
         title="模型请求"
-        subtitle={`${inFlight} 个请求进行中 · 共 ${rows.length} 条记录。调用目标、按栏目的来源与用量都在这里；用量只读显示。`}
+        subtitle={attemptsSummary({
+          inFlight,
+          total: usage.data === null ? null : usage.data.totals.attempts,
+          loaded: rows.length,
+          more: attempts.data !== null && attempts.data.cursor !== null,
+        })}
       />
       <Section
         id="obs-requests"
