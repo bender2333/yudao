@@ -3,6 +3,7 @@ import time
 
 from harness.app.application import Application
 from harness.app.event_stream import EventScope
+from harness.app.labels import GENERIC_EVENT_LABEL, _LABELS
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import project_stream
 from harness.models import ProjectEventType
@@ -145,3 +146,25 @@ def test_idle_emits_a_checkpoint_at_the_scanned_position(tmp_path):
     assert messages[1].kind == "checkpoint"
     assert messages[1].position == messages[0].position
     assert messages[1].previous == messages[0].position
+
+
+def test_an_event_without_a_label_does_not_break_the_stream(tmp_path):
+    # 一条没有登记中文说明的事件不能让整条流断掉（工单 #664）：
+    # 事件流播到这一条就断，客户端每秒重连一次，永远过不去。
+    # 这里把这类事件的说明从标签表里去掉，复现「事件种类漏登记说明」的情形。
+    application = _application(tmp_path)
+    for index in range(3):
+        _record(application, "p1", index)
+
+    template = _LABELS.pop(ProjectEventType.PROJECT_RENAMED)
+    try:
+        stream = application.open_event_stream(
+            EventScope(types=(ProjectEventType.PROJECT_RENAMED,)), after=0, live=False)
+        messages = _collect(stream, 3)
+    finally:
+        _LABELS[ProjectEventType.PROJECT_RENAMED] = template
+
+    assert len(messages) == 3
+    assert [message.event.label for message in messages] == [GENERIC_EVENT_LABEL] * 3
+    assert [message.event.position for message in messages] == sorted(
+        message.event.position for message in messages)

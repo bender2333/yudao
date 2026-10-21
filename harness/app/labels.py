@@ -55,6 +55,14 @@ def department_name(department: Any) -> str:
     return f"{DEFINITIONS.department_labels.get(value, value)}部门"
 
 
+# 修改人：user:alice 这样的标识写成「用户 alice」，机器标识不直接出现
+def modifier_name(value: Any) -> str:
+    text = str(value or "")
+    if text.startswith("user:"):
+        return "用户 " + text[len("user:"):]
+    return text
+
+
 # 写回停止原因的中文名（工单 #347）：取值不在停止原因里，单独给中文名
 WRITEBACK_REASON_NAMES = {
     "conflict": "合并出现冲突",
@@ -79,12 +87,23 @@ def item_count(items: Any) -> str:
     return f"{len(items)} 个"
 
 
+# 一条没有登记说明的事件的通用说明（工单 #664）：一条事件不能把整条事件流断掉
+GENERIC_EVENT_LABEL = "发生了一条事件"
+
+
 def event_label(event_type: str, payload: dict[str, Any]) -> str:
-    # 一条事件的中文说明；载荷中的关键字段填进说明里，字段不在载荷里时直接报错，说明里不出现空白的占位
+    # 一条事件的中文说明；载荷中的关键字段填进说明里。
+    # 没有登记说明的种类、或者载荷里缺了说明要的字段时，退回一句通用说明：
+    # 事件流播到这一条就断掉，客户端会每秒重连一次，永远过不去（工单 #664）。
+    # 标签表与事件种类清单的一致性由 test_event_classification.py 核对，
+    # 说明里用的字段都在载荷里也由那一条核对。
     template = _LABELS.get(event_type)
     if template is None:
-        raise KeyError(f"no event label is defined for {event_type}")
-    return template.format_map(_Translated(payload))
+        return GENERIC_EVENT_LABEL
+    try:
+        return template.format_map(_Translated(payload))
+    except (KeyError, IndexError, ValueError):
+        return GENERIC_EVENT_LABEL
 
 
 class _Translated(dict):
@@ -96,6 +115,7 @@ class _Translated(dict):
         "guidance_ids": item_count, "candidate_ids": item_count, "running_runs": item_count,
         "stopped_runs": item_count, "restarted_work_items": item_count,
         "kind": decision_kind_name, "from_phase": phase_name, "to_phase": phase_name,
+        "modified_by": modifier_name,
     }
 
     def __getitem__(self, key: str) -> Any:
@@ -174,6 +194,7 @@ _LABELS: dict[str, str] = {
     ProjectEventType.PROJECT_DECISION_WITHDRAWN: "撤销了决定请求：{reason}",
     ProjectEventType.ONBOARDING_REVISION_STARTED: "开始第 {round} 轮建档",
     ProjectEventType.BASELINE_ADOPTED: "采纳了建档基线：{summary}",
+    ProjectEventType.PARAMETER_SET: "把项目参数 {name} 从 {old_value} 改为 {new_value}：{reason}（{modified_by} 修改）",
     ProjectEventType.WRITEBACK_COMPLETED: "写回了采纳成果：分支 {branch}，最终树 {final_tree_digest}",
     ProjectEventType.WRITEBACK_STOPPED: "写回停止：{reason}",
     ProjectEventType.WRITEBACK_NOT_NEEDED: "无需写回：本事项的变更已经在目标分支上",
