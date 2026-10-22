@@ -254,7 +254,7 @@ class _ChatInvoker:
             response_id=response_id, protocol="chat_completions",
             actual_model=actual_model, reasoning=reasoning,
             wire_evidence={"request": {key: value for key, value in params.items() if not key.startswith("_")},
-                           "response_id": response_id},
+                           "response_id": response_id, "finish_reason": finish_reason},
         )
 
 

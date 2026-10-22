@@ -8,6 +8,8 @@ from urllib.parse import urlsplit, urlunsplit
 import pytest
 
 from harness.definitions import DEFINITIONS
+from harness.app.application import Application
+from harness.app.project_queries import RunAttempt
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType
 from harness.providers import (
@@ -34,7 +36,9 @@ from harness.tests.protocol_helpers import (
     serve,
     sse,
 )
-from harness.tests.provider_replies import BROKEN_STREAMS, PARTIAL_OUTPUT, empty_reply, product_spec_reply
+from harness.tests.provider_replies import (
+    BROKEN_STREAMS, HTTP_SCRIPT, PARTIAL_OUTPUT, chat_reply, empty_reply, product_spec_reply,
+)
 
 HI = [{"role": "user", "content": "hi"}]
 
@@ -80,6 +84,29 @@ def test_chat_wire_format_tool_round_trip_and_identity_headers():
     assert result.usage.input_tokens == 10
     assert result.usage.cache_read_tokens == 2
     assert result.usage.output_tokens == 5
+
+
+@pytest.mark.parametrize("finish_reason", ["length", "stop", "tool_calls"])
+def test_chat_finish_reason_is_visible_in_the_persisted_attempt_details(data_dir, finish_reason):
+    def reply(_provider, handler):
+        send_reply(handler, 200, "text/event-stream",
+                   chat_reply(1, HTTP_SCRIPT[0], finish_reason=finish_reason))
+
+    provider = ScriptedProvider([reply])
+    try:
+        system, run_id = provider_system(data_dir, provider.base, "chat_completions")
+        try:
+            result = system.activate_once(run_id)
+            completed = next(event for event in system.store.list_events(run_id)
+                             if event.type == EventType.MODEL_ATTEMPT_FINISHED)
+            detail = Application(system).query("run.attempt", RunAttempt(
+                run_id=run_id, attempt_id=completed.payload["attempt_id"]))
+            assert result.phase == "ENGINEERING", result.error
+            assert detail.data.response["finish_reason"] == finish_reason
+        finally:
+            system.close()
+    finally:
+        provider.close()
 
 
 def test_chat_chunk_identity_that_is_not_a_string_is_not_recorded():
