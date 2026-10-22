@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CommandOutcome } from "../../contract/invoke";
 import { newCommandId } from "../../contract/command-id.ts";
+import { optionalRead, readFailureText } from "../../contract/read-failure.ts";
 import type { Rejected } from "../../api/generated/types.gen";
 import type { ViewSync } from "../../contract/view-sync";
 import type {
@@ -355,13 +356,23 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     await runSave(body, saveSuccessText(form.mode), form.state, secret, persist);
   }, [form, runSave, saveImpact]);
 
-  const deleteProvider = useCallback(async (providerId: string) => {
-    // 删除之前按第 4.5 节取回引用方与将一并删除的定义；被引用时确认框列出引用方，拒绝删除
+  const deleteProvider = useCallback((providerId: string) => {
+    // 删除之前按第 4.5 节取回引用方与将一并删除的定义；被引用时确认框列出引用方，拒绝删除。
+    // 这一次读取会失败（服务不可达或查询失败）：失败有去处——写明失败的原因，
+    // 不产生未处理的拒绝（工单 #777）
     setBusy(true);
-    const snapshot = await props.query<ChangeImpact>("catalog.change_impact", { kind: "provider", provider_id: providerId });
-    setBusy(false);
-    setDeleteImpact(collectImpact(snapshot.data));
-    setPendingDelete(providerId);
+    optionalRead(
+      props.query<ChangeImpact>("catalog.change_impact", { kind: "provider", provider_id: providerId }),
+      (snapshot) => {
+        setBusy(false);
+        setDeleteImpact(collectImpact(snapshot.data));
+        setPendingDelete(providerId);
+      },
+      (reason) => {
+        setBusy(false);
+        setNotice({ kind: "error", message: readFailureText(reason) });
+      },
+    );
   }, [props]);
 
   const runDelete = useCallback(async (providerId: string) => {
@@ -375,9 +386,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     }
   }, [submit]);
 
-  const removeModel = useCallback(async (providerId: string, modelId: string) => {
+  const removeModel = useCallback((providerId: string, modelId: string) => {
     // 移除单条定义（设计说明第 4.5 节）：被引用时显示引用方并拒绝。
-    // 先取回拟议终态（这条定义被移除）的影响，引用方存在时显示引用方，不再提交命令
+    // 先取回拟议终态（这条定义被移除）的影响，引用方存在时显示引用方，不再提交命令。
+    // 这一次读取会失败：失败有去处——写明失败的原因，不产生未处理的拒绝（工单 #777）
     const catalogNow = catalogRef.current;
     const provider = catalogNow?.providers.find((item) => item.id === providerId);
     if (catalogNow === null || provider === undefined) {
@@ -386,17 +398,25 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     const remaining = provider.models
       .filter((item) => item.id !== modelId)
       .map((item) => modelDocumentFromDefinition(item));
-    const snapshot = await props.query<ChangeImpact>("catalog.change_impact", {
-      kind: "connection",
-      document: JSON.stringify({ provider: providerInputOf(provider), models: remaining }),
-    });
-    const referrers = modelRemoveReferrers(collectImpact(snapshot.data));
-    if (referrers !== "") {
-      setNotice({ kind: "error", message: referrers });
-      return;
-    }
-    const result = await submit("catalog.model.remove", { provider_id: providerId, model_id: modelId });
-    setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? "已移除访问定义。" : result.message });
+    optionalRead(
+      props.query<ChangeImpact>("catalog.change_impact", {
+        kind: "connection",
+        document: JSON.stringify({ provider: providerInputOf(provider), models: remaining }),
+      }),
+      (snapshot) => {
+        const referrers = modelRemoveReferrers(collectImpact(snapshot.data));
+        if (referrers !== "") {
+          setNotice({ kind: "error", message: referrers });
+          return;
+        }
+        void submit("catalog.model.remove", { provider_id: providerId, model_id: modelId }).then((result) => {
+          setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? "已移除访问定义。" : result.message });
+        });
+      },
+      (reason) => {
+        setNotice({ kind: "error", message: readFailureText(reason) });
+      },
+    );
   }, [props, submit]);
 
   const testConnection = useCallback(async (providerId: string) => {

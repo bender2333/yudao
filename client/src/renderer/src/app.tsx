@@ -9,6 +9,7 @@ import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
 import { mismatchAdvice } from "./contract/page-version";
 import { PAGE_RELEASE } from "./contract/page-release";
+import { optionalRead } from "./contract/read-failure.ts";
 import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
@@ -220,13 +221,23 @@ export function App() {
         || projects.some((row) => row.project_id === projectId))
         && (workItemId === null || itemsRef.current.has(workItemId));
       if (projectId !== null && workItemId !== null && !known) {
-        void app.queryOne<ProjectOverviewResult>("project.overview", { project_id: projectId }).then((snapshot) => {
-          projectNamesRef.current.set(projectId, snapshot.data.name);
-          for (const item of snapshot.data.work_items) {
-            itemsRef.current.set(item.work_item_id, item.title);
-          }
-          notifier.notify(noticeForEvent(event, namesRef.current) ?? notice, openDecision);
-        });
+        // 名称还没有取到：先取到再发通知，正文写明是哪个项目、哪件事。
+        // 这一次读取会失败（服务不可达时）：失败有去处——取不到名称就不发这条通知，
+        // 失败不冒到控制台（工单 #777）。这件事仍然在页面的待决列表里，
+        // 服务整体不可达由连接层说明（页面写「正在重新连接」）。
+        optionalRead(
+          app.queryOne<ProjectOverviewResult>("project.overview", { project_id: projectId }),
+          (snapshot) => {
+            projectNamesRef.current.set(projectId, snapshot.data.name);
+            for (const item of snapshot.data.work_items) {
+              itemsRef.current.set(item.work_item_id, item.title);
+            }
+            notifier.notify(noticeForEvent(event, namesRef.current) ?? notice, openDecision);
+          },
+          () => {
+            // 取不到名称就不发这条通知：通知正文要写明是哪个项目、哪件事，没有名字就不写。
+          },
+        );
         return;
       }
       notifier.notify(notice, openDecision);
