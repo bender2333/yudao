@@ -9,6 +9,7 @@ import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "
 import { PAGE_RELEASE } from "../contract/page-release";
 import { rejectionLabel, useCommand, useSnapshot } from "../views/project/use-snapshot";
 import { Icon } from "./kit";
+import { providerNotice, type ProviderReadiness } from "./provider-status";
 import { useTheme, type ThemeChoice } from "./theme";
 import { WORK_ITEM_STATUS, connectionText, label } from "../views/project/labels";
 import { list, text } from "../views/project/common";
@@ -26,6 +27,8 @@ export type TopbarProps = {
   projectDecisions: DecisionView[];
   // 事件流的三种状态（工单 #653）：顶栏按它显示连接中、已连接或连接中断
   stream: StreamState;
+  // 模型服务是否可用（工单 #718）：不可用时顶栏给出一处提示，点一下进模型管理页
+  provider: ProviderReadiness | null;
   onPendingClick: () => void;
   onToggleDrawer: () => void;
   onNavigate: (hash: string) => void;
@@ -35,6 +38,8 @@ export function Topbar(props: TopbarProps) {
   const [decisionsOpen, setDecisionsOpen] = useState(false);
   const waiting = sortByRequested(props.projectDecisions);
   const now = Date.now();
+  // 模型服务不可用时的提示（工单 #718）：可用时不显示
+  const provider = providerNotice(props.provider);
   return (
     <header className="y10-topbar topbar">
       <button type="button" className="y10-icon-btn y10-drawer-open drawer-toggle" onClick={props.onToggleDrawer} aria-label="打开左侧栏">
@@ -72,6 +77,18 @@ export function Topbar(props: TopbarProps) {
           </button>
           <ThemeSwitch />
           <span className="y10-service note" title="页面版本">{PAGE_RELEASE}</span>
+          {provider ? (
+            <button
+              type="button"
+              className="y10-service connection interrupted provider status-item"
+              role="status"
+              onClick={() => props.onNavigate("#/sys/models")}
+              title={provider.detail === "" ? provider.label : `${provider.label}：${provider.detail}`}
+            >
+              <span className="y10-dot" />
+              {provider.label}
+            </button>
+          ) : null}
           <span className={`y10-service connection${props.stream.kind === "interrupted" ? " interrupted" : ""}`} role="status">
             <span className="y10-dot" />
             {connectionText(props.stream)}

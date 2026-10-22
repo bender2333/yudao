@@ -166,6 +166,9 @@ a { color: var(--green); }
 .y10-scope-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .y10-scope select { max-width: 260px; min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; background: var(--surface); font-size: 13px; }
 .y10-service { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+/* 模型服务不可用（工单 #718）：与连接状态一样的位置，用红色说明「现在跑不了」 */
+.y10-service.provider { color: var(--red); cursor: pointer; background: none; border: 0; padding: 0; font: inherit; }
+.y10-service.provider .y10-dot { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent); }
 .y10-menu-wrap { position: relative; }
 .y10-crumbs { order: 1; }
 .y10-top-actions { order: 2; }

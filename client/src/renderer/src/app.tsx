@@ -309,6 +309,7 @@ export function App() {
           pending={pending}
           projectDecisions={projectDecisions}
           stream={state.stream}
+          provider={systemStatus === null ? null : systemStatus.provider}
           onPendingClick={() => navigate(paths.home())}
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
           onNavigate={navigate}
