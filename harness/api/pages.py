@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from starlette.responses import JSONResponse, Response
@@ -12,10 +13,27 @@ from starlette.types import Scope
 # 发布资源目录（网页界面的提供与发布设计说明第 5.1、6.1 节）：被 git 忽略，
 # 发布脚本把页面文件与执行代理的 wheel 放进去，随 wheel 一起发布
 RELEASE_ASSETS = Path(__file__).resolve().parent.parent / "release_assets"
+# 页面文件对应的接口版本写在发布资源目录的这个文件里（工单 #704）
+PAGES_API_VERSION_FILE = "api-version.json"
 # 从源码运行而没有构建页面时给用户的原因
 NO_PAGES = "没有页面文件"
 # Vite 把带内容摘要的文件放在 assets/ 下，文件名随内容改变，可以长期缓存
 HASHED_DIRECTORY = "assets"
+
+
+def pages_api_version() -> int | None:
+    """这一份页面文件对应哪个接口版本；没有页面文件或没有写下版本时为空。
+
+    发布脚本复制页面文件时一并写下这个版本（工单 #704）：服务与页面不匹配时，
+    运维与日志能说清是哪一边落后了。
+    """
+    source = RELEASE_ASSETS / PAGES_API_VERSION_FILE
+    try:
+        document = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    version = document.get("api_version") if isinstance(document, dict) else None
+    return version if isinstance(version, int) else None
 
 class PageFiles(StaticFiles):
     def __init__(self, directory: Path) -> None:

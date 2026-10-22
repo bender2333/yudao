@@ -26,7 +26,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -42,6 +44,8 @@ MIN_NODE = (22, 12)
 TAG_PREFIX = "v"
 # 页面构建输出目录（vite.pages.config.ts 的 build.outDir）
 PAGES_OUTPUT = Path("out") / "renderer"
+# 页面文件对应的接口版本写在发布资源目录的这个文件里（工单 #704）
+PAGES_API_VERSION_FILE = "api-version.json"
 # 发布资源目录：页面文件与执行代理的 wheel 随 wheel 一起发布（设计说明第 5.1、6.1 节）
 RELEASE_ASSETS = Path("harness") / "release_assets"
 
@@ -166,6 +170,18 @@ def build_pages(repo_root: Path, *, version: str) -> Path:
         raise ReleaseError(f"页面构建没有生成 {output / 'index.html'}")
     return output
 
+def _pages_api_version(repo_root: Path) -> int | None:
+    # 这一份页面文件对应哪个接口版本（工单 #704）：从客户端生成的版本常量读出；
+    # 读不到就写不了，服务那时的日志只说「不知道」
+    source = repo_root / "client" / "src" / "renderer" / "src" / "api" / "interface-version.ts"
+    try:
+        text = source.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = re.search(r"CLIENT_API_VERSION\s*=\s*(\d+)", text)
+    return int(match.group(1)) if match else None
+
+
 def assemble_assets(repo_root: Path, pages: Path) -> Path:
     # 第 4 步前半：清空发布资源目录（该目录被 git 忽略），把页面文件整个复制进去。
     # 先清空，避免上一次发布留下的文件混进 wheel；执行代理的 wheel 在 M3 由 #144 复制进来
@@ -173,6 +189,13 @@ def assemble_assets(repo_root: Path, pages: Path) -> Path:
     if assets_dir.exists():
         shutil.rmtree(assets_dir)
     shutil.copytree(pages, assets_dir)
+    # 这份页面文件对应哪个接口版本（工单 #704）：服务启动时读出来写进日志，
+    # 页面与服务不匹配时能说清是哪一边落后了
+    version = _pages_api_version(repo_root)
+    if version is not None:
+        (assets_dir / PAGES_API_VERSION_FILE).write_text(
+            json.dumps({"api_version": version}, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8")
     return assets_dir
 
 def clean_build_artifacts(repo_root: Path) -> None:

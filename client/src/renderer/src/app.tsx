@@ -7,6 +7,8 @@ import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList
 import { rememberToken, storedToken } from "./contract/access-token";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
+import { mismatchAdvice } from "./contract/page-version";
+import { PAGE_RELEASE } from "./contract/page-release";
 import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
@@ -253,12 +255,20 @@ export function App() {
     return <div className="y10-gate gate"><div className="y10-gate-card card"><h1>连接中…</h1></div></div>;
   }
   if (state.kind === "outdated") {
-    // 页面与服务出自同一个发布，接口版本不同时页面不能使用这个服务
+    // 页面与服务出自同一个发布，接口版本不同时页面不能使用这个服务（工单 #704）：
+    // 说清两边各是哪个版本、该做什么；「重新加载」只在有用时出现
+    const advice = mismatchAdvice({
+      pageVersion: state.clientVersion,
+      serverVersion: state.serverVersion,
+      sameRelease: state.serverRelease === PAGE_RELEASE,
+    });
     return (
       <div className="y10-gate gate"><div className="y10-gate-card card">
         <h1>页面与服务的接口版本不同</h1>
-        <p className="error">页面的接口版本是 {state.clientVersion}，服务 {state.serverRelease} 的接口版本是 {state.serverVersion}。重新加载页面以取得同一版本的页面文件。</p>
-        <button className="y10-btn primary" type="button" onClick={() => window.location.reload()}>重新加载</button>
+        <p className="error">{advice.text}</p>
+        {advice.reloadHelps ? (
+          <button className="y10-btn primary" type="button" onClick={() => window.location.reload()}>重新加载</button>
+        ) : null}
       </div></div>
     );
   }

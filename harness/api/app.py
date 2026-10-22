@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import inspect
 import json
+import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import version
@@ -24,13 +25,13 @@ from pydantic import TypeAdapter
 from ..app.access_tokens import AccessTokenStore
 from ..app.application import DEFAULT_REGISTRY, Application
 from ..app.catalog_queries import CatalogQueryInvalid
-from ..app.contracts import AccessMode, Accepted, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
+from ..app.contracts import AccessMode, Accepted, API_VERSION, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
 from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
 from ..app.project_queries import NotFound
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
 from ..app.replay import ReplayOutOfRange
 from .access import AccessMiddleware
-from .pages import PageFiles, RELEASE_ASSETS
+from .pages import PageFiles, RELEASE_ASSETS, pages_api_version
 
 _COMPONENTS = "#/components/schemas/{model}"
 
@@ -46,6 +47,7 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
             raise ValueError("the application was opened with a different registry than the routes")
         api.state.application = application
         api.state.contract_digest = contract_digest(api)
+        _log_pages_api_version(pages)
         try:
             yield
         finally:
@@ -72,8 +74,24 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
     return api
 
 
+def _log_pages_api_version(pages: Path) -> None:
+    # 服务提供的页面文件对应哪个接口版本（工单 #704）：与服务的接口版本不同就写进日志，
+    # 页面上会显示「这一份页面文件的接口版本是几、服务要的是几」并给出该做什么
+    logger = logging.getLogger("harness")
+    version = pages_api_version() if pages == RELEASE_ASSETS else None
+    if version is None:
+        logger.info("页面文件的接口版本：未知（没有构建页面或没有写下版本）")
+        return
+    if version == API_VERSION:
+        logger.info("页面文件的接口版本：%s，与服务一致", version)
+        return
+    logger.warning(
+        "页面文件的接口版本：%s，服务的接口版本是 %s——页面会显示不兼容；"
+        "重新构建页面文件（cd client && npm run build:pages）并复制到 harness/release_assets/ 以后可用",
+        version, API_VERSION)
+
+
 def close_event_streams(api: FastAPI) -> None:
-    # 停止服务的第一步：让等待中的事件流连接干净结束（设计说明第 4.2 节）。
     # lifespan 的关闭阶段太晚（uvicorn 先等这些连接关闭再关闭应用），
     # 因此由服务进程在关闭开始时调用，打开着的事件流连接不阻止进程退出
     api.state.application.close_event_streams()
