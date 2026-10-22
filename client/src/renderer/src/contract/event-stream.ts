@@ -4,6 +4,7 @@
 // 帧的解析与位置核对放在 stream-frames.ts，这里只负责连接、订阅与上报。
 
 import { EventSource } from "eventsource";
+import { ReconnectBackoff } from "./reconnect-backoff";
 import { nextPosition, parseFrame, streamUrl, type StreamMessage, type StreamScope } from "./stream-frames";
 
 export type { StreamMessage, StreamScope } from "./stream-frames";
@@ -17,15 +18,13 @@ export type StreamHandlers = {
   onInterrupted: () => void;
 };
 
-// 重连的递增间隔（工单 #301）：第一次 1 秒，以后每次翻倍，30 秒封顶
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 30000;
+// 重连的递增间隔（工单 #301）与「连接站得住才清零」的规则放在 reconnect-backoff.ts（工单 #679）
 
 export class EventStreamClient {
   private source: EventSource | null = null;
   private lastPosition = 0;
   private closed = false;
-  private failures = 0;
+  private readonly backoff = new ReconnectBackoff();
   private timer: NodeJS.Timeout | null = null;
   private readonly baseUrl: string;
   private readonly scope: StreamScope;
@@ -43,7 +42,7 @@ export class EventStreamClient {
   start(after: number): void {
     this.stop();
     this.closed = false;
-    this.failures = 0;
+    this.backoff.stoodUp();
     this.lastPosition = after;
     this.connect();
   }
@@ -66,7 +65,7 @@ export class EventStreamClient {
       if (this.source !== source || this.closed) {
         return;
       }
-      this.failures = 0;
+      // 打开不算站得住（工单 #679）：退避在收到帧以后才清零
       this.handlers.onConnected();
     });
     for (const name of ["event", "checkpoint", "delta", "resync"]) {
@@ -78,11 +77,10 @@ export class EventStreamClient {
       }
       source.close();
       this.source = null;
-      if (this.failures === 0) {
+      if (this.backoff.count === 0) {
         this.handlers.onInterrupted();
       }
-      this.failures += 1;
-      const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** (this.failures - 1));
+      const delay = this.backoff.nextDelayMs();
       this.timer = setTimeout(() => {
         this.timer = null;
         this.connect();
@@ -106,6 +104,8 @@ export class EventStreamClient {
   }
 
   private onFrame(name: string, message: MessageEvent): void {
+    // 收到一帧：这条连接站住了（工单 #679），下一次断线重新从 1 秒算起
+    this.backoff.stoodUp();
     const parsed = parseFrame(name, message.data, this.lastPosition);
     if (parsed.kind === "gap") {
       // previous 与本连接最后收到的不符：缺口，交给重新同步（第 5.5 节）
