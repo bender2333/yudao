@@ -14,6 +14,7 @@ import type {
 } from "../../api/generated/types.gen";
 import { paths, type Route } from "../../shell/routing";
 import { PageHead } from "../../shell/kit";
+import { artifactRefsRow } from "./artifact-ref";
 import { failureRows } from "./attempt-failure";
 import { attemptsSummary } from "./attempts-summary";
 import { Empty, KeyValue, Loading, Section, Table, Tabs, dict, formatNumberOr, list, numberValue, optionalText, pageKey, show, text } from "./common";
@@ -385,7 +386,8 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
           ...failure,
           ["错误", show(optionalText(attempt.error), "没有"),],
           ["是否可重试", attempt.retryable === true ? "是" : attempt.retryable === false ? "否" : "未上报"],
-          ["引用", `请求 ${show(optionalText(refs.request))}，响应 ${show(optionalText(refs.response))}，原始流 ${show(optionalText(refs.events))}，用量 ${show(optionalText(refs.usage))}`],
+          // 工件引用是对象，页面按实际情况给出可核对的标识（工单 #745）
+          artifactRefsRow(refs),
         ]}
       />
       {parts.length > 0 ? (
