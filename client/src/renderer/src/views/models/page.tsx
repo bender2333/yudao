@@ -93,6 +93,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const [defaultsStatus, setDefaultsStatus] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  // 目录与目录文档读取失败时的原因（工单 #776）：读不出来时说读不出来，
+  // 不停在「正在读取目录…」，也不让用户在空文档上按保存
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
   // 保存会作废准入的修改之前的影响列表，与删除时的一并删除清单（设计说明第 4.4、4.5 节，工单 #94）：
   // 由应用层查询 catalog.change_impact 算出，界面按它弹确认框与列出引用方
   const [saveImpact, setSaveImpact] = useState<ModelImpact | null>(null);
@@ -158,6 +162,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     }
     void views.open<Catalog>("models.catalog", { query: "catalog", params: undefined }, (data) => {
       catalogRef.current = data;
+      setCatalogError(null);
       setCatalog(data);
       setEditingDefaults((current) => {
         // 部门默认的草稿：目录更新时保留用户未提交的选择，其余按目录重建
@@ -170,9 +175,16 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         }
         return next;
       });
+    }, (reason) => {
+      // 目录读不出来：说读出来不成功，不停在「正在读取目录…」（工单 #776）
+      setCatalogError(reason);
     });
     void views.open<CatalogDocument>("models.document", { query: "catalog.document", params: undefined }, (data) => {
+      setDocumentError(null);
       setDocument(data);
+    }, (reason) => {
+      // 目录文档读不出来：编辑器里要说明，不是一份空文档（工单 #776）
+      setDocumentError(reason);
     });
     return () => {
       views.close("models.catalog");
@@ -547,7 +559,17 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   }, [views, formImpactParams]);
 
   if (catalog === null) {
-    return <div className="y10-block card"><h1>模型管理</h1><p className="y10-muted note">正在读取目录…</p></div>;
+    // 目录读不出来：写一句失败提示与服务端给的原文，不停在「正在读取目录…」（工单 #776）
+    return (
+      <div className="y10-block card">
+        <h1>模型管理</h1>
+        {catalogError !== null ? (
+          <p className="y10-note note" role="status">{readFailureText(catalogError)}</p>
+        ) : (
+          <p className="y10-muted note">正在读取目录…</p>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -1273,6 +1295,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             models: document.models,
             bindings: document.bindings,
           }}
+          error={documentError}
           onSave={saveDocument}
           onClose={() => setJsonOpen(false)}
         />
