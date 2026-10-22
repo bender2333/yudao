@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { buildCatalog } from "../../src/renderer/src/pixel/world/floor-decl.ts";
 import { createScene } from "../../src/renderer/src/pixel/world/scene.ts";
 import { buildingWalkerState, createBuildingDriver, BUILDING_GEO, SPEED_ROAM, SPEED_WORK } from "../../src/renderer/src/pixel/world/building.ts";
-import { floorStatus, sceneStatus } from "../../src/renderer/src/pixel/building/model.ts";
+import { buildingFloorOf, floorStatus, sceneStatus } from "../../src/renderer/src/pixel/building/model.ts";
 import type { BuildingFloor, BuildingModel } from "../../src/renderer/src/pixel/world/building.ts";
 
 // 与原型 walkers.js 一致：确定的随机数序列
@@ -143,4 +143,24 @@ test("楼层状态灯不包含待核实", () => {
   const item = { work_item_id: "w1", status: "unknown", department: "engineering", color_index: 0, recovery_state: "pending_verification" };
   assert.equal(sceneStatus(item), null);
   assert.equal(floorStatus([item]), "idle");
+});
+
+test("楼层状态灯：只有已结束的事项时显示空闲", () => {
+  const items = ["stopped", "adopted", "released_unsettled"].map((status, index) => ({
+    work_item_id: `history-${index}`, status, department: null, color_index: index, recovery_state: null,
+  }));
+  assert.equal(floorStatus(items), "idle");
+});
+
+test("楼层状态灯：历史停止事项与正在工作的部门共同出现时显示运行中", () => {
+  const floor = buildingFloorOf({
+    project_id: "project", name: "文本工具", pinned: false, archived: false,
+    last_activity_at: "2026-10-22T00:00:00Z", decisions_waiting: 0,
+  }, [
+    { work_item_id: "cancelled", status: "stopped", department: null, color_index: 0, recovery_state: null },
+    { work_item_id: "working", status: "in_progress", department: "engineering", color_index: 1, recovery_state: null },
+  ]);
+  assert.equal(floor.status, "running");
+  assert.equal(floor.lit.engineering, true);
+  assert.deepEqual(floor.flags.map((flag) => flag.work_item_id), ["working"]);
 });

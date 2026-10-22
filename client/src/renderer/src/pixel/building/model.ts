@@ -66,13 +66,14 @@ export function sceneStatus(item: BuildingItemRow): string | null {
   }
 }
 
-/** 楼层的状态灯：按原型 markerOf 的优先级取第一个命中（等待恢复、中断、已停止、等待你的决定、等待模型服务、等待执行槽位、运行中、排队中，否则空闲）。 */
+/** 楼层的状态灯：只由未结束事项决定，按等待恢复、中断、等待你的决定、等待模型服务、等待执行槽位、运行中、排队中的优先级显示，否则空闲。 */
 export function floorStatus(items: BuildingItemRow[]): string {
-  const statuses = items.map((it) => sceneStatus(it));
+  const statuses = items
+    .filter((it) => !["stopped", "adopted", "released_unsettled"].includes(it.status))
+    .map((it) => sceneStatus(it));
   const has = (s: string): boolean => statuses.includes(s);
   if (has("waiting_resume")) return "waiting_resume";
   if (has("interrupted")) return "interrupted";
-  if (has("stopped")) return "stopped";
   if (has("waiting_decision")) return "waiting_decision";
   if (has("waiting_provider")) return "waiting_provider";
   if (has("waiting_slot")) return "waiting_slot";
