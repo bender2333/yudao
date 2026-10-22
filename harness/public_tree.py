@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+import atexit
+import hashlib
 import os
 import re
+import shutil
 import stat
 import tempfile
 from dataclasses import dataclass
@@ -24,6 +27,9 @@ _HASH = re.compile(r"sha256:[0-9a-f]{64}")
 IGNORE_PROBE_DIR = ".yudao-ignore-probe.git"
 QA_TESTS_DIR = ".yudao-qa-tests"
 _GIT_DIR_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+# 探测库所在的进程专属目录（工单 #706）：libgit2 拒绝长度超过约 190 个字符的仓库路径，
+# 探测库放在工作区旁边时，深的数据目录会让每一次判断都失败
+_PROBE_ROOT: Path | None = None
 
 
 class UnrepresentableWorkspace(TreeError):
@@ -108,10 +114,33 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         if parent != PurePosixPath(".") and str(parent) not in directory_set:
             raise TreeError(f"Public tree entry has no declared parent directory: {relative}")
 
+def _probe_root() -> Path:
+    """The directory holding this process's probe repositories.
+
+    It lives under the system temp directory, so its path does not grow with the
+    workspace path. One directory per process: the probes are removed when the
+    process ends.
+    """
+    global _PROBE_ROOT
+    if _PROBE_ROOT is None:
+        root = Path(tempfile.gettempdir()) / f"yudao-ignore-{os.getpid()}"
+        _PROBE_ROOT = root
+        atexit.register(shutil.rmtree, root, True)
+    return _PROBE_ROOT
+
+
 def ignore_probe_directory(root: str | Path) -> Path:
-    """The probe Git directory for one workspace root: outside the workspace itself."""
+    """The probe Git directory for one workspace root: a short path outside the workspace.
+
+    libgit2 refuses a repository path longer than about 190 characters, so the probe
+    cannot live beside the workspace: a deep data directory would make every run fail
+    with a TreeError (工单 #706). The probe lives in this process's directory under the
+    system temp directory and is named after a digest of the workspace's absolute path,
+    so two workspaces never share one probe.
+    """
     base = _absolute_path(root)
-    probe = base.parent / (base.name + IGNORE_PROBE_DIR)
+    digest = hashlib.sha256(str(base).encode("utf-8")).hexdigest()[:12]
+    probe = _probe_root() / (digest + IGNORE_PROBE_DIR)
     if not _GIT_DIR_NAME.fullmatch(probe.name):
         raise TreeError(f"Ignore probe directory is not a plain name: {probe.name!r}")
     return probe
@@ -138,7 +167,7 @@ def has_ignore_rules(root: str | Path, relative: str) -> bool:
     return (base / ".gitignore").exists() or (base / ".git").exists()
 
 def _probe_repository(base: Path, probe: Path) -> pygit2.Repository:
-    """The workspace's probe repository, opened or created in process beside the work tree.
+    """The workspace's probe repository, opened or created in process under the probe root.
 
     An empty template directory keeps the probe free of info/exclude and hook samples;
     core.excludesFile points at the null device so the user's global ignore file cannot
@@ -148,6 +177,7 @@ def _probe_repository(base: Path, probe: Path) -> pygit2.Repository:
     if os.path.exists(probe / "HEAD"):
         repository = pygit2.Repository(str(probe), flags=RepositoryOpenFlag.NO_SEARCH)
     else:
+        probe.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory() as empty_template:
             repository = pygit2.init_repository(
                 str(probe), bare=True, template_path=empty_template,
@@ -161,10 +191,11 @@ def _probe_repository(base: Path, probe: Path) -> pygit2.Repository:
 def excluded_by_ignore_rules(root: str | Path, relatives: Sequence[str]) -> frozenset[str]:
     """The relatives the project's ignore rules exclude, decided in process by libgit2.
 
-    The probe repository belongs to the workspace root and lives beside it, so the
-    enclosing repository's rules (for example an outer .gitignore) do not leak in.
-    Relatives no ignore file can reach are not decided at all: with no ignore file the
-    answer is empty and the probe repository is never opened.
+    The probe repository is an empty one whose work tree is the workspace, so only the
+    workspace's own rules apply and the enclosing repository's rules (for example an
+    outer .gitignore) do not leak in. Relatives no ignore file can reach are not
+    decided at all: with no ignore file the answer is empty and the probe repository
+    is never opened.
     """
     base = _absolute_path(root)
     candidates = [relative for relative in relatives if has_ignore_rules(base, relative)]
