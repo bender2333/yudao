@@ -1,5 +1,7 @@
 # 三部门的循环结构
 
+本文是成果驱动模式的设计说明；另一种编排模式见[黑板编排设计说明](blackboard-orchestration.md)，两种模式的分工见 [ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)（2026-10-22）。
+
 日期：2026-10-12；2026-10-13 按 [ADR-0038](../adr/0038-function-first-commands-without-registration.md) 修改第 1 节的范围与第 3.2、4.3 节的工作区；同日按工单审查补充三处，用户确认：第 3.1 节质检在交付之前与交付到达时用哪份快照，第 4.6 节工程与质检之间问答的事实与解释，第 6 节放行等发给产品的输入处理完。2026-10-14 按 #488、#489 的讨论修改，用户确认：第 2 节去掉交接，部门按关注的成果开始工作；第 4.4 节询问链允许回问，层数上限是规则参数；第 6 节指导是接收部门关注的成果。2026-10-20 拆分 #552 时补充第 4.7 节询问的记录与查询（被唤醒的架构师）。状态：用户逐轮采纳推荐，未实施。ADR：[0036](../adr/0036-concurrent-departments-and-nested-asks.md)、[0037](../adr/0037-engineering-plan-stays-with-engineering.md)、[0039](../adr/0039-departments-work-from-watched-outputs.md)。需求：[D38](../requirements/system-intent.md)、[D20](../requirements/department-guidance.md)。
 
 ## 1. 依据与范围

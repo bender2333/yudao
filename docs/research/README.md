@@ -4,6 +4,7 @@
 
 | 调研 | 支持的文档 | 用途 |
 | --- | --- | --- |
+| [黑板编排的参照调研](blackboard-orchestration-references.md) | [D39 黑板编排](../requirements/blackboard-orchestration.md)、[ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)、[黑板编排设计说明](../design/blackboard-orchestration.md) | 经典黑板系统的控制、近两年大模型系统里的黑板与共享状态、AI4S 系统的共享状态形态，对设计说明各节与暂定默认值的影响 |
 | [JEV 决策模型：能力边界与在 Yudao 中的用法](jev-decision-model.md) | [D28 元观察与规则检查部门](../requirements/meta-observer.md)、[ADR-0028](../adr/0028-three-means-of-adjudication.md) | 元观察的设计还没有写，这份调研是能力边界的依据 |
 | [圈复杂度与变异测试调研](complexity-and-mutation-testing.md) | [D35 自举](../requirements/self-hosting.md) | Stage 3 结束之前手动进行的步骤与工具选择 |
 | [组织、运行与演化研究](organization-runtime-evolution.md) | [恢复合同与故障矩阵](../design/recovery-contract-and-fault-matrix.md)、[D29 远程执行](../requirements/remote-execution.md) | 子循环、持久恢复与运维分工的依据 |
