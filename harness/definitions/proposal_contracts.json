@@ -38,7 +38,11 @@
             "current_contract.content_hash",
             "run_check receipts from this activation on the current workspace"
           ],
-          "basis_product_spec_hash": "content hash of the ProductSpec this delivery is based on; the host rejects the submission if it does not equal the current effective ProductSpec content_hash"
+          "basis_product_spec_hash": "content hash of the ProductSpec this delivery is based on; the host rejects the submission if it does not equal the current effective ProductSpec content_hash",
+          "parts": {
+            "facts": ["files", "check_names", "checks"],
+            "explanation": ["summary", "known_risks"]
+          }
         },
         "structure": {
           "when": ["ENGINEERING"],

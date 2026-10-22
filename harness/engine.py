@@ -500,7 +500,8 @@ class StepDriver:
                                 effective_contract_hash=new_contract_hash,
                             )
                     elif name == "answer":
-                        text = args.get("answer") or args.get("text") or ""
+                        # 工程回答质检时回答分两部分：facts 是事实部分，explanation 是解释部分（工单 #554）
+                        text = args.get("answer") or args.get("text") or args.get("facts") or ""
                         if not isinstance(text, str) or not text.strip():
                             ok, output, error = False, None, "answer must be a non-empty string"
                         elif any(args.get(field) is not None for field in PRD_REVISION_FIELDS):
@@ -509,7 +510,8 @@ class StepDriver:
                             else:
                                 projection = self._writes.read(self._stream).projection
                                 spec_proposal = {
-                                    **{k: v for k, v in args.items() if k not in ("answer", "text") and v is not None},
+                                    **{k: v for k, v in args.items()
+                                       if k not in ("answer", "text", "facts", "explanation") and v is not None},
                                     "kind": "product_spec",
                                     "issuer": "product",
                                 }

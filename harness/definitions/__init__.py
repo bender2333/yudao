@@ -377,6 +377,9 @@ class Definitions(_Definition):
         submit_tools = [tool for tool in [*own.submit_tools, *shared.submit_tools]
                         if self.tools[tool].proposal in available]
         kinds = {name: description for name, description in {**own.kinds, **shared.kinds}.items() if name in available}
+        # 事实与解释的划分是主机装配时用的（工单 #554），不进模型看到的合同：模型按字段填写即可
+        kinds = {name: {key: value for key, value in description.items() if key != "parts"}
+                 for name, description in kinds.items()}
         work = self.department_work(department, kind)
         # 建档等事项种类的角色说明写在种类里，普通事项的注意事项来自角色自己的部分
         own_notes = () if work is not None else own.notes

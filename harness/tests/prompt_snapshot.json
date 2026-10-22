@@ -318,7 +318,7 @@
     }
    },
    {
-    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result.",
+    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result. When engineering asks quality, write the question and the background in two parts instead of question and background: facts (interfaces, usage, file locations, how to run, references to host evidence) and explanation (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads the facts part only until it has submitted its own conclusion on the current delivery.",
     "name": "ask",
     "parameters": {
      "additionalProperties": false,
@@ -327,6 +327,14 @@
        "type": "string"
       },
       "expected": {
+       "type": "string"
+      },
+      "explanation": {
+       "description": "Engineering asking quality: the explanation part (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads it only after it has submitted its own conclusion on the current delivery.",
+       "type": "string"
+      },
+      "facts": {
+       "description": "Engineering asking quality: the question and the background as facts (interfaces, usage, file locations, how to run, references to host evidence).",
        "type": "string"
       },
       "question": {
@@ -343,8 +351,6 @@
      },
      "required": [
       "recipient",
-      "question",
-      "background",
       "expected"
      ],
      "type": "object"
@@ -710,7 +716,7 @@
     }
    },
    {
-    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result.",
+    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result. When engineering asks quality, write the question and the background in two parts instead of question and background: facts (interfaces, usage, file locations, how to run, references to host evidence) and explanation (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads the facts part only until it has submitted its own conclusion on the current delivery.",
     "name": "ask",
     "parameters": {
      "additionalProperties": false,
@@ -719,6 +725,14 @@
        "type": "string"
       },
       "expected": {
+       "type": "string"
+      },
+      "explanation": {
+       "description": "Engineering asking quality: the explanation part (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads it only after it has submitted its own conclusion on the current delivery.",
+       "type": "string"
+      },
+      "facts": {
+       "description": "Engineering asking quality: the question and the background as facts (interfaces, usage, file locations, how to run, references to host evidence).",
        "type": "string"
       },
       "question": {
@@ -735,8 +749,6 @@
      },
      "required": [
       "recipient",
-      "question",
-      "background",
       "expected"
      ],
      "type": "object"
@@ -1282,7 +1294,7 @@
     }
    },
    {
-    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result.",
+    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result. When engineering asks quality, write the question and the background in two parts instead of question and background: facts (interfaces, usage, file locations, how to run, references to host evidence) and explanation (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads the facts part only until it has submitted its own conclusion on the current delivery.",
     "name": "ask",
     "parameters": {
      "additionalProperties": false,
@@ -1291,6 +1303,14 @@
        "type": "string"
       },
       "expected": {
+       "type": "string"
+      },
+      "explanation": {
+       "description": "Engineering asking quality: the explanation part (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads it only after it has submitted its own conclusion on the current delivery.",
+       "type": "string"
+      },
+      "facts": {
+       "description": "Engineering asking quality: the question and the background as facts (interfaces, usage, file locations, how to run, references to host evidence).",
        "type": "string"
       },
       "question": {
@@ -1307,8 +1327,6 @@
      },
      "required": [
       "recipient",
-      "question",
-      "background",
       "expected"
      ],
      "type": "object"
@@ -1328,7 +1346,7 @@
   },
   "tools": [
    {
-    "description": "Submit an answer to the current ask question, ending this branch session. Product may optionally include PRD revision parameters to update requirements.",
+    "description": "Submit an answer to the current ask question, ending this branch session. Product may optionally include PRD revision parameters to update requirements. When engineering answers quality, write the answer in two parts instead of answer: facts (interfaces, usage, file locations, how to run, references to host evidence) and explanation (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads the facts part only until it has submitted its own conclusion on the current delivery.",
     "name": "answer",
     "parameters": {
      "additionalProperties": false,
@@ -1431,6 +1449,14 @@
        },
        "type": "array"
       },
+      "explanation": {
+       "description": "Engineering answering quality: the explanation part (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads it only after it has submitted its own conclusion on the current delivery.",
+       "type": "string"
+      },
+      "facts": {
+       "description": "Engineering answering quality: the answer as facts (interfaces, usage, file locations, how to run, references to host evidence).",
+       "type": "string"
+      },
       "fatal_conditions": {
        "description": "Optional",
        "items": {
@@ -1456,14 +1482,12 @@
        "type": "array"
       }
      },
-     "required": [
-      "answer"
-     ],
+     "required": [],
      "type": "object"
     }
    },
    {
-    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result.",
+    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result. When engineering asks quality, write the question and the background in two parts instead of question and background: facts (interfaces, usage, file locations, how to run, references to host evidence) and explanation (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads the facts part only until it has submitted its own conclusion on the current delivery.",
     "name": "ask",
     "parameters": {
      "additionalProperties": false,
@@ -1472,6 +1496,14 @@
        "type": "string"
       },
       "expected": {
+       "type": "string"
+      },
+      "explanation": {
+       "description": "Engineering asking quality: the explanation part (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads it only after it has submitted its own conclusion on the current delivery.",
+       "type": "string"
+      },
+      "facts": {
+       "description": "Engineering asking quality: the question and the background as facts (interfaces, usage, file locations, how to run, references to host evidence).",
        "type": "string"
       },
       "question": {
@@ -1488,8 +1520,6 @@
      },
      "required": [
       "recipient",
-      "question",
-      "background",
       "expected"
      ],
      "type": "object"
@@ -1706,7 +1736,7 @@
     }
    },
    {
-    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result.",
+    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result. When engineering asks quality, write the question and the background in two parts instead of question and background: facts (interfaces, usage, file locations, how to run, references to host evidence) and explanation (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads the facts part only until it has submitted its own conclusion on the current delivery.",
     "name": "ask",
     "parameters": {
      "additionalProperties": false,
@@ -1715,6 +1745,14 @@
        "type": "string"
       },
       "expected": {
+       "type": "string"
+      },
+      "explanation": {
+       "description": "Engineering asking quality: the explanation part (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads it only after it has submitted its own conclusion on the current delivery.",
+       "type": "string"
+      },
+      "facts": {
+       "description": "Engineering asking quality: the question and the background as facts (interfaces, usage, file locations, how to run, references to host evidence).",
        "type": "string"
       },
       "question": {
@@ -1731,8 +1769,6 @@
      },
      "required": [
       "recipient",
-      "question",
-      "background",
       "expected"
      ],
      "type": "object"

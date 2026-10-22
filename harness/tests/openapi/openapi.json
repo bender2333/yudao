@@ -13350,6 +13350,28 @@
               }
             ],
             "title": "Revision"
+          },
+          "facts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facts"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
           }
         },
         "required": [
@@ -13520,6 +13542,7 @@
             "type": "string"
           },
           "question": {
+            "default": "",
             "title": "Question",
             "type": "string"
           },
@@ -13548,12 +13571,33 @@
               }
             ],
             "title": "Expected"
+          },
+          "facts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facts"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
           }
         },
         "required": [
           "requester",
           "recipient",
-          "question",
           "branch_session_id"
         ],
         "title": "AskStartedPayload",

@@ -1648,7 +1648,7 @@
    "error": null,
    "payload": {
     "code_snapshot_hash": "<sha256#49>",
-    "content_hash": "<sha256#89>",
+    "content_hash": "<sha256#90>",
     "delivery_spec_hash": "<sha256#53>",
     "effective_contract_hash": "<sha256#25>",
     "id": "<qa#1>",

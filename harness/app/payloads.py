@@ -691,10 +691,13 @@ class ProductDecisionAcceptedPayload(Payload):
 class AskStartedPayload(Payload):
     requester: Department
     recipient: Department
-    question: str
+    question: str = ""
     branch_session_id: str
     background: str | None = None
     expected: str | None = None
+    # 工程询问质检时问题与背景分成的两部分（工单 #554）：facts 是事实部分，explanation 是解释部分
+    facts: str | None = None
+    explanation: str | None = None
 
 
 class AskAnsweredPayload(Payload):
@@ -705,6 +708,9 @@ class AskAnsweredPayload(Payload):
     reason: str = ""
     with_spec_revision: bool = False
     revision: int | None = None
+    # 工程回答质检时回答分成的两部分（工单 #554）
+    facts: str | None = None
+    explanation: str | None = None
 
 
 

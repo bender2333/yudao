@@ -20,6 +20,8 @@ from .models import (
     DepartmentGuidance,
     DeliverySpec,
     DepartmentPrompt,
+    Event,
+    EventType,
     ProductDecision,
     ProjectEventType,
     RunProjection,
@@ -92,10 +94,17 @@ class ContextAssembler:
         # 全体角色共同的规则文字与本角色的可见范围取自定义
         rules = DEFINITIONS.organization.rules
         visible = DEFINITIONS.role(department).visibility
+        current_delivery = projection.delivery_spec
+        if current_delivery is not None and current_delivery.status != "active":
+            current_delivery = None
+        # 质检请求里可以放入的工程内容（工单 #554）：事实部分总在，解释部分看质检有没有对当前交付下结论
+        engineering = (quality_engineering_content(events or [], delivery=current_delivery)
+                       if department == "quality" else None)
         # 钉住材料顺序：intend → current_work → project（项目 run）→ department_guidance（有待处理指导）→ department_rules。
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
-            ContextPart("current_work", projection.phase, json_dumps(_current_work(projection, department))),
+            ContextPart("current_work", projection.phase,
+                        json_dumps(_current_work(projection, department, engineering))),
         ]
         if projection.project_context_ref is not None:
             if self.artifacts is None:
@@ -182,7 +191,15 @@ class ContextAssembler:
         if projection.active_ask is not None:
             ask = projection.active_ask
             if ask.get("recipient") == department:
-                parts.append(ContextPart("pending_ask", ask.get("branch_session_id"), json_dumps(ask)))
+                payload = dict(ask)
+                if engineering is not None and not engineering["explanation_visible"]:
+                    # 质检分支看到的问题：解释部分在质检对当前交付下结论以前不给（工单 #554）
+                    payload.pop("explanation", None)
+                parts.append(ContextPart("pending_ask", ask.get("branch_session_id"), json_dumps(payload)))
+        if engineering is not None and engineering["explanations"]:
+            # 质检对当前交付下结论以后，工程在问答里的解释部分进入它之后的请求（工单 #554）
+            parts.append(ContextPart("engineering_explanation", None,
+                                     json_dumps(engineering["explanations"])))
         pending_for_results = [item for item in projection.department_guidance
                                if item.department == department and item.status in {"received", "in_input"}]
         if pending_for_results and events:
@@ -226,25 +243,29 @@ class ContextAssembler:
                     json_dumps([_decision_payload(item) for item in projection.effective_decisions]),
                 )
             )
-        current_delivery = projection.delivery_spec
-        if current_delivery is not None and current_delivery.status != "active":
-            current_delivery = None
         if current_delivery is not None and "current_delivery_spec" in visible:
+            payload = (engineering["delivery"] if engineering is not None
+                       else _delivery_payload(current_delivery))
             parts.append(
                 ContextPart(
                     "current_delivery_spec",
                     f"r{current_delivery.revision}",
-                    json_dumps(_delivery_payload(current_delivery)),
+                    json_dumps(payload),
                 )
             )
         elif current_delivery is None and "prior_delivery" in visible:
             prior = _prior_delivery_for_repair(projection)
             if prior is not None:
+                payload = _delivery_payload(prior, purpose="repair_basis")
+                if engineering is not None and not engineering["explanation_visible"]:
+                    # 新的交付还没有结论：此前全部工程内容的解释部分都重新藏起来（工单 #554）
+                    for field in _delivery_explanation_fields():
+                        payload.pop(field, None)
                 parts.append(
                     ContextPart(
                         "prior_delivery",
                         f"r{prior.revision}",
-                        json_dumps(_delivery_payload(prior, purpose="repair_basis")),
+                        json_dumps(payload),
                     )
                 )
         if "qa_defects" in visible and projection.last_review and projection.last_review.verdict.startswith("rework"):
@@ -401,7 +422,8 @@ class ContextAssembler:
         return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
 
 
-def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
+def _current_work(projection: RunProjection, department: str,
+                  engineering: dict[str, Any] | None = None) -> dict[str, Any]:
     if projection.kind == "onboarding":
         # 建档事项中的工作文字（工单 #134）：读取与核验现有代码，没有实现与放行
         work = {
@@ -424,8 +446,14 @@ def _current_work(projection: RunProjection, department: str) -> dict[str, Any]:
     if projection.active_ask is not None:
         ask = projection.active_ask
         if ask.get("recipient") == department:
-            work = (f"回答来自 {ask.get('requester')} 的询问：{ask.get('question')}。"
-                    f"背景：{ask.get('background', '')}。期望结果：{ask.get('expected', '')}。"
+            question = str(ask.get("question") or "")
+            background = str(ask.get("background") or "")
+            if engineering is not None:
+                # 质检分支看到的问题：只留事实部分，解释部分等质检对当前交付下结论以后（工单 #554）
+                question = str(ask.get("facts") or question)
+                background = ""
+            work = (f"回答来自 {ask.get('requester')} 的询问：{question}。"
+                    f"背景：{background}。期望结果：{ask.get('expected', '')}。"
                     "使用 answer 工具提交回答。")
     pending_guidance = [item for item in projection.department_guidance
                         if item.department == department and item.status in {"received", "in_input"}]
@@ -499,7 +527,8 @@ def _decision_payload(item: ProductDecision) -> dict[str, Any]:
     return asdict(item)
 
 
-def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None) -> dict[str, Any]:
+def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None,
+                      explanation_visible: bool = True) -> dict[str, Any]:
     payload = {
         "check_names": delivery.check_names,
         "checks": delivery.checks,
@@ -519,7 +548,105 @@ def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None) -> 
     }
     if purpose is not None:
         payload["purpose"] = purpose
+    if not explanation_visible:
+        # 解释部分还没有到质检看的时候：只留事实部分（工单 #554）
+        for field in _delivery_explanation_fields():
+            payload.pop(field, None)
     return payload
+
+
+def _delivery_explanation_fields() -> tuple[str, ...]:
+    # 交付说明里属于解释部分的字段：提案合同里标明（工单 #554）
+    contract = DEFINITIONS.proposal_contracts.roles["engineering"].kinds["delivery_spec"]
+    parts = contract.get("parts") or {}
+    return tuple(str(field) for field in parts.get("explanation") or ())
+
+
+def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec | None = None) -> dict[str, Any]:
+    # 质检请求里可以放入的工程内容（工单 #554，验证的独立性设计说明第 4 节）：
+    # 事实部分总在；解释部分只在质检对当前交付提交结论以后进入它之后的请求。
+    # 新的交付到达后按新交付重新计算：解释部分重新藏起来，等质检对新交付的结论。
+    # 三条通道：交付说明、质检收到的工程回答、质检分支看到的工程的问题。
+    delivery_hash = delivery.content_hash if delivery is not None else _latest_delivery_hash(events)
+    explanation_visible = delivery_hash is not None and any(
+        event.type == EventType.QA_SUBMITTED
+        and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
+        for event in events
+    )
+    asks: dict[str, dict[str, Any]] = {}
+    questions: list[dict[str, Any]] = []
+    answers: list[dict[str, Any]] = []
+    for event in events:
+        payload = event.payload or {}
+        if event.type == EventType.ASK_STARTED:
+            item = {
+                "event_id": event.event_id,
+                "branch_session_id": payload.get("branch_session_id"),
+                "question": payload.get("question", ""),
+                "background": payload.get("background", ""),
+                "expected": payload.get("expected", ""),
+                "facts": payload.get("facts", ""),
+                "explanation": payload.get("explanation", ""),
+            }
+            asks[str(payload.get("branch_session_id"))] = item
+            if payload.get("requester") == "engineering" and payload.get("recipient") == "quality":
+                # 工程问质检的问题：分事实与解释两部分（工单 #554）
+                questions.append(item)
+        elif event.type == EventType.ASK_ANSWERED \
+                and payload.get("requester") == "quality" and payload.get("recipient") == "engineering":
+            # 工程回答质检的回答：分事实与解释两部分（工单 #554）
+            asked = asks.get(event.session_id, {})
+            answers.append({
+                "event_id": event.event_id,
+                "branch_session_id": event.session_id,
+                "question": asked.get("question", ""),
+                "question_facts": "",
+                "question_explanation": "",
+                "answer": payload.get("answer", ""),
+                "facts": payload.get("facts", ""),
+                "explanation": payload.get("explanation", ""),
+            })
+    return {
+        "explanation_visible": explanation_visible,
+        "delivery": None if delivery is None else _delivery_payload(
+            delivery, explanation_visible=explanation_visible),
+        "questions": questions,
+        "answers": answers,
+        # 问答的解释部分：质检对当前交付下结论以后进入它之后的请求（工单 #554）
+        "explanations": [
+            {
+                "branch_session_id": item["branch_session_id"],
+                "answer": engineering_facts_text(item, part="answer", explanation_visible=True),
+            }
+            for item in answers
+            if explanation_visible and str(item.get("explanation") or "").strip()
+        ],
+    }
+
+
+def _latest_delivery_hash(events: list[Event]) -> str | None:
+    # 事件日志里最近一次封存的交付：质检对它的结论决定解释部分是否可见（工单 #554）
+    for event in reversed(events):
+        if event.type == EventType.DELIVERY_ACCEPTED:
+            return str((event.payload or {}).get("content_hash") or "") or None
+    return None
+
+
+def engineering_facts_text(item: dict[str, Any], *, part: str = "answer",
+                           explanation_visible: bool) -> str:
+    # 一次问答在质检那里的样子：解释部分不可见时只留事实部分（工单 #554）
+    if part == "question":
+        facts = str(item.get("question_facts") or "").strip()
+        fallback = str(item.get("question") or "")
+        explanation = str(item.get("question_explanation") or "").strip()
+    else:
+        facts = str(item.get("facts") or "").strip()
+        fallback = str(item.get("answer") or "")
+        explanation = str(item.get("explanation") or "").strip()
+    text = facts or fallback
+    if explanation_visible and explanation:
+        return f"{text}\n{explanation}" if text else explanation
+    return text
 
 
 def _prior_delivery_for_repair(projection: RunProjection) -> DeliverySpec | None:
