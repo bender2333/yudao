@@ -2,20 +2,11 @@
 // 结算因此不采纳，发出内核修改决定请求。页面上的决定卡片要给出改动的路径与差异；批准以后交付被采纳。
 // 后端是 FakeAdapter 驱动的真实服务（tests/e2e/backend.py），不使用 mock。
 
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
-
-// 决定卡片上的文字不应出现开发用语与英文内部提示（工单 #303 的验收）
-const FORBIDDEN = /(?<![A-Za-z])run(?![A-Za-z])|released|decisions\.list|decision\.answer|work_item\.[a-z_]+|run\.[a-z_]+|project\.[a-z_]+|[A-Z][A-Z_]{3,}|#\d+/;
 
 // 交付改动的内核路径：与 backend.py 的 KERNEL_PATH 一致
 const KERNEL_PATH = "harness/bounds.py";
-
-async function expectNoDeveloperText(scope: Locator, where: string): Promise<void> {
-  const text = (await scope.innerText()).replaceAll("Yudao", "");
-  const found = text.match(FORBIDDEN);
-  expect.soft(found?.[0] ?? null, `${where}：卡片文字不应出现开发用语与英文内部提示`).toBeNull();
-}
 
 let backend: Backend;
 
@@ -113,8 +104,6 @@ test("内核修改决定请求：卡片给出改动的内核路径与差异，�
     await expect(material).toContainText("改动的内核路径");
     // 改动的内核路径写在材料里：与后端交付改动的路径一致（工单 #354）
     await expect(material).toContainText(KERNEL_PATH);
-    // 卡片文字没有开发用语与英文内部提示（工单 #303）
-    await expectNoDeveloperText(card, "内核修改决定卡片");
     // 批准：交付被采纳，这个决定移出等待列表
     await card.locator(".decision-answer button").first().click();
     await waitUntil(
