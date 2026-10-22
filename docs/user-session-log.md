@@ -87,6 +87,8 @@
 
 | U35 | #684 在最新代码上仍然成立，而且边界清楚了：**修复之后跑的尝试有分项，修复之前跑的那一批永远是空的**，两者在同一个实例上并存。 | 在最新代码上按项目看 `project.usage` 的 totals，再读主实例读模型里最早的三次尝试 | 主实例：取前几行工具（124 次）与词频统计工具（112 次）分项齐（input 1780718／1430411）；Demo 项目（13 次）、文本统计工具（162 次）、文本统计工具（已接入）（99 次）**全是 null**；读模型里最早的三次尝试连 `total` 都是 null。干净实例（全部在新代码下跑）五个项目分项都齐——算法这一侧已经对了，缺的是历史数据那一侧：读模型里的旧行不会被重算（`read_models.rebuild()` 只有测试在调），要么给一个用户能触发的重建入口，要么明确不回溯并在页面上说清 | 工单 [#684](https://github.com/bender2333/yudao/issues/684)（补了现状核对与边界） |
 
+| U36 | #669 修好了：新的 `run_created` 事件载荷里**不再带不再生效的事项级窗口**；旧事件仍留着 32000（事件日志是历史，不改写是对的）。 | 拉最新代码（52348cb3）并重启干净实例，在新项目上建一个事项，读新写入的 `run_created` 载荷 | 新事件（位置 2380）的载荷键：`adapter, baseline, check_timeout_sec, definitions_version, git_version, initial_input, intend_path, intend_ref, kind, max_cycles, onboarding_basis, overview_ref, parameters_version, project_context_ref, project_id, prompt_config_versions, provider, round, run_event_version, run_time_limit_sec, sessions, snapshot, task, work_item_id, workspace_digest`——**没有 `context_window`**；同一次核对里修复之前写下的旧事件（位置 2095）仍然带 `context_window: 32000`。页面上给出的窗口本来就是调用目标的 1,000,000（U32），现在事件本身也不再误导人了 | 无（#669 已合入，52348cb3，复验通过） |
+
 核对过但不成立（2026-10-21）：曾怀疑首页把同一个项目显示成两种名字。查 `projects.list` 与 `project.overview` 的原始数据，项目名只有「Demo 项目」一处，侧栏、楼层与表格一致，不是问题。
 
 核对过但不成立（2026-10-21）：曾怀疑概览页「已放行（0）」说明事项没有放行。看 `project.overview` 的原始数据，该事项 `stop_reason=released`、`phase=DONE`、`status=adopted`；看板的「已放行」列对应 `released_unsettled`（已放行但未采纳），放行并采纳的事项归到「已采纳」列，`board.ts` 第 21 至 43 行的分列逻辑正确。标签容易误读，但不是错误。
