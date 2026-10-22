@@ -31,7 +31,9 @@ def test_first_run_archives_and_restores_every_public_byte_from_a_new_data_direc
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE", result.error
     delivery = result.delivery_spec
-    assert delivery.files == ["src/echo.py"]
+    # 交付的文件清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）。
+    # 工程只声明了 src/echo.py，工作区里另外两个文件同样在清单里，清单不会少文件。
+    assert delivery.files == [".hidden", "src/echo.py", "undeclared.bin"]
     tree = load_tree(system.artifacts, run_id, delivery.tree_ref)
     assert tree.digest == delivery.code_tree_digest
     assert [item.path for item in tree.files] == [".hidden", "src/echo.py", "undeclared.bin"]
@@ -39,6 +41,7 @@ def test_first_run_archives_and_restores_every_public_byte_from_a_new_data_direc
     assert all(receipt["snapshot_hash"] == tree.digest for receipt in delivery.checks)
     assert result.last_review.code_snapshot_hash == tree.digest
     event = next(event for event in system.store.list_events(run_id) if event.type == EventType.DELIVERY_ACCEPTED)
+    assert event.payload["files"] == [".hidden", "src/echo.py", "undeclared.bin"]
     assert event.payload["tree_ref"]["content_hash"] in event.artifact_hashes
     assert "file_refs" not in event.payload and "snapshot_ref" not in event.payload
     shutil.rmtree(workspace.root)
