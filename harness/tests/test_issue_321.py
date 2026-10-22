@@ -258,9 +258,10 @@ def test_a_run_missing_after_an_interruption_is_rebuilt_from_the_record(data_dir
     assert reopened.projects.projection(project_id).work_item(work_item_id).snapshot["tree_digest"] == expected
     reopened.close()
 
-def test_a_queued_work_item_is_not_treated_as_a_run_missing_after_an_interruption(data_dir, tmp_path):
+def test_a_queued_work_item_is_started_at_the_next_start_after_the_drain(data_dir, tmp_path):
     # 排空期间排队的事项登记在项目流里而 run 流为空，与进程中断留下的事项在数据上相同。
-    # 区别在于排空：排空没有结束时启动核对不补建排队事项的 run，它们按设计等升级完成以后才开始
+    # 区别在于排空：排空在下一次启动时结束（工单 #731，应用层与接口层设计说明第 3.2 节「升级」：
+    # 排空在服务下一次启动时结束），那批排队的事项这一次补建 run 并开始
     source = _initial_directory(tmp_path)
     system = _opened(data_dir, _blocked_script())
     project_id = system.projects.register("排空项目", GOAL, initial_directory=str(source))
@@ -274,10 +275,11 @@ def test_a_queued_work_item_is_not_treated_as_a_run_missing_after_an_interruptio
     system.close()
 
     reopened = _opened(data_dir, _blocked_script())
-    # 排队的事项仍然排队：没有被补建的 run，也没有开始执行
-    assert reopened.recovered_work_item_runs == []
-    assert reopened.store.stream_events(run_stream(queued_run), after_version=0) == []
-    assert reopened.projects.projection(project_id).work_item(queued_work_item).status == "not_started"
+    # 下一次启动：排空结束，排队的事项补建 run 并开始
+    assert reopened.drain.state == "idle"
+    assert reopened.recovered_work_item_runs == [queued_run]
+    assert reopened.store.stream_events(run_stream(queued_run), after_version=0) != []
+    assert reopened.projects.projection(project_id).work_item(queued_work_item).status != "not_started"
     reopened.close()
 
 # ---------------------------------------------------------------------------
