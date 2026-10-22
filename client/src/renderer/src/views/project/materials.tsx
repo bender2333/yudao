@@ -13,6 +13,7 @@ import { StatusMark } from "../../shell/kit";
 import { ITEM_COLORS } from "../../pixel/registry";
 import { Empty, KeyValue, Loading, Section, Tag, dict, list, show, text } from "./common";
 import { departmentName, formatTime, label, WORK_ITEM_STATUS, WORK_ITEM_STATUS_KIND } from "./labels";
+import { fileDownload } from "./materials-download";
 import { useSnapshot } from "./use-snapshot";
 
 const COUNT_KINDS = [
@@ -402,23 +403,26 @@ function DeliveryBlock(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
   );
 }
 
-// 文本内容直接显示；二进制给出 base64 的下载链接，界面不伪造文本
+// 文本内容直接显示，也给下载；二进制给出 base64 的下载链接，界面不伪造文本（工单 #748）
 function FileContent(props: { data: DeliveryFileResult }) {
+  const download = fileDownload(props.data);
+  const link = download === null ? null : (
+    <a className="y10-btn primary" href={download.href} download={download.name}>下载文件</a>
+  );
   if (props.data.content !== null && props.data.content !== undefined) {
-    return <pre className="y10-pre raw">{props.data.content}</pre>;
+    return (
+      <>
+        {link}
+        <pre className="y10-pre raw">{props.data.content}</pre>
+      </>
+    );
   }
   const base64 = props.data.base64;
   if (base64 !== null && base64 !== undefined) {
     return (
       <>
         <p className="y10-note note">二进制内容（{base64.length} 个 base64 字符，指纹 {show(props.data.content_hash)}）</p>
-        <a
-          className="y10-btn primary"
-          href={`data:application/octet-stream;base64,${base64}`}
-          download={props.data.path.split("/").pop() ?? "file"}
-        >
-          下载文件
-        </a>
+        {link}
       </>
     );
   }
