@@ -21,6 +21,6 @@ export function providerNotice(provider: ProviderReadiness | null | undefined): 
   if (!provider || provider.available) {
     return null;
   }
-  const detail = provider.message ?? provider.reason ?? "";
-  return { label: "模型服务不可用", detail };
+  // 只写服务端的说明，不写 reason 这类内部标识（工单 #715，与 #671、#713 同一约定）
+  return { label: "模型服务不可用", detail: provider.message ?? "" };
 }

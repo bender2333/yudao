@@ -21,7 +21,9 @@ test("还没有读到状态时不显示", () => {
   assert.equal(providerNotice(undefined), null);
 });
 
-test("服务端没有给说明时用原因顶上", () => {
-  const notice = providerNotice({ available: false, reason: "provider_unavailable", message: null });
-  assert.equal(notice!.detail, "provider_unavailable");
+test("服务端没有给说明时不写内部标识", () => {
+  // reason 是内部标识（provider_config_missing 这类），页面上不写它
+  const notice = providerNotice({ available: false, reason: "provider_config_missing", message: null });
+  assert.equal(notice!.detail, "");
+  assert.equal(notice!.label.includes("provider_config_missing"), false);
 });
