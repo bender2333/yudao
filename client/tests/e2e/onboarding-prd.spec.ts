@@ -179,6 +179,11 @@ test.describe("初始 PRD 的修改往返（1440×900）", () => {
       await expect(card).toContainText("没有 git 仓库，快照采集时的目录内容");
       await expect(card).toContainText("文件 3 项");
 
+      // 顶栏的跨项目待决数量跟着加上（工单 #701）：初始 PRD 的决定写在项目流里，
+      // 决定请求到达以后这个数字要变成 1，不刷新页面
+      await expect(page.locator(".topbar .status-item").filter({ hasText: "待你决定：" }))
+        .toHaveText("待你决定：1");
+
       // 说明为空时提交被卡片自己拦下：给出提示、不送出命令、不出现第二轮
       await card.getByRole("button", { name: "提出修改" }).click();
       await expect(card.getByRole("status")).toHaveText("「提出修改」需要在说明里写明修改意见");
@@ -199,6 +204,9 @@ test.describe("初始 PRD 的修改往返（1440×900）", () => {
       if (backend.sourceDir !== null) {
         await expect(await section(page, "项目摘要")).toContainText(backend.sourceDir);
       }
+      // 顶栏的跨项目待决数量跟着更新（工单 #701）：初始 PRD 的决定写在项目流里，
+      // 回答以后这个数字要跟着少，不刷新页面
+      await expect(page.locator(".topbar .status-item").filter({ hasText: "待你决定：" })).toHaveText("待你决定：无");
       expect(MODEL_CALLS_PER_PROJECT).toBe(12);
       expect(errors).toEqual([]);
     } finally {
