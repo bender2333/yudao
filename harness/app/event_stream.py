@@ -24,6 +24,7 @@ from ..deltas import DeltaFragment, DeltaPump
 from ..event_store import EventStore
 from ..models import CatalogEvent, Event, ProjectEvent
 from .labels import event_label
+from .payloads import is_known_event_type, payload_for_reading
 
 BATCH_SIZE = 500
 # 一个连接的订阅队列长度：客户端处理太慢导致队列溢出时发送 resync 并关闭
@@ -159,7 +160,7 @@ class EventStream:
                                work_items=scope.work_items, runs=scope.runs,
                                departments=scope.departments, types=scope.types)
             for event in batch:
-                if self.matches(event):
+                if self.matches(event) and not self._skippable(event):
                     yield self._event_message(event)
             if len(batch) < self._batch_size:
                 break
@@ -182,7 +183,7 @@ class EventStream:
                 for event in drained:
                     if event.position <= self._previous:
                         continue
-                    if self.matches(event):
+                    if self.matches(event) and not self._skippable(event):
                         yield self._event_message(event)
                         idle_since = None
                     else:
@@ -221,6 +222,11 @@ class EventStream:
         self._scanned = max(self._scanned, event.position)
         return message
 
+    def _skippable(self, event: StoredEvent) -> bool:
+        # 已经被删掉的事件种类（旧版本的协作请求）：事件日志里仍然留着，
+        # 事件流不转发它们，一条读不懂的事件不能把整条历史事件流作废
+        return not is_known_event_type(event.type)
+
     def _object(self, event: StoredEvent) -> Contract:
         # 事件对象（第 5.2 节）：公共字段加上按种类确定的 type 与 payload
         fields = {
@@ -231,7 +237,8 @@ class EventStream:
             "role": getattr(event, "role", None), "actor": event.actor or "",
             "command_id": event.command_id, "label": event_label(event.type, event.payload),
         }
-        return _EVENT_OBJECT.validate_python({**fields, "type": event.type, "payload": event.payload})
+        return _EVENT_OBJECT.validate_python({**fields, "type": event.type,
+                                             "payload": payload_for_reading(event.type, event.payload)})
 
     def _drain_deltas(self) -> list[StreamDelta]:
         # 这一合并周期里本连接的片段：先驱动一次泵的合并周期（把被接受的片段分发进每个登记的待发队列，

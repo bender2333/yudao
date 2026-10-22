@@ -7,12 +7,14 @@ import httpx
 
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import DEFAULT_REGISTRY, Application
+from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.adapters.base import Availability
 from harness.providers.call import CallUsage, ModelDelta, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.write_path import NewEvent
 
 _USAGE = CallUsage(input_tokens=10, output_tokens=5, total_tokens=15, reported=True)
 
@@ -154,6 +156,43 @@ def _record(client, project_id: str, index: int) -> None:
                            json={"command_id": str(uuid.uuid4()), "project_id": project_id,
                                  "text": f"材料 {index}"})
     assert response.status_code == 200
+
+def test_the_event_stream_reads_old_events_with_removed_fields(data_dir):
+    # 工单 #697：旧事件里有模型已经删掉的字段，读的时候忽略它们；
+    # 一条读不懂的事件不能把整条历史事件流作废，读模型的重建也要能走过
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        project_id = _create_project(client)
+        _record(client, project_id, 1)
+        system = opened.applications[0].system
+        run_id = system.create_run("旧事件")
+        system.writes.append(run_stream(run_id), NewEvent(
+            EventType.DEPARTMENT_ACTIVATED, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+            actor="department:product", department="product",
+            payload={"activation_id": "old-1", "cycle": 1, "effective_contract_hash": None,
+                     "request_id": "req_old", "guidance_ids": [], "guidance_only": False,
+                     "guidance_version": 0, "input_version": 0, "prompt_version": 0,
+                     "prompt_hash": None, "yielded_work": None}))
+        # 旧版本写下的另一种事件：协作请求这个种类已经被删掉
+        system.writes.append(run_stream(run_id), NewEvent(
+            "collaboration_requested", state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+            actor="department:engineering", department="engineering",
+            payload={"id": "req_old", "requester": "engineering", "recipient": "product",
+                     "question": "旧机制留下的请求", "status": "open"}))
+        end = system.store.end_position()
+        # 事件流不转发那个被删掉的种类，事件帧因此比日志末尾少一条
+        frames = _read_stream(client, "/api/events?after=0", limit=end - 1)
+        opened.applications[0].rebuild_read_models()
+
+    kinds = [frame[2]["type"] for frame in frames if frame[0] == "event"]
+    assert EventType.DEPARTMENT_ACTIVATED in kinds
+    # 已经被删掉的种类不转发：事件日志里仍然留着，事件详情照旧能查
+    assert "collaboration_requested" not in kinds
+    old = next(frame[2] for frame in frames
+               if frame[0] == "event" and frame[2]["type"] == EventType.DEPARTMENT_ACTIVATED)
+    assert "request_id" not in old["payload"]
+    assert old["payload"]["activation_id"] == "old-1"
+
 
 def test_event_stream_backfills_by_position_with_labels_and_previous(data_dir):
     # 断线以后按位置补齐：事件带位置 id、previous 链与中文说明；跨项目按全局位置排列
