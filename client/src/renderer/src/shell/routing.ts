@@ -1,6 +1,8 @@
 // 页面路径（原型 v8 设计说明第 3.3 节）：首页 #/home、机器页 #/sys/machines 等。
 // 本工单建立外壳与路径；首页、项目页面与像素画面由各自的工单实现。
 
+import { departmentName } from "../views/project/labels.ts";
+
 export type Route = {
   name: string;
   projectId: string | null;
@@ -22,6 +24,38 @@ const SYSTEM_PAGES: Record<string, string> = {
   runtime: "sys-runtime",
   tools: "sys-tools",
 };
+
+// 顶栏的路径里的页名（设计说明第 3.4、9.1 节）：项目内页面写页名，系统页写它自己的页名。
+// 系统页的页名与页面里的标题一致，不写路由里的英文段名（工单 #702）
+const PAGE_LABELS: Record<string, string> = {
+  overview: "概览",
+  materials: "资料",
+  observe: "观测",
+  "observe-detail": "请求详情",
+  settings: "设置",
+  recovery: "恢复",
+  "sys-models": "模型管理",
+  "sys-machines": "机房",
+  "sys-runtime": "执行槽位",
+  "sys-tools": "工具登记",
+};
+
+/**
+ * 顶栏的路径：项目内页面写「项目名 / 页名」，系统页只写页名（设计说明第 9.1 节）。
+ * 部门页的页名就是部门名，与页签一致（产品、工程、质检）。
+ */
+export function pathLabel(route: Route, projects: { project_id: string; name: string }[]): string {
+  if (route.name === "home" || route.name === "not-found") {
+    return "首页";
+  }
+  if (route.name.startsWith("sys-")) {
+    return PAGE_LABELS[route.name] ?? "系统";
+  }
+  const page = route.name === "dept" ? departmentName(route.department) : PAGE_LABELS[route.name] ?? "这个页面";
+  const project = projects.find((item) => item.project_id === route.projectId);
+  const name = project?.name ?? route.projectId ?? "";
+  return `${name} / ${page}`;
+}
 
 export function parseRoute(hash: string): Route {
   const text = (hash || "").replace(/^#/, "");
