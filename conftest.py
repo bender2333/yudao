@@ -14,6 +14,10 @@ MODULE = "module"
 INTEGRATION = "integration"
 
 TIMEOUTS = {UNIT: 5, MODULE: 60, INTEGRATION: 300}
+# 有些文件的工作量天然超过本层的上限（工单 #753）：发布构建那条用例要装依赖、构建页面并构建 wheel，
+# 在 CI 上要三百多秒。上限到了以后 pytest-timeout 在 Windows 上结束整个进程，集成层用 -n 4 运行，
+# 结束的进程就是一个 worker，它消失以后报成「worker crashed」而不是一条失败。这些文件单独定时限。
+FILE_TIMEOUTS = {"test_release_script.py": 1200}
 TMP_FIXTURES = ("tmp_path", "tmp_path_factory", "data_dir")
 
 AUDIT_RESOURCES = {
@@ -138,11 +142,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     registry = _load_registry()
     for item in items:
         path = getattr(item, "path", None)
-        layer = registry.get(_relative(path)) if path is not None else None  # type: ignore[arg-type]
+        relative = _relative(path) if path is not None else None
+        layer = registry.get(relative) if relative is not None else None
         if layer is None:
             continue
         item.add_marker(getattr(pytest.mark, layer))
-        item.add_marker(pytest.mark.timeout(TIMEOUTS[layer]))
+        item.add_marker(pytest.mark.timeout(FILE_TIMEOUTS.get(relative, TIMEOUTS[layer])))
         item.stash[_LAYER_KEY] = layer
 
 

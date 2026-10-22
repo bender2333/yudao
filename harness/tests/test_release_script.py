@@ -28,6 +28,10 @@ pytestmark = pytest.mark.xdist_group("release_build")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_SCRIPT = REPO_ROOT / "scripts" / "release.py"
+# 发布构建的时限（工单 #753）：装依赖、构建页面并构建 wheel，在 CI 上要三百多秒。
+# 超过这个时限就以一条说清原因的失败结束。不能让时间上限来结束它：pytest-timeout 在 Windows 上
+# 结束的是整个进程，集成层用 -n 4 运行，结束的进程就是一个 worker，它消失以后报成「worker crashed」。
+RELEASE_BUILD_TIMEOUT_SEC = 900
 # 构建与复制跳过的东西：虚拟环境、临时目录、依赖、已有的构建产物与发布资源
 _SKIP_NAMES = {".venv", ".tmp", "__pycache__", "node_modules", "release_assets", ".pytest_cache",
                "dist", "test-results", "playwright-report", ".git", "out"}
@@ -85,10 +89,22 @@ def _python() -> Path:
     return Path(sys.executable)
 
 def _run_release(source: Path, output_dir: Path, *extra: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [str(_python()), str(source / "scripts" / "release.py"), "--repo-root", str(source),
-         "--output-dir", str(output_dir), *extra],
-        cwd=source, capture_output=True, text=True, encoding="utf-8", errors="replace", env=_env())
+    # 自己开进程：构建超过时限时把这一棵进程结束掉，再以一条说清原因的失败结束。
+    # 直接用 subprocess.run 的话它只结束发布脚本自己，npm 与 vite 还在跑
+    command = [str(_python()), str(source / "scripts" / "release.py"), "--repo-root", str(source),
+               "--output-dir", str(output_dir), *extra]
+    spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+             else {"start_new_session": True})
+    with subprocess.Popen(command, cwd=source, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, encoding="utf-8", errors="replace", env=_env(), **spawn) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=RELEASE_BUILD_TIMEOUT_SEC)
+        except subprocess.TimeoutExpired:
+            _stop(process)
+            raise AssertionError(
+                f"发布构建超过 {RELEASE_BUILD_TIMEOUT_SEC} 秒没有结束（工单 #753）："
+                "构建慢的时候要在这里说清原因，不能让时间上限结束整个进程") from None
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 @pytest.fixture(scope="module")
 def release_build(tmp_path_factory, release_template):
@@ -141,7 +157,8 @@ def test_the_wheel_carries_no_installer_or_update_manifest(release_build):
         [name for name in members if name.endswith((".exe", ".blockmap", ".yml"))]
 
 def test_wheel_page_files_match_the_build_output(release_build):
-    # 验收第 1 项：wheel 内的页面文件与页面构建输出目录中的文件逐个一致
+    # 验收第 1 项：wheel 内的页面文件与页面构建输出目录中的文件逐个一致。
+    # 发布资源目录里另有接口版本这一个元数据文件（工单 #704），它不是页面文件，不参与比对（工单 #753）
     version = _version(REPO_ROOT / "pyproject.toml")
     wheel = _wheel_path(release_build["output_dir"], version)
     built = release_build["source"] / "client" / "out" / "renderer"
@@ -151,11 +168,24 @@ def test_wheel_page_files_match_the_build_output(release_build):
     prefix = "harness/release_assets/"
     with zipfile.ZipFile(wheel) as archive:
         packaged = {name[len(prefix):]: archive.read(name) for name in archive.namelist()
-                    if name.startswith(prefix) and not name.endswith("/")}
+                    if name.startswith(prefix) and not name.endswith("/")
+                    and name != prefix + "api-version.json"}
     assert set(packaged) == set(expected), \
         set(packaged) ^ set(expected)
     changed = [name for name, content in expected.items() if packaged[name] != content]
     assert not changed, changed
+
+def test_the_wheel_carries_the_api_version_of_the_page_files(release_build):
+    # 工单 #704：发布脚本把这一份页面文件对应的接口版本写进发布资源目录，随 wheel 一起发布，
+    # 服务启动时读出来写进日志（页面与服务不匹配时说得出是哪一边落后了）。
+    # 它不是页面文件，页面文件的核对不把它算成页面构建输出以外的文件（工单 #753）
+    version = _version(REPO_ROOT / "pyproject.toml")
+    wheel = _wheel_path(release_build["output_dir"], version)
+    metadata = release_build["source"] / "harness" / "release_assets" / "api-version.json"
+    assert metadata.is_file(), "发布脚本没有写下这一份页面文件对应的接口版本"
+    with zipfile.ZipFile(wheel) as archive:
+        packaged = archive.read("harness/release_assets/api-version.json")
+    assert packaged == metadata.read_bytes()
 
 def test_the_wheel_carries_no_stale_file_and_rejects_foreign_files(release_template, tmp_path):
     # 工单 #313 的清理逻辑沿用：setuptools 不清理 build/lib，上一次构建的文件会跟着这次构建进 wheel；

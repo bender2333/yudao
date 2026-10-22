@@ -7,6 +7,8 @@
 
 ---
 
+solo-minimax-M3.1-Flash / 2026-10-23 00:38 / 工单 #753：docs/design/test-pyramid.md 第 2.2 节写明集成层用 -n 运行时 pytest-timeout 结束的是整个进程（一个 worker），因此「工作量超过本层上限的文件」单独定时限并由测试自己写子进程时限；docs/design/web-interface-and-release.md 第 5.1、6.1、6.3 节写明发布资源目录里的 api-version.json 是接口版本记录，不是页面文件，不参与页面文件与页面构建输出的比对 / 集成层里发布构建那条用例的耗时正好在 300 秒上下，超时以后 worker 消失，报成「worker crashed」而不是一条失败；发布脚本自己写下 api-version.json 又在自己的核对里把它当成页面构建输出以外的文件，发布脚本因此永远失败 / 与工单 #753 的验收标准一致：崩溃的原因写进设计说明
+
 Codex / 2026-10-21 22:11 / 工单 #635 客户端适配与端到端脚本改用询问事件，执行记录新增 agents_jour/635.md / 像素房间与楼层按 ask_started、ask_answered 传信；两个既有房间端到端失败已由架构师在 main 复现并登记为 #650
 
 minimax-M3.1-Flash / 2026-10-22 05:35 / 工单 #658：docs/prototypes/v10/js/pixel/engine.js 的动作目录里执行命令的说明由「执行登记命令」改为「执行命令」；docs/prototypes/v10/design.md 的更新行写明这次改动；docs/prototypes/CHANGELOG.md 记录这次更新并从「下一版原型的待办」里去掉动作列表显示命令原文那一条 / ADR-0038 删除了命令登记，动作列表按命令原文显示，原型与界面的说法跟着改

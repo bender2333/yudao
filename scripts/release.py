@@ -6,7 +6,8 @@
 #   1. 核对：工作区干净；当前提交在 main 上并已推送；pyproject.toml 的版本号；Node 不低于 22.12，uv 可用。
 #   2. 构建页面：npm ci，Vite 把页面文件构建到 client/out/renderer。
 #   3. M3 起构建执行代理的 wheel（#144 加入）。
-#   4. 清空 harness/release_assets/，把页面文件复制进去，删除仓库根下的 build/ 与 *.egg-info，
+#   4. 清空 harness/release_assets/，把页面文件复制进去，写下这一份页面文件对应的接口版本（#704），
+#      删除仓库根下的 build/ 与 *.egg-info，
 #      uv build --wheel 生成 wheel；核对 wheel 内的页面文件与页面构建输出逐个一致。
 #   5. 仅带 --publish 时：打标签 v<版本> 并推送，gh release create 把 wheel 上传到 Release。
 #   6. 输出 wheel 的路径与 SHA-256。
@@ -220,9 +221,25 @@ def build_wheel(repo_root: Path, version: str, output_dir: Path) -> Path:
         raise ReleaseError(f"uv build 没有生成 {expected}")
     return expected
 
+def _api_version_record(content: bytes) -> int | None:
+    # 发布资源目录里那份接口版本记录：读出它记的版本；读不出来或记的不是整数就当没有
+    try:
+        document = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    value = document.get("api_version")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
 def verify_wheel_contents(wheel: Path, built: Path) -> None:
     # 核对 wheel 内的页面文件与页面构建输出逐个一致（设计说明第 6.3 节第 4 步）：缺少、多出
     # 与内容不同都写明文件名退出。M3 起执行代理的 wheel 也放在发布资源目录里（#144 加入）
+    #
+    # 发布资源目录里除页面文件以外还有接口版本这一个元数据文件（工单 #704 写下）：
+    # 它不是页面文件，不参与与页面构建输出的比对，但要读得出它记的版本（工单 #753）
     prefix = RELEASE_ASSETS.as_posix() + "/"
     expected = page_files(built)
     with zipfile.ZipFile(wheel) as archive:
@@ -232,13 +249,16 @@ def verify_wheel_contents(wheel: Path, built: Path) -> None:
     missing = sorted(set(expected) - set(packaged))
     if missing:
         raise ReleaseError(f"wheel {wheel.name} 中缺少页面文件：" + "、".join(missing))
-    foreign = sorted(set(packaged) - set(expected))
+    foreign = sorted(set(packaged) - set(expected) - {PAGES_API_VERSION_FILE})
     if foreign:
         raise ReleaseError(f"wheel {wheel.name} 的 {prefix} 中有页面构建输出以外的文件："
                            + "、".join(foreign))
     changed = [name for name, path in expected.items() if contents[name] != path.read_bytes()]
     if changed:
         raise ReleaseError(f"wheel {wheel.name} 中的页面文件与页面构建输出不同：" + "、".join(changed))
+    metadata = contents.get(PAGES_API_VERSION_FILE)
+    if metadata is not None and _api_version_record(metadata) is None:
+        raise ReleaseError(f"wheel {wheel.name} 的 {PAGES_API_VERSION_FILE} 读不出页面文件对应的接口版本")
 
 def publish(repo_root: Path, version: str, wheel: Path, *, remote: str) -> None:
     # 第 5 步：仅带 --publish 时。打标签 v<版本> 并推送，
