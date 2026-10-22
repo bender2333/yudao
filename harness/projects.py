@@ -400,7 +400,8 @@ class ProjectService:
         return project_projection(self.store, self.artifacts, project_id)
 
     def list_projects(self, *, include_archived: bool = False) -> list[ProjectProjection]:
-        projects = [self.projection(project_id) for project_id in self.store.list_project_ids()]
+        projects = [project_projection(self.store, self.artifacts, project_id, include_history=False)
+                    for project_id in self.store.list_project_ids()]
         if not include_archived:
             projects = [item for item in projects if not item.archived]
         # 置顶优先、再按 updated_at 倒序：两次稳定排序。
