@@ -896,3 +896,5 @@ minimax-M3.1-Flash / 2026-10-22 21:15 / docs/user-session-log.md 把 U19–U36 �
 执行者 minimax-M3.1-Flash / 2026-10-22 05:05 / 工单 #663 「开始排空」先确认再执行：新增 client/src/renderer/src/views/system/drain-text.ts 给确认框的措辞与排空期间的提示，runtime.tsx 的「开始排空」先开确认框（写明不再开始新事项、这一步回不去、剩下的是强制升级），sidebar.tsx 与 app.tsx 在排空期间于侧栏项目列表上方给出提示；新增 client/tests/unit/drain-text.test.ts 四项 / 用户走查 U10：「开始排空」不可逆，界面上既没有确认也没有说明回不去
 
 执行者 minimax-M3.1-Flash / 2026-10-22 05:45 / 工单 #659 重新订阅不再退回位置 0：client/src/renderer/src/contract/view-sync.ts 的 refreshAll 取视图位置最小值时跳过 0（0 表示「这个视图还没有快照」），并新增 resubscribePosition 给出起点（视图位置与事件流已读到的位置里更晚的那个），client-app.ts 的 resync 用它重订阅；新增 client/tests/unit/resubscribe-position.test.ts 四项 / 用户走查 U08：新开的标签页一直停在「正在读取数据」；每十秒一轮的重新订阅把起点拖回 0，服务重放整段历史后 previous 对不上又触发下一轮
+
+minimax-M3.1-Flash / 2026-10-22 10:47 / 走查记录补 U37：把 U23「旧事件读不懂」说得更准——读不懂的只是「按当前载荷模型严格校验」这一层，用户看得见的三条路（事件流、请求详情、事件导出）都读得出来，并说明 #684 的「重建读模型」不受这条限制；claude_jour.md 里 2026-10-22 的 47 条日记时间戳按各自对应的 git 提交时间校准 / U23 那句「旧事件读不懂」会让人以为 #697 修完以后旧事件仍然不可用，与实测相反；日记时间戳是按估计写的而不是按真实时钟写的，偏差从 20 分钟一路累积到 8 小时，读者无法把日记与提交对上
