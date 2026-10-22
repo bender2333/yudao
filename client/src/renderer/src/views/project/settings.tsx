@@ -11,8 +11,8 @@ import {
   CommandFeedback, Empty, KeyValue, Loading, Section, SubmitButton, Table, TextArea, TextInput,
   hasCommand, list, pageKey, text, useDraft,
 } from "./common";
-import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, useDepartmentDraft } from "./department-settings-form";
-import { SETTING_SOURCE, departmentName, label } from "./labels";
+import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, promptWritten, useDepartmentDraft } from "./department-settings-form";
+import { departmentName, itemSource } from "./labels";
 import { PageHead } from "../../shell/kit";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { readFailureText } from "../../contract/read-failure";
@@ -203,14 +203,18 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
               <h3>
                 {departmentName(key)}（{key}）
               </h3>
-              <p className="y10-note note">
-                {setting.version} 版；来源 {label(SETTING_SOURCE, setting.source)}
-              </p>
+              <p className="y10-note note">第 {setting.version} 版</p>
             </div>
+            {/* 来源按项说：模型、档位与部门 Prompt 各自有没有由本项目写入（工单 #741） */}
             <p className="y10-note note">
               模型与档位：{setting.model_id
                 ? `${model?.model ?? setting.model_id}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`
                 : `${followText}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`}
+              ；模型来源 {itemSource(Boolean(setting.model_id), "跟随部门默认")}
+              ；档位来源 {itemSource(Boolean(setting.requested_tier), "跟随")}
+            </p>
+            <p className="y10-note note" data-testid={`settings-prompt-source-${key}`}>
+              部门 Prompt 来源：{itemSource(promptWritten(setting.department_setting_configured, setting.text), "内置默认")}
             </p>
             <ReminderList items={reminders} testId={`settings-reminder-${key}`} />
             <pre className="y10-pre raw department-setting-text">{setting.text || "（没有部门 Prompt 文字）"}</pre>
@@ -236,7 +240,7 @@ function DepartmentSettingsForm(props: {
 }) {
   const { data } = props;
   const setting = data.departments[props.department];
-  const [draft, setDraft] = useDepartmentDraft(setting ?? null);
+  const [draft, setDraft, saved] = useDepartmentDraft(setting ?? null);
   const command = useCommand(props.app, pageKey([setting?.version, draft.model, draft.tier, draft.text]));
   const catalog = useSnapshot<Catalog>(props.app, `page.settings.catalog.${props.department}`, "catalog", {});
   const bindings = catalog.data?.bindings ?? {};
@@ -266,10 +270,8 @@ function DepartmentSettingsForm(props: {
           model: followName,
         }}
         reminders={[...reminders, ...savedReminders]}
+        saved={saved}
       />
-      <div className="y10-row row-actions">
-        <button type="button" onClick={() => setDraft({ ...draft, text: setting.text })}>恢复默认</button>
-      </div>
       <DepartmentSettingsSave
         projectId={data.project_id}
         department={props.department}

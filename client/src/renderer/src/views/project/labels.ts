@@ -119,11 +119,12 @@ export const INPUT_PROGRESS: Record<string, string> = {
   accepted: "已由有效需求接纳",
 };
 
-// 部门设置的来源（DepartmentSettingView 的 source 取值）：本项目写入的设置或跟随部门默认
-export const SETTING_SOURCE: Record<string, string> = {
-  configured: "本项目写入",
-  default: "跟随部门默认",
-};
+// 项目部门设置里每一项的来源（工单 #741）：写入了就是「本项目写入」，
+// 没写入就是这一项自己的默认：模型跟随部门默认、档位跟随、部门 Prompt 用内置默认。
+// 按项判断，不按设置记录判断（有设置记录但没写这一项时，这一项仍然用默认）
+export function itemSource(written: boolean, fallback: string): string {
+  return written ? "本项目写入" : fallback;
+}
 
 // 输入种类的中文名（work_item.inputs 的 kind 取值：文字，或用户在输入框里发出的命令）
 export const INPUT_KIND: Record<string, string> = {
