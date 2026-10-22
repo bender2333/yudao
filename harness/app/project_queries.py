@@ -2135,6 +2135,11 @@ PROJECT_SETTINGS = QueryDefinition(
     changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
                 ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.SOURCE_DIRECTORY_CONFIGURED,
+                # 这一页显示部门设置、置顶与归档：改变它们的事件种类要在清单里，
+                # 否则保存以后页面停在旧值，要手动刷新（工单 #674）
+                ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED,
+                ProjectEventType.PROJECT_PINNED, ProjectEventType.PROJECT_ARCHIVED,
+                ProjectEventType.PROJECT_RESTORED,
                 # 目录修订（准入作废、模型变更）以后生效模型的建议能力提醒随之更新（工单 #95）
                 CatalogEventType.CATALOG_REVISED),
 )

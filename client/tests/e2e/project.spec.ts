@@ -763,6 +763,38 @@ test.describe("项目页面（1440×900）", () => {
     }
   });
 
+  test("设置页：改完部门设置并保存以后部门设置那一节自己更新（工单 #674）", async () => {
+    const client = await openProjectClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      const id = await projectId(page, SAMPLE);
+      await gotoView(page, id, "settings");
+      const departments = await section(page, "部门设置");
+      const product = departments.locator(".y10-set-dept").filter({ hasText: "产品（product）" });
+      await expect(product).toContainText("1 版；来源 本项目写入");
+      // 改产品部门的 Prompt 并保存
+      const text = "产品部门先写目标与验收标准，再问范围以外的要求。";
+      await product.getByRole("button", { name: "修改部门设置" }).click();
+      await product.getByLabel("部门 Prompt").fill(text);
+      await product.getByRole("button", { name: "保存部门设置" }).click();
+      // 那一节自己更新：事件到达以后按能力清单重新查询，不刷新页面
+      await waitUntil(async () => (await product.innerText()).includes("2 版；来源 本项目写入"),
+        page, "部门设置的版本与来源更新");
+      await expect(product.locator("pre.department-setting-text")).toContainText(text);
+      // 还原 Prompt，后面的用例按原文核对
+      await product.getByRole("button", { name: "修改部门设置" }).click();
+      await product.getByLabel("部门 Prompt").fill(PRODUCT_PROMPT);
+      await product.getByRole("button", { name: "保存部门设置" }).click();
+      await waitUntil(async () => (await product.innerText()).includes("3 版；来源 本项目写入"),
+        page, "还原以后版本继续");
+      await expect(product.locator("pre.department-setting-text")).toContainText(PRODUCT_PROMPT);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
   test("设置页：基准版本过期时提示重新读取", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
