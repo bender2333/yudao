@@ -140,7 +140,7 @@
     "kind": "environment",
     "action": "write",
     "guidance_only": false,
-    "description": "Replace an exact original line span inside one public workspace file. Engineering only. The span must equal expected_text exactly, expected_text must occur exactly once in the file, and expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged.",
+    "description": "Replace an exact original text inside one public workspace file. Engineering only. The text is located by content: when expected_text occurs exactly once in the file it is replaced wherever it is, so the line numbers may be stale; when it occurs more than once, start_line picks the occurrence starting on that line. expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -150,19 +150,19 @@
         },
         "start_line": {
           "type": "integer",
-          "description": "First line to replace, 1-based"
+          "description": "First line of the span to replace, 1-based; optional, used to choose between several occurrences of expected_text"
         },
         "end_line": {
           "type": "integer",
-          "description": "Last line to replace, inclusive"
+          "description": "Last line of the span to replace, inclusive; optional, used to choose between occurrences on the same line"
         },
         "expected_text": {
           "type": "string",
-          "description": "Exact original lines previously read, joined by newline without a trailing newline"
+          "description": "Exact original text previously read, joined by newline without a trailing newline"
         },
         "new_text": {
           "type": "string",
-          "description": "Replacement text for the span, lines joined by newline"
+          "description": "Replacement text for the located text, lines joined by newline"
         },
         "expected_digest": {
           "type": [
@@ -175,8 +175,6 @@
       "additionalProperties": false,
       "required": [
         "path",
-        "start_line",
-        "end_line",
         "expected_text",
         "new_text"
       ]
