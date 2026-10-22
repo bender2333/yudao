@@ -185,7 +185,8 @@ test("覆盖层按钮条在画面上方不与画面重叠，文字列表默认�
     expect(texts.length).toBe(loop.work_items.length);
     for (const text of texts) {
       expect(text).toMatch(/(大厅|产品|工程|质检|运维)/);
-      expect(text).toMatch(/(未开始|进行中|已采纳|已放行|等待确认初始 PRD|已停止|排队中)/);
+      // 排队中的事项写「排队中」（工单 #733 以后不再写「未开始」）
+      expect(text).toMatch(/(进行中|已采纳|已放行|等待确认初始 PRD|已停止|排队中|成果已挂起)/);
     }
     expect(errors).toEqual([]);
   } finally {

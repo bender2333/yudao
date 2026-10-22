@@ -50,9 +50,9 @@ export function sceneStatus(item: BuildingItemRow): string | null {
   switch (item.status) {
     case "in_progress":
       return item.pending_question ? "asking" : "running";
-    // 等待用户决定的事项停在最后所在的房间等待；只有 held 才可能是等待决定，普通排队在大厅
+    // 等待用户决定的事项停在最后所在的房间等待；held 是「成果已挂起」，与排队等槽位是两件事（工单 #733）
     case "held":
-      return item.pending_question ? "waiting_decision" : "waiting_slot";
+      return item.pending_question ? "waiting_decision" : "held";
     case "not_started":
       return "queued";
     // 用户停止的事项写「已停止」；恢复观察里的中断是另一回事（工单 #319）
@@ -66,7 +66,7 @@ export function sceneStatus(item: BuildingItemRow): string | null {
   }
 }
 
-/** 楼层的状态灯：只由未结束事项决定，按等待恢复、中断、等待你的决定、等待模型服务、等待执行槽位、运行中、排队中的优先级显示，否则空闲。 */
+/** 楼层的状态灯：只由未结束事项决定，按等待恢复、中断、等待你的决定、等待模型服务、运行中、成果已挂起、排队中的优先级显示，否则空闲。 */
 export function floorStatus(items: BuildingItemRow[]): string {
   const statuses = items
     .filter((it) => !["stopped", "adopted", "released_unsettled"].includes(it.status))
@@ -78,6 +78,7 @@ export function floorStatus(items: BuildingItemRow[]): string {
   if (has("waiting_provider")) return "waiting_provider";
   if (has("waiting_slot")) return "waiting_slot";
   if (has("running") || has("asking")) return "running";
+  if (has("held")) return "held";
   if (has("queued")) return "queued";
   return "idle";
 }

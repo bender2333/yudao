@@ -10,13 +10,15 @@ export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
 };
 
 export const WORK_ITEM_STATUS: Record<string, string> = {
-  not_started: "未开始",
+  // not_started 是「已登记、还没开始运行」——排队等开始时也是它，页面上叫「排队中」（工单 #733）
+  not_started: "排队中",
   in_progress: "进行中",
   adopted: "已采纳",
   released_unsettled: "已放行",
   awaiting_initial_prd: "等待确认初始 PRD",
   stopped: "已停止",
-  held: "排队中",
+  // held 是「上一个采纳成果被挂起」（基线变更），与排队是两件事，页面上不叫「排队中」（工单 #733）
+  held: "成果已挂起",
 };
 // 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
 // held 与 stopped 在原型图标里没有对应（held 无图标），这两项保留纯文字，界面不猜

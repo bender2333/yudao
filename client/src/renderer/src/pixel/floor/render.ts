@@ -27,7 +27,7 @@ const TUBE_D = "#3f86b0";
 const STATUS_TEXT: Record<string, string> = {
   queued: "排队中", waiting_slot: "等待执行槽位", running: "运行中", asking: "询问中", waiting_provider: "等待模型服务", paused: "已暂停",
   failed: "失败", done: "已完成", cancelled: "已取消", interrupted: "中断", waiting_resume: "待恢复",
-  stopped: "已停止", stopped_for_upgrade: "因升级停止", adopted: "已采纳", waiting_decision: "等待你的决定", released_unsettled: "已放行",
+  stopped: "已停止", stopped_for_upgrade: "因 Yudao 升级停止", adopted: "已采纳", waiting_decision: "等待你的决定", released_unsettled: "已放行",
 };
 const STATUS_CHIP: Record<string, string> = {
   waiting_decision: PAL.yellow2,
