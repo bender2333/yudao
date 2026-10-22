@@ -2,6 +2,8 @@
 // 每个视图保存快照与位置；位置不大于快照位置的事件不作用于这个视图；按能力清单中查询声明的事件种类
 // 重新查询，200 毫秒内的多条事件合并为一次；切换项目或事项以后丢弃迟到的旧查询结果。
 
+import { failureReason } from "./read-failure.ts";
+
 // 一次查询：名称与参数；转交应用层发出请求并返回快照（position 与 data）
 export type QueryRunner = <T>(name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
 
@@ -60,9 +62,8 @@ export class ViewSync {
       snapshot = await this.runner<Data>(request.query, request.params);
     } catch (error) {
       snapshot = null;
-      const message = error instanceof Error ? error.message : String(error);
-      // 失败原因不能是空串：空串到了界面上与「没有失败」分不开
-      failure = message === "" ? "这次读取没有成功" : message;
+      // 失败原因不能是空串：空串到了界面上与「没有失败」分不开（工单 #777：原因由共用函数产生）
+      failure = failureReason(error);
     }
     if (!entry.active || this.entries.get(viewId) !== entry) {
       // 迟到的结果：这个视图已经关闭或换了对象，丢弃（可观测性设计第 5 节）
