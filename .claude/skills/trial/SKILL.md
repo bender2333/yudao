@@ -1,260 +1,207 @@
 ---
 name: trial
-description: 试用 Yudao：以经验丰富的 agent 使用者的标准，从产品流、性能与成本、上手与使用方便、功能够不够用、稳定性与恢复、可观测与可诊断、文档与实际一致、数据与安全八个维度实际使用一个从 main 打包安装的 Yudao 实例，把发现的问题按四档分级、写清复现步骤与证据，合成一篇帖子发到 GitHub Discussions 的 General 分类。试用的过程不改被测对象。
-argument-hint: "[附加任务或备注，例如「只跑产品流」「加一个自己的任务」]"
+description: 试用 Yudao：像真实用户一样使用一个从 main 打包安装的实例，分新手段（只读 README 与页面，边做边说）与专家段（读导出，把每处卡点追到具体一步），跑一个评测场景的固定任务与一个有歧义、中途改主意、离开再回来的模拟用户任务；交付交给 evals 的隐藏检查打分并与单 agent 对照，问题经查重、换路复测与另一个模型的独立复现才进列表，合成一篇帖子发到 GitHub Discussions 的 General 分类。试用的过程不改被测对象。
+argument-hint: "[备注，例如「只跑固定任务」]"
 ---
 
 # 试用
 
-试用是一次读数：把 Yudao 当成一个要被用起来的东西，从试用者的位置走一遍，看它在什么地方绊住人，把绊人的地方记成带证据的问题，把结论写成一篇别人能照着核对的帖子。读数要能被下一次读数比较，所以任务固定、指标同名、提交号写在最前面。
+试用回答四个问题，每个问题只用一种证据：
 
-试用的对象是试用者自己从 main 打包并安装的实例，不是发布版，也不是源码直跑。试用由 agent 全程执行，人提供环境与凭据。
-
-试用过程只读被测对象：不改 Yudao 源码、不改仓库工作树、不提交、不当场修缺陷。允许改试用者自己环境的配置（Provider、凭据、部门 Prompt），因为那是试用者的环境，不是被测对象。缺陷只记录与发帖，改动走工单。
-
-## 1. 准入
-
-逐项查，缺项降级并写明，**不假装测过**。
-
-| 需要什么 | 怎么查 | 缺了怎么办 |
+| 问题 | 证据 | 谁判断 |
 | --- | --- | --- |
-| 模型服务地址、凭据、模型名 | 环境变量，或试用者的 Provider 配置 | 停在这里。没有真实模型就没有任何读数 |
-| Python ≥ 3.11、uv | `python --version`、`uv --version` | 停 |
-| Node ≥ 22.12 | `node --version` | 降级：不能构建 wheel，界面维度不测，帖子写明 |
-| Git | `git --version` | 停 |
-| `gh` 已登录 | `gh auth status` | 降级：帖子停在草稿，给出命令，不代发 |
-| 检出干净、且在 main 上 | `git status --porcelain`、`git rev-parse --abbrev-ref HEAD` | 停：构建脚本要求工作区干净 |
-| 时间与费用预算 | 默认整次 ≤ 60 分钟，单个任务 ≤ 15 分钟 | 按试用者自己的服务方案 |
+| 交付得好不好 | `evals/scorer` 的隐藏检查，Yudao 与单 agent 各一份 | 评分器 |
+| 新手能不能自己走通 | 新手段带时间戳的出声记录 | 新手段记录，专家段核对 |
+| 改了主意、离开再回来，还接得住吗 | 模拟用户任务的事件与页面状态 | 专家段 |
+| 卡住时查得出原因吗 | 专家段把卡点追到具体一步，以及花了多久 | 专家段 |
 
-时间与费用是真实支出。开始前告诉试用者这次大概要花多久、要调用多少次模型；超了就少跑几个任务，在读数里写明哪些任务没跑，不要硬跑。
+成本（墙钟、请求数、用量、费用）是读数，不另成维度。试用 agent 不自己判断交付对错，也不评论代码风格。
 
-## 2. 按什么标准看
+试用的对象是从 main 打包安装的实例。试用过程只读被测对象：不改 Yudao 源码与仓库工作树、不提交、不当场修缺陷、不建工单、不动规则文件与设计说明。可以改试用者自己环境的配置（Provider、凭据）。
 
-试用者是做过 agent 运行时的人，看的是这些：
+## 1. 准入与预算
 
-- **上下文有没有带够事实。** 部门开始一轮工作时拿到的材料，够不够它做对事；压缩以后关键事实还在不在。
-- **工具调用有没有真的推进。** 调了工具但工作区没变化，是空转；工具有效但方向错了，是判断问题。
-- **契约与放行有没有绑在真实证据上。** 质检说通过，通过的是不是它实际检查过的那份交付。
-- **失败以后能不能恢复。** 出错、中断、限流、重启之后，状态是不是还讲得通，能不能接着做。
-- **一次尝试花了多少。** 墙钟、模型请求数、用量、费用。一个任务花掉多少，是产品成本的直接读数。
-- **交付能不能被第三方核验。** 拿到交付物与记录的人，能不能不信任作者也核对出同一结果。
+逐项查，缺项就停，不降级硬跑：
 
-不评论代码风格、命名与目录结构；那是工单审查者的范围，不是试用者的。
+| 需要什么 | 怎么查 |
+| --- | --- |
+| 模型服务地址、凭据、模型名（Yudao 三个部门用） | 环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`、`YUDAO_EVAL_MODEL` |
+| 试用 agent 的模型与 Yudao 部门的模型不同 | 对照两边的模型名；相同就停，两边的错误会一起漏掉 |
+| Python ≥ 3.11、uv、Git、Node ≥ 22.12 | `--version`；没有 Node 就没有页面，新手段做不了 |
+| 能操作浏览器的工具，另有第二个浏览器用于换路复测 | 试用环境的工具列表 |
+| 检出干净、在 main 上 | `git status --porcelain`、`git rev-parse --abbrev-ref HEAD` |
+| `gh` 已登录 | `gh auth status`；没登录，帖子停在草稿 |
+
+预算（一次一轮，多轮留给以后的 benchmark 优化）：
+
+| 部分 | 上限 |
+| --- | --- |
+| 安装与准备 | 15 分钟 |
+| 固定任务 F1 | 90 分钟（与评测一致） |
+| 模拟用户任务 R1 | 45 分钟 |
+| 专家段与评分 | 30 分钟 |
+| 独立复现 | 30 分钟 |
+
+合计约 3.5 小时，另有试用 agent 自己操作浏览器与记录的用量。开始前把预计的时间与模型调用告诉试用者。超预算时按这个顺序砍，砍掉的写进帖子：
+
+1. R1 只做「离开再回来」，不做第二句改主意；
+2. 独立复现只做排在前面的问题，其余标「未经复现」，进观察。
+
+F1 与新手段不砍。单 agent 一侧条件相同时复用已有读数（第 6 节），本来就不重跑。
+
+## 2. 判据先核对
+
+判缺陷之前，先读 `docs/decision.md` 中上一篇试用帖子以后的用户决定，再核对 [任务集](../../../docs/trial/tasks.md) 的判据与本文第 5 节的分类是否还有效。与用户决定冲突的判据不用，在帖子里写明是哪一条、被哪个决定取代。
+
+例：2026-10-22 用户决定页面直接显示原始标识与原文。页面上出现 `provider_unavailable`、英文报错原文都不是缺陷。
 
 ## 3. 试用实例
 
-### 3.1 默认：隔离安装
-
-先记下试用者已有的安装，以便恢复：
-
-```bash
-yudao --version
-uv tool list
-```
-
-从 main 构建 wheel（官方路径，需要工作区干净、Node ≥ 22.12；只构建，不发布）：
+记下试用者已有的安装（`yudao --version`、`uv tool list`），然后从 main 构建 wheel，装进仓库外的独立虚拟环境：
 
 ```bash
 git rev-parse HEAD
-uv run python scripts/release.py
-```
-
-脚本输出 wheel 的路径与 SHA-256。装进仓库外的独立虚拟环境，不覆盖试用者已有的安装：
-
-```bash
+uv run python scripts/release.py          # 输出 wheel 路径与 SHA-256
 uv venv <仓库外目录>/trial-venv
 uv pip install --python <仓库外目录>/trial-venv/Scripts/python.exe <wheel 路径>
-```
-
-Windows 的解释器在 `Scripts\`，其他系统在 `bin\`。
-
-用独立数据目录与空闲端口启动。默认数据目录是用户数据目录（Windows `%LOCALAPPDATA%\Yudao`），试用不要用它：
-
-```bash
 <venv>/Scripts/python.exe -m harness api --data-dir <仓库外目录>/trial-data --port 8766
 ```
 
-页面在 `http://127.0.0.1:8766`。浏览器打开它，页面文件由 wheel 随包提供。
+Windows 的解释器在 `Scripts\`，其他系统在 `bin\`。不用默认数据目录。构建失败就停：源码直跑没有页面文件。
 
-模型配置在页面的「模型管理」里做：连接 → 候选列表 → 建立访问定义 → 模型测试准入 → 三个部门各选一个模型。部门没绑模型时建事项会被拒。凭据只从进程环境或数据目录内的 `.env` 解析；页面填的 Key 默认只对本进程有效，勾了持久化才写进 `.env`。Key 不回填，也不进日志、事件与导出。
+## 4. 新手段
 
-### 3.2 想按真实用户方式装
+新手段只读 README 与页面，**不读 `docs/`、不调接口、不看导出**，也不用本文第 5 节以后的知识。从第一次打开页面开始，配置模型（「模型管理」）也算在内。任务的输入由试用者事先准备好（任务集「准备」一节），粘贴进页面。
 
-有人愿意把 main 构建的 wheel 当成自己平常那个 Yudao 来用，那就覆盖安装，并在动手前记下旧版本以便回退：
+每一步记一行，写进归档目录的 `novice.md`：
+
+| 时间 | 看到什么 | 以为会怎样 | 实际怎样 | 犹豫或猜错 | 四问 |
+| --- | --- | --- | --- | --- | --- |
+
+四问是认知走查的四个问题，每步都过，答「否」的写出来：
+
+1. 知不知道这一步要做什么？
+2. 看不看得到能做这件事的地方？
+3. 能不能把它和自己的目标对上？
+4. 做完能不能看出事情在推进？
+
+等部门工作时每 2 分钟看一次页面，一次算一步。有一问答「否」、或者犹豫、猜错的一步，就是一处**卡点**。新手段只记录，不解释原因。
+
+## 5. 专家段
+
+两个任务的新手段都结束以后，才打开 `run.export`、`run.attempt`、`project.attempts`、`run.asks`、`run.recovery`、`replay.check`。请求体以 `GET /api/openapi.json` 为准。
+
+逐处卡点，按时间戳对到事件，归到一类，并记下定位用了多久：
+
+- **该说的结论没说**：状态没显示；读取失败说成没有内容；原因说错了；没给下一步；结论没有范围（比如放行没说覆盖了哪些要求）。
+- **系统出错**：事件里有错误、空转、状态讲不通。
+- **试用者误解**：页面说清楚了，是新手段看漏了。不进问题列表。
+
+定位不到具体一步的卡点，本身记一条「查不出原因」，属于可诊断的问题。
+
+另做一次机械扫描：把导出写到文件，搜 `key`、`token`、`password`、`Authorization`、盘符开头与 `/home/` 开头的路径。命中就是问题。
+
+## 6. 读数与对照
+
+读数用 `evals/runner/yudao_metrics.py` 的 `collect(export, outcome, replay)` 算。`outcome` 写 `{"timed_out": ..., "elapsed_seconds": ..., "hidden_failures": [评分器里失败的检查]}`，`replay` 是 `replay.check` 的返回。用量没上报的写「未知」，不算 0。
+
+F1 的交付按评测运行器的方式取回，再交给评分器：
 
 ```bash
-uv tool install --python 3.12 <wheel 路径>
+uv run python -c "import sys, json; sys.path.insert(0, 'evals/runner'); import yudao; e = json.load(open('<导出文件>', encoding='utf-8')); print(yudao.fetch_delivery(yudao.YudaoClient('http://127.0.0.1:8766'), yudao.last_archived_delivery(e), '<交付目录>'))"
+uv run python evals/scorer/scorer.py --delivery <交付目录> --result <结果文件>
 ```
 
-回退：`uv tool install --reinstall --python 3.12 <上一个版本的 wheel 路径>`，或者 `uv tool uninstall yudao` 后装回原来的版本。默认数据目录里的数据不会因为覆盖安装而消失，但试用产生的数据会留在那里，用独立 `--data-dir` 就不受影响。
+**单 agent 对照**：材料版本、模型、OpenCode 版本都与已有读数相同时，复用 `docs/evaluation/` 下最近的一份 OpenCode 结果，写明出处；不同时，用 `evals/runner/run_eval.py --scenario scenario3 --runs 1` 跑一次，模型与 Yudao 三个部门相同。Yudao 一侧的历史读数也在同一目录，同样写明可不可比。对照只做 F1。R1 要停服务、追加输入，单 agent 的一次性运行做不了同样的操作。
 
-### 3.3 降级：源码实例
+## 7. 问题的门槛与排序
 
-构建失败（没有 Node、工作区不干净、构建报错）时，从源码起一个只有接口的实例：
+一条问题进列表之前过三道：
 
-```bash
-uv run python -m harness api --data-dir <仓库外目录>/trial-data --port 8766
-```
+1. **查重**：`gh issue list --state open --limit 300 --json number,title,body`，逐条比。重复的，在原工单下评论补证据（脱敏规则同第 9 节），不进列表，在帖子里列出补了哪几张。
+2. **换路复测**：换浏览器、换新数据目录，或者改用接口做同一件事。换了路就不出现的，归为试用环境的问题，写进「环境与前提」。
+3. **单独复现**：在全新实例上照复现步骤再做一次。
 
-源码直跑没有页面文件，页面只回「没有页面文件」。这时候界面相关的维度（上手与使用方便、文档与实际一致）记「降级：没有页面文件」，其余维度照走。帖子与环境与前提里都要写明这次是降级。
+每条问题写：编号 `T<提交短号>-NN`、标题、复现步骤、期望、实际、证据（run id、事件 id、截图、命令与输出）、专家段的分类。另外标三样，按这个顺序排：
 
-## 4. 走查：八个维度
+- 影响：挡住目标 > 拖慢 > 只干扰；
+- 能不能绕过：不能 > 能（写明代价）；
+- 频率：两段、两个任务、两条路中一共出现几次。
 
-每个维度写一个结论：能不能用，绊在哪里，证据是什么。
+偏好、猜测、main 上还没承诺的能力进「观察」，不进问题列表。
 
-1. **产品流**——从「新建项目」到「交付并放行」走通一遍：建项目 → 登记检查命令 → 建事项 → 看三个部门工作 → 追加输入 → 质检放行 → 取回交付物。结论写「能不能一次走通，卡在哪一步」。
-2. **性能与成本**——每个任务的墙钟、模型请求数、用量、费用、循环次数、返工次数、询问次数（第 6 节）。结论写「一次典型任务花多少，和第 9 节的上一次比如何」。
-3. **上手与使用方便**——安装、配置模型、找入口、关掉再启动、报错能不能看懂。界面走查用试用环境里能操作浏览器的工具；没有浏览器工具时这一项记「降级：没有浏览器工具」。
-4. **功能够不够用**——当前阶段承诺的能力是不是真的能用。承诺看[总体路线图](../../docs/program-roadmap.md)与[当前验收基线](../../docs/current-baseline.md)。main 上还没承诺的能力（未开工的工单、M2/M3 之类），不算问题，进第 8 节的「观察」。
-5. **稳定性与恢复**——故意让它失败一次（见 T3）；事项进行中停掉服务再启动，看状态讲不讲得通、能不能接着做；`run.recovery` 与 `replay.check` 的结果。结论写「出问题时人能不能自己走出来」。
-6. **可观测与可诊断**——`project.attempts`、`run.attempt`、`run.asks`、`department.workspace` 能不能把原因定位到具体一步；事件里有没有人话。结论写「出问题时查得到吗，要查多久」。
-7. **文档与实际一致**——[README](../../README.md) 与试用指南里写的步骤、命令、路径，在实际页面上是不是还对得上；对不上是文档问题，记问题。
-8. **数据与安全**——凭据有没有漏进日志、事件、导出；数据目录是不是只在试用者自己的机器上；导出的事件里有没有不该出现的东西（见 T5）。
+## 8. 建议与独立复现
 
-## 5. 轻量任务
+每条建议写四样：挡住了用户的哪个目标；证据（链到问题编号）；与单 agent 对照是更好、更差、看不出差别还是不可比；对应路线图「进入可迭代状态」五条判据中的哪一条（有负载、能度量、改动便宜可撤回、看得见、锚点受保护）。对不上任何一条的不写成建议。
 
-任务集在 [docs/trial/tasks.md](../../docs/trial/tasks.md)，是带版本的数据文件：方法在本文，任务在那里。默认跑完那里的五个任务，每个任务几分钟。试用者可以按参数增补自己的任务，增补的任务在帖子里单独标出，不与固定任务混在一起算读数。
+**独立复现**：帖子发出之前，用 omp 起一个 agent，模型与试用 agent、Yudao 部门都不同（命令写法见 [运行配置](../../../docs/agents/autopilot-runtime.md) 的审查者一行，用 `--model` 指定）。只给它帖子草稿里每条问题的复现步骤、同一个 wheel 与一个全新数据目录，不给本次的记录与结论。复现不了的问题降为观察，并写明原因。
 
-任务的目标文本要原样提交给 Yudao，不要替它改写、不要加提示。给 Yudao 的输入就是试用者给的输入。
+## 9. 帖子
 
-## 6. 读数
-
-每个任务跑完，从 `GET /api/queries/run.export?run_id=<run id>` 的导出里算，口径与 `evals/runner/yudao_metrics.py` 一致（`projection` 与 `events` 两个部分）：
-
-| 读数 | 取法 |
-| --- | --- |
-| 结束状态 | `projection.phase` 与 `projection.stop_reason`；放行 = phase 是 `DONE` 且 stop_reason 是 `released` |
-| 循环次数 | `projection.cycle_count` |
-| 返工次数 | `projection.rework_count` |
-| 部门之间询问次数 | 事件里 `ask_started` 的条数；每次询问的内容用 `run.asks` 读 |
-| 模型请求数 | 从导出的调用尝试统计 |
-| 用量 | `usage.totals` 的 `input_tokens`、`output_tokens`、`cache_read_tokens`、`cache_write_tokens`、`total_tokens`、`cost`；服务没上报时写「未知」，**不算 0**，也不进平均值 |
-| 模型延迟 | `usage.totals` 的 `latency_ms` |
-| 耗时 | 墙钟秒数 |
-| 空响应 | `empty_model_responses` |
-
-每个任务另外记两件：质检有没有放行；有没有产生缺陷记录。
-
-全部任务合计：总耗时、总模型请求数、总用量、总费用、问题按四档的条数。
-
-接口的请求体形状以 `GET /api/openapi.json` 与 `GET /api/capabilities` 为准，不要凭记忆写。常用的几条：
-
-- 命令（`POST /api/commands/<名称>`，每条带客户端生成的 `command_id`，重试用同一个值）：`project.create`、`work_item.create`、`work_item.append_input`、`guidance.send`、`work_item.cancel`、`department_settings.save`。
-- 查询（`GET /api/queries/<名称>`）：`project.overview`、`project.flow`、`work_item.inputs`、`department.workspace`、`project.attempts`、`run.attempt`、`run.asks`、`run.export`、`run.recovery`、`replay.check`、`delivery.file`、`project.usage`。
-
-## 7. 问题怎么记
-
-四档：
-
-- **阻断**——做不下去。试用者没法继续用。
-- **绕行**——能继续，但得绕。找得到替代办法，代价看得见。
-- **烦人**——不挡路，但干扰。反复出现、每次都要多想一下。
-- **建议**——不是缺陷，是偏好或改进方向。
-
-每条问题写全这六样，缺一条就不要写进问题列表：
-
-1. 编号与一句话标题
-2. 属于哪个维度
-3. 复现步骤（从哪个界面或哪条命令开始，做了什么）
-4. 期望什么
-5. 实际什么
-6. 证据：run id、事件 id、截图路径、日志片段、命令与其输出。证据要能被别人打开核对。
-
-猜测、没复现过的、和纯偏好不进问题列表。偏好、猜测与 main 上尚未承诺的能力进第 8 节的「观察」。
-
-## 8. 帖子
-
-一次试用一篇，发到 GitHub Discussions 的 **General** 分类（仓库 `bender2333/yudao`，仓库 id `R_kgDOSpFnRw`，General 分类 id `DIC_kwDOSpFnR84DIxLV`）。Announcements 只有维护者能发，不要往那里发。
-
-标题：`试用：<一句话结论> — <main 提交短号> <版本>`。
-
-正文顺序：
+一次试用一篇，发到 Discussions 的 **General** 分类（仓库 `bender2333/yudao`，仓库 id `R_kgDOSpFnRw`，分类 id `DIC_kwDOSpFnR84DIxLV`）。标题：`试用：<一句话结论> — <提交短号> <任务集版本>`。
 
 ```
-本帖由 Yudao 仓库的 /trial skill 自动生成与发布，试用过程由 agent 执行。
+本帖由 Yudao 仓库的 /trial skill 生成与发布，试用过程由 agent 执行。
 
 ## 环境与前提
-机器、系统、Python、Node、Yudao 版本与 main 提交号、模型与档位、耗时、用量、费用、是否降级（降级写明原因）
+系统、Yudao 版本与 main 提交、部门模型、试用 agent 模型、复现 agent 模型、任务集与材料版本、耗时、用量、费用、砍掉的部分、试用环境的问题、不再使用的判据
 
-## 读数
-各任务与合计的指标表
+## 交付与对照
+F1 两边的评分（完成度、正确性、做错与没做的检查）与读数
 
-## 八个维度
-每个维度一节：结论 + 证据
+## 新手段
+两个任务的卡点表（时间、哪一步、四问中答「否」的）
+
+## 专家段
+每处卡点的原因、分类与定位用时；R1 的过程事实
 
 ## 问题
-按四档分组，每条带第 7 节的六样
+排好序的列表，每条带编号与第 7 节各项；补过证据的已有工单
+
+## 建议
+每条带第 8 节的四样
 
 ## 观察
-偏好与猜测、main 上尚未承诺的能力（标明对应工单或阶段）、本次没能测到的部分
+降级的问题、偏好、未承诺的能力、没测到的部分
 
-## 与上一次试用对比
-同名指标的对照；没有上一次就写「没有上一次」
+## 命中率
+上一次的问题编号回查结果（第 10 节）
 ```
 
-### 发帖前逐条过（脱敏）
+**脱敏**，逐条机械检查：绝对路径换成 `<数据目录>`、`<仓库>`、`<运行目录>`；不出现用户名、机器名、主机名、内网地址；不出现凭据、Key、`.env` 内容、Authorization 头；材料片段不超过 20 行；截图检查地址栏、标签页标题、路径与账号名。保留提交号、run id、事件 id、版本号。
 
-公开发言撤不回，这一步是机械检查，不靠眼力：
-
-- 绝对路径（`C:\Users\…`、`/Users/…`、`/home/…`）换成 `<数据目录>`、`<仓库>`、`<运行目录>`。
-- 用户名、机器名、主机名：不出现。
-- 凭据、Key、`.env` 内容、请求头里的 Authorization：不出现。
-- 试用者自己的代码与材料：只贴与问题直接相关的最小片段（不超过 20 行），其余写「省略」。
-- 模型名与服务方案名可以留；内网地址、私有主机名去掉。
-- 截图：检查地址栏、通知、标签页标题、路径、账号名，需要时裁剪。
-- 保留：提交号、run id、事件 id、版本号。它们是别人核对用的锚点。
-
-### 发帖
-
-用试用者自己的 `gh` 账号发。PowerShell 下查询要写成变量形式，内联的双引号会被 shell 吃掉：
+**发帖**用试用者自己的 `gh` 账号。标题写进 `title.txt`，正文写进 `body.md`，都用 UTF-8 无 BOM。PowerShell 下查询用变量形式：
 
 ```bash
 # 找上一篇「试用：」帖子
 gh api graphql -F owner='bender2333' -F name='yudao' -F first=50 \
-  -f query='query($owner:String!,$name:String!,$first:Int!){ repository(owner:$owner,name:$name){ discussions(first:$first, orderBy:{field:CREATED_AT, direction:DESC}){ nodes { number title url createdAt author { login } category { name } } } } }' \
-  --jq '.data.repository.discussions.nodes[] | select(.category.name=="General" and (.title|startswith("试用："))) | "\(.number)\t\(.url)\t\(.title)\t\(.author.login)"'
-```
+  -f query='query($owner:String!,$name:String!,$first:Int!){ repository(owner:$owner,name:$name){ discussions(first:$first, orderBy:{field:CREATED_AT, direction:DESC}){ nodes { number title url createdAt category { name } } } } }' \
+  --jq '.data.repository.discussions.nodes[] | select(.category.name=="General" and (.title|startswith("试用："))) | "\(.number)\t\(.url)\t\(.title)"'
 
-发帖。标题写进 `title.txt`，正文写进 `body.md`，两个文件都是 UTF-8 无 BOM（PowerShell 5.1 的 `Set-Content -Encoding UTF8` 会写 BOM，标题会多出一个看不见的字符）：
-
-```bash
+# 发帖
 gh api graphql -f query='mutation($repo:ID!,$cat:ID!,$title:String!,$body:String!){ createDiscussion(input:{repositoryId:$repo, categoryId:$cat, title:$title, body:$body}) { discussion { number url } } }' \
   -f repo='R_kgDOSpFnRw' -f cat='DIC_kwDOSpFnR84DIxLV' -F title=@<草稿目录>/title.txt -F body=@<草稿目录>/body.md
-```
 
-发完读回核对标题、分类与正文长度：
-
-```bash
+# 读回核对标题、分类与正文长度
 gh api graphql -F owner='bender2333' -F name='yudao' -F n=<编号> \
-  -f query='query($owner:String!,$name:String!,$n:Int!){ repository(owner:$owner,name:$name){ discussion(number:$n){ id number title url category { name } body } } }'
-```
+  -f query='query($owner:String!,$name:String!,$n:Int!){ repository(owner:$owner,name:$name){ discussion(number:$n){ id title url category { name } body } } }'
 
-要改正文时取回正文、改完写回：
-
-```bash
+# 改正文
 gh api graphql -f query='mutation($id:ID!,$body:String!){ updateDiscussion(input:{discussionId:$id, body:$body}) { discussion { url } } }' -f id=<讨论的 id> -F body=@<草稿目录>/body.md
 ```
 
-`gh` 没登录或者发帖失败时，帖子停在草稿，把标题、正文与上面这条命令交给试用者，不代发、不用别的账号发。
+发帖失败时，帖子停在草稿，把文件与命令交给试用者，不用别的账号代发。发完回报链接，并说明帖子可以自己改或删。
 
-发完把帖子链接与编号回报，并说明帖子可以自己改或删。
+## 10. 命中率
 
-## 9. 与上一次试用对比
+维护者把问题转成工单时，在工单正文里写上问题编号。下一次试用读上一篇帖子的问题列表，逐条查 `gh issue list --state all --search "<编号>" --json number,state,stateReason`：
 
-用第 8 节那条查询找上一篇「试用：」开头的帖子，读它的「读数」一节，比同名指标：耗时、模型请求数、用量、费用、循环次数、返工次数、询问次数、是否放行。模型服务没上报的项写「未知」，不与 0 比。
+- **确认**：工单按完成关闭；
+- **误报**：工单按 `not planned` 或 `wontfix` 关闭，或者维护者在帖子下说明不成立。另记原因，比如判据过期；
+- 还开着、或者没建工单的，不计。
 
-上一次不是同一个任务集或者用了不同模型，就写明「不可比」，不要硬比数字。差别能由一两处变化解释的，写「看不出差别」。
-
-## 10. 不做的事
-
-- 不改 Yudao 源码，不改仓库工作树，不提交，不当场修缺陷。
-- 不建工单。帖子只做公开记录；维护者读帖子以后把确认的问题转成工单，排在队列最前。
-- 不动规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流与设计说明。
-- 不发到 Announcements，不在其它分类发帖。
-- 不替试用者登录账号，不处理凭据的存储位置以外的事。
+命中率 = 确认 ÷（确认 + 误报），写进帖子，和以前几次的数字放在一起。任务集版本不同的两次，读数不比较，命中率照算。
 
 ## 11. 本地归档
 
-试用的原始材料留在仓库外，不进版本控制：`.yudao/trial/<提交短号>-<年月日-时分>/`（`.yudao/` 已被忽略）。里面放：草稿（`title.txt`、`body.md`）、每个任务的 `run.export` 导出、读数表、截图、日志片段、发帖回执。
-
-试用结束清理试用实例时，只删这次建的虚拟环境与数据目录；试用者原有的安装不动。
+原始材料留在仓库外，不进版本控制：`.yudao/trial/<提交短号>-<年月日-时分>/`。里面放：`novice.md`、每个任务的 `run.export`、评分结果、截图、复现 agent 的输出、草稿与发帖回执。清理时只删这次建的虚拟环境与数据目录。
