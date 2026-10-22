@@ -83,6 +83,9 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
     > .tmp/architect-<日期时刻>.json
   ```
 
+- 启动 solo 执行者（用户指定 solo 范围时，在主工作区或工单的 worktree 中运行；进程环境使用开发 App，按第 2 节设置，并设置署名 `GIT_AUTHOR_NAME`、`GIT_COMMITTER_NAME` 为 `solo-<模型 ID>`）。合并要用仓库所有者的豁免，所以 solo 执行者的 `gh` 使用 `bender2333` 登录的身份，不设置开发 App 的两个变量；开发 App 没有豁免权限：
+  `claude -p --model <solo 模型> --dangerously-skip-permissions --output-format json "你是 solo 执行者，按 AGENTS.md「Solo 模式」处理范围 <范围> 内的工单"`
+  solo 范围内没有派发者，一次启动处理到范围内没有可以领取的工单为止，或者到第 7 节的执行者一轮时长。
 - 打开自动合并：`gh pr merge <PR> --auto --squash`；关掉：`gh pr merge <PR> --disable-auto`。
 - 在本机运行集成层（在集成层的 worktree 中后台运行）。平时集成层由 CI 在每次合并以后运行（第 5 节）；本机运行用于和 CI 的结果对照，或者 CI 不可用的时候：
 
