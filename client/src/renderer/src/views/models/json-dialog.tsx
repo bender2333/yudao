@@ -4,6 +4,7 @@
 // 界面这一侧只做 JSON 解析；解析失败时整份拒绝，不发命令。
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { canSaveDocument, jsonDialogFailureText } from "./model-logic";
 
 // 可编辑的目录文档文本形状（后端 catalog.document 查询交回的 providers/models/bindings 三项）
 export type EditableDocument = {
@@ -14,6 +15,8 @@ export type EditableDocument = {
 
 export type JsonDialogProps = {
   document: EditableDocument | null;
+  /** 目录文档读取失败时的原因：有它时编辑器说明读不出来，不让保存空文档（工单 #776） */
+  error: string | null;
   onSave: (document: EditableDocument) => Promise<{ ok: boolean; message: string }>;
   onClose: () => void;
 };
@@ -123,6 +126,10 @@ export function JsonDialog(props: JsonDialogProps) {
           目录文档是 Provider 配置、模型访问定义与部门默认的完整文本，不含 API Key 与准入记录。
           校验通过时整份写入；任何一项不通过时整份拒绝，并指出字段位置。
         </p>
+        {jsonDialogFailureText(props.error) !== null ? (
+          // 目录文档读不出来：说读不出来，不是一份空文档（工单 #776）
+          <p className="y10-warn-text hint mm-error" role="status">{jsonDialogFailureText(props.error)}</p>
+        ) : null}
         <textarea className="y10-textarea y10-json json-editor" aria-label="目录文档 JSON" value={text} spellCheck={false}
                   onChange={(event) => setText(event.target.value)} />
         {status && (
@@ -142,7 +149,8 @@ export function JsonDialog(props: JsonDialogProps) {
                    event.target.value = "";
                  }} />
           <button type="button" className="y10-btn" onClick={exportFile}>导出</button>
-          <button className="y10-btn primary" type="button" disabled={saving} onClick={() => void save()}>
+          {/* 空文档不让保存：目录文档读不出来时那会把目录写成空的（工单 #776） */}
+          <button className="y10-btn primary" type="button" disabled={saving || !canSaveDocument(text)} onClick={() => void save()}>
             {saving ? "保存中…" : "保存"}
           </button>
           <button type="button" className="y10-btn" onClick={props.onClose}>关闭</button>

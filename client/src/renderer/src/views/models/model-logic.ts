@@ -10,6 +10,7 @@ import type {
   CatalogProvider,
 } from "../../api/generated/types.gen";
 import { newCommandId } from "../../contract/command-id.ts";
+import { readFailureText } from "../../contract/read-failure.ts";
 
 // 服务方案预置表里的一项（查询 catalog 的 presets.presets 交回；合同是开放字典，这里声明界面用到的字段）
 export type ServicePreset = {
@@ -866,4 +867,20 @@ export const DEPARTMENT_SAVE_NOTICE = "从本部门下一次模型请求起生�
 // 连接保存成功以后的提示（工单 #302）：添加与保存两种来源用词不同；表单收起以后仍要看得见
 export function saveSuccessText(mode: "add" | "edit"): string {
   return mode === "add" ? "已添加 Provider 配置。" : "已保存 Provider 配置。";
+}
+
+/**
+ * 编辑 JSON 弹窗里的失败提示（工单 #776）：目录文档读不出来时给失败说明与服务端给的原文；
+ * 没有失败时没有提示——「本来就没有内容」与「读不出来」是两回事。
+ */
+export function jsonDialogFailureText(error: string | null): string | null {
+  return error === null || error === "" ? null : readFailureText(error);
+}
+
+/**
+ * 能不能保存这份目录文档（工单 #776）：空文档不让保存——
+ * 目录文档读不出来时文本框是空的，按保存会把目录写成空的。
+ */
+export function canSaveDocument(text: string): boolean {
+  return text.trim() !== "";
 }
