@@ -199,12 +199,29 @@ def test_cancel_while_waiting_withdraws_the_request_and_keeps_no_baseline(data_d
         assert events[0].payload["decision_id"] == decision["decision_id"]
         project = opened.system.projects.projection(refs["project_id"])
         assert project.current_adoption is None
-        assert project.work_item(refs["work_item_id"]).status == "stopped"
+        item = project.work_item(refs["work_item_id"])
+        assert item.status == "stopped"
+        # 停止原因写「用户已取消」，不抄 run 的结束原因（run 本身是跑完的，工单 #707）
+        assert item.stop_reason == "user_cancelled"
+        # 被放弃的事项也要有一句「接下来该做什么」：与取消的情形对齐
+        assert item.pending_question == "已放弃这次建档。如需继续，重新开始建档。"
         remaining = client.get(f"/api/queries/decisions.list?project_id={refs['project_id']}").json()["data"]["decisions"]
         assert [item for item in remaining if item["status"] == "open"] == []
         row = next(entry for entry in client.get("/api/queries/projects.list").json()["data"]["projects"]
                    if entry["project_id"] == refs["project_id"])
         assert row["onboarding_status"] == "awaiting_onboarding"
+    finally:
+        context.__exit__(None, None, None)
+
+
+def test_the_away_report_does_not_count_an_abandoned_onboarding(data_dir, tmp_path):
+    # 工单 #707：跑完一轮（run_done）不算「完成与放行」——被用户放弃的建档成果没有采纳
+    context, client, opened, refs = _run_onboarding_http(data_dir, tmp_path, _round([REQUIREMENT]))
+    try:
+        cancelled = _post(client, "work_item.cancel", work_item_id=refs["work_item_id"])
+        assert cancelled.status_code == 200, cancelled.text
+        report = client.get("/api/queries/home.away_report", params={"range": "24h"}).json()["data"]
+        assert [item for item in report["summary"] if item["id"] == "released"] == []
     finally:
         context.__exit__(None, None, None)
 

@@ -58,6 +58,7 @@ export const STOP_REASON: Record<string, string> = {
   workspace_unrepresentable: "工作区有无法表示的条目",
   time_limit: "运行时间已达上限",
   cancelled: "运行已被取消",
+  user_cancelled: "用户已取消",
   provider_error: "模型服务失败",
   provider_timeout: "模型服务请求超时",
   provider_protocol: "模型服务协议不符",
@@ -139,11 +140,13 @@ export function label(map: Record<string, string>, value: string | null | undefi
 // 后端把用户取消的终态记成 phase=FAILED 配 stop_reason=cancelled，真正失败时也是 FAILED，
 // 区别只在停止原因上。取消是用户自己的决定，页面上不该说失败，
 // 因此取消的事项不写阶段名（状态行已经写着「已停止」，下一行的停止原因写着「运行已被取消」）。
+// user_cancelled 同理：用户放弃的建档 run 本身是跑完的（phase=DONE），但事项是被用户放弃的，
+// 写「已完成」与「已停止」挨在一起读起来自相矛盾（工单 #707）。
 export function phaseLabel(phase: string | null | undefined, stopReason: string | null | undefined): string | null {
   if (!phase) {
     return null;
   }
-  if (stopReason === "cancelled") {
+  if (stopReason === "cancelled" || stopReason === "user_cancelled") {
     return null;
   }
   return label(PHASE_LABELS, phase);

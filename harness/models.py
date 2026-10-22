@@ -688,6 +688,7 @@ STOP_REASON_LABELS = {
     "workspace_unrepresentable": "工作区有无法表示的条目",
     "time_limit": "运行时间已达上限",
     "cancelled": "运行已被取消",
+    "user_cancelled": "用户已取消",
     "provider_error": "模型服务失败",
     "provider_timeout": "模型服务请求超时",
     "provider_protocol": "模型服务协议不符",

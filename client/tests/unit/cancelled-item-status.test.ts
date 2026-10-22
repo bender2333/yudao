@@ -10,6 +10,11 @@ test("取消过的事项不写「执行失败」", () => {
   assert.equal(phaseLabel("FAILED", "cancelled"), null);
 });
 
+test("用户放弃的建档也不写阶段名：run 跑完了，事项是被用户放弃的", () => {
+  // 工单 #707：写「已完成」与「已停止」挨在一起读起来自相矛盾
+  assert.equal(phaseLabel("DONE", "user_cancelled"), null);
+});
+
 test("真正的失败仍然写「执行失败」", () => {
   assert.equal(phaseLabel("FAILED", "provider_error"), "执行失败");
   assert.equal(phaseLabel("FAILED", "time_limit"), "执行失败");

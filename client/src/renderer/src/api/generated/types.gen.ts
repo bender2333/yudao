@@ -7451,7 +7451,7 @@ export type DecisionWithdrawnPayload = {
     /**
      * Reason
      */
-    reason: 'released' | 'baseline_verified' | 'max_cycles' | 'model_steps_exhausted' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed' | 'superseded_by_hand_back';
+    reason: 'released' | 'baseline_verified' | 'max_cycles' | 'model_steps_exhausted' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'user_cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed' | 'superseded_by_hand_back';
 };
 
 /**
@@ -12873,7 +12873,7 @@ export type RunFailedPayload = {
     /**
      * Stop Reason
      */
-    stop_reason: 'time_limit' | 'cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed';
+    stop_reason: 'time_limit' | 'cancelled' | 'user_cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed';
     /**
      * Human Action
      */

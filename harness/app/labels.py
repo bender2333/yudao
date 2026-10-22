@@ -72,7 +72,8 @@ WRITEBACK_REASON_NAMES = {
     "missing_source_reference": "缺少事项起点依据",
 }
 # 说明里出现的取值按中文写，机器标识不直接出现（暂缓采纳、用户取消决定请求、写回停止原因）
-OTHER_VALUE_NAMES = {"baseline_changed": "基线已经变化", "user_cancelled": "用户已取消",
+# user_cancelled 已经是停止原因，中文名在 models.py 的停止原因表里（工单 #707）
+OTHER_VALUE_NAMES = {"baseline_changed": "基线已经变化",
                      "superseded_by_hand_back": "已交还模型",
                      **WRITEBACK_REASON_NAMES}
 

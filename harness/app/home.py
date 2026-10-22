@@ -154,11 +154,12 @@ def _events_in_range(store: Any, from_position: int, to_position: int,
 def _summary(events: list[Event | ProjectEvent]) -> list[ReportItem]:
     # 汇总各项：由范围内的事件汇总得到，没有来源事件的项不显示（不写成零）。
     # 完成与放行、用量来自现有事件；故障、修复、部署与回滚、等待模型服务、磁盘与报到属于 Stage 4
+    # 「完成与放行的事项」只数成果被采纳（deliverable_adopted）或被质检放行的事项：
+    # 跑完一轮（run_done）不算——被用户放弃的建档也是跑完过的，但它的成果没有采纳（工单 #707）
     items: list[ReportItem] = []
     released_events = [
         event for event in events
         if (event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") == "release")
-        or event.type == EventType.RUN_DONE
         or event.type == ProjectEventType.DELIVERABLE_ADOPTED
     ]
     released_items = {event.work_item_id for event in released_events if event.work_item_id is not None}

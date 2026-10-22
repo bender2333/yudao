@@ -31,6 +31,10 @@
     "outcome": "failed",
     "human_action": "运行已被取消。如需继续，作为新事项重新开始。"
   },
+  "user_cancelled": {
+    "outcome": "failed",
+    "human_action": "已放弃这次建档。如需继续，重新开始建档。"
+  },
   "provider_error": {
     "outcome": "failed",
     "human_action": "模型服务失败。查看错误事件后，作为新事项重新开始或更换模型服务。"
