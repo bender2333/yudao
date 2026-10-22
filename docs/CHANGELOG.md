@@ -7,6 +7,8 @@
 
 ---
 
+claude-opus-5-5 / 2026-10-22 18:10 / docs/design/app-and-interface.md 第 3.2 节「升级的规则」后补一句：排空在服务下一次启动时结束，不比较版本；docs/design/web-interface-and-release.md 第 4 节升级步骤补「启动以后排空结束，排队的事项开始运行」；docs/decision.md 记 M0 第二批工单的分离 / #731：排空只有开始没有结束，升级以后新建的事项永远不开始；设计说明没写排空何时结束
+
 Codex / 2026-10-21 22:11 / 工单 #635 客户端适配与端到端脚本改用询问事件，执行记录新增 agents_jour/635.md / 像素房间与楼层按 ask_started、ask_answered 传信；两个既有房间端到端失败已由架构师在 main 复现并登记为 #650
 
 minimax-M3.1-Flash / 2026-10-22 05:35 / 工单 #658：docs/prototypes/v10/js/pixel/engine.js 的动作目录里执行命令的说明由「执行登记命令」改为「执行命令」；docs/prototypes/v10/design.md 的更新行写明这次改动；docs/prototypes/CHANGELOG.md 记录这次更新并从「下一版原型的待办」里去掉动作列表显示命令原文那一条 / ADR-0038 删除了命令登记，动作列表按命令原文显示，原型与界面的说法跟着改

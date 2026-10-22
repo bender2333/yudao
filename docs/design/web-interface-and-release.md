@@ -68,7 +68,7 @@ flowchart LR
 ### 3.2 控制主机上的 Yudao 服务
 
 - 安装：`uv tool install --python 3.12 <发布的 wheel 的路径>`。`yudao` 命令安装到 uv 的可执行文件目录（Windows 为 `%USERPROFILE%\.local\bin`）；目录不在 PATH 中时 uv 提示运行 `uv tool update-shell`。
-- 升级：按 ADR-0019 先排空，停止 Yudao 服务（第 4.2 节），`uv tool install --reinstall --python 3.12 <新的 wheel>`，再启动。已经打开的页面在重新连接以后自动重新加载，使用新版本的页面文件（第 5.1 节）。同一个地址上的文件被替换以后，没有 `--reinstall` 的再次安装按「已经安装」结束。
+- 升级：按 ADR-0019 先排空，停止 Yudao 服务（第 4.2 节），`uv tool install --reinstall --python 3.12 <新的 wheel>`，再启动。启动以后排空结束，排队的事项开始运行。已经打开的页面在重新连接以后自动重新加载，使用新版本的页面文件（第 5.1 节）。同一个地址上的文件被替换以后，没有 `--reinstall` 的再次安装按「已经安装」结束。
 - 控制主机换到另一台机器时，从私有仓库的 Release 取得 wheel（`gh release download`）。
 
 ### 3.3 数据目录
