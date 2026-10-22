@@ -49,6 +49,11 @@
 
 使用 pytest-timeout（加入 dev 依赖组）。根 `conftest.py` 按层给测试加上上限：单元层 5 秒，模块层 60 秒，集成层 300 秒。Windows 上 pytest-timeout 使用线程方式：超时时打印全部线程的调用堆栈并结束测试进程。这样一次卡住的测试以失败和堆栈结束，不会让运行停滞几十分钟。
 
+集成层用 `-n` 运行（第 4.2 节），结束的进程就是一个 worker：xdist 报「node down」与「worker crashed」，堆栈也跟着丢掉，看到的是崩溃而不是一条失败。两处补齐：
+
+- 工作量天然超过本层上限的文件单独定时限，写在根 `conftest.py` 的 `FILE_TIMEOUTS` 里（工单 #753：`test_release_script.py` 1200 秒——它要装依赖、构建页面并构建 wheel，CI 上要三百多秒，正好在 300 秒上下）。
+- 这一类文件自己把时限写在子进程上（工单 #753 的 `RELEASE_BUILD_TIMEOUT_SEC`）：构建超过时限时测试以一条说清原因的失败结束，worker 不消失。它比 `FILE_TIMEOUTS` 里的上限小，超时先由它接手。
+
 ### 2.3 多进程运行
 
 只有集成层的运行（第 4.2 节）使用 `pytest-xdist`。根 `conftest.py` 在 `-n` 大于 0 而选中的测试中有集成层以外的测试时拒绝运行。事件序列基准与 OpenAPI 快照的重写（`--write-event-baselines`、`--write-openapi-snapshot`）同样只允许单进程。
