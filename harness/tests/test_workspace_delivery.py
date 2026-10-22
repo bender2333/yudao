@@ -31,7 +31,8 @@ def test_first_run_archives_and_restores_every_public_byte_from_a_new_data_direc
     result = system.run_until_stop(run_id)
     assert result.phase == "DONE", result.error
     delivery = result.delivery_spec
-    assert delivery.files == ["src/echo.py"]
+    # 清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）
+    assert delivery.files == [".hidden", "src/echo.py", "undeclared.bin"]
     tree = load_tree(system.artifacts, run_id, delivery.tree_ref)
     assert tree.digest == delivery.code_tree_digest
     assert [item.path for item in tree.files] == [".hidden", "src/echo.py", "undeclared.bin"]
