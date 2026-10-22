@@ -25,8 +25,8 @@ argument-hint: "[备注，例如「只跑固定任务」]"
 
 | 需要什么 | 怎么查 |
 | --- | --- |
-| 模型服务地址、凭据、模型名（Yudao 三个部门用） | 环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`、`YUDAO_EVAL_MODEL` |
-| 试用 agent 的模型与 Yudao 部门的模型不同 | 对照两边的模型名；相同就停，两边的错误会一起漏掉 |
+| 这一次用的模型：Yudao 部门、试用 agent、复现 agent 各用哪个服务与模型 | 开始前问试用者，不沿用上一次，也不从固定的环境变量或配置文件取；凭据由试用者当场给出 |
+| 三方的模型互不相同 | 对照三方的模型名；有相同的就停，两边的错误会一起漏掉 |
 | Python ≥ 3.11、uv、Git、Node ≥ 22.12 | `--version`；没有 Node 就没有页面，新手段做不了 |
 | 能操作浏览器的工具，另有第二个浏览器用于换路复测 | 试用环境的工具列表 |
 | 检出干净、在 main 上 | `git status --porcelain`、`git rev-parse --abbrev-ref HEAD` |
@@ -71,7 +71,7 @@ Windows 的解释器在 `Scripts\`，其他系统在 `bin\`。不用默认数据
 
 ## 4. 新手段
 
-新手段只读 README 与页面，**不读 `docs/`、不调接口、不看导出**，也不用本文第 5 节以后的知识。从第一次打开页面开始，配置模型（「模型管理」）也算在内。任务的输入由试用者事先准备好（任务集「准备」一节），粘贴进页面。
+新手段只读 README 与页面，**不读 `docs/`、不调接口、不看导出**，也不用本文第 5 节以后的知识。从第一次打开页面开始，在页面上用试用者这一次给的服务与凭据配置模型（「模型管理」），这一段也算在内。任务的输入由试用者事先准备好（任务集「准备」一节），粘贴进页面。
 
 每一步记一行，写进归档目录的 `novice.md`：
 
@@ -112,7 +112,7 @@ uv run python -c "import sys, json; sys.path.insert(0, 'evals/runner'); import y
 uv run python evals/scorer/scorer.py --delivery <交付目录> --result <结果文件>
 ```
 
-**单 agent 对照**：材料版本、模型、OpenCode 版本都与已有读数相同时，复用 `docs/evaluation/` 下最近的一份 OpenCode 结果，写明出处；不同时，用 `evals/runner/run_eval.py --scenario scenario3 --runs 1` 跑一次，模型与 Yudao 三个部门相同。Yudao 一侧的历史读数也在同一目录，同样写明可不可比。对照只做 F1。R1 要停服务、追加输入，单 agent 的一次性运行做不了同样的操作。
+**单 agent 对照**：材料版本、模型、OpenCode 版本都与已有读数相同时，复用 `docs/evaluation/` 下最近的一份 OpenCode 结果，写明出处；不同时，用 `evals/runner/run_eval.py --scenario scenario3 --runs 1` 跑一次，模型与 Yudao 三个部门相同；运行器从环境变量读服务（`evals/README.md`「运行一次评测」），在这次运行的进程里用试用者给的值设置，不写进文件。Yudao 一侧的历史读数也在同一目录，同样写明可不可比。对照只做 F1。R1 要停服务、追加输入，单 agent 的一次性运行做不了同样的操作。
 
 ## 7. 问题的门槛与排序
 
@@ -134,7 +134,7 @@ uv run python evals/scorer/scorer.py --delivery <交付目录> --result <结果�
 
 每条建议写四样：挡住了用户的哪个目标；证据（链到问题编号）；与单 agent 对照是更好、更差、看不出差别还是不可比；对应路线图「进入可迭代状态」五条判据中的哪一条（有负载、能度量、改动便宜可撤回、看得见、锚点受保护）。对不上任何一条的不写成建议。
 
-**独立复现**：帖子发出之前，用 omp 起一个 agent，模型与试用 agent、Yudao 部门都不同（命令写法见 [运行配置](../../../docs/agents/autopilot-runtime.md) 的审查者一行，用 `--model` 指定）。只给它帖子草稿里每条问题的复现步骤、同一个 wheel 与一个全新数据目录，不给本次的记录与结论。复现不了的问题降为观察，并写明原因。
+**独立复现**：帖子发出之前，用 omp 起一个 agent，模型用试用者这一次指定的复现模型（命令写法见 [运行配置](../../../docs/agents/autopilot-runtime.md) 的审查者一行，用 `--model` 指定）。只给它帖子草稿里每条问题的复现步骤、同一个 wheel 与一个全新数据目录，不给本次的记录与结论。复现不了的问题降为观察，并写明原因。
 
 ## 9. 帖子
 
