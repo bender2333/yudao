@@ -385,6 +385,19 @@ def test_a_department_without_a_model_is_named_in_chinese_with_where_to_set_it()
     assert readiness["issues"] == [{"location": "bindings.quality", "message": "质检部门还没有选择模型"}]
 
 
+def test_a_binding_to_a_model_that_is_not_admitted_names_the_department_and_the_model():
+    # 工单 #715：配置在、但绑定的模型没有通过模型测试准入时，说明要说清是哪个部门、哪个模型、
+    # 为什么，不能只给一条内部的定位串，也不能笼统地说「尚未配置 Provider」
+    facade = ProviderFacade(credentials={"credential-a": "a-secret", "credential-b": "b-secret"})
+    facade.store_document(_document())
+    readiness = facade.describe_readiness()
+    assert readiness["available"] is False
+    assert readiness["reason"] == "provider_unavailable"
+    assert "产品部门绑定的模型 model-a 尚未通过模型测试准入" in readiness["message"]
+    assert "bindings." not in readiness["message"]
+    assert "尚未配置 Provider" not in readiness["message"]
+
+
 def test_every_department_without_a_model_is_named_in_one_message():
     facade = ProviderFacade()
     facade.store_document(_document(bindings={}))

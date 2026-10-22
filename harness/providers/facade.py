@@ -1623,6 +1623,14 @@ def _readiness_message(exc: CatalogValidationError, store: ProviderStore,
             parts.append(f"{name}部门还没有选择模型，"
                          f"到系统的模型管理页设置部门默认，或在本项目的设置页为这个项目选择")
             continue
+        if "准入" in issue.message:
+            # 准入的说明（工单 #715）：补上部门名与模型标识，不写内部的定位串
+            department = location.split(".")[1] if location.startswith("bindings.") else ""
+            name = DEFINITIONS.department_labels.get(department, department)
+            model_id = str(bindings.get(department, {}).get("model_id", ""))
+            state = "准入已作废" if "作废" in issue.message else "尚未通过模型测试准入"
+            parts.append(f"{name}部门绑定的模型 {model_id} {state}，请在模型管理页重新测试通过后再用")
+            continue
         if "context_window" in issue.message:
             parts.append(f"{location}: {issue.message}（请为该部门绑定声明容量的模型）")
             continue
