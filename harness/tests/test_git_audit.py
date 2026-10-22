@@ -5,13 +5,13 @@ import subprocess
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.git_audit import GitBindingError, git_version_detail, verify_git_history
+from harness.git_audit import GitBindingError, verify_git_history
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.saved_rewrite import rewrite_saved_events
 
-def test_detail_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp_path):
+def test_history_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), delivery_turn(), review_turn("release", "Independent checks passed"),
     ]))
@@ -67,8 +67,5 @@ def test_detail_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp_
         recorded = system.store.list_events(run_id)
         with pytest.raises(GitBindingError, match="accepted event materials"):
             verify_git_history(system.git_versions, system.artifacts, recorded)
-        recorded_quality = next(item for item in recorded if item.event_id == quality.event_id)
-        with pytest.raises(GitBindingError, match="accepted event materials"):
-            git_version_detail(system.git_versions, system.artifacts, recorded, recorded_quality)
     finally:
         system.store.close()

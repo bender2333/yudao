@@ -17,23 +17,6 @@ class GitBindingError(ValueError):
     """A Git snapshot does not reproduce its formally accepted materials."""
 
 
-def git_version_detail(versions: GitVersionStore, artifacts: ArtifactStore,
-                       events: list[Event], event: Event) -> dict[str, Any]:
-    accepted = next((item for item in events if item.event_id == event.event_id), None)
-    if accepted != event or event.type not in GIT_VERSION_EVENTS:
-        raise GitBindingError("Git version is not bound to this accepted event")
-    previous = None
-    for group, revision, files in _expected_versions(artifacts, events):
-        if any(item.event_id == event.event_id for item in group):
-            if previous is not None:
-                parent_revision, parent_files = previous
-                _verify_files(versions, event.run_id, parent_revision, parent_files)
-            _verify_files(versions, event.run_id, revision, files)
-            return versions.show(event.run_id, revision)
-        previous = revision, files
-    raise GitBindingError("Accepted event has no verifiable Git version")
-
-
 def verify_git_history(versions: GitVersionStore, artifacts: ArtifactStore,
                        events: list[Event]) -> list[dict[str, Any]]:
     history = []

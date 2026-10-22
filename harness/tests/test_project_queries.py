@@ -7,6 +7,7 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 import pytest
+import pygit2
 from filelock import FileLock
 
 from harness.__main__ import main
@@ -39,7 +40,8 @@ from harness.app.registry import Registry
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
-from harness.models import EventType, ProjectEventType
+from harness.git_versions import GitVersionError
+from harness.models import ArtifactRef, EventType, ProjectEventType
 from harness.proposals import (
     product_spec, delivery_turn, review_turn,
     ask_turn, answer_turn,
@@ -48,7 +50,9 @@ from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
+from harness.tests.api_helpers import running_api
 from harness.tests.saved_rewrite import rewrite_saved_event
+from harness.tree_archive import load_tree
 from harness.write_path import NewEvent
 
 GOAL = "把文本按行处理清楚"
@@ -573,6 +577,56 @@ def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
     context = application.query("event.detail", EventDetail(event_id=assembled.event_id))
     assert context.data.artifacts["request"]["input"][0]["role"] == "developer"
 
+def test_event_detail_reads_the_recorded_contract_shape_from_git(data_dir):
+    system = _system(data_dir, _release_script())
+    try:
+        run_id = system.create_run("读取历史交付")
+        assert system.run_until_stop(run_id).phase == "DONE"
+        delivery = next(event for event in system.store.list_events(run_id)
+                        if event.type == EventType.DELIVERY_ACCEPTED)
+        original = delivery.payload["git_version"]
+        files = system.git_versions.read_files(run_id, original)
+        contract = json.loads(files["specs/contract.json"])
+        contract["legacy_contract_field"] = "stored with this delivery"
+        revision = system.git_versions.prepare(
+            run_id, parent_commit=original["parent_commit"],
+            updates={"specs/contract.json": json.dumps(contract).encode("utf-8"),
+                     "specs/delivery.json": files["specs/delivery.json"],
+                     "specs/delivery-tree.json": files["specs/delivery-tree.json"]},
+            code_tree=load_tree(system.artifacts, run_id, ArtifactRef(**delivery.payload["tree_ref"])),
+            message="历史材料包含旧字段",
+        )
+        rewrite_saved_event(system.store, replace(delivery, payload={**delivery.payload, "git_version": revision}))
+        detail = _application(system).query("event.detail", EventDetail(event_id=delivery.event_id))
+        shown = detail.data.artifacts["git_version"]
+        assert shown["commit"] == revision["commit"]
+        assert "legacy_contract_field" in shown["diff"]
+        assert any(item["path"] == "specs/contract.json" for item in shown["files"])
+        assert detail.data.artifacts["tree_archive"]["tree_digest"] == delivery.payload["code_tree_digest"]
+    finally:
+        system.close()
+
+
+@pytest.mark.parametrize("damage", ["missing_commit", "unbound_commit"])
+def test_event_detail_http_reports_unreadable_git_references(data_dir, damage):
+    system = _system(data_dir, [])
+    run_id = system.create_run("读取失效版本")
+    event = next(event for event in system.store.list_events(run_id) if event.type == EventType.RUN_CREATED)
+    revision = dict(event.payload["git_version"])
+    if damage == "missing_commit":
+        revision["commit"] = "0" * 40
+        rewrite_saved_event(system.store, replace(event, payload={**event.payload, "git_version": revision}))
+    else:
+        repository = pygit2.Repository(str(system.git_versions.root / (run_id + ".git")))
+        repository.references["refs/snapshots/" + revision["commit"]].delete()
+    with pytest.raises(GitVersionError) as failed:
+        system.git_versions.show(run_id, revision)
+    with running_api(lambda: _application(system)) as client:
+        response = client.get("/api/queries/event.detail", params={"event_id": event.event_id})
+        assert response.status_code == 404, response.text
+        assert response.json()["error"] == str(failed.value)
+
+
 def test_event_detail_rejects_an_artifact_of_another_run(data_dir, monkeypatch):
     system = _system(data_dir, [*_release_script(), *_release_script()])
     first_project = system.projects.register("第一个", GOAL)
@@ -665,8 +719,7 @@ def test_queries_reject_a_corrupted_delivery_archive(data_dir, damage):
     blob = system.artifacts.root / archive["blobs"][0]["artifact"]["path"]
     if damage == "missing_blob":
         blob.unlink()
-        # 事件详情的 Git 版本核对先读到缺失的对象（GitBindingError），交付文件按缺失的工件拒绝
-        detail_error, file_error = ValueError, FileNotFoundError
+        detail_error = file_error = FileNotFoundError
     else:
         blob.write_bytes(b"corrupt archive")
         detail_error = file_error = ValueError
@@ -677,8 +730,8 @@ def test_queries_reject_a_corrupted_delivery_archive(data_dir, damage):
         application.query("delivery.file", DeliveryFile(event_id=delivery.created_event_id, path="src/echo.py"))
 
 @pytest.mark.parametrize("mismatch", ["other_commit", "fake_tree", "forged_material"])
-def test_event_detail_rejects_a_git_version_not_bound_to_its_materials(data_dir, mismatch):
-    # 改写保存的事件行以后核对绑定：另一个事件的版本、伪造的树、伪造的正式材料
+def test_event_detail_reads_only_the_recorded_git_reference(data_dir, mismatch):
+    # 引用按 Git 对象读取；材料的完整核对由 replay.check 执行
     system = _system(data_dir, _release_script())
     project_id = system.projects.register("绑定", GOAL)
     _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
@@ -696,8 +749,12 @@ def test_event_detail_rejects_a_git_version_not_bound_to_its_materials(data_dir,
             run_id, "prd", "FORGED_ACCEPTED_MATERIAL", media_type="text/markdown"))
     rewrite_saved_event(system.store, replace(delivery, payload=payload))
     application = _application(system)
-    with pytest.raises(ValueError):
-        application.query("event.detail", EventDetail(event_id=delivery.event_id))
+    if mismatch == "fake_tree":
+        with pytest.raises(NotFound, match="Git version is unavailable or invalid"):
+            application.query("event.detail", EventDetail(event_id=delivery.event_id))
+    else:
+        detail = application.query("event.detail", EventDetail(event_id=delivery.event_id))
+        assert detail.data.artifacts["git_version"]["commit"] == payload["git_version"]["commit"]
 
 def test_work_item_scope_is_checked_in_every_project_query(data_dir):
     # 事项范围参数指向别的事项时，项目内的查询都以目标不存在拒绝（旧路由的跨项目场景）

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, field_validator
 
-from ..git_audit import git_version_detail
+from ..git_versions import GitVersionError
 from ..event_store import run_stream
 from ..models import (
     ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
@@ -486,19 +486,19 @@ def _event_detail(application: Application, request: EventDetail) -> Snapshot[Ev
 
 def _event_artifacts(application: Application, event: Any) -> dict[str, Any]:
     # 一条 run 事件的完整内容：正式事件的 Git 版本、交付封存、引用的工件原文与压缩来源
-    store = application.system.store
     artifacts = application.system.artifacts
     run_id = event.run_id
     loaded: dict[str, Any] = {}
     version = event.payload.get("git_version")
     if event.type in GIT_VERSION_EVENTS:
         if version is None:
-            raise ValueError("该正式事件缺少 Git 版本记录")
-        loaded["git_version"] = git_version_detail(
-            application.system.git_versions, artifacts, store.list_events(run_id), event,
-        )
+            raise NotFound("该正式事件缺少 Git 版本记录")
+        try:
+            loaded["git_version"] = application.system.git_versions.show(run_id, version)
+        except GitVersionError as error:
+            raise NotFound(str(error)) from error
     elif version is not None:
-        raise ValueError("Git 版本未绑定正式事件")
+        raise NotFound("Git 版本未绑定正式事件")
     if event.type == EventType.DELIVERY_ACCEPTED:
         tree, archive = _delivery_archive(application, event)
         loaded["tree_archive"] = archive
