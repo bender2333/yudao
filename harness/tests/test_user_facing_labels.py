@@ -1,7 +1,8 @@
-# 用户看到的说明文字（工单 #303）：等待说明、事件说明、流转内容、停止原因的处理说明都不出现
-# 英文机器标识；阶段与停止原因的中文名必须与状态机和定义同一份取值。
+# 用户看到的说明文字（工单 #303）：阶段与停止原因的中文名必须与状态机和定义同一份取值，
+# 说明文字里的内容与中文名一致。
+# 页面直接显示原始标识与原文，不再要求翻译（决策记录 2026-10-22，工单 #717），
+# 因此这里不再检查说明文字里有没有英文内部标识。
 
-import re
 import string
 import typing
 
@@ -15,28 +16,12 @@ from harness.models import (PHASES, TERMINAL_PHASES, EventType, ProjectEventType
                            waiting_reason_for)
 from harness.tests.project_stream_fields import load_manifest
 
-LATIN = re.compile(r"[A-Za-z]")
-# 产品名在顶栏与关于页本来就显示，出现在说明里不算英文内部提示；检查前先去掉它
-BRAND = re.compile(r"Yudao")
-
-
-def _without_brand(text: str) -> str:
-    return BRAND.sub("", text)
-
-
-def _human_action_stop_reasons() -> list[str]:
-    return [reason for reason, definition in DEFINITIONS.stop_reasons.items()
-            if definition.human_action is not None]
-
-
 def test_phase_names_cover_the_state_machine_exactly():
     assert set(PHASE_NAMES) == set(PHASES)
-    assert all(LATIN.search(name) is None for name in PHASE_NAMES.values())
 
 
 def test_stop_reason_names_cover_the_definitions_exactly():
     assert set(STOP_REASON_NAMES) == set(DEFINITIONS.stop_reasons)
-    assert all(LATIN.search(_without_brand(name)) is None for name in STOP_REASON_NAMES.values())
     assert core_name("released") == stop_reason_name("released")
 
 
@@ -47,27 +32,18 @@ def test_unknown_values_are_shown_verbatim_instead_of_being_guessed():
 
 
 @pytest.mark.parametrize("phase", PHASES)
-def test_waiting_reason_is_written_in_chinese_for_every_phase(phase):
+def test_every_phase_has_a_waiting_reason(phase):
     reason = waiting_reason_for(phase, "cancelled")
     if phase == "DONE":
         assert reason is None
         return
     assert reason is not None
-    assert LATIN.search(reason) is None, reason
 
 
 @pytest.mark.parametrize("phase", sorted(TERMINAL_PHASES - {"DONE"}))
 def test_terminal_waiting_reason_names_the_stop_reason_in_chinese(phase):
     reason = waiting_reason_for(phase, "provider_timeout")
     assert reason is not None and "模型服务请求超时" in reason
-    assert LATIN.search(reason) is None, reason
-
-
-@pytest.mark.parametrize("reason", _human_action_stop_reasons())
-def test_human_action_text_is_written_in_chinese(reason):
-    action = DEFINITIONS.stop_reasons[reason].human_action
-    assert action is not None
-    assert LATIN.search(_without_brand(action)) is None, f"{reason}: {action}"
 
 
 def test_transition_and_stop_events_name_phases_and_stop_reasons_in_chinese():
@@ -82,7 +58,6 @@ def test_transition_and_stop_events_name_phases_and_stop_reasons_in_chinese():
 def test_decision_kind_names_cover_all_decision_kinds():
     from harness.decisions import DECISION_KINDS
     assert set(DECISION_KIND_NAMES) == set(DECISION_KINDS)
-    assert all(LATIN.search(name) is None for name in DECISION_KIND_NAMES.values())
     assert decision_kind_name("not_a_kind") == "not_a_kind"
 
 
@@ -93,7 +68,6 @@ def test_decision_requested_names_the_kind_in_chinese_with_description(kind):
     text = event_label(EventType.DECISION_REQUESTED, {"kind": kind, "description": "需要人工处理"})
     assert DECISION_KIND_NAMES[kind] in text
     assert "需要人工处理" in text
-    assert LATIN.search(_without_brand(text)) is None, text
 
 
 def _placeholders(template: str) -> set[str]:

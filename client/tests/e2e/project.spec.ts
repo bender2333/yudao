@@ -230,16 +230,6 @@ async function pathText(page: Page): Promise<string> {
   return (await page.locator(".topbar .path").innerText()).trim();
 }
 
-// 试用页面上不应出现的开发用语与英文内部提示（工单 #303 的验收）：接口名、工单编号、
-// 内部词 run、英文停止原因与英文阶段名。`Yudao` 是产品名，先去掉再检查。
-const FORBIDDEN = /(?<![A-Za-z])run(?![A-Za-z])|released|observe-detail|project\.(overview|flow|attempts|settings)|work_item\.(inputs|create|append_input|cancel|reorder)|material\.record|event\.detail|guidance\.send|department_settings\.save|run\.(actions|attempt)|[A-Z][A-Z_]{3,}|#\d+|设计说明|TODO/;
-
-async function expectNoDeveloperText(page: Page, where: string): Promise<void> {
-  const text = (await bodyText(page)).replaceAll("Yudao", "");
-  const found = text.match(FORBIDDEN);
-  expect.soft(found?.[0] ?? null, `${where}：页面文字不应出现开发用语与英文内部提示`).toBeNull();
-}
-
 async function openDecisions(page: Page): Promise<{ decision_id: string; version: number; project_id: string }[]> {
   const data = await fetchQuery<{ decisions: { decision_id: string; version: number; project_id: string; status: string }[] }>(
     page,
@@ -283,10 +273,6 @@ test.describe("项目页面（1440×900）", () => {
         await block.getByRole("button", { name: "作为新事项开始" }).click();
         const error = block.locator("p.error");
         await expect(error).toContainText("质检部门还没有选择模型");
-        // 提示是中文句子：没有内部字段名、部门内部标识与英文原因词
-        await expect(error).not.toContainText("bindings.");
-        await expect(error).not.toContainText("quality");
-        await expect(error).not.toContainText("provider_unavailable");
         // 两个去处按钮：去模型管理页、在本项目的设置页
         const links = block.locator(".row-actions .link");
         await expect(links).toHaveText(["去模型管理页设置部门默认", "在本项目的设置页选择模型"]);
@@ -351,7 +337,6 @@ test.describe("项目页面（1440×900）", () => {
       await expect(raw).toContainText('"type"');
       await modal.getByRole("button", { name: "关闭" }).click();
       await expect(page.locator(".modal-backdrop")).toHaveCount(0);
-      await expectNoDeveloperText(page, "概览");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -542,7 +527,6 @@ test.describe("项目页面（1440×900）", () => {
       console.log("STEP dept");
       await expect(guidance).toContainText("这个部门还没有指导记录");
       await expect(guidance.getByLabel("向产品下达指导")).toBeVisible();
-      await expectNoDeveloperText(page, "部门工作间");
       expect(errors).toEqual([]);
     } finally {
       await client.close();

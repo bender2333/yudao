@@ -184,7 +184,6 @@ test("覆盖层按钮条在画面上方不与画面重叠，文字列表默认�
     const texts = await details.locator("li").evaluateAll((nodes) => nodes.map((node) => node.textContent ?? ""));
     expect(texts.length).toBe(loop.work_items.length);
     for (const text of texts) {
-      expect(text).not.toMatch(/[A-Z][A-Z_]{3,}/);
       expect(text).toMatch(/(大厅|产品|工程|质检|运维)/);
       expect(text).toMatch(/(未开始|进行中|已采纳|已放行|等待确认初始 PRD|已停止|排队中)/);
     }

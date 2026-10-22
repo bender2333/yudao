@@ -4,7 +4,7 @@
 // 覆盖：状态项「待你决定」与 decisions.list 数量一致、首页与标签栏的决定卡片、提问被回答或撤销时显示原因、
 // 离开期间的报告三种范围与「已看过」、项目列表字段与 projects.list 一致；控制台错误为零。
 
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
 const BLOCKED = "文本工具";
@@ -124,16 +124,6 @@ async function overflowReport(page: Page): Promise<string[]> {
   });
 }
 
-// 决定卡片上的文字不应出现开发用语与英文内部提示（工单 #303 的验收）：内部词 run、
-// 英文停止原因、接口名与英文阶段名。`Yudao` 是产品名，先去掉再检查。
-const FORBIDDEN = /(?<![A-Za-z])run(?![A-Za-z])|released|decisions\.list|decision\.answer|work_item\.[a-z_]+|run\.[a-z_]+|project\.[a-z_]+|[A-Z][A-Z_]{3,}|#\d+/;
-
-async function expectNoDeveloperText(scope: Locator, where: string): Promise<void> {
-  const text = (await scope.innerText()).replaceAll("Yudao", "");
-  const found = text.match(FORBIDDEN);
-  expect.soft(found?.[0] ?? null, `${where}：卡片文字不应出现开发用语与英文内部提示`).toBeNull();
-}
-
 type DecisionRow = { decision_id: string; version: number; project_id: string; work_item_id: string | null };
 
 async function openDecisions(page: Page): Promise<DecisionRow[]> {
@@ -173,9 +163,6 @@ test.describe("系统首页（1440×900）", () => {
       await expect(first.locator(".decision-meta")).toContainText("挡住");
       // 材料按决定种类整理：待恢复显示部门与具体问题
       await expect(first.locator("details")).toContainText("部门");
-      for (const card of await block.locator(".decision-card").all()) {
-        await expectNoDeveloperText(card, "决定卡片");
-      }
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -317,18 +304,14 @@ test.describe("系统首页（1440×900）", () => {
     }
   });
 
-  test("首页两个区块的说明与报告项不出现开发用语", async () => {
-    // 工单 #319 第 5 项：首页「项目」区块的说明与离开期间报告的说明原来写着接口名
+  test("首页项目区块的说明不出现接口名", async () => {
+    // 工单 #319 第 5 项：首页「项目」区块的说明原来写着接口名
     const client = await openHome({ width: 1440, height: 900 });
     const errors = watchErrors(client);
     try {
       const projects = client.page.locator("section.card")
         .filter({ has: client.page.getByRole("heading", { name: "项目", exact: true }) });
-      const report = client.page.locator("section.card")
-        .filter({ has: client.page.getByRole("heading", { name: "离开期间的报告", exact: true }) });
       await expect(projects.locator(".note, header .note").first()).not.toContainText("数据来自");
-      await expectNoDeveloperText(projects, "首页项目区块");
-      await expectNoDeveloperText(report, "离开期间的报告");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
