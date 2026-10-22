@@ -233,6 +233,47 @@ def test_ingest_snapshot_function_writes_nothing_to_source(tmp_path, data_dir):
     assert capture_public_tree(restored).digest == tree.digest
 
 
+@pytest.mark.parametrize("entry", ["initial_directory", "onboard", "restart_onboarding"])
+def test_snapshot_entries_exclude_ignored_files_from_archives_and_workspaces(data_dir, tmp_path, entry):
+    source = _make_source(tmp_path / "source")
+    system = _system(data_dir)
+    try:
+        if entry == "restart_onboarding":
+            project_id, _item_id, old_run_id, _snapshot = _start(system, source)
+            system.cancel(old_run_id)
+            system.projects.settle(old_run_id)
+        (source / ".gitignore").write_bytes(b"secret.txt\ncache/\n")
+        (source / "secret.txt").write_bytes(b"excluded source contents")
+        (source / "cache").mkdir()
+        (source / "cache" / "dependency.bin").write_bytes(b"excluded dependency")
+        before = _fingerprint(source)
+
+        if entry == "initial_directory":
+            project_id = system.projects.register("快照项目", GOAL, initial_directory=str(source))
+            snapshot = system.projects.projection(project_id).initial_snapshot
+            _item_id, run_id = system.projects.start_work_item(project_id, REQUIREMENT)
+            scope = project_id
+        elif entry == "onboard":
+            project_id, _item_id, run_id, snapshot = _start(system, source)
+            scope = run_id
+        else:
+            item_id, run_id = system.projects.restart_onboarding(project_id, "src")
+            snapshot = system.projects.projection(project_id).work_item(item_id).snapshot
+            scope = run_id
+
+        assert snapshot["files"] == [".gitignore", ".hidden", "src/app.py", "src/data.bin"]
+        assert snapshot["directories"] == ["empty", "empty/nested", "src"]
+        assert snapshot["bytes"] == len(b"secret.txt\ncache/\n") + len(HIDDEN_BYTES) + len(APP_BYTES) + len(BIN_BYTES)
+        restored = restore_snapshot(system.artifacts, scope, snapshot, tmp_path / "restored")
+        for root in (restored, system.workspace(run_id).root):
+            assert not (root / "secret.txt").exists()
+            assert not (root / "cache").exists()
+            assert (root / "src" / "app.py").read_bytes() == APP_BYTES
+        assert _fingerprint(source) == before
+    finally:
+        system.close()
+
+
 def test_project_onboard_http_entry(data_dir, tmp_path):
     # 经 HTTP 命令 project.onboard 接入：建档 run 由流程编排作为任务运行到 baseline_verified
     source = _make_source(tmp_path / "source")
