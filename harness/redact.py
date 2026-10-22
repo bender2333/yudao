@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+from typing import Any
 
 _SECRET_KEY = re.compile(r"(API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AUTHORIZATION)", re.I)
 _MIN_VALUE_LEN = 8
@@ -43,3 +44,12 @@ def redact_text(text: str, *, extra_values: list[str] | None = None) -> str:
     for value, replacement in values:
         redacted = redacted.replace(value, replacement)
     return redacted
+
+
+def redact_tool_args(args: dict[str, Any]) -> dict[str, Any]:
+    # 动作参数里的命令按 ADR-0038 只留凭据的名称：保存的内容里不出现密钥原文，
+    # 命令输出里的同一规则（redact_text）也适用于命令本身
+    command = args.get("command")
+    if not isinstance(command, str) or not command:
+        return args
+    return {**args, "command": redact_text(command)}

@@ -553,16 +553,12 @@ class UsageCharge(Versions, CallTarget):
 
 
 class ToolStartedPayload(AttemptIdentity, Versions, WorkBasis):
-    # registered_name、registered_argv 与 snapshot_hash 只在登记命令获准执行时出现
     id: str
     name: str
     args: dict[str, Any]
     step_id: int
     activation_id: str
     attempt: int
-    registered_name: str | None = None
-    registered_argv: list[str] | None = None
-    snapshot_hash: str | None = None
     # 动作前的公开树快照（工单 #17）：许可以后、执行之前写入，中断后按它与动作参数核对实际效果
     before_snapshot_ref: ArtifactRef | None = None
     # 自动重新执行（工单 #307）：旧事件保留，新版本不再写

@@ -161,14 +161,6 @@ export type AcceptedWorkItemRefs = {
  */
 export type ActionReceipt = {
     /**
-     * Registered Name
-     */
-    registered_name: string | null;
-    /**
-     * Registered Argv
-     */
-    registered_argv: Array<string> | null;
-    /**
      * Args
      */
     args: {
@@ -14486,18 +14478,6 @@ export type ToolStartedPayload = {
      * Attempt
      */
     attempt: number;
-    /**
-     * Registered Name
-     */
-    registered_name?: string | null;
-    /**
-     * Registered Argv
-     */
-    registered_argv?: Array<string> | null;
-    /**
-     * Snapshot Hash
-     */
-    snapshot_hash?: string | null;
     before_snapshot_ref?: ArtifactRef | null;
     /**
      * Auto Retry Of

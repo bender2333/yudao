@@ -3798,31 +3798,6 @@
       },
       "ActionReceipt": {
         "properties": {
-          "registered_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Registered Name"
-          },
-          "registered_argv": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Registered Argv"
-          },
           "args": {
             "additionalProperties": true,
             "type": "object",
@@ -3867,8 +3842,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "registered_name",
-          "registered_argv",
           "args",
           "ok",
           "error",
@@ -6963,7 +6936,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 5
+            "example": 6
           },
           "contract_digest": {
             "type": "string",
@@ -31090,42 +31063,6 @@
           "attempt": {
             "title": "Attempt",
             "type": "integer"
-          },
-          "registered_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Registered Name"
-          },
-          "registered_argv": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Registered Argv"
-          },
-          "snapshot_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Hash"
           },
           "before_snapshot_ref": {
             "anyOf": [
