@@ -10,7 +10,7 @@ import pytest
 
 from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
-from harness.models import CatalogEventType
+from harness.models import CatalogEventType, ProjectEventType
 from harness.release_check import (
     MANIFEST_PATH, Finding, check_repository, decision_request_payload, load_manifest, request_instance_upgrade,
 )
@@ -312,6 +312,10 @@ def test_the_catalog_stream_decisions_mark_the_list_for_resubscription(repositor
         listed = next(item for item in capabilities.queries if item.name == "decisions.list")
         assert {CatalogEventType.INSTANCE_UPGRADE_REQUESTED, CatalogEventType.INSTANCE_UPGRADE_ANSWERED,
                 CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN} <= set(listed.changed_by)
+        # 工单 #701：项目流里的决定（接入已有项目的初始 PRD）同样在清单里，
+        # 客户端按这份清单重查顶栏的待决数量
+        assert {ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
+                ProjectEventType.PROJECT_DECISION_WITHDRAWN} <= set(listed.changed_by)
     finally:
         system.close()
 

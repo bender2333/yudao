@@ -8,6 +8,7 @@ import type { Capabilities, DecisionList, EventObject, OutputDelta } from "../ap
 import { connect, interfaceFor, type Interface } from "./connection";
 import { EventStreamClient } from "./event-stream";
 import { callCommand, type CommandOutcome } from "./invoke";
+import { pendingDecisionEventTypes } from "./pending-decisions";
 import { nextStreamState, type StreamState } from "./stream-state";
 import { ViewSync, resubscribePosition } from "./view-sync";
 
@@ -168,7 +169,9 @@ export class ClientApp {
     for (const listener of [...this.pageListeners]) {
       listener(event);
     }
-    if (event.type === "decision_requested" || event.type === "decision_answered" || event.type === "decision_withdrawn") {
+    // 待决数量按能力清单里 decisions.list 声明的事件种类重查（工单 #701）：
+    // 决定请求可能在 run 流、项目流或目录流里，写死三种会漏掉后两种
+    if (pendingDecisionEventTypes(this.capabilities).has(event.type)) {
       void this.refreshPendingDecisions();
     }
   }
