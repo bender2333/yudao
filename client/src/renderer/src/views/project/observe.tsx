@@ -20,6 +20,7 @@ import { Empty, KeyValue, Loading, Section, Table, Tabs, dict, formatNumberOr, l
 import { ATTEMPT_STATUS, DEPARTMENTS, departmentName, formatTime, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
 import { usageText } from "./usage-text";
+import { readFailureText } from "../../contract/read-failure";
 
 const PAGE_SIZE = 50;
 
@@ -116,6 +117,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
         subtitle={attemptsSummary({
           inFlight,
           total: usage.data === null ? null : usage.data.totals.attempts,
+          totalError: usage.error,
           loaded: rows.length,
           more: attempts.data !== null && attempts.data.cursor !== null,
         })}
@@ -254,12 +256,17 @@ function RecordsPanel(props: {
   );
 }
 
-function UsageSection(props: { usage: { data: UsageReport | null; loading: boolean } }) {
+function UsageSection(props: { usage: { data: UsageReport | null; loading: boolean; error: string | null } }) {
   const data = props.usage.data;
   if (data === null) {
     return (
       <div className="y10-usage">
-        <Loading state={props.usage} />
+        {props.usage.error !== null ? (
+          // 用量统计读不出来：说读不出来，不安静地少一句数字（工单 #775）
+          <p className="y10-note note" role="status">{readFailureText(props.usage.error)}</p>
+        ) : (
+          <Loading state={props.usage} />
+        )}
       </div>
     );
   }

@@ -17,6 +17,7 @@ import type {
 import { paths } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import type { Route } from "../../shell/routing";
+import { emptyOrFailureText, readFailureText } from "../../contract/read-failure";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, SubmitButton, Table, TextArea,
   TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
 import { FloorScreen } from "./floor-screen";
@@ -71,7 +72,10 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
   return (
     <div className={`page${at !== null ? " is-replay" : ""}`}>
       <Loading state={overview} />
-      {data ? (
+      {overview.error !== null ? (
+        // 读不出来就说读不出来：这一页本来有内容（工单 #775），不写空态，也不留一片空白
+        <p className="y10-note note" role="status">{readFailureText(overview.error)}</p>
+      ) : data ? (
         <>
           <Summary data={data} />
           <Section
@@ -192,10 +196,13 @@ function CurrentItem(props: {
   }
 
   const data = inputs.data;
-  const processing = data === null
-    ? (inputs.loading ? "正在读取" : "没有输入记录")
-    : `已接收第 ${data.input_version} 版输入，已由有效需求接纳到第 ${data.processed_input_version} 版`
-      + `${data.input_version > data.processed_input_version ? "（还有输入没有接纳）" : ""}`;
+  // 读不出来与本来就没有输入记录是两句话（工单 #775）：失败说失败，空态说空态
+  const processing = inputs.error !== null
+    ? readFailureText(inputs.error)
+    : data === null
+      ? (inputs.loading ? "正在读取" : "没有输入记录")
+      : `已接收第 ${data.input_version} 版输入，已由有效需求接纳到第 ${data.processed_input_version} 版`
+        + `${data.input_version > data.processed_input_version ? "（还有输入没有接纳）" : ""}`;
   // 停止的事项没有在处理的部门，这一项不写进去
   const department = departmentName(item.department);
   const note = `${item.title}（事项标识 ${item.work_item_id}，第 ${item.round} 轮${department === "" ? "" : `，部门 ${department}`}）`;
@@ -212,7 +219,7 @@ function CurrentItem(props: {
           ["处理进度", processing],
         ]}
       />
-      <InputRecords app={props.app} inputs={data === null ? [] : data.inputs} loading={inputs.loading} />
+      <InputRecords app={props.app} inputs={data === null ? [] : data.inputs} loading={inputs.loading} error={inputs.error} />
       {item.status === "in_progress" && hasCommand(props.app, "work_item.append_input") ? (
         <div className="y10-ov-composer composer">
           <TextArea label="追加需求" value={appendText} onInput={setAppendText} />
@@ -313,7 +320,13 @@ export function NewItemComposer(props: {
 }
 
 // 输入记录：版本、字节范围与原文；点击打开接收这条输入的原始事件
-function InputRecords(props: { app: ClientApp; inputs: WorkItemInputsResult["inputs"]; loading: boolean }) {
+function InputRecords(props: {
+  app: ClientApp;
+  inputs: WorkItemInputsResult["inputs"];
+  loading: boolean;
+  /** 读取失败时的原因；有它时不说「没有输入记录」（工单 #775） */
+  error: string | null;
+}) {
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const detail = useSnapshot<EventDetailResult>(
     props.app,
@@ -324,7 +337,9 @@ function InputRecords(props: { app: ClientApp; inputs: WorkItemInputsResult["inp
   );
 
   if (props.inputs.length === 0) {
-    return props.loading ? <p className="y10-note note">正在读取输入记录</p> : <Empty text="这个事项没有输入记录" />;
+    return props.loading
+      ? <p className="y10-note note">正在读取输入记录</p>
+      : <Empty text={emptyOrFailureText(props.error, "这个事项没有输入记录")} />;
   }
 
   return (
@@ -380,7 +395,7 @@ function Board(props: { items: WorkItemCard[] }) {
 }
 
 // 流转记录：时间、方向、类型、内容与状态；返工行用醒目颜色，点击打开原始事件
-function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | null; loading: boolean } }) {
+function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | null; loading: boolean; error: string | null } }) {
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const detail = useSnapshot<EventDetailResult>(
     props.app,
@@ -401,7 +416,7 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
 
   return (
     <Section id="ov-flow" title="流转记录" note="点击时间打开原始事件；返工行用醒目的颜色标出">
-      {records.length === 0 ? <Empty text="项目还没有流转记录" /> : (
+      {records.length === 0 ? <Empty text={emptyOrFailureText(props.flow.error, "项目还没有流转记录")} /> : (
         <Table
           head={["时间", "方向", "类型", "内容", "状态"]}
           rows={records.map((record) => [

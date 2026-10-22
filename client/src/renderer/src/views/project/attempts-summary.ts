@@ -7,6 +7,11 @@ export function attemptsSummary(input: {
   inFlight: number;
   /** 范围里的模型请求总数；没有读到时是 null */
   total: number | null;
+  /**
+   * 总数读不出来时的原因（project.usage 失败）；有它时说明总数读不出来，
+   * 不安静地少一句数字（工单 #775）。没有它时只说已显示的行数。
+   */
+  totalError?: string | null;
   /** 已经加载出来的行数 */
   loaded: number;
   /** 还有下一页 */
@@ -14,7 +19,9 @@ export function attemptsSummary(input: {
 }): string {
   const parts: string[] = [`${input.inFlight} 个请求进行中`];
   if (input.total === null) {
-    parts.push(`已显示 ${input.loaded} 条`);
+    parts.push(input.totalError === null || input.totalError === undefined
+      ? `已显示 ${input.loaded} 条`
+      : `总数读不出来：${input.totalError}，已显示 ${input.loaded} 条`);
   } else {
     parts.push(`共 ${input.total} 次模型请求，已显示 ${input.loaded} 条`);
   }
