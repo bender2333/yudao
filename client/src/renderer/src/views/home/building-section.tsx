@@ -15,6 +15,7 @@ import { BUILDING_STATUS } from "../../pixel/building/render";
 import type { PixelFloorEvent } from "../../pixel/world/types";
 import { floorEventOf } from "../project/floor-screen";
 import { Section } from "../project/common";
+import { emptyOrFailureText } from "../../contract/read-failure";
 
 /** 楼的位置用到的项目行：projects.list 里与建楼有关的字段。 */
 type ProjectRow = ProjectList["projects"][number];
@@ -22,6 +23,8 @@ type ProjectRow = ProjectList["projects"][number];
 export interface BuildingSectionProps {
   app: ClientApp;
   projects: ProjectList | null;
+  /** 项目列表读取失败时的原因：有它时不说「还没有项目」，说「读不出来」（工单 #728）。 */
+  error: string | null;
   /** 回放位置（全局位置）：不为 null 时每个项目的 project.loop 按位置带 at 读取。 */
   at?: number | null;
   onNavigate: (hash: string) => void;
@@ -45,7 +48,7 @@ export function BuildingSection(props: BuildingSectionProps): React.JSX.Element 
         </div>
       </div>
       {model.floors.length === 0 ? (
-        <p className="y10-note note">还没有项目</p>
+        <p className="y10-note note">{emptyOrFailureText(props.error, "还没有项目")}</p>
       ) : (
         <ul className="building-list">
           {model.floors.map((floor) => (

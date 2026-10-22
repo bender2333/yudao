@@ -118,18 +118,19 @@ test("resync 时重新查询快照（refreshAll），视图补齐", async () => 
   assert.deepEqual(seen.map((item) => item.value), [1, 2]);
 });
 
-test("打开时查询失败不通知、不抛出，错误回调结束读取状态", async () => {
+test("打开时查询失败不通知、不抛出，错误回调结束读取状态并带出原因", async () => {
   // 工单 #301：服务不可达时查询失败，open 不把失败当快照用；调用处用 onError 结束「正在读取数据」
+  // 工单 #728：失败的原因要带出来，界面才能说「读不出来」而不是「本来就没有内容」
   const views = new ViewSync(async () => {
-    throw new Error("查询 projects.list 没有返回数据");
+    throw new Error("查询 projects.list 没有返回数据：Internal Server Error");
   }, CAPABILITIES);
   const seen = [];
-  let errored = 0;
-  await views.open("v", { query: "projects.list" }, (data) => seen.push(data), () => {
-    errored += 1;
+  const reasons = [];
+  await views.open("v", { query: "projects.list" }, (data) => seen.push(data), (reason) => {
+    reasons.push(reason);
   });
   assert.deepEqual(seen, []);
-  assert.equal(errored, 1);
+  assert.deepEqual(reasons, ["查询 projects.list 没有返回数据：Internal Server Error"]);
 });
 
 test("重查失败保留旧快照与旧位置，不抛出", async () => {

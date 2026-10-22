@@ -9,6 +9,7 @@ import type { ClientApp } from "../contract/client-app";
 import { useCommand } from "../views/project/use-snapshot";
 import { visibleProjects } from "../views/project/project-list";
 import { drainNoticeText } from "../views/system/drain-text";
+import { emptyOrFailureText } from "../contract/read-failure";
 import { Icon, StatusMark } from "./kit";
 import { onboardingRejectionText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
 
@@ -17,6 +18,8 @@ export type SidebarProps = {
   capabilities: Capabilities;
   decisions: DecisionView[];
   projects: ProjectRow[];
+  // 项目列表读取失败时的原因（工单 #728）：有它时不说「没有符合的项目」，说「读不出来」
+  projectsError: string | null;
   activeProjectId: string | null;
   activeName: string;
   pendingByProject: Record<string, number>;
@@ -177,7 +180,7 @@ export function Sidebar(props: SidebarProps) {
             );
           })}
         </ul>
-        {visible.length === 0 ? <p className="y10-note note" role="status">没有符合的项目</p> : null}
+        {visible.length === 0 ? <p className="y10-note note" role="status">{emptyOrFailureText(props.projectsError, "没有符合的项目")}</p> : null}
         <label className="y10-check checkbox">
           <input type="checkbox" checked={props.includeArchived} onChange={(event) => props.onIncludeArchivedChange(event.target.checked)} />
           <span>显示归档的项目</span>

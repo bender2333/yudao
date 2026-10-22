@@ -6,8 +6,9 @@
 import type { Rejected } from "../api/generated/types.gen";
 import type { Client } from "../api/generated/client";
 import * as sdk from "../api/generated/sdk.gen";
+import { queryFailureText } from "./read-failure";
 
-type QueryFunction = (options: { client: Client; query?: Record<string, unknown> }) => Promise<{ data: unknown }>;
+type QueryFunction = (options: { client: Client; query?: Record<string, unknown> }) => Promise<{ data: unknown; error?: unknown }>;
 type CommandFunction = (options: { client: Client; body: unknown }) => Promise<{ data: unknown; error?: unknown }>;
 
 // 一条命令的结果：接受返回应用层的受理回执（command_id、position、refs），拒绝返回 Rejected
@@ -40,8 +41,9 @@ export async function callQuery<T>(
   }
   const response = await (fn as QueryFunction)({ client, query: params });
   if (response.data === undefined) {
-    // 服务不可达或查询失败时生成客户端返回空 data：直接抛出，不把 undefined 当快照用
-    throw new Error(`查询 ${name} 没有返回数据`);
+    // 服务不可达或查询失败时生成客户端返回空 data：直接抛出，不把 undefined 当快照用。
+    // 服务端给的说明带在错误里（工单 #728）：界面要能把它与「本来就没有内容」分开。
+    throw new Error(queryFailureText(name, response.error));
   }
   return response.data as { position: number; data: T };
 }
