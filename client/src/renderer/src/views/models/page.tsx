@@ -6,8 +6,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CommandOutcome } from "../../contract/invoke";
 import { newCommandId } from "../../contract/command-id.ts";
+import { commandProblemText } from "../../contract/command-problem.ts";
 import { optionalRead, readFailureText } from "../../contract/read-failure.ts";
-import type { Rejected } from "../../api/generated/types.gen";
 import type { ViewSync } from "../../contract/view-sync";
 import type {
   Catalog,
@@ -1304,25 +1304,26 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   );
 }
 
-// 一条命令的结果：接受时 ok，拒绝时按 Rejected 的原因与当前版本显示
+// 一条命令的结果：接受时 ok，没有成功时显示那一句说明
+// （应用层拒绝、接口层校验错误与其它失败各有各的说法，工单 #740）
 function interpret(outcome: CommandOutcome): SubmitResult {
   if (outcome.ok) {
     return { ok: true, message: "" };
   }
-  const rejection = outcome.rejection as Rejected & { detail?: { loc?: unknown[]; msg?: string }[] };
-  // 合同校验失败（422）返回错误明细，逐条指出字段位置（第 4.6 节）；命令被拒绝（409）返回原因与当前版本
-  if (Array.isArray(rejection.detail)) {
-    const parts = rejection.detail.map((item) => {
-      const location = Array.isArray(item.loc) ? item.loc.filter((part) => part !== "body").join(".") : "";
-      return location === "" ? String(item.msg ?? "") : `${location}：${item.msg ?? ""}`;
-    });
-    return { ok: false, message: parts.join("；") };
+  const problem = outcome.problem;
+  if (problem.kind === "invalid") {
+    // 合同校验失败（422）：这一页编辑的是原始 JSON，按字段位置指出问题改哪一处（第 4.6 节）；
+    // 服务端给的字段错误明细里就有位置，没有明细时用服务端给的那句中文说明
+    const detail = (problem.body as { detail?: { loc?: unknown[]; msg?: string }[] } | null)?.detail;
+    if (Array.isArray(detail)) {
+      const parts = detail.map((item) => {
+        const location = Array.isArray(item.loc) ? item.loc.filter((part) => part !== "body").join(".") : "";
+        return location === "" ? String(item.msg ?? "") : `${location}：${item.msg ?? ""}`;
+      });
+      return { ok: false, message: parts.join("；") };
+    }
   }
-  const current = rejection.current_version;
-  return {
-    ok: false,
-    message: current === null || current === undefined ? rejection.message : `${rejection.message}（当前版本 ${current}）`,
-  };
+  return { ok: false, message: commandProblemText(problem) };
 }
 
 // 某部门当前绑定到所选模型的已保存请求档位（设计说明第 9.1 节）：绑定指向别的模型时没有已保存档位

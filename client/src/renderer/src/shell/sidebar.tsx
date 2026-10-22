@@ -4,14 +4,15 @@
 // 项目列表本身由外壳的视图同步给出，命令被接受以后由事件到达时重新查询。
 
 import { useEffect, useMemo, useState } from "react";
-import type { Capabilities, DecisionView, ProjectRow, Rejected } from "../api/generated/types.gen";
+import type { Capabilities, DecisionView, ProjectRow } from "../api/generated/types.gen";
 import type { ClientApp } from "../contract/client-app";
+import { type CommandProblem } from "../contract/command-problem.ts";
 import { useCommand } from "../views/project/use-snapshot";
 import { visibleProjects } from "../views/project/project-list";
 import { drainNoticeText } from "../views/system/drain-text";
 import { emptyOrFailureText } from "../contract/read-failure";
 import { Icon, StatusMark } from "./kit";
-import { onboardingRejectionText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
+import { onboardingProblemText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
 
 export type SidebarProps = {
   app: ClientApp;
@@ -124,7 +125,7 @@ export function Sidebar(props: SidebarProps) {
             mode={creating}
             busy={command.busy}
             submitted={command.submitted}
-            rejection={command.rejection}
+            problem={command.problem}
             onClose={() => setCreating(null)}
             onSubmit={(name, body) => command.submit(name, body)}
           />
@@ -220,7 +221,7 @@ function NewProject(props: {
   mode: "idea" | "existing";
   busy: boolean;
   submitted: boolean;
-  rejection: Rejected | null;
+  problem: CommandProblem | null;
   onClose: () => void;
   onSubmit: (name: string, body: Record<string, unknown>) => Promise<boolean>;
 }) {
@@ -307,13 +308,13 @@ function NewProject(props: {
             {props.busy ? "正在提交" : props.mode === "idea" ? "新建项目" : "接入项目"}
           </button>
         </div>
-        {props.rejection ? (
+        {props.problem ? (
           <div className="rejection" role="status">
             <p className="error">
-              {onboardingRejectionText(props.rejection)}
+              {onboardingProblemText(props.problem)}
             </p>
             <ul className="rejection-paths y10-list">
-              {sourceInvalidLines(props.rejection).map((line) => <li key={line}>{line}</li>)}
+              {sourceInvalidLines(props.problem).map((line) => <li key={line}>{line}</li>)}
             </ul>
           </div>
         ) : null}

@@ -232,7 +232,7 @@ function CurrentItem(props: {
                 .then((ok) => { if (ok) setAppendText(""); });
             }}
           />
-          <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
+          <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
         </div>
       ) : null}
       {/* 建档事项等用户确认初始 PRD 时事项本身没有在执行，取消撤销那条决定请求（工单 #136），
@@ -247,7 +247,7 @@ function CurrentItem(props: {
               void props.command.submit("work_item.cancel", { work_item_id: item.work_item_id, base_version: item.version });
             }}
           />
-          <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
+          <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
         </div>
       ) : null}
     </Section>
@@ -301,9 +301,9 @@ export function NewItemComposer(props: {
           />
         ) : <p className="y10-note note">这台主机没有提供新建事项的操作</p>}
         <p className="y10-note note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
-        <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
+        <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
         {(() => {
-          const links = rejectionLinks(props.command.rejection, props.projectId);
+          const links = rejectionLinks(props.command.problem, props.projectId);
           return links.length > 0 ? (
             <div className="y10-row row-actions">
               {links.map((link) => (

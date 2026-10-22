@@ -24,6 +24,11 @@ function rejection(overrides) {
   };
 }
 
+// 命令失败的形状（工单 #740）：应用层拒绝、接口层校验错误、其余
+function problem(rejectionBody) {
+  return { kind: "rejected", rejection: rejectionBody };
+}
+
 function project(overrides) {
   return { project_id: "p1", onboarding_status: null, ...overrides };
 }
@@ -45,7 +50,7 @@ function toolStarted(overrides) {
 }
 
 test("拒绝说明按分号分行，每条相对路径各占一行", () => {
-  assert.deepEqual(sourceInvalidLines(rejection()), [
+  assert.deepEqual(sourceInvalidLines(problem(rejection())), [
     "Links and reparse points are not supported: docs/alpha",
     "Links and reparse points are not supported: docs/beta",
     "Add these paths to the project's ignore rules or delete them.",
@@ -54,9 +59,13 @@ test("拒绝说明按分号分行，每条相对路径各占一行", () => {
 
 test("只有一条原因时分行给出这一条，空段落不出现", () => {
   assert.deepEqual(
-    sourceInvalidLines(rejection({ message: "宿主私有路径不能进入公开快照：.checks" })),
+    sourceInvalidLines(problem(rejection({ message: "宿主私有路径不能进入公开快照：.checks" }))),
     ["宿主私有路径不能进入公开快照：.checks"],
   );
+});
+
+test("接口层校验错误没有路径可列（工单 #740）", () => {
+  assert.deepEqual(sourceInvalidLines({ kind: "invalid", note: "这次请求被拒绝：「名称」不能为空" }), []);
 });
 
 test("接入的每个拒绝原因都有中文说明", () => {

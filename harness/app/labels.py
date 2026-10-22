@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..definitions import DEFINITIONS
@@ -211,3 +212,105 @@ _LABELS: dict[str, str] = {
     CatalogEventType.INSTANCE_UPGRADE_ANSWERED: "回答了实例升级的决定：{option}",
     CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN: "撤销了实例升级的决定：{reason}",
 }
+
+
+# ---------------------------------------------------------------------------
+# 请求体不符合合同时给页面的中文说明（工单 #740）
+#
+# 服务端按 422 拒绝一条命令时，响应体里有两样东西：pydantic 的字段错误明细（机器看）
+# 与一句中文说明（页面直接显示）。这句说明写明是哪个字段、要求是什么：
+# 字段写页面上的中文名，字段路径与错误类型这些机器标识不写进去。
+
+# 命令请求字段的中文名：与页面上表单里那个名字一致
+COMMAND_FIELD_NAMES: dict[str, str] = {
+    "command_id": "命令身份",
+    "project_id": "项目",
+    "work_item_id": "事项",
+    "department": "部门",
+    "name": "名称",
+    "goal": "长期目标",
+    "title": "标题",
+    "text": "内容",
+    "path": "目录路径",
+    "source_name": "源目录名称",
+    "source_path": "源目录路径",
+    "initial_directory": "起始文件夹",
+    "department_prompt": "部门 Prompt",
+    "provider_id": "服务提供方",
+    "model_id": "模型",
+    "requested_tier": "推理档位",
+    "remote": "远程仓库",
+    "target_branch": "目标分支",
+    "check_commands": "检查命令",
+    "credential_ref": "凭据引用",
+    "ref": "凭据引用",
+    "secret": "凭据",
+    "position": "位置",
+    "reason": "原因",
+    "modified_by": "修改人",
+    "decision_id": "决定请求",
+    "option": "选项",
+    "note": "说明",
+    "models_url": "模型清单地址",
+    "value": "取值",
+}
+
+# 校验错误的中文说法：键是 pydantic 的错误类型，named 是写明字段时的说法，
+# unnamed 是没有登记字段名时的说法。string_too_short_min 是长度下限大于 1 的情形。
+VALIDATION_REQUIREMENTS: dict[str, dict[str, str]] = {
+    "string_too_short": {"named": "不能为空", "unnamed": "有一项内容不能为空"},
+    "string_too_short_min": {"named": "太短了", "unnamed": "有一项内容太短了"},
+    "string_too_long": {"named": "太长了", "unnamed": "有一项内容太长了"},
+    "missing": {"named": "必须填写", "unnamed": "有一项内容必须填写"},
+    "string_pattern_mismatch": {"named": "格式不对", "unnamed": "有一项内容格式不对"},
+    "literal_error": {"named": "不是允许的取值", "unnamed": "有一项内容不是允许的取值"},
+    "int_parsing": {"named": "必须是数字", "unnamed": "有一项内容必须是数字"},
+    "float_parsing": {"named": "必须是数字", "unnamed": "有一项内容必须是数字"},
+    # 合同里的空白检查（contracts.py 的 _not_blank）拒绝只有空白的文字
+    "value_error": {"named": "不能只有空白字符", "unnamed": "有一项内容不能只有空白字符"},
+    # 多余的字段不写字段名：那是服务端不认识的字段，页面上也没有对应的输入框
+    "extra_forbidden": {"named": "不是这个命令要的填写项", "unnamed": "多填了一项服务端不认识的填写内容"},
+}
+
+
+def _error_field(location: Any) -> str:
+    """字段错误明细里的字段名：位置的最后一段（body、字段、嵌套字段）。"""
+    if not isinstance(location, Sequence) or isinstance(location, str):
+        return ""
+    parts = [str(part) for part in location if isinstance(part, (str, int))]
+    return parts[-1] if parts else ""
+
+
+def _error_kind(error: Mapping[str, Any]) -> str:
+    """字段错误的种类：pydantic 的错误类型；长度下限大于 1 的另算一种。"""
+    kind = str(error.get("type") or "")
+    if kind == "string_too_short":
+        context = error.get("ctx")
+        minimum = context.get("min_length") if isinstance(context, Mapping) else None
+        if isinstance(minimum, int) and minimum > 1:
+            return "string_too_short_min"
+    return kind
+
+
+def validation_text(errors: Sequence[Mapping[str, Any]]) -> str:
+    """请求体不符合合同时的一句话：写明这次请求被拒绝、是哪个字段、要求是什么。
+
+    服务端给的每一条字段错误都写到这一句里，不丢一条。没有登记的字段名不写出来，
+    只写要求（页面上不出现字段路径这样的机器标识）。
+    """
+    clauses: list[str] = []
+    for error in errors:
+        kind = _error_kind(error)
+        requirement = VALIDATION_REQUIREMENTS.get(kind)
+        if requirement is None:
+            clauses.append("有一项填写的内容不符合要求")
+            continue
+        label = COMMAND_FIELD_NAMES.get(_error_field(error.get("loc")))
+        if label is None or kind == "extra_forbidden":
+            clauses.append(requirement["unnamed"])
+        else:
+            clauses.append(f"「{label}」{requirement['named']}")
+    if not clauses:
+        return "这次请求被拒绝：提交的内容没有通过服务端的检查，请修改以后再提交。"
+    unique = list(dict.fromkeys(clauses))
+    return f"这次请求被拒绝：{'；'.join(unique)}，请修改以后再提交。"

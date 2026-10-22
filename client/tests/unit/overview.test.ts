@@ -29,7 +29,7 @@ async function driver(input: { scenario: string }): Promise<Record<string, unkno
   const command = {
     busy: false,
     submitted: false,
-    rejection: null,
+    problem: null,
     accepted: null,
     submit: async (name: string, body: Record<string, unknown>): Promise<boolean> => {
       calls.push({ name, body });

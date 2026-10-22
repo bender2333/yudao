@@ -3,11 +3,16 @@
 // 命令结果与查询，没有对应数据时没有标记，界面不猜。
 
 import type { ActionView, DecisionView, EventObject, ProjectRow, Rejected } from "../../api/generated/types.gen";
+import { type CommandProblem, commandProblemText } from "../../contract/command-problem.ts";
 
 // 源目录无效时服务端把各条相对路径与处理方法写进 message，用分号连接（harness/public_tree.py 的
 // UnrepresentableWorkspace、harness/snapshot.py 的 TreeError）。界面按分号分行显示，路径原样给出。
-export function sourceInvalidLines(rejection: Rejected): string[] {
-  return rejection.message.split(";").map((line) => line.trim()).filter((line) => line !== "");
+// 只有应用层的拒绝有这些路径；接口层校验错误与其它失败没有路径可列（工单 #740）。
+export function sourceInvalidLines(problem: CommandProblem): string[] {
+  if (problem.kind !== "rejected") {
+    return [];
+  }
+  return problem.rejection.message.split(";").map((line) => line.trim()).filter((line) => line !== "");
 }
 
 // 建档状态标记的中文名：按 onboarding_status 与是否有等待确认的初始 PRD 决定
@@ -37,6 +42,16 @@ export const ONBOARDING_REJECTION_REASONS: Record<string, string> = {
  */
 export function onboardingRejectionText(rejection: Rejected): string {
   return ONBOARDING_REJECTION_REASONS[rejection.reason] ?? "命令被拒绝";
+}
+
+/**
+ * 建档表单的失败说明：应用层拒绝按拒绝原因给中文说法，接口层校验错误与其它失败用统一的一句（工单 #740）。
+ */
+export function onboardingProblemText(problem: CommandProblem): string {
+  if (problem.kind !== "rejected") {
+    return commandProblemText(problem);
+  }
+  return onboardingRejectionText(problem.rejection);
 }
 
 /** 项目行里的建档标记：状态取自 projects.list，等待确认初始 PRD 由本项目的决定请求给出。 */

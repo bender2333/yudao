@@ -171,7 +171,7 @@ function Basics(props: { app: ClientApp; data: ProjectSettingsResult; command: C
           />
         </div>
       ) : null}
-      <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
+      <CommandFeedback submitted={command.submitted} problem={command.problem} />
     </Section>
   );
 }
@@ -279,7 +279,7 @@ function DepartmentSettingsForm(props: {
         onSaved={props.onClose}
       />
       <button type="button" onClick={props.onClose}>取消</button>
-      <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
+      <CommandFeedback submitted={command.submitted} problem={command.problem} />
     </div>
   );
 }
@@ -340,7 +340,7 @@ function SourceDirectoryForm(props: { app: ClientApp; data: ProjectSettingsResul
         }).then((ok) => { if (ok) { setOpen(false); } })}
       />
       <button type="button" onClick={() => setOpen(false)}>取消</button>
-      <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
+      <CommandFeedback submitted={command.submitted} problem={command.problem} />
     </span>
   );
 }
