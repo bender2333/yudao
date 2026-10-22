@@ -878,6 +878,8 @@ minimax-M3.1-Flash / 2026-10-22 20:35 / docs/user-session-log.md 补 U35（#684 
 
 minimax-M3.1-Flash / 2026-10-22 20:50 / docs/user-session-log.md 补 U36（#669 已合入 52348cb3 并复验通过：新的 run_created 载荷里没有 context_window 了，旧事件仍留着 32000——事件日志是历史，不改写是对的） / 继续以用户身份使用系统：按「修好以后回头复验」的规矩，把 #669 在新代码上重跑一遍核对事件载荷
 
+minimax-M3.1-Flash / 2026-10-22 21:00 / docs/user-session-log.md 开头的概览重写成当前实况：范围（两个实例、12 个项目、28 个事项、13 个页面）、21 张工单里 8 张已合入并在页面上复验过、还开着的 7 张逐条列出并标出各自的形状、以及 U26 那条更正（页面加载不出来是我那个浏览器会话被冻结，不是产品缺陷）与教训 / 继续以用户身份使用系统：把走查记录的首页概览刷新成当前实况，让分诊的人第一眼看到全貌
+
 执行者 minimax-M3.1-Flash / 2026-10-22 13:15 / 工单 #671 拒绝提示里不再露出内部原因标识：侧栏接入表单改用新增的 onboardingRejectionText（只给中文说明与服务端列出的路径），顶栏项目菜单改用项目各页已有的 rejectionLabel；新增 client/tests/unit/rejection-text.test.ts 六项，其中一项扫描渲染进程的源文件，不让「（原因 xxx）」这种写法再出现 / 用户走查 U16：接入已有项目时被拒绝的提示写着「源目录不能作为代码快照的来源（原因 source_invalid）」，内部标识对用户没有用处
 执行者 minimax-M3.1-Flash / 2026-10-22 12:40 / 工单 #664 事件种类漏登记中文说明不再让事件流断掉：harness/app/labels.py 给 project_parameter_set 补上说明，event_label 在没有登记说明的种类或载荷缺字段时退回一句通用说明（一条事件不再能把整条流断掉），工单 #319 的「载荷没有的字段直接失败」改为测试期核对；harness/tests/test_event_classification.py 加两条核对（每种事件都要有说明、说明用到的字段都要在载荷里），harness/tests/test_event_stream.py 加一条（没有说明的事件不会让连接中断） / 用户走查 U11：改过一次项目级参数以后，事件流播到那条事件就抛 KeyError 把响应截断，客户端每秒重连一次，永远过不去
 
