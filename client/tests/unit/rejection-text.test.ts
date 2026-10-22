@@ -8,7 +8,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ONBOARDING_REJECTION_REASONS, onboardingRejectionText } from "../../src/renderer/src/views/project/onboarding.ts";
-import { rejectionLabel } from "../../src/renderer/src/views/project/use-snapshot.ts";
+import { rejectionLabel } from "../../src/renderer/src/contract/command-problem.ts";
 import type { Rejected } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));

@@ -3,18 +3,19 @@
 // 查询与命令函数由 @hey-api/openapi-ts 生成；这里按名称查找它们，避免为每个页面各写一遍调用。
 // 生成函数的返回类型由合同给出，因此这里的返回保留原始类型；只有按名称查找这一步是运行时的。
 
-import type { Rejected } from "../api/generated/types.gen";
 import type { Client } from "../api/generated/client";
 import * as sdk from "../api/generated/sdk.gen";
+import { classifyCommandFailure, type CommandProblem } from "./command-problem.ts";
 import { queryFailureText } from "./read-failure";
 
 type QueryFunction = (options: { client: Client; query?: Record<string, unknown> }) => Promise<{ data: unknown; error?: unknown }>;
-type CommandFunction = (options: { client: Client; body: unknown }) => Promise<{ data: unknown; error?: unknown }>;
+type CommandFunction = (options: { client: Client; body: unknown }) => Promise<{ data: unknown; error?: unknown; response?: Response }>;
 
-// 一条命令的结果：接受返回应用层的受理回执（command_id、position、refs），拒绝返回 Rejected
+// 一条命令的结果：接受返回应用层的受理回执（command_id、position、refs），
+// 没有成功时给出失败的三种形状（contract/command-problem.ts）
 export type CommandOutcome =
   | { ok: true; accepted: Record<string, unknown> }
-  | { ok: false; rejection: Rejected };
+  | { ok: false; problem: CommandProblem };
 
 // 生成的函数名：querySystemStatus、commandProjectCreate、queryWorkItemMaterials 等。
 // 名称里的点与下划线都是分词：每一段的首字母大写以后直接拼起来（work_item.materials -> WorkItemMaterials）
@@ -49,7 +50,8 @@ export async function callQuery<T>(
 }
 
 // 提交一条命令：200 返回受理回执；409 的响应体是 Rejected，生成的客户端把它放在 error 字段。
-// 网络错误与其他非预期状态码直接抛出，由调用处的界面显示（fast-fail，不静默吞掉）
+// 失败按响应体的形状与状态码分三种（contract/command-problem.ts）：应用层拒绝、接口层校验错误、其余。
+// 网络错误与其他非预期状态码不再直接抛出，由这里给出一句能显示的话（工单 #740）
 export async function callCommand(
   client: Client,
   name: string,
@@ -61,7 +63,7 @@ export async function callCommand(
   }
   const response = await (fn as CommandFunction)({ client, body });
   if (response.error !== undefined && response.error !== null) {
-    return { ok: false, rejection: response.error as Rejected };
+    return { ok: false, problem: classifyCommandFailure(response.error, response.response?.status ?? 0) };
   }
   return { ok: true, accepted: (response.data ?? {}) as Record<string, unknown> };
 }

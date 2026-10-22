@@ -2,9 +2,8 @@
 // 全部数据来自应用层的查询结果；没有数据或字段未上报时写明「未上报」或「无」，不用假数据补位。
 
 import { useEffect, useRef, useState } from "react";
-import type { Rejected } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
-import { rejectionLabel } from "./use-snapshot";
+import { type CommandProblem, commandProblemText } from "../../contract/command-problem.ts";
 
 export type Field = Record<string, unknown>;
 
@@ -129,12 +128,13 @@ export function Tabs(props: { items: { id: string; label: string }[]; active: st
   );
 }
 
-// 命令提交后的反馈：已提交在快照出现新内容以后恢复；拒绝时显示原因，基准版本过期提示重新读取
-export function CommandFeedback(props: { submitted: boolean; rejection: Rejected | null }) {
-  if (props.rejection) {
+// 命令提交后的反馈：已提交在快照出现新内容以后恢复；命令没有成功时显示那一句说明
+// （应用层拒绝、接口层校验错误与其它失败各有各的说法，工单 #740）
+export function CommandFeedback(props: { submitted: boolean; problem: CommandProblem | null }) {
+  if (props.problem) {
     return (
       <p className="error" role="status">
-        {rejectionLabel(props.rejection)}
+        {commandProblemText(props.problem)}
       </p>
     );
   }

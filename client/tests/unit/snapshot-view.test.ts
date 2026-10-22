@@ -8,7 +8,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Rejected } from "../../src/renderer/src/api/generated/types.gen";
-import { rejectionLabel, rejectionLinks, snapshotView } from "../../src/renderer/src/views/project/use-snapshot.ts";
+import { rejectionLabel } from "../../src/renderer/src/contract/command-problem.ts";
+import { rejectionLinks, snapshotView } from "../../src/renderer/src/views/project/use-snapshot.ts";
 
 const KEY = JSON.stringify({ project_id: "p1", work_item: "wi1" });
 
@@ -56,12 +57,12 @@ test("拒绝的说明只写服务端的中文消息，不带英文的原因标�
 });
 
 test("部门没有选模型时给出两个去处：模型管理页与本项目的设置页", () => {
-  const links = rejectionLinks({ reason: "provider_unavailable", message: "质检部门还没有选择模型" } as Rejected, "p1");
+  const links = rejectionLinks({ kind: "rejected", rejection: { reason: "provider_unavailable", message: "质检部门还没有选择模型" } as Rejected }, "p1");
   assert.deepEqual(links.map((link) => link.label), ["去模型管理页设置部门默认", "在本项目的设置页选择模型"]);
   assert.deepEqual(links.map((link) => link.hash), ["/sys/models", "/p/p1/settings"]);
 });
 
 test("其余拒绝原因不给去处", () => {
-  assert.deepEqual(rejectionLinks({ reason: "busy", message: "已有事项正在执行" } as Rejected, "p1"), []);
+  assert.deepEqual(rejectionLinks({ kind: "rejected", rejection: { reason: "busy", message: "已有事项正在执行" } as Rejected }, "p1"), []);
   assert.deepEqual(rejectionLinks(null, "p1"), []);
 });

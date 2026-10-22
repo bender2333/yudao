@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import FastAPI, Header, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.openapi.utils import get_openapi
@@ -27,6 +28,7 @@ from ..app.application import DEFAULT_REGISTRY, Application
 from ..app.catalog_queries import CatalogQueryInvalid
 from ..app.contracts import AccessMode, Accepted, API_VERSION, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
 from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
+from ..app.labels import validation_text
 from ..app.project_queries import NotFound
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
 from ..app.replay import ReplayOutOfRange
@@ -55,6 +57,8 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
 
     api = FastAPI(title="Yudao", version=version("yudao-harness"), docs_url=None, redoc_url=None,
                   openapi_url="/openapi.json", lifespan=lifespan)
+    # 请求体不符合合同时由这一处回答：422，字段错误明细之外还带一句中文说明（工单 #740）
+    api.add_exception_handler(RequestValidationError, _invalid_request)
     for command in registry.commands.values():
         _add_command(api, registry, command)
     for query in registry.queries.values():
@@ -109,6 +113,15 @@ def _application(request: Request) -> Application:
 
 def _operation_id(kind: str, name: str) -> str:
     return f"{kind}_{name.replace('.', '_')}"
+
+
+def _invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # 请求体不符合合同：422。响应体有两样东西——pydantic 的字段错误明细（机器看）
+    # 与一句中文说明（页面直接显示，用户才知道是哪个字段、要求是什么，工单 #740）。
+    # 明细保持原样，机器读的那一份没有变。
+    errors = exc.errors()
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors),
+                                                  "error": validation_text(errors)})
 
 
 def _add_command(api: FastAPI, registry: Registry, definition: CommandDefinition) -> None:

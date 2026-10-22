@@ -473,7 +473,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
                   }).then((ok) => { if (ok) setDraft(""); });
                 }}
               />
-              <CommandFeedback submitted={props.command.submitted} rejection={props.command.rejection} />
+              <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
             </div>
           ) : (
             <p className="y10-note note">
@@ -543,7 +543,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
       ) : (
         <p className="y10-note note">这台主机没有提供保存部门设置的操作</p>
       )}
-      <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
+      <CommandFeedback submitted={command.submitted} problem={command.problem} />
     </Modal>
   );
 }

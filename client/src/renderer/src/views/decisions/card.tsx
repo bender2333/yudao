@@ -230,7 +230,7 @@ export function DecisionCard(props: DecisionCardProps) {
           )}
           {/* 已提交提示挂在选项行末尾（原型 v10 卡片同样位置）。命令反馈在卡片里只留拒绝提示：
               两条「已提交」同时出现会让提示重复（工单 #319） */}
-          <CommandFeedback submitted={command.submitted && !isSubmitted} rejection={command.rejection} />
+          <CommandFeedback submitted={command.submitted && !isSubmitted} problem={command.problem} />
         </div>
       )}
       {target !== null ? (

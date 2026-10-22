@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, WorkItemLoop } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { newCommandId } from "../../contract/command-id.ts";
+import { commandProblemText } from "../../contract/command-problem.ts";
 import { createRafClock, type Clock } from "../../pixel/clock";
 import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
 import type { DecisionAnswer, DecisionResult } from "../../pixel/floor/card";
@@ -151,7 +152,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
       base_version: payload.base_version,
     });
     if (outcome.ok) return { accepted: true, message: "" };
-    return { accepted: false, message: outcome.rejection.message };
+    return { accepted: false, message: commandProblemText(outcome.problem) };
   };
 
   // 建立画面：PixiJS 的 Application 挂在宿主元素上，时钟与事件流分别订阅

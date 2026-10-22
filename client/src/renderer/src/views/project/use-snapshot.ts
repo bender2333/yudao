@@ -3,8 +3,8 @@
 // 命令经 ClientApp 提交，接受以后显示「已提交」，快照出现新内容以后恢复，拒绝时显示原因。
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Rejected } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
+import { type CommandProblem } from "../../contract/command-problem.ts";
 import { newCommandId } from "../../contract/command-id.ts";
 
 export type SnapshotState<T> = {
@@ -73,7 +73,8 @@ export function useSnapshot<T>(
 export type CommandState = {
   busy: boolean;
   submitted: boolean;
-  rejection: Rejected | null;
+  // 命令没有成功时页面上要显示的那句话的来源（工单 #740）：三种形状由 contract/command-problem.ts 给出
+  problem: CommandProblem | null;
   // 最近一次被接受时应用层带回的受理回执（例如保存部门设置带回的建议能力提醒）
   accepted: Record<string, unknown> | null;
   submit: (name: string, body: Record<string, unknown>) => Promise<boolean>;
@@ -83,7 +84,7 @@ export type CommandState = {
 export function useCommand(app: ClientApp | null, dataKey: string): CommandState {
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [rejection, setRejection] = useState<Rejected | null>(null);
+  const [problem, setProblem] = useState<CommandProblem | null>(null);
   const [accepted, setAccepted] = useState<Record<string, unknown> | null>(null);
   const lastKey = useRef(dataKey);
 
@@ -97,11 +98,14 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
   const submit = useCallback(
     async (name: string, body: Record<string, unknown>): Promise<boolean> => {
       if (!app) {
-        setRejection({ command_id: "", reason: "not_allowed", message: "尚未连接控制主机", current_version: null });
+        setProblem({
+          kind: "rejected",
+          rejection: { command_id: "", reason: "not_allowed", message: "尚未连接控制主机", current_version: null },
+        });
         return false;
       }
       setBusy(true);
-      setRejection(null);
+      setProblem(null);
       try {
         const outcome = await app.command(name, { command_id: newCommandId(), ...body });
         if (outcome.ok) {
@@ -109,7 +113,12 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
           setAccepted(outcome.accepted);
           return true;
         }
-        setRejection(outcome.rejection);
+        setProblem(outcome.problem);
+        return false;
+      } catch {
+        // 命令调用本身抛出（连接断了、命令名字不在能力清单里）：也给用户一句说明，
+        // 不留一个空的错误框（工单 #740）
+        setProblem({ kind: "failed", status: 0 });
         return false;
       } finally {
         setBusy(false);
@@ -118,25 +127,13 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
     [app],
   );
 
-  return { busy, submitted, rejection, accepted, submit };
+  return { busy, submitted, problem, accepted, submit };
 }
 
-// 命令被拒绝时的说明：基准版本过期时提示重新读取（工单验收第 3 条）。
-// 原因标识是内部词，不写进页面（工单 #319 第 5 项）；服务端的消息本身已经是中文说明
-export function rejectionLabel(rejection: Rejected): string {
-  if (rejection.reason === "stale_base") {
-    const version = rejection.current_version === null || rejection.current_version === undefined
-      ? "未知"
-      : rejection.current_version;
-    return `${rejection.message}（服务端当前版本 ${version}），请重新读取以后提交`;
-  }
-  return rejection.message;
-}
-
-// 被拒绝以后给用户的去处（工单 #319 第 6 项）：部门没有选模型时给两个地方，
+// 命令被拒绝以后给用户的去处（工单 #319 第 6 项）：部门没有选模型时给两个地方，
 // 一处是全系统的部门默认，一处是这个项目的部门设置；其余拒绝原因不给去处
-export function rejectionLinks(rejection: Rejected | null, projectId: string): { label: string; hash: string }[] {
-  if (rejection === null || rejection.reason !== "provider_unavailable") {
+export function rejectionLinks(problem: CommandProblem | null, projectId: string): { label: string; hash: string }[] {
+  if (problem === null || problem.kind !== "rejected" || problem.rejection.reason !== "provider_unavailable") {
     return [];
   }
   return [

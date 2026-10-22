@@ -5,9 +5,10 @@
 import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
 import type { StreamState } from "../contract/stream-state";
-import type { DecisionView, ProjectOverviewResult, ProjectRow, Rejected } from "../api/generated/types.gen";
+import type { DecisionView, ProjectOverviewResult, ProjectRow } from "../api/generated/types.gen";
 import { PAGE_RELEASE } from "../contract/page-release";
-import { rejectionLabel, useCommand, useSnapshot } from "../views/project/use-snapshot";
+import { type CommandProblem, commandProblemText } from "../contract/command-problem.ts";
+import { useCommand, useSnapshot } from "../views/project/use-snapshot";
 import { Icon } from "./kit";
 import { providerNotice, type ProviderReadiness } from "./provider-status";
 import { useTheme, type ThemeChoice } from "./theme";
@@ -217,18 +218,18 @@ function ProjectMenu(props: {
               归档项目
             </button>
           )}
-          <MenuFeedback submitted={command.submitted} rejection={command.rejection} />
+          <MenuFeedback submitted={command.submitted} problem={command.problem} />
         </div>
       ) : null}
     </div>
   );
 }
 
-function MenuFeedback(props: { submitted: boolean; rejection: Rejected | null }) {
-  if (props.rejection) {
+function MenuFeedback(props: { submitted: boolean; problem: CommandProblem | null }) {
+  if (props.problem) {
     return (
       <p className="error" role="status">
-        {rejectionLabel(props.rejection)}
+        {commandProblemText(props.problem)}
       </p>
     );
   }

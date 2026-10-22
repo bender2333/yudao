@@ -59,7 +59,7 @@ export function RestartOnboarding(props: { app: ClientApp; projectId: string }) 
           >
             {command.busy ? "正在提交" : "重新开始建档"}
           </button>
-          <CommandFeedback submitted={command.submitted} rejection={command.rejection} />
+          <CommandFeedback submitted={command.submitted} problem={command.problem} />
         </div>
       )}
     </Section>
