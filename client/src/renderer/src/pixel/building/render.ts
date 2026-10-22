@@ -8,24 +8,15 @@ import { bitmapGrid } from "../char.ts";
 import { mix, rgba } from "../grid.ts";
 import { DEPTS, ITEM_COLORS, ITEM_SHADES, PAL } from "../registry.ts";
 import { drawActor, drawBitmap, drawPixelText, drawSign, drawText, fillPixel, fillPixelOutlined } from "../shapes.ts";
+import { BUILDING_STATUS } from "./status-text.ts";
 import type { SceneLike } from "../world/types.ts";
 import { BUILDING_GEO, type BuildingDriver, type BuildingFloor } from "../world/building.ts";
 
 const { W, ROOF, FH, BASE } = BUILDING_GEO;
 const ROOMS = ["product", "engineering", "quality", "operations"] as const;
 
-/** 状态灯与状态文字的配色（原型 building.js 的 STATUS，颜色取 PAL 的子集）。 */
-export const BUILDING_STATUS: Record<string, { text: string; color: string }> = {
-  running: { text: "运行中", color: PAL.green2 },
-  queued: { text: "排队中", color: PAL.grey2 },
-  waiting_slot: { text: "等待执行槽位", color: PAL.orange2 },
-  waiting_provider: { text: "等待模型服务", color: PAL.grey3 },
-  waiting_resume: { text: "待恢复", color: PAL.yellow2 },
-  waiting_decision: { text: "等待你的决定", color: PAL.yellow2 },
-  interrupted: { text: "中断", color: PAL.grey4 },
-  stopped: { text: "已停止", color: PAL.grey4 },
-  idle: { text: "空闲", color: PAL.grey2 },
-};
+/** 状态灯与状态文字的配色：单独成模块，单元测试才能直接核对这几句话。 */
+export { BUILDING_STATUS } from "./status-text.ts";
 
 /** 每分钟闪烁的状态灯（原型 drawFloor 的判据）。 */
 const BLINK = ["running", "waiting_slot", "waiting_resume"];
