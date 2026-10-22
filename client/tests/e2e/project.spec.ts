@@ -701,6 +701,14 @@ test.describe("项目页面（1440×900）", () => {
       await expect(detail.locator(".line", { hasText: "失败类型" }).locator(".value")).toHaveText("没有");
       await expect(detail).toContainText("结束原因");
       await expect(detail.locator(".line", { hasText: "结束原因" }).locator(".value")).toHaveText("未上报");
+      // 工件引用（工单 #745）：这一行按项说，缺哪一项写哪一项没有，不是一句「未上报」盖住四项。
+      // 预置项目的模型回答来自 FakeAdapter，没有留下工件，因此四项都是「未上报」；
+      // 四项都在时的显示由客户端单元测试核对（那里给出的是工件引用的对象形状）。
+      const refs = detail.locator('.line:has(.term:text-is("引用")) .value');
+      await expect(refs).toHaveText("请求 未上报，响应 未上报，原始流 未上报，用量 未上报");
+      // 页面上不出现英文内部标识与开发者措辞
+      await expect(refs).not.toContainText("sdk_");
+      await expect(refs).not.toContainText("sha256");
       // 详情页的返回：回到观测页，页签回到请求记录
       await detail.getByRole("button", { name: "返回请求记录" }).click();
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.observe}`);
