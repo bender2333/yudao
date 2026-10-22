@@ -5609,6 +5609,14 @@ export type AskAnsweredPayload = {
      * Revision
      */
     revision?: number | null;
+    /**
+     * Facts
+     */
+    facts?: string | null;
+    /**
+     * Explanation
+     */
+    explanation?: string | null;
 };
 
 /**
@@ -5693,7 +5701,7 @@ export type AskStartedPayload = {
     /**
      * Question
      */
-    question: string;
+    question?: string;
     /**
      * Branch Session Id
      */
@@ -5706,6 +5714,14 @@ export type AskStartedPayload = {
      * Expected
      */
     expected?: string | null;
+    /**
+     * Facts
+     */
+    facts?: string | null;
+    /**
+     * Explanation
+     */
+    explanation?: string | null;
 };
 
 /**

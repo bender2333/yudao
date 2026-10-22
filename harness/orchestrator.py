@@ -1438,10 +1438,14 @@ class Orchestrator:
             question = args.get("question")
             background = args.get("background", "")
             expected = args.get("expected", "")
+            facts = args.get("facts") or ""
+            explanation = args.get("explanation") or ""
 
             if recipient not in ("product", "engineering", "quality") or recipient == scope.department:
                 return False, None, f"invalid recipient {recipient}", None, 0
-            if not isinstance(question, str) or not question.strip():
+            # 工程询问质检时问题与背景分两部分：facts 与 explanation 至少给一份（工单 #554）
+            if not (isinstance(question, str) and question.strip()) \
+                    and not (isinstance(facts, str) and facts.strip()):
                 return False, None, "question must be a non-empty string", None, 0
 
             branch_session_id = new_id(f"ses_ask_{recipient[:3]}")
@@ -1458,9 +1462,11 @@ class Orchestrator:
                     payload={
                         "requester": scope.department,
                         "recipient": recipient,
-                        "question": question,
+                        "question": question or "",
                         "background": background,
                         "expected": expected,
+                        "facts": facts or None,
+                        "explanation": explanation or None,
                         "branch_session_id": branch_session_id,
                     },
                 ))
@@ -1529,7 +1535,9 @@ class Orchestrator:
 
         if isinstance(result, Answered):
             ans_args = result.args
-            ans_text = ans_args.get("answer") or ans_args.get("text") or ""
+            ans_text = ans_args.get("answer") or ans_args.get("text") or ans_args.get("facts") or ""
+            ans_facts = ans_args.get("facts") or None
+            ans_explanation = ans_args.get("explanation") or None
             with_spec_revision = False
             revision = None
             new_contract_hash = None
@@ -1590,6 +1598,8 @@ class Orchestrator:
                         "reason": "",
                         "with_spec_revision": with_spec_revision,
                         "revision": revision,
+                        "facts": ans_facts,
+                        "explanation": ans_explanation,
                     },
                 ))
 

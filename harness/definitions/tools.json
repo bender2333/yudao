@@ -492,7 +492,7 @@
   "ask": {
     "kind": "host",
     "guidance_only": false,
-    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result.",
+    "description": "Ask another department a question. The step loop pauses until the recipient department answers via a branch session; the answer is returned as this tool's result. When engineering asks quality, write the question and the background in two parts instead of question and background: facts (interfaces, usage, file locations, how to run, references to host evidence) and explanation (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads the facts part only until it has submitted its own conclusion on the current delivery.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -512,13 +512,19 @@
         },
         "expected": {
           "type": "string"
+        },
+        "facts": {
+          "type": "string",
+          "description": "Engineering asking quality: the question and the background as facts (interfaces, usage, file locations, how to run, references to host evidence)."
+        },
+        "explanation": {
+          "type": "string",
+          "description": "Engineering asking quality: the explanation part (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads it only after it has submitted its own conclusion on the current delivery."
         }
       },
       "additionalProperties": false,
       "required": [
         "recipient",
-        "question",
-        "background",
         "expected"
       ]
     }
@@ -526,12 +532,20 @@
   "answer": {
     "kind": "host",
     "guidance_only": false,
-    "description": "Submit an answer to the current ask question, ending this branch session. Product may optionally include PRD revision parameters to update requirements.",
+    "description": "Submit an answer to the current ask question, ending this branch session. Product may optionally include PRD revision parameters to update requirements. When engineering answers quality, write the answer in two parts instead of answer: facts (interfaces, usage, file locations, how to run, references to host evidence) and explanation (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads the facts part only until it has submitted its own conclusion on the current delivery.",
     "parameters": {
       "type": "object",
       "properties": {
         "answer": {
           "type": "string"
+        },
+        "facts": {
+          "type": "string",
+          "description": "Engineering answering quality: the answer as facts (interfaces, usage, file locations, how to run, references to host evidence)."
+        },
+        "explanation": {
+          "type": "string",
+          "description": "Engineering answering quality: the explanation part (why it is implemented this way, the judgement about correctness, the view on failures and review comments). Quality reads it only after it has submitted its own conclusion on the current delivery."
         },
         "goal": {
           "type": "string"
@@ -654,9 +668,7 @@
         }
       },
       "additionalProperties": false,
-      "required": [
-        "answer"
-      ]
+      "required": []
     }
   },
   "submit_guidance_response": {

@@ -322,7 +322,10 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
     quality = [item for item in adapter.invocations if item.department == "quality"][-1]
     current = _part(quality, "current_delivery_spec")
     assert current is not None
-    assert current["summary"] == "NEW_DELIVERY_CANARY"
+    # 事实部分总在；解释部分（summary）在质检对当前交付下结论以前不给（工单 #554）
+    assert current["content_hash"] == projection.delivery_spec.content_hash
+    assert current["content_hash"] != projection.delivery_specs[0].content_hash
+    assert "summary" not in current
     assert current["status"] == "active"
     assert _part(quality, "prior_delivery") is None
 

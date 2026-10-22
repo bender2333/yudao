@@ -535,6 +535,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "origin_session_id": event.session_id,
             "background": payload.get("background"),
             "expected": payload.get("expected"),
+            # 工程询问质检时问题与背景分成的两部分（工单 #554）
+            "facts": payload.get("facts"),
+            "explanation": payload.get("explanation"),
         })
         return
 
