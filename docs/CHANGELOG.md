@@ -938,3 +938,5 @@ claude-opus-5-5 / 2026-10-22 14:30 / docs/decision.md 新增「页面直接显�
 claude-opus-5-5 / 2026-10-22 15:10 / docs/decision.md 新增「M0 走查问题的五项口径」；CONTEXT.md 新增「交付快照」「读模型」；docs/agents/autopilot-runtime.md 第 7 节「唤醒架构师」暂时改为关 / 用户采纳 /grill-with-docs 第一轮建议，修改设计说明期间不让被唤醒的架构师同时改
 
 claude-opus-5-5 / 2026-10-22 15:20 / docs/design/web-interface-and-release.md 第 5.1 节：页面与服务按接口版本对齐，发布版本号不作判据；两个方向分别给出下一步（服务新：自动重新加载一次，仍旧则提示重新构建页面文件；页面新：提示重启服务） / #704，用户采纳；引用这一节的开放工单只有 #704 与等待中的父工单 #71，没有已放出的工单需要退回
+
+claude-opus-5-5 / 2026-10-22 15:35 / CONTEXT.md 的「读模型」改为设计说明已用的「读取模型」并写明范围；docs/design/app-and-interface.md 第 4.2 节加一条：读取模型记录推导版本，版本不同时服务启动整份重建 / #684，用户采纳
