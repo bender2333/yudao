@@ -21,6 +21,7 @@ import { Empty, KeyValue, Loading, Section, Tag, show } from "./common";
 import { ACTION_STATUS, RECOVERY_STATE, STOP_REASON, departmentName, formatDuration, formatTime, label } from "./labels";
 import { RestartOnboarding } from "./restart-onboarding";
 import { useSnapshot } from "./use-snapshot";
+import { readFailureText } from "../../contract/read-failure";
 
 // 恢复观察状态对应的原型标记（原型 v10 views/recovery.js 的 STATE_KIND）
 const STATE_KIND: Record<string, string> = {
@@ -79,7 +80,15 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
       <Loading state={overview} />
       <Loading state={recovery} />
       {workItemId === "" ? <Empty text="这个页面按事项查看：路径里没有事项标识" /> : null}
-      {item === null && !loop.loading && workItemId !== "" ? <Empty text="这个项目里没有这个事项" /> : null}
+      {loop.error !== null ? (
+        // 事项列表读不出来：事项明明在，是读不出来，不写「这个项目里没有这个事项」（工单 #775）
+        <p className="y10-note note" role="status">{readFailureText(loop.error)}</p>
+      ) : null}
+      {recovery.error !== null ? (
+        // 恢复观察读不出来：这一块本来有内容（工单 #775）
+        <p className="y10-note note" role="status">{readFailureText(recovery.error)}</p>
+      ) : null}
+      {item === null && !loop.loading && loop.error === null && workItemId !== "" ? <Empty text="这个项目里没有这个事项" /> : null}
       {item !== null && runId === null ? <Empty text="这个事项还没有运行记录，没有恢复观察" /> : null}
       {data ? (
         <>

@@ -21,6 +21,7 @@ import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
+import { emptyOrFailureText, readFailureText } from "../../contract/read-failure";
 
 export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
@@ -52,6 +53,14 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
     <div className="y10-ws page" data-dept={department}>
       <Loading state={picked} />
       <Loading state={workspace} />
+      {picked.error !== null ? (
+        // 项目概览读不出来：连当前事项都取不到，不留一片空白（工单 #775）
+        <p className="y10-note note" role="status">{readFailureText(picked.error)}</p>
+      ) : null}
+      {workspace.error !== null ? (
+        // 部门工作间读不出来：这一处本来有内容（工单 #775）
+        <p className="y10-note note" role="status">{readFailureText(workspace.error)}</p>
+      ) : null}
       {noWorkItem ? <Empty text="项目还没有事项，部门工作间没有内容可显示" /> : null}
       {data ? (
         <TitleArea
@@ -301,7 +310,7 @@ function Actions(props: { app: ClientApp; runId: string | null }) {
   return (
     <>
       <RunningBackgroundCommands commands={backgroundCommands} />
-      {rows.length === 0 ? <Empty text="这次运行没有记录动作" /> : (
+      {rows.length === 0 ? <Empty text={emptyOrFailureText(actions.error, "这次运行没有记录动作")} /> : (
         <Table
           head={ACTION_TABLE_HEAD}
           rows={rows.map((action) => {

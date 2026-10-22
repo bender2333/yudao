@@ -15,6 +15,7 @@ import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, useDepa
 import { SETTING_SOURCE, departmentName, label } from "./labels";
 import { PageHead } from "../../shell/kit";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
+import { readFailureText } from "../../contract/read-failure";
 import { followDepartmentLabel, mergedModelId, modelById } from "../models/model-logic";
 
 export function SettingsPage(props: { app: ClientApp; route: Route }) {
@@ -34,6 +35,10 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
         subtitle="基本信息、部门设置、源目录、工具授权、机器授权、执行位置与角色设置。"
       />
       <Loading state={settings} />
+      {settings.error !== null ? (
+        // 项目设置读不出来：这一页本来有内容（工单 #775），不留一片空白
+        <p className="y10-note note" role="status">{readFailureText(settings.error)}</p>
+      ) : null}
       {data ? (
         <>
           <Basics app={props.app} data={data} command={command} />
