@@ -48,6 +48,7 @@
 "test_delivery_tree_engine.py" = "module"
 "test_demo.py" = "module"
 "test_department_guidance.py" = "integration"
+"test_department_language_rule.py" = "module"
 "test_department_prompts.py" = "module"
 "test_department_providers.py" = "integration"
 "test_engine.py" = "integration"
