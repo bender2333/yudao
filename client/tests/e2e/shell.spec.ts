@@ -76,10 +76,11 @@ test("能力清单缺少某个查询时，依赖它的页面入口不出现", as
   const client = await openClient({ width: 1440, height: 900 });
   const errors = watchErrors(client);
   try {
-    // 当前部署的注册表没有 machines.list、runtime.slots、tools.registry 等查询
+    // 当前部署的注册表没有 machines.list、tools.registry 等查询
     await expect(client.page.getByRole("button", { name: "机器" })).toHaveCount(0);
-    await expect(client.page.getByRole("button", { name: "运行与执行槽位" })).toHaveCount(0);
     await expect(client.page.getByRole("button", { name: "工具与扩展" })).toHaveCount(0);
+    // 执行槽位这一页的数据来自 system.status（工单 #727），所以它的入口在
+    await expect(client.page.getByRole("button", { name: "运行与执行槽位" })).toHaveCount(1);
     expect(errors).toEqual([]);
   } finally {
     await client.close();
@@ -179,8 +180,9 @@ test("接口版本不同时页面只显示版本不同的提示（写明两边�
     const errors = watchErrors(client);
     try {
       await expect(client.page.getByRole("heading", { name: "页面与服务的接口版本不同" })).toBeVisible();
-      await expect(client.page.locator(".gate .error")).toContainText(`页面的接口版本是 ${CLIENT_API_VERSION}`);
-      await expect(client.page.locator(".gate .error")).toContainText(`的接口版本是 ${CLIENT_API_VERSION + 1}`);
+      // 页面上的措辞按工单 #704 改过：写清这一份页面文件与服务各是哪个版本（原来写「页面的接口版本是 7」）
+      await expect(client.page.locator(".gate .error")).toContainText(`这一份页面文件的接口版本是 ${CLIENT_API_VERSION}`);
+      await expect(client.page.locator(".gate .error")).toContainText(`服务要的是 ${CLIENT_API_VERSION + 1}`);
       // 不打开任何页面：外壳与左侧栏都不出现
       await expect(client.page.locator(".sidebar")).toHaveCount(0);
       expect(errors).toEqual([]);

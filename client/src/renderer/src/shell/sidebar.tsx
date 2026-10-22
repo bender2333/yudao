@@ -31,11 +31,13 @@ export type SidebarProps = {
   onNavigate: (hash: string) => void;
 };
 
-// 系统分组的入口与图标（原型 v10 shell.js 的 SYSTEM_LINKS）；查询不在能力清单里时不出现
+// 系统分组的入口与图标（原型 v10 shell.js 的 SYSTEM_LINKS）；查询不在能力清单里时不出现。
+// 执行槽位这一页的数据来自 system.status（排空、强制升级、正在执行的事项都在那里），
+// 所以入口按 system.status 出现，不必等 runtime.slots 那条查询（工单 #727）。
 const SYSTEM_ENTRIES: { page: string; label: string; query: string; icon: string }[] = [
   { page: "models", label: "模型管理", query: "catalog", icon: "models" },
   { page: "machines", label: "机器", query: "machines.list", icon: "machines" },
-  { page: "runtime", label: "运行与执行槽位", query: "runtime.slots", icon: "runtime" },
+  { page: "runtime", label: "运行与执行槽位", query: "system.status", icon: "runtime" },
   { page: "tools", label: "工具与扩展", query: "tools.registry", icon: "tools" },
 ];
 

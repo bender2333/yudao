@@ -1,63 +1,55 @@
 // 运行与执行槽位页（原型 v10 的 ui/views/sys-runtime.js，原型 v8 设计说明第 9.3 节，工单 #378）：
-// 执行槽位、排空与磁盘可用空间。数据都来自已经在用的查询：执行槽位数是 rules.registry 里的
-// execution.slots 参数，占用与排队数来自 system.status，磁盘可用空间是 home.disk_free_bytes。
+// 执行槽位、排空与磁盘可用空间。数据都来自已经在用的查询：占用与排队数来自 system.status，
+// 磁盘可用空间是 home.disk_free_bytes。
 // 原型里「正在执行的事项」与「等待队列」的明细来自 runtime.slots，后端还没有这一条查询，
 // 因此只写 system.status 给出的数量，不画一张取不到数据的表。
 
 import { useState } from "react";
-import type { RuleEntry, SystemStatus } from "../../api/generated/types.gen";
+import type { SystemStatus } from "../../api/generated/types.gen";
 import { newCommandId } from "../../contract/command-id.ts";
 import type { ClientApp } from "../../contract/client-app";
 import { Block } from "../../shell/kit";
 import { KeyValue, Loading, Modal, hasCommand } from "../project/common";
-import { useCommand, useSnapshot } from "../project/use-snapshot";
+import { useCommand } from "../project/use-snapshot";
 import { DRAIN_CONFIRM_CANCEL, DRAIN_CONFIRM_CONFIRM, DRAIN_CONFIRM_LINES, DRAIN_CONFIRM_TITLE } from "./drain-text";
+import { slotView } from "./slot-view";
 
 // 排空状态（ADR-0019）：未排空、排空中、已排空可以升级
 const DRAIN_LABELS: Record<string, string> = { idle: "未排空", draining: "排空中", ready: "已排空，可以升级" };
 
 export function RuntimePage(props: { app: ClientApp; systemStatus: SystemStatus | null }) {
-  const rules = useSnapshot<{ rules: RuleEntry[] }>(props.app, "sys.runtime.rules", "rules.registry", {});
-
   if (props.systemStatus === null) {
     return <Loading state={{ loading: true, data: null }} />;
   }
   const status = props.systemStatus;
   return (
     <div className="y10-sys-runtime">
-      <SlotBlock status={status} rules={rules.data ?? null} />
+      <SlotBlock status={status} />
       <DrainBlock app={props.app} status={status} />
       <RetentionBlock status={status} />
     </div>
   );
 }
 
-// 执行槽位：总数是 execution.slots 参数的现值，占用的盏按 system.status 的 running_runs 点亮。
-// 槽位数是部署设置，改它用 parameter.set，页面上不给出改它的输入框，避免与参数登记的页重复
-function SlotBlock(props: { status: SystemStatus; rules: { rules: RuleEntry[] } | null }) {
-  const slot = props.rules?.rules.find((rule) => rule.name === "execution.slots") ?? null;
-  const total = typeof slot?.value === "number" ? slot.value : null;
-  const used = props.status.running_runs;
+// 执行槽位：现在一次只执行一个事项（并行要等 #19），总数是 1，盏只有一盏，
+// 占用的那盏按 system.status 的 running_runs 点亮。
+function SlotBlock(props: { status: SystemStatus }) {
+  const view = slotView({ running_runs: props.status.running_runs, slot_parameter: null });
   return (
-    <Block
-      title="执行槽位"
-      subtitle="执行槽位数是部署设置；三个部门共用一个池子，不同项目并行时按队列顺序取得槽位"
-    >
+    <Block title="执行槽位" subtitle={view.subtitle}>
       <div className="y10-slot-row">
         <div className="y10-lamps">
-          {total === null
-            ? null
-            : Array.from({ length: total }, (_unused, index) => (
-                <span
-                  key={index}
-                  className={`y10-lamp${index < used ? " is-on" : ""}`}
-                  title={index < used ? "已占用" : "空闲"}
-                />
-              ))}
+          {view.lamps.map((lamp, index) => (
+            <span
+              key={index}
+              className={`y10-lamp${lamp.on ? " is-on" : ""}`}
+              title={lamp.title}
+            />
+          ))}
         </div>
         <div className="y10-slot-count">
           <strong>
-            {used} / {total === null ? "未上报" : total}
+            {view.used} / {view.total}
           </strong>
           <span className="y10-muted">已占用 / 总数</span>
         </div>
