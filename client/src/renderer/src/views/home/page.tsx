@@ -14,6 +14,7 @@ import type {
 } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { Loading, Section, hasCommand } from "../project/common";
+import { readFailureText } from "../../contract/read-failure";
 import { formatTime } from "../project/labels";
 import { useCommand, useSnapshot } from "../project/use-snapshot";
 import { projectOnboardingMark } from "../project/onboarding";
@@ -97,6 +98,8 @@ export function HomePage(props: {
   }, [report.data, openItem]);
 
   const replaying = at !== null;
+  // 项目列表读取失败时的原因：有它时这一节说「读不出来」，不说「没有项目」（工单 #728）
+  const projectError = replaying ? replayProjects.error : projects.error;
 
   return (
     <div className={`y10-home page home${replaying ? " is-replay" : ""}`}>
@@ -106,6 +109,7 @@ export function HomePage(props: {
       <BuildingSection
         app={props.app}
         projects={replaying ? replayProjects.data : projects.data}
+        error={replaying ? replayProjects.error : projects.error}
         at={at}
         onNavigate={props.onNavigate}
       />
@@ -143,7 +147,9 @@ export function HomePage(props: {
       />
 
       <Section id="home-projects" title="项目" note="按项目列出长期目标、当前成果与等待数量">
-        {(replaying ? replayProjects.data : projects.data) === null ? (
+        {projectError !== null ? (
+          <p className="y10-note note" role="status">{readFailureText(projectError)}</p>
+        ) : (replaying ? replayProjects.data : projects.data) === null ? (
           <Loading state={replaying ? replayProjects : projects} />
         ) : (
           <div className="table-scroll">

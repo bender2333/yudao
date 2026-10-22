@@ -38,6 +38,8 @@ export function App() {
   const [state, setState] = useState<ClientState>({ kind: "connecting" });
   const [pending, setPending] = useState(0);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
+  // 项目列表读取失败时的原因：侧栏与首页据此说「读不出来」，不说「没有项目」（工单 #728）
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [pendingByProject, setPendingByProject] = useState<Record<string, number>>({});
   const [decisions, setDecisions] = useState<DecisionView[]>([]);
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
@@ -115,6 +117,11 @@ export function App() {
     }
     void views.open<ProjectList>("shell.projects", { query: "projects.list", params: projectsListParams(includeArchived) }, (data) => {
       setProjects(data.projects);
+      setProjectsError(null);
+    }, (reason) => {
+      // 读取失败：状态以查询为准，清掉旧的项目，失败的原因留给界面说（工单 #728）
+      setProjects([]);
+      setProjectsError(reason);
     });
     return () => {
       views.close("shell.projects");
@@ -298,6 +305,7 @@ export function App() {
         capabilities={capabilities}
         decisions={decisions}
         projects={projects}
+        projectsError={projectsError}
         activeProjectId={route.projectId}
         activeName={route.name}
         pendingByProject={pendingByProject}

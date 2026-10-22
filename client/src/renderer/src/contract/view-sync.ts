@@ -40,9 +40,10 @@ export class ViewSync {
 
   // 打开一个视图：立即查询一次并交给 listener，之后相关事件到达时重新查询。Data 由调用方的查询合同给出
   // 查询失败时（例如服务不可达）不通知、不抛出：调用处继续显示旧的或空的状态，由连接状态提示过时；
-  // useSnapshot 另传 onError 把读取状态结束，避免「正在读取数据」一直不消失
+  // useSnapshot 另传 onError 把读取状态结束并带上失败的原因（工单 #728），避免「正在读取数据」一直不消失，
+  // 也避免失败与「本来就没有内容」在界面上变成同一句话
   async open<Data>(viewId: string, request: ViewRequest, listener: (value: Data) => void,
-                   onError?: () => void): Promise<void> {
+                   onError?: (reason: string) => void): Promise<void> {
     this.close(viewId);
     const entry: Entry = {
       query: request.query,
@@ -54,17 +55,21 @@ export class ViewSync {
     };
     this.entries.set(viewId, entry);
     let snapshot: { position: number; data: Data } | null = null;
+    let failure = "";
     try {
       snapshot = await this.runner<Data>(request.query, request.params);
-    } catch {
+    } catch (error) {
       snapshot = null;
+      const message = error instanceof Error ? error.message : String(error);
+      // 失败原因不能是空串：空串到了界面上与「没有失败」分不开
+      failure = message === "" ? "这次读取没有成功" : message;
     }
     if (!entry.active || this.entries.get(viewId) !== entry) {
       // 迟到的结果：这个视图已经关闭或换了对象，丢弃（可观测性设计第 5 节）
       return;
     }
     if (snapshot === null) {
-      onError?.();
+      onError?.(failure);
       return;
     }
     entry.position = snapshot.position;

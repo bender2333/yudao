@@ -40,6 +40,9 @@ export type PageOptions = {
   // initScript 在页面装载前包装 window.Notification 以记录调用（包装仍然调用真实构造函数）
   permissions?: string[];
   initScript?: () => void;
+  // 页面装载前拦截请求（工单 #728）：把某个接口拦成失败，走的是与真实失败同一条路径。
+  // 在 page.goto 之前注册，否则页面已经连上服务、请求已经发出。
+  intercept?: (page: Page) => Promise<void>;
 };
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -205,6 +208,9 @@ export async function openPage(
     await context.grantPermissions(options.permissions, { origin: new URL(url).origin });
   }
   const page = await context.newPage();
+  if (options.intercept !== undefined) {
+    await options.intercept(page);
+  }
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   // 重复调用时不再动作（用例的收尾写在 finally 里）
