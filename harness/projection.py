@@ -519,18 +519,25 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.ASK_STARTED:
-        state.active_ask = {
+        state.ask_stack.append({
             "requester": payload["requester"],
             "recipient": payload["recipient"],
             "question": payload["question"],
             "branch_session_id": payload["branch_session_id"],
             "background": payload.get("background"),
             "expected": payload.get("expected"),
-        }
+        })
         return
 
     if etype == EventType.ASK_ANSWERED:
-        state.active_ask = None
+        # 回答的是链上的哪一层：按分支会话找那一层，移除它以后外层继续（工单 #473 的嵌套询问）
+        session_id = event.session_id
+        remaining = [ask for ask in state.ask_stack
+                     if ask.get("branch_session_id") != session_id]
+        if len(remaining) == len(state.ask_stack):
+            # 找不到对应的一层（旧 run 的事件没有分支会话标识）：按最内层移除
+            remaining = state.ask_stack[:-1]
+        state.ask_stack = remaining
         return
 
 

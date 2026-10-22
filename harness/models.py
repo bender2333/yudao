@@ -597,7 +597,9 @@ class RunProjection:
     product_spec: ProductSpec | None = None
     effective_contract: EffectiveContract | None = None
     delivery_spec: DeliverySpec | None = None
-    active_ask: dict[str, Any] | None = None
+    # 还没回答的询问：链上的每一层一个，最内层（正在被回答的那一层）在最后（工单 #473）。
+    # 嵌套询问时外层还在等内层，内层回答以后回到外层。
+    ask_stack: list[dict[str, Any]] = field(default_factory=list)
     last_review: QAReview | None = None
     # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧 run 的事件没有这个字段时为 change
     kind: str = "change"
@@ -659,6 +661,16 @@ class RunProjection:
     def provider_bindings(self) -> dict[str, dict[str, Any]]:
         # 每个部门最近一次请求解析出的调用目标；还没有请求时为空
         return self.department_call_targets
+
+    @property
+    def active_ask(self) -> dict[str, Any] | None:
+        # 正在被回答的那一次询问：链上最内层的那一个（工单 #473 的嵌套询问）
+        return self.ask_stack[-1] if self.ask_stack else None
+
+    @property
+    def ask_depth(self) -> int:
+        # 询问链的层数：还没回答的询问有几个（工单 #473）
+        return len(self.ask_stack)
 
 
 

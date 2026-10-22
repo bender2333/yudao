@@ -9,6 +9,7 @@ from typing import Any
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .collaboration import tool_error
 from .contracts import current_contract_hash
+from .definitions import DEFINITIONS
 from .models import TERMINAL_PHASES, Event, RunProjection, hash_bytes
 from .tools import has_tool, offers_with_input, proposal_kind, tool_action, tools_for, usable_when_guidance_only
 from .validation import FieldError, ProposalDecision, evaluate_proposal
@@ -70,6 +71,20 @@ class ToolPermission:
     def allowed(self) -> bool:
         return not self.stopped and self.reason is None
 
+def ask_chain_decision(depth: int, limit: int) -> tuple[bool, str | None]:
+    # 询问链能不能再问一层（工单 #473）：层数不超过上限时可以。
+    # 超过上限时给出原因：链已有几层、上限是多少，并提示把要问的内容写进回答。
+    if depth + 1 <= limit:
+        return True, None
+    return False, (f"询问链已有 {depth} 层，上限是 {limit} 层：不能再回问，"
+                   f"把要问的内容写进回答")
+
+
+def ask_chain_max_depth() -> int:
+    # 询问链的层数上限：规则登记 organization.ask_chain_max_depth（工单 #473），不在代码里写死
+    return int(DEFINITIONS.rule_value("organization.ask_chain_max_depth"))
+
+
 def _ask_branch_permission(projection: RunProjection, department: str, name: str) -> ToolPermission | None:
     if projection.active_ask is None:
         if name == "answer":
@@ -80,10 +95,12 @@ def _ask_branch_permission(projection: RunProjection, department: str, name: str
         return None
     if name == "answer":
         return ToolPermission()
+    if name == "ask":
+        # 回问：在被问部门那里另开一个询问分支，层数不超过上限（工单 #473）
+        allowed, reason = ask_chain_decision(projection.ask_depth, ask_chain_max_depth())
+        return None if allowed else ToolPermission(reason=reason)
     if department == "product":
         return ToolPermission(reason="Product ask branch can only submit answer")
-    if name == "ask":
-        return ToolPermission(reason="Nested asks are not allowed in a branch session")
     if _is_write(name):
         return ToolPermission(reason="The branch session cannot modify files in the running workspace")
     if name == "submit_delivery":
@@ -103,11 +120,14 @@ def offered_tools(projection: RunProjection, department: str, *, guidance_only: 
     if projection.active_ask is not None:
         recipient = projection.active_ask.get("recipient")
         if department == recipient:
+            # 分支里的回问：层数不超过上限时提供 ask 工具（工单 #473）
+            chain_allowed, _ = ask_chain_decision(projection.ask_depth, ask_chain_max_depth())
+            nested = ["ask"] if chain_allowed else []
             if department == "product":
-                return ["answer"]
+                return ["answer"] + nested
             allowed = [name for name in available
                        if name != "ask" and not _is_write(name) and proposal_kind(name) is None]
-            return allowed + ["answer"]
+            return allowed + ["answer"] + nested
     if guidance_only:
         available = [name for name in available if usable_when_guidance_only(name)]
     return [name for name in offers_with_input(available, input_modalities)

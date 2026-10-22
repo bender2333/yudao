@@ -230,6 +230,17 @@
     "tighten_when": "子循环的运行记录显示更深处的记录无法审计",
     "origin": "ADR-0031，嵌套深度的上限是内核常量，现值为 2"
   },
+  "organization.ask_chain_max_depth": {
+    "value": 3,
+    "bounds": [1, 6],
+    "kind": "structure",
+    "form": "boundary",
+    "guards": "两个部门来回追问，每层都装配整个部门的历史，花费过高才失败",
+    "cost": "超过层数的追问被拒绝，提问方要把问题写进回答",
+    "relax_when": "被层数上限拒绝的询问记录显示挡住了需要的追问",
+    "tighten_when": "询问链的花费记录显示深链很少带来新信息",
+    "origin": "ADR-0039，默认 3 覆盖质检询问工程、工程询问产品、产品再询问质检"
+  },
   "stall.rounds": {
     "value": 3,
     "bounds": [1, 20],
