@@ -32,11 +32,10 @@
       "kinds": {
         "delivery_spec": {
           "when": ["ENGINEERING", "REWORK_ENGINEERING"],
-          "required": ["kind=delivery_spec", "summary", "files", "check_names", "basis_product_spec_hash"],
+          "required": ["kind=delivery_spec", "summary", "check_names", "basis_product_spec_hash"],
           "optional": ["known_risks"],
           "bind": [
             "current_contract.content_hash",
-            "workspace files must exist",
             "run_check receipts from this activation on the current workspace"
           ],
           "basis_product_spec_hash": "content hash of the ProductSpec this delivery is based on; the host rejects the submission if it does not equal the current effective ProductSpec content_hash"

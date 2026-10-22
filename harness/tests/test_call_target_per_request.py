@@ -67,7 +67,7 @@ def _delivery_stream(*, response_id: str, model: str, basis_product_spec_hash: s
         _call_item("engineering-write", "write_file", {"path": "src/echo.py", "content": "print('echo')\n"}),
         _call_item("engineering-check", "run_check", {"name": "smoke", "command": "python src/echo.py"}),
         _call_item("engineering-delivery", "submit_delivery",
-                   {"summary": "implemented echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"],
+                   {"summary": "implemented echo CLI", "check_names": ["smoke"],
                     "basis_product_spec_hash": basis_product_spec_hash}),
     ], response_id=response_id, model=model)
 

@@ -215,7 +215,7 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
     calls = [{"id": "first", "call_id": "first", "type": "function_call", "name": "bash",
               "arguments": json_dumps({"command": command})},
              _call("second", "write_file", path="src/second.py", content="must not start"),
-             _call("submission", "submit_delivery", summary="old delivery", files=["src/first.py"], check_names=["smoke"])]
+             _call("submission", "submit_delivery", summary="old delivery", check_names=["smoke"])]
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(), ModelResponse(output=calls),
         product_spec_turn(requirements=["print the argument in uppercase"], change_record=CHANGE_RECORD)]))

@@ -363,7 +363,7 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
     adapter = FakeAdapter(
         [
             product_spec(),
-            {"kind": "delivery_spec", "summary": "", "files": ["src/echo.py"], "check_names": ["smoke"]},
+            {"kind": "delivery_spec", "summary": "", "check_names": ["smoke"]},
             delivery_turn(summary="first valid delivery"),
             review_turn(
                 "rework_engineering",

@@ -367,7 +367,7 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
                            response_id="b-ask", model="b-engineering-actual")
 
         content = delivery_file if counts[department] == 2 else repaired_file
-        payload = delivery(files=["src/echo.py"], check_names=["smoke"],
+        payload = delivery(check_names=["smoke"],
                            basis_product_spec_hash=_spec_hash(body))
         payload.pop("kind")
         calls = [
@@ -882,7 +882,7 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
         # 第一次交付拿过期依据被拒，下一次激活按当前版本重交（工单 #471）：
         # 被拒的提交留在本部门历史里，工程的第三次请求看得到它，别的部门看不到
         basis = "stale" if count == 2 else _spec_hash(body)
-        payload = delivery(files=["src/echo.py"], check_names=["smoke"],
+        payload = delivery(check_names=["smoke"],
                            basis_product_spec_hash=basis)
         payload.pop("kind")
         return _chat_stream([

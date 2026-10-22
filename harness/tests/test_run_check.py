@@ -267,7 +267,7 @@ def test_delivery_citing_a_run_check_receipt_is_accepted_and_quality_releases_on
 def test_delivery_citing_a_bash_result_is_rejected_with_the_check_reason(tmp_path):
     # 交付引用 bash 的动作回执被拒绝，拒绝原因写明要用检查
     from harness.proposals import delivery
-    smoke_delivery = dict(delivery("echo CLI", files=["src/echo.py"], check_names=["smoke"]))
+    smoke_delivery = dict(delivery("echo CLI", check_names=["smoke"]))
     smoke_delivery.pop("kind", None)
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([
         product_spec(),

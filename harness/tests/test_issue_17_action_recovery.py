@@ -152,7 +152,7 @@ def test_a_partial_model_response_executes_remaining_host_tool(data_dir):
     item_submit = {
         "id": "hs1", "call_id": "hs1", "type": "function_call", "name": "submit_delivery",
         "arguments": json_dumps({
-            "summary": "deliver echo", "files": ["src/echo.py"], "check_names": [],
+            "summary": "deliver echo", "check_names": [],
             "basis_product_spec_hash": product_spec_hash,
         })
     }
