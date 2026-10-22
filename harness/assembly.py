@@ -149,6 +149,24 @@ class ContextAssembly:
         is_branch = session_id is not None and session_id in branch_starts
         branch_start_event = branch_starts.get(session_id) if is_branch else None
 
+        # 外层会话还没结果的询问调用不进分支的历史（工单 #473 的嵌套询问）：
+        # 这个分支就是那次调用的继续，它从那次调用之前的历史开始。
+        # 同一个部门的嵌套分支才会遇到：外层主线的询问调用在分支开出来时还没有结果。
+        outer_pending_steps: set[tuple[str | None, Any, Any]] = set()
+        if is_branch:
+            disposed = {
+                event.payload.get("id")
+                for event in events
+                if event.type in (EventType.TOOL_CALLED, EventType.TOOL_SKIPPED)
+            }
+            for event in events:
+                if event.type != EventType.TOOL_STARTED or event.payload.get("name") != "ask":
+                    continue
+                if event.session_id == session_id or event.payload.get("id") in disposed:
+                    continue
+                outer_pending_steps.add((event.session_id, event.payload.get("activation_id"),
+                                         event.payload.get("step_id")))
+
         failed_steps = {
             (event.payload.get("activation_id"), event.payload.get("step_id"))
             for event in events
@@ -157,6 +175,9 @@ class ContextAssembly:
         records: list[dict[str, Any]] = []
         for event in events:
             if is_branch:
+                if (event.session_id, event.payload.get("activation_id"),
+                        event.payload.get("step_id")) in outer_pending_steps:
+                    continue
                 if event.session_id in branch_starts and event.session_id != session_id:
                     continue
                 if event.session_id != session_id and branch_start_event is not None and event.stream_version >= branch_start_event.stream_version:

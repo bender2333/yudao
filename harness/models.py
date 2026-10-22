@@ -597,7 +597,12 @@ class RunProjection:
     product_spec: ProductSpec | None = None
     effective_contract: EffectiveContract | None = None
     delivery_spec: DeliverySpec | None = None
-    active_ask: dict[str, Any] | None = None
+    # 还没回答的询问：链上的每一层一个，最内层（正在被回答的那一层）在最后（工单 #473）。
+    # 嵌套询问时外层还在等内层，内层回答以后回到外层。
+    ask_stack: list[dict[str, Any]] = field(default_factory=list)
+    # 开过的询问分支会话：分支是部门主线之外的另一条会话，
+    # 它的激活不改部门主线的会话记录与最近激活（工单 #473）
+    branch_sessions: list[str] = field(default_factory=list)
     last_review: QAReview | None = None
     # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧 run 的事件没有这个字段时为 change
     kind: str = "change"
@@ -659,6 +664,47 @@ class RunProjection:
     def provider_bindings(self) -> dict[str, dict[str, Any]]:
         # 每个部门最近一次请求解析出的调用目标；还没有请求时为空
         return self.department_call_targets
+
+    @property
+    def active_ask(self) -> dict[str, Any] | None:
+        # 正在被回答的那一次询问：链上最内层的那一个（工单 #473 的嵌套询问）
+        return self.ask_stack[-1] if self.ask_stack else None
+
+    @property
+    def ask_depth(self) -> int:
+        # 询问链的层数：还没回答的询问有几个（工单 #473）
+        return len(self.ask_stack)
+
+    def ask_by_origin(self, session_id: str | None) -> dict[str, Any] | None:
+        # 这个会话发出的、还没回答的询问：恢复时继续这一层，不新开一层（工单 #473）
+        if not session_id:
+            return None
+        for ask in self.ask_stack:
+            if ask.get("origin_session_id") == session_id:
+                return ask
+        return None
+
+    def ask_by_branch(self, session_id: str | None) -> dict[str, Any] | None:
+        # 这个会话是哪一个询问的分支：分支里的回答与回问都发生在这个会话上（工单 #473）
+        if not session_id:
+            return None
+        for ask in self.ask_stack:
+            if ask.get("branch_session_id") == session_id:
+                return ask
+        return None
+
+    def ask_position(self, session_id: str | None) -> int:
+        # 这个会话在询问链上的位置：主线是 0；分支是它回答的那一次询问的层号；
+        # 发出询问的会话是它发出的那次询问的层号减一（工单 #473）
+        if not session_id:
+            return 0
+        for index, ask in enumerate(self.ask_stack):
+            if ask.get("origin_session_id") == session_id:
+                return index
+        for index, ask in enumerate(self.ask_stack):
+            if ask.get("branch_session_id") == session_id:
+                return index + 1
+        return 0
 
 
 

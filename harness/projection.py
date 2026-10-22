@@ -316,13 +316,16 @@ def apply_event(state: RunProjection, event: Event) -> None:
     if etype == EventType.DEPARTMENT_ACTIVATED:
         state.cycle_count += 1
         state.active_department = event.department
-        session = state.sessions.get(event.department or "")
-        if session:
-            session.activations += 1
-            session.status = "active"
-        activation_id = payload.get("activation_id")
-        if event.department and activation_id:
-            state.last_activations[event.department] = str(activation_id)
+        if event.session_id not in state.branch_sessions:
+            # 主线会话的激活：部门主线的会话记录与最近激活由它更新（工单 #473）。
+            # 询问分支是另一条会话，它的激活不改主线：主线的检查回执按主线的激活编号核对。
+            session = state.sessions.get(event.department or "")
+            if session:
+                session.activations += 1
+                session.status = "active"
+            activation_id = payload.get("activation_id")
+            if event.department and activation_id:
+                state.last_activations[event.department] = str(activation_id)
         incoming = payload.get("yielded_work")
         if incoming:
             if state.yielded_work is None:
@@ -455,9 +458,11 @@ def apply_event(state: RunProjection, event: Event) -> None:
 
     if etype == EventType.ACTIVATION_FINISHED:
         state.latency_ms += int(payload.get("latency_ms", 0))
-        session = state.sessions.get(event.department or "")
-        if session:
-            session.status = "closed" if state.phase in TERMINAL_PHASES else "idle"
+        if event.session_id not in state.branch_sessions:
+            # 主线会话结束：部门主线的会话记录由它更新（工单 #473 的分支会话不算主线结束）
+            session = state.sessions.get(event.department or "")
+            if session:
+                session.status = "closed" if state.phase in TERMINAL_PHASES else "idle"
         return
 
     if etype == EventType.PROPOSAL_REJECTED:
@@ -519,18 +524,25 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.ASK_STARTED:
-        state.active_ask = {
+        if payload["branch_session_id"] not in state.branch_sessions:
+            state.branch_sessions.append(payload["branch_session_id"])
+        state.ask_stack.append({
             "requester": payload["requester"],
             "recipient": payload["recipient"],
             "question": payload["question"],
             "branch_session_id": payload["branch_session_id"],
+            # 发起这次询问的会话：恢复时按它找到这一层，回问时按它算层数（工单 #473）
+            "origin_session_id": event.session_id,
             "background": payload.get("background"),
             "expected": payload.get("expected"),
-        }
+        })
         return
 
     if etype == EventType.ASK_ANSWERED:
-        state.active_ask = None
+        # 回答的是链上的哪一层：按分支会话找那一层，移除它以后外层继续（工单 #473 的嵌套询问）
+        session_id = event.session_id
+        state.ask_stack = [ask for ask in state.ask_stack
+                           if ask.get("branch_session_id") != session_id]
         return
 
 

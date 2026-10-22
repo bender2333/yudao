@@ -466,8 +466,11 @@ class Orchestrator:
     def _inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
         # 会话的检查工作区（工单 #481）：根在运行工作区以外，激活开始时从当前源
         # （质检从最新交付，其他从当前运行工作区）建立；提案提交按同一根打开，
-        # 不重新建立，激活里写入的文件与检查回执在提交判断时仍然可见
-        root = inspection_root(self.workspace_root / run_id, department)
+        # 不重新建立，激活里写入的文件与检查回执在提交判断时仍然可见。
+        # 根按会话一个（工单 #473）：主线会话与它在询问分支里的会话各用各的
+        if not session_id:
+            raise RuntimeError(f"inspection workspace for {department} needs a session id")
+        root = inspection_root(self.workspace_root / run_id, session_id)
         return LocalEnvironment.open(
             root,
             check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id),
@@ -480,7 +483,6 @@ class Orchestrator:
         # 源可能在上一次激活后被新交付覆盖，质检必须看到最新交付而不是上一次的副本
         projection = self.project(run_id)
         run_root = self.workspace_root / run_id
-        root = inspection_root(run_root, department)
         if session_id is None and self.sessions is not None:
             try:
                 session_id = self.sessions.get(run_id, department).session_id
@@ -488,14 +490,17 @@ class Orchestrator:
                 ids = {item.department: item.session_id for item in projection.sessions.values()} if projection.sessions else None
                 sessions = self.sessions.create_run_sessions(run_id, ids)
                 session_id = sessions[department].session_id
+        if session_id is None:
+            raise RuntimeError(f"inspection workspace for {department} needs a session id")
+        root = inspection_root(run_root, session_id)
         if jobs is None and self.sessions is not None:
             jobs = getattr(self.sessions, "jobs", None)
 
-        if session_id is not None and jobs is not None:
+        if jobs is not None:
             jobs.stop_and_remove_for_workspace(session_id, root)
 
         if root.exists():
-            cleanup_inspection_workspace(run_root, department)
+            cleanup_inspection_workspace(run_root, session_id)
         tree = self._inspection_source_tree(department, projection)
         env = LocalEnvironment.establish(
             root,
@@ -1420,13 +1425,14 @@ class Orchestrator:
         call: dict[str, Any],
     ) -> tuple[bool, Any, str | None, str | None, int]:
         args = call.get("args") or {}
-        active = self.project(scope.run_id).active_ask
-        if active is not None and active.get("requester") == scope.department:
-            branch_session_id = str(active["branch_session_id"])
-            recipient = str(active["recipient"])
-            question = str(active["question"])
-            background = str(active.get("background") or "")
-            expected = str(active.get("expected") or "")
+        # 这个会话自己那次没结束的询问：恢复时继续这一层，不新开一层（工单 #473 的嵌套询问）
+        pending = self.project(scope.run_id).ask_by_origin(scope.session_id)
+        if pending is not None:
+            branch_session_id = str(pending["branch_session_id"])
+            recipient = str(pending["recipient"])
+            question = str(pending["question"])
+            background = str(pending.get("background") or "")
+            expected = str(pending.get("expected") or "")
         else:
             recipient = args.get("recipient")
             question = args.get("question")
@@ -1468,7 +1474,7 @@ class Orchestrator:
         )
         if prior_answered is not None:
             p = prior_answered.payload or {}
-            branch_steps = len([e for e in events if e.type == EventType.MODEL_REQUESTED and e.session_id == branch_session_id])
+            branch_steps = self._branch_steps(events, branch_session_id)
             if p.get("status") == "answered":
                 return True, p.get("answer", ""), None, None, branch_steps
             else:
@@ -1519,7 +1525,7 @@ class Orchestrator:
             deadline=deadline,
         )
         events_after = self.writes.read(run_stream(scope.run_id)).events()
-        branch_steps = len([e for e in events_after if e.type == EventType.MODEL_REQUESTED and e.session_id == branch_session_id])
+        branch_steps = self._branch_steps(events_after, branch_session_id)
 
         if isinstance(result, Answered):
             ans_args = result.args
@@ -1624,6 +1630,23 @@ class Orchestrator:
             self.writes.transact(run_stream(scope.run_id), record_ask_unable)
             return False, None, reason, None, branch_steps
 
+    def _branch_steps(self, events: list[Any], branch_session_id: str) -> int:
+        # 这个分支会话用掉的模型步数：分支里再问一层时，回问的分支是它的下一层，
+        # 那一层的步数逐层计入最初的提问方（工单 #473 的嵌套询问）
+        sessions = {branch_session_id}
+        grew = True
+        while grew:
+            grew = False
+            for event in events:
+                if event.type != EventType.ASK_STARTED or event.session_id not in sessions:
+                    continue
+                branch = (event.payload or {}).get("branch_session_id")
+                if isinstance(branch, str) and branch not in sessions:
+                    sessions.add(branch)
+                    grew = True
+        return len([e for e in events
+                    if e.type == EventType.MODEL_REQUESTED and e.session_id in sessions])
+
     async def _run_ask_branch(
         self,
         activation: _Activation,
@@ -1725,7 +1748,7 @@ class Orchestrator:
                 ))
             self.writes.transact(run_stream(run_id), finish_branch)
             try:
-                cleanup_inspection_workspace(self.workspace_root / run_id, department)
+                cleanup_inspection_workspace(self.workspace_root / run_id, session_id)
             except Exception:
                 pass
         return result

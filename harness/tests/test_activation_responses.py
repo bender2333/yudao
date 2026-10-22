@@ -110,8 +110,10 @@ def test_same_provider_call_id_in_different_steps_executes_each_host_call(tmp_pa
 
     def repeat_call(handler, _body):
         # 同一个 call_id 的两次调用都执行在本会话的检查工作区里（工单 #481）：
-        # 产品会话不持有交接，改写检查工作区才会改变第二次调用的结果
-        product_root = inspection_root(system.workspace_root / run_id, "product")
+        # 产品会话不持有交接，改写检查工作区才会改变第二次调用的结果。
+        # 检查工作区按会话一个（工单 #473），路径的最后一段是会话标识
+        session_id = system.orchestrator.sessions.get(run_id, "product").session_id
+        product_root = inspection_root(system.workspace_root / run_id, session_id)
         product_root.mkdir(parents=True, exist_ok=True)
         product_root.joinpath("proof.txt").write_text("second-result", encoding="utf-8")
         _send(handler, _stream([CALL], response_id="resp-two"))

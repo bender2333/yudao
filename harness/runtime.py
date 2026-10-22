@@ -11,7 +11,7 @@ from .deltas import DeltaChannel
 from .definitions import DEFINITIONS
 from . import parameters
 from .engine import StepLimits
-from .environment import LocalEnvironment, cleanup_inspection_workspace
+from .environment import LocalEnvironment, cleanup_run_inspections
 from .event_store import Command, EventStore, catalog_stream
 from .models import CatalogEventType, ProjectEventType, TERMINAL_PHASES
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
@@ -429,11 +429,10 @@ class LoopSystem:
                 continue
             if phase not in TERMINAL_PHASES:
                 continue
-            for department in ("product", "engineering", "quality"):
-                try:
-                    cleanup_inspection_workspace(self.workspace_root / run_id, department)
-                except RuntimeError:
-                    pass
+            try:
+                cleanup_run_inspections(self.workspace_root / run_id)
+            except (OSError, RuntimeError):
+                pass
 
     def replay(self, run_id: str) -> RunProjection:
         return verify_replay(self.store, self.artifacts, self.git_versions, run_id)

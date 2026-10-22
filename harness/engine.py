@@ -591,13 +591,15 @@ class StepDriver:
         # 最近一次进入历史的完整模型响应里，没有得到处置的工具调用。每一条 MODEL_MESSAGE 事件保存响应中的一个
         # 输出条目（function_call / message），同一次响应的事件共享（激活、步骤）：按这一组收集，再排除已经
         # 处置的（tool_started/tool_called/tool_skipped）。压缩请求的回答不是工作响应，跳过
+        # 收集范围是这次激活自己的会话（工单 #473）：主线会话与分支会话是两条会话，
+        # 分支不接手主线没有处置完的调用，同一个部门的两个会话各管各的
         events = self._writes.read(self._stream).events()
         dispositioned: set[str] = set()
         responses: dict[tuple[str, int], list[Any]] = {}
         order: list[tuple[str, int]] = []
         for event in events:
             payload = event.payload or {}
-            if event.department != self._scope.department or payload.get("purpose") == "compaction":
+            if event.session_id != self._scope.session_id or payload.get("purpose") == "compaction":
                 continue
             if event.type in (EventType.TOOL_CALLED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED):
                 identity = payload.get("id")
@@ -892,7 +894,8 @@ class StepDriver:
             projection = self._settle(transaction)
             facts = self._environment.query(facts_query(call))
             permission = tool_permission(
-                projection, call, department=scope.department, guidance_only=scope.guidance_only,
+                projection, call, department=scope.department, session_id=scope.session_id,
+                guidance_only=scope.guidance_only,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
             )
             if not permission.allowed and scope.department == "quality" and call["name"] == "write_file":

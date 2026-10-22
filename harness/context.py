@@ -87,8 +87,8 @@ class ContextAssembler:
         guidance_items = list(guidance or [])
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
-        tool_names = offered_tools(projection, department, guidance_only=guidance_only,
-                                   input_modalities=input_modalities)
+        tool_names = offered_tools(projection, department, session_id=session_id,
+                                   guidance_only=guidance_only, input_modalities=input_modalities)
         # 全体角色共同的规则文字与本角色的可见范围取自定义
         rules = DEFINITIONS.organization.rules
         visible = DEFINITIONS.role(department).visibility

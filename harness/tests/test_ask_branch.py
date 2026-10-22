@@ -139,7 +139,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
     projection = RunProjection(
         run_id="run_test",
         phase="ENGINEERING",
-        active_ask={"requester": "product", "recipient": "engineering", "branch_session_id": "ses_ask_eng"},
+        ask_stack=[{"requester": "product", "recipient": "engineering", "branch_session_id": "ses_ask_eng"}],
     )
     basis = WorkBasis.current(projection, "engineering")
 
@@ -148,6 +148,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         projection,
         {"name": "write_file", "args": {"path": "src/new.py", "content": "x"}},
         department="engineering",
+        session_id="ses_ask_eng",
         guidance_only=False,
         basis=basis,
         aborted=False,
@@ -160,6 +161,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         projection,
         {"name": "submit_delivery", "args": {"summary": "done", "check_names": []}},
         department="engineering",
+        session_id="ses_ask_eng",
         guidance_only=False,
         basis=basis,
         aborted=False,
@@ -171,13 +173,14 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
     qa_projection = RunProjection(
         run_id="run_test",
         phase="QUALITY",
-        active_ask={"requester": "engineering", "recipient": "quality", "branch_session_id": "ses_ask_qa"},
+        ask_stack=[{"requester": "engineering", "recipient": "quality", "branch_session_id": "ses_ask_qa"}],
     )
     qa_basis = WorkBasis.current(qa_projection, "quality")
     perm_rev = tool_permission(
         qa_projection,
         {"name": "submit_review", "args": {"verdict": "release", "rationale": "ok", "checks": []}},
         department="quality",
+        session_id="ses_ask_qa",
         guidance_only=False,
         basis=qa_basis,
         aborted=False,
@@ -189,13 +192,14 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
     prod_projection = RunProjection(
         run_id="run_test",
         phase="ENGINEERING",
-        active_ask={"requester": "engineering", "recipient": "product", "branch_session_id": "ses_ask_pro"},
+        ask_stack=[{"requester": "engineering", "recipient": "product", "branch_session_id": "ses_ask_pro"}],
     )
     prod_basis = WorkBasis.current(prod_projection, "product")
     perm_prod_read = tool_permission(
         prod_projection,
         {"name": "read_file", "args": {"path": "src/echo.py"}},
         department="product",
+        session_id="ses_ask_pro",
         guidance_only=False,
         basis=prod_basis,
         aborted=False,
