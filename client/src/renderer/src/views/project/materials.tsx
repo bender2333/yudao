@@ -14,7 +14,9 @@ import { ITEM_COLORS } from "../../pixel/registry";
 import { Empty, KeyValue, Loading, Section, Tag, dict, list, show, text } from "./common";
 import { departmentName, formatTime, label, WORK_ITEM_STATUS, WORK_ITEM_STATUS_KIND } from "./labels";
 import { fileDownload } from "./materials-download";
+import { originalView, readView } from "./materials-read";
 import { useSnapshot } from "./use-snapshot";
+import { readFailureText } from "../../contract/read-failure";
 
 const COUNT_KINDS = [
   ["intend", "intend"],
@@ -65,6 +67,9 @@ export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate:
         </p>
       </header>
       <Loading state={overview} />
+      {overview.error !== null ? (
+        <p className="y10-note note" role="status">{readFailureText(overview.error)}</p>
+      ) : null}
       {overview.data !== null ? (
         <IndexBlock
           items={items}
@@ -74,6 +79,9 @@ export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate:
           onNavigate={props.onNavigate}
           projectId={projectId}
         />
+      ) : null}
+      {materials.error !== null ? (
+        <p className="y10-note note" role="status">{readFailureText(materials.error)}</p>
       ) : null}
       {data ? (
         <>
@@ -320,7 +328,8 @@ function VersionBlock(props: {
     { event_id: open ?? "" },
     open === null,
   );
-  const original = detail.data === null ? null : text(dict(detail.data.artifacts).prd);
+  // 读不出来与「这一版没有留下原文」是两句不同的话（工单 #714）
+  const original = originalView(detail, (data) => text(dict(data.artifacts).prd));
 
   return (
     <Section id={props.id} title={props.title} note={props.note} className="y10-mt">
@@ -345,8 +354,12 @@ function VersionBlock(props: {
             <h2>合同原文</h2>
             <button type="button" onClick={() => setOpen(null)}>收起</button>
           </div>
-          {detail.loading && detail.data === null ? <p className="y10-note note">正在读取原文</p> : null}
-          {original === null ? <p className="y10-note note">这一版没有留下原文</p> : <pre className="y10-pre raw">{original}</pre>}
+          {original.kind === "loading" ? <p className="y10-note note">正在读取原文</p> : null}
+          {original.kind === "failed" ? (
+            <p className="y10-note note" role="status">{readFailureText(original.reason)}</p>
+          ) : null}
+          {original.kind === "empty" ? <p className="y10-note note">这一版没有留下原文</p> : null}
+          {original.kind === "content" ? <pre className="y10-pre raw">{original.text}</pre> : null}
         </div>
       )}
     </Section>
@@ -363,6 +376,8 @@ function DeliveryBlock(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
     { event_id: open?.eventId ?? "", path: open?.path ?? "" },
     open === null,
   );
+  // 读不出来与「没有内容」是两句不同的话（工单 #714）
+  const view = readView(file);
 
   return (
     <Section id="mt-delivery" title="交付" note="各版本的封存快照：文件清单、摘要与文件下载" className="y10-mt">
@@ -395,8 +410,11 @@ function DeliveryBlock(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
             <h2>交付文件 {open.path}</h2>
             <button type="button" onClick={() => setOpen(null)}>收起</button>
           </div>
-          {file.loading && file.data === null ? <p className="y10-note note">正在读取文件</p> : null}
-          {file.data ? <FileContent data={file.data} /> : null}
+          {view.kind === "loading" ? <p className="y10-note note">正在读取文件</p> : null}
+          {view.kind === "failed" ? (
+            <p className="y10-note note" role="status">{readFailureText(view.reason)}</p>
+          ) : null}
+          {view.kind === "ready" && view.data !== null ? <FileContent data={view.data} /> : null}
         </div>
       ) : null}
     </Section>
