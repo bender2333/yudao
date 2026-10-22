@@ -172,6 +172,7 @@
 "test_workspace_boundary.py" = "unit"
 "test_workspace_delivery.py" = "integration"
 "test_workspace_unrepresentable.py" = "integration"
+"test_pages_api_version.py" = "module"
 "test_write_path.py" = "module"
 "test_writeback_branch.py" = "module"
 "test_writeback.py" = "module"

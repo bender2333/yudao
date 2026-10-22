@@ -13,6 +13,27 @@ export type Connection =
   | { state: "unauthorized"; address: string }
   | { state: "failed"; address: string; message: string };
 
+// 同一会话里已经重载过（工单 #704）：服务与页面一直不匹配时不再反复重载，
+// 而是给出该做什么的说明
+const RELOAD_MARK = "yudao.page-reloaded";
+
+function reloadedThisSession(): boolean {
+  try {
+    return window.sessionStorage.getItem(RELOAD_MARK) === "1";
+  } catch {
+    // 浏览器不给用会话存储时按没重载过处理（重载一次无害）
+    return false;
+  }
+}
+
+function markReloadedThisSession(): void {
+  try {
+    window.sessionStorage.setItem(RELOAD_MARK, "1");
+  } catch {
+    // 存不进去就当没记住：这一轮只会多重载一次
+  }
+}
+
 // 一次连接建立的接口访问对象：所有查询与命令都经它发出请求，baseUrl 由地址决定
 export type Interface = {
   baseUrl: string;
@@ -56,9 +77,14 @@ export async function connect(address: string, token = ""): Promise<Connection> 
     return { state: "failed", address, message: "没有取到能力清单" };
   }
   // 页面与服务同出一个发布（网页界面的提供与发布设计说明第 5.1 节）：服务的发布版本与页面构建时的
-  // 版本不同时重新加载页面，取到与服务同一个版本的页面文件。每次连接都核对，包括服务重启以后的重新连接
-  if (deployment.version !== PAGE_RELEASE) {
-    window.location.reload();
+  // 版本不同时重新加载页面，取到与服务同一个版本的页面文件。每次连接都核对，包括服务重启以后的重新连接。
+  // 接口版本不同时也重载一次（工单 #704）：接口一变，页面文件多半要重新构建过；重载取到新文件就用新的。
+  // 同一会话只重载一次：页面与服务一直不匹配时（例如页面文件还没重建），不停重载只会一直闪。
+  if (deployment.version !== PAGE_RELEASE || deployment.api_version !== CLIENT_API_VERSION) {
+    if (!reloadedThisSession()) {
+      markReloadedThisSession();
+      window.location.reload();
+    }
   }
   // 进入已连接只用了 deployment 的两个字段（上面已核对类型）；完整合同由服务端保证
   const capabilities = raw as Capabilities;
