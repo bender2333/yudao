@@ -362,6 +362,22 @@ def test_ignore_rules_exclude_the_paths_the_project_lists(tmp_path, monkeypatch)
     assert excluded == {"build", "build/out.bin"}
     assert excluded == _git_check_ignore(workspace, relatives)
 
+
+def test_ignore_rules_are_decided_for_a_workspace_deep_in_the_file_system(tmp_path, monkeypatch):
+    # 工单 #706：libgit2 拒绝超过约 190 个字符的仓库路径，探测库放在工作区旁边时，
+    # 深的数据目录会让每一次判断都以 TreeError 结束；探测库放在进程专属目录以后照常判断
+    _forbid_subprocess(monkeypatch)
+    base = tmp_path
+    while len(str(base)) < 170:
+        base = base / "deeper"
+    base.mkdir(parents=True, exist_ok=True)
+    workspace = _ignore_workspace(base / "work", rules="build/\n")
+    relatives = ["src/app.py", "build/out.bin", "build"]
+    excluded = excluded_by_ignore_rules(workspace, relatives)
+    monkeypatch.undo()
+    assert excluded == {"build", "build/out.bin"}
+    assert excluded == _git_check_ignore(workspace, relatives)
+
 def test_a_capture_over_a_workspace_without_ignore_files_never_opens_a_probe(tmp_path, monkeypatch):
     # 一次采集的每一层目录都判定一遍忽略规则；工作区没有忽略文件时整次采集不打开探测库也不启动进程
     _forbid_subprocess(monkeypatch)
