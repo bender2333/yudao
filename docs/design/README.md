@@ -22,6 +22,10 @@
   - 内容：部门按关注的成果开始工作与部门的步骤循环、三个部门同时运行的情况与条件、询问是一次工具调用、询问分支、回答能做什么、询问链（允许回问，层数上限是规则参数）、用量与失败、工作中途要求变化、指导、提交与版本、工程的计划、停止与恢复、与现有代码的差异，含成果流向图、模块交互图与时序图。
   - 状态：2026-10-12 设计，用户逐轮采纳推荐；2026-10-14 按 #488、#489 的讨论去掉交接、询问链允许回问，用户确认；未实施。
   - 需求：[D38](../requirements/system-intent.md)、[D20](../requirements/department-guidance.md)。ADR：[0036](../adr/0036-concurrent-departments-and-nested-asks.md)、[0037](../adr/0037-engineering-plan-stays-with-engineering.md)、[0039](../adr/0039-departments-work-from-watched-outputs.md)、[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。
+- [黑板编排](blackboard-orchestration.md)
+  - 内容：两种编排模式与共享的底层、模式在定义里、黑板的任务与状态与事件、发布与认领、部门在黑板模式下的一轮工作与工具与上下文、验证与完成（开环）、用户、一定会停与收敛、界面、两种模式的比较、定义的改动、暂定默认值。
+  - 状态：2026-10-22 设计草案，两种模式并存与共用底层已由用户决定，第 15 节的暂定默认值待用户确认，未实施；实施排在 M0 的 #474 之后，路线图位置待用户决定。
+  - 需求：[D39](../requirements/blackboard-orchestration.md)。ADR：[0041](../adr/0041-two-orchestration-modes-share-control-core.md)。
 - [循环与收敛](loops-and-convergence.md)
   - 内容：循环层的声明、一定会停、子循环、收敛的检测、防止滑向静态编排的五条判据、容纳变化的判据。
   - 状态：2026-10-07 设计，用户已确认，未实施；同日第 5 节写明 Stage 3 判定步骤循环与 run 两层、run 层只计有可执行检验的条件、步骤循环取 8 步与 3 次。工单：B2（M2）、#143、#246、自举试点的首批工单（收敛状态投影与 `run.loops`）、Stage 4、Stage 5。

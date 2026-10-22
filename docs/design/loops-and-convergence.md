@@ -1,5 +1,7 @@
 # 循环与收敛设计说明
 
+2026-10-22 补充（[ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)）：第 6 节的五条判据对成果驱动与黑板两种编排模式都适用；第 5 节的进展度量按模式各自定义，黑板模式的度量见[黑板编排设计说明](blackboard-orchestration.md)第 8.3 节。
+
 更新：2026-10-07（第 5 节写明 Stage 3 判定的范围、run 层只计有可执行检验的条件、步骤循环的判定取值）。状态：设计已确认（2026-10-07 用户确认按意图校准整理项目），未实施。路线位置：已用时间写入事件、边界的核对从流程编排中分出来是 Stage 3 的 B2（挂在 3.1 下，M2）；等待的时长上限并入 #143（等待机器）与 #246（等待桌面解锁），等待模型服务的上限在 Stage 4；收敛状态的投影与画面是自举试点的首批工单；流转由定义驱动、控制代码中没有部门名称是 Stage 4 的完成依据；子循环与部门内循环的边界在 Stage 5。
 
 依据：[D38 系统意图与基础规则](../requirements/system-intent.md)（N-L1 至 N-L4、N-A1 至 N-A3、N-C1、N-C3、N-I6）、[ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md)、[ADR-0030](../adr/0030-rules-are-provisional-defaults.md)、[D09 循环次数与超时限制](../requirements/execution-limits.md)、[部门内多角色设计说明](department-roles.md)、[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)、[Loop System 原理](../archive/native-harness/loop-system-principles.md)第 7、12 节。

@@ -47,6 +47,7 @@
 | D35 | [自举：用 Yudao 开发 Yudao](self-hosting.md) | 需求已记录（2026-09-29、09-30）：自举是核心目标；单一写入角色是短期取舍，将来用 worktree 或跨执行主机的分支并发；质量检查作为部门工序（工程对单元测试、圈复杂度与变异测试作自我保证，质检做大的验证）；圈复杂度与变异测试的研发工具放到下一阶段，Stage 3 结束之前由用户与 Claude 手动进行一次；2026-10-07 确定边界与路线位置（[D38](system-intent.md)、[ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)）：自举是路线图的一条工作线，第一层的试点在 M2 关闭并且五项前置条件完成以后开始，成果以合并请求交给现有的审查流程，第二层是 Stage 6；未实施 |
 | D36 | [网络取回与 MCP 工具](network-and-mcp.md) | 需求与设计已确认（[设计说明](../design/network-and-mcp.md)），未实施；路线位置 Stage 3 的 3.2B，工单 #122（#68、#69、#236，界面 #237 至 #239），属于里程碑 M3；取回与 MCP 服务器在控制主机上运行（[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)），搜索经 MCP 提供；2026-10-13 按 [ADR-0038](../adr/0038-function-first-commands-without-registration.md) 修改：取回任何 http 与 https 地址，MCP 服务器写在项目设置中、工具全部直接提供 |
 | D37 | [新建项目的起始文件夹](project-initial-files.md) | 需求与设计已确认（[设计说明](../design/project-initial-files.md)），未实施；路线位置 Stage 3 的 3.8 的补充（#124 下），属于里程碑 M2；新建项目可以带起始文件夹，快照是第一次采纳之前每个事项的起点，不建档；评测场景 3 的数据文件需要它 |
+| D39 | [黑板编排：与成果驱动并存的第二种编排模式](blackboard-orchestration.md) | 2026-10-22 需求已确认：两种编排模式共用控制核心，黑板模式不要求验证者与作者分开；设计见[黑板编排设计说明](../design/blackboard-orchestration.md)，决定见 [ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)；未实施，路线图位置待定 |
 | D38 | [系统意图与基础规则](system-intent.md) | 2026-10-07 意图校准确认：三条目的、可迭代状态的五条判据、六条基础规则与可视化的决定 A–H，需求编号 N-xx；由路线图的「迭代底座」工作包、自举工作线与 Stage 4 至 Stage 6 分别实现；2026-10-20 N-G1 的验收改为「高于」的判法（只看质检这一段带来的提高） |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。
