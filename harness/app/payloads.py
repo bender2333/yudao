@@ -1561,3 +1561,34 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.INSTANCE_UPGRADE_ANSWERED: InstanceUpgradeAnswered,
     CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN: InstanceUpgradeWithdrawn,
 }
+
+
+def _known_fields(model: Any) -> set[str]:
+    # 一个事件种类的载荷类型：单个模型取它的字段名与别名，联合取各成员字段的并集
+    if isinstance(model, type) and issubclass(model, BaseModel):
+        names: set[str] = set()
+        for name, field in model.model_fields.items():
+            names.add(name)
+            if field.alias:
+                names.add(field.alias)
+        return names
+    fields: set[str] = set()
+    for member in getattr(model, "__args__", ()):
+        fields |= _known_fields(member)
+    return fields
+
+
+def payload_for_reading(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+    # 读旧事件时宽容：事件日志里留着模型已经删掉的字段（ADR-0019），
+    # 读的时候忽略它们，日志本身不改；一条读不懂的事件不能把整条历史事件流作废
+    model = PAYLOADS.get(event_type)
+    if model is None or not isinstance(payload, dict):
+        return payload
+    known = _known_fields(model)
+    return {key: value for key, value in payload.items() if key in known}
+
+
+def is_known_event_type(event_type: str) -> bool:
+    # 这个事件种类现在还有载荷类型：已经被删掉的种类（旧版本的协作请求）读的时候跳过，
+    # 事件日志里仍然留着，事件详情照旧能查
+    return event_type in PAYLOADS
