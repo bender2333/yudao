@@ -343,7 +343,7 @@ def bash_is_not_a_check_receipt(data_dir):
 
     def submit(call, identity):
         return _call(identity, "submit_delivery",
-                     {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["unit-tests"],
+                     {"summary": "echo CLI", "check_names": ["unit-tests"],
                       "basis_product_spec_hash": _current_spec_hash(call)})
 
     def first(call):
@@ -400,7 +400,7 @@ def cancel_while_check_runs(data_dir):
         return ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
                                      _call("check-1", "run_check", {"name": "smoke", "command": command}),
                                      _call("submit-1", "submit_delivery",
-                                           {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"],
+                                           {"summary": "echo CLI", "check_names": ["smoke"],
                                             "basis_product_spec_hash": _current_spec_hash(call)})])
     system, _, run_id = _system(data_dir, [
         product_spec(),
@@ -418,7 +418,7 @@ def cancel_while_bash_runs(data_dir):
     def deliver(call):
         return ModelResponse(output=[_call("command-1", "bash", {"command": command}),
                                      _call("submit-1", "submit_delivery",
-                                           {"summary": "echo CLI", "files": ["src/echo.py"], "check_names": ["smoke"],
+                                           {"summary": "echo CLI", "check_names": ["smoke"],
                                             "basis_product_spec_hash": _current_spec_hash(call)})])
     system, _, run_id = _system(data_dir, [
         product_spec(),

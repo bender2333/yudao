@@ -71,15 +71,14 @@ def product_decision(statement: str, rationale: str) -> dict[str, Any]:
 
 def delivery(
     summary: str = "implemented echo CLI",
-    files: list[str] | None = None,
     check_names: list[str] | None = None,
     known_risks: list[str] | None = None,
     basis_product_spec_hash: str | None = None,
 ) -> dict[str, Any]:
+    # 交付的文件清单由主机从封存的交付快照得出，工程不再填（工单 #677）
     return {
         "kind": "delivery_spec",
         "summary": summary,
-        "files": files or ["src/echo.py"],
         "check_names": check_names or ["smoke"],
         "known_risks": known_risks or [],
         "basis_product_spec_hash": basis_product_spec_hash,
@@ -203,7 +202,7 @@ def delivery_turn(
             raw = prompt_part(call, "current_product_spec")
             declared = json.loads(raw).get("content_hash") if raw else None
         return FakeTurn(
-            proposal=delivery(summary, files=list(files), check_names=list(checks),
+            proposal=delivery(summary, check_names=list(checks),
                               basis_product_spec_hash=declared),
             writes=files,
             checks=checks,

@@ -158,7 +158,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
     # 工程分支试图提交交付
     perm_del = tool_permission(
         projection,
-        {"name": "submit_delivery", "args": {"summary": "done", "files": ["src/new.py"], "check_names": []}},
+        {"name": "submit_delivery", "args": {"summary": "done", "check_names": []}},
         department="engineering",
         guidance_only=False,
         basis=basis,

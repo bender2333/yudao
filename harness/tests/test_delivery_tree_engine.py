@@ -36,7 +36,8 @@ def test_accepted_delivery_restores_complete_tree_without_the_original_workspace
         result = system.activate_once(run_id)
     assert result.phase == "QUALITY", result.error
     delivery = result.delivery_spec
-    assert delivery.files == ["src/echo.py"]
+    # 清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）
+    assert delivery.files == [".project-config", "assets/binary.dat", "src/echo.py"]
     event = system.store.get_event(delivery.created_event_id)
     assert event.payload["tree_ref"] == asdict(delivery.tree_ref)
     assert "file_refs" not in event.payload and "snapshot_ref" not in event.payload

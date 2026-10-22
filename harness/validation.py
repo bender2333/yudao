@@ -160,7 +160,6 @@ def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
     if kind == "delivery_spec":
         return (
             _require_text(proposal, "summary")
-            + _require_string_list(proposal, "files", min_items=1)
             + _require_string_list(proposal, "check_names", min_items=1)
             + _optional_string_list(proposal, "known_risks")
         )
@@ -465,10 +464,9 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
         return ProposalDecision(False, [FieldError("effective_contract", "delivery requires a current effective contract")])
     errors: list[FieldError] = []
     errors.extend(_basis_hash_errors(proposal, "basis_product_spec_hash", projection.product_spec.content_hash))
-    files = [item.replace("\\", "/") for item in proposal["files"]]
-    for rel in files:
-        if not facts.has_file(rel):
-            errors.append(FieldError("files", f"missing workspace file: {rel}"))
+    # 交付的文件清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）。
+    # 工程不再填清单——三份真实交付的清单只写了「这次改的那个文件」，用户按清单下载拿不全成果。
+    files = sorted(item.replace("\\", "/") for item in facts.files)
     checks = []
     for name in proposal["check_names"]:
         receipt = facts.latest_check(

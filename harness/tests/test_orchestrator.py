@@ -94,7 +94,6 @@ def test_illegal_workpiece_stays_in_department(data_dir):
                 {
                     "kind": "delivery_spec",
                     "summary": "wrong department",
-                    "files": ["src/echo.py"],
                     "check_names": ["smoke"],
                     "known_risks": [],
                 }

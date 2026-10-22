@@ -710,13 +710,6 @@
         "summary": {
           "type": "string"
         },
-        "files": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Workspace-relative files included in the delivery"
-        },
         "check_names": {
           "type": "array",
           "items": {
@@ -743,7 +736,6 @@
        "required": [
         "basis_product_spec_hash",
         "summary",
-        "files",
         "check_names"
        ]
       }

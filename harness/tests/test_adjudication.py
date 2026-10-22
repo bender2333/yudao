@@ -60,7 +60,7 @@ def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_pa
     )
     ws.write_file("src/echo.py", "print(1)\n")
     ws.record_check("engineering", "pytest", 0, "ok")
-    proposal = delivery(files=["src/echo.py"], check_names=["pytest"],
+    proposal = delivery(check_names=["pytest"],
                         basis_product_spec_hash=projection.product_spec.content_hash)
     facts = environment.query(FactsQuery(tree=True)).tree
     events = system.store.list_events(projection.run_id)
@@ -83,6 +83,31 @@ def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_pa
                               **arguments)
     assert not changed.accepted
     assert changed.errors[0].message.startswith("The workspace snapshot changed")
+
+
+def test_the_delivery_file_list_comes_from_the_sealed_snapshot(tmp_path):
+    # 工单 #677：工程不再填文件清单——三份真实交付的清单只写了「这次改的那个文件」，
+    # 用户按清单下载拿不全成果；清单由主机从封存的交付快照得出（公开树的全部文件，按路径排序）
+    system, projection = _engineering(tmp_path)
+    environment = _environment(system, projection)
+    ws = system.workspace(projection.run_id)
+    ws.bind_check(
+        activation_id=projection.last_activations.get("engineering"),
+        product_spec_hash=projection.product_spec.content_hash,
+        delivery_spec_hash=None,
+        effective_contract_hash=projection.effective_contract.content_hash,
+    )
+    for name, content in (("src/echo.py", "print(1)\n"), ("src/selfcheck.py", "print(2)\n"), ("README.md", "# echo\n")):
+        ws.write_file(name, content)
+    ws.record_check("engineering", "pytest", 0, "ok")
+    proposal = delivery(summary="改了 src/echo.py", check_names=["pytest"],
+                        basis_product_spec_hash=projection.product_spec.content_hash)
+    facts = environment.query(FactsQuery(tree=True)).tree
+    events = system.store.list_events(projection.run_id)
+    decision = proposal_decision(projection, department="engineering", proposal=proposal, facts=facts, events=events)
+    assert decision.accepted, decision.error_dicts
+    # 摘要只提了一个文件，清单是快照里的全部文件
+    assert decision.artifact["files"] == ["README.md", "src/echo.py", "src/selfcheck.py"]
 
 
 def test_write_permission_uses_the_canonical_path_from_the_environment(tmp_path):
