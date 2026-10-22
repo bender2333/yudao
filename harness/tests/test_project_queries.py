@@ -273,6 +273,22 @@ def test_query_time_does_not_grow_with_unrelated_history(data_dir):
     again = min(measure(), measure(), measure())
     assert again < baseline * 4, f"baseline={baseline:.4f}s again={again:.4f}s"
 
+def test_the_action_receipt_shows_the_command_text(data_dir):
+    # 工单 #658：动作回执里显示动作实际执行的命令原文，界面按它列出命令
+    def bash(request):
+        identity = "bash-1"
+        return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call", "name": "bash",
+                                      "arguments": json.dumps({"command": "python -m pytest"})}])
+    system = _system(data_dir, [bash])
+    run_id = system.create_run("跑一条命令")
+    system.run_until_stop(run_id)
+    application = _application(system)
+    actions = application.query("run.actions", RunActions(run_id=run_id))
+    commands = [action.receipt.args.get("command") for action in actions.data.actions
+                if action.receipt is not None]
+    assert "python -m pytest" in commands
+
+
 def test_current_queries_cover_the_old_read_scenarios(data_dir):
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("对照", GOAL)

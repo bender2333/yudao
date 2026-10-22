@@ -7149,7 +7149,7 @@
    },
    "run_command": {
     "label": "走到终端拉下拉杆",
-    "fact": "执行登记命令",
+    "fact": "执行命令",
     "source": "tool_started（run_command）到 tool_called",
     "action": "走到终端拉下拉杆",
     "room": "终端滚动输出；结束时退出状态灯亮绿灯或红灯；超时时终端冒烟",

@@ -23,6 +23,7 @@ from ..providers.selection import ModelSelection
 from ..project_projection import replay_project, saved_project
 from ..projection import RunNotFoundError, project_run, replay_decisions, replay_run, load_decisions
 from ..projects import ProjectNotFoundError, project_projection
+from ..redact import redact_tool_args
 from ..replay_check import ReplayIntegrityError, verify_replay
 from ..recovery import (
     ACTION_UNKNOWN, OBSERVATION_INTERRUPTED, OBSERVATION_RUNNING,
@@ -1008,8 +1009,6 @@ class RunActions(Contract):
 
 
 class ActionReceipt(Contract):
-    registered_name: str | None
-    registered_argv: list[str] | None
     args: dict[str, Any]
     ok: bool
     error: str | None
@@ -1171,9 +1170,8 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
         input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
         created_at=result_event.created_at,
         receipt=ActionReceipt(
-            registered_name=payload.get("registered_name") or started_payload.get("registered_name"),
-            registered_argv=started_payload.get("registered_argv") or payload.get("registered_argv"),
-            args=dict(payload.get("args") or started_payload.get("args") or {}), ok=ok, error=payload.get("error"),
+            args=redact_tool_args(dict(payload.get("args") or started_payload.get("args") or {})),
+            ok=ok, error=payload.get("error"),
             output_ref=payload.get("output_ref"), event_id=result_event.event_id,
             created_at=result_event.created_at,
         ),

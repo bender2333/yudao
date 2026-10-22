@@ -28,7 +28,7 @@
     search: act('翻文件柜举放大镜', '搜索', 'tool_started（search）', '翻文件柜，举放大镜', '文件柜抽屉打开', 'ui', 'magnify'),
     read: act('捧着文件阅读', '按区间阅读', 'tool_started（read_range、read_file）', '捧着文件阅读', '—', 'ui', 'read_sit'),
     write: act('在文件上写字', '编辑', 'tool_started（edit_range、write_file）', '在文件上写字', '屏幕显示增删的行', 'ui', 'write'),
-    run_command: act('走到终端拉下拉杆', '执行登记命令', 'tool_started（run_command）到 tool_called', '走到终端拉下拉杆', '终端滚动输出；结束时退出状态灯亮绿灯或红灯；超时时终端冒烟', 'ui', 'lever'),
+    run_command: act('走到终端拉下拉杆', '执行命令', 'tool_started（run_command）到 tool_called', '走到终端拉下拉杆', '终端滚动输出；结束时退出状态灯亮绿灯或红灯；超时时终端冒烟', 'ui', 'lever'),
     toss: act('摇头扔纸团', '工具被拒绝', 'tool_skipped', '摇头，把纸团扔进废纸篓', '—', 'ui', 'shake'),
     submit: act('放进提案托盘', '提交提案', 'proposal_submitted', '把文件放进提案托盘', '—', 'ui', 'side_place'),
     returned: act('文件退回挠头', '提案被退回', 'proposal_rejected', '文件被退回，小人挠头', '—', 'ui', 'scratch'),
