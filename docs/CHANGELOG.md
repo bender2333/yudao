@@ -862,6 +862,8 @@ minimax-M3.1-Flash / 2026-10-22 17:30 / docs/user-session-log.md 补 U27（回�
 
 minimax-M3.1-Flash / 2026-10-22 17:55 / docs/user-session-log.md 补 U28（用新浏览器把十三个页面逐页扫过：连接状态都是「已连接」、没有一页停在「正在读取数据」、控制台错误 0 失败请求 0；只有机器、运行、工具三个系统页的顶栏路径写的是英文路由名，根因是 app.tsx 的 pathLabel 只给 sys-models 写了中文名），另补一条走查中确认正常的行为（十三页逐页扫过都正常，首页楼层、概览看板、三个部门工作间、资料页、观测页、设置页、恢复页、模型管理页的内容都在） / 继续以用户身份使用系统：用新浏览器逐页扫了一遍，建单 #702
 
+minimax-M3.1-Flash / 2026-10-22 18:05 / docs/user-session-log.md 补 U29（改项目名称以后页面现在会自己更新了——侧栏当场换名，之前记的「保存了但页面不动」是事件流断掉那个时期的现象；#683 在资料页上仍然成立：PRD 一节两版都写 active，交付一节写 superseded 与 active，两节口径不一致），并给 #683 补了页面上的证据 / 继续以用户身份使用系统：复验改名字这条路径，并把 #683 的现象在页面上拍下来
+
 执行者 minimax-M3.1-Flash / 2026-10-22 13:15 / 工单 #671 拒绝提示里不再露出内部原因标识：侧栏接入表单改用新增的 onboardingRejectionText（只给中文说明与服务端列出的路径），顶栏项目菜单改用项目各页已有的 rejectionLabel；新增 client/tests/unit/rejection-text.test.ts 六项，其中一项扫描渲染进程的源文件，不让「（原因 xxx）」这种写法再出现 / 用户走查 U16：接入已有项目时被拒绝的提示写着「源目录不能作为代码快照的来源（原因 source_invalid）」，内部标识对用户没有用处
 执行者 minimax-M3.1-Flash / 2026-10-22 12:40 / 工单 #664 事件种类漏登记中文说明不再让事件流断掉：harness/app/labels.py 给 project_parameter_set 补上说明，event_label 在没有登记说明的种类或载荷缺字段时退回一句通用说明（一条事件不再能把整条流断掉），工单 #319 的「载荷没有的字段直接失败」改为测试期核对；harness/tests/test_event_classification.py 加两条核对（每种事件都要有说明、说明用到的字段都要在载荷里），harness/tests/test_event_stream.py 加一条（没有说明的事件不会让连接中断） / 用户走查 U11：改过一次项目级参数以后，事件流播到那条事件就抛 KeyError 把响应截断，客户端每秒重连一次，永远过不去
 
