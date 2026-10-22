@@ -10,7 +10,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
-from harness.event_store import Command, project_stream
+from harness.event_store import Command, project_stream, run_stream
 from harness.department_prompts import save_department_prompt
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, ProjectEventType, json_dumps
 from harness.write_path import NewProjectEvent
@@ -64,6 +64,44 @@ def _project_events(system, project_id, event_type):
 def _open_decisions(system):
     return [decision for decision in saved_decisions(system.store, kinds=("kernel_modification",))[1]
             if decision.status == "open"]
+
+@pytest.mark.parametrize("query", ["project_list", "drain"])
+def test_status_queries_keep_work_item_states_without_reading_run_histories(data_dir, query):
+    system = _system(data_dir, [*happy_script(), product_spec()])
+    try:
+        adopted_project = system.projects.register("已有成果", GOAL)
+        _adopted_item, adopted_run = system.projects.start_work_item(adopted_project, "完成一个事项")
+        assert system.run_until_stop(adopted_run).phase == "DONE"
+        system.projects.settle(adopted_run)
+        running_project = system.projects.register("正在运行", GOAL)
+        _running_item, running_run = system.projects.start_work_item(running_project, "继续工作")
+        system.activate_once(running_run)
+        system.start_drain()
+        queued_project = system.projects.register("等待执行", GOAL)
+        system.projects.queue_work_item(queued_project, "排队的事项")
+        queries = []
+        connections = list(system.store._opened)
+        for connection in connections:
+            connection.set_trace_callback(queries.append)
+        try:
+            if query == "project_list":
+                projects = system.projects.list_projects()
+                assert {project.name: project.work_items[0].status for project in projects} == {
+                    "已有成果": "adopted", "正在运行": "in_progress", "等待执行": "not_started",
+                }
+            else:
+                state = system.drain
+                assert (state.state, state.running_runs, state.queued_work_items) == ("draining", 1, 1)
+        finally:
+            for connection in connections:
+                connection.set_trace_callback(None)
+        run_queries = [statement for statement in queries
+                       if "SELECT * FROM events WHERE stream = '" in statement
+                       and any(run_stream(run_id) in statement for run_id in (adopted_run, running_run))]
+        assert run_queries == []
+    finally:
+        system.close()
+
 
 def _answer(system, decision_id, option):
     command = Command(decision_id, "decision.answer", f"sha256:{option}", "user:local")

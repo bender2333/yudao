@@ -18,7 +18,7 @@ from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalErro
 from .write_path import NewCatalogEvent, WritePath
 from .projection import RunNotFoundError, RunProjection, project_run
 from .project_projection import catalog_handler, handler_for
-from .projects import ProjectService
+from .projects import ProjectService, project_projection
 from .providers import ProviderFacade
 from .streams import (
     DRAIN_DRAINING, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED,
@@ -207,7 +207,7 @@ class LoopSystem:
         # 排空期间新建、还没有开始的事项：事项已登记而它的 run 流还没有任何事件
         queued = []
         for project_id in self.store.list_project_ids():
-            for item in self.projects.projection(project_id).work_items:
+            for item in project_projection(self.store, self.artifacts, project_id, include_history=False).work_items:
                 try:
                     project_run(self.store, item.run_id)
                 except RunNotFoundError:
