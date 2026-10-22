@@ -45,11 +45,11 @@ test("服务端以 422 拒绝一条命令时，页面上写明是哪个字段、
   const page = client.page;
   try {
     await expect(page.locator(".brand .y10-brand-name")).toContainText("Yudao");
-    const project = await page.evaluate(async () => {
+    const project = await page.evaluate(async (name) => {
       const response = await fetch("/api/queries/projects.list");
       const envelope = await response.json() as { data?: { projects: { name: string; project_id: string }[] } };
-      return envelope.data?.projects.find((item) => item.name === "示例项目")?.project_id ?? "";
-    });
+      return envelope.data?.projects.find((item) => item.name === name)?.project_id ?? "";
+    }, SAMPLE);
     expect(project).not.toBe("");
     await page.evaluate((id) => {
       window.location.hash = `#/p/${id}/settings`;
