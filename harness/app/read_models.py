@@ -34,6 +34,12 @@ FLOW_TYPES = frozenset({
     EventType.TRANSITION, EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED,
 })
 DELIVERY_PHASE = "DELIVERY"
+# 读取模型的推导版本：改了调用尝试表或流转记录的推导方式就把它加一。
+# 服务打开读取模型时，保存的版本与这个不同（含旧文件里没有这一行）就从事件重放重建一次——
+# 读模型是增量投影，修了算法不会让旧行跟着变（工单 #684）。
+DERIVATION_VERSION = 1
+# 推导版本在读取模型自己的表里：app_read_meta 的 key 是 "derivation_version"
+DERIVATION_KEY = "derivation_version"
 # 质检退回的判定到承接部门的对应；与项目流使用的退回判定必须是同一个集合，启动时核对
 _REWORK_DEPARTMENTS = {"rework_product": "product", "rework_engineering": "engineering"}
 if set(_REWORK_DEPARTMENTS) != set(REWORK_VERDICTS):
@@ -43,6 +49,10 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS app_read_positions (
     model TEXT PRIMARY KEY,
     position INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS app_read_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS app_attempt_state (
     run_id TEXT PRIMARY KEY,
@@ -119,6 +129,22 @@ class ReadModels:
         self._connection.executescript(SCHEMA)
         self._dirty = True
         self._unsubscribe = store.subscribe(lambda _events: self._mark_dirty())
+        if self.path is not None:
+            # 可写打开时按推导版本决定要不要重建：改了推导方式以后旧行不会自己跟着变（工单 #684）
+            self._rebuild_if_derivation_changed()
+
+    def _rebuild_if_derivation_changed(self) -> None:
+        # 推导方式变了就重建一次：读模型是增量投影，算法修好以后已有的行仍然是旧的（工单 #684）。
+        # 重建只从事件重放，不调用模型与工具，也不写事件日志。
+        with self._reading() as connection:
+            row = connection.execute("SELECT value FROM app_read_meta WHERE key = ?",
+                                    (DERIVATION_KEY,)).fetchone()
+        if row is not None and row["value"] == str(DERIVATION_VERSION):
+            return
+        self.rebuild()
+        with self._transaction() as connection:
+            connection.execute("INSERT OR REPLACE INTO app_read_meta (key, value) VALUES (?, ?)",
+                               (DERIVATION_KEY, str(DERIVATION_VERSION)))
 
     def close(self) -> None:
         self._unsubscribe()

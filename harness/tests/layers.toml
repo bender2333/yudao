@@ -133,6 +133,7 @@
 "test_public_tree.py" = "module"
 "test_qa_test_materials.py" = "integration"
 "test_range_edit.py" = "integration"
+"test_read_model_derivation.py" = "module"
 "test_release_archive_integrity.py" = "module"
 "test_release_script.py" = "integration"
 "test_release_check.py" = "module"
