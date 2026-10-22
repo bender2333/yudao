@@ -130,6 +130,8 @@ class CatalogEventType:
     CREDENTIAL_CHANGED = "credential_changed"
     # 排空与强制升级（3.1）：与目录事件同流，是控制主机长期事实（ADR-0019）
     RUNTIME_DRAIN_STARTED = "runtime_drain_started"
+    # 排空结束：升级完成（换了版本）以后记下，此后这个实例重新开始新事项（工单 #731）
+    RUNTIME_DRAIN_FINISHED = "runtime_drain_finished"
     RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
     # 用户查看过的全局位置（界面工作线，工单 #127）：控制主机上只有一个，随部署长期保存
     HOME_SEEN = "home_seen"

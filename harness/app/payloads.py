@@ -1396,6 +1396,12 @@ class RuntimeDrainStartedPayload(Payload):
     version: int
     running_runs: int
 
+
+class RuntimeDrainFinishedPayload(Payload):
+    # 排空结束：服务下一次启动时记下，此后这个实例重新开始新事项（工单 #731，
+    # 应用层与接口层设计说明第 3.2 节「升级」：排空在下一次启动时结束）
+    version: int
+
 class RuntimeForceUpgradeRequestedPayload(Payload):
     # 强制升级：排空状态的版本、因升级停止的 run 与用采纳成果重新开始的事项
     version: int
@@ -1553,6 +1559,7 @@ PAYLOADS: dict[str, Any] = {
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,
     CatalogEventType.CREDENTIAL_CHANGED: CredentialChangedPayload,
     CatalogEventType.RUNTIME_DRAIN_STARTED: RuntimeDrainStartedPayload,
+    CatalogEventType.RUNTIME_DRAIN_FINISHED: RuntimeDrainFinishedPayload,
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: RuntimeForceUpgradeRequestedPayload,
     CatalogEventType.HOME_SEEN: HomeSeenPayload,
     CatalogEventType.PARAMETER_SET: ParameterSetPayload,

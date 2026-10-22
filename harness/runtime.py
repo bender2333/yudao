@@ -21,8 +21,8 @@ from .project_projection import catalog_handler, handler_for
 from .projects import ProjectService, project_projection
 from .providers import ProviderFacade
 from .streams import (
-    DRAIN_DRAINING, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED,
-    DrainState, classify_startup_runs,
+    DRAIN_DRAINING, DRAIN_FINISHED, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED,
+    DrainState, classify_startup_runs, last_drain_event,
 )
 from .replay_check import verify_replay
 from .workspace import Workspace
@@ -96,6 +96,10 @@ class LoopSystem:
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
         # 流程编排的结算与执行槽位判断经项目服务完成（应用层与接口层设计说明第 7.2 节）
         self.orchestrator.projects = self.projects
+        # 排空在服务下一次启动时结束（工单 #731）：启动时把还没结束的排空记成已结束，
+        # 这个实例重新开始新事项。这一步在补建排队事项的 run 之前：
+        # 排空结束以后那些事项这一次就补建并开始，之后新建的事项直接开始。
+        self.drain_finished_on_startup = self.finish_drain_on_startup()
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
         # 启动时补建缺少的建档修改轮 run（工单 #136，设计第 6 节）：回答「提出修改」以后
@@ -190,13 +194,31 @@ class LoopSystem:
     @property
     def drain(self) -> DrainState:
         # 排空状态：未排空、排空中（还有 run 在进行）、已排空可以升级；正在进行的 run 数与期间排队的事项数
+        # 排空在升级完成（换了版本）以后结束：最后一条排空事件是「排空已结束」时不再排空（工单 #731）
         running = self.running_runs
-        version = self._drain_version()
-        if version is None:
+        last = last_drain_event(self.store.stream_events(catalog_stream()))
+        if last is None or last.type == DRAIN_FINISHED:
             return DrainState(state=DRAIN_IDLE, version=0, running_runs=running)
+        version = int(last.payload["version"])
         state = DRAIN_READY if running == 0 else DRAIN_DRAINING
         return DrainState(state=state, version=version, running_runs=running,
                           queued_work_items=len(self._queued_work_items()))
+
+    def finish_drain_on_startup(self) -> bool:
+        # 排空在服务下一次启动时结束（工单 #731，应用层与接口层设计说明第 3.2 节「升级」）：
+        # 排空的用处是让服务可以停下来升级，服务一旦重新启动，这个用处就完成了。
+        # 记一条「排空已结束」的事件，排空状态以后从事件里读得出来（跨版本保存的长期事实）。
+        last = last_drain_event(self.store.stream_events(catalog_stream()))
+        if last is None or last.type == DRAIN_FINISHED:
+            return False
+        version = self._drain_version() or 0
+
+        def decide(transaction):
+            transaction.append(NewCatalogEvent(
+                DRAIN_FINISHED, {"version": version}, actor="system"))
+
+        self.writes.transact(catalog_stream(), decide)
+        return True
 
     def _drain_version(self) -> int | None:
         # 目录流中最后一条开始排空的事件给出的排空状态版本；没有开始排空时为空
@@ -215,7 +237,8 @@ class LoopSystem:
         return queued
 
     def start_drain(self, *, command: Command | None = None) -> DrainState:
-        # 开始排空：记下这一刻还没有结束的 run 数，之后新建的事项排队不开始
+        # 开始排空：记下这一刻还没有结束的 run 数，之后新建的事项排队不开始；
+        # 排空在服务下一次启动时结束（工单 #731）
         version = (self._drain_version() or 0) + 1
         unfinished = classify_startup_runs(self.store)
         running = len(unfinished.same_version) + len(unfinished.other_version)

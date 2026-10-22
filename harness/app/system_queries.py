@@ -116,7 +116,7 @@ SYSTEM_STATUS = QueryDefinition(
                 EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
                 EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
                 EventType.DECISION_WITHDRAWN, CatalogEventType.CATALOG_REVISED,
-                CatalogEventType.RUNTIME_DRAIN_STARTED),
+                CatalogEventType.RUNTIME_DRAIN_STARTED, CatalogEventType.RUNTIME_DRAIN_FINISHED),
     replayable=True,
 )
 
