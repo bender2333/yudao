@@ -87,26 +87,72 @@ def test_changed_file_since_read_is_rejected_without_modification(tmp_path):
     assert (workspace.root / "src" / "a.py").read_bytes() == before_bytes.replace(b"VALUE = 1", b"VALUE = 9")
     assert workspace.digest() == changed_digest
 
-def test_ambiguous_expected_text_is_rejected_without_modification(tmp_path):
+def test_ambiguous_expected_text_is_rejected_without_a_matching_start_line(tmp_path):
+    # 工单 #719：原文出现多次时用 start_line 消歧；没有这样的一处就拒绝，并写明匹配了几次
     workspace, environment = _environment(tmp_path)
     workspace.write_file("src/a.py", "VALUE = 1\nOTHER = 2\nVALUE = 1\n")
     content_hash = _read_content_hash(environment, "src/a.py", 1, 1)
     before_bytes = (workspace.root / "src" / "a.py").read_bytes()
     before_digest = workspace.digest()
+    # 不给 start_line：无法消歧
     result = perform(environment, "edit_range", {
-        "path": "src/a.py", "start_line": 1, "end_line": 1,
+        "path": "src/a.py",
         "expected_text": "VALUE = 1", "new_text": "VALUE = 2",
         "expected_digest": content_hash,
     })
     assert result.ok is False
     assert "ambiguous" in (result.error or "")
+    assert "2 times" in (result.error or "")
+    assert (workspace.root / "src" / "a.py").read_bytes() == before_bytes
+    assert workspace.digest() == before_digest
+    # start_line 指到没有匹配的那一行：同样拒绝
+    wrong_line = perform(environment, "edit_range", {
+        "path": "src/a.py", "start_line": 2, "end_line": 2,
+        "expected_text": "VALUE = 1", "new_text": "VALUE = 2",
+        "expected_digest": content_hash,
+    })
+    assert wrong_line.ok is False
+    assert "ambiguous" in (wrong_line.error or "")
     assert (workspace.root / "src" / "a.py").read_bytes() == before_bytes
     assert workspace.digest() == before_digest
 
+
+def test_ambiguous_expected_text_is_chosen_by_start_line(tmp_path):
+    # 工单 #719：原文出现多次时，起点落在 start_line 的那一处被选中
+    workspace, environment = _environment(tmp_path)
+    workspace.write_file("src/a.py", "VALUE = 1\nOTHER = 2\nVALUE = 1\n")
+    content_hash = _read_content_hash(environment, "src/a.py", 1, 1)
+    result = perform(environment, "edit_range", {
+        "path": "src/a.py", "start_line": 3, "end_line": 3,
+        "expected_text": "VALUE = 1", "new_text": "VALUE = 3",
+        "expected_digest": content_hash,
+    })
+    assert result.ok, result.error
+    assert result.output["start_line"] == 3
+    assert workspace.read_file("src/a.py") == "VALUE = 1\nOTHER = 2\nVALUE = 3\n"
+
+
+def test_a_unique_text_is_edited_after_the_lines_above_it_moved(tmp_path):
+    # 工单 #719：原文唯一时按原文定位，行号可以过期——文件上半部分改过以后下半部分的行号往后挪了，
+    # 旧行号定位会把这次编辑拒掉
+    workspace, environment = _environment(tmp_path)
+    workspace.write_file("src/a.py", "HEADER = True\nVALUE = 1\nTAIL = 1\n")
+    first = perform(environment, "edit_range", {
+        "path": "src/a.py", "start_line": 1, "end_line": 1,
+        "expected_text": "HEADER = True", "new_text": "HEADER = True\nEXTRA = 1",
+    })
+    assert first.ok, first.error
+    # 仍按之前读到的行号编辑下半部分：原文唯一，仍然成功，落点跟着原文走
+    second = perform(environment, "edit_range", {
+        "path": "src/a.py", "start_line": 3, "end_line": 3,
+        "expected_text": "TAIL = 1", "new_text": "TAIL = 2",
+    })
+    assert second.ok, second.error
+    assert second.output["start_line"] == 4
+    assert workspace.read_file("src/a.py") == "HEADER = True\nEXTRA = 1\nVALUE = 1\nTAIL = 2\n"
+
 @pytest.mark.parametrize("path,start,end", [
     ("src/missing.py", 1, 1),
-    ("src/a.py", 5, 5),
-    ("src/a.py", 2, 4),
     ("src", 1, 1),
 ])
 def test_missing_target_is_rejected_without_modification(tmp_path, path, start, end):
@@ -122,6 +168,19 @@ def test_missing_target_is_rejected_without_modification(tmp_path, path, start, 
     assert result.error
     assert workspace.digest() == before_digest
     assert workspace.list_files() == before_files
+
+
+def test_a_span_that_does_not_exist_is_located_by_the_text_instead(tmp_path):
+    # 工单 #719：行号指向不存在的地方不再拒绝——原文唯一时按原文定位
+    workspace, environment = _environment(tmp_path)
+    workspace.write_file("src/a.py", "ONE = 1\nTWO = 2\n")
+    result = perform(environment, "edit_range", {
+        "path": "src/a.py", "start_line": 5, "end_line": 5,
+        "expected_text": "ONE = 1", "new_text": "ONE = 9",
+    })
+    assert result.ok, result.error
+    assert result.output["start_line"] == 1
+    assert workspace.read_file("src/a.py") == "ONE = 9\nTWO = 2\n"
 
 def test_encoding_difference_is_rejected_without_modification(tmp_path):
     workspace, environment = _environment(tmp_path)

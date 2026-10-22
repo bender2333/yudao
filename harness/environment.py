@@ -115,6 +115,39 @@ def _bash_slice(full: str, start: int) -> tuple[str, int | None]:
     return full[start:cut], cut
 
 
+def _locate_expected(text: str, expected: str, rel: str,
+                     start: int | None, end: int | None) -> int:
+    """按原文定位要替换的那一段的字符偏移（工单 #719）。
+
+    原文在文件里只出现一次时直接用它——行号可以是过期的（文件的上半部分改过以后行号会移动，
+    这时候按行号定位会把后面的编辑全部拒掉）。
+    出现多次时用 start_line 消歧：取起点落在那一行的那一处；没有这样的一处就拒绝，并写明匹配了几次。
+    """
+    offsets = [match.start() for match in re.finditer(re.escape(expected), text)]
+    if not offsets:
+        raise ValueError(f"expected text does not occur in {rel}; re-read the file before editing")
+    if len(offsets) == 1:
+        return offsets[0]
+    starts = [text.count("\n", 0, offset) + 1 for offset in offsets]
+    if start is None:
+        raise ValueError(f"expected text is ambiguous: it matches {len(offsets)} times in {rel}; "
+                         "pass start_line to choose one")
+    candidates = [offset for offset, line in zip(offsets, starts) if line == start]
+    if not candidates:
+        raise ValueError(f"expected text is ambiguous: it matches {len(offsets)} times in {rel}; "
+                         f"none of them starts at line {start}; re-read with a unique span")
+    if len(candidates) > 1 and end is not None:
+        # 同一行里出现多次时用 end_line 再收一次
+        narrowed = [offset for offset in candidates
+                    if text.count("\n", 0, offset + len(expected) - 1) + 1 == end]
+        if narrowed:
+            candidates = narrowed
+    if len(candidates) > 1:
+        raise ValueError(f"expected text is ambiguous: it matches {len(candidates)} times at line {start} in {rel}; "
+                         "pass end_line to choose one")
+    return candidates[0]
+
+
 def _resolve_bash() -> str:
     # 找到可执行的 bash：Windows 上先看 Git 安装目录，再看 PATH；POSIX 上只认 /bin/bash。
     # 找不到就直接报错，不回退到 cmd 或 PowerShell。
@@ -575,12 +608,15 @@ class LocalEnvironment:
         rel = args.get("path")
         if not isinstance(rel, str) or not rel:
             raise ValueError("edit_range requires a path")
+        # 行号是消歧用的提示，不再是必填（工单 #719）：原文唯一时按原文定位，行号可以过期
         start = args.get("start_line")
-        if type(start) is not int or start < 1:
-            raise ValueError("start_line must be an integer >= 1")
+        if start is not None and (type(start) is not int or start < 1):
+            raise ValueError("start_line must be an integer >= 1 when given")
         end = args.get("end_line")
-        if type(end) is not int or end < start:
-            raise ValueError("end_line must be an integer >= start_line")
+        if end is not None and (type(end) is not int or end < 1):
+            raise ValueError("end_line must be an integer >= 1 when given")
+        if start is not None and end is not None and end < start:
+            raise ValueError("end_line must be >= start_line when both are given")
         expected = args.get("expected_text")
         if not isinstance(expected, str) or not expected:
             raise ValueError("expected_text must be a non-empty string")
@@ -615,35 +651,23 @@ class LocalEnvironment:
         # 与 read_range 一致按通用换行分行，落盘时保留原换行格式
         crlf = "\r\n" in text
         normalized = text.replace("\r\n", "\n")
-        ends_newline = normalized.endswith(("\n", "\r"))
-        # 与 read_range 同一切分口径，尾换行不计为一行
-        file_lines = normalized.splitlines()
-        total = len(file_lines)
-        if end > total:
-            raise ValueError(f"target span {start}-{end} does not exist in {rel} with {total} lines")
-        current_span = "\n".join(file_lines[start - 1:end])
-        if current_span != expected:
-            raise ValueError("file changed since the read; re-read the span before editing")
-        occurrences = normalized.count(expected)
-        if occurrences != 1:
-            raise ValueError(f"expected text matches {occurrences} times in {rel}; the span is ambiguous, re-read with a unique span")
+        # 按原文定位要替换的那一段（工单 #719）：原文唯一时直接用它，行号可以是过期的
+        offset = _locate_expected(normalized, expected, rel, start, end)
         new_lines = new_text.split("\n")
-        merged = file_lines[:start - 1] + new_lines + file_lines[end:]
-        if not merged:
-            new_raw = b""
-        else:
-            joined = "\n".join(merged)
-            if crlf:
-                joined = joined.replace("\n", "\r\n")
-            new_raw = (joined + ("\r\n" if crlf else "\n") if ends_newline else joined).encode("utf-8")
+        # 命中的那一段按字符替换：前后的内容原样保留，尾换行也跟着保留
+        replaced = normalized[:offset] + new_text + normalized[offset + len(expected):]
+        if crlf:
+            replaced = replaced.replace("\n", "\r\n")
+        new_raw = replaced.encode("utf-8")
         # 全部核对通过后才落盘；任一拒绝都不触碰文件字节
         self.workspace.resolve(rel).write_bytes(new_raw)
         final = self.workspace.snapshot()
+        first_line = normalized.count("\n", 0, offset) + 1
         return {
             "path": rel,
-            "start_line": start,
-            "end_line": start + len(new_lines) - 1,
-            "total_lines": len(merged),
+            "start_line": first_line,
+            "end_line": first_line + len(new_lines) - 1,
+            "total_lines": len(replaced.splitlines()),
             "digest": final.digest,
             "content_hash": hash_bytes(new_raw),
         }
