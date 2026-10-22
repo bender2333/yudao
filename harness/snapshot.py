@@ -25,7 +25,7 @@ def ingest_snapshot(source_dir: str | Path, artifacts: ArtifactStore, scope: str
     # scope 是工件所属范围：建档与修改轮的快照属于那个 run，项目起始文件夹的快照属于项目（工单 #321）
     # 只读采集：先拒绝宿主私有路径，再采集封存；源目录不被写入
     _reject_private_paths(source_dir)
-    tree = capture_public_tree(source_dir)
+    tree = capture_public_tree(source_dir, respect_ignore_rules=True)
     ref = store_tree(artifacts, scope, tree)
     record = {
         "source": str(Path(source_dir).absolute()),

@@ -221,8 +221,9 @@ def unrepresentable_reason(observed: os.stat_result, relative: str) -> str | Non
 def capture_public_tree(root: str | Path, respect_ignore_rules: bool = False) -> CapturedTree:
     """Capture stable local bytes; filesystem changes during collection are errors.
 
-    respect_ignore_rules 打开时（run 工作区的读取），被项目忽略规则排除的路径不进入公开树，
-    规则由 Git 命令行判断；其余读取（封存、恢复、核对）不执行命令，也不应用忽略规则。
+    respect_ignore_rules 打开时（run 工作区的读取、起始文件夹与建档的快照采集），
+    被项目忽略规则排除的路径不进入公开树，规则由 libgit2 在进程内判断；
+    已封存树的恢复与核对不应用忽略规则。
     """
     base = _checked_directory(root)
     before = _scan(base, respect_ignore_rules=respect_ignore_rules)
