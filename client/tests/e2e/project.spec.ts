@@ -638,6 +638,14 @@ test.describe("项目页面（1440×900）", () => {
       await delivery.locator("button.link", { hasText: "查看内容" }).click();
       const viewer = page.locator("div.card").filter({ has: page.getByRole("heading", { name: `交付文件 ${DELIVERY_FILE}` }) });
       await expect(viewer.locator("pre.raw")).toContainText("import sys");
+      // 文本交付文件也有下载入口（工单 #748）：下载到的内容与展开框里看到的逐字相同
+      const link = viewer.locator("a", { hasText: "下载文件" });
+      await expect(link).toHaveAttribute("download", DELIVERY_FILE);
+      const shown = await viewer.locator("pre.raw").innerText();
+      const href = await link.getAttribute("href");
+      expect(href).not.toBeNull();
+      const encoded = (href as string).split(",")[1];
+      expect(decodeURIComponent(encoded)).toBe(shown);
       await viewer.getByRole("button", { name: "收起" }).click();
       await expect(page.getByRole("heading", { name: `交付文件 ${DELIVERY_FILE}` })).toHaveCount(0);
       // 没有事项的项目：资料页显示空态，没有一直转的「正在读取数据」（工单 #295 第 3 项）
