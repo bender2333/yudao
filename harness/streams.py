@@ -7,7 +7,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any
 
 from .event_store import EventStore
 from .models import TERMINAL_PHASES
@@ -111,6 +113,7 @@ CATALOG_EVENT_TYPES = frozenset({
     "catalog_test_finished",
     "credential_changed",
     "runtime_drain_started",
+    "runtime_drain_finished",
     "runtime_force_upgrade_requested",
     "home_seen",
     "parameter_set",
@@ -138,7 +141,20 @@ DRAIN_READY = "ready"
 
 # 排空与强制升级的事件种类：记在目录流中，是控制主机这一份部署的长期事实（ADR-0019）
 DRAIN_STARTED = "runtime_drain_started"
+# 排空结束：升级完成（换了版本）以后记下，此后这个实例重新开始新事项（工单 #731）
+DRAIN_FINISHED = "runtime_drain_finished"
 FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
+
+
+def last_drain_event(events: Iterable[Any]) -> Any | None:
+    # 目录流里最后一条与排空有关的事件：「开始排空」或「排空已结束」（工单 #731）。
+    # 最后一条是「排空已结束」时排空不再有效；没有这类事件时为 None。
+    last = None
+    for event in events:
+        if event.type in (DRAIN_STARTED, DRAIN_FINISHED):
+            last = event
+    return last
+
 
 @dataclass(frozen=True)
 class StartupRuns:

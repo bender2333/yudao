@@ -33,6 +33,15 @@ test("排空期间给出提示，说明新的事项为什么没有开始", () =>
   assert.notEqual(drainNoticeText("ready"), null);
 });
 
+test("提示写清下一步：装上新的版本重新启动，排空会解除（工单 #731）", () => {
+  for (const state of ["draining", "ready"]) {
+    const text = drainNoticeText(state) ?? "";
+    assert.match(text, /新的版本/);
+    assert.match(text, /重新启动/);
+    assert.match(text, /重新开始新事项|排空会解除/);
+  }
+});
+
 test("没有排空时不出现这句提示", () => {
   assert.equal(drainNoticeText("idle"), null);
   assert.equal(drainNoticeText(null), null);

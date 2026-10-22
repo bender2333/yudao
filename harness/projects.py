@@ -43,7 +43,7 @@ from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .decisions import INITIAL_PRD, KERNEL_MODIFICATION
 from .path_guard import changed_paths, kernel_diff, kernel_hits, kernel_manifest_paths
-from .streams import DRAIN_STARTED, PRIORITY_UPGRADE_RESTART, PRIORITY_USER, classify_startup_runs
+from .streams import DRAIN_FINISHED, DRAIN_STARTED, PRIORITY_UPGRADE_RESTART, PRIORITY_USER, classify_startup_runs, last_drain_event
 from .tree_archive import artifact_run, load_tree
 
 TITLE_LIMIT = 40
@@ -942,8 +942,10 @@ class ProjectService:
 
     def _draining(self) -> bool:
         # 排空还没有结束（目录流里有开始排空的事件，还有未结束的 run）：
-        # 排空期间排队的事项按设计等升级完成以后才开始，这里不补建它们的 run
-        if not any(event.type == DRAIN_STARTED for event in self.store.stream_events(catalog_stream())):
+        # 排空期间排队的事项按设计等升级完成以后才开始，这里不补建它们的 run。
+        # 升级完成（换了版本）以后排空结束，不再排空（工单 #731）
+        last = last_drain_event(self.store.stream_events(catalog_stream()))
+        if last is None or last.type == DRAIN_FINISHED:
             return False
         unfinished = classify_startup_runs(self.store)
         return bool(unfinished.same_version or unfinished.other_version)

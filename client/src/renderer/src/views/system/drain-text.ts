@@ -21,15 +21,17 @@ export const DRAIN_CONFIRM_CONFIRM = "不再开始新事项";
 export const DRAIN_CONFIRM_CANCEL = "先不开始";
 
 /**
- * 排空期间给用户看的一句提示：新的事项为什么没有开始。
+ * 排空期间给用户看的一句提示：新的事项为什么没有开始，下一步做什么。
  * 没有排空时是空（页面上不出现这句话）。
  */
 export function drainNoticeText(state: string | null | undefined): string | null {
   if (state === "draining") {
-    return "实例正在停止开始新事项：新的事项会排队，等正在执行的事项结束。";
+    return "实例正在停止开始新事项：新的事项会排队，等正在执行的事项结束。"
+      + "排空完以后装上新的版本重新启动，这个实例会重新开始新事项。";
   }
   if (state === "ready") {
-    return "实例已经不再开始新事项：新的事项会排队，等升级。";
+    return "实例已经不再开始新事项：新的事项会排队，等升级。"
+      + "装上新的版本以后重新启动，排空会解除，这个实例重新开始新事项。";
   }
   return null;
 }

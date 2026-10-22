@@ -203,6 +203,7 @@ _LABELS: dict[str, str] = {
     CatalogEventType.CATALOG_TEST_FINISHED: "模型测试结束：{kind}，结果 {ok}",
     CatalogEventType.CREDENTIAL_CHANGED: "凭据发生变化：{action}",
     CatalogEventType.RUNTIME_DRAIN_STARTED: "开始排空运行（目录第 {version} 号）：还有 {running_runs} 个运行未结束",
+    CatalogEventType.RUNTIME_DRAIN_FINISHED: "排空结束（目录第 {version} 号）：这个实例重新开始新事项",
     CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED: "请求强制升级（目录第 {version} 号）：停了 {stopped_runs} 个运行",
     CatalogEventType.HOME_SEEN: "记下用户查看的位置：{position}",
     CatalogEventType.PARAMETER_SET: "把参数 {name} 从 {old_value} 改为 {new_value}：{reason}",

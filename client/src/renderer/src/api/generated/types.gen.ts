@@ -13074,6 +13074,83 @@ export type RunResumedPayload = {
 };
 
 /**
+ * RuntimeDrainFinishedEvent
+ */
+export type RuntimeDrainFinishedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'runtime_drain_finished';
+    payload: RuntimeDrainFinishedPayload;
+};
+
+/**
+ * RuntimeDrainFinishedPayload
+ */
+export type RuntimeDrainFinishedPayload = {
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
  * RuntimeDrainStartedEvent
  */
 export type RuntimeDrainStartedEvent = {
@@ -15843,6 +15920,8 @@ export type EventObject = ({
 } & CredentialChangedEvent) | ({
     type: 'runtime_drain_started';
 } & RuntimeDrainStartedEvent) | ({
+    type: 'runtime_drain_finished';
+} & RuntimeDrainFinishedEvent) | ({
     type: 'runtime_force_upgrade_requested';
 } & RuntimeForceUpgradeRequestedEvent) | ({
     type: 'home_seen';
