@@ -176,8 +176,11 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     elif run.run_id in held:
         item.status = "held"
     elif withdrawn_initial_prd:
-        # 用户在等待确认时取消了这个建档事项：请求被撤销，事项已停止，项目保持没有基线（工单 #136）
+        # 用户在等待确认时取消了这个建档事项：请求被撤销，事项已停止，项目保持没有基线（工单 #136）。
+        # 停止原因写「用户已取消」，不抄 run 的结束原因——run 成功结束与事项被用户放弃是两件事（工单 #707）
         item.status = "stopped"
+        item.stop_reason = "user_cancelled"
+        item.human_action = DEFINITIONS.stop_reason("user_cancelled").human_action
     elif run.phase == "DONE":
         # 建档 run 结束以后等待用户确认初始 PRD：事项还没有采纳成果，状态是等待确认（工单 #136）
         item.status = "awaiting_initial_prd" if awaiting_initial_prd else "released_unsettled"
@@ -195,7 +198,10 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
             for event in events
             if event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") in REWORK_VERDICTS
         ]
-    if awaiting_initial_prd:
+    if withdrawn_initial_prd:
+        # 被放弃的事项也要有一句「接下来该做什么」：与取消的情形对齐（工单 #707）
+        item.pending_question = item.human_action
+    elif awaiting_initial_prd:
         item.pending_question = f"等待你确认第 {run.round} 轮的初始 PRD"
     elif run.phase in TERMINAL_PHASES:
         item.pending_question = run.human_action

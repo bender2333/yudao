@@ -16987,6 +16987,7 @@
                   "workspace_unrepresentable",
                   "time_limit",
                   "cancelled",
+                  "user_cancelled",
                   "provider_error",
                   "provider_timeout",
                   "provider_protocol",
@@ -27931,6 +27932,7 @@
             "enum": [
               "time_limit",
               "cancelled",
+              "user_cancelled",
               "provider_error",
               "provider_timeout",
               "provider_protocol",
