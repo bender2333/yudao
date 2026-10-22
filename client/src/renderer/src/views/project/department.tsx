@@ -15,8 +15,8 @@ import type {
 import type { Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
-import { DepartmentSettingsFields, DepartmentSettingsSave, useDepartmentDraft } from "./department-settings-form";
-import { DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, SETTING_SOURCE, departmentName, formatTime, label } from "./labels";
+import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDepartmentDraft } from "./department-settings-form";
+import { DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, itemSource, label } from "./labels";
 import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
@@ -398,20 +398,23 @@ function ContextPanel(props: { data: DepartmentWorkspaceResult }) {
   );
 }
 
-// 部门设置：项目当前配置与所选请求实际使用的版本
+// 部门设置：项目当前配置与所选请求实际使用的版本。
+// 来源按这一段部门 Prompt 说：本项目写入还是内置默认（工单 #741）
 function DepartmentSettingState(props: { data: DepartmentWorkspaceResult }) {
   const setting = props.data.department_setting;
+  const written = promptWritten(setting.department_setting_configured, setting.configured_text);
   return (
     <>
       <KeyValue
         items={[
-          ["项目当前配置", `第 ${setting.configured_version} 版（来源 ${label(SETTING_SOURCE, setting.source)}）`],
+          ["项目当前配置", `第 ${setting.configured_version} 版`],
+          ["部门 Prompt 来源", itemSource(written, "内置默认")],
           ["所选请求实际使用的版本", setting.used_version === null
             ? "这次运行还没有用到部门设置"
             : `第 ${setting.used_version} 版（事件 ${show(setting.used_event_id)}）`],
         ]}
       />
-      <h3 className="y10-h3 sub">配置的内容</h3>
+      <h3 className="y10-h3 sub">部门 Prompt 的内容</h3>
       <pre className="y10-pre raw">{setting.configured_text === "" ? "（空）" : setting.configured_text}</pre>
     </>
   );
@@ -509,7 +512,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
 // 版本冲突时服务端按 stale_base 拒绝，反馈提示重新读取（useCommand 的 rejection）。
 function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult; onClose: () => void }) {
   const { data } = props;
-  const [draft, setDraft] = useDepartmentDraft(data.setting);
+  const [draft, setDraft, saved] = useDepartmentDraft(data.setting);
   const command = useCommand(props.app, pageKey([data.setting.version, draft.model, draft.tier, draft.text]));
   const canSave = hasCommand(props.app, "department_settings.save");
   // 保存结果带回的提醒（第 5.6 节「保存时」）：照常保存，提醒在设置旁显示
@@ -527,10 +530,8 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
         onDraft={setDraft}
         effective={data.effective}
         reminders={reminders}
+        saved={saved}
       />
-      <div className="y10-row row-actions">
-        <button type="button" onClick={() => setDraft({ ...draft, text: data.setting.text })}>恢复默认</button>
-      </div>
       {canSave ? (
         <DepartmentSettingsSave
           projectId={data.project_id}

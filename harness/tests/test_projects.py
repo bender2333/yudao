@@ -520,6 +520,25 @@ def test_department_setting_versions_conflicts_and_effect_timing(data_dir):
     assert later_a == requests_a
     assert system.projects.read_department_setting(project_id, "engineering")["version"] == 2
 
+
+def test_department_setting_without_prompt_returns_to_the_builtin_default(data_dir):
+    # 不写入部门 Prompt（工单 #741：客户端的「使用内置默认 Prompt」走的就是这条）：
+    # 这一段不再由本项目写入，文字回到内置默认 Prompt，设置记录的版本继续往下走
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    project_id = system.projects.register("Prompts", GOAL)
+    default_text = DEFINITIONS.role("engineering").prompt
+    written = system.projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(department_prompt="工程 Prompt v1：直接写代码。"), 0)
+    assert written["department_setting_configured"] is True
+    reset = system.projects.configure_department_settings(
+        project_id, "engineering", ModelSelection(), 1)
+    assert (reset["version"], reset["department_setting_configured"]) == (2, False)
+    assert reset["text"] == default_text
+    # 读到的设置与投影一致：这一段的内容是内置默认，且不再由本项目写入
+    current = system.projects.read_department_setting(project_id, "engineering")
+    assert current["text"] == default_text and current["department_setting_configured"] is False
+    assert system.projects.projection(project_id).department_settings["engineering"].configured_prompt is False
+
 # ---------------------------------------------------------------------------
 # §13.9 归档项目只读
 

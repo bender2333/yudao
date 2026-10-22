@@ -519,7 +519,10 @@ test.describe("项目页面（1440×900）", () => {
       await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
       await expect(inspect).toContainText("上下文清单");
       await tabs.nth(2).click();
-      await expect(inspect.locator(".kv").first()).toContainText("第 1 版（来源 本项目写入）");
+      // 来源按这一段部门 Prompt 说：本项目写入还是内置默认（工单 #741）
+      await expect(inspect.locator(".kv").first()).toContainText("第 1 版");
+      await expect(inspect.locator(".kv").first()).toContainText("部门 Prompt 来源");
+      await expect(inspect.locator(".kv").first()).toContainText("本项目写入");
       await expect(inspect.locator("pre.raw")).toContainText(PRODUCT_PROMPT);
       const messages = await section(page, "部门消息");
       await expect(messages.locator("ul.message-list li").first()).toBeVisible();
@@ -544,13 +547,15 @@ test.describe("项目页面（1440×900）", () => {
       await expect(await section(page, "工程部门")).toContainText("按有效需求实现并封存交付");
       const engineering = page.locator('section.card:has([role="tablist"])').first();
       await engineering.locator('[role="tab"]').nth(2).click();
-      await expect(engineering.locator(".kv").first()).toContainText("第 0 版（来源 跟随部门默认）");
+      await expect(engineering.locator(".kv").first()).toContainText("第 0 版");
+      await expect(engineering.locator(".kv").first()).toContainText("内置默认");
       await gotoView(page, id, "dept/quality");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL["dept/quality"]}`);
       await expect(await section(page, "质检部门")).toContainText("按验收条件核验并给出放行或返工");
       const quality = page.locator('section.card:has([role="tablist"])').first();
       await quality.locator('[role="tab"]').nth(2).click();
-      await expect(quality.locator(".kv").first()).toContainText("第 0 版（来源 跟随部门默认）");
+      await expect(quality.locator(".kv").first()).toContainText("第 0 版");
+      await expect(quality.locator(".kv").first()).toContainText("内置默认");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -735,15 +740,21 @@ test.describe("项目页面（1440×900）", () => {
       await expect(basics.getByRole("button", { name: "归档项目" })).toBeVisible();
       const departments = await section(page, "部门设置");
       await expect(departments).toContainText("产品（product）");
-      await expect(departments).toContainText("1 版；来源 本项目写入");
+      await expect(departments).toContainText("第 1 版");
+      await expect(departments).toContainText("部门 Prompt 来源：本项目写入");
       await expect(departments.locator("pre.department-setting-text").first()).toContainText(PRODUCT_PROMPT);
       await expect(departments).toContainText("工程（engineering）");
-      await expect(departments).toContainText("0 版；来源 跟随部门默认");
+      await expect(departments).toContainText("第 0 版");
+      await expect(departments).toContainText("部门 Prompt 来源：内置默认");
       await expect(departments).toContainText("质检（quality）");
       // 修改部门设置：模型、推理档位与部门 Prompt 三项（第 9.2 节）
       await departments.getByRole("button", { name: "修改部门设置" }).first().click();
       await expect(departments.getByLabel("部门 Prompt")).toHaveValue(PRODUCT_PROMPT);
       await expect(departments.getByLabel("模型")).toContainText("跟随部门默认（当前：fake-script）");
+      // 这一段写不写由一行中文说明说清；两个动作的名字说它们做的事（工单 #741）
+      await expect(departments).toContainText("这一段由本项目写入，保存以后按这里的内容生效。");
+      await expect(departments.getByRole("button", { name: "撤销本次修改" })).toBeVisible();
+      await expect(departments.getByRole("button", { name: "使用内置默认 Prompt" })).toBeVisible();
       await departments.getByRole("button", { name: "取消" }).first().click();
       // 登记命令一节随 ADR-0038 删除：设置页上不再出现登记命令的列表与表单
       await expect(page.getByText("登记命令")).toHaveCount(0);
@@ -764,21 +775,22 @@ test.describe("项目页面（1440×900）", () => {
       await gotoView(page, id, "settings");
       const departments = await section(page, "部门设置");
       const product = departments.locator(".y10-set-dept").filter({ hasText: "产品（product）" });
-      await expect(product).toContainText("1 版；来源 本项目写入");
+      await expect(product).toContainText("第 1 版");
+      await expect(product).toContainText("部门 Prompt 来源：本项目写入");
       // 改产品部门的 Prompt 并保存
       const text = "产品部门先写目标与验收标准，再问范围以外的要求。";
       await product.getByRole("button", { name: "修改部门设置" }).click();
       await product.getByLabel("部门 Prompt").fill(text);
       await product.getByRole("button", { name: "保存部门设置" }).click();
       // 那一节自己更新：事件到达以后按能力清单重新查询，不刷新页面
-      await waitUntil(async () => (await product.innerText()).includes("2 版；来源 本项目写入"),
+      await waitUntil(async () => (await product.innerText()).includes("第 2 版"),
         page, "部门设置的版本与来源更新");
       await expect(product.locator("pre.department-setting-text")).toContainText(text);
       // 还原 Prompt，后面的用例按原文核对
       await product.getByRole("button", { name: "修改部门设置" }).click();
       await product.getByLabel("部门 Prompt").fill(PRODUCT_PROMPT);
       await product.getByRole("button", { name: "保存部门设置" }).click();
-      await waitUntil(async () => (await product.innerText()).includes("3 版；来源 本项目写入"),
+      await waitUntil(async () => (await product.innerText()).includes("第 3 版"),
         page, "还原以后版本继续");
       await expect(product.locator("pre.department-setting-text")).toContainText(PRODUCT_PROMPT);
       expect(errors).toEqual([]);

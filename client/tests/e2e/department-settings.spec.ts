@@ -344,6 +344,53 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
       await client.close();
     }
   });
+  test("把项目写过的部门 Prompt 恢复成内置默认：来源说内置默认，文字回到内置的那一段", async () => {
+    const client = await openClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    const custom = "质检部门先核产品要求，再核实际结果。";
+    try {
+      const id = await projectId(page, SAMPLE);
+      await gotoView(page, id, "dept/quality");
+      const title = await section(page, "质检部门");
+
+      // 先写一段：这一段由本项目写入
+      await title.getByRole("button", { name: "部门设置" }).click();
+      const dialog = page.locator(".modal-backdrop");
+      await dialog.getByLabel("部门 Prompt").fill(custom);
+      await dialog.getByRole("button", { name: "保存部门设置" }).click();
+      await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+
+      // 重新打开：文本框里是这一段，说明写明这一段由本项目写入
+      await title.getByRole("button", { name: "部门设置" }).click();
+      const dialog2 = page.locator(".modal-backdrop");
+      await expect(dialog2.getByLabel("部门 Prompt")).toHaveValue(custom);
+      await expect(dialog2).toContainText("这一段由本项目写入，保存以后按这里的内容生效。");
+
+      // 「使用内置默认 Prompt」：这一段不再由本项目写入，文本框清空
+      await dialog2.getByRole("button", { name: "使用内置默认 Prompt" }).click();
+      await expect(dialog2).toContainText("这一段不写入本项目，部门使用内置默认 Prompt。");
+      await expect(dialog2.getByLabel("部门 Prompt")).toHaveValue("");
+      await dialog2.getByRole("button", { name: "保存部门设置" }).click();
+      await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+
+      // 服务端这一段不再由本项目写入：文字回到内置默认的那一段
+      const settings = await fetchQuery<{ departments: Record<string, { text: string; version: number;
+        department_setting_configured: boolean }> }>(page, "project.settings", { project_id: id });
+      expect(settings.departments.quality.department_setting_configured).toBe(false);
+      expect(settings.departments.quality.text).not.toBe(custom);
+      expect(settings.departments.quality.text.length).toBeGreaterThan(0);
+
+      // 工作间的检查区：来源按这一段说，写着内置默认
+      const inspect = page.locator('section.card:has([role="tablist"])').first();
+      await inspect.locator('[role="tab"]').nth(2).click();
+      await expect(inspect.locator(".kv").first()).toContainText("部门 Prompt 来源");
+      await expect(inspect.locator(".kv").first()).toContainText("内置默认");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
 });
 
 test.describe("部门设置弹窗与部门工作间（1920×1080，深色）", () => {
