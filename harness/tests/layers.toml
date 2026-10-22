@@ -175,3 +175,4 @@
 "test_writeback_branch.py" = "module"
 "test_writeback.py" = "module"
 "test_issue_562.py" = "integration"
+"test_issue_669.py" = "module"

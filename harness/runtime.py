@@ -331,9 +331,12 @@ class LoopSystem:
                     step_limits: StepLimits = StepLimits(),
                     resume_on_startup: bool = True) -> "LoopSystem":
         # 显式提供的确定性适配器只用于确定性测试。resume_on_startup=False 用于测试自己控制激活的时机，
-        # 打开数据目录时不自动继续未结束的 run（工单 #16）
+        # 打开数据目录时不自动继续未结束的 run（工单 #16）。
+        # 模型目录放在数据目录里：调用目标（fake 模型定义）随数据目录一起保留，
+        # 重开数据目录以后这一次运行按同一个调用目标继续，窗口不随进程消失（工单 #669）
+        config = Path(data_dir).absolute().resolve() / "providers.json"
         return cls(data_dir, test_adapter=adapter, step_limits=step_limits,
-                   resume_on_startup=resume_on_startup)
+                   resume_on_startup=resume_on_startup, provider_config_path=config)
 
     def start_provider_watching(self, interval_sec: float = 1.0) -> None:
         # 文件重载由系统装配启动，Web 只提交命令和读取状态

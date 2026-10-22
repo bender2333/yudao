@@ -25,6 +25,7 @@ from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
+from .context import DEFAULT_CONTEXT_WINDOW
 from .contracts import current_contract_hash
 from .collaboration import guidance_target_phase
 from .decisions import (
@@ -239,6 +240,8 @@ class Orchestrator:
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
         # 事项的执行任务与结算：run_id -> 任务；由 start_work_item 建立，任务结束时移除
         self._work_item_tasks: dict[str, asyncio.Task[Any]] = {}
+        # 测试系统的确定性适配器登记的调用目标窗口：按 run 记下这一次声明的窗口（工单 #669）
+        self._test_context_windows: dict[str, int] = {}
         # 项目服务在装配以后回填，用于结算与判断执行槽位（busy）
         self.projects: Any = None
 
@@ -248,7 +251,9 @@ class Orchestrator:
         *,
         max_cycles: int = DEFINITIONS.rule_value("max_cycles"),
         run_time_limit_sec: int = DEFINITIONS.rule_value("run_time_limit_sec"),
-        context_window: int = 32_000,
+        # 窗口是调用目标的属性：真实运行取模型访问定义声明的窗口。这里给的是测试适配器登记调用目标时
+        # 声明的窗口，不给时按目录里已有的调用目标（工单 #669）
+        context_window: int | None = None,
         # 检查的时限（迭代底座 B3，工单 #351）：不给时按项目级取值与全局现值取一次，随 run 冻结
         check_timeout_sec: int | None = None,
         run_id: str | None = None,
@@ -271,7 +276,7 @@ class Orchestrator:
             raise ValueError("max_cycles must be positive")
         if run_time_limit_sec < 1:
             raise ValueError("run_time_limit_sec must be positive")
-        if context_window < 1:
+        if context_window is not None and context_window < 1:
             raise ValueError("context_window must be positive")
         check_timeout_sec = (parameter_values.value_for_project(self.store, project_id, "check_timeout_sec")
                              if check_timeout_sec is None else check_timeout_sec)
@@ -292,6 +297,13 @@ class Orchestrator:
             prompt_config_versions=prompt_config_versions,
         )
         run_id = run_id or new_id("run")
+        # 窗口是调用目标的属性，不再随 run 冻结（工单 #669）：声明的窗口写进调用目标（目录），
+        # 记在编排器里，激活时按这一次声明再写一次；不声明时按目录里已有的调用目标。
+        # 写在 run 的事件之前：调用目标登记不成功时不留下半个 run
+        if context_window is not None:
+            self._test_context_windows[run_id] = context_window
+            if self.test_adapter_factory is not None and self.facade is not None:
+                self._install_test_call_target(context_window)
         material_dir = self.materials_root / run_id
         if material_dir == self.materials_root or not material_dir.is_relative_to(self.materials_root):
             raise ValueError("run_id must stay within the run materials directory")
@@ -329,7 +341,6 @@ class Orchestrator:
                 "intend_path": (Path("materials") / run_id / "intend.md").as_posix(),
                 "max_cycles": max_cycles,
                 "run_time_limit_sec": run_time_limit_sec,
-                "context_window": context_window,
                 "check_timeout_sec": check_timeout_sec,
                 "provider": self.test_provider if self.test_adapter_factory is not None else "directory",
                 "adapter": self.test_adapter_name if self.test_adapter_factory is not None else "directory",
@@ -372,11 +383,12 @@ class Orchestrator:
     def project(self, run_id: str) -> RunProjection:
         return project_run(self.store, run_id)
 
-    def _install_test_call_target(self, context_window: int) -> None:
+    def _install_test_call_target(self, context_window: int | None) -> None:
         # 测试系统的确定性适配器：用它的名称与模型名登记一个 fake 协议的模型访问定义。
         # 声明的输出上限取不改变默认保留的值，使既有的阈值行为与事项窗口一致。
         # 目录里已有内容时按合并处理：保留已有的连接、定义与部门默认，只补上缺的 fake 连接，
-        # 并且只给它补上还没有默认的部门——测试适配器不覆盖用户在目录与项目里写入的模型选择
+        # 并且只给它补上还没有默认的部门——测试适配器不覆盖用户在目录与项目里写入的模型选择。
+        # 窗口是调用目标的属性：给了就用给的，不给时保留目录里已经登记的窗口（工单 #669）
         if self.facade is None:
             raise ValueError("a provider facade is required for runs")
         provider_id = self.test_provider
@@ -393,15 +405,24 @@ class Orchestrator:
         bindings = {key: dict(value) for key, value in view["bindings"].items()}
         if not any(item["id"] == provider_id for item in providers):
             providers.append({"id": provider_id, "name": provider_id, "base_url": ""})
-        if not any(item["id"] == model_id for item in models):
+        existing = next((item for item in models if item["id"] == model_id), None)
+        if existing is None:
+            window = context_window if context_window is not None else DEFAULT_CONTEXT_WINDOW
             models.append({
                 "id": model_id, "provider_id": provider_id, "model": self.test_model,
-                "protocol": "fake", "context_window": context_window,
-                "max_output_tokens": response_reserve(context_window, None),
+                "protocol": "fake", "context_window": window,
+                "max_output_tokens": response_reserve(window, None),
             })
+        elif context_window is not None:
+            # fake 模型的窗口是这一次声明的（工单 #669）：同一个 fake 模型登记过的窗口要跟着这一次走
+            existing["context_window"] = context_window
+            existing["max_output_tokens"] = response_reserve(context_window, None)
         for department in DEPARTMENTS:
             bindings.setdefault(department, {"provider_id": provider_id, "model_id": model_id})
         self.facade.store_document({"providers": providers, "models": models, "bindings": bindings})
+        if self.facade.config_path is not None:
+            # 调用目标随数据目录一起落盘：重开数据目录以后按同一个调用目标继续（工单 #669）
+            self.facade.persist_document(self.facade.config_path)
 
     def _environment(self, run_id: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
         # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351），不跟随之后的修改
@@ -1178,8 +1199,9 @@ class Orchestrator:
 
         if self.test_adapter_factory is not None:
             # 确定性测试适配器没有目录条目：表示成一个 fake 协议的模型访问定义并绑定三个部门，
-            # 声明这个事项的窗口，使步骤驱动的每次解析与真实 Provider 走同一条路径（#45 架构答复第 6 条）
-            self._install_test_call_target(projection.context_window)
+            # 用这一次声明的窗口（没有声明时保留目录里已登记的窗口），使步骤驱动的每次解析与真实
+            # Provider 走同一条路径（#45 架构答复第 6 条）
+            self._install_test_call_target(self._test_context_windows.get(projection.run_id))
             try:
                 adapter = self.test_adapter_factory(department)
             except Exception as exc:

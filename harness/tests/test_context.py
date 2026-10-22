@@ -391,12 +391,13 @@ def test_assembler_records_budget_and_digest(tmp_path):
         run_id="run_x",
         task="task",
         phase="ENGINEERING",
-        context_window=8000,
         sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
     )
     prompt = DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")
+    # 窗口是调用目标的属性：装配时由调用方给出（工单 #669）
     assembled = ContextAssembler().assemble(
-        projection, department="engineering", session_id="ses_e", activation_id="act_1", prompt=prompt)
+        projection, department="engineering", session_id="ses_e", activation_id="act_1", prompt=prompt,
+        context_window=8000)
     assert assembled.manifest.budget == 8000
     assert assembled.manifest.digest.startswith("sha256:")
     assert assembled.manifest.token_estimate > 0
@@ -409,7 +410,7 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
     prompt_text = DEFINITIONS.role("engineering").prompt
     prompt_ref = save_department_prompt(ArtifactStore(tmp_path), "run_x", "engineering", prompt_text)
     projection = RunProjection(
-        run_id="run_x", task="task", phase="ENGINEERING", context_window=8000,
+        run_id="run_x", task="task", phase="ENGINEERING",
         sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
     )
     prompt = DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")

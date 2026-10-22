@@ -324,6 +324,7 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             prompt_config_versions=dict(payload["prompt_config_versions"]),
             max_cycles=int(payload["max_cycles"]),
             run_time_limit_sec=int(payload["run_time_limit_sec"]),
+            # 项目流的字段按 ADR-0019 保留：它是这个事项声明的窗口，现在只给测试适配器用
             context_window=int(payload["context_window"]), created_at=event.created_at,
             stream_version=event.stream_version, event_id=event.event_id, snapshot=payload.get("snapshot"),
             kind=payload.get("kind", "change"),

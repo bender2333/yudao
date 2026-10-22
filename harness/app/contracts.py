@@ -146,7 +146,8 @@ AccessMode = Literal["local", "lan"]
 # 版本 4：删除工作依据、调用记录、上下文清单与正式成果里的协作请求编号（#637）
 # 版本 5：删除协作请求与协作回答的事件种类（#552）
 # 版本 6：删除动作回执里的登记名与登记参数，动作列表显示命令原文（#658）
-API_VERSION = 6
+# 版本 7：删除 run_created 载荷里不再生效的事项级窗口字段（#669）
+API_VERSION = 7
 
 
 class Deployment(Contract):

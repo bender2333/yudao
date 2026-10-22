@@ -242,7 +242,6 @@ class RunCreatedPayload(Payload):
     intend_path: str
     max_cycles: int
     run_time_limit_sec: int
-    context_window: int
     # 这个 run 中检查的时限（迭代底座 B3，工单 #351）：创建时按项目级取值与全局现值冻结；
     # 旧事件没有这个字段时按当时的全局现值处理
     check_timeout_sec: int = 600
