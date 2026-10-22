@@ -36,7 +36,7 @@
 | `needs-review` | CI 已通过，交付说明已写在 PR 上，等待审查 | 执行者，在 PR 上发出 `DELIVERY:` 评论后 |
 | `needs-architect` | 等架构师处理：执行者交回、审查者请架构师处理、要求修改达到上限、执行或审查异常结束、依据的设计说明在放出以后有改动 | 执行者，在工单上发出 `ARCHITECT:` 评论后；其余由派发者 |
 
-solo 模式（`AGENTS.md`「Solo 模式」）只用 `ready-for-agent`、`in-progress` 与 `ready-for-human`：solo 执行者领取时改为 `in-progress`，保持到合并，不使用 `needs-review` 与 `needs-architect`；需要用户决定的改为 `ready-for-human`。
+solo 模式（`AGENTS.md`「Solo 模式」）使用同一套流程标签，由 solo 执行者自己切换：领取时 `ready-for-agent` 改为 `in-progress`，交付评论发出以后改为 `needs-review`（此时是合并前的自我核对，没有别的审查者），核对不通过改回 `in-progress`，合并后工单关闭并去掉标签；需要用户决定的改为 `ready-for-human`。不使用 `needs-architect`。
 
 审查的结论是 PR 审查的状态（批准或要求修改），不用标签表示。要求修改后，派发者把标签改回 `ready-for-agent`；卡住的工单改为 `needs-architect`，派发者启动架构师。架构师处理以后改为 `ready-for-agent`、`needs-review` 或 `ready-for-human`，`ready-for-human` 表示架构师已经看过、要用户决定。`needs-architect` 与 `needs-triage`、`waiting` 是两回事：架构师自己退回工单、改写正文期间用 `needs-triage`，等前提条件用 `waiting`，都不会启动被唤醒的架构师。
 
