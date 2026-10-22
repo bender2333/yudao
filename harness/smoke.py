@@ -936,7 +936,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if items[1:] != expected.payload["input"][1:]:
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
-                    offered = set(offered_tools(current_work, event.department, guidance_only=frame.guidance_only,
+                    offered = set(offered_tools(current_work, event.department, session_id=event.session_id,
+                                               guidance_only=frame.guidance_only,
                                                input_modalities=tuple(target_modalities or ())))
                     if len(names) != len(set(names)) or set(names) != offered:
                         raise ValueError("actual tool schemas do not match the department's tools")

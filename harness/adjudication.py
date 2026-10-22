@@ -71,12 +71,13 @@ class ToolPermission:
     def allowed(self) -> bool:
         return not self.stopped and self.reason is None
 
-def ask_chain_decision(depth: int, limit: int) -> tuple[bool, str | None]:
-    # 询问链能不能再问一层（工单 #473）：层数不超过上限时可以。
+def ask_chain_decision(position: int, limit: int) -> tuple[bool, str | None]:
+    # 询问链能不能再问一层（工单 #473）：position 是这个会话在链上的位置，
+    # 它再问一层是第 position + 1 层。层数不超过上限时可以；
     # 超过上限时给出原因：链已有几层、上限是多少，并提示把要问的内容写进回答。
-    if depth + 1 <= limit:
+    if position + 1 <= limit:
         return True, None
-    return False, (f"询问链已有 {depth} 层，上限是 {limit} 层：不能再回问，"
+    return False, (f"询问链已有 {position} 层，上限是 {limit} 层：不能再回问，"
                    f"把要问的内容写进回答")
 
 
@@ -85,19 +86,22 @@ def ask_chain_max_depth() -> int:
     return int(DEFINITIONS.rule_value("organization.ask_chain_max_depth"))
 
 
-def _ask_branch_permission(projection: RunProjection, department: str, name: str) -> ToolPermission | None:
-    if projection.active_ask is None:
+def _ask_branch_permission(projection: RunProjection, session_id: str | None, department: str,
+                            name: str) -> ToolPermission | None:
+    # 分支会话的许可按会话判定：这个会话是不是某个询问的分支（工单 #473 的嵌套询问）。
+    # 同一个部门的主线会话与分支会话是两回事，只有分支会话受分支的约束。
+    if projection.ask_by_branch(session_id) is None:
         if name == "answer":
             return ToolPermission(reason="answer tool is only available in an ask branch session")
-        return None
-    recipient = projection.active_ask.get("recipient")
-    if department != recipient:
         return None
     if name == "answer":
         return ToolPermission()
     if name == "ask":
         # 回问：在被问部门那里另开一个询问分支，层数不超过上限（工单 #473）
-        allowed, reason = ask_chain_decision(projection.ask_depth, ask_chain_max_depth())
+        if projection.ask_by_origin(session_id) is not None:
+            # 这个会话自己那次询问还没结束：继续这一层，不新开一层
+            return None
+        allowed, reason = ask_chain_decision(projection.ask_position(session_id), ask_chain_max_depth())
         return None if allowed else ToolPermission(reason=reason)
     if department == "product":
         return ToolPermission(reason="Product ask branch can only submit answer")
@@ -112,22 +116,21 @@ def _ask_branch_permission(projection: RunProjection, department: str, name: str
     return None
 
 
-def offered_tools(projection: RunProjection, department: str, *, guidance_only: bool = False,
+def offered_tools(projection: RunProjection, department: str, *, session_id: str | None = None,
+                  guidance_only: bool = False,
                   input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
     # 请求中提供给模型的工具：部门的工具，只能回应指导时限于回应指导的范围，再去掉当前工作不允许的提交，
     # 最后按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具（设计说明第 5.6 节）
     available = tools_for(department, projection.kind)
-    if projection.active_ask is not None:
-        recipient = projection.active_ask.get("recipient")
-        if department == recipient:
-            # 分支里的回问：层数不超过上限时提供 ask 工具（工单 #473）
-            chain_allowed, _ = ask_chain_decision(projection.ask_depth, ask_chain_max_depth())
-            nested = ["ask"] if chain_allowed else []
-            if department == "product":
-                return ["answer"] + nested
-            allowed = [name for name in available
-                       if name != "ask" and not _is_write(name) and proposal_kind(name) is None]
-            return allowed + ["answer"] + nested
+    if projection.ask_by_branch(session_id) is not None:
+        # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案（工单 #473）
+        chain_allowed, _ = ask_chain_decision(projection.ask_position(session_id), ask_chain_max_depth())
+        nested = ["ask"] if chain_allowed else []
+        if department == "product":
+            return ["answer"] + nested
+        allowed = [name for name in available
+                   if name != "ask" and not _is_write(name) and proposal_kind(name) is None]
+        return allowed + ["answer"] + nested
     if guidance_only:
         available = [name for name in available if usable_when_guidance_only(name)]
     return [name for name in offers_with_input(available, input_modalities)
@@ -149,6 +152,7 @@ def tool_permission(
     call: dict[str, Any],
     *,
     department: str,
+    session_id: str | None = None,
     guidance_only: bool,
     basis: WorkBasis,
     aborted: bool,
@@ -158,7 +162,7 @@ def tool_permission(
     if projection.phase in TERMINAL_PHASES or aborted or basis.changed(projection, department):
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
-    branch_perm = _ask_branch_permission(projection, department, name)
+    branch_perm = _ask_branch_permission(projection, session_id, department, name)
     if branch_perm is not None:
         return branch_perm
     if not has_tool(department, name, projection.kind):

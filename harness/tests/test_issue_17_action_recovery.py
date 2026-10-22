@@ -109,6 +109,11 @@ def test_a_partial_model_response_only_executes_the_remaining_calls(data_dir):
     assert restarted.workspace(run_id).list_files() == ["src/c2.py"]
     restarted.close()
 
+def _engineering_session(system, run_id):
+    # 工程主线会话的标识：恢复时补执行的动作按会话找（工单 #473），
+    # 真实记录里的事件都带着会话标识
+    return system.project(run_id).sessions["engineering"].session_id
+
 def _append_partial_response(system, run_id, *, executed, remaining):
     # 保存一条完整模型响应（每个输出条目一条 model_message 事件，与真实记录一致），executed 已经有
     # tool_started 与 tool_called，remaining 没有任何事件：与进程在把响应执行到一半时退出留下的状态一致
@@ -118,20 +123,21 @@ def _append_partial_response(system, run_id, *, executed, remaining):
         return {"id": identity, "call_id": identity, "type": "function_call", "name": "write_file",
                 "arguments": json_dumps({"path": path, "content": identity.upper()})}
 
+    session_id = _engineering_session(system, run_id)
     for index, identity in enumerate((*executed, *remaining)):
         item = call(identity, f"src/{identity}.py")
         ref = system.artifacts.put(run_id, "model_message", json.dumps(item, ensure_ascii=False),
                                    media_type="application/json")
         system.writes.append(run_stream(run_id), NewEvent(
             EventType.MODEL_MESSAGE, actor="department:planning", department="engineering",
-            state_before="ENGINEERING", state_after="ENGINEERING",
+            state_before="ENGINEERING", state_after="ENGINEERING", session_id=session_id,
             payload={"message_ref": asdict(ref), "message_index": index + 1,
                      "activation_id": "act_partial", "step_id": 1, "purpose": "work"}))
     for identity in executed:
         for event_type in (EventType.TOOL_STARTED, EventType.TOOL_CALLED):
             system.writes.append(run_stream(run_id), NewEvent(
                 event_type, actor="department:planning", department="engineering",
-                state_before="ENGINEERING", state_after="ENGINEERING",
+                state_before="ENGINEERING", state_after="ENGINEERING", session_id=session_id,
                 payload={"id": identity, "name": "write_file",
                          "args": {"path": f"src/{identity}.py", "content": identity.upper()},
                          "step_id": 1, "activation_id": "act_partial", "attempt": 1, "purpose": "work",
@@ -156,18 +162,19 @@ def test_a_partial_model_response_executes_remaining_host_tool(data_dir):
             "basis_product_spec_hash": product_spec_hash,
         })
     }
+    session_id = _engineering_session(system, run_id)
     for index, item in enumerate((item_write, item_submit)):
         ref = system.artifacts.put(run_id, "model_message", json.dumps(item, ensure_ascii=False),
                                    media_type="application/json")
         system.writes.append(run_stream(run_id), NewEvent(
             EventType.MODEL_MESSAGE, actor="department:planning", department="engineering",
-            state_before="ENGINEERING", state_after="ENGINEERING",
+            state_before="ENGINEERING", state_after="ENGINEERING", session_id=session_id,
             payload={"message_ref": asdict(ref), "message_index": index + 1,
                      "activation_id": "act_partial_host", "step_id": 1, "purpose": "work"}))
     for event_type in (EventType.TOOL_STARTED, EventType.TOOL_CALLED):
         system.writes.append(run_stream(run_id), NewEvent(
             event_type, actor="department:planning", department="engineering",
-            state_before="ENGINEERING", state_after="ENGINEERING",
+            state_before="ENGINEERING", state_after="ENGINEERING", session_id=session_id,
             payload={"id": "hw1", "name": "write_file",
                      "args": {"path": "src/echo.py", "content": "print('ok')"},
                      "step_id": 1, "activation_id": "act_partial_host", "attempt": 1, "purpose": "work",

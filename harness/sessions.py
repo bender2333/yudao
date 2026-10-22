@@ -53,16 +53,17 @@ class SessionFactory:
         return self._sessions[run_id][department]
 
     def cleanup_run(self, run_id: str) -> list[Exception]:
-        # 删除 run 的全部会话检查工作区；返回未删除部门的错误清单，由调用方决定如何处理。
+        # 删除 run 的全部会话检查工作区；返回未删除会话的错误清单，由调用方决定如何处理。
         # 没有 workspace_root（纯内存测试）时直接返回空
-        session_ids = [s.session_id for s in self._sessions.get(run_id, {}).values()]
+        sessions = list(self._sessions.get(run_id, {}).values())
+        session_ids = [s.session_id for s in sessions]
         self.jobs.stop_for_sessions(session_ids)
         errors: list[Exception] = []
         if self._workspace_root is None:
             return errors
-        for department in DEPARTMENTS:
+        for session in sessions:
             try:
-                cleanup_inspection_workspace(self._workspace_root / run_id, department)
+                cleanup_inspection_workspace(self._workspace_root / run_id, session.session_id)
             except RuntimeError as exc:
                 errors.append(exc)
         return errors

@@ -21,7 +21,8 @@ from .models import TERMINAL_PHASES
 # 版本 5：删除工作依据、调用记录、上下文清单与正式成果里的协作请求编号（#637）
 # 版本 6：删除协作请求与协作回答的事件种类（#552）
 # 版本 7：删除 run_created 载荷里不再生效的事项级窗口字段（#669）
-RUN_EVENT_VERSION = 7
+# 版本 8：询问改为按会话归属的栈，嵌套询问的层数由规则参数控制；分支会话的激活不再改部门主线的最近激活（#473）
+RUN_EVENT_VERSION = 8
 
 # run 流：事项的进行过程（每次 run 的交接、询问、尝试与动作）
 RUN_EVENT_TYPES = frozenset({

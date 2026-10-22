@@ -55,12 +55,13 @@ _CLEANUP_ATTEMPTS = 3
 _CLEANUP_INITIAL_BACKOFF_SEC = 0.05
 
 
-def inspection_root(run_root: str | Path, department: str) -> Path:
-    # 每个部门会话的检查工作区根：<运行工作区同级>/inspections/<run_id>/<部门>。
+def inspection_root(run_root: str | Path, session_id: str) -> Path:
+    # 每个会话的检查工作区根：<运行工作区同级>/inspections/<run_id>/<会话>。
     # 放在运行工作区外面以免被 capture_public_tree 当作运行内容（工单 #481）。
-    # 部门是预定义的合法分量，不做路径校验
+    # 每个会话一个（本地通用工具设计说明第 2 节）：主线会话与它在询问分支里的会话各用各的，
+    # 嵌套询问时同一部门的两个会话不共用一个目录，也就不互相删除对方的检查工作区（工单 #473）
     path = Path(run_root)
-    return path.parent / INSPECTIONS_DIR / path.name / department
+    return path.parent / INSPECTIONS_DIR / path.name / session_id
 
 
 def workspace_tree(run_root: str | Path) -> CapturedTree:
@@ -70,20 +71,33 @@ def workspace_tree(run_root: str | Path) -> CapturedTree:
 
 
 def _prune_empty_inspection_parents(root: Path) -> None:
-    # 三个部门都删除后 <root>/../ 与 <root>/../../ 空了，把它们一并删掉，不留空骨架目录。
-    # 只删两级且都空：别的 run 的检查工作区还在时父目录非空，自然跳过
-    for parent in (root.parent, root.parent.parent):
+    # 空的上级目录一并删掉，不留空骨架目录。
+    # 只删到 inspections 这一层：别的 run 的检查工作区还在时父目录非空，自然跳过
+    for parent in root.parents:
         try:
             parent.rmdir()
         except OSError:
             return
+        if parent.name == INSPECTIONS_DIR:
+            break
 
 
-def cleanup_inspection_workspace(run_root: str | Path, department: str) -> None:
-    # 删除部门的检查工作区：会话结束、取消、异常三种路径都调用。Windows 上有进程仍持有目录句柄时
+def cleanup_run_inspections(run_root: str | Path) -> None:
+    # 删除 run 的全部检查工作区：启动扫描用（进程异常退出时留下的目录以 run 已结束为信号删除）。
+    # 目录不存在时是幂等的
+    path = Path(run_root)
+    root = path.parent / INSPECTIONS_DIR / path.name
+    if not root.exists():
+        return
+    shutil.rmtree(root)
+    _prune_empty_inspection_parents(root)
+
+
+def cleanup_inspection_workspace(run_root: str | Path, session_id: str) -> None:
+    # 删除会话的检查工作区：会话结束、取消、异常三种路径都调用。Windows 上有进程仍持有目录句柄时
     # shutil.rmtree 会抛 PermissionError（工单 #479）；按固定次数与递增退避重试，仍失败时把最后一次
     # 异常透传，由调用方决定是放行还是写进事件。多次调用与目录不存在都是幂等的
-    root = inspection_root(run_root, department)
+    root = inspection_root(run_root, session_id)
     if not root.exists():
         return
     backoff = _CLEANUP_INITIAL_BACKOFF_SEC
@@ -95,7 +109,7 @@ def cleanup_inspection_workspace(run_root: str | Path, department: str) -> None:
         except OSError as exc:
             if attempt + 1 >= _CLEANUP_ATTEMPTS:
                 raise RuntimeError(
-                    f"failed to remove inspection workspace for {department} at {root} after "
+                    f"failed to remove inspection workspace for session {session_id} at {root} after "
                     f"{_CLEANUP_ATTEMPTS} attempts: {type(exc).__name__}: {exc}"
                 ) from exc
             time.sleep(backoff)
