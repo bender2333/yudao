@@ -1671,7 +1671,7 @@
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
-  "run_event_version": 6,
+  "run_event_version": 7,
   "stream_version": 67,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"

@@ -18,7 +18,8 @@ from .models import TERMINAL_PHASES
 # 版本 4：删除事件种类 plan_accepted 与工程计划工具的提交与接纳（#470）
 # 版本 5：删除工作依据、调用记录、上下文清单与正式成果里的协作请求编号（#637）
 # 版本 6：删除协作请求与协作回答的事件种类（#552）
-RUN_EVENT_VERSION = 6
+# 版本 7：删除 run_created 载荷里不再生效的事项级窗口字段（#669）
+RUN_EVENT_VERSION = 7
 
 # run 流：事项的进行过程（每次 run 的交接、询问、尝试与动作）
 RUN_EVENT_TYPES = frozenset({

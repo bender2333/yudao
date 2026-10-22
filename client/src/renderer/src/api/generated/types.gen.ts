@@ -12664,10 +12664,6 @@ export type RunCreatedPayload = {
      */
     run_time_limit_sec: number;
     /**
-     * Context Window
-     */
-    context_window: number;
-    /**
      * Check Timeout Sec
      */
     check_timeout_sec?: number;

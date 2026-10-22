@@ -28,6 +28,10 @@ from .models import (
     json_dumps,
 )
 
+# 调用目标没有给出窗口时按这个值处理（工单 #669）：窗口是调用目标的属性，run 不再冻结它
+DEFAULT_CONTEXT_WINDOW = 32_000
+
+
 @dataclass(frozen=True)
 class ContextPart:
     source: str
@@ -68,7 +72,7 @@ class ContextAssembler:
                  events: list[Any] | None = None,
                  snapshot_hash: str | None = None,
                  input_modalities: tuple[str, ...] = ("text",)) -> AssembledContext:
-        effective_window = projection.context_window if context_window is None else context_window
+        effective_window = context_window if context_window is not None else DEFAULT_CONTEXT_WINDOW
         if (not isinstance(effective_window, int) or isinstance(effective_window, bool)
                 or effective_window < 1):
             raise ValueError("context_window must be a positive integer")
