@@ -20,7 +20,7 @@ import { attemptsSummary } from "./attempts-summary";
 import { Empty, KeyValue, Loading, Section, Table, Tabs, dict, formatNumberOr, list, numberValue, optionalText, pageKey, show, text } from "./common";
 import { ATTEMPT_STATUS, DEPARTMENTS, departmentName, formatTime, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
-import { usageText } from "./usage-text";
+import { reportedCountText, usageText } from "./usage-text";
 import { readFailureText } from "../../contract/read-failure";
 
 const PAGE_SIZE = 50;
@@ -68,7 +68,8 @@ function selectionSourceName(value: string | null): string {
   return show(value);
 }
 
-// 用量的显示见 usage-text.ts：表格列与详情行同一口径（工单 #301）
+// 用量的显示见 usage-text.ts：请求记录表、请求详情与用量统计说的是同一件事，
+// 表格列与详情行由同一个函数算出（工单 #301、#744）
 // 调用目标的显示（设计说明第 7.4 节）：连接、协议、地址、上游模型、容量、凭据引用与版本。
 // 字段取自请求事件的调用目标公开部分（不含 Key）；解析尚未确定的项写成「未上报」
 function callTargetText(target: Record<string, unknown>): string {
@@ -201,8 +202,8 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
   );
 }
 
-// 请求记录面板：列按原型 v10 的「请求记录」页签排布（开始、状态、耗时、部门、请求、返回、请求类型、输入输出）；
-// 请求与返回的模型分开列出，用量没有上报时写「未上报」，不填 0
+// 请求记录面板：列按原型 v10 的「请求记录」页签排布（开始、状态、耗时、部门、请求、返回、请求类型、用量）；
+// 请求与返回的模型分开列出，用量的显示与请求详情同一口径（工单 #744：同一页三处说法不同）
 function RecordsPanel(props: {
   projectId: string;
   rows: AttemptView[];
@@ -213,15 +214,13 @@ function RecordsPanel(props: {
 }) {
   return (
     <>
-      <p className="y10-note note">用量没有上报时显示「未上报」，不填 0；请求与返回的模型分开列出。</p>
+      <p className="y10-note note">用量与请求详情同一口径：报了总量写「总 X token」，没报的那几项写「未上报」；一次都没有上报时写「未上报」，不填 0。请求与返回的模型分开列出。</p>
       {props.rows.length === 0 && !props.loading ? <Empty text="这个范围没有请求记录" /> : null}
       {props.rows.length > 0 ? (
         <Table
-          head={["开始", "状态", "耗时", "部门", "请求", "返回", "请求类型", "输入 / 输出", ""]}
+          head={["开始", "状态", "耗时", "部门", "请求", "返回", "请求类型", "用量", ""]}
           rows={props.rows.map((item) => {
             const usage = dict(item.usage);
-            const input = numberValue(usage.input_tokens);
-            const output = numberValue(usage.output_tokens);
             return [
               formatTime(item.started_at ?? item.finished_at),
               label(ATTEMPT_STATUS, item.status),
@@ -232,9 +231,7 @@ function RecordsPanel(props: {
               show(item.requested_model, "未知"),
               show(item.actual_model, "未知"),
               item.purpose === "work" ? "工作请求" : item.purpose === "compaction" ? "压缩请求" : show(item.purpose, ""),
-              input === null && output === null
-                ? "未上报"
-                : `${input === null ? "未上报" : input.toLocaleString("zh-CN")} / ${output === null ? "未上报" : output.toLocaleString("zh-CN")}`,
+              usageText(usage),
               <button
                 type="button"
                 className="y10-link link"
@@ -276,10 +273,11 @@ function UsageSection(props: { usage: { data: UsageReport | null; loading: boole
   return (
     <div className="y10-usage">
       <h3>用量统计</h3>
-      <p className="y10-usage-note note">输入（含缓存）与缓存读取（输入子集）不重复相加；用量只读显示，不是事项的预算</p>
+      <p className="y10-usage-note note">「上报用量的请求」按当前筛选范围统计，请求记录一页 50 条、可以加载更多；输入（含缓存）与缓存读取（输入子集）不重复相加；用量只读显示，不是事项的预算</p>
       <KeyValue
         items={[
-          ["请求数", `${formatNumberOr(numberValue(totals.attempts))}（上报 ${formatNumberOr(numberValue(totals.reported))}）`],
+          ["请求数", formatNumberOr(numberValue(totals.attempts))],
+          ["上报用量的请求", reportedCountText(totals.reported)],
           ["输入（含缓存）", formatNumberOr(numberValue(totals.input_tokens), " token")],
           ["输出", formatNumberOr(numberValue(totals.output_tokens), " token")],
           ["缓存读取（输入子集）", formatNumberOr(numberValue(totals.cache_read_tokens), " token")],
@@ -299,10 +297,11 @@ function UsageGroups(props: { title: string; groups: UsageReport["departments"] 
   }
   return (
     <Table
-      head={["名称", "请求数", "输入（含缓存）", "输出", "总 Token", "成本"]}
+      head={["名称", "请求数", "上报用量的请求", "输入（含缓存）", "输出", "总 Token", "成本"]}
       rows={props.groups.map((group) => [
         group.label || group.key,
         formatNumberOr(group.attempts),
+        reportedCountText(group.reported),
         formatNumberOr(numberValue(group.input_tokens)),
         formatNumberOr(numberValue(group.output_tokens)),
         formatNumberOr(numberValue(group.total_tokens)),
