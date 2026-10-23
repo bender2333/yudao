@@ -16,6 +16,7 @@ from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
+from harness.tests.helpers import quality_turns
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 UNAVAILABLE = "Missing configuration: provider credential"
@@ -39,20 +40,27 @@ class _Service:
 def _blocked_script():
     # 产品提交规格以后工程部门的请求被提供方报告为不可用：run 停在等待用户回答的待恢复状态，
     # 回答以后从这次请求接着进行到放行，交付与放行评审齐备，结算才有可采纳的成果
-    return [
-        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))],
+        "engineering": [ProviderError(UNAVAILABLE, reason="provider_unavailable"), delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def _release_script():
-    return [product_spec(),delivery_turn(),
-            review_turn("release", "checks passed on the current snapshot")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def _completion_script():
-    # 产品已经提交规格以后剩下的三个回答：计划、交付与放行评审
-    return [delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
+    # 产品已经提交规格以后剩下的回答：交付与放行评审
+    return {
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def _open_decision(system, run_id):
     _position, decisions = saved_decisions(system.store, statuses=("open",))

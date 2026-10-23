@@ -10,22 +10,22 @@ from harness.definitions import DEFINITIONS
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, json_dumps
 from harness.projection import replay_events
 from harness.proposals import (delivery_turn, product_spec, review, review_turn)
-from harness.tests.helpers import happy_script, recorded_context, run_scripted
+from harness.tests.helpers import explore_turn, happy_script, quality_turns, recorded_context, run_scripted
 
 def rework_script():
     # 质检的结论只有缺陷记录与放行（工单 #555）：缺陷记录之后工程返工一轮，候选记的是这次结论
-    script = [
-        product_spec(),
-        delivery_turn(),
-        review_turn("rework_engineering", "QA reported missing empty-input handling", defects=[
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
+    # 质检在交付到达以前还有一轮预测性探索，脚本项给足几轮
+    return {
+        "product": [product_spec()],
+        "engineering": [
+            delivery_turn(),
+            delivery_turn(summary="handle empty input"),
+        ],
+        "quality": quality_turns("rework_engineering", "QA reported missing empty-input handling", defects=[
             {"severity": "minor", "summary": "Empty input needs review"},
         ]),
-    ]
-    return [
-        *script,
-        delivery_turn(summary="handle empty input"),
-        review_turn("release", "checked revised delivery"),
-    ]
+    }
 
 def assert_candidate_does_not_change_execution(system, projection):
     events = system.store.list_events(projection.run_id)
@@ -69,7 +69,11 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path):
         assert any(all(check[key] == receipt[key] for key in (
             "name", "snapshot_hash", "product_spec_hash", "delivery_spec_hash", "activation_id"
         )) for receipt in receipts)
-    assert len(system.test_adapter.invocations) == len(script)
+    # 三个部门都工作过：产品提交要求、工程交付、质检起草测试用例并核验。
+    # 质检在交付到达以前还有一轮预测性探索（工单 #557），因此这里不数模型调用的次数
+    departments = [call.department for call in system.test_adapter.invocations]
+    assert set(departments) == {"product", "engineering", "quality"}
+    assert departments.count("product") == 1 and departments.count("engineering") == 2
     assert_candidate_does_not_change_execution(system, result)
     assert system.replay(result.run_id).canonical_state() == result.canonical_state()
     before = result.stream_version
@@ -99,8 +103,16 @@ def test_candidate_is_never_injected_into_department_context(tmp_path):
 
 @pytest.mark.parametrize("with_delivery", [False, True])
 def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path, with_delivery):
-    script = [product_spec(),delivery_turn()] if with_delivery else []
-    script.append(ProviderError("controlled connection failure"))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
+    # 产品的请求失败时没有成果，交付以后失败时失败候选引用这份交付作为已有的证据
+    script = {
+        "product": [product_spec()] if with_delivery else [ProviderError("controlled connection failure")],
+        "engineering": ([delivery_turn()] if with_delivery else []) + [
+            ProviderError("controlled connection failure")],
+        # 质检只起草测试用例（预测性探索），这一轮没有交付可以核验，提交的结论被拒绝；
+        # 交付到达以后质检开始新一轮，那时工程已经失败
+        "quality": [explore_turn()],
+    }
     system, result = run_scripted(tmp_path, script)
     assert result.status == "failed"
     assert result.stop_reason == "provider_error"
@@ -120,7 +132,9 @@ def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path
         assert candidate.product_spec_hash is None
         assert candidate.delivery_spec_hash is None
         assert candidate.checks == candidate.evidence_refs == []
-    assert len(system.test_adapter.invocations) == len(script)
+    # 模型的调用：没有交付时只有产品那一次（请求失败，事项因此失败）；
+    # 有交付时产品提交要求、工程交付
+    assert [call.department for call in system.test_adapter.invocations].count("product") == 1
     assert_candidate_does_not_change_execution(system, result)
     assert system.replay(result.run_id).canonical_state() == result.canonical_state()
 
