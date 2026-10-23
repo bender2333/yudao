@@ -322,13 +322,12 @@ test.describe("项目页面（1440×900）", () => {
       await expect(board.locator("h3").filter({ hasText: "已采纳" })).toContainText("（1）");
       await expect(board.locator(".board-card strong")).toHaveText(SAMPLE_ITEM);
       const flow = await section(page, "流转记录");
-      await expect(flow).toContainText("需求交接");
+      // 工单 #556：阶段迁移事件没有了，流转记录里的「版本交付」由交付到达给出
       await expect(flow).toContainText("版本交付");
-      await expect(flow).toContainText("产品处理中 → 工程处理中");
-      await expect(flow).toContainText("工程处理中 → 交付核验中");
+      await expect(flow).toContainText("工程 → 质检");
       await expect(flow).toContainText("已完成");
       // 时间列是按钮：点开原始事件的详情弹窗（event.detail）
-      const row = flow.locator("tbody tr").filter({ hasText: "需求交接" }).first();
+      const row = flow.locator("tbody tr").filter({ hasText: "版本交付" }).first();
       await row.locator("button.link").click();
       const modal = page.locator(".modal-backdrop");
       await expect(modal.locator(".modal-head h2")).toContainText("事件 evt_");
@@ -1145,7 +1144,8 @@ test.describe("项目页面（1440×900）", () => {
       await expect(page.locator(".page")).not.toContainText("正在读取数据");
       // 文本工具：给产品部门发一条指导，指导列表由事件流更新
       await gotoView(page, blockedId, "dept/product");
-      await expect(await section(page, "产品部门")).toContainText("工程处理中");
+      // 工单 #556：阶段没有了，部门页写 run 的状态与本部门是不是在工作的部门
+      await expect(await section(page, "产品部门")).toContainText("这次运行不在本部门");
       const guidance = await section(page, "部门指导");
       const note = `界面发出的指导 ${Date.now()}`;
       await guidance.getByLabel("向产品下达指导").fill(note);

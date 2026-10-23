@@ -273,7 +273,7 @@ def test_timeout_run_is_reported_with_the_time_limit_reason():
 
 
 def test_metrics_read_cycles_rework_requests_and_usage():
-    export = _export(projection={"outcome": "released", "cycle_count": 4, "rework_count": 2,
+    export = _export(projection={"status": "released", "cycle_count": 4, "rework_count": 2,
                                  "request_count": 11})
     export["events"] = [{"type": "ask_started"}, {"type": "ask_started"},
                         {"type": "ask_started"}]
@@ -320,7 +320,7 @@ def test_a_run_without_release_is_not_a_false_release():
 
 def test_request_count_falls_back_to_the_attempts_in_the_usage_report():
     """投影的 request_count 在没有分项统计时是 0，请求数取用量里的 attempts。"""
-    export = _export(projection={"outcome": "paused", "request_count": 0})
+    export = _export(projection={"status": "paused", "request_count": 0})
     export["usage"] = {"totals": {"attempts": 11, "total_tokens": 216_649, "latency_ms": 386_341}}
     collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 5.0,
                                                "hidden_failures": []})
@@ -330,7 +330,7 @@ def test_request_count_falls_back_to_the_attempts_in_the_usage_report():
 
 def test_usage_that_the_model_did_not_report_is_unknown_not_zero():
     """模型服务没有上报的用量记未知：不记 0、不进均值（第 5.2 节）。"""
-    export = _export(projection={"outcome": "paused"})
+    export = _export(projection={"status": "paused"})
     export["usage"] = {"totals": {"attempts": 11, "input_tokens": None, "output_tokens": None,
                                   "total_tokens": 216_649, "cost": None}}
     collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 5.0,
@@ -343,7 +343,7 @@ def test_usage_that_the_model_did_not_report_is_unknown_not_zero():
 
 def test_missing_usage_fields_are_unknown():
     """字段整个缺失与上报为 None 同样是未知。"""
-    export = _export(projection={"outcome": "paused"})
+    export = _export(projection={"status": "paused"})
     export["usage"] = {"totals": {"attempts": 11, "total_tokens": 216_649}}
     collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 5.0,
                                                "hidden_failures": []})
@@ -622,7 +622,7 @@ def test_result_records_the_yudao_commit_and_the_host_environment():
 def test_result_aggregates_mean_min_and_max():
     runs = [_run(), _run(run_id="yudao-run-2")]
     runs[1]["metrics"] = yudao_metrics.collect(
-        _export(projection={"outcome": "released", "cycle_count": 8, "request_count": 20}),
+        _export(projection={"status": "released", "cycle_count": 8, "request_count": 20}),
         {"timed_out": False, "elapsed_seconds": 40.0, "hidden_failures": []})
     summary = yudao_report.aggregate_metrics(runs)
     assert summary["elapsed_seconds"] == {"count": 2, "unknown": 0, "mean": 30.0,
