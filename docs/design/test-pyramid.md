@@ -87,7 +87,7 @@
 | 每次推送到 PR 与 main | CI | 四个作业并行：① 单元层、② 模块层（各含一项固定检查）、评测工具（`evals/tests`，`real_model` 默认不选）、客户端（类型检查、单元测试（逐场景回放测试除外）、编译页面与 wheel）；`check` 汇总四项，合并必须通过；PR 上另有「用例变化」（第 4.4 节），只显示 | 单进程 |
 | 审查 | 审查者 | 与改动相关的测试文件，反向验证 | 单进程 |
 | 每次合并到 main 以后 | CI | ③ 集成层（作业 `integration`）：集成层全部；不挡合并，失败由派发者交回那张工单（第 4.2 节） | 多进程 |
-| 里程碑发布之前 | 架构师 | 要发布的 main 提交：CI 的 `integration` 通过；真实模型冒烟；全部客户端端到端测试（`cd client && npm run test:e2e`）；全部 `desktop` 测试 | 多进程 |
+| 里程碑发布之前 | 架构师 | 要发布的 main 提交：CI 的 `integration` 通过；真实模型冒烟；全部客户端端到端测试（`cd client && npm run test:e2e`）；全部 `desktop` 测试；真实用户场景验收（[骨架与应用设计说明](skeleton-and-application.md)第 11 节：代理扮演新用户照 README 完成一句话目标，确定性代码判分；运行器建成以后加入） | 多进程 |
 
 执行者运行本次改动或新增的集成层测试文件，保证提交的集成测试本身可以运行，例如重写了事件序列基准的 PR。CI 的定义是 `.github/workflows/ci.yml`，在 GitHub 提供的 Windows 运行机上运行（[运行配置](../agents/autopilot-runtime.md)第 5 节）。
 

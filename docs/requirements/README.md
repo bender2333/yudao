@@ -48,5 +48,7 @@
 | D36 | [网络取回与 MCP 工具](network-and-mcp.md) | 需求与设计已确认（[设计说明](../design/network-and-mcp.md)），未实施；路线位置 Stage 3 的 3.2B，工单 #122（#68、#69、#236，界面 #237 至 #239），属于里程碑 M3；取回与 MCP 服务器在控制主机上运行（[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)），搜索经 MCP 提供；2026-10-13 按 [ADR-0038](../adr/0038-function-first-commands-without-registration.md) 修改：取回任何 http 与 https 地址，MCP 服务器写在项目设置中、工具全部直接提供 |
 | D37 | [新建项目的起始文件夹](project-initial-files.md) | 需求与设计已确认（[设计说明](../design/project-initial-files.md)），未实施；路线位置 Stage 3 的 3.8 的补充（#124 下），属于里程碑 M2；新建项目可以带起始文件夹，快照是第一次采纳之前每个事项的起点，不建档；评测场景 3 的数据文件需要它 |
 | D38 | [系统意图与基础规则](system-intent.md) | 2026-10-07 意图校准确认：三条目的、可迭代状态的五条判据、六条基础规则与可视化的决定 A–H，需求编号 N-xx；由路线图的「迭代底座」工作包、自举工作线与 Stage 4 至 Stage 6 分别实现；2026-10-20 N-G1 的验收改为「高于」的判法（只看质检这一段带来的提高） |
+| D39 | 黑板编排 | 暂缓：需求、设计与 ADR-0041 在 PR #751 里不合并（用户 2026-10-23 决定暂时不做）；编号保留 |
+| D40 | [骨架与应用](skeleton-and-application.md) | 需求已确认（2026-10-23）：系统分两层，骨架向后兼容、应用一次完成；裁决只读骨架自己算的最小投影；路由、装配、执行三道契约按定义选择实现，任务池是以后的路由实现；MCP 与技能照做；看门狗只写设计（[ADR-0042](../adr/0042-skeleton-and-application-two-layers.md)、[设计说明](../design/skeleton-and-application.md)）；Stage 3 工作包「骨架与应用」，里程碑 M0.5，未实施 |
 
 日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。
