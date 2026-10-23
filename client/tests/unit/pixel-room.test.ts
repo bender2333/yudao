@@ -177,13 +177,16 @@ test("说话气泡：没有专门动作的工具事件也说话", () => {
   assert.equal(qr.actor("q-test")?.say?.text, "现在试用网页");
 });
 
-// 原型 room.js 的 say：新话直接覆盖头顶正在显示的那句，不排队
-test("说话气泡：盖章紧跟着完成时，完成的话直接盖掉盖章说明", () => {
+// 原型 v11 第 2 条：盖章先做完，完成的话排在它后面，盖章说明停留到读得完
+test("说话气泡：盖章紧跟着完成时，盖章说明先显示，完成的话排在后面", () => {
   const h = mountRoom("quality", QUA);
   h.step(500);
   h.driver.playEvent({ type: "qa_submitted", department: "quality", role: "q-test", work_item_id: "w1", label: "质检提交结论", payload: { verdict: "release" } });
   h.driver.playEvent({ type: "run_done", department: "quality", role: "q-test", work_item_id: "w1", label: "事项完成", payload: {} });
   h.step(200);
+  assert.equal(h.actor("q-test")?.say?.text, "现在盖放行章");
+  // 盖章做完以后，完成的话才显示
+  h.step(3000);
   assert.equal(h.actor("q-test")?.say?.text, "完成了！");
 });
 
@@ -377,18 +380,34 @@ test("事件成串到达时，队满挤掉最早排入的那个", () => {
   assert.ok(!queued.includes("collaboration_requested"), `最早排入的应被挤掉，实际队列：${queued.join("、")}`);
 });
 
-// 原型 room.js：收到的一方在从管道口取件这一步说话；紧接着的下一句直接盖掉这一句
-test("收到交接的一方在取件这一步说话，紧接着的下一句直接盖掉", () => {
+// 原型 v11：收到的一方在动作开始时说话；紧接着的下一句直接盖掉这一句
+test("收到交接的一方在动作开始时说话，紧接着的下一句直接盖掉", () => {
   const q = mountRoom("quality", QUA);
   q.step(500);
   // 先收到工程送来的交付箱，紧接着质检把放行单送走；两步之间没有停顿
   q.driver.playEvent({ type: "transition", department: "engineering", payload: { from: "engineering", to: "quality", artifact: "box" } } as PixelFloorEvent);
-  // 走到传信管口取件时才说话：走到管口加上 reach 这两步约 3.3 秒
-  q.step(3500);
+  // 动作开始时就说话（原型 v11 第 1 条）：不用等到走到管道口
   assert.equal(q.actor("q-test")?.say?.text, "收到交付箱，来自工程");
   q.driver.playEvent({ type: "transition", department: "quality", payload: { from: "quality", to: "adopted", artifact: "release" } } as PixelFloorEvent);
   q.step(200);
   assert.equal(q.actor("q-test")?.say?.text, "现在把放行单送给成果库");
+});
+
+// 原型 v11 第 2 条：交接与盖章先做完，状态类动作排在它们后面
+test("状态类动作到达时，排队的盖章先做完，状态类动作排在它后面", () => {
+  const q = mountRoom("quality", QUA);
+  q.step(500);
+  const scene = q.driver.scene;
+  const actor = scene.actors.find((a) => a.id === "ch-q-test")!;
+  // 让角色正在做一段长动作，排队里因此有盖章
+  scene.run(actor, [{ t: "anim", name: "type", ms: 60000, key: true }, { t: "anim", name: "type", ms: 60000 }], { tail: 1 });
+  q.step(100);
+  q.driver.playEvent({ type: "qa_submitted", department: "quality", payload: { verdict: "release" } } as PixelFloorEvent);
+  assert.equal(q.actor("q-test")?.queue.length, 1, "盖章应排入队列");
+  // 事项完成到达：盖章先做完，状态类动作排在它后面
+  q.driver.playEvent({ type: "run_done", department: "quality", payload: {} } as PixelFloorEvent);
+  const queued = q.actor("q-test")!.queue.map((entry) => entry.action);
+  assert.deepEqual(queued, ["stamp_release", "done"], `队列：${queued.join("、")}`);
 });
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-// 部门房间的调用录制（工单 #177 验收标准 2）：在原型 v10 的页面上播放 19 个场景，
+// 部门房间的调用录制（工单 #177 验收标准 2）：在原型 v11 的页面上播放 19 个场景，
 // 依次打开产品的部门工作间，录下部门房间画面收到的 setModel、playEvent 调用，
 // 并记录每个事件之后固定时刻的状态：每个角色的任务与姿势、头顶的话、房间状态、管道口状态与信号。
 //
@@ -23,7 +23,7 @@ const outFile = join(outDir, "recordings.json");
 const args = process.argv.slice(2);
 const WRITE = args.includes("--write");
 const rootArg = args.indexOf("--root");
-const ROOT = rootArg >= 0 ? args[rootArg + 1] : pathToFileURL(join(repoRoot, "docs", "prototypes", "v10", "index.html")).href;
+const ROOT = rootArg >= 0 ? args[rootArg + 1] : pathToFileURL(join(repoRoot, "docs", "prototypes", "v11", "index.html")).href;
 
 const playwrightPath = process.env.PLAYWRIGHT_PATH
   || join(repoRoot, ".tmp", "v8", "pw", "node_modules", "playwright");
@@ -50,7 +50,7 @@ const SAMPLE_MS = [0, 800];
 
 // 在页面里运行的录制驱动：包装 createRoomScene，记录调用；在每次调用之后把时钟推进到固定时刻并取状态。
 const DRIVER = async ({ sampleMs, departments }) => {
-  const P = window.Y10.pixel;
+  const P = window.Y11.pixel;
   // 确定的时钟：rAF 的回调收进队列，由 step 按固定步长推进
   let t = 0;
   const q = [];
@@ -131,7 +131,7 @@ const DRIVER = async ({ sampleMs, departments }) => {
 
   return {
     play: async (id, pid, dept) => {
-      const app = window.Y10;
+      const app = window.Y11;
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       app.scenario.select(id);
       await sleep(250);
@@ -162,14 +162,14 @@ async function main() {
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.addInitScript(() => sessionStorage.setItem("y10.level", JSON.stringify("S5")));
+  await page.addInitScript(() => sessionStorage.setItem("y11.level", JSON.stringify("S5")));
   await page.goto(ROOT + "#/sys/machines");
   await page.waitForTimeout(700);
   await page.evaluate((src) => { window.__roomDriver = (0, eval)(`(${src})`); }, DRIVER.toString());
   await page.evaluate(async (arg) => { window.__room = await window.__roomDriver(arg); }, { sampleMs: SAMPLE_MS, departments: DEPARTMENTS });
 
   // 只录现有测试用到的场景（编号 1 至 19）：编号 20、21 是自举试点的场景，由实现覆盖层的工单加入录制
-  const scenarios = await page.evaluate((maxScenarioNo) => window.Y10.backend.scenarios().filter((s) => s.no <= maxScenarioNo).map((s) => {
+  const scenarios = await page.evaluate((maxScenarioNo) => window.Y11.backend.scenarios().filter((s) => s.no <= maxScenarioNo).map((s) => {
     const m = /^#\/p\/([^/]+)\//.exec(s.go || "");
     let pid = m ? m[1] : null;
     if (!pid) pid = s.steps.map((st) => st.event && st.event.project_id).find(Boolean) || null;
@@ -192,7 +192,7 @@ async function main() {
   await browser.close();
   if (errors.length) console.log("原型页面控制台错误", errors.length, errors.slice(0, 3));
   const payload = {
-    generatedFrom: "docs/prototypes/v10（部门房间，工单 #177）",
+    generatedFrom: "docs/prototypes/v11（部门房间，工单 #177）",
     sampleMs: SAMPLE_MS,
     scenarios: recordings,
   };
