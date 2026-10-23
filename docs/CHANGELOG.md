@@ -1036,3 +1036,5 @@ claude-sonnet-5-5 / 2026-10-22 22:58 / 新增 solo 模式：`AGENTS.md` 新增�
 claude-sonnet-5-5 / 2026-10-22 23:03 / solo 模式补标签规则：`AGENTS.md`「Solo 模式」新增「标签」一节（阶段与标签对照表），交付以后标签改为 `needs-review`，合并前核对不通过改回 `in-progress`，合并后去掉流程标签；`docs/agents/triage-labels.md` 同步 / 用户要求 solo 模式也要打 `in-progress` 等状态标签，原先写成「不使用 `needs-review`」使交付到合并之间没有状态可看
 
 solo-minimax-M3.1-Flash / 2026-10-23 13:39 / 工单 #709：采纳成果以后页面上有写回的入口——项目设置页新增「成果写回」一节（发起写回、列出写回记录），源目录一节补上写回设置（是否打开、远端、目标分支），概览页的「当前成果」多一行写回状态；新增查询 `project.writeback`（写回记录：状态、停止原因、推送的分支、目标分支、合并请求、冲突的文件）；命令 `writeback.execute` 在写回目标不可用时（目标仓库不存在、那个路径不是 git 仓库、目标分支不存在）按 `not_allowed` 给出中文说明，不再回 500 内部错误（`harness/writeback.py` 增加 `WritebackTargetUnavailable`）；采纳以后自动发起的写回遇到目标不可用时做不了，也不因此让这一次采纳失败（`harness/projects.py` 的 `_trigger_writeback_if_enabled` 接住它）；docs/design/app-and-interface.md 补查询一行与「写回在页面上的显示」，docs/design/existing-project-onboarding.md 第 5 节写回结果的位置由「事项详情」改为项目设置页与概览页 / 工单 #709：界面上没有写回的入口，「接入已有项目」这条路只走了一半；后端能力齐备（#347 与采纳以后自动发起写回都在），缺的是入口、写回设置与结果的可见性
+
+claude-fable-5-1 / 2026-10-23 15:41 / docs/agents/autopilot-runtime.md 第 7 节「唤醒架构师」改为关 / 用户在场的会话开始做骨架与应用的设计修改（CLAUDE.md「自主推进模式」），做完改回开
