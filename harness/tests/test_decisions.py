@@ -13,6 +13,7 @@ from harness.projection import saved_decision, saved_decisions
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
+from harness.tests.helpers import quality_turns
 from harness.write_path import NewEvent
 
 # 用户决定在控制核心中的行为：模型引用无法使用时流程编排发出待恢复的决定请求，run 停在这次请求之前、不再推进；
@@ -31,12 +32,12 @@ def _answer(system: LoopSystem, decision_id: str, option: str = "continue", *, b
 
 def _engineering_unavailable_system(data_dir):
     # 产品规格被接纳以后，工程部门的请求被提供方报告为不可用（缺少凭据）
-    adapter = FakeAdapter([
-        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ])
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    adapter = FakeAdapter({
+        "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))],
+        "engineering": [ProviderError(UNAVAILABLE, reason="provider_unavailable"), delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    })
     system = LoopSystem.for_testing(data_dir, adapter)
     return system, adapter, system.create_run("build an echo CLI")
 
@@ -48,9 +49,11 @@ def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run
     system, adapter, run_id = _engineering_unavailable_system(data_dir)
     blocked = system.run_until_stop(run_id)
 
-    # 工程部门的请求没有发出成功：run 停在 ENGINEERING，没有结束，产品的成果与已用的激活次数、用量都在
-    assert (blocked.active_department, blocked.stop_reason, blocked.status) == ("engineering", None, "running")
-    assert blocked.product_spec is not None and blocked.cycle_count == 2 and blocked.token_used == 120
+    # 工程部门的请求没有发出成功：run 没有结束，产品的成果与已用的用量都在。
+    # 同时运行的会话各自记下自己结束的时刻，最后激活的是哪个部门不再固定（工单 #557）：
+    # 这里断言的是结果，不是哪个部门最后激活
+    assert (blocked.stop_reason, blocked.status) == (None, "running")
+    assert blocked.product_spec is not None and blocked.token_used == 120
     [decision] = _open(system)
     events = system.store.list_events(run_id)
     [failed] = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
@@ -68,9 +71,10 @@ def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run
 
     # 回答之前 run 不推进：再次运行或激活都不写入，也不调用模型
     end = system.store.end_position()
+    calls = len(adapter.invocations)
     assert has_new_work(system.run_until_stop(run_id), "engineering")
     assert has_new_work(system.activate_once(run_id), "engineering")
-    assert system.store.end_position() == end and len(adapter.invocations) == 2
+    assert system.store.end_position() == end and len(adapter.invocations) == calls
 
     # 回答继续执行：从工程部门的这次请求接着进行，产品不再调用，走完交付与放行
     assert _answer(system, decision.decision_id, note="凭据已经补上") == run_id
@@ -79,10 +83,14 @@ def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run
                                                                                        "凭据已经补上")
     finished = system.run_until_stop(run_id)
     assert finished.status == "done"
-    assert [call.department for call in adapter.invocations] == [
-        "product", "engineering", "engineering", "quality"]
+    # 产品只提交过一次 PRD；工程在阻塞以后接着做完了交付，质检核验并放行。
+    # 质检在交付到达以前还有一轮预测性探索（工单 #557），因此这里不数模型调用的次数
+    departments = [call.department for call in adapter.invocations]
+    assert departments.count("product") == 1
+    assert departments.count("engineering") >= 2
+    assert "quality" in departments
     assert finished.product_specs == blocked.product_specs
-    assert finished.cycle_count == 4 and finished.token_used >= 120
+    assert finished.cycle_count > blocked.cycle_count and finished.token_used >= 120
     assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
     assert_payloads_follow_contract(system.store.list_events(run_id))
 
@@ -90,12 +98,13 @@ def test_choosing_to_stop_ends_the_run_in_the_same_transaction_as_the_answer(dat
     system, adapter, run_id = _engineering_unavailable_system(data_dir)
     system.run_until_stop(run_id)
     [decision] = _open(system)
+    calls = len(adapter.invocations)
     assert _answer(system, decision.decision_id, "stop") is None
     events = system.store.list_events(run_id)
     assert [event.type for event in events[-2:]] == [EventType.DECISION_ANSWERED, EventType.RUN_FAILED]
     assert events[-1].stop_reason == "cancelled" and events[-2].command_id == events[-1].command_id
     assert system.run_until_stop(run_id).status == "failed"
-    assert len(adapter.invocations) == 2
+    assert len(adapter.invocations) == calls
     with pytest.raises(DecisionClosed):
         _answer(system, decision.decision_id)
 

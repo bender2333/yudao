@@ -11,6 +11,7 @@ from harness.models import EventType, TERMINAL_STATUSES, Usage
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
+from harness.tests.helpers import quality_turns
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 用户决定在应用层与接口层的行为（设计说明第 3.3、4.3 节）：未回答的请求由查询 decisions.list 读取，回答经命令
@@ -39,14 +40,15 @@ class _Service:
     def system(self) -> LoopSystem:
         return self.applications[-1].system
 
-def _unavailable_script() -> list[object]:
+def _unavailable_script(runs: int = 1) -> dict[str, list[object]]:
     # 产品提交规格（带用量）以后，工程部门的请求被提供方报告为不可用（缺少凭据）；修复配置以后从这次请求接着进行
-    return [
-        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）。
+    # runs 给出连续几个事项的脚本：一个事项一份，各部门各自按顺序取用
+    return {
+        "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))] * runs,
+        "engineering": [ProviderError(UNAVAILABLE, reason="provider_unavailable"), delivery_turn()] * runs,
+        "quality": quality_turns("release", "checks passed on the current snapshot", times=4 * runs),
+    }
 
 def _blocked_run(client, service):
     # 新建项目经命令，事项与运行经控制核心的公开接口；运行到模型不可用而停在这次请求之前
@@ -89,8 +91,10 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
     with running_api(service) as client:
         project_id, work_item_id, run_id, blocked = _blocked_run(client, service)
         system = service.system
-        assert (blocked.active_department, blocked.stop_reason, blocked.status) == ("engineering", None, "running")
-        assert blocked.cycle_count == 2 and blocked.token_used == 120 and blocked.product_spec is not None
+        # 同时运行的会话各自记下自己结束的时刻，最后激活的是哪个部门不再固定（工单 #557）：
+        # 这里断言的是结果：run 停在这次请求之前，产品的成果与已用的用量都在
+        assert (blocked.stop_reason, blocked.status) == (None, "running")
+        assert blocked.token_used == 120 and blocked.product_spec is not None
 
         # 未回答的请求按项目与事项列出，内容完整：身份、所属的项目、事项与 run、种类、阻塞范围、选项与说明、
         # 涉及的事实引用、状态与回答
@@ -124,10 +128,11 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
 
         # 查询不写入，也不推进运行：再次运行与激活都不写入，模型不再被调用
         end = system.store.end_position()
+        calls = len(service.adapters[0].invocations)
         assert _list(client, project_id=project_id)["position"] == end
-        assert system.store.end_position() == end and len(service.adapters[0].invocations) == 2
+        assert system.store.end_position() == end and len(service.adapters[0].invocations) == calls
         assert has_new_work(system.run_until_stop(run_id), "engineering")
-        assert system.store.end_position() == end and len(service.adapters[0].invocations) == 2
+        assert system.store.end_position() == end and len(service.adapters[0].invocations) == calls
 
         # 回答「继续执行」：run 在服务的事件循环中继续到结束
         command_id = str(uuid.uuid4())
@@ -140,11 +145,15 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
 
         finished = _wait_for_completion(system, run_id)
         assert finished.status == "done"
-        assert [call.department for call in service.adapters[0].invocations] == [
-            "product", "engineering", "engineering", "quality"]
+        # 产品只提交过一次 PRD；工程在阻塞以后接着做完了交付，质检核验并放行。
+        # 质检在交付到达以前还有一轮预测性探索（工单 #557），因此这里不数模型调用的次数
+        departments = [call.department for call in service.adapters[0].invocations]
+        assert departments.count("product") == 1
+        assert departments.count("engineering") >= 2
+        assert "quality" in departments
         # 已完成的工作、激活次数与已用限额保留：产品的成果不变，激活与用量从阻塞时接着增加
         assert finished.product_specs == blocked.product_specs
-        assert finished.cycle_count == blocked.cycle_count + 2
+        assert finished.cycle_count > blocked.cycle_count
         assert finished.token_used >= blocked.token_used
         assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
 
@@ -170,6 +179,7 @@ def test_answering_stop_ends_the_work_item_as_cancelled(data_dir):
         project_id, work_item_id, run_id, _blocked = _blocked_run(client, service)
         system = service.system
         [decision] = _list(client, project_id=project_id)["data"]["decisions"]
+        calls = len(service.adapters[0].invocations)
 
         command_id = str(uuid.uuid4())
         accepted = _answer(client, command_id, decision_id=decision["decision_id"], option="stop", base_version=1)
@@ -181,7 +191,7 @@ def test_answering_stop_ends_the_work_item_as_cancelled(data_dir):
         assert (run.status, run.stop_reason) == ("failed", "cancelled")
         [item] = system.projects.projection(project_id).work_items
         assert (item.work_item_id, item.status, item.stop_reason) == (work_item_id, "stopped", "cancelled")
-        assert len(service.adapters[0].invocations) == 2
+        assert len(service.adapters[0].invocations) == calls
         [answered_decision] = _list(client, project_id=project_id, status=["answered"])["data"]["decisions"]
         assert (answered_decision["status"], answered_decision["answer"]["option"],
                 answered_decision["answer"]["note"]) == ("answered", "stop", None)
@@ -261,19 +271,17 @@ def test_a_withdrawn_request_is_not_in_the_waiting_list_and_cannot_be_answered(d
                 _list(client, project_id=project_id, work_item_id=work_item_id)["data"]["decisions"]] == ["withdrawn"]
 
         end = system.store.end_position()
+        calls = len(service.adapters[0].invocations)
         closed = _answer(client, str(uuid.uuid4()), decision_id=decision["decision_id"], option="continue",
                          base_version=1)
         assert closed.status_code == 409 and closed.json()["reason"] == "decision_closed"
         assert "已经撤销" in closed.json()["message"]
-        assert system.store.end_position() == end and len(service.adapters[0].invocations) == 2
+        assert system.store.end_position() == end and len(service.adapters[0].invocations) == calls
 
 def test_the_listing_filters_by_several_states_and_reports_the_owning_identities(data_dir):
     # 状态筛选可以重复给出多个状态（?status=open&status=answered），也可以一次给出多个；省略状态时不限制。
     # 每一项都带所属的项目、事项与 run；不在清单里的状态被拒绝（422），查询不写入
-    service = _Service(data_dir, [_unavailable_script() + [
-        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-    ]])
+    service = _Service(data_dir, [_unavailable_script(2)])
     with running_api(service) as client:
         project_id, work_item_id, run_id, _blocked = _blocked_run(client, service)
         system = service.system
@@ -295,8 +303,7 @@ def test_the_listing_filters_by_several_states_and_reports_the_owning_identities
         # 第二个事项的请求在运行取消时撤销
         second_item, second_run = system.projects.start_work_item(project_id, "另一个事项")
         blocked_again = system.run_until_stop(second_run)
-        assert (blocked_again.active_department, blocked_again.stop_reason, blocked_again.status) == ("engineering", None,
-                                                                                          "running")
+        assert (blocked_again.stop_reason, blocked_again.status) == (None, "running")
         [second] = _list(client, work_item_id=second_item)["data"]["decisions"]
         assert (second["project_id"], second["work_item_id"], second["run_id"]) == (project_id, second_item,
                                                                                     second_run)
