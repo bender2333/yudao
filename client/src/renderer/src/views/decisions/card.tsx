@@ -11,7 +11,7 @@ import { Icon } from "../../shell/kit";
 import { CommandFeedback, KeyValue, Tag, TextArea, hasCommand } from "../project/common";
 import { DECISION_BLOCKS, DECISION_KIND, formatDuration, formatTime, label } from "../project/labels";
 import { useCommand } from "../project/use-snapshot";
-import { blockedText, decisionLinks, materialRows, missingNoteText, viewHref, waitedSeconds } from "./card-logic";
+import { blockedText, decisionLinks, materialRows, metaLine, missingNoteText, viewHref, waitedSeconds } from "./card-logic";
 
 export type DecisionCardProps = {
   app: ClientApp | null;
@@ -19,6 +19,7 @@ export type DecisionCardProps = {
   // 现在的时间：等待时长按发出时间到现在的差显示；由调用处给出，卡片不自行计时
   now: number;
   // 所属的项目名与事项标题：由调用处的快照解析（决定请求只带标识）
+  // 事项标题取不到时是空串，卡片不写事项标识（工单 #802）
   projectName: string;
   workItemTitle: string;
   // 上一轮的修改意见原文（工单 #138，设计第 3.2 节）：由调用处按项目与事项解析，第一轮为空
@@ -132,7 +133,7 @@ export function DecisionCard(props: DecisionCardProps) {
   if (revisionNote !== "") {
     rows.push({ term: "上一轮修改意见", value: revisionNote });
   }
-  const blocks = blockedText(decision);
+  const blocks = blockedText(decision, props.workItemTitle);
   const links = decisionLinks(decision);
   const target = viewHref(decision);
   const options = decision.request?.options ?? [];
@@ -173,10 +174,7 @@ export function DecisionCard(props: DecisionCardProps) {
           <Tag>{decision.blocks === "" ? "不阻塞" : `阻塞范围：${label(DECISION_BLOCKS, decision.blocks)}`}</Tag>
         </div>
         <div className="y10-card-meta decision-meta">
-          <span>
-            {props.projectName || decision.project_id || "项目流"}
-            {props.workItemTitle || decision.work_item_id ? ` · ${props.workItemTitle || decision.work_item_id}` : ""}
-          </span>
+          <span>{metaLine(decision, { projectName: props.projectName, workItemTitle: props.workItemTitle })}</span>
           <span>已等待 {formatDuration(waitedSeconds(decision.requested_at, props.now))}</span>
           <span className={blocks.muted ? "muted" : ""}>{blocks.text}</span>
         </div>
@@ -255,7 +253,8 @@ function answeredLabel(decision: DecisionView): string {
 }
 
 // 决定卡片列表：按发出时间排列，空列表写明没有等待回答的决定。
-// names 把决定请求里的项目与事项标识解析成名称（由调用处的快照给出），解析不到时回落到标识
+// names 把决定请求里的项目与事项标识解析成名称（由调用处的快照给出）；解析不到时是空串，
+// 卡片不写标识（工单 #802）
 export function DecisionCardList(props: {
   app: ClientApp | null;
   decisions: DecisionView[];

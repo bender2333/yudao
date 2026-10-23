@@ -58,10 +58,14 @@ test("待恢复的决定：材料列出部门、模型与具体问题", () => {
 });
 
 
-test("挡住的对象：写明被阻塞的事项与排在后面的事项数量", () => {
-  assert.deepEqual(blockedText(decision()), { text: "挡住「w1」，同一项目中排在它后面的事项 2 个", muted: false });
+test("挡住的对象：写明被阻塞的事项与排在后面的事项数量，事项写标题不写标识", () => {
+  assert.deepEqual(blockedText(decision(), "实现逐行处理"), { text: "挡住「实现逐行处理」，同一项目中排在它后面的事项 2 个", muted: false });
   const idle = decision({ blocks: "", blocked: null });
-  assert.deepEqual(blockedText(idle), { text: "不挡住事项", muted: true });
+  assert.deepEqual(blockedText(idle, "实现逐行处理"), { text: "不挡住事项", muted: true });
+  // 事项标题取不到时不拿事项标识凑数（工单 #802，原型 v11 的 blocksText 同一写法）
+  assert.deepEqual(blockedText(decision(), ""), { text: "同一项目中排在它后面的事项 2 个", muted: false });
+  const alone = decision({ blocked: { work_item_id: "w1", queued_after: 0 } });
+  assert.deepEqual(blockedText(alone, ""), { text: "挡住本事项", muted: false });
 });
 
 test("等待时长：按发出时间到现在的差，负差按零", () => {
@@ -94,10 +98,10 @@ test("等待回答的请求按发出时间排列", () => {
 
 test("给像素画面用的纯文字版本与页面卡片共用同一份材料", () => {
   const now = new Date("2026-10-02T10:01:00Z").getTime();
-  const card = face(decision(), now);
+  const card = face(decision(), now, { projectName: "文本工具", workItemTitle: "实现逐行处理" });
   assert.equal(card.id, "d1");
   assert.equal(card.title, "模型引用无法使用，等待恢复");
-  assert.equal(card.blocks, "挡住「w1」，同一项目中排在它后面的事项 2 个");
+  assert.equal(card.blocks, "挡住「实现逐行处理」，同一项目中排在它后面的事项 2 个");
   assert.deepEqual(card.rows, materialRows(decision()));
   assert.deepEqual(card.options.map((option) => option.id), ["continue", "stop"]);
 });
@@ -114,9 +118,11 @@ test("给画面用的卡片内容带上决定版本、项目与事项、链接�
   assert.equal(card.waited, "已等待 60 秒");
   assert.deepEqual(card.links.map((link) => link.href), ["#/sys/models", "#/p/p1/settings"]);
   assert.equal(card.options[0].note_required, true);
-  // 没有给出名称时回落到标识
+  // 没有给出名称时只写项目名，不写事项标识（工单 #802）
   const bare = face(decision(), now);
-  assert.equal(bare.where, "p1 · w1");
+  assert.equal(bare.where, "p1");
+  assert.ok(!bare.where.includes("w1"), "页面上不出现事项标识");
+  assert.equal(bare.blocks, "同一项目中排在它后面的事项 2 个");
 });
 
 test("要求写说明的选项在说明为空时不提交，有说明时通过", () => {

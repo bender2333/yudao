@@ -5,7 +5,7 @@
 import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
 import type { StreamState } from "../contract/stream-state";
-import type { DecisionView, ProjectOverviewResult, ProjectRow } from "../api/generated/types.gen";
+import type { DecisionView, ProjectOverviewResult, ProjectRow, WorkItemCard } from "../api/generated/types.gen";
 import { PAGE_RELEASE } from "../contract/page-release";
 import { type CommandProblem, commandProblemText } from "../contract/command-problem.ts";
 import { useCommand, useSnapshot } from "../views/project/use-snapshot";
@@ -14,6 +14,7 @@ import { providerNotice, type ProviderReadiness } from "./provider-status";
 import { useTheme, type ThemeChoice } from "./theme";
 import { WORK_ITEM_STATUS, connectionText, label } from "../views/project/labels";
 import { list, text } from "../views/project/common";
+import { scopeName } from "../views/project/scope-name";
 import { DecisionCardList } from "../views/decisions/card";
 import { sortByRequested } from "../views/decisions/card-logic";
 import { type Route, withScope } from "./routing";
@@ -43,6 +44,13 @@ export function Topbar(props: TopbarProps) {
   const now = Date.now();
   // 模型服务不可用时的提示（工单 #718）：可用时不显示
   const provider = providerNotice(props.provider);
+  // 本项目的事项表：范围选择框与下拉里的决定卡片共用这一份（工单 #802）。
+  // 事项标题就在这份数据里（work_items 的 title），决定卡片写标题，不写事项标识。
+  const projectId = props.route.projectId;
+  const overview = useSnapshot<ProjectOverviewResult>(props.app, "topbar.overview", "project.overview", {
+    project_id: projectId ?? "",
+  }, projectId === null);
+  const workItems = overview.data?.work_items ?? [];
   return (
     <header className="y10-topbar topbar">
       <button type="button" className="y10-icon-btn y10-drawer-open drawer-toggle" onClick={props.onToggleDrawer} aria-label="打开左侧栏">
@@ -53,7 +61,7 @@ export function Topbar(props: TopbarProps) {
       </nav>
       <div className="y10-top-actions">
         {props.projectId ? (
-          <WorkItemPicker app={props.app} route={props.route} onNavigate={props.onNavigate} />
+          <WorkItemPicker route={props.route} items={workItems} onNavigate={props.onNavigate} />
         ) : null}
         {/* 顶栏的状态项：跨项目与本项目的等待回答的决定请求，亮起时可以直接点开 */}
         <div className="y10-top-stats">
@@ -109,7 +117,7 @@ export function Topbar(props: TopbarProps) {
             now={now}
             names={(decision) => ({
               projectName: props.project?.name ?? decision.project_id ?? "",
-              workItemTitle: decision.work_item_id ?? "",
+              workItemTitle: scopeName(workItems, decision.work_item_id),
             })}
             onNavigate={props.onNavigate}
             viewId="topbar.decisions"
@@ -146,16 +154,13 @@ function ThemeSwitch() {
 // 事项选择框：「整个项目」或某个事项（标题与状态）；概览、部门工作间、资料、观测按所选范围显示。
 // 换一个范围时留在当前页（工单 #746）：范围是项目级的一份，写在路径参数 ?w= 中，
 // 选完以后当前的页面与筛选条件都还在，只有范围变了。
+// 事项表由顶栏这一层给出（project.overview）：下拉里的决定卡片用它写事项标题（工单 #802）。
 function WorkItemPicker(props: {
-  app: ClientApp | null;
   route: Route;
+  items: WorkItemCard[];
   onNavigate: (hash: string) => void;
 }) {
-  const projectId = props.route.projectId ?? "";
-  const snapshot = useSnapshot<ProjectOverviewResult>(props.app, "topbar.overview", "project.overview", {
-    project_id: projectId,
-  });
-  const items = snapshot.data === null ? [] : list(snapshot.data.work_items);
+  const items = list(props.items);
 
   return (
     <label className="y10-scope field picker">

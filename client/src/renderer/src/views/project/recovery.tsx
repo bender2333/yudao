@@ -64,6 +64,8 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
   }, workItemId === "");
   const settled = overview.data?.work_items.find((entry) => entry.work_item_id === workItemId) ?? null;
   const title = settled?.title ?? workItemId;
+  // 决定卡片写事项标题；取不到时不写事项标识（工单 #802）
+  const cardTitle = settled?.title ?? "";
   const runId = item?.run_id ?? null;
   const elapsed = item?.elapsed_sec ?? null;
   const limit = item?.time_limit_sec ?? null;
@@ -108,7 +110,7 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
               app={props.app}
               decisions={decisions.data?.decisions ?? []}
               now={now}
-              names={() => ({ projectName: projectId, workItemTitle: title })}
+              names={() => ({ projectName: projectId, workItemTitle: cardTitle })}
               onNavigate={props.onNavigate}
               viewId="recovery.decisions"
               emptyText="没有等待你回答的决定"

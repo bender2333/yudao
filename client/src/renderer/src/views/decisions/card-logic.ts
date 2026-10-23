@@ -224,24 +224,39 @@ export function viewHref(decision: DecisionView): string | null {
 
 // 挡住了什么：被阻塞的事项，以及同一项目中排在它后面的事项数量（v8 第 6 节）。
 // 不挡住任何事项的请求按 muted 显示（例如不阻塞的已阅通知）。
-export function blockedText(decision: DecisionView): { text: string; muted: boolean } {
+// 被挡住的事项写标题，不写事项标识（工单 #802，原型 v11 的 Y11.ui.cards.blocksText 同一写法）：
+// 标题由调用处按项目的事项列表解析；挡住的事项就是决定请求所属的事项
+// （服务端按这个事项给出挡住的对象，harness/app/decision_queries.py 的 _blocked），
+// 取不到标题时写「挡住本事项」，不拿标识凑数。
+export function blockedText(decision: DecisionView, workItemTitle = ""): { text: string; muted: boolean } {
   if (decision.blocks === "" || decision.blocked === null) {
     return { text: "不挡住事项", muted: true };
   }
   const parts: string[] = [];
-  if (decision.blocked.work_item_id !== null) {
-    parts.push(`挡住「${decision.blocked.work_item_id}」`);
-  } else {
-    parts.push("挡住本事项");
+  const title = workItemTitle.trim();
+  if (title !== "") {
+    parts.push(`挡住「${title}」`);
   }
   if (decision.blocked.queued_after > 0) {
     parts.push(`同一项目中排在它后面的事项 ${decision.blocked.queued_after} 个`);
   }
-  return { text: parts.join("，"), muted: false };
+  return { text: parts.length === 0 ? "挡住本事项" : parts.join("，"), muted: false };
+}
+
+// 决定卡片头的一行：项目名与事项标题（工单 #802，原型 v11 的 Y11.ui.cards.render 同一写法）。
+// 事项标题由调用处按项目的事项列表解析；取不到时只写项目名，不写事项标识——
+// 页面上不出现内部标识（事项范围那一处的做法一样，views/project/scope-name.ts）。
+export function metaLine(
+  decision: DecisionView,
+  names: { projectName: string; workItemTitle: string },
+): string {
+  const project = names.projectName || decision.project_id || "项目流";
+  const item = names.workItemTitle.trim();
+  return item === "" ? project : `${project} · ${item}`;
 }
 
 // 给像素画面用的纯文字版本（原型 v10 的 Y10.cards.face）：与页面卡片同一份材料，不含界面元素。
-// where 是「项目 · 事项」，由调用处按快照把标识解析成名称；解析不到时回落到标识。
+// where 是「项目 · 事项」，由调用处按快照把标识解析成名称；解析不到时不写标识（工单 #802）。
 // options 保留 note_required（原型选项的标记）：为真时，没有写说明就不提交。
 export function face(
   decision: DecisionView,
@@ -260,8 +275,6 @@ export function face(
   links: MaterialLink[];
   options: { id: string; label: string; note_required: boolean }[];
 } {
-  const project = names?.projectName || decision.project_id || "项目流";
-  const item = names?.workItemTitle || decision.work_item_id;
   const request = (decision.request ?? {}) as Record<string, unknown>;
   const options = (request.options ?? []) as { id: string; label: string; note_required?: boolean }[];
   return {
@@ -270,9 +283,9 @@ export function face(
     version: decision.version,
     title: label(DECISION_KIND, decision.kind),
     work_item_id: decision.work_item_id,
-    where: item ? `${project} · ${item}` : project,
+    where: metaLine(decision, { projectName: names?.projectName ?? "", workItemTitle: names?.workItemTitle ?? "" }),
     waited: `已等待 ${waitedSeconds(decision.requested_at, now)} 秒`,
-    blocks: blockedText(decision).text,
+    blocks: blockedText(decision, names?.workItemTitle ?? "").text,
     rows: materialRows(decision),
     links: decisionLinks(decision),
     options: options.map((option) => ({ id: option.id, label: option.label, note_required: Boolean(option.note_required) })),

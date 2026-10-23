@@ -206,7 +206,7 @@ function OnboardingMark(props: { project: ProjectRow; decisions: DecisionView[] 
 }
 
 // 待你决定：跨项目的决定卡片。事项标题由 project.overview 解析（决定请求只带标识），
-// 解析不到时回落到标识本身。项目名由 projects.list 给出。
+// 解析不到时是空串，卡片不写事项标识（工单 #802）。项目名由 projects.list 给出。
 function DecisionNames(props: {
   app: ClientApp;
   decisions: DecisionView[];
@@ -224,7 +224,7 @@ function DecisionNames(props: {
       now={props.now}
       names={(decision) => ({
         projectName: props.projectNames[decision.project_id ?? ""] ?? decision.project_id ?? "",
-        workItemTitle: titles[decision.work_item_id ?? ""] ?? decision.work_item_id ?? "",
+        workItemTitle: titles[decision.work_item_id ?? ""] ?? "",
       })}
       onNavigate={props.onNavigate}
       targetDecision={props.targetDecision}

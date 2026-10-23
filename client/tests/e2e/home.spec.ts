@@ -124,7 +124,7 @@ async function overflowReport(page: Page): Promise<string[]> {
   });
 }
 
-type DecisionRow = { decision_id: string; version: number; project_id: string; work_item_id: string | null };
+type DecisionRow = { decision_id: string; version: number; project_id: string; work_item_id: string | null; kind: string };
 
 async function openDecisions(page: Page): Promise<DecisionRow[]> {
   const data = await fetchQuery<{ decisions: DecisionRow[] }>(page, "decisions.list", { status: "open" });
@@ -161,6 +161,15 @@ test.describe("系统首页（1440×900）", () => {
       await expect.poll(async () => first.locator(".decision-meta").innerText()).toContain(resolvedName);
       await expect(first.locator(".decision-meta")).toContainText("已等待");
       await expect(first.locator(".decision-meta")).toContainText("挡住");
+      // 事项写标题，不写事项标识（工单 #802）
+      const blocked = waiting.find((row) => row.kind === "model_unavailable");
+      if (blocked?.work_item_id) {
+        const title = await workItemTitle(client.page, blocked.project_id, blocked.work_item_id);
+        expect(title).not.toBe("");
+        const card = client.page.locator(`#decision-${blocked.decision_id}`);
+        await expect(card.locator(".decision-meta")).toContainText(title);
+        await expect(card.locator(".decision-meta")).not.toContainText(blocked.work_item_id);
+      }
       // 材料按决定种类整理：待恢复显示部门与具体问题
       await expect(first.locator("details")).toContainText("部门");
       expect(errors).toEqual([]);
@@ -363,6 +372,16 @@ test.describe("系统首页（1440×900）", () => {
       for (const decision of projectWaiting) {
         await expect(dropdown.locator(`#decision-${decision.decision_id}`)).toBeVisible();
       }
+      // 卡片写事项标题，与首页的同一批卡片写同一件事，不写事项标识（工单 #802）
+      const blockedDecision = projectWaiting.find((row) => row.kind === "model_unavailable");
+      if (blockedDecision?.work_item_id) {
+        const title = await workItemTitle(client.page, blockedId, blockedDecision.work_item_id);
+        expect(title).not.toBe("");
+        const card = dropdown.locator(`#decision-${blockedDecision.decision_id}`);
+        await expect(card.locator(".decision-meta")).toContainText(title);
+        await expect(card.locator(".decision-meta")).not.toContainText(blockedDecision.work_item_id);
+      }
+      await expect(dropdown).not.toContainText("wi_");
       const otherProject = (await openDecisions(client.page)).find((row) => row.project_id !== blockedId);
       if (otherProject) {
         await expect(dropdown.locator(`#decision-${otherProject.decision_id}`)).toHaveCount(0);
@@ -411,5 +430,14 @@ async function projectId(page: Page, name: string): Promise<string> {
 async function projectName(page: Page, projectIdValue: string): Promise<string> {
   return fetchQuery<{ projects: { name: string; project_id: string }[] }>(page, "projects.list").then((data) => {
     return data.projects.find((project) => project.project_id === projectIdValue)?.name ?? "";
+  });
+}
+
+// 事项的标题：决定卡片写它，不写事项标识（工单 #802）
+async function workItemTitle(page: Page, projectIdValue: string, workItemId: string): Promise<string> {
+  return fetchQuery<{ work_items: { work_item_id: string; title: string }[] }>(page, "project.overview", {
+    project_id: projectIdValue,
+  }).then((data) => {
+    return data.work_items.find((item) => item.work_item_id === workItemId)?.title ?? "";
   });
 }
