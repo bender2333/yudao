@@ -10,9 +10,11 @@ from harness.environment import QA_TESTS_DIR
 from harness.event_store import Command
 from harness.models import EventType, json_dumps
 from harness.projection import saved_decisions
-from harness.proposals import delivery, delivery_turn, product_spec, review, review_turn
-from harness.providers.call import ModelResponse
+from harness.proposals import (answer_turn, ask_turn, delivery, delivery_turn, product_spec,
+                                product_spec_turn, review, review_turn)
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
+from harness.tests.helpers import guidance_reply, quality_turns
 
 CHECKS = {"smoke": {"command": "python -c \"print('smoke ok')\""}}
 ECHO = "import sys\nprint(sys.argv[1])\n"
@@ -240,5 +242,57 @@ def test_pause_and_continue_lets_each_session_resume_where_it_stopped(tmp_path: 
     accepted = [event for event in events if event.type == EventType.DELIVERY_ACCEPTED]
     assert accepted, "继续以后没有交付"
     assert accepted[0].position > continued.position
+    released = [event for event in events if event.type == EventType.QA_SUBMITTED]
+    assert released and released[0].payload.get("verdict") == "release"
+
+
+def test_an_ask_branch_whose_basis_changed_cannot_answer_and_the_asker_continues(tmp_path: Path) -> None:
+    # 另一个会话修订了 PRD，进行中的询问分支依据过时：这个分支不能继续工作，询问记成
+    # 「没能回答」，原因写明是 PRD 被修订；提问方拿到原因以后接着工作（工单 #557 的同时运行结构；
+    # PRD 新版本作为通知送达进行中的会话由工单 #558 实现）
+    holder: dict[str, object] = {}
+
+    def branch_turn(call):
+        # 分支会话工作期间，产品的另一个会话修订了 PRD：产品的指导让它的主线会话开始一轮工作，
+        # 那一轮提交修订版的产品要求（同时运行的会话）
+        holder["system"].add_guidance(call.run_id, "product", "请按新的要求修订产品要求。")
+        for _ in range(200):
+            if len(holder["system"].project(call.run_id).effective_contracts) >= 2:
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
+        return answer_turn("已按新的要求修订产品要求。")(call)
+
+    adapter = FakeAdapter({
+        "product": [
+            product_spec(),
+            product_spec_turn(goal="Build an echo CLI v2",
+                              requirements=["print the given argument to stdout"],
+                              acceptance=["echo hello prints hello"],
+                              change_record={
+                                  "changed": ["The requirements are stated once"],
+                                  "retained": ["The echo CLI scope"],
+                                  "retired": [],
+                                  "rationale": "The user asked for a revised contract.",
+                              }),
+            guidance_reply("已按新的要求修订产品要求。"),
+        ],
+        "engineering": [ask_turn(), delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
+        "product:ask": [branch_turn],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }, stream_gap_sec=0.01)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
+    run_id = system.create_run("build an echo CLI")
+    projection = system.run_until_stop(run_id)
+    assert projection.status == "done", projection.stop_reason
+
+    events = _events(system, run_id)
+    answered = [event for event in events if event.type == EventType.ASK_ANSWERED]
+    assert len(answered) == 1
+    payload = answered[0].payload
+    assert payload["status"] == "unable"
+    assert "the PRD was revised by another session" in payload["reason"]
+    # 提问方拿到原因以后接着工作：交付到达，质检放行
+    assert [event for event in events if event.type == EventType.DELIVERY_ACCEPTED]
     released = [event for event in events if event.type == EventType.QA_SUBMITTED]
     assert released and released[0].payload.get("verdict") == "release"

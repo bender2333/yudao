@@ -177,7 +177,7 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
                 product_decision("Use DECISION_CANARY_C.", "The second requirement needs this exact output."),
                 guidance_reply("已给出两条产品决定。"),
             ],
-            "engineering": [delivery_turn(), delivery_turn(), delivery_turn()],
+            "engineering": [delivery_turn(), delivery_turn(), delivery_turn(), delivery_turn()],
             "quality": quality_turns(
                 "rework_engineering", "the delivery misses an acceptance criterion",
                 defects=[{"severity": "major", "summary": "defect A"}]),
