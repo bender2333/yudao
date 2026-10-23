@@ -49,7 +49,7 @@ from harness.proposals import (
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script
+from harness.tests.helpers import explore_turn, happy_script, merge_scripts
 from harness.tests.api_helpers import running_api
 from harness.tests.saved_rewrite import rewrite_saved_event
 from harness.tree_archive import load_tree
@@ -58,10 +58,13 @@ from harness.write_path import NewEvent
 GOAL = "把文本按行处理清楚"
 
 def _release_script(summary="v1", files=None):
-    return [
-        product_spec(),delivery_turn(summary=summary, files=files),
-        review_turn("release", f"ok {summary}"),
-    ]
+    # 按部门给出（工单 #557：同时运行的会话各自取用自己的脚本）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary=summary, files=files)],
+        "quality": [explore_turn(), review_turn("release", f"ok {summary}")],
+    }
+
 
 def _system(data_dir, script):
     return LoopSystem.for_testing(data_dir, FakeAdapter(script))
@@ -628,7 +631,7 @@ def test_event_detail_http_reports_unreadable_git_references(data_dir, damage):
 
 
 def test_event_detail_rejects_an_artifact_of_another_run(data_dir, monkeypatch):
-    system = _system(data_dir, [*_release_script(), *_release_script()])
+    system = _system(data_dir, merge_scripts(_release_script(), _release_script()))
     first_project = system.projects.register("第一个", GOAL)
     _work_item_id, run_id = system.projects.start_work_item(first_project, "第一件事")
     system.run_until_stop(run_id)
@@ -782,12 +785,15 @@ def test_work_item_scope_is_checked_in_every_project_query(data_dir):
             application.query(name, request.model_copy(update={"work_item": "wi_missing"}))
 
 def _rework_script(verdict="rework_engineering"):
-    return [
-        product_spec(),delivery_turn(),
-        review_turn(verdict, "质检退回", defects=[{"severity": "minor", "summary": "空输入需要处理"}]),
-        delivery_turn(summary="处理空输入"),
-        review_turn("release", "revised delivery checked"),
-    ]
+    # 按部门给出（工单 #557：同时运行的会话各自取用自己的脚本）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [explore_turn(),
+                    review_turn(verdict, "质检退回", defects=[{"severity": "minor", "summary": "空输入需要处理"}]),
+                    review_turn("release", "revised delivery checked")],
+    }
+
 
 def test_read_models_write_only_their_own_database(data_dir):
     system = _system(data_dir, happy_script())
