@@ -51,8 +51,14 @@ def test_demo_fills_four_views(demo_run):
     flow = application.query("project.flow", ProjectFlow(
         project_id=projection.project_id, work_item=projection.work_item_id))
     consultations = [record for record in flow.data.records if record.kind == "询问"]
-    assert {record.status for record in consultations} == {"已回答"}
+    # 同时运行的会话：质检在预测性探索里询问工程时，产品的会话同时修订了 PRD，
+    # 这个分支的依据过时，没有回答（PRD 新版本作为通知送达进行中的会话由工单 #558 补上）
+    assert {record.status for record in consultations} == {"已回答", "没能回答"}
     assert {record.direction_from for record in consultations} == {"product", "engineering", "quality"}
+    stale = [record for record in consultations if record.status == "没能回答"]
+    assert len(stale) == 1
+    assert (stale[0].direction_from, stale[0].direction_to) == ("quality", "engineering")
+    assert "the PRD was revised by another session" in stale[0].content
     materials = application.query("work_item.materials", WorkItemMaterials(
         project_id=projection.project_id, work_item=projection.work_item_id))
     assert materials.data.reviews

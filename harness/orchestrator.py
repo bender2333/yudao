@@ -1807,7 +1807,12 @@ class Orchestrator:
             elif isinstance(result, Stopped) and result.reason:
                 reason = result.reason
             else:
-                reason = "branch failed to answer"
+                # 分支没有做出回答就结束：最常见的原因是分支工作期间工作依据变了
+                # （另一个会话修订了 PRD、用户有新输入或新的指导），依据变了以后这个分支
+                # 不能继续工作（设计说明第 5 节、第 9 节）。写明是哪一种，提问方才知道
+                # 接下来怎么做（设计说明第 4.5 节）
+                reason = self._stale_branch_reason(scope.run_id, recipient, branch_session_id) \
+                    or "branch failed to answer"
             def record_ask_unable(transaction: Transaction) -> None:
                 transaction.append(NewEvent(
                     EventType.ASK_ANSWERED,
@@ -1829,6 +1834,34 @@ class Orchestrator:
                 ))
             self.writes.transact(run_stream(scope.run_id), record_ask_unable)
             return False, None, reason, None, branch_steps
+
+    def _stale_branch_reason(self, run_id: str, department: str, branch_session_id: str) -> str | None:
+        # 分支会话开始时采用的工作依据与此刻的依据：变了就说明这个分支不能继续工作
+        # （设计说明第 5 节、第 9 节）。写明是哪一种变化，提问方拿到的原因才有内容
+        # （设计说明第 4.5 节）。
+        events = self.writes.read(run_stream(run_id)).events()
+        started = next((event for event in events
+                        if event.type == EventType.DEPARTMENT_ACTIVATED
+                        and event.session_id == branch_session_id), None)
+        if started is None:
+            return None
+        payload = started.payload or {}
+        basis = WorkBasis(
+            effective_contract_hash=payload.get("effective_contract_hash"),
+            input_version=int(payload.get("input_version") or 0),
+            guidance_version=int(payload.get("guidance_version") or 0),
+        )
+        current = WorkBasis.current(self.project(run_id), department)
+        if current.effective_contract_hash != basis.effective_contract_hash:
+            return ("the PRD was revised by another session while this branch was working; "
+                    "the basis of this branch is stale, so it could not answer")
+        if current.input_version != basis.input_version:
+            return ("new user input arrived while this branch was working; "
+                    "the basis of this branch is stale, so it could not answer")
+        if current.guidance_version > basis.guidance_version:
+            return ("new guidance arrived while this branch was working; "
+                    "the basis of this branch is stale, so it could not answer")
+        return None
 
     def _branch_steps(self, events: list[Any], branch_session_id: str) -> int:
         # 这个分支会话用掉的模型步数：分支里再问一层时，回问的分支是它的下一层，

@@ -2,11 +2,14 @@
 # 质检在预测性探索里按 PRD 起草测试用例，交付到达以后开始新一轮工作，核验并放行。
 # 取消与暂停作用于事项的全部会话。
 
+import uuid
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.environment import QA_TESTS_DIR
+from harness.event_store import Command
 from harness.models import EventType, json_dumps
+from harness.projection import saved_decisions
 from harness.proposals import delivery, delivery_turn, product_spec, review, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -174,3 +177,68 @@ def test_cancel_stops_every_session(tmp_path: Path) -> None:
     # 取消以后结束的会话都记着取消这个原因
     assert all(event.payload.get("stop_reason") == "cancelled"
                for event in finished if event.department != "product")
+
+
+def test_pause_and_continue_lets_each_session_resume_where_it_stopped(tmp_path: Path) -> None:
+    # 暂停以后继续，各会话从停下的位置接着工作（工单 #557 验收第 8 条）：
+    # 工程的会话连续只回复文字，运行以 no_tool_call 暂停；用户回答「继续」以后，
+    # 工程从停下的位置接着工作——它下一步的请求里已经有暂停以前做过的步骤，
+    # 交付里也有暂停以前写下的文件
+    def text_only(call):
+        return FakeTurn(transcript="我先想想。")
+
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        # 先写文件，再连续只回复文字（运行因此暂停），继续以后交付
+        "engineering": [
+            FakeTurn(writes={"src/echo.py": ECHO}),
+            text_only, text_only, text_only, text_only,
+            delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
+        ],
+        "quality": [_explore(), _release()],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build an echo CLI")
+    paused = system.run_until_stop(run_id)
+    assert (paused.status, paused.stop_reason) == ("paused", "no_tool_call")
+
+    events = _events(system, run_id)
+    # 暂停以前工程写过文件：这一步的结果在这个会话的历史里
+    written = [event for event in events
+               if event.type == EventType.TOOL_CALLED and event.department == "engineering"
+               and (event.payload or {}).get("name") == "write_file"]
+    assert written, "暂停以前工程没有写文件"
+    write_call_id = written[0].payload.get("id")
+
+    # 用户回答「处理以后继续执行」
+    _position, decisions = saved_decisions(system.store, statuses=("open",))
+    assert len(decisions) == 1, [decision.decision_id for decision in decisions]
+    [decision] = decisions
+    assert decision.request["kind"] == "no_tool_call"
+    command = Command(str(uuid.uuid4()), "decision.answer", "sha256:continue:1", "user:local")
+    system.orchestrator.answer_decision(decision.decision_id, "continue", None,
+                                        base_version=decision.version, command=command)
+    projection = system.run_until_stop(run_id)
+    assert projection.status == "done", projection.stop_reason
+
+    events = _events(system, run_id)
+    continued = next(event for event in events if event.type == EventType.RUN_CONTINUED)
+    # 继续以后工程又发了请求：这个请求里有暂停以前那一步的结果（会话从停下的位置接着工作）
+    resumed = [event for event in events
+               if event.type == EventType.MODEL_REQUESTED and event.department == "engineering"
+               and event.position > continued.position]
+    assert resumed, "继续以后工程没有接着工作"
+    request = next(call for call in adapter.invocations
+                   if call.department == "engineering"
+                   and call.activation_id == resumed[0].payload["activation_id"]
+                   and call.step_id == resumed[0].payload["step_id"])
+    outputs = [item for item in request.input_items
+               if isinstance(item, dict) and item.get("type") == "function_call_output"
+               and item.get("call_id") == write_call_id]
+    assert outputs, "继续以后的请求里没有暂停以前那一步的结果"
+    # 交付在继续以后到达，交付的内容是暂停以前写下的文件
+    accepted = [event for event in events if event.type == EventType.DELIVERY_ACCEPTED]
+    assert accepted, "继续以后没有交付"
+    assert accepted[0].position > continued.position
+    released = [event for event in events if event.type == EventType.QA_SUBMITTED]
+    assert released and released[0].payload.get("verdict") == "release"
