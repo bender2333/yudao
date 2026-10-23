@@ -662,7 +662,9 @@ test.describe("项目页面（1440×900）", () => {
       // 第一轮三部门各一次模型请求（#470 删工程计划以后没有 plan_turn）：共三条
       await expect(all.locator("tbody tr")).toHaveCount(3);
       await expect(all.locator("tbody tr").first()).toContainText("fake-script");
-      await expect(all.locator("tbody tr").first()).toContainText("未上报");
+      // 用量列（工单 #744）：列名是「用量」，与请求详情同一口径；预置项目的模型回答没有上报用量，写「未上报」
+      await expect(all.locator("thead th").nth(7)).toHaveText("用量");
+      await expect(all.locator("tbody tr").first().locator("td").nth(7)).toHaveText("未上报");
       // 关键词筛选：命中三条（请求的模型都是 fake-script）
       const keyword = record.locator("label.field").filter({ hasText: "关键词" }).locator("input");
       await keyword.fill("fake");
@@ -701,6 +703,8 @@ test.describe("项目页面（1440×900）", () => {
       await expect(detail.locator(".line", { hasText: "失败类型" }).locator(".value")).toHaveText("没有");
       await expect(detail).toContainText("结束原因");
       await expect(detail.locator(".line", { hasText: "结束原因" }).locator(".value")).toHaveText("未上报");
+      // 用量（工单 #744）：请求详情与请求记录表说的是同一件事，同样没有上报用量时都写「未上报」
+      await expect(detail.locator('.line:has(.term:text-is("用量")) .value')).toHaveText("未上报");
       // 工件引用（工单 #745）：这一行按项说，缺哪一项写哪一项没有，不是一句「未上报」盖住四项。
       // 预置项目的模型回答来自 FakeAdapter，没有留下工件，因此四项都是「未上报」；
       // 四项都在时的显示由客户端单元测试核对（那里给出的是工件引用的对象形状）。
@@ -718,9 +722,30 @@ test.describe("项目页面（1440×900）", () => {
       await expect(usage.locator("h3")).toHaveText("用量统计");
       await expect(usage.locator(".y10-usage-note")).toContainText("用量只读显示，不是事项的预算");
       await expect(usage).toContainText("请求数");
-      await expect(usage).toContainText("3（上报 0）");
+      // 「上报用量的请求」（工单 #744）：这个范围里上报了用量的请求数，一个都没有时写「未上报」
+      await expect(usage.locator('.line:has(.term:text-is("请求数")) .value')).toHaveText("3");
+      await expect(usage.locator('.line:has(.term:text-is("上报用量的请求")) .value')).toHaveText("未上报");
+      // 分组表同样给出这个数，页面上「上报了多少个」与请求记录里的显示对得上
+      await expect(await table(page, "按部门")).toContainText("上报用量的请求");
+      await expect(await table(page, "按模型")).toContainText("上报用量的请求");
       await expect(await table(page, "按部门")).toContainText("product");
       await expect(await table(page, "按模型")).toContainText("fake · fake-script");
+      // 另一个项目里那一次请求上报了用量（预置脚本给了它 100 输入与 20 输出）：
+      // 请求记录表与请求详情写出同一句话，用量统计说这个范围里有 1 个请求上报了用量（工单 #744）
+      const used = await projectId(page, "文本工具");
+      await gotoView(page, used, "observe");
+      const usedRecord = await section(page, "请求记录与用量");
+      await usedRecord.getByRole("tab", { name: "请求记录" }).click();
+      const usedTable = usedRecord.locator("table").first();
+      await expect(usedTable.locator("tbody tr").first().locator("td").nth(7)).toHaveText("总 120 token，输入 100，输出 20");
+      await usedTable.locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
+      await expect.poll(async () => pathText(page)).toBe("文本工具 / 请求详情");
+      const usedDetail = await section(page, "请求详情");
+      await expect(usedDetail.locator('.line:has(.term:text-is("用量")) .value')).toHaveText("总 120 token，输入 100，输出 20");
+      await usedDetail.getByRole("button", { name: "返回请求记录" }).click();
+      await expect.poll(async () => pathText(page)).toBe("文本工具 / 观测");
+      await usedRecord.getByRole("tab", { name: "用量统计" }).click();
+      await expect(usedRecord.locator('.line:has(.term:text-is("上报用量的请求")) .value')).toHaveText("1 个");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
