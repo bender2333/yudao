@@ -410,6 +410,25 @@ test("状态类动作到达时，排队的盖章先做完，状态类动作排�
   assert.deepEqual(queued, ["stamp_release", "done"], `队列：${queued.join("、")}`);
 });
 
+// 原型 v11 第 2 条：盖章排在普通动作后面时也不被状态类动作清掉
+test("状态类动作到达时，排在普通动作后面的盖章仍然先做完", () => {
+  const q = mountRoom("quality", QUA);
+  q.step(500);
+  const scene = q.driver.scene;
+  const actor = scene.actors.find((a) => a.id === "ch-q-test")!;
+  scene.run(actor, [{ t: "anim", name: "type", ms: 60000, key: true }, { t: "anim", name: "type", ms: 60000 }], { tail: 1 });
+  q.step(100);
+  // 先排一个工具类动作，再排盖章：盖章在队里但不在队首
+  q.driver.playEvent({ type: "tool_started", department: "quality", tool: "read_file", payload: { name: "a.py" } } as PixelFloorEvent);
+  q.driver.playEvent({ type: "qa_submitted", department: "quality", payload: { verdict: "release" } } as PixelFloorEvent);
+  const before = q.actor("q-test")!.queue.map((entry) => entry.action);
+  assert.deepEqual(before, ["read", "stamp_release"], `队列：${before.join("、")}`);
+  // 事项完成到达：普通的排队动作清掉，盖章留下并先做完，状态类动作排在它后面
+  q.driver.playEvent({ type: "run_done", department: "quality", payload: {} } as PixelFloorEvent);
+  const queued = q.actor("q-test")!.queue.map((entry) => entry.action);
+  assert.deepEqual(queued, ["stamp_release", "done"], `队列：${queued.join("、")}`);
+});
+
 // ---------------------------------------------------------------------------
 // 事件到动作的解析
 
