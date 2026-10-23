@@ -2945,6 +2945,48 @@
         }
       }
     },
+    "/api/queries/project.writeback": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "project.writeback",
+        "operationId": "query_project_writeback",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ProjectWritebackResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/run.export": {
       "get": {
         "tags": [
@@ -9401,6 +9443,28 @@
         ],
         "title": "ProjectSettingsResult"
       },
+      "ProjectWritebackResult": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/WritebackRecordView"
+            },
+            "type": "array",
+            "title": "Records"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "records"
+        ],
+        "title": "ProjectWritebackResult"
+      },
       "ProviderInput": {
         "properties": {
           "id": {
@@ -10816,6 +10880,24 @@
           "data"
         ],
         "title": "Snapshot[ProjectSettingsResult]"
+      },
+      "Snapshot_ProjectWritebackResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProjectWritebackResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ProjectWritebackResult]"
       },
       "Snapshot_ReplayCheckResult_": {
         "properties": {
@@ -12483,6 +12565,113 @@
           "project_id"
         ],
         "title": "WritebackExecute"
+      },
+      "WritebackRecordView": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "adoption_id": {
+            "type": "string",
+            "title": "Adoption Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "target_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Branch"
+          },
+          "pull_request_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pull Request Title"
+          },
+          "pull_request_local_only": {
+            "type": "boolean",
+            "title": "Pull Request Local Only",
+            "default": false
+          },
+          "target_commit": {
+            "type": "string",
+            "title": "Target Commit"
+          },
+          "final_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Tree Digest"
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conflicts",
+            "default": []
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "work_item_id",
+          "adoption_id",
+          "target_commit",
+          "created_at",
+          "event_id"
+        ],
+        "title": "WritebackRecordView"
       },
       "ActionVerifiedEvent": {
         "additionalProperties": false,

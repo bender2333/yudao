@@ -23,3 +23,15 @@ solo-minimax-M3.1-Flash / 2026-10-23 00:38 / 工单 #753 / 工单 #704（合并�
 处理：已在 docs/design/web-interface-and-release.md 第 5.1、6.1、6.3 节写明，由 #753 实现（solo-minimax-M3.1-Flash 2026-10-23）
 
 solo-minimax-M3.1-Flash / 2026-10-23 09:40 / 工单 #747 / 恢复观察状态按结束的方式分开以后（完成、暂停、取消、停止四种），原型 v9 与 v10 的恢复页与它的示例数据仍用旧的状态取值：`docs/prototypes/v10/js/ui/views/recovery.js` 与 v9 的同名文件里的 `STATES`／`STATE_LABEL`／`STATE_KIND` 写着运行中、中断、待核实、待恢复、已终止（`terminated` 画成 `cancelled`），示例数据里 `runs[...].recovery.state` 写的也是 `terminated`；客户端与服务端已经用新的七种状态（工单 #747），原型是界面对照与录制的基准（ADR-0021），于是原型的这一页与客户端不一致。改它要动两版的恢复页脚本、两版的合同处理器与六份示例数据，共十四个文件，超过运行配置第 7 节「只改」清单手写文件 15 个的上限（本工单还要改服务端、客户端与设计说明） / 已在本工单里把设计说明（`docs/prototypes/v8/design.md` 第 7.2 节与第 14 节、`docs/prototypes/v8/BUILD.md`）与客户端、服务端改到新口径；原型脚本与示例数据单独一张工单改，改的时候示例数据里 `terminated` 按真实情形分开写（完成的写 `completed`，取消的写 `cancelled`），并删掉早已不存在的「待核实」
+
+solo-minimax-M3.1-Flash / 2026-10-23 13:39 / 工单 #709 / 写回命令只把「项目找不到」「项目已归档」「没有可写回的对象」三种情况变成中文的拒绝（工单 #661 已经为第三种做过处理），写回目标不可用的三种情况没有接住：`harness/writeback.py` 在远端仓库路径不存在时抛 `FileNotFoundError`、那个路径不是 git 仓库时抛 `pygit2.GitError`、目标分支不存在时抛 `ValueError`，`harness/app/project_and_work_item_commands.py` 的 `_execute_writeback` 只接住前两种项目状态，这三种一路冒到接口层变成 500 内部错误，页面上什么也没发生 / 已在 `harness/writeback.py` 增加 `WritebackTargetUnavailable`（带着是哪一种与目标是什么），命令层按 `not_allowed` 给出中文说明；`harness/tests/test_issue_709.py` 覆盖目标分支不存在与目标仓库不存在两种
+处理：已在 #709 实现（solo-minimax-M3.1-Flash 2026-10-23）
+
+solo-minimax-M3.1-Flash / 2026-10-23 13:39 / 工单 #709 / 源目录登记的保存是整份替换：`harness/projects.py` 的 `configure_source_directory` 把没有给出的字段一律写成缺省值，而客户端的源目录表单只提交名称、路径与基准版本，用户在页面上改一次路径就把写回设置（是否打开、远端、目标分支）与写回检查的命令清空了。写回检查的命令只有服务端能填，界面上没有入口 / 表单补上写回的三项设置，保存时把写回检查的命令与凭据引用按原来的值写回；写回检查的命令的界面入口另开工单
+处理：已在 #709 实现（solo-minimax-M3.1-Flash 2026-10-23）；写回检查命令的界面入口另开工单
+
+solo-minimax-M3.1-Flash / 2026-10-23 13:39 / 工单 #709 / 写回的结果没有查询可以读：`project.overview`、`project.flow` 与 `project.settings` 都不返回写回记录，项目投影里的写回记录只进了控制核心，界面拿不到。因此页面上既看不出成果有没有回到仓库，刷新以后连刚才的结果也留不住 / 新增查询 `project.writeback`（写回记录：状态、停止原因、推送的分支、目标分支、合并请求、冲突的文件、发生的时间），项目设置页与概览页都按它显示；接口快照与客户端类型按合同重新生成
+处理：已在 #709 实现（solo-minimax-M3.1-Flash 2026-10-23）
+
+solo-minimax-M3.1-Flash / 2026-10-23 13:39 / 工单 #709 / 接入已有项目设计说明第 5 节写「写回的结果写成事件，列在事项详情里」，界面上没有事项详情这个位置（事项的内容在部门工作间里），写回的结果因此没有落点 / 写回的结果改为列在项目设置页的「成果写回」一节里，概览页的「当前成果」给出这一次采纳有没有写回；设计说明按此改写，与代码一致
+处理：已在 #709 改写 docs/design/existing-project-onboarding.md 第 5 节（solo-minimax-M3.1-Flash 2026-10-23）

@@ -186,4 +186,5 @@
 "test_writeback.py" = "module"
 "test_issue_562.py" = "integration"
 "test_issue_669.py" = "module"
+"test_issue_709.py" = "module"
 "test_issue_740.py" = "integration"

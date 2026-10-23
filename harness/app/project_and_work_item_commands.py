@@ -18,6 +18,7 @@ from ..projects import (
     DepartmentSettingConflict, ProjectArchivedError, ProjectNotFoundError,
     SourceDirectoryConflict, WorkItemInProgressError,
 )
+from ..writeback import WritebackTargetUnavailable
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Text
 from .registry import CommandDefinition
@@ -401,6 +402,15 @@ class WritebackExecute(CommandRequest):
     adoption_id: str | None = None
 
 
+def _writeback_target_message(missing: WritebackTargetUnavailable) -> str:
+    # 写回的目标不可用：三种都是源目录登记里的配置问题，说明写清是哪一处（工单 #709）
+    if missing.reason == "remote_missing":
+        return f"写回的目标仓库不存在：{missing.target}"
+    if missing.reason == "not_a_repository":
+        return f"写回的目标不是 git 仓库：{missing.target}"
+    return f"写回的目标分支不存在：{missing.target}"
+
+
 async def _execute_writeback(application: "Application", command: Command,
                              request: WritebackExecute) -> None:
     try:
@@ -410,6 +420,8 @@ async def _execute_writeback(application: "Application", command: Command,
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     except ProjectArchivedError as archived:
         raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
+    except WritebackTargetUnavailable as unavailable:
+        raise Rejection("not_allowed", _writeback_target_message(unavailable)) from unavailable
     if result is None:
         # 没有可写回的对象是一种正常情况，按设计不写回（工单 #661）：
         # 以前这里什么都不做，命令没有在写路径上登记，接口层回 500，用户看不到理由。

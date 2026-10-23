@@ -25,6 +25,7 @@ import { Timeline } from "../timeline/timeline";
 import { ticksOf } from "../timeline/logic";
 import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, formatTime, label, phaseLabel } from "./labels";
 import { RestartOnboarding } from "./restart-onboarding";
+import { WritebackState } from "./writeback";
 import { BOARD_TITLES, boardColumns } from "./board";
 import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
 
@@ -77,7 +78,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
         <p className="y10-note note" role="status">{readFailureText(overview.error)}</p>
       ) : data ? (
         <>
-          <Summary data={data} />
+          <Summary app={props.app} projectId={projectId} data={data} />
           <Section
             id="ov-loop"
             title="循环画面"
@@ -119,7 +120,7 @@ function atTimeOf(report: AwayReport | null, at: number): string | null {
   return report.facts.find((fact) => fact.position === at)?.at ?? report.range.from_at;
 }
 
-function Summary(props: { data: ProjectOverviewResult }) {
+function Summary(props: { app: ClientApp; projectId: string; data: ProjectOverviewResult }) {
   const adoption = props.data.current_adoption;
   const baseline = adoption !== null && adoption.onboarding_baseline;
   return (
@@ -133,6 +134,15 @@ function Summary(props: { data: ProjectOverviewResult }) {
               {show(adoption.summary, "没有摘要")}（采纳于 {formatTime(adoption.adopted_at)}，
               文件 {adoption.files.length} 项，检查 {adoption.check_names.length} 项，已知风险 {adoption.known_risks.length} 项）
             </span>
+          )],
+          // 写回状态（工单 #709）：采纳以后成果有没有回到仓库，没有写回时给出到设置页的入口
+          ["写回", adoption === null ? "尚未采纳，没有需要写回的成果" : (
+            <WritebackState
+              app={props.app}
+              projectId={props.projectId}
+              adoptionId={adoption.adoption_id}
+              onboardingBaseline={baseline}
+            />
           )],
           // 接入已有项目时的建档基线（工单 #138，设计第 3.4 节）：快照来源与现有缺陷数
           ...(baseline ? [

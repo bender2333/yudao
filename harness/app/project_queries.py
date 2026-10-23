@@ -1829,6 +1829,59 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
 
 
 # ---------------------------------------------------------------------------
+# project.writeback
+
+class ProjectWriteback(Contract):
+    project_id: str
+
+
+class WritebackRecordView(Contract):
+    # 一次写回的结果（工单 #709）：状态与停止原因、推送的分支、目标分支、合并请求、冲突的文件路径
+    status: str
+    work_item_id: str
+    adoption_id: str
+    reason: str | None = None
+    branch: str | None = None
+    target_branch: str | None = None
+    pull_request_title: str | None = None
+    # 合并请求还只是本地记录，没有在代码托管平台上创建（自举试点的已知边界）
+    pull_request_local_only: bool = False
+    target_commit: str
+    final_tree_digest: str | None = None
+    conflicts: list[str] = []
+    created_at: str
+    event_id: str
+
+
+class ProjectWritebackResult(Contract):
+    project_id: str
+    # 最近的写回在前：界面显示最近一次的结果
+    records: list[WritebackRecordView]
+
+
+def _project_writeback(application: Application, request: ProjectWriteback) -> Snapshot[ProjectWritebackResult]:
+    store = application.system.store
+    state = _project(application, request.project_id, include_history=False)
+    records: list[WritebackRecordView] = []
+    for record in reversed(state.writebacks):
+        pull_request = record.pull_request or {}
+        records.append(WritebackRecordView(
+            status=record.status, work_item_id=record.work_item_id, adoption_id=record.adoption_id,
+            reason=record.reason, branch=record.branch,
+            target_branch=pull_request.get("target_branch"),
+            pull_request_title=pull_request.get("title"),
+            pull_request_local_only=pull_request.get("status") == "local_test_boundary",
+            target_commit=record.target_commit, final_tree_digest=record.final_tree_digest,
+            conflicts=[str(item.get("path", "")) for item in record.conflicts],
+            created_at=record.created_at, event_id=record.event_id,
+        ))
+    return Snapshot[ProjectWritebackResult](
+        position=store.end_position(),
+        data=ProjectWritebackResult(project_id=state.project_id, records=records),
+    )
+
+
+# ---------------------------------------------------------------------------
 # run.export 与 replay.check
 
 
@@ -2153,6 +2206,14 @@ RUN_EXPORT = QueryDefinition(
     name="run.export", request=RunExport, result=RunExportResult, handle=_run_export, changed_by=(),
 )
 
+PROJECT_WRITEBACK = QueryDefinition(
+    name="project.writeback", request=ProjectWriteback, result=ProjectWritebackResult, handle=_project_writeback,
+    # 写回的五种结果事件：写回完成以后页面上那一节自己更新（工单 #709）
+    changed_by=(ProjectEventType.WRITEBACK_COMPLETED, ProjectEventType.WRITEBACK_STOPPED,
+                ProjectEventType.WRITEBACK_NOT_NEEDED, ProjectEventType.WRITEBACK_HELD,
+                ProjectEventType.WRITEBACK_VERIFIED),
+)
+
 REPLAY_CHECK = QueryDefinition(
     name="replay.check", request=ReplayCheck, result=ReplayCheckResult, handle=_replay_check, changed_by=(),
 )
@@ -2429,5 +2490,5 @@ RUN_RECOVERY = QueryDefinition(
 PROJECT_QUERIES = (
     PROJECTS_LIST, PROJECT_OVERVIEW, PROJECT_LOOP, PROJECT_FLOW, WORK_ITEM_INPUTS, EVENT_DETAIL,
     DEPARTMENT_WORKSPACE, RUN_ACTIONS, RUN_ASKS, WORK_ITEM_MATERIALS, DELIVERY_FILE, PROJECT_ATTEMPTS, PROJECT_USAGE,
-    RUN_ATTEMPT, PROJECT_SETTINGS, RUN_EXPORT, REPLAY_CHECK, RUN_RECOVERY,
+    RUN_ATTEMPT, PROJECT_SETTINGS, PROJECT_WRITEBACK, RUN_EXPORT, REPLAY_CHECK, RUN_RECOVERY,
 )

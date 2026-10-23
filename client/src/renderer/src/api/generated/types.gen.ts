@@ -3383,6 +3383,20 @@ export type ProjectSettingsResult = {
 };
 
 /**
+ * ProjectWritebackResult
+ */
+export type ProjectWritebackResult = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Records
+     */
+    records: Array<WritebackRecordView>;
+};
+
+/**
  * ProviderInput
  */
 export type ProviderInput = {
@@ -4230,6 +4244,17 @@ export type SnapshotProjectSettingsResult = {
      */
     position: number;
     data: ProjectSettingsResult;
+};
+
+/**
+ * Snapshot[ProjectWritebackResult]
+ */
+export type SnapshotProjectWritebackResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ProjectWritebackResult;
 };
 
 /**
@@ -5171,6 +5196,64 @@ export type WritebackExecute = {
      * Adoption Id
      */
     adoption_id?: string | null;
+};
+
+/**
+ * WritebackRecordView
+ */
+export type WritebackRecordView = {
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Adoption Id
+     */
+    adoption_id: string;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Branch
+     */
+    branch?: string | null;
+    /**
+     * Target Branch
+     */
+    target_branch?: string | null;
+    /**
+     * Pull Request Title
+     */
+    pull_request_title?: string | null;
+    /**
+     * Pull Request Local Only
+     */
+    pull_request_local_only?: boolean;
+    /**
+     * Target Commit
+     */
+    target_commit: string;
+    /**
+     * Final Tree Digest
+     */
+    final_tree_digest?: string | null;
+    /**
+     * Conflicts
+     */
+    conflicts?: Array<string>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Event Id
+     */
+    event_id: string;
 };
 
 /**
@@ -17617,6 +17700,36 @@ export type QueryProjectSettingsResponses = {
 };
 
 export type QueryProjectSettingsResponse = QueryProjectSettingsResponses[keyof QueryProjectSettingsResponses];
+
+export type QueryProjectWritebackData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    url: '/api/queries/project.writeback';
+};
+
+export type QueryProjectWritebackErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryProjectWritebackError = QueryProjectWritebackErrors[keyof QueryProjectWritebackErrors];
+
+export type QueryProjectWritebackResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotProjectWritebackResult;
+};
+
+export type QueryProjectWritebackResponse = QueryProjectWritebackResponses[keyof QueryProjectWritebackResponses];
 
 export type QueryRunExportData = {
     body?: never;
