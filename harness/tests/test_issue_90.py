@@ -182,7 +182,11 @@ def test_connection_address_change_lists_impact_and_returns_definitions_to_candi
             assert {item["department"] for item in impact["project_settings"]} == {"engineering"}
             assert {item["project_id"] for item in impact["work_items"]} == {project_a}
             assert {item["work_item_id"] for item in impact["work_items"]} == {item_a.work_item_id}
-            assert {item["department"] for item in impact["work_items"]} == {"engineering"}
+            # 影响列表里的进行中事项写出它当前所在的部门（工单 #557：同时运行的会话下，
+            # 事项当前所在的部门是最后激活的那一个会话的部门；设计说明第 4.4 节只写
+            # 「正在使用它们的进行中事项」，部门这一项的口径由架构师定，已登记在 docs/architecture-issues.md）
+            assert {item["department"] for item in impact["work_items"]} == {item_a.department}
+            assert item_a.department in {"engineering", "quality"}
             assert impact["revision"] == document["revision"]
 
             saved = _post(client, "catalog.connection.save", base_version=impact["revision"],

@@ -45,11 +45,17 @@ def _happy() -> list[dict]:
     return [_product_turn(), _structure_turn(), _review_turn()]
 
 
+def _sessions(product: list[dict], engineering: list[dict], quality: list[dict]) -> dict:
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {"product": product, "engineering": engineering, "quality": quality}
+
+
 
 def _check_action(run) -> str:
     # 那个逻辑动作的编号（工程部在这一次激活里跑检查）
+    # 同时运行的会话各自跑自己的检查（工单 #557）：只认工程部门的那一次
     started = [event.payload for event in run.before_events if event.type == EventType.TOOL_STARTED
-               and event.payload.get("name") == "run_check"]
+               and event.payload.get("name") == "run_check" and event.department == "engineering"]
     assert started, "建档中的 run_check 没有被执行"
     return str(started[-1]["id"])
 
@@ -78,7 +84,9 @@ def test_a_killed_onboarding_check_is_retried_and_the_round_finishes(tmp_path):
     signals.mkdir()
     blocking = {"smoke": {"command": run_wait_command(signals)}}
     # 产品的规格以后是带着阻塞检查的结构说明：进程在这个检查的进程里被终止
-    script = [_product_turn(), _structure_turn(blocking)]
+    # 脚本按部门给出（工单 #557）：质检在 PRD 被接纳以后与工程同时开始一轮工作，
+    # 它的结论这时没有结构说明可以核验，被拒绝
+    script = _sessions([_product_turn()], [_structure_turn(blocking)], [_review_turn()])
 
     # 第一次：检查的真实进程开始运行以后终止
     first = killed.interrupted(data_dir, script, task=GOAL, onboard=_source(tmp_path / "source"),
@@ -90,7 +98,8 @@ def test_a_killed_onboarding_check_is_retried_and_the_round_finishes(tmp_path):
     # 重启：放行检查，启动恢复自动重新执行它（用记录下来的 argv），跑完以后结构说明重新提交，
     # 基线核验的回答由恢复的脚本给出；子进程直接运行到停止
     (signals / "release").write_text("go", encoding="utf-8")
-    second = killed.restarted(data_dir, [_structure_turn(), _review_turn()], resume_after=False)
+    second = killed.restarted(data_dir, _sessions([], [_structure_turn()], [_review_turn(), _review_turn()]),
+                              resume_after=False)
     verified = [e for e in killed.events(second.after, first.run_id, "action_verified")
                 if (e.payload or {}).get("id") == action_id]
     assert len(verified) == 1, "结果未知的检查交还会话"

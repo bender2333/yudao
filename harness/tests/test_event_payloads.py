@@ -8,12 +8,13 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import Command, catalog_stream
 from harness.models import ArtifactRef, CatalogEventType, EventType, ProjectEventType
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec
 from harness.providers.selection import ModelSelection
 from harness.public_tree import CapturedFile, CapturedTree
 from harness.release_check import ReleaseCheckReport, request_instance_upgrade
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
+from harness.tests.helpers import merge_scripts, quality_turns
 from harness.tree_archive import artifact_run, load_tree
 from harness.write_path import NewCatalogEvent
 
@@ -25,8 +26,13 @@ _PASS_COMMAND = f'"{sys.executable}" -c "import sys; sys.exit(0)"'
 
 
 def _release_script(summary, files=None):
-    return [product_spec(), delivery_turn(summary=summary, files=files, checks={_PASS_COMMAND: 0}),
-            review_turn("release", f"ok {summary}")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary=summary, files=files, checks={_PASS_COMMAND: 0})],
+        # 质检在交付到达以前有一轮预测性探索，到达以后才核验（quality_turns 按这一轮开始时有没有交付决定做什么）
+        "quality": quality_turns("release", f"ok {summary}"),
+    }
 
 def _release_report() -> ReleaseCheckReport:
     # 一次通过的发布检查结果：与 harness/release_check.py 写进决定请求的同一形状
@@ -126,10 +132,10 @@ def _produce_writeback_events(system, projects, project_id, base_version, adopti
     assert stopped.type == ProjectEventType.WRITEBACK_STOPPED
 
 def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([
-        *_release_script("A"), *_release_script("B", files={"src/echo.py": "print('B')\n"}),
-        *_release_script("C", files={"src/echo.py": "print('C')\n"}),
-    ]))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(merge_scripts(
+        _release_script("A"), _release_script("B", files={"src/echo.py": "print('B')\n"}),
+        _release_script("C", files={"src/echo.py": "print('C')\n"}),
+    )))
     projects = system.projects
     project_id = projects.register("载荷", "核对每种事件的载荷")
     projects.rename(project_id, "载荷核对")

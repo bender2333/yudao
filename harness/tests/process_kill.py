@@ -554,7 +554,9 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]] | Mapping[str, Se
     work = data_dir.parent
     log = work / f"restart-{restart_round}.log"
     script_file = work / f"restart-script-{restart_round}.json"
-    script_file.write_text(json.dumps(list(script), ensure_ascii=False), encoding="utf-8")
+    # 脚本按会话给出时是一个字典（工单 #557），按队列给出时是一个列表
+    script_file.write_text(json.dumps(script if isinstance(script, Mapping) else list(script),
+                                     ensure_ascii=False), encoding="utf-8")
     hold_dir = work / f"hold-{restart_round}"
     hold_dir.mkdir(exist_ok=True)
     process = _spawn(data_dir, script_file, "restart", log, resume_only=True,

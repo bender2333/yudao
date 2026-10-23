@@ -248,11 +248,16 @@ def test_structure_requires_activation_receipt(tmp_path):
 
 def test_structure_rejects_requirement_coverage_mismatch(tmp_path):
     # requirement_locations 必须恰好覆盖当前初始 PRD 的每条要求
-    system, run_id = _onboarding_run(tmp_path, [
-        _product_turn(),
-        structure_turn(requirement_locations=[{"requirement": "a requirement that is not in the PRD",
-                                               "locations": ["src/echo.py"]}]),
-    ])
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system, run_id = _onboarding_run(tmp_path, {
+        "product": [_product_turn()],
+        "engineering": [
+            structure_turn(requirement_locations=[{"requirement": "a requirement that is not in the PRD",
+                                                   "locations": ["src/echo.py"]}]),
+        ],
+        # 质检在 PRD 被接纳以后与工程同时开始一轮工作（工单 #557）：结构说明还没有被接纳，这一轮提交的结论被拒绝
+        "quality": [_review_turn()],
+    })
     system.run_until_stop(run_id)
     events = [event.type for event in system.store.list_events(run_id)]
     assert EventType.STRUCTURE_ACCEPTED not in events

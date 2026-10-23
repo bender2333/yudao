@@ -15,6 +15,7 @@ from harness.projection import saved_decisions
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.streams import PRIORITY_UPGRADE_RESTART, STOP_REASON_UPGRADE
 from harness.tests.api_helpers import running_api
+from harness.tests.helpers import merge_scripts
 from harness.tests.onboarding_project import (
     ONBOARDING_GOAL as GOAL,
     ONBOARDING_REQUIREMENT as REQUIREMENT,
@@ -31,22 +32,35 @@ NOTE = "现有 CLI 还没有 --help，初始 PRD 要把这个用法说明写进�
 SECOND_REQUIREMENT = "the CLI explains its usage when started with --help"
 
 
-def _round(requirements: list[str]) -> list:
+def _round(requirements: list[str]) -> dict:
     # 一轮建档的三个部门：产品写初始 PRD、工程写结构说明、质检核验
-    return [
-        FakeTurn(proposal=product_spec(requirements=requirements, acceptance=["run the CLI with a word"])),
-        structure_turn(requirement_locations=[{"requirement": item, "locations": ["src/echo.py"]}
-                                               for item in requirements]),
-        baseline_review_turn(conclusions=[{"requirement": item, "status": "verified", "evidence": "smoke"}
-                                          for item in requirements]),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    conclusions = [{"requirement": item, "status": "verified", "evidence": "smoke"} for item in requirements]
+    return {
+        "product": [FakeTurn(proposal=product_spec(requirements=requirements,
+                                                   acceptance=["run the CLI with a word"]))],
+        "engineering": [structure_turn(requirement_locations=[{"requirement": item, "locations": ["src/echo.py"]}
+                                                            for item in requirements])],
+        # 质检在 PRD 被接纳以后与工程同时开始一轮工作（工单 #557）：这一轮还没有结构说明可以核验，
+        # 提交的结论被拒绝（结论覆盖的不是当前 PRD 的要求）；结构说明被接纳以后质检开始新一轮核验
+        "quality": [
+            baseline_review_turn(conclusions=[{"requirement": "a requirement that is not in the PRD",
+                                               "status": "verified", "evidence": "smoke"}]),
+            baseline_review_turn(conclusions=conclusions),
+        ],
+    }
 
 
-def _blocked_onboarding(requirements: list[str]) -> list:
+def _blocked_onboarding(requirements: list[str]) -> dict:
     # 建档第一轮的前半：产品提交规格以后工程部门的请求失败，run 停在非终态，可以发起强制升级
-    return [FakeTurn(proposal=product_spec(requirements=requirements,
-                                           acceptance=["run the CLI with a word"])),
-            ProviderError("Missing configuration: provider credential", reason="provider_unavailable")]
+    return {
+        "product": [FakeTurn(proposal=product_spec(requirements=requirements,
+                                                   acceptance=["run the CLI with a word"]))],
+        "engineering": [ProviderError("Missing configuration: provider credential", reason="provider_unavailable")],
+        # 质检在 PRD 被接纳以后与工程同时开始一轮工作（工单 #557）：这一轮没有结构说明可以核验，结论被拒绝
+        "quality": [baseline_review_turn(conclusions=[{"requirement": item, "status": "verified", "evidence": "smoke"}
+                                                      for item in requirements])],
+    }
 
 
 def _answer(client, decision: dict, option: str, note: str | None = None):
@@ -109,7 +123,7 @@ def test_starting_from_an_older_version_can_confirm_the_candidate(data_dir, tmp_
 def test_starting_from_an_older_version_can_ask_for_a_revision(data_dir, tmp_path):
     # 验收四（提出修改）：同样用较早 run 事件版本的数据目录启动，提出修改以后开始第二轮 run，
     # 第二轮带这一轮的候选与修改意见
-    opened = _Opened(data_dir, turns=[*_round([REQUIREMENT]), *_round([SECOND_REQUIREMENT])])
+    opened = _Opened(data_dir, turns=merge_scripts(_round([REQUIREMENT]), _round([SECOND_REQUIREMENT])))
     with running_api(opened) as client:
         refs = _onboard(client, tmp_path)
         opened.system.close()
@@ -162,7 +176,7 @@ def test_force_upgrade_restarts_the_first_onboarding_round_from_the_snapshot(dat
 def test_force_upgrade_restarts_the_revision_round_with_the_same_candidate_and_note(data_dir, tmp_path):
     # 验收五（修改轮）：强制升级时进行中的建档修改轮 run 记为因升级停止，新 run 带同一份上一轮候选与修改意见，
     # 轮次不变（仍为 2）
-    opened = _Opened(data_dir, turns=[*_round([REQUIREMENT]), *_blocked_onboarding([SECOND_REQUIREMENT])])
+    opened = _Opened(data_dir, turns=merge_scripts(_round([REQUIREMENT]), _blocked_onboarding([SECOND_REQUIREMENT])))
     with running_api(opened) as client:
         refs = _onboard(client, tmp_path)
         first_candidate = next(event for event in opened.system.store.list_project_events(refs["project_id"])

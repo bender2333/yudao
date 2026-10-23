@@ -399,8 +399,13 @@ def test_work_item_creation_model_requests_and_proposal_decisions_record_the_def
         if event.type in recorded:
             counts[event.type] += 1
             assert event.payload["definitions_version"] == DEFINITIONS.version, event.type
-    assert counts == {EventType.RUN_CREATED: 1, EventType.MODEL_REQUESTED: 4,
-                      EventType.PROPOSAL_SUBMITTED: 4, EventType.PROPOSAL_REJECTED: 1}
+    assert counts[EventType.RUN_CREATED] == 1
+    # 每次模型请求都提交了一个提案（工单 #557：质检的预测性探索也提交一个结论，没有交付可以核验，被拒绝）
+    assert counts[EventType.MODEL_REQUESTED] == counts[EventType.PROPOSAL_SUBMITTED]
+    # 提交过的提案被拒绝两次：产品那次无效的规格，质检预测性探索里没有交付可以核验的结论
+    rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
+    assert len(rejected) == 2
+    assert {event.department for event in rejected} == {"product", "quality"}
     system.close()
 
 
