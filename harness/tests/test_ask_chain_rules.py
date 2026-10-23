@@ -25,7 +25,7 @@ def _chain(depth: int) -> RunProjection:
         }
         for index in range(depth)
     ]
-    return RunProjection(run_id="run_test", phase="ENGINEERING", ask_stack=stack)
+    return RunProjection(run_id="run_test", status="running", ask_stack=stack)
 
 
 def _permission(projection: RunProjection, session_id: str):

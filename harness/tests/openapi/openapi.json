@@ -6849,7 +6849,7 @@
             ],
             "title": "Run Id"
           },
-          "phase": {
+          "run_status": {
             "anyOf": [
               {
                 "type": "string"
@@ -6858,7 +6858,7 @@
                 "type": "null"
               }
             ],
-            "title": "Phase"
+            "title": "Run Status"
           },
           "status": {
             "anyOf": [
@@ -6945,7 +6945,7 @@
           "department",
           "work_item_id",
           "run_id",
-          "phase",
+          "run_status",
           "status",
           "stop_reason",
           "active",
@@ -8781,22 +8781,6 @@
               "workspace_unrepresentable"
             ],
             "title": "Stop Reason"
-          },
-          "resumed_at_phase": {
-            "type": "string",
-            "enum": [
-              "CREATED",
-              "PRODUCT_SPEC",
-              "ENGINEERING",
-              "DELIVERY",
-              "QUALITY",
-              "REWORK_PRODUCT",
-              "REWORK_ENGINEERING",
-              "DONE",
-              "PAUSED",
-              "FAILED"
-            ],
-            "title": "Resumed At Phase"
           }
         },
         "additionalProperties": false,
@@ -8808,8 +8792,7 @@
           "description",
           "facts",
           "department",
-          "stop_reason",
-          "resumed_at_phase"
+          "stop_reason"
         ],
         "title": "PauseRequested"
       },
@@ -12084,16 +12067,15 @@
             ],
             "title": "Department"
           },
-          "phase": {
+          "progress": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/WorkItemProgress"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Phase"
+            ]
           },
           "round": {
             "type": "integer",
@@ -12167,7 +12149,7 @@
           "created_at",
           "status",
           "department",
-          "phase",
+          "progress",
           "round",
           "stop_reason",
           "human_action",
@@ -12289,16 +12271,15 @@
             ],
             "title": "Department"
           },
-          "phase": {
+          "progress": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/WorkItemProgress"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Phase"
+            ]
           },
           "round": {
             "type": "integer",
@@ -12381,7 +12362,7 @@
           "color_index",
           "status",
           "department",
-          "phase",
+          "progress",
           "round",
           "started_at",
           "elapsed_sec",
@@ -12460,6 +12441,64 @@
           "onboarding_rounds"
         ],
         "title": "WorkItemMaterialsResult"
+      },
+      "WorkItemProgress": {
+        "properties": {
+          "product_spec_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Spec Revision"
+          },
+          "delivery_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Revision"
+          },
+          "delivery_product_spec_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Product Spec Revision"
+          },
+          "conclusion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conclusion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "product_spec_revision",
+          "delivery_revision",
+          "delivery_product_spec_revision",
+          "conclusion"
+        ],
+        "title": "WorkItemProgress",
+        "description": "事项的进度：从成果推算（循环结构第 2 节）。\n\n阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、\n最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。"
       },
       "WorkItemRefs": {
         "properties": {
@@ -27524,28 +27563,11 @@
             ],
             "title": "Stop Reason",
             "type": "string"
-          },
-          "resumed_at_phase": {
-            "enum": [
-              "CREATED",
-              "PRODUCT_SPEC",
-              "ENGINEERING",
-              "DELIVERY",
-              "QUALITY",
-              "REWORK_PRODUCT",
-              "REWORK_ENGINEERING",
-              "DONE",
-              "PAUSED",
-              "FAILED"
-            ],
-            "title": "Resumed At Phase",
-            "type": "string"
           }
         },
         "required": [
           "decision_id",
-          "stop_reason",
-          "resumed_at_phase"
+          "stop_reason"
         ],
         "title": "RunContinuedPayload",
         "type": "object"
@@ -28396,22 +28418,6 @@
             ],
             "title": "Message"
           },
-          "paused_at_phase": {
-            "enum": [
-              "CREATED",
-              "PRODUCT_SPEC",
-              "ENGINEERING",
-              "DELIVERY",
-              "QUALITY",
-              "REWORK_PRODUCT",
-              "REWORK_ENGINEERING",
-              "DONE",
-              "PAUSED",
-              "FAILED"
-            ],
-            "title": "Paused At Phase",
-            "type": "string"
-          },
           "cycle_count": {
             "title": "Cycle Count",
             "type": "integer"
@@ -28428,7 +28434,6 @@
         "required": [
           "stop_reason",
           "human_action",
-          "paused_at_phase",
           "cycle_count",
           "max_cycles",
           "token_used"
@@ -31517,213 +31522,6 @@
         "title": "ToolStartedPayload",
         "type": "object"
       },
-      "TransitionEvent": {
-        "additionalProperties": false,
-        "properties": {
-          "position": {
-            "title": "Position",
-            "type": "integer"
-          },
-          "previous": {
-            "title": "Previous",
-            "type": "integer"
-          },
-          "event_id": {
-            "title": "Event Id",
-            "type": "string"
-          },
-          "at": {
-            "format": "date-time",
-            "title": "At",
-            "type": "string"
-          },
-          "stream": {
-            "title": "Stream",
-            "type": "string"
-          },
-          "stream_version": {
-            "title": "Stream Version",
-            "type": "integer"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
-          "work_item_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Work Item Id"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Run Id"
-          },
-          "department": {
-            "anyOf": [
-              {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department"
-          },
-          "role": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Role"
-          },
-          "actor": {
-            "title": "Actor",
-            "type": "string"
-          },
-          "command_id": {
-            "anyOf": [
-              {
-                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Command Id"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "type": {
-            "const": "transition",
-            "title": "Type",
-            "type": "string"
-          },
-          "payload": {
-            "$ref": "#/components/schemas/TransitionPayload"
-          }
-        },
-        "required": [
-          "position",
-          "previous",
-          "event_id",
-          "at",
-          "stream",
-          "stream_version",
-          "project_id",
-          "work_item_id",
-          "run_id",
-          "department",
-          "role",
-          "actor",
-          "command_id",
-          "label",
-          "type",
-          "payload"
-        ],
-        "title": "TransitionEvent",
-        "type": "object"
-      },
-      "TransitionPayload": {
-        "additionalProperties": false,
-        "properties": {
-          "from": {
-            "enum": [
-              "CREATED",
-              "PRODUCT_SPEC",
-              "ENGINEERING",
-              "DELIVERY",
-              "QUALITY",
-              "REWORK_PRODUCT",
-              "REWORK_ENGINEERING",
-              "DONE",
-              "PAUSED",
-              "FAILED"
-            ],
-            "title": "From",
-            "type": "string"
-          },
-          "to": {
-            "enum": [
-              "CREATED",
-              "PRODUCT_SPEC",
-              "ENGINEERING",
-              "DELIVERY",
-              "QUALITY",
-              "REWORK_PRODUCT",
-              "REWORK_ENGINEERING",
-              "DONE",
-              "PAUSED",
-              "FAILED"
-            ],
-            "title": "To",
-            "type": "string"
-          },
-          "route": {
-            "title": "Route",
-            "type": "string"
-          },
-          "yielded_work_resolved": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Yielded Work Resolved"
-          },
-          "yielded_work": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/YieldedWork"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "from",
-          "to",
-          "route"
-        ],
-        "title": "TransitionPayload",
-        "type": "object"
-      },
       "Usage": {
         "additionalProperties": false,
         "properties": {
@@ -33798,22 +33596,6 @@
       "YieldedWork": {
         "additionalProperties": false,
         "properties": {
-          "phase": {
-            "enum": [
-              "CREATED",
-              "PRODUCT_SPEC",
-              "ENGINEERING",
-              "DELIVERY",
-              "QUALITY",
-              "REWORK_PRODUCT",
-              "REWORK_ENGINEERING",
-              "DONE",
-              "PAUSED",
-              "FAILED"
-            ],
-            "title": "Phase",
-            "type": "string"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -33838,7 +33620,6 @@
           }
         },
         "required": [
-          "phase",
           "effective_contract_hash",
           "delivery_spec_hash"
         ],
@@ -33923,7 +33704,6 @@
             "tool_called": "#/components/schemas/ToolCalledEvent",
             "tool_skipped": "#/components/schemas/ToolSkippedEvent",
             "tool_started": "#/components/schemas/ToolStartedEvent",
-            "transition": "#/components/schemas/TransitionEvent",
             "user_input_received": "#/components/schemas/UserInputReceivedEvent",
             "work_item_created": "#/components/schemas/WorkItemCreatedEvent",
             "work_item_start_failed": "#/components/schemas/WorkItemStartFailedEvent",
@@ -34049,9 +33829,6 @@
           },
           {
             "$ref": "#/components/schemas/LessonCandidateRecordedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/TransitionEvent"
           },
           {
             "$ref": "#/components/schemas/RunDoneEvent"

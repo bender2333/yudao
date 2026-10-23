@@ -7,6 +7,7 @@ import json
 import uuid
 from dataclasses import asdict
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.decision_commands import DecisionAnswer
@@ -49,7 +50,7 @@ def _engineering_run(data_dir, script):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     project_id, _work_item_id, run_id = _work_item_run(system, "被中断的事项")
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     return system, project_id, run_id
 
 def _lost_write(system, run_id, *, tool="write_file", action_id="lost-write"):
@@ -59,7 +60,7 @@ def _lost_write(system, run_id, *, tool="write_file", action_id="lost-write"):
                                media_type="application/json")
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
+        state_before="running", state_after="running",
         payload={"id": action_id, "name": tool, "args": {"path": "src/a.py", "content": "A"},
                  "step_id": 1, "activation_id": "act_" + action_id, "attempt": 1, "purpose": "work",
                  "before_snapshot_ref": asdict(ref)}))
@@ -139,7 +140,7 @@ def test_a_finished_run_is_observed_as_completed(data_dir):
         product_spec(),delivery_turn(), review_turn("release", "checks passed on the snapshot")]))
     _project_id, _work_item_id, run_id = _work_item_run(system, "要完成的事项")
     system.run_until_stop(run_id)
-    assert system.project(run_id).phase == "DONE"
+    assert system.project(run_id).status == "done"
     application = _application(system)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
     assert recovery.state == "completed", recovery
@@ -156,7 +157,7 @@ def test_a_cancelled_run_is_observed_as_cancelled(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
     _project_id, _work_item_id, run_id = _work_item_run(system, "被取消的事项")
     system.cancel(run_id)
-    assert system.project(run_id).phase == "FAILED"
+    assert system.project(run_id).status == "failed"
     assert system.project(run_id).stop_reason == "cancelled"
     application = _application(system)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
@@ -172,7 +173,7 @@ def test_a_paused_run_is_observed_as_paused(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     _project_id, _work_item_id, run_id = _work_item_run(system, "暂停等待处理的事项")
     system.run_until_stop(run_id)
-    assert system.project(run_id).phase == "PAUSED"
+    assert system.project(run_id).status == "paused"
     application = _application(system)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
     assert recovery.state == "paused", recovery
@@ -188,7 +189,7 @@ def test_a_failed_run_is_observed_as_stopped(data_dir):
         product_spec(), ProviderError("模型服务协议不符", reason="provider_protocol")]))
     _project_id, _work_item_id, run_id = _work_item_run(system, "没有通过的事项")
     system.run_until_stop(run_id)
-    assert system.project(run_id).phase == "FAILED"
+    assert system.project(run_id).status == "failed"
     application = _application(system)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
     assert recovery.state == "stopped", recovery
@@ -206,7 +207,7 @@ def test_a_live_run_is_observed_as_running(data_dir):
     system.activate_once(run_id)
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.DEPARTMENT_ACTIVATED, actor="department:engineering", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
+        state_before="running", state_after="running",
         payload={"activation_id": "act_live", "step_id": 0}))
     application = _application(system)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
@@ -246,7 +247,7 @@ def test_the_event_stream_reconnect_only_adds_observation(data_dir):
     assert system.store.end_position() == before_position
     assert len([event for event in system.store.list_events(run_id)
                 if event.type == EventType.MODEL_REQUESTED]) == before_models
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     system.close()
 
 def test_system_status_counts_match_the_event_log(data_dir):
@@ -255,7 +256,7 @@ def test_system_status_counts_match_the_event_log(data_dir):
     _project_id, _work_item_id, run_id = _work_item_run(system, "中断的事项")
     system.activate_once(run_id)
     _lost_write(system, run_id, action_id="another-unknown")
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     system.close()
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
@@ -271,7 +272,7 @@ def test_projects_list_reports_interruption_pending_and_resume_markers(data_dir)
     system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
     project_id, _work_item_id, run_id = _work_item_run(system, "中断的事项")
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     system.close()
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
@@ -340,7 +341,7 @@ def test_history_queries_export_and_replay_stay_read_only(data_dir):
     _query(application, PROJECT_LOOP, ProjectLoop(project_id=project_id))
     _query(application, RUN_ACTIONS, RunActions(run_id=run_id))
     assert system.store.end_position() == position
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     # 重放核对不写入，结果一致
     report = _query(application, REPLAY_CHECK, ReplayCheck(run_id=run_id))
     assert report.consistent is True

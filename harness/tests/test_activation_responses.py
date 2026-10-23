@@ -2,6 +2,7 @@
 
 import json
 
+from harness.collaboration import has_new_work
 from harness.tests.helpers import FAST_RETRIES
 from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec
@@ -71,7 +72,7 @@ def test_native_loop_executes_tool_and_persists_exact_inputs_before_each_request
             system.workspace(run_id).write_file("proof.txt", "host-read-evidence")
             system.workspace(run_id).write_file("AGENTS.md", canary)
             result = system.activate_once(run_id)
-            assert result.phase == "ENGINEERING", result.error
+            assert has_new_work(result, "engineering"), result.error
             assert result.token_used == 260
             assert result.cost == 0
             assert live_audits == [True]
@@ -126,7 +127,7 @@ def test_same_provider_call_id_in_different_steps_executes_each_host_call(tmp_pa
             # 两步之间改写检查工作区里的同一份文件，第二次调用读到的是另一份内容
             system.workspace(run_id).write_file("proof.txt", "first-result")
             result = system.activate_once(run_id)
-            assert result.phase == "ENGINEERING", result.error
+            assert has_new_work(result, "engineering"), result.error
             tools = [event for event in system.store.list_events(run_id)
                      if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file"]
             assert [_artifact(system, event.payload["output_ref"]) for event in tools] == ["first-result", "second-result"]
@@ -156,7 +157,7 @@ def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_message
             run_id = system.create_run("later timeout")
             system.workspace(run_id).write_file("proof.txt", "survives-timeout")
             result = system.activate_once(run_id)
-            assert result.phase == "FAILED" and result.stop_reason == "provider_timeout"
+            assert result.status == "failed" and result.stop_reason == "provider_timeout"
             assert "timed out" in result.error
             assert result.token_used >= 130
             events = system.store.list_events(run_id)
@@ -184,7 +185,7 @@ def test_failed_first_model_request_still_has_durable_exact_input(tmp_path):
         try:
             run_id = system.create_run("failed provider request")
             result = system.activate_once(run_id)
-            assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+            assert result.status == "failed" and result.stop_reason == "provider_error"
             assert len(captures) == 3
             events = system.store.list_events(run_id)
             assert len([event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]) == 3
@@ -204,7 +205,7 @@ def test_http_500_retry_then_success_reaches_native_loop(tmp_path):
         try:
             run_id = system.create_run("HTTP retry to success")
             result = system.activate_once(run_id)
-            assert result.phase == "ENGINEERING", result.error
+            assert has_new_work(result, "engineering"), result.error
             assert len(captures) == 2
             events = system.store.list_events(run_id)
             assert len([event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]) == 1
@@ -222,7 +223,7 @@ def test_partial_http_stream_is_audit_only_and_absent_from_retry_input(tmp_path)
         try:
             run_id = system.create_run("partial stream retry")
             result = system.activate_once(run_id)
-            assert result.phase == "ENGINEERING", result.error
+            assert has_new_work(result, "engineering"), result.error
             assert len(captures) == 2
             assert "partial-call" not in json.dumps(captures[1]["input"])
             events = system.store.list_events(run_id)
@@ -239,7 +240,7 @@ def test_missing_provider_usage_is_not_estimated_and_does_not_stop_work(tmp_path
         try:
             run_id = system.create_run("provider did not report usage")
             result = system.activate_once(run_id)
-            assert result.phase == "ENGINEERING", result.error
+            assert has_new_work(result, "engineering"), result.error
             contexts = _assert_request_audit(system, run_id, captures)
             assert result.token_used == 0
             assert contexts[0].payload["token_estimate"] > 0
@@ -266,7 +267,7 @@ def test_host_failure_to_record_a_stream_event_names_the_actual_error_type(tmp_p
             run_id = system.create_run("stream capture failure")
             monkeypatch.setattr("tempfile.tempdir", str(tmp_path / "missing-temp"))
             result = system.activate_once(run_id)
-            assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+            assert result.status == "failed" and result.stop_reason == "provider_error"
             assert len(captures) == 1
             failed = [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_ATTEMPT_FAILED]
             assert [event.error for event in failed] == ["model adapter failed: FileNotFoundError"]
@@ -284,7 +285,7 @@ def test_duplicate_call_ids_in_one_response_are_rejected_before_any_tool_starts(
             system.workspace(run_id).write_file("proof.txt", "first output")
             system.workspace(run_id).write_file("second.txt", "second output")
             result = system.activate_once(run_id)
-            assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+            assert result.status == "failed" and result.stop_reason == "provider_error"
             assert len(captures) == 1
             assert not any(event.type == EventType.TOOL_STARTED for event in system.store.list_events(run_id))
         finally:

@@ -24,10 +24,10 @@ if TYPE_CHECKING:
 RANGES: dict[str, str] = {"since_seen": "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天"}
 RANGE_SECONDS = {"24h": 24 * 3600, "7d": 7 * 24 * 3600}
 
-# 范围内的关键事实种类（设计说明第 4.3 节）：交接、询问与回答、返工、放行、采纳、决定请求的发出与回答。
+# 范围内的关键事实种类（设计说明第 4.3 节）：询问与回答、返工、放行、采纳、决定请求的发出与回答。
 # 故障、修复、部署与回滚、进入与离开等待属于 Stage 4，所属工作包完成之前没有数据
 FACT_TYPES: frozenset[str] = frozenset({
-    EventType.TRANSITION, EventType.ASK_STARTED, EventType.ASK_ANSWERED,
+    EventType.ASK_STARTED, EventType.ASK_ANSWERED,
     EventType.QA_SUBMITTED, EventType.RUN_DONE, EventType.RUN_PAUSED,
     EventType.RUN_FAILED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
     ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.WORK_ITEM_CREATED,
@@ -35,10 +35,8 @@ FACT_TYPES: frozenset[str] = frozenset({
 REWORK_VERDICTS = frozenset({"rework_engineering"})
 
 # 关键事实的种类（时间轴刻度与离开期间的报告使用，设计说明第 5.5 节）：刻度按种类着色。
-# 与原型 v9 的 contract/registry.js 的 KEY_KINDS 一致；判定用事件的种类与载荷（质检的结论分放行与返工）。
 # 故障、修复、部署与回滚、进入与离开等待属于 Stage 4，事件种类登记以后在这里补上
 FACT_KINDS: dict[str, str] = {
-    EventType.TRANSITION: "handoff",
     EventType.ASK_STARTED: "ask",
     EventType.ASK_ANSWERED: "answer",
     EventType.RUN_DONE: "release",

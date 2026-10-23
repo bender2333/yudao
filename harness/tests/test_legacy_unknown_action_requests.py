@@ -11,6 +11,7 @@ from dataclasses import asdict
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.decision_commands import DecisionAnswer
@@ -28,7 +29,7 @@ def _engineering_run(data_dir, script):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     return system, run_id
 
 
@@ -43,14 +44,14 @@ def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-wri
                                    media_type="application/json")
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.MODEL_MESSAGE, actor="model:fake", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
+        state_before="running", state_after="running",
         payload={
             "activation_id": "act_eng_1", "step_id": 1, "purpose": "work",
             "message_ref": asdict(msg_ref),
         }))
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
+        state_before="running", state_after="running",
         payload={"id": action_id, "name": tool, "args": args,
                  "step_id": 1, "activation_id": "act_eng_1", "attempt": 1,
                  "purpose": "work", "before_snapshot_ref": asdict(snap_ref)}))
@@ -82,7 +83,7 @@ def test_unanswered_legacy_unknown_action_is_withdrawn_handed_back_and_resumes(t
     _append_lost_write(system, run_id, tool="write_file", action_id="lost-write")
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.DECISION_REQUESTED, actor="system", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
+        state_before="running", state_after="running",
         payload={
             "kind": "unknown_action",
             "blocks": "action",
@@ -149,7 +150,7 @@ def test_event_stream_and_run_export_read_legacy_decision_and_continue_records(t
     # 写入旧的 unknown_action 决定请求事件
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.DECISION_REQUESTED, actor="system", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
+        state_before="running", state_after="running",
         payload={
             "kind": "unknown_action",
             "blocks": "action",
@@ -167,7 +168,7 @@ def test_event_stream_and_run_export_read_legacy_decision_and_continue_records(t
     # 写入旧的 resolution: continue 核实记录事件
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.ACTION_VERIFIED, actor="system", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
+        state_before="running", state_after="running",
         payload={
             "id": "legacy-act",
             "name": "write_file",

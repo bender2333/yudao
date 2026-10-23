@@ -16,7 +16,6 @@ from ..event_store import EventStore
 from ..models import Event, EventType, ProjectEvent, json_dumps
 from ..observability import AttemptFold, search_text
 from ..projects import REWORK_VERDICTS
-from .labels import phase_name
 
 ATTEMPTS = "attempts"
 FLOWS = "flows"
@@ -29,11 +28,10 @@ ATTEMPT_TYPES = frozenset({
     EventType.MODEL_REQUEST_SERIALIZED, EventType.MODEL_MESSAGE, EventType.MODEL_ATTEMPT_FINISHED,
     EventType.MODEL_ATTEMPT_FAILED, EventType.MODEL_RETRY_SCHEDULED, EventType.MODEL_STREAM_PROGRESS,
 })
-# 流转记录吸收的事件种类：阶段迁移、部门之间的请求与回答、质检退回
+# 流转记录吸收的事件种类：部门之间的请求与回答、交付到达与质检退回
 FLOW_TYPES = frozenset({
-    EventType.TRANSITION, EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED,
+    EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
 })
-DELIVERY_PHASE = "DELIVERY"
 # 读取模型的推导版本：改了调用尝试表或流转记录的推导方式就把它加一。
 # 服务打开读取模型时，保存的版本与这个不同（含旧文件里没有这一行）就从事件重放重建一次——
 # 读模型是增量投影，修了算法不会让旧行跟着变（工单 #684）。
@@ -96,18 +94,6 @@ CREATE TABLE IF NOT EXISTS app_flows (
 CREATE INDEX IF NOT EXISTS idx_app_flows_scope ON app_flows(project_id, work_item_id, position);
 """
 
-# 阶段迁移到流转类型的对应：进入工程工作包是需求交接，进入交付是版本交付，退回是返工
-_TRANSITION_KINDS = {
-    "ENGINEERING": "需求交接",
-    DELIVERY_PHASE: "版本交付",
-    "REWORK_PRODUCT": "返工",
-    "REWORK_ENGINEERING": "返工",
-}
-_TRANSITION_DEPARTMENTS = {
-    "PRODUCT_SPEC": "product", "REWORK_PRODUCT": "product",
-    "ENGINEERING": "engineering", "REWORK_ENGINEERING": "engineering",
-    "QUALITY": "quality", DELIVERY_PHASE: "quality",
-}
 _ASK_STATUS = {
     "answered": "已回答", "unable": "没能回答",
 }
@@ -390,15 +376,11 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
         "position": event.position, "seq": event.stream_version, "event_id": event.event_id,
         "created_at": event.created_at,
     }
-    if event.type == EventType.TRANSITION:
-        kind = _TRANSITION_KINDS.get(event.state_after)
-        if kind is None:
-            return []
-        return [{**base, "flow_id": event.event_id, "kind": kind,
-                 "direction_from": _TRANSITION_DEPARTMENTS.get(event.state_before) or event.state_before,
-                 "direction_to": _TRANSITION_DEPARTMENTS.get(event.state_after) or event.state_after,
-                 "status": "已退回" if kind == "返工" else "已完成",
-                 "content": f"{phase_name(event.state_before)} → {phase_name(event.state_after)}"}]
+    if event.type == EventType.DELIVERY_ACCEPTED:
+        # 交付到达（工单 #556：不再有阶段迁移事件，版本交付的记录由交付到达给出）
+        return [{**base, "flow_id": event.event_id, "kind": "版本交付",
+                 "direction_from": "engineering", "direction_to": "quality",
+                 "status": "已完成", "content": payload.get("summary", "")}]
     if event.type == EventType.ASK_STARTED:
         return [{**base, "flow_id": payload["branch_session_id"], "kind": "询问",
                  "direction_from": payload["requester"], "direction_to": payload["recipient"],

@@ -64,7 +64,7 @@ def test_restart_keeps_accumulated_time_and_counts(tmp_path):
         assert (before_activations, before_steps) == _event_counts(before[:settled + 1]), "写入的累计次数与已结束的事件数一致"
 
         finished = run.after.run_until_stop(run.run_id)
-        assert finished.phase == "DONE", "重启以后自动继续到放行"
+        assert finished.status == "done", "重启以后自动继续到放行"
 
         after = run.after.store.list_events(run.run_id)
         after_elapsed, after_activations, after_steps = _usage(after)
@@ -95,7 +95,7 @@ def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
         assert "time_limit" not in stops, f"中断时 run 已经以运行时间上限停止，停止原因 {stops}"
 
         finished = run.after.project(run.run_id)
-        assert (finished.phase, finished.stop_reason) == ("FAILED", "time_limit")
+        assert (finished.status, finished.stop_reason) == ("failed", "time_limit")
 
         after = run.after.store.list_events(run.run_id)
         after_usage = _usage(after)
@@ -118,7 +118,7 @@ def test_waiting_for_a_decision_is_excluded_from_run_time(tmp_path):
         wall_started = time.monotonic()
         run_id = system.create_run("build an echo CLI")
         blocked = system.run_until_stop(run_id)
-        assert blocked.outcome == "running", "模型引用不可用时等待用户决定"
+        assert blocked.status == "running", "模型引用不可用时等待用户决定"
 
         # 等待 5 秒就够：累计只记录不含等待的那几段，整段墙钟比累计至少多出这一段等待，
         # 与机器快慢无关（工单 #410）
@@ -131,7 +131,7 @@ def test_waiting_for_a_decision_is_excluded_from_run_time(tmp_path):
         command = Command(str(uuid.uuid4()), "decision.answer", "sha256:continue:1", "user:local")
         system.orchestrator.answer_decision(decision.decision_id, "continue", None, base_version=1,
                                             command=command)
-        assert system.run_until_stop(run_id).phase == "DONE"
+        assert system.run_until_stop(run_id).status == "done"
 
         # 核对等待没有计入运行时间：累计的已用时间小于这一整段过程实际经过的墙钟时间。
         # 这条关系与机器快慢无关，负载重时墙钟变长而累计不计入等待，两边的差距只会更大

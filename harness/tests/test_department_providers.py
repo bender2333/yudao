@@ -13,6 +13,7 @@ from typing import Any, Callable, Iterator
 import pytest
 from openai import DEFAULT_CONNECTION_LIMITS
 
+from harness.collaboration import has_new_work
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade, ResponsesConfig
@@ -392,7 +393,7 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
 
         assert not errors_a and not errors_b
         assert config_a.base_url != config_b.base_url
-        assert result.phase == "DONE", result.error
+        assert result.status == "done", result.error
         assert result.rework_count == 1
         assert any(event.type == EventType.ASK_ANSWERED for event in system.store.list_events(run_id))
         assert counts == {"product": 2, "engineering": 3, "quality": 2}
@@ -535,13 +536,13 @@ def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
             cancelled_result = cancelled_future.result(timeout=wait_limit_sec)
 
         assert not errors_a
-        assert successful.phase == "ENGINEERING"
-        assert cancelled.phase == "FAILED" and cancelled.stop_reason == "cancelled"
+        assert has_new_work(successful, "engineering")
+        assert cancelled.status == "failed" and cancelled.stop_reason == "cancelled"
         assert cancelled_result.stop_reason == "cancelled"
         assert len(captures_a) == 2
         assert all(item["authorization"] == "Bearer provider-a-key" for item in captures_a)
         assert all(item["body"]["model"] == "a-product" for item in captures_a)
-        assert system.project(other_run).phase == "ENGINEERING"
+        assert has_new_work(system.project(other_run), "engineering")
 
 def test_restart_resolves_the_current_credentials_for_the_next_request(tmp_path):
     # 上游拒绝凭据（HTTP 401）：请求带着重启后解析出的 Key 发出，运行进入待恢复，不因「凭据已不在本进程」结束
@@ -571,7 +572,7 @@ def test_restart_resolves_the_current_credentials_for_the_next_request(tmp_path)
         # 重启以后按当前凭据来源解析：这次请求带着新的 Key 发往部门默认绑定的目标
         assert not errors_a
         assert [item["authorization"] for item in captures_a] == ["Bearer provider-a-new-key"]
-        assert result.outcome == "running" and result.stop_reason is None
+        assert result.status == "running" and result.stop_reason is None
         requests = [event for event in restarted.store.list_events(run_id)
                     if event.type == EventType.MODEL_REQUESTED]
         assert [(item.payload["provider_config_id"], item.payload["credential_version"]) for item in requests] == [
@@ -602,7 +603,7 @@ def test_retry_stays_on_the_bound_provider_and_model(tmp_path):
         result = system.activate_once(run_id)
 
         assert not errors_a and not errors_b
-        assert result.phase == "ENGINEERING", result.error
+        assert has_new_work(result, "engineering"), result.error
         assert len(captures_a) == 2 and not captures_b
         assert all(item["authorization"] == "Bearer provider-a-key" for item in captures_a)
         assert [item["body"]["model"] for item in captures_a] == ["a-product", "a-product"]
@@ -642,7 +643,7 @@ def test_missing_returned_model_remains_unknown_in_request_trace(tmp_path):
         result = system.activate_once(run_id)
 
         assert not errors_a and len(captures_a) == 1
-        assert result.phase == "ENGINEERING", result.error
+        assert has_new_work(result, "engineering"), result.error
         assert result.model_requests[0]["requested_model"] == "a-product"
         assert result.model_requests[0]["actual_model"] is None
         assert result.actual_model is None
@@ -677,7 +678,7 @@ def test_terminal_returned_models_are_recorded_for_unreported_multi_step_work(tm
         result = system.activate_once(run_id)
 
         assert not errors_a
-        assert result.phase == "ENGINEERING", result.error
+        assert has_new_work(result, "engineering"), result.error
         assert len(captures_a) == 3
         assert [item["purpose"] for item in result.model_requests] == ["work", "work", "work"]
         assert [item["actual_model"] for item in result.model_requests] == [
@@ -702,7 +703,7 @@ def test_failed_http_attempt_keeps_requested_identity_without_actual_model(tmp_p
         result = system.activate_once(run_id)
 
         assert not errors_a
-        assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+        assert result.status == "failed" and result.stop_reason == "provider_error"
         assert len(captures_a) == 3
         assert all(item["authorization"] == "Bearer provider-a-key" for item in captures_a)
         assert all(item["body"]["model"] == "a-product" for item in captures_a)
@@ -787,7 +788,7 @@ def test_small_bound_model_uses_its_own_compaction_request(tmp_path):
         result = system.activate_once(run_id)
 
         assert not errors_a
-        assert result.phase == "ENGINEERING", result.error
+        assert has_new_work(result, "engineering"), result.error
         assert state["read"] and state["compactions"] >= 1
         assert len(captures_a) == len(result.model_requests)
         assert all(item["body"]["model"] == "a-product" for item in captures_a)
@@ -918,7 +919,7 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
             other_run = system.create_run("a second task")
 
     assert not errors_p and not errors_e and not errors_q
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     # 每条协议按自己的路径与认证方式发送
     assert {item["path"] for item in captures_p} == {"/v1/messages"}
     assert {item["path"] for item in captures_e} == {"/v1/chat/completions"}

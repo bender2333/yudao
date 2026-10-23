@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
@@ -21,7 +22,8 @@ def _retry_source(tmp_path):
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("retry audit")
-    assert system.activate_once(run_id).phase == "ENGINEERING"
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(system.activate_once(run_id), "engineering")
     return system, run_id
 
 
@@ -41,7 +43,8 @@ def _partial_source(tmp_path):
     adapter = FakeAdapter([fail_after_partial, product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("partial retry audit")
-    assert system.activate_once(run_id).phase == "ENGINEERING"
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(system.activate_once(run_id), "engineering")
     assert "failed-partial" not in json.dumps(adapter.invocations[1].input_items)
     return system, run_id
 
@@ -93,7 +96,7 @@ def _prepared_source(tmp_path):
 def saved_prepared(tmp_path_factory):
     def build(directory):
         system, run_id = _prepared_source(directory)
-        assert system.activate_once(run_id).phase == "PRODUCT_SPEC"
+        assert has_new_work(system.activate_once(run_id), "product")
         return system, run_id
 
     return _saved_source(build, tmp_path_factory.mktemp("prepared"))

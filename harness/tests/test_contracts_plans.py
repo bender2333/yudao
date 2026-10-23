@@ -27,7 +27,7 @@ def test_prd_and_delivery_bind_the_same_accepted_contract(tmp_path):
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请补充产品决定。")
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     assert len(result.product_specs) == 1
     contract = result.effective_contract
     assert contract.decision_hashes == [result.product_decisions[-1].content_hash]

@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.actions import Action
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS
@@ -140,7 +141,7 @@ def test_pause_and_resume_preserves_qa_tests(tmp_path: Path) -> None:
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
     proj = system.run_until_stop(run_id)
-    assert proj.phase == "PAUSED" and proj.stop_reason == "no_tool_call"
+    assert proj.status == "paused" and proj.stop_reason == "no_tool_call"
 
     # User answers decision to continue
     _pos, decisions = saved_decisions(system.store, statuses=("open",))
@@ -151,7 +152,7 @@ def test_pause_and_resume_preserves_qa_tests(tmp_path: Path) -> None:
     system.orchestrator.answer_decision(d.decision_id, "continue", None, base_version=d.version, command=command_obj)
 
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE"
+    assert result.status == "done"
 
     events = system.writes.read(f"run:{run_id}").events()
     check_called = next(e for e in events if e.type == EventType.TOOL_CALLED and e.department == "quality" and e.payload.get("name") == "run_check" and (e.payload.get("args") or {}).get("name") == "resume_check")
@@ -366,11 +367,11 @@ def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_reru
     errors = rejected.payload.get("errors", [])
     assert any(err.get("field") == "checks" and "测试材料已经改变，用当前的测试材料重新运行检查" in err.get("message", "")
                for err in errors), f"Expected checks error message, got: {errors}"
-    assert proj_qa1.phase == "QUALITY"
+    assert has_new_work(proj_qa1, "quality")
 
     # Now step 3 runs in next activation: reruns check and release is accepted
     proj_qa2 = system.activate_once(run_id)
-    assert proj_qa2.phase == "DONE"
+    assert proj_qa2.status == "done"
 
     events_final = system.writes.read(f"run:{run_id}").events()
     qa_submitted_events = [e for e in events_final if e.type == EventType.QA_SUBMITTED]
@@ -423,7 +424,7 @@ def test_qa_emptying_test_materials_allows_release(tmp_path: Path) -> None:
     system.activate_once(run_id)  # engineering
     proj = system.activate_once(run_id)  # quality step 1 & 2
 
-    assert proj.phase == "DONE"
+    assert proj.status == "done"
 
     events = system.writes.read(f"run:{run_id}").events()
     saved_events = [e for e in events if e.type == EventType.QA_TESTS_SAVED]

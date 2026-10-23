@@ -59,7 +59,7 @@ def _two_round_onboarding(tmp_path: Path) -> dict:
     project_id, work_item_id, first_run_id = system.projects.onboard(
         "已有项目", GOAL, "src", str(_source(tmp_path / "source")))
     first = system.run_until_stop(first_run_id)
-    assert first.phase == "DONE", first.error
+    assert first.status == "done", first.error
     assert first.stop_reason == "baseline_verified"
     assert system.projects.settle(first_run_id) is not None
 
@@ -75,7 +75,7 @@ def _two_round_onboarding(tmp_path: Path) -> dict:
                     if event.type == ProjectEventType.ONBOARDING_REVISION_STARTED)
     second_run_id = revision.payload["run_id"]
     second = system.run_until_stop(second_run_id)
-    assert second.phase == "DONE", second.error
+    assert second.status == "done", second.error
     assert second.round == 2
 
     return {

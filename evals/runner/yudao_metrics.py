@@ -15,9 +15,9 @@ from metrics import FAILURE_MARKERS
 MODEL_SERVICE_FAILURE = "model_service_failure"
 TIME_LIMIT = "time_limit"
 # 设计第 5.1 节第 1 项：no_tool_call / 取消 / 达到限额 / 服务故障 / 进程退出
-# 都不能通过「放行」这一项；放行等于 `phase == "DONE"` 且 `stop_reason == "released"`
+# 都不能通过「放行」这一项；放行等于 `status == "done"` 且 `stop_reason == "released"`
 RELEASE_STOP_REASONS = frozenset({"released"})
-RELEASE_PHASES = frozenset({"DONE"})
+RELEASE_STATUSES = frozenset({"done"})
 
 # 用量字段：模型未上报时为未知，进度时按 `notes[].reason` 写明原因
 USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens",
@@ -38,9 +38,9 @@ def collect(export, outcome, replay=None, parameters_version=None):
     return {
         "end_status": status,
         "end_reason": reason,
-        "outcome": projection.get("outcome"),
+        "outcome": projection.get("status"),
         "stop_reason": projection.get("stop_reason"),
-        "phase": projection.get("phase"),
+        "status": projection.get("status"),
         "cycles": int(projection.get("cycle_count") or 0),
         "rework": int(projection.get("rework_count") or 0),
         "collaboration": _count(events, "ask_started"),
@@ -63,21 +63,21 @@ def collect(export, outcome, replay=None, parameters_version=None):
 
 def _end_state(projection, outcome, model_service_failure):
     """结束状态与原因（设计第 5.1 节第 1 项）：
-    - 放行等于 `phase == "DONE"` 且 `stop_reason == "released"`；
-    - 其余 `phase == "DONE"` 但 stop_reason 不是 released 的（不会发生，留作防御）按 ended 计；
+    - 放行等于 `status == "done"` 且 `stop_reason == "released"`；
+    - 其余 `status == "done"` 但 stop_reason 不是 released 的（不会发生，留作防御）按 ended 计；
     - 超时记 `time_limit`；
     - 模型服务故障记 `model_service_failure`；
     - `no_tool_call` / `cancelled` / 进程退出都按 ended + 原始 stop_reason。
     """
-    phase = projection.get("phase")
+    status = projection.get("status")
     stop_reason = projection.get("stop_reason")
     if outcome["timed_out"]:
         return "ended", TIME_LIMIT
     if model_service_failure:
         return "ended", MODEL_SERVICE_FAILURE
-    if phase in RELEASE_PHASES and stop_reason in RELEASE_STOP_REASONS:
+    if status in RELEASE_STATUSES and stop_reason in RELEASE_STOP_REASONS:
         return "released", stop_reason
-    return "ended", stop_reason or phase or "unknown"
+    return "ended", stop_reason or status or "unknown"
 
 
 def _usage_totals(export):
@@ -146,8 +146,8 @@ def checkpoints_of(events, status, replay, outcome, parameters_version=None,
 
 def _check_release_and_limit(events, outcome, status, parameters_version,
                              model_service_failure=False):
-    """设计第 5.1 节第 1 项：放行等于阶段 DONE 且停止原因 released，另核质检放行与冻结限额。"""
-    phase = _phase_from_events(events)
+    """设计第 5.1 节第 1 项：放行等于状态 done 且停止原因 released，另核质检放行与冻结限额。"""
+    end_status = _status_from_events(events)
     stop_reason = _stop_reason_from_events(events)
     reasons = []
     if outcome.get("timed_out"):
@@ -156,8 +156,8 @@ def _check_release_and_limit(events, outcome, status, parameters_version,
         reasons.append("模型服务故障被运行器结束")
     if outcome.get("process_exit_failed"):
         reasons.append("运行器进程退出码非零")
-    if phase not in RELEASE_PHASES:
-        reasons.append("阶段不是 DONE（实际为 " + str(phase or "未知") + "）")
+    if end_status not in RELEASE_STATUSES:
+        reasons.append("状态不是 done（实际为 " + str(end_status or "未知") + "）")
     if stop_reason not in RELEASE_STOP_REASONS:
         reasons.append("停止原因不是 released（实际为 " + str(stop_reason or "未知") + "）")
     if not _latest_qa_release(events):
@@ -167,16 +167,16 @@ def _check_release_and_limit(events, outcome, status, parameters_version,
         reasons.append(limit_check["reason"])
     passed = (status == "released") and not reasons
     return {"passed": passed,
-            "detail": ("运行在冻结限额内以放行结束：阶段 DONE、停止原因 released、"
+            "detail": ("运行在冻结限额内以放行结束：状态 done、停止原因 released、"
                        "质检已放行、用量未超限额"
                        if passed else "运行未通过放行判定：" + "；".join(reasons))}
 
 
-def _phase_from_events(events):
+def _status_from_events(events):
     for event in reversed(events):
         if event.get("type") in ("run_done", "run_paused", "run_failed"):
             payload = event.get("payload") or {}
-            return payload.get("phase") or payload.get("state_after") or event.get("state_after")
+            return payload.get("status") or event.get("state_after")
     return None
 
 

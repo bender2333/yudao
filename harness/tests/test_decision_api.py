@@ -3,10 +3,11 @@ import time
 import uuid
 from datetime import datetime
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
-from harness.models import EventType, TERMINAL_PHASES, Usage
+from harness.models import EventType, TERMINAL_STATUSES, Usage
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
@@ -69,7 +70,7 @@ def _wait_for_completion(system: LoopSystem, run_id: str, timeout_sec: float = W
     deadline = time.monotonic() + timeout_sec
     while time.monotonic() < deadline:
         projection = system.project(run_id)
-        if projection.phase in TERMINAL_PHASES and system.orchestrator.execution(run_id) is None:
+        if projection.status in TERMINAL_STATUSES and system.orchestrator.execution(run_id) is None:
             return projection
         time.sleep(0.02)
     raise AssertionError(f"run {run_id} was not finished by its task within {timeout_sec}s")
@@ -88,7 +89,7 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
     with running_api(service) as client:
         project_id, work_item_id, run_id, blocked = _blocked_run(client, service)
         system = service.system
-        assert (blocked.phase, blocked.stop_reason, blocked.outcome) == ("ENGINEERING", None, "running")
+        assert (blocked.active_department, blocked.stop_reason, blocked.status) == ("engineering", None, "running")
         assert blocked.cycle_count == 2 and blocked.token_used == 120 and blocked.product_spec is not None
 
         # 未回答的请求按项目与事项列出，内容完整：身份、所属的项目、事项与 run、种类、阻塞范围、选项与说明、
@@ -125,7 +126,7 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
         end = system.store.end_position()
         assert _list(client, project_id=project_id)["position"] == end
         assert system.store.end_position() == end and len(service.adapters[0].invocations) == 2
-        assert system.run_until_stop(run_id).phase == "ENGINEERING"
+        assert has_new_work(system.run_until_stop(run_id), "engineering")
         assert system.store.end_position() == end and len(service.adapters[0].invocations) == 2
 
         # 回答「继续执行」：run 在服务的事件循环中继续到结束
@@ -138,7 +139,7 @@ def test_an_unavailable_model_blocks_the_run_until_the_answer_and_the_run_then_c
             "refs": {"decision_id": decision["decision_id"], "run_id": run_id}}
 
         finished = _wait_for_completion(system, run_id)
-        assert finished.phase == "DONE"
+        assert finished.status == "done"
         assert [call.department for call in service.adapters[0].invocations] == [
             "product", "engineering", "engineering", "quality"]
         # 已完成的工作、激活次数与已用限额保留：产品的成果不变，激活与用量从阻塞时接着增加
@@ -177,7 +178,7 @@ def test_answering_stop_ends_the_work_item_as_cancelled(data_dir):
 
         # 回答与结束运行在同一个事务中写入；事项以 cancelled 结束，模型不再被调用
         run = system.project(run_id)
-        assert (run.phase, run.stop_reason) == ("FAILED", "cancelled")
+        assert (run.status, run.stop_reason) == ("failed", "cancelled")
         [item] = system.projects.projection(project_id).work_items
         assert (item.work_item_id, item.status, item.stop_reason) == (work_item_id, "stopped", "cancelled")
         assert len(service.adapters[0].invocations) == 2
@@ -251,7 +252,7 @@ def test_a_withdrawn_request_is_not_in_the_waiting_list_and_cannot_be_answered(d
         [decision] = _list(client, project_id=project_id, status=["open"])["data"]["decisions"]
 
         cancelled = system.cancel(run_id)
-        assert (cancelled.phase, cancelled.stop_reason) == ("FAILED", "cancelled")
+        assert (cancelled.status, cancelled.stop_reason) == ("failed", "cancelled")
         assert _list(client, project_id=project_id, status=["open"])["data"] == {"decisions": []}
         [withdrawn] = _list(client, project_id=project_id, status=["withdrawn"])["data"]["decisions"]
         assert (withdrawn["decision_id"], withdrawn["status"], withdrawn["answer"]) == (
@@ -285,7 +286,7 @@ def test_the_listing_filters_by_several_states_and_reports_the_owning_identities
         # 回答以后它只在 answered 下出现
         assert _answer(client, str(uuid.uuid4()), decision_id=first["decision_id"], option="continue",
                        base_version=1).status_code == 200
-        assert _wait_for_completion(system, run_id).phase == "DONE"
+        assert _wait_for_completion(system, run_id).status == "done"
         assert _list(client, project_id=project_id, status=["open"])["data"] == {"decisions": []}
         assert [(item["decision_id"], item["status"]) for item in
                 _list(client, project_id=project_id, status=["open", "answered"])["data"]["decisions"]] == [
@@ -294,7 +295,7 @@ def test_the_listing_filters_by_several_states_and_reports_the_owning_identities
         # 第二个事项的请求在运行取消时撤销
         second_item, second_run = system.projects.start_work_item(project_id, "另一个事项")
         blocked_again = system.run_until_stop(second_run)
-        assert (blocked_again.phase, blocked_again.stop_reason, blocked_again.outcome) == ("ENGINEERING", None,
+        assert (blocked_again.active_department, blocked_again.stop_reason, blocked_again.status) == ("engineering", None,
                                                                                           "running")
         [second] = _list(client, work_item_id=second_item)["data"]["decisions"]
         assert (second["project_id"], second["work_item_id"], second["run_id"]) == (project_id, second_item,
@@ -326,7 +327,7 @@ def test_a_decision_request_and_its_answer_survive_deleting_the_saved_projection
         [decision] = _list(client, project_id=project_id)["data"]["decisions"]
         assert _answer(client, str(uuid.uuid4()), decision_id=decision["decision_id"], option="continue",
                        base_version=1, note="凭据已经补上").status_code == 200
-        assert _wait_for_completion(service.system, run_id).phase == "DONE"
+        assert _wait_for_completion(service.system, run_id).status == "done"
         # run 结束时由流程编排结算（采纳）；这里显式结算一次，作为重启以后补结算的对照
         service.system.projects.settle(run_id)
         before = _list(client, project_id=project_id, work_item_id=work_item_id)

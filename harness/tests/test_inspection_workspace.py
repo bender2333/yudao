@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.actions import Action, ActionReceipt
 from harness.adapters.fake import FakeAdapter
 from harness.environment import (
@@ -213,13 +214,12 @@ def test_engineering_delivers_from_the_run_workspace_and_quality_from_its_own(tm
     orchestrator = system.orchestrator
     system.activate_once(run_id)   # 产品：产品要求
     system.activate_once(run_id)   # 工程：交付，运行工作区里的 src/echo.py 被封存
-    assert system.project(run_id).phase == "QUALITY"
+    assert has_new_work(system.project(run_id), "quality")
 
-    # 交付之后阶段已转到质检，工程不再是交接持有者：它此时回答协作请求，
-    # 用的是自己的检查工作区，运行工作区交给质检之后的部门不动
+    # 交接去掉以后（工单 #556）：运行工作区只由工程的一轮工作写入，工程的主线会话
+    # 就是写运行工作区的那一轮；它在询问分支里回答时用自己的检查工作区
     engineering = orchestrator._environment_for(run_id, "engineering", refresh=True)
-    assert engineering.workspace.root == inspection_root(
-        run_root, _session_id(system, run_id, "engineering"))
+    assert engineering.workspace.root == run_root
 
     quality = orchestrator._environment_for(run_id, "quality", refresh=True)
     assert quality.workspace.root == inspection_root(
@@ -242,7 +242,7 @@ def test_the_inspection_workspaces_are_removed_when_the_run_reaches_done(tmp_pat
     system.run_until_stop(run_id)
     run_root = tmp_path / "workspaces" / run_id
 
-    assert system.project(run_id).phase == "DONE"
+    assert system.project(run_id).status == "done"
     for department in DEPARTMENTS:
         assert not inspection_root(run_root, _session_id(system, run_id, department)).exists()
     assert (run_root / "src" / "echo.py").exists()
@@ -280,7 +280,7 @@ def _inspection_bash_reads_the_sealed_delivery(tmp_path: Path) -> tuple:
     run_root = tmp_path / "workspaces" / run_id
     system.activate_once(run_id)   # 产品：产品要求
     system.activate_once(run_id)   # 工程：交付并封存 src/echo.py
-    assert system.project(run_id).phase == "QUALITY"
+    assert has_new_work(system.project(run_id), "quality")
     delivery = system.project(run_id).delivery_spec
     sealed = load_tree(system.artifacts, run_id, delivery.tree_ref)
 
@@ -289,7 +289,7 @@ def _inspection_bash_reads_the_sealed_delivery(tmp_path: Path) -> tuple:
     system.activate_once(run_id)   # 质检一轮：bash 读交付、写自己的文件、跑检查并退回返工
 
     quality_root = inspection_root(run_root, _session_id(system, run_id, "quality"))
-    assert system.project(run_id).phase == "QUALITY"
+    assert has_new_work(system.project(run_id), "quality")
     assert (quality_root / "seen.txt").read_text(encoding="utf-8") == "SEALED_VERSION\n"
     assert (run_root / "src" / "echo.py").read_text(encoding="utf-8") == "CHANGED_AFTER_DELIVERY\n"
     assert not (run_root / "qa").exists()
@@ -320,7 +320,7 @@ def test_product_bash_views_and_runs_the_snapshot(tmp_path: Path) -> None:
     system.activate_once(run_id)   # 产品一轮：bash 查看与运行现有代码，写下自己的文件并提交产品要求
 
     product_root = inspection_root(run_root, _session_id(system, run_id, "product"))
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     assert (product_root / "src" / "echo.py").read_text(encoding="utf-8") == "import sys\nprint(sys.argv[1])\n"
     assert "echo.py" in (product_root / "listing.txt").read_text(encoding="utf-8")
     assert (product_root / "result.txt").read_text(encoding="utf-8") == "hello\n"
@@ -344,7 +344,7 @@ def test_two_sessions_do_not_share_their_inspection_workspace(tmp_path: Path) ->
     system, _adapter, run_id = event_scenarios._system(
         tmp_path, {"product": [event_scenarios.product_spec()]})
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     orchestrator = system.orchestrator
     quality = orchestrator._environment_for(run_id, "quality", refresh=True)
     product = orchestrator._environment_for(run_id, "product", refresh=True)
@@ -388,7 +388,7 @@ def test_startup_removes_inspections_of_a_run_that_already_finished(tmp_path: Pa
         "engineering": [event_scenarios._deliver()],
         "quality": [event_scenarios._release()],
     })
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     system.close()
     _leave_inspection_dirs(data_dir, run_id)
 
@@ -427,7 +427,7 @@ def test_a_cancelled_run_removes_its_inspection_workspaces(tmp_path: Path) -> No
     })
     system.activate_once(run_id)   # 产品：产品要求
     system.activate_once(run_id)   # 工程：交付，阶段转到质检
-    assert system.project(run_id).phase == "QUALITY"
+    assert has_new_work(system.project(run_id), "quality")
     orchestrator = system.orchestrator
     orchestrator._environment_for(run_id, "quality", refresh=True)
     run_root = tmp_path / "workspaces" / run_id
@@ -435,7 +435,7 @@ def test_a_cancelled_run_removes_its_inspection_workspaces(tmp_path: Path) -> No
 
     system.cancel(run_id)
 
-    assert system.project(run_id).phase == "FAILED"
+    assert system.project(run_id).status == "failed"
     assert system.project(run_id).stop_reason == "cancelled"
     assert not (run_root.parent / "inspections" / run_id).exists()
     assert not (run_root.parent / "inspections").exists()
@@ -448,7 +448,7 @@ def test_quality_before_any_delivery_starts_from_the_work_item(tmp_path: Path) -
     system, _adapter, run_id = event_scenarios._system(
         tmp_path, {"product": [event_scenarios.product_spec()]})
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     assert system.project(run_id).delivery_spec is None
     run_root = tmp_path / "workspaces" / run_id
     system.workspace(run_id).write_file("src/echo.py", "NOT_DELIVERED\n")

@@ -202,8 +202,8 @@ async def _run_demo(application: Application, system: LoopSystem) -> tuple[LoopS
         base_version=system.projects.read_department_setting(project_id, "product")["version"])
     await task
     projection = system.project(run_id)
-    if projection.phase != "DONE":
-        raise RuntimeError(f"demo did not finish: {projection.phase} {projection.stop_reason} {projection.error}")
+    if projection.status != "done":
+        raise RuntimeError(f"demo did not finish: {projection.status} {projection.stop_reason} {projection.error}")
     return system, run_id
 
 

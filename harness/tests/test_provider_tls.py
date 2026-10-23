@@ -4,6 +4,7 @@ import ssl
 import pytest
 import trustme
 
+from harness.collaboration import has_new_work
 from harness.models import EventType
 from harness.providers import ProviderDefinition, effective_models_url, refresh_candidates, ssl_context
 from harness.providers.tls import service_address
@@ -79,7 +80,7 @@ def test_certificate_from_an_authority_in_the_trust_source_is_accepted(protocol,
             system.close()
     finally:
         provider.close()
-    assert result.phase == "ENGINEERING", result.error
+    assert has_new_work(result, "engineering"), result.error
     assert len(provider.requests) == 1
 
 

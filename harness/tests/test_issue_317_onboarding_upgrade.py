@@ -7,6 +7,7 @@ import json
 import sqlite3
 import uuid
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import EventType, ProjectEventType
@@ -122,7 +123,7 @@ def test_starting_from_an_older_version_can_ask_for_a_revision(data_dir, tmp_pat
         revision = next(event for event in restarted.system.store.list_project_events(refs["project_id"])
                         if event.type == ProjectEventType.ONBOARDING_REVISION_STARTED)
         second_run_id = revision.payload["run_id"]
-        assert _wait_for(lambda: restarted.system.project(second_run_id).phase == "DONE"), \
+        assert _wait_for(lambda: restarted.system.project(second_run_id).status == "done"), \
             "第二轮没有结束"
         assert restarted.system.project(second_run_id).error is None
         assert _wait_for(lambda: _open_initial_prd(client, refs["project_id"]) is not None), \
@@ -136,12 +137,12 @@ def test_force_upgrade_restarts_the_first_onboarding_round_from_the_snapshot(dat
     with running_api(opened) as client:
         refs = _onboard_partial(client, tmp_path)
         run_id = refs["run_id"]
-        assert _wait_run(lambda: opened.system.project(run_id).phase == "ENGINEERING")
+        assert _wait_run(lambda: has_new_work(opened.system.project(run_id), "engineering"))
         assert _post(client, "runtime.start_drain").status_code == 200
         assert _post(client, "runtime.force_upgrade").status_code == 200
 
         stopped = opened.system.project(run_id)
-        assert (stopped.phase, stopped.stop_reason) == ("FAILED", STOP_REASON_UPGRADE)
+        assert (stopped.status, stopped.stop_reason) == ("failed", STOP_REASON_UPGRADE)
         created = [event for event in opened.system.store.list_project_events(refs["project_id"])
                    if event.type == ProjectEventType.WORK_ITEM_CREATED]
         assert created[-1].payload["priority"] == PRIORITY_UPGRADE_RESTART
@@ -170,12 +171,12 @@ def test_force_upgrade_restarts_the_revision_round_with_the_same_candidate_and_n
         revision = next(event for event in opened.system.store.list_project_events(refs["project_id"])
                         if event.type == ProjectEventType.ONBOARDING_REVISION_STARTED)
         revision_run_id = revision.payload["run_id"]
-        assert _wait_run(lambda: opened.system.project(revision_run_id).phase == "ENGINEERING")
+        assert _wait_run(lambda: has_new_work(opened.system.project(revision_run_id), "engineering"))
         assert _post(client, "runtime.start_drain").status_code == 200
         assert _post(client, "runtime.force_upgrade").status_code == 200
 
         stopped = opened.system.project(revision_run_id)
-        assert (stopped.phase, stopped.stop_reason) == ("FAILED", STOP_REASON_UPGRADE)
+        assert (stopped.status, stopped.stop_reason) == ("failed", STOP_REASON_UPGRADE)
         created = [event for event in opened.system.store.list_project_events(refs["project_id"])
                    if event.type == ProjectEventType.WORK_ITEM_CREATED]
         assert created[-1].payload["priority"] == PRIORITY_UPGRADE_RESTART

@@ -1843,9 +1843,9 @@ export type DepartmentWorkspaceResult = {
      */
     run_id: string | null;
     /**
-     * Phase
+     * Run Status
      */
-    phase: string | null;
+    run_status: string | null;
     /**
      * Status
      */
@@ -2968,10 +2968,6 @@ export type PauseRequested = {
      * Stop Reason
      */
     stop_reason: 'no_tool_call' | 'workspace_unrepresentable';
-    /**
-     * Resumed At Phase
-     */
-    resumed_at_phase: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
 };
 
 /**
@@ -4938,10 +4934,7 @@ export type WorkItemCard = {
      * Department
      */
     department: string | null;
-    /**
-     * Phase
-     */
-    phase: string | null;
+    progress: WorkItemProgress | null;
     /**
      * Round
      */
@@ -5048,10 +5041,7 @@ export type WorkItemLoop = {
      * Department
      */
     department: string | null;
-    /**
-     * Phase
-     */
-    phase: string | null;
+    progress: WorkItemProgress | null;
     /**
      * Round
      */
@@ -5126,6 +5116,33 @@ export type WorkItemMaterialsResult = {
      * Onboarding Rounds
      */
     onboarding_rounds: Array<OnboardingRound>;
+};
+
+/**
+ * WorkItemProgress
+ *
+ * 事项的进度：从成果推算（循环结构第 2 节）。
+ *
+ * 阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、
+ * 最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。
+ */
+export type WorkItemProgress = {
+    /**
+     * Product Spec Revision
+     */
+    product_spec_revision: number | null;
+    /**
+     * Delivery Revision
+     */
+    delivery_revision: number | null;
+    /**
+     * Delivery Product Spec Revision
+     */
+    delivery_product_spec_revision: number | null;
+    /**
+     * Conclusion
+     */
+    conclusion: string | null;
 };
 
 /**
@@ -12674,10 +12691,6 @@ export type RunContinuedPayload = {
      * Stop Reason
      */
     stop_reason: 'no_tool_call' | 'workspace_unrepresentable';
-    /**
-     * Resumed At Phase
-     */
-    resumed_at_phase: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
 };
 
 /**
@@ -13079,10 +13092,6 @@ export type RunPausedPayload = {
      * Message
      */
     message?: string | null;
-    /**
-     * Paused At Phase
-     */
-    paused_at_phase: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
     /**
      * Cycle Count
      */
@@ -14674,96 +14683,6 @@ export type ToolStartedPayload = {
 };
 
 /**
- * TransitionEvent
- */
-export type TransitionEvent = {
-    /**
-     * Position
-     */
-    position: number;
-    /**
-     * Previous
-     */
-    previous: number;
-    /**
-     * Event Id
-     */
-    event_id: string;
-    /**
-     * At
-     */
-    at: string;
-    /**
-     * Stream
-     */
-    stream: string;
-    /**
-     * Stream Version
-     */
-    stream_version: number;
-    /**
-     * Project Id
-     */
-    project_id: string | null;
-    /**
-     * Work Item Id
-     */
-    work_item_id: string | null;
-    /**
-     * Run Id
-     */
-    run_id: string | null;
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality' | null;
-    /**
-     * Role
-     */
-    role: string | null;
-    /**
-     * Actor
-     */
-    actor: string;
-    /**
-     * Command Id
-     */
-    command_id: string | null;
-    /**
-     * Label
-     */
-    label: string;
-    /**
-     * Type
-     */
-    type: 'transition';
-    payload: TransitionPayload;
-};
-
-/**
- * TransitionPayload
- */
-export type TransitionPayload = {
-    /**
-     * From
-     */
-    from: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
-    /**
-     * To
-     */
-    to: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
-    /**
-     * Route
-     */
-    route: string;
-    /**
-     * Yielded Work Resolved
-     */
-    yielded_work_resolved?: boolean | null;
-    yielded_work?: YieldedWork | null;
-};
-
-/**
  * Usage
  */
 export type Usage = {
@@ -15863,10 +15782,6 @@ export type WritebackVerifiedPayload = {
  */
 export type YieldedWork = {
     /**
-     * Phase
-     */
-    phase: 'CREATED' | 'PRODUCT_SPEC' | 'ENGINEERING' | 'DELIVERY' | 'QUALITY' | 'REWORK_PRODUCT' | 'REWORK_ENGINEERING' | 'DONE' | 'PAUSED' | 'FAILED';
-    /**
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
@@ -15953,8 +15868,6 @@ export type EventObject = ({
 } & BaselineReviewAcceptedEvent) | ({
     type: 'lesson_candidate_recorded';
 } & LessonCandidateRecordedEvent) | ({
-    type: 'transition';
-} & TransitionEvent) | ({
     type: 'run_done';
 } & RunDoneEvent) | ({
     type: 'run_paused';

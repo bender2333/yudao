@@ -26,18 +26,18 @@ def _swap(events, first, second):
 
 def test_cross_session_interleave_still_passes():
     # 调换两个会话之间事件交错的先后（会话内部顺序与因果关系不变）：产品组收尾的
-    # activation_finished（<evt#16>）与工程组开头的 department_activated（<evt#17>）在数组里
-    # 相邻且分属两组，调换后两组各自的内部顺序不变，transition → activation 边的方向也不变，
-    # 应通过；工程组收尾（<evt#36>）与质检组开头（<evt#37>）同样调换一对（计划删除后编号前移）
+    # activation_finished（<evt#14>）与工程组开头的 department_activated（<evt#15>）在数组里
+    # 相邻且分属两组，调换后两组各自的内部顺序不变，成果 → activation 边的方向也不变，
+    # 应通过；工程组收尾（<evt#32>）与质检组开头（<evt#33>）同样调换一对
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     events = actual["events"]
-    first = next(i for i, e in enumerate(events) if e["event"] == "<evt#16>")
-    second = next(i for i, e in enumerate(events) if e["event"] == "<evt#17>")
+    first = next(i for i, e in enumerate(events) if e["event"] == "<evt#14>")
+    second = next(i for i, e in enumerate(events) if e["event"] == "<evt#15>")
     assert second == first + 1
     _swap(events, first, second)
-    third = next(i for i, e in enumerate(events) if e["event"] == "<evt#36>")
-    fourth = next(i for i, e in enumerate(events) if e["event"] == "<evt#37>")
+    third = next(i for i, e in enumerate(events) if e["event"] == "<evt#32>")
+    fourth = next(i for i, e in enumerate(events) if e["event"] == "<evt#33>")
     assert fourth == third + 1
     _swap(events, third, fourth)
     compare_documents("handoff_release", expected, actual)
@@ -62,21 +62,21 @@ def test_intra_session_swap_fails_with_diff():
 
 
 def test_handoff_edge_reversed_fails_with_diff():
-    # 让交接的提交落在下一个部门开始之后：把工程组的 department_activated（<evt#17>）
-    # 搬到产品组的 transition（<evt#15>）之前。搬家跨过的事件里没有工程组的事件，
-    # 每个会话内部的相对顺序都不变，分组比较通过；但提交 → 下一个部门开始的因果边反向，
-    # 应失败并点名因果边
+    # 让交付的接纳落在下一个部门开始之后：把质检组的 department_activated（<evt#33>）
+    # 搬到工程组的 delivery_accepted（<evt#31>）之前。搬家跨过的事件里没有质检组的事件，
+    # 每个会话内部的相对顺序都不变，分组比较通过；但成果 → 下一个部门开始的因果边反向，
+    # 应失败并点名因果边（工单 #556：没有阶段迁移事件，因果边由正式成果给出）
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     events = actual["events"]
-    transition = next(i for i, e in enumerate(events) if e["event"] == "<evt#15>")
-    activation = next(i for i, e in enumerate(events) if e["event"] == "<evt#17>")
-    assert events[transition]["type"] == "transition"
+    outcome = next(i for i, e in enumerate(events) if e["event"] == "<evt#31>")
+    activation = next(i for i, e in enumerate(events) if e["event"] == "<evt#33>")
+    assert events[outcome]["type"] == "delivery_accepted"
     assert events[activation]["type"] == "department_activated"
-    assert transition < activation
-    assert all(e.get("session_id") != "<ses_eng#1>" for e in events[transition:activation])
+    assert outcome < activation
+    assert all(e.get("session_id") != "<ses_qua#1>" for e in events[outcome:activation])
     item = events.pop(activation)
-    events.insert(transition, item)
+    events.insert(outcome, item)
     with pytest.raises(AssertionError) as raised:
         compare_documents("handoff_release", expected, actual)
     message = str(raised.value)
@@ -116,24 +116,24 @@ def test_projection_difference_fails_with_fields_line():
     # 推出来的结果，事件一致时失败应落在投影上，并在 `fields:` 一行写明是哪个键
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
-    assert actual["projection"]["outcome"] == "done"
-    actual["projection"]["outcome"] = "rework"
+    assert actual["projection"]["status"] == "done"
+    actual["projection"]["status"] = "running"
     with pytest.raises(AssertionError) as raised:
         compare_documents("handoff_release", expected, actual)
     message = str(raised.value)
     assert "handoff_release" in message, message
     assert "projection differs" in message, message
-    assert "fields: outcome" in message, message
+    assert "fields: status" in message, message
 
 
 def test_event_difference_reported_before_projection():
-    # 同时改质检 qa_submitted 事件的 payload.verdict 与投影的 outcome（#541 步骤 3 第 2 项）：
+    # 同时改质检 qa_submitted 事件的 payload.verdict 与投影的 status（#541 步骤 3 第 2 项）：
     # 两边都不一致时，信息先报事件，写明是哪个会话、会话内第几个事件与哪个字段，不报投影
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     index = next(i for i, e in enumerate(actual["events"]) if e["type"] == "qa_submitted")
     actual["events"][index]["payload"]["verdict"] = "rework_engineering"
-    actual["projection"]["outcome"] = "rework"
+    actual["projection"]["status"] = "running"
     with pytest.raises(AssertionError) as raised:
         compare_documents("handoff_release", expected, actual)
     message = str(raised.value)

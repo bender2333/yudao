@@ -29,7 +29,7 @@ def test_delivery_accepts_a_short_data_directory(tmp_path):
     system = LoopSystem.for_testing(short, FakeAdapter(_delivery_script()))
     run_id = system.create_run("Build echo")
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     assert result.delivery_spec.files == ["src/echo.py"]
     # 材料目录的读写：接纳写入的意图与 PRD 材料落在解析后的材料根下，可以按同一份根读回
     materials = system.orchestrator.materials_root

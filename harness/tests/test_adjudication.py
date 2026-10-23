@@ -3,7 +3,9 @@ from dataclasses import replace
 from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import WorkBasis, commit_decision, facts_query, proposal_decision, tool_permission
+from harness.collaboration import has_new_work
 from harness.environment import LocalEnvironment
+from harness.models import SessionRecord
 from harness.proposals import delivery, product_spec
 from harness.runtime import LoopSystem
 
@@ -13,7 +15,12 @@ def _engineering(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("echo")
     projection = system.activate_once(run_id)
-    assert projection.phase == "ENGINEERING" and projection.effective_contract is not None
+    # 产品要求已接纳：工程按关注的成果开始一轮工作（工单 #556）
+    assert has_new_work(projection, "engineering") and projection.effective_contract is not None
+    # 部门按关注的成果开始一轮工作（工单 #556）：工程这一轮在工作，
+    # 会话的记录是「工作中」
+    projection = replace(projection, sessions={**projection.sessions, "engineering": SessionRecord(
+        session_id="ses_eng", department="engineering", status="active")})
     return system, projection
 
 def _environment(system, projection):
@@ -33,7 +40,7 @@ def test_tool_permission_stops_after_cancel_end_or_changed_basis(tmp_path):
     write = ("write_file", {"path": "src/echo.py", "content": "print(1)\n"})
     assert _permission(system, projection, *write).allowed
     assert _permission(system, projection, *write, aborted=True).stopped
-    assert _permission(system, replace(projection, phase="FAILED"), *write).stopped
+    assert _permission(system, replace(projection, status="failed"), *write).stopped
     newer_input = replace(WorkBasis.current(projection, "engineering"), input_version=projection.input_version - 1)
     assert _permission(system, projection, *write, basis=newer_input).stopped
     other_contract = replace(WorkBasis.current(projection, "engineering"), effective_contract_hash="sha256:other")

@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.decisions import DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision
@@ -48,7 +49,7 @@ def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run
     blocked = system.run_until_stop(run_id)
 
     # 工程部门的请求没有发出成功：run 停在 ENGINEERING，没有结束，产品的成果与已用的激活次数、用量都在
-    assert (blocked.phase, blocked.stop_reason, blocked.outcome) == ("ENGINEERING", None, "running")
+    assert (blocked.active_department, blocked.stop_reason, blocked.status) == ("engineering", None, "running")
     assert blocked.product_spec is not None and blocked.cycle_count == 2 and blocked.token_used == 120
     [decision] = _open(system)
     events = system.store.list_events(run_id)
@@ -67,8 +68,8 @@ def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run
 
     # 回答之前 run 不推进：再次运行或激活都不写入，也不调用模型
     end = system.store.end_position()
-    assert system.run_until_stop(run_id).phase == "ENGINEERING"
-    assert system.activate_once(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.run_until_stop(run_id), "engineering")
+    assert has_new_work(system.activate_once(run_id), "engineering")
     assert system.store.end_position() == end and len(adapter.invocations) == 2
 
     # 回答继续执行：从工程部门的这次请求接着进行，产品不再调用，走完交付与放行
@@ -77,7 +78,7 @@ def test_a_model_that_cannot_be_used_blocks_the_run_until_the_answer_and_the_run
     assert (answered.status, answered.answer["option"], answered.answer["note"]) == ("answered", "continue",
                                                                                        "凭据已经补上")
     finished = system.run_until_stop(run_id)
-    assert finished.phase == "DONE"
+    assert finished.status == "done"
     assert [call.department for call in adapter.invocations] == [
         "product", "engineering", "engineering", "quality"]
     assert finished.product_specs == blocked.product_specs
@@ -93,7 +94,7 @@ def test_choosing_to_stop_ends_the_run_in_the_same_transaction_as_the_answer(dat
     events = system.store.list_events(run_id)
     assert [event.type for event in events[-2:]] == [EventType.DECISION_ANSWERED, EventType.RUN_FAILED]
     assert events[-1].stop_reason == "cancelled" and events[-2].command_id == events[-1].command_id
-    assert system.run_until_stop(run_id).phase == "FAILED"
+    assert system.run_until_stop(run_id).status == "failed"
     assert len(adapter.invocations) == 2
     with pytest.raises(DecisionClosed):
         _answer(system, decision.decision_id)
@@ -103,7 +104,7 @@ def test_cancelling_a_blocked_run_withdraws_its_decision_request(data_dir):
     system.run_until_stop(run_id)
     [decision] = _open(system)
     cancelled = system.cancel(run_id)
-    assert (cancelled.phase, cancelled.stop_reason) == ("FAILED", "cancelled")
+    assert (cancelled.status, cancelled.stop_reason) == ("failed", "cancelled")
     events = system.store.list_events(run_id)
     assert [event.type for event in events[-2:]] == [EventType.DECISION_WITHDRAWN, EventType.RUN_FAILED]
     assert events[-2].actor == "system" and events[-2].payload == {"decision_id": decision.decision_id,
@@ -146,7 +147,7 @@ def test_a_decision_request_blocking_the_run_stops_a_running_activation_at_its_n
     def reply_after_the_request(_call):
         system.writes.transact(run_stream(run_id), lambda transaction: transaction.append(NewEvent(
             EventType.DECISION_REQUESTED, actor="system", department="product",
-            state_before=transaction.projection.phase, state_after=transaction.projection.phase, payload={
+            state_before=transaction.projection.status, state_after=transaction.projection.status, payload={
                 "kind": "model_unavailable", "blocks": "run",
                 "options": [{"id": "continue", "label": "继续执行"}, {"id": "stop", "label": "停止事项"}],
                 "description": "部门 product 的模型无法使用", "facts": [], "department": "product",
@@ -159,12 +160,12 @@ def test_a_decision_request_blocking_the_run_stops_a_running_activation_at_its_n
     run_id = system.create_run("build an echo CLI")
     blocked = system.activate_once(run_id)
     assert requested.is_set()
-    assert (blocked.phase, blocked.product_spec) == ("PRODUCT_SPEC", None)
+    assert (blocked.active_department, blocked.product_spec) == ("product", None)
     events = system.store.list_events(run_id)
     skipped = [event for event in events if event.type == EventType.TOOL_SKIPPED]
     assert [event.payload["name"] for event in skipped] == ["submit_product_spec"]
     assert events[-1].type == EventType.ACTIVATION_FINISHED
-    assert system.run_until_stop(run_id).phase == "PRODUCT_SPEC"
+    assert has_new_work(system.run_until_stop(run_id), "product")
 
     [decision] = _open(system)
     _answer(system, decision.decision_id)

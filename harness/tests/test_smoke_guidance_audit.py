@@ -5,6 +5,7 @@ from dataclasses import asdict
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.tools import usable_when_guidance_only
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
@@ -85,7 +86,7 @@ def saved_combined(tmp_path_factory):
     holder["system"] = system
     run_id = system.create_run("build an export CLI", max_cycles=20)
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     invocations = list(adapter.invocations)
     system.close()
     return system.data_dir, run_id, projection, invocations
@@ -98,7 +99,7 @@ def combined_run(saved_combined, tmp_path):
 
 def test_combined_run_shape(combined_run):
     system, run_id, projection, invocations = combined_run
-    assert projection.phase == "DONE" and projection.stop_reason == "released", (projection.stop_reason, projection.error)
+    assert projection.status == "done" and projection.stop_reason == "released", (projection.stop_reason, projection.error)
     assert projection.input_version == projection.processed_input_version == 2
     assert projection.product_spec.revision == 2
     assert [item.status for item in projection.department_guidance] == ["explained", "explained"]
@@ -137,7 +138,7 @@ def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_pa
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build an echo CLI")
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
 
     system.add_guidance(run_id, "engineering", "请先核对当前文件，再说明处理边界。")
     adapter.script.extend([

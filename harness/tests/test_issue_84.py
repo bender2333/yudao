@@ -274,5 +274,5 @@ def test_full_system_run_with_fake_adapter(tmp_path: Path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
     run_id = system.create_run("build echo")
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert projection.stop_reason == "released"

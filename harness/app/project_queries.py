@@ -15,7 +15,7 @@ from pydantic import Field, field_validator
 from ..git_versions import GitVersionError
 from ..event_store import run_stream
 from ..models import (
-    ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
+    ArtifactRef, DEPARTMENTS, TERMINAL_STATUSES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
     ProjectEventType, hash_bytes, stop_reason_name,
 )
 from ..observability import ObservabilityQuery
@@ -32,7 +32,7 @@ from ..recovery import (
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
-from .labels import phase_name
+from .labels import status_name
 from .payloads import BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure, Department
 from .read_models import AttemptStatus, ReadModels
 from .registry import QueryDefinition
@@ -186,6 +186,19 @@ class ProjectOverview(Contract):
     work_item: str | None = None
 
 
+class WorkItemProgress(Contract):
+    """事项的进度：从成果推算（循环结构第 2 节）。
+
+    阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、
+    最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。
+    """
+
+    product_spec_revision: int | None
+    delivery_revision: int | None
+    delivery_product_spec_revision: int | None
+    conclusion: str | None
+
+
 class WorkItemCard(Contract):
     work_item_id: str
     kind: str
@@ -196,7 +209,8 @@ class WorkItemCard(Contract):
     created_at: str
     status: str
     department: str | None
-    phase: str | None
+    # 事项的进度：从成果推算（循环结构第 2 节、工单 #556）
+    progress: WorkItemProgress | None
     round: int
     stop_reason: str | None
     human_action: str | None
@@ -244,7 +258,9 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
                 WorkItemCard(
                     work_item_id=item.work_item_id, kind=item.kind, title=item.title, text=item.text, run_id=item.run_id,
                     version=item.stream_version, created_at=item.created_at, status=item.status,
-                    department=item.department, phase=item.phase, round=item.cycle_count,
+                    department=item.department,
+                    progress=_work_item_progress(_optional_run(application, item.run_id)),
+                    round=item.cycle_count,
                     stop_reason=item.stop_reason, human_action=item.human_action,
                     pending_question=item.pending_question, adoption_id=item.adoption_id,
                     start_error=item.start_error,
@@ -301,7 +317,7 @@ class WorkItemLoop(Contract):
     # 事项状态；建档事项结束而初始 PRD 仍待确认时为 awaiting_initial_prd（工单 #136）
     status: str
     department: str | None
-    phase: str | None
+    progress: WorkItemProgress | None
     round: int
     started_at: str | None
     elapsed_sec: int | None
@@ -337,7 +353,7 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
         bounds = store.run_time_bounds(item.run_id, through=through)
         rows.append(WorkItemLoop(
             work_item_id=item.work_item_id, kind=item.kind, sign=item.title, color_index=index + 1, status=item.status,
-            department=item.department, phase=item.phase, round=item.cycle_count,
+            department=item.department, progress=_work_item_progress(run), round=item.cycle_count,
             started_at=None if bounds is None else bounds[0],
             elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run, now=at_time),
             time_limit_sec=item.run_time_limit_sec, pending_question=item.pending_question,
@@ -348,6 +364,39 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
         position=_snapshot_position(store, through),
         data=ProjectLoopResult(project_id=state.project_id, work_items=rows,
                                adoptions=[_adoption(item) for item in state.adoptions]),
+    )
+
+
+def _work_item_progress(run: Any) -> WorkItemProgress | None:
+    """事项的进度：从成果推算（循环结构第 2 节）。
+
+    当前有效的 PRD 是第几版、最新一份交付是第几版、它依据的 PRD 版本，
+    以及对最新交付的结论（缺陷记录或放行）。
+    """
+    if run is None:
+        return None
+    spec = getattr(run, "product_spec", None)
+    delivery = getattr(run, "delivery_spec", None)
+    if delivery is None:
+        specs = getattr(run, "delivery_specs", None) or []
+        delivery = specs[-1] if specs else None
+    conclusion = None
+    for review in reversed(getattr(run, "reviews", None) or []):
+        if delivery is not None and review.delivery_spec_hash == delivery.content_hash:
+            conclusion = review.verdict
+            break
+    # 交付依据的 PRD 版本：按交付记录的 PRD 摘要找到那一版的修订号
+    basis_revision = None
+    if delivery is not None:
+        for item in getattr(run, "product_specs", None) or []:
+            if item.content_hash == delivery.product_spec_hash:
+                basis_revision = item.revision
+                break
+    return WorkItemProgress(
+        product_spec_revision=None if spec is None else spec.revision,
+        delivery_revision=None if delivery is None else delivery.revision,
+        delivery_product_spec_revision=basis_revision,
+        conclusion=conclusion,
     )
 
 
@@ -667,7 +716,8 @@ class DepartmentWorkspaceResult(Contract):
     department: str
     work_item_id: str | None
     run_id: str | None
-    phase: str | None
+    # run 的状态（进行中与三个终态）：部门进行到哪一步不记在这里（工单 #556）
+    run_status: str | None
     # 事项状态与停止原因：用户停止的事项在部门页写「已停止」，不写「执行失败」（工单 #319）
     status: str | None
     stop_reason: str | None
@@ -731,11 +781,11 @@ def _room_status(run: Any, department: str, observation: str | None) -> str:
     if run.active_department == department:
         if observation == OBSERVATION_WAITING_RESUME:
             return "waiting_resume"
-        if run.phase == "PAUSED":
+        if run.status == "paused":
             return "paused"
-        if run.phase == "FAILED":
+        if run.status == "failed":
             return "failed"
-        if run.phase == "DONE":
+        if run.status == "done":
             return "done"
         return "working"
     # 本部门参与过这次 run（它的激活记录已写入）时按 run 的终态；否则未工作
@@ -743,11 +793,11 @@ def _room_status(run: Any, department: str, observation: str | None) -> str:
         return "idle"
     if run.stop_reason and run.stop_reason == "cancelled":
         return "cancelled"
-    if run.phase == "FAILED":
+    if run.status == "failed":
         return "failed"
-    if run.phase == "PAUSED":
+    if run.status == "paused":
         return "paused"
-    if run.phase == "DONE":
+    if run.status == "done":
         return "done"
     return "idle"
 
@@ -850,7 +900,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
         data=DepartmentWorkspaceResult(
             project_id=state.project_id, department=request.department,
             work_item_id=None if item is None else item.work_item_id,
-            run_id=None if run is None else run.run_id, phase=None if run is None else run.phase,
+            run_id=None if run is None else run.run_id, run_status=None if run is None else run.status,
             status=None if item is None else item.status,
             stop_reason=None if run is None else run.stop_reason,
             active=False if run is None else run.active_department == request.department,
@@ -2030,7 +2080,7 @@ def _recovery_observation(application: Application, run_id: str) -> str | None:
         return None
     events = application.system.store.list_events(run_id)
     decisions = _run_decisions(application, run_id)
-    return observation_state(events, decisions.values(), phase=run.phase, stop_reason=run.stop_reason)
+    return observation_state(events, decisions.values(), status=run.status, stop_reason=run.stop_reason)
 
 class RecoveryStatus(Contract):
     # 恢复观察的汇总（工单 #18，设计说明第 4.3 节 system.status 的 3.1 部分）：服务重启后自动继续的事项数、
@@ -2051,7 +2101,7 @@ def recovery_status(application: Application) -> RecoveryStatus:
             continue
         events = store.list_events(run_id)
         decisions = _run_decisions(application, run_id)
-        state = observation_state(events, decisions.values(), phase=run.phase, stop_reason=run.stop_reason)
+        state = observation_state(events, decisions.values(), status=run.status, stop_reason=run.stop_reason)
         if state == OBSERVATION_WAITING_RESUME:
             waiting_resume += 1
     resumed = getattr(application.system, "resumed_runs", None)
@@ -2078,7 +2128,7 @@ PROJECTS_LIST = QueryDefinition(
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
                 ProjectEventType.BASELINE_ADOPTED,
-                EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.TOOL_STARTED, EventType.ACTION_VERIFIED,
                 EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
 )
@@ -2089,7 +2139,7 @@ PROJECT_OVERVIEW = QueryDefinition(
                 ProjectEventType.PROJECT_GOAL_CHANGED,
                 ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
                 ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
-                EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_CONTINUED,
                 EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED,
@@ -2103,7 +2153,7 @@ PROJECT_LOOP = QueryDefinition(
     name="project.loop", request=ProjectLoop, result=ProjectLoopResult, handle=_project_loop,
     replayable=True,
     changed_by=(ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
-                EventType.TRANSITION, EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
+                EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
                 EventType.RUN_PAUSED, EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.DEPARTMENT_ACTIVATED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.TOOL_STARTED, EventType.TOOL_CALLED,
                 EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED,
@@ -2115,7 +2165,7 @@ PROJECT_LOOP = QueryDefinition(
 
 PROJECT_FLOW = QueryDefinition(
     name="project.flow", request=ProjectFlow, result=ProjectFlowResult, handle=_project_flow,
-    changed_by=(EventType.TRANSITION, EventType.ASK_STARTED, EventType.ASK_ANSWERED,
+    changed_by=(EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 EventType.QA_SUBMITTED),
 )
 
@@ -2137,7 +2187,7 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 EventType.CONTEXT_ASSEMBLED, EventType.COMPACTION_RECORDED, EventType.USER_INPUT_RECEIVED,
                 EventType.DEPARTMENT_INPUT,
                 ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
-                EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_CONTINUED, EventType.RUN_RESUMED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 # 本项目的部门设置修改以后生效模型与来源随之更新（工单 #95 的验收）；
@@ -2317,8 +2367,8 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     run = _run(application, request.run_id)
     events = store.list_events(request.run_id)
     decisions = _run_decisions(application, request.run_id)
-    terminal = run.phase in TERMINAL_PHASES
-    state = observation_state(events, decisions.values(), phase=run.phase, stop_reason=run.stop_reason)
+    terminal = run.status in TERMINAL_STATUSES
+    state = observation_state(events, decisions.values(), status=run.status, stop_reason=run.stop_reason)
     # 已结束的 run 不再继续：未完成动作与未回答的核实请求不由恢复处理，只显示结束原因
     unfinished = [] if terminal else _unfinished_actions(events)
     verifications = _verification_records(events, decisions.values())
@@ -2355,7 +2405,7 @@ def _recovery_reason(run: Any, state: str, resume_requests: list[Any]) -> str | 
     # 四种结束方式各自说明结束的原因；运行中不需要说明。
     # 阶段与停止原因按中文写（工单 #747）：机器标识不直接出现在给用户看的文字里
     if state == OBSERVATION_INTERRUPTED:
-        return f"进程在{phase_name(run.phase)}时停止，等待启动时自动继续"
+        return "进程停止，等待启动时自动继续"
     if state == OBSERVATION_WAITING_RESUME and resume_requests:
         return str(resume_requests[0].request.get("description") or resume_requests[0].kind)
     if state == OBSERVATION_COMPLETED:

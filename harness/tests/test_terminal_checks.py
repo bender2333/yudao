@@ -1,3 +1,4 @@
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.engine import StepLimits
@@ -51,11 +52,12 @@ def test_input_written_before_the_failure_commits_keeps_the_run_going(tmp_path, 
     [writer] = done
     assert not writer.errors
     # 新输入使重试用完的失败判断过期：运行没有结束，下一次激活处理新输入
-    assert stopped.phase == "PRODUCT_SPEC" and stopped.stop_reason is None
+    assert has_new_work(stopped, "product") and stopped.stop_reason is None
     assert EventType.RUN_FAILED not in _types(system, run_id)
     assert stopped.input_version == 2 and len(adapter.invocations) == 3
     resumed = system.activate_once(run_id)
-    assert resumed.phase == "ENGINEERING" and resumed.product_spec.input_version == 2
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(resumed, "engineering") and resumed.product_spec.input_version == 2
     assert resumed.canonical_state() == system.replay(run_id).canonical_state()
 
 
@@ -68,7 +70,7 @@ def test_guidance_written_before_the_failure_commits_keeps_the_run_going(tmp_pat
 
     [writer] = done
     assert not writer.errors
-    assert stopped.phase == "PRODUCT_SPEC" and EventType.RUN_FAILED not in _types(system, run_id)
+    assert has_new_work(stopped, "product") and EventType.RUN_FAILED not in _types(system, run_id)
     assert [item.status for item in stopped.department_guidance] == ["received"]
 
 
@@ -80,7 +82,7 @@ def test_a_stop_command_written_before_the_failure_commits_leaves_only_the_cance
 
     [writer] = done
     assert not writer.errors
-    assert stopped.phase == "FAILED" and stopped.stop_reason == "cancelled"
+    assert stopped.status == "failed" and stopped.stop_reason == "cancelled"
     failures = [event for event in system.store.list_events(run_id) if event.type == EventType.RUN_FAILED]
     assert [event.stop_reason for event in failures] == ["cancelled"]
 
@@ -97,7 +99,7 @@ def test_input_written_before_the_time_limit_commits_still_ends_the_run(tmp_path
 
     [writer] = done
     assert not writer.errors
-    assert failed.phase == "FAILED" and failed.stop_reason == "time_limit"
+    assert failed.status == "failed" and failed.stop_reason == "time_limit"
     types = _types(system, run_id)
     assert types.index(EventType.USER_INPUT_RECEIVED) < types.index(EventType.RUN_FAILED)
     assert failed.canonical_state() == system.replay(run_id).canonical_state()

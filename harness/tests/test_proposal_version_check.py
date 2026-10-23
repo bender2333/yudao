@@ -3,7 +3,8 @@ from dataclasses import replace
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
-from harness.models import EventType, json_dumps
+from harness.collaboration import has_new_work
+from harness.models import EventType, SessionRecord, json_dumps
 from harness.proposals import (answer_turn, ask_turn, delivery, delivery_turn, guidance_response,
                                 product_spec, product_spec_turn, review, review_turn)
 from harness.runtime import LoopSystem
@@ -60,7 +61,7 @@ def test_input_after_validation_rejects_the_commit_and_the_proposal_is_judged_ag
     [rejected] = _events(system, run_id, EventType.PROPOSAL_REJECTED)
     assert [error["field"] for error in rejected.payload["errors"]] == ["execution_basis"]
     assert not _events(system, run_id, EventType.SPEC_ACCEPTED)
-    assert result.phase == "PRODUCT_SPEC" and result.input_version == 2
+    assert has_new_work(result, "product") and result.input_version == 2
     accepted = system.activate_once(run_id)
     assert accepted.product_spec.input_version == 2
     assert accepted.canonical_state() == system.replay(run_id).canonical_state()
@@ -75,7 +76,7 @@ def test_a_cancel_after_validation_leaves_no_proposal_record(tmp_path, monkeypat
     [writer] = done
     assert not writer.errors
     assert len(conflicts) == 1 and len(versions) == 2
-    assert result.phase == "FAILED" and result.stop_reason == "cancelled"
+    assert result.status == "failed" and result.stop_reason == "cancelled"
     assert not _events(system, run_id, EventType.PROPOSAL_SUBMITTED)
 
 
@@ -145,8 +146,14 @@ def _activate_until(system, run_id, revision):
     projection = system.project(run_id)
     while projection.product_spec is None or projection.product_spec.revision < revision:
         projection = system.activate_once(run_id)
-        assert projection.phase not in ("DONE", "FAILED"), projection.stop_reason
+        assert projection.status not in ("done", "failed"), projection.stop_reason
     return projection
+
+
+def _working(projection, department):
+    # 部门按关注的成果开始一轮工作（工单 #556）：这一轮在工作的部门可以提交正式成果
+    return replace(projection, sessions={**projection.sessions, department: SessionRecord(
+        session_id=f"ses_{department}", department=department, status="active")})
 
 
 def test_a_spec_that_declares_the_wrong_basis_is_rejected_with_the_current_version(tmp_path):
@@ -155,8 +162,8 @@ def test_a_spec_that_declares_the_wrong_basis_is_rejected_with_the_current_versi
     first = system.activate_once(run_id)
     assert first.product_spec is not None
     projection = system.project(run_id)
-    decision = evaluate_proposal(phase="REWORK_PRODUCT", department="product",
-                                 projection=replace(projection, phase="REWORK_PRODUCT"),
+    decision = evaluate_proposal(department="product",
+                                 projection=_working(projection, "product"),
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=_revision(CHANGE_RECORD, "sha256:" + "0" * 64))
     assert not decision.accepted
@@ -169,8 +176,8 @@ def test_a_first_spec_must_declare_a_null_basis(tmp_path):
     # 还没有当前 ProductSpec：第一份规格必须声明 null 依据，给了 hash 就拒绝
     system, run_id = _system(tmp_path, product_spec())
     projection = system.project(run_id)
-    decision = evaluate_proposal(phase="PRODUCT_SPEC", department="product",
-                                 projection=replace(projection, phase="PRODUCT_SPEC"),
+    decision = evaluate_proposal(department="product",
+                                 projection=replace(projection, status="running"),
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=_revision(CHANGE_RECORD, "sha256:" + "1" * 64))
     assert not decision.accepted
@@ -184,8 +191,8 @@ def test_a_missing_basis_declaration_rejects_the_submission(tmp_path):
     projection = system.project(run_id)
     proposal = _revision(CHANGE_RECORD, None)
     without_field = {key: value for key, value in proposal.items() if key != "basis_product_spec_hash"}
-    decision = evaluate_proposal(phase="PRODUCT_SPEC", department="product",
-                                 projection=replace(projection, phase="PRODUCT_SPEC"),
+    decision = evaluate_proposal(department="product",
+                                 projection=replace(projection, status="running"),
                                  facts=system.workspace(run_id).snapshot().facts, proposal=without_field)
     assert not decision.accepted
     [error] = decision.error_dicts
@@ -198,8 +205,8 @@ def test_a_spec_may_declare_the_current_basis(tmp_path):
     system, run_id = _system(tmp_path, product_spec())
     first = system.activate_once(run_id)
     projection = system.project(run_id)
-    decision = evaluate_proposal(phase="REWORK_PRODUCT", department="product",
-                                 projection=replace(projection, phase="REWORK_PRODUCT"),
+    decision = evaluate_proposal(department="product",
+                                 projection=_working(projection, "product"),
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=_revision(CHANGE_RECORD, first.product_spec.content_hash))
     assert decision.accepted, decision.errors
@@ -210,7 +217,8 @@ def test_a_delivery_bound_to_a_stale_spec_is_rejected(tmp_path):
     # 工程拿着已过期的 ProductSpec 提交交付：整次提交被拒绝，错误指向依据字段并给出当前版本
     system, run_id = _system_with_guided_revision(tmp_path)
     revised = _activate_until(system, run_id, 2)
-    assert revised.phase == "ENGINEERING"
+    # 产品修订了 PRD（工单 #556：产品按关注的成果开始工作，工程按 PRD 的新版本开始返工）
+    assert has_new_work(revised, "product")
     assert revised.product_specs[0].content_hash != revised.product_spec.content_hash
     stale_delivery = FakeTurn(proposal=delivery(
         summary="implemented echo CLI", check_names=["smoke"],
@@ -233,9 +241,9 @@ def test_a_review_bound_to_a_stale_delivery_is_rejected(tmp_path):
         delivery_turn(summary="revised implementation"))
     # 跑到质检阶段且已有两个交付版本：第一个已被返工取代，不是当前版本
     projection = system.project(run_id)
-    while projection.phase != "QUALITY" or len(projection.delivery_specs) < 2:
+    while len(projection.delivery_specs) < 2:
         projection = system.activate_once(run_id)
-        assert projection.phase not in ("DONE", "FAILED"), projection.stop_reason
+        assert projection.status not in ("done", "failed"), projection.stop_reason
     stale_review = FakeTurn(proposal=review(
         "release", "the superseded delivery passed", checks=["smoke"],
         basis_delivery_spec_hash=projection.delivery_specs[0].content_hash), checks={"smoke": 0})
@@ -251,12 +259,12 @@ def test_a_review_bound_to_a_stale_delivery_is_rejected(tmp_path):
 def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path):
     # 放行前的最后一道关：交付本身依据的是已被取代的产品规格，依据字段写对了也不放行
     system, run_id = _system(tmp_path, product_spec(), delivery_turn())
-    while system.project(run_id).phase != "QUALITY":
+    while system.project(run_id).delivery_spec is None:
         projection = system.activate_once(run_id)
-        assert projection.phase not in ("DONE", "FAILED"), projection.stop_reason
+        assert projection.status not in ("done", "failed"), projection.stop_reason
     projection = system.project(run_id)
     superseded = replace(projection.delivery_spec, product_spec_hash="sha256:" + "0" * 64)
-    decision = evaluate_proposal(phase="QUALITY", department="quality",
+    decision = evaluate_proposal(department="quality",
                                  projection=replace(projection, delivery_spec=superseded),
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=review("release", "releasing a stale-bound delivery",
@@ -296,7 +304,8 @@ def test_a_revision_with_a_stale_basis_is_rejected_by_the_host_and_can_be_resubm
     # 拒绝的原因与当前版本作为 validation_feedback 交回，产品读过反馈以后按当前版本重交，修订被接纳
     system, run_id = _system_with_guided_revision(tmp_path)
     projection = _activate_until(system, run_id, 2)
-    assert projection.phase == "ENGINEERING"
+    # 产品修订了 PRD（工单 #556：产品按关注的成果开始工作，工程按 PRD 的新版本开始返工）
+    assert has_new_work(projection, "product")
     current_hash = projection.product_spec.content_hash
     # 修订提交必须来自产品会话：用指导把产品请回工作，脚本按会话给
     system.add_guidance(run_id, "product", "请再确认一次验收边界。")
@@ -327,7 +336,8 @@ def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_cur
     # 读过反馈以后按当前版本重交，交付被接纳并进入质检
     system, run_id = _system_with_guided_revision(tmp_path)
     projection = _activate_until(system, run_id, 2)
-    assert projection.phase == "ENGINEERING"
+    # 产品修订了 PRD（工单 #556：产品按关注的成果开始工作，工程按 PRD 的新版本开始返工）
+    assert has_new_work(projection, "product")
     current_hash = projection.product_spec.content_hash
     files = {"src/echo.py": "import sys\nprint(sys.argv[1])\n"}
     stale = FakeTurn(proposal=delivery(
@@ -358,7 +368,8 @@ def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_cur
     assert accepted.delivery_spec.product_spec_hash == current_hash
     [event] = _events(system, run_id, EventType.DELIVERY_ACCEPTED)[-1:]
     assert event.payload["product_spec_hash"] == current_hash
-    assert accepted.phase == "QUALITY"
+    # 新的交付让质检开始一轮工作（工单 #556：质检关注新的交付）
+    assert has_new_work(accepted, "quality")
     assert accepted.pending_feedback == {}
 
 
@@ -369,9 +380,9 @@ def test_a_review_with_a_stale_basis_is_rejected_then_resubmitted_with_the_curre
                                           defects=[{"severity": "minor", "summary": "naming"}]),
                               delivery_turn(summary="revised implementation"))
     projection = system.project(run_id)
-    while projection.phase != "QUALITY" or len(projection.delivery_specs) < 2:
+    while len(projection.delivery_specs) < 2:
         projection = system.activate_once(run_id)
-        assert projection.phase not in ("DONE", "FAILED"), projection.stop_reason
+        assert projection.status not in ("done", "failed"), projection.stop_reason
     current_hash = projection.delivery_spec.content_hash
     stale = FakeTurn(proposal=review(
         "release", "the superseded delivery passed", checks=["smoke"],
@@ -395,7 +406,7 @@ def test_a_review_with_a_stale_basis_is_rejected_then_resubmitted_with_the_curre
     system.test_adapter.script = [resubmit]
     accepted = system.activate_once(run_id)
     assert len(_events(system, run_id, EventType.QA_SUBMITTED)) == submitted_before + 1
-    assert accepted.phase == "DONE"
+    assert accepted.status == "done"
     assert accepted.delivery_spec.content_hash == current_hash
     [event] = _events(system, run_id, EventType.QA_SUBMITTED)[-1:]
     assert event.payload["delivery_spec_hash"] == current_hash

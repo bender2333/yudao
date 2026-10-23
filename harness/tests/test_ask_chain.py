@@ -77,8 +77,8 @@ def test_the_nested_ask_answers_the_outer_branch_and_the_run_continues(tmp_path:
     system.run_until_stop(run_id)
 
     projection = system.project(run_id)
-    assert projection.outcome == "done", projection.error
-    assert projection.phase == "DONE"
+    assert projection.status == "done", projection.error
+    assert projection.status == "done"
 
     started = _events(system, run_id, EventType.ASK_STARTED)
     answered = _events(system, run_id, EventType.ASK_ANSWERED)
@@ -129,7 +129,7 @@ def test_the_three_layer_chain_answers_and_refuses_the_fourth_layer(tmp_path: Pa
     system.run_until_stop(run_id)
 
     projection = system.project(run_id)
-    assert projection.outcome == "done", projection.error
+    assert projection.status == "done", projection.error
 
     started = _events(system, run_id, EventType.ASK_STARTED)
     answered = _events(system, run_id, EventType.ASK_ANSWERED)
@@ -175,7 +175,7 @@ def test_the_chain_limit_is_read_from_the_rule_registry(tmp_path: Path, monkeypa
     run_id = system.create_run("build echo")
     system.run_until_stop(run_id)
 
-    assert system.project(run_id).outcome == "done", system.project(run_id).error
+    assert system.project(run_id).status == "done", system.project(run_id).error
     # 只有两层开出来，第三层被拒绝
     assert len(_events(system, run_id, EventType.ASK_STARTED)) == 2
     refused = [event for event in _events(system, run_id, EventType.TOOL_CALLED)
@@ -218,7 +218,7 @@ def test_the_nested_branch_steps_are_charged_to_the_first_asker(tmp_path: Path):
     # 链上的步数计入提问方：提问方没有余步交付，事项以步数用完暂停
     assert not [event for event in events if event.type == EventType.DELIVERY_ACCEPTED]
     projection = system.project(run_id)
-    assert projection.outcome == "paused"
+    assert projection.status == "paused"
     assert projection.stop_reason == "model_steps_exhausted"
 
 

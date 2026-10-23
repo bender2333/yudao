@@ -249,7 +249,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert capabilities["queries"][-2] == {
         "name": "home.away_report", "replayable": False,
         "changed_by": sorted([
-            "transition", "ask_started", "ask_answered",
+            "ask_started", "ask_answered",
             "qa_submitted", "run_done", "run_paused", "run_failed", "decision_requested", "decision_answered",
             "deliverable_adopted", "work_item_created",
         ]) + ["model_attempt_finished", "home_seen"],

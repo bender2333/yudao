@@ -41,7 +41,7 @@ def assert_candidate_does_not_change_execution(system, projection):
 def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path):
     script = rework_script()
     system, result = run_scripted(tmp_path, script)
-    assert result.phase == "DONE"
+    assert result.status == "done"
     assert len(result.lesson_candidates) == 1
     candidate = result.lesson_candidates[0]
     source = system.store.get_event(candidate.source_event_id)
@@ -102,7 +102,7 @@ def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path
     script = [product_spec(),delivery_turn()] if with_delivery else []
     script.append(ProviderError("controlled connection failure"))
     system, result = run_scripted(tmp_path, script)
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "provider_error"
     assert len(result.lesson_candidates) == 1
     candidate = result.lesson_candidates[0]
@@ -126,9 +126,9 @@ def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path
 
 def test_success_cancel_pause_and_rejected_review_do_not_invent_candidates(tmp_path):
     _system, success = run_scripted(tmp_path / "success", happy_script())
-    assert success.phase == "DONE" and success.lesson_candidates == []
+    assert success.status == "done" and success.lesson_candidates == []
     system, paused = run_scripted(tmp_path / "pause", [product_spec()], max_cycles=1)
-    assert paused.phase == "PAUSED" and paused.lesson_candidates == []
+    assert paused.status == "paused" and paused.lesson_candidates == []
     run_id = system.create_run("cancelled by developer")
     cancelled = system.cancel(run_id)
     assert cancelled.stop_reason == "cancelled" and cancelled.lesson_candidates == []
@@ -139,7 +139,7 @@ def test_success_cancel_pause_and_rejected_review_do_not_invent_candidates(tmp_p
     _system, rejected = run_scripted(
         tmp_path / "rejected", [product_spec(),delivery_turn(), invalid], max_cycles=3
     )
-    assert rejected.phase == "PAUSED" and rejected.rejections
+    assert rejected.status == "paused" and rejected.rejections
     assert rejected.lesson_candidates == []
 
 def test_release_with_defect_keeps_existing_rejection_and_does_not_create_candidate(tmp_path):
@@ -148,7 +148,7 @@ def test_release_with_defect_keeps_existing_rejection_and_does_not_create_candid
         review_turn("release", "nonblocking observation", defects=[{"severity": "minor", "summary": "naming could improve"}]),
         review_turn("release", "no defects remain"),
     ])
-    assert result.phase == "DONE"
+    assert result.status == "done"
     assert result.lesson_candidates == []
     assert result.rejections[0]["errors"] == [{"field": "defects", "message": "release requires an empty defect list"}]
     # #470 删除工程计划以后，工程激活只提交一次计划，模型调用少一次：产品、交付、两次质检

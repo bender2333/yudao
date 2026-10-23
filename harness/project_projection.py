@@ -191,7 +191,6 @@ class WorkItem:
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
     department: str | None = None
-    phase: str | None = None
     stop_reason: str | None = None
     human_action: str | None = None
     cycle_count: int = 0

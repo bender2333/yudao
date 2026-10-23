@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, UnknownStopReason, load_definitions
@@ -309,27 +310,6 @@ def test_malformed_json_duplicate_keys_and_missing_files_are_reported(tmp_path):
     assert raised.value.issues == (("rules.json", "（整个文件）", "定义文件不存在"),)
 
 
-def _without_quality(directory: Path) -> None:
-    organization = _read(directory, "organization.json")
-    organization["departments"] = organization["departments"][:2]
-    _write(directory, "organization.json", organization)
-    for name, key in (("roles.json", None), ("proposal_contracts.json", "roles"),
-                      ("work_items.json", ("kinds", "onboarding", "departments")),
-                      ("work_items.json", ("kinds", "change", "departments"))):
-        content = _read(directory, name)
-        target = content
-        steps = [] if key is None else ([key] if isinstance(key, str) else list(key))
-        for step in steps:
-            target = target[step]
-        del target["quality"]
-        _write(directory, name, content)
-    # 规则登记里的可见范围条目同样要去掉这个部门
-    rules = _read(directory, "rules.json")
-    del rules["roles.quality.visibility"]
-    _write(directory, "rules.json", rules)
-
-
-
 def _with_unimplemented_tool(directory: Path) -> None:
     tools = _read(directory, "tools.json")
     tools["fetch_url"] = {**tools["read_file"], "description": "Fetch one registered URL."}
@@ -345,8 +325,6 @@ def _with_unimplemented_tool(directory: Path) -> None:
                                "max_cycles": {**_read(directory, "rules.json")["max_cycles"],
                                               "value": -1}}),
      "rules.json max_cycles："),
-    # 控制核心的阶段迁移只为产品、工程、质检写了阶段
-    (_without_quality, "organization.json departments：控制核心的阶段迁移按顺序支持部门 product、engineering、quality"),
     # 执行环境没有实现的环境工具
     (_with_unimplemented_tool, "tools.json fetch_url：执行环境没有这个环境工具的实现"),
 ])
@@ -365,8 +343,8 @@ def test_startup_fails_when_a_definition_is_invalid(tmp_path, change, expected):
 
 
 def _terminal(event_type: str, stop_reason: str | None) -> NewEvent:
-    return NewEvent(event_type, actor="system", department="product", state_before="PRODUCT_SPEC",
-                    state_after="FAILED",
+    return NewEvent(event_type, actor="system", department="product", state_before="running",
+                    state_after="failed",
                     stop_reason=stop_reason, payload={"stop_reason": stop_reason})
 
 
@@ -383,18 +361,18 @@ def test_stop_reasons_outside_the_definitions_cannot_be_written(tmp_path):
         system.writes.append(run_stream(run_id), _terminal(EventType.RUN_DONE, "time_limit"))
     with pytest.raises(ValueError, match="requires a stop reason"):
         system.writes.append(run_stream(run_id), _terminal(EventType.RUN_PAUSED, None))
-    with pytest.raises(ValueError, match="cannot be recorded on transition"):
-        system.writes.append(run_stream(run_id), _terminal(EventType.TRANSITION, "cancelled"))
+    with pytest.raises(ValueError, match="cannot be recorded on department_activated"):
+        system.writes.append(run_stream(run_id), _terminal(EventType.DEPARTMENT_ACTIVATED, "cancelled"))
     # 结束事件的终态与载荷中的停止原因都要与事件的停止原因一致
-    paused = NewEvent(EventType.RUN_PAUSED, actor="system", department="product", state_before="PRODUCT_SPEC",
-                      state_after="FAILED",
+    paused = NewEvent(EventType.RUN_PAUSED, actor="system", department="product", state_before="running",
+                      state_after="failed",
                       stop_reason="max_cycles", payload={"stop_reason": "max_cycles"})
-    with pytest.raises(ValueError, match="must end in PAUSED"):
+    with pytest.raises(ValueError, match="must end in paused"):
         system.writes.append(run_stream(run_id), paused)
     with pytest.raises(ValueError, match="same stop reason in its payload"):
         system.writes.append(run_stream(run_id), NewEvent(
-            EventType.RUN_FAILED, actor="system", department="product", state_before="PRODUCT_SPEC",
-            state_after="FAILED",
+            EventType.RUN_FAILED, actor="system", department="product", state_before="running",
+            state_after="failed",
             stop_reason="cancelled", payload={"stop_reason": "made_up_reason"}))
     assert system.store.list_events(run_id) == before
     system.close()
@@ -405,7 +383,7 @@ def test_work_item_creation_model_requests_and_proposal_decisions_record_the_def
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([invalid_spec, *happy_script()]))
     project_id = system.projects.register("定义版本", "做一个命令行回显工具。")
     work_item_id, run_id = system.projects.start_work_item(project_id, "回显参数")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
 
     [created] = [event for event in system.store.list_project_events(project_id)
                  if event.type == ProjectEventType.WORK_ITEM_CREATED]
@@ -448,7 +426,7 @@ def test_a_run_stopping_for_an_unlisted_reason_fails_to_record_the_stop(tmp_path
     with pytest.raises(UnknownStopReason):
         system.run_until_stop(run_id)
     projection = system.project(run_id)
-    assert projection.phase == "PRODUCT_SPEC" and projection.stop_reason is None
+    assert has_new_work(projection, "product") and projection.stop_reason is None
     assert not [event for event in system.store.list_events(run_id)
                 if event.type in {EventType.RUN_FAILED, EventType.RUN_PAUSED, EventType.RUN_DONE}]
     system.close()

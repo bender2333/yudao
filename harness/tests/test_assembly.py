@@ -3,6 +3,7 @@ from dataclasses import asdict
 
 from harness.adapters.fake import FakeAdapter
 from harness.assembly import TARGET_KEYS, ContextAssembly, ModelLimits, StepFrame, model_limits
+from harness.collaboration import has_new_work
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, EventType, RunProjection, hash_bytes
 from harness.projection import apply_event
@@ -78,6 +79,7 @@ def test_each_recorded_request_is_rebuilt_from_the_events_before_it(tmp_path):
 
 def test_compaction_requests_and_checkpoints_are_rebuilt_from_recorded_events(tmp_path):
     system, _, run_id, _ = _runner(tmp_path)
-    assert system.activate_once(run_id).phase == "ENGINEERING"
+    # 产品要求已接纳：工程按关注的成果开始一轮工作（工单 #556）
+    assert has_new_work(system.activate_once(run_id), "engineering")
     counts = _rebuild_recorded_steps(system, run_id)
     assert counts["compaction"] == counts["recorded"] > 1 and counts["work"] > 1

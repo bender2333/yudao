@@ -16,7 +16,7 @@ import { paths, type Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDepartmentDraft } from "./department-settings-form";
-import { DEPARTMENTS, GUIDANCE_STATUS, PHASE_LABELS, departmentName, formatTime, itemSource, label } from "./labels";
+import { DEPARTMENTS, GUIDANCE_STATUS, RUN_STATUS_LABELS, departmentName, formatTime, itemSource, label } from "./labels";
 import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
@@ -47,7 +47,7 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   // 事项标识取不到时 department.workspace 不被打开：那一处没有读取动作，页面显示空态，
   // 不显示「正在读取数据」（工单 #295 第 3 项）
   const noWorkItem = picked.data !== null && workItem === null;
-  const command = useCommand(props.app, pageKey([data?.work_item_id, data?.department_setting.configured_version, data?.phase]));
+  const command = useCommand(props.app, pageKey([data?.work_item_id, data?.department_setting.configured_version, data?.run_status]));
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
@@ -169,9 +169,9 @@ function departmentStatus(data: DepartmentWorkspaceResult): string {
     return "已停止";
   }
   if (data.active) {
-    return `正在工作 · ${label(PHASE_LABELS, data.phase)}`;
+    return `正在工作 · ${label(RUN_STATUS_LABELS, data.run_status)}`;
   }
-  return `这次运行不在本部门 · ${label(PHASE_LABELS, data.phase)}`;
+  return `这次运行不在本部门 · ${label(RUN_STATUS_LABELS, data.run_status)}`;
 }
 
 function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: string; scopeWorkItem: string | null; scopeNote: string; onOpenSettings: () => void }) {

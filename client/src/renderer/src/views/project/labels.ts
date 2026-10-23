@@ -55,17 +55,12 @@ export const RECOVERY_STATE_KIND: Record<string, string> = {
   stopped: "failed",
 };
 
-export const PHASE_LABELS: Record<string, string> = {
-  CREATED: "等待开始",
-  PRODUCT_SPEC: "产品处理中",
-  ENGINEERING: "工程处理中",
-  DELIVERY: "交付核验中",
-  QUALITY: "质检处理中",
-  REWORK_PRODUCT: "产品返工中",
-  REWORK_ENGINEERING: "工程返工中",
-  DONE: "已完成",
-  FAILED: "执行失败",
-  PAUSED: "已暂停",
+// run 状态的中文名（工单 #556）：阶段状态机删掉以后，run 的状态只有进行中与三个终态
+export const RUN_STATUS_LABELS: Record<string, string> = {
+  running: "进行中",
+  done: "已完成",
+  paused: "已暂停",
+  failed: "执行失败",
 };
 
 // 停止原因的中文名（harness/definitions/stop_reasons.json 的取值与 done 的两种一致）
@@ -157,20 +152,38 @@ export function label(map: Record<string, string>, value: string | null | undefi
   return map[value] ?? value;
 }
 
-// 事项状态行里的阶段名（工单 #657）。
-// 后端把用户取消的终态记成 phase=FAILED 配 stop_reason=cancelled，真正失败时也是 FAILED，
-// 区别只在停止原因上。取消是用户自己的决定，页面上不该说失败，
-// 因此取消的事项不写阶段名（状态行已经写着「已停止」，下一行的停止原因写着「运行已被取消」）。
-// user_cancelled 同理：用户放弃的建档 run 本身是跑完的（phase=DONE），但事项是被用户放弃的，
-// 写「已完成」与「已停止」挨在一起读起来自相矛盾（工单 #707）。
-export function phaseLabel(phase: string | null | undefined, stopReason: string | null | undefined): string | null {
-  if (!phase) {
+// 事项的进度（工单 #556）：从成果推算，不记阶段。
+// 当前有效的 PRD 是第几版、最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。
+export interface WorkItemProgressView {
+  product_spec_revision: number | null;
+  delivery_revision: number | null;
+  delivery_product_spec_revision: number | null;
+  conclusion: string | null;
+}
+
+const CONCLUSION_LABELS: Record<string, string> = {
+  rework_engineering: "缺陷记录",
+  release: "放行",
+};
+
+export function progressLabel(progress: WorkItemProgressView | null | undefined): string | null {
+  if (!progress) {
     return null;
   }
-  if (stopReason === "cancelled" || stopReason === "user_cancelled") {
-    return null;
+  const parts: string[] = [];
+  if (progress.product_spec_revision !== null) {
+    parts.push(`PRD 第 ${progress.product_spec_revision} 版`);
   }
-  return label(PHASE_LABELS, phase);
+  if (progress.delivery_revision !== null) {
+    const basis = progress.delivery_product_spec_revision !== null
+      ? `（依据 PRD 第 ${progress.delivery_product_spec_revision} 版）`
+      : "";
+    parts.push(`交付第 ${progress.delivery_revision} 版${basis}`);
+  }
+  if (progress.conclusion) {
+    parts.push(`结论：${CONCLUSION_LABELS[progress.conclusion] ?? progress.conclusion}`);
+  }
+  return parts.length === 0 ? null : parts.join("，");
 }
 
 export function departmentName(value: string | null | undefined): string {

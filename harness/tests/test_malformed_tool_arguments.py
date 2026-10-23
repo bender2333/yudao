@@ -4,6 +4,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from harness.collaboration import has_new_work
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.models import DEPARTMENTS, EventType, json_dumps
@@ -36,7 +37,7 @@ def test_truncated_arguments_are_sanitized_before_history_replay(tmp_path):
     result = system.activate_once(run_id)
 
     # 可恢复的参数错误不能变成硬失败，运行必须继续推进
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     assert len(adapter.invocations) == 2
     # 记入历史与下次请求回放的参数恒为有效 JSON 对象
     history = department_history(system, run_id, "product")
@@ -71,7 +72,7 @@ def test_valid_tool_call_still_executes_with_original_arguments(tmp_path):
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     events = system.store.list_events(run_id)
     called = next(item for item in events
                   if item.type == EventType.TOOL_CALLED and item.payload.get("id") == "call-search")
@@ -181,7 +182,7 @@ def test_truncated_chat_stream_never_replays_invalid_assistant_arguments(tmp_pat
         server.shutdown()
         server.server_close()
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     assert len(capture.requests) == 2
     second = capture.requests[1]
     assistant_calls = [call for message in second["messages"]

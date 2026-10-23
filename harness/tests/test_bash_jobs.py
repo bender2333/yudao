@@ -11,6 +11,7 @@ import sys
 import time
 from pathlib import Path
 
+from harness.collaboration import has_new_work
 from harness.models import ArtifactRef, EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelCall, ModelResponse
@@ -115,7 +116,7 @@ def test_cross_activation_read_output_stop_job_and_department_isolation(tmp_path
     run_id = system.create_run("cross activation test")
     # 推进到工程阶段，使工程持有运行工作区
     proj = system.activate_once(run_id)
-    assert proj.phase == "ENGINEERING"
+    assert has_new_work(proj, "engineering")
 
     # 激活 1：持有运行工作区的工程获取环境并启动持续输出的后台命令
     env1 = system.orchestrator._environment_for(run_id, "engineering", refresh=True)
@@ -216,7 +217,7 @@ def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
     child_pause = _grandchild(perform(env_pause, "read_output", {"job_id": rec_pause.output["job_id"]}).output["output"])
 
     res_pause = sys_pause.run_until_stop(run_pause)
-    assert res_pause.phase == "PAUSED" and res_pause.stop_reason == "max_cycles"
+    assert res_pause.status == "paused" and res_pause.stop_reason == "max_cycles"
     assert wait_until_stopped(child_pause)
     sys_pause.close()
 
@@ -230,7 +231,7 @@ def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
     child_release = _grandchild(perform(env_release, "read_output", {"job_id": rec_release.output["job_id"]}).output["output"])
 
     res_release = sys_release.run_until_stop(run_release)
-    assert res_release.phase == "DONE" and res_release.stop_reason == "released"
+    assert res_release.status == "done" and res_release.stop_reason == "released"
     assert wait_until_stopped(child_release)
     sys_release.close()
 
@@ -385,7 +386,7 @@ def test_work_item_run_with_background_bash_port_access_read_output_and_stop(tmp
     system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter(script))
     run_id = system.create_run("build server")
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE" and result.stop_reason == "released"
+    assert result.status == "done" and result.stop_reason == "released"
 
     events = system.store.list_events(run_id)
     tool_events = [e for e in events if e.type == EventType.TOOL_CALLED and e.payload.get("name") in {"bash", "read_output", "stop_job"}]

@@ -7,6 +7,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.definitions import DEFINITIONS
 from harness.app.application import Application
 from harness.app.project_queries import RunAttempt
@@ -101,7 +102,7 @@ def test_chat_finish_reason_is_visible_in_the_persisted_attempt_details(data_dir
                              if event.type == EventType.MODEL_ATTEMPT_FINISHED)
             detail = Application(system).query("run.attempt", RunAttempt(
                 run_id=run_id, attempt_id=completed.payload["attempt_id"]))
-            assert result.phase == "ENGINEERING", result.error
+            assert has_new_work(result, "engineering"), result.error
             assert detail.data.response["finish_reason"] == finish_reason
         finally:
             system.close()
@@ -608,7 +609,7 @@ def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_su
             system.close()
     finally:
         provider.close()
-    assert result.phase == "ENGINEERING", result.error
+    assert has_new_work(result, "engineering"), result.error
     assert [event.error for event in failed] == ["Model provider connection failed"]
     assert failed[0].payload["reason"] == "provider_error"
     assert failed[0].payload["retryable"] is True and failed[0].payload["will_retry"] is True
@@ -691,7 +692,7 @@ def test_messages_stream_error_event_is_classified_by_its_type(error_type, retry
     assert failed[0].payload["provider_response_id"] == "msg-stream-error"
     assert failed[0].payload["stream_last_stage"] == "error"
     if retryable:
-        assert result.phase == "ENGINEERING", result.error
+        assert has_new_work(result, "engineering"), result.error
         assert len(scheduled) == 1
         assert len(provider.requests) == 2
     else:
@@ -847,7 +848,7 @@ def test_empty_output_is_retried_and_the_run_continues(protocol, data_dir):
     finally:
         provider.close()
     failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
-    assert result.phase == "ENGINEERING", result.error
+    assert has_new_work(result, "engineering"), result.error
     assert len(failed) == 1
     assert failed[0].payload["reason"] == "empty_output"
     assert failed[0].payload["retryable"] is True and failed[0].payload["will_retry"] is True
@@ -870,7 +871,7 @@ def test_repeated_empty_output_stops_the_run_as_a_provider_failure_without_pausi
             system.close()
     finally:
         provider.close()
-    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert result.status == "failed" and result.stop_reason == "provider_error"
     assert result.stop_reason in DEFINITIONS.stop_reasons
     failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
     assert len(failed) == 1

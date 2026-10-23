@@ -29,7 +29,7 @@ from .deltas import DeltaChannel, DeltaScope
 from .environment import LocalEnvironment, QA_TESTS_DIR, qa_tests_digest
 from .event_store import run_stream
 from .write_path import Transaction, WritePath
-from .models import TERMINAL_PHASES, ArtifactRef, DepartmentPrompt, EventType, RunProjection, json_dumps
+from .models import TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, EventType, RunProjection, json_dumps
 from .public_tree import UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
@@ -518,7 +518,6 @@ class StepDriver:
                                 facts = self._environment.query(FactsQuery(tree=True)).tree
                                 events = self._writes.read(self._stream).events()
                                 decision = evaluate_proposal(
-                                    phase=projection.phase,
                                     department="product",
                                     proposal=spec_proposal,
                                     projection=projection,
@@ -748,7 +747,7 @@ class StepDriver:
 
         def prepare(transaction: Transaction) -> tuple[ModelRequest, StepRequest] | _Unassembled | None:
             projection = transaction.projection
-            if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
+            if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
                 return None
             projection = self._settle(transaction)
             if scope.basis.changed(projection, scope.department):
@@ -822,7 +821,7 @@ class StepDriver:
 
         def start(transaction: Transaction) -> bool:
             projection = self._settle(transaction)
-            if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
+            if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
                 return False
             if scope.basis.changed(projection, scope.department):
                 return False
@@ -860,7 +859,7 @@ class StepDriver:
 
         def schedule(transaction: Transaction) -> bool:
             projection = self._settle(transaction)
-            if (projection.phase in TERMINAL_PHASES or self._cancelled.is_set()
+            if (projection.status in TERMINAL_STATUSES or self._cancelled.is_set()
                     or scope.basis.changed(projection, scope.department)):
                 return False
             self._recorder.retry_scheduled(transaction, request, error, delay, next_step_id)
@@ -874,7 +873,7 @@ class StepDriver:
         def finish(transaction: Transaction) -> None:
             projection = transaction.projection
             self._version = projection.stream_version
-            if projection.phase in TERMINAL_PHASES or self._cancelled.is_set():
+            if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
                 return
             if scope.basis.changed(projection, scope.department):
                 return

@@ -38,7 +38,7 @@ function workItem(workItemId: string, title: string): WorkItemCard {
     created_at: "2026-10-02T09:00:00Z",
     status: "running",
     department: "engineering",
-    phase: null,
+    progress: null,
     round: 1,
     stop_reason: null,
     human_action: null,

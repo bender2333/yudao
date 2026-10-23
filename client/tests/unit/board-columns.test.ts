@@ -1,16 +1,13 @@
 // 事项看板分列与页面名称的单元测试（工单 #303）：取消的事项不再落进部门列；
-// 阶段与停止原因的中文名与状态机一致，停止事项没有部门时页面省略这一格。
+// run 状态与停止原因的中文名与控制核心一致，停止事项没有部门时页面省略这一格（工单 #556）。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BOARD_TITLES, boardColumns } from "../../src/renderer/src/views/project/board.ts";
-import { DECISION_BLOCKS, PHASE_LABELS, STOP_REASON, departmentName, label } from "../../src/renderer/src/views/project/labels.ts";
+import { DECISION_BLOCKS, RUN_STATUS_LABELS, STOP_REASON, departmentName, label } from "../../src/renderer/src/views/project/labels.ts";
 import type { WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
-const PHASES = [
-  "CREATED", "PRODUCT_SPEC", "ENGINEERING", "DELIVERY", "QUALITY",
-  "REWORK_PRODUCT", "REWORK_ENGINEERING", "DONE", "FAILED", "PAUSED",
-];
+const RUN_STATUSES = ["running", "done", "failed", "paused"];
 
 const STOP_REASONS = [
   "released", "baseline_verified", "max_cycles", "model_steps_exhausted", "no_tool_call",
@@ -29,7 +26,7 @@ function item(overrides: Partial<WorkItemCard> & { work_item_id: string }): Work
     created_at: "2026-01-01T00:00:00Z",
     status: "in_progress",
     department: null,
-    phase: null,
+    progress: null,
     round: 1,
     stop_reason: null,
     human_action: null,
@@ -66,19 +63,18 @@ test("部门列按部门分列，已放行与已采纳各自一列", () => {
   assert.deepEqual(columns.adopted.map((entry) => entry.work_item_id), ["w6"]);
 });
 
-test("看板列名与状态词表一致，状态机里没有单独的工程计划阶段", () => {
+test("看板列名与状态词表一致，run 状态只有进行中与三个终态", () => {
   assert.deepEqual(BOARD_TITLES.map(([, title]) => title),
     ["排队中", "产品", "工程", "质检", "已放行", "已采纳", "已停止"]);
-  assert.equal(PHASE_LABELS.ENGINEERING, "工程处理中");
-  assert.equal("ENGINEERING_PLAN" in PHASE_LABELS, false);
-  assert.deepEqual(Object.keys(PHASE_LABELS).sort(), [...PHASES].sort());
+  assert.equal(RUN_STATUS_LABELS.running, "进行中");
+  assert.deepEqual(Object.keys(RUN_STATUS_LABELS).sort(), [...RUN_STATUSES].sort());
 });
 
-test("停止原因与阶段的中文名只覆盖状态机与定义里的取值", () => {
+test("停止原因与 run 状态的中文名只覆盖控制核心与定义里的取值", () => {
   assert.deepEqual(Object.keys(STOP_REASON).sort(), [...STOP_REASONS].sort());
   assert.equal(label(STOP_REASON, "released"), "已完成并放行");
   assert.equal(label(STOP_REASON, "cancelled"), "运行已被取消");
-  for (const name of [...Object.values(PHASE_LABELS), ...Object.values(STOP_REASON)]) {
+  for (const name of [...Object.values(RUN_STATUS_LABELS), ...Object.values(STOP_REASON)]) {
     assert.equal(/[A-Za-z]/.test(name.replace("Yudao", "")), false, name);
   }
 });

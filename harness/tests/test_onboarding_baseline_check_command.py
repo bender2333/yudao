@@ -48,7 +48,7 @@ def test_decisions_list_returns_the_baseline_checks_with_their_command(data_dir,
                          source_name="src", source_path=str(source))
         assert accepted.status_code == 200, accepted.text
         refs = accepted.json()["refs"]
-        assert _wait_for(lambda: opened.system.project(refs["run_id"]).phase == "DONE"), \
+        assert _wait_for(lambda: opened.system.project(refs["run_id"]).status == "done"), \
             "the onboarding run did not stop"
         # 运行到 DONE 与主机结算（写出建档候选和决定请求）是两步：结算在 DONE 之后才发生，
         # 读决定之前要等它出现，不能假定 DONE 时已经有

@@ -29,7 +29,7 @@ def _plain_replies(count: int = 8):
     return [_plain_reply() for _ in range(count)]
 
 def _requested(department: str = "product") -> NewEvent:
-    return NewEvent(EventType.DECISION_REQUESTED, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+    return NewEvent(EventType.DECISION_REQUESTED, state_before="running", state_after="running",
                     actor="system", department=department, payload={
                         "kind": "model_unavailable", "blocks": "run",
                         "options": [{"id": "continue", "label": "继续执行"}, {"id": "stop", "label": "停止事项"}],
@@ -40,13 +40,13 @@ def _requested(department: str = "product") -> NewEvent:
 
 
 def _answered(decision_id: str, option: str = "continue") -> NewEvent:
-    return NewEvent(EventType.DECISION_ANSWERED, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+    return NewEvent(EventType.DECISION_ANSWERED, state_before="running", state_after="running",
                     actor="user:local", parent_event_id=decision_id,
                     payload={"decision_id": decision_id, "option": option, "note": None, "base_version": 1})
 
 
 def _withdrawn(decision_id: str) -> NewEvent:
-    return NewEvent(EventType.DECISION_WITHDRAWN, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+    return NewEvent(EventType.DECISION_WITHDRAWN, state_before="running", state_after="running",
                     actor="system", parent_event_id=decision_id,
                     payload={"decision_id": decision_id, "reason": "cancelled"})
 

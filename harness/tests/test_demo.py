@@ -26,7 +26,7 @@ def demo_run(saved_demo, tmp_path):
 def test_demo_fills_four_views(demo_run):
     system, run_id = demo_run
     projection = system.project(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert projection.rework_count == 1
     assert projection.product_spec.revision == 3
     assert projection.input_version == projection.processed_input_version == 2

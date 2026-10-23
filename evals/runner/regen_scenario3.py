@@ -42,6 +42,7 @@ def _read_source(path):
 def _reshape_checkpoints(run_metrics, hidden_failures):
     """按新五项口径重算检查点；未核实项如实标注。"""
     released = run_metrics.get("end_status") == "released"
+    # 输入是历史运行的指标（阶段状态机还在的时候记的），阶段的键名是 phase
     phase = run_metrics.get("phase")
     stop_reason = run_metrics.get("stop_reason")
     if released:

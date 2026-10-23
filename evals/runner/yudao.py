@@ -35,7 +35,7 @@ MODEL_DEFINITION_ID = "yudao-eval-model"
 PROTOCOL = "chat_completions"
 CONTEXT_WINDOW = 128_000
 MAX_OUTPUT_TOKENS = 8_192
-TERMINAL_PHASES = ("DONE", "PAUSED", "FAILED")
+TERMINAL_STATUSES = ("done", "paused", "failed")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
 POLL_INTERVAL_SECONDS = 3.0
 STARTUP_TIMEOUT_SECONDS = 180.0

@@ -1,6 +1,7 @@
 import time
 import uuid
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import DEFAULT_REGISTRY, Application
@@ -177,7 +178,7 @@ def test_work_item_append_input_accepts_changed_version_and_deduplicates(data_di
         run_id = item_res.json()["refs"]["run_id"]
 
         # 事项在执行：等待运行停在请求之前
-        assert _wait_for(lambda: project_run(opened.store, run_id).phase == "ENGINEERING")
+        assert _wait_for(lambda: has_new_work(project_run(opened.store, run_id), "engineering"))
 
         # 事项在执行时新建事项被拒绝，原因 busy
         busy = _post(client, "work_item.create", project_id=project_id, text="第二个事项")
@@ -210,7 +211,7 @@ def test_guidance_send_accepts_changed_version(data_dir):
         item_res = _post(client, "work_item.create", project_id=project_id, text="带指导的事项")
         work_item_id = item_res.json()["refs"]["work_item_id"]
         run_id = item_res.json()["refs"]["run_id"]
-        assert _wait_for(lambda: project_run(opened.store, run_id).phase == "ENGINEERING")
+        assert _wait_for(lambda: has_new_work(project_run(opened.store, run_id), "engineering"))
 
         sent = client.post("/api/commands/guidance.send", json={
             "command_id": str(uuid.uuid4()), "base_version": 999, "work_item_id": work_item_id,
@@ -230,13 +231,13 @@ def test_work_item_cancel_stops_run_and_rejects_after_terminal(data_dir):
         item_res = _post(client, "work_item.create", project_id=project_id, text="要取消的事项")
         work_item_id = item_res.json()["refs"]["work_item_id"]
         run_id = item_res.json()["refs"]["run_id"]
-        assert _wait_for(lambda: project_run(opened.store, run_id).phase == "ENGINEERING")
+        assert _wait_for(lambda: has_new_work(project_run(opened.store, run_id), "engineering"))
 
         cancel_res = client.post("/api/commands/work_item.cancel", json={
             "command_id": str(uuid.uuid4()), "base_version": 999, "work_item_id": work_item_id})
         assert cancel_res.status_code == 200, cancel_res.text
         projection = project_run(opened.store, run_id)
-        assert (projection.phase, projection.stop_reason) == ("FAILED", "cancelled")
+        assert (projection.status, projection.stop_reason) == ("failed", "cancelled")
 
         # 已终结的事项再次取消返回 run_terminal
         again = client.post("/api/commands/work_item.cancel", json={
@@ -260,7 +261,7 @@ def test_work_item_execution_runs_in_loop_and_settles_on_completion(data_dir):
         adopted = [event for event in opened.store.list_project_events(project_id)
                    if event.type == ProjectEventType.DELIVERABLE_ADOPTED]
         assert len(adopted) == 1 and adopted[0].payload["run_id"] == run_id
-        assert project_run(opened.store, run_id).phase == "DONE"
+        assert project_run(opened.store, run_id).status == "done"
 
 
 def test_busy_does_not_block_on_in_process_task_table_after_terminal_event(data_dir):
@@ -277,7 +278,7 @@ def test_busy_does_not_block_on_in_process_task_table_after_terminal_event(data_
         run_id = item_res.json()["refs"]["run_id"]
 
         # run 跑到终态并完成结算：事件日志里已经没有未结束的 run
-        assert _wait_for(lambda: project_run(opened.store, run_id).phase == "DONE")
+        assert _wait_for(lambda: project_run(opened.store, run_id).status == "done")
         assert _wait_for(lambda: any(
             event.type == ProjectEventType.DELIVERABLE_ADOPTED
             for event in opened.store.list_project_events(project_id)))
@@ -302,7 +303,7 @@ def test_startup_settles_pending_and_query_does_not_settle(data_dir):
     project_id = system.projects.register("中断测试", "验证启动时补结算")
     work_item_id, run_id = system.projects.start_work_item(project_id, "构建 CLI 工具")
     system.run_until_stop(run_id)
-    assert project_run(system.store, run_id).phase == "DONE"
+    assert project_run(system.store, run_id).status == "done"
     before = [event.type for event in system.store.list_project_events(project_id)]
     assert ProjectEventType.DELIVERABLE_ADOPTED not in before
     system.close()

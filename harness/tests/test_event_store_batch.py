@@ -11,7 +11,7 @@ RUN = run_stream("run")
 
 
 def _note(name, **fields):
-    return NewEvent(name, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC", actor="system", **fields)
+    return NewEvent(name, state_before="running", state_after="running", actor="system", **fields)
 
 
 def test_event_batch_commits_in_order_with_contiguous_versions_and_positions(tmp_path):
@@ -45,7 +45,7 @@ def test_invalid_batch_entry_cannot_begin_a_partial_commit(tmp_path):
     writes = WritePath(store, lambda _stream: run_handler())
     with pytest.raises(sqlite3.IntegrityError):
         writes.append(RUN, _note("valid"),
-                      NewEvent("invalid", state_before="PRODUCT_SPEC", state_after=None, actor="system"))
+                      NewEvent("invalid", state_before="running", state_after=None, actor="system"))
     assert store.list_events("run") == []
     assert store.projection(run_stream("run")) is None
 

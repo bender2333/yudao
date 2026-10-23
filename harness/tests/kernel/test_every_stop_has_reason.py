@@ -11,7 +11,7 @@
 import json
 from pathlib import Path
 
-from harness.models import TERMINAL_PHASES
+from harness.models import TERMINAL_STATUSES
 
 BASELINE_DIR = Path(__file__).resolve().parents[1] / "event_sequences"
 STOP_REASONS = Path(__file__).resolve().parents[3] / "harness" / "definitions" / "stop_reasons.json"
@@ -46,8 +46,8 @@ def test_every_baseline_ends_with_a_reasoned_stop_event_or_waits():
         events = document["events"]
         assert events, f"{path.name} 没有录到事件"
         stops = [event for event in events if event["type"] in _STOP_EVENTS]
-        phase = document["projection"].get("phase")
-        if phase in TERMINAL_PHASES:
+        status = document["projection"].get("status")
+        if status in TERMINAL_STATUSES:
             assert stops, f"{path.name} 已到终态却没有结束事件"
             for stop in stops:
                 reason = (stop.get("payload") or {}).get("stop_reason")

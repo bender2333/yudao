@@ -102,7 +102,7 @@ def test_each_query_returns_a_snapshot_and_later_events_have_greater_positions(d
         before = system.store.end_position()
         assert snapshot.position <= before
         system.writes.append(run_stream(run_id), NewEvent(
-            "marker", state_before="DONE", state_after="DONE", actor="system", payload={"marker": name},
+            "marker", state_before="done", state_after="done", actor="system", payload={"marker": name},
         ))
         assert system.store.end_position() > snapshot.position
 
@@ -202,7 +202,7 @@ def test_attempt_pages_stay_inside_the_first_page_position(data_dir):
     assert first.data.attempts
     assert first.data.cursor
     system.writes.append(run_stream(run_id), NewEvent(
-        EventType.MODEL_ATTEMPT_FINISHED, state_before="DONE", state_after="DONE", actor="system",
+        EventType.MODEL_ATTEMPT_FINISHED, state_before="done", state_after="done", actor="system",
         department="product",
         payload={
             "attempt_id": "late-attempt", "logical_call_id": "late",
@@ -269,7 +269,7 @@ def test_query_time_does_not_grow_with_unrelated_history(data_dir):
 
     measure()  # 预热：第一次查询建立读取模型
     baseline = min(measure(), measure(), measure())
-    noise = [NewEvent("noise", state_before="CREATED", state_after="CREATED", actor="system",
+    noise = [NewEvent("noise", state_before="running", state_after="running", actor="system",
                       payload={"n": index})
              for index in range(system.store.end_position() * 9)]
     system.writes.append(run_stream("run_noise"), *noise)
@@ -500,7 +500,8 @@ def test_run_asks_returns_in_progress_answered_and_unable(data_dir):
     assert "without calling a tool" in asks[2].reason
     assert asks[2].start_position > asks[1].end_position
     assert asks[2].end_position > asks[2].start_position
-def test_flow_records_cover_handoff_delivery_problem_and_rework(data_dir):
+def test_flow_records_cover_delivery_problem_and_rework(data_dir):
+    # 工单 #556：阶段迁移事件没有了，交接与返工的记录由正式成果给出（版本交付、质检退回）
     system = _system(data_dir, _rework_script())
     project_id = system.projects.register("流转", GOAL)
     work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
@@ -508,10 +509,10 @@ def test_flow_records_cover_handoff_delivery_problem_and_rework(data_dir):
     application = _application(system)
     flow = application.query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
     kinds = [record.kind for record in flow.data.records]
-    assert {"需求交接", "版本交付", "返工", "问题反馈"} <= set(kinds)
-    rework = next(record for record in flow.data.records if record.kind == "返工")
-    assert rework.status == "已退回" and rework.direction_to == "engineering"
+    assert {"版本交付", "问题反馈"} <= set(kinds)
+    assert "需求交接" not in set(kinds)
     problem = next(record for record in flow.data.records if record.kind == "问题反馈")
+    assert problem.status == "已退回" and problem.direction_to == "engineering"
     assert problem.content == "质检退回" and problem.direction_from == "quality"
     assert all(record.work_item_id == work_item_id for record in flow.data.records)
     positions = [record.position for record in flow.data.records]
@@ -553,12 +554,11 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
 
     rows = [record for record in flow.data.records
             if record.direction_from == "quality" and record.direction_to == "engineering"]
-    assert len(rows) == 3
-    assert sorted(record.kind for record in rows) == ["询问", "返工", "问题反馈"]
+    assert len(rows) == 2
+    assert sorted(record.kind for record in rows) == ["询问", "问题反馈"]
     by_kind = {record.kind: record for record in rows}
     assert by_kind["询问"].status == "已回答"
     assert by_kind["问题反馈"].status == "已退回"
-    assert by_kind["返工"].status == "已退回"
 def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
     system = _system(data_dir, _release_script())
     project_id = system.projects.register("工件", GOAL)
@@ -581,7 +581,7 @@ def test_event_detail_reads_the_recorded_contract_shape_from_git(data_dir):
     system = _system(data_dir, _release_script())
     try:
         run_id = system.create_run("读取历史交付")
-        assert system.run_until_stop(run_id).phase == "DONE"
+        assert system.run_until_stop(run_id).status == "done"
         delivery = next(event for event in system.store.list_events(run_id)
                         if event.type == EventType.DELIVERY_ACCEPTED)
         original = delivery.payload["git_version"]

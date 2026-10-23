@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, DEPARTMENTS, EventType
 from harness.proposals import baseline_review_turn, product_spec, product_spec_turn, structure_turn
@@ -42,7 +43,7 @@ def _happy_script() -> list:
 def test_onboarding_run_reaches_baseline_verified(tmp_path):
     system, run_id = _onboarding_run(tmp_path, _happy_script())
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     assert result.kind == "onboarding"
     assert result.stop_reason == "baseline_verified"
     kinds = [event.type for event in system.store.list_events(run_id)]
@@ -57,7 +58,7 @@ def test_onboarding_run_reaches_baseline_verified(tmp_path):
 def test_onboarding_workspace_tree_equals_snapshot_throughout(tmp_path):
     system, run_id = _onboarding_run(tmp_path, _happy_script())
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     assert result.workspace_digest == result.snapshot["tree_digest"]
     assert result.structure["code_tree_digest"] == result.snapshot["tree_digest"]
     assert result.baseline_review["code_snapshot_hash"] == result.snapshot["tree_digest"]
@@ -77,7 +78,7 @@ def test_onboarding_departments_have_no_write_tools(tmp_path):
 def test_repository_overview_is_generated(tmp_path):
     system, run_id = _onboarding_run(tmp_path, _happy_script())
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     overview = system.artifacts.get_for_run(run_id, ArtifactRef(**result.overview_ref)).decode("utf-8")
     assert "仓库概况" in overview
     assert "src/" in overview
@@ -123,7 +124,7 @@ def test_quality_cannot_see_existing_structure(tmp_path):
     ])
     holder["system"] = system
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     engineering_sources = [part.source for part in captured["engineering"].parts]
     quality_sources = [part.source for part in captured["quality"].parts]
     assert "existing_overview" in engineering_sources
@@ -141,7 +142,7 @@ def test_consistent_with_unsupported_is_rejected(tmp_path):
                              checks={"smoke": 0}),
     ])
     result = system.run_until_stop(run_id)
-    assert result.phase != "DONE"
+    assert result.status != "done"
     assert EventType.BASELINE_REVIEW_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
 
 def test_rework_product_returns_to_product(tmp_path):
@@ -153,9 +154,10 @@ def test_rework_product_returns_to_product(tmp_path):
     ])
     result = system.run_until_stop(run_id)
     assert result.baseline_review["verdict"] == "rework_product"
-    routes = [event.payload["route"] for event in system.store.list_events(run_id) if event.type == EventType.TRANSITION]
-    assert "QUALITY->REWORK_PRODUCT" in routes
-    assert "REWORK_PRODUCT->PRODUCT_SPEC" in routes
+    # 核验要求产品修改以后，产品开始一轮工作（工单 #556：关注的成果有了新东西，部门在等待工作时开始工作）
+    activated = [event.department for event in system.store.list_events(run_id)
+                 if event.type == EventType.DEPARTMENT_ACTIVATED]
+    assert activated == ["product", "engineering", "quality", "product"]
     assert EventType.BASELINE_REVIEW_ACCEPTED in [event.type for event in system.store.list_events(run_id)]
 
 def test_rework_product_requires_unsupported_or_omission(tmp_path):
@@ -166,7 +168,7 @@ def test_rework_product_requires_unsupported_or_omission(tmp_path):
                              checks={"smoke": 0}),
     ])
     result = system.run_until_stop(run_id)
-    assert result.phase != "REWORK_PRODUCT"
+    assert result.active_department != "product"
     assert EventType.BASELINE_REVIEW_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
 
 def test_failing_existing_test_can_still_be_consistent(tmp_path):
@@ -180,7 +182,7 @@ def test_failing_existing_test_can_still_be_consistent(tmp_path):
                              checks={"smoke": 0, "failing": 1}),
     ], source=source(tmp_path / "source"))
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     assert result.baseline_review["verdict"] == "consistent"
     referenced = {item["evidence"] for item in result.baseline_review["conclusions"] if item["status"] == "existing_defect"}
     assert "failing" in referenced
@@ -192,7 +194,7 @@ def test_unexplained_failing_check_is_rejected(tmp_path):
                              checks={"smoke": 0, "failing": 1}),
     ])
     result = system.run_until_stop(run_id)
-    assert result.phase != "DONE"
+    assert result.status != "done"
     assert EventType.BASELINE_REVIEW_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
 
 def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
@@ -206,7 +208,7 @@ def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
     system, run_id = _onboarding_run(tmp_path, [_product_turn(), _structure_turn()])
     system.activate_once(run_id)
     result = system.activate_once(run_id)
-    assert result.phase == "QUALITY", result.phase
+    assert has_new_work(result, "quality"), result.status
     projection = system.project(run_id)
     workspace = system.workspace(run_id)
     facts = workspace.snapshot().facts
@@ -221,13 +223,13 @@ def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
         "conclusions": [{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
         "omissions": [], "checks": ["slow"], "other_failures": [],
     }
-    decision = evaluate_proposal(phase="QUALITY", department="quality", proposal=unexplained,
+    decision = evaluate_proposal(department="quality", proposal=unexplained,
                                  projection=projection, facts=facts)
     assert not decision.accepted
     assert any("failing check" in error.message for error in decision.errors)
     explained = {**unexplained,
                  "conclusions": [{"requirement": REQUIREMENT, "status": "existing_defect", "evidence": "slow"}]}
-    decision = evaluate_proposal(phase="QUALITY", department="quality", proposal=explained,
+    decision = evaluate_proposal(department="quality", proposal=explained,
                                  projection=projection, facts=facts)
     assert decision.accepted, [error.message for error in decision.errors]
     assert decision.artifact["checks"][0]["exit_code"] == TIMEOUT_EXIT_CODE
@@ -241,7 +243,7 @@ def test_structure_requires_activation_receipt(tmp_path):
                        checks={}, build_and_test=[{"name": "smoke", "command": "python src/echo.py", "purpose": "run the CLI"}]),
     ])
     result = system.run_until_stop(run_id)
-    assert result.phase != "QUALITY"
+    assert result.active_department != "quality"
     assert EventType.STRUCTURE_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
 
 def test_structure_rejects_requirement_coverage_mismatch(tmp_path):
@@ -263,7 +265,7 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
 
     system, run_id = _onboarding_run(tmp_path, [_product_turn()])
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING", result.phase
+    assert has_new_work(result, "engineering"), result.status
     projection = system.project(run_id)
     facts = system.workspace(run_id).snapshot().facts
     proposal = {
@@ -275,7 +277,7 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
         "conventions": [],
     }
     changed = facts.model_copy(update={"digest": "sha256:" + "0" * 64})
-    decision = evaluate_proposal(phase="ENGINEERING", department="engineering", proposal=proposal,
+    decision = evaluate_proposal(department="engineering", proposal=proposal,
                                  projection=projection, facts=changed)
     assert not decision.accepted
     assert any("no longer matches the snapshot" in error.message for error in decision.errors)
@@ -299,7 +301,7 @@ def test_design_only_capability_goes_to_boundary_with_mark(tmp_path):
         _review_turn(),
     ], source=_design_doc_source(tmp_path / "source"))
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     spec = system.project(run_id).product_spec
     assert any("设计中，未实施" in entry for entry in spec.boundaries)
     assert any(DESIGN_CAPABILITY in entry for entry in spec.boundaries)
@@ -322,7 +324,7 @@ def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
     ])
     system.activate_once(run_id)
     result = system.activate_once(run_id)
-    assert result.phase == "QUALITY", result.phase
+    assert has_new_work(result, "quality"), result.status
     projection = system.project(run_id)
     facts = system.workspace(run_id).snapshot().facts
     spec = projection.product_spec
@@ -335,7 +337,7 @@ def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
         "conclusions": [{"requirement": DESIGN_CAPABILITY, "status": "existing_defect", "evidence": "smoke"}],
         "omissions": [], "checks": ["smoke"], "other_failures": [],
     }
-    decision = evaluate_proposal(phase="QUALITY", department="quality", proposal=proposal,
+    decision = evaluate_proposal(department="quality", proposal=proposal,
                                  projection=projection, facts=facts)
     assert not decision.accepted
     assert any("设计中，未实施" in error.message for error in decision.errors)

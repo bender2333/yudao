@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactStore
 from harness.event_store import EventStore
@@ -34,7 +35,7 @@ def saved_native(tmp_path_factory):
         review_turn("release", "host checks passed"),
     ]
     system, projection = run_scripted(tmp_path_factory.mktemp("native"), script)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     system.close()
     return system.data_dir, projection.run_id
 
@@ -45,7 +46,7 @@ def native_run(saved_native, tmp_path):
 
 def test_smoke_requires_current_input_audit_and_host_receipts():
     base = {
-        "phase": "DONE",
+        "status": "done",
         "stop_reason": "released",
         "replay_consistent": True,
         "context_isolated": True,
@@ -127,7 +128,7 @@ def test_directory_fake_protocol_is_flagged_and_never_passes_as_real(tmp_path):
     result = system.activate_once(run_id)
     summary = summarize_run(system, run_id, scenario="happy")
 
-    assert result.phase == "PAUSED"
+    assert result.status == "paused"
     assert summary["fake_used"] is True
     assert summary["provider_bindings"]["product"]["protocol"] == "fake"
     assert smoke_exit_code({"available": True, "scenarios": {"happy": summary}}) == 2
@@ -211,7 +212,7 @@ def test_ask_audit_rejects_missing_pre_spec_ask(ask_run):
     delete_saved_events(system.store, [first_ask_start.event_id, first_ask_ans.event_id])
     audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
     assert audit["pre_spec_ask"] is False
-    assert smoke_exit_code({"available": True, "scenarios": {"ask": {"phase": "DONE", "stop_reason": "released", "replay_consistent": True, "context_isolated": True, "model_input_audit": {"status": "verified"}, "check_receipts": [{"name": "smoke"}], "check_receipts_verified": True, "delivery_archive": {"status": "verified"}, "git_audit": {"status": "verified"}, "fake_used": False, "ask_audit": audit}}}) == 1
+    assert smoke_exit_code({"available": True, "scenarios": {"ask": {"status": "done", "stop_reason": "released", "replay_consistent": True, "context_isolated": True, "model_input_audit": {"status": "verified"}, "check_receipts": [{"name": "smoke"}], "check_receipts_verified": True, "delivery_archive": {"status": "verified"}, "git_audit": {"status": "verified"}, "fake_used": False, "ask_audit": audit}}}) == 1
 
 
 def test_ask_audit_rejects_missing_revision_in_answer(ask_run):
@@ -222,7 +223,7 @@ def test_ask_audit_rejects_missing_revision_in_answer(ask_run):
     rewrite_saved_event(system.store, second_ask_ans)
     audit = summarize_run(system, run_id, scenario="ask")["ask_audit"]
     assert audit["requirements_revision"] is False
-    assert smoke_exit_code({"available": True, "scenarios": {"ask": {"phase": "DONE", "stop_reason": "released", "replay_consistent": True, "context_isolated": True, "model_input_audit": {"status": "verified"}, "check_receipts": [{"name": "smoke"}], "check_receipts_verified": True, "delivery_archive": {"status": "verified"}, "git_audit": {"status": "verified"}, "fake_used": False, "ask_audit": audit}}}) == 1
+    assert smoke_exit_code({"available": True, "scenarios": {"ask": {"status": "done", "stop_reason": "released", "replay_consistent": True, "context_isolated": True, "model_input_audit": {"status": "verified"}, "check_receipts": [{"name": "smoke"}], "check_receipts_verified": True, "delivery_archive": {"status": "verified"}, "git_audit": {"status": "verified"}, "fake_used": False, "ask_audit": audit}}}) == 1
 
 
 def test_ask_audit_rejects_mismatched_ask_parties_or_events(ask_run):
@@ -280,7 +281,7 @@ def test_ask_audit_rejects_revision_outside_ask_window(ask_run):
 
 def _ask_smoke_exit_code(audit):
     return smoke_exit_code({"available": True, "scenarios": {"ask": {
-        "phase": "DONE", "stop_reason": "released", "replay_consistent": True,
+        "status": "done", "stop_reason": "released", "replay_consistent": True,
         "context_isolated": True, "model_input_audit": {"status": "verified"},
         "check_receipts": [{"name": "smoke"}], "check_receipts_verified": True,
         "delivery_archive": {"status": "verified"}, "git_audit": {"status": "verified"},
@@ -503,7 +504,7 @@ _PRODUCT_RETURN_SCRIPT = [
 @pytest.fixture(scope="module")
 def saved_product_return(tmp_path_factory):
     system, projection = run_scripted(tmp_path_factory.mktemp("product-return"), _PRODUCT_RETURN_SCRIPT)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     system.close()
     return system.data_dir, projection.run_id
 
@@ -546,7 +547,7 @@ def saved_compacted(tmp_path_factory):
     # 上下文窗口只有 6000 的运行：压缩以后继续工程工作，保存到第一次压缩之后
     system, _adapter, run_id, _original = compacted_runner(tmp_path_factory.mktemp("compacted"))
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     assert len(result.compactions) > 1
     system.close()
     return system.data_dir, run_id
@@ -611,7 +612,7 @@ def test_unmatched_host_receipt_does_not_pass(native_run):
     assert any("no matching host execution" in note for note in summary["check_receipt_notes"])
 
 def test_smoke_does_not_merge_a_previous_runtime_report(tmp_path):
-    (tmp_path / "smoke-report.json").write_text(json.dumps({"scenarios": {"old": {"phase": "DONE"}}}), encoding="utf-8")
+    (tmp_path / "smoke-report.json").write_text(json.dumps({"scenarios": {"old": {"status": "done"}}}), encoding="utf-8")
     config = tmp_path / "providers.json"
     config.write_text(json.dumps({
         "providers": [{"id": "provider", "name": "Provider",

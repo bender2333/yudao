@@ -2,6 +2,8 @@
 // 这里只放类型：实体、组件、任务目录、待机活动、信号与画面数据。
 // 世界与系统不依赖渲染与 PixiJS，可以直接在 node --test 下驱动。
 
+import type { WorkItemProgress } from "../../api/generated/types.gen.ts";
+
 /** 任务里的命名位置（原型 floor-decl.js 的 spot 字段）。 */
 export type SpotKind =
   | "desk"
@@ -342,7 +344,8 @@ export interface LoopItem {
   color_index: number;
   status: string;
   department: string | null;
-  phase: string | null;
+  // 事项的进度：从成果推算（循环结构第 2 节、工单 #556）
+  progress: WorkItemProgress | null;
   round: number;
   started_at: string | null;
   elapsed_sec: number | null;

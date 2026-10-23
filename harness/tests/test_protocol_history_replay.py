@@ -5,6 +5,7 @@ import threading
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from harness.collaboration import has_new_work
 from harness.models import json_dumps
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, ProviderFacade
@@ -149,7 +150,7 @@ def _assert_history_items_are_responses_shaped(history: list[dict]) -> None:
 def test_chat_history_replay_sends_each_tool_result_once_without_empty_turns(tmp_path):
     result, requests, history = _run_product_activation(tmp_path, _chat_body, "chat_completions")
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     assert len(requests) == 2
     messages = requests[1]["messages"]
     tool_ids = Counter(message["tool_call_id"] for message in messages if message["role"] == "tool")
@@ -167,7 +168,7 @@ def test_chat_history_replay_sends_each_tool_result_once_without_empty_turns(tmp
 def test_messages_history_replay_sends_each_tool_result_once_without_empty_turns(tmp_path):
     result, requests, history = _run_product_activation(tmp_path, _messages_body, "messages")
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     assert len(requests) == 2
     messages = requests[1]["messages"]
     results = Counter(block["tool_use_id"] for message in messages if isinstance(message["content"], list)

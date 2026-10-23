@@ -15,6 +15,7 @@ import pytest
 import httpx
 from openai import APIConnectionError, AsyncOpenAI
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.providers import ProviderConnections, ResponsesConfig
 from harness.tests.protocol_helpers import (
@@ -279,7 +280,7 @@ def test_local_http_transient_failure_retries_same_input_then_succeeds(tmp_path,
         run_id = system.create_run("local retry")
         result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING", result.error
+    assert has_new_work(result, "engineering"), result.error
     assert len(captures) == 2 and captures[0] == captures[1]
     events = system.store.list_events(run_id)
     failed = [item for item in events if item.type == "model_attempt_failed"]
@@ -297,7 +298,7 @@ def test_server_overloaded_stream_error_retries_after_partial_output_without_run
         system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config), step_limits=FAST_RETRIES)
         result = system.activate_once(system.create_run("retry provider overload"))
 
-    assert result.phase == "ENGINEERING", result.error
+    assert has_new_work(result, "engineering"), result.error
     assert len(captures) == 2
     assert "call-one" not in json.dumps(captures[1])
     events = system.store.list_events(result.run_id)
@@ -314,7 +315,7 @@ def test_server_overloaded_stream_error_is_exhausted_at_three_attempts(tmp_path)
         system = LoopSystem.for_testing(tmp_path, ResponsesAdapter(config), step_limits=FAST_RETRIES)
         result = system.activate_once(system.create_run("provider overload exhaustion"))
 
-    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert result.status == "failed" and result.stop_reason == "provider_error"
     assert len(captures) == 3
     events = system.store.list_events(result.run_id)
     failed = [event for event in events if event.type == "model_attempt_failed"]

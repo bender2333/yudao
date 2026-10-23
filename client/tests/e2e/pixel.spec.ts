@@ -183,7 +183,7 @@ for (const size of [
           engineering: [role("e-mgr", "manager", "工程经理")],
           quality: [role("q-mgr", "manager", "质检经理")],
         };
-        const item = { work_item_id: "w1", kind: "request", sign: "测试事项", color_index: 0, status: "running", department: "engineering", round: 1, elapsed_sec: 100, time_limit_sec: 7200, version: 1, phase: null, started_at: null, pending_question: null, run_id: "r1", adoption_id: null, recovery_state: null };
+        const item = { work_item_id: "w1", kind: "request", sign: "测试事项", color_index: 0, status: "running", department: "engineering", round: 1, elapsed_sec: 100, time_limit_sec: 7200, version: 1, progress: null, started_at: null, pending_question: null, run_id: "r1", adoption_id: null, recovery_state: null };
         const face = (id: string, over: Record<string, unknown> = {}) => Object.assign({
           id, kind: "model_unavailable", version: 3, title: "模型引用无法使用", work_item_id: "w1", where: "项目 · 测试事项", waited: "已等待 1 分", blocks: "不挡住事项",
           rows: [{ term: "部门", value: "工程" }], links: [],

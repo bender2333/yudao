@@ -102,7 +102,7 @@ def test_a_killed_onboarding_check_is_retried_and_the_round_finishes(tmp_path):
     # 重启的子进程跑完这一轮并结算：基线核验通过以后有一个候选与一个决定请求
     after = second.after
     finished = after.project(first.run_id)
-    assert finished.phase == "DONE", finished.error
+    assert finished.status == "done", finished.error
     assert finished.stop_reason == "baseline_verified"
     project_id = after.store.list_project_ids()[0]
     assert len(_candidates(after, project_id)) == 1, "第一轮结算出一个初始 PRD 的候选"
@@ -157,7 +157,7 @@ def test_a_kill_after_the_revision_answer_rebuilds_the_missing_run(tmp_path):
         second = after.project(run.run_id)
         assert second.round == 2, "补建的是第二轮的 run"
         assert second.kind == "onboarding"
-        assert second.phase == "DONE", second.error
+        assert second.status == "done", second.error
         assert second.stop_reason == "baseline_verified"
 
         # 修改意见仍然是这一轮的用户输入：run_created 同一步写入的第二项输入

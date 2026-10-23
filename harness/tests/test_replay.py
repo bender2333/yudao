@@ -74,7 +74,7 @@ def test_replay_survives_asks_and_rework(ask_run):
     replayed = system.replay(run_id)
     assert replayed.canonical_state() == projection.canonical_state()
     assert replayed.rework_count == 1
-    assert replayed.phase == "DONE"
+    assert replayed.status == "done"
     assert replayed.product_spec.revision == 2
     assert [item.status for item in replayed.delivery_specs] == ["superseded", "active"]
     assert replayed.delivery_specs[0].invalidation_reason == "qa_rework_engineering"

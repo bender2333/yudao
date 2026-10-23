@@ -3,18 +3,21 @@
     {
       "id": "product",
       "label": "产品",
-      "roles": ["product"]
+      "roles": ["product"],
+      "watched": ["user_input", "guidance", "baseline_review"]
     },
     {
       "id": "engineering",
       "label": "工程",
-      "roles": ["engineering"]
+      "roles": ["engineering"],
+      "watched": ["product_spec", "defect_record", "guidance"]
     },
     {
       "id": "quality",
       "label": "质检",
       "roles": ["quality"],
-      "suggested_capabilities": ["image"]
+      "suggested_capabilities": ["image"],
+      "watched": ["delivery", "guidance", "structure"]
     }
   ],
   "rules": {

@@ -30,7 +30,7 @@ KEY_B = "issue91-key-b"
 def _event(kind: str, **payload: Any) -> str:
     return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload}, ensure_ascii=False)}\n\n"
 
-def _phase(body: dict[str, Any]) -> str:
+def _department(body: dict[str, Any]) -> str:
     parts: list[str] = []
     for item in body.get("input", []):
         content = item.get("content")
@@ -40,7 +40,7 @@ def _phase(body: dict[str, Any]) -> str:
             for segment in content:
                 if isinstance(segment, dict) and isinstance(segment.get("text"), str):
                     parts.append(segment["text"])
-    match = re.search(r'"phase":"([A-Z_]+)"', "\n".join(parts))
+    match = re.search(r'"department":"(\w+)"', "\n".join(parts))
     return match.group(1) if match else ""
 
 def _proposal_reply(*, response_id: str, model: str, payload: dict[str, Any]) -> tuple[int, str, list[bytes]]:
@@ -87,7 +87,7 @@ def _two_stage(model: str = "upstream-a", *, park_after_product: Any = None):
     # park_after_product 在产品交完提案后调用一次，可让此后的工程解析失败从而停在工程进行中
     def responder(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
         chosen = str(body.get("model") or model)
-        if _phase(body) != "ENGINEERING":
+        if _department(body) != "engineering":
             reply = _proposal_reply(response_id="spec", model=chosen, payload={"kind": "product_spec"})
             if park_after_product is not None:
                 park_after_product()
@@ -309,7 +309,7 @@ def test_external_address_change_returns_definitions_to_candidates(tmp_path):
             if parked.get("record") is not None:
                 opened.system.facade._admissions["model-a"] = parked["record"]
             item = opened.system.projects.projection(project_id).work_items[-1]
-            assert item.status == "in_progress", (item.status, item.phase)
+            assert item.status == "in_progress", (item.status, item.status)
 
             # 外部修改连接的地址：该连接下的 model-a 与 model-a2 都回到候选
             document = opened.document()
@@ -400,7 +400,7 @@ def test_deleting_the_catalog_file_clears_defaults_and_recovers_after_answer(tmp
             run_id = _start_work_item(client, project_id)
             _finish(opened.system, run_id)
             item = opened.system.projects.projection(project_id).work_items[-1]
-            assert item.status == "in_progress", (item.status, item.phase)
+            assert item.status == "in_progress", (item.status, item.status)
             # 工程部门前的决定请求已经发出；先记下它，删除目录文件以后不再新增请求
             first = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
             assert len(first) == 1 and first[0]["request"]["department"] == "engineering"

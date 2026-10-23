@@ -73,7 +73,7 @@ def _run_onboarding_http(data_dir, tmp_path, script, *, rounds: int = 0):
         assert answered.status_code == 200, answered.text
         run_id = next(event.payload["run_id"] for event in opened.system.store.list_project_events(
             refs["project_id"]) if event.type == ProjectEventType.ONBOARDING_REVISION_STARTED)
-        assert _wait_for(lambda: opened.system.project(run_id).phase == "DONE"), "the revision run did not stop"
+        assert _wait_for(lambda: opened.system.project(run_id).status == "done"), "the revision run did not stop"
         assert opened.system.project(run_id).error is None
         assert _wait_for(lambda: _request_opened(client, refs["project_id"])), "the next round was not requested"
     return context, client, opened, refs

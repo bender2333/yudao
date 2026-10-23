@@ -20,11 +20,11 @@ def test_read_only_event_store_refuses_write_methods_at_python_layer(tmp_path: P
     store = EventStore(db_path, read_only=True)
     try:
         with pytest.raises(RuntimeError, match="the event store is open read-only"):
-            store.commit("run:r1", 0, [], "PRODUCT_SPEC")
+            store.commit("run:r1", 0, [], "running")
         with pytest.raises(RuntimeError, match="the event store is open read-only"):
-            store.claim_execution_right("run:r1", 1, [], "PRODUCT_SPEC")
+            store.claim_execution_right("run:r1", 1, [], "running")
         with pytest.raises(RuntimeError, match="the event store is open read-only"):
-            store.replace_projection("run:r1", "PRODUCT_SPEC", 0, 0)
+            store.replace_projection("run:r1", "running", 0, 0)
     finally:
         store.close()
 

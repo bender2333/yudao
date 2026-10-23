@@ -7,7 +7,6 @@ import type { DepartmentWorkspaceResult } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { createRafClock, type Clock } from "../../pixel/clock";
 import { createRoomView, type RoomModel, type RoomView } from "../../pixel/room/view";
-import { handoffOf } from "../../pixel/room/decl";
 import { StreamBubble } from "../../pixel/room/stream";
 import type { PixelFloorEvent } from "../../pixel/world/types";
 import { LETTER_ANSWERED_TYPE, LETTER_ASKED_TYPE } from "../../pixel/world/types";
@@ -43,17 +42,19 @@ export function roomModelOf(workspace: DepartmentWorkspaceResult): RoomModel {
 }
 
 /** 把事件流里的事件转成部门房间的事件（只保留本部门相关的事件）。
- *  交接与询问的载荷在真实系统里不是部门，这里统一补成原型的 from/to 形状，画面与说话目录按同一份数据工作。 */
+ *  询问的载荷在真实系统里不是部门，这里统一补成原型的 from/to 形状，画面与说话目录按同一份数据工作。
+ *  阶段迁移事件没有了（工单 #556：部门按关注的成果开始工作，控制核心不再决定下一个谁工作），
+ *  房间里交付箱从工程到质检的画面改由交付到达驱动。 */
 export function roomEventOf(event: EventObject, department: string): PixelFloorEvent | null {
   const raw = event.payload as unknown as Record<string, unknown>;
   let type: string = event.type;
   let payload = raw;
   let eventDept: string | null = event.department;
-  if (event.type === "transition") {
-    const handoff = handoffOf(raw);
-    if (!handoff) return null;
-    if (handoff.from !== department && handoff.to !== department) return null;
-    payload = { ...raw, from: handoff.from, to: handoff.to, artifact: handoff.artifact };
+  if (event.type === "delivery_accepted") {
+    // 交付到达：交付箱从工程送到质检（原型 v11 的交接画面）
+    payload = { ...raw, from: "engineering", to: "quality", artifact: "box" };
+    if (department !== "engineering" && department !== "quality") return null;
+    type = "transition";
   } else if (event.type === "ask_started") {
     const requester = typeof raw?.requester === "string" ? raw.requester : null;
     const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;

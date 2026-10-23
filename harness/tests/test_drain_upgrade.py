@@ -33,7 +33,7 @@ def _phase(system, run_id):
     # run 的阶段；run 还没有建出来时是空
     from harness.projection import RunNotFoundError, project_run
     try:
-        return project_run(system.store, run_id).phase
+        return project_run(system.store, run_id).status
     except RunNotFoundError:
         return None
 
@@ -76,7 +76,7 @@ def test_the_queued_work_item_starts_after_the_restart(data_dir):
     with running_api(restarted) as client:
         assert client.get("/api/queries/system.status").json()["data"]["drain"]["state"] == "idle"
         # 排队的事项这一次补建并跑完
-        assert _wait_for(lambda: _phase(restarted.system, queued_run) in ("DONE", "FAILED"))
+        assert _wait_for(lambda: _phase(restarted.system, queued_run) in ("done", "failed"))
         assert restarted.system.projects.projection(project_id).work_item(
             queued.json()["refs"]["work_item_id"]).status != "not_started"
         # 之后新建的事项直接开始：不再排队

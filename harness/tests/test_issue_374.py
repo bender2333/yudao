@@ -24,7 +24,7 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.app.access_tokens import AccessTokenStore
 from harness.app.application import Application
-from harness.models import TERMINAL_PHASES, utc_now
+from harness.models import TERMINAL_STATUSES, utc_now
 from harness.data_directory import LOG_DIR, LOG_FILE
 from harness.projection import project_run
 from harness.proposals import delivery_turn, product_spec, review_turn
@@ -241,7 +241,7 @@ def _interrupted_data_dir(data_dir: Path) -> tuple[str, str]:
     project_id = system.projects.register("停止与继续", "核对进行中的 run 在下次启动时自动继续")
     work_item_id, run_id = system.projects.start_work_item(project_id, "停下时进行中的事项")
     system.activate_once(run_id)
-    assert project_run(system.store, run_id).phase not in TERMINAL_PHASES
+    assert project_run(system.store, run_id).status not in TERMINAL_STATUSES
     system.close()
     return project_id, run_id
 
@@ -263,8 +263,8 @@ def test_a_run_in_progress_continues_at_the_next_start(tmp_path):
         assert run_id in system.resumed_runs, "启动时没有取得执行权"
         deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
         while time.monotonic() < deadline:
-            if project_run(system.store, run_id).phase in TERMINAL_PHASES:
+            if project_run(system.store, run_id).status in TERMINAL_STATUSES:
                 break
             time.sleep(0.05)
         projection = project_run(system.store, run_id)
-        assert (projection.phase, projection.stop_reason) == ("DONE", "released")
+        assert (projection.status, projection.stop_reason) == ("done", "released")

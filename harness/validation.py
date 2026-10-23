@@ -66,7 +66,9 @@ class ProposalDecision:
     accepted: bool
     errors: list[FieldError] = field(default_factory=list)
     artifact: dict[str, Any] | None = None
-    transitions: list[tuple[str, str]] = field(default_factory=list)
+    # 这次接纳以后事项结束（工单 #556）：只有质检的放行与基线核验的一致结论结束事项，
+    # 结束以后控制核心不再决定下一个谁工作
+    ends_run: bool = False
 
     @property
     def error_dicts(self) -> list[dict[str, str]]:
@@ -75,7 +77,6 @@ class ProposalDecision:
 
 def evaluate_proposal(
     *,
-    phase: str,
     department: str,
     proposal: dict[str, Any] | None,
     projection: RunProjection,
@@ -84,7 +85,6 @@ def evaluate_proposal(
 ) -> ProposalDecision:
     try:
         return _evaluate_proposal(
-            phase=phase,
             department=department,
             proposal=proposal,
             projection=projection,
@@ -100,7 +100,6 @@ def evaluate_proposal(
 
 def _evaluate_proposal(
     *,
-    phase: str,
     department: str,
     proposal: dict[str, Any] | None,
     projection: RunProjection,
@@ -127,7 +126,7 @@ def _evaluate_proposal(
         return ProposalDecision(False, errors)
 
     if kind == "product_spec":
-        return _accept_product_spec(phase, proposal, projection)
+        return _accept_product_spec(proposal, projection)
     if kind == "department_guidance_response":
         return _accept_guidance_response(proposal, projection, department, events, facts)
     if kind == "product_decision":
@@ -403,7 +402,7 @@ def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjectio
     })
 
 
-def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
+def _accept_product_spec(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
     if projection.input_version != projection.product_work_input_version:
         return ProposalDecision(False, [FieldError("input_version", "new user input must enter product work before requirements can be accepted")])
     current_hash = None if projection.product_spec is None else projection.product_spec.content_hash
@@ -430,18 +429,8 @@ def _accept_product_spec(phase: str, proposal: dict[str, Any], projection: RunPr
         "status": "active",
         "content_hash": spec_content_hash("product_spec", payload, parent_hash=parent, revision=revision),
     }
-    if projection.active_ask is not None:
-        return ProposalDecision(True, artifact=artifact)
-    if phase in {"PRODUCT_SPEC", "REWORK_PRODUCT"}:
-        transitions = [(phase, "ENGINEERING")]
-        return ProposalDecision(True, artifact=artifact, transitions=transitions)
-    has_product_guidance = any(
-        item.department == "product" and item.status in {"received", "in_input"}
-        for item in projection.department_guidance
-    )
-    if has_product_guidance:
-        return ProposalDecision(True, artifact=artifact)
-    return ProposalDecision(False, [FieldError("kind", "product_spec not expected")])
+    # PRD 被接纳以后由关注的成果决定下一个谁工作（工单 #556）：这里不再写阶段迁移
+    return ProposalDecision(True, artifact=artifact)
 
 
 def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
@@ -452,8 +441,7 @@ def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection
     content_hash = canonical_hash(payload)
     if any(item.content_hash == content_hash for item in projection.product_decisions):
         return ProposalDecision(False, [FieldError("statement", "this product decision has already been accepted")])
-    transitions = [(projection.phase, "ENGINEERING")]
-    return ProposalDecision(True, artifact={**payload, "kind": "product_decision", "content_hash": content_hash}, transitions=transitions)
+    return ProposalDecision(True, artifact={**payload, "kind": "product_decision", "content_hash": content_hash})
 
 
 def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
@@ -511,12 +499,7 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
         "status": "active",
         "content_hash": spec_content_hash("delivery_spec", payload, parent_hash=parent, revision=revision),
     }
-    from_phase = projection.phase if projection.phase in {"ENGINEERING", "REWORK_ENGINEERING"} else "ENGINEERING"
-    return ProposalDecision(
-        True,
-        artifact=artifact,
-        transitions=[(from_phase, "DELIVERY"), ("DELIVERY", "QUALITY")],
-    )
+    return ProposalDecision(True, artifact=artifact)
 
 
 def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
@@ -594,11 +577,8 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
         "status": "active",
         "content_hash": spec_content_hash("qa_review", payload, parent_hash=parent, revision=revision),
     }
-    if verdict == "release":
-        transitions = [("QUALITY", "DONE")]
-    else:
-        transitions = [("QUALITY", "REWORK_ENGINEERING"), ("REWORK_ENGINEERING", "ENGINEERING")]
-    return ProposalDecision(True, artifact=artifact, transitions=transitions)
+    # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
+    return ProposalDecision(True, artifact=artifact, ends_run=verdict == "release")
 
 
 def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
@@ -667,8 +647,7 @@ def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts
         "status": "active",
         "content_hash": spec_content_hash("structure", payload, parent_hash=parent, revision=revision),
     }
-    return ProposalDecision(True, artifact=artifact,
-                            transitions=[tuple(item) for item in DEFINITIONS.transitions(projection.kind, "structure", "accepted")])
+    return ProposalDecision(True, artifact=artifact)
 
 
 def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
@@ -744,8 +723,8 @@ def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection,
         "status": "active",
         "content_hash": spec_content_hash("baseline_review", payload, parent_hash=parent, revision=revision),
     }
-    return ProposalDecision(True, artifact=artifact,
-                            transitions=[tuple(item) for item in DEFINITIONS.transitions(projection.kind, "baseline_review", verdict)])
+    # 基线核验的一致结论结束建档事项；要求产品修改时产品开始一轮工作（工单 #556）
+    return ProposalDecision(True, artifact=artifact, ends_run=verdict == "consistent")
 
 
 def _product_payload(proposal: dict[str, Any]) -> dict[str, Any]:

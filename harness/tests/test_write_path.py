@@ -196,8 +196,8 @@ def test_the_execution_right_number_is_recorded_and_an_older_number_is_refused(d
     stream = run_stream(run_id)
 
     def note(transaction):
-        phase = transaction.projection.phase
-        return transaction.append(NewEvent("execution_note", state_before=phase, state_after=phase,
+        status = transaction.projection.status
+        return transaction.append(NewEvent("execution_note", state_before=status, state_after=status,
                                            actor="user:local"))[0]
 
     first = system.writes.transact(stream, note, epoch=2)

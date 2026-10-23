@@ -107,8 +107,8 @@ def test_ask_answer_with_spec_revision_continuous_work(tmp_path: Path):
     system.run_until_stop(run_id)
 
     projection = system.project(run_id)
-    assert projection.outcome == "done"
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
+    assert projection.status == "done"
     assert projection.product_spec is not None
     assert projection.product_spec.revision == 2
 
@@ -182,7 +182,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
 
     projection = RunProjection(
         run_id="run_test",
-        phase="ENGINEERING",
+        status="running",
         ask_stack=[{"requester": "product", "recipient": "engineering", "branch_session_id": "ses_ask_eng"}],
     )
     basis = WorkBasis.current(projection, "engineering")
@@ -216,7 +216,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
     # 质检分支试图提交放行或缺陷记录
     qa_projection = RunProjection(
         run_id="run_test",
-        phase="QUALITY",
+        status="running",
         ask_stack=[{"requester": "engineering", "recipient": "quality", "branch_session_id": "ses_ask_qa"}],
     )
     qa_basis = WorkBasis.current(qa_projection, "quality")
@@ -235,7 +235,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
     # 产品分支试图执行除 answer 之外的工具被拒绝
     prod_projection = RunProjection(
         run_id="run_test",
-        phase="ENGINEERING",
+        status="running",
         ask_stack=[{"requester": "engineering", "recipient": "product", "branch_session_id": "ses_ask_pro"}],
     )
     prod_basis = WorkBasis.current(prod_projection, "product")
@@ -308,7 +308,7 @@ def test_ask_answer_requirements_only_rejected_and_cannot_lose_acceptance_criter
     system.run_until_stop(run_id)
 
     projection = system.project(run_id)
-    assert projection.outcome == "done"
+    assert projection.status == "done"
     assert projection.product_spec.revision == 2
     assert projection.product_spec.acceptance_criteria == ["running the program with a word prints that word in uppercase"]
 
@@ -356,7 +356,7 @@ def test_ask_answer_echoing_only_basis_hash_creates_no_revision(tmp_path: Path):
     system.run_until_stop(run_id)
 
     projection = system.project(run_id)
-    assert projection.outcome == "done"
+    assert projection.status == "done"
     # 没有出新版本，仍然是 rev 1
     assert projection.product_spec.revision == 1
     assert len(projection.product_spec.requirements) >= 1
@@ -454,7 +454,7 @@ def test_ask_branch_exhausted_ends_with_unable_and_usage_charged(tmp_path: Path)
     # 提问方投影的已用量包含分支的步骤
     finished_events = [e for e in events if e.type == EventType.ACTIVATION_FINISHED and e.department == "engineering"]
     assert finished_events[0].payload["model_steps"] == 4
-    assert system.project(run_id).outcome == "done"
+    assert system.project(run_id).status == "done"
 
 def test_ask_branch_exhausted_by_requester_remaining_steps_ends_with_unable(tmp_path: Path):
     # 提问方剩余可用步数生效：声明 4 步、提问方剩余 1 步时，分支上限取 1 步；两步才回答的分支以 unable 结束
@@ -501,7 +501,7 @@ def test_ask_branch_exhausted_by_requester_remaining_steps_ends_with_unable(tmp_
     assert len(tool_calls) == 1
     assert tool_calls[0].payload["ok"] is False
     assert "step limit" in (tool_calls[0].payload.get("error") or "")
-    assert system.project(run_id).outcome == "paused"
+    assert system.project(run_id).status == "paused"
     assert system.project(run_id).stop_reason == "model_steps_exhausted"
     finished_events = [e for e in events if e.type == EventType.ACTIVATION_FINISHED and e.department == "engineering"]
     assert finished_events[0].payload["model_steps"] == 3
@@ -543,7 +543,7 @@ def test_ask_branch_resumes_across_system_restart(tmp_path: Path):
         assert ask_started_events[0].payload["branch_session_id"] == ask_answered_events[0].session_id
         assert ask_answered_events[0].payload["status"] == "answered"
         assert ask_answered_events[0].payload["answer"] == "Yes, lowercase is ok."
-        assert run.after.project(run.run_id).phase == "DONE"
+        assert run.after.project(run.run_id).status == "done"
 
 
 def test_ask_branch_finished_restart_retains_accumulated_elapsed_time(tmp_path: Path):
@@ -581,7 +581,7 @@ def test_ask_branch_finished_restart_retains_accumulated_elapsed_time(tmp_path: 
         elapsed_list = [e.payload["elapsed_ms"] for e in after_events if e.type == EventType.ACTIVATION_FINISHED]
         assert len(elapsed_list) == 4
         assert all(x <= y for x, y in zip(elapsed_list, elapsed_list[1:]))
-        assert run.after.project(run.run_id).phase == "DONE"
+        assert run.after.project(run.run_id).status == "done"
 
 
 def test_ask_branch_no_tool_call_ends_with_unable(tmp_path: Path):
@@ -621,7 +621,7 @@ def test_ask_branch_no_tool_call_ends_with_unable(tmp_path: Path):
     assert len(tool_calls) == 1
     assert tool_calls[0].payload["ok"] is False
     assert "without calling a tool" in (tool_calls[0].payload.get("error") or "")
-    assert system.project(run_id).outcome == "done"
+    assert system.project(run_id).status == "done"
 
 
 def test_ask_branch_exhausted_by_department_time_limit_ends_with_unable(tmp_path: Path):
@@ -662,7 +662,7 @@ def test_ask_branch_exhausted_by_department_time_limit_ends_with_unable(tmp_path
     assert len(tool_calls) == 1
     assert tool_calls[0].payload["ok"] is False
     assert "time limit" in (tool_calls[0].payload.get("error") or "").lower()
-    assert system.project(run_id).outcome == "done"
+    assert system.project(run_id).status == "done"
 
 
 def test_ask_branch_exhausted_by_run_time_limit_ends_with_unable(tmp_path: Path):

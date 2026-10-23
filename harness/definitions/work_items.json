@@ -125,34 +125,6 @@
             "submit_guidance_response"
           ]
         }
-      },
-      "transitions": {
-        "structure": {
-          "accepted": [
-            [
-              "ENGINEERING",
-              "QUALITY"
-            ]
-          ]
-        },
-        "baseline_review": {
-          "consistent": [
-            [
-              "QUALITY",
-              "DONE"
-            ]
-          ],
-          "rework_product": [
-            [
-              "QUALITY",
-              "REWORK_PRODUCT"
-            ],
-            [
-              "REWORK_PRODUCT",
-              "PRODUCT_SPEC"
-            ]
-          ]
-        }
       }
     }
   },

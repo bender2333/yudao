@@ -46,7 +46,7 @@ def stubbed_admission(monkeypatch):
 
     monkeypatch.setattr(ProviderFacade, "test_connection", test_connection)
     monkeypatch.setattr(ProviderFacade, "model_test", model_test)
-    monkeypatch.setattr(smoke, "_run_scenario", lambda system, name: {"scenario": name, "phase": "DONE"})
+    monkeypatch.setattr(smoke, "_run_scenario", lambda system, name: {"scenario": name, "status": "done"})
     return calls
 
 

@@ -7,6 +7,7 @@ from dataclasses import replace
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_parts
 from harness.event_store import run_stream
 from harness.models import EventType
@@ -19,7 +20,7 @@ from harness.validation import evaluate_proposal
 
 def _accept_new_spec(system, run_id):
     projection = system.project(run_id)
-    decision = evaluate_proposal(phase="PRODUCT_SPEC", department="product", projection=replace(projection, phase="PRODUCT_SPEC"),
+    decision = evaluate_proposal(department="product", projection=replace(projection, status="running"),
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=product_spec(requirements=["print the argument in uppercase"], change_record={
                                      "changed": ["Print the argument in uppercase"], "retained": ["Keep a single argument CLI"],
@@ -42,7 +43,7 @@ def test_writes_without_a_plan_are_allowed(tmp_path):
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     result = system.activate_once(run_id)
-    assert result.phase == "QUALITY", result.error
+    assert has_new_work(result, "quality"), result.error
     assert result.delivery_spec is not None
     assert system.workspace(run_id).list_files() == ["src/direct.py"]
     events = system.store.list_events(run_id)
@@ -77,7 +78,7 @@ def test_supplementary_decision_changes_contract_without_new_spec(tmp_path):
     assert new.effective_contract.content_hash != old.effective_contract.content_hash
     # 旧合同下的检查回执属于早先激活：新激活直接交付因缺少本次激活的回执被拒绝
     facts = system.workspace(run_id).snapshot().facts
-    decision = evaluate_proposal(phase=new.phase, department="engineering", projection=new,
+    decision = evaluate_proposal(department="engineering", projection=new,
                                  facts=facts, proposal=delivery(check_names=["smoke"]))
     assert not decision.accepted
     assert any(error.field == "check_names" for error in decision.errors)
@@ -148,7 +149,7 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
     facts = system.workspace(run_id).snapshot().facts
     for changes in ([], [{"decision_hash": "unknown", "disposition": "retain", "rationale": "Unknown"}],
                     [{"decision_hash": original_decision.content_hash, "disposition": "retain", "rationale": "Keep"}] * 2):
-        decision = evaluate_proposal(phase="PRODUCT_SPEC", department="product", projection=replace(dec, phase="PRODUCT_SPEC"),
+        decision = evaluate_proposal(department="product", projection=replace(dec, status="running"),
                                      facts=facts, proposal=product_spec(decision_changes=changes, change_record={
                                          "changed": [], "retained": ["Echo behavior"], "retired": [],
                                          "rationale": "Review earlier decisions",
@@ -178,7 +179,7 @@ def test_prd_artifact_failure_does_not_accept_product_or_contract(tmp_path, monk
 
     monkeypatch.setattr(system.artifacts, "put", fail_prd)
     result = system.activate_once(run_id)
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "host_commit_error"
     assert "cannot persist PRD" in result.error
     assert result.human_action

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .event_store import EventStore
-from .models import TERMINAL_PHASES
+from .models import TERMINAL_STATUSES
 
 # 当前的 run 事件版本：run 事件的语义改变时提高这个版本。每个 run 在创建时把它记进 run_created 事件。
 # 版本 2：删除事件种类 department_prompt_updated 与 run_created 的 department_prompts 字段（#89）
@@ -24,7 +24,8 @@ from .models import TERMINAL_PHASES
 # 版本 8：询问改为按会话归属的栈，嵌套询问的层数由规则参数控制；分支会话的激活不再改部门主线的最近激活（#473）
 # 版本 9：activation_finished 新增会话级累计已用量字段 session_elapsed_ms、session_activations、
 # session_model_steps；核实记录（action_verified）带上发出它的会话编号（#475）
-RUN_EVENT_VERSION = 9
+# 版本 10：删除事件种类 transition（阶段状态机删掉，部门按关注的成果开始工作，#556）
+RUN_EVENT_VERSION = 10
 
 # run 流：事项的进行过程（每次 run 的交接、询问、尝试与动作）
 RUN_EVENT_TYPES = frozenset({
@@ -66,7 +67,6 @@ RUN_EVENT_TYPES = frozenset({
     "lesson_candidate_recorded",
     "structure_accepted",
     "baseline_review_accepted",
-    "transition",
     "run_resumed",
     "run_continued",
     "run_done",
@@ -181,7 +181,7 @@ def classify_startup_runs(store: EventStore) -> StartupRuns:
             run = project_run(store, run_id)
         except RunNotFoundError:
             continue
-        if run.phase in TERMINAL_PHASES:
+        if run.status in TERMINAL_STATUSES:
             finished.append(run_id)
         elif run.run_event_version == RUN_EVENT_VERSION:
             same.append(run_id)

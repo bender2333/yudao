@@ -83,7 +83,7 @@ def test_initial_prd_decision_request_and_proposed_event_carry_summary(data_dir,
                            if e.type == ProjectEventType.ONBOARDING_REVISION_STARTED]
         assert len(revision_events) == 1
         second_run_id = revision_events[0].payload["run_id"]
-        assert _wait_for(lambda: opened.system.project(second_run_id).phase == "DONE"), \
+        assert _wait_for(lambda: opened.system.project(second_run_id).status == "done"), \
             "第二轮建档 run 未结束"
         assert opened.system.project(second_run_id).error is None
 

@@ -204,14 +204,14 @@ def test_run_created_from_snapshot_has_files_before_activation(data_dir, tmp_pat
     assert run.snapshot == snapshot
     assert run.baseline is None
     events = system.store.list_events(run_id)
-    assert [event.type for event in events] == [EventType.RUN_CREATED, EventType.TRANSITION]
+    assert [event.type for event in events] == [EventType.RUN_CREATED]
     created = next(event for event in events if event.type == EventType.RUN_CREATED)
     assert created.payload["snapshot"]["source"] == str(source.absolute())
     assert created.payload["snapshot"]["files"] == [".hidden", "src/app.py", "src/data.bin"]
     assert created.payload["snapshot"]["directories"] == ["empty", "empty/nested", "src"]
     # 建档 run 以 baseline_verified 结束；结算按工单 #136 提出初始 PRD 候选并请求用户确认
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE"
+    assert result.status == "done"
     assert result.stop_reason == "baseline_verified"
     [proposed, requested] = [system.projects.settle(run_id), system.projects.settle(run_id)]
     assert proposed is not None and requested is None
@@ -299,7 +299,7 @@ def test_project_onboard_http_entry(data_dir, tmp_path):
 
         assert _wait_for(settled), "the onboarding run did not stop"
         run = system.project(run_id)
-        assert run.phase == "DONE"
+        assert run.status == "done"
         assert run.stop_reason == "baseline_verified"
         assert run.workspace_digest == run.snapshot["tree_digest"]
         assert _fingerprint(source) == before
