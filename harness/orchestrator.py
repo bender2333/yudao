@@ -236,6 +236,13 @@ class Orchestrator:
         # 等待期间段计时暂停，等待的时间不计入（工单 #350）
         self._run_elapsed_ms: dict[str, int] = {}
         self._run_segment_start: dict[str, float] = {}
+        # 每个会话累计的已用运行时间（毫秒，工单 #475）：键是 (run 编号, 会话编号)。
+        # 会话自己的累计值在重新启动以后从事件恢复，连续累计，不因中断清零；
+        # _session_base_ms 记下这次激活开始时 run 的累计已用时间，用来算这个会话这一段用掉多少
+        self._session_elapsed_ms: dict[tuple[str, str], int] = {}
+        self._session_base_ms: dict[tuple[str, str], int] = {}
+        # 已经从事件恢复过会话用量的 run：恢复只做一次
+        self._recovered_session_runs: set[str] = set()
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
         # 事项的执行任务与结算：run_id -> 任务；由 start_work_item 建立，任务结束时移除
@@ -707,11 +714,72 @@ class Orchestrator:
     def _elapsed_sec(self, run_id: str) -> float:
         # 这个 run 已经用的运行时间（秒）：已持久化的累计加上当前运行段。等待（重试退避、
         # 用户决定阻塞等）期间段计时暂停，不计入（工单 #350）
+        return self._elapsed_ms(run_id) / 1000.0
+
+    def _elapsed_ms(self, run_id: str) -> int:
+        # 这个 run 已经用的运行时间（毫秒）：已持久化的累计加上当前运行段
         total_ms = self._run_elapsed_ms.get(run_id, 0)
         started = self._run_segment_start.get(run_id)
         if started is not None:
             total_ms += max(0, int((time.monotonic() - started) * 1000))
-        return total_ms / 1000.0
+        return total_ms
+
+    def _recover_session_usage(self, run_id: str, events: Sequence[Any]) -> None:
+        # 会话自己的累计已用时间（工单 #475）：从事件恢复，重新启动以后连续累计。
+        # 每个会话最后一条 activation_finished 记下的累计值就是它到那一刻的总量；
+        # 计数（激活次数与模型步数）由事件数得出，不依赖这个字段
+        if run_id in self._recovered_session_runs:
+            return
+        self._recovered_session_runs.add(run_id)
+        for event in events:
+            if event.type != EventType.ACTIVATION_FINISHED or not event.session_id:
+                continue
+            key = (run_id, event.session_id)
+            elapsed = int((event.payload or {}).get("session_elapsed_ms", 0) or 0)
+            self._session_elapsed_ms[key] = max(self._session_elapsed_ms.get(key, 0), elapsed)
+
+    def _start_session_segment(self, run_id: str, session_id: str) -> None:
+        # 会话这一段工作的起点：记下 run 此刻的累计已用时间（工单 #475）
+        self._session_base_ms[(run_id, session_id)] = self._elapsed_ms(run_id)
+
+    def _settle_session_segment(self, run_id: str, session_id: str, run_elapsed_ms: int) -> int:
+        # 会话这一段工作用掉的毫秒数：run 的累计已用时间减去这一段的起点。
+        # 一个部门会话包含它等待的分支会话的时间（用量计入提问方），因此各会话的用时之和可以大于事项的用时
+        key = (run_id, session_id)
+        base = self._session_base_ms.pop(key, None)
+        if base is None:
+            return self._session_elapsed_ms.get(key, 0)
+        used = max(0, run_elapsed_ms - base)
+        total = self._session_elapsed_ms.get(key, 0) + used
+        self._session_elapsed_ms[key] = total
+        return total
+
+    def _session_model_steps(self, run_id: str, session_id: str, events: Sequence[Any]) -> int:
+        # 这个会话已经用过的模型步数（工单 #475）：按这个会话的 model_requested 事件数算。
+        # 重新启动以后从事件重算，连续累计：分支会话中断以后继续，用掉的步数不从上限里清零
+        return len([event for event in events
+                    if event.type == EventType.MODEL_REQUESTED and event.session_id == session_id])
+
+    def _session_unfinished_model_steps(self, run_id: str, session_id: str, events: Sequence[Any]) -> int:
+        # 这个会话还没有结束的激活用掉的模型步数（工单 #475）：上一次激活结束以后
+        # （activation_finished）这个会话又用掉的步数。中断时那次激活没有结束事件，
+        # 它用掉的步数算在这里，重新启动以后从它自己的步骤上限里扣掉
+        last_finished = None
+        for event in events:
+            if event.type == EventType.ACTIVATION_FINISHED and event.session_id == session_id:
+                last_finished = event.stream_version
+        return len([event for event in events
+                    if event.type == EventType.MODEL_REQUESTED and event.session_id == session_id
+                    and (last_finished is None or event.stream_version > last_finished)])
+
+    def _session_elapsed_sec(self, run_id: str, session_id: str) -> float:
+        # 这个会话已经用的运行时间（秒）：累计值加上当前这一段
+        key = (run_id, session_id)
+        total = self._session_elapsed_ms.get(key, 0)
+        base = self._session_base_ms.get(key)
+        if base is not None:
+            total += max(0, self._elapsed_ms(run_id) - base)
+        return total / 1000.0
 
     def _pause_run_clock(self, run_id: str) -> None:
         # 暂停这个 run 的段计时：进入等待时调用，等待的时间不计入运行时间
@@ -946,9 +1014,12 @@ class Orchestrator:
         }
         if comparison is not None:
             event_payload["verification"] = comparison
+        # 交还给发出这个动作的会话（工单 #475）：会话编号取自发这个动作的 tool_started，
+        # 核实记录因此进入那个会话的历史（分支会话的核实结果不进入部门主线）
         return NewEvent(
             EventType.ACTION_VERIFIED, actor="system", department=started.department,
             state_before=phase, state_after=phase, parent_event_id=started.event_id,
+            session_id=started.session_id,
             payload=event_payload,
         )
 
@@ -962,6 +1033,7 @@ class Orchestrator:
         return NewEvent(
             EventType.ACTION_VERIFIED, actor="system", department=started.department,
             state_before=phase, state_after=phase, parent_event_id=started.event_id,
+            session_id=started.session_id,
             payload={"id": action_id, "name": str(payload.get("name") or ""), "step_id": payload.get("step_id"),
                      "activation_id": payload.get("activation_id"),
                      "purpose": payload.get("purpose", "work"), "input_item": input_item,
@@ -1138,6 +1210,14 @@ class Orchestrator:
                                        if event.type == EventType.DEPARTMENT_ACTIVATED])
                     model_steps = len([event for event in happened
                                        if event.type == EventType.MODEL_REQUESTED])
+                    # 这个会话自己的累计用量（工单 #475）：重新启动以后从事件连续累计
+                    session_elapsed_ms = self._settle_session_segment(run_id, scope.session_id, elapsed_ms)
+                    session_activations = len([event for event in happened
+                                               if event.type == EventType.DEPARTMENT_ACTIVATED
+                                               and event.session_id == scope.session_id])
+                    session_model_steps = len([event for event in happened
+                                               if event.type == EventType.MODEL_REQUESTED
+                                               and event.session_id == scope.session_id])
                     transaction.append(NewEvent(
                         EventType.ACTIVATION_FINISHED,
                         actor="system",
@@ -1153,6 +1233,9 @@ class Orchestrator:
                             "elapsed_ms": elapsed_ms,
                             "activations": activations,
                             "model_steps": model_steps,
+                            "session_elapsed_ms": session_elapsed_ms,
+                            "session_activations": session_activations,
+                            "session_model_steps": session_model_steps,
                             "stop_reason": current.stop_reason,
                         },
                     ))
@@ -1172,6 +1255,8 @@ class Orchestrator:
         if not projection.run_id:
             raise RunNotFoundError(run_id)
         self._recover_run_usage(run_id, transaction.events())
+        # 会话自己的累计用量同样从事件恢复（工单 #475）：重新启动以后各会话的已用时间与次数连续累计
+        self._recover_session_usage(run_id, transaction.events())
         self._resume_run_clock(run_id)
         if self._abort.get(run_id) and self._abort[run_id].is_set():
             return None
@@ -1263,6 +1348,8 @@ class Orchestrator:
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=guidance_ids,
             guidance_only=guidance_only, basis=basis, provider=provider_name,
         )
+        # 会话这一段工作的起点（工单 #475）：这一段用掉的时间算到这个会话的累计已用时间里
+        self._start_session_segment(run_id, session.session_id)
         return _Activation(scope, prompt, self._abort.setdefault(run_id, Event()), adapter, yielded_work,
                            transaction.projection.stream_version)
 
@@ -1338,6 +1425,16 @@ class Orchestrator:
             "sent_tier": None,
         }
 
+    def _session_limits(self, run_id: str, session_id: str) -> StepLimits:
+        # 这个会话这一步的步数上限（工单 #475）：会话上一次没有结束的激活用掉的模型步数
+        # 从它自己的上限里扣掉，重新启动以后连续累计，不因中断清零。
+        # 已经结束的激活不算在内：下一轮工作重新按上限开始
+        events = self.writes.read(run_stream(run_id)).events()
+        used = self._session_unfinished_model_steps(run_id, session_id, events)
+        if used <= 0:
+            return self.step_limits
+        return replace(self.step_limits, max_model_steps=max(0, self.step_limits.max_model_steps - used))
+
     async def _invoke_activation(self, activation: _Activation) -> None:
         scope = activation.scope
         run_id, department = scope.run_id, scope.department
@@ -1370,7 +1467,8 @@ class Orchestrator:
                 scope, activation.prompt, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
-                nodes=_SafeNode(self, activation), cancelled=activation.abort_flag, limits=self.step_limits,
+                nodes=_SafeNode(self, activation), cancelled=activation.abort_flag,
+                limits=self._session_limits(run_id, scope.session_id),
                 deltas=self.deltas,
             )
             result = await activation.driver.result()
@@ -1492,7 +1590,12 @@ class Orchestrator:
         declared_steps = self.step_limits.department_max_model_steps.get(
             recipient, self.step_limits.max_model_steps
         )
-        branch_max_steps = min(declared_steps, remaining_steps)
+        # 这个分支会话已经用过的模型步数从它自己的上限里扣掉（工单 #475）：
+        # 分支会话有自己的步骤上限，中断以后继续时用掉的步数不清零
+        used_steps = self._session_model_steps(
+            scope.run_id, branch_session_id,
+            self.writes.read(run_stream(scope.run_id)).events())
+        branch_max_steps = min(declared_steps, remaining_steps) - used_steps
 
         if branch_max_steps <= 0:
             reason = "department reached the model step limit without submitting a proposal"
@@ -1522,7 +1625,10 @@ class Orchestrator:
         declared_time = self.step_limits.department_max_time_sec.get(
             recipient, float(projection.run_time_limit_sec)
         )
-        deadline = time.monotonic() + declared_time
+        # 这个分支会话已经用掉的时间从它自己的时限里扣掉（工单 #475）：
+        # 中断以后继续时，剩余时间按已用时间连续累计
+        used_time = self._session_elapsed_sec(scope.run_id, branch_session_id)
+        deadline = time.monotonic() + max(0.0, declared_time - used_time)
 
         result = await self._run_ask_branch(
             activation, scope.run_id, recipient, branch_session_id, question,
@@ -1698,6 +1804,8 @@ class Orchestrator:
             return events[0]
 
         act_event = self.writes.transact(run_stream(run_id), activate_branch)
+        # 这个分支会话这一段工作的起点（工单 #475）
+        self._start_session_segment(run_id, session_id)
 
         branch_scope = ActivationScope(
             run_id, department, session_id, activation_id, act_event.event_id,
@@ -1738,6 +1846,8 @@ class Orchestrator:
                 happened = transaction.events()
                 activations = len([e for e in happened if e.type == EventType.DEPARTMENT_ACTIVATED and e.session_id == session_id])
                 model_steps = len([e for e in happened if e.type == EventType.MODEL_REQUESTED and e.session_id == session_id])
+                # 这个分支会话自己的累计用量（工单 #475）：重新启动以后从事件连续累计
+                session_elapsed_ms = self._settle_session_segment(run_id, session_id, self._elapsed_ms(run_id))
                 transaction.append(NewEvent(
                     EventType.ACTIVATION_FINISHED,
                     actor="system",
@@ -1753,6 +1863,9 @@ class Orchestrator:
                         "elapsed_ms": int(self._elapsed_sec(run_id) * 1000),
                         "activations": activations,
                         "model_steps": model_steps,
+                        "session_elapsed_ms": session_elapsed_ms,
+                        "session_activations": activations,
+                        "session_model_steps": model_steps,
                         "stop_reason": None,
                     },
                 ))

@@ -5487,6 +5487,18 @@ export type ActivationFinishedPayload = {
      */
     model_steps: number;
     /**
+     * Session Elapsed Ms
+     */
+    session_elapsed_ms?: number;
+    /**
+     * Session Activations
+     */
+    session_activations?: number;
+    /**
+     * Session Model Steps
+     */
+    session_model_steps?: number;
+    /**
      * Stop Reason
      */
     stop_reason: string | null;
