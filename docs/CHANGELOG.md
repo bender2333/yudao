@@ -1043,6 +1043,18 @@ claude-sonnet-5-5 / 2026-10-22 23:03 / solo 模式补标签规则：`AGENTS.md`�
 
 solo-minimax-M3.1-Flash / 2026-10-23 13:39 / 工单 #709：采纳成果以后页面上有写回的入口——项目设置页新增「成果写回」一节（发起写回、列出写回记录），源目录一节补上写回设置（是否打开、远端、目标分支），概览页的「当前成果」多一行写回状态；新增查询 `project.writeback`（写回记录：状态、停止原因、推送的分支、目标分支、合并请求、冲突的文件）；命令 `writeback.execute` 在写回目标不可用时（目标仓库不存在、那个路径不是 git 仓库、目标分支不存在）按 `not_allowed` 给出中文说明，不再回 500 内部错误（`harness/writeback.py` 增加 `WritebackTargetUnavailable`）；采纳以后自动发起的写回遇到目标不可用时做不了，也不因此让这一次采纳失败（`harness/projects.py` 的 `_trigger_writeback_if_enabled` 接住它）；docs/design/app-and-interface.md 补查询一行与「写回在页面上的显示」，docs/design/existing-project-onboarding.md 第 5 节写回结果的位置由「事项详情」改为项目设置页与概览页 / 工单 #709：界面上没有写回的入口，「接入已有项目」这条路只走了一半；后端能力齐备（#347 与采纳以后自动发起写回都在），缺的是入口、写回设置与结果的可见性
 
+claude-fable-5-1 / 2026-10-23 15:41 / docs/agents/autopilot-runtime.md 第 7 节「唤醒架构师」改为关 / 用户在场的会话开始做骨架与应用的设计修改（CLAUDE.md「自主推进模式」），做完改回开
+
+claude-fable-5-1 / 2026-10-23 15:50 / 新增 docs/requirements/skeleton-and-application.md（D40）、docs/adr/0042-skeleton-and-application-two-layers.md、docs/design/skeleton-and-application.md；docs/design/architecture/overall-architecture.md 第 1.1 节内核段落改为最小投影并加两层的说明，第 2 节可信内核一行、第 6.1 节流程编排一行相应修改；docs/design/trusted-kernel.md 第 2 节投影两行与第 3 节清单说明；docs/design/department-loop.md 开头一句（成果驱动路由实现的设计说明）；docs/design/test-pyramid.md 第 4 节发布前一行加真实用户场景验收；docs/program-roadmap.md 第 2 节第 17 项、里程碑顺序与第 5.1 节看门狗；docs/stage-3-plan.md 第 2、3、7、9 节各加一行；CONTEXT.md 增加骨架、应用、最小投影、薄驱动、路由契约、装配契约、执行契约、骨架事件、看门狗、金丝雀任务、健康协议；docs/design/README.md 与 docs/requirements/README.md 索引（D39 编号保留给暂缓的黑板编排）；docs/decision.md 2026-10-23 一条；docs/agents/autopilot-runtime.md 第 7 节「唤醒架构师」改回开 / 用户 2026-10-23 决定系统分骨架与应用两层，骨架向后兼容、应用一次完成，裁决只读最小投影（ADR-0042）
+
+claude-fable-5-1 / 2026-10-23 15:53 / docs/program-roadmap.md 第 2 节第 17 项、docs/stage-3-plan.md 第 3、9 节、docs/design/skeleton-and-application.md 第 12 节、docs/requirements/skeleton-and-application.md 写入工单编号：父工单 #823，S1 至 S6 是 #824 至 #829，S7 是 #830 / 工单已建立
+
+claude-opus-5-5 / 2026-10-24 / docs/architecture-issues.md 中工单 #747 原型恢复页那一条补处理行：只改当前定稿 v11，开工单 #831 / 会话开始时查看未处理的架构问题
+
+claude-opus-5-5 / 2026-10-24 / docs/decision.md 新增 2026-10-24「任务池按地图找路，保留质检的独立放行」 / 用户用 /wayfinder 为任务池建地图（#836），逐项采纳推荐
+
+claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 新增第 5.4 节「第二种路由：骨架要满足的条件」（七条与证明方式），相应修改第 3.1 节裁决规则的兼容说法、第 4 节成果接纳按统一字段折叠、第 5.1 与 5.3 节的工作引用与一轮的结果、第 7 节应用事件的登记、第 12 节 S1、S2、S3、S5、S6 的验收、第 14 与 15 节；ADR-0042 追加 2026-10-24 补充；D40 记用户原话与第 12 至 15 条；CONTEXT.md「路由契约」补一句；docs/decision.md 新增条目 / 用户 2026-10-24：骨架要支持两种路由，第二种路由不受之前 ADR 限制、复用骨架、不改旧的成果和结构（任务池地图 #836）
+
 solo-minimax-M3.1-Flash / 2026-10-24 02:20 / 工单 #557：集成层的用例按同时运行以后的结构改写——共用一个队列的脚本改成按部门给出（同时运行的会话各自取用自己的脚本项，共用一个队列时哪一项给哪个部门随请求先后变化，脚本项会串部门），质检的脚本改用共享的工厂（`harness/tests/helpers.py` 的 `quality_turns`：PRD 的每一个新版本与每一份新交付都让质检开始一轮工作，轮数随成果到达的时机变化，每一轮按这一轮开始时有没有交付决定做什么）；数模型调用次数与轮次的断言按测试分层设计说明第 10 节改成断言结果（三个部门都工作过、审计覆盖每一次发过请求的激活、导出的尝试与查询读到的是同一批）；`harness/tests/test_smoke_guidance_audit.py` 的组合 run 夹具按部门给出脚本，「这一轮只回应指导」不再断言（同时运行以后这一轮是不是只回应指导取决于别的部门有没有先做完，见 `docs/architecture-issues.md`）
 
 solo-minimax-M3.1-Flash / 2026-10-24 03:50 / 工单 #557：集成层剩下的用例按同时运行以后的结构改写——共用一个队列的脚本改成按部门给出（`harness/tests/test_event_payloads.py`、`test_engine.py`、`test_onboarding.py`、`test_issue_317_onboarding_upgrade.py`、`test_issue_317_onboarding_interruption.py`、`test_department_providers.py`），`harness/tests/process_kill.py` 的 `restarted` 改成也能写按会话给出的脚本；数模型调用次数与轮次的断言按测试分层设计说明第 10 节改成断言结果（`test_definitions.py`、`test_department_providers.py`、`test_engine.py`）；`docs/architecture-issues.md` 登记两条：同时被挡住时待恢复的决定请求是合发一条还是各发一条、被挡住的那一轮在回答以后要不要接着做；影响列表里的进行中事项只写一个部门（取事项投影的当前部门）/ 上一轮登记的两处由架构师定口径；本轮按现在的实现把用例写对：两个会话被挡住时各有一条待恢复的决定请求、各写明自己的部门，影响列表写的部门与事项投影当前所在部门一致
