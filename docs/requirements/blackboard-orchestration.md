@@ -1,6 +1,6 @@
 # D39 黑板编排：与成果驱动并存的第二种编排模式
 
-日期：2026-10-22。状态：需求已确认，设计见[黑板编排设计说明](../design/blackboard-orchestration.md)，决定见 [ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)，未实施。
+日期：2026-10-22。状态：暂缓。用户 2026-10-23 决定暂时不做，还没有完全想明白；需求、设计与 ADR 保留在 PR #751 里不合并，第 3 节的待定事项不处理，不拆工单。设计见[黑板编排设计说明](../design/blackboard-orchestration.md)，决定见 [ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)。
 
 ## 1. 用户原话
 

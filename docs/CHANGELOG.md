@@ -1008,3 +1008,5 @@ minimax-M3.1-Flash / 2026-10-22 19:28 / 走查记录补 U103、U104：**资料�
 claude-fable-5-1 / 2026-10-22 22:30 / 新增 docs/requirements/blackboard-orchestration.md（D39，含用户 2026-10-22 任务池方案原文与会话补充）、docs/adr/0041-two-orchestration-modes-share-control-core.md、docs/design/blackboard-orchestration.md；docs/requirements/README.md 登记 D39；docs/design/README.md 登记黑板编排；docs/design/department-loop.md 开头标明它是成果驱动模式的设计说明；docs/design/loops-and-convergence.md 开头补充五条判据对两种模式都适用、进展度量按模式定义；docs/decision.md 新增 2026-10-22 两种编排模式的决定 / 用户决定保留成果驱动与黑板两种编排模式并共用控制核心（ADR-0041）
 
 claude-fable-5-1 / 2026-10-22 23:05 / 新增 docs/research/blackboard-orchestration-references.md（黑板编排的参照调研：经典黑板系统、大模型系统里的黑板与共享状态、AI4S 的共享状态形态、对设计说明的影响、没读到的材料与来源）；docs/research/README.md 登记；docs/design/blackboard-orchestration.md 第 10 节的对照报告加入没认领到的轮次用量与「自述完成但隐藏检查未通过」的比例，第 15 节加入第 7 条可选的按结果类型派生任务 / 用户要求调研黑板模式的编排与 AI4S 里的实例
+
+claude-fable-5-1 / 2026-10-23 15:15 / docs/requirements/blackboard-orchestration.md、docs/design/blackboard-orchestration.md 的状态行与 docs/adr/0041 的 Status 改为暂缓；docs/decision.md 新增 2026-10-23 黑板编排暂缓 / 用户决定暂时不做，PR #751 保留不合并

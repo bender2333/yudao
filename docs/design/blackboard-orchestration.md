@@ -1,6 +1,6 @@
 # 黑板编排设计说明
 
-日期：2026-10-22。状态：设计草案，两种模式并存与共用底层已由用户决定（[ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)），第 15 节的暂定默认值待用户确认，未实施。需求：[D39](../requirements/blackboard-orchestration.md)、[D38](../requirements/system-intent.md)。前置设计：[总体架构：职责分层](architecture/overall-architecture.md)、[三部门的循环结构](department-loop.md)（成果驱动模式）、[循环与收敛](loops-and-convergence.md)、[规则登记与参数](rules-and-parameters.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。
+日期：2026-10-22。状态：暂缓（用户 2026-10-23 决定暂时不做，保留在 PR #751 里不合并）。设计草案，两种模式并存与共用底层见 [ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)，第 15 节的暂定默认值待用户确认，未实施，不拆工单。需求：[D39](../requirements/blackboard-orchestration.md)、[D38](../requirements/system-intent.md)。前置设计：[总体架构：职责分层](architecture/overall-architecture.md)、[三部门的循环结构](department-loop.md)（成果驱动模式）、[循环与收敛](loops-and-convergence.md)、[规则登记与参数](rules-and-parameters.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
 ## 1. 要解决的问题
 
