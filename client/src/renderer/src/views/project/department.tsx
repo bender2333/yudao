@@ -21,6 +21,7 @@ import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
+import { scopeName } from "./scope-name";
 import { emptyOrFailureText, readFailureText } from "../../contract/read-failure";
 
 export function DepartmentPage(props: { app: ClientApp; route: Route }) {
@@ -65,6 +66,9 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
       {data ? (
         <TitleArea
           data={data}
+          // 所选事项用名字说明，不显示事项标识这类内部标识（工单 #746）
+          workItemTitle={scopeName(items, data.work_item_id)}
+          scopeWorkItem={requested}
           scopeNote={requested !== null
             ? "（顶栏选中）"
             : workItem !== null ? "（未选中事项，取当前事项）" : "（项目还没有事项）"}
@@ -170,12 +174,13 @@ function departmentStatus(data: DepartmentWorkspaceResult): string {
   return `这次运行不在本部门 · ${label(PHASE_LABELS, data.phase)}`;
 }
 
-function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; onOpenSettings: () => void }) {
+function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: string; scopeWorkItem: string | null; scopeNote: string; onOpenSettings: () => void }) {
   const data = props.data;
   const effective = data.effective;
   const lastCall = data.last_call === null ? null : dict(data.last_call);
   const info = DEPARTMENTS[data.department];
-  const observeLink = `#/p/${data.project_id}/observe?dept=${data.department}`;
+  // 去观测页时带着当前的范围（工单 #746）：范围是项目级的一份，换页面不丢掉
+  const observeLink = `#/p/${data.project_id}/observe?dept=${data.department}${props.scopeWorkItem === null ? "" : `&w=${props.scopeWorkItem}`}`;
   const statusText = departmentStatus(data);
   const statusKind = data.status === "stopped" ? "cancelled stopped" : data.active ? "running" : "idle";
 
@@ -193,7 +198,9 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; scopeNote: string; 
           <p className="y10-ws-duty note">{info ? info.role : "部门职责未登记"}</p>
           <p className="y10-ws-item item">
             <span className="y10-muted">事项</span>
-            <strong>{data.work_item_id === null ? "本项目没有进行中的事项" : `所选事项 ${data.work_item_id}`}</strong>
+            <strong>{data.work_item_id === null
+              ? "本项目没有进行中的事项"
+              : `所选事项${props.workItemTitle === "" ? "" : ` ${props.workItemTitle}`}`}</strong>
             {props.scopeNote ? <span className="y10-muted">{props.scopeNote}</span> : null}
           </p>
           <div className="y10-ws-inline">

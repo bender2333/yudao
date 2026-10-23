@@ -9,6 +9,7 @@ import type { ClientApp } from "../../contract/client-app";
 import type {
   AttemptView,
   ProjectAttemptsResult,
+  ProjectOverviewResult,
   RunAttemptResult,
   UsageReport,
 } from "../../api/generated/types.gen";
@@ -22,6 +23,7 @@ import { ATTEMPT_STATUS, DEPARTMENTS, departmentName, formatTime, label } from "
 import { useSnapshot } from "./use-snapshot";
 import { reportedCountText, usageText } from "./usage-text";
 import { readFailureText } from "../../contract/read-failure";
+import { scopeName } from "./scope-name";
 
 const PAGE_SIZE = 50;
 
@@ -100,6 +102,11 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
     "project.attempts",
     { ...params, cursor },
   );
+  // 范围里是哪个事项：用事项的名字说明，不显示事项标识（工单 #746）
+  const scope = useSnapshot<ProjectOverviewResult>(props.app, "page.observe.scope", "project.overview", {
+    project_id: projectId,
+  });
+  const scopeTitle = scopeName(scope.data?.work_items ?? [], workItem);
   // 游标分页：翻到的页累加起来；第一页的每次新快照（筛选、事项变化或事件到达）都用它替换已有行
   const [rows, setRows] = useState<AttemptView[]>([]);
   const loadedSnapshot = useRef<ProjectAttemptsResult | null>(null);
@@ -127,7 +134,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
       <Section
         id="obs-requests"
         title="请求记录与用量"
-        note={`范围：${workItem === null ? "整个项目" : `事项 ${workItem}`}；按部门、状态、Provider 与模型筛选；两个页签使用同一组筛选。`}
+        note={`范围：${workItem === null ? "整个项目" : scopeTitle === "" ? "顶栏选中的事项" : scopeTitle}；按部门、状态、Provider 与模型筛选；两个页签使用同一组筛选。`}
         className="y10-obs"
       >
         <div className="y10-obs-filters filters">
@@ -338,7 +345,7 @@ export function ObserveDetailPage(props: { app: ClientApp; route: Route }) {
           <button
             type="button"
             className="y10-link link"
-            onClick={() => { window.location.hash = paths.observe(projectId) + (workItem ? `?w=${workItem}` : ""); }}
+            onClick={() => { window.location.hash = paths.observe(projectId, { workItem }); }}
           >
             返回请求记录
           </button>

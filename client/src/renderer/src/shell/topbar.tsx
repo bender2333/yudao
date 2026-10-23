@@ -1,6 +1,6 @@
 // 顶栏与项目标签（原型 v10 外壳，工单 #377）：面包屑路径、事项范围、亮起的状态项、
 // 版本与连接状态、项目菜单与主题切换。状态项取自 system.status 与 decisions.list 的等待数量；
-// 事项范围的选择写在路径参数 ?w={事项} 中。
+// 事项范围的选择写在路径参数 ?w={事项} 中；换一个范围时留在当前页（工单 #746）。
 
 import { useState } from "react";
 import type { ClientApp } from "../contract/client-app";
@@ -16,11 +16,13 @@ import { WORK_ITEM_STATUS, connectionText, label } from "../views/project/labels
 import { list, text } from "../views/project/common";
 import { DecisionCardList } from "../views/decisions/card";
 import { sortByRequested } from "../views/decisions/card-logic";
+import { type Route, withScope } from "./routing";
 
 export type TopbarProps = {
   app: ClientApp | null;
   projectId: string | null;
-  workItemId: string | null;
+  // 当前页面（含路径参数）：顶栏的事项范围按它决定换范围以后去哪一个页面（工单 #746）
+  route: Route;
   project: ProjectRow | null;
   path: string;
   pending: number;
@@ -51,7 +53,7 @@ export function Topbar(props: TopbarProps) {
       </nav>
       <div className="y10-top-actions">
         {props.projectId ? (
-          <WorkItemPicker app={props.app} projectId={props.projectId} workItemId={props.workItemId} onNavigate={props.onNavigate} />
+          <WorkItemPicker app={props.app} route={props.route} onNavigate={props.onNavigate} />
         ) : null}
         {/* 顶栏的状态项：跨项目与本项目的等待回答的决定请求，亮起时可以直接点开 */}
         <div className="y10-top-stats">
@@ -97,7 +99,7 @@ export function Topbar(props: TopbarProps) {
         </div>
       </div>
       {props.projectId && props.project && props.app ? (
-        <ProjectMenu app={props.app} projectId={props.projectId} workItemId={props.workItemId} project={props.project} onNavigate={props.onNavigate} />
+        <ProjectMenu app={props.app} projectId={props.projectId} workItemId={props.route.workItemId} project={props.project} onNavigate={props.onNavigate} />
       ) : null}
       {decisionsOpen ? (
         <div className="dropdown decisions-dropdown">
@@ -141,15 +143,17 @@ function ThemeSwitch() {
   );
 }
 
-// 事项选择框：「整个项目」或某个事项（标题与状态）；概览、部门工作间、资料、观测按所选范围显示
+// 事项选择框：「整个项目」或某个事项（标题与状态）；概览、部门工作间、资料、观测按所选范围显示。
+// 换一个范围时留在当前页（工单 #746）：范围是项目级的一份，写在路径参数 ?w= 中，
+// 选完以后当前的页面与筛选条件都还在，只有范围变了。
 function WorkItemPicker(props: {
   app: ClientApp | null;
-  projectId: string;
-  workItemId: string | null;
+  route: Route;
   onNavigate: (hash: string) => void;
 }) {
+  const projectId = props.route.projectId ?? "";
   const snapshot = useSnapshot<ProjectOverviewResult>(props.app, "topbar.overview", "project.overview", {
-    project_id: props.projectId,
+    project_id: projectId,
   });
   const items = snapshot.data === null ? [] : list(snapshot.data.work_items);
 
@@ -158,12 +162,11 @@ function WorkItemPicker(props: {
       <span className="y10-scope-label">范围</span>
       <select
         className="y10-select"
-        value={props.workItemId ?? ""}
+        value={props.route.workItemId ?? ""}
         aria-label="事项范围"
         onChange={(event) => {
-          const base = `#/p/${props.projectId}/overview`;
           const chosen = event.target.value;
-          props.onNavigate(chosen === "" ? base : `${base}?w=${chosen}`);
+          props.onNavigate(withScope(props.route, chosen === "" ? null : chosen));
         }}
       >
         <option value="">整个项目</option>
@@ -246,6 +249,7 @@ function MenuFeedback(props: { submitted: boolean; problem: CommandProblem | nul
 export type Tab = { label: string; hash: string };
 
 // 项目标签：active 比较 hash 的路径部分，带 ?w= 时仍高亮当前页
+// 页签的地址带着当前范围（工单 #746），因此高亮只看路径部分，参数不参与比较
 export function Tabbar(props: { tabs: Tab[]; activeHash: string; onNavigate: (hash: string) => void }) {
   if (props.tabs.length === 0) {
     return null;
@@ -254,16 +258,19 @@ export function Tabbar(props: { tabs: Tab[]; activeHash: string; onNavigate: (ha
   return (
     <nav className="y10-tabbar tabbar" aria-label="项目页面">
       <div className="y10-ptabs">
-        {props.tabs.map((tab) => (
-          <button
-            key={tab.hash}
-            className={`y10-ptab tab${tab.hash === activePath ? " is-active" : ""}`}
-            aria-current={tab.hash === activePath ? "page" : undefined}
-            onClick={() => props.onNavigate(tab.hash)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {props.tabs.map((tab) => {
+          const tabPath = tab.hash.split("?")[0];
+          return (
+            <button
+              key={tab.hash}
+              className={`y10-ptab tab${tabPath === activePath ? " is-active" : ""}`}
+              aria-current={tabPath === activePath ? "page" : undefined}
+              onClick={() => props.onNavigate(tab.hash)}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
     </nav>
   );

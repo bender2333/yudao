@@ -96,7 +96,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
                 fromAt={report.data.range.from_at}
                 project={projectId}
                 at={at}
-                onPosition={(next) => props.onNavigate(paths.overviewAt(projectId, next))}
+                onPosition={(next) => props.onNavigate(paths.overviewAt(projectId, next, { workItem }))}
                 onSelect={() => undefined}
                 highlight={[]}
                 liveNote={`实时画面 · ${ticksOf(report.data.facts, projectId).length} 条关键事实`}
