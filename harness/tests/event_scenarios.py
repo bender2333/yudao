@@ -403,9 +403,12 @@ def bash_is_not_a_check_receipt(data_dir):
     return system, run_id, {}
 
 
-def _running(label: str) -> str:
+def _running(label: str, *, delay_sec: float = 0.0) -> str:
     # 运行中的进程（argv 的一项）：输出一行，在第一个参数给出的位置写下标记文件以后一直等待
+    # delay_sec 大于零时先等这么久再写标记：取消因此落在别的会话这一轮工作结束以后，
+    # 事件序列不依赖取消落在别的会话的哪一步（工单 #557）
     return (f"import pathlib, sys, time; print('{label} started', flush=True); "
+            f"time.sleep({delay_sec}); "
             "pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)")
 
 
@@ -426,8 +429,10 @@ def _cancel_when_running(system: LoopSystem, run_id: str, marker) -> threading.T
 
 def cancel_while_check_runs(data_dir):
     # 标记文件的路径写成正斜杠形式，规整以后各平台相同
+    # 标记文件在检查开始一秒以后写下：取消发生在质检那一轮工作结束以后，
+    # 事件序列不依赖取消落在别的会话的哪一步（工单 #557，与 cancel_while_bash_runs 同一做法）
     marker = (data_dir / "check-running").as_posix()
-    command = f'python -c "{_running("check")}" "{marker}"'
+    command = f'python -c "{_running("check", delay_sec=1)}" "{marker}"'
     def deliver(call):
         return ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
                                      _call("check-1", "run_check", {"name": "smoke", "command": command}),
