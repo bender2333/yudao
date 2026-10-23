@@ -18,7 +18,7 @@ from harness.providers.call import ModelCall, ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.environment import BackgroundJobTable, LocalEnvironment
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, perform, wait_for_file, wait_until_stopped
+from harness.tests.helpers import happy_script, perform, wait_for_file, wait_until_stopped, quality_turns
 from harness.workspace import Workspace
 
 
@@ -373,15 +373,18 @@ def test_work_item_run_with_background_bash_port_access_read_output_and_stop(tmp
             "name": "stop_job", "arguments": json.dumps({"job_id": job_id}),
         }])
 
-    script = [
-        product_spec(),
-        eng_step1,
-        eng_step2,
-        eng_step3,
-        eng_step4,
-        delivery_turn(files={"src/server.py": "print('ok')\n"}, checks={"smoke": 0}),
-        review_turn("release", "verified server delivery independently"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [product_spec()],
+        "engineering": [
+            eng_step1,
+            eng_step2,
+            eng_step3,
+            eng_step4,
+            delivery_turn(files={"src/server.py": "print('ok')\n"}, checks={"smoke": 0}),
+        ],
+        "quality": quality_turns("release", "verified server delivery independently"),
+    }
 
     system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter(script))
     run_id = system.create_run("build server")

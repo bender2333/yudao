@@ -12,6 +12,7 @@ from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.helpers import quality_turns
 
 # 项目与事项的命令（应用层与接口层设计说明第 3、7.2 节，工单 #74）：真实启动 FastAPI 应用（uvicorn），
 # 经 HTTP 提交命令、读取查询；控制核心在服务生命周期中建立，事件日志是真实的 SQLite 文件，
@@ -23,10 +24,12 @@ UNAVAILABLE = "Missing configuration: provider credential"
 
 def _blocked_script():
     # 产品提交规格以后，工程部门的请求被提供方报告为不可用：run 停在这次请求之前（ENGINEERING，未终态）
-    return [
-        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))],
+        "engineering": [ProviderError(UNAVAILABLE, reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 
 class _Opened:

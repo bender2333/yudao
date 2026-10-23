@@ -14,6 +14,7 @@ from harness.projects import project_projection
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
+from harness.tests.helpers import quality_turns
 
 OLD_GOAL = "最初的长期目标。"
 NEW_GOAL = "修改以后的长期目标。"
@@ -123,13 +124,20 @@ def _mixed_script():
     # 事项 B 的脚本与 A 相同，用来核对 B 的请求使用修改以后的目标
     from harness.adapters.base import ProviderError
     from harness.adapters.fake import FakeTurn
-    return [
-        FakeTurn(proposal=product_spec()),
-        ProviderError("Missing configuration: provider credential", reason="provider_unavailable"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [FakeTurn(proposal=product_spec())],
+        "engineering": [ProviderError("Missing configuration: provider credential",
+                                       reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def test_new_work_items_use_the_new_goal_and_in_progress_items_keep_the_old(data_dir):
-    adapter = FakeAdapter([*_mixed_script(), *_mixed_script()])
+    adapter = FakeAdapter({
+        "product": [*_mixed_script()["product"], *_mixed_script()["product"]],
+        "engineering": [*_mixed_script()["engineering"], *_mixed_script()["engineering"]],
+        "quality": [*_mixed_script()["quality"], *_mixed_script()["quality"]],
+    })
     system = LoopSystem.for_testing(data_dir, adapter)
     project_id = system.projects.register("目标项目", OLD_GOAL)
 
@@ -157,7 +165,7 @@ def test_new_work_items_use_the_new_goal_and_in_progress_items_keep_the_old(data
     assert not _request_has_goal(adapter, run_b, OLD_GOAL)
 
 def test_run_created_records_the_goal_at_creation(data_dir):
-    adapter = FakeAdapter([*_mixed_script()])
+    adapter = FakeAdapter(_mixed_script())
     system = LoopSystem.for_testing(data_dir, adapter)
     project_id = system.projects.register("目标项目", OLD_GOAL)
     _work_a, run_a = system.projects.start_work_item(project_id, "事项 A")

@@ -19,6 +19,7 @@ from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tools import tool_action
 from harness.tree_archive import load_tree
+from harness.tests.helpers import quality_turns
 
 
 def _short_data_dir(tmp_path):
@@ -27,7 +28,12 @@ def _short_data_dir(tmp_path):
     return Path(tempfile.mkdtemp(prefix="d", dir=tmp_path.parent)) / "data"
 
 def _system(tmp_path, turns):
-    return LoopSystem.for_testing(_short_data_dir(tmp_path), FakeAdapter([product_spec(),*turns]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return LoopSystem.for_testing(_short_data_dir(tmp_path), FakeAdapter({
+        "product": [product_spec()],
+        "engineering": list(turns),
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }))
 
 def _write_command_body(workspace, outside):
     # bash 命令调用的脚本：在 node_modules 下建立指向工作区之外的目录链接

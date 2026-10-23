@@ -15,6 +15,7 @@ from harness.public_tree import TreeError, capture_public_tree, materialize_tree
 from harness.runtime import CancelledInputSaveError, LoopSystem, RunTerminalError
 from harness.tree_archive import load_tree
 from harness.validation import evaluate_proposal
+from harness.tests.helpers import quality_turns
 
 CHANGE_RECORD = {
     "changed": ["Print the argument in uppercase"],
@@ -48,10 +49,13 @@ def _commit_spec(system, run_id, proposal):
     ).append(transaction))
 
 def test_new_input_and_requirement_diff_form_one_accepted_history_through_redelivery(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),delivery_turn(), _revision(),        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
-        review_turn("release", "Uppercase output was independently verified"),
-    ]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec(), _revision()],
+        "engineering": [delivery_turn(),
+                        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"})],
+        "quality": quality_turns("release", "Uppercase output was independently verified"),
+    }))
     run_id = system.create_run("  build echo\r\n", max_cycles=12)
     for _ in range(2):
         before = system.activate_once(run_id)

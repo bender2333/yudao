@@ -11,6 +11,7 @@ from harness.projection import project_run
 from harness.proposals import product_spec
 from harness.streams import PRIORITY_UPGRADE_RESTART, STOP_REASON_UPGRADE
 from harness.tests.api_helpers import running_api
+from harness.tests.helpers import quality_turns
 from harness.tests.onboarding_project import (
     OpenedFake as _Opened,
     post_command as _post,
@@ -20,9 +21,14 @@ from harness.tests.onboarding_project import (
 
 def _blocked_script():
     # 产品提交规格以后工程部门的请求失败：run 停在非终态（ENGINEERING），可以用来检查排空与强制升级
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
     from harness.adapters.base import ProviderError
-    return [product_spec(), ProviderError("Missing configuration: provider credential",
-                                          reason="provider_unavailable")]
+    return {
+        "product": [product_spec()],
+        "engineering": [ProviderError("Missing configuration: provider credential",
+                                       reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def test_force_upgrade_outside_a_drain_is_rejected(data_dir):
     opened = _Opened(data_dir, adapter=FakeAdapter(_blocked_script()))

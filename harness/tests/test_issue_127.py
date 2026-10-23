@@ -19,7 +19,7 @@ from harness.models import CatalogEventType, Usage
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
-from harness.tests.helpers import happy_script
+from harness.tests.helpers import happy_script, quality_turns
 
 GOAL = "把文本按行处理清楚"
 
@@ -34,8 +34,12 @@ def _run_once(system) -> tuple[str, str, str]:
 
 def _unavailable_script():
     # 产品提交规格以后，工程部门的请求被报告为不可用；run 停在这次请求上，产生一个等待回答的决定请求
-    return [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-            ProviderError("model reference is unavailable", reason="provider_unavailable")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))],
+        "engineering": [ProviderError("model reference is unavailable", reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 # ---------------------------------------------------------------------------
 # 按位置读取（回放）

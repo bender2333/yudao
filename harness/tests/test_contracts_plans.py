@@ -4,7 +4,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.contracts import contract_payload, render_prd
 from harness.proposals import (delivery_turn, product_decision, product_spec, review_turn)
 from harness.runtime import LoopSystem
-from harness.tests.helpers import guidance_reply
+from harness.tests.helpers import guidance_reply, quality_turns
 
 def test_prd_and_delivery_bind_the_same_accepted_contract(tmp_path):
     # 质检的结论只有缺陷记录与放行（工单 #555）：产品的工作由用户的指导触发，
@@ -15,12 +15,11 @@ def test_prd_and_delivery_bind_the_same_accepted_contract(tmp_path):
             product_decision("Treat unknown flags as an error.", "Unknown flags must not silently change the command."),
             guidance_reply("已给出产品决定。"),
         ],
-        "engineering": [delivery_turn(), delivery_turn()],
-        "quality": [
-            review_turn("rework_engineering", "the delivery misses an acceptance criterion",
-                        defects=[{"severity": "major", "summary": "defect"}]),
-            review_turn("release", "Verified the current requirements"),
-        ],
+        # 工程的交付可能在 PRD 修订的那一轮被拒绝，脚本给足几次（工单 #557）
+        "engineering": [delivery_turn()] * 4,
+        # 质检在交付到达以前还有一轮预测性探索，脚本项给足几轮（工单 #557）
+        "quality": quality_turns("rework_engineering", "the delivery misses an acceptance criterion",
+                                 defects=[{"severity": "major", "summary": "defect"}]),
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")

@@ -76,12 +76,18 @@ def test_a_killed_bash_is_handed_back_to_model(tmp_path):
     signals = tmp_path / "signals"
     signals.mkdir(exist_ok=True)
 
-    script = [
-        {"proposal": product_spec()},
-        {"output": [_call("call-bash", "bash", {"command": run_wait_command(signals)})]},
-    ]
+    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [
+            {"output": [_call("call-bash", "bash", {"command": run_wait_command(signals)})]},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
+    }
 
-    with killed.interrupted(data_dir, script, tail=[_settle()], started=signals / "started") as run:
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()],
+                                                     "quality": [{"proposal": {"kind": "quality_auto"}}]},
+                            started=signals / "started") as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
 
         started = [
@@ -117,12 +123,18 @@ def test_b_killed_check_is_handed_back_to_model(tmp_path):
     signals = tmp_path / "signals"
     signals.mkdir(exist_ok=True)
 
-    script = [
-        {"proposal": product_spec()},
-        {"checks": {"smoke": {"command": run_wait_command(signals)}}},
-    ]
+    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [
+            {"checks": {"smoke": {"command": run_wait_command(signals)}}},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
+    }
 
-    with killed.interrupted(data_dir, script, tail=[_settle()], started=signals / "started") as run:
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()],
+                                                     "quality": [{"proposal": {"kind": "quality_auto"}}]},
+                            started=signals / "started") as run:
         action_id = _check_action(run.before, run.run_id)
         assert killed.unknown_action_requests(run.after, run.run_id) == []
 

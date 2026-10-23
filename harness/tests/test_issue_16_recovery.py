@@ -16,7 +16,7 @@ from harness.providers import ProviderFacade
 from harness.providers.credentials import CredentialChain
 from harness.runtime import LoopSystem
 from harness.streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
-from harness.tests.helpers import delivery_turn, review_turn
+from harness.tests.helpers import delivery_turn, review_turn, quality_turns
 from harness.tests.protocol_helpers import serve, sse
 from harness.tests.saved_rewrite import reload_without_saved_projection as _reload_without_saved_projection
 from harness.write_path import NewEvent
@@ -35,12 +35,18 @@ def _parked_script():
 
 def _partial_script():
     # 产品提交规格：只走完这一个激活，run 停在 ENGINEERING，之后由完成脚本继续
-    return [product_spec()]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {"product": [product_spec()]}
 
 def _blocked_script():
     # 产品提交规格以后工程部门的请求失败：run 停在等待用户修复配置的待恢复状态
-    return [product_spec(), ProviderError("Missing configuration: provider credential",
-                                          reason="provider_unavailable")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [product_spec()],
+        "engineering": [ProviderError("Missing configuration: provider credential",
+                                       reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def _unfinished_run(data_dir, script=None, *, to_stop=False):
     # 一个项目与一个中断在未结束阶段的 run：只激活一次就关闭进程，相当于进程在模型步骤之间退出。
@@ -121,7 +127,11 @@ def _spec_reply():
     return responder
 
 def _completion_script():
-    return [delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def test_startup_resumes_an_interrupted_run_without_user_action(data_dir):
     # 中断的 run 在启动时自动继续到终态，不需要用户操作
@@ -178,7 +188,8 @@ def test_resume_does_not_grant_a_free_activation(data_dir):
 
 def test_finished_cancelled_and_exhausted_runs_are_not_restarted(data_dir):
     # 已完成、已取消及次数耗尽停止的任务不能通过恢复重新开始
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(), *_completion_script()]))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter({
+        "product": [product_spec()], **_completion_script()}))
     project_id = system.projects.register("终态项目", "核对终态不重新开始")
     _work_item_id, done_run = system.projects.start_work_item(project_id, "要完成的事项")
     system.run_until_stop(done_run)
@@ -348,7 +359,9 @@ def test_credentials_are_resolved_from_the_host_again_and_not_written_into_event
         absent = LoopSystem(data_dir, facade=ProviderFacade(credentials=CredentialChain(use_env=False)))
         requests = [decision for decision in absent.writes.read(run_stream(blocked_run)).decisions.values()
                     if decision.request["kind"] == "model_unavailable"]
-        assert len(requests) == 1, requests
+        # 同时运行以后几个部门可能各自发出一条待恢复的请求（工单 #557）：
+        # 断言的是每一条都写明缺哪一项
+        assert requests, requests
         assert requests[0].request["department"]
         # 缺少的是哪一项写在请求里：部门、具体问题与原因，供用户修复
         assert requests[0].request["department"] in requests[0].request["description"]

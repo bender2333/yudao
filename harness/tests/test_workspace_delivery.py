@@ -14,11 +14,16 @@ from harness.public_tree import TreeError, capture_public_tree, materialize_tree
 from harness.runtime import LoopSystem
 from harness.tree_archive import load_tree
 from harness.workspace import Workspace
+from harness.tests.helpers import quality_turns
 
 def _system_with_delivery(tmp_path):
-    system = LoopSystem.for_testing(tmp_path / "new" / "data", FakeAdapter([
-        product_spec(),delivery_turn(), review_turn("release", "Checks passed"),
-    ]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）。
+    # 质检给两项：交付到达以前提交的那一项没有交付可以核验，被拒绝；到达以后的那一项核验并放行
+    system = LoopSystem.for_testing(tmp_path / "new" / "data", FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [review_turn("release", "Checks passed"), review_turn("release", "Checks passed")],
+    }))
     run_id = system.create_run("Build echo")
     workspace = system.workspace(run_id)
     (workspace.root / ".hidden").write_bytes(b"\x00\xff\xfe")

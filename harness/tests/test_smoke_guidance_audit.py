@@ -1,4 +1,4 @@
-"""组合 run 的模型输入审计：连续输入 v2 + 部门指导（guidance_only 激活）+ 专家协作 + 最终独立 QA 放行。"""
+"""组合 run 的模型输入审计：连续输入 v2 + 部门指导 + 专家协作 + 最终独立 QA 放行。"""
 
 import json
 from dataclasses import asdict
@@ -7,16 +7,15 @@ import pytest
 
 from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from harness.tools import usable_when_guidance_only
 from harness.models import ArtifactRef, EventType, canonical_hash, json_dumps
 from harness.proposals import (
     answer_turn, ask_turn, delivery_turn, guidance_response,
-    product_spec, product_spec_turn, review_turn,
+    product_spec, product_spec_turn,
 )
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
-from harness.tests.helpers import recorded_context, system_on_copy
+from harness.tests.helpers import quality_turns, recorded_context, system_on_copy
 from harness.tests.saved_rewrite import rewrite_saved_event, rewrite_saved_events
 
 INPUT_V2 = "Also print a status column in the export.\r\n"
@@ -61,27 +60,38 @@ def saved_combined(tmp_path_factory):
             _guidance_ids(request)[0], status="explained", text="将在交付时于文件头部标注导出格式。",
         ))
 
-    adapter = FakeAdapter([
-        product_spec(),
-        in_flight_changes,
-        remember_guidance_then_check, explain_first,
-        explain_second,
-        product_spec_turn(
-            requirements=["print the given argument to stdout", "print a status column in the export"],
-            change_record={
-                "changed": ["The export includes a status column"],
-                "retained": ["Ordinary input is printed unchanged"],
-                "retired": [],
-                "rationale": "The user's additional original input asks for a status column.",
-            },
-        ),
-        ask_turn("product", "Is the status column part of the acceptance criteria?",
-                 background="Engineering is planning the export.",
-                 expected="Confirm the acceptance basis without changing files."),
-        answer_turn("The status column is part of the accepted requirements."),
-        delivery_turn(files={"src/echo.py": "# export-format: csv\nimport sys\nprint(sys.argv[1])\n"}),
-        review_turn("release", "Independent quality check passed on the current delivery."),
-    ])
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列。
+    # 共用一个队列时哪个部门拿到哪一项随请求先后变化，脚本项会串部门）
+    adapter = FakeAdapter({
+        "product": [
+            product_spec(),
+            product_spec_turn(
+                requirements=["print the given argument to stdout", "print a status column in the export"],
+                change_record={
+                    "changed": ["The export includes a status column"],
+                    "retained": ["Ordinary input is printed unchanged"],
+                    "retired": [],
+                    "rationale": "The user's additional original input asks for a status column.",
+                },
+            ),
+        ],
+        "engineering": [
+            in_flight_changes,
+            remember_guidance_then_check, explain_first,
+            explain_second,
+            ask_turn("product", "Is the status column part of the acceptance criteria?",
+                     background="Engineering is planning the export.",
+                     expected="Confirm the acceptance basis without changing files."),
+            delivery_turn(files={"src/echo.py": "# export-format: csv\nimport sys\nprint(sys.argv[1])\n"}),
+        ],
+        # 询问分支的会话按被询问的部门区分（工单 #557）
+        "product:ask": [
+            answer_turn("The status column is part of the accepted requirements."),
+        ],
+        # 质检关注「PRD 被接纳」：PRD 的每一次修订与每一份新交付都让质检开始一轮工作。
+        # 每一轮按这一轮开始时有没有交付决定做什么（预测性探索或核验）
+        "quality": quality_turns("release", "Independent quality check passed on the current delivery."),
+    })
     system = LoopSystem.for_testing(tmp_path_factory.mktemp("combined"), adapter)
     holder["system"] = system
     run_id = system.create_run("build an export CLI", max_cycles=20)
@@ -107,22 +117,26 @@ def test_combined_run_shape(combined_run):
     ask_answered = [e for e in events if e.type == EventType.ASK_ANSWERED]
     assert len(ask_answered) == 1 and ask_answered[0].payload["status"] == "answered"
     assert any(event.type == EventType.TOOL_SKIPPED for event in events)
-    guidance_only = [request for request in invocations
-                     if recorded_context(system, request).manifest.guidance_only]
-    assert {request.department for request in guidance_only} == {"engineering"}
-    assert len({request.activation_id for request in guidance_only}) == 2
-    assert all(usable_when_guidance_only(tool["name"]) for request in guidance_only for tool in request.tools)
-    results = next(json.loads(text) for request in guidance_only
+    # 指导进了工程的模型输入（设计说明第 6 节），由工程回答：
+    # 同时运行以后这一轮是不是「只回应指导」的一轮取决于别的部门有没有先做完，
+    # 这里断言的是指导的处理结果，不断言是哪一轮处理的
+    guidance_requests = [request for request in invocations
+                         if (text := prompt_part(request, "department_guidance")) and json.loads(text)]
+    assert guidance_requests and {request.department for request in guidance_requests} == {"engineering"}
+    answered = [event for event in events if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
+    assert len(answered) == 2
+    # 处理指导的那一轮里跑的是检查，不是写入
+    results = next(json.loads(text) for request in invocations
                    if (text := prompt_part(request, "guidance_results")) and json.loads(text))
-    assert results[0]["name"] == "run_check"
+    assert {item["name"] for item in results} == {"run_check"}
 
 def test_model_input_audit_verifies_combined_run(combined_run):
-    system, run_id, _projection, _invocations = combined_run
+    system, run_id, _projection, invocations = combined_run
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["model_input_audit"]["status"] == "verified", fields["model_input_audit"]["notes"]
     assert fields["context_isolated"] is True
-    # 产品 / 工程让出 / 两次 guidance_only / 产品处理 v2 / 工程询问与交付 / 产品分支回应 / 质检
-    assert fields["model_input_audit"]["activation_count"] == 8
+    # 审计覆盖每一次发过请求的激活：同时运行以后激活的个数随运行变化，不写死
+    assert fields["model_input_audit"]["activation_count"] == len({r.activation_id for r in invocations})
 
 def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_path):
     """写操作之后、下一次检查之前仍有待处理指导且检查结果可认领：审计靠记录下来的快照重建，而不是推断。"""
@@ -198,15 +212,16 @@ def _rehash_request(system, events, assembled, request):
 
 @pytest.mark.parametrize("mutation,expected", [
     ("private_text_in_guidance", "pinned developer input differs"),
-    ("full_tools_in_guidance_only", "guidance_only does not match"),
+    ("guidance_only_flag", "guidance_only does not match"),
 ])
 def test_model_input_audit_rejects_tampered_guidance_request(combined_run, mutation, expected):
     system, run_id, _projection, _invocations = combined_run
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     events = _saved_events(system, run_id)
-    activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
-                     and event.payload.get("guidance_only") is True)
     if mutation == "private_text_in_guidance":
+        # 处理指导的那一次激活：它的固定输入里有指导的内容
+        activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
+                         and event.payload.get("guidance_ids"))
         assembled = next(event for event in events if event.type == EventType.CONTEXT_ASSEMBLED
                          and event.payload["activation_id"] == activated.payload["activation_id"]
                          and event.payload["step_id"] == 1)
@@ -216,7 +231,10 @@ def test_model_input_audit_rejects_tampered_guidance_request(combined_run, mutat
         )
         _rehash_request(system, events, assembled, request)
     else:
-        activated.payload["guidance_only"] = False
+        # 把一次普通激活记成「只回应指导」的一轮：审计按事件重新判定，对不上
+        activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
+                         and event.payload.get("guidance_only") is False)
+        activated.payload["guidance_only"] = True
         rewrite_saved_event(system.store, activated)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"

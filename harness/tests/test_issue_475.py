@@ -49,24 +49,37 @@ def test_a_branch_session_continues_after_a_restart(tmp_path):
     # 重新启动以后分支会话继续（分支的步骤上限不清零），分支里结果未知的动作交还这个分支会话，
     # 回答照常交回提问方，事项运行到放行
     data_dir = tmp_path / "data"
-    script = [
-        {"proposal": product_spec()},
-        {"output": [_call("ask-1", "ask", {
-            "recipient": "quality",
-            "question": "Does the current snapshot match the requirements?",
-            "background": "Engineering needs a second opinion before delivering.",
-            "expected": "A verdict on the snapshot."})]},
+    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
+    # 质检的分支会话另有一份（被询问的是质检）
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [
+            {"output": [_call("ask-1", "ask", {
+                "recipient": "quality",
+                "question": "Does the current snapshot match the requirements?",
+                "background": "Engineering needs a second opinion before delivering.",
+                "expected": "A verdict on the snapshot."})]},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
         # 质检的分支会话的第一步：在自己的检查工作区里跑一条命令
-        {"output": [_call("branch-bash", "bash", {"command": "echo inspecting"})]},
-    ]
-    tail = [
-        {"output": [_call("ans-1", "answer", {"answer": "The snapshot matches the requirements."})]},
-        {"proposal": delivery(check_names=["smoke"]),
-         "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-         "checks": _smoke_check()},
-        {"proposal": review("release", "checks passed on the current snapshot"),
-         "checks": _smoke_check()},
-    ]
+        "quality:ask": [
+            {"output": [_call("branch-bash", "bash", {"command": "echo inspecting"})]},
+        ],
+    }
+    tail = {
+        "quality:ask": [
+            {"output": [_call("ans-1", "answer", {"answer": "The snapshot matches the requirements."})]},
+        ],
+        "engineering": [
+            {"proposal": delivery(check_names=["smoke"]),
+             "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+             "checks": _smoke_check()},
+        ],
+        "quality": [
+            {"proposal": review("release", "checks passed on the current snapshot"),
+             "checks": _smoke_check()},
+        ],
+    }
 
     with killed.interrupted(data_dir, script, tail=tail, hold_after="tool_started",
                             hold_session="ses_ask_") as run:
@@ -110,16 +123,22 @@ def test_a_branch_session_continues_after_a_restart(tmp_path):
 def test_the_delivery_is_verified_after_a_restart(tmp_path):
     # (b) 工程提交交付以后、质检开始核验以前结束进程：重新启动以后质检开始核验这份交付
     data_dir = tmp_path / "data"
-    script = [
-        {"proposal": product_spec()},
-        {"proposal": delivery(check_names=["smoke"]),
-         "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-         "checks": _smoke_check()},
-    ]
-    tail = [
-        {"proposal": review("release", "checks passed on the current snapshot"),
-         "checks": _smoke_check()},
-    ]
+    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [
+            {"proposal": delivery(check_names=["smoke"]),
+             "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+             "checks": _smoke_check()},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
+    }
+    tail = {
+        "quality": [
+            {"proposal": review("release", "checks passed on the current snapshot"),
+             "checks": _smoke_check()},
+        ],
+    }
 
     with killed.interrupted(data_dir, script, tail=tail, hold_after="delivery_accepted") as run:
         # 终止前：交付已经接纳，质检还没有开始核验
@@ -147,23 +166,35 @@ def test_session_and_item_usage_accumulate_across_a_restart(tmp_path):
     # (c) 重新启动前后，各会话与事项的已用时间与次数连续累计：
     # 事项的累计已用时间不倒退；分支会话的模型步数是累计值（中断前用掉的步数不清零）
     data_dir = tmp_path / "data"
-    script = [
-        {"proposal": product_spec()},
-        {"output": [_call("ask-1", "ask", {
-            "recipient": "quality",
-            "question": "Does the current snapshot match the requirements?",
-            "background": "Engineering needs a second opinion before delivering.",
-            "expected": "A verdict on the snapshot."})]},
-        {"output": [_call("branch-bash", "bash", {"command": "echo inspecting"})]},
-    ]
-    tail = [
-        {"output": [_call("ans-1", "answer", {"answer": "The snapshot matches the requirements."})]},
-        {"proposal": delivery(check_names=["smoke"]),
-         "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-         "checks": _smoke_check()},
-        {"proposal": review("release", "checks passed on the current snapshot"),
-         "checks": _smoke_check()},
-    ]
+    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [
+            {"output": [_call("ask-1", "ask", {
+                "recipient": "quality",
+                "question": "Does the current snapshot match the requirements?",
+                "background": "Engineering needs a second opinion before delivering.",
+                "expected": "A verdict on the snapshot."})]},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
+        "quality:ask": [
+            {"output": [_call("branch-bash", "bash", {"command": "echo inspecting"})]},
+        ],
+    }
+    tail = {
+        "quality:ask": [
+            {"output": [_call("ans-1", "answer", {"answer": "The snapshot matches the requirements."})]},
+        ],
+        "engineering": [
+            {"proposal": delivery(check_names=["smoke"]),
+             "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+             "checks": _smoke_check()},
+        ],
+        "quality": [
+            {"proposal": review("release", "checks passed on the current snapshot"),
+             "checks": _smoke_check()},
+        ],
+    }
 
     with killed.interrupted(data_dir, script, tail=tail, hold_after="tool_started",
                             hold_session="ses_ask_") as run:
@@ -199,17 +230,25 @@ def test_an_unknown_action_is_handed_back_to_the_session_that_issued_it(tmp_path
     signals = tmp_path / "signals"
     signals.mkdir(exist_ok=True)
 
-    script = [
-        {"proposal": product_spec()},
-        {"output": [_call("call-bash", "bash", {"command": run_wait_command(signals)})]},
-    ]
-    tail = [
-        {"proposal": delivery(check_names=["smoke"]),
-         "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-         "checks": _smoke_check()},
-        {"proposal": review("release", "checks passed on the current snapshot"),
-         "checks": _smoke_check()},
-    ]
+    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [
+            {"output": [_call("call-bash", "bash", {"command": run_wait_command(signals)})]},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
+    }
+    tail = {
+        "engineering": [
+            {"proposal": delivery(check_names=["smoke"]),
+             "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+             "checks": _smoke_check()},
+        ],
+        "quality": [
+            {"proposal": review("release", "checks passed on the current snapshot"),
+             "checks": _smoke_check()},
+        ],
+    }
 
     with killed.interrupted(data_dir, script, tail=tail, started=signals / "started") as run:
         after = run.after.store.list_events(run.run_id)

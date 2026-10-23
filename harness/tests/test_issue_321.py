@@ -19,7 +19,7 @@ from harness.public_tree import TreeError, capture_public_tree
 from harness.event_store import run_stream
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
-from harness.tests.helpers import happy_script
+from harness.tests.helpers import happy_script, quality_turns
 
 GOAL = "把起点文件夹里的数据用到第一个事项的交付里。"
 TEXT = "用起始文件夹里的数据文件改一处代码"
@@ -38,8 +38,13 @@ def _initial_directory(tmp_path, files=None):
 def _blocked_script():
     # 产品提交规格以后工程部门的请求失败：run 停在非终态，用来检查排空期间排队的事项
     from harness.adapters.base import ProviderError
-    return [product_spec(), ProviderError("Missing configuration: provider credential",
-                                          reason="provider_unavailable")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [product_spec()],
+        "engineering": [ProviderError("Missing configuration: provider credential",
+                                       reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def _opened(data_dir, script=None):
     return LoopSystem.for_testing(data_dir, FakeAdapter(script or happy_script()))
@@ -210,8 +215,13 @@ def test_the_start_point_function_serves_the_three_call_sites(data_dir, tmp_path
 def test_the_first_item_restarts_for_upgrade_with_the_initial_directory(data_dir, tmp_path):
     # 因升级重新开始的第一个事项（没有采纳成果）带着起始文件夹重新开始（排空期间的强制升级）
     source = _initial_directory(tmp_path)
-    script = [product_spec(), ProviderError("Missing configuration: provider credential",
-                                           reason="provider_unavailable")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [product_spec()],
+        "engineering": [ProviderError("Missing configuration: provider credential",
+                                       reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     project_id = system.projects.register("带起点的项目", GOAL, initial_directory=str(source))
     _work_item_id, run_id = system.projects.start_work_item(project_id, TEXT)
