@@ -30,7 +30,9 @@ export interface RoomActor {
   persist: { anim: string; icon?: { kind: string; text?: string } | null; hold?: string | null; write?: boolean; until?: number } | null;
   say: { text: string; until: number } | null;
   /** 排队的动作：`from` 是产生它的真实事件类型，事项进入停止态时据此决定保留或清除。 */
-  queue: { fn: () => void; at: number; from: string }[];
+  queue: { fn: () => void; at: number; from: string; action: string }[];
+  /** 正在做的是交接：交接与盖章先做完，状态类动作排在它们后面（原型 v11 第 2 条）。 */
+  handoff: boolean;
   formSign: string | null;
   /** 流式输出的累计文字：第一段取代默认的标签，后续片段接在后面。 */
   streamText: string | null;
@@ -180,6 +182,8 @@ const OWN_SPEECH = new Set(["hand_back"]);
 const THINK_ACTIONS = new Set(["type_think", "stream_text"]);
 /** 状态类动作立即执行（原型 IMMEDIATE）。 */
 const IMMEDIATE = new Set(["paused", "failed", "done", "cancelled", "puzzled", "hold_card", "resume"]);
+/** 交接与盖章这两类先做完（原型 v11 第 2 条）：还在做或排在队里时，状态类动作排在它们后面。 */
+const KEEP_ACTIONS = new Set(["seal", "stamp_valid", "stamp_release", "stamp_rework"]);
 
 /** 建立部门房间的驱动。 */
 export function createRoomDriver(opts: { department: string; sceneOptions: SceneOptions }): RoomDriver {
@@ -293,7 +297,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         existing.role = r;
         existing.desk = d;
       } else {
-        actors.set(r.id, { id: r.id, role: r, desk: d, doing: null, persist: null, say: null, queue: [], formSign: null, streamText: null, nextStretch: 0, nextPause: 0 });
+        actors.set(r.id, { id: r.id, role: r, desk: d, doing: null, persist: null, say: null, queue: [], handoff: false, formSign: null, streamText: null, nextStretch: 0, nextPause: 0 });
       }
       if (!state.deskState[r.id]) {
         state.deskState[r.id] = {
@@ -333,7 +337,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         if (s === "interrupted") continue;
         const actor = actorOf(a.id);
         if (actor?.script && (s === "waiting_resume" || s === "asking" || prev === "asking")) scene.cancel(actor);
-        if (s !== "working") { a.persist = null; a.queue = []; }
+        if (s !== "working") { a.persist = null; a.queue = a.queue.filter((item) => KEEP_ACTIONS.has(item.action) || IMMEDIATE.has(item.action)); }
       }
       if (s !== "failed") for (const a of roleActors()) { if (!a.persist) ds(a).redLamp = false; }
     }
@@ -462,8 +466,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         const inTail = actor ? scene.inTail(actor) : true;
         const justStarted = actor?.step?.st.key === true && scene.realT - actor.step.t0 < 600;
         // 原型 room.js：排队的动作在当前动作的关键步骤做完（或进入收尾步骤）后立即开始；
-        // 等了 0.9 秒仍未轮到时打断当前动作，只让刚开始的关键步骤再显示到 0.6 秒
-        if (inTail || (waited >= 900 && !justStarted)) {
+        // 等了 0.9 秒仍未轮到时打断当前动作，只让刚开始的关键步骤再显示到 0.6 秒。
+        // 交接与盖章先做完：它们在做的时候不打断（原型 v11 第 2 条）
+        const currentIsKeep = (a.handoff || (a.doing !== null && KEEP_ACTIONS.has(a.doing))) && !inTail;
+        if (!currentIsKeep && (inTail || (waited >= 900 && !justStarted))) {
           const next = q.shift()!;
           if (actor?.script) scene.cancel(actor);
           next.fn();
@@ -563,11 +569,12 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
     } else if (pl.to === dept) {
+      // 收到的一方在动作开始时说话（原型 v11 第 1 条）：随后从管道口取出，带到工作台或桌上放下
+      say(sayEv, a, "to");
       const p = plan(a);
+      a.handoff = true;
       p.spot("pipe");
       p.add(S.call(() => {
-        // 原型 room.js：收到的一方在从管道口取件这一步说话
-        say(sayEv, a, "to");
         scene.fly({ bmp, from: [L.pipe.x + 10, L.pipe.base - 8], to: [p.x + 6, p.y - 18], ms: 620, arc: 8, onDone: () => { const actor = actorOf(a.id); if (actor) actor.hold = bmp; } });
       }), S.anim("reach", 700, true), S.anim("catch", 900));
       if (isOps() || art === "prd") {
@@ -578,7 +585,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         p.add(S.anim("place", 700), S.hold(null), S.call(() => arrivalArt(a, art)));
       }
       p.back();
-      p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
+      p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; a.handoff = false; });
     }
   }
 
@@ -738,6 +745,23 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       })), S.anim("side_reach", 900, true));
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; shelve(); });
+    },
+    pin_plan(_ev: PixelFloorEvent, a: RoomActor) {
+      // 计划接纳：把计划拿到白板贴上（原型 room.js 的 pin_plan）
+      setPersist(a, null);
+      const p = plan(a);
+      p.stand();
+      p.add(S.hold("doc"));
+      p.spot("wb", "carry");
+      p.add(S.anim("board_pin", undefined, true),
+        S.call(() => { state.wbSheetUntil = scene.realT + PROP_KEEP; }),
+        S.hold(null), S.anim("back", 500), S.anim("idle_happy", 400));
+      p.back();
+      p.run(() => {
+        if (state.wbSheetUntil < scene.realT) state.wbSheetUntil = scene.realT + PROP_KEEP;
+        const actor = actorOf(a.id);
+        if (actor) actor.hold = null;
+      });
     },
     seal(_ev: PixelFloorEvent, a: RoomActor) {
       setPersist(a, null);
@@ -1395,17 +1419,36 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       const actor2 = actorOf(a.id);
       if (actor2) actor2.icon = null;
       a.doing = action;
+      a.handoff = false;
       if (!OWN_SPEECH.has(action) && !THINK_ACTIONS.has(action)) say(ev, a);
       fn(ev, a);
     };
+    // 原型 v11 第 2 条：交接与盖章先做完——还在做或排在队里时，状态类动作排在它们后面，
+    // 说出的话停留到读得完；队满时也不挤掉它们
+    const keepPending = (): boolean => {
+      if (a.handoff) return true;
+      if (a.doing && KEEP_ACTIONS.has(a.doing)) return true;
+      // 队里的任何一条交接与盖章都算数，不只是队首那条（原型 v11 第 2 条）
+      return a.queue.some((item) => KEEP_ACTIONS.has(item.action));
+    };
     // 原型 room.js 的口径：立即执行的动作清掉排队的条目；排队的条目超出上限时丢掉最早的
     if (IMMEDIATE.has(action) || (actor && scene.inTail(actor))) {
+      if (keepPending()) {
+        // 交接与盖章先做完：普通的排队动作仍然清掉，状态类动作排在它们后面（原型 v11 第 2 条）
+        a.queue = a.queue.filter((item) => KEEP_ACTIONS.has(item.action));
+        a.queue.push({ fn: start, at: scene.realT, from: ev.type, action });
+        return;
+      }
       a.queue = [];
       start();
       return;
     }
-    a.queue.push({ fn: start, at: scene.realT, from: ev.type });
-    if (a.queue.length > 3) a.queue.shift();
+    a.queue.push({ fn: start, at: scene.realT, from: ev.type, action });
+    if (a.queue.length > 3) {
+      // 队满时挤掉最早的一条；交接与盖章不挤掉（原型 v11 第 2 条）
+      const index = a.queue.findIndex((item) => !KEEP_ACTIONS.has(item.action));
+      a.queue.splice(index >= 0 ? index : 0, 1);
+    }
   }
 
   // 与原型 room.js 一致：建立画面时先按缺省角色设置同步一次（一个部门一个 Agent），快照到达时再同步
