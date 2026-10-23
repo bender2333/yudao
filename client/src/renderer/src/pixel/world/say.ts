@@ -147,6 +147,7 @@ export const SAY_CATALOG: Record<string, SayRule> = {
   proposal_rejected: () => "提案被退回，重新修改",
   spec_accepted: () => "现在盖上有效章",
   contract_accepted: () => "现在盖上有效章",
+  plan_accepted: () => "现在把计划贴上白板",
   delivery_accepted: () => "现在装箱封存",
   qa_started: () => "现在开始检查",
   qa_submitted: (_ev, pl) => (pl.verdict === "release" ? "现在盖放行章" : "现在盖返工章"),
@@ -171,6 +172,7 @@ export const SAY_CATALOG: Record<string, SayRule> = {
     if (x.side === "to" || (x.dept && x.dept !== answerer)) return `收到${deptName(answerer)}的回答${tail}`;
     return `现在回答${deptName(asker)}的询问`;
   },
+  collaboration_closed: () => null,
   department_guidance_received: () => "收到用户的指导",
   department_guidance_applied: () => "现在阅读指导",
   department_guidance_responded: () => "现在写指导的回复",

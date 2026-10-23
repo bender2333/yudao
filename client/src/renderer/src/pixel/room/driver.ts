@@ -746,6 +746,23 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; shelve(); });
     },
+    pin_plan(_ev: PixelFloorEvent, a: RoomActor) {
+      // 计划接纳：把计划拿到白板贴上（原型 room.js 的 pin_plan）
+      setPersist(a, null);
+      const p = plan(a);
+      p.stand();
+      p.add(S.hold("doc"));
+      p.spot("wb", "carry");
+      p.add(S.anim("board_pin", undefined, true),
+        S.call(() => { state.wbSheetUntil = scene.realT + PROP_KEEP; }),
+        S.hold(null), S.anim("back", 500), S.anim("idle_happy", 400));
+      p.back();
+      p.run(() => {
+        if (state.wbSheetUntil < scene.realT) state.wbSheetUntil = scene.realT + PROP_KEEP;
+        const actor = actorOf(a.id);
+        if (actor) actor.hold = null;
+      });
+    },
     seal(_ev: PixelFloorEvent, a: RoomActor) {
       setPersist(a, null);
       const p = plan(a);
