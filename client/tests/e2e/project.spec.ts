@@ -776,6 +776,10 @@ test.describe("项目页面（1440×900）", () => {
       const record = await section(page, "请求记录与用量");
       await expect(record.getByLabel("部门")).toHaveValue("quality");
       await expect(record.locator(".section-head .note")).toContainText("只看质检的请求");
+      // 用量统计页签用同一组筛选：请求数与请求记录表里的一样
+      await record.getByRole("tab", { name: "用量统计" }).click();
+      await expect(record.locator('.line:has(.term:text-is("请求数")) .value')).toHaveText("1");
+      await record.getByRole("tab", { name: "请求记录" }).click();
       // 进请求详情再回来：这一格筛选不丢
       await filtered.locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
       await expect.poll(async () => page.evaluate(() => window.location.hash)).toContain("dept=quality");
