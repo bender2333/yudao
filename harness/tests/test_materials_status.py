@@ -11,6 +11,7 @@ from harness.app.application import Application
 from harness.app.project_queries import WorkItemMaterials
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_decision, product_spec, review_turn
 from harness.runtime import LoopSystem
+from harness.tests.helpers import guidance_reply
 
 GOAL = "把文本按行处理清楚"
 
@@ -56,17 +57,25 @@ def test_materials_prd_versions_carry_their_real_status(tmp_path):
 def test_materials_prd_versions_follow_the_product_decision_path(tmp_path):
     # 工单 #683：产品用「产品决定」修订 PRD 时，新合同沿用同一条产品需求；
     # 两版合同的状态按「是不是当前有效的那一版」判定，第 1 版不再也是 active
-    adapter = FakeAdapter([
-        product_spec(),
-        delivery_turn(),
-        review_turn("rework_product", "need decision", defects=[{"severity": "major", "summary": "need decision"}]),
-        product_decision("Treat unknown flags as an error.", "Unknown flags must not silently change the command."),
-        delivery_turn(),
-        review_turn("release", "Verified the current requirements"),
-    ])
+    # 产品的工作由用户的指导触发（工单 #555）
+    adapter = FakeAdapter({
+        "product": [
+            product_spec(),
+            product_decision("Treat unknown flags as an error.", "Unknown flags must not silently change the command."),
+            guidance_reply("已给出产品决定。"),
+        ],
+        "engineering": [delivery_turn(), delivery_turn()],
+        "quality": [
+            review_turn("rework_engineering", "the delivery misses an acceptance criterion",
+                        defects=[{"severity": "major", "summary": "defect"}]),
+            review_turn("release", "Verified the current requirements"),
+        ],
+    })
     system = LoopSystem.for_testing(tmp_path, adapter)
     project_id = system.projects.register("产品决定修订 PRD", GOAL)
     work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请补充产品决定。")
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE", projection.error
     # 一条产品需求、两版有效合同

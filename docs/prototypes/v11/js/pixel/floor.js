@@ -54,7 +54,7 @@
   P.FLOOR_VIEWS = [
     { id: 'working', fact: '部门正在工作', source: '事项的当前部门与 department_activated', picture: '该房间亮灯，房间里的小人在工位工作', level: 'ui', events: ['department_activated'] },
     { id: 'handoff', fact: '交接', source: 'transition 与交接内容', picture: '包裹在交接管道中移动', level: 'ui', events: ['transition'] },
-    { id: 'rework', fact: '返工', source: 'qa_submitted 的结论为 rework_engineering 或 rework_product', picture: '包裹贴红色返工单反向或经回流管道流动，管道闪红色', level: 'ui', events: ['qa_submitted', 'transition'] },
+    { id: 'rework', fact: '返工', source: 'qa_submitted 的结论为 rework_engineering', picture: '包裹贴红色返工单反向或经回流管道流动，管道闪红色', level: 'ui', events: ['qa_submitted', 'transition'] },
     { id: 'ask', fact: '询问与回答', source: 'collaboration_requested、collaboration_responded、collaboration_closed', picture: '信件在传信管中往返；未回答的信件停在出口', level: 'ui', events: ['collaboration_requested', 'collaboration_responded'] },
     { id: 'cycle', fact: '循环次数与时间', source: 'run 的循环计数、已用时间与时间上限', picture: '信息条显示「第 N 轮」与时间进度条；接近上限时变为警示色', level: 'ui', events: [] },
     { id: 'adopt', fact: '采纳', source: 'deliverable_adopted', picture: '箱子放上成果库的架子，版本号加一', level: 'ui', events: ['deliverable_adopted'] },

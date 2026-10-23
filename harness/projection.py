@@ -607,10 +607,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
         review = _review_from_payload(payload, event)
         state.reviews.append(review)
         state.last_review = review
-        if review.verdict in {"rework_product", "rework_engineering"}:
+        if review.verdict == "rework_engineering":
             state.rework_count += 1
-            reason = "qa_rework_product" if review.verdict == "rework_product" else "qa_rework_engineering"
-            _supersede_active_deliveries(state, reason)
+            _supersede_active_deliveries(state, "qa_rework_engineering")
         state.evidence.append(
             {
                 "kind": "qa_review",

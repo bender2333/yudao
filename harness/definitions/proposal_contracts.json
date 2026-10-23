@@ -73,7 +73,7 @@
           "when": ["QUALITY"],
           "required": ["kind=qa_review", "verdict", "rationale", "checks", "basis_delivery_spec_hash"],
           "optional": ["defects"],
-          "verdict": ["rework_product", "rework_engineering", "release"],
+          "verdict": ["rework_engineering", "release"],
           "bind": [
             "current_contract.content_hash",
             "current_delivery_spec.content_hash",

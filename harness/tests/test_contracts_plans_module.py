@@ -14,6 +14,7 @@ from harness.proposals import (ask_turn, delivery, delivery_turn,
                                product_decision, product_spec, review_turn)
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
+from harness.tests.helpers import guidance_reply
 from harness.validation import evaluate_proposal
 
 def _accept_new_spec(system, run_id):
@@ -51,18 +52,25 @@ def test_writes_without_a_plan_are_allowed(tmp_path):
     assert any(event.type == EventType.DELIVERY_ACCEPTED for event in events)
 
 def test_supplementary_decision_changes_contract_without_new_spec(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(files={"src/echo.py": "print('echo')"}, checks={"smoke": 0}),
-        review_turn("rework_product", "Product decision needed on flags.",
-                    defects=[{"severity": "major", "summary": "flags clarification"}]),
-        product_decision("Use exit code 2 for unknown flags", "Keep invalid arguments distinguishable from normal output."),
-    ]))
+    # 产品的工作由用户的指导触发（工单 #555）：补充决定改变合同，产品要求本身不变
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [
+            product_spec(),
+            product_decision("Use exit code 2 for unknown flags", "Keep invalid arguments distinguishable from normal output."),
+            guidance_reply("已给出产品决定。"),
+        ],
+        "engineering": [delivery_turn(files={"src/echo.py": "print('echo')"}, checks={"smoke": 0})],
+        "quality": [
+            review_turn("rework_engineering", "the delivery misses an acceptance criterion",
+                        defects=[{"severity": "major", "summary": "flags clarification"}]),
+        ],
+    }))
     run_id = system.create_run("echo")
     old = system.activate_once(run_id)
     assert old.effective_contract.revision == 1
     system.activate_once(run_id)
     system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请补充产品决定。")
     new = system.activate_once(run_id)
     assert new.product_spec.content_hash == old.product_spec.content_hash
     assert new.effective_contract.revision == 2
@@ -111,6 +119,7 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
         "product": [
             product_spec(),
             product_decision("Reject unknown flags.", "Invalid options require an explicit error."),
+            guidance_reply("已给出产品决定。"),
         ],
         "engineering": [
             delivery_turn(),
@@ -121,18 +130,20 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
             branch_answer,
         ],
         "quality": [
-            review_turn("rework_product", "Product decision needed on flags.",
+            review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                         defects=[{"severity": "major", "summary": "flags clarification"}]),
         ],
     }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product spec -> ENGINEERING
     system.activate_once(run_id)  # engineering delivery -> QUALITY
-    system.activate_once(run_id)  # quality rework -> REQUIREMENTS
+    system.activate_once(run_id)  # quality records a defect -> ENGINEERING
+    system.add_guidance(run_id, "product", "请补充产品决定。")
     dec = system.activate_once(run_id)  # product decision -> ENGINEERING
     assert len(dec.product_decisions) == 1
     original_decision = dec.product_decisions[0]
     original_spec = dec.product_spec.content_hash
+    system.activate_once(run_id)  # product replies to the guidance
 
     facts = system.workspace(run_id).snapshot().facts
     for changes in ([], [{"decision_hash": "unknown", "disposition": "retain", "rationale": "Unknown"}],

@@ -4,8 +4,8 @@ from dataclasses import replace
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
 from harness.models import EventType, json_dumps
-from harness.proposals import (delivery, delivery_turn, product_spec,
-                                product_spec_turn, review, review_turn)
+from harness.proposals import (answer_turn, ask_turn, delivery, delivery_turn, guidance_response,
+                                product_spec, product_spec_turn, review, review_turn)
 from harness.runtime import LoopSystem
 from harness.tests.helpers import from_another_thread
 from harness.validation import evaluate_proposal
@@ -95,6 +95,51 @@ CHANGE_RECORD = {
 }
 
 
+def _system_asking_product(tmp_path):
+    # 质检要求有问题时询问产品，产品在回答里修订 PRD（工单 #555）：结论只有缺陷记录与放行，
+    # 要求有问题时不再把工作退回产品。脚本按会话给：产品的询问分支回答并修订 PRD。
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [
+            ask_turn(recipient="product", question="验收标准漏了空输入，请修订 PRD。"),
+            review_turn("rework_engineering", "the contract missed empty input",
+                        defects=[{"severity": "major", "summary": "empty input not covered"}]),
+        ],
+        "product:ask": [answer_turn(
+            answer="已补上空输入的验收标准。",
+            requirements=["print the given argument to stdout"],
+            acceptance=["empty input prints a blank line"],
+            change_record=CHANGE_RECORD)],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    return system, system.create_run("build an echo CLI")
+
+
+def _system_with_guided_revision(tmp_path):
+    # 产品修订 PRD：质检的结论不再把工作退回产品（工单 #555），产品的修订由用户的指导触发，
+    # 修订以后事项仍在工程阶段，工程按新合同继续工作。
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build an echo CLI")
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请把验收标准写清空输入的行为。")
+    adapter.scripts["product"] = [
+        product_spec_turn(acceptance=["empty input prints a blank line"], change_record=CHANGE_RECORD),
+        lambda request: FakeTurn(proposal=guidance_response(
+            _guidance_id(request), status="explained", text="已按新的验收标准修订产品要求。")),
+    ]
+    return system, run_id
+
+
+def _guidance_id(request):
+    return json.loads(prompt_part(request, "department_guidance"))[0]["id"]
+
+
 def _activate_until(system, run_id, revision):
     # 跑到产品规格出现指定的修订版为止，不做完整循环：后面的提交要检验的是过期依据
     projection = system.project(run_id)
@@ -163,18 +208,15 @@ def test_a_spec_may_declare_the_current_basis(tmp_path):
 
 def test_a_delivery_bound_to_a_stale_spec_is_rejected(tmp_path):
     # 工程拿着已过期的 ProductSpec 提交交付：整次提交被拒绝，错误指向依据字段并给出当前版本
-    system, run_id = _system(tmp_path, product_spec(), delivery_turn(),
-                              review_turn("rework_product", "the contract missed empty input",
-                                          defects=[{"severity": "major", "summary": "empty input not covered"}]),
-                              product_spec_turn(acceptance=["empty input prints a blank line"],
-                                                change_record=CHANGE_RECORD))
+    system, run_id = _system_with_guided_revision(tmp_path)
     revised = _activate_until(system, run_id, 2)
     assert revised.phase == "ENGINEERING"
     assert revised.product_specs[0].content_hash != revised.product_spec.content_hash
     stale_delivery = FakeTurn(proposal=delivery(
         summary="implemented echo CLI", check_names=["smoke"],
         basis_product_spec_hash=revised.product_specs[0].content_hash), checks={"smoke": 0})
-    system.test_adapter.script = [stale_delivery]
+    system.activate_once(run_id)  # 产品回应指导，指导不再是待处理
+    system.test_adapter.scripts = {"engineering": [stale_delivery]}
     accepted_before = len(_events(system, run_id, EventType.DELIVERY_ACCEPTED))
     result = system.activate_once(run_id)
     [error] = [item for rejection in result.rejections for item in rejection["errors"]]
@@ -252,11 +294,7 @@ def test_a_spec_that_omits_the_basis_is_rejected_by_the_host(tmp_path):
 def test_a_revision_with_a_stale_basis_is_rejected_by_the_host_and_can_be_resubmitted(tmp_path):
     # 产品拿着过期版本提交修订：activate_once 整次拒绝，错误给出当前版本；
     # 拒绝的原因与当前版本作为 validation_feedback 交回，产品读过反馈以后按当前版本重交，修订被接纳
-    system, run_id = _system(tmp_path, product_spec(), delivery_turn(),
-                              review_turn("rework_product", "the contract missed empty input",
-                                          defects=[{"severity": "major", "summary": "empty input not covered"}]),
-                              product_spec_turn(acceptance=["empty input prints a blank line"],
-                                                change_record=CHANGE_RECORD))
+    system, run_id = _system_with_guided_revision(tmp_path)
     projection = _activate_until(system, run_id, 2)
     assert projection.phase == "ENGINEERING"
     current_hash = projection.product_spec.content_hash
@@ -287,11 +325,7 @@ def test_a_revision_with_a_stale_basis_is_rejected_by_the_host_and_can_be_resubm
 def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_current_version(tmp_path):
     # 交付链闭环：工程拿着过期规格提交被拒，拒绝的原因与当前版本作为工具结果交回，
     # 读过反馈以后按当前版本重交，交付被接纳并进入质检
-    system, run_id = _system(tmp_path, product_spec(), delivery_turn(),
-                              review_turn("rework_product", "the contract missed empty input",
-                                          defects=[{"severity": "major", "summary": "empty input not covered"}]),
-                              product_spec_turn(acceptance=["empty input prints a blank line"],
-                                                change_record=CHANGE_RECORD))
+    system, run_id = _system_with_guided_revision(tmp_path)
     projection = _activate_until(system, run_id, 2)
     assert projection.phase == "ENGINEERING"
     current_hash = projection.product_spec.content_hash
@@ -301,7 +335,8 @@ def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_cur
         basis_product_spec_hash=projection.product_specs[0].content_hash),
         writes=files, checks={"smoke": 0})
     accepted_before = len(_events(system, run_id, EventType.DELIVERY_ACCEPTED))
-    system.test_adapter.script = [stale]
+    system.activate_once(run_id)  # 产品回应指导，指导不再是待处理
+    system.test_adapter.scripts = {"engineering": [stale]}
     rejected = system.activate_once(run_id)
     [error] = _basis_errors(rejected)
     assert error["field"] == "basis_product_spec_hash" and current_hash in error["message"]
@@ -316,7 +351,7 @@ def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_cur
             summary="implemented echo CLI", check_names=["smoke"], basis_product_spec_hash=current_hash),
             writes=files, checks={"smoke": 0})
 
-    system.test_adapter.script = [resubmit]
+    system.test_adapter.scripts = {"engineering": [resubmit]}
     accepted = system.activate_once(run_id)
     assert len(_events(system, run_id, EventType.DELIVERY_ACCEPTED)) == accepted_before + 1
     assert accepted.delivery_spec is not None

@@ -12348,7 +12348,7 @@ export type QaSubmittedPayload = {
     /**
      * Verdict
      */
-    verdict: 'rework_product' | 'rework_engineering' | 'release';
+    verdict: 'rework_engineering' | 'release';
     /**
      * Rationale
      */

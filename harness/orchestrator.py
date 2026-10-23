@@ -1900,7 +1900,7 @@ class Orchestrator:
             self._fail(transaction, "host_commit_error", f"{type(exc).__name__}: {exc}")
             return
         source_event = acceptance.append(transaction)
-        if artifact["kind"] == "qa_review" and artifact["verdict"] in {"rework_product", "rework_engineering"}:
+        if artifact["kind"] == "qa_review" and artifact["verdict"] == "rework_engineering":
             self._record_lesson_candidate(transaction, source_event, projection)
         for source, target in transitions:
             transaction.append(NewEvent(

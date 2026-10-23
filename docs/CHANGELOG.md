@@ -7,6 +7,8 @@
 
 ---
 
+minimax-M3.1-Flash / 2026-10-23 10:40 / 工单 #555：docs/prototypes/v11/js/pixel/engine.js 的动作目录与 qa_submitted 的动作表去掉 rework_product（质检的结论只有缺陷记录与放行）；docs/prototypes/v11/js/pixel/floor.js 的返工画面来源改为「qa_submitted 的结论为 rework_engineering」；docs/prototypes/v11/js/ui/views/materials.js 的判定文字去掉「退回产品」 / 质检把工作退回产品这条路径按 ADR-0039 删除，要求有问题时改为询问产品、产品在回答里修订 PRD；原型与客户端（client/src/renderer/src/views/project/materials.tsx）的判定文字与动作表保持一致
+
 solo-minimax-M3.1-Flash / 2026-10-23 10:45 / 工单 #650：docs/prototypes/v11/BUILD.md 的一处对照页面写错——原文写「验收脚本以 v10 为对照页面、v11 为被检查的页面」，而 v11 的验收脚本（docs/prototypes/v11/checks/env.js）是从 v10 的那一份复制来的，对照页面仍然是 v9（v10 的 BUILD.md 本来写的就是「以 v9 为对照页面」）；照实改成 v9，并写明这一版只改部门房间的两条规则、楼与机房的静止画面与 v9 仍然逐像素相同 / 那一行是照抄 v10 的 BUILD.md 时连着改名一起改过来的，与脚本里的实际地址对不上；按脚本说的做会以为对照页面是 v10
 
 minimax-M3.1-Flash / 2026-10-23 09:30 / 工单 #650：docs/prototypes/CHANGELOG.md 写 v11 这一版与两条改动、「当前定稿」改为 v11；docs/prototypes/v11/design.md 与 docs/prototypes/v11/BUILD.md 按「只写与 v10 不同的地方」重写 / 用户 2026-10-21 决定修订原型的两条规则：接收交接的一方在动作开始时说话，状态类动作到达时正在做或排着的交接与盖章先做完；原型出 v11 而不是原地改 v10（v10 已被事件基准、房间调用录制与像素登记表引用）

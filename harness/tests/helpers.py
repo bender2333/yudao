@@ -14,14 +14,14 @@ from pathlib import Path
 from typing import Any
 
 from harness.actions import Action, ActionReceipt, Preconditions
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.assembly import ContextAssembly
 from harness.context import ContextAssembler, ContextPart
 from harness.definitions import DEFINITIONS
 from harness.department_prompts import save_department_prompt
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, ContextManifest, DepartmentPrompt, Event, json_dumps
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, guidance_response, product_spec, review_turn
 from harness.environment import LocalEnvironment
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
@@ -32,6 +32,21 @@ FAST_RETRIES = StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.02
 
 # 连续只回复文字、没有调用工具时最多追加说明的次数，取规则登记中的现值
 TOOL_CALL_REQUIRED_LIMIT = DEFINITIONS.rule_value("tool_call_required_limit")
+
+
+def guidance_id(request: ModelCall) -> str:
+    """请求里当前那条指导的标识（指导的回应要写明它）。"""
+    return json.loads(prompt_part(request, "department_guidance"))[0]["id"]
+
+
+def guidance_reply(text: str = "已按新的要求处理。"):
+    """指导的回应：一条指导要有一条回应才算处理完。
+
+    质检的结论只有缺陷记录与放行（工单 #555），产品的工作不再由质检把工作退回产品触发，
+    而是由用户的指导触发；指导处理完以后部门才回到等待工作。"""
+    def factory(request: ModelCall) -> FakeTurn:
+        return FakeTurn(proposal=guidance_response(guidance_id(request), status="explained", text=text))
+    return factory
 
 
 def calls_during(function, operation) -> int:

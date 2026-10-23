@@ -26880,7 +26880,6 @@
           },
           "verdict": {
             "enum": [
-              "rework_product",
               "rework_engineering",
               "release"
             ],

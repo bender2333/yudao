@@ -32,7 +32,7 @@ FACT_TYPES: frozenset[str] = frozenset({
     EventType.RUN_FAILED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
     ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.WORK_ITEM_CREATED,
 })
-REWORK_VERDICTS = frozenset({"rework_product", "rework_engineering"})
+REWORK_VERDICTS = frozenset({"rework_engineering"})
 
 # 关键事实的种类（时间轴刻度与离开期间的报告使用，设计说明第 5.5 节）：刻度按种类着色。
 # 与原型 v9 的 contract/registry.js 的 KEY_KINDS 一致；判定用事件的种类与载荷（质检的结论分放行与返工）。

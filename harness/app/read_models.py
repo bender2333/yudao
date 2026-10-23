@@ -41,7 +41,7 @@ DERIVATION_VERSION = 1
 # 推导版本在读取模型自己的表里：app_read_meta 的 key 是 "derivation_version"
 DERIVATION_KEY = "derivation_version"
 # 质检退回的判定到承接部门的对应；与项目流使用的退回判定必须是同一个集合，启动时核对
-_REWORK_DEPARTMENTS = {"rework_product": "product", "rework_engineering": "engineering"}
+_REWORK_DEPARTMENTS = {"rework_engineering": "engineering"}
 if set(_REWORK_DEPARTMENTS) != set(REWORK_VERDICTS):
     raise ValueError("the flow read model and the project stream disagree on the rework verdicts")
 

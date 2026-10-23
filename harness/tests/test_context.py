@@ -8,12 +8,13 @@ from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.department_prompts import save_department_prompt
 from harness.models import DepartmentPrompt, EventType, RunProjection, SessionRecord
-from harness.proposals import (answer_turn, ask_turn, delivery_turn, product_decision, product_spec,
-                                product_spec_turn, review_turn)
+from harness.proposals import (answer_turn, ask_turn, delivery_turn, guidance_response, product_decision,
+                                product_spec, product_spec_turn, review_turn)
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
-from harness.tests.helpers import developer_text, happy_script, pinned_input_tokens, recorded_context, run_scripted
+from harness.tests.helpers import (developer_text, guidance_reply, happy_script, pinned_input_tokens,
+                                 recorded_context, run_scripted)
 from harness.tests.protocol_helpers import serve
 from harness.tests.provider_replies import HTTP_REPLIES, http_script
 from harness.tools import tool_action
@@ -164,21 +165,28 @@ def test_validation_feedback_is_injected_after_rejection(data_dir):
     assert "goal" in developer_text(product_calls[1])
 
 def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
+    # 质检的结论只有缺陷记录与放行（工单 #555）：产品的工作由用户的指导触发，
+    # 两条正式产品决定照旧进入有效合同，工程与质检的请求里都带着它们
     adapter = FakeAdapter(
-        [
-            product_spec(),
-            delivery_turn(),
-            review_turn("rework_product", "need decision A", defects=[{"severity": "major", "summary": "defect A"}]),
-            product_decision("Use DECISION_CANARY_A.", "The first requirement needs this exact output."),
-            delivery_turn(),
-            review_turn("rework_product", "need decision C", defects=[{"severity": "major", "summary": "defect C"}]),
-            product_decision("Use DECISION_CANARY_C.", "The second requirement needs this exact output."),
-            delivery_turn(),
-            review_turn("release", "accepted both product decisions"),
-        ]
+        {
+            "product": [
+                product_spec(),
+                product_decision("Use DECISION_CANARY_A.", "The first requirement needs this exact output."),
+                product_decision("Use DECISION_CANARY_C.", "The second requirement needs this exact output."),
+                guidance_reply("已给出两条产品决定。"),
+            ],
+            "engineering": [delivery_turn(), delivery_turn()],
+            "quality": [
+                review_turn("rework_engineering", "the delivery misses an acceptance criterion",
+                            defects=[{"severity": "major", "summary": "defect A"}]),
+                review_turn("release", "accepted both product decisions"),
+            ],
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请补充两条产品决定。")
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
     assert len(projection.effective_decisions) == 2
@@ -203,18 +211,27 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
         assert "DECISION_CANARY_C" in developer_text(request)
 
 def test_effective_decision_keeps_explicit_requirement(data_dir):
+    # 产品的工作由用户的指导触发（工单 #555）：决定里的明确要求照旧进入工程与质检的请求
     adapter = FakeAdapter(
-        [
-            product_spec(),
-            delivery_turn(),
-            review_turn("rework_product", "need decision", defects=[{"severity": "major", "summary": "need decision"}]),
-            product_decision("Print BACKGROUND_CANARY for the selected mode.", "IMPACT_CANARY identifies the required public behavior."),
-            delivery_turn(),
-            review_turn("release", "accepted the described approach"),
-        ]
+        {
+            "product": [
+                product_spec(),
+                product_decision("Print BACKGROUND_CANARY for the selected mode.",
+                                 "IMPACT_CANARY identifies the required public behavior."),
+                guidance_reply("已给出产品决定。"),
+            ],
+            "engineering": [delivery_turn(), delivery_turn()],
+            "quality": [
+                review_turn("rework_engineering", "the delivery misses an acceptance criterion",
+                            defects=[{"severity": "major", "summary": "defect"}]),
+                review_turn("release", "accepted the described approach"),
+            ],
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请补充产品决定。")
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
     assert len(projection.effective_decisions) == 1
@@ -246,24 +263,31 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
         ])(request)
 
     adapter = FakeAdapter(
-        [
-            product_spec(acceptance=["old behavior"]),
-            delivery_turn(summary="INITIAL_DELIVERY"),
-            review_turn("rework_product", "need decision", defects=[{"severity": "major", "summary": "need decision"}]),
-            product_decision(stale, "This is the initial product requirement."),
-            delivery_turn(summary="OLD_DELIVERY_CANARY"),
-            review_turn(
-                "rework_product",
-                "contract is wrong",
-                defects=[{"severity": "major", "summary": "contract issue"}],
-            ),
-            retire_decisions,
-            delivery_turn(summary="new delivery"),
-            review_turn("release", "new contract checked"),
-        ]
+        {
+            "product": [
+                product_spec(acceptance=["old behavior"]),
+                product_decision(stale, "This is the initial product requirement."),
+                retire_decisions,
+                guidance_reply("已修订产品要求并废止过期决定。"),
+            ],
+            "engineering": [
+                delivery_turn(summary="INITIAL_DELIVERY"),
+                delivery_turn(summary="OLD_DELIVERY_CANARY"),
+                delivery_turn(summary="new delivery"),
+            ],
+            "quality": [
+                review_turn("rework_engineering", "the delivery misses an acceptance criterion",
+                            defects=[{"severity": "major", "summary": "need decision"}]),
+                review_turn("rework_engineering", "contract is wrong",
+                            defects=[{"severity": "major", "summary": "contract issue"}]),
+                review_turn("release", "new contract checked"),
+            ],
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请补充产品决定并修订产品要求。")
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
     assert projection.product_spec.revision == 2
@@ -275,29 +299,37 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
     assert "expired_product_decisions" in excluded
 
 def test_superseded_delivery_is_not_injected_as_current(data_dir):
+    # 工程发现要求说得不清楚，询问产品，产品在回答里修订 PRD（工单 #555）：
+    # 旧交付被取代以后不再当作当前交付注入
     adapter = FakeAdapter(
-        [
-            product_spec(acceptance=["old behavior"]),
-            delivery_turn(summary="OLD_DELIVERY_CANARY"),
-            review_turn(
-                "rework_product",
-                "contract is wrong",
-                defects=[{"severity": "major", "summary": "contract issue"}],
-            ),
-            product_spec_turn(acceptance=["new behavior"], change_record={
-                "changed": ["Replace old behavior with new behavior"], "retained": ["The echo CLI scope"],
-                "retired": ["The old behavior acceptance criterion"], "rationale": "Address the quality contract defect.",
-            }),
-            delivery_turn(summary="NEW_DELIVERY_CANARY"),
-            review_turn("release", "new delivery checked"),
-        ]
+        {
+            "product": [product_spec(acceptance=["old behavior"])],
+            "engineering": [
+                delivery_turn(summary="OLD_DELIVERY_CANARY"),
+                ask_turn(recipient="product", question="验收标准说得不清楚，请修订。"),
+                delivery_turn(summary="NEW_DELIVERY_CANARY"),
+            ],
+            "quality": [
+                review_turn("rework_engineering", "the delivery misses an acceptance criterion",
+                            defects=[{"severity": "major", "summary": "contract issue"}]),
+                review_turn("release", "new delivery checked"),
+            ],
+            "product:ask": [answer_turn(
+                answer="已按新的验收标准修订产品要求。",
+                requirements=["print the given argument to stdout"],
+                acceptance=["new behavior"],
+                change_record={
+                    "changed": ["Replace old behavior with new behavior"], "retained": ["The echo CLI scope"],
+                    "retired": ["The old behavior acceptance criterion"], "rationale": "Address the quality contract defect.",
+                })],
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
     assert projection.phase == "DONE"
     assert [item.status for item in projection.delivery_specs] == ["superseded", "active"]
-    assert projection.delivery_specs[0].invalidation_reason in {"qa_rework_product", "product_spec_changed"}
+    assert projection.delivery_specs[0].invalidation_reason in {"qa_rework_engineering", "product_spec_changed"}
     assert projection.delivery_spec is not None
     assert projection.delivery_spec.summary == "NEW_DELIVERY_CANARY"
     assert projection.delivery_spec.status == "active"

@@ -4,7 +4,7 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactRef
 from harness.definitions import DEFINITIONS
-from harness.proposals import (delivery_turn, product_spec, product_spec_turn,
+from harness.proposals import (answer_turn, ask_turn, delivery_turn, product_spec, product_spec_turn,
                                 review, review_turn)
 from harness.runtime import LoopSystem
 from harness.tests.helpers import department_history, happy_script, run_scripted
@@ -58,33 +58,6 @@ def test_quality_rework_routes_to_engineering(data_dir):
     assert "QUALITY->REWORK_ENGINEERING" in projection.transitions
     assert "REWORK_ENGINEERING->ENGINEERING" in projection.transitions
     assert projection.rework_count == 1
-
-def test_quality_rework_routes_to_product(data_dir):
-    script = [
-        product_spec(),
-        delivery_turn(),
-        review_turn(
-            "rework_product",
-            "acceptance misses empty input",
-            defects=[{"severity": "blocker", "summary": "empty input not in spec"}],
-        ),
-        product_spec_turn(
-            goal="Build echo including empty input", acceptance=["empty input prints a blank line"],
-            change_record={
-                "changed": ["Empty input must print a blank line"],
-                "retained": ["Print the given argument to stdout", "Single-file implementation without file reads or network access"],
-                "retired": [],
-                "rationale": "Address the quality review identifying missing acceptance coverage for empty input.",
-            },
-        ),
-        delivery_turn(summary="updated implementation", files={"src/echo.py": "print('')\n"}),
-        review_turn("release", "spec now covers the case"),
-    ]
-    _, projection = run_scripted(data_dir, script)
-    assert projection.phase == "DONE"
-    assert "QUALITY->REWORK_PRODUCT" in projection.transitions
-    assert "REWORK_PRODUCT->PRODUCT_SPEC" in projection.transitions
-    assert projection.product_spec.revision == 2
 
 def test_illegal_workpiece_stays_in_department(data_dir):
     system = LoopSystem.for_testing(
@@ -164,27 +137,32 @@ def test_context_overflow_is_explicit_failure(data_dir):
     assert projection.stop_reason == "context_overflow"
 
 def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
-    script = [
-        product_spec(acceptance=["old behavior"]),
-        delivery_turn(),
-        review_turn(
-            "rework_product",
-            "contract is wrong",
-            defects=[{"severity": "major", "summary": "contract issue"}],
-        ),
-        product_spec_turn(
+    # PRD 修订以后质检不能沿用旧依据下的检查回执（工单 #555：质检要求有问题时询问产品，
+    # 产品在回答里修订 PRD）
+    script = {
+        "product": [product_spec(acceptance=["old behavior"])],
+        "engineering": [
+            delivery_turn(),
+            ask_turn(recipient="product", question="验收标准说得不清楚，请修订。"),
+            delivery_turn(summary="same code under new spec"),
+        ],
+        "quality": [
+            review_turn("rework_engineering", "the delivery misses an acceptance criterion",
+                        defects=[{"severity": "major", "summary": "contract issue"}]),
+            FakeTurn(proposal=review("release", "I am done without any new check"), checks={}),
+            review_turn("release", "checked current contract"),
+        ],
+        "product:ask": [answer_turn(
+            answer="已按新的验收标准修订产品要求。",
+            requirements=["print the given argument to stdout"],
             acceptance=["new behavior"],
             change_record={
                 "changed": ["Replace the acceptance criterion with new behavior"],
                 "retained": ["The echo goal, argument-printing requirement, and existing implementation constraints"],
                 "retired": ["The old behavior acceptance criterion"],
                 "rationale": "Correct the contract issue reported by quality; evidence must be collected against the revised criterion.",
-            },
-        ),
-        delivery_turn(summary="same code under new spec"),
-        FakeTurn(proposal=review("release", "I am done without any new check"), checks={}),
-        review_turn("release", "checked current contract"),
-    ]
+            })],
+    }
     system, projection = run_scripted(data_dir, script, max_cycles=12)
     assert projection.product_spec.revision == 2
     assert any(

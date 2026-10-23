@@ -7240,7 +7240,7 @@
    "stamp_rework": {
     "label": "盖红色「返工」章",
     "fact": "返工",
-    "source": "qa_submitted（rework_engineering、rework_product）",
+    "source": "qa_submitted（rework_engineering）",
     "action": "盖红色「返工」章，把箱子放进回流管道",
     "room": "—",
     "level": "ui",
@@ -7644,8 +7644,7 @@
     "by": "verdict",
     "map": {
      "release": "stamp_release",
-     "rework_engineering": "stamp_rework",
-     "rework_product": "stamp_rework"
+     "rework_engineering": "stamp_rework"
     }
    },
    "collaboration_requested": "send_letter",
