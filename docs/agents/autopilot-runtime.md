@@ -177,6 +177,6 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 工单大小的上限 | 「只改」清单中手写文件 15 个；生成的客户端类型、接口快照、事件序列基准与日记不计 | `CLAUDE.md`「工单规范」；`AGENTS.md` 执行者第 2 步 |
 | 同时进行的 `touches-core` 工单 | 1 张（`in-progress` 与 `needs-review` 合计） | 派发者规则第 3 节第 1 步 |
 | 核心文件 | 工具定义：`harness/tools.py`、`harness/definitions/`；控制核心：`harness/` 下的 `orchestrator.py`、`engine.py`、`recording.py`、`assembly.py`、`context.py`、`compaction.py`、`adjudication.py`、`validation.py`、`write_path.py`、`event_store.py`、`projection.py`、`decisions.py`、`runtime.py`；执行环境：`harness/` 下的 `environment.py`、`actions.py`、`workspace.py`；事件序列基准：`harness/tests/event_sequences/`、`harness/tests/prompt_snapshot.json`；接口合同：`harness/tests/openapi/openapi.json`、`client/src/renderer/src/api/generated/` | `CLAUDE.md`「工单规范」 |
-| 唤醒架构师 | 关 | 派发者规则第 3 节第 7 步；用户在场的会话做大的设计修改时改为关，做完改回 |
+| 唤醒架构师 | 开 | 派发者规则第 3 节第 7 步；用户在场的会话做大的设计修改时改为关，做完改回 |
 | 被唤醒的架构师一次运行的时长 | 4 小时 | 派发者规则第 3 节第 7 步 |
 | 同一张工单唤醒架构师的上限 | 2 次，第 3 次直接交给用户 | `CLAUDE.md`「被唤醒的架构师」 |
