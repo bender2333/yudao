@@ -198,6 +198,15 @@ def repeat_script(script: dict[str, list[Any]], times: int) -> dict[str, list[An
     return {department: list(turns) * times for department, turns in script.items()}
 
 
+def merge_scripts(*scripts: dict[str, list[Any]]) -> dict[str, list[Any]]:
+    # 把几个按部门给出的脚本接在一起（一个适配器跑几个事项，每个事项一份脚本）
+    merged: dict[str, list[Any]] = {}
+    for script in scripts:
+        for department, turns in script.items():
+            merged.setdefault(department, []).extend(turns)
+    return merged
+
+
 def list_files_turn(call: ModelCall) -> ModelResponse:
     # 三个部门都能调用的只读工具，用来构造不提交提案的工作步骤
     identity = f"list-{call.activation_id}-{call.step_id}"
