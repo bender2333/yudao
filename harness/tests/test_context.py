@@ -14,8 +14,8 @@ from harness.proposals import (answer_turn, ask_turn, delivery_turn, guidance_re
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
-from harness.tests.helpers import (developer_text, guidance_reply, happy_script, pinned_input_tokens,
-                                 recorded_context, run_scripted)
+from harness.tests.helpers import (developer_text, explore_turn, guidance_reply, happy_script,
+                                   pinned_input_tokens, recorded_context, run_scripted)
 from harness.tests.protocol_helpers import serve
 from harness.tests.provider_replies import HTTP_REPLIES, http_script, reply_index, request_department
 from harness.tools import tool_action
@@ -34,7 +34,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
             "product": [FakeTurn(proposal=product_spec(), transcript=marker)],
             "engineering": [ask_turn(), delivery_turn()],
             "product:ask": [answer_turn("The existing contract covers this input.")],
-            "quality": [review_turn("release", "ok")],
+            "quality": [explore_turn(), review_turn("release", "ok")],
         }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -72,7 +72,7 @@ def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
             "product": [product_spec(goal=unique)],
             "engineering": [ask_turn(), delivery_turn()],
             "product:ask": [v2_answer],
-            "quality": [review_turn("release", "v2")],
+            "quality": [explore_turn(), review_turn("release", "v2")],
         }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -177,7 +177,7 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
                 guidance_reply("已给出两条产品决定。"),
             ],
             "engineering": [delivery_turn(), delivery_turn()],
-            "quality": [
+            "quality": [explore_turn(), 
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "defect A"}]),
                 review_turn("release", "accepted both product decisions"),
@@ -222,7 +222,7 @@ def test_effective_decision_keeps_explicit_requirement(data_dir):
                 guidance_reply("已给出产品决定。"),
             ],
             "engineering": [delivery_turn(), delivery_turn()],
-            "quality": [
+            "quality": [explore_turn(), 
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "defect"}]),
                 review_turn("release", "accepted the described approach"),
@@ -276,7 +276,7 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
                 delivery_turn(summary="OLD_DELIVERY_CANARY"),
                 delivery_turn(summary="new delivery"),
             ],
-            "quality": [
+            "quality": [explore_turn(), 
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "need decision"}]),
                 review_turn("rework_engineering", "contract is wrong",
@@ -310,7 +310,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
                 ask_turn(recipient="product", question="验收标准说得不清楚，请修订。"),
                 delivery_turn(summary="NEW_DELIVERY_CANARY"),
             ],
-            "quality": [
+            "quality": [explore_turn(), 
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "contract issue"}]),
                 review_turn("release", "new delivery checked"),
