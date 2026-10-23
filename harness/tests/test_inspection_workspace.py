@@ -201,7 +201,7 @@ def _system_with_handoff(data_dir: Path):
     system, adapter, run_id = event_scenarios._system(data_dir, {
         "product": [event_scenarios.product_spec()],
         "engineering": [event_scenarios._deliver()],
-        "quality": [event_scenarios._release()],
+        "quality": [event_scenarios._explore(), event_scenarios._release()],
     })
     return system, adapter, run_id
 
@@ -237,7 +237,7 @@ def test_the_inspection_workspaces_are_removed_when_the_run_reaches_done(tmp_pat
     system, _adapter, run_id = event_scenarios._system(tmp_path, {
         "product": [event_scenarios.product_spec()],
         "engineering": [event_scenarios._deliver()],
-        "quality": [event_scenarios._release()],
+        "quality": [event_scenarios._explore(), event_scenarios._release()],
     })
     system.run_until_stop(run_id)
     run_root = tmp_path / "workspaces" / run_id
@@ -386,7 +386,7 @@ def test_startup_removes_inspections_of_a_run_that_already_finished(tmp_path: Pa
     system, _adapter, run_id = event_scenarios._system(data_dir, {
         "product": [event_scenarios.product_spec()],
         "engineering": [event_scenarios._deliver()],
-        "quality": [event_scenarios._release()],
+        "quality": [event_scenarios._explore(), event_scenarios._release()],
     })
     assert system.run_until_stop(run_id).status == "done"
     system.close()
@@ -423,7 +423,7 @@ def test_a_cancelled_run_removes_its_inspection_workspaces(tmp_path: Path) -> No
         "product": [event_scenarios.product_spec()],
         "engineering": [event_scenarios.delivery_turn(
             files={"src/echo.py": "SEALED_VERSION\n"}, checks=event_scenarios.CHECKS)],
-        "quality": [event_scenarios._release()],
+        "quality": [event_scenarios._explore(), event_scenarios._release()],
     })
     system.activate_once(run_id)   # 产品：产品要求
     system.activate_once(run_id)   # 工程：交付，阶段转到质检

@@ -21,8 +21,9 @@ from harness.definitions import DEFINITIONS
 from harness.department_prompts import save_department_prompt
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, ContextManifest, DepartmentPrompt, Event, json_dumps
-from harness.proposals import delivery_turn, guidance_response, product_spec, review_turn
-from harness.environment import LocalEnvironment
+from harness.proposals import (delivery_turn, guidance_response, product_spec, review,
+                        review_turn)
+from harness.environment import LocalEnvironment, QA_TESTS_DIR
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tools import tool_action
@@ -172,12 +173,58 @@ def system_on_copy(source: Path, destination: Path, script=()) -> LoopSystem:
                                   resume_on_startup=False)
 
 
+def explore_turn() -> FakeTurn:
+    # 质检的预测性探索：按 PRD 起草测试用例，写进质检自己的测试材料；
+    # 这一轮没有交付可以核验，提交的结论被拒绝，这一轮到这里结束（工单 #557）
+    return FakeTurn(
+        writes={f"{QA_TESTS_DIR}/test_echo.py":
+                "import subprocess, sys\nr = subprocess.run([sys.executable, 'src/echo.py', 'hello'],"
+                "capture_output=True, text=True)\nassert r.returncode == 0 and r.stdout.strip() == 'hello'\n"},
+        proposal=review("release", "按 PRD 起草了测试用例；还没有交付可以核验"),
+    )
+
+
+def quality_turns(verdict: str = "release", rationale: str = "checks passed on the current snapshot",
+                  *, defects: list[dict[str, str]] | None = None, checks: dict[str, Any] | None = None,
+                  times: int = 10) -> list[Any]:
+    # 质检的脚本（工单 #557）：质检关注「PRD 被接纳」，PRD 的每一个新版本与每一份新交付都让它开始一轮工作，
+    # 轮数随这些成果到达的时机变化，因此每一轮按这一轮开始时有没有交付决定做什么：
+    # 没有交付的一轮是预测性探索（提交的结论被拒绝），有交付的一轮是核验（缺陷记录或放行）。
+    # 脚本项给足几轮，实际用掉几轮由运行决定（PRD 每修订一次就多一轮预测性探索）。
+    state = {"concluded": False}
+
+    def turn(call: ModelCall) -> FakeTurn:
+        if not prompt_part(call, "current_delivery_spec"):
+            return explore_turn()
+        if verdict == "rework_engineering" and not state["concluded"]:
+            state["concluded"] = True
+            return review_turn(verdict, rationale, defects=defects, checks=checks)(call)
+        return review_turn("release", rationale, checks=checks)(call)
+
+    return [turn] * times
+
+
 def happy_script():
-    return [
-        product_spec(),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 按部门给出的脚本（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [explore_turn(), review_turn("release", "checks passed on the current snapshot")],
+    }
+
+
+def repeat_script(script: dict[str, list[Any]], times: int) -> dict[str, list[Any]]:
+    # 同一个适配器跑多次运行（例如两个项目各完成一个事项）：每个部门的脚本重复若干遍
+    return {department: list(turns) * times for department, turns in script.items()}
+
+
+def merge_scripts(*scripts: dict[str, list[Any]]) -> dict[str, list[Any]]:
+    # 把几个按部门给出的脚本接在一起（一个适配器跑几个事项，每个事项一份脚本）
+    merged: dict[str, list[Any]] = {}
+    for script in scripts:
+        for department, turns in script.items():
+            merged.setdefault(department, []).extend(turns)
+    return merged
 
 
 def list_files_turn(call: ModelCall) -> ModelResponse:

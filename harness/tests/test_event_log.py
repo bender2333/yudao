@@ -3,7 +3,7 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.models import DEPARTMENTS, Event, EventType, ProjectEvent, ProjectEventType
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, system_on_copy
+from harness.tests.helpers import happy_script, repeat_script, system_on_copy
 
 # 一份事件日志：按全局位置与范围分批读取。系统整体运行，模型回答由 FakeAdapter 脚本给出。
 # 需要一份真实运行记录的文件：module 作用域的夹具各跑一次日志并保存数据目录，
@@ -18,7 +18,7 @@ def _saved_log(builder, directory):
 
 def _two_projects_source(data_dir):
     # 两个项目各完成一个事项并采纳，另有一个不属于项目的 run
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script() + happy_script() + happy_script()))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(repeat_script(happy_script(), 3)))
     owners = {}
     for name in ("A", "B"):
         project_id = system.projects.register(f"项目 {name}", "逐行文本处理工具")

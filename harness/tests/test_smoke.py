@@ -15,7 +15,10 @@ from harness.providers import ProviderFacade
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
 from harness.smoke import EVAL_ENV_NAMES, isolation_fields, run_smoke, smoke_exit_code, summarize_run
-from harness.tests.helpers import compacted_runner, happy_script, recorded_context, run_scripted, system_on_copy
+from harness.tests.helpers import (compacted_runner, explore_turn, happy_script, recorded_context,
+                                 run_scripted, system_on_copy)
+from harness.tests.helpers import (compacted_runner, explore_turn, happy_script, recorded_context, run_scripted,
+                                   system_on_copy)
 from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_event, rewrite_saved_events,
                                          rewrite_saved_projection)
 
@@ -26,14 +29,23 @@ from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_even
 def saved_native(tmp_path_factory):
     # 一次本机流程走完的运行：产品给要求、工程写入、检查、交付、再检查、质检放行
     # 提交依据的版本由工厂从请求里的当前版本取（工单 #471）：脚本项是工厂而不是裸提交
-    script = [
-        product_spec(),
-        FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
-        FakeTurn(checks={"smoke": 0}),
-        delivery_turn(),
-        FakeTurn(checks={"smoke": 0}),
-        review_turn("release", "host checks passed"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
+    # 质检在 PRD 被接纳以后还有一轮预测性探索，这一轮没有交付可以核验，提交的结论被拒绝
+    # 提交依据的版本由工厂从请求里的当前版本取（工单 #471）：脚本项是工厂而不是裸提交。
+    # 按部门给出（工单 #557：同时运行的会话各自取用自己的脚本），质检先起草测试材料
+    script = {
+        "product": [product_spec()],
+        "engineering": [
+            FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+            FakeTurn(checks={"smoke": 0}),
+            delivery_turn(),
+        ],
+        "quality": [
+            explore_turn(),
+            FakeTurn(checks={"smoke": 0}),
+            review_turn("release", "host checks passed"),
+        ],
+    }
     system, projection = run_scripted(tmp_path_factory.mktemp("native"), script)
     assert projection.status == "done"
     system.close()
@@ -101,7 +113,11 @@ def test_native_audit_checks_every_step_and_actual_host_receipts(native_run):
     assert summary["context_isolated"] is True, summary["context_isolation_notes"]
     assert summary["model_input_audit"]["status"] == "verified"
     assert summary["model_input_audit"]["request_count"] > 3
-    assert summary["model_input_audit"]["activation_count"] == 3
+    # 三个部门都工作过（工单 #557：同时运行的会话各有一轮工作，激活的个数不再固定，
+    # 这里断言的是做成了什么，不是数了几轮）
+    activated = {event.department for event in system.store.list_events(run_id)
+                 if event.type == EventType.DEPARTMENT_ACTIVATED}
+    assert activated == {"product", "engineering", "quality"}
     assert summary["check_receipts_verified"] is True, summary["check_receipt_notes"]
     assert summary["delivery_archive"]["status"] == "verified", summary["delivery_archive"]
     assert summary["delivery_archive"]["tree_digest"] == system.project(run_id).delivery_spec.code_tree_digest
@@ -329,7 +345,7 @@ def test_model_input_audit_rejects_changed_received_original(ask_run, field):
 def test_model_input_audit_uses_the_project_department_prompt(tmp_path):
     # 部门 Prompt 来自项目部门设置（run 内没有副本）：装配的请求正文用项目设置中的 Prompt，
     # 审计从项目部门设置取出同一个 Prompt 复核
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([*happy_script()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
     project_id = system.projects.register("Audit", "目标")
     prompt = "  NEW_ENGINEERING_PROMPT\r\n"
     system.projects.configure_department_settings(
@@ -493,13 +509,13 @@ def test_audit_does_not_replace_missing_run_artifact_with_another_runs_copy(nati
     assert fields["model_input_audit"]["status"] == "unverified"
 
 # 同一个脚本被两项检查共用：请求让出以后回到产品部门，两项检查各在自己的副本上改写与检查
-_PRODUCT_RETURN_SCRIPT = [
-    product_spec(),
-    ask_turn(recipient="product", question="Clarify flags?"),
-    answer_turn("The existing requirements do not distinguish flags."),
-    delivery_turn(),
-    review_turn("release", "host checks passed"),
-]
+# 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本）
+_PRODUCT_RETURN_SCRIPT = {
+    "product": [product_spec()],
+    "engineering": [ask_turn(recipient="product", question="Clarify flags?"), delivery_turn()],
+    "product:ask": [answer_turn("The existing requirements do not distinguish flags.")],
+    "quality": [explore_turn(), review_turn("release", "host checks passed")],
+}
 
 @pytest.fixture(scope="module")
 def saved_product_return(tmp_path_factory):
@@ -517,7 +533,11 @@ def test_audit_preserves_department_history_when_request_returns_to_product(prod
     system, run_id = product_return_run
     fields = isolation_fields(system.store, system.artifacts, run_id)
     assert fields["context_isolated"] is True, fields["model_input_audit"]["notes"]
-    assert fields["model_input_audit"]["activation_count"] == 4
+    # 产品的请求让出以后回到产品部门，产品又工作了一轮（这一轮本身就是被测的行为；
+    # 激活的总数不再固定：工单 #557 以后同时运行的会话各有一轮工作）
+    reactivated = [event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == "product"]
+    assert len(reactivated) == 2
 
 def test_audit_rejects_missing_new_work_message_after_product_reactivation(product_return_run):
     system, run_id = product_return_run

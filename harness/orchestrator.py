@@ -76,7 +76,8 @@ from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .validation import PRD_REVISION_FIELDS, ProposalDecision, evaluate_proposal
-from .collaboration import guidance_diverted, next_department, watched_new_work
+from .collaboration import (guidance_diverted, has_new_work, next_department,
+                           ready_departments)
 from .workspace import WorkspaceSnapshot
 
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
@@ -225,9 +226,10 @@ class Orchestrator:
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
         self._cancellers: dict[str, set[object]] = {}
         self._cancellers_changed = Condition()
-        # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 只能有一次激活），_active 是激活本身
-        self._running: dict[str, object] = {}
-        self._active: dict[str, _Activation] = {}
+        # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 的同一部门只能有一次激活，
+        # 工单 #557 以后一个 run 里不同部门可以同时激活），_active 是这些激活本身
+        self._running: dict[tuple[str, str], object] = {}
+        self._active: dict[str, dict[str, _Activation]] = {}
         # 会话结束（事务 on_commit）执行后留下的清理错误：Windows 句柄长期占用时会出现，
         # 留给运维或下一次启动扫描处理，不阻塞 run 的正常退出
         self._close_errors: dict[str, list[Exception]] = {}
@@ -446,6 +448,13 @@ class Orchestrator:
                 waiting.add(department)
         return waiting
 
+    def _department_ready(self, run_id: str, projection: RunProjection, department: str) -> bool:
+        # 这个部门现在可以开始一轮工作：在等待工作，并且关注的成果有了新东西。
+        # 同时运行（工单 #557）：准备激活的事务里重新核对，别的会话在这期间做完了就开始
+        if department not in self._waiting_departments(run_id):
+            return False
+        return has_new_work(projection, department)
+
     def _is_handoff_session(self, department: str, session_id: str, projection: RunProjection) -> bool:
         # 持有交接的工程：工程部门的主线会话，它这次激活产出的东西进入运行工作区。
         # 询问分支与产品要求都由各自的部门在检查工作区里回答，它们才是 local-tools 第 2 节
@@ -577,7 +586,7 @@ class Orchestrator:
         message = "This run has ended; create a new task for this input."
         with self._cancelling(run_id):
             self._require_open(run_id, self.project(run_id), message)
-            activation, cancel_error = self._abort_run(run_id)
+            _activation, cancel_error = self._abort_run(run_id)
             stop_error = cancel_error
 
             def receive(transaction: Transaction) -> None:
@@ -605,9 +614,9 @@ class Orchestrator:
                     stop_error = stop_error or exc
             finally:
                 if cancel_error is not None:
-                    # 取消正在进行的步骤出过错：再通知一次
+                    # 取消正在进行的步骤出过错：再通知一次（这个 run 的每一个会话）
                     try:
-                        self._cancel_driver(activation)
+                        self._abort_run(run_id)
                     except Exception as exc:
                         stop_error = stop_error or exc
         if save_error is not None:
@@ -617,16 +626,20 @@ class Orchestrator:
         return self.project(run_id)
 
     def _abort_run(self, run_id: str) -> tuple[_Activation | None, Exception | None]:
-        # 中止运行：之后的核对都得到停止，正在进行的步骤立即取消；交回正在进行的激活与取消它时的错误
+        # 中止运行：之后的核对都得到停止，正在进行的步骤立即取消；交回正在进行的激活与取消它时的错误。
+        # 同时运行（工单 #557）：取消与暂停作用于事项的全部会话，这里取消这个 run 的每一个会话
         self._abort.setdefault(run_id, Event()).set()
-        activation = self._active.get(run_id)
-        if activation is None:
-            return None, None
-        try:
-            self._cancel_driver(activation)
-        except Exception as exc:
-            return activation, exc
-        return activation, None
+        activations = list(self._active.get(run_id, {}).values())
+        first: _Activation | None = None
+        error: Exception | None = None
+        for activation in activations:
+            if first is None:
+                first = activation
+            try:
+                self._cancel_driver(activation)
+            except Exception as exc:
+                error = error or exc
+        return first, error
 
     @contextmanager
     def _cancelling(self, run_id: str) -> Iterator[None]:
@@ -787,8 +800,12 @@ class Orchestrator:
             total += max(0, self._elapsed_ms(run_id) - base)
         return total / 1000.0
 
-    def _pause_run_clock(self, run_id: str) -> None:
-        # 暂停这个 run 的段计时：进入等待时调用，等待的时间不计入运行时间
+    def _pause_run_clock(self, run_id: str, exclude: str | None = None) -> None:
+        # 暂停这个 run 的段计时：进入等待时调用，等待的时间不计入运行时间。
+        # 同时运行（工单 #557）：还有别的会话在工作时计时继续
+        active = self._active.get(run_id, {})
+        if any(key != exclude for key in active):
+            return
         started = self._run_segment_start.pop(run_id, None)
         if started is not None:
             self._run_elapsed_ms[run_id] = self._run_elapsed_ms.get(run_id, 0) + max(
@@ -798,9 +815,10 @@ class Orchestrator:
         # 等待结束以后重新开始段计时
         self._run_segment_start.setdefault(run_id, time.monotonic())
 
-    def _settle_run_segment(self, run_id: str) -> int:
-        # 激活结束：结算当前段，返回累计的已用毫秒
-        self._pause_run_clock(run_id)
+    def _settle_run_segment(self, run_id: str, department: str | None = None) -> int:
+        # 激活结束：结算当前段，返回累计的已用毫秒。
+        # 同时运行（工单 #557）：这个会话结束时别的会话还在工作，run 的计时继续
+        self._pause_run_clock(run_id, exclude=department)
         return self._run_elapsed_ms.get(run_id, 0)
 
     def _recover_run_usage(self, run_id: str, events: Sequence[Any]) -> None:
@@ -843,12 +861,13 @@ class Orchestrator:
             activation.wakeup = None
 
     def _wake(self, run_id: str) -> None:
-        # 在安全节点等待重试的激活立即回到安全节点判断；在改变提交以后调用
-        activation = self._active.get(run_id)
-        wakeup = None if activation is None else activation.wakeup
-        if wakeup is not None:
-            loop, changed = wakeup
-            loop.call_soon_threadsafe(changed.set)
+        # 在安全节点等待重试的激活立即回到安全节点判断；在改变提交以后调用。
+        # 同时运行（工单 #557）：这个 run 的每一个会话都醒过来
+        for activation in list(self._active.get(run_id, {}).values()):
+            wakeup = activation.wakeup
+            if wakeup is not None:
+                loop, changed = wakeup
+                loop.call_soon_threadsafe(changed.set)
 
     def _on_close_run(self, run_id: str) -> None:
         # 会话结束（事务提交以后）执行的副作用：关闭会话并清理检查工作区。
@@ -869,9 +888,9 @@ class Orchestrator:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
                     transaction, "cancelled", "run cancelled"), command=command)
             finally:
-                activation, cancel_error = self._abort_run(run_id)
+                _activation, cancel_error = self._abort_run(run_id)
                 if cancel_error is not None:
-                    self._cancel_driver(activation)
+                    self._abort_run(run_id)
         if cancel_error is not None:
             raise cancel_error
         return self.project(run_id)
@@ -1086,8 +1105,11 @@ class Orchestrator:
 
     async def run_until_stop(self, run_id: str) -> RunProjection:
         # 运行到终态，或者到 run 被未回答的决定请求阻塞、等待用户回答为止。
-        # 一次运行期间的模型调用复用同一组连接，连接只在这个事件循环中使用
+        # 一次运行期间的模型调用复用同一组连接，连接只在这个事件循环中使用。
+        # 同时运行（工单 #557）：等待工作的部门各开始一轮工作，各自一个会话，
+        # 这个循环等全部会话结束或事项到终态
         connections = ProviderConnections()
+        tasks: dict[str, asyncio.Task[RunProjection]] = {}
         try:
             while True:
                 snapshot = self.writes.read(run_stream(run_id))
@@ -1095,14 +1117,54 @@ class Orchestrator:
                 if not projection.run_id:
                     raise RunNotFoundError(run_id)
                 if projection.status in TERMINAL_STATUSES:
+                    await self._stop_sessions(run_id, tasks)
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
+                    await self._stop_sessions(run_id, tasks)
                     return await asyncio.to_thread(self._settled, run_id)
                 if blocks_run(snapshot.decisions.values()):
+                    await self._stop_sessions(run_id, tasks)
                     return projection
-                await self._activate_once(run_id, connections)
+                for department in self._ready_departments(run_id):
+                    task = tasks.get(department)
+                    if task is not None and not task.done():
+                        continue
+                    tasks[department] = asyncio.get_running_loop().create_task(
+                        self._activate_department(run_id, department, connections))
+                pending = [task for task in tasks.values() if not task.done()]
+                if not pending:
+                    # 没有部门在工作，也没有可以开始的部门：没有新的工作
+                    return await self._no_new_work(run_id)
+                done, _pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    task.result()
         finally:
+            await self._stop_sessions(run_id, tasks)
             await connections.aclose()
+
+    def _ready_departments(self, run_id: str) -> list[str]:
+        # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些（工单 #557）
+        projection = self.project(run_id)
+        return ready_departments(projection, waiting=self._waiting_departments(run_id))
+
+    async def _stop_sessions(self, run_id: str, tasks: dict[str, asyncio.Task[RunProjection]]) -> None:
+        # 事项到终态或被未回答的决定请求阻塞：其余会话停止并收尾。
+        # 取消与暂停作用于事项的全部会话，立即生效（工单 #557）
+        pending = [task for task in tasks.values() if not task.done()]
+        if not pending:
+            return
+        for activation in list(self._active.get(run_id, {}).values()):
+            try:
+                self._cancel_driver(activation)
+            except Exception:
+                pass
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    async def _no_new_work(self, run_id: str) -> RunProjection:
+        # 没有部门可以开始一轮工作：没有新的工作，结束这个 run
+        self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
+            transaction, "provider_error", "no department has new work"))
+        return await asyncio.to_thread(self._settled, run_id)
 
     def start(self, run_id: str) -> asyncio.Task[RunProjection]:
         # 在当前事件循环中把这个 run 作为任务运行到停止（run_until_stop）；这个 run 已有任务时，新任务在它结束以后开始。
@@ -1183,6 +1245,7 @@ class Orchestrator:
             })
 
     async def activate_once(self, run_id: str) -> RunProjection:
+        # 开始一个部门的一轮工作（单步入口）：按关注的成果取下一个可以工作的部门
         connections = ProviderConnections()
         try:
             return await self._activate_once(run_id, connections)
@@ -1190,18 +1253,30 @@ class Orchestrator:
             await connections.aclose()
 
     async def _activate_once(self, run_id: str, connections: ProviderConnections) -> RunProjection:
+        projection = self.project(run_id)
+        department = next_department(projection, waiting=self._waiting_departments(run_id))
+        if department is None:
+            return await self._no_new_work(run_id)
+        return await self._activate_department(run_id, department, connections)
+
+    async def _activate_department(self, run_id: str, department: str,
+                                   connections: ProviderConnections) -> RunProjection:
+        # 这个部门的一轮工作：准备激活、跑步骤驱动、收尾。
+        # 同时运行（工单 #557）：一个 run 里不同部门的会话各自一个任务，同一个部门同时只有一轮
         claim = object()
-        if self._running.setdefault(run_id, claim) is not claim:
-            raise RuntimeError("run already has an active department invocation")
+        key = (run_id, department)
+        if self._running.setdefault(key, claim) is not claim:
+            raise RuntimeError("department already has an active department invocation")
         try:
             activation = self.writes.transact(
-                run_stream(run_id), lambda transaction: self._prepare_activation(run_id, transaction, connections))
+                run_stream(run_id), lambda transaction: self._prepare_activation(
+                    run_id, transaction, connections, department))
             if activation is None:
-                # 没有开始新的激活（等待用户回答、已经结束或达到上限）：这段不计入运行时间，
-                # 累计保留在内存里，下次激活从事件恢复时继续
+                # 没有开始新的激活（等待用户回答、已经结束、达到上限或这个部门已经别人的工作）：
+                # 这段不计入运行时间，累计保留在内存里，下次激活从事件恢复时继续
                 self._pause_run_clock(run_id)
                 return await asyncio.to_thread(self._settled, run_id)
-            self._active[run_id] = activation
+            self._active.setdefault(run_id, {})[department] = activation
             started = time.monotonic()
             try:
                 await self._invoke_activation(activation)
@@ -1210,7 +1285,7 @@ class Orchestrator:
 
                 def finish(transaction: Transaction) -> None:
                     current = transaction.projection
-                    elapsed_ms = self._settle_run_segment(run_id)
+                    elapsed_ms = self._settle_run_segment(run_id, scope.department)
                     happened = transaction.events()
                     activations = len([event for event in happened
                                        if event.type == EventType.DEPARTMENT_ACTIVATED])
@@ -1250,13 +1325,17 @@ class Orchestrator:
                 await asyncio.to_thread(self._await_cancellers, run_id)
                 self.writes.transact(run_stream(run_id), finish)
                 self.sessions.get(run_id, scope.department).idle()
-                self._active.pop(run_id, None)
+                active = self._active.get(run_id)
+                if active is not None:
+                    active.pop(scope.department, None)
+                    if not active:
+                        self._active.pop(run_id, None)
             return await asyncio.to_thread(self._settled, run_id)
         finally:
-            self._running.pop(run_id, None)
+            self._running.pop(key, None)
 
     def _prepare_activation(self, run_id: str, transaction: Transaction,
-                            connections: ProviderConnections) -> _Activation | None:
+                            connections: ProviderConnections, department: str) -> _Activation | None:
         projection = transaction.projection
         if not projection.run_id:
             raise RunNotFoundError(run_id)
@@ -1279,20 +1358,20 @@ class Orchestrator:
             else:
                 self._pause(transaction, bound)
             return None
-        # 下一个开始一轮工作的部门由它关注的成果决定（循环结构第 2 节、ADR-0039）：
+        # 开始一轮工作的部门由它关注的成果决定（循环结构第 2 节、ADR-0039）：
         # 关注的成果有了新东西、部门在等待工作时，它开始一轮工作。
-        waiting = self._waiting_departments(run_id)
-        department = next_department(projection, waiting=waiting)
+        # 同时运行（工单 #557）：这个部门在准备激活之前可能已经别人的工作做完了，
+        # 这时不再开始一轮工作。
+        if not self._department_ready(run_id, projection, department):
+            return None
         guidance_only = False
         yielded_work = None
-        if department is not None and guidance_diverted(projection, department):
+        if guidance_diverted(projection, department):
             # 这一轮被指导提前安排：只回应指导，让出它自己的那一轮
             # （工单 #560 以后指导按四种送达方式分开处理）
             guidance_only = department != "product"
-            yielded_work = dict(projection.yielded_work) if projection.yielded_work else self._work_basis(projection)
-        if department is None:
-            self._fail(transaction, "provider_error", "no department has new work")
-            return None
+            prior = projection.department_yielded_work.get(department)
+            yielded_work = dict(prior) if prior else self._work_basis(projection)
 
         if self.test_adapter_factory is not None:
             # 确定性测试适配器没有目录条目：表示成一个 fake 协议的模型访问定义并绑定三个部门，
@@ -1728,7 +1807,12 @@ class Orchestrator:
             elif isinstance(result, Stopped) and result.reason:
                 reason = result.reason
             else:
-                reason = "branch failed to answer"
+                # 分支没有做出回答就结束：最常见的原因是分支工作期间工作依据变了
+                # （另一个会话修订了 PRD、用户有新输入或新的指导），依据变了以后这个分支
+                # 不能继续工作（设计说明第 5 节、第 9 节）。写明是哪一种，提问方才知道
+                # 接下来怎么做（设计说明第 4.5 节）
+                reason = self._stale_branch_reason(scope.run_id, recipient, branch_session_id) \
+                    or "branch failed to answer"
             def record_ask_unable(transaction: Transaction) -> None:
                 transaction.append(NewEvent(
                     EventType.ASK_ANSWERED,
@@ -1750,6 +1834,34 @@ class Orchestrator:
                 ))
             self.writes.transact(run_stream(scope.run_id), record_ask_unable)
             return False, None, reason, None, branch_steps
+
+    def _stale_branch_reason(self, run_id: str, department: str, branch_session_id: str) -> str | None:
+        # 分支会话开始时采用的工作依据与此刻的依据：变了就说明这个分支不能继续工作
+        # （设计说明第 5 节、第 9 节）。写明是哪一种变化，提问方拿到的原因才有内容
+        # （设计说明第 4.5 节）。
+        events = self.writes.read(run_stream(run_id)).events()
+        started = next((event for event in events
+                        if event.type == EventType.DEPARTMENT_ACTIVATED
+                        and event.session_id == branch_session_id), None)
+        if started is None:
+            return None
+        payload = started.payload or {}
+        basis = WorkBasis(
+            effective_contract_hash=payload.get("effective_contract_hash"),
+            input_version=int(payload.get("input_version") or 0),
+            guidance_version=int(payload.get("guidance_version") or 0),
+        )
+        current = WorkBasis.current(self.project(run_id), department)
+        if current.effective_contract_hash != basis.effective_contract_hash:
+            return ("the PRD was revised by another session while this branch was working; "
+                    "the basis of this branch is stale, so it could not answer")
+        if current.input_version != basis.input_version:
+            return ("new user input arrived while this branch was working; "
+                    "the basis of this branch is stale, so it could not answer")
+        if current.guidance_version > basis.guidance_version:
+            return ("new guidance arrived while this branch was working; "
+                    "the basis of this branch is stale, so it could not answer")
+        return None
 
     def _branch_steps(self, events: list[Any], branch_session_id: str) -> int:
         # 这个分支会话用掉的模型步数：分支里再问一层时，回问的分支是它的下一层，

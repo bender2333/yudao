@@ -153,6 +153,9 @@ class ScriptedProvider:
 
             def _reply(self, body: dict[str, Any] | None) -> None:
                 provider.requests.append(body)
+                # 这次请求的正文挂在处理机上：同时运行的会话各自发请求时，
+                # replies 里的脚本项要知道自己回答的是哪一次请求（工单 #557）
+                self.body = body
                 if not provider.replies:
                     # 脚本之外的请求：明确的 HTTP 500，测试从 requests 的数量看到多出的请求
                     send_reply(self, 500, "application/json", b'{"error":{"message":"unexpected request"}}')

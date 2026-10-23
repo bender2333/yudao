@@ -321,16 +321,19 @@ def test_external_address_change_returns_definitions_to_candidates(tmp_path):
             assert {"model-a", "model-a2"} <= stale
             assert opened.system.facade.get_bindings()["engineering"]["model_id"] == "model-a"
 
-            # 回答先前的决定请求让运行继续：下一次模型请求按作废的准入进入待恢复，说明写明原因
-            first = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")[0]
-            answered = _post(client, "decision.answer", base_version=first["version"],
-                             decision_id=first["decision_id"], option="continue", note=None)
-            assert answered.status_code == 200, answered.text
+            # 被挡住的是两个同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，
+            # 每条写明自己的部门（模型管理设计说明第 5.5 节：这次模型请求不发送，事项停在这次请求之前）
+            blocked = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
+            assert {item["request"]["department"] for item in blocked} == {"engineering", "quality"}
+            # 回答这两条以后运行继续：工程的下一次模型请求按作废的准入再次进入待恢复，说明写明原因
+            for item in blocked:
+                answered = _post(client, "decision.answer", base_version=item["version"],
+                                 decision_id=item["decision_id"], option="continue", note=None)
+                assert answered.status_code == 200, answered.text
             _finish(opened.system, run_id)
             decisions = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
-            assert len(decisions) == 1
+            assert [item["request"]["department"] for item in decisions] == ["engineering"]
             request = decisions[0]["request"]
-            assert request["department"] == "engineering"
             assert "准入已作废" in request["message"]
     finally:
         server.shutdown()
@@ -401,9 +404,10 @@ def test_deleting_the_catalog_file_clears_defaults_and_recovers_after_answer(tmp
             _finish(opened.system, run_id)
             item = opened.system.projects.projection(project_id).work_items[-1]
             assert item.status == "in_progress", (item.status, item.status)
-            # 工程部门前的决定请求已经发出；先记下它，删除目录文件以后不再新增请求
+            # 被挡住的是两个同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，
+            # 每条写明自己的部门（模型管理设计说明第 5.5 节）；先记下它们，删除目录文件以后不再新增请求
             first = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
-            assert len(first) == 1 and first[0]["request"]["department"] == "engineering"
+            assert {item["request"]["department"] for item in first} == {"engineering", "quality"}
             if parked.get("record") is not None:
                 opened.system.facade._admissions["model-a"] = parked["record"]
 
@@ -417,15 +421,14 @@ def test_deleting_the_catalog_file_clears_defaults_and_recovers_after_answer(tmp
 
             # 回答先前的决定请求让运行继续：下一次模型请求因为目录已清空而进入待恢复，
             # 说明写明部门与「未选择模型访问定义」
-            first = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")[0]
-            answered = _post(client, "decision.answer", base_version=first["version"],
-                             decision_id=first["decision_id"], option="continue", note=None)
-            assert answered.status_code == 200, answered.text
+            for item in first:
+                answered = _post(client, "decision.answer", base_version=item["version"],
+                                 decision_id=item["decision_id"], option="continue", note=None)
+                assert answered.status_code == 200, answered.text
             _finish(opened.system, run_id)
             decisions = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
-            assert len(decisions) == 1
+            assert [item["request"]["department"] for item in decisions] == ["engineering"]
             request = decisions[0]["request"]
-            assert request["department"] == "engineering"
             # 项目部门设置仍指向那份定义，目录已清空，因此下一次请求按「模型访问定义不存在」进入待恢复
             assert "模型访问定义不存在" in request["message"]
 

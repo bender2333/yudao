@@ -291,13 +291,17 @@ class _Normalizer:
         return record
 
 
-def _repeated_progress(event: Any, last_stage: dict[str, str]) -> bool:
+def _repeated_progress(event: Any, seen_stages: set[tuple[Any, Any]]) -> bool:
+    # 流式进度按「一次调用尝试里的一个阶段」去重：同一次尝试中阶段不变时按时间间隔重复记录，
+    # 只保留每个阶段第一次出现的一条。分片到达的时机随运行变化（同时运行的会话会互相影响），
+    # 按阶段去重以后留下的条数不随运行变化（工单 #557）
     if event.type != EventType.MODEL_STREAM_PROGRESS:
         return False
-    attempt, stage = event.payload.get("attempt_id"), event.payload.get("stage")
-    repeated = last_stage.get(attempt) == stage
-    last_stage[attempt] = stage
-    return repeated
+    key = (event.payload.get("attempt_id"), event.payload.get("stage"))
+    if key in seen_stages:
+        return True
+    seen_stages.add(key)
+    return False
 
 
 def _shared_candidate(value: Any) -> str | None:
@@ -342,12 +346,37 @@ def _share_children(value: Any, counts: Counter, shared: dict[str, Any], labels:
     return value
 
 
+def _in_group_order(events: list[Any]) -> list[Any]:
+    # 事件按会话分组，每组内部按原来的先后；组之间的顺序是确定的：
+    # 运行级的事件在前，然后按部门在定义里的顺序，同一部门的分支按它们出现的先后。
+    # 同时运行的会话让事件的全局顺序随运行变化（工单 #557），
+    # 编号按这个顺序产生，基准才不随运行变化。
+    rank = {department: index for index, department in enumerate(DEFINITIONS.departments)}
+    first: dict[str, int] = {}
+    department_of: dict[str, str] = {}
+    for index, event in enumerate(events):
+        group = event.session_id or RUN_GROUP
+        if group not in first:
+            first[group] = index
+            department_of[group] = event.department or ""
+    order = {group: position for position, group in enumerate(sorted(
+        first, key=lambda group: (0 if group == RUN_GROUP else 1,
+                                  rank.get(department_of[group], len(rank)),
+                                  first[group])))}
+    return [item[2] for item in sorted(
+        ((order[event.session_id or RUN_GROUP], index, event) for index, event in enumerate(events)),
+        key=lambda item: (item[0], item[1]))]
+
+
 def normalized_run(system: Any, run_id: str, replacements: dict[str, str] | None = None) -> dict[str, Any]:
     # replacements：场景自己的机器相关值（例如本机 HTTP 服务的地址）与它的占位写法
     events = system.store.list_events(run_id)
-    last_stage: dict[str, str] = {}
-    kept = [event for event in events if not _repeated_progress(event, last_stage)]
+    seen_stages: set[tuple[Any, Any]] = set()
+    kept = [event for event in events if not _repeated_progress(event, seen_stages)]
     normalizer = _Normalizer(system, run_id, kept, dict(replacements or {}))
+    # 编号先按会话分组的确定顺序产生（同时运行时事件的全局顺序会变）
+    for event in _in_group_order(kept):
+        normalizer.event(event)
     document = {
         "events": [normalizer.event(event) for event in kept],
         "projection": _key_fields(system.project(run_id).canonical_state(), PROJECTION_KEY_FIELDS,

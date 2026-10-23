@@ -11,7 +11,7 @@ from harness.app.application import Application
 from harness.app.project_queries import WorkItemMaterials
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_decision, product_spec, review_turn
 from harness.runtime import LoopSystem
-from harness.tests.helpers import guidance_reply
+from harness.tests.helpers import guidance_reply, quality_turns
 
 GOAL = "把文本按行处理清楚"
 
@@ -32,7 +32,8 @@ def _scripts() -> dict[str, list]:
                                        "retired": [],
                                        "rationale": "Clarification revision."}),
         ],
-        "quality": [review_turn("release", "valid uppercase implementation")],
+        # 质检在交付到达以前还有一轮预测性探索，脚本项给足几轮（工单 #557）
+        "quality": quality_turns("release", "valid uppercase implementation"),
     }
 
 
@@ -64,12 +65,11 @@ def test_materials_prd_versions_follow_the_product_decision_path(tmp_path):
             product_decision("Treat unknown flags as an error.", "Unknown flags must not silently change the command."),
             guidance_reply("已给出产品决定。"),
         ],
-        "engineering": [delivery_turn(), delivery_turn()],
-        "quality": [
-            review_turn("rework_engineering", "the delivery misses an acceptance criterion",
-                        defects=[{"severity": "major", "summary": "defect"}]),
-            review_turn("release", "Verified the current requirements"),
-        ],
+        # 工程的交付可能在 PRD 修订的那一轮被拒绝，脚本给足几次（工单 #557）
+        "engineering": [delivery_turn()] * 4,
+        # 质检在交付到达以前还有一轮预测性探索，脚本项给足几轮（工单 #557）
+        "quality": quality_turns("rework_engineering", "the delivery misses an acceptance criterion",
+                                 defects=[{"severity": "major", "summary": "defect"}]),
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     project_id = system.projects.register("产品决定修订 PRD", GOAL)

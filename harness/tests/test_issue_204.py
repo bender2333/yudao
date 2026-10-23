@@ -24,7 +24,7 @@ from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
-from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT
+from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT, quality_turns
 
 
 def _events(system, run_id, event_type):
@@ -45,12 +45,19 @@ def _plain_reply():
     return lambda _call: FakeTurn(transcript="先整理一下思路，稍后提交。")
 
 def _completion_script():
-    return [delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def _no_tool_call_run(tmp_path, tail=None):
-    script = [_plain_reply() for _ in range(LIMIT + 1)]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {"product": [_plain_reply() for _ in range(LIMIT + 1)],
+              "engineering": [], "quality": []}
     if tail is not None:
-        script.extend(tail)
+        for department, turns in tail.items():
+            script[department] = script[department] + list(turns)
     system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter(script))
     run_id = system.create_run("build echo")
     result = system.run_until_stop(run_id)
@@ -90,7 +97,8 @@ def test_pause_decision_is_listed_by_the_query_with_its_options(tmp_path):
 
 def test_no_tool_call_continue_resumes_from_the_paused_phase(tmp_path):
     # 回答继续以后 run 从暂停位置（PRODUCT_SPEC）继续，接着走完三部门并完成
-    system, run_id, result = _no_tool_call_run(tmp_path, tail=[product_spec(), *_completion_script()])
+    system, run_id, result = _no_tool_call_run(
+        tmp_path, tail={"product": [product_spec()], **_completion_script()})
     paused_cycle = result.cycle_count
     paused_requests = len(_events(system, run_id, EventType.MODEL_REQUESTED))
     [decision] = _open_decisions(system, run_id)
@@ -142,8 +150,9 @@ def test_no_tool_call_stop_keeps_the_run_paused_with_the_same_reason(tmp_path):
 def test_second_no_tool_call_pause_after_the_first_continue_is_a_fresh_count(tmp_path):
     # 继续以后连续不调用工具的计数从零开始：继续之后再连续 LIMIT 次仍不调用工具也不暂停，
     # 第 LIMIT+1 次换成提交产品要求并走完三部门
-    script = [*[_plain_reply() for _ in range(LIMIT + 1)],
-              *[_plain_reply() for _ in range(LIMIT)], product_spec(), *_completion_script()]
+    script = {"product": [*[_plain_reply() for _ in range(LIMIT + 1)],
+                        *[_plain_reply() for _ in range(LIMIT)], product_spec()],
+              **_completion_script()}
     system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter(script))
     run_id = system.create_run("build echo")
     assert system.run_until_stop(run_id).stop_reason == "no_tool_call"

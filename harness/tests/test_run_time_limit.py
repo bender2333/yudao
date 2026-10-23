@@ -7,7 +7,7 @@ from harness.engine import StepLimits
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, list_files_turn, run_scripted
+from harness.tests.helpers import happy_script, list_files_turn, run_scripted, quality_turns
 
 def _slow(turn):
     # 模型调用持续超过 1 秒的运行时间限制
@@ -49,12 +49,12 @@ def test_time_limit_checked_between_activations(data_dir):
 def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
     # 旧默认值 max_cycles=8，新默认值 999999
     # 用 10 个激活（超过旧限制 8），验证不会暂停
-    script = [
-        product_spec(),
-        *[list_files_turn for _ in range(50)],
-        delivery_turn(),
-        review_turn("release", "ok"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [product_spec()],
+        "engineering": [*[list_files_turn for _ in range(50)], delivery_turn()],
+        "quality": quality_turns("release", "ok"),
+    }
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo")
     # 默认的激活次数上限与运行时间上限取规则登记中的现值
@@ -68,12 +68,12 @@ def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
     # 最大模型步数的默认值是 999999（StepLimits），不再是 32
     # 用超过 32 个步骤后提交，验证不会暂停
     many_steps = [list_files_turn for _ in range(40)]
-    script = [
-        product_spec(),
-        *many_steps,
-        delivery_turn(),
-        review_turn("release", "ok"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [product_spec()],
+        "engineering": [*many_steps, delivery_turn()],
+        "quality": quality_turns("release", "ok"),
+    }
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo")
     result = system.run_until_stop(run_id)

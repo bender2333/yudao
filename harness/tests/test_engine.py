@@ -9,7 +9,7 @@ from harness.models import ArtifactRef, DepartmentPrompt, EventType, canonical_h
 from harness.proposals import answer_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import CallUsage, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import (FAST_RETRIES, after_event, recorded_context,
+from harness.tests.helpers import (FAST_RETRIES, after_event, explore_turn, recorded_context,
                                    from_another_thread, run_wait_command, wait_for_file)
 from harness.tests.protocol_helpers import complete, model_call
 
@@ -48,21 +48,31 @@ def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
 def test_each_step_assembles_auditable_input_with_only_current_activation_history(tmp_path):
     reasoning = {"id": "reason-1", "type": "reasoning", "summary": [], "encrypted_content": "PRIVATE_CHAIN"}
     lookup = _call("read-1", "read_file", path="proof.txt")
-    adapter = FakeAdapter([
-        ModelResponse(output=[lookup], reasoning={"provider_id": "fake", "protocol": "fake",
-                                                  "model": "fake-script", "items": [reasoning]}),
-        ModelResponse(output=[_submit(), _call("after-submit", "read_file", path="must-not-read.txt")]),
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    adapter = FakeAdapter({
+        "product": [
+            ModelResponse(output=[lookup], reasoning={"provider_id": "fake", "protocol": "fake",
+                                                      "model": "fake-script", "items": [reasoning]}),
+            ModelResponse(output=[_submit(), _call("after-submit", "read_file", path="must-not-read.txt")]),
+        ],
         # 工程先拿着过期依据提交被拒，再按当前版本重交（工单 #471、#499）：
         # 提交的历史留在本部门，工程的第二次请求看得到它，别的部门看不到
-        delivery_turn(basis_product_spec_hash="stale"), delivery_turn(),
-        review_turn("release", "valid host evidence"),
-    ])
+        "engineering": [delivery_turn(basis_product_spec_hash="stale"), delivery_turn()],
+        # 质检在交付到达以前有一轮预测性探索（工单 #557），交付到达以后才核验
+        "quality": [explore_turn(), review_turn("release", "valid host evidence")],
+    })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.workspace(run_id).write_file("proof.txt", "CAUSAL_TOOL_OUTPUT")
     result = system.run_until_stop(run_id)
     assert result.status == "done"
-    assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1, 1]
+    # 步骤编号按各自的会话算：产品的两次请求在同一次激活里（1、2），别的部门各自是新激活的第一步
+    steps = [(request.department, request.step_id) for request in adapter.invocations]
+    assert steps[:2] == [("product", 1), ("product", 2)]
+    assert sorted(steps[2:]) == [("engineering", 1), ("engineering", 1), ("quality", 1), ("quality", 1)]
+    by_department: dict[str, list] = {}
+    for request in adapter.invocations:
+        by_department.setdefault(request.department, []).append(request)
     # 同一连接、同一协议、同一上游模型时推理内容原样回放，紧接它产生的那次输出（工单 #88）
     replayed = adapter.invocations[1].input_items[2]
     assert replayed["id"] == "reason-1" and replayed["encrypted_content"] == "PRIVATE_CHAIN"
@@ -74,15 +84,20 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
         assert "PRIVATE_CHAIN" not in json_dumps(request.input_items)
         assert "CAUSAL_TOOL_OUTPUT" not in json_dumps(request.input_items)
         assert request.input_items[-1]["role"] == "user"
-    assert len(adapter.invocations[2].input_items) == len(adapter.invocations[4].input_items) == 2
-    assert any(item.get("name") == "submit_delivery" for item in adapter.invocations[3].input_items)
+    # 每个部门第一次请求的输入只有当前状态与工作说明两段
+    assert len(by_department["engineering"][0].input_items) == 2
+    assert len(by_department["quality"][0].input_items) == 2
+    assert any(item.get("name") == "submit_delivery" for item in by_department["engineering"][1].input_items)
     events = system.store.list_events(run_id)
     assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == "after-submit" for event in events)
     assert any(event.type == EventType.MODEL_REASONING and event.model == "fake-script"
                for event in events)
     contexts = [event for event in events if event.type == EventType.CONTEXT_ASSEMBLED]
     assert len(contexts) == len(adapter.invocations)
-    for event, request in zip(contexts, adapter.invocations):
+    # 同时运行的会话各自装配自己的上下文：按激活与步骤对上，不按先后（工单 #557）
+    by_step = {(event.payload["activation_id"], event.payload["step_id"]): event for event in contexts}
+    for request in adapter.invocations:
+        event = by_step[(request.activation_id, request.step_id)]
         saved = json.loads(system.artifacts.get_text(event.payload["request_ref"]["content_hash"]))
         expected = {"input": request.input_items, "tools": request.tools}
         if request.max_output_tokens is not None:

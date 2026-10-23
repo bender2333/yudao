@@ -8,6 +8,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.environment import LocalEnvironment
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
+from harness.tests.helpers import quality_turns
 
 # 数据目录以 Windows 的 8.3 短路径给出时（用户名超过 8 个字符的机器上 TEMP 的默认值就是这种形式），
 # 工作区与材料目录的路径判断必须与解析后的根一致（工单 #250）。
@@ -21,7 +22,12 @@ def _short_path(path):
 
 def _delivery_script():
     # 一轮完整的三部门：产品规格、交付提案与质检放行
-    return [product_spec(),delivery_turn(), review_turn("release", "Checks passed")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "Checks passed"),
+    }
 
 @pytest.mark.skipif(os.name != "nt", reason="8.3 short paths are Windows-specific")
 def test_delivery_accepts_a_short_data_directory(tmp_path):

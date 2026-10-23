@@ -139,12 +139,14 @@ def _file_system(tmp_path, base_url: str, *, dotenv_text: str) -> tuple[LoopSyst
 
 def _answer_open_decision(system: LoopSystem, option: str) -> None:
     # 只经公开接口回答待恢复：按保存的投影列出未回答的决定请求，经流程编排的回答入口回答
+    # 同时运行的会话各自被挡住时各有一条（工单 #557），逐条回答
     _position, decisions = saved_decisions(system.store, statuses=("open",))
-    assert len(decisions) == 1, [decision.decision_id for decision in decisions]
-    [decision] = decisions
-    assert (decision.request["kind"], decision.request["blocks"]) == ("model_unavailable", "run")
-    command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:{option}:1", "user:local")
-    system.orchestrator.answer_decision(decision.decision_id, option, None, base_version=1, command=command)
+    assert decisions, "没有待恢复的决定请求"
+    for decision in decisions:
+        assert (decision.request["kind"], decision.request["blocks"]) == ("model_unavailable", "run")
+        command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:{option}:1", "user:local")
+        system.orchestrator.answer_decision(decision.decision_id, option, None,
+                                             base_version=decision.version, command=command)
 
 def test_missing_credential_blocks_until_the_dotenv_file_is_fixed(tmp_path):
     server, capture, base = serve(lambda _body: _stream_reply(
@@ -375,11 +377,16 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
 
         # 下一次请求不发送，运行停在这次请求之前，发出待恢复的决定请求
         blocked = system.run_until_stop(run_id)
-        assert (blocked.active_department, blocked.status) == ("engineering", "running")
-        assert [item["model"] for item in capture.requests] == ["m-local-target"]
+        assert blocked.status == "running"
+        # 同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，每条写明自己的部门
+        # （模型管理设计说明第 5.5 节：这次模型请求不发送，事项停在这次请求之前）
         _position, decisions = saved_decisions(system.store, statuses=("open",))
-        assert [decision.request["kind"] for decision in decisions] == ["model_unavailable"]
-        assert "m-local" in decisions[0].request["description"]
+        assert [decision.request["kind"] for decision in decisions] == ["model_unavailable", "model_unavailable"]
+        assert {decision.request["department"] for decision in decisions} == {"engineering", "quality"}
+        assert all("m-local" in decision.request["description"] for decision in decisions)
+        # 事项投影的当前部门是最后激活的那一个会话的部门（同时运行以后不是一个部门）
+        assert blocked.active_department in {"engineering", "quality"}
+        assert [item["model"] for item in capture.requests] == ["m-local-target"]
         # 已完成的工作与已用限额保留：停止发生在这次请求之前，事件只增不改
         assert len(system.store.list_events(run_id)) > positions_before
 

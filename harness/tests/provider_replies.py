@@ -7,6 +7,7 @@ from typing import Any
 
 from harness.models import json_dumps
 from harness.proposals import delivery, product_spec, review
+from harness.public_tree import QA_TESTS_DIR
 from harness.tests.protocol_helpers import ScriptedProvider, send_reply, sse
 
 # 检查命令一律写成 ["python", ...]，由主机解析解释器，基准中不出现本机路径
@@ -40,23 +41,62 @@ def _material_hash(body: dict[str, Any], source: str, field: str) -> str | None:
     return None
 
 
-def http_script(body: dict[str, Any]) -> list[list[tuple[str, dict[str, Any]]]]:
-    # 交接一次需要的三段脚本（工单 #471）：提交依据的版本取自本次请求装配好的部门材料，
-    # 与真实模型从上下文读到的当前版本是同一个
+def request_department(body: dict[str, Any]) -> str:
+    # 请求里带的工具给出提出请求的部门（工单 #557：同时运行的会话各自取用自己的脚本，
+    # 不按请求的先后顺序分配）
+    names: set[str] = set()
+    for tool in body.get("tools") or []:
+        if not isinstance(tool, dict):
+            continue
+        function = tool.get("function")
+        name = function.get("name") if isinstance(function, dict) else tool.get("name")
+        if isinstance(name, str):
+            names.add(name)
+    if "submit_product_spec" in names:
+        return "product"
+    if "submit_delivery" in names:
+        return "engineering"
+    return "quality"
+
+
+# 回复里的调用身份在各部门之间不重复（工单 #557）：同时运行的会话各自发请求，
+# 身份重复会让控制核心把别人的工具开始当成本次已经开始
+REPLY_INDEX_BASE = {"product": 0, "engineering": 100, "quality": 200}
+
+
+def reply_index(department: str, counter: int) -> int:
+    """这个部门的第几次请求对应的回复编号：各部门一段，编号互不重叠。"""
+    return REPLY_INDEX_BASE[department] + counter
+
+
+def http_script(body: dict[str, Any]) -> dict[str, list[list[tuple[str, dict[str, Any]]]]]:
+    # 按部门给出的脚本（工单 #471、#557）：提交依据的版本取自本次请求装配好的部门材料，
+    # 与真实模型从上下文读到的当前版本是同一个。
+    # 同时运行以后质检有两段：PRD 被接纳以后还没有交付，质检先起草测试用例，
+    # 交付到达以后质检核验并放行。
     spec_hash = _material_hash(body, "current_product_spec", "content_hash")
     delivery_hash = _material_hash(body, "current_delivery_spec", "content_hash")
-    return [
-        [("submit_product_spec", _submission(product_spec()))],
-        [("write_file", {"path": "src/echo.py", "content": ECHO}),
-         ("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
-         ("submit_delivery", _submission(delivery(check_names=["smoke"], basis_product_spec_hash=spec_hash)))],
-        [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
-         ("submit_review", _submission(review("release", "checks passed on the current snapshot",
-                                              basis_delivery_spec_hash=delivery_hash)))],
-    ]
+    return {
+        "product": [
+            [("submit_product_spec", _submission(product_spec()))],
+        ],
+        "engineering": [
+            [("write_file", {"path": "src/echo.py", "content": ECHO}),
+             ("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
+             ("submit_delivery", _submission(delivery(check_names=["smoke"], basis_product_spec_hash=spec_hash)))],
+        ],
+        "quality": [
+            [("write_file", {"path": f"{QA_TESTS_DIR}/test_echo.py",
+                             "content": "import sys\nprint('QA_TEST_DRAFTED')\nsys.exit(0)\n"}),
+             ("submit_review", _submission(review("release", "按 PRD 起草了测试用例；还没有交付可以核验")))],
+            [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
+             ("submit_review", _submission(review("release", "checks passed on the current snapshot",
+                                                  basis_delivery_spec_hash=delivery_hash)))],
+        ],
+    }
 
 
-HTTP_SCRIPT: list[list[tuple[str, dict[str, Any]]]] = http_script({})
+HTTP_SCRIPT: list[list[tuple[str, dict[str, Any]]]] = http_script({})["product"]
 
 
 def _sse_event(kind: str, payload: dict[str, Any]) -> str:

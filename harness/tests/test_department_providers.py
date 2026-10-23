@@ -319,6 +319,7 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
     counts = {"product": 0, "engineering": 0, "quality": 0}
     delivery_file = "import sys\nprint(sys.argv[1])\n"
     repaired_file = "import sys\nprint(sys.argv[1].upper())\n"
+    reworked = {"done": False}
 
     def provider_a(body: dict[str, Any], _count: int) -> _Reply:
         department = _department(body)
@@ -334,13 +335,27 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
             return _stream([_call(f"product-answer-{counts[department]}", "answer", payload)],
                            response_id=f"a-product-answer-{counts[department]}", model="a-product-actual")
 
-        verdict = "rework_engineering" if counts[department] == 1 else "release"
+        # 质检在交付到达以前有一轮预测性探索（工单 #557）：这一轮没有交付可以核验，提交的结论被拒绝；
+        # 交付到达以后质检核验，第一份交付给出缺陷记录，返工以后的交付放行
+        basis = _material_hash(body, "current_delivery_spec", "content_hash")
+        if basis is None:
+            payload = review("release", "按 PRD 起草了测试用例；还没有交付可以核验")
+            payload.pop("kind")
+            return _stream([
+                _call(
+                    f"quality-explore-{counts[department]}", "run_check",
+                    {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""},
+                ),
+                _call(f"quality-explore-review-{counts[department]}", "submit_review", payload),
+            ], response_id=f"a-quality-explore-{counts[department]}", model="a-quality-actual")
+        verdict = "release" if reworked["done"] else "rework_engineering"
+        reworked["done"] = True
         payload = review(
             verdict,
             "The first delivery needs an uppercase output check." if verdict.startswith("rework") else "The repaired delivery passes.",
             checks=["smoke"],
             defects=[{"severity": "major", "summary": "Output is not uppercase."}] if verdict.startswith("rework") else [],
-            basis_delivery_spec_hash=_material_hash(body, "current_delivery_spec", "content_hash"),
+            basis_delivery_spec_hash=basis,
         )
         payload.pop("kind")
         calls = [
@@ -394,17 +409,24 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
         assert not errors_a and not errors_b
         assert config_a.base_url != config_b.base_url
         assert result.status == "done", result.error
-        assert result.rework_count == 1
         assert any(event.type == EventType.ASK_ANSWERED for event in system.store.list_events(run_id))
-        assert counts == {"product": 2, "engineering": 3, "quality": 2}
+        # 质检的两条结论：第一条是缺陷记录，返工以后的交付放行（预测性探索那一轮的结论没有交付可以核验，被拒绝）
+        verdicts = [event.payload["verdict"] for event in system.store.list_events(run_id)
+                    if event.type == EventType.QA_SUBMITTED]
+        assert verdicts == ["rework_engineering", "release"]
+        assert result.rework_count == 1
         assert [item["path"] for item in captures_a] == ["/v1/responses"] * len(captures_a)
         assert [item["path"] for item in captures_b] == ["/v1/responses"] * len(captures_b)
-        assert [_department(item["body"]) for item in captures_a] == ["product", "product", "quality", "quality"]
-        assert [_department(item["body"]) for item in captures_b] == ["engineering"] * 3
+        # 每个部门的请求都发到它自己的连接上（工单 #557：同时运行的会话各自发自己的请求，不按先后排队）
+        departments_a = [_department(item["body"]) for item in captures_a]
+        assert set(departments_a) == {"product", "quality"}
+        assert {_department(item["body"]) for item in captures_b} == {"engineering"}
         assert all(item["authorization"] == "Bearer provider-a-key-v1" for item in captures_a)
         assert all(item["authorization"] == "Bearer provider-b-key-v1" for item in captures_b)
-        assert [item["body"]["model"] for item in captures_a] == ["a-product", "a-product", "a-quality", "a-quality"]
-        assert [item["body"]["model"] for item in captures_b] == ["b-engineering"] * 3
+        for item in captures_a:
+            department = _department(item["body"])
+            assert item["body"]["model"] == ("a-product" if department == "product" else "a-quality")
+        assert {item["body"]["model"] for item in captures_b} == {"b-engineering"}
         timeline = [(item["client_port"], round(item["arrived"], 2), round(item["replied"], 2))
                     for item in captures_a + captures_b]
         kept_alive = _connections_kept_alive(captures_a) + _connections_kept_alive(captures_b)
@@ -417,30 +439,34 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
         assert result.provider_bindings["engineering"]["provider_config_id"] == "provider-b"
         assert result.provider_bindings["quality"]["provider_config_id"] == "provider-a"
         requests = result.model_requests
-        assert [(item["provider_config_id"], item["requested_model"]) for item in requests] == [
-            ("provider-a", "a-product"), ("provider-b", "b-engineering"),
-            ("provider-a", "a-product"), ("provider-b", "b-engineering"),
-            ("provider-a", "a-quality"),
-            ("provider-b", "b-engineering"), ("provider-a", "a-quality"),
-        ]
+        bound = {"product": ("provider-a", "a-product"),
+                 "engineering": ("provider-b", "b-engineering"),
+                 "quality": ("provider-a", "a-quality")}
+        assert {item["department"] for item in requests} == set(bound)
+        for item in requests:
+            assert (item["provider_config_id"], item["requested_model"]) == bound[item["department"]]
         assert all(item["actual_model"] for item in requests)
         public = _public_run_data(system, run_id)
         assert "provider-a-key-v1" not in public and "provider-b-key-v1" not in public
-        captures_by_provider = {"provider-a": captures_a, "provider-b": captures_b}
-        positions = {provider: 0 for provider in captures_by_provider}
+        captures_by_department: dict[str, list[dict[str, Any]]] = {}
+        for item in captures_a + captures_b:
+            captures_by_department.setdefault(_department(item["body"]), []).append(item)
         contexts = [event for event in system.store.list_events(run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
         assert len(contexts) == len(captures_a) + len(captures_b)
+        # 同时运行的会话各自装配自己的上下文：按部门对上，不按先后（工单 #557）
+        contexts_by_department: dict[str, list[Any]] = {}
         for event in contexts:
-            provider = event.payload["provider_config_id"]
-            captured = captures_by_provider[provider][positions[provider]]
-            positions[provider] += 1
-            persisted = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["request_ref"])))
-            assert persisted["input"] == captured["body"]["input"]
-            assert persisted["tools"] == captured["body"]["tools"]
-            assert persisted.get("max_output_tokens") == captured["body"].get("max_output_tokens")
-            assert "authorization" not in json_dumps(persisted).casefold()
-            assert "provider-a-key-v1" not in json_dumps(persisted)
-            assert "provider-b-key-v1" not in json_dumps(persisted)
+            contexts_by_department.setdefault(event.department, []).append(event)
+        assert set(contexts_by_department) == set(captures_by_department)
+        for department, items in contexts_by_department.items():
+            for event, captured in zip(items, captures_by_department[department]):
+                persisted = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["request_ref"])))
+                assert persisted["input"] == captured["body"]["input"]
+                assert persisted["tools"] == captured["body"]["tools"]
+                assert persisted.get("max_output_tokens") == captured["body"].get("max_output_tokens")
+                assert "authorization" not in json_dumps(persisted).casefold()
+                assert "provider-a-key-v1" not in json_dumps(persisted)
+                assert "provider-b-key-v1" not in json_dumps(persisted)
         audit = summarize_run(system, run_id, scenario="d18-local-http")
         assert audit["model_input_audit"]["status"] == "verified", audit["model_input_audit"]
         assert audit["manifest_boundary"] is True
@@ -949,7 +975,9 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
     assert engineering_requests[1]["retry_of_step_id"] == engineering_requests[0]["step_id"]
     scheduled = [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_RETRY_SCHEDULED]
     assert [(event.department, event.payload["provider_config_id"]) for event in scheduled] == [("engineering", "provider-e")]
-    assert [item["purpose"] for item in requests if item["department"] == "quality"] == ["work"]
+    # 质检的请求都是工作请求（工单 #557：预测性探索那一轮与核验那一轮都是工作请求，不数请求的次数）
+    quality_purposes = [item["purpose"] for item in requests if item["department"] == "quality"]
+    assert quality_purposes and set(quality_purposes) == {"work"}
 
     # 模型输出按统一输出项记录，跨激活回放的历史里只有真实的消息、工具调用与结果
     for event in system.store.list_events(run_id):

@@ -19,8 +19,9 @@ from harness.proposals import (
 from harness.providers.call import ModelResponse
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem, RunTerminalError
-from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_history, from_another_thread,
-                                   recorded_context, wait_for_file)
+from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_history,
+                                    from_another_thread, quality_turns, recorded_context,
+                                    wait_for_file)
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 CHANGE_RECORD = {
@@ -138,10 +139,13 @@ def test_failed_intend_publication_preserves_previous_original_and_received_stat
     assert list(path.parent.glob(".intend-*.tmp")) == []
 
 def test_only_complete_product_spec_can_process_received_input(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), product_decision("Uppercase all output", "This cannot consume pending input"),
-        product_spec_turn(requirements=["print the argument in uppercase"]), _revision(),
-    ]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec(), product_decision("Uppercase all output", "This cannot consume pending input"),
+                    product_spec_turn(requirements=["print the argument in uppercase"]), _revision()],
+        "engineering": [],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }))
     run_id = system.create_run("build echo")
     old = system.activate_once(run_id)
     system.add_input(run_id, "Print uppercase now")
@@ -217,9 +221,13 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
               "arguments": json_dumps({"command": command})},
              _call("second", "write_file", path="src/second.py", content="must not start"),
              _call("submission", "submit_delivery", summary="old delivery", check_names=["smoke"])]
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), ModelResponse(output=calls),
-        product_spec_turn(requirements=["print the argument in uppercase"], change_record=CHANGE_RECORD)]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec(),
+                    product_spec_turn(requirements=["print the argument in uppercase"], change_record=CHANGE_RECORD)],
+        "engineering": [ModelResponse(output=calls)],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }))
     run_id = system.create_run("build echo")
     _steps(system, run_id, 1)
     with ThreadPoolExecutor(max_workers=1) as pool:
@@ -250,7 +258,12 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
         system.add_input(request.run_id, "Print uppercase instead")
         return review_turn("release", "This belongs to the old input")(request)
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),delivery_turn(), stale_release]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [stale_release],
+    }))
     run_id = system.create_run("build echo")
     _steps(system, run_id, 2)
     current = system.activate_once(run_id)
@@ -262,9 +275,12 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
 def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_path, monkeypatch):
     # 质检放行正在准备接纳时另一个线程写入新输入：放行的提交因流版本改变被写入口拒绝，按写入以后的状态重新判断；
     # 激活开始以后输入改变，放行按 execution_basis 拒绝，新输入保留，运行没有结束
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),delivery_turn(), review_turn("release", "Current check passed"),
-    ]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [review_turn("release", "Current check passed")],
+    }))
     run_id = system.create_run("build echo")
     _steps(system, run_id, 2)
     prepare = system.orchestrator.submissions.prepare
@@ -412,11 +428,13 @@ def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(
     assert second.canonical_state() == system.replay(run_id).canonical_state()
 
 def test_updated_requirements_flow_through_new_delivery_and_independent_quality(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),delivery_turn(), _revision(),
-        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
-        review_turn("release", "Independently checked the updated uppercase output"),
-    ]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec(), _revision()],
+        "engineering": [delivery_turn(),
+                        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"})],
+        "quality": quality_turns("release", "Independently checked the updated uppercase output"),
+    }))
     run_id = system.create_run("build echo", max_cycles=12)
     old = _steps(system, run_id, 2)
     system.add_input(run_id, "Print the argument in uppercase")

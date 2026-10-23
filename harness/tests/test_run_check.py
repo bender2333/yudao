@@ -27,7 +27,7 @@ from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import action, perform, wait_until_stopped
+from harness.tests.helpers import action, perform, wait_until_stopped, quality_turns
 from harness.workspace import Workspace
 
 
@@ -238,10 +238,13 @@ def _tool_call(identity: str, name: str, arguments: dict[str, Any]) -> dict[str,
             "arguments": json_dumps(arguments)}
 
 
-def _script_with(checks: dict[str, Any]) -> list[dict[str, Any]]:
-    return [product_spec(),
-            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}, checks=checks),
-            review_turn("release", "checks passed on the current snapshot", checks=checks)]
+def _script_with(checks: dict[str, Any]) -> dict[str, list]:
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}, checks=checks)],
+        "quality": quality_turns("release", "checks passed on the current snapshot", checks=checks),
+    }
 
 
 def test_delivery_citing_a_run_check_receipt_is_accepted_and_quality_releases_on_it(tmp_path):
@@ -269,15 +272,19 @@ def test_delivery_citing_a_bash_result_is_rejected_with_the_check_reason(tmp_pat
     from harness.proposals import delivery
     smoke_delivery = dict(delivery("echo CLI", check_names=["smoke"]))
     smoke_delivery.pop("kind", None)
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        ModelResponse(output=[
-            _tool_call("write-1", "write_file", {"path": "src/echo.py",
-                                                 "content": "import sys\nprint(sys.argv[1])\n"}),
-            _tool_call("bash-1", "bash", {"command": RUN_CHECK_TEXT}),
-            _tool_call("submit-1", "submit_delivery", smoke_delivery),
-        ]),
-    ]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [
+            ModelResponse(output=[
+                _tool_call("write-1", "write_file", {"path": "src/echo.py",
+                                                     "content": "import sys\nprint(sys.argv[1])\n"}),
+                _tool_call("bash-1", "bash", {"command": RUN_CHECK_TEXT}),
+                _tool_call("submit-1", "submit_delivery", smoke_delivery),
+            ]),
+        ],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }))
     run_id = system.create_run("build an echo CLI")
     system.run_until_stop(run_id)
     projection = system.project(run_id)

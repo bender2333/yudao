@@ -33,7 +33,7 @@ from harness.providers.call import ModelResponse
 from harness.public_tree import TreeError, capture_public_tree
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields, summarize_run
-from harness.tests.helpers import happy_script, recorded_context
+from harness.tests.helpers import explore_turn, happy_script, merge_scripts, recorded_context
 from harness.tree_archive import load_tree
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
@@ -42,15 +42,23 @@ def _system(data_dir, script):
     return LoopSystem.for_testing(data_dir, FakeAdapter(script))
 
 def _release_script(summary="v1", files=None):
-    return [product_spec(),delivery_turn(summary=summary, files=files), review_turn("release", f"ok {summary}")]
+    # 按部门给出的脚本（工单 #557：同时运行的会话各自取用自己的脚本）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary=summary, files=files)],
+        "quality": [explore_turn(), review_turn("release", f"ok {summary}")],
+    }
 
 def _v2_files():
     return {"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n", "src/extra.py": "EXTRA = True\n"}
 
 def _kernel_release_script(summary="v1", files=None):
     # 内核清单路径的写操作需要用户决定授权，工具才会允许写这个文件
-    return [product_spec(),delivery_turn(summary=summary, files=files),
-            review_turn("release", f"ok {summary}")]
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary=summary, files=files)],
+        "quality": [explore_turn(), review_turn("release", f"ok {summary}")],
+    }
 
 def _pinned_sources(system, request):
     return [part.source for part in recorded_context(system, request).parts]
@@ -68,7 +76,9 @@ def _open_decisions(system):
 
 @pytest.mark.parametrize("query", ["project_list", "drain"])
 def test_status_queries_keep_work_item_states_without_reading_run_histories(data_dir, query):
-    system = _system(data_dir, [*happy_script(), product_spec()])
+    script = happy_script()
+    script["product"] = [*script["product"], product_spec()]
+    system = _system(data_dir, script)
     try:
         adopted_project = system.projects.register("已有成果", GOAL)
         _adopted_item, adopted_run = system.projects.start_work_item(adopted_project, "完成一个事项")
@@ -133,7 +143,7 @@ def test_project_events_have_their_own_stream_in_the_one_log(data_dir):
 # §13.1 同一项目两事项：继承与新版本
 
 def test_second_work_item_inherits_adopted_tree_byte_for_byte(data_dir):
-    system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
+    system = _system(data_dir, merge_scripts(_release_script("v1"), _release_script("v2", files=_v2_files())))
     project_id = system.projects.register("Echo", GOAL)
     work_item_1, run_1 = system.projects.start_work_item(project_id, "第一步：echo CLI")
     run = system.project(run_1)
@@ -180,7 +190,7 @@ def test_second_work_item_inherits_adopted_tree_byte_for_byte(data_dir):
 # §13.2 基线在放行前已变：保留为未采纳候选
 
 def test_release_after_baseline_change_is_held_not_adopted(data_dir):
-    system = _system(data_dir, [*_release_script("A"), *_release_script("B", files=_v2_files())])
+    system = _system(data_dir, merge_scripts(_release_script("A"), _release_script("B", files=_v2_files())))
     project_id = system.projects.register("Held", GOAL)
     work_item_a, run_a = system.projects.start_work_item(project_id, "事项 A")
     work_item_b, run_b = system.projects.start_work_item(project_id, "事项 B（在 A 采纳前创建）")
@@ -241,7 +251,7 @@ def test_stopped_runs_keep_stop_reason_and_are_not_adopted(data_dir, scenario, e
 # §13.4 两个项目互不可见
 
 def test_projects_do_not_see_each_other(data_dir):
-    system = _system(data_dir, [*_release_script("A"), *_release_script("B")])
+    system = _system(data_dir, merge_scripts(_release_script("A"), _release_script("B")))
     project_a = system.projects.register("A", "目标 A")
     project_b = system.projects.register("B", "目标 B")
     work_item_a, run_a = system.projects.start_work_item(project_a, "A 的事项")
@@ -270,7 +280,7 @@ def test_projects_do_not_see_each_other(data_dir):
 # §13.5 事件重放：两表重建 == 在线
 
 def test_project_projection_rebuilds_from_two_tables_and_cli_replay(data_dir, capsys):
-    system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
+    system = _system(data_dir, merge_scripts(_release_script("v1"), _release_script("v2", files=_v2_files())))
     project_id = system.projects.register("Replay", GOAL)
     system.projects.configure_department_settings(
         project_id, "engineering", ModelSelection(department_prompt="工程 Prompt v1"), 0)
@@ -461,7 +471,7 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
 
 def test_department_setting_versions_conflicts_and_effect_timing(data_dir):
     # 部门 Prompt 保存在项目部门设置中，run 内没有副本：修改从该部门的下一次模型请求起生效
-    adapter = FakeAdapter([*_release_script("A"), *_release_script("B", files=_v2_files())])
+    adapter = FakeAdapter(merge_scripts(_release_script("A"), _release_script("B", files=_v2_files())))
     system = LoopSystem.for_testing(data_dir, adapter)
     project_id = system.projects.register("Prompts", GOAL)
     default = system.projects.read_department_setting(project_id, "engineering")
@@ -650,7 +660,7 @@ def test_project_context_text_is_deterministic_and_ordered(data_dir):
     assert project.work_item(work_item_id).run_id == run_id
 
 def test_second_work_item_project_part_includes_source_spec(data_dir):
-    system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
+    system = _system(data_dir, merge_scripts(_release_script("v1"), _release_script("v2", files=_v2_files())))
     project_id = system.projects.register("决定", GOAL)
     _work_1, run_1 = system.projects.start_work_item(project_id, "第一步")
     first = system.artifacts.get_for_run(run_1, ArtifactRef(**system.project(run_1).project_context_ref)).decode("utf-8")
@@ -734,7 +744,7 @@ def test_work_item_start_failure_is_recorded_and_project_stays_usable(data_dir):
     assert system.project(run_id).work_item_id == work_item_id
 
 def test_settle_pending_recovers_release_left_unsettled(data_dir):
-    system = _system(data_dir, [*_release_script("v1"), *_release_script("v2", files=_v2_files())])
+    system = _system(data_dir, merge_scripts(_release_script("v1"), _release_script("v2", files=_v2_files())))
     project_id = system.projects.register("Recover", GOAL)
     _work_item_1, run_1 = system.projects.start_work_item(project_id, "第一步")
     system.run_until_stop(run_1)

@@ -29,7 +29,7 @@ from harness.event_store import run_stream
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
-from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT
+from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT, quality_turns
 from harness.write_path import NewEvent
 
 def _application(system: LoopSystem) -> Application:
@@ -116,9 +116,13 @@ def test_an_unavailable_model_is_observed_as_waiting_resume(data_dir):
     # 脚本在提交规格以后给出模型引用无法使用的错误，run 停在这次请求之前并带一个阻塞整个 run 的请求
     from harness.adapters.base import ProviderError
 
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([
-        product_spec(),
-        ProviderError("Missing configuration: provider credential", reason="provider_unavailable")]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(data_dir, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [ProviderError("Missing configuration: provider credential",
+                                       reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }))
     _project_id, _work_item_id, run_id = _work_item_run(system, "等待修复配置")
     system.run_until_stop(run_id)
     system.close()
@@ -136,8 +140,12 @@ def test_an_unavailable_model_is_observed_as_waiting_resume(data_dir):
 
 def test_a_finished_run_is_observed_as_completed(data_dir):
     # 已完成：完成的 run 观察状态为已完成（不是「已终止」，工单 #747），继续执行不可用
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([
-        product_spec(),delivery_turn(), review_turn("release", "checks passed on the snapshot")]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(data_dir, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the snapshot"),
+    }))
     _project_id, _work_item_id, run_id = _work_item_run(system, "要完成的事项")
     system.run_until_stop(run_id)
     assert system.project(run_id).status == "done"

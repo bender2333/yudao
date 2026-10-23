@@ -13,7 +13,7 @@ from harness.providers.call import ModelResponse
 from harness.public_tree import capture_public_tree
 from harness.replay_check import PROJECTION_REASON, ReplayIntegrityError
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, system_on_copy
+from harness.tests.helpers import happy_script, repeat_script, system_on_copy
 
 # 需要一份真实运行记录的文件：module 作用域的夹具各跑一次运行并保存数据目录，
 # 每项测试复制一份数据目录，在自己的副本上改写与检查。数据来自真实运行，登记为集成层。
@@ -22,7 +22,7 @@ from harness.tests.helpers import happy_script, system_on_copy
 @pytest.fixture(scope="module")
 def saved_project_and_bare_run(tmp_path_factory):
     directory = tmp_path_factory.mktemp("project-and-bare")
-    system = LoopSystem.for_testing(directory / "data", FakeAdapter(happy_script() + happy_script()))
+    system = LoopSystem.for_testing(directory / "data", FakeAdapter(repeat_script(happy_script(), 2)))
     project_id = system.projects.register("项目", "逐行文本处理工具")
     _work_item_id, run_id = system.projects.start_work_item(project_id, "事项")
     system.run_until_stop(run_id)

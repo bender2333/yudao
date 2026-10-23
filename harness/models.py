@@ -601,6 +601,15 @@ class RunProjection:
     # 建档的轮次（工单 #136）：第一轮为 1，修改轮逐轮加一；普通事项与旧 run 为 0
     round: int = 0
     sessions: dict[str, SessionRecord] = field(default_factory=dict)
+    # 每个部门上一次工作时采用的工作依据（有效合同的摘要）：部门关注的成果有了新版本时用它判断
+    # 这个部门是不是已经看过当前这一版（工单 #557：质检关注「PRD 被接纳」）
+    department_bases: dict[str, str] = field(default_factory=dict)
+    # 每个部门这一轮开始时面对的交付（工单 #557）：质检的检查工作区由它建立，
+    # 没有交付时这一轮没有可以核验的对象，提交结论被拒绝
+    department_delivery_bases: dict[str, str] = field(default_factory=dict)
+    # 每个部门让出的工作：被指导提前安排的那一轮让出自己的工作时记在这里，
+    # 部门继续自己的那一轮时取回（工单 #557：同时运行时各部门各记各的）
+    department_yielded_work: dict[str, dict[str, Any]] = field(default_factory=dict)
     product_specs: list[ProductSpec] = field(default_factory=list)
     effective_contracts: list[EffectiveContract] = field(default_factory=list)
     delivery_specs: list[DeliverySpec] = field(default_factory=list)

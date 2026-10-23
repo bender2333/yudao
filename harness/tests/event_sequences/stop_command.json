@@ -286,7 +286,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#25>",
+    "content_hash": "<sha256#27>",
     "id": "<spec#1>",
     "input_version": 1,
     "issuer": "product",
@@ -308,9 +308,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#26>",
+    "content_hash": "<sha256#28>",
     "input_version": 1,
-    "product_spec_hash": "<sha256#25>",
+    "product_spec_hash": "<sha256#27>",
     "revision": 1
    }
   },

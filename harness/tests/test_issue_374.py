@@ -31,6 +31,7 @@ from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import bearer, running_server
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.helpers import quality_turns
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # 服务进程启动时导入模型 SDK 并构建流事件的模型，机器负载高时要一分钟以上
@@ -231,8 +232,12 @@ def test_an_open_event_stream_does_not_hold_the_process(service, tmp_path):
             assert _stop(started.process) == 0
 
 def _completion_script():
-    # 中断在产品提交规格以后，恢复时剩下三个回答：计划、交付与放行评审
-    return [delivery_turn(), review_turn("release", "checks passed on the current snapshot")]
+    # 中断在产品提交规格以后，恢复时剩下交付与放行评审
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
 
 def _interrupted_data_dir(data_dir: Path) -> tuple[str, str]:
     # 一份有未结束 run 的数据目录：产品已经提交规格，run 停在工程部门请求模型以前；

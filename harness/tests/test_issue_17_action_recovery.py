@@ -15,6 +15,7 @@ from harness.models import EventType, new_id
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.write_path import NewEvent
+from harness.tests.helpers import quality_turns
 
 PROJECT_ID = "proj_test"
 
@@ -199,8 +200,12 @@ def test_an_adoption_settlement_is_idempotent_across_recovery(data_dir):
     # 窄场景三：交付与质检已接纳、项目采纳前进程退出；恢复补一次合法采纳，重复恢复不再补第二次
     from harness.proposals import delivery_turn, review_turn
 
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(
-        [product_spec(),delivery_turn(), review_turn("release", "ok")]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(data_dir, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "ok"),
+    }))
     project_id = system.projects.register("采纳项目", "核对采纳结算幂等")
     _work_item_id, run_id = system.projects.start_work_item(project_id, "被中断的事项")
     # 只把 run 运行到结束，不做结算：与「run 已经结束、采纳以前进程退出」留下的状态一致

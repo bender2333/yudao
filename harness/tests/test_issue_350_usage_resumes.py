@@ -16,6 +16,7 @@ from harness.proposals import delivery, delivery_turn, product_spec, review, rev
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests import process_kill as killed
+from harness.tests.helpers import quality_turns
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
 CHECKS = {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}
@@ -83,8 +84,10 @@ def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
     # 断言只核对事件推出的关系：中断时 run 还没有以运行时间上限停止；重启以后的累计不小于终止前
     # 记录的累计（累计在进程终止与重启之间连续）并且达到上限
     data_dir = tmp_path / "data"
-    script = [{"proposal": product_spec()}]
-    tail = [{"proposal": delivery(check_names=["slow"]), "checks": SLOW_CHECK}]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {"product": [{"proposal": product_spec()}]}
+    tail = {"engineering": [{"proposal": delivery(check_names=["slow"]), "checks": SLOW_CHECK}],
+            "quality": [{"proposal": {"kind": "quality_auto"}}]}
 
     with killed.interrupted(data_dir, script, tail=tail, run_time_limit_sec=TIME_LIMIT_SEC,
                             hold_after="activation_finished") as run:
@@ -108,10 +111,13 @@ def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
 
 def test_waiting_for_a_decision_is_excluded_from_run_time(tmp_path):
     # 验收三：等待用户决定期间不计入运行时间
-    script = [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-              ProviderError("model is not available", reason="provider_unavailable"),
-              delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
-              review_turn("release", "checks passed on the current snapshot")]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))],
+        "engineering": [ProviderError("model is not available", reason="provider_unavailable"),
+                        delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }
     data_dir = tmp_path / "data"
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     try:

@@ -10,11 +10,15 @@ from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.saved_rewrite import rewrite_saved_events
+from harness.tests.helpers import quality_turns
 
 def test_history_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), delivery_turn(), review_turn("release", "Independent checks passed"),
-    ]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "Independent checks passed"),
+    }))
     run_id = system.create_run("build echo")
     try:
         assert system.run_until_stop(run_id).status == "done"

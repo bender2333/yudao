@@ -19,6 +19,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.collaboration import has_new_work
 from harness.decisions import DecisionClosed
 from harness.engine import StepLimits
+from harness.environment import QA_TESTS_DIR
 from harness.event_store import Command
 from harness.models import EventType, Usage, json_dumps
 from harness.providers.call import ModelCall, ModelResponse
@@ -38,6 +39,8 @@ from harness.tests.provider_replies import (
     http_error as _http_error,
     messages_credential_rejected as _messages_credential_rejected,
     product_spec_reply,
+    reply_index,
+    request_department,
 )
 
 
@@ -69,6 +72,16 @@ def _release(rationale: str = "checks passed on the current snapshot") -> Callab
     return review_turn("release", rationale, checks=CHECKS)
 
 
+def _explore(name: str = "test_echo.py") -> FakeTurn:
+    # 质检的预测性探索（循环结构第 3.1 节、工单 #557）：PRD 被接纳以后还没有交付，
+    # 质检按 PRD 起草测试用例，写进质检自己的测试材料。这一轮没有交付可以核验，
+    # 提交的结论被拒绝，这一轮到这里结束；交付到达以后质检开始新一轮工作。
+    return FakeTurn(
+        writes={f"{QA_TESTS_DIR}/{name}": "import sys\nprint('QA_TEST_DRAFTED')\nsys.exit(0)\n"},
+        proposal=review("release", "按 PRD 起草了测试用例；还没有交付可以核验"),
+    )
+
+
 def _handoff_script() -> list[Any]:
     return [product_spec(), _deliver(), _release()]
 
@@ -82,11 +95,12 @@ def _system(data_dir, script: list[Any] | dict[str, list[Any]], *, step_limits: 
 
 
 def handoff_release(data_dir):
-    # 按部门给出的脚本：产品一份、工程一份（交付）、质检一份（#469 验收 1；计划已随 #470 删除）
+    # 按部门给出的脚本：产品一份、工程一份（交付）、质检两份（预测性探索与放行）
+    # （#469 验收 1；计划已随 #470 删除；工单 #557 增加质检的预测性探索）
     system, _, run_id = _system(data_dir, {
         "product": [product_spec()],
         "engineering": [_deliver()],
-        "quality": [_release()],
+        "quality": [_explore(), _release()],
     })
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -174,17 +188,21 @@ def _guidance_id(call) -> str:
 
 
 def tool_denied_guidance_only(data_dir):
-    system, adapter, run_id = _system(data_dir, [product_spec(), _deliver()])
+    # 按部门给出的脚本（工单 #557：同时运行的会话各自取用自己的脚本）
+    system, adapter, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [_deliver()],
+        "quality": [_explore(), _release()],
+    })
     for _ in range(2):
         system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请直接改交付文件以处理错误输出。")
-    adapter.script.extend([
+    adapter.scripts["engineering"].extend([
         lambda request: FakeTurn(
             writes={"src/echo.py": "import sys\nprint('changed by guidance')\n"},
             proposal=guidance_response(_guidance_id(request), status="explained",
                                        text="指导不能授权修改交付，写文件被拒绝。"),
         ),
-        _release(),
     ])
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -203,7 +221,7 @@ def ask_answer_with_spec_revision(data_dir):
                         change_record={"changed": ["print the given argument in uppercase to stdout"],
                                        "retained": ["single file implementation"]}),
         ],
-        "quality": [_release()],
+        "quality": [_explore(), _release()],
     })
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -219,43 +237,53 @@ def ask_branch_exhausted(data_dir):
         "product:ask": [
             ModelResponse(output=[_call("ans-err", "answer", {"answer": ""})]),
         ],
-        "quality": [_release()],
+        "quality": [_explore(), _release()],
     }, step_limits=StepLimits(max_model_steps=4, department_max_model_steps={"product": 1}))
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
 def guidance_response_explained(data_dir):
-    system, adapter, run_id = _system(data_dir, [product_spec()])
+    system, adapter, run_id = _system(data_dir, {"product": [product_spec()],
+                                                 "engineering": [], "quality": []})
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请说明当前错误输出边界，无需改文件。")
-    adapter.script.extend([
+    adapter.scripts["engineering"].extend([
         lambda request: FakeTurn(proposal=guidance_response(
             _guidance_id(request), status="explained", text="当前合同已覆盖该边界，无需变更。")),
-        _deliver(), _release(),
+        _deliver(),
     ])
+    adapter.scripts["quality"].extend([_explore(), _release()])
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
 def proposal_rejected(data_dir):
-    system, _, run_id = _system(data_dir, [
-        {"kind": "product_spec", "goal": "", "requirements": ["print the argument"], "acceptance_criteria": ["prints it"]},
-        *_handoff_script(),
-    ])
+    system, _, run_id = _system(data_dir, {
+        "product": [{"kind": "product_spec", "goal": "", "requirements": ["print the argument"],
+                     "acceptance_criteria": ["prints it"]}],
+        "engineering": [_deliver()],
+        "quality": [_explore(), _release()],
+    })
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
 def quality_rework(data_dir):
-    system, _, run_id = _system(data_dir, [
-        product_spec(), _deliver(),
-        review_turn("rework_engineering", "the output misses a trailing newline check", checks=CHECKS,
-                    defects=[{"severity": "major", "summary": "no check covers an argument with spaces"}]),
-        delivery_turn("handled arguments with spaces", files={"src/echo.py": "import sys\nprint(' '.join(sys.argv[1:]))\n"},
-                      checks=CHECKS),
-        _release("the rework passed the checks"),
-    ])
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [
+            _deliver(),
+            delivery_turn("handled arguments with spaces", files={"src/echo.py": "import sys\nprint(' '.join(sys.argv[1:]))\n"},
+                          checks=CHECKS),
+        ],
+        "quality": [
+            _explore(),
+            review_turn("rework_engineering", "the output misses a trailing newline check", checks=CHECKS,
+                        defects=[{"severity": "major", "summary": "no check covers an argument with spaces"}]),
+            _release("the rework passed the checks"),
+        ],
+    })
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -275,7 +303,9 @@ def cancel_during_model_call(data_dir):
         holder["system"].cancel(request.run_id)
         return _deliver()
 
-    system, _, run_id = _system(data_dir, [product_spec(), cancel_then_deliver])
+    system, _, run_id = _system(data_dir, {"product": [product_spec()],
+                                           "engineering": [cancel_then_deliver],
+                                           "quality": [_explore()]})
     holder["system"] = system
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -287,7 +317,10 @@ def time_limit(data_dir):
         time.sleep(3.2)
         return product_spec()
 
-    system, _, run_id = _system(data_dir, [slow_spec, *_handoff_script()[1:]], run_time_limit_sec=3)
+    system, _, run_id = _system(data_dir, {"product": [slow_spec],
+                                           "engineering": [_deliver()],
+                                           "quality": [_explore(), _release()]},
+                                run_time_limit_sec=3)
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -361,20 +394,21 @@ def bash_is_not_a_check_receipt(data_dir):
         return ModelResponse(output=[_call("check-3", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}),
                                      submit(call, "submit-3")])
 
-    system, _, run_id = _system(data_dir, [
-        product_spec(),
-        first,
-        second,
-        third,
-        _release("verified the delivered echo CLI"),
-    ])
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [first, second, third],
+        "quality": [_explore(), _release("verified the delivered echo CLI")],
+    })
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
-def _running(label: str) -> str:
+def _running(label: str, *, delay_sec: float = 0.0) -> str:
     # 运行中的进程（argv 的一项）：输出一行，在第一个参数给出的位置写下标记文件以后一直等待
+    # delay_sec 大于零时先等这么久再写标记：取消因此落在别的会话这一轮工作结束以后，
+    # 事件序列不依赖取消落在别的会话的哪一步（工单 #557）
     return (f"import pathlib, sys, time; print('{label} started', flush=True); "
+            f"time.sleep({delay_sec}); "
             "pathlib.Path(sys.argv[1]).write_text('running'); time.sleep(60)")
 
 
@@ -395,18 +429,21 @@ def _cancel_when_running(system: LoopSystem, run_id: str, marker) -> threading.T
 
 def cancel_while_check_runs(data_dir):
     # 标记文件的路径写成正斜杠形式，规整以后各平台相同
+    # 标记文件在检查开始一秒以后写下：取消发生在质检那一轮工作结束以后，
+    # 事件序列不依赖取消落在别的会话的哪一步（工单 #557，与 cancel_while_bash_runs 同一做法）
     marker = (data_dir / "check-running").as_posix()
-    command = f'python -c "{_running("check")}" "{marker}"'
+    command = f'python -c "{_running("check", delay_sec=1)}" "{marker}"'
     def deliver(call):
         return ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
                                      _call("check-1", "run_check", {"name": "smoke", "command": command}),
                                      _call("submit-1", "submit_delivery",
                                            {"summary": "echo CLI", "check_names": ["smoke"],
                                             "basis_product_spec_hash": _current_spec_hash(call)})])
-    system, _, run_id = _system(data_dir, [
-        product_spec(),
-        deliver,
-    ])
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [deliver],
+        "quality": [_explore()],
+    })
     canceller = _cancel_when_running(system, run_id, data_dir / "check-running")
     system.run_until_stop(run_id)
     canceller.join(60)
@@ -415,31 +452,38 @@ def cancel_while_check_runs(data_dir):
 
 def cancel_while_bash_runs(data_dir):
     marker = (data_dir / "command-running").as_posix()
-    command = f"echo command started; printf running > \"{marker}\"; sleep 60"
+    # 标记文件在命令开始一秒以后写下：取消发生在别的会话这一轮工作结束以后，
+    # 事件序列不依赖取消落在别的会话的哪一步（工单 #557）
+    command = f"echo command started; sleep 1; printf running > \"{marker}\"; sleep 60"
     def deliver(call):
         return ModelResponse(output=[_call("command-1", "bash", {"command": command}),
                                      _call("submit-1", "submit_delivery",
                                            {"summary": "echo CLI", "check_names": ["smoke"],
                                             "basis_product_spec_hash": _current_spec_hash(call)})])
-    system, _, run_id = _system(data_dir, [
-        product_spec(),
-        deliver,
-    ])
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [deliver],
+        "quality": [_explore()],
+    })
     canceller = _cancel_when_running(system, run_id, data_dir / "command-running")
     system.run_until_stop(run_id)
     canceller.join(60)
     return system, run_id, {}
 
 
-# 真实 Provider 模块：三个部门绑定同一个本机 HTTP 服务，服务按请求顺序回放脚本中的工具调用
+# 真实 Provider 模块：三个部门绑定同一个本机 HTTP 服务，服务按部门回放脚本中的工具调用
 def _http_scenario(protocol: str):
     def run(data_dir):
-        state = {"index": 0}
+        state = {"product": 0, "engineering": 0, "quality": 0}
 
         def responder(body):
-            calls = http_script(body)[state["index"]]
-            state["index"] += 1
-            return 200, "text/event-stream", [HTTP_REPLIES[protocol](state["index"], calls)]
+            # 同时运行的会话各自取用自己的脚本（工单 #557）：按请求里的工具分派到部门，
+            # 不按请求的先后顺序
+            department = request_department(body)
+            index = state[department]
+            state[department] += 1
+            calls = http_script(body)[department][index]
+            return 200, "text/event-stream", [HTTP_REPLIES[protocol](reply_index(department, index), calls)]
 
         server, _capture, base = serve(responder)
         try:
@@ -511,21 +555,23 @@ def _answer_open_decision(system: LoopSystem, option: str) -> str:
     return decision.decision_id
 
 
-def _request_time_unavailable_script() -> list[Any]:
+def _request_time_unavailable_script() -> dict[str, list[Any]]:
     # 请求时模型引用不可用：产品规格被接纳以后工程部门的请求被提供方报告为不可用
-    return [
-        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-        ProviderError(_UNAVAILABLE_MESSAGE, reason="provider_unavailable"),
-        _deliver(),
-        _release(),
-    ]
+    return {
+        "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))],
+        "engineering": [ProviderError(_UNAVAILABLE_MESSAGE, reason="provider_unavailable"), _deliver()],
+        "quality": [_explore(), _release()],
+    }
 
 
 def request_time_unavailable(data_dir):
     system, _, run_id = _system(data_dir, _request_time_unavailable_script())
     blocked = system.run_until_stop(run_id)
-    assert (blocked.active_department, blocked.status) == ("engineering", "running")
+    assert blocked.status == "running"
     assert blocked.product_spec is not None
+    # 不可用的请求来自工程：决定请求写明提出它的部门（不依赖部门激活的先后，工单 #557）
+    _position, open_decisions = saved_decisions(system.store, statuses=("open",))
+    assert [item.request["department"] for item in open_decisions] == ["engineering"]
     _answer_open_decision(system, "continue")
     assert system.run_until_stop(run_id).status == "done"
     return system, run_id, {}
@@ -534,7 +580,7 @@ def request_time_unavailable(data_dir):
 def request_time_unavailable_stop(data_dir):
     system, _, run_id = _system(data_dir, _request_time_unavailable_script())
     blocked = system.run_until_stop(run_id)
-    assert (blocked.active_department, blocked.status) == ("engineering", "running")
+    assert blocked.status == "running"
     _answer_open_decision(system, "stop")
     finished = system.run_until_stop(run_id)
     assert (finished.status, finished.stop_reason) == ("failed", "cancelled")
@@ -546,7 +592,7 @@ def request_time_unavailable_stop(data_dir):
 def request_time_unavailable_cancel(data_dir):
     system, _, run_id = _system(data_dir, _request_time_unavailable_script())
     blocked = system.run_until_stop(run_id)
-    assert (blocked.active_department, blocked.status) == ("engineering", "running")
+    assert blocked.status == "running"
     _position, decisions = saved_decisions(system.store, statuses=("open",))
     assert len(decisions) == 1
     cancelled = system.cancel(run_id)
@@ -579,7 +625,9 @@ class _FlakyAvailabilityAdapter(FakeAdapter):
 
 
 def activation_start_unavailable(data_dir):
-    adapter = _FlakyAvailabilityAdapter(_handoff_script())
+    adapter = _FlakyAvailabilityAdapter({"product": [product_spec()],
+                                          "engineering": [_deliver()],
+                                          "quality": [_explore(), _release()]})
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build an echo CLI")
     blocked = system.run_until_stop(run_id)
@@ -594,19 +642,23 @@ def activation_start_unavailable(data_dir):
 
 def _credential_rejected_then_continue(protocol: str, first):
     # 真实本地 Provider 上游拒绝凭据（HTTP 401）：第一次请求记为不可重试的 provider_unavailable 进入待恢复，
-    # 回答继续执行以后走完交接与放行；四个成功回复按交接脚本顺序回放
+    # 回答继续执行以后走完交接与放行；成功回复按部门回放交接脚本（工单 #557：同时运行的会话各自取用自己的）
     def run(data_dir):
         replies = [first]
-        counter = {"index": 0}
+        counters = {"product": 0, "engineering": 0, "quality": 0}
 
         def after_rejection(provider, handler):
-            # 提交依据的版本取自这次请求装配好的部门材料（ScriptedProvider 记录了收到的请求体）
-            calls = http_script(provider.requests[-1])[counter["index"]]
-            counter["index"] += 1
+            # 提交依据的版本取自这次请求装配好的部门材料（ScriptedProvider 把请求正文挂在处理机上：
+            # 同时运行的会话各自发请求，不能拿最后收到的请求当作这次请求）
+            body = handler.body
+            department = request_department(body)
+            index = counters[department]
+            counters[department] += 1
+            calls = http_script(body)[department][index]
             send_reply(handler, 200, "text/event-stream",
-                       HTTP_REPLIES[protocol](counter["index"], calls))
+                       HTTP_REPLIES[protocol](reply_index(department, index), calls))
 
-        replies.extend(after_rejection for _ in range(3))
+        replies.extend(after_rejection for _ in range(4))
         provider = ScriptedProvider(replies)
         try:
             system, run_id = provider_system(data_dir, provider.base, protocol)
@@ -622,7 +674,23 @@ def _credential_rejected_then_continue(protocol: str, first):
     return run
 
 
+def concurrent_departments(data_dir):
+    # 一个事项里多个会话同时运行（工单 #557）：PRD 被接纳以后工程与质检各开始一轮工作，
+    # 各自一个会话；工程写文件的同时质检按 PRD 起草测试用例，测试材料保存为一个版本；
+    # 交付到达以后质检开始新一轮工作，从这份交付重建检查工作区，核验并放行。
+    system, _, run_id = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [_deliver()],
+        "quality": [_explore(), _release()],
+    })
+    system.run_until_stop(run_id)
+    return system, run_id, {}
+
+
 SCENARIOS: dict[str, Scenario] = {
+    "concurrent_departments": Scenario(
+        "一个事项里工程与质检同时运行：PRD 被接纳以后两个部门各开始一轮工作，工程写文件的同时质检起草测试用例；交付到达以后质检开始新一轮工作，核验并放行。",
+        concurrent_departments),
     "handoff_release": Scenario(
         "一次成功的提交与部门交接：产品提交规格，工程直接写文件、运行检查并提交交付，质检运行检查后放行，运行结束于 DONE。",
         handoff_release),

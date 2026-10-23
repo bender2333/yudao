@@ -14,10 +14,10 @@ from harness.proposals import (answer_turn, ask_turn, delivery_turn, guidance_re
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
-from harness.tests.helpers import (developer_text, guidance_reply, happy_script, pinned_input_tokens,
-                                 recorded_context, run_scripted)
+from harness.tests.helpers import (developer_text, explore_turn, guidance_reply, happy_script,
+                                 pinned_input_tokens, quality_turns, recorded_context, run_scripted)
 from harness.tests.protocol_helpers import serve
-from harness.tests.provider_replies import HTTP_REPLIES, http_script
+from harness.tests.provider_replies import HTTP_REPLIES, http_script, reply_index, request_department
 from harness.tools import tool_action
 
 def _part(call, source: str):
@@ -34,7 +34,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
             "product": [FakeTurn(proposal=product_spec(), transcript=marker)],
             "engineering": [ask_turn(), delivery_turn()],
             "product:ask": [answer_turn("The existing contract covers this input.")],
-            "quality": [review_turn("release", "ok")],
+            "quality": [explore_turn(), review_turn("release", "ok")],
         }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -72,7 +72,7 @@ def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
             "product": [product_spec(goal=unique)],
             "engineering": [ask_turn(), delivery_turn()],
             "product:ask": [v2_answer],
-            "quality": [review_turn("release", "v2")],
+            "quality": quality_turns("release", "v2"),
         }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -111,7 +111,8 @@ def test_quality_runs_its_checks_through_run_check(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
     assert system.run_until_stop(run_id).status == "done"
-    [quality] = [item for item in adapter.invocations if item.department == "quality"]
+    # 质检在 PRD 被接纳以后先有一轮预测性探索（工单 #557），核验交付的是后面那一轮
+    quality = [item for item in adapter.invocations if item.department == "quality"][-1]
     assert [tool["name"] for tool in quality.tools if tool_action(tool["name"]) == "check"] == ["run_check"]
     checks = [event.payload["name"] for event in system.store.list_events(run_id)
               if event.type == EventType.TOOL_CALLED and event.department == "quality"
@@ -176,16 +177,15 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
                 product_decision("Use DECISION_CANARY_C.", "The second requirement needs this exact output."),
                 guidance_reply("已给出两条产品决定。"),
             ],
-            "engineering": [delivery_turn(), delivery_turn()],
-            "quality": [
-                review_turn("rework_engineering", "the delivery misses an acceptance criterion",
-                            defects=[{"severity": "major", "summary": "defect A"}]),
-                review_turn("release", "accepted both product decisions"),
-            ],
+            "engineering": [delivery_turn(), delivery_turn(), delivery_turn(), delivery_turn()],
+            "quality": quality_turns(
+                "rework_engineering", "the delivery misses an acceptance criterion",
+                defects=[{"severity": "major", "summary": "defect A"}]),
         }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
-    run_id = system.create_run("build echo", max_cycles=12)
+    # 同时运行以后激活的次数变多（质检多一轮预测性探索与返工），循环上限给足
+    run_id = system.create_run("build echo", max_cycles=24)
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请补充两条产品决定。")
     projection = system.run_until_stop(run_id)
@@ -223,6 +223,7 @@ def test_effective_decision_keeps_explicit_requirement(data_dir):
             ],
             "engineering": [delivery_turn(), delivery_turn()],
             "quality": [
+                explore_turn(),
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "defect"}]),
                 review_turn("release", "accepted the described approach"),
@@ -276,7 +277,7 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
                 delivery_turn(summary="OLD_DELIVERY_CANARY"),
                 delivery_turn(summary="new delivery"),
             ],
-            "quality": [
+            "quality": [explore_turn(), 
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "need decision"}]),
                 review_turn("rework_engineering", "contract is wrong",
@@ -311,6 +312,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
                 delivery_turn(summary="NEW_DELIVERY_CANARY"),
             ],
             "quality": [
+                explore_turn(),
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "contract issue"}]),
                 review_turn("release", "new delivery checked"),
@@ -364,17 +366,22 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
 
 def test_rework_engineering_keeps_only_one_active_delivery(data_dir):
     adapter = FakeAdapter(
-        [
-            product_spec(),
-            delivery_turn(summary="OLD_DELIVERY_CANARY"),
-            review_turn(
-                "rework_engineering",
-                "need a fix",
-                defects=[{"severity": "minor", "summary": "naming"}],
-            ),
-            delivery_turn(summary="FIXED_DELIVERY", files={"src/echo.py": "print('v2')\n"}),
-            review_turn("release", "ok"),
-        ]
+        {
+            "product": [product_spec()],
+            "engineering": [
+                delivery_turn(summary="OLD_DELIVERY_CANARY"),
+                delivery_turn(summary="FIXED_DELIVERY", files={"src/echo.py": "print('v2')\n"}),
+            ],
+            "quality": [
+                explore_turn(),
+                review_turn(
+                    "rework_engineering",
+                    "need a fix",
+                    defects=[{"severity": "minor", "summary": "naming"}],
+                ),
+                review_turn("release", "ok"),
+            ],
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
@@ -397,18 +404,23 @@ def test_rework_engineering_keeps_only_one_active_delivery(data_dir):
 
 def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
     adapter = FakeAdapter(
-        [
-            product_spec(),
-            {"kind": "delivery_spec", "summary": "", "check_names": ["smoke"]},
-            delivery_turn(summary="first valid delivery"),
-            review_turn(
-                "rework_engineering",
-                "need a fix",
-                defects=[{"severity": "minor", "summary": "naming"}],
-            ),
-            delivery_turn(summary="fixed", files={"src/echo.py": "print('v2')\n"}),
-            review_turn("release", "ok"),
-        ]
+        {
+            "product": [product_spec()],
+            "engineering": [
+                {"kind": "delivery_spec", "summary": "", "check_names": ["smoke"]},
+                delivery_turn(summary="first valid delivery"),
+                delivery_turn(summary="fixed", files={"src/echo.py": "print('v2')\n"}),
+            ],
+            "quality": [
+                explore_turn(),
+                review_turn(
+                    "rework_engineering",
+                    "need a fix",
+                    defects=[{"severity": "minor", "summary": "naming"}],
+                ),
+                review_turn("release", "ok"),
+            ],
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
@@ -476,13 +488,16 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
 @contextmanager
 def _bound_system(tmp_path, *, context_window, max_output_tokens):
     # 三个部门绑定测试内启动的 HTTP 服务上的模型（Responses 协议），模型声明给定的窗口与输出上限；
-    # 服务按请求顺序回放交接脚本中的工具调用，记录收到的请求。提交依据的版本取自本次请求装配好的材料
-    state = {"index": 0}
+    # 服务按部门回放交接脚本中的工具调用，记录收到的请求。提交依据的版本取自本次请求装配好的材料
+    # （工单 #557：同时运行的会话各自取用自己的脚本，按请求里的工具分派到部门）
+    state = {"product": 0, "engineering": 0, "quality": 0}
 
     def responder(body):
-        calls = http_script(body)[state["index"]]
-        state["index"] += 1
-        return 200, "text/event-stream", [HTTP_REPLIES["responses"](state["index"], calls)]
+        department = request_department(body)
+        index = state[department]
+        state[department] += 1
+        calls = http_script(body)[department][index]
+        return 200, "text/event-stream", [HTTP_REPLIES["responses"](reply_index(department, index), calls)]
 
     server, capture, base = serve(responder)
     try:
@@ -542,8 +557,10 @@ def test_wide_window_work_requests_keep_the_declared_output_limit(tmp_path):
 
     assert result.status == "done", result.error
     payloads = _work_assemblies(system, run_id)
-    assert len(payloads) == len(capture.requests) == 3
-    assert [request["max_output_tokens"] for request in capture.requests] == [4096] * 3
+    # 三个部门都发了工作请求（工单 #557：同时运行的会话各有一轮工作，请求的个数不再固定；
+    # 这里断言的是每个请求都保留了声明的输出上限）
+    assert len(payloads) == len(capture.requests) >= 3
+    assert [request["max_output_tokens"] for request in capture.requests] == [4096] * len(capture.requests)
     # Baseline before the narrow-window reserve: every 32000/4096 work request asked for 4096 tokens.
     assert all(item["max_output_tokens"] == item["output_reserve_tokens"] == 4096 for item in payloads)
     assert all(item["admitted"] is True and item["effective_context_window"] == 32000 for item in payloads)

@@ -8,7 +8,7 @@ from harness.definitions import DEFINITIONS
 from harness.proposals import (answer_turn, ask_turn, delivery_turn, product_spec, product_spec_turn,
                                 review, review_turn)
 from harness.runtime import LoopSystem
-from harness.tests.helpers import department_history, happy_script, run_scripted
+from harness.tests.helpers import department_history, happy_script, quality_turns, run_scripted
 
 def test_happy_path_requires_quality_release(data_dir):
     system, projection = run_scripted(data_dir, happy_script())
@@ -38,17 +38,18 @@ def test_happy_path_requires_quality_release(data_dir):
     assert projection.last_review.code_snapshot_hash == projection.delivery_spec.code_tree_digest
 
 def test_quality_rework_routes_to_engineering(data_dir):
-    script = [
-        product_spec(),
-        delivery_turn(summary="first delivery"),
-        review_turn(
-            "rework_engineering",
-            "edge case fails",
-            defects=[{"severity": "major", "summary": "empty input is unhandled"}],
-        ),
-        delivery_turn(summary="fixed edge case", files={"src/echo.py": "print('ok')\n"}),
-        review_turn("release", "fixed"),
-    ]
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
+    # 质检的每一轮按当前有没有交付决定做什么（预测性探索或核验）
+    script = {
+        "product": [product_spec()],
+        "engineering": [
+            delivery_turn(summary="first delivery"),
+            delivery_turn(summary="fixed edge case", files={"src/echo.py": "print('ok')\n"}),
+        ],
+        "quality": quality_turns(
+            "rework_engineering", "edge case fails",
+            defects=[{"severity": "major", "summary": "empty input is unhandled"}]),
+    }
     _, projection = run_scripted(data_dir, script)
     assert projection.status == "done"
     # 缺陷记录让工程开始一轮返工（工单 #556：工程关注针对最新交付的缺陷记录）
@@ -159,7 +160,14 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
                 "rationale": "Correct the contract issue reported by quality; evidence must be collected against the revised criterion.",
             })],
     }
-    system, projection = run_scripted(data_dir, script, max_cycles=12)
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
+    run_id = system.create_run("build echo", max_cycles=12)
+    # 逐个部门驱动（这条规则与同时运行无关）：产品提交要求、工程交付、质检记缺陷记录，
+    # 以后工程返工并询问产品，质检重新核验
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    projection = system.run_until_stop(run_id)
     assert projection.product_spec.revision == 2
     assert any(
         "prior receipts are not reused" in error["message"] or "must run" in error["message"]
@@ -197,13 +205,20 @@ def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
     assert events[-1].state_after == "done"
 
 def test_release_without_quality_evidence_is_rejected(data_dir):
-    script = [
-        product_spec(),
-        delivery_turn(),
-        FakeTurn(proposal={"kind": "qa_review", "verdict": "release", "rationale": "looks good", "checks": ["smoke"], "defects": []}),
-    ]
+    # 质检声称跑过检查但没有跑：放行被拒绝（这条规则与同时运行无关，
+    # 因此这里逐个部门驱动：产品提交要求、工程交付、质检核验）
+    script = {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [
+            FakeTurn(proposal={"kind": "qa_review", "verdict": "release", "rationale": "looks good",
+                               "checks": ["smoke"], "defects": []}),
+        ],
+    }
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo", max_cycles=8)
+    system.activate_once(run_id)          # 产品提交要求
+    system.activate_once(run_id)          # 工程交付
     projection = system.run_until_stop(run_id)
     assert projection.status != "done"
     assert any("quality must run" in error["message"] for item in projection.rejections for error in item["errors"])

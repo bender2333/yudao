@@ -12,7 +12,7 @@ from harness.proposals import (delivery_turn, product_spec,
 from harness.public_tree import capture_public_tree
 from harness.environment import LocalEnvironment
 from harness.runtime import LoopSystem
-from harness.tests.helpers import perform
+from harness.tests.helpers import perform, quality_turns
 from harness.tree_archive import load_tree
 from harness.workspace import Workspace
 
@@ -264,7 +264,12 @@ def test_link_made_by_a_command_during_a_run_is_refused_as_a_tool_result(tmp_pat
             _edit_call("edit-link", "src/linked.txt", 1, 1, "VALUE = 9", "VALUE = 2", None),
         ])
 
-    system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(),link_then_edit]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [link_then_edit],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }))
     run_id = system.create_run("Edit a file that a command turned into a link")
     workspace = system.workspace(run_id)
     workspace.write_file("make_link.py", (
@@ -426,29 +431,34 @@ def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 def test_adopted_baseline_applies_to_next_work_item_and_replay_verifies(data_dir):
-    adapter = FakeAdapter([
-        product_spec(),delivery_turn(summary="v1"), review_turn("release", "ok v1"),
-    ])
-    system = LoopSystem.for_testing(data_dir, adapter)
-    project_id = system.projects.register("Echo", "做一个可以长期演进的逐行文本处理工具。")
+    holder = {}
 
     def second_work(request):
-        environment = LocalEnvironment(system.workspace(request.run_id))
+        environment = LocalEnvironment(holder["system"].workspace(request.run_id))
         return ModelResponse(output=[
             _edit_call("edit-v2", "src/echo.py", 2, 2,
                        "print(sys.argv[1])", "print(sys.argv[1].upper())",
                        _read_content_hash(environment, "src/echo.py", 2, 2)),
         ])
 
-    adapter.script.extend([
-        product_spec(),second_work,
-        # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：脚本项是工厂而不是 FakeTurn 实例
-        delivery_turn(
-            summary="v2", files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"},
-            checks={"smoke": 0},
-        ),
-        review_turn("release", "ok v2"),
-    ])
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
+    # 两个事项依次运行，各用自己的一份
+    adapter = FakeAdapter({
+        "product": [product_spec(), product_spec()],
+        "engineering": [
+            delivery_turn(summary="v1"),
+            second_work,
+            # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：脚本项是工厂而不是 FakeTurn 实例
+            delivery_turn(
+                summary="v2", files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"},
+                checks={"smoke": 0},
+            ),
+        ],
+        "quality": [*quality_turns("release", "ok v1"), *quality_turns("release", "ok v2")],
+    })
+    system = LoopSystem.for_testing(data_dir, adapter)
+    holder["system"] = system
+    project_id = system.projects.register("Echo", "做一个可以长期演进的逐行文本处理工具。")
     _work_item_1, run_1 = system.projects.start_work_item(project_id, "第一步：echo CLI")
     assert system.run_until_stop(run_1).status == "done"
     assert system.projects.settle(run_1).type == ProjectEventType.DELIVERABLE_ADOPTED
