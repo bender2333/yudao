@@ -233,8 +233,11 @@ async def _run_demo(application: Application, system: LoopSystem) -> tuple[LoopS
     task = system.orchestrator.work_item_execution(run_id)
     assert task is not None, "work_item.create did not start the run task"
     # 等到修订要求的协作请求已关闭（V2 接纳且 engineering 回复 completed），再追加变更：
-    # 主分支上这笔输入在首次计划接纳后才追加；删计划后等价点是请求关闭后，V3 消费它
-    await _wait_for(lambda: len(system.project(run_id).effective_contracts) >= 2)
+    # 主分支上这笔输入在首次计划接纳后才追加；删计划后等价点是请求关闭后，V3 消费它。
+    # 同时运行的会话里还要等质检对工程的询问回答完（工单 #557）：询问的分支会话在工作期间
+    # 遇到依据变化（这里就是 V3 修订了 PRD）会停下来，那次询问就记成「没能回答」。
+    await _wait_for(lambda: len(system.project(run_id).effective_contracts) >= 2
+                    and _answers_done(system, run_id))
     await _command(application, "work_item.append_input",
                    WorkItemAppendInput(command_id=str(uuid.uuid4()), work_item_id=work_item_id, text=DEMO_CHANGE))
     system.projects.configure_department_settings(
@@ -254,10 +257,22 @@ async def _wait_for(predicate, timeout_sec: float = 300.0) -> None:
     while asyncio.get_running_loop().time() < deadline:
         if predicate():
             return
-        # 轮询的间隔要短：同时运行的会话里，这笔输入应当在质检开始核验以前就进入产品
-        # （工单 #557），否则质检这一轮的依据会在询问的分支会话工作期间变旧
         await asyncio.sleep(0.002)
     raise RuntimeError("demo did not reach its initial accepted contract")
+
+
+def _answers_done(system: LoopSystem, run_id: str) -> bool:
+    # 质检对工程的询问已经回答完（同时运行的会话里，这笔输入进产品以后，
+    # 还在工作着的会话依据就变旧了，询问的分支会话会停下来）
+    events = system.store.list_events(run_id)
+    asked = [event for event in events
+             if event.type == "ask_started" and event.payload.get("requester") == "quality"]
+    if not asked:
+        return False
+    branches = {event.payload.get("branch_session_id") for event in asked}
+    answered = {event.session_id for event in events
+                if event.type == "ask_answered" and event.payload.get("status") == "answered"}
+    return branches <= answered
 
 
 async def _command(application: Application, name: str, request):
