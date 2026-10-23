@@ -507,7 +507,9 @@
         if (q && q.length && !scene.frozen) {
           const waited = scene.realT - q[0].at;
           const keyJustStarted = a.step && a.step.st.key && (scene.realT - a.step.t0) < 600;
-          if (scene.inTail(a) || (waited >= 900 && !keyJustStarted)) {
+          // 交接与盖章先做完：它们在做的时候不打断（v11 第 2 条）
+          const currentIsKeep = (!!a.data.handoff || (a.data.doing && KEEP_ACTIONS.has(a.data.doing))) && !scene.inTail(a);
+          if (!currentIsKeep && (scene.inTail(a) || (waited >= 900 && !keyJustStarted))) {
             const next = q.shift();
             if (a.script) scene.cancel(a);
             next.fn();
@@ -1401,8 +1403,8 @@
       // 状态类动作立即执行；其他动作在当前动作的主要部分做完后执行
       if (IMMEDIATE.has(action) || scene.inTail(a)) {
         if (keepPending(a)) {
-          // 交接与盖章先做完：状态类动作排在它们后面（v11 第 2 条）
-          a.data.queue = a.data.queue || [];
+          // 交接与盖章先做完：普通的排队动作仍然清掉，状态类动作排在它们后面（v11 第 2 条）
+          a.data.queue = (a.data.queue || []).filter((item) => KEEP_ACTIONS.has(item.action));
           a.data.queue.push({ fn: start, at: scene.realT, action });
           return;
         }

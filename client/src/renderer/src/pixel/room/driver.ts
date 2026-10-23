@@ -466,8 +466,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         const inTail = actor ? scene.inTail(actor) : true;
         const justStarted = actor?.step?.st.key === true && scene.realT - actor.step.t0 < 600;
         // 原型 room.js：排队的动作在当前动作的关键步骤做完（或进入收尾步骤）后立即开始；
-        // 等了 0.9 秒仍未轮到时打断当前动作，只让刚开始的关键步骤再显示到 0.6 秒
-        if (inTail || (waited >= 900 && !justStarted)) {
+        // 等了 0.9 秒仍未轮到时打断当前动作，只让刚开始的关键步骤再显示到 0.6 秒。
+        // 交接与盖章先做完：它们在做的时候不打断（原型 v11 第 2 条）
+        const currentIsKeep = (a.handoff || (a.doing !== null && KEEP_ACTIONS.has(a.doing))) && !inTail;
+        if (!currentIsKeep && (inTail || (waited >= 900 && !justStarted))) {
           const next = q.shift()!;
           if (actor?.script) scene.cancel(actor);
           next.fn();
@@ -1414,6 +1416,8 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     // 原型 room.js 的口径：立即执行的动作清掉排队的条目；排队的条目超出上限时丢掉最早的
     if (IMMEDIATE.has(action) || (actor && scene.inTail(actor))) {
       if (keepPending()) {
+        // 交接与盖章先做完：普通的排队动作仍然清掉，状态类动作排在它们后面（原型 v11 第 2 条）
+        a.queue = a.queue.filter((item) => KEEP_ACTIONS.has(item.action));
         a.queue.push({ fn: start, at: scene.realT, from: ev.type, action });
         return;
       }

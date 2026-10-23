@@ -186,7 +186,7 @@ test("说话气泡：盖章紧跟着完成时，盖章说明先显示，完成�
   h.step(200);
   assert.equal(h.actor("q-test")?.say?.text, "现在盖放行章");
   // 盖章做完以后，完成的话才显示
-  h.step(3000);
+  h.step(8000);
   assert.equal(h.actor("q-test")?.say?.text, "完成了！");
 });
 
