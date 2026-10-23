@@ -153,6 +153,11 @@ class ContextAssembly:
         # 这个分支就是那次调用的继续，它从那次调用之前的历史开始。
         # 同一个部门的嵌套分支才会遇到：外层主线的询问调用在分支开出来时还没有结果。
         outer_pending_steps: set[tuple[str | None, Any, Any]] = set()
+        # 别的会话正在进行的这一步不进分支的历史（同时运行，工单 #557）：
+        # 分支开出来的时候，被询问部门的主线会话可能正在一步的中途，这一步的模型输出与工具结果
+        # 还没有成对出现。历史以没有结果的工具调用收尾，装配与压缩因此拒绝这个历史。
+        # 这一整个步不进分支的历史：模型输出与工具结果成对出现，只留一半同样不成对。
+        unfinished_steps: set[tuple[str | None, Any, Any]] = set()
         if is_branch:
             disposed = {
                 event.payload.get("id")
@@ -166,6 +171,18 @@ class ContextAssembly:
                     continue
                 outer_pending_steps.add((event.session_id, event.payload.get("activation_id"),
                                          event.payload.get("step_id")))
+            started: dict[tuple[str | None, Any, Any], set[str]] = {}
+            answered: dict[tuple[str | None, Any, Any], set[str]] = {}
+            for event in events:
+                if event.type == EventType.TOOL_STARTED:
+                    key = (event.session_id, event.payload.get("activation_id"), event.payload.get("step_id"))
+                    started.setdefault(key, set()).add(str(event.payload.get("id")))
+                elif event.type in (EventType.TOOL_CALLED, EventType.TOOL_SKIPPED):
+                    key = (event.session_id, event.payload.get("activation_id"), event.payload.get("step_id"))
+                    answered.setdefault(key, set()).add(str(event.payload.get("id")))
+            for key, identities in started.items():
+                if identities - answered.get(key, set()):
+                    unfinished_steps.add(key)
 
         failed_steps = {
             (event.payload.get("activation_id"), event.payload.get("step_id"))
@@ -177,6 +194,12 @@ class ContextAssembly:
             if is_branch:
                 if (event.session_id, event.payload.get("activation_id"),
                         event.payload.get("step_id")) in outer_pending_steps:
+                    continue
+                if (event.session_id != session_id
+                        and (event.session_id, event.payload.get("activation_id"),
+                             event.payload.get("step_id")) in unfinished_steps
+                        and event.type not in (EventType.DEPARTMENT_INPUT, EventType.TOOL_CALL_REQUIRED)):
+                    # 别的会话正在进行的这一步：模型输出与工具结果都不进分支的历史
                     continue
                 if event.session_id in branch_starts and event.session_id != session_id:
                     continue

@@ -9,7 +9,7 @@ from harness.models import EventType
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import explore_turn
+from harness.tests.helpers import quality_turns
 
 
 def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path):
@@ -100,7 +100,7 @@ def test_ask_answer_with_spec_revision_continuous_work(tmp_path: Path):
                       )["content_hash"]),
             ]),
         ],
-        "quality": [explore_turn(), review_turn("release", "valid uppercase implementation")],
+        "quality": quality_turns("release", "valid uppercase implementation"),
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -147,7 +147,7 @@ def test_ask_branch_history_isolation(tmp_path: Path):
             delivery_turn(),
         ],
         "product:ask": [product_branch_turn],
-        "quality": [explore_turn(), review_turn("release", "ok")],
+        "quality": quality_turns("release", "ok"),
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -301,7 +301,7 @@ def test_ask_answer_requirements_only_rejected_and_cannot_lose_acceptance_criter
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
         ],
         "product:ask": [product_branch_steps, product_branch_steps],
-        "quality": [explore_turn(), review_turn("release", "valid uppercase implementation")],
+        "quality": quality_turns("release", "valid uppercase implementation"),
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -349,7 +349,7 @@ def test_ask_answer_echoing_only_basis_hash_creates_no_revision(tmp_path: Path):
                       )["content_hash"]),
             ]),
         ],
-        "quality": [explore_turn(), review_turn("release", "valid echo implementation")],
+        "quality": quality_turns("release", "valid echo implementation"),
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -390,7 +390,7 @@ def test_ask_answered_payload_parties_and_status(tmp_path: Path):
                 _call("ans-1", "answer", answer="Clarification given."),
             ]),
         ],
-        "quality": [explore_turn(), review_turn("release", "ok")],
+        "quality": quality_turns("release", "ok"),
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -427,7 +427,7 @@ def test_ask_branch_exhausted_ends_with_unable_and_usage_charged(tmp_path: Path)
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [product_branch_invalid],
-        "quality": [explore_turn(), review_turn("release", "ok")],
+        "quality": quality_turns("release", "ok"),
     }
     adapter = FakeAdapter(scripts)
     # 提问方上限 4 步，被询问部门声明上限 1 步
@@ -452,9 +452,17 @@ def test_ask_branch_exhausted_ends_with_unable_and_usage_charged(tmp_path: Path)
     assert tool_calls[0].payload["ok"] is False
     assert "step limit" in (tool_calls[0].payload.get("error") or "")
 
-    # 提问方投影的已用量包含分支的步骤
+    # 提问方投影的已用量包含分支的步骤：分支的模型请求计入提问方的用量。
+    # 激活结束时记下的 model_steps 是这个 run 累计的模型请求数，同时运行的会话各自写自己的，
+    # 这个数因此取决于会话的先后（工单 #557）。这里断言的是结果：分支的步骤计入提问方，
+    # 提问方自己只用了自己的两步（发起询问与提交交付）。
     finished_events = [e for e in events if e.type == EventType.ACTIVATION_FINISHED and e.department == "engineering"]
-    assert finished_events[0].payload["model_steps"] == 4
+    asker_requests = [e for e in events if e.type == EventType.MODEL_REQUESTED
+                      and e.department == "engineering" and not (e.session_id or "").startswith("ses_ask_")]
+    branch_requests = [e for e in events if e.type == EventType.MODEL_REQUESTED
+                       and (e.session_id or "").startswith("ses_ask_")]
+    assert len(asker_requests) == 2 and len(branch_requests) == 1
+    assert max(e.payload["model_steps"] for e in finished_events) >= len(asker_requests) + len(branch_requests)
     assert system.project(run_id).status == "done"
 
 def test_ask_branch_exhausted_by_requester_remaining_steps_ends_with_unable(tmp_path: Path):
@@ -480,7 +488,7 @@ def test_ask_branch_exhausted_by_requester_remaining_steps_ends_with_unable(tmp_
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [product_branch_two_steps],
-        "quality": [explore_turn(), review_turn("release", "ok")],
+        "quality": quality_turns("release", "ok"),
     }
     adapter = FakeAdapter(scripts)
     # 提问方上限 2 步（发起 ask 消耗 1 步，剩余 1 步），被询问部门声明上限 4 步
@@ -505,34 +513,53 @@ def test_ask_branch_exhausted_by_requester_remaining_steps_ends_with_unable(tmp_
     assert system.project(run_id).status == "paused"
     assert system.project(run_id).stop_reason == "model_steps_exhausted"
     finished_events = [e for e in events if e.type == EventType.ACTIVATION_FINISHED and e.department == "engineering"]
-    assert finished_events[0].payload["model_steps"] == 3
+    # 提问方的用量包含分支的步骤：分支的模型请求计入提问方。
+    # 激活结束时记下的 model_steps 是这个 run 累计的模型请求数，同时运行的会话各自写自己的，
+    # 这个数因此取决于会话的先后（工单 #557）。这里断言的是结果：分支的步骤计入提问方。
+    asker_requests = [e for e in events if e.type == EventType.MODEL_REQUESTED
+                      and e.department == "engineering" and not (e.session_id or "").startswith("ses_ask_")]
+    branch_requests = [e for e in events if e.type == EventType.MODEL_REQUESTED
+                       and (e.session_id or "").startswith("ses_ask_")]
+    assert len(asker_requests) == 1 and len(branch_requests) == 1
+    assert max(e.payload["model_steps"] for e in finished_events) >= len(asker_requests) + len(branch_requests)
 
 def test_ask_branch_resumes_across_system_restart(tmp_path: Path):
     # AC2 & AC5: 分支进行中重新启动 Yudao，分支继续，回答交回提问方，事项运行到放行
     import sys
+    from harness.proposals import delivery
     from harness.tests import process_kill as killed
-    from harness.proposals import delivery, review
 
     data_dir = tmp_path / "data"
-    script = [
-        {"proposal": {"kind": "product_spec", "goal": "build an echo CLI",
-                      "requirements": ["echo input"], "acceptance_criteria": ["prints arg"]}},
-        {"output": [
-            _call("ask-1", "ask", recipient="product", question="Is lowercase ok?",
-                  background="Bg", expected="Exp"),
-        ]},
-    ]
+    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [
+            {"proposal": {"kind": "product_spec", "goal": "build an echo CLI",
+                          "requirements": ["echo input"], "acceptance_criteria": ["prints arg"]}},
+        ],
+        "engineering": [
+            {"output": [
+                _call("ask-1", "ask", recipient="product", question="Is lowercase ok?",
+                      background="Bg", expected="Exp"),
+            ]},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto", "verdict": "release",
+                                  "rationale": "checks passed on the current snapshot"}}],
+    }
     checks = {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}
-    tail = [
-        {"output": [
-            _call("ans-1", "answer", answer="Yes, lowercase is ok."),
-        ]},
-        {"proposal": delivery(check_names=["smoke"]),
-         "writes": {"src/echo.py": "import sys\nprint(sys.argv[1].lower())\n"},
-         "checks": checks},
-        {"proposal": review("release", "checks passed on the current snapshot"),
-         "checks": checks},
-    ]
+    tail = {
+        "product:ask": [
+            {"output": [
+                _call("ans-1", "answer", answer="Yes, lowercase is ok."),
+            ]},
+        ],
+        "engineering": [
+            {"proposal": delivery(check_names=["smoke"]),
+             "writes": {"src/echo.py": "import sys\nprint(sys.argv[1].lower())\n"},
+             "checks": checks},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto", "verdict": "release",
+                                  "rationale": "checks passed on the current snapshot"}}],
+    }
 
     with killed.interrupted(data_dir, script, hold_after=EventType.ASK_STARTED, tail=tail) as run:
         events_after = run.after.store.list_events(run.run_id)
@@ -551,20 +578,31 @@ def test_ask_branch_finished_restart_retains_accumulated_elapsed_time(tmp_path: 
     # 分支结束 → 重启 → run 已用时间恢复包含分支时段，各激活结束事件 elapsed_ms 单调不减
     import sys
     from harness.tests import process_kill as killed
-    from harness.proposals import delivery, review
+    from harness.proposals import delivery
 
     data_dir = tmp_path / "data"
-    script = [
-        {"proposal": {"kind": "product_spec", "goal": "build echo", "requirements": ["echo"], "acceptance_criteria": ["ok"]}},
-        {"output": [_call("ask-1", "ask", recipient="product", question="q?", background="b", expected="e")]},
-    ]
-    tail = [
-        {"output": [_call("ans-1", "answer", answer="ans")]},
-        {"proposal": delivery(check_names=["smoke"]), "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-         "checks": {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}},
-        {"proposal": review("release", "ok"),
-         "checks": {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}},
-    ]
+    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    script = {
+        "product": [
+            {"proposal": {"kind": "product_spec", "goal": "build echo", "requirements": ["echo"],
+                          "acceptance_criteria": ["ok"]}},
+        ],
+        "engineering": [
+            {"output": [_call("ask-1", "ask", recipient="product", question="q?", background="b", expected="e")]},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto", "verdict": "release", "rationale": "ok"}}],
+    }
+    tail = {
+        "product:ask": [
+            {"output": [_call("ans-1", "answer", answer="ans")]},
+        ],
+        "engineering": [
+            {"proposal": delivery(check_names=["smoke"]),
+             "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
+             "checks": {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}},
+        ],
+        "quality": [{"proposal": {"kind": "quality_auto", "verdict": "release", "rationale": "ok"}}],
+    }
 
     with killed.interrupted(data_dir, script, hold_after="tool_called", hold_action="ask-1", tail=tail) as run:
         branch_finished = [
@@ -580,8 +618,10 @@ def test_ask_branch_finished_restart_retains_accumulated_elapsed_time(tmp_path: 
 
         after_events = run.after.store.list_events(run.run_id)
         elapsed_list = [e.payload["elapsed_ms"] for e in after_events if e.type == EventType.ACTIVATION_FINISHED]
-        assert len(elapsed_list) == 4
+        # 各激活结束事件记下的已用时间单调不减：同时运行的会话各自记下自己结束时刻的累计值（工单 #557）
         assert all(x <= y for x, y in zip(elapsed_list, elapsed_list[1:]))
+        assert {event.department for event in after_events
+                if event.type == EventType.ACTIVATION_FINISHED} == {"product", "engineering", "quality"}
         assert run.after.project(run.run_id).status == "done"
 
 
@@ -604,7 +644,7 @@ def test_ask_branch_no_tool_call_ends_with_unable(tmp_path: Path):
                                   "content": [{"type": "output_text", "text": "Just plain text."}]}])
             for i in range(limit + 1)
         ],
-        "quality": [explore_turn(), review_turn("release", "ok")],
+        "quality": quality_turns("release", "ok"),
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -644,7 +684,7 @@ def test_ask_branch_exhausted_by_department_time_limit_ends_with_unable(tmp_path
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [product_branch_slow],
-        "quality": [explore_turn(), review_turn("release", "ok")],
+        "quality": quality_turns("release", "ok"),
     }
     adapter = FakeAdapter(scripts)
     step_limits = StepLimits(department_max_time_sec={"product": 0.2})
@@ -685,7 +725,7 @@ def test_ask_branch_exhausted_by_run_time_limit_ends_with_unable(tmp_path: Path)
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [product_branch_slow],
-        "quality": [explore_turn(), review_turn("release", "ok")],
+        "quality": quality_turns("release", "ok"),
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(

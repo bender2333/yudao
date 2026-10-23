@@ -35,9 +35,10 @@ import subprocess
 import sys
 import time
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
@@ -48,7 +49,7 @@ from harness.projection import saved_decisions
 from harness.proposals import delivery_turn, product_spec_turn, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import after_event
+from harness.tests.helpers import after_event, quality_turns
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # 子进程启动、超时与等待退出的上限；真实进程要走文件系统与进程表，比内存里的操作慢
@@ -60,7 +61,7 @@ _FACTORY_SKIP_FIELDS = frozenset({"kind", "basis_product_spec_hash", "basis_deli
                                   "check_names", "known_risks"})
 
 
-def build_script(items: Sequence[dict[str, Any]]) -> list[Any]:
+def build_script(items: Sequence[dict[str, Any]] | Mapping[str, Sequence[dict[str, Any]]]) -> Any:
     # 把 JSON 脚本项变成 FakeAdapter 的脚本项：
     #   {"proposal": {...}}   提交一种提案（product_spec、delivery_spec 等）
     #   {"output": [...]}     一次回答的全部输出条目（自己写调用，例如指定编号的一次读取）
@@ -69,6 +70,10 @@ def build_script(items: Sequence[dict[str, Any]]) -> list[Any]:
     # 只有提案的项仍然直接给出提案对象，行为与 #307 建立时相同
     # 正式成果的提案（product_spec、delivery_spec、qa_review）换成工厂（工单 #471）：
     # 脚本项只写提案内容，依据版本由工厂从请求里的当前版本取
+    # 脚本可以按会话给出（工单 #557）：给的是一个字典时每个会话各有一份脚本，
+    # 同时运行的会话各自取用自己的，不按请求的先后顺序抢同一个队列
+    if isinstance(items, Mapping):
+        return {key: build_script(value) for key, value in items.items()}
     script: list[Any] = []
     for item in items:
         if "output" in item:
@@ -76,6 +81,14 @@ def build_script(items: Sequence[dict[str, Any]]) -> list[Any]:
             continue
         rest = {key: value for key, value in item.items() if key != "proposal"}
         proposal = dict(item["proposal"]) if "proposal" in item else None
+        if (proposal or {}).get("kind") == "quality_auto":
+            # 质检的脚本（工单 #557）：质检关注「PRD 被接纳」，它的轮数随 PRD 的版本数与交付的到达变化，
+            # 每一轮按这一轮开始时有没有交付决定做什么（预测性探索或核验）。这一项给出若干轮，
+            # 实际用掉几轮由运行决定
+            script.extend(quality_turns(proposal.get("verdict", "release"),
+                                        proposal.get("rationale", "checks passed on the current snapshot"),
+                                        times=int(proposal.get("times", 4))))
+            continue
         factory = _TURN_FACTORIES.get((proposal or {}).get("kind"))
         if factory is not None:
             # 依据字段交给工厂从请求里取：脚本项里写了的也丢掉，工厂读到的当前版本才是 host 端。
@@ -454,8 +467,8 @@ class Interrupted:
         self.close()
 
 
-def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
-                tail: Sequence[dict[str, Any]] | None = None,
+def interrupted(data_dir: Path, script: Sequence[dict[str, Any]] | Mapping[str, Sequence[dict[str, Any]]], *,
+                tail: Sequence[dict[str, Any]] | Mapping[str, Sequence[dict[str, Any]]] | None = None,
                 task: str = "build echo",
                 workspace_files: dict[str, str] | None = None,
                 started: Path | None = None,
@@ -488,7 +501,9 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
     hold_dir.mkdir(exist_ok=True)
 
     script_file = work / "script.json"
-    script_file.write_text(json.dumps(list(script), ensure_ascii=False), encoding="utf-8")
+    # 脚本按会话给出时是一个字典（工单 #557），按队列给出时是一个列表
+    script_file.write_text(json.dumps(script if isinstance(script, Mapping) else list(script),
+                                     ensure_ascii=False), encoding="utf-8")
     files_file = None
     if workspace_files is not None:
         files_file = work / "workspace-files.json"
@@ -521,7 +536,7 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
     return Interrupted(before, after, observed, log)
 
 
-def restarted(data_dir: Path, script: Sequence[dict[str, Any]], *,
+def restarted(data_dir: Path, script: Sequence[dict[str, Any]] | Mapping[str, Sequence[dict[str, Any]]], *,
               started: Path | None = None,
               kill: bool = True,
               resume_after: bool = True,

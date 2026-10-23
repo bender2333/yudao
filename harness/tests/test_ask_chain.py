@@ -16,6 +16,7 @@ from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
+from harness.tests.helpers import explore_turn, quality_turns
 
 
 def _call(identity: str, name: str, **args: Any) -> dict[str, Any]:
@@ -69,7 +70,8 @@ def test_the_nested_ask_answers_the_outer_branch_and_the_run_continues(tmp_path:
         "engineering:ask": [
             _answer("ans-2", "不用改。"),
         ],
-        "quality": [review_turn("release", "valid uppercase implementation")],
+        # 质检的脚本：预测性探索与核验各一轮（工单 #557）
+        "quality": [explore_turn(), review_turn("release", "valid uppercase implementation")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -105,6 +107,8 @@ def test_the_three_layer_chain_answers_and_refuses_the_fourth_layer(tmp_path: Pa
         "engineering": [delivery_turn()],
         "quality": [
             _ask("ask-1", "engineering", "检查项覆盖了回问吗？"),
+            # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）
+            explore_turn(),
             review_turn("release", "ok"),
         ],
         # 工程在分支里回问产品（第二层）
@@ -158,6 +162,8 @@ def test_the_chain_limit_is_read_from_the_rule_registry(tmp_path: Path, monkeypa
         "engineering": [delivery_turn()],
         "quality": [
             _ask("ask-1", "engineering", "检查项覆盖了回问吗？"),
+            # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）
+            explore_turn(),
             review_turn("release", "ok"),
         ],
         "engineering:ask": [
@@ -204,7 +210,8 @@ def test_the_nested_branch_steps_are_charged_to_the_first_asker(tmp_path: Path):
         "engineering:ask": [
             _answer("ans-2", "不用改。"),
         ],
-        "quality": [review_turn("release", "valid uppercase implementation")],
+        # 质检的脚本：预测性探索与核验各一轮（工单 #557）
+        "quality": [explore_turn(), review_turn("release", "valid uppercase implementation")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=4))
@@ -213,8 +220,11 @@ def test_the_nested_branch_steps_are_charged_to_the_first_asker(tmp_path: Path):
 
     events = system.store.list_events(run_id)
     requests = [event for event in events if event.type == EventType.MODEL_REQUESTED]
-    # 产品主线的 PRD 一次，加上提问方预算里的四步：提问方一步、产品分支两步、嵌套分支一步
-    assert len(requests) == 5
+    # 链上的步数计入提问方：提问方的四步预算里，提问方自己一步、产品分支两步、嵌套分支一步。
+    # 同时运行的质检会话不在这个预算里（工单 #557），因此这里只数提问方与链上的分支。
+    chain = [event for event in requests
+             if (event.session_id or "").startswith("ses_ask_") or event.department == "engineering"]
+    assert len(chain) == 4
     # 链上的步数计入提问方：提问方没有余步交付，事项以步数用完暂停
     assert not [event for event in events if event.type == EventType.DELIVERY_ACCEPTED]
     projection = system.project(run_id)
