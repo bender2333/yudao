@@ -474,7 +474,8 @@ Y8.data.define({
     waiting_provider: { department, since, next_retry_at, category } | null, // S4
     stop_reason: { code, text } | null,
     recovery: { state, reason, unusable, last_confirmed, owner, late_results, verifications, unfinished, limits, auto_resumed_at },
-    // state：'running'|'waiting_resume'|'terminated'（各档）、'interrupted'|'pending_verification'（3.1 起）；
+    // state：'running'|'waiting_resume'（各档）、'interrupted'|'pending_verification'（3.1 起）、
+    // 结束的方式分开（工单 #747）：'completed'|'paused'|'cancelled'|'stopped'；
     // unusable：{ department, model, problem }，待恢复时写明；其余字段供恢复页使用（3.1）
     // stop_reason.code：'cancelled' 用户取消 | 'upgrade' 因升级停止（3.1）| 'stopped_by_user' 决定中选择停止 | 其他为失败原因
     inputs: [{ version, kind, text, at, progress, bytes }],

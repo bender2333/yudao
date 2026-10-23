@@ -3993,7 +3993,7 @@ export type RunRecoveryResult = {
     /**
      * State
      */
-    state: 'running' | 'interrupted' | 'waiting_resume' | 'terminated';
+    state: 'running' | 'interrupted' | 'waiting_resume' | 'completed' | 'paused' | 'cancelled' | 'stopped';
     /**
      * Reason
      */
