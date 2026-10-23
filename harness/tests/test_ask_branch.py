@@ -707,12 +707,14 @@ def test_ask_branch_exhausted_by_department_time_limit_ends_with_unable(tmp_path
 
 
 def test_ask_branch_exhausted_by_run_time_limit_ends_with_unable(tmp_path: Path):
-    # 事项运行时间在分支进行中用完：声明值（45s）大于剩余量（~3s），事项运行时间用完而以 unable 结束
+    # 事项运行时间在分支进行中用完：声明值（45s）大于剩余量（~10s），事项运行时间用完而以 unable 结束
+    # 上限与分支的等待都要比运行机上准备这一段时间长（准备里有一次 Git 提交），否则上限在分支开始前就用完，
+    # 询问没有被回答（工单 #557 以后同时运行，准备这一段更慢）
     import time
     from harness.engine import StepLimits
 
     def product_branch_slow(call):
-        time.sleep(4)
+        time.sleep(12)
         return ModelResponse(output=[_call("ans-1", "answer", answer="too late")])
 
     scripts = {
@@ -733,7 +735,7 @@ def test_ask_branch_exhausted_by_run_time_limit_ends_with_unable(tmp_path: Path)
         adapter,
         step_limits=StepLimits(department_max_time_sec={"product": 45.0}),
     )
-    run_id = system.create_run("build echo", run_time_limit_sec=3)
+    run_id = system.create_run("build echo", run_time_limit_sec=10)
     system.run_until_stop(run_id)
 
     events = system.store.list_events(run_id)

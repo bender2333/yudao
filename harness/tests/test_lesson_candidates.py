@@ -32,7 +32,9 @@ def assert_candidate_does_not_change_execution(system, projection):
     without_candidates = replay_events([
         event for event in events if event.type != EventType.LESSON_CANDIDATE_RECORDED
     ]).to_dict()
-    actual = projection.to_dict()
+    # 比较的是此刻的投影：同时运行以后，事项结束的时候别的会话的收尾事件可能还没有写下来，
+    # 停止时读到的那份投影因此早于事件日志（工单 #557）
+    actual = system.project(projection.run_id).to_dict()
     for field in ("lesson_candidates", "last_event_id", "stream_version"):
         actual.pop(field)
         without_candidates.pop(field)
@@ -75,7 +77,7 @@ def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path):
     assert set(departments) == {"product", "engineering", "quality"}
     assert departments.count("product") == 1 and departments.count("engineering") == 2
     assert_candidate_does_not_change_execution(system, result)
-    assert system.replay(result.run_id).canonical_state() == result.canonical_state()
+    assert system.replay(result.run_id).canonical_state() == system.project(result.run_id).canonical_state()
     before = result.stream_version
     assert system.run_until_stop(result.run_id).stream_version == before
     assert system.activate_once(result.run_id).stream_version == before
@@ -136,7 +138,7 @@ def test_failure_candidate_has_only_existing_evidence_and_keeps_failure(tmp_path
     # 有交付时产品提交要求、工程交付
     assert [call.department for call in system.test_adapter.invocations].count("product") == 1
     assert_candidate_does_not_change_execution(system, result)
-    assert system.replay(result.run_id).canonical_state() == result.canonical_state()
+    assert system.replay(result.run_id).canonical_state() == system.project(result.run_id).canonical_state()
 
 def test_success_cancel_pause_and_rejected_review_do_not_invent_candidates(tmp_path):
     _system, success = run_scripted(tmp_path / "success", happy_script())

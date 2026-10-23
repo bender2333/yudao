@@ -24,7 +24,7 @@ from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
-from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT, quality_turns
+from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT, explore_turn, quality_turns
 
 
 def _events(system, run_id, event_type):
@@ -199,8 +199,14 @@ def _workspace_unrepresentable_run(tmp_path, tail):
         return ModelResponse(output=[_command_call("cmd-link", "linked")])
 
     # 产品先提交产品要求，工步建立链接（node_modules/linked）导致公开树无法表示
-    system = LoopSystem.for_testing(_short_data_dir(tmp_path),
-                                    FakeAdapter([product_spec(),link_then, tail]))
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
+    # 质检在 PRD 被接纳以后与工程同时开始一轮工作，它的检查工作区来自事项开始时的项目起点
+    # （不读运行工作区），这一轮与链接无关；交付到达以后质检开始新一轮，给出放行
+    system = LoopSystem.for_testing(_short_data_dir(tmp_path), FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [link_then, tail],
+        "quality": [explore_turn(), review_turn("release", "checks passed on the current snapshot")],
+    }))
     run_id = system.create_run("A link pauses the run")
     workspace = system.workspace(run_id)
     _write_command_body(workspace, outside)
@@ -229,7 +235,6 @@ def test_workspace_unrepresentable_continue_after_ignoring_the_entry_completes(t
     [decision] = _open_decisions(system, run_id)
     workspace.write_file(".gitignore", "node_modules/\n")
     assert _answer(system, decision, "continue") == run_id
-    system.test_adapter.script.extend([review_turn("release", "checks passed on the current snapshot")])
     finished = system.run_until_stop(run_id)
     assert finished.status == "done", (finished.status, finished.stop_reason)
     [continued] = _events(system, run_id, EventType.RUN_CONTINUED)
