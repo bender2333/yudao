@@ -17,6 +17,8 @@ from harness.runtime import LoopSystem
 from harness.smoke import EVAL_ENV_NAMES, isolation_fields, run_smoke, smoke_exit_code, summarize_run
 from harness.tests.helpers import (compacted_runner, explore_turn, happy_script, recorded_context,
                                  run_scripted, system_on_copy)
+from harness.tests.helpers import (compacted_runner, explore_turn, happy_script, recorded_context, run_scripted,
+                                   system_on_copy)
 from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_event, rewrite_saved_events,
                                          rewrite_saved_projection)
 
@@ -29,6 +31,8 @@ def saved_native(tmp_path_factory):
     # 提交依据的版本由工厂从请求里的当前版本取（工单 #471）：脚本项是工厂而不是裸提交
     # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
     # 质检在 PRD 被接纳以后还有一轮预测性探索，这一轮没有交付可以核验，提交的结论被拒绝
+    # 提交依据的版本由工厂从请求里的当前版本取（工单 #471）：脚本项是工厂而不是裸提交。
+    # 按部门给出（工单 #557：同时运行的会话各自取用自己的脚本），质检先起草测试材料
     script = {
         "product": [product_spec()],
         "engineering": [
