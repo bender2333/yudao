@@ -8,7 +8,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type { DeliveryFileResult, EventDetailResult, ProjectOverviewResult, WorkItemMaterialsResult,
   WorkItemCard } from "../../api/generated/types.gen";
-import type { Route } from "../../shell/routing";
+import { paths, type Route } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import { ITEM_COLORS } from "../../pixel/registry";
 import { Empty, KeyValue, Loading, Section, Tag, dict, list, show, text } from "./common";
@@ -17,6 +17,7 @@ import { fileDownload } from "./materials-download";
 import { originalView, readView } from "./materials-read";
 import { useSnapshot } from "./use-snapshot";
 import { readFailureText } from "../../contract/read-failure";
+import { scopeName } from "./scope-name";
 
 const COUNT_KINDS = [
   ["intend", "intend"],
@@ -118,11 +119,13 @@ function IndexBlock(props: {
   projectId: string;
   onNavigate: (hash: string) => void;
 }) {
+  // 本页的事项用名字说明，不显示事项标识这类内部标识（工单 #746）
+  const chosenTitle = scopeName(props.items, props.chosen);
   return (
     <Section
       id="mt-index"
       title="按事项查看"
-      note={`资料按事项保存；点击事项查看它的 intend、PRD、交付、质检与项目材料；本页的事项 ${props.chosen}${props.requested === null ? "（未选中事项，取当前事项）" : ""}`}
+      note={`资料按事项保存；点击事项查看它的 intend、PRD、交付、质检与项目材料；本页的事项${chosenTitle === "" ? "" : ` ${chosenTitle}`}${props.requested === null ? "（未选中事项，取当前事项）" : ""}`}
       className="y10-mt"
     >
       {props.items.length === 0 ? <Empty text="项目还没有事项，没有资料可看" /> : (
@@ -138,7 +141,7 @@ function IndexBlock(props: {
                 <button
                   type="button"
                   className="y10-pp-title"
-                  onClick={() => props.onNavigate(`#/p/${props.projectId}/materials?w=${item.work_item_id}`)}
+                  onClick={() => props.onNavigate(paths.materials(props.projectId, { workItem: item.work_item_id }))}
                 >
                   {item.title}
                 </button>

@@ -494,7 +494,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(title).toContainText("当前生效的模型及来源");
       await expect(title).toContainText("（来源 部门默认）");
       await expect(title).toContainText("工位：产品 Agent");
-      await expect(title).toContainText("所选事项 wi_");
+      await expect(title).toContainText(`所选事项 ${SAMPLE_ITEM}`);
       // 部门设置弹窗：标题为「本项目 · 某部门设置」，模型、推理档位与部门 Prompt 三项（第 9.2 节）
       await title.getByRole("button", { name: "部门设置" }).click();
       const dialog = page.locator(".modal-backdrop");
@@ -611,7 +611,7 @@ test.describe("项目页面（1440×900）", () => {
       await gotoView(page, id, "materials");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL.materials}`);
       const index = await section(page, "按事项查看");
-      await expect(index.locator(".section-head .note")).toContainText("本页的事项 wi_");
+      await expect(index.locator(".section-head .note")).toContainText(`本页的事项 ${SAMPLE_ITEM}`);
       await expect(index.locator(".section-head .note")).toContainText("（未选中事项，取当前事项）");
       const intend = await section(page, "intend 原文");
       await expect(intend).toContainText("第 1 版");
@@ -662,7 +662,9 @@ test.describe("项目页面（1440×900）", () => {
       // 第一轮三部门各一次模型请求（#470 删工程计划以后没有 plan_turn）：共三条
       await expect(all.locator("tbody tr")).toHaveCount(3);
       await expect(all.locator("tbody tr").first()).toContainText("fake-script");
-      await expect(all.locator("tbody tr").first()).toContainText("未上报");
+      // 用量列（工单 #744）：列名是「用量」，与请求详情同一口径；预置项目的模型回答没有上报用量，写「未上报」
+      await expect(all.locator("thead th").nth(7)).toHaveText("用量");
+      await expect(all.locator("tbody tr").first().locator("td").nth(7)).toHaveText("未上报");
       // 关键词筛选：命中三条（请求的模型都是 fake-script）
       const keyword = record.locator("label.field").filter({ hasText: "关键词" }).locator("input");
       await keyword.fill("fake");
@@ -701,6 +703,8 @@ test.describe("项目页面（1440×900）", () => {
       await expect(detail.locator(".line", { hasText: "失败类型" }).locator(".value")).toHaveText("没有");
       await expect(detail).toContainText("结束原因");
       await expect(detail.locator(".line", { hasText: "结束原因" }).locator(".value")).toHaveText("未上报");
+      // 用量（工单 #744）：请求详情与请求记录表说的是同一件事，同样没有上报用量时都写「未上报」
+      await expect(detail.locator('.line:has(.term:text-is("用量")) .value')).toHaveText("未上报");
       // 工件引用（工单 #745）：这一行按项说，缺哪一项写哪一项没有，不是一句「未上报」盖住四项。
       // 预置项目的模型回答来自 FakeAdapter，没有留下工件，因此四项都是「未上报」；
       // 四项都在时的显示由客户端单元测试核对（那里给出的是工件引用的对象形状）。
@@ -718,13 +722,106 @@ test.describe("项目页面（1440×900）", () => {
       await expect(usage.locator("h3")).toHaveText("用量统计");
       await expect(usage.locator(".y10-usage-note")).toContainText("用量只读显示，不是事项的预算");
       await expect(usage).toContainText("请求数");
-      await expect(usage).toContainText("3（上报 0）");
+      // 「上报用量的请求」（工单 #744）：这个范围里上报了用量的请求数，一个都没有时写「未上报」
+      await expect(usage.locator('.line:has(.term:text-is("请求数")) .value')).toHaveText("3");
+      await expect(usage.locator('.line:has(.term:text-is("上报用量的请求")) .value')).toHaveText("未上报");
+      // 分组表同样给出这个数，页面上「上报了多少个」与请求记录里的显示对得上
+      await expect(await table(page, "按部门")).toContainText("上报用量的请求");
+      await expect(await table(page, "按模型")).toContainText("上报用量的请求");
       await expect(await table(page, "按部门")).toContainText("product");
       await expect(await table(page, "按模型")).toContainText("fake · fake-script");
+      // 另一个项目里那一次请求上报了用量（预置脚本给了它 100 输入与 20 输出）：
+      // 请求记录表与请求详情写出同一句话，用量统计说这个范围里有 1 个请求上报了用量（工单 #744）
+      const used = await projectId(page, "文本工具");
+      await gotoView(page, used, "observe");
+      const usedRecord = await section(page, "请求记录与用量");
+      await usedRecord.getByRole("tab", { name: "请求记录" }).click();
+      const usedTable = usedRecord.locator("table").first();
+      await expect(usedTable.locator("tbody tr").first().locator("td").nth(7)).toHaveText("总 120 token，输入 100，输出 20");
+      await usedTable.locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
+      await expect.poll(async () => pathText(page)).toBe("文本工具 / 请求详情");
+      const usedDetail = await section(page, "请求详情");
+      await expect(usedDetail.locator('.line:has(.term:text-is("用量")) .value')).toHaveText("总 120 token，输入 100，输出 20");
+      await usedDetail.getByRole("button", { name: "返回请求记录" }).click();
+      await expect.poll(async () => pathText(page)).toBe("文本工具 / 观测");
+      await usedRecord.getByRole("tab", { name: "用量统计" }).click();
+      await expect(usedRecord.locator('.line:has(.term:text-is("上报用量的请求")) .value')).toHaveText("1 个");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
     }
+  });
+
+  // 工单 #746：顶栏的事项范围。范围是项目级的一份，写在路径参数 ?w= 中：
+  // 换一个范围时留在当前页，切页签不丢范围，观测页与资料页拿得到范围。
+  // 这条用例改变服务端状态（回答决定请求、新建第二个事项），用自己的一份后端，共用的那份不受影响。
+  test("顶栏的事项范围：换一个范围留在本页，切页签不丢范围", async () => {
+    test.setTimeout(300_000);
+    await withOwnBackend(async () => {
+      const client = await startClient(backend, { width: 1440, height: 900 });
+      const errors = watchErrors(client);
+      const page = client.page;
+      try {
+        const id = await projectId(page, SAMPLE);
+        // 执行槽位只有一个：「文本工具」项目里等待回答的事项占着它。
+        // 回答「继续执行」两次：第一次以后再次遇到不可用，第二次以后走完剩下的三部门，槽位空出来
+        const blocked = await projectId(page, BLOCKED);
+        for (let round = 0; round < 2; round += 1) {
+          await waitUntil(async () => (await openDecisions(page)).length > 0, page, "等待回答的决定请求");
+          const decision = (await openDecisions(page))[0];
+          await expectAccepted(page, "decision.answer", {
+            decision_id: decision.decision_id, option: "continue", base_version: decision.version,
+          });
+        }
+        await waitUntil(async () => {
+          const data = await fetchQuery<{ work_items: { status: string }[] }>(page, "project.overview", { project_id: blocked });
+          return data.work_items.every((item) => item.status !== "in_progress");
+        }, page, "执行槽位空出来");
+        // 第二个事项：整个项目的请求记录翻倍，按事项筛选以后回到一半
+        await expectAccepted(page, "work_item.create", { project_id: id, text: "实现第二个工具" });
+        await waitUntil(async () => {
+          const data = await fetchQuery<{ attempts: { work_item_id: string | null }[] }>(page, "project.attempts", { project_id: id });
+          return new Set(data.attempts.map((row) => row.work_item_id)).size === 2;
+        }, page, "两个事项的请求记录都在");
+        const items = await fetchQuery<{ work_items: { work_item_id: string; title: string }[] }>(page, "project.overview", { project_id: id });
+        const first = items.work_items.find((item) => item.title === SAMPLE_ITEM);
+        const second = items.work_items.find((item) => item.title === "实现第二个工具");
+        if (first === undefined || second === undefined) {
+          throw new Error(`示例项目里没有那两个事项（现有：${items.work_items.map((item) => item.title).join("、")}）`);
+        }
+        await gotoView(page, id, "observe");
+        const record = await section(page, "请求记录与用量");
+        const all = page.locator("section.card table").first();
+        // 整个项目：两个事项各三次模型请求，共六条
+        await expect(all.locator("tbody tr")).toHaveCount(6);
+        // 在观测页用顶栏的范围选一个事项：仍留在观测页，表格按该事项过滤
+        await page.getByLabel("事项范围").selectOption(first.work_item_id);
+        await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?w=${first.work_item_id}`);
+        await expect(record.locator(".section-head .note")).toContainText(`范围：${SAMPLE_ITEM}`);
+        await expect(all.locator("tbody tr")).toHaveCount(3);
+        // 切页签：范围不丢（页签的地址带着 ?w=）
+        await page.locator(".tabbar .tab", { hasText: "质检" }).click();
+        await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/dept/quality?w=${first.work_item_id}`);
+        await expect(page.getByLabel("事项范围")).toHaveValue(first.work_item_id);
+        await page.locator(".tabbar .tab", { hasText: "资料" }).click();
+        await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/materials?w=${first.work_item_id}`);
+        await expect(page.getByLabel("事项范围")).toHaveValue(first.work_item_id);
+        // 资料页上换一个范围：留在资料页，范围换成另一个事项
+        await page.getByLabel("事项范围").selectOption(second.work_item_id);
+        await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/materials?w=${second.work_item_id}`);
+        // 回到观测页：范围仍然是另一个事项，表格按它过滤
+        await page.locator(".tabbar .tab", { hasText: "观测" }).click();
+        await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?w=${second.work_item_id}`);
+        await expect(all.locator("tbody tr")).toHaveCount(3);
+        // 清空范围：回到整个项目，地址里不留 ?w=
+        await page.getByLabel("事项范围").selectOption("");
+        await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe`);
+        await expect(all.locator("tbody tr")).toHaveCount(6);
+        expect(errors).toEqual([]);
+      } finally {
+        await client.close();
+      }
+    });
   });
 
   test("设置页：基本信息、部门设置与源目录", async () => {
