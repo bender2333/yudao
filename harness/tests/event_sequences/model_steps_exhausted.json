@@ -633,6 +633,9 @@
     "input_version": 1,
     "model_steps": 3,
     "prompt_version": 0,
+    "session_activations": 1,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 3,
     "stop_reason": "model_steps_exhausted"
    }
   }
@@ -650,7 +653,7 @@
   "input_version": 1,
   "processed_input_version": 0,
   "product_work_input_version": 1,
-  "run_event_version": 9,
+  "run_event_version": 10,
   "stream_version": 24,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
