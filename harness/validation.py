@@ -167,13 +167,13 @@ def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
         errors = _require_text(proposal, "rationale")
         verdict = proposal.get("verdict")
         if verdict not in QA_VERDICTS:
-            errors.append(FieldError("verdict", "verdict must be rework_product, rework_engineering, or release"))
+            errors.append(FieldError("verdict", "verdict must be rework_engineering or release"))
         errors.extend(_qa_defects_errors(proposal))
         errors.extend(_qa_check_name_errors(proposal))
         defects = [] if "defects" not in proposal else proposal.get("defects")
         if verdict == "release" and isinstance(defects, list) and defects:
             errors.append(FieldError("defects", "release requires an empty defect list"))
-        if verdict in {"rework_product", "rework_engineering"} and isinstance(defects, list) and not defects:
+        if verdict == "rework_engineering" and isinstance(defects, list) and not defects:
             errors.append(FieldError("defects", "rework requires at least one defect"))
         return errors
     if kind == "structure":
@@ -596,8 +596,6 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
     }
     if verdict == "release":
         transitions = [("QUALITY", "DONE")]
-    elif verdict == "rework_product":
-        transitions = [("QUALITY", "REWORK_PRODUCT"), ("REWORK_PRODUCT", "PRODUCT_SPEC")]
     else:
         transitions = [("QUALITY", "REWORK_ENGINEERING"), ("REWORK_ENGINEERING", "ENGINEERING")]
     return ProposalDecision(True, artifact=artifact, transitions=transitions)

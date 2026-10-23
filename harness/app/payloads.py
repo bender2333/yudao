@@ -744,7 +744,7 @@ class QaSubmittedPayload(Payload):
     effective_contract_hash: str
     delivery_spec_hash: str
     code_snapshot_hash: str
-    verdict: Literal["rework_product", "rework_engineering", "release"]
+    verdict: Literal["rework_engineering", "release"]
     rationale: str
     checks: list[CheckReceipt]
     defects: list[Defect]

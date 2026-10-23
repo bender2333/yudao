@@ -132,7 +132,7 @@ def test_event_difference_reported_before_projection():
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     index = next(i for i, e in enumerate(actual["events"]) if e["type"] == "qa_submitted")
-    actual["events"][index]["payload"]["verdict"] = "rework_product"
+    actual["events"][index]["payload"]["verdict"] = "rework_engineering"
     actual["projection"]["outcome"] = "rework"
     with pytest.raises(AssertionError) as raised:
         compare_documents("handoff_release", expected, actual)
@@ -152,7 +152,7 @@ def test_payload_field_difference_fails_with_fields_line():
     events = actual["events"]
     index = next(i for i, e in enumerate(events) if e["type"] == "qa_submitted")
     assert events[index]["payload"]["verdict"] == "release"
-    events[index]["payload"]["verdict"] = "rework_product"
+    events[index]["payload"]["verdict"] = "rework_engineering"
     with pytest.raises(AssertionError) as raised:
         compare_documents("handoff_release", expected, actual)
     message = str(raised.value)

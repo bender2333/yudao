@@ -33,7 +33,7 @@ PRODUCT_ACTIVE = frozenset({"PRODUCT_SPEC", "REWORK_PRODUCT"})
 ENGINEERING_ACTIVE = frozenset({"ENGINEERING", "REWORK_ENGINEERING"})
 QUALITY_ACTIVE = frozenset({"QUALITY", "DELIVERY"})
 
-QA_VERDICTS = ("rework_product", "rework_engineering", "release")
+QA_VERDICTS = ("rework_engineering", "release")
 # 基线核验逐条结论的状态（工单 #134，docs/design/existing-project-onboarding.md 第 4.5 节）
 BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
 # 提案种类：定义中提交类工具提交的种类

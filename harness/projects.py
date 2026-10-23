@@ -49,7 +49,7 @@ from .tree_archive import artifact_run, load_tree
 TITLE_LIMIT = 40
 RECENT_LIMIT = 20
 RECENT_RUN_EVENTS = frozenset({EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED})
-REWORK_VERDICTS = frozenset({"rework_product", "rework_engineering"})
+REWORK_VERDICTS = frozenset({"rework_engineering"})
 
 
 class ProjectNotFoundError(KeyError):

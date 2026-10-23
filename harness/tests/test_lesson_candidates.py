@@ -9,24 +9,18 @@ from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, json_dumps
 from harness.projection import replay_events
-from harness.proposals import (delivery_turn, product_spec, product_spec_turn, review, review_turn)
+from harness.proposals import (delivery_turn, product_spec, review, review_turn)
 from harness.tests.helpers import happy_script, recorded_context, run_scripted
 
-def rework_script(verdict="rework_engineering"):
+def rework_script():
+    # 质检的结论只有缺陷记录与放行（工单 #555）：缺陷记录之后工程返工一轮，候选记的是这次结论
     script = [
         product_spec(),
         delivery_turn(),
-        review_turn(verdict, "QA reported missing empty-input handling", defects=[
+        review_turn("rework_engineering", "QA reported missing empty-input handling", defects=[
             {"severity": "minor", "summary": "Empty input needs review"},
         ]),
     ]
-    if verdict == "rework_product":
-        # 修订版产品要求的提交依据由工厂从请求里的当前 ProductSpec 取（工单 #471），
-        # 改写后的验收标准与变更记录照旧，证明候选保留下的是质检触发的那次修订
-        script.append(product_spec_turn(acceptance=["empty input prints an empty line"], change_record={
-            "changed": ["Require an empty output line for empty input"], "retained": ["Echo the provided argument"],
-            "retired": [], "rationale": "Quality identified missing empty-input behavior.",
-        }))
     return [
         *script,
         delivery_turn(summary="handle empty input"),
@@ -44,9 +38,8 @@ def assert_candidate_does_not_change_execution(system, projection):
         without_candidates.pop(field)
     assert actual == without_candidates
 
-@pytest.mark.parametrize("verdict", ["rework_engineering", "rework_product"])
-def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path, verdict):
-    script = rework_script(verdict)
+def test_qa_candidate_preserves_actual_source_contract_and_evidence(tmp_path):
+    script = rework_script()
     system, result = run_scripted(tmp_path, script)
     assert result.phase == "DONE"
     assert len(result.lesson_candidates) == 1

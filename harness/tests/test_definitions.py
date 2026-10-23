@@ -201,9 +201,9 @@ def test_loaded_definitions_are_read_only_and_hand_out_plain_copies(tmp_path):
     contract = DEFINITIONS.proposal_contract("quality")
     contract["kinds"]["qa_review"]["verdict"].append("approve")
     contract["submit_tools"].clear()
-    assert list(review.parameters["properties"]["verdict"]["enum"]) == ["rework_product", "rework_engineering", "release"]
+    assert list(review.parameters["properties"]["verdict"]["enum"]) == ["rework_engineering", "release"]
     assert DEFINITIONS.proposal_contract("quality")["kinds"]["qa_review"]["verdict"] == [
-        "rework_product", "rework_engineering", "release"]
+        "rework_engineering", "release"]
     assert load_definitions() == DEFINITIONS
 
 

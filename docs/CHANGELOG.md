@@ -7,6 +7,8 @@
 
 ---
 
+minimax-M3.1-Flash / 2026-10-23 10:40 / 工单 #555：docs/prototypes/v11/js/pixel/engine.js 的动作目录与 qa_submitted 的动作表去掉 rework_product（质检的结论只有缺陷记录与放行）；docs/prototypes/v11/js/pixel/floor.js 的返工画面来源改为「qa_submitted 的结论为 rework_engineering」；docs/prototypes/v11/js/ui/views/materials.js 的判定文字去掉「退回产品」 / 质检把工作退回产品这条路径按 ADR-0039 删除，要求有问题时改为询问产品、产品在回答里修订 PRD；原型与客户端（client/src/renderer/src/views/project/materials.tsx）的判定文字与动作表保持一致
+
 minimax-M3.1-Flash / 2026-10-23 09:30 / 工单 #650：docs/prototypes/CHANGELOG.md 写 v11 这一版与两条改动、「当前定稿」改为 v11；docs/prototypes/v11/design.md 与 docs/prototypes/v11/BUILD.md 按「只写与 v10 不同的地方」重写 / 用户 2026-10-21 决定修订原型的两条规则：接收交接的一方在动作开始时说话，状态类动作到达时正在做或排着的交接与盖章先做完；原型出 v11 而不是原地改 v10（v10 已被事件基准、房间调用录制与像素登记表引用）
 
 solo-minimax-M3.1-Flash / 2026-10-23 09:40 / 工单 #747：恢复观察状态按结束的方式分开（docs/prototypes/v8/design.md 第 7.2 节与第 14 节、docs/prototypes/v8/BUILD.md 的合同注释、docs/design/recovery-contract-and-fault-matrix.md 第 1 节、docs/requirements/stage-requirements-overview.md 的 3.1 一行）——运行中、中断、待恢复三种未结束的状态，加上四种结束方式：已完成（阶段 DONE）、已暂停（阶段 PAUSED）、已取消（停止原因是 cancelled）、已停止（其余结束方式）；「已终止」不再用来表示完成并采纳 / 恢复页对一个已经完成并被采纳的事项写「已终止」，并且用「已取消」的标记画出来（用户使用记录 U101）；根因在观察状态的模型：状态只有四种，正常完成没有自己的状态，`test_issue_18_recovery_observation.py` 还断言「完成的 run 观察状态为已终止」，那是工单 #18 定的口径；中文的「已终止」是被中止的意思，与停止原因「已完成基线核验」在同一块地方自相矛盾。页面上也不再出现停止原因与阶段的机器标识（「运行以 baseline_verified 结束」「进程在 ENGINEERING 阶段停止」改成中文名）

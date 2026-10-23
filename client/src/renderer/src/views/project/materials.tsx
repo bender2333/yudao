@@ -488,7 +488,6 @@ function verdictClass(verdict: string): string {
 const VERDICT_LABELS: Record<string, string> = {
   release: "放行",
   rework_engineering: "退回工程",
-  rework_product: "退回产品",
 };
 
 function checkRow(value: Record<string, unknown>): string {

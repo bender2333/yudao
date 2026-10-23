@@ -6,9 +6,53 @@ import pytest
 
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
+
+
+def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path):
+    # 工单 #555：质检的结论只有缺陷记录与放行，要求有问题时质检询问产品，
+    # 产品在回答里修订 PRD；质检对旧交付的放行被拒绝（交付依据的 PRD 版本过期，#471）
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [
+            ask_turn(recipient="product", question="验收标准漏了空输入，请修订 PRD。"),
+            review_turn("release", "the delivery passed the criterion the quality had"),
+        ],
+        "product:ask": [answer_turn(
+            answer="已补上空输入的验收标准。",
+            requirements=["print the given argument to stdout"],
+            acceptance=["running the program with a word prints that word",
+                        "empty input prints a blank line"],
+            change_record={
+                "changed": ["empty input prints a blank line"],
+                "retained": ["running the program with a word prints that word"],
+                "retired": [], "rationale": "The acceptance criteria missed the empty input."})],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)  # 产品提交初始 PRD
+    system.activate_once(run_id)  # 工程交付
+    projection = system.activate_once(run_id)  # 质检询问产品，产品在回答里修订 PRD，质检的放行被拒绝
+
+    # 产品在回答里修订了 PRD，修订版是第 2 版
+    assert projection.product_spec is not None
+    assert projection.product_spec.revision == 2
+    # 询问与回答各有一条事件，修订由产品的回答带来
+    events = system.store.list_events(run_id)
+    assert any(event.type == EventType.ASK_STARTED for event in events)
+    answered = [event for event in events if event.type == EventType.ASK_ANSWERED]
+    assert len(answered) == 1
+    assert answered[0].payload["with_spec_revision"] is True
+    assert answered[0].payload["revision"] == 2
+    # 质检对旧交付的放行被拒绝：交付依据的 PRD 版本过期
+    assert any(
+        error["field"] == "delivery_spec"
+        for item in projection.rejections
+        for error in item["errors"]
+    )
 
 
 def _call(identity: str, name: str, **args: Any) -> dict[str, Any]:

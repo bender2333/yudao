@@ -7,8 +7,7 @@
   const DEPT_LABEL = { product: '产品', engineering: '工程', quality: '质检', operations: '运维' };
   const VERDICT = {
     release: { cls: 'is-release', kind: 'released', label: '放行' },
-    rework_engineering: { cls: 'is-rework', kind: 'failed', label: '退回工程' },
-    rework_product: { cls: 'is-rework', kind: 'failed', label: '退回产品' }
+    rework_engineering: { cls: 'is-rework', kind: 'failed', label: '退回工程' }
   };
   const PHASE = {
     PRODUCT_SPEC: '产品规格', ENGINEERING: '工程实现', DELIVERY: '交付', QUALITY: '质检',
