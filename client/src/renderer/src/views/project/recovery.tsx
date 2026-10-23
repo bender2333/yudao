@@ -2,7 +2,9 @@
 // 待恢复原因与修复入口、等待回答的决定请求、未完成动作与核实记录、限额、执行所有权与迟到结果。
 // 数据只来自 run.recovery、decisions.list、project.loop 与 project.overview 四个已登记的查询；
 // 状态迁移由控制层决定，页面不做任何推进，也不显示按钮声称能继续。
-// 因升级停止（原型 rc-upgrade）在 run.recovery 里没有对应的取值，本页不显示这一块。
+// 恢复观察状态按结束的方式区分（工单 #747）：正常完成是「已完成」，被取消是「已取消」，
+// 状态的说法与标记一致，页面上不出现停止原因与阶段的机器标识。
+// 因升级停止没有单独的一块（原型 rc-upgrade），停止原因里写着「因 Yudao 升级停止」。
 
 import type {
   DecisionList,
@@ -18,17 +20,18 @@ import type { Route } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import { DecisionCardList } from "../decisions/card";
 import { Empty, KeyValue, Loading, Section, Tag, show } from "./common";
-import { ACTION_STATUS, RECOVERY_STATE, STOP_REASON, departmentName, formatDuration, formatTime, label } from "./labels";
+import { ACTION_STATUS, RECOVERY_STATE, RECOVERY_STATE_KIND, STOP_REASON, departmentName, formatDuration, formatTime, label } from "./labels";
 import { RestartOnboarding } from "./restart-onboarding";
 import { useSnapshot } from "./use-snapshot";
 import { readFailureText } from "../../contract/read-failure";
 
-// 恢复观察状态对应的原型标记（原型 v10 views/recovery.js 的 STATE_KIND）
-const STATE_KIND: Record<string, string> = {
-  running: "running",
-  interrupted: "interrupted",
-  waiting_resume: "waiting",
-  terminated: "cancelled",
+// 四种结束方式（原型 rc-reason）：按状态给出不同的说明。
+// 正常完成不是被中止（工单 #747），被取消是用户自己的决定。
+const TERMINAL_NOTES: Record<string, string> = {
+  completed: "已完成的运行不再继续；未完成动作不由恢复处理。",
+  paused: "运行暂停，等待处理；处理以后可以继续。",
+  cancelled: "取消是用户自己的决定；未完成动作不由恢复处理。",
+  stopped: "已停止的运行不再继续；未完成动作不由恢复处理。",
 };
 
 // 动作状态对应的原型标记（原型 v10 views/recovery.js 的 ACTION_KIND）；
@@ -123,7 +126,7 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
   );
 }
 
-// 恢复观察状态（原型 rc-state）：五种状态按原型排成一排，当前一项用原型标记显示
+// 恢复观察状态（原型 rc-state）：七种状态按原型排成一排，当前一项用原型标记显示
 function StateBlock(props: { title: string; data: RunRecoveryResult; startedAt: string | null }) {
   const current = props.data.state;
   return (
@@ -137,7 +140,7 @@ function StateBlock(props: { title: string; data: RunRecoveryResult; startedAt: 
         {Object.keys(RECOVERY_STATE).map((state) => (
           <li key={state} className={`y10-rc-state${state === current ? ` is-on is-${state}` : ""}`}>
             {state === current
-              ? <StatusMark kind={STATE_KIND[state]} text={label(RECOVERY_STATE, state)} />
+              ? <StatusMark kind={RECOVERY_STATE_KIND[state]} text={label(RECOVERY_STATE, state)} />
               : label(RECOVERY_STATE, state)}
           </li>
         ))}
@@ -154,8 +157,8 @@ function StateBlock(props: { title: string; data: RunRecoveryResult; startedAt: 
   );
 }
 
-// 待恢复原因、中断位置与已终止（原型 rc-reason）：按状态给出不同内容。
-// 已终止的 run 不再继续，未完成动作不由恢复处理，只显示终止原因与所在部门
+// 待恢复原因、中断位置与四种结束方式（原型 rc-reason）：按状态给出不同内容。
+// 已结束的 run 不再继续，未完成动作不由恢复处理，只显示结束原因与所在部门
 function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null }) {
   const data = props.data;
   if (data.state === "waiting_resume") {
@@ -197,17 +200,19 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
       </Section>
     );
   }
-  if (data.state === "terminated") {
+  // 四种结束方式：标题与状态一致，停止原因与所在部门照旧列出（工单 #747）
+  const note = TERMINAL_NOTES[data.state];
+  if (note !== undefined) {
     const item = props.item;
     return (
-      <Section id="rc-reason" title="已终止" className="y10-rc-reason-block">
+      <Section id="rc-reason" title={label(RECOVERY_STATE, data.state)} className="y10-rc-reason-block">
         <KeyValue
           items={[
             ["停止原因", item?.stop_reason ? label(STOP_REASON, item.stop_reason) : "未上报"],
             ["所在部门", item?.department ? departmentName(item.department) : "没有在部门里执行"],
           ]}
         />
-        <p className="y10-note note">已终止的执行不再继续；未完成动作不由恢复处理。</p>
+        <p className="y10-note note">{note}</p>
       </Section>
     );
   }
