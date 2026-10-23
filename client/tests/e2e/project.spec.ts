@@ -752,6 +752,72 @@ test.describe("项目页面（1440×900）", () => {
     }
   });
 
+  // 工单 #801：部门工作间的「本部门的模型请求」带着 ?dept= 进观测页，
+  // 观测页按它只显示这个部门的请求；范围（?w=）与部门筛选（?dept=）各写各的。
+  test("部门工作间：本部门的模型请求只显示这个部门的请求", async () => {
+    const client = await openProjectClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      const id = await projectId(page, SAMPLE);
+      // 整个项目：三部门各一次模型请求
+      await gotoView(page, id, "observe");
+      const all = page.locator("section.card table").first();
+      await expect(all.locator("tbody tr")).toHaveCount(3);
+      // 部门工作间里的入口：点「本部门的模型请求」
+      await gotoView(page, id, "dept/quality");
+      await page.getByRole("link", { name: "本部门的模型请求" }).click();
+      await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?dept=quality`);
+      // 观测页按这个部门筛选：只剩质检的请求，不是整个项目的三条
+      const filtered = page.locator("section.card table").first();
+      await expect(filtered.locator("tbody tr")).toHaveCount(1);
+      await expect(filtered.locator("tbody tr").first().locator("td").nth(3)).toHaveText("质检");
+      // 部门这一格显示当前筛选的部门；页面上说明当前只看这个部门的请求
+      const record = await section(page, "请求记录与用量");
+      await expect(record.getByLabel("部门")).toHaveValue("quality");
+      await expect(record.locator(".section-head .note")).toContainText("只看质检的请求");
+      // 用量统计页签用同一组筛选：请求数与请求记录表里的一样
+      await record.getByRole("tab", { name: "用量统计" }).click();
+      await expect(record.locator('.line:has(.term:text-is("请求数")) .value')).toHaveText("1");
+      await record.getByRole("tab", { name: "请求记录" }).click();
+      // 进请求详情再回来：这一格筛选不丢
+      await filtered.locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
+      await expect.poll(async () => page.evaluate(() => window.location.hash)).toContain("dept=quality");
+      await page.getByRole("button", { name: "返回请求记录" }).click();
+      await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?dept=quality`);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(1);
+      // 换部门筛选：地址跟着改，表格按新的部门过滤
+      await record.getByLabel("部门").selectOption("product");
+      await record.getByRole("button", { name: "按条件筛选" }).click();
+      await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?dept=product`);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(1);
+      await expect(page.locator("section.card table").first().locator("tbody tr").first().locator("td").nth(3)).toHaveText("产品");
+      // 清除筛选：地址里去掉部门，表格回到整个项目
+      await record.getByRole("button", { name: "清除筛选" }).click();
+      await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe`);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(3);
+      // 换事项范围：这一格筛选不丢（?w= 与 ?dept= 各自保留）
+      await record.getByLabel("部门").selectOption("quality");
+      await record.getByRole("button", { name: "按条件筛选" }).click();
+      await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?dept=quality`);
+      const items = await fetchQuery<{ work_items: { work_item_id: string; title: string }[] }>(page, "project.overview", { project_id: id });
+      const first = items.work_items.find((item) => item.title === SAMPLE_ITEM);
+      if (first === undefined) {
+        throw new Error(`示例项目里没有事项 ${SAMPLE_ITEM}（现有：${items.work_items.map((item) => item.title).join("、")}）`);
+      }
+      await page.getByLabel("事项范围").selectOption(first.work_item_id);
+      await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?w=${first.work_item_id}&dept=quality`);
+      // 页面上不出现英文内部标识与开发者措辞
+      const text = await bodyText(page);
+      expect(text).not.toContain("dept=");
+      expect(text).not.toContain("quality");
+      expect(text).not.toContain("product");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
   // 工单 #746：顶栏的事项范围。范围是项目级的一份，写在路径参数 ?w= 中：
   // 换一个范围时留在当前页，切页签不丢范围，观测页与资料页拿得到范围。
   // 这条用例改变服务端状态（回答决定请求、新建第二个事项），用自己的一份后端，共用的那份不受影响。
