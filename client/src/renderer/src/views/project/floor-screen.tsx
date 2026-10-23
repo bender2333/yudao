@@ -61,9 +61,10 @@ export function floorModelOf(input: {
     if (workspace.roles && workspace.roles.length) roles[department] = workspace.roles;
   }
   const now = input.now ?? Date.now();
-  // 决定请求的画面内容（纯文字版本，与页面卡片同一份材料）：事项标题取本项目事项表的 sign
+  // 决定请求的画面内容（纯文字版本，与页面卡片同一份材料）：事项标题取本项目事项表的 sign，
+  // 取不到时不写事项标识（工单 #802）
   const titleOf = (workItemId: string | null): string =>
-    workItemId ? items.find((it) => it.work_item_id === workItemId)?.sign ?? workItemId : "";
+    workItemId ? items.find((it) => it.work_item_id === workItemId)?.sign ?? "" : "";
   return {
     items,
     open_requests: [],
@@ -324,7 +325,7 @@ function FloorTextList(props: {
 }): React.JSX.Element {
   const now = Date.now();
   const titleOf = (workItemId: string | null): string =>
-    workItemId ? props.items.find((it) => it.work_item_id === workItemId)?.sign ?? workItemId : "";
+    workItemId ? props.items.find((it) => it.work_item_id === workItemId)?.sign ?? "" : "";
   return (
     <>
       <details className="y10-scene-list floor-text-list">
