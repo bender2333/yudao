@@ -452,57 +452,62 @@ def test_run_asks_returns_in_progress_answered_and_unable(data_dir):
     app = Application(system)
 
     in_prog_asks = captured["in_progress_asks"]
-    assert len(in_prog_asks) == 2
-    assert in_prog_asks[0].status == "已回答"
-    assert in_prog_asks[0].requester == "product"
-    assert in_prog_asks[0].recipient == "engineering"
-    assert in_prog_asks[0].question == "Python 单文件 CLI 是否可行？"
-    assert in_prog_asks[0].answer == "标准库支持该实现，无需外部依赖。"
-    assert in_prog_asks[0].reason is None
-    assert in_prog_asks[0].start_position > 0
-    assert in_prog_asks[0].end_position is not None
-    assert in_prog_asks[0].end_position > in_prog_asks[0].start_position
+    # 同时运行以后质检也可能在这期间发起询问（工单 #557），捕获到的条数不再固定：
+    # 断言的是每一条询问的内容与状态
+    captured_by_question = {ask.question: ask for ask in in_prog_asks}
+    assert {"Python 单文件 CLI 是否可行？", "参数错误如何处理？"} <= set(captured_by_question)
+    first = captured_by_question["Python 单文件 CLI 是否可行？"]
+    assert first.status == "已回答"
+    assert first.requester == "product"
+    assert first.recipient == "engineering"
+    assert first.answer == "标准库支持该实现，无需外部依赖。"
+    assert first.reason is None
+    assert first.start_position > 0
+    assert first.end_position is not None
+    assert first.end_position > first.start_position
 
-    assert in_prog_asks[1].status == "进行中"
-    assert in_prog_asks[1].requester == "engineering"
-    assert in_prog_asks[1].recipient == "product"
-    assert in_prog_asks[1].question == "参数错误如何处理？"
-    assert in_prog_asks[1].answer is None
-    assert in_prog_asks[1].reason is None
-    assert in_prog_asks[1].start_position > in_prog_asks[0].end_position
-    assert in_prog_asks[1].end_position is None
+    second = captured_by_question["参数错误如何处理？"]
+    assert second.status == "进行中"
+    assert second.requester == "engineering"
+    assert second.recipient == "product"
+    assert second.answer is None
+    assert second.reason is None
+    assert second.start_position > first.start_position
+    assert second.end_position is None
 
     final_query = app.query("run.asks", RunAsks(run_id=run_id))
     asks = final_query.data.asks
     assert len(asks) == 3
+    # 同时运行以后几次询问的先后不再固定（工单 #557），断言的是每一条询问的内容与状态
+    by_question = {ask.question: ask for ask in asks}
 
-    assert asks[0].status == "已回答"
-    assert asks[0].requester == "product"
-    assert asks[0].recipient == "engineering"
-    assert asks[0].question == "Python 单文件 CLI 是否可行？"
-    assert asks[0].answer == "标准库支持该实现，无需外部依赖。"
-    assert asks[0].reason is None
-    assert asks[0].start_position > 0
-    assert asks[0].end_position > asks[0].start_position
+    answered = by_question["Python 单文件 CLI 是否可行？"]
+    assert answered.status == "已回答"
+    assert answered.requester == "product"
+    assert answered.recipient == "engineering"
+    assert answered.answer == "标准库支持该实现，无需外部依赖。"
+    assert answered.reason is None
+    assert answered.start_position > 0
+    assert answered.end_position > answered.start_position
 
-    assert asks[1].status == "已回答"
-    assert asks[1].requester == "engineering"
-    assert asks[1].recipient == "product"
-    assert asks[1].question == "参数错误如何处理？"
-    assert asks[1].answer == "已回答问题二"
-    assert asks[1].reason is None
-    assert asks[1].start_position > asks[0].end_position
-    assert asks[1].end_position > asks[1].start_position
+    answered_to_product = by_question["参数错误如何处理？"]
+    assert answered_to_product.status == "已回答"
+    assert answered_to_product.requester == "engineering"
+    assert answered_to_product.recipient == "product"
+    assert answered_to_product.answer == "已回答问题二"
+    assert answered_to_product.reason is None
+    assert answered_to_product.start_position > 0
+    assert answered_to_product.end_position > answered_to_product.start_position
 
-    assert asks[2].status == "没能回答"
-    assert asks[2].requester == "quality"
-    assert asks[2].recipient == "engineering"
-    assert asks[2].question == "执行入口在哪里？"
-    assert asks[2].answer is None
-    assert asks[2].reason is not None
-    assert "without calling a tool" in asks[2].reason
-    assert asks[2].start_position > asks[1].end_position
-    assert asks[2].end_position > asks[2].start_position
+    unable = by_question["执行入口在哪里？"]
+    assert unable.status == "没能回答"
+    assert unable.requester == "quality"
+    assert unable.recipient == "engineering"
+    assert unable.answer is None
+    assert unable.reason is not None
+    assert "without calling a tool" in unable.reason
+    assert unable.start_position > 0
+    assert unable.end_position > unable.start_position
 def test_flow_records_cover_delivery_problem_and_rework(data_dir):
     # 工单 #556：阶段迁移事件没有了，交接与返工的记录由正式成果给出（版本交付、质检退回）
     system = _system(data_dir, _rework_script())
@@ -539,6 +544,8 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
                 background="Quality is preparing its verdict.",
                 expected="Name the acceptance line to follow.",
             ),
+            # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）
+            explore_turn(),
             review_turn(
                 "rework_engineering", "质检退回",
                 defects=[{"severity": "minor", "summary": "空输入需要处理"}],
