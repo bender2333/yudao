@@ -205,17 +205,17 @@ sequenceDiagram
 
 ## 12. 从现有代码过去的路径（工单）
 
-全部工单都是 `touches-core`，一次只进行一张；M0 剩下的循环结构工单（#557 至 #561）关闭以后放出。每张工单的「只改」以放出时核对的 main 为准。
+父工单 #823。S1 至 S6 都是 `touches-core`，一次只进行一张；M0 剩下的循环结构工单（#557 至 #561）关闭以后放出。每张工单的「只改」以放出时核对的 main 为准。
 
 | 工单 | 内容 | 只改（主要） | 验收 | 前置 |
 | --- | --- | --- | --- | --- |
-| S1 最小投影 | 新模块 `harness/kernel_projection.py`（名称在工单里定）从骨架事件折叠第 4 节的六项；写入口、裁决入口、边界的核对改读它；`RunProjection` 保留给应用 | `projection.py`、`models.py`、`write_path.py`、`adjudication.py`、`validation.py`、`bounds.py`、`orchestrator.py`、`kernel-manifest.json`、内核测试 | 内核的不变式测试通过；裁决模块不再导入 `RunProjection`；事件序列基准不变；内核清单的修改由用户在合并时批准 | 无 |
-| S2 路由契约与成果驱动路由 | 路由契约（第 5.1 节）成为一个带版本的协议；成果驱动的实现从 `orchestrator.py` 分出，名称 `watched_outputs`；组织定义增加 `routing`，默认值即现状 | `orchestrator.py`、新路由模块、`definitions/organization.json`、`definitions/__init__.py`、相关测试 | 用假模型跑完三部门循环的事件序列与基准一致；定义里把 `routing` 改成不存在的名称时加载失败并写明原因 | S1 |
-| S3 执行契约与装配契约 | `StepDriver` 与 `SafeNode`、`ContextAssembly` 的接口写成带版本的协议，薄驱动只经它们调用 | `engine.py`、`assembly.py`、`recording.py`、`orchestrator.py`、相关测试 | 接口模块只导入内核与标准库；实现声明版本；基准不变 | S1 |
-| S4 薄驱动 | `orchestrator.py` 剩下的部分只做第 6 节的五件事；拆出决定请求的处理与建档的流转到应用层 | `orchestrator.py`、`runtime.py`、`app/` 中接收拆出部分的模块、相关测试 | 一项单元层测试检索薄驱动源码里的部门标识与成果种类，命中即失败；薄驱动行数写进工单的验收 | S2、S3 |
-| S5 骨架事件与应用事件 | 按第 7 节把 `EventType` 分成两组；事件信封与骨架事件的数据结构留在内核文件，应用事件的数据结构移出；应用的投影从 `projection.py` 移到知识层 | `models.py`、新的应用事件模块、`projection.py`、`app/` 的读取模型、`kernel-manifest.json`、相关测试 | 内核文件的行数下降并写进清单；导入方向的测试通过；重放核对通过 | S1 |
-| S6 兼容的检查 | import-linter 增加合同：契约模块只导入内核与标准库，应用不导入薄驱动的内部；骨架事件种类的登记表与「只增」的测试；路由契约版本的测试 | `pyproject.toml` 或 `importlinter` 配置、`harness/tests/kernel/`、登记表 | 删除一种骨架事件或一个信封字段时测试失败 | S2 至 S5 |
-| S7 真实用户场景验收的运行器 | 第 11 节的运行器与第一批五个任务 | `evals/` | 代理照 README 完成「配模型并跑完一个事项」，判分代码从数据库核对 | 评测工作线，S4 之后 |
+| S1 最小投影（#824） | 新模块 `harness/kernel_projection.py`（名称在工单里定）从骨架事件折叠第 4 节的六项；写入口、裁决入口、边界的核对改读它；`RunProjection` 保留给应用 | `projection.py`、`models.py`、`write_path.py`、`adjudication.py`、`validation.py`、`bounds.py`、`orchestrator.py`、`kernel-manifest.json`、内核测试 | 内核的不变式测试通过；裁决模块不再导入 `RunProjection`；事件序列基准不变；内核清单的修改由用户在合并时批准 | 无 |
+| S2 路由契约与成果驱动路由（#825） | 路由契约（第 5.1 节）成为一个带版本的协议；成果驱动的实现从 `orchestrator.py` 分出，名称 `watched_outputs`；组织定义增加 `routing`，默认值即现状 | `orchestrator.py`、新路由模块、`definitions/organization.json`、`definitions/__init__.py`、相关测试 | 用假模型跑完三部门循环的事件序列与基准一致；定义里把 `routing` 改成不存在的名称时加载失败并写明原因 | S1 |
+| S3 执行契约与装配契约（#826） | `StepDriver` 与 `SafeNode`、`ContextAssembly` 的接口写成带版本的协议，薄驱动只经它们调用 | `engine.py`、`assembly.py`、`recording.py`、`orchestrator.py`、相关测试 | 接口模块只导入内核与标准库；实现声明版本；基准不变 | S1 |
+| S4 薄驱动（#827） | `orchestrator.py` 剩下的部分只做第 6 节的五件事；拆出决定请求的处理与建档的流转到应用层 | `orchestrator.py`、`runtime.py`、`app/` 中接收拆出部分的模块、相关测试 | 一项单元层测试检索薄驱动源码里的部门标识与成果种类，命中即失败；薄驱动行数写进工单的验收 | S2、S3 |
+| S5 骨架事件与应用事件（#828） | 按第 7 节把 `EventType` 分成两组；事件信封与骨架事件的数据结构留在内核文件，应用事件的数据结构移出；应用的投影从 `projection.py` 移到知识层 | `models.py`、新的应用事件模块、`projection.py`、`app/` 的读取模型、`kernel-manifest.json`、相关测试 | 内核文件的行数下降并写进清单；导入方向的测试通过；重放核对通过 | S1 |
+| S6 兼容的检查（#829） | import-linter 增加合同：契约模块只导入内核与标准库，应用不导入薄驱动的内部；骨架事件种类的登记表与「只增」的测试；路由契约版本的测试 | `pyproject.toml` 或 `importlinter` 配置、`harness/tests/kernel/`、登记表 | 删除一种骨架事件或一个信封字段时测试失败 | S2 至 S5 |
+| S7 真实用户场景验收的运行器（#830） | 第 11 节的运行器与第一批五个任务 | `evals/` | 代理照 README 完成「配模型并跑完一个事项」，判分代码从数据库核对 | 评测工作线，S4 之后 |
 
 现有工单的关系：迭代底座的 B2（#344、#350）已完成，`bounds.py` 就是分出来的边界核对；B1 的内核清单与不变式测试（#352 至 #354）继续，S1 与 S5 修改清单的条目；B7（#348、#355、#356）不变。#620（应用层只导入控制核心的公开接口）与 S6 合并处理；#619（接口版本快照）是第 9 节的兼容办法。暂缓的黑板编排（PR #751）恢复时按第 5.1 节写成第二个路由实现。
 
