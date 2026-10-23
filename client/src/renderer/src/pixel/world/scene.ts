@@ -162,11 +162,13 @@ export function createScene(opts: SceneOptions): SceneLike {
     stepScene(deltaMs) {
       scene.realT += deltaMs;
       if (!scene.frozen && !scene.reduced) scene.animT += deltaMs;
-      for (const actor of scene.actors.slice()) advanceActor(scene, actor, deltaMs);
-      advanceFlyers(scene);
-      advanceParticles(scene, deltaMs);
+      // 一帧里的顺序与原型 engine.js 的 frame 一致：先到点的回调，再小人，再粒子与飞行物。
+      // 回调先跑，定时开始的脚本才能在同一帧里迈出第一步，与原型一样。
       for (const timer of scene.afterCallbacks.filter((x) => x.at <= scene.realT)) timer.fn();
       scene.afterCallbacks = scene.afterCallbacks.filter((x) => x.at > scene.realT);
+      for (const actor of scene.actors.slice()) advanceActor(scene, actor, deltaMs);
+      advanceParticles(scene, deltaMs);
+      advanceFlyers(scene);
     },
     hasTween: opts.tween !== undefined,
     tween: opts.tween ?? (() => ({ kill: () => {} })),

@@ -1431,11 +1431,11 @@
     const KEEP_ACTIONS = new Set(['seal', 'stamp_valid', 'stamp_release', 'stamp_rework']);
 
     function keepPending(a) {
-      // 正在做或排在队里的交接与盖章
+      // 正在做或排在队里的交接与盖章（队里的任何一条，不只是队首）
       if (a.data.handoff) return true;
       if (a.data.doing && KEEP_ACTIONS.has(a.data.doing)) return true;
       const q = a.data.queue;
-      return !!(q && q.length && KEEP_ACTIONS.has(q[0].action));
+      return !!(q && q.some((item) => KEEP_ACTIONS.has(item.action)));
     }
 
     // -------------------------------------------------------------------------

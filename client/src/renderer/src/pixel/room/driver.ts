@@ -1428,7 +1428,8 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     const keepPending = (): boolean => {
       if (a.handoff) return true;
       if (a.doing && KEEP_ACTIONS.has(a.doing)) return true;
-      return a.queue.length > 0 && KEEP_ACTIONS.has(a.queue[0].action);
+      // 队里的任何一条交接与盖章都算数，不只是队首那条（原型 v11 第 2 条）
+      return a.queue.some((item) => KEEP_ACTIONS.has(item.action));
     };
     // 原型 room.js 的口径：立即执行的动作清掉排队的条目；排队的条目超出上限时丢掉最早的
     if (IMMEDIATE.has(action) || (actor && scene.inTail(actor))) {
