@@ -340,6 +340,11 @@ class ActivationFinishedPayload(Versions):
     elapsed_ms: int
     activations: int
     model_steps: int
+    # 这个会话自己累计的已用量（工单 #475）：重新启动以后从事件恢复，连续累计。
+    # 旧事件没有这些字段，按 0 处理
+    session_elapsed_ms: int = 0
+    session_activations: int = 0
+    session_model_steps: int = 0
     stop_reason: str | None
 
 

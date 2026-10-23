@@ -13125,6 +13125,21 @@
             "title": "Model Steps",
             "type": "integer"
           },
+          "session_elapsed_ms": {
+            "default": 0,
+            "title": "Session Elapsed Ms",
+            "type": "integer"
+          },
+          "session_activations": {
+            "default": 0,
+            "title": "Session Activations",
+            "type": "integer"
+          },
+          "session_model_steps": {
+            "default": 0,
+            "title": "Session Model Steps",
+            "type": "integer"
+          },
           "stop_reason": {
             "anyOf": [
               {

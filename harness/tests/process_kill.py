@@ -112,16 +112,20 @@ def _with_fields(turn: Any, rest: dict[str, Any]) -> FakeTurn:
 
 
 def _hold_after(system: LoopSystem, event_type: str, directory: Path, *,
-                action_id: str | None = None) -> None:
+                action_id: str | None = None, session_prefix: str | None = None) -> None:
     # 在指定事件提交以后停在这个位置：写下 hold 标记以后一直等待，由父进程终止这个进程。
     # 同步执行的工具（读取、写入、编辑、删除、移动）没有可以等待的子进程，只能在这一刻停住，
     # 这次动作的结果因此没有落盘；父进程见到 hold 标记以后终止，恢复时这次动作的结果未知。
     # 给出 action_id 时只在这个调用编号的那次事件上停（同一个工具的前几次调用不算）。
+    # 给出 session_prefix 时只在这个会话的事件上停（工单 #475：停住某个会话的一次模型请求，
+    # 用来观察会话进行中重新启动以后这个会话怎样继续）。
     # 恢复途中注册这个钩子时，停住的是恢复自动重新执行的那一次尝试
     marker = directory / "hold"
 
     def hold(event: Any) -> None:
         if action_id is not None and str((event.payload or {}).get("id")) != action_id:
+            return
+        if session_prefix is not None and not str(event.session_id or "").startswith(session_prefix):
             return
         marker.write_text("holding", encoding="utf-8")
         while True:
@@ -199,6 +203,8 @@ def main() -> None:
     parser.add_argument("--hold-dir", type=Path, default=None, help="hold 标记所在的目录")
     parser.add_argument("--hold-action", type=str, default=None,
                         help="只在这个调用编号的那次事件上停住")
+    parser.add_argument("--hold-session", type=str, default=None,
+                        help="只在这个会话编号前缀的事件上停住（工单 #475：会话进行中重新启动）")
     parser.add_argument("--workspace-files", type=Path, default=None,
                         help="工作区种子文件的 JSON（路径到内容），在事项开始以前写入")
     parser.add_argument("--onboard", action="store_true",
@@ -222,7 +228,8 @@ def main() -> None:
     system = LoopSystem.for_testing(args.data_dir, FakeAdapter(build_script(items)),
                                     resume_on_startup=args.hold_after is None)
     if args.hold_after is not None:
-        _hold_after(system, args.hold_after, args.hold_dir, action_id=args.hold_action)
+        _hold_after(system, args.hold_after, args.hold_dir, action_id=args.hold_action,
+                    session_prefix=args.hold_session)
     if args.resume_only:
         try:
             print(json.dumps({"run_id": None, "phase": "resumed",
@@ -269,7 +276,8 @@ if __name__ == "__main__":
 
 def _spawn(data_dir: Path, script: Path, task: str, log: Path, *,
            hold_after: str | None = None, hold_dir: Path | None = None,
-           hold_action: str | None = None, workspace_files: Path | None = None,
+           hold_action: str | None = None, hold_session: str | None = None,
+           workspace_files: Path | None = None,
            onboard: Path | None = None, settle: bool = False,
            answer_revise: str | None = None,
            await_file: tuple[str, str] | None = None, await_dir: Path | None = None,
@@ -285,6 +293,8 @@ def _spawn(data_dir: Path, script: Path, task: str, log: Path, *,
         argv.extend(["--hold-after", hold_after, "--hold-dir", str(hold_dir)])
         if hold_action is not None:
             argv.extend(["--hold-action", hold_action])
+        if hold_session is not None:
+            argv.extend(["--hold-session", hold_session])
     if workspace_files is not None:
         argv.extend(["--workspace-files", str(workspace_files)])
     if onboard is not None:
@@ -451,6 +461,7 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
                 started: Path | None = None,
                 hold_after: str | None = None,
                 hold_action: str | None = None,
+                hold_session: str | None = None,
                 await_file: tuple[str, str] | None = None,
                 onboard: Path | None = None,
                 settle: bool = False,
@@ -485,7 +496,8 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]], *,
 
     await_dir = None if await_file is None else data_dir / "workspaces"
     process = _spawn(data_dir, script_file, task, log, hold_after=hold_after,
-                     hold_dir=hold_dir, hold_action=hold_action, workspace_files=files_file,
+                     hold_dir=hold_dir, hold_action=hold_action, hold_session=hold_session,
+                     workspace_files=files_file,
                      onboard=onboard, settle=settle, answer_revise=answer_revise,
                      await_file=None if await_file is None else (await_file[0], await_file[1]),
                      await_dir=await_dir, run_time_limit_sec=run_time_limit_sec)

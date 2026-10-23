@@ -55,7 +55,7 @@ PARAMETERS_VERSION = initial_version()
 
 BASELINE_DIR = Path(__file__).parent / "event_sequences"
 
-_TIME_KEYS = frozenset({"duration_ms", "latency_ms", "elapsed_ms"})
+_TIME_KEYS = frozenset({"duration_ms", "latency_ms", "elapsed_ms", "session_elapsed_ms"})
 _ISO_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)")
 _ELAPSED = re.compile(r"run wall-clock time \d+s")
 _GENERATED_ID = re.compile(r"(?<![A-Za-z0-9_])([a-z]+(?:_[a-z]+)*)_([0-9a-f]{16})(?![0-9a-f])")
@@ -91,7 +91,8 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
                            "guidance_ids", "guidance_only", "input_version", "limit", "prompt_version",
                            "purpose", "step_id"),
     "activation_finished": ("activation_id", "activations", "guidance_ids", "guidance_only", "input_version",
-                            "model_steps", "prompt_version", "stop_reason"),
+                            "model_steps", "prompt_version", "session_activations", "session_elapsed_ms",
+                            "session_model_steps", "stop_reason"),
     "context_assembled": ("activation_id", "admitted", "attempt", "attempt_id",
                           "compaction_event_id", "department", "effective_contract_hash", "guidance_ids",
                           "guidance_only", "input_version", "logical_call_id", "prompt_version", "purpose",

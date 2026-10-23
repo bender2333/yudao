@@ -100,6 +100,7 @@
 "test_issue_374.py" = "integration"
 "test_issue_384.py" = "integration"
 "test_issue_350_usage_resumes.py" = "integration"
+"test_issue_475.py" = "integration"
 "test_layers.py" = "unit"
 "test_layer_boundaries.py" = "module"
 "test_lesson_candidates.py" = "integration"

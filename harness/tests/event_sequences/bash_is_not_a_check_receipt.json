@@ -367,6 +367,9 @@
     "input_version": 1,
     "model_steps": 1,
     "prompt_version": 0,
+    "session_activations": 1,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 1,
     "stop_reason": null
    }
   },
@@ -835,6 +838,9 @@
     "input_version": 1,
     "model_steps": 2,
     "prompt_version": 0,
+    "session_activations": 1,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 1,
     "stop_reason": null
    }
   },
@@ -1304,6 +1310,9 @@
     "input_version": 1,
     "model_steps": 3,
     "prompt_version": 0,
+    "session_activations": 2,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 2,
     "stop_reason": null
    }
   },
@@ -1728,6 +1737,9 @@
     "input_version": 1,
     "model_steps": 4,
     "prompt_version": 0,
+    "session_activations": 3,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 3,
     "stop_reason": null
    }
   },
@@ -2149,6 +2161,9 @@
     "input_version": 1,
     "model_steps": 5,
     "prompt_version": 0,
+    "session_activations": 1,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 1,
     "stop_reason": "released"
    }
   }
@@ -2167,7 +2182,7 @@
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
-  "run_event_version": 8,
+  "run_event_version": 9,
   "stream_version": 86,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
