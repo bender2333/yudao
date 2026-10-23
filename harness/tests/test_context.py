@@ -184,7 +184,8 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
         }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
-    run_id = system.create_run("build echo", max_cycles=12)
+    # 同时运行以后激活的次数变多（质检多一轮预测性探索与返工），循环上限给足
+    run_id = system.create_run("build echo", max_cycles=24)
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请补充两条产品决定。")
     projection = system.run_until_stop(run_id)
