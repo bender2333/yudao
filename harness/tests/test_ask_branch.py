@@ -9,6 +9,7 @@ from harness.models import EventType
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
+from harness.tests.helpers import explore_turn
 
 
 def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path):
@@ -99,7 +100,7 @@ def test_ask_answer_with_spec_revision_continuous_work(tmp_path: Path):
                       )["content_hash"]),
             ]),
         ],
-        "quality": [review_turn("release", "valid uppercase implementation")],
+        "quality": [explore_turn(), review_turn("release", "valid uppercase implementation")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -146,7 +147,7 @@ def test_ask_branch_history_isolation(tmp_path: Path):
             delivery_turn(),
         ],
         "product:ask": [product_branch_turn],
-        "quality": [review_turn("release", "ok")],
+        "quality": [explore_turn(), review_turn("release", "ok")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -300,7 +301,7 @@ def test_ask_answer_requirements_only_rejected_and_cannot_lose_acceptance_criter
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"}),
         ],
         "product:ask": [product_branch_steps, product_branch_steps],
-        "quality": [review_turn("release", "valid uppercase implementation")],
+        "quality": [explore_turn(), review_turn("release", "valid uppercase implementation")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -348,7 +349,7 @@ def test_ask_answer_echoing_only_basis_hash_creates_no_revision(tmp_path: Path):
                       )["content_hash"]),
             ]),
         ],
-        "quality": [review_turn("release", "valid echo implementation")],
+        "quality": [explore_turn(), review_turn("release", "valid echo implementation")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -389,7 +390,7 @@ def test_ask_answered_payload_parties_and_status(tmp_path: Path):
                 _call("ans-1", "answer", answer="Clarification given."),
             ]),
         ],
-        "quality": [review_turn("release", "ok")],
+        "quality": [explore_turn(), review_turn("release", "ok")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -426,7 +427,7 @@ def test_ask_branch_exhausted_ends_with_unable_and_usage_charged(tmp_path: Path)
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [product_branch_invalid],
-        "quality": [review_turn("release", "ok")],
+        "quality": [explore_turn(), review_turn("release", "ok")],
     }
     adapter = FakeAdapter(scripts)
     # 提问方上限 4 步，被询问部门声明上限 1 步
@@ -479,7 +480,7 @@ def test_ask_branch_exhausted_by_requester_remaining_steps_ends_with_unable(tmp_
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [product_branch_two_steps],
-        "quality": [review_turn("release", "ok")],
+        "quality": [explore_turn(), review_turn("release", "ok")],
     }
     adapter = FakeAdapter(scripts)
     # 提问方上限 2 步（发起 ask 消耗 1 步，剩余 1 步），被询问部门声明上限 4 步
@@ -603,7 +604,7 @@ def test_ask_branch_no_tool_call_ends_with_unable(tmp_path: Path):
                                   "content": [{"type": "output_text", "text": "Just plain text."}]}])
             for i in range(limit + 1)
         ],
-        "quality": [review_turn("release", "ok")],
+        "quality": [explore_turn(), review_turn("release", "ok")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -643,7 +644,7 @@ def test_ask_branch_exhausted_by_department_time_limit_ends_with_unable(tmp_path
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [product_branch_slow],
-        "quality": [review_turn("release", "ok")],
+        "quality": [explore_turn(), review_turn("release", "ok")],
     }
     adapter = FakeAdapter(scripts)
     step_limits = StepLimits(department_max_time_sec={"product": 0.2})
@@ -684,7 +685,7 @@ def test_ask_branch_exhausted_by_run_time_limit_ends_with_unable(tmp_path: Path)
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [product_branch_slow],
-        "quality": [review_turn("release", "ok")],
+        "quality": [explore_turn(), review_turn("release", "ok")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(
