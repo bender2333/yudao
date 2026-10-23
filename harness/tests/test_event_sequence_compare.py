@@ -24,35 +24,53 @@ def _swap(events, first, second):
     events[first], events[second] = events[second], events[first]
 
 
+def _index(events, predicate):
+    return next(index for index, event in enumerate(events) if predicate(event))
+
+
+# 因果边由这些事件种类给出：调换它们与别的会话的事件会改变因果边的方向（工单 #556）
+_OUTCOME_TYPES = {"spec_accepted", "contract_accepted", "delivery_accepted", "qa_submitted",
+                  "baseline_review_accepted", "run_done", "ask_started", "ask_answered"}
+
+
+def _adjacent_cross_session_pair(events):
+    # 相邻的、分属两个会话、且不带因果边的两条事件：调换它们不改变任何会话内部的顺序，
+    # 也不改变因果边的方向（工单 #557：同时运行的会话让事件的全局顺序随运行变化，
+    # 基准的比较按会话进行，这样的调换应当仍然通过）
+    for index in range(len(events) - 1):
+        one, other = events[index], events[index + 1]
+        if one.get("session_id") == other.get("session_id"):
+            continue
+        if one["type"] in _OUTCOME_TYPES or other["type"] in _OUTCOME_TYPES:
+            continue
+        return index, index + 1
+    raise AssertionError("no adjacent events from different sessions without a causal edge")
+
+
 def test_cross_session_interleave_still_passes():
-    # 调换两个会话之间事件交错的先后（会话内部顺序与因果关系不变）：产品组收尾的
-    # activation_finished（<evt#14>）与工程组开头的 department_activated（<evt#15>）在数组里
-    # 相邻且分属两组，调换后两组各自的内部顺序不变，成果 → activation 边的方向也不变，
-    # 应通过；工程组收尾（<evt#32>）与质检组开头（<evt#33>）同样调换一对
+    # 调换两个会话之间事件交错的先后（会话内部顺序与因果关系不变）：两个会话各自收尾与开头的
+    # 事件在数组里相邻且分属两组，调换后两组各自的内部顺序不变，成果 → activation 边的方向也不变，
+    # 应通过
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     events = actual["events"]
-    first = next(i for i, e in enumerate(events) if e["event"] == "<evt#14>")
-    second = next(i for i, e in enumerate(events) if e["event"] == "<evt#15>")
-    assert second == first + 1
+    first, second = _adjacent_cross_session_pair(events)
     _swap(events, first, second)
-    third = next(i for i, e in enumerate(events) if e["event"] == "<evt#32>")
-    fourth = next(i for i, e in enumerate(events) if e["event"] == "<evt#33>")
-    assert fourth == third + 1
+    third, fourth = _adjacent_cross_session_pair(events)
     _swap(events, third, fourth)
     compare_documents("handoff_release", expected, actual)
 
 
 def test_intra_session_swap_fails_with_diff():
-    # 调换工程会话内部两条相邻的工具事件（<evt#26> tool_started 与 <evt#27> tool_called，计划删除后编号前移）：
-    # 会话内顺序变了，分组比较应失败并点名差异
+    # 调换工程会话内部两条相邻的同类工具事件：会话内顺序变了，分组比较应失败并点名差异
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     events = actual["events"]
-    first = next(i for i, e in enumerate(events) if e["event"] == "<evt#26>")
-    second = next(i for i, e in enumerate(events) if e["event"] == "<evt#27>")
-    assert events[first]["session_id"] == events[second]["session_id"] == "<ses_eng#1>"
-    assert second == first + 1
+    first = _index(events, lambda e: e["session_id"] == "<ses_eng#1>" and e["type"] == "tool_called")
+    second = first + 1
+    while not (events[second]["session_id"] == "<ses_eng#1>"
+               and events[second]["type"] == events[first]["type"]):
+        second += 1
     _swap(events, first, second)
     with pytest.raises(AssertionError) as raised:
         compare_documents("handoff_release", expected, actual)
@@ -62,15 +80,16 @@ def test_intra_session_swap_fails_with_diff():
 
 
 def test_handoff_edge_reversed_fails_with_diff():
-    # 让交付的接纳落在下一个部门开始之后：把质检组的 department_activated（<evt#33>）
-    # 搬到工程组的 delivery_accepted（<evt#31>）之前。搬家跨过的事件里没有质检组的事件，
-    # 每个会话内部的相对顺序都不变，分组比较通过；但成果 → 下一个部门开始的因果边反向，
-    # 应失败并点名因果边（工单 #556：没有阶段迁移事件，因果边由正式成果给出）
+    # 让交付的接纳落在下一个部门开始之后：把交付以后的质检部门激活搬到交付被接纳之前。
+    # 搬家跨过的事件里没有质检组的事件，每个会话内部的相对顺序都不变，分组比较通过；
+    # 但成果 → 下一个部门开始的因果边反向，应失败并点名因果边（工单 #556：没有阶段迁移事件，
+    # 因果边由正式成果给出）
     expected = _load("handoff_release")
     actual = copy.deepcopy(expected)
     events = actual["events"]
-    outcome = next(i for i, e in enumerate(events) if e["event"] == "<evt#31>")
-    activation = next(i for i, e in enumerate(events) if e["event"] == "<evt#33>")
+    outcome = _index(events, lambda e: e["type"] == "delivery_accepted")
+    activation = _index(events, lambda e: e["type"] == "department_activated"
+                        and e["session_id"] == "<ses_qua#1>" and e["event"] > events[outcome]["event"])
     assert events[outcome]["type"] == "delivery_accepted"
     assert events[activation]["type"] == "department_activated"
     assert outcome < activation
