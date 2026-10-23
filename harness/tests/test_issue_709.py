@@ -189,3 +189,27 @@ def test_the_writeback_command_explains_an_unusable_target_in_chinese(tmp_path):
     finally:
         store.close()
         gc.collect()
+
+
+def test_the_automatic_writeback_does_not_fail_the_adoption_when_the_target_is_unusable(tmp_path):
+    # 采纳以后自动发起的写回：目标不可用时做不了，也不因此让这一次采纳失败。
+    # 页面上这一次采纳仍是「还没有写回」，用户在设置页改好以后按「写回成果」重新发起，
+    # 那时命令给出中文的理由（工单 #709）
+    bare_path = tmp_path / "bare.git"
+    _bare_repo(bare_path)
+    store, artifacts, projects, project_id = _project_with_adoption(
+        tmp_path, remote=str(bare_path), target_branch="main")
+    try:
+        projects.configure_source_directory(
+            project_id, "default", str(tmp_path / "src"), base_version=1,
+            writeback_enabled=True, remote=str(tmp_path / "no-such-repo.git"), target_branch="main",
+            check_commands=[PASSING_CHECK])
+        projects._trigger_writeback_if_enabled(project_id, "adopt_1")
+        # 采纳仍然在项目里，写回没有发生
+        projection = projects.projection(project_id)
+        assert projection.current_adoption is not None
+        assert projection.current_adoption.adoption_id == "adopt_1"
+        assert projection.writebacks == []
+    finally:
+        store.close()
+        gc.collect()

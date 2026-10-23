@@ -836,9 +836,17 @@ class ProjectService:
     def _trigger_writeback_if_enabled(self, project_id: str, adoption_id: str) -> None:
         # 采纳以后按源目录登记的写回设置执行写回（ADR-0034）：停止与冲突由写回自己记成事件，
         # 不在这里吞掉结果；异常表示写回没有产生事件，由用户重新发起
+        # 写回目标不可用时（目标仓库不存在、那个路径不是 git 仓库、目标分支不存在），
+        # 自动写回做不了，也不因此让这一次采纳失败：页面上这一次采纳仍是「还没有写回」，
+        # 用户在项目设置页改好设置以后按「写回成果」重新发起，那时命令给出中文的理由（工单 #709）
+        from .writeback import WritebackTargetUnavailable
+
         project = self.projection(project_id)
         if any(d.writeback_enabled for d in project.source_directories.values()):
-            self.execute_writeback(project_id, adoption_id)
+            try:
+                self.execute_writeback(project_id, adoption_id)
+            except WritebackTargetUnavailable:
+                return
 
     def execute_writeback(
         self,
