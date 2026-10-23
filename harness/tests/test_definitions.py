@@ -309,27 +309,6 @@ def test_malformed_json_duplicate_keys_and_missing_files_are_reported(tmp_path):
     assert raised.value.issues == (("rules.json", "（整个文件）", "定义文件不存在"),)
 
 
-def _without_quality(directory: Path) -> None:
-    organization = _read(directory, "organization.json")
-    organization["departments"] = organization["departments"][:2]
-    _write(directory, "organization.json", organization)
-    for name, key in (("roles.json", None), ("proposal_contracts.json", "roles"),
-                      ("work_items.json", ("kinds", "onboarding", "departments")),
-                      ("work_items.json", ("kinds", "change", "departments"))):
-        content = _read(directory, name)
-        target = content
-        steps = [] if key is None else ([key] if isinstance(key, str) else list(key))
-        for step in steps:
-            target = target[step]
-        del target["quality"]
-        _write(directory, name, content)
-    # 规则登记里的可见范围条目同样要去掉这个部门
-    rules = _read(directory, "rules.json")
-    del rules["roles.quality.visibility"]
-    _write(directory, "rules.json", rules)
-
-
-
 def _with_unimplemented_tool(directory: Path) -> None:
     tools = _read(directory, "tools.json")
     tools["fetch_url"] = {**tools["read_file"], "description": "Fetch one registered URL."}
@@ -345,8 +324,6 @@ def _with_unimplemented_tool(directory: Path) -> None:
                                "max_cycles": {**_read(directory, "rules.json")["max_cycles"],
                                               "value": -1}}),
      "rules.json max_cycles："),
-    # 控制核心的阶段迁移只为产品、工程、质检写了阶段
-    (_without_quality, "organization.json departments：控制核心的阶段迁移按顺序支持部门 product、engineering、quality"),
     # 执行环境没有实现的环境工具
     (_with_unimplemented_tool, "tools.json fetch_url：执行环境没有这个环境工具的实现"),
 ])

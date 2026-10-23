@@ -8,7 +8,7 @@ from typing import Any
 
 from .models import (
     DEPARTMENTS, QUALITY_ACTIVE, TERMINAL_PHASES, Event,
-    EventType, RunProjection, department_for_phase, hash_bytes, json_dumps,
+    EventType, RunProjection, hash_bytes, json_dumps,
 )
 from .definitions import DEFINITIONS
 from .tools import proposal_kind, proposal_kinds
@@ -25,20 +25,129 @@ _ACCEPTED_RESULTS = {
 _GUIDANCE_ACCEPTED = _ACCEPTED_RESULTS
 _GUIDANCE_RESPONSE_STATUSES = {"explained", "completed", "declined", "needs_work"}
 
+# 指导还没处理完的两种状态（判定待处理指导的口径）
+PENDING_GUIDANCE = ("received", "in_input")
+
+
+# ---------------------------------------------------------------------------
+# 部门按关注的成果开始一轮工作（循环结构第 2 节、ADR-0039）
+#
+# 每个部门在组织定义里写明关注的成果；这里只有一条通用规则：关注的成果有了新东西、
+# 部门在等待工作时，它开始一轮工作。关注关系来自定义，代码里不按部门写死。
+# 「有新东西」按成果的种类分别判断，判断的是成果本身与它上一次被处理到的版本，
+# 不记录额外的状态：项目推算进度时读的是同一批成果。
+
+
+def is_working(projection: RunProjection, department: str) -> bool:
+    """部门这一轮正在工作：它主线会话的记录是「工作中」，或它在回答一个询问。
+
+    询问分支是部门主线之外的另一条会话（工单 #473），分支里的部门也在工作。
+    """
+    session = projection.sessions.get(department)
+    if session is not None and session.status == "active":
+        return True
+    ask = projection.active_ask
+    return bool(ask and ask.get("recipient") == department)
+
+
+def is_waiting(projection: RunProjection, department: str) -> bool:
+    """部门在等待工作：它这一轮已经结束（或还没开始过）。"""
+    return not is_working(projection, department)
+
+
+def _has_new_user_input(projection: RunProjection) -> bool:
+    """用户的输入：还有没被产品处理的输入。"""
+    return projection.input_version > projection.processed_input_version
+
+
+def _has_new_guidance(projection: RunProjection, department: str) -> bool:
+    """发给这个部门的指导：还有没处理完的。"""
+    return any(item.department == department and item.status in PENDING_GUIDANCE
+               for item in projection.department_guidance)
+
+
+def latest_delivery(projection: RunProjection):
+    """最近一份交付（被取代的也算）：缺陷记录与新交付都以它为准。"""
+    if projection.delivery_specs:
+        return projection.delivery_specs[-1]
+    return projection.delivery_spec
+
+
+def _has_new_product_spec(projection: RunProjection) -> bool:
+    """PRD 的新版本：当前有效的 PRD 比最近一份交付依据的版本新（还没有交付时为真）。"""
+    if projection.product_spec is None:
+        return False
+    delivery = latest_delivery(projection)
+    if delivery is None:
+        return True
+    return delivery.product_spec_hash != projection.product_spec.content_hash
+
+
+def _has_new_defect_record(projection: RunProjection) -> bool:
+    """针对最新交付的缺陷记录：这份交付上质检记了缺陷记录。"""
+    delivery = latest_delivery(projection)
+    if delivery is None:
+        return False
+    return any(review.delivery_spec_hash == delivery.content_hash and review.verdict == "rework_engineering"
+               for review in projection.reviews)
+
+
+def _has_new_delivery(projection: RunProjection) -> bool:
+    """新的交付：最近一份交付还没有质检的结论。"""
+    delivery = latest_delivery(projection)
+    if delivery is None:
+        return False
+    return not any(review.delivery_spec_hash == delivery.content_hash for review in projection.reviews)
+
+
+_WATCHED_CHECKS = {
+    "user_input": lambda projection, department: _has_new_user_input(projection),
+    "guidance": _has_new_guidance,
+    "product_spec": lambda projection, department: _has_new_product_spec(projection),
+    "defect_record": lambda projection, department: _has_new_defect_record(projection),
+    "delivery": lambda projection, department: _has_new_delivery(projection),
+}
+
+
+def watched_new_work(projection: RunProjection, department: str) -> list[str]:
+    """部门关注的成果里，现在有新东西的那些（按定义的顺序）。"""
+    return [kind for kind in DEFINITIONS.watched_outputs(department)
+            if _WATCHED_CHECKS[kind](projection, department)]
+
+
+def has_new_work(projection: RunProjection, department: str) -> bool:
+    """部门现在有没有新的工作：关注的成果有了新东西。"""
+    return bool(watched_new_work(projection, department))
+
+
+def next_department(projection: RunProjection) -> str | None:
+    """下一个开始一轮工作的部门：按定义里的部门顺序，取第一个在等待且有新的工作的。
+
+    一个部门同一时刻最多一轮工作（工单 #556）：这里一次只选一个部门。
+    """
+    for department in DEFINITIONS.departments:
+        if is_waiting(projection, department) and has_new_work(projection, department):
+            return department
+    return None
+
 
 def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[str]:
     if projection.phase in TERMINAL_PHASES or department not in DEPARTMENTS:
         return set()
     has_guidance = _has_pending_guidance(projection, department)
-    if department != department_for_phase(projection.phase):
-        return _diverted_guidance_kinds(department, projection) if has_guidance else set()
-    # 本部门在这种事项种类中可以提交的提案种类由定义给出（工单 #134）：普通事项与建档事项的清单不同
-    allowed = proposal_kinds(department, projection.kind) - {"department_guidance_response"}
+    # 部门这一轮正在工作：它主线会话的记录是「工作中」，或它在回答一个询问
+    if is_working(projection, department) or has_new_work(projection, department):
+        # 本部门在这一轮工作：可提交的种类按定义给出（工单 #134）；普通事项与建档事项的清单不同
+        allowed = proposal_kinds(department, projection.kind) - {"department_guidance_response"}
+        if has_guidance:
+            allowed.add("department_guidance_response")
+        if projection.input_version > projection.processed_input_version:
+            return allowed - {"product_decision"} if department == "product" else set()
+        return allowed
     if has_guidance:
-        allowed.add("department_guidance_response")
-    if projection.input_version > projection.processed_input_version:
-        return allowed - {"product_decision"} if department == "product" else set()
-    return allowed
+        # 被指导提前安排的部门只回应指导
+        return _diverted_guidance_kinds(department, projection)
+    return set()
 
 
 def tool_error(projection: RunProjection, department: str, name: str,

@@ -36,7 +36,6 @@ from .models import (
     SessionRecord,
     UserInput,
     TERMINAL_PHASES,
-    department_for_phase,
     waiting_reason_for,
 )
 
@@ -634,8 +633,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.transitions.append(route)
         if payload.get("yielded_work_resolved"):
             state.yielded_work = None
-        if event.state_after not in TERMINAL_PHASES:
-            state.active_department = department_for_phase(event.state_after)
         return
 
     if etype == EventType.RUN_DONE:
@@ -662,7 +659,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.stop_reason = None
         state.human_action = None
         state.error = None
-        state.active_department = department_for_phase(state.phase)
+        state.active_department = None
         return
 
     if etype == EventType.RUN_FAILED:

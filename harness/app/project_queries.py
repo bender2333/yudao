@@ -186,6 +186,19 @@ class ProjectOverview(Contract):
     work_item: str | None = None
 
 
+class WorkItemProgress(Contract):
+    """事项的进度：从成果推算（循环结构第 2 节）。
+
+    阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、
+    最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。
+    """
+
+    product_spec_revision: int | None
+    delivery_revision: int | None
+    delivery_product_spec_hash: str | None
+    conclusion: str | None
+
+
 class WorkItemCard(Contract):
     work_item_id: str
     kind: str
@@ -302,6 +315,7 @@ class WorkItemLoop(Contract):
     status: str
     department: str | None
     phase: str | None
+    progress: WorkItemProgress | None
     round: int
     started_at: str | None
     elapsed_sec: int | None
@@ -337,7 +351,7 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
         bounds = store.run_time_bounds(item.run_id, through=through)
         rows.append(WorkItemLoop(
             work_item_id=item.work_item_id, kind=item.kind, sign=item.title, color_index=index + 1, status=item.status,
-            department=item.department, phase=item.phase, round=item.cycle_count,
+            department=item.department, phase=item.phase, progress=_work_item_progress(run), round=item.cycle_count,
             started_at=None if bounds is None else bounds[0],
             elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run, now=at_time),
             time_limit_sec=item.run_time_limit_sec, pending_question=item.pending_question,
@@ -348,6 +362,32 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
         position=_snapshot_position(store, through),
         data=ProjectLoopResult(project_id=state.project_id, work_items=rows,
                                adoptions=[_adoption(item) for item in state.adoptions]),
+    )
+
+
+def _work_item_progress(run: Any) -> WorkItemProgress | None:
+    """事项的进度：从成果推算（循环结构第 2 节）。
+
+    当前有效的 PRD 是第几版、最新一份交付是第几版、它依据的 PRD 版本，
+    以及对最新交付的结论（缺陷记录或放行）。
+    """
+    if run is None:
+        return None
+    spec = getattr(run, "product_spec", None)
+    delivery = getattr(run, "delivery_spec", None)
+    if delivery is None:
+        specs = getattr(run, "delivery_specs", None) or []
+        delivery = specs[-1] if specs else None
+    conclusion = None
+    for review in reversed(getattr(run, "reviews", None) or []):
+        if delivery is not None and review.delivery_spec_hash == delivery.content_hash:
+            conclusion = review.verdict
+            break
+    return WorkItemProgress(
+        product_spec_revision=None if spec is None else spec.revision,
+        delivery_revision=None if delivery is None else delivery.revision,
+        delivery_product_spec_hash=None if delivery is None else delivery.product_spec_hash,
+        conclusion=conclusion,
     )
 
 

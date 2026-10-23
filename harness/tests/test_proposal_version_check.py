@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
-from harness.models import EventType, json_dumps
+from harness.models import EventType, SessionRecord, json_dumps
 from harness.proposals import (answer_turn, ask_turn, delivery, delivery_turn, guidance_response,
                                 product_spec, product_spec_turn, review, review_turn)
 from harness.runtime import LoopSystem
@@ -149,6 +149,12 @@ def _activate_until(system, run_id, revision):
     return projection
 
 
+def _working(projection, department):
+    # 部门按关注的成果开始一轮工作（工单 #556）：这一轮在工作的部门可以提交正式成果
+    return replace(projection, sessions={**projection.sessions, department: SessionRecord(
+        session_id=f"ses_{department}", department=department, status="active")})
+
+
 def test_a_spec_that_declares_the_wrong_basis_is_rejected_with_the_current_version(tmp_path):
     # 修订版 ProductSpec 声明了别的 hash：整次提交被拒绝，错误给出 host 端的当前版本，模型重读后可以重交
     system, run_id = _system(tmp_path, product_spec())
@@ -156,7 +162,7 @@ def test_a_spec_that_declares_the_wrong_basis_is_rejected_with_the_current_versi
     assert first.product_spec is not None
     projection = system.project(run_id)
     decision = evaluate_proposal(phase="REWORK_PRODUCT", department="product",
-                                 projection=replace(projection, phase="REWORK_PRODUCT"),
+                                 projection=_working(projection, "product"),
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=_revision(CHANGE_RECORD, "sha256:" + "0" * 64))
     assert not decision.accepted
@@ -199,7 +205,7 @@ def test_a_spec_may_declare_the_current_basis(tmp_path):
     first = system.activate_once(run_id)
     projection = system.project(run_id)
     decision = evaluate_proposal(phase="REWORK_PRODUCT", department="product",
-                                 projection=replace(projection, phase="REWORK_PRODUCT"),
+                                 projection=_working(projection, "product"),
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=_revision(CHANGE_RECORD, first.product_spec.content_hash))
     assert decision.accepted, decision.errors

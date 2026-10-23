@@ -5052,6 +5052,7 @@ export type WorkItemLoop = {
      * Phase
      */
     phase: string | null;
+    progress: WorkItemProgress | null;
     /**
      * Round
      */
@@ -5126,6 +5127,33 @@ export type WorkItemMaterialsResult = {
      * Onboarding Rounds
      */
     onboarding_rounds: Array<OnboardingRound>;
+};
+
+/**
+ * WorkItemProgress
+ *
+ * 事项的进度：从成果推算（循环结构第 2 节）。
+ *
+ * 阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、
+ * 最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。
+ */
+export type WorkItemProgress = {
+    /**
+     * Product Spec Revision
+     */
+    product_spec_revision: number | null;
+    /**
+     * Delivery Revision
+     */
+    delivery_revision: number | null;
+    /**
+     * Delivery Product Spec Hash
+     */
+    delivery_product_spec_hash: string | null;
+    /**
+     * Conclusion
+     */
+    conclusion: string | null;
 };
 
 /**

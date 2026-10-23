@@ -709,21 +709,6 @@ class RunProjection:
 
 
 
-def department_for_phase(phase: str) -> str | None:
-    if phase in PRODUCT_ACTIVE:
-        return "product"
-    if phase in ENGINEERING_ACTIVE:
-        return "engineering"
-    if phase in QUALITY_ACTIVE:
-        return "quality"
-    return None
-
-
-# 阶段迁移是控制核心的状态机，只为这些部门写了阶段；定义中的部门必须与它们相同，否则启动失败
-_PHASE_DEPARTMENTS = [department_for_phase(phase) for phase in ("PRODUCT_SPEC", "ENGINEERING", "QUALITY")]
-if list(DEPARTMENTS) != _PHASE_DEPARTMENTS:
-    raise DefinitionError([("organization.json", "departments",
-                            "控制核心的阶段迁移按顺序支持部门 " + "、".join(_PHASE_DEPARTMENTS))])
 
 
 # 停止原因的中文名：等待说明与事件说明按中文写，机器标识不直接出现在给用户看的文字里

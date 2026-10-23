@@ -12300,6 +12300,16 @@
             ],
             "title": "Phase"
           },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkItemProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "round": {
             "type": "integer",
             "title": "Round"
@@ -12382,6 +12392,7 @@
           "status",
           "department",
           "phase",
+          "progress",
           "round",
           "started_at",
           "elapsed_sec",
@@ -12460,6 +12471,64 @@
           "onboarding_rounds"
         ],
         "title": "WorkItemMaterialsResult"
+      },
+      "WorkItemProgress": {
+        "properties": {
+          "product_spec_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Spec Revision"
+          },
+          "delivery_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Revision"
+          },
+          "delivery_product_spec_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Product Spec Hash"
+          },
+          "conclusion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conclusion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "product_spec_revision",
+          "delivery_revision",
+          "delivery_product_spec_hash",
+          "conclusion"
+        ],
+        "title": "WorkItemProgress",
+        "description": "事项的进度：从成果推算（循环结构第 2 节）。\n\n阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、\n最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。"
       },
       "WorkItemRefs": {
         "properties": {

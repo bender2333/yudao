@@ -125,6 +125,9 @@ class Department(_Definition):
     # 本部门模型的建议能力（设计说明第 5.6 节）：取值来自模型访问定义的输入方式。
     # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
+    # 部门关注的成果（循环结构第 2 节、ADR-0039）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
+    # 关注关系写在定义里，代码里只有一条通用规则
+    watched: tuple[Literal["user_input", "guidance", "product_spec", "defect_record", "delivery"], ...] = ()
 
 
 class OrganizationRules(_Definition):
@@ -346,6 +349,13 @@ class Definitions(_Definition):
         for item in self.organization.departments:
             if item.id == department:
                 return item.suggested_capabilities
+        raise ValueError(f"unknown department {department!r}")
+
+    def watched_outputs(self, department: str) -> tuple[str, ...]:
+        """部门关注的成果（循环结构第 2 节）：关注关系写在组织定义里，代码里只有一条通用规则。"""
+        for item in self.organization.departments:
+            if item.id == department:
+                return item.watched
         raise ValueError(f"unknown department {department!r}")
 
     def work_item(self, kind: str) -> WorkItemKind:

@@ -711,7 +711,7 @@
   "outcome": "running",
   "error": null,
   "waiting_reason": "工程正在按有效需求实现",
-  "active_department": "engineering",
+  "active_department": "product",
   "human_action": null,
   "cycle_count": 1,
   "rework_count": 0,

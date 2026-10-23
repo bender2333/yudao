@@ -62,7 +62,6 @@ from .models import (
     ProjectEvent,
     ProjectEventType,
     TERMINAL_PHASES,
-    department_for_phase,
     json_dumps,
     new_id,
     spec_content_hash,
@@ -78,6 +77,7 @@ from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .validation import PRD_REVISION_FIELDS, ProposalDecision, evaluate_proposal
+from .collaboration import next_department, watched_new_work
 from .workspace import WorkspaceSnapshot
 
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
@@ -440,15 +440,15 @@ class Orchestrator:
             session_id=session_id,
         )
 
-    def _is_handoff_session(self, department: str, projection: RunProjection) -> bool:
-        # 持有交接的工程：工程部门，且这次激活产出的东西进入运行工作区——当前阶段属于工程。
+    def _is_handoff_session(self, department: str, session_id: str, projection: RunProjection) -> bool:
+        # 持有交接的工程：工程部门的主线会话，它这次激活产出的东西进入运行工作区。
         # 询问分支与产品要求都由各自的部门在检查工作区里回答，它们才是 local-tools 第 2 节
         # 「在询问分支里回答的工程」那一格
         if department != "engineering":
             return False
-        if projection.active_ask is not None and projection.active_ask.get("recipient") == department:
+        if session_id in projection.branch_sessions:
             return False
-        return department == department_for_phase(projection.phase)
+        return True
 
     def _inspection_source_tree(self, department: str, projection: RunProjection) -> CapturedTree:
         # 每个会话检查工作区的建立源：质检从它当前面对的快照建立——最新的封存交付，
@@ -544,7 +544,7 @@ class Orchestrator:
             session_id = session.session_id
             jobs = getattr(self.sessions, "jobs", None)
 
-        if self._is_handoff_session(department, projection):
+        if self._is_handoff_session(department, session_id, projection):
             return self._environment(run_id, session_id=session_id, jobs=jobs)
         if refresh:
             return self._new_inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
@@ -1273,18 +1273,18 @@ class Orchestrator:
             else:
                 self._pause(transaction, bound)
             return None
-        normal_department = department_for_phase(projection.phase)
+        # 下一个开始一轮工作的部门由它关注的成果决定（循环结构第 2 节、ADR-0039）：
+        # 关注的成果有了新东西、部门在等待工作时，它开始一轮工作。
+        department = next_department(projection)
         waiting_guidance = [item for item in projection.department_guidance if item.status in PENDING_GUIDANCE]
         guidance_only = False
-        department = normal_department
         yielded_work = None
-        if waiting_guidance:
-            if normal_department is None or waiting_guidance[0].department != normal_department:
-                department = waiting_guidance[0].department
-                guidance_only = department != "product"
-                yielded_work = dict(projection.yielded_work) if projection.yielded_work else self._work_basis(projection)
+        if department is not None and watched_new_work(projection, department) == ["guidance"]:
+            # 这一轮只有指导是新的东西：只回应指导（工单 #560 以后指导按四种送达方式分开处理）
+            guidance_only = department != "product"
+            yielded_work = dict(projection.yielded_work) if projection.yielded_work else self._work_basis(projection)
         if department is None:
-            self._fail(transaction, "provider_error", f"no department for phase {projection.phase}")
+            self._fail(transaction, "provider_error", f"no department has new work in phase {projection.phase}")
             return None
 
         if self.test_adapter_factory is not None:
@@ -2015,11 +2015,14 @@ class Orchestrator:
         source_event = acceptance.append(transaction)
         if artifact["kind"] == "qa_review" and artifact["verdict"] == "rework_engineering":
             self._record_lesson_candidate(transaction, source_event, projection)
+        # 阶段迁移的记录（工单 #556 第一轮）：记录这一步之后由哪个部门接手，
+        # 接手部门按关注的成果算（watch.next_department），不再由阶段决定
+        taking_over = next_department(transaction.projection) or department
         for source, target in transitions:
             transaction.append(NewEvent(
                 EventType.TRANSITION,
                 actor="system",
-                department=department_for_phase(target) or department,
+                department=taking_over,
                 parent_event_id=parent_event_id,
                 state_before=source,
                 state_after=target,
@@ -2069,7 +2072,7 @@ class Orchestrator:
         transaction.append(NewEvent(
             EventType.TRANSITION,
             actor="system",
-            department=department_for_phase(target) or department,
+            department=next_department(transaction.projection) or department,
             parent_event_id=parent_event_id,
             state_before=current.phase,
             state_after=target,

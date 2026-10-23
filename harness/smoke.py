@@ -26,8 +26,7 @@ from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
 from .event_store import EventStore, run_stream
 from .git_audit import verify_git_history
-from .models import (ArtifactRef, DepartmentPrompt, EventType, ProjectEventType, RunProjection, canonical_hash,
-                     department_for_phase, estimate_tokens, hash_bytes, json_dumps)
+from .models import (ArtifactRef, DepartmentPrompt, EventType, ProjectEventType, RunProjection, canonical_hash, estimate_tokens, hash_bytes, json_dumps)
 from .projection import apply_event, project_run
 from .providers import ProviderFacade
 from .public_tree import capture_public_tree, materialize_tree
@@ -583,7 +582,7 @@ def _expected_guidance_only(projection: RunProjection, department: str) -> bool:
     if department == "product":
         return False
     pending = [item for item in projection.department_guidance if item.status in PENDING_GUIDANCE]
-    return bool(pending) and pending[0].department == department and department != department_for_phase(projection.phase)
+    return bool(pending) and pending[0].department == department and department != projection.active_department
 
 
 def _assembly_snapshot_hash(events: list[Any], index: int) -> str:

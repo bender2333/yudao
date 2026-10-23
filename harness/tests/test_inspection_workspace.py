@@ -215,11 +215,10 @@ def test_engineering_delivers_from_the_run_workspace_and_quality_from_its_own(tm
     system.activate_once(run_id)   # 工程：交付，运行工作区里的 src/echo.py 被封存
     assert system.project(run_id).phase == "QUALITY"
 
-    # 交付之后阶段已转到质检，工程不再是交接持有者：它此时回答协作请求，
-    # 用的是自己的检查工作区，运行工作区交给质检之后的部门不动
+    # 交接去掉以后（工单 #556）：运行工作区只由工程的一轮工作写入，工程的主线会话
+    # 就是写运行工作区的那一轮；它在询问分支里回答时用��己的检查工作区
     engineering = orchestrator._environment_for(run_id, "engineering", refresh=True)
-    assert engineering.workspace.root == inspection_root(
-        run_root, _session_id(system, run_id, "engineering"))
+    assert engineering.workspace.root == run_root
 
     quality = orchestrator._environment_for(run_id, "quality", refresh=True)
     assert quality.workspace.root == inspection_root(

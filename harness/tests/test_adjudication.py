@@ -4,6 +4,7 @@ from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import WorkBasis, commit_decision, facts_query, proposal_decision, tool_permission
 from harness.environment import LocalEnvironment
+from harness.models import SessionRecord
 from harness.proposals import delivery, product_spec
 from harness.runtime import LoopSystem
 
@@ -14,6 +15,10 @@ def _engineering(tmp_path):
     run_id = system.create_run("echo")
     projection = system.activate_once(run_id)
     assert projection.phase == "ENGINEERING" and projection.effective_contract is not None
+    # 部门按关注的成果开始一轮工作（工单 #556）：工程这一轮在工作，
+    # 会话的记录是「工作中」
+    projection = replace(projection, sessions={**projection.sessions, "engineering": SessionRecord(
+        session_id="ses_eng", department="engineering", status="active")})
     return system, projection
 
 def _environment(system, projection):

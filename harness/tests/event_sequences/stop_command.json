@@ -393,7 +393,7 @@
    "event": "<evt#18>",
    "type": "run_failed",
    "actor": "system",
-   "department": "engineering",
+   "department": "product",
    "state_before": "ENGINEERING",
    "state_after": "FAILED",
    "parent_event_id": null,

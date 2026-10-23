@@ -23,7 +23,6 @@ from .models import (
     ProjectEventType,
     RunProjection,
     TERMINAL_PHASES,
-    department_for_phase,
     new_id,
 )
 from .project_projection import (
@@ -169,7 +168,7 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     item.stop_reason = run.stop_reason
     item.human_action = run.human_action
     item.cycle_count = run.cycle_count
-    item.department = None if run.phase in TERMINAL_PHASES else department_for_phase(run.phase)
+    item.department = None if run.phase in TERMINAL_PHASES else run.active_department
     if run.run_id in adopted:
         item.status = "adopted"
         item.adoption_id = adopted[run.run_id].adoption_id
