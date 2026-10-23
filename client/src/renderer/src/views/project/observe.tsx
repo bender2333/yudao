@@ -24,19 +24,9 @@ import { useSnapshot } from "./use-snapshot";
 import { reportedCountText, usageText } from "./usage-text";
 import { readFailureText } from "../../contract/read-failure";
 import { scopeName } from "./scope-name";
+import { EMPTY_FILTERS, type Filters, departmentFilterNote, seedFilters } from "./observe-filter";
 
 const PAGE_SIZE = 50;
-
-export type Filters = {
-  department: string;
-  status: string;
-  provider: string;
-  requestedModel: string;
-  actualModel: string;
-  q: string;
-};
-
-const EMPTY_FILTERS: Filters = { department: "", status: "", provider: "", requestedModel: "", actualModel: "", q: "" };
 
 // 筛选条件转成查询参数：空值写成 null，由 useSnapshot 去掉（查询按省略处理）
 export function filterParams(projectId: string, workItem: string | null, filters: Filters, limit: number): Record<string, unknown> {
@@ -56,6 +46,15 @@ export function filterParams(projectId: string, workItem: string | null, filters
 function trimOrNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === "" ? null : trimmed;
+}
+
+// 部门这一格写回地址（工单 #801）：地址里写的与页面上生效的始终是同一件事，
+// 刷新、后退与分享链接都对得上。地址没有变化时不写，地址栏里不多一条历史。
+function writeDepartment(projectId: string, workItem: string | null, department: string): void {
+  const target = paths.observe(projectId, { workItem, department: department || null });
+  if (window.location.hash !== target) {
+    window.location.hash = target;
+  }
 }
 
 // 选择来源的显示（设计说明第 5.3、7.4 节）：提供模型访问定义的那一层。
@@ -89,8 +88,19 @@ function callTargetText(target: Record<string, unknown>): string {
 export function ObservePage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
   const workItem = props.route.workItemId;
-  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
-  const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
+  // 部门这一格筛选条件由地址给出（?dept=，工单 #801）：部门工作间的「本部门的模型请求」
+  // 带它进来，观测页自己换条件时地址跟着改；进入页面时的初值就是它
+  const department = props.route.departmentFilter;
+  const [draft, setDraft] = useState<Filters>(() => seedFilters(department));
+  const [applied, setApplied] = useState<Filters>(() => seedFilters(department));
+  // 地址里的部门变了（后退、前进、别的页面带进来）：下拉里的初值与已生效的筛选都跟着变
+  const lastDepartment = useRef(department);
+  if (lastDepartment.current !== department) {
+    lastDepartment.current = department;
+    const value = department ?? "";
+    setDraft((prev) => (prev.department === value ? prev : { ...prev, department: value }));
+    setApplied((prev) => (prev.department === value ? prev : { ...prev, department: value }));
+  }
   const [tab, setTab] = useState<"records" | "usage">("records");
   const [cursor, setCursor] = useState<string | null>(null);
   const params = filterParams(projectId, workItem, applied, PAGE_SIZE);
@@ -117,6 +127,24 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
 
   const filtersChanged = pageKey([draft]) !== pageKey([applied]);
   const inFlight = rows.filter((item) => item.status === "running" || item.status === "requesting").length;
+  // 当前筛选的是哪个部门：页面上说明一句（中文名，不出现内部标识）
+  const departmentNote = departmentFilterNote(applied.department);
+
+  // 按条件筛选：页面内的一组条件一起生效。部门这一格同时写回地址，
+  // 地址里写的与页面上生效的始终是同一件事（工单 #801）
+  const applyFilters = () => {
+    setApplied(draft);
+    setCursor(null);
+    writeDepartment(projectId, workItem, draft.department);
+  };
+
+  // 清除筛选：条件全部清空，地址里的部门也去掉
+  const clearFilters = () => {
+    setDraft(EMPTY_FILTERS);
+    setApplied(EMPTY_FILTERS);
+    setCursor(null);
+    writeDepartment(projectId, workItem, "");
+  };
 
   return (
     <div className="page y10-obs">
@@ -134,7 +162,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
       <Section
         id="obs-requests"
         title="请求记录与用量"
-        note={`范围：${workItem === null ? "整个项目" : scopeTitle === "" ? "顶栏选中的事项" : scopeTitle}；按部门、状态、Provider 与模型筛选；两个页签使用同一组筛选。`}
+        note={`范围：${workItem === null ? "整个项目" : scopeTitle === "" ? "顶栏选中的事项" : scopeTitle}${departmentNote === "" ? "" : `；${departmentNote}`}；按部门、状态、Provider 与模型筛选；两个页签使用同一组筛选。`}
         className="y10-obs"
       >
         <div className="y10-obs-filters filters">
@@ -174,7 +202,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
           <button
             type="button"
             className="y10-btn primary"
-            onClick={() => { setApplied(draft); setCursor(null); }}
+            onClick={applyFilters}
           >
             按条件筛选
           </button>
@@ -182,7 +210,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
             <button
               type="button"
               className="y10-link y10-obs-reset link"
-              onClick={() => { setDraft(EMPTY_FILTERS); setApplied(EMPTY_FILTERS); setCursor(null); }}
+              onClick={clearFilters}
             >
               清除筛选
             </button>
@@ -199,6 +227,7 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
             projectId={projectId}
             rows={rows}
             workItem={workItem}
+            department={applied.department}
             loading={attempts.loading}
             cursor={attempts.data?.cursor ?? null}
             onMore={() => setCursor(attempts.data?.cursor ?? null)}
@@ -215,6 +244,8 @@ function RecordsPanel(props: {
   projectId: string;
   rows: AttemptView[];
   workItem: string | null;
+  // 当前生效的部门筛选条件：进请求详情时带着，回来以后还是同一组筛选（工单 #801）
+  department: string;
   loading: boolean;
   cursor: string | null;
   onMore: () => void;
@@ -243,7 +274,7 @@ function RecordsPanel(props: {
                 type="button"
                 className="y10-link link"
                 key={item.attempt_id}
-                onClick={() => { window.location.hash = paths.observeDetail(props.projectId, item.attempt_id, { workItem: props.workItem, runId: item.run_id }); }}
+                onClick={() => { window.location.hash = paths.observeDetail(props.projectId, item.attempt_id, { workItem: props.workItem, runId: item.run_id, department: props.department || null }); }}
               >
                 详情
               </button>,
@@ -345,7 +376,7 @@ export function ObserveDetailPage(props: { app: ClientApp; route: Route }) {
           <button
             type="button"
             className="y10-link link"
-            onClick={() => { window.location.hash = paths.observe(projectId, { workItem }); }}
+            onClick={() => { window.location.hash = paths.observe(projectId, { workItem, department: props.route.departmentFilter }); }}
           >
             返回请求记录
           </button>

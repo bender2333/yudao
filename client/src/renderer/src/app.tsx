@@ -457,7 +457,8 @@ function buildTabs(route: Route, capabilities: Capabilities): Tab[] {
     { label: "工程", hash: paths.dept(projectId, "engineering", scope), query: "department.workspace" },
     { label: "质检", hash: paths.dept(projectId, "quality", scope), query: "department.workspace" },
     { label: "资料", hash: paths.materials(projectId, scope), query: "work_item.materials" },
-    { label: "观测", hash: paths.observe(projectId, scope), query: "project.attempts" },
+    // 观测页的部门筛选条件带着（工单 #801）：点当前的观测页签不会把这一格筛选丢掉
+    { label: "观测", hash: paths.observe(projectId, { ...scope, department: route.departmentFilter }), query: "project.attempts" },
     { label: "设置", hash: paths.settings(projectId, scope), query: "project.settings" },
   ];
   return candidates.filter((tab) => has(tab.query)).map((tab) => ({ label: tab.label, hash: tab.hash }));

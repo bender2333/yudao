@@ -12,7 +12,7 @@ import type {
   ProjectOverviewResult,
   RunActionsResult,
 } from "../../api/generated/types.gen";
-import type { Route } from "../../shell/routing";
+import { paths, type Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDepartmentDraft } from "./department-settings-form";
@@ -179,8 +179,9 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: stri
   const effective = data.effective;
   const lastCall = data.last_call === null ? null : dict(data.last_call);
   const info = DEPARTMENTS[data.department];
-  // 去观测页时带着当前的范围（工单 #746）：范围是项目级的一份，换页面不丢掉
-  const observeLink = `#/p/${data.project_id}/observe?dept=${data.department}${props.scopeWorkItem === null ? "" : `&w=${props.scopeWorkItem}`}`;
+  // 去观测页时带着当前的范围（工单 #746）与本部门的筛选条件（工单 #801）：
+  // 范围是项目级的一份，换页面不丢掉；部门是筛选条件，观测页按它只显示这个部门的请求
+  const observeLink = paths.observe(data.project_id, { workItem: props.scopeWorkItem, department: data.department });
   const statusText = departmentStatus(data);
   const statusKind = data.status === "stopped" ? "cancelled stopped" : data.active ? "running" : "idle";
 
