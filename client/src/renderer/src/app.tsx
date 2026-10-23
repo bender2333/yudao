@@ -332,7 +332,7 @@ export function App() {
         <Topbar
           app={app}
           projectId={route.projectId}
-          workItemId={route.workItemId}
+          route={route}
           project={project}
           path={pathLabel(route, projects)}
           pending={pending}
@@ -442,20 +442,23 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
 }
 
 // 项目标签（原型 v8 设计说明第 3.2 节）：按能力清单显示，缺少查询的标签不出现
+// 页签的地址带着当前的事项范围（工单 #746）：切页签不丢范围，
+// 范围是项目级的一份（写在 ?w= 中），设置页不按范围筛选内容，但范围同样带着
 function buildTabs(route: Route, capabilities: Capabilities): Tab[] {
   if (!route.projectId) {
     return [];
   }
   const has = (name: string) => capabilities.queries.some((query) => query.name === name);
   const projectId = route.projectId;
+  const scope = { workItem: route.workItemId };
   const candidates: { label: string; hash: string; query: string }[] = [
-    { label: "概览", hash: paths.overview(projectId), query: "project.overview" },
-    { label: "产品", hash: paths.dept(projectId, "product"), query: "department.workspace" },
-    { label: "工程", hash: paths.dept(projectId, "engineering"), query: "department.workspace" },
-    { label: "质检", hash: paths.dept(projectId, "quality"), query: "department.workspace" },
-    { label: "资料", hash: paths.materials(projectId), query: "work_item.materials" },
-    { label: "观测", hash: paths.observe(projectId), query: "project.attempts" },
-    { label: "设置", hash: paths.settings(projectId), query: "project.settings" },
+    { label: "概览", hash: paths.overview(projectId, scope), query: "project.overview" },
+    { label: "产品", hash: paths.dept(projectId, "product", scope), query: "department.workspace" },
+    { label: "工程", hash: paths.dept(projectId, "engineering", scope), query: "department.workspace" },
+    { label: "质检", hash: paths.dept(projectId, "quality", scope), query: "department.workspace" },
+    { label: "资料", hash: paths.materials(projectId, scope), query: "work_item.materials" },
+    { label: "观测", hash: paths.observe(projectId, scope), query: "project.attempts" },
+    { label: "设置", hash: paths.settings(projectId, scope), query: "project.settings" },
   ];
   return candidates.filter((tab) => has(tab.query)).map((tab) => ({ label: tab.label, hash: tab.hash }));
 }

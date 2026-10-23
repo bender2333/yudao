@@ -6,6 +6,7 @@ import { departmentName } from "../views/project/labels.ts";
 export type Route = {
   name: string;
   projectId: string | null;
+  // 事项范围（作用域）：项目内的一份，写在路径参数 ?w= 中；null 表示整个项目（工单 #746）
   workItemId: string | null;
   department: string | null;
   systemPage: string | null;
@@ -79,7 +80,8 @@ export function parseRoute(hash: string): Route {
   }
   if (segments[0] === "p" && segments[1]) {
     route.projectId = segments[1];
-    route.workItemId = query.get("w");
+    // 事项范围：空值按没有范围处理（地址里不留空的 ?w=，工单 #746）
+    route.workItemId = query.get("w") || null;
     if (segments[2] === "dept" && segments[3]) {
       route.name = "dept";
       route.department = segments[3];
@@ -122,13 +124,26 @@ function parseRound(query: URLSearchParams): number | null {
   return Number(text);
 }
 
+// 事项范围（作用域）：项目内的一份，写在路径参数 ?w= 中（原型第 3.3 节）。
+// 没有范围（整个项目）时不带这个参数：地址里不留空的 ?w=，两种写法不并存。
+function scopeQuery(workItem: string | null | undefined): string {
+  if (!workItem) {
+    return "";
+  }
+  const query = new URLSearchParams();
+  query.set("w", workItem);
+  return `?${query.toString()}`;
+}
+
 // 每个页面的路径（原型 v8 设计说明第 3.3 节）
 export const paths = {
   home: () => "#/home",
   // 首页的回放位置写在 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
   homeAt: (at: number | null) => (at === null ? "#/home" : `#/home?at=${at}`),
-  overview: (projectId: string) => `#/p/${projectId}/overview`,
-  dept: (projectId: string, department: string) => `#/p/${projectId}/dept/${department}`,
+  overview: (projectId: string, options: { workItem?: string | null } = {}) =>
+    `#/p/${projectId}/overview${scopeQuery(options.workItem)}`,
+  dept: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
+    `#/p/${projectId}/dept/${department}${scopeQuery(options.workItem)}`,
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
   materials: (projectId: string, options: { workItem?: string | null; round?: number | null } = {}) => {
     const query = new URLSearchParams();
@@ -141,7 +156,8 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/materials${suffix ? `?${suffix}` : ""}`;
   },
-  observe: (projectId: string) => `#/p/${projectId}/observe`,
+  observe: (projectId: string, options: { workItem?: string | null } = {}) =>
+    `#/p/${projectId}/observe${scopeQuery(options.workItem)}`,
   // 请求详情：事项范围（w）与 run 标识（r）都写在参数里，刷新、后退与直接输入路径都能读回
   observeDetail: (projectId: string, attemptId: string, options: { workItem?: string | null; runId?: string | null } = {}) => {
     const query = new URLSearchParams();
@@ -154,9 +170,44 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/observe/${attemptId}${suffix ? `?${suffix}` : ""}`;
   },
-  // 概览页的回放位置写在 ?at= 中，与首页共用同一个参数名；回到现在时路径不带 at
-  overviewAt: (projectId: string, at: number | null) =>
-    at === null ? `#/p/${projectId}/overview` : `#/p/${projectId}/overview?at=${at}`,
-  settings: (projectId: string) => `#/p/${projectId}/settings`,
+  // 概览页的回放位置写在 ?at= 中，与首页共用同一个参数名；回到现在时路径不带 at。
+  // 事项范围（w）与回放位置一起带着：换回放位置不丢掉所选范围。
+  overviewAt: (projectId: string, at: number | null, options: { workItem?: string | null } = {}) => {
+    const query = new URLSearchParams();
+    if (at !== null) {
+      query.set("at", String(at));
+    }
+    if (options.workItem) {
+      query.set("w", options.workItem);
+    }
+    const suffix = query.toString();
+    return `#/p/${projectId}/overview${suffix ? `?${suffix}` : ""}`;
+  },
+  settings: (projectId: string, options: { workItem?: string | null } = {}) =>
+    `#/p/${projectId}/settings${scopeQuery(options.workItem)}`,
   sys: (page: string) => `#/sys/${page}`,
 };
+
+// 换一个事项范围，仍在当前页（原型 v10 的 Y10.paths.withScope，工单 #746）。
+// 范围是项目级的一份，写在 ?w= 里；换范围只改这一个参数，页面本身不变。
+// 请求详情页回到请求记录页（详情页的内容属于某一个请求，不随范围变化）；
+// 恢复页按新的事项打开，没有范围时回到概览页（恢复页按事项看，没有事项就没有内容）。
+export function withScope(route: Route, workItemId: string | null): string {
+  const projectId = route.projectId ?? "";
+  switch (route.name) {
+    case "dept":
+      return paths.dept(projectId, route.department ?? "product", { workItem: workItemId });
+    case "materials":
+      return paths.materials(projectId, { workItem: workItemId });
+    case "observe":
+      return paths.observe(projectId, { workItem: workItemId });
+    case "observe-detail":
+      return paths.observe(projectId, { workItem: workItemId });
+    case "recovery":
+      return workItemId === null ? paths.overview(projectId) : paths.recovery(projectId, workItemId);
+    case "settings":
+      return paths.settings(projectId, { workItem: workItemId });
+    default:
+      return paths.overview(projectId, { workItem: workItemId });
+  }
+}
