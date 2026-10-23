@@ -1044,3 +1044,5 @@ claude-fable-5-1 / 2026-10-23 15:50 / 新增 docs/requirements/skeleton-and-appl
 claude-fable-5-1 / 2026-10-23 15:53 / docs/program-roadmap.md 第 2 节第 17 项、docs/stage-3-plan.md 第 3、9 节、docs/design/skeleton-and-application.md 第 12 节、docs/requirements/skeleton-and-application.md 写入工单编号：父工单 #823，S1 至 S6 是 #824 至 #829，S7 是 #830 / 工单已建立
 
 claude-opus-5-5 / 2026-10-24 / docs/architecture-issues.md 中工单 #747 原型恢复页那一条补处理行：只改当前定稿 v11，开工单 #831 / 会话开始时查看未处理的架构问题
+
+claude-opus-5-5 / 2026-10-24 / docs/decision.md 新增 2026-10-24「任务池按地图找路，保留质检的独立放行」 / 用户用 /wayfinder 为任务池建地图（#836），逐项采纳推荐
