@@ -7,7 +7,7 @@ import json
 import uuid
 from dataclasses import asdict
 
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.decision_commands import DecisionAnswer
 from harness.app.event_stream import EventScope
@@ -28,6 +28,7 @@ from harness.event_store import run_stream
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
+from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT
 from harness.write_path import NewEvent
 
 def _application(system: LoopSystem) -> Application:
@@ -132,8 +133,8 @@ def test_an_unavailable_model_is_observed_as_waiting_resume(data_dir):
     assert recovery.unusable.problem
     restarted.close()
 
-def test_a_finished_run_is_observed_as_terminated(data_dir):
-    # 已终止：完成的 run 观察状态为已终止，继续执行不可用
+def test_a_finished_run_is_observed_as_completed(data_dir):
+    # 已完成：完成的 run 观察状态为已完成（不是「已终止」，工单 #747），继续执行不可用
     system = LoopSystem.for_testing(data_dir, FakeAdapter([
         product_spec(),delivery_turn(), review_turn("release", "checks passed on the snapshot")]))
     _project_id, _work_item_id, run_id = _work_item_run(system, "要完成的事项")
@@ -141,10 +142,60 @@ def test_a_finished_run_is_observed_as_terminated(data_dir):
     assert system.project(run_id).phase == "DONE"
     application = _application(system)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    assert recovery.state == "terminated", recovery
+    assert recovery.state == "completed", recovery
     assert recovery.can_continue is False
     assert recovery.next_legal_action is None
     assert recovery.executable is False
+    # 说明按中文写：停止原因的机器标识不直接出现在给用户看的文字里（工单 #747）
+    assert recovery.reason == "运行已完成：已完成并放行", recovery.reason
+    assert "released" not in recovery.reason
+    system.close()
+
+def test_a_cancelled_run_is_observed_as_cancelled(data_dir):
+    # 已取消：用户取消的 run 观察状态为已取消，一眼看得出是取消，不是「已终止」（工单 #747）
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
+    _project_id, _work_item_id, run_id = _work_item_run(system, "被取消的事项")
+    system.cancel(run_id)
+    assert system.project(run_id).phase == "FAILED"
+    assert system.project(run_id).stop_reason == "cancelled"
+    application = _application(system)
+    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
+    assert recovery.state == "cancelled", recovery
+    assert recovery.reason == "运行已被取消", recovery.reason
+    assert recovery.can_continue is False
+    assert recovery.next_legal_action is None
+    system.close()
+
+def test_a_paused_run_is_observed_as_paused(data_dir):
+    # 已暂停：模型连续没有调用工具，运行暂停等待用户处理，观察状态是已暂停（工单 #747）
+    script = [FakeTurn(transcript="先整理一下思路，稍后提交。") for _ in range(LIMIT + 1)]
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
+    _project_id, _work_item_id, run_id = _work_item_run(system, "暂停等待处理的事项")
+    system.run_until_stop(run_id)
+    assert system.project(run_id).phase == "PAUSED"
+    application = _application(system)
+    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
+    assert recovery.state == "paused", recovery
+    assert recovery.reason == "运行已暂停，等待处理：部门连续多次没有调用工具", recovery.reason
+    assert "no_tool_call" not in recovery.reason
+    system.close()
+
+def test_a_failed_run_is_observed_as_stopped(data_dir):
+    # 已停止：执行失败的 run 观察状态为已停止，说明写出停止原因的中文名（工单 #747）
+    from harness.adapters.base import ProviderError
+
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([
+        product_spec(), ProviderError("模型服务协议不符", reason="provider_protocol")]))
+    _project_id, _work_item_id, run_id = _work_item_run(system, "没有通过的事项")
+    system.run_until_stop(run_id)
+    assert system.project(run_id).phase == "FAILED"
+    application = _application(system)
+    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
+    assert recovery.state == "stopped", recovery
+    assert recovery.reason.startswith("运行已停止："), recovery.reason
+    assert "provider_protocol" not in recovery.reason
+    assert recovery.can_continue is False
+    assert recovery.next_legal_action is None
     system.close()
 
 def test_a_live_run_is_observed_as_running(data_dir):

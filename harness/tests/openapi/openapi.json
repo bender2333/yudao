@@ -10365,7 +10365,10 @@
               "running",
               "interrupted",
               "waiting_resume",
-              "terminated"
+              "completed",
+              "paused",
+              "cancelled",
+              "stopped"
             ],
             "title": "State"
           },

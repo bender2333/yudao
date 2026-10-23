@@ -30,11 +30,29 @@ export const WORK_ITEM_STATUS_KIND: Record<string, string> = {
   awaiting_initial_prd: "asking",
 };
 
+// 恢复观察状态（工单 #747）：结束的方式分开，正常完成不是「已终止」。
+// 用词跟着项目里已有的词表走：楼层与房间的状态词表里 done 是「已完成」、cancelled 是「已取消」、
+// paused 是「已暂停」；事项状态表里 stopped 是「已停止」。
 export const RECOVERY_STATE: Record<string, string> = {
   running: "运行中",
   interrupted: "中断",
   waiting_resume: "待恢复",
-  terminated: "已终止",
+  completed: "已完成",
+  paused: "已暂停",
+  cancelled: "已取消",
+  stopped: "已停止",
+};
+
+// 恢复观察状态对应的原型标记：与状态一致（工单 #747）。
+// 正常完成画成功的标记，被取消画已取消的标记，其余结束方式画失败的标记。
+export const RECOVERY_STATE_KIND: Record<string, string> = {
+  running: "running",
+  interrupted: "interrupted",
+  waiting_resume: "waiting",
+  completed: "succeeded",
+  paused: "paused",
+  cancelled: "cancelled",
+  stopped: "failed",
 };
 
 export const PHASE_LABELS: Record<string, string> = {

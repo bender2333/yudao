@@ -16,7 +16,7 @@ from ..git_versions import GitVersionError
 from ..event_store import run_stream
 from ..models import (
     ArtifactRef, DEPARTMENTS, TERMINAL_PHASES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
-    ProjectEventType, hash_bytes,
+    ProjectEventType, hash_bytes, stop_reason_name,
 )
 from ..observability import ObservabilityQuery
 from ..providers.selection import ModelSelection
@@ -26,12 +26,13 @@ from ..projects import ProjectNotFoundError, project_projection
 from ..redact import redact_tool_args
 from ..replay_check import ReplayIntegrityError, verify_replay
 from ..recovery import (
-    ACTION_UNKNOWN, OBSERVATION_INTERRUPTED, OBSERVATION_RUNNING,
-    OBSERVATION_TERMINATED, OBSERVATION_WAITING_RESUME, action_identity,
-    classify_actions, observation_state, open_decisions, open_resume_decisions,
+    ACTION_UNKNOWN, OBSERVATION_CANCELLED, OBSERVATION_COMPLETED, OBSERVATION_INTERRUPTED,
+    OBSERVATION_PAUSED, OBSERVATION_RUNNING, OBSERVATION_STOPPED, OBSERVATION_WAITING_RESUME,
+    action_identity, classify_actions, observation_state, open_decisions, open_resume_decisions,
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
+from .labels import phase_name
 from .payloads import BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure, Department
 from .read_models import AttemptStatus, ReadModels
 from .registry import QueryDefinition
@@ -308,7 +309,8 @@ class WorkItemLoop(Contract):
     pending_question: str | None
     run_id: str
     adoption_id: str | None
-    # 恢复观察状态（工单 #18）：运行中、中断、待恢复、已终止；run 没有创建时没有
+    # 恢复观察状态（工单 #18、#747）：运行中、中断、待恢复，以及完成、暂停、取消、停止四种结束方式；
+    # run 没有创建时没有
     recovery_state: str | None
     # 事项的版本：取消事项等命令的基准版本
     version: int
@@ -1967,14 +1969,15 @@ def _optional_run(application: Application, run_id: str, *, through: int | None 
         return None
 
 def _recovery_observation(application: Application, run_id: str) -> str | None:
-    # 一个事项的恢复观察状态（工单 #18，v8 设计说明第 7.2 节）：由 run 的事件、决定请求与投影的终态得出。
+    # 一个事项的恢复观察状态（工单 #18，v8 设计说明第 7.2 节；工单 #747 区分结束的方式）：
+    # 由 run 的事件、决定请求与投影的终态得出。
     # run 没有创建时没有恢复观察状态
     run = _optional_run(application, run_id)
     if run is None:
         return None
     events = application.system.store.list_events(run_id)
     decisions = _run_decisions(application, run_id)
-    return observation_state(events, decisions.values(), terminal=run.phase in TERMINAL_PHASES)
+    return observation_state(events, decisions.values(), phase=run.phase, stop_reason=run.stop_reason)
 
 class RecoveryStatus(Contract):
     # 恢复观察的汇总（工单 #18，设计说明第 4.3 节 system.status 的 3.1 部分）：服务重启后自动继续的事项数、
@@ -1995,7 +1998,7 @@ def recovery_status(application: Application) -> RecoveryStatus:
             continue
         events = store.list_events(run_id)
         decisions = _run_decisions(application, run_id)
-        state = observation_state(events, decisions.values(), terminal=run.phase in TERMINAL_PHASES)
+        state = observation_state(events, decisions.values(), phase=run.phase, stop_reason=run.stop_reason)
         if state == OBSERVATION_WAITING_RESUME:
             waiting_resume += 1
     resumed = getattr(application.system, "resumed_runs", None)
@@ -2221,7 +2224,7 @@ class RunRecoveryResult(Contract):
     # 核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果
     work_item_id: str
     run_id: str
-    state: Literal["running", "interrupted", "waiting_resume", "terminated"]
+    state: Literal["running", "interrupted", "waiting_resume", "completed", "paused", "cancelled", "stopped"]
     reason: str | None
     executable: bool
     last_confirmed_position: int
@@ -2241,7 +2244,10 @@ _NEXT_ACTION = {
     OBSERVATION_RUNNING: "none",
     OBSERVATION_INTERRUPTED: "continue",
     OBSERVATION_WAITING_RESUME: "repair_and_resume",
-    OBSERVATION_TERMINATED: None,
+    OBSERVATION_COMPLETED: None,
+    OBSERVATION_PAUSED: None,
+    OBSERVATION_CANCELLED: None,
+    OBSERVATION_STOPPED: None,
 }
 
 def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[RunRecoveryResult]:
@@ -2251,8 +2257,8 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     events = store.list_events(request.run_id)
     decisions = _run_decisions(application, request.run_id)
     terminal = run.phase in TERMINAL_PHASES
-    state = observation_state(events, decisions.values(), terminal=terminal)
-    # 已终止的 run 不再继续：未完成动作与未回答的核实请求不由恢复处理，只显示终止原因
+    state = observation_state(events, decisions.values(), phase=run.phase, stop_reason=run.stop_reason)
+    # 已结束的 run 不再继续：未完成动作与未回答的核实请求不由恢复处理，只显示结束原因
     unfinished = [] if terminal else _unfinished_actions(events)
     verifications = _verification_records(events, decisions.values())
     resume_requests = [] if terminal else open_resume_decisions(decisions.values())
@@ -2284,26 +2290,34 @@ def _run_decisions(application: Application, run_id: str) -> dict[str, Any]:
     return load_decisions(application.system.store.projection(run_stream(run_id)))
 
 def _recovery_reason(run: Any, state: str, resume_requests: list[Any]) -> str | None:
-    # 恢复观察状态的说明：中断给出停止位置，待恢复给出无法使用的模型，待核实给出未完成动作数，
-    # 已终止给出停止原因；运行中不需要说明
+    # 恢复观察状态的说明：中断给出停止位置，待恢复给出无法使用的模型，
+    # 四种结束方式各自说明结束的原因；运行中不需要说明。
+    # 阶段与停止原因按中文写（工单 #747）：机器标识不直接出现在给用户看的文字里
     if state == OBSERVATION_INTERRUPTED:
-        return f"进程在 {run.phase} 阶段停止，等待启动时自动继续"
+        return f"进程在{phase_name(run.phase)}时停止，等待启动时自动继续"
     if state == OBSERVATION_WAITING_RESUME and resume_requests:
         return str(resume_requests[0].request.get("description") or resume_requests[0].kind)
-    if state == OBSERVATION_TERMINATED:
-        return f"运行以 {run.stop_reason or run.outcome} 结束"
+    if state == OBSERVATION_COMPLETED:
+        return f"运行已完成：{stop_reason_name(run.stop_reason)}" if run.stop_reason else "运行已完成"
+    if state == OBSERVATION_CANCELLED:
+        return "运行已被取消"
+    if state == OBSERVATION_PAUSED:
+        return (f"运行已暂停，等待处理：{stop_reason_name(run.stop_reason)}"
+                if run.stop_reason else "运行已暂停，等待处理")
+    if state == OBSERVATION_STOPPED:
+        return f"运行已停止：{stop_reason_name(run.stop_reason)}" if run.stop_reason else "运行已停止"
     return None
 
 def _can_continue(state: str, terminal: bool) -> bool:
-    # 继续执行是否可用：已终止不可继续；运行中已经在执行；其余状态在用户处理（回答或修复）以后可继续
+    # 继续执行是否可用：已结束不可继续；运行中已经在执行；其余状态在用户处理（回答或修复）以后可继续
     if terminal:
         return False
     return state == OBSERVATION_RUNNING
 
 def _cannot_continue_reason(run: Any, state: str, terminal: bool, resume_requests: list[Any]) -> str | None:
-    # 继续执行不可用的原因
+    # 继续执行不可用的原因；停止原因按中文写（工单 #747）
     if terminal:
-        return f"运行已经结束：{run.stop_reason or run.outcome}"
+        return f"运行已经结束：{stop_reason_name(run.stop_reason)}" if run.stop_reason else "运行已经结束"
     if state == OBSERVATION_WAITING_RESUME:
         return "模型引用无法使用或定义版本不同，等待用户回答决定请求"
     if state == OBSERVATION_INTERRUPTED:
