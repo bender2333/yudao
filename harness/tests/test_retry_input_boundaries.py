@@ -4,6 +4,7 @@ from threading import Event
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter
@@ -36,7 +37,7 @@ def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_
 
     events = system.store.list_events(run_id)
     failed = [item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED]
-    assert result.phase == "PRODUCT_SPEC"
+    assert has_new_work(result, "product")
     assert result.stop_reason is None
     assert result.input_version == 2
     assert len(adapter.invocations) == 1
@@ -59,11 +60,12 @@ def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path):
         system.add_input(run_id, "NEW USER ORIGINAL\nwith exact spacing")
         first_result = future.result(timeout=_WAIT_LIMIT)
 
-    assert first_result.phase == "PRODUCT_SPEC"
+    assert has_new_work(first_result, "product")
     assert len(adapter.invocations) == 1
     second_result = system.activate_once(run_id)
 
-    assert second_result.phase == "ENGINEERING"
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(second_result, "engineering")
     assert len(adapter.invocations) == 2
     content = adapter.invocations[1].input_items[0]["content"]
     assert "[intend]\noriginal taskNEW USER ORIGINAL\nwith exact spacing\n\n" in content
@@ -93,7 +95,7 @@ def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_pa
     # 20 秒同时远大于正常用时（唤醒到激活结束含一次版本存储写入，并发负载下数秒），
     # 按 #107 的裁定（docs/architecture-issues.md，架构师 2026-09-27 16:55）取这一数量级
     assert time.monotonic() - started < 20
-    assert result.phase == "PRODUCT_SPEC" and result.stop_reason is None
+    assert has_new_work(result, "product") and result.stop_reason is None
     assert len(adapter.invocations) == 1
 
 
@@ -137,7 +139,7 @@ def test_run_time_limit_ends_a_long_retry_wait(tmp_path):
     result = system.activate_once(run_id)
 
     assert time.monotonic() - started < 10
-    assert result.phase == "FAILED" and result.stop_reason == "time_limit"
+    assert result.status == "failed" and result.stop_reason == "time_limit"
     assert len(adapter.invocations) == 1
     assert any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in system.store.list_events(run_id))
 
@@ -163,10 +165,10 @@ def test_input_or_cancel_after_a_retryable_failure_prevents_the_retry(tmp_path, 
     assert len(adapter.invocations) == 1
     assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
     if action == "input":
-        assert result.phase == "PRODUCT_SPEC"
+        assert has_new_work(result, "product")
         assert not any(item.type == EventType.RUN_FAILED for item in events)
     else:
-        assert result.phase == "FAILED" and result.stop_reason == "cancelled"
+        assert result.status == "failed" and result.stop_reason == "cancelled"
 
 
 def test_model_attempts_are_bounded_by_model_steps(tmp_path):
@@ -179,7 +181,7 @@ def test_model_attempts_are_bounded_by_model_steps(tmp_path):
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=5))
     result = system.activate_once(system.create_run("original task"))
 
-    assert result.phase == "PAUSED" and result.stop_reason == "model_steps_exhausted"
+    assert result.status == "paused" and result.stop_reason == "model_steps_exhausted"
     assert len(adapter.invocations) == 5
     assert [request.step_id for request in adapter.invocations] == [1, 2, 3, 4, 5]
     assert [request.attempt for request in adapter.invocations] == [1, 2, 3, 1, 2]

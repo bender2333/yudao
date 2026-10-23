@@ -62,7 +62,7 @@ class _Opened:
 
 def _adopt(system, project_id, run_id):
     # 把一个跑到 DONE 的 run 结算到采纳：结算写在 RUN_DONE 之后，这里显式补做
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     system.projects.settle_pending(project_id)
 
 def _post(client, command, **body):
@@ -254,7 +254,7 @@ def test_a_run_missing_after_an_interruption_is_rebuilt_from_the_record(data_dir
     assert (workspace.root / "data.json").read_text(encoding="utf-8") == '{"rows": 3}\n'
     assert (workspace.root / "src" / "app.py").read_text(encoding="utf-8") == "print('start')\n"
     run = project_run(reopened.store, run_id)
-    assert run.phase != "FAILED"
+    assert run.status != "failed"
     assert reopened.projects.projection(project_id).work_item(work_item_id).snapshot["tree_digest"] == expected
     reopened.close()
 

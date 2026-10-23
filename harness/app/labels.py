@@ -9,25 +9,19 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..definitions import DEFINITIONS
-from ..models import (PHASES, STOP_REASON_LABELS, CatalogEventType, EventType, ProjectEventType,
+from ..models import (RUN_STATUSES, STOP_REASON_LABELS, CatalogEventType, EventType, ProjectEventType,
                      stop_reason_name)
 
 
-# 阶段的中文名（harness/models.py 的 PHASES 是同一份取值）：事件说明里的阶段按中文写
-PHASE_NAMES: dict[str, str] = {
-    "CREATED": "等待开始",
-    "PRODUCT_SPEC": "产品处理中",
-    "ENGINEERING": "工程处理中",
-    "DELIVERY": "交付核验中",
-    "QUALITY": "质检处理中",
-    "REWORK_PRODUCT": "产品返工中",
-    "REWORK_ENGINEERING": "工程返工中",
-    "DONE": "已完成",
-    "PAUSED": "已暂停",
-    "FAILED": "执行失败",
+# run 状态的中文名（harness/models.py 的 RUN_STATUSES 是同一份取值）：事件说明里的状态按中文写
+STATUS_NAMES: dict[str, str] = {
+    "running": "进行中",
+    "done": "已完成",
+    "paused": "已暂停",
+    "failed": "执行失败",
 }
-if set(PHASE_NAMES) != set(PHASES):
-    raise KeyError("阶段的中文名必须与控制核心的阶段取值相同：" + "、".join(PHASES))
+if set(STATUS_NAMES) != set(RUN_STATUSES):
+    raise KeyError("状态的中文名必须与控制核心的状态取值相同：" + "、".join(RUN_STATUSES))
 
 STOP_REASON_NAMES = STOP_REASON_LABELS
 DECISION_KIND_NAMES: dict[str, str] = {
@@ -41,9 +35,9 @@ DECISION_KIND_NAMES: dict[str, str] = {
 }
 
 
-def phase_name(phase: Any) -> str:
-    # 阶段的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
-    return PHASE_NAMES.get(str(phase or ""), str(phase or ""))
+def status_name(status: Any) -> str:
+    # run 状态的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
+    return STATUS_NAMES.get(str(status or ""), str(status or ""))
 
 def decision_kind_name(kind: Any) -> str:
     # 决定种类的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
@@ -109,14 +103,13 @@ def event_label(event_type: str, payload: dict[str, Any]) -> str:
 
 
 class _Translated(dict):
-    # 阶段、停止原因与部门取中文名，标识清单取数量，其余字段原样
+    # 停止原因与部门取中文名，标识清单取数量，其余字段原样
     _NAMES = {
-        "from": phase_name, "to": phase_name, "resumed_at_phase": phase_name,
-        "paused_at_phase": phase_name, "stop_reason": stop_reason_name, "reason": value_name,
+        "stop_reason": stop_reason_name, "reason": value_name,
         "department": department_name, "requester": department_name, "recipient": department_name,
         "guidance_ids": item_count, "candidate_ids": item_count, "running_runs": item_count,
         "stopped_runs": item_count, "restarted_work_items": item_count,
-        "kind": decision_kind_name, "from_phase": phase_name, "to_phase": phase_name,
+        "kind": decision_kind_name,
         "modified_by": modifier_name,
     }
 
@@ -165,10 +158,9 @@ _LABELS: dict[str, str] = {
     EventType.STRUCTURE_ACCEPTED: "采纳了现有结构说明（第 {revision} 版）",
     EventType.BASELINE_REVIEW_ACCEPTED: "质检提交了基线核验：{verdict}",
     EventType.LESSON_CANDIDATE_RECORDED: "记下了一条经验候选：{suggestion}",
-    EventType.TRANSITION: "运行状态从 {from} 变为 {to}",
     EventType.RUN_DONE: "运行结束：{stop_reason}",
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
-    EventType.RUN_CONTINUED: "运行从暂停位置继续：{resumed_at_phase}",
+    EventType.RUN_CONTINUED: "运行从暂停位置继续",
     EventType.RUN_RESUMED: "中断的运行自动继续（执行权第 {acquired_epoch} 号）",
     EventType.RUN_FAILED: "运行失败：{stop_reason}",
     EventType.DECISION_REQUESTED: "提出等待回答的决定（{kind}）：{description}",

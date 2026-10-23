@@ -35,7 +35,7 @@ from .models import (
     RunProjection,
     SessionRecord,
     UserInput,
-    TERMINAL_PHASES,
+    TERMINAL_STATUSES,
     waiting_reason_for,
 )
 
@@ -192,10 +192,9 @@ def replay_decisions(events: list[Event] | list[ProjectEvent]) -> dict[str, Deci
 
 
 def _settle_run_state(state: RunProjection) -> None:
-    # 由阶段与停止原因得出的字段；可以重复计算，结果只取决于这两个字段
-    state.waiting_reason = waiting_reason_for(state.phase, state.stop_reason)
-    if state.phase in TERMINAL_PHASES:
-        state.outcome = {"DONE": "done", "PAUSED": "paused", "FAILED": "failed"}[state.phase]
+    # 由 run 的状态与停止原因得出的字段；可以重复计算，结果只取决于这两个字段
+    state.waiting_reason = waiting_reason_for(state.status, state.stop_reason)
+    if state.status in TERMINAL_STATUSES:
         state.active_department = None
 
 
@@ -238,7 +237,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.inputs.append(initial)
         state.input_version = initial.version
         state.product_work_input_version = initial.version
-        state.phase = event.state_after
+        state.status = "running"
         state.max_cycles = int(payload["max_cycles"])
         state.run_time_limit_sec = int(payload["run_time_limit_sec"])
         state.provider = payload.get("provider", "fake")
@@ -278,7 +277,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
 
     if etype == EventType.PRODUCT_INPUT_ASSIGNED:
         state.product_work_input_version = payload["through_version"]
-        state.phase = "PRODUCT_SPEC"
         state.active_department = "product"
         return
 
@@ -310,6 +308,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
                     response_text=payload.get("text"),
                 )
                 break
+        # 指导回应以后让出的工作恢复：部门继续它自己那一轮（工单 #556：不再有阶段迁移事件）
+        state.yielded_work = None
         return
 
     if etype == EventType.DEPARTMENT_ACTIVATED:
@@ -461,7 +461,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             # 主线会话结束：部门主线的会话记录由它更新（工单 #473 的分支会话不算主线结束）
             session = state.sessions.get(event.department or "")
             if session:
-                session.status = "closed" if state.phase in TERMINAL_PHASES else "idle"
+                session.status = "closed" if state.status in TERMINAL_STATUSES else "idle"
         return
 
     if etype == EventType.PROPOSAL_REJECTED:
@@ -469,7 +469,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             "department": event.department,
             "errors": payload.get("errors", []),
             "event_id": event.event_id,
-            "phase": event.state_after,
+            "status": event.state_after,
         }
         state.rejections.append(item)
         if event.department:
@@ -627,24 +627,14 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.qa_tests_archive_ref = payload["archive_ref"]
         return
 
-    if etype == EventType.TRANSITION:
-        state.phase = event.state_after
-        route = payload.get("route") or f"{event.state_before}->{event.state_after}"
-        state.transitions.append(route)
-        if payload.get("yielded_work_resolved"):
-            state.yielded_work = None
-        return
-
     if etype == EventType.RUN_DONE:
-        state.phase = "DONE"
-        state.outcome = "done"
+        state.status = "done"
         state.stop_reason = event.stop_reason
         state.active_department = None
         return
 
     if etype == EventType.RUN_PAUSED:
-        state.phase = "PAUSED"
-        state.outcome = "paused"
+        state.status = "paused"
         state.stop_reason = event.stop_reason
         state.human_action = payload.get("human_action")
         state.error = event.error
@@ -652,10 +642,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.RUN_CONTINUED:
-        # 用户在暂停以后回答「处理以后继续执行」（工单 #204）：从暂停位置恢复阶段，清除暂停留下的字段；
+        # 用户在暂停以后回答「处理以后继续执行」（工单 #204）：从暂停的位置继续，清除暂停留下的字段；
         # 已用的激活次数、模型步数与运行时间保持在暂停时的值，不在这里重置
-        state.phase = payload["resumed_at_phase"]
-        state.outcome = "running"
+        state.status = "running"
         state.stop_reason = None
         state.human_action = None
         state.error = None
@@ -663,8 +652,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.RUN_FAILED:
-        state.phase = "FAILED"
-        state.outcome = "failed"
+        state.status = "failed"
         state.stop_reason = event.stop_reason
         state.error = event.error
         state.human_action = payload.get("human_action")

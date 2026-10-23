@@ -59,9 +59,9 @@ def _no_tool_call_run(tmp_path, tail=None):
 def test_no_tool_call_pause_requests_a_decision(tmp_path):
     # 模型连续第 LIMIT+1 次没有调用工具：暂停并发出决定请求
     system, run_id, result = _no_tool_call_run(tmp_path)
-    assert result.phase == "PAUSED" and result.stop_reason == "no_tool_call"
+    assert result.status == "paused" and result.stop_reason == "no_tool_call"
     [pause] = _events(system, run_id, EventType.RUN_PAUSED)
-    assert pause.payload["paused_at_phase"] == "PRODUCT_SPEC"
+    assert pause.payload["stop_reason"] == result.stop_reason
     opened = _open_decisions(system, run_id)
     assert len(opened) == 1, [decision.decision_id for decision in opened]
     request = opened[0].request
@@ -85,7 +85,6 @@ def test_pause_decision_is_listed_by_the_query_with_its_options(tmp_path):
     assert (view.kind, view.blocks, view.run_id) == ("no_tool_call", "run", run_id)
     assert [option.id for option in view.request.options] == ["continue", "stop"]
     assert [option.label for option in view.request.options] == ["处理以后继续执行", "停止事项"]
-    assert view.request.resumed_at_phase == "PRODUCT_SPEC"
     assert view.request.stop_reason == "no_tool_call"
     application.close()
 
@@ -98,18 +97,17 @@ def test_no_tool_call_continue_resumes_from_the_paused_phase(tmp_path):
     assert _answer(system, decision, "continue") == run_id
     finished = system.run_until_stop(run_id)
 
-    assert finished.phase == "DONE", (finished.phase, finished.stop_reason)
-    # 继续写成事件，恢复到暂停时的阶段
+    assert finished.status == "done", (finished.status, finished.stop_reason)
+    # 继续写成事件（工单 #556：继续以后下一个谁工作由关注的成果决定，不再记阶段）
     [continued] = _events(system, run_id, EventType.RUN_CONTINUED)
-    assert continued.payload["resumed_at_phase"] == "PRODUCT_SPEC"
-    assert continued.payload["decision_id"] == decision.decision_id
     assert continued.payload["stop_reason"] == "no_tool_call"
+    assert continued.payload["decision_id"] == decision.decision_id
     # 已用的激活次数与模型步数连续，不重新计算：继续之前的事件与计数都保留
     assert finished.cycle_count >= paused_cycle
     assert len(_events(system, run_id, EventType.MODEL_REQUESTED)) > paused_requests
     # 暂停的停止原因在继续以后不再出现在运行状态上：运行到达放行结束
     assert finished.stop_reason == "released"
-    assert finished.phase == "DONE"
+    assert finished.status == "done"
     system.close()
 
 def test_no_tool_call_without_handling_pauses_again_with_a_new_request(tmp_path):
@@ -122,7 +120,7 @@ def test_no_tool_call_without_handling_pauses_again_with_a_new_request(tmp_path)
     assert _answer(system, first, "continue") == run_id
     result = system.run_until_stop(run_id)
 
-    assert result.phase == "PAUSED" and result.stop_reason == "no_tool_call"
+    assert result.status == "paused" and result.stop_reason == "no_tool_call"
     opened = _open_decisions(system, run_id)
     assert len(opened) == 1, [decision.decision_id for decision in opened]
     assert opened[0].decision_id != first.decision_id
@@ -135,7 +133,7 @@ def test_no_tool_call_stop_keeps_the_run_paused_with_the_same_reason(tmp_path):
     [decision] = _open_decisions(system, run_id)
     assert _answer(system, decision, "stop") is None
     projection = system.project(run_id)
-    assert projection.phase == "PAUSED" and projection.stop_reason == "no_tool_call"
+    assert projection.status == "paused" and projection.stop_reason == "no_tool_call"
     # 停止以后没有继续事件，也没有新的决定请求
     assert _events(system, run_id, EventType.RUN_CONTINUED) == []
     assert _open_decisions(system, run_id) == []
@@ -154,7 +152,7 @@ def test_second_no_tool_call_pause_after_the_first_continue_is_a_fresh_count(tmp
     finished = system.run_until_stop(run_id)
 
     # 继续以后的 LIMIT 次只回复文字没有触发暂停，第 LIMIT+1 次换成了提交产品要求
-    assert finished.phase == "DONE", (finished.phase, finished.stop_reason)
+    assert finished.status == "done", (finished.status, finished.stop_reason)
     assert finished.stop_reason != "no_tool_call"
     system.close()
 
@@ -202,9 +200,9 @@ def _workspace_unrepresentable_run(tmp_path, tail):
 
 def test_workspace_unrepresentable_pause_requests_a_decision_with_the_paths(tmp_path):
     system, run_id, workspace, result = _workspace_unrepresentable_run(tmp_path, delivery_turn())
-    assert result.phase == "PAUSED" and result.stop_reason == "workspace_unrepresentable"
+    assert result.status == "paused" and result.stop_reason == "workspace_unrepresentable"
     [pause] = _events(system, run_id, EventType.RUN_PAUSED)
-    assert pause.payload["paused_at_phase"] == "ENGINEERING"
+    assert pause.payload["stop_reason"] == result.stop_reason
     [decision] = _open_decisions(system, run_id)
     request = decision.request
     assert (request["kind"], request["blocks"]) == ("workspace_unrepresentable", "run")
@@ -224,9 +222,9 @@ def test_workspace_unrepresentable_continue_after_ignoring_the_entry_completes(t
     assert _answer(system, decision, "continue") == run_id
     system.test_adapter.script.extend([review_turn("release", "checks passed on the current snapshot")])
     finished = system.run_until_stop(run_id)
-    assert finished.phase == "DONE", (finished.phase, finished.stop_reason)
+    assert finished.status == "done", (finished.status, finished.stop_reason)
     [continued] = _events(system, run_id, EventType.RUN_CONTINUED)
-    assert continued.payload["resumed_at_phase"] == "ENGINEERING"
+    assert continued.payload["stop_reason"] == "workspace_unrepresentable"
     system.close()
 
 def test_workspace_unrepresentable_continue_without_handling_pauses_again(tmp_path):
@@ -236,7 +234,7 @@ def test_workspace_unrepresentable_continue_without_handling_pauses_again(tmp_pa
     assert _answer(system, first, "continue") == run_id
     # 继续以后的第一次请求装配仍然发现无法表示的条目：再次以同一原因暂停
     again = system.run_until_stop(run_id)
-    assert again.phase == "PAUSED" and again.stop_reason == "workspace_unrepresentable"
+    assert again.status == "paused" and again.stop_reason == "workspace_unrepresentable"
     opened = _open_decisions(system, run_id)
     assert len(opened) == 1 and opened[0].decision_id != first.decision_id
     system.close()
@@ -246,7 +244,7 @@ def test_workspace_unrepresentable_stop_keeps_the_run_paused(tmp_path):
     [decision] = _open_decisions(system, run_id)
     assert _answer(system, decision, "stop") is None
     projection = system.project(run_id)
-    assert projection.phase == "PAUSED" and projection.stop_reason == "workspace_unrepresentable"
+    assert projection.status == "paused" and projection.stop_reason == "workspace_unrepresentable"
     system.close()
 
 def test_max_cycles_pause_does_not_request_a_decision(tmp_path):
@@ -254,7 +252,7 @@ def test_max_cycles_pause_does_not_request_a_decision(tmp_path):
     system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter([product_spec(), *_completion_script()]))
     run_id = system.create_run("build echo", max_cycles=1)
     result = system.run_until_stop(run_id)
-    assert result.phase == "PAUSED" and result.stop_reason == "max_cycles"
+    assert result.status == "paused" and result.stop_reason == "max_cycles"
     assert _open_decisions(system, run_id) == []
     assert _events(system, run_id, EventType.DECISION_REQUESTED) == []
     system.close()
@@ -267,7 +265,7 @@ def test_model_steps_exhausted_pause_does_not_request_a_decision(tmp_path):
                                     step_limits=limits)
     run_id = system.create_run("build echo")
     result = system.run_until_stop(run_id)
-    assert result.phase == "PAUSED" and result.stop_reason == "model_steps_exhausted"
+    assert result.status == "paused" and result.stop_reason == "model_steps_exhausted"
     assert _open_decisions(system, run_id) == []
     system.close()
 
@@ -342,7 +340,7 @@ def test_no_tool_call_continue_uses_the_model_changed_before_answering(tmp_path)
         system = LoopSystem(tmp_path / "data", facade=facade)
         run_id = system.create_run("build an echo CLI")
         result = system.run_until_stop(run_id)
-        assert result.phase == "PAUSED" and result.stop_reason == "no_tool_call"
+        assert result.status == "paused" and result.stop_reason == "no_tool_call"
         [decision] = _open_decisions(system, run_id)
 
         # 在部门设置中把产品部门的模型换成 m-b

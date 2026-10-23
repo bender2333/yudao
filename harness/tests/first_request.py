@@ -24,7 +24,7 @@ def main() -> None:
         result = system.activate_once(run_id)
         failed = [event.payload["reason"] for event in system.store.list_events(run_id)
                   if event.type == EventType.MODEL_ATTEMPT_FAILED]
-        print(json.dumps({"phase": result.phase, "stop_reason": result.stop_reason, "failed": failed}))
+        print(json.dumps({"status": result.status, "stop_reason": result.stop_reason, "failed": failed}))
     finally:
         system.close()
 

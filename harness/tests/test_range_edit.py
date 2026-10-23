@@ -3,6 +3,7 @@ import os
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, EventType, ProjectEventType, json_dumps
@@ -398,17 +399,18 @@ def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
     run_id = system.create_run("echo", max_cycles=12)
     for _ in range(2):
         pending = system.activate_once(run_id)
-    assert pending.phase == "QUALITY"
+    assert has_new_work(pending, "quality")
     original = pending.delivery_spec.content_hash
     original_digest = pending.delivery_spec.code_tree_digest
     rework = system.activate_once(run_id)
-    assert rework.phase == "ENGINEERING"
+    assert has_new_work(rework, "engineering")
     delivered = system.activate_once(run_id)
-    assert delivered.phase == "QUALITY" and delivered.active_department == "quality"
+    # 新的交付让质检开始一轮工作（工单 #556：质检关注新的交付）
+    assert has_new_work(delivered, "quality")
     assert delivered.delivery_spec.content_hash != original
     assert delivered.delivery_spec.code_tree_digest != original_digest
     result = system.activate_once(run_id)
-    assert result.phase == "QUALITY", result.error
+    assert has_new_work(result, "quality"), result.error
     assert result.last_review.verdict == "rework_engineering"
     errors = result.rejections[-1]["errors"]
     assert [error["field"] for error in errors] == ["basis_delivery_spec_hash"]
@@ -448,7 +450,7 @@ def test_adopted_baseline_applies_to_next_work_item_and_replay_verifies(data_dir
         review_turn("release", "ok v2"),
     ])
     _work_item_1, run_1 = system.projects.start_work_item(project_id, "第一步：echo CLI")
-    assert system.run_until_stop(run_1).phase == "DONE"
+    assert system.run_until_stop(run_1).status == "done"
     assert system.projects.settle(run_1).type == ProjectEventType.DELIVERABLE_ADOPTED
     first_adoption = system.projects.projection(project_id).current_adoption
     _work_item_2, run_2 = system.projects.start_work_item(project_id, "第二步：输出大写")
@@ -456,7 +458,7 @@ def test_adopted_baseline_applies_to_next_work_item_and_replay_verifies(data_dir
     assert system.project(run_2).baseline["adoption_id"] == first_adoption.adoption_id
     assert system.project(run_2).workspace_digest == first_adoption.code_tree_digest
     assert capture_public_tree(system.workspace(run_2).root).digest == first_adoption.code_tree_digest
-    assert system.run_until_stop(run_2).phase == "DONE"
+    assert system.run_until_stop(run_2).status == "done"
     assert system.projects.settle(run_2).type == ProjectEventType.DELIVERABLE_ADOPTED
     project = system.projects.projection(project_id)
     assert project.current_adoption.run_id == run_2

@@ -7,11 +7,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..definitions import DEFINITIONS
-from ..models import DEPARTMENTS, PHASES, CatalogEventType, EventType, ProjectEventType
+from ..models import DEPARTMENTS, CatalogEventType, EventType, ProjectEventType
 from ..streams import PRIORITY_USER
 
 Department = Literal[DEPARTMENTS]
-Phase = Literal[PHASES]
 Purpose = Literal["work", "compaction"]
 
 
@@ -63,7 +62,6 @@ class CheckReceipt(Payload):
 
 class YieldedWork(Payload):
     # 部门为回应指导让出的工作与让出时的依据
-    phase: Phase
     effective_contract_hash: str | None
     delivery_spec_hash: str | None
 
@@ -878,16 +876,6 @@ class LessonCandidateRecordedPayload(Payload):
     evidence_refs: list[ArtifactRef]
 
 
-class TransitionPayload(Payload):
-    # yielded_work_resolved 与 yielded_work 在恢复让出的工作时出现
-    model_config = ConfigDict(extra="forbid", frozen=True, serialize_by_alias=True)
-    from_: Phase = Field(alias="from")
-    to: Phase
-    route: str
-    yielded_work_resolved: bool | None = None
-    yielded_work: YieldedWork | None = None
-
-
 class RunDonePayload(Payload):
     stop_reason: ReleasedReason
 
@@ -897,7 +885,6 @@ class RunPausedPayload(Payload):
     stop_reason: PausedReason
     human_action: str
     message: str | None = None
-    paused_at_phase: Phase
     cycle_count: int
     max_cycles: int
     token_used: int
@@ -983,8 +970,7 @@ class ModelUnavailableRequested(Payload):
 class PauseRequested(Payload):
     # 暂停以后继续（D09，工单 #204）：模型连续多次没有调用工具，或者工作区出现无法表示的条目，
     # run 暂停并发出这个请求，回答之前这个 run 不推进。description 写明停止原因与人工处理说明；
-    # workspace_unrepresentable 的 facts 是条目在工作区内的相对路径；department 是暂停时正在工作的部门；
-    # resumed_at_phase 是暂停时所在的阶段，回答继续时恢复到它
+    # workspace_unrepresentable 的 facts 是条目在工作区内的相对路径；department 是暂停时正在工作的部门
     kind: Literal["no_tool_call", "workspace_unrepresentable"]
     blocks: Literal["run"]
     options: list[DecisionOption]
@@ -992,7 +978,6 @@ class PauseRequested(Payload):
     facts: list[str]
     department: Department
     stop_reason: Literal["no_tool_call", "workspace_unrepresentable"]
-    resumed_at_phase: Phase
 
 
 class UnknownActionRequested(Payload):
@@ -1098,10 +1083,9 @@ class RunResumedPayload(Payload):
 
 class RunContinuedPayload(Payload):
     # 暂停的 run 在用户回答「处理以后继续执行」以后继续（D09，工单 #204）：decision_id 是被回答的决定请求，
-    # stop_reason 是暂停时的停止原因，resumed_at_phase 是恢复到的阶段（暂停时记录在 run_paused 的 paused_at_phase）
+    # stop_reason 是暂停时的停止原因；继续以后下一个谁工作由关注的成果决定（工单 #556）
     decision_id: str
     stop_reason: Literal["no_tool_call", "workspace_unrepresentable"]
-    resumed_at_phase: Phase
 
 
 # ---------------------------------------------------------------------------
@@ -1531,7 +1515,6 @@ PAYLOADS: dict[str, Any] = {
     EventType.STRUCTURE_ACCEPTED: StructureAcceptedPayload,
     EventType.BASELINE_REVIEW_ACCEPTED: BaselineReviewAcceptedPayload,
     EventType.LESSON_CANDIDATE_RECORDED: LessonCandidateRecordedPayload,
-    EventType.TRANSITION: TransitionPayload,
     EventType.RUN_DONE: RunDonePayload,
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,

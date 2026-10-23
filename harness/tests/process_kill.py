@@ -232,7 +232,7 @@ def main() -> None:
                     session_prefix=args.hold_session)
     if args.resume_only:
         try:
-            print(json.dumps({"run_id": None, "phase": "resumed",
+            print(json.dumps({"run_id": None, "status": "resumed",
                               "resumed": list(system.resume_startup_runs())}, ensure_ascii=False), flush=True)
         finally:
             system.close()
@@ -257,7 +257,7 @@ def main() -> None:
             workspace.write_file(path, content)
     try:
         result = system.run_until_stop(run_id)
-        print(json.dumps({"run_id": run_id, "phase": result.phase,
+        print(json.dumps({"run_id": run_id, "status": result.status,
                           "stop_reason": result.stop_reason}, ensure_ascii=False), flush=True)
         if args.settle:
             system.projects.settle(run_id)

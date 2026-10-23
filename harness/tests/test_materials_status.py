@@ -77,7 +77,7 @@ def test_materials_prd_versions_follow_the_product_decision_path(tmp_path):
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请补充产品决定。")
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE", projection.error
+    assert projection.status == "done", projection.error
     # 一条产品需求、两版有效合同
     assert len(projection.product_specs) == 1
     assert len(projection.effective_contracts) == 2

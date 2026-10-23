@@ -45,7 +45,7 @@ def _text_reply(*, response_id: str, model: str, text: str) -> tuple[int, str, l
             "content": [{"type": "output_text", "text": text, "annotations": []}]}
     return 200, "text/event-stream", [_reply([item], response_id=response_id, model=model)]
 
-def _phase(body: dict[str, Any]) -> str:
+def _department(body: dict[str, Any]) -> str:
     parts: list[str] = []
     for item in body.get("input", []):
         content = item.get("content")
@@ -55,7 +55,7 @@ def _phase(body: dict[str, Any]) -> str:
             for segment in content:
                 if isinstance(segment, dict) and isinstance(segment.get("text"), str):
                     parts.append(segment["text"])
-    match = re.search(r'"phase":"([A-Z_]+)"', "\n".join(parts))
+    match = re.search(r'"department":"(\w+)"', "\n".join(parts))
     return match.group(1) if match else ""
 
 def _proposal_reply(*, response_id: str, model: str, payload: dict[str, Any]) -> tuple[int, str, list[bytes]]:
@@ -69,7 +69,7 @@ def _proposal_reply(*, response_id: str, model: str, payload: dict[str, Any]) ->
 def _department_aware(model: str):
     # 产品部门先提交产品要求，之后返回不带工具调用的回答让运行停在工程进行中
     def responder(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
-        if _phase(body) != "ENGINEERING":
+        if _department(body) != "engineering":
             return _proposal_reply(response_id="spec", model=model, payload={"kind": "product_spec"})
         return _text_reply(response_id="idle", model=model, text="waiting")
     return responder

@@ -167,18 +167,18 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
                                   "status"),
     "transition": ("from", "route", "to"),
     "run_done": ("stop_reason", ),
-    "run_paused": ("cycle_count", "human_action", "max_cycles", "paused_at_phase", "stop_reason"),
+    "run_paused": ("cycle_count", "human_action", "max_cycles", "stop_reason"),
     "run_failed": ("human_action", "stop_reason"),
     "run_resumed": ("acquired_epoch", "previous_epoch"),
-    "run_continued": ("decision_id", "resumed_at_phase", "stop_reason"),
-    "decision_requested": ("blocks", "department", "kind", "options", "reason", "resumed_at_phase", "stop_reason",
+    "run_continued": ("decision_id", "stop_reason"),
+    "decision_requested": ("blocks", "department", "kind", "options", "reason", "stop_reason",
                            "target"),
     "decision_answered": ("base_version", "decision_id", "option"),
     "decision_withdrawn": ("decision_id", "reason"),
 }
 
 # 投影在基准里保留的字段；带下划线的四项各自再保留下面列出的键
-PROJECTION_KEY_FIELDS = ("phase", "stop_reason", "outcome", "error", "waiting_reason", "active_department",
+PROJECTION_KEY_FIELDS = ("status", "stop_reason", "error", "waiting_reason", "active_department",
                          "human_action", "cycle_count", "rework_count", "round", "input_version",
                          "processed_input_version", "product_work_input_version", "run_event_version",
                          "stream_version", "definitions_version", "parameters_version")
@@ -466,6 +466,8 @@ _TOOL_RESULT_TYPES = frozenset({
     "tool_called", "tool_started", "proposal_submitted", "spec_accepted", "contract_accepted",
     "plan_accepted", "delivery_accepted", "qa_submitted",
 })
+# 正式成果被接纳的事件种类：它们之后由关注的成果决定下一个谁工作（工单 #556）
+_OUTCOME_TYPES = frozenset({"spec_accepted", "delivery_accepted", "baseline_review_accepted"})
 
 
 def _inline(value, shared, memo):
@@ -548,11 +550,12 @@ def _causal_edges(events):
                 requester = group_of[position]
                 stop = next((pos for pos, other in enumerate(events)
                              if pos > answers[0] and group_of[pos] == requester
-                             and other.get("type") in {"transition", "run_done"}), len(events))
+                             and other.get("type") in _OUTCOME_TYPES | {"run_done"}), len(events))
                 for pos in range(answers[0] + 1, stop):
                     if group_of[pos] == requester and events[pos].get("type") in _TOOL_RESULT_TYPES:
                         link(answers[0], pos)
-        elif event.get("type") == "transition":
+        elif event.get("type") in _OUTCOME_TYPES:
+            # 正式成果的因果边：成果被接纳 → 下一个部门开始（工单 #556：没有阶段迁移事件了）
             targets = [pos for pos in activations if pos > position]
             if targets:
                 link(position, targets[0])

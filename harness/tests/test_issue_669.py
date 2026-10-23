@@ -73,6 +73,6 @@ def test_old_run_created_with_window_is_read_without_it(data_dir):
         assert not hasattr(run, "context_window")
         assert run.max_cycles == max_cycles
         assert run.run_time_limit_sec == run_time_limit_sec
-        assert run.phase == "PRODUCT_SPEC"
+        assert run.status == "running"
     finally:
         reopened.close()

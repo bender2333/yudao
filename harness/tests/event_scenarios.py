@@ -16,6 +16,7 @@ import pytest
 
 from harness.adapters.base import Availability, ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
+from harness.collaboration import has_new_work
 from harness.decisions import DecisionClosed
 from harness.engine import StepLimits
 from harness.event_store import Command
@@ -523,20 +524,20 @@ def _request_time_unavailable_script() -> list[Any]:
 def request_time_unavailable(data_dir):
     system, _, run_id = _system(data_dir, _request_time_unavailable_script())
     blocked = system.run_until_stop(run_id)
-    assert (blocked.phase, blocked.outcome) == ("ENGINEERING", "running")
+    assert (blocked.active_department, blocked.status) == ("engineering", "running")
     assert blocked.product_spec is not None
     _answer_open_decision(system, "continue")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     return system, run_id, {}
 
 
 def request_time_unavailable_stop(data_dir):
     system, _, run_id = _system(data_dir, _request_time_unavailable_script())
     blocked = system.run_until_stop(run_id)
-    assert (blocked.phase, blocked.outcome) == ("ENGINEERING", "running")
+    assert (blocked.active_department, blocked.status) == ("engineering", "running")
     _answer_open_decision(system, "stop")
     finished = system.run_until_stop(run_id)
-    assert (finished.phase, finished.stop_reason) == ("FAILED", "cancelled")
+    assert (finished.status, finished.stop_reason) == ("failed", "cancelled")
     events = system.store.list_events(run_id)
     assert [event.type for event in events[-2:]] == [EventType.DECISION_ANSWERED, EventType.RUN_FAILED]
     return system, run_id, {}
@@ -545,11 +546,11 @@ def request_time_unavailable_stop(data_dir):
 def request_time_unavailable_cancel(data_dir):
     system, _, run_id = _system(data_dir, _request_time_unavailable_script())
     blocked = system.run_until_stop(run_id)
-    assert (blocked.phase, blocked.outcome) == ("ENGINEERING", "running")
+    assert (blocked.active_department, blocked.status) == ("engineering", "running")
     _position, decisions = saved_decisions(system.store, statuses=("open",))
     assert len(decisions) == 1
     cancelled = system.cancel(run_id)
-    assert (cancelled.phase, cancelled.stop_reason) == ("FAILED", "cancelled")
+    assert (cancelled.status, cancelled.stop_reason) == ("failed", "cancelled")
     events = system.store.list_events(run_id)
     assert [event.type for event in events[-2:]] == [EventType.DECISION_WITHDRAWN, EventType.RUN_FAILED]
     _position, withdrawn = saved_decisions(system.store, statuses=("withdrawn",))
@@ -582,11 +583,12 @@ def activation_start_unavailable(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build an echo CLI")
     blocked = system.run_until_stop(run_id)
-    assert (blocked.phase, blocked.outcome) == ("PRODUCT_SPEC", "running")
+    # 模型服务在激活开始时不可用：产品还没有开始一轮工作，它按关注的成果等着（工单 #556）
+    assert (has_new_work(blocked, "product"), blocked.status) == (True, "running")
     assert len(adapter.invocations) == 0
     adapter.flaky = False
     _answer_open_decision(system, "continue")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     return system, run_id, {}
 
 
@@ -609,10 +611,10 @@ def _credential_rejected_then_continue(protocol: str, first):
         try:
             system, run_id = provider_system(data_dir, provider.base, protocol)
             blocked = system.run_until_stop(run_id)
-            assert blocked.outcome == "running"
+            assert blocked.status == "running"
             _answer_open_decision(system, "continue")
             finished = system.run_until_stop(run_id)
-            assert finished.phase == "DONE"
+            assert finished.status == "done"
         finally:
             provider.close()
         return system, run_id, {provider.base: "<provider>"}

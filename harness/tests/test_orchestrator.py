@@ -1,5 +1,6 @@
 import json
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactRef
@@ -24,16 +25,11 @@ def test_happy_path_requires_quality_release(data_dir):
     assert "host-executed" in engineering_check.summary
     assert "host-executed" in quality_check["summary"]
 
-    assert projection.phase == "DONE"
-    assert projection.outcome == "done"
+    assert projection.status == "done"
     assert projection.stop_reason == "released"
-    assert projection.transitions == [
-        "CREATED->PRODUCT_SPEC",
-        "PRODUCT_SPEC->ENGINEERING",
-        "ENGINEERING->DELIVERY",
-        "DELIVERY->QUALITY",
-        "QUALITY->DONE",
-    ]
+    # 阶段状态机删掉以后没有阶段迁移事件（工单 #556）：下一个谁工作由关注的成果决定
+    assert not [event for event in system.store.list_events(projection.run_id)
+                if event.type == "transition"]
     assert projection.product_spec is not None
     assert projection.delivery_spec is not None
     assert projection.last_review is not None
@@ -54,10 +50,10 @@ def test_quality_rework_routes_to_engineering(data_dir):
         review_turn("release", "fixed"),
     ]
     _, projection = run_scripted(data_dir, script)
-    assert projection.phase == "DONE"
-    assert "QUALITY->REWORK_ENGINEERING" in projection.transitions
-    assert "REWORK_ENGINEERING->ENGINEERING" in projection.transitions
+    assert projection.status == "done"
+    # 缺陷记录让工程开始一轮返工（工单 #556：工程关注针对最新交付的缺陷记录）
     assert projection.rework_count == 1
+    assert len(projection.delivery_specs) == 2
 
 def test_illegal_workpiece_stays_in_department(data_dir):
     system = LoopSystem.for_testing(
@@ -75,8 +71,8 @@ def test_illegal_workpiece_stays_in_department(data_dir):
     )
     run_id = system.create_run("build echo")
     projection = system.activate_once(run_id)
-    assert projection.phase == "PRODUCT_SPEC"
-    assert projection.outcome == "running"
+    assert has_new_work(projection, "product")
+    assert projection.status == "running"
     assert projection.rejections
     assert projection.rejections[0]["errors"][0]["field"] == "kind"
 
@@ -93,8 +89,8 @@ def test_natural_language_completion_does_not_finish(data_dir):
     system.activate_once(run_id)
     system.activate_once(run_id)
     projection = system.activate_once(run_id)
-    assert projection.phase == "PAUSED"
-    assert projection.outcome != "done"
+    assert projection.status == "paused"
+    assert projection.status != "done"
     assert projection.stop_reason == "no_tool_call"
     assert projection.last_review is None
 
@@ -105,14 +101,14 @@ def test_max_cycles_pauses_with_human_action(data_dir):
         review_turn("rework_engineering", "defect found", defects=[{"severity": "major", "summary": "fix"}]),
     ]
     _, projection = run_scripted(data_dir, script, max_cycles=2)
-    assert projection.phase == "PAUSED"
+    assert projection.status == "paused"
     assert projection.stop_reason == "max_cycles"
     assert projection.human_action
     assert "循环次数已达上限" in projection.waiting_reason
 
 def test_cycle_limit_pauses_after_work_without_provider_usage(data_dir):
     _, projection = run_scripted(data_dir, happy_script(), max_cycles=1)
-    assert projection.phase == "PAUSED"
+    assert projection.status == "paused"
     assert projection.stop_reason == "max_cycles"
     assert projection.product_spec is not None
     assert projection.token_used == 0
@@ -121,19 +117,19 @@ def test_cancel_is_explicit_failure(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
     run_id = system.create_run("build echo")
     projection = system.cancel(run_id)
-    assert projection.phase == "FAILED"
+    assert projection.status == "failed"
     assert projection.stop_reason == "cancelled"
 
 def test_provider_error_is_explicit_failure(data_dir):
     script = [product_spec(), FakeTurn(raise_error=ProviderError("upstream 500"))]
     _, projection = run_scripted(data_dir, script)
-    assert projection.phase == "FAILED"
+    assert projection.status == "failed"
     assert projection.stop_reason == "provider_error"
     assert "upstream 500" in (projection.error or "")
 
 def test_context_overflow_is_explicit_failure(data_dir):
     _, projection = run_scripted(data_dir, happy_script(), context_window=8)
-    assert projection.phase == "FAILED"
+    assert projection.status == "failed"
     assert projection.stop_reason == "context_overflow"
 
 def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
@@ -170,7 +166,7 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
         for item in projection.rejections
         for error in item["errors"]
     )
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert projection.last_review.product_spec_hash == projection.product_spec.content_hash
     assert projection.last_review.delivery_spec_hash == projection.delivery_spec.content_hash
 
@@ -196,9 +192,9 @@ def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
     assert not any("AttributeError" in message or "TypeError" in message for message in messages)
     events = system.store.list_events(projection.run_id)
     assert any(event.type == "proposal_rejected" for event in events)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert events[-1].type == "activation_finished"
-    assert events[-1].state_after == "DONE"
+    assert events[-1].state_after == "done"
 
 def test_release_without_quality_evidence_is_rejected(data_dir):
     script = [
@@ -209,7 +205,7 @@ def test_release_without_quality_evidence_is_rejected(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo", max_cycles=8)
     projection = system.run_until_stop(run_id)
-    assert projection.phase != "DONE"
+    assert projection.status != "done"
     assert any("quality must run" in error["message"] for item in projection.rejections for error in item["errors"])
 
 def test_truncated_work_response_is_terminal_without_retry(data_dir):
@@ -226,7 +222,7 @@ def test_truncated_work_response_is_terminal_without_retry(data_dir):
     run_id = system.create_run("build echo")
     result = system.activate_once(run_id)
 
-    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert result.status == "failed" and result.stop_reason == "provider_error"
     assert len(adapter.invocations) == 1
     events = system.store.list_events(run_id)
     failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]

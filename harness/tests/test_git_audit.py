@@ -17,7 +17,7 @@ def test_history_rejects_valid_current_tree_with_unaccepted_parent_materials(tmp
     ]))
     run_id = system.create_run("build echo")
     try:
-        assert system.run_until_stop(run_id).phase == "DONE"
+        assert system.run_until_stop(run_id).status == "done"
         assert verify_git_history(system.git_versions, system.artifacts, system.store.list_events(run_id))
         events = system.store.list_events(run_id)
         delivery = next(event for event in events if event.type == EventType.DELIVERY_ACCEPTED)

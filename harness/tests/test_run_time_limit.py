@@ -1,5 +1,6 @@
 import time
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
@@ -23,7 +24,7 @@ def test_time_limit_stops_run_with_failed_state(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1, max_cycles=999)
     result = system.activate_once(run_id)
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "time_limit"
     assert result.human_action is not None
     assert "运行时间已达上限" in (result.waiting_reason or "")
@@ -38,11 +39,11 @@ def test_time_limit_checked_between_activations(data_dir):
     # 第一次激活正常完成；两次激活之间的等待不计入运行时间（工单 #350，按 #410 对齐短时限到 10 秒避免负载抖动），
     # 第二次激活开始时累计还没有达到上限，照常进行
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     time.sleep(10.2)
     result = system.activate_once(run_id)
     assert result.stop_reason is None
-    assert result.phase == "QUALITY"
+    assert has_new_work(result, "quality")
     assert len(system.test_adapter.invocations) == 2
 
 def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
@@ -61,7 +62,7 @@ def test_loosened_defaults_allow_more_than_old_cycle_limit(data_dir):
     assert projection.max_cycles == DEFINITIONS.rule_value("max_cycles")
     assert projection.run_time_limit_sec == DEFINITIONS.rule_value("run_time_limit_sec")
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE"
+    assert result.status == "done"
 
 def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
     # 最大模型步数的默认值是 999999（StepLimits），不再是 32
@@ -76,13 +77,13 @@ def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo")
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE"
+    assert result.status == "done"
 
 def test_small_cycle_limit_still_pauses(data_dir):
     script = [product_spec(),delivery_turn(),
               review_turn("release", "ok")]
     _, projection = run_scripted(data_dir, script, max_cycles=1, run_time_limit_sec=7200)
-    assert projection.phase == "PAUSED"
+    assert projection.status == "paused"
     assert projection.stop_reason == "max_cycles"
 
 def test_small_step_limit_still_pauses(data_dir):
@@ -95,7 +96,7 @@ def test_small_step_limit_still_pauses(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script), step_limits=StepLimits(max_model_steps=3))
     run_id = system.create_run("echo", run_time_limit_sec=7200)
     result = system.activate_once(run_id)
-    assert result.phase == "PAUSED"
+    assert result.status == "paused"
     assert result.stop_reason == "model_steps_exhausted"
 
 def test_convergence_with_defaults_always_terminates(data_dir):
@@ -104,8 +105,8 @@ def test_convergence_with_defaults_always_terminates(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo")
     result = system.run_until_stop(run_id)
-    from harness.models import TERMINAL_PHASES
-    assert result.phase in TERMINAL_PHASES
+    from harness.models import TERMINAL_STATUSES
+    assert result.status in TERMINAL_STATUSES
 
 def test_convergence_with_long_script_reaches_terminal(data_dir):
     # 用较长脚本验证收敛：即使有很多步骤，最终仍到达终态
@@ -118,8 +119,8 @@ def test_convergence_with_long_script_reaches_terminal(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(long_script))
     run_id = system.create_run("echo", run_time_limit_sec=7200)
     result = system.run_until_stop(run_id)
-    from harness.models import TERMINAL_PHASES
-    assert result.phase in TERMINAL_PHASES
+    from harness.models import TERMINAL_STATUSES
+    assert result.status in TERMINAL_STATUSES
 
 def test_time_limit_event_recorded(data_dir):
     script = [_slow(product_spec()),delivery_turn(),
@@ -155,7 +156,7 @@ def test_per_request_timeout_still_applies_inside_step(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=7200)
     result = system.activate_once(run_id)
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "provider_error"
 
 def test_explicit_small_max_cycles_with_large_time_limit(data_dir):
@@ -163,5 +164,5 @@ def test_explicit_small_max_cycles_with_large_time_limit(data_dir):
     script = [product_spec(),delivery_turn(),
               review_turn("release", "ok")]
     _, projection = run_scripted(data_dir, script, max_cycles=1, run_time_limit_sec=7200)
-    assert projection.phase == "PAUSED"
+    assert projection.status == "paused"
     assert projection.stop_reason == "max_cycles"

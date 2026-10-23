@@ -206,7 +206,7 @@ def test_a_paused_run_keeps_its_frozen_limit_after_the_parameter_is_raised(data_
         system.set_parameter("max_cycles", 1, reason="先看一轮", modified_by="user:test")
         _work_item, run_id = system.projects.start_work_item(project_id, "做回显功能。")
         stopped = system.run_until_stop(run_id)
-        assert stopped.phase == "PAUSED" and stopped.stop_reason == "max_cycles"
+        assert stopped.status == "paused" and stopped.stop_reason == "max_cycles"
         assert stopped.cycle_count == 1 and stopped.max_cycles == 1
 
         system.set_parameter("max_cycles", 999999, reason="调回去", modified_by="user:test")
@@ -214,6 +214,6 @@ def test_a_paused_run_keeps_its_frozen_limit_after_the_parameter_is_raised(data_
         # 已停止的 run 保持停止：限额与轮数都按创建时的值
         assert system.project(run_id).max_cycles == 1
         again = system.run_until_stop(run_id)
-        assert again.phase == "PAUSED" and again.cycle_count == 1
+        assert again.status == "paused" and again.cycle_count == 1
     finally:
         system.close()

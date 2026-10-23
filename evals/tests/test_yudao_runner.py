@@ -224,7 +224,7 @@ def _export(outcome="released", events=None, projection=None):
             events = []
     base = {"outcome": "done" if outcome == "released" else outcome,
             "stop_reason": "released" if outcome == "released" else None,
-            "phase": "DONE" if outcome == "released" else None}
+            "status": "done" if outcome == "released" else None}
     if projection:
         base.update(projection)
     return {"projection": base, "events": events, "usage": {}}
@@ -260,7 +260,7 @@ def test_released_run_is_reported_as_released():
     assert collected["end_status"] == "released"
     assert collected["outcome"] == "done"
     assert collected["stop_reason"] == "released"
-    assert collected["phase"] == "DONE"
+    assert collected["status"] == "done"
 
 
 def test_timeout_run_is_reported_with_the_time_limit_reason():
@@ -291,11 +291,11 @@ def test_metrics_read_cycles_rework_requests_and_usage():
 
 
 def test_replay_difference_fails_the_checkpoint():
-    replay = {"consistent": False, "differences": ["phase: DONE != PAUSED"]}
+    replay = {"consistent": False, "differences": ["status: done != paused"]}
     checkpoints = yudao_metrics.checkpoints_of([], "released", replay,
                                                {"timed_out": False, "hidden_failures": []})
     assert checkpoints["replay_consistent"]["passed"] is False
-    assert "phase" in checkpoints["replay_consistent"]["detail"]
+    assert "status" in checkpoints["replay_consistent"]["detail"]
 
 
 def test_false_release_is_reported_when_hidden_checks_fail():
@@ -411,7 +411,7 @@ def test_release_checkpoint_passes_on_handoff_release_fixture():
     assert collected["end_status"] == "released"
     assert collected["outcome"] == "done"
     assert collected["stop_reason"] == "released"
-    assert collected["phase"] == "DONE"
+    assert collected["status"] == "done"
 
 def test_release_checkpoint_fails_on_no_tool_call_pause():
     """第一项四项同检：no_tool_call 暂停不算放行。"""

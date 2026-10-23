@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
@@ -101,7 +102,7 @@ def test_the_quality_sees_only_facts_before_its_own_conclusion(tmp_path: Path):
 
     system.activate_once(run_id)   # 产品：产品要求
     system.activate_once(run_id)   # 工程：交付，并回问质检
-    assert system.project(run_id).phase == "QUALITY", system.project(run_id).error
+    assert has_new_work(system.project(run_id), "quality"), system.project(run_id).error
 
     # AC9：质检分支的请求里只有问题与背景的事实部分（质检还没有下结论）
     branch_calls = _quality_branch_calls(adapter)
@@ -111,7 +112,7 @@ def test_the_quality_sees_only_facts_before_its_own_conclusion(tmp_path: Path):
     assert QUESTION_EXPLANATION not in branch_text
 
     system.activate_once(run_id)   # 质检第一轮：先问工程，拿到回答以后提交缺陷记录
-    assert system.project(run_id).phase == "ENGINEERING", system.project(run_id).error
+    assert has_new_work(system.project(run_id), "engineering"), system.project(run_id).error
 
     quality_calls = _quality_calls(adapter)
     assert len(quality_calls) == 2, quality_calls
@@ -127,7 +128,7 @@ def test_the_quality_sees_only_facts_before_its_own_conclusion(tmp_path: Path):
 
     # 质检提交缺陷记录以后，工程再问质检：质检分支的请求里有解释部分
     system.activate_once(run_id)   # 工程：再问质检并提交新的交付
-    assert system.project(run_id).phase == "QUALITY", system.project(run_id).error
+    assert has_new_work(system.project(run_id), "quality"), system.project(run_id).error
     branch_calls = _quality_branch_calls(adapter)
     assert len(branch_calls) == 2, branch_calls
     branch_text = _text(branch_calls[1])
@@ -143,6 +144,6 @@ def test_the_quality_sees_only_facts_before_its_own_conclusion(tmp_path: Path):
     assert FIRST_SUMMARY not in third, third
     assert ANSWER_EXPLANATION not in third, third
 
-    assert system.project(run_id).phase == "DONE"
+    assert system.project(run_id).status == "done"
     reviews = [event for event in system.store.list_events(run_id) if event.type == EventType.QA_SUBMITTED]
     assert len(reviews) == 2

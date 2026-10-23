@@ -10,7 +10,7 @@ from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .collaboration import tool_error
 from .contracts import current_contract_hash
 from .definitions import DEFINITIONS
-from .models import TERMINAL_PHASES, Event, RunProjection, hash_bytes
+from .models import TERMINAL_STATUSES, Event, RunProjection, hash_bytes
 from .tools import has_tool, offers_with_input, proposal_kind, tool_action, tools_for, usable_when_guidance_only
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 
@@ -20,13 +20,12 @@ _STALE_SNAPSHOT = "The workspace snapshot changed after this activation began; s
 
 
 def submission_basis(projection: RunProjection) -> dict[str, Any]:
-    # 一次提交所依据的东西：用户的意图、当前有效合同、当前交付与阶段。
+    # 一次提交所依据的东西：用户的意图、当前有效合同与当前交付。
     # 校验以后这几样里任何一样变了，这次提交就不能再按原来的依据接纳
     return {
         "intend_hash": hash_bytes(projection.task.encode("utf-8")),
         "effective_contract_hash": _content_hash(projection.effective_contract),
         "delivery_spec_hash": _content_hash(projection.delivery_spec),
-        "phase": projection.phase,
     }
 
 
@@ -159,7 +158,7 @@ def tool_permission(
     facts: WorkspaceFacts,
 ) -> ToolPermission:
     # facts 是执行环境按 facts_query(call) 查询的结果
-    if projection.phase in TERMINAL_PHASES or aborted or basis.changed(projection, department):
+    if projection.status in TERMINAL_STATUSES or aborted or basis.changed(projection, department):
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
     branch_perm = _ask_branch_permission(projection, session_id, department, name)
@@ -182,7 +181,7 @@ def tool_permission(
 def proposal_decision(projection: RunProjection, *, department: str, proposal: dict[str, Any] | None,
                       facts: TreeFacts, events: list[Event]) -> ProposalDecision:
     # 提案校验：按投影、工作区事实与事件判断提案能否接纳；自然语言与格式错误都成为字段错误
-    return evaluate_proposal(phase=projection.phase, department=department, proposal=proposal,
+    return evaluate_proposal(department=department, proposal=proposal,
                              projection=projection, facts=facts, events=events)
 
 
@@ -202,8 +201,7 @@ def commit_decision(
     # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。激活开始以后输入、指导、合同或当前工作改变，
     # 或者校验以后工作区改变，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验
     now = WorkBasis.current(current, department)
-    if (current.phase != started.phase
-            or now.input_version != basis.input_version
+    if (now.input_version != basis.input_version
             or now.guidance_version != basis.guidance_version
             or now.effective_contract_hash != basis.effective_contract_hash
             or submission_basis(current) != submission_basis(evaluated)):

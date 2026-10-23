@@ -67,7 +67,7 @@ class InteractionWriter:
         transaction.on_commit(lambda: self._publish_committed(run_id))
         return transaction.append(NewEvent(
             EventType.USER_INPUT_RECEIVED, actor="user:local",
-            state_before=projection.phase, state_after=projection.phase, payload=payload,
+            state_before=projection.status, state_after=projection.status, payload=payload,
             artifact_hashes=[payload["input_ref"]["content_hash"], payload["intend_ref"]["content_hash"]],
         ))[0]
 
@@ -95,8 +95,8 @@ class InteractionWriter:
             EventType.DEPARTMENT_GUIDANCE_RECEIVED,
             actor="user:local",
             department=department,
-            state_before=projection.phase,
-            state_after=projection.phase,
+            state_before=projection.status,
+            state_after=projection.status,
             payload=payload,
             artifact_hashes=[ref.content_hash],
         ))[0]

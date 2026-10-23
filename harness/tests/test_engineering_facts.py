@@ -12,7 +12,7 @@ def _event(position: int, type: str, payload: dict, *, session_id: str | None = 
            department: str | None = None) -> Event:
     return Event(
         event_id=f"evt_{position}", run_id="run_1", type=type, role=None, parent_event_id=None,
-        state_before="QUALITY", state_after="QUALITY", payload=payload, artifact_hashes=[],
+        state_before="running", state_after="running", payload=payload, artifact_hashes=[],
         session_id=session_id, provider=None, model=None, context_digest=None, stop_reason=None,
         error=None, created_at="2026-10-24T00:00:00Z", position=position, stream="run_1",
         stream_version=position, project_id=None, work_item_id=None, department=department,

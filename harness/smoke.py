@@ -20,6 +20,7 @@ from .app.project_commands import ProjectCreate
 from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, TARGET_KEYS, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
+from .collaboration import guidance_diverted
 from .contracts import current_contract_hash
 from .data_directory import default_provider_config
 from .definitions import DEFINITIONS
@@ -198,7 +199,7 @@ def _run_scenario(system: LoopSystem, name: str) -> dict[str, Any]:
         return {
             "run_id": failure.run_id,
             "scenario": name,
-            "phase": "FAILED",
+            "status": "failed",
             "stop_reason": "provider_error",
             "error": str(failure.cause),
             "fake_used": _fake_used(failed_projection),
@@ -243,8 +244,8 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
     return {
         "run_id": run_id,
         "scenario": scenario,
-        "phase": projection.phase,
-        "outcome": projection.outcome,
+        "status": projection.status,
+        "outcome": projection.status,
         "stop_reason": projection.stop_reason,
         "error": projection.error,
         # 运行停下等待用户回答时，未回答的请求说明原因（例如模型引用无法使用时的待恢复）
@@ -260,7 +261,7 @@ def summarize_run(system: LoopSystem, run_id: str, *, scenario: str) -> dict[str
         "requested_model": projection.requested_model,
         "actual_provider": projection.actual_provider,
         "actual_model": projection.actual_model,
-        "route": list(projection.transitions),
+        "route": [],
         "ask_audit": _ask_evidence(system, run_id),
         "rework_count": projection.rework_count,
         "cycle_count": projection.cycle_count,
@@ -577,12 +578,11 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
 
 
 def _expected_guidance_only(projection: RunProjection, department: str) -> bool:
-    """部门因待处理指导被提前安排（不是该阶段的正常部门）时只拿只读与回应工具；产品照常处理。"""
+    """部门因待处理指导被提前安排（不是按关注的成果本该工作的部门）时只拿只读与回应工具；产品照常处理。"""
 
     if department == "product":
         return False
-    pending = [item for item in projection.department_guidance if item.status in PENDING_GUIDANCE]
-    return bool(pending) and pending[0].department == department and department != projection.active_department
+    return guidance_diverted(projection, department)
 
 
 def _assembly_snapshot_hash(events: list[Any], index: int) -> str:
@@ -1185,7 +1185,7 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"## {name}",
                 "",
                 f"- run id: `{scenario.get('run_id')}`",
-                f"- phase: `{scenario.get('phase')}`",
+                f"- status: `{scenario.get('status')}`",
                 f"- stop reason: `{scenario.get('stop_reason')}`",
                 f"- adapter: `{scenario.get('adapter')}`",
                 f"- provider/model: `{scenario.get('provider')}` / `{scenario.get('model')}`",
@@ -1249,7 +1249,7 @@ def smoke_exit_code(report: dict[str, Any]) -> int:
     for scenario in scenarios.values():
         if scenario.get("fake_used"):
             return 2
-        if scenario.get("phase") != "DONE" or scenario.get("stop_reason") != "released":
+        if scenario.get("status") != "done" or scenario.get("stop_reason") != "released":
             return 1
         if not scenario.get("replay_consistent") or not scenario.get("context_isolated"):
             return 1

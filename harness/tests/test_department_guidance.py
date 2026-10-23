@@ -5,6 +5,7 @@ import uuid
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace
@@ -72,7 +73,7 @@ def test_guidance_for_previous_department_gets_a_read_only_activation_before_rel
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "QUALITY"
+    assert has_new_work(system.project(run_id), "quality")
 
     system.add_guidance(run_id, "engineering", "请说明本次交付的错误处理边界。")
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
@@ -80,7 +81,7 @@ def test_guidance_for_previous_department_gets_a_read_only_activation_before_rel
     )))
     result = system.activate_once(run_id)
 
-    assert result.phase == "QUALITY"
+    assert has_new_work(result, "quality")
     assert result.active_department == "engineering"
     assert result.department_guidance[0].status == "explained"
     request = adapter.invocations[-1]
@@ -185,7 +186,7 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
 
     system.add_guidance(run_id, "product", "请确认未知参数是否需要写入验收。")
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
@@ -200,16 +201,16 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     assert "submit_guidance_response" in names
     assert names != ["read_file", "list_files", "run_check", "submit_guidance_response"]
     yielded = _last_activation(system, run_id).payload["yielded_work"]
-    assert yielded["phase"] == "ENGINEERING"
+    assert set(yielded) == {"effective_contract_hash", "delivery_spec_hash"}
     assert yielded["effective_contract_hash"] == result.effective_contract.content_hash
     assert "engineering_plan_hash" not in yielded
     assert result.department_guidance[0].status == "explained"
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
 
     adapter.script.append(delivery_turn())
     resumed = system.activate_once(run_id)
     assert adapter.invocations[-1].department == "engineering"
-    assert resumed.phase == "QUALITY"
+    assert has_new_work(resumed, "quality")
     assert resumed.delivery_spec is not None
 
 def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
@@ -219,7 +220,7 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     system.activate_once(run_id)
     system.activate_once(run_id)
     before = system.project(run_id)
-    assert before.phase == "QUALITY"
+    assert has_new_work(before, "quality")
     old_delivery = before.delivery_spec.content_hash
 
     system.add_guidance(run_id, "product", "请把输出改为大写并更新验收。")
@@ -234,7 +235,6 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
         },
     ))
     first_yield = {
-        "phase": "QUALITY",
         "effective_contract_hash": before.effective_contract.content_hash,
         "delivery_spec_hash": old_delivery,
     }
@@ -242,7 +242,7 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     assert revised.delivery_spec is None
     assert revised.delivery_specs[-1].status == "superseded"
     assert revised.delivery_specs[-1].content_hash == old_delivery
-    assert revised.phase == "QUALITY"
+    assert has_new_work(revised, "quality")
     assert revised.department_guidance[0].status in {"received", "in_input"}
     spec_activation = _last_activation(system, run_id)
     assert spec_activation.payload["yielded_work"] == first_yield
@@ -253,22 +253,15 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     )))
     responded = system.activate_once(run_id)
     assert responded.department_guidance[0].status == "completed"
-    assert responded.phase == "ENGINEERING"
+    # 回应以后 PRD 有了新版本，工程开始一轮返工（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(responded, "engineering")
     assert responded.delivery_spec is None
     assert _last_activation(system, run_id).payload["yielded_work"] == first_yield
-    responded_event = next(event for event in system.store.list_events(run_id)
-                           if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED)
-    resume = next(event for event in system.store.list_events(run_id)
-                  if event.type == EventType.TRANSITION and event.stream_version > responded_event.stream_version)
-    assert resume.payload["from"] == "QUALITY"
-    assert resume.payload["to"] == "ENGINEERING"
-    assert resume.payload["yielded_work_resolved"] is True
-    assert resume.payload["yielded_work"] == first_yield
     assert responded.yielded_work is None
 
+    # 回应以后由关注的成果决定下一个谁工作：PRD 有了新版本，工程开始一轮返工（工单 #556）
     adapter.script.append(delivery_turn())
     next_work = system.activate_once(run_id)
-    assert next_work.phase == "QUALITY"
     assert adapter.invocations[-1].department == "engineering"
     assert next_work.delivery_spec is not None
 
@@ -301,7 +294,7 @@ def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
                    and event.payload.get("activation_id") == activation_id
                    for event in system.store.list_events(run_id))
     assert system.workspace(run_id).read_file("src/echo.py") == original
-    assert result.phase == "QUALITY"
+    assert has_new_work(result, "quality")
 
 def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
     holder = {}
@@ -321,7 +314,7 @@ def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
     result = system.activate_once(run_id)
 
     assert result.stop_reason == "cancelled"
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.department_guidance[0].status in {"received", "in_input"}
     assert result.department_guidance[0].status != "completed"
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
@@ -333,12 +326,12 @@ def test_qa_release_blocked_until_guidance_response(tmp_path):
     run_id = system.create_run("echo", max_cycles=12)
     system.activate_once(run_id)
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "QUALITY"
+    assert has_new_work(system.project(run_id), "quality")
 
     system.add_guidance(run_id, "quality", "放行前请核对错误输出边界。")
     adapter.script.append(review_turn("release", "Attempt release before the guidance has a recorded response."))
     blocked = system.activate_once(run_id)
-    assert blocked.phase == "QUALITY"
+    assert has_new_work(blocked, "quality")
     assert blocked.last_review is None
     assert any(error["field"] == "guidance" for error in blocked.rejections[-1]["errors"])
     assert blocked.department_guidance[0].status in {"received", "in_input"}
@@ -348,11 +341,11 @@ def test_qa_release_blocked_until_guidance_response(tmp_path):
     )))
     responded = system.activate_once(run_id)
     assert responded.department_guidance[0].status == "explained"
-    assert responded.phase == "QUALITY"
+    assert has_new_work(responded, "quality")
 
     adapter.script.append(review_turn("release", "Independent quality check after the guidance response."))
     done = system.activate_once(run_id)
-    assert done.phase == "DONE"
+    assert done.status == "done"
     assert done.last_review.verdict == "release"
 
 def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
@@ -361,7 +354,7 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     run_id = system.create_run("echo", max_cycles=12)
     system.activate_once(run_id)
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "QUALITY"
+    assert has_new_work(system.project(run_id), "quality")
 
     system.add_guidance(run_id, "quality", "返工后仍需独立复检，不能把旧放行当作完成。")
     adapter.script.append(review_turn(
@@ -370,7 +363,7 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
         defects=[{"severity": "major", "summary": "Empty input is not rejected."}],
     ))
     rejected = system.activate_once(run_id)
-    assert rejected.phase == "ENGINEERING"
+    assert has_new_work(rejected, "engineering")
     assert rejected.delivery_spec is None
     assert rejected.last_review.verdict == "rework_engineering"
     assert rejected.department_guidance[0].status in {"received", "in_input"}
@@ -382,7 +375,7 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     )))
     responded = system.activate_once(run_id)
     assert responded.department_guidance[0].status == "explained"
-    assert responded.phase == "ENGINEERING"
+    assert has_new_work(responded, "engineering")
     assert responded.last_review.verdict == "rework_engineering"
     assert responded.last_activations["quality"] != rework_activation
     assert adapter.invocations[-1].department == "quality"
@@ -391,7 +384,6 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
 
     adapter.script.append(delivery_turn())
     next_work = system.activate_once(run_id)
-    assert next_work.phase == "QUALITY"
     assert adapter.invocations[-1].department == "engineering"
     assert next_work.delivery_spec is not None
     assert next_work.last_review.verdict == "rework_engineering"
@@ -417,7 +409,7 @@ def test_engineering_write_then_completed_without_tool_id_is_host_bound(tmp_path
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
 
     system.add_guidance(run_id, "engineering", "请修改错误输出处理。")
     adapter.script.append(lambda request: FakeTurn(
@@ -545,7 +537,7 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
     system.activate_once(run_id)
     system.activate_once(run_id)
     before = system.project(run_id)
-    assert before.phase == "QUALITY"
+    assert has_new_work(before, "quality")
     old_delivery_id = before.delivery_spec.created_event_id
     old_check_id = next(
         event.event_id for event in system.store.list_events(run_id)
@@ -574,7 +566,7 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
     )))
     responded = system.activate_once(run_id)
     assert responded.department_guidance[0].status == "completed"
-    assert responded.phase == "ENGINEERING"
+    assert has_new_work(responded, "engineering")
 
     system.add_guidance(run_id, "engineering", "请按新合同处理交付。")
     adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
@@ -627,7 +619,7 @@ def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     written = system.activate_once(run_id)
-    assert written.phase == "ENGINEERING", written.stop_reason
+    assert has_new_work(written, "engineering"), written.stop_reason
     old_write = next(
         event for event in system.store.list_events(run_id)
         if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"

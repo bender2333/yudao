@@ -130,7 +130,7 @@ def test_first_request_in_a_new_process_fits_provider_delay_plus_one_second(prot
         _close(server)
     assert completed.returncode == 0, completed.stderr
     result = json.loads(completed.stdout.strip().splitlines()[-1])
-    assert result == {"phase": "ENGINEERING", "stop_reason": None, "failed": []}
+    assert result == {"status": "running", "stop_reason": None, "failed": []}
     assert len(capture.requests) == 1
 
 
@@ -148,7 +148,7 @@ def test_provider_delay_beyond_the_limit_is_a_provider_timeout(protocol, data_di
             system.close()
     finally:
         _close(server)
-    assert result.phase == "FAILED" and result.stop_reason == "provider_timeout"
+    assert result.status == "failed" and result.stop_reason == "provider_timeout"
     assert [event.payload["reason"] for event in failed] == ["provider_timeout"]
     assert failed[0].payload["retryable"] is True
     assert len(capture.requests) == 1

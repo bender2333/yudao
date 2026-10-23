@@ -1,5 +1,6 @@
 from dataclasses import asdict
 
+from harness.collaboration import has_new_work
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, json_dumps
@@ -34,7 +35,7 @@ def test_accepted_delivery_restores_complete_tree_without_the_original_workspace
     (workspace.root / "empty" / "nested").mkdir(parents=True)
     for _ in range(2):
         result = system.activate_once(run_id)
-    assert result.phase == "QUALITY", result.error
+    assert has_new_work(result, "quality"), result.error
     delivery = result.delivery_spec
     # 清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）
     assert delivery.files == [".project-config", "assets/binary.dat", "src/echo.py"]
@@ -64,7 +65,7 @@ def test_tree_archive_failure_has_a_persisted_host_error_and_no_accepted_deliver
 
     monkeypatch.setattr(system.artifacts, "put", fail_tree)
     result = system.activate_once(run_id)
-    assert result.phase == "FAILED" and result.stop_reason == "host_commit_error"
+    assert result.status == "failed" and result.stop_reason == "host_commit_error"
     assert "archive storage unavailable" in result.error
     assert result.delivery_spec is None
     assert not any(event.type == EventType.DELIVERY_ACCEPTED for event in system.store.list_events(run_id))
@@ -76,7 +77,7 @@ def test_delete_and_move_share_the_current_contract_and_record_their_actual_acti
     system, run_id, workspace = _engineering(tmp_path, actions)
     before = system.project(run_id)
     result = system.activate_once(run_id)
-    assert result.phase == "QUALITY", result.error
+    assert has_new_work(result, "quality"), result.error
     assert not (workspace.root / "src" / "old.py").exists()
     assert not (workspace.root / "src" / "keep.py").exists()
     assert workspace.read_file("src/new.py") == "preserved source"
@@ -107,7 +108,7 @@ def test_product_cannot_start_delete_or_move_actions(tmp_path):
     workspace.write_file("src/keep.py", "preserved source")
     before = workspace.snapshot().tree
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING", result.error
+    assert has_new_work(result, "engineering"), result.error
     assert workspace.snapshot().tree == before
     events = system.store.list_events(run_id)
     for action in actions:
@@ -123,7 +124,7 @@ def test_leading_space_paths_stay_literal_paths(tmp_path):
     workspace.write_file(" src/old.py", "spaced old source")
     workspace.write_file(" src/keep.py", "spaced preserved source")
     result = system.activate_once(run_id)
-    assert result.phase == "QUALITY", result.error
+    assert has_new_work(result, "quality"), result.error
     assert workspace.read_file("src/old.py") == "old source"
     assert workspace.read_file("src/keep.py") == "preserved source"
     assert not (workspace.root / " src" / "old.py").exists()

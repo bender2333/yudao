@@ -1,6 +1,7 @@
 import json
 from contextlib import contextmanager
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
 from harness.artifacts import ArtifactStore
 from harness.compaction import response_reserve
@@ -39,7 +40,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     later = [item for item in adapter.invocations if item.department != "product"]
     assert later
     for item in later:
@@ -77,7 +78,7 @@ def test_old_spec_full_text_is_not_injected_after_supersede(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert projection.product_spec.goal == "Build echo v2"
     engineering_after = [item for item in adapter.invocations if item.department == "engineering"][-1]
     assert unique not in developer_text(engineering_after)
@@ -109,7 +110,7 @@ def test_quality_runs_its_checks_through_run_check(data_dir):
     adapter = FakeAdapter(happy_script())
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     [quality] = [item for item in adapter.invocations if item.department == "quality"]
     assert [tool["name"] for tool in quality.tools if tool_action(tool["name"]) == "check"] == ["run_check"]
     checks = [event.payload["name"] for event in system.store.list_events(run_id)
@@ -126,7 +127,7 @@ def test_requests_carry_no_remaining_cycles_while_the_host_enforces_the_limit(da
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=2)
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "PAUSED" and projection.stop_reason == "max_cycles"
+    assert projection.status == "paused" and projection.stop_reason == "max_cycles"
     assert adapter.invocations
     for item in adapter.invocations:
         assert "loop_limits" not in [part.source for part in recorded_context(system, item).parts]
@@ -188,7 +189,7 @@ def test_two_formal_product_decisions_reach_engineering_and_quality(data_dir):
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请补充两条产品决定。")
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert len(projection.effective_decisions) == 2
     assert [item.statement for item in projection.effective_decisions] == [
         "Use DECISION_CANARY_A.",
@@ -233,7 +234,7 @@ def test_effective_decision_keeps_explicit_requirement(data_dir):
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请补充产品决定。")
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert len(projection.effective_decisions) == 1
     decision = projection.effective_decisions[0]
     assert decision.statement == "Print BACKGROUND_CANARY for the selected mode."
@@ -289,7 +290,7 @@ def test_new_spec_does_not_inject_stale_product_decisions(data_dir):
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请补充产品决定并修订产品要求。")
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert projection.product_spec.revision == 2
     assert projection.effective_decisions == []
     engineering_after = [item for item in adapter.invocations if item.department == "engineering"][-1]
@@ -327,7 +328,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert [item.status for item in projection.delivery_specs] == ["superseded", "active"]
     assert projection.delivery_specs[0].invalidation_reason in {"qa_rework_engineering", "product_spec_changed"}
     assert projection.delivery_spec is not None
@@ -378,7 +379,7 @@ def test_rework_engineering_keeps_only_one_active_delivery(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert [item.status for item in projection.delivery_specs] == ["superseded", "active"]
     assert projection.delivery_specs[0].invalidation_reason == "qa_rework_engineering"
     assert projection.delivery_spec.summary == "FIXED_DELIVERY"
@@ -412,7 +413,7 @@ def test_validation_feedback_is_not_kept_after_successful_proposal(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=12)
     projection = system.run_until_stop(run_id)
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     engineering = [item for item in adapter.invocations if item.department == "engineering"]
     assert "validation_feedback" in developer_text(engineering[1])
     later = engineering[-1]
@@ -425,7 +426,7 @@ def test_assembler_records_budget_and_digest(tmp_path):
     projection = RunProjection(
         run_id="run_x",
         task="task",
-        phase="ENGINEERING",
+        status="running",
         sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
     )
     prompt = DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")
@@ -445,7 +446,7 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
     prompt_text = DEFINITIONS.role("engineering").prompt
     prompt_ref = save_department_prompt(ArtifactStore(tmp_path), "run_x", "engineering", prompt_text)
     projection = RunProjection(
-        run_id="run_x", task="task", phase="ENGINEERING",
+        run_id="run_x", task="task", status="running",
         sessions={"engineering": SessionRecord("ses_e", "engineering", "active")},
     )
     prompt = DepartmentPrompt("engineering", 1, prompt_text, prompt_ref, "initial-prompt")
@@ -520,7 +521,7 @@ def test_narrow_window_work_request_spends_the_window_left_after_its_input(tmp_p
         run_id = system.create_run("build echo")
         result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING", result.error
+    assert has_new_work(result, "engineering"), result.error
     [payload] = _work_assemblies(system, run_id)
     assert payload["effective_context_window"] == window and payload["configured_max_output_tokens"] == output_limit
     # 固定材料的实测估算加上请求本身新增的少量内容（工具调用与提案），写成区间
@@ -539,7 +540,7 @@ def test_wide_window_work_requests_keep_the_declared_output_limit(tmp_path):
         run_id = system.create_run("build echo")
         result = system.run_until_stop(run_id)
 
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     payloads = _work_assemblies(system, run_id)
     assert len(payloads) == len(capture.requests) == 3
     assert [request["max_output_tokens"] for request in capture.requests] == [4096] * 3

@@ -88,7 +88,7 @@ def test_smoke_exit_code_does_not_accept_fake_or_missing_evidence():
 
     assert smoke_exit_code({"available": False}) == 2
     done = {
-        "phase": "DONE",
+        "status": "done",
         "stop_reason": "released",
         "replay_consistent": True,
         "context_isolated": True,

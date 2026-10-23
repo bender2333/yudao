@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..event_store import Command
-from ..models import DEPARTMENTS, TERMINAL_PHASES, Event, ProjectEvent
+from ..models import DEPARTMENTS, TERMINAL_STATUSES, Event, ProjectEvent
 from ..interactions import RunTerminalError
 from ..projection import RunNotFoundError
 from ..providers.errors import CatalogValidationError
@@ -269,7 +269,7 @@ async def _cancel_work_item(application: "Application", command: Command, reques
         projection = system.orchestrator.project(run_id)
     except RunNotFoundError as missing:
         raise Rejection("not_found", "没有这个事项，请重新读取以后提交") from missing
-    if projection.phase in TERMINAL_PHASES:
+    if projection.status in TERMINAL_STATUSES:
         # 建档 run 已结束、正在等待确认初始 PRD 时，取消撤销项目流中的决定请求（工单 #136，设计第 3.1 节）
         withdrawn = system.projects.withdraw_waiting_initial_prd(request.work_item_id, command=command)
         if withdrawn:

@@ -4,7 +4,7 @@
       "id": "product",
       "label": "产品",
       "roles": ["product"],
-      "watched": ["user_input", "guidance"]
+      "watched": ["user_input", "guidance", "baseline_review"]
     },
     {
       "id": "engineering",
@@ -17,7 +17,7 @@
       "label": "质检",
       "roles": ["quality"],
       "suggested_capabilities": ["image"],
-      "watched": ["delivery", "guidance"]
+      "watched": ["delivery", "guidance", "structure"]
     }
   ],
   "rules": {

@@ -38,7 +38,7 @@ def _formal(system, run_id):
 def _commit_spec(system, run_id, proposal):
     projection = system.project(run_id)
     snapshot = system.workspace(run_id).snapshot()
-    decision = evaluate_proposal(phase=projection.phase, department="product", projection=projection,
+    decision = evaluate_proposal(department="product", projection=projection,
                                  facts=snapshot.facts, proposal=proposal, events=system.store.list_events(run_id))
     assert decision.accepted, decision.error_dicts
     return system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(
@@ -71,7 +71,7 @@ def test_new_input_and_requirement_diff_form_one_accepted_history_through_redeli
     old_spec = json.loads(system.git_versions.read_file(run_id, old_spec_event.payload["git_version"], "specs/product.json"))
     assert old_spec["revision"] == 1 and old_spec["change_record"] is None
     current = system.run_until_stop(run_id)
-    assert current.phase == "DONE", current.error
+    assert current.status == "done", current.error
     assert len(current.git_versions) == 7
     parent = None
     for entry in current.git_versions:
@@ -159,7 +159,7 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
     # 新输入交给产品工作（与激活开始时流程编排写入的事件相同），产品规格的修订才能接纳
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.PRODUCT_INPUT_ASSIGNED, actor="system", department="product",
-        state_before=received.phase, state_after="PRODUCT_SPEC",
+        state_before=received.status, state_after="running",
         payload={"through_version": received.input_version}))
     before = system.project(run_id)
     assert before.product_work_input_version == before.input_version == 2
@@ -225,7 +225,7 @@ def test_nonformal_event_cannot_advance_git_version_projection(tmp_path):
     before = system.project(run_id)
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.MODEL_MESSAGE, actor="department:product", department="product",
-        state_before=before.phase, state_after=before.phase,
+        state_before=before.status, state_after=before.status,
         payload={"git_version": {"commit": "unaccepted"}}))
     after = system.project(run_id)
     assert after.git_version == before.git_version and after.git_versions == before.git_versions
@@ -306,7 +306,7 @@ def test_cancel_stops_active_model_when_command_version_cannot_be_saved(tmp_path
         assert current.git_version == before.git_version and current.input_version == before.input_version
         assert not [event for event in _formal(system, run_id) if event.type == EventType.USER_INPUT_RECEIVED]
         if failure != "cancellation_event":
-            assert current.phase == "FAILED" and current.stop_reason == "cancelled"
+            assert current.status == "failed" and current.stop_reason == "cancelled"
             cancelled = [event for event in system.store.list_events(run_id) if event.type == EventType.RUN_FAILED][-1]
             assert cancelled.payload["input_save_failure"]["text"] == command
             assert "git_version" not in cancelled.payload
@@ -385,6 +385,6 @@ def test_cancel_notifies_model_before_waiting_for_git_storage(tmp_path, monkeypa
     assert len(cancel_results) == 1
     assert isinstance(cancel_results[0], CancelledInputSaveError) == git_fails
     current = system.project(run_id)
-    assert current.phase == "FAILED" and current.stop_reason == "cancelled"
+    assert current.status == "failed" and current.stop_reason == "cancelled"
     assert current.product_spec is None and len(system.test_adapter.invocations) == 1
     assert current.input_version == (1 if git_fails else 2)

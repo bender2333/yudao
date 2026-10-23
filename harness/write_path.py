@@ -29,8 +29,8 @@ T = TypeVar("T")
 MAX_JUDGMENTS = 100
 
 # 结束运行的事件：它承载的停止原因规定的结束方式，与事件写入的终态
-_STOP_EVENTS = {EventType.RUN_DONE: ("done", "DONE"), EventType.RUN_PAUSED: ("paused", "PAUSED"),
-                EventType.RUN_FAILED: ("failed", "FAILED")}
+_STOP_EVENTS = {EventType.RUN_DONE: ("done", "done"), EventType.RUN_PAUSED: ("paused", "paused"),
+                EventType.RUN_FAILED: ("failed", "failed")}
 
 
 @dataclass(frozen=True)

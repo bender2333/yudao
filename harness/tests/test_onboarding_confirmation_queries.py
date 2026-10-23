@@ -48,7 +48,7 @@ def _onboard(client, opened, tmp_path):
                      source_name="src", source_path=str(source))
     assert accepted.status_code == 200, accepted.text
     refs = accepted.json()["refs"]
-    assert _wait_for(lambda: opened.system.project(refs["run_id"]).phase == "DONE"), \
+    assert _wait_for(lambda: opened.system.project(refs["run_id"]).status == "done"), \
         "the onboarding run did not stop"
     assert _wait_for(lambda: _open_initial_prd(client, refs["project_id"]) is not None), \
         "the initial PRD decision was not requested"

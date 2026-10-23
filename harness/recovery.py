@@ -9,7 +9,7 @@ import json
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from .models import TERMINAL_PHASES, ArtifactRef, DecisionRequest, Event, EventType, hash_bytes
+from .models import TERMINAL_STATUSES, ArtifactRef, DecisionRequest, Event, EventType, hash_bytes
 
 # 动作的三类处置（恢复契约第 4 节）：completed 已有结果；unknown 已经发出但结果没有得到确认，必须核实或
 # 交给用户；还有一类是没有发出任何事件的调用，由步骤驱动按保存的模型响应补执行，见 engine 的补执行。
@@ -273,31 +273,31 @@ def _live_activation(events: Sequence[Event]) -> bool:
             open_activations.discard(str(activation_id))
     return bool(open_activations)
 
-def terminal_observation_state(phase: str, stop_reason: str | None = None) -> str:
+def terminal_observation_state(status: str, stop_reason: str | None = None) -> str:
     # run 已经结束时的观察状态（工单 #747）：按结束的方式分开。
-    # - 已完成：阶段 DONE，这次运行正常完成（成果可能被采纳，采纳是另一件事）；
+    # - 已完成：状态 done，这次运行正常完成（成果可能被采纳，采纳是另一件事）；
     # - 已取消：停止原因是 cancelled，用户取消这次运行；
-    # - 已暂停：阶段 PAUSED，运行暂停等待用户处理；
+    # - 已暂停：状态 paused，运行暂停等待用户处理；
     # - 已停止：其余结束方式（执行失败、因 Yudao 升级停止等）
-    if phase == "DONE":
+    if status == "done":
         return OBSERVATION_COMPLETED
     if stop_reason == "cancelled":
         return OBSERVATION_CANCELLED
-    if phase == "PAUSED":
+    if status == "paused":
         return OBSERVATION_PAUSED
     return OBSERVATION_STOPPED
 
 def observation_state(events: Sequence[Event], decisions: Iterable[DecisionRequest], *,
-                      phase: str, stop_reason: str | None = None) -> str:
+                      status: str, stop_reason: str | None = None) -> str:
     # 一个 run 的恢复观察状态（v8 设计说明第 7.2 节）：运行中、中断、待恢复，以及四种结束方式。
     # 判据只取持久事件、决定请求与投影中的终态，不读时钟，不调用模型：
-    # - 已完成、已暂停、已取消、已停止：run 已经结束（完成、暂停、取消、失败）；由阶段与停止原因给出；
+    # - 已完成、已暂停、已取消、已停止：run 已经结束（完成、暂停、取消、失败）；由状态与停止原因给出；
     # - 待恢复：有未回答、阻塞整个 run 的待恢复请求（模型引用无法使用或定义版本不同）；
     # - 运行中：进程正在执行（有一次没有结束的激活）；
     # - 中断：其余情况，进程在步骤之间退出，等待启动时自动继续
     decision_list = list(decisions)
-    if phase in TERMINAL_PHASES:
-        return terminal_observation_state(phase, stop_reason)
+    if status in TERMINAL_STATUSES:
+        return terminal_observation_state(status, stop_reason)
     if open_resume_decisions(decision_list):
         return OBSERVATION_WAITING_RESUME
     if _live_activation(events):

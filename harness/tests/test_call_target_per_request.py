@@ -11,6 +11,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+from harness.collaboration import has_new_work
 from harness.engine import StepLimits
 from harness.models import DEPARTMENTS, EventType
 from harness.proposals import product_spec
@@ -74,8 +75,8 @@ def _delivery_stream(*, response_id: str, model: str, basis_product_spec_hash: s
 def _stream_reply(body: bytes) -> tuple[int, str, list[bytes]]:
     return 200, "text/event-stream", [body]
 
-def _request_phase(body: dict[str, Any]) -> str:
-    # 从请求内容里取当前工作相位：步骤驱动把 [current_work] 的 phase 放进请求文本
+def _request_department(body: dict[str, Any]) -> str:
+    # 从请求内容里取当前工作的部门：步骤驱动把 [current_work] 的 department 放进请求文本
     parts: list[str] = []
     for item in body.get("input", []):
         content = item.get("content")
@@ -86,7 +87,7 @@ def _request_phase(body: dict[str, Any]) -> str:
                 if isinstance(segment, dict) and isinstance(segment.get("text"), str):
                     parts.append(segment["text"])
 
-    match = re.search(r'"phase":"([A-Z_]+)"', "\n".join(parts))
+    match = re.search(r'"department":"(\w+)"', "\n".join(parts))
     return match.group(1) if match else ""
 
 def _request_spec_hash(body: dict[str, Any]) -> str | None:
@@ -105,7 +106,7 @@ def _request_spec_hash(body: dict[str, Any]) -> str | None:
 
 def _department_aware_reply(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
     # 产品部门返回产品要求，工程部门返回一次可接纳的交付：同一次运行要跨越两个部门
-    if _request_phase(body) == "ENGINEERING":
+    if _request_department(body) == "engineering":
         return _stream_reply(_delivery_stream(response_id="resp-plan", model="m-local-target",
                                               basis_product_spec_hash=_request_spec_hash(body)))
     return _stream_reply(_product_spec_stream(response_id="resp-1", model="m-local-target"))
@@ -154,7 +155,7 @@ def test_missing_credential_blocks_until_the_dotenv_file_is_fixed(tmp_path):
 
         blocked = system.run_until_stop(run_id)
         # 凭据起初缺失：请求没有发出，运行停在这次请求之前等待修复，不因「凭据已不在本进程」结束
-        assert (blocked.phase, blocked.outcome) == ("PRODUCT_SPEC", "running")
+        assert (blocked.active_department, blocked.status) == ("product", "running")
         assert capture.requests == []
         _position, decisions = saved_decisions(system.store, statuses=("open",))
         assert [decision.request["kind"] for decision in decisions] == ["model_unavailable"]
@@ -167,7 +168,7 @@ def test_missing_credential_blocks_until_the_dotenv_file_is_fixed(tmp_path):
         _answer_open_decision(system, "continue")
         finished = system.activate_once(run_id)
 
-        assert finished.phase == "ENGINEERING", finished.error
+        assert has_new_work(finished, "engineering"), finished.error
         assert [item["authorization"] for item in capture.headers] == ["Bearer dotenv-secret-1"]
         requests = [event for event in system.store.list_events(run_id)
                     if event.type == EventType.MODEL_REQUESTED]
@@ -242,7 +243,7 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
             release.set()
             result = future.result(timeout=WAIT_FOR_HOST_WORK_SEC)
 
-        assert result.phase == "ENGINEERING", result.error
+        assert has_new_work(result, "engineering"), result.error
         # 这一次逻辑调用的重试仍发往原目标
         assert [item["model"] for item in capture_a.requests] == ["m-a-target", "m-a-target"]
         assert [item["authorization"] for item in capture_a.headers] == ["Bearer key-a", "Bearer key-a"]
@@ -360,7 +361,7 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
 
         # 第一次请求按已准入的定义发出，运行推进到工程部门
         first = system.activate_once(run_id)
-        assert first.phase == "ENGINEERING", first.error
+        assert has_new_work(first, "engineering"), first.error
         assert [item["model"] for item in capture.requests] == ["m-local-target"]
         positions_before = len(system.store.list_events(run_id))
 
@@ -374,7 +375,7 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
 
         # 下一次请求不发送，运行停在这次请求之前，发出待恢复的决定请求
         blocked = system.run_until_stop(run_id)
-        assert (blocked.phase, blocked.outcome) == ("ENGINEERING", "running")
+        assert (blocked.active_department, blocked.status) == ("engineering", "running")
         assert [item["model"] for item in capture.requests] == ["m-local-target"]
         _position, decisions = saved_decisions(system.store, statuses=("open",))
         assert [decision.request["kind"] for decision in decisions] == ["model_unavailable"]
@@ -391,7 +392,7 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
         _answer_open_decision(system, "continue")
         finished = system.activate_once(run_id)
         # 从被挡住的那次请求接着进行：工程部门的交付请求重新发出并被接受
-        assert finished.phase == "QUALITY", finished.error
+        assert has_new_work(finished, "quality"), finished.error
         assert [item["model"] for item in capture.requests] == ["m-local-target", "m-local-target"]
         deliveries = [event for event in system.store.list_events(run_id) if event.type == EventType.DELIVERY_ACCEPTED]
         assert len(deliveries) == 1

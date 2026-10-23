@@ -13,7 +13,7 @@ from . import parameters
 from .engine import StepLimits
 from .environment import LocalEnvironment, cleanup_run_inspections
 from .event_store import Command, EventStore, catalog_stream
-from .models import CatalogEventType, ProjectEventType, TERMINAL_PHASES
+from .models import CatalogEventType, ProjectEventType, TERMINAL_STATUSES
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .write_path import NewCatalogEvent, WritePath
 from .projection import RunNotFoundError, RunProjection, project_run
@@ -424,10 +424,10 @@ class LoopSystem:
         # 下一个会话首次激活时按会话检查工作区规则重建。删除失败留给下次启动
         for run_id in self.list_run_ids():
             try:
-                phase = self.project(run_id).phase
+                status = self.project(run_id).status
             except Exception:
                 continue
-            if phase not in TERMINAL_PHASES:
+            if status not in TERMINAL_STATUSES:
                 continue
             try:
                 cleanup_run_inspections(self.workspace_root / run_id)

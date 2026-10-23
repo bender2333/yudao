@@ -601,7 +601,7 @@ class StepRecorder:
         # 这次激活的一条记录：部门、上级事件与会话取自激活，阶段在追加的事务中填入。
         # 角色任务中的记录由部门提出（设计第 5.2 节）
         scope = self.scope
-        return lambda phase: NewEvent(type, state_before=phase, state_after=phase,
+        return lambda status: NewEvent(type, state_before=status, state_after=status,
                                       actor=f"department:{scope.department}", department=scope.department,
                                       parent_event_id=scope.parent_event_id, session_id=scope.session_id, **fields)
 
@@ -626,9 +626,9 @@ class StepRecorder:
 
     @staticmethod
     def _record_in(transaction: Transaction, *drafts: Draft) -> list[Event]:
-        # 在调用方的事务中追加记录，阶段取这个事务中的运行状态
-        phase = transaction.projection.phase
-        return transaction.append(*(draft(phase) for draft in drafts))
+        # 在调用方的事务中追加记录，状态取这个事务中的运行状态
+        status = transaction.projection.status
+        return transaction.append(*(draft(status) for draft in drafts))
 
     def _capture(self, request: ModelRequest) -> _AttemptCapture:
         capture = self._captures.get(request.attempt_id)

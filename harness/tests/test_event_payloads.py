@@ -147,13 +147,13 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
         projects.start_work_item(project_id, "开始失败的事项", max_cycles=0)
     _work_item_a, run_a = projects.start_work_item(project_id, "事项 A")
     _work_item_b, run_b = projects.start_work_item(project_id, "事项 B（在 A 采纳前创建）")
-    assert system.run_until_stop(run_a).phase == "DONE"
+    assert system.run_until_stop(run_a).status == "done"
     assert projects.settle(run_a).type == ProjectEventType.DELIVERABLE_ADOPTED
-    assert system.run_until_stop(run_b).phase == "DONE"
+    assert system.run_until_stop(run_b).status == "done"
     assert projects.settle(run_b).type == ProjectEventType.ADOPTION_HELD
     # 采纳写回（#347）：事项 C 的基线是事项 A 的采纳，写回的五种事件由真实流程产出
     _work_item_c, run_c = projects.start_work_item(project_id, "事项 C")
-    assert system.run_until_stop(run_c).phase == "DONE"
+    assert system.run_until_stop(run_c).status == "done"
     assert projects.settle(run_c).type == ProjectEventType.DELIVERABLE_ADOPTED
     adoption_id = projects.projection(project_id).current_adoption.adoption_id
     _produce_writeback_events(system, projects, project_id, base_version=1,

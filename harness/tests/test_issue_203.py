@@ -5,6 +5,7 @@
 
 import uuid
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.models import ArtifactRef, EventType, ProjectEventType
@@ -134,7 +135,7 @@ def test_new_work_items_use_the_new_goal_and_in_progress_items_keep_the_old(data
 
     # 事项 A 开始并停在进行中，它的请求使用开始时的目标
     _work_a, run_a = system.projects.start_work_item(project_id, "事项 A")
-    assert system.run_until_stop(run_a).phase == "ENGINEERING"
+    assert has_new_work(system.run_until_stop(run_a), "engineering")
     assert _request_has_goal(adapter, run_a, OLD_GOAL)
     assert not _request_has_goal(adapter, run_a, NEW_GOAL)
 
@@ -151,7 +152,7 @@ def test_new_work_items_use_the_new_goal_and_in_progress_items_keep_the_old(data
 
     # 修改以后新建的事项：部门请求中的项目上下文是新目标
     _work_b, run_b = system.projects.start_work_item(project_id, "事项 B")
-    assert system.run_until_stop(run_b).phase == "ENGINEERING"
+    assert has_new_work(system.run_until_stop(run_b), "engineering")
     assert _request_has_goal(adapter, run_b, NEW_GOAL)
     assert not _request_has_goal(adapter, run_b, OLD_GOAL)
 
@@ -160,7 +161,7 @@ def test_run_created_records_the_goal_at_creation(data_dir):
     system = LoopSystem.for_testing(data_dir, adapter)
     project_id = system.projects.register("目标项目", OLD_GOAL)
     _work_a, run_a = system.projects.start_work_item(project_id, "事项 A")
-    assert system.run_until_stop(run_a).phase == "ENGINEERING"
+    assert has_new_work(system.run_until_stop(run_a), "engineering")
 
     # run_created 里记下的是开始时的目标：修改目标不改动已创建 run 的钉住上下文
     system.projects.set_goal(project_id, NEW_GOAL)

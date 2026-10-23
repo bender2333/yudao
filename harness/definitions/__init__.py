@@ -127,7 +127,8 @@ class Department(_Definition):
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
     # 部门关注的成果（循环结构第 2 节、ADR-0039）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
     # 关注关系写在定义里，代码里只有一条通用规则
-    watched: tuple[Literal["user_input", "guidance", "product_spec", "defect_record", "delivery"], ...] = ()
+    watched: tuple[Literal["user_input", "guidance", "product_spec", "defect_record", "delivery",
+                          "structure", "baseline_review"], ...] = ()
 
 
 class OrganizationRules(_Definition):
@@ -260,9 +261,6 @@ class StopReason(_Definition):
     human_action: str | None
 
 
-PhaseName = Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z_]*$")]
-
-
 class DepartmentWork(_Definition):
     # 事项种类为某个部门写的说明：本种类内的角色说明、可以使用的工具与提案合同的注意事项。
     # 某个部门没有写明时，这个种类沿用 roles.json 中部门自己的角色说明与工具清单。
@@ -272,29 +270,14 @@ class DepartmentWork(_Definition):
 
 
 class WorkItemKind(_Definition):
-    # 事项种类（ADR-0014）：部门说明、工具清单与阶段迁移按种类定义
+    # 事项种类（ADR-0014）：部门说明与工具清单按种类定义
     label: str = Field(min_length=1)
     # 本种类的 run 进入完成状态时的停止原因，必须是 stop_reasons.json 中的编号
     stop_reason: Identifier
     # 各部门在本种类中的说明，键是部门编号
     departments: Mapping[Identifier, DepartmentWork] = Field(default_factory=dict)
-    # 阶段迁移：提案种类 -> 接纳结果 -> 迁移的路径，每段是（来源阶段，目标阶段）；
-    # 迁移本身仍由控制核心写成事件，定义只给出接纳以后应当走哪条路
-    transitions: Mapping[Identifier, Mapping[Identifier, tuple[tuple[PhaseName, PhaseName], ...]]] = \
-        Field(default_factory=dict)
 
-    freeze_work_items = _frozen("departments", "transitions")
-
-    @model_validator(mode="after")
-    def _connected(self) -> "WorkItemKind":
-        for kind, outcomes in self.transitions.items():
-            for outcome, path in outcomes.items():
-                if not path:
-                    raise ValueError(f"transitions.{kind}.{outcome} 至少需要一段迁移")
-                for previous, following in zip(path, path[1:]):
-                    if previous[1] != following[0]:
-                        raise ValueError(f"transitions.{kind}.{outcome} 的迁移不相接：{previous[1]} 与 {following[0]}")
-        return self
+    freeze_work_items = _frozen("departments")
 
 
 class OverviewCategory(_Definition):
@@ -359,7 +342,7 @@ class Definitions(_Definition):
         raise ValueError(f"unknown department {department!r}")
 
     def work_item(self, kind: str) -> WorkItemKind:
-        # 事项种类的定义；普通事项没有部门说明与阶段迁移，沿用 roles.json
+        # 事项种类的定义；普通事项没有部门说明，沿用 roles.json
         definition = self.work_items.kinds.get(kind)
         if definition is None:
             raise ValueError(f"work item kind {kind!r} is not defined in work_items.json")
@@ -368,10 +351,6 @@ class Definitions(_Definition):
     def department_work(self, department: str, kind: str) -> DepartmentWork | None:
         # 部门在本事项种类中的说明；没有定义时交回 None，由调用方使用 roles.json 的角色说明
         return self.work_item(kind).departments.get(department)
-
-    def transitions(self, kind: str, proposal: str, result: str) -> tuple[tuple[str, str], ...]:
-        # 事项种类中一次接纳的阶段迁移：种类没有写明这条路径时没有迁移
-        return self.work_item(kind).transitions.get(proposal, {}).get(result, ())
 
     def tools_for(self, department: str, kind: str = "change") -> tuple[Identifier, ...]:
         # 部门在事项种类中的工具清单：种类写明时以它为准，未写明时是角色自己的清单

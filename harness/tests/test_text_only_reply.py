@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import tool_call_required_text
 from harness.models import ArtifactRef, EventType, json_dumps
@@ -56,7 +57,7 @@ def test_text_only_reply_appends_user_message_to_history_and_events(tmp_path):
     system, adapter, run_id = _text_then_spec(tmp_path)
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING" and result.product_spec is not None
+    assert has_new_work(result, "engineering") and result.product_spec is not None
     first, second = adapter.invocations
     appended = {"role": "user", "content": tool_call_required_text(1)}
     assert second.input_items[:len(first.input_items)] == first.input_items
@@ -83,7 +84,7 @@ def test_empty_reply_is_followed_by_the_same_user_message(tmp_path):
     run_id = system.create_run("build echo")
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     assert adapter.invocations[1].input_items[-1] == {"role": "user", "content": tool_call_required_text(1)}
     _assert_replayable(system, run_id, result)
 
@@ -95,7 +96,7 @@ def test_consecutive_text_only_replies_pause_the_run_and_keep_every_reply(tmp_pa
     run_id = system.create_run("build echo")
     result = system.activate_once(run_id)
 
-    assert result.phase == "PAUSED" and result.stop_reason == "no_tool_call"
+    assert result.status == "paused" and result.stop_reason == "no_tool_call"
     assert result.product_spec is None
     assert len(adapter.invocations) == LIMIT + 1
     required = _events(system, run_id, EventType.TOOL_CALL_REQUIRED)
@@ -123,7 +124,7 @@ def test_tool_call_resets_the_count_of_replies_without_tool_calls(tmp_path):
     run_id = system.create_run("build echo")
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING" and result.product_spec is not None
+    assert has_new_work(result, "engineering") and result.product_spec is not None
     counts = [event.payload["count"] for event in _events(system, run_id, EventType.TOOL_CALL_REQUIRED)]
     assert counts == [*range(1, limit + 1), 1]
     _assert_replayable(system, run_id, result)
@@ -164,7 +165,7 @@ def test_the_request_after_the_last_host_hint_requires_a_tool_call(tmp_path):
     # 连续三次只回复文字以后，第四次请求要求调用工具（#102）；之前的请求都是自动，请求事件记录这一项
     system, adapter, run_id = _text_only_activation(tmp_path)
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING" and result.product_spec is not None
+    assert has_new_work(result, "engineering") and result.product_spec is not None
     choices = [call.tool_choice for call in adapter.invocations]
     assert choices == ["auto"] * LIMIT + ["required"]
     assert [event.payload["tool_choice"] for event in _events(system, run_id, EventType.MODEL_REQUESTED)] == choices
@@ -178,7 +179,7 @@ def test_a_tool_call_in_the_required_request_continues_the_run_and_resets_the_co
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build echo")
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING" and result.product_spec is not None
+    assert has_new_work(result, "engineering") and result.product_spec is not None
     assert adapter.invocations[LIMIT].tool_choice == "required"
     assert adapter.invocations[LIMIT + 1].tool_choice == "auto"
 
@@ -227,6 +228,6 @@ def test_a_model_declared_without_a_required_tool_call_sends_auto_and_pauses(dat
             system.close()
     finally:
         provider.close()
-    assert result.phase == "PAUSED" and result.stop_reason == "no_tool_call"
+    assert result.status == "paused" and result.stop_reason == "no_tool_call"
     assert len(provider.requests) == LIMIT + 1
     assert all("tool_choice" not in (body or {}) for body in provider.requests)

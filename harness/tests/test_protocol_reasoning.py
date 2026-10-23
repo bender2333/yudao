@@ -5,6 +5,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from harness.collaboration import has_new_work
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, ProviderFacade
@@ -157,7 +158,7 @@ def test_chat_reasoning_content_is_saved_and_replayed_on_the_same_model(tmp_path
     result, requests, history, system, run_id = _run_product_activation(
         tmp_path, _chat_body, "chat_completions")
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     reasoning = _reasoning_items(history)
     # 同一轮回答的推理块累积成一条 assistant 消息上的 reasoning_content
     assert [item["reasoning_content"] for item in reasoning] == ["先看代码，再提交。决定了工具。"]
@@ -171,7 +172,7 @@ def test_chat_reasoning_content_is_saved_and_replayed_on_the_same_model(tmp_path
 def test_messages_thinking_and_signature_are_saved_and_replayed_on_the_same_model(tmp_path):
     result, requests, history, system, run_id = _run_product_activation(tmp_path, _messages_body, "messages")
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     reasoning = _reasoning_items(history)
     assert len(reasoning) == 1
     assert reasoning[0]["call_id"] == "call-list"
@@ -188,7 +189,7 @@ def test_messages_thinking_and_signature_are_saved_and_replayed_on_the_same_mode
 def test_responses_reasoning_item_is_saved_and_replayed_on_the_same_model(tmp_path):
     result, requests, history, system, run_id = _run_product_activation(tmp_path, _responses_body, "responses")
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     reasoning = _reasoning_items(history)
     assert len(reasoning) == 1
     assert reasoning[0]["encrypted_content"] == "CIPHER-1"
@@ -205,7 +206,7 @@ def _delivery_arguments() -> str:
     from harness.proposals import delivery
     return json_dumps({key: value for key, value in delivery().items() if key != "kind"})
 
-def _phase(body: dict) -> str:
+def _department(body: dict) -> str:
     parts: list[str] = []
     for item in body.get("input", []):
         content = item.get("content")
@@ -216,7 +217,7 @@ def _phase(body: dict) -> str:
                 if isinstance(segment, dict) and isinstance(segment.get("text"), str):
                     parts.append(segment["text"])
     import re
-    match = re.search(r'"phase":"([A-Z_]+)"', "\n".join(parts))
+    match = re.search(r'"department":"(\w+)"', "\n".join(parts))
     return match.group(1) if match else ""
 
 def _reasoning_call_item(call_id: str, name: str, arguments: str) -> list[dict]:
@@ -228,7 +229,7 @@ def _reasoning_call_item(call_id: str, name: str, arguments: str) -> list[dict]:
 def _department_responses_body(body: dict, model: str) -> str:
     def event(kind: str, payload: dict) -> str:
         return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload}, ensure_ascii=False)}\n\n"
-    if _phase(body) == "ENGINEERING":
+    if _department(body) == "engineering":
         items = _reasoning_call_item("eng-delivery", "submit_delivery", _delivery_arguments())
         response_id = "resp-delivery"
     elif _has_department_history_pair(body):

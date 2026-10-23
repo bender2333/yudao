@@ -252,7 +252,7 @@ def test_delivery_citing_a_run_check_receipt_is_accepted_and_quality_releases_on
     run_id = system.create_run("build an echo CLI")
     system.run_until_stop(run_id)
     projection = system.project(run_id)
-    assert projection.phase == "DONE" and projection.stop_reason == "released"
+    assert projection.status == "done" and projection.stop_reason == "released"
     engineering = [receipt for receipt in system.workspace(run_id).receipts() if receipt.name == "smoke"]
     # 质检在自己的检查工作区里跑，会话结束即删，回执按 #481 的位置从工具事件工件读
     quality = [json.loads(system.artifacts.get(ArtifactRef(**event.payload["output_ref"])).decode("utf-8"))
@@ -281,7 +281,7 @@ def test_delivery_citing_a_bash_result_is_rejected_with_the_check_reason(tmp_pat
     run_id = system.create_run("build an echo CLI")
     system.run_until_stop(run_id)
     projection = system.project(run_id)
-    assert projection.phase != "QUALITY" and not projection.delivery_spec, "引用 bash 结果的交付不能被接纳"
+    assert projection.active_department != "quality" and not projection.delivery_spec, "引用 bash 结果的交付不能被接纳"
     assert projection.rejections, "引用 bash 结果的交付必须被拒绝"
     rejected = projection.rejections
     assert any(item.get("department") == "engineering" for item in rejected), "拒绝项要由工程部门触发"

@@ -46,7 +46,7 @@ const ROLES: Record<string, RoleInfo[]> = {
 const item = (status: string, department: string | null): LoopItem => ({
   // 原型 behaviors.js 的 item 用 id 查（floor.js 的 itemById 按 it.id），事项同时带 work_item_id
   id: "w1", work_item_id: "w1", kind: "request", sign: "测试事项", color_index: 0, status, department, round: 1,
-  elapsed_sec: 100, time_limit_sec: 7200, version: 1, phase: null, started_at: null, pending_question: null,
+  elapsed_sec: 100, time_limit_sec: 7200, version: 1, progress: null, started_at: null, pending_question: null,
   run_id: "r1", adoption_id: null, recovery_state: null,
 });
 

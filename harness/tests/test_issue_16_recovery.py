@@ -4,11 +4,12 @@
 import json
 import sqlite3
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS
 from harness.event_store import Command, StaleExecutionRight, run_stream
-from harness.models import EventType, TERMINAL_PHASES, new_id
+from harness.models import EventType, TERMINAL_STATUSES, new_id
 from harness.projection import project_run
 from harness.proposals import product_spec
 from harness.providers import ProviderFacade
@@ -52,7 +53,7 @@ def _unfinished_run(data_dir, script=None, *, to_stop=False):
     else:
         system.activate_once(run_id)
     projection = project_run(system.store, run_id)
-    assert projection.phase not in TERMINAL_PHASES, projection.phase
+    assert projection.status not in TERMINAL_STATUSES, projection.status
     system.close()
     return system, project_id, run_id
 
@@ -129,7 +130,7 @@ def test_startup_resumes_an_interrupted_run_without_user_action(data_dir):
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_completion_script()))
     assert run_id in restarted.resumed_runs
     projection = project_run(restarted.store, run_id)
-    assert projection.phase == "DONE", (projection.phase, projection.stop_reason)
+    assert projection.status == "done", (projection.status, projection.stop_reason)
     restarted.close()
 
 def test_resume_records_the_interrupted_position_and_the_basis(data_dir):
@@ -140,7 +141,7 @@ def test_resume_records_the_interrupted_position_and_the_basis(data_dir):
     events = _resumed_events(restarted, run_id)
     assert len(events) == 1, events
     basis = events[0].payload["basis"]
-    assert basis["interrupted_at_phase"] == "ENGINEERING", basis
+    assert basis["interrupted_at_status"] == "running", basis
     assert basis["interrupted_at_event_id"] is not None
     assert basis["current_run_event_version"] == RUN_EVENT_VERSION
     assert basis["recorded_run_event_version"] == RUN_EVENT_VERSION
@@ -182,17 +183,17 @@ def test_finished_cancelled_and_exhausted_runs_are_not_restarted(data_dir):
     _work_item_id, done_run = system.projects.start_work_item(project_id, "要完成的事项")
     system.run_until_stop(done_run)
     system.projects.settle(done_run)
-    assert project_run(system.store, done_run).phase == "DONE"
+    assert project_run(system.store, done_run).status == "done"
 
     _work_item_id, cancelled_run = system.projects.start_work_item(project_id, "要取消的事项")
     system.activate_once(cancelled_run)
     system.cancel(cancelled_run)
-    assert project_run(system.store, cancelled_run).phase == "FAILED"
+    assert project_run(system.store, cancelled_run).status == "failed"
 
     _work_item_id, exhausted_run = system.projects.start_work_item(project_id, "次数耗尽的事项", max_cycles=1)
     system.run_until_stop(exhausted_run)
     exhausted = project_run(system.store, exhausted_run)
-    assert exhausted.phase in TERMINAL_PHASES, exhausted.phase
+    assert exhausted.status in TERMINAL_STATUSES, exhausted.status
     system.close()
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_parked_script()))
@@ -217,7 +218,7 @@ def test_two_processes_recovering_the_same_run_only_one_advances(data_dir):
 
     # 旧执行者的迟到结果只能作为历史事实：携带已经不是最新的编号时写入被拒绝
     late = NewEvent(EventType.DEPARTMENT_INPUT, actor="department:engineering", department="engineering",
-                    state_before="ENGINEERING", state_after="ENGINEERING", payload={"text": "late result"})
+                    state_before="running", state_after="running", payload={"text": "late result"})
     first = LoopSystem.for_testing(data_dir, FakeAdapter(_parked_script()))
     second = LoopSystem.for_testing(data_dir, FakeAdapter(_parked_script()))
     # 两次取得都写进了同一份事件日志（第三个进程的恢复会再取得一次，所以只看前两次）
@@ -277,7 +278,7 @@ def test_continuing_on_the_new_definitions_version_records_it_in_later_events(da
                                            base_version=request.version, command=_answer_command())
     restarted.run_until_stop(run_id)
     projection = project_run(restarted.store, run_id)
-    assert projection.phase == "DONE", (projection.phase, projection.stop_reason)
+    assert projection.status == "done", (projection.status, projection.stop_reason)
     # 决定以后写入的请求与裁决事件记录当前加载的版本
     later = [event for event in restarted.store.list_events(run_id)
              if event.stream_version > request.version and event.type in (EventType.MODEL_REQUESTED,
@@ -297,7 +298,7 @@ def test_stopping_on_a_changed_definitions_version_ends_the_run(data_dir):
     restarted.orchestrator.answer_decision(request.decision_id, "stop", None,
                                            base_version=request.version, command=_answer_command())
     projection = project_run(restarted.store, run_id)
-    assert projection.phase in TERMINAL_PHASES, projection.phase
+    assert projection.status in TERMINAL_STATUSES, projection.status
     assert _resumed_events(restarted, run_id) == []
     restarted.close()
 
@@ -322,7 +323,7 @@ def test_credentials_are_resolved_from_the_host_again_and_not_written_into_event
         project_id = system.projects.register("恢复项目", "核对凭据按引用重新解析")
         _work_item_id, run_id = system.projects.start_work_item(project_id, "被中断的事项")
         system.activate_once(run_id)
-        assert project_run(system.store, run_id).phase not in TERMINAL_PHASES
+        assert project_run(system.store, run_id).status not in TERMINAL_STATUSES
         config_path, dotenv_path = system.provider_config_path, system.dotenv_path
         system.close()
 
@@ -390,7 +391,7 @@ def test_replay_and_query_paths_do_not_invoke_the_model(data_dir):
     assert invocations > 0
     before = restarted.store.end_position()
     # 只读重放与状态查询不推进 run，也不调用模型
-    assert restarted.replay(run_id).phase == "DONE"
+    assert restarted.replay(run_id).status == "done"
     restarted.project(run_id)
     assert len(adapter.invocations) == invocations
     assert restarted.store.end_position() == before

@@ -203,7 +203,7 @@ def test_service_starts_in_every_unready_state_and_blocks_the_first_request(tmp_
         run_id = system.create_run("create without a ready provider")
         assert system.list_run_ids() == [run_id]
         blocked = system.run_until_stop(run_id)
-        assert (blocked.outcome, blocked.stop_reason) == ("running", None)
+        assert (blocked.status, blocked.stop_reason) == ("running", None)
         _position, decisions = saved_decisions(system.store, statuses=("open",))
         assert [decision.request["kind"] for decision in decisions] == ["model_unavailable"]
         assert not any(event.type == EventType.MODEL_REQUESTED for event in system.store.list_events(run_id))

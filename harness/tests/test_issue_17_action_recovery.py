@@ -5,6 +5,7 @@
 import json
 from dataclasses import asdict
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.decision_commands import DecisionAnswer
@@ -25,7 +26,7 @@ def _engineering_run(data_dir, script):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
-    assert system.project(run_id).phase == "ENGINEERING"
+    assert has_new_work(system.project(run_id), "engineering")
     return system, run_id
 
 def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-write", before=None):
@@ -40,7 +41,7 @@ def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-wri
             else {"path": "src/a.py", "content": "A"})
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
-        state_before="ENGINEERING", state_after="ENGINEERING",
+        state_before="running", state_after="running",
         payload={"id": action_id, "name": tool, "args": args,
                  "step_id": 1, "activation_id": activated[-1].payload["activation_id"], "attempt": 1,
                  "purpose": "work", "before_snapshot_ref": asdict(ref)}))
@@ -130,14 +131,14 @@ def _append_partial_response(system, run_id, *, executed, remaining):
                                    media_type="application/json")
         system.writes.append(run_stream(run_id), NewEvent(
             EventType.MODEL_MESSAGE, actor="department:planning", department="engineering",
-            state_before="ENGINEERING", state_after="ENGINEERING", session_id=session_id,
+            state_before="running", state_after="running", session_id=session_id,
             payload={"message_ref": asdict(ref), "message_index": index + 1,
                      "activation_id": "act_partial", "step_id": 1, "purpose": "work"}))
     for identity in executed:
         for event_type in (EventType.TOOL_STARTED, EventType.TOOL_CALLED):
             system.writes.append(run_stream(run_id), NewEvent(
                 event_type, actor="department:planning", department="engineering",
-                state_before="ENGINEERING", state_after="ENGINEERING", session_id=session_id,
+                state_before="running", state_after="running", session_id=session_id,
                 payload={"id": identity, "name": "write_file",
                          "args": {"path": f"src/{identity}.py", "content": identity.upper()},
                          "step_id": 1, "activation_id": "act_partial", "attempt": 1, "purpose": "work",
@@ -168,13 +169,13 @@ def test_a_partial_model_response_executes_remaining_host_tool(data_dir):
                                    media_type="application/json")
         system.writes.append(run_stream(run_id), NewEvent(
             EventType.MODEL_MESSAGE, actor="department:planning", department="engineering",
-            state_before="ENGINEERING", state_after="ENGINEERING", session_id=session_id,
+            state_before="running", state_after="running", session_id=session_id,
             payload={"message_ref": asdict(ref), "message_index": index + 1,
                      "activation_id": "act_partial_host", "step_id": 1, "purpose": "work"}))
     for event_type in (EventType.TOOL_STARTED, EventType.TOOL_CALLED):
         system.writes.append(run_stream(run_id), NewEvent(
             event_type, actor="department:planning", department="engineering",
-            state_before="ENGINEERING", state_after="ENGINEERING", session_id=session_id,
+            state_before="running", state_after="running", session_id=session_id,
             payload={"id": "hw1", "name": "write_file",
                      "args": {"path": "src/echo.py", "content": "print('ok')"},
                      "step_id": 1, "activation_id": "act_partial_host", "attempt": 1, "purpose": "work",
@@ -203,7 +204,7 @@ def test_an_adoption_settlement_is_idempotent_across_recovery(data_dir):
     project_id = system.projects.register("采纳项目", "核对采纳结算幂等")
     _work_item_id, run_id = system.projects.start_work_item(project_id, "被中断的事项")
     # 只把 run 运行到结束，不做结算：与「run 已经结束、采纳以前进程退出」留下的状态一致
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     assert system.projects.projection(project_id).adoptions == []
     system.close()
 

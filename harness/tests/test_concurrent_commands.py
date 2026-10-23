@@ -2,6 +2,7 @@ import threading
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.projects import WorkItemInProgressError
@@ -42,7 +43,7 @@ def test_an_input_losing_to_a_stop_command_leaves_the_committed_original_publish
     [stopper] = done
     assert not stopper.errors
     current = system.project(run_id)
-    assert current.phase == "FAILED" and current.stop_reason == "cancelled"
+    assert current.status == "failed" and current.stop_reason == "cancelled"
     assert [item.text for item in current.inputs] == ["original", "/stop"]
     published = (tmp_path / "materials" / run_id / "intend.md").read_bytes()
     assert published == b"original/stop"
@@ -79,9 +80,9 @@ def test_a_cancellation_that_could_not_be_written_is_written_by_the_run_loop(tmp
         with pytest.raises(OSError):
             system.cancel(run_id)
     # 中止已经生效，取消没有写入；没有正在进行的取消时，运行循环写入取消，不再激活部门
-    assert system.project(run_id).phase == "PRODUCT_SPEC"
+    assert has_new_work(system.project(run_id), "product")
     result = system.run_until_stop(run_id)
-    assert result.phase == "FAILED" and result.stop_reason == "cancelled"
+    assert result.status == "failed" and result.stop_reason == "cancelled"
     assert not system.test_adapter.invocations
 
 
@@ -132,7 +133,7 @@ def test_a_run_cancelled_from_another_thread_during_a_model_call_returns_cancell
 
     assert not errors
     assert not cancellers[0].is_alive()
-    assert result.phase == "FAILED" and result.stop_reason == "cancelled"
+    assert result.status == "failed" and result.stop_reason == "cancelled"
     events = system.store.list_events(run_id)
     assert [event.type for event in events[-2:]] == [EventType.RUN_FAILED, EventType.ACTIVATION_FINISHED]
     assert system.project(run_id).sessions["product"].status == "closed"
@@ -157,4 +158,4 @@ def test_archiving_while_a_work_item_is_starting_is_rejected(tmp_path, monkeypat
     project = system.projects.projection(project_id)
     assert not project.archived and project.materials == []
     assert project.work_item(work_item_id).status == "in_progress"
-    assert system.project(run_id).phase == "PRODUCT_SPEC"
+    assert has_new_work(system.project(run_id), "product")

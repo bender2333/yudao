@@ -106,7 +106,7 @@ def test_project_onboard_reaches_baseline_verified_over_http(data_dir, tmp_path)
         assert accepted.status_code == 200, accepted.text
         refs = accepted.json()["refs"]
         project_id, run_id = refs["project_id"], refs["run_id"]
-        assert _wait_for(lambda: _idle(client) and opened.system.project(run_id).phase == "DONE")
+        assert _wait_for(lambda: _idle(client) and opened.system.project(run_id).status == "done")
         run = opened.system.project(run_id)
         assert run.stop_reason == "baseline_verified"
         assert run.kind == "onboarding"
@@ -146,7 +146,7 @@ def test_git_provenance_recorded_when_the_source_is_a_repository(data_dir, tmp_p
         assert accepted.status_code == 200, accepted.text
         plain_run = accepted.json()["refs"]["run_id"]
         assert opened.system.project(plain_run).snapshot["provenance"] == {}
-        assert _wait_for(lambda: opened.system.project(plain_run).phase == "DONE")
+        assert _wait_for(lambda: opened.system.project(plain_run).status == "done")
 
 def test_source_invalid_rejects_without_building_the_project(data_dir, tmp_path):
     # 验收（第 10 节第 9 项）：源目录不存在、含宿主私有路径或公开树有无法表示的条目时返回 source_invalid，
@@ -199,7 +199,7 @@ def test_new_work_item_is_rejected_before_the_baseline(data_dir, tmp_path):
         restarted = _post(client, "onboarding.restart", project_id=project_id, source_name="src")
         assert restarted.status_code == 200, restarted.text
         second_run = restarted.json()["refs"]["run_id"]
-        assert _wait_for(lambda: opened.system.project(second_run).phase == "DONE")
+        assert _wait_for(lambda: opened.system.project(second_run).status == "done")
         assert opened.system.project(second_run).stop_reason == "baseline_verified"
 
 def test_projects_list_and_loop_show_onboarding_status_and_kind(data_dir, tmp_path):
@@ -240,7 +240,7 @@ def test_time_limit_stops_the_onboarding_item_and_restart_is_available(data_dir,
     project_id, work_item_id, run_id = system.projects.onboard(
         "已有项目", GOAL, "src", str(source), run_time_limit_sec=1)
     result = system.run_until_stop(run_id)
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "time_limit"
     item = system.projects.projection(project_id).work_item(work_item_id)
     assert item.status == "stopped"

@@ -11,7 +11,7 @@ import uuid
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
-from harness.models import ProjectEventType, TERMINAL_PHASES, Usage
+from harness.models import ProjectEventType, TERMINAL_STATUSES, Usage
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
@@ -69,7 +69,7 @@ def _wait_for_terminal(system, run_id):
     deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
     while time.monotonic() < deadline:
         projection = system.project(run_id)
-        if projection.phase in TERMINAL_PHASES and system.orchestrator.execution(run_id) is None:
+        if projection.status in TERMINAL_STATUSES and system.orchestrator.execution(run_id) is None:
             return projection
         time.sleep(0.02)
     raise AssertionError(f"run {run_id} was not finished by its task within {WAIT_FOR_HOST_WORK_SEC}s")
@@ -86,7 +86,7 @@ def test_answering_the_resume_decision_settles_the_run_it_finishes(data_dir):
         project_id = created.json()["refs"]["project_id"]
         # 事项经控制核心的公开接口开始，run 在测试进程里跑到待恢复；回答以后由命令经 start 继续运行
         work_item_id, run_id = system.projects.start_work_item(project_id, "build an echo CLI")
-        assert system.run_until_stop(run_id).outcome == "running"
+        assert system.run_until_stop(run_id).status == "running"
         decision = _open_decision(system, run_id)
 
         answered = client.post("/api/commands/decision.answer", json={
@@ -95,7 +95,7 @@ def test_answering_the_resume_decision_settles_the_run_it_finishes(data_dir):
         assert answered.status_code == 200, answered.text
 
         finished = _wait_for_terminal(system, run_id)
-        assert (finished.phase, finished.stop_reason) == ("DONE", "released")
+        assert (finished.status, finished.stop_reason) == ("done", "released")
 
         # 采纳由这次继续运行的结算写入：一个事项、一条采纳事件、事项状态已采纳
         [adopted] = _adoptions(system, project_id)
@@ -112,13 +112,13 @@ def test_a_run_resumed_on_startup_is_settled_when_it_stops(data_dir):
     project_id = interrupted.projects.register("恢复结算", "核对启动时自动继续的结算")
     work_item_id, run_id = interrupted.projects.start_work_item(project_id, "被中断的事项")
     interrupted.activate_once(run_id)
-    assert interrupted.project(run_id).phase not in TERMINAL_PHASES
+    assert interrupted.project(run_id).status not in TERMINAL_STATUSES
     interrupted.close()
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_completion_script()))
     try:
         assert run_id in restarted.resumed_runs
-        assert (restarted.project(run_id).phase, restarted.project(run_id).stop_reason) == ("DONE", "released")
+        assert (restarted.project(run_id).status, restarted.project(run_id).stop_reason) == ("done", "released")
         [adopted] = _adoptions(restarted, project_id)
         assert adopted.payload["run_id"] == run_id and adopted.payload["work_item_id"] == work_item_id
         project = restarted.projects.projection(project_id)
@@ -132,14 +132,14 @@ def test_a_settled_run_does_not_write_another_adoption(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(_release_script()))
     project_id = system.projects.register("重复结算", "核对结算幂等")
     work_item_id, run_id = system.projects.start_work_item(project_id, "第一个事项")
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     assert system.projects.settle(run_id).type == ProjectEventType.DELIVERABLE_ADOPTED
     before = [event.event_id for event in system.store.list_project_events(project_id)]
 
     # 再次经回答决定以后的入口把同一个 run 运行到停止
     projection = asyncio.run(_start_again(system, run_id))
 
-    assert projection.phase == "DONE"
+    assert projection.status == "done"
     assert [event.event_id for event in system.store.list_project_events(project_id)] == before
     assert system.projects.settle(run_id) is None
     project = system.projects.projection(project_id)

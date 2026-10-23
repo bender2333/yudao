@@ -27,7 +27,6 @@ from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_mess
 from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
 from .contracts import current_contract_hash
-from .collaboration import guidance_target_phase
 from .decisions import (
     DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
     DecisionClosed,
@@ -61,7 +60,7 @@ from .models import (
     EventType,
     ProjectEvent,
     ProjectEventType,
-    TERMINAL_PHASES,
+    TERMINAL_STATUSES,
     json_dumps,
     new_id,
     spec_content_hash,
@@ -77,7 +76,7 @@ from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .validation import PRD_REVISION_FIELDS, ProposalDecision, evaluate_proposal
-from .collaboration import next_department, watched_new_work
+from .collaboration import guidance_diverted, next_department, watched_new_work
 from .workspace import WorkspaceSnapshot
 
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
@@ -339,8 +338,8 @@ class Orchestrator:
             EventType.RUN_CREATED,
             actor="system",
             department="product",
-            state_before="CREATED",
-            state_after="PRODUCT_SPEC",
+            state_before="running",
+            state_after="running",
             payload={
                 "task": task,
                 "kind": kind,
@@ -367,24 +366,16 @@ class Orchestrator:
                 "round": round,
             },
         )
-        transition = NewEvent(
-            EventType.TRANSITION,
-            actor="system",
-            department="product",
-            state_before="CREATED",
-            state_after="PRODUCT_SPEC",
-            payload={"from": "CREATED", "to": "PRODUCT_SPEC", "route": "CREATED->PRODUCT_SPEC"},
-        )
         note_received = (NewEvent(
             EventType.USER_INPUT_RECEIVED, actor="user:local", department="product",
-            state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+            state_before="running", state_after="running",
             payload=follow_up,
             artifact_hashes=[follow_up["input_ref"]["content_hash"], follow_up["intend_ref"]["content_hash"]],
         ) if follow_up is not None else None)
         # 新的 run 流从版本 0 开始；同一编号的 run 已经存在时拒绝
         self.writes.transact(run_stream(run_id), lambda transaction: transaction.append(
-            *((run_created, transition, note_received) if note_received is not None
-              else (run_created, transition))), expected_version=0)
+            *((run_created, note_received) if note_received is not None
+              else (run_created,))), expected_version=0)
         return run_id
 
     def project(self, run_id: str) -> RunProjection:
@@ -439,6 +430,21 @@ class Orchestrator:
             jobs=jobs,
             session_id=session_id,
         )
+
+    def _waiting_departments(self, run_id: str) -> set[str]:
+        # 在等待工作的部门：这个进程里没有正在工作的会话的那些。
+        # 进程中断以后会话是新开的，投影里那条「工作中」的记录不再算数（工单 #16 的恢复口径）：
+        # 这时还没有会话的部门同样在等待，它可以被重新激活。
+        waiting: set[str] = set()
+        for department in DEPARTMENTS:
+            try:
+                session = self.sessions.get(run_id, department)
+            except KeyError:
+                waiting.add(department)
+                continue
+            if session.status != "active":
+                waiting.add(department)
+        return waiting
 
     def _is_handoff_session(self, department: str, session_id: str, projection: RunProjection) -> bool:
         # 持有交接的工程：工程部门的主线会话，它这次激活产出的东西进入运行工作区。
@@ -575,7 +581,7 @@ class Orchestrator:
             stop_error = cancel_error
 
             def receive(transaction: Transaction) -> None:
-                if transaction.projection.phase in TERMINAL_PHASES:
+                if transaction.projection.status in TERMINAL_STATUSES:
                     raise RunTerminalError(message)
                 self.interactions.receive(transaction, text, command=True)
 
@@ -645,11 +651,11 @@ class Orchestrator:
         # 激活与运行循环结束时交回的运行状态。有正在进行的取消（cancel 或 /stop）时，等待它结束，
         # 交回它写入以后的状态；运行已经中止而没有正在进行的取消（例如它的写入失败了）时在这里写入取消
         projection = self.project(run_id)
-        if projection.phase in TERMINAL_PHASES:
+        if projection.status in TERMINAL_STATUSES:
             return projection
         self._await_cancellers(run_id)
         projection = self.project(run_id)
-        if projection.phase in TERMINAL_PHASES:
+        if projection.status in TERMINAL_STATUSES:
             return projection
         if self._abort.get(run_id) is not None and self._abort[run_id].is_set():
             return self.cancel(run_id)
@@ -672,16 +678,16 @@ class Orchestrator:
         # 已经结束或已经中止的运行不再接收输入、指导与提示词
         if not projection.run_id:
             raise RunNotFoundError(run_id)
-        if projection.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        if projection.status in TERMINAL_STATUSES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
             raise RunTerminalError(message)
 
     def _assign_new_inputs(self, transaction: Transaction) -> RunProjection:
         projection = transaction.projection
-        if projection.phase in TERMINAL_PHASES or projection.input_version <= projection.product_work_input_version:
+        if projection.status in TERMINAL_STATUSES or projection.input_version <= projection.product_work_input_version:
             return projection
         transaction.append(NewEvent(
             EventType.PRODUCT_INPUT_ASSIGNED, actor="system", department="product",
-            state_before=projection.phase, state_after="PRODUCT_SPEC",
+            state_before=projection.status, state_after="PRODUCT_SPEC",
             payload={"through_version": projection.input_version},
         ))
         return transaction.projection
@@ -707,7 +713,7 @@ class Orchestrator:
         return (activation.abort_flag.is_set()
                 or (activation.deadline is not None and time.monotonic() >= activation.deadline)
                 or time_used_up(projection, self._elapsed_sec(activation.run_id))
-                or projection.phase in TERMINAL_PHASES or blocks_run(decisions)
+                or projection.status in TERMINAL_STATUSES or blocks_run(decisions)
                 or projection.input_version != basis.input_version
                 or guidance_version(projection, activation.department) > basis.guidance_version)
 
@@ -856,7 +862,7 @@ class Orchestrator:
         # 调用尝试因取消而失败的记录排在取消之后。写入出错时同样取消正在进行的步骤；取消步骤出错时再通知一次，
         # 错误交给调用方
         with self._cancelling(run_id):
-            if self.project(run_id).phase in TERMINAL_PHASES:
+            if self.project(run_id).status in TERMINAL_STATUSES:
                 return self.project(run_id)
             self._abort.setdefault(run_id, Event()).set()
             try:
@@ -885,7 +891,7 @@ class Orchestrator:
         # 记下中断位置与继续的依据，再从已提交的状态继续运行到终态。
         # 已经结束的 run 不取得执行权、不写事件；有未回答、阻塞整个 run 的决定请求时不继续，交给用户回答
         projection = self.project(run_id)
-        if projection.phase in TERMINAL_PHASES:
+        if projection.status in TERMINAL_STATUSES:
             return None
         decisions = self.writes.read(run_stream(run_id)).decisions.values()
         if blocks_run(decisions):
@@ -904,14 +910,14 @@ class Orchestrator:
         # 请求只发一次：已经有过一个定义版本不同的请求时不重复
         def request(transaction: Transaction) -> None:
             current = transaction.projection
-            if current.phase in TERMINAL_PHASES or blocks_run(transaction.decisions.values()):
+            if current.status in TERMINAL_STATUSES or blocks_run(transaction.decisions.values()):
                 return
             if any(decision.request.get("kind") == DEFINITIONS_CHANGED.name
                    for decision in transaction.decisions.values()):
                 return
             transaction.append(NewEvent(
                 EventType.DECISION_REQUESTED, actor="system", department=current.active_department,
-                state_before=current.phase, state_after=current.phase,
+                state_before=current.status, state_after=current.status,
                 payload={
                     "kind": DEFINITIONS_CHANGED.name, "blocks": DEFINITIONS_CHANGED.blocks,
                     "options": [{"id": option.id, "label": option.label} for option in DEFINITIONS_CHANGED.options],
@@ -939,7 +945,7 @@ class Orchestrator:
         # 不再发出任何 unknown_action 决定请求，事项直接继续。
         def request(transaction: Transaction) -> None:
             projection = transaction.projection
-            if projection.phase in TERMINAL_PHASES:
+            if projection.status in TERMINAL_STATUSES:
                 return
             for decision in transaction.decisions.values():
                 if decision.status == "open" and decision.kind == "unknown_action":
@@ -948,8 +954,8 @@ class Orchestrator:
                         actor="system",
                         department=decision.request.get("department") or projection.active_department,
                         parent_event_id=decision.decision_id,
-                        state_before=projection.phase,
-                        state_after=projection.phase,
+                        state_before=projection.status,
+                        state_after=projection.status,
                         payload={
                             "decision_id": decision.decision_id,
                             "reason": "superseded_by_hand_back",
@@ -975,24 +981,24 @@ class Orchestrator:
                 action_id = identity[2]
                 comparison = comparisons.get(action_id)
                 if comparison is not None and comparison["verdict"] == "completed":
-                    transaction.append(self._auto_verified(started, projection.phase, comparison))
+                    transaction.append(self._auto_verified(started, projection.status, comparison))
                     continue
                 if comparison is not None and comparison["verdict"] == "not_happened":
                     transaction.append(self._handed_back_action(
-                        started, projection.phase,
+                        started, projection.status,
                         error="执行被中断，核实确认没有发生",
                         comparison=comparison,
                     ))
                     continue
                 transaction.append(self._handed_back_action(
-                    started, projection.phase,
+                    started, projection.status,
                     error="执行被中断，结果未知，由模型检查以后决定是否重新执行；没有收到输出",
                     comparison=comparison,
                 ))
 
         self.writes.transact(run_stream(run_id), request)
 
-    def _handed_back_action(self, started: Any, phase: str, *,
+    def _handed_back_action(self, started: Any, status: str, *,
                             error: str,
                             comparison: dict[str, Any] | None = None) -> NewEvent:
         # 结果未知的动作交还会话（工单 #581）：写一条 resolution="handed_back" 的核实记录，
@@ -1018,12 +1024,12 @@ class Orchestrator:
         # 核实记录因此进入那个会话的历史（分支会话的核实结果不进入部门主线）
         return NewEvent(
             EventType.ACTION_VERIFIED, actor="system", department=started.department,
-            state_before=phase, state_after=phase, parent_event_id=started.event_id,
+            state_before=status, state_after=status, parent_event_id=started.event_id,
             session_id=started.session_id,
             payload=event_payload,
         )
 
-    def _auto_verified(self, started: Any, phase: str, comparison: dict[str, Any]) -> NewEvent:
+    def _auto_verified(self, started: Any, status: str, comparison: dict[str, Any]) -> NewEvent:
         # 自动核实（工单 #308）：对比确认动作已经完成时记一条核实记录，不补造原来的 tool_called 回执。
         # 结果进入部门历史：input_item 按原来的动作编号给出，与同一条结果的其它记录共享这个编号
         payload = started.payload or {}
@@ -1032,7 +1038,7 @@ class Orchestrator:
         input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
         return NewEvent(
             EventType.ACTION_VERIFIED, actor="system", department=started.department,
-            state_before=phase, state_after=phase, parent_event_id=started.event_id,
+            state_before=status, state_after=status, parent_event_id=started.event_id,
             session_id=started.session_id,
             payload={"id": action_id, "name": str(payload.get("name") or ""), "step_id": payload.get("step_id"),
                      "activation_id": payload.get("activation_id"),
@@ -1051,11 +1057,11 @@ class Orchestrator:
             # 这里的依据过期，事务因版本不符重新判断，因此这个编号与写入口确定的编号相同
             transaction.append(NewEvent(
                 EventType.RUN_RESUMED, department=projection.active_department, actor="system",
-                state_before=projection.phase, state_after=projection.phase,
+                state_before=projection.status, state_after=projection.status,
                 parent_event_id=projection.last_event_id,
                 payload={
                     "basis": {
-                        "interrupted_at_phase": projection.phase,
+                        "interrupted_at_status": projection.status,
                         "interrupted_at_version": projection.stream_version,
                         "interrupted_at_event_id": projection.last_event_id,
                         "recorded_run_event_version": projection.run_event_version,
@@ -1088,7 +1094,7 @@ class Orchestrator:
                 projection = snapshot.projection
                 if not projection.run_id:
                     raise RunNotFoundError(run_id)
-                if projection.phase in TERMINAL_PHASES:
+                if projection.status in TERMINAL_STATUSES:
                     return projection
                 if self._abort.get(run_id) and self._abort[run_id].is_set():
                     return await asyncio.to_thread(self._settled, run_id)
@@ -1223,8 +1229,8 @@ class Orchestrator:
                         actor="system",
                         department=scope.department,
                         parent_event_id=scope.parent_event_id,
-                        state_before=current.phase,
-                        state_after=current.phase,
+                        state_before=current.status,
+                        state_after=current.status,
                         session_id=scope.session_id,
                         payload={
                             "activation_id": scope.activation_id,
@@ -1264,7 +1270,7 @@ class Orchestrator:
             # 等待用户回答阻塞 run 或某个动作的决定请求：不开始新的激活，什么也不写
             return None
         projection = self._assign_new_inputs(transaction)
-        if projection.phase in TERMINAL_PHASES:
+        if projection.status in TERMINAL_STATUSES:
             return None
         bound = activation_bound(projection, self._elapsed_sec(run_id))
         if bound is not None:
@@ -1275,16 +1281,17 @@ class Orchestrator:
             return None
         # 下一个开始一轮工作的部门由它关注的成果决定（循环结构第 2 节、ADR-0039）：
         # 关注的成果有了新东西、部门在等待工作时，它开始一轮工作。
-        department = next_department(projection)
-        waiting_guidance = [item for item in projection.department_guidance if item.status in PENDING_GUIDANCE]
+        waiting = self._waiting_departments(run_id)
+        department = next_department(projection, waiting=waiting)
         guidance_only = False
         yielded_work = None
-        if department is not None and watched_new_work(projection, department) == ["guidance"]:
-            # 这一轮只有指导是新的东西：只回应指导（工单 #560 以后指导按四种送达方式分开处理）
+        if department is not None and guidance_diverted(projection, department):
+            # 这一轮被指导提前安排：只回应指导，让出它自己的那一轮
+            # （工单 #560 以后指导按四种送达方式分开处理）
             guidance_only = department != "product"
             yielded_work = dict(projection.yielded_work) if projection.yielded_work else self._work_basis(projection)
         if department is None:
-            self._fail(transaction, "provider_error", f"no department has new work in phase {projection.phase}")
+            self._fail(transaction, "provider_error", "no department has new work")
             return None
 
         if self.test_adapter_factory is not None:
@@ -1330,8 +1337,8 @@ class Orchestrator:
             EventType.DEPARTMENT_ACTIVATED,
             actor="system",
             department=department,
-            state_before=projection.phase,
-            state_after=projection.phase,
+            state_before=projection.status,
+            state_after=projection.status,
             session_id=session.session_id,
             provider=provider_name,
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
@@ -1390,7 +1397,6 @@ class Orchestrator:
     def _work_basis(projection: RunProjection) -> dict[str, Any]:
         return {
             "effective_contract_hash": current_contract_hash(projection),
-            "phase": projection.phase,
             "delivery_spec_hash": None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
         }
 
@@ -1488,7 +1494,7 @@ class Orchestrator:
             return
 
         current = self.project(run_id)
-        if current.phase in TERMINAL_PHASES:
+        if current.status in TERMINAL_STATUSES:
             return
         if isinstance(result, Stopped):
             elapsed = self._elapsed_sec(run_id)
@@ -1555,8 +1561,8 @@ class Orchestrator:
                     department=scope.department,
                     parent_event_id=scope.parent_event_id,
                     session_id=scope.session_id,
-                    state_before=transaction.projection.phase,
-                    state_after=transaction.projection.phase,
+                    state_before=transaction.projection.status,
+                    state_after=transaction.projection.status,
                     payload={
                         "requester": scope.department,
                         "recipient": recipient,
@@ -1606,8 +1612,8 @@ class Orchestrator:
                     department=recipient,
                     parent_event_id=scope.parent_event_id,
                     session_id=branch_session_id,
-                    state_before=transaction.projection.phase,
-                    state_after=transaction.projection.phase,
+                    state_before=transaction.projection.status,
+                    state_after=transaction.projection.status,
                     payload={
                         "requester": scope.department,
                         "recipient": recipient,
@@ -1658,7 +1664,6 @@ class Orchestrator:
                         "issuer": "product",
                     }
                     decision = evaluate_proposal(
-                        phase=projection.phase,
                         department="product",
                         proposal=spec_proposal,
                         projection=projection,
@@ -1674,7 +1679,7 @@ class Orchestrator:
                         snapshot=env.snapshot(),
                         environment=env,
                         artifact=decision.artifact,
-                        transitions=[],
+                        ends_run=decision.ends_run,
                         parent_event_id=scope.parent_event_id,
                         session_id=branch_session_id,
                         provider=result.response.provider or self._activation_provider(activation.adapter),
@@ -1694,8 +1699,8 @@ class Orchestrator:
                     department=recipient,
                     parent_event_id=scope.parent_event_id,
                     session_id=branch_session_id,
-                    state_before=transaction.projection.phase,
-                    state_after=transaction.projection.phase,
+                    state_before=transaction.projection.status,
+                    state_after=transaction.projection.status,
                     payload={
                         "requester": scope.department,
                         "recipient": recipient,
@@ -1731,8 +1736,8 @@ class Orchestrator:
                     department=recipient,
                     parent_event_id=scope.parent_event_id,
                     session_id=branch_session_id,
-                    state_before=transaction.projection.phase,
-                    state_after=transaction.projection.phase,
+                    state_before=transaction.projection.status,
+                    state_after=transaction.projection.status,
                     payload={
                         "requester": scope.department,
                         "recipient": recipient,
@@ -1785,8 +1790,8 @@ class Orchestrator:
                 actor="system",
                 department=department,
                 parent_event_id=parent_event_id,
-                state_before=transaction.projection.phase,
-                state_after=transaction.projection.phase,
+                state_before=transaction.projection.status,
+                state_after=transaction.projection.status,
                 session_id=session_id,
                 payload={
                     "activation_id": activation_id,
@@ -1853,8 +1858,8 @@ class Orchestrator:
                     actor="system",
                     department=department,
                     parent_event_id=act_event.event_id,
-                    state_before=transaction.projection.phase,
-                    state_after=transaction.projection.phase,
+                    state_before=transaction.projection.status,
+                    state_after=transaction.projection.status,
                     session_id=session_id,
                     payload={
                         "activation_id": activation_id,
@@ -1939,7 +1944,7 @@ class Orchestrator:
         # 提交的事务：读取的流版本就是校验时的版本
         run_id = transaction.projection.run_id
         current = transaction.projection
-        if current.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        if current.status in TERMINAL_STATUSES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
             return
         current = self._assign_new_inputs(transaction)
         snapshot = environment.snapshot()
@@ -1952,7 +1957,7 @@ class Orchestrator:
             transaction.append(NewEvent(
                 EventType.PROPOSAL_SUBMITTED, actor=f"department:{department}", department=department,
                 parent_event_id=parent_event_id,
-                state_before=current.phase, state_after=current.phase,
+                state_before=current.status, state_after=current.status,
                 session_id=session_id, provider=provider, model=model,
                 payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
                          "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version,
@@ -1963,7 +1968,7 @@ class Orchestrator:
             transaction.append(NewEvent(
                 EventType.PROPOSAL_REJECTED, actor=f"department:{department}", department=department,
                 parent_event_id=parent_event_id,
-                state_before=current.phase, state_after=current.phase,
+                state_before=current.status, state_after=current.status,
                 session_id=session_id, provider=provider, model=model,
                 payload={
                     "errors": judged.error_dicts,
@@ -1977,7 +1982,7 @@ class Orchestrator:
             return
         self._commit_accepted(
             transaction, department=department, snapshot=snapshot, environment=environment,
-            artifact=judged.artifact or {}, transitions=judged.transitions,
+            artifact=judged.artifact or {}, ends_run=judged.ends_run,
             parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
             yielded_work=yielded_work,
         )
@@ -1990,7 +1995,7 @@ class Orchestrator:
         snapshot: WorkspaceSnapshot,
         environment: LocalEnvironment,
         artifact: dict[str, Any],
-        transitions: list[tuple[str, str]],
+        ends_run: bool,
         parent_event_id: str,
         session_id: str,
         provider: str | None,
@@ -1999,7 +2004,7 @@ class Orchestrator:
     ) -> None:
         projection = transaction.projection
         run_id = projection.run_id
-        if projection.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        if projection.status in TERMINAL_STATUSES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
             return
         try:
             acceptance = self.submissions.prepare(
@@ -2015,71 +2020,23 @@ class Orchestrator:
         source_event = acceptance.append(transaction)
         if artifact["kind"] == "qa_review" and artifact["verdict"] == "rework_engineering":
             self._record_lesson_candidate(transaction, source_event, projection)
-        # 阶段迁移的记录（工单 #556 第一轮）：记录这一步之后由哪个部门接手，
-        # 接手部门按关注的成果算（watch.next_department），不再由阶段决定
-        taking_over = next_department(transaction.projection) or department
-        for source, target in transitions:
+        # 只有质检的放行与基线核验的一致结论结束事项（工单 #556）：结束以后控制核心不再决定下一个谁工作
+        if ends_run:
+            # 进入完成状态的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified
+            stop_reason = DEFINITIONS.work_item(projection.kind).stop_reason
+            self._withdraw_decisions(transaction, stop_reason)
             transaction.append(NewEvent(
-                EventType.TRANSITION,
+                EventType.RUN_DONE,
                 actor="system",
-                department=taking_over,
+                department=department,
                 parent_event_id=parent_event_id,
-                state_before=source,
-                state_after=target,
+                state_before="running",
+                state_after="done",
                 session_id=session_id,
-                payload={"from": source, "to": target, "route": f"{source}->{target}"},
+                stop_reason=stop_reason,
+                payload={"stop_reason": stop_reason},
             ))
-            if target == "DONE":
-                # 进入 DONE 的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified
-                stop_reason = DEFINITIONS.work_item(projection.kind).stop_reason
-                self._withdraw_decisions(transaction, stop_reason)
-                transaction.append(NewEvent(
-                    EventType.RUN_DONE,
-                    actor="system",
-                    department="quality",
-                    parent_event_id=parent_event_id,
-                    state_before="QUALITY",
-                    state_after="DONE",
-                    session_id=session_id,
-                    stop_reason=stop_reason,
-                    payload={"stop_reason": stop_reason},
-                ))
-                transaction.on_commit(lambda: self._on_close_run(run_id))
-        self._resume_yielded_work(
-            transaction, artifact=artifact, yielded_work=yielded_work,
-            parent_event_id=parent_event_id, session_id=session_id, department=department,
-        )
-
-    def _resume_yielded_work(
-        self,
-        transaction: Transaction,
-        *,
-        artifact: dict[str, Any],
-        yielded_work: dict[str, Any] | None,
-        parent_event_id: str,
-        session_id: str,
-        department: str,
-    ) -> None:
-        current = transaction.projection
-        basis = current.yielded_work or yielded_work
-        if artifact.get("kind") != "department_guidance_response" or not basis:
-            return
-        if current.phase in TERMINAL_PHASES:
-            return
-        target = guidance_target_phase(basis, current)
-        if target == current.phase:
-            return
-        transaction.append(NewEvent(
-            EventType.TRANSITION,
-            actor="system",
-            department=next_department(transaction.projection) or department,
-            parent_event_id=parent_event_id,
-            state_before=current.phase,
-            state_after=target,
-            session_id=session_id,
-            payload={"from": current.phase, "to": target, "route": f"{current.phase}->{target}",
-                     "yielded_work_resolved": True, "yielded_work": dict(basis)},
-        ))
+            transaction.on_commit(lambda: self._on_close_run(run_id))
 
     @staticmethod
     def _record_lesson_candidate(transaction: Transaction, source: RunEvent, projection: RunProjection) -> None:
@@ -2148,13 +2105,13 @@ class Orchestrator:
         # 写明部门、模型与具体问题；不改用其他模型。已经结束或正在取消的运行不再写入
         projection = transaction.projection
         run_id = projection.run_id
-        if projection.phase in TERMINAL_PHASES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        if projection.status in TERMINAL_STATUSES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
             return
         kind = MODEL_UNAVAILABLE
         model = "（没有找到调用目标）" if target is None else target["requested_model"]
         transaction.append(NewEvent(
             EventType.DECISION_REQUESTED, actor="system", department=department,
-            state_before=projection.phase, state_after=projection.phase,
+            state_before=projection.status, state_after=projection.status,
             payload={
                 "kind": kind.name, "blocks": kind.blocks,
                 "options": [{"id": option.id, "label": option.label} for option in kind.options],
@@ -2225,7 +2182,7 @@ class Orchestrator:
         projection = transaction.projection
         transaction.append(NewEvent(
             EventType.DECISION_ANSWERED, department=decision.request["department"], parent_event_id=decision_id,
-            state_before=projection.phase, state_after=projection.phase,
+            state_before=projection.status, state_after=projection.status,
             payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
         ))
         transaction.on_commit(lambda: self._wake(projection.run_id))
@@ -2353,21 +2310,18 @@ class Orchestrator:
         )
 
     def _continue_paused_run(self, transaction: Transaction, decision_id: str, decision: DecisionRequest) -> None:
-        # 用户回答「处理以后继续执行」：把 run 从 PAUSED 恢复到暂停时的阶段，下一次激活由流程编排接着开始。
+        # 用户回答「处理以后继续执行」：把 run 从暂停恢复成进行中，下一次激活由流程编排接着开始
+        # （下一个谁工作由关注的成果决定，工单 #556）。
         # 不写限额与计数字段（激活次数、模型步数、运行时间保持暂停时的值）；连续不调用工具的计数属于步骤驱动的
         # 一次激活内部状态，暂停时激活已经结束，继续以后的第一次激活从零开始
         projection = transaction.projection
-        if projection.phase != "PAUSED":
+        if projection.status != "paused":
             return
-        resumed_at_phase = decision.request.get("resumed_at_phase")
-        if resumed_at_phase is None:
-            raise ValueError(f"pause decision {decision_id} has no resumed_at_phase")
         transaction.append(NewEvent(
             EventType.RUN_CONTINUED, actor="system", department=decision.request["department"],
             parent_event_id=decision_id,
-            state_before="PAUSED", state_after=resumed_at_phase,
-            payload={"decision_id": decision_id, "stop_reason": decision.request["stop_reason"],
-                     "resumed_at_phase": resumed_at_phase},
+            state_before="paused", state_after="running",
+            payload={"decision_id": decision_id, "stop_reason": decision.request["stop_reason"]},
         ))
         transaction.on_commit(lambda: self._wake(projection.run_id))
 
@@ -2402,28 +2356,26 @@ class Orchestrator:
                 continue
             transaction.append(NewEvent(
                 EventType.DECISION_WITHDRAWN, actor="system", department=decision.request["department"],
-                parent_event_id=decision.decision_id, state_before=projection.phase, state_after=projection.phase,
+                parent_event_id=decision.decision_id, state_before=projection.status, state_after=projection.status,
                 payload={"decision_id": decision.decision_id, "reason": reason},
             ))
 
     def _pause(self, transaction: Transaction, reason: str, message: str | None = None,
                *, facts: list[str] | None = None) -> None:
         projection = transaction.projection
-        if projection.phase in TERMINAL_PHASES:
+        if projection.status in TERMINAL_STATUSES:
             return
         department = projection.active_department
-        paused_at_phase = projection.phase
         self._withdraw_decisions(transaction, reason)
         transaction.append(NewEvent(
             EventType.RUN_PAUSED, actor="system", department=department,
-            state_before=projection.phase, state_after="PAUSED", stop_reason=reason,
+            state_before=projection.status, state_after="paused", stop_reason=reason,
             error=message,
             provider=projection.provider, model=projection.model,
             payload={
                 "stop_reason": reason,
                 "human_action": DEFINITIONS.stop_reason(reason).human_action,
                 **({"message": message} if message else {}),
-                "paused_at_phase": projection.phase,
                 "cycle_count": projection.cycle_count,
                 "max_cycles": projection.max_cycles,
                 "token_used": projection.token_used,
@@ -2435,11 +2387,11 @@ class Orchestrator:
         # max_cycles 与 model_steps_exhausted 不发出这个请求，仍按原样暂停
         kind = RESUMABLE_PAUSE_KINDS.get(reason)
         if kind is not None:
-            self._request_pause_resume(transaction, kind, department, paused_at_phase, reason, message, facts or [])
+            self._request_pause_resume(transaction, kind, department, reason, message, facts or [])
         transaction.on_commit(lambda: self._on_close_run(projection.run_id))
 
     def _request_pause_resume(self, transaction: Transaction, kind: DecisionKind, department: str,
-                              paused_at_phase: str, reason: str, message: str | None,
+                              reason: str, message: str | None,
                               facts: list[str]) -> None:
         # 暂停以后继续的决定请求：说明写明停止原因与人工处理说明，工作区无法表示的条目列为事实引用
         human = DEFINITIONS.stop_reason(reason).human_action
@@ -2448,12 +2400,12 @@ class Orchestrator:
             description = f"{description} 停止说明：{message}"
         transaction.append(NewEvent(
             EventType.DECISION_REQUESTED, actor="system", department=department,
-            state_before="PAUSED", state_after="PAUSED",
+            state_before="paused", state_after="paused",
             payload={
                 "kind": kind.name, "blocks": kind.blocks,
                 "options": [{"id": option.id, "label": option.label} for option in kind.options],
                 "description": description, "facts": list(facts), "department": department,
-                "stop_reason": reason, "resumed_at_phase": paused_at_phase,
+                "stop_reason": reason,
             },
         ))
         transaction.on_commit(lambda: self._wake(transaction.projection.run_id))
@@ -2462,13 +2414,13 @@ class Orchestrator:
               *, input_save_failure: dict[str, str] | None = None) -> None:
         human = DEFINITIONS.stop_reason(reason).human_action
         projection = transaction.projection
-        if projection.phase in TERMINAL_PHASES:
+        if projection.status in TERMINAL_STATUSES:
             return
         department = projection.active_department
         self._withdraw_decisions(transaction, reason)
         source_event = transaction.append(NewEvent(
             EventType.RUN_FAILED, actor="system", department=department,
-            state_before=projection.phase, state_after="FAILED", stop_reason=reason, error=message,
+            state_before=projection.status, state_after="failed", stop_reason=reason, error=message,
             provider=projection.provider, model=projection.model,
             payload={"stop_reason": reason, "human_action": human, "message": message,
                      **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},

@@ -8,7 +8,7 @@ from typing import Any
 
 from .adjudication import offered_tools
 from .contracts import current_contract_hash
-from .collaboration import guidance_result_summaries
+from .collaboration import guidance_result_summaries, has_new_baseline_review
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
 from .event_store import EventStore
@@ -27,6 +27,7 @@ from .models import (
     RunProjection,
     canonical_hash,
     estimate_tokens,
+    hash_bytes,
     json_dumps,
 )
 
@@ -101,10 +102,11 @@ class ContextAssembler:
         engineering = (quality_engineering_content(events or [], delivery=current_delivery)
                        if department == "quality" else None)
         # 钉住材料顺序：intend → current_work → project（项目 run）→ department_guidance（有待处理指导）→ department_rules。
+        current_work = _current_work(projection, department, engineering)
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
-            ContextPart("current_work", projection.phase,
-                        json_dumps(_current_work(projection, department, engineering))),
+            ContextPart("current_work", _current_work_version(current_work),
+                        json_dumps(current_work)),
         ]
         if projection.project_context_ref is not None:
             if self.artifacts is None:
@@ -422,6 +424,11 @@ class ContextAssembler:
         return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
 
 
+def _current_work_version(current_work: dict[str, Any]) -> str:
+    # 当前工作材料的版本：内容变了就是新的一份（阶段状态机删掉以后不再由阶段表示，工单 #556）
+    return hash_bytes(json_dumps(current_work).encode("utf-8"))
+
+
 def _current_work(projection: RunProjection, department: str,
                   engineering: dict[str, Any] | None = None) -> dict[str, Any]:
     if projection.kind == "onboarding":
@@ -437,7 +444,7 @@ def _current_work(projection: RunProjection, department: str,
             "engineering": "依据当前产品要求实现、运行检查并提交交付。",
             "quality": "独立验证当前交付，提交放行或返工决定。",
         }[department]
-    if department == "product" and projection.phase == "REWORK_PRODUCT":
+    if department == "product" and has_new_baseline_review(projection):
         work = ("根据基线核验中 unsupported 的结论与遗漏修改初始 PRD 的描述，并提交新的 ProductSpec。"
                 if projection.kind == "onboarding"
                 else "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。")
@@ -464,7 +471,7 @@ def _current_work(projection: RunProjection, department: str,
                  "guidance_results 只列出本指导被采用后可由宿主绑定的结果；completed 时宿主绑定这些结果，不必手抄事件 id；"
                  "指导不能替代产品要求、交付说明或质检放行。")
     return {
-        "department": department, "phase": projection.phase, "work": work,
+        "department": department, "work": work,
         "current_goal": projection.product_spec.goal if projection.product_spec else None,
         "precedence": "本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。",
     }
@@ -475,7 +482,6 @@ def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
     delivery = projection.delivery_spec if projection.delivery_spec is not None and projection.delivery_spec.status == "active" else None
     return {
         "department": department,
-        "phase": projection.phase,
         "product_spec_id": None if spec is None else spec.id,
         "product_spec_hash": None if spec is None else spec.content_hash,
         "product_spec_revision": None if spec is None else spec.revision,
@@ -518,8 +524,6 @@ def _causal_chain(projection: RunProjection) -> list[dict[str, str]]:
         chain.append(item)
     for review in projection.reviews[-3:]:
         chain.append({"kind": "qa_review", "verdict": review.verdict, "hash": review.content_hash, "id": review.id})
-    for route in projection.transitions[-8:]:
-        chain.append({"kind": "transition", "route": route})
     return chain
 
 

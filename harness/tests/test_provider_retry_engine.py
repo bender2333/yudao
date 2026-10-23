@@ -7,6 +7,7 @@ import pytest
 
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
+from harness.collaboration import has_new_work
 from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
 from harness.proposals import product_spec
@@ -26,7 +27,7 @@ def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     first, second = adapter.invocations
     assert first.department == second.department == "product"
     assert first.activation_id == second.activation_id
@@ -48,7 +49,7 @@ def test_retry_reassembles_context_before_each_attempt(tmp_path):
     run_id = system.create_run("echo")
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     first, second = adapter.invocations
     assembled = [event for event in system.store.list_events(run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
     assert [event.payload["attempt"] for event in assembled] == [1, 2]
@@ -66,7 +67,7 @@ def test_retry_exhaustion_records_all_attempts_and_fails_once(tmp_path):
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "FAILED" and result.stop_reason == "provider_error"
+    assert result.status == "failed" and result.stop_reason == "provider_error"
     assert [request.attempt for request in adapter.invocations] == [1, 2, 3]
     events = system.store.list_events(run_id)
     failed = [item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED]
@@ -84,7 +85,8 @@ def test_provider_timeout_retries_without_a_logical_time_budget(tmp_path):
                                     step_limits=StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.01))
     result = system.activate_once(system.create_run("echo"))
 
-    assert result.phase == "ENGINEERING"
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(result, "engineering")
     assert len(adapter.invocations) == 2
     events = system.store.list_events(result.run_id)
     assert [item.payload["delay_sec"] for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED] == [0.01]
@@ -105,7 +107,7 @@ def test_retry_after_over_max_stops_without_waiting(tmp_path):
     result = system.activate_once(run_id)
 
     assert time.monotonic() - started < 30
-    assert result.phase == "FAILED" and result.stop_reason == "retry_after_too_long"
+    assert result.status == "failed" and result.stop_reason == "retry_after_too_long"
     assert len(adapter.invocations) == 1
     events = system.store.list_events(run_id)
     assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
@@ -127,7 +129,7 @@ def test_retryable_attempts_stop_at_the_32_step_limit(tmp_path):
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=limits)
     result = system.activate_once(system.create_run("echo"))
 
-    assert result.phase == "PAUSED" and result.stop_reason == "model_steps_exhausted"
+    assert result.status == "paused" and result.stop_reason == "model_steps_exhausted"
     assert len(adapter.invocations) == limits.max_model_steps
     assert [request.step_id for request in adapter.invocations] == list(range(1, limits.max_model_steps + 1))
 
@@ -187,7 +189,7 @@ def test_failed_stream_observations_and_tool_calls_are_audit_only(tmp_path):
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING"
+    assert has_new_work(result, "engineering")
     assert "must-not-exist.txt" not in system.workspace(run_id).list_files()
     history = department_history(system, run_id, "product")
     assert "failed-call" not in json_dumps(history)
@@ -214,7 +216,8 @@ def test_malformed_tool_arguments_are_returned_to_model_without_starting_tool(tm
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING"
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(result, "engineering")
     assert len(adapter.invocations) == 2
     events = system.store.list_events(run_id)
     assert any(item.type == EventType.MODEL_MESSAGE and item.payload.get("response_id") == "bad-call" for item in events)
@@ -244,7 +247,7 @@ def test_invalid_response_is_rejected_before_recording_and_never_retried(tmp_pat
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "FAILED" and result.stop_reason in {"provider_error", "cancelled"}
+    assert result.status == "failed" and result.stop_reason in {"provider_error", "cancelled"}
     assert len(adapter.invocations) == 1
     events = system.store.list_events(run_id)
     assert not any(item.type == EventType.MODEL_MESSAGE for item in events)
@@ -277,7 +280,7 @@ def test_compaction_uses_the_same_retry_path(tmp_path):
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "ENGINEERING" and result.compactions
+    assert has_new_work(result, "engineering") and result.compactions
     attempts = [request for request in adapter.invocations if request.purpose == "compaction"]
     assert len(attempts) >= 2
     assert attempts[0].input_items == attempts[1].input_items

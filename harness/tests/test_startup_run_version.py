@@ -37,7 +37,7 @@ def _unstarted_run(system, project_id):
     # 第二个事项：登记以后还没有执行，run 停在非终态
     _work_item_id, run_id = system.projects.start_work_item(project_id, "第二个事项")
     projection = project_run(system.store, run_id)
-    assert projection.phase not in {"DONE", "PAUSED", "FAILED"}, projection.phase
+    assert projection.status not in {"done", "paused", "failed"}, projection.status
     return run_id
 
 
@@ -115,7 +115,7 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts_the_work_it
 
     # 旧 run 记为因升级停止，没有决定请求，也不由恢复继续
     stopped = project_run(restarted.store, second_run)
-    assert (stopped.phase, stopped.stop_reason) == ("FAILED", STOP_REASON_UPGRADE)
+    assert (stopped.status, stopped.stop_reason) == ("failed", STOP_REASON_UPGRADE)
     assert _definitions_changed(restarted, second_run) == []
     assert second_run not in restarted.resumed_runs
 
@@ -129,7 +129,7 @@ def test_starting_from_an_older_run_event_version_stops_and_restarts_the_work_it
 
     # 重新开始以后的 run 由启动序列自动继续到结束
     assert new_run_id in restarted.resumed_runs, restarted.resumed_runs
-    assert project_run(restarted.store, new_run_id).phase == "DONE"
+    assert project_run(restarted.store, new_run_id).status == "done"
 
     # 第一个事项已经结束，不因版本不同停止；旧版本的 run 事件保留供查阅
     assert project_run(restarted.store, first_run).stop_reason == "released"
@@ -190,7 +190,7 @@ def test_same_version_and_finished_runs_are_left_alone_at_startup(data_dir):
         [PRIORITY_USER, PRIORITY_USER]
     # 版本相同的未结束 run 照常自动继续到结束
     assert second_run in restarted.resumed_runs
-    assert project_run(restarted.store, second_run).phase == "DONE"
+    assert project_run(restarted.store, second_run).status == "done"
     assert project_run(restarted.store, second_run).stop_reason != STOP_REASON_UPGRADE
     restarted.close()
 
@@ -206,7 +206,7 @@ def test_an_onboarding_run_is_restarted_from_the_recorded_snapshot(data_dir, tmp
 
     restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_onboarding_script()))
     stopped = project_run(restarted.store, run_id)
-    assert (stopped.phase, stopped.stop_reason) == ("FAILED", STOP_REASON_UPGRADE)
+    assert (stopped.status, stopped.stop_reason) == ("failed", STOP_REASON_UPGRADE)
     created = _started_work_items(restarted, project_id)[-1]
     assert created.payload["priority"] == PRIORITY_UPGRADE_RESTART
     assert created.payload["kind"] == "onboarding"
@@ -218,7 +218,7 @@ def test_an_onboarding_run_is_restarted_from_the_recorded_snapshot(data_dir, tmp
     assert restarted_run.snapshot == snapshot, "从建档事项记录的快照开始"
     # 重新开始以后的建档 run 照常跑到它的终态
     assert created.payload["run_id"] in restarted.resumed_runs
-    assert project_run(restarted.store, created.payload["run_id"]).phase == "DONE"
+    assert project_run(restarted.store, created.payload["run_id"]).status == "done"
     restarted.close()
 
 

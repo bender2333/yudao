@@ -42,14 +42,14 @@ def _read_source(path):
 def _reshape_checkpoints(run_metrics, hidden_failures):
     """按新五项口径重算检查点；未核实项如实标注。"""
     released = run_metrics.get("end_status") == "released"
-    phase = run_metrics.get("phase")
+    status = run_metrics.get("status")
     stop_reason = run_metrics.get("stop_reason")
     if released:
-        detail = ("运行在冻结限额内以放行结束：阶段 " + str(phase)
+        detail = ("运行在冻结限额内以放行结束：状态 " + str(status)
                   + "、停止原因 " + str(stop_reason)
                   + "、质检已放行、用量未超限额")
     else:
-        detail = "运行未通过放行判定：阶段不是 DONE（实际为 " + str(phase or "未知") + "）；停止原因不是 released（实际为 " + str(stop_reason or "未知") + "）；没有当前交付快照的质检放行；用量未超限额"
+        detail = "运行未通过放行判定：状态不是 done（实际为 " + str(status or "未知") + "）；停止原因不是 released（实际为 " + str(stop_reason or "未知") + "）；没有当前交付快照的质检放行；用量未超限额"
     return {
         "ended_within_limit": {"passed": released, "applicable": True, "detail": detail},
         "quality_release_bound_to_delivery": {

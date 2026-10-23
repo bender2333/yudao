@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.__main__ import main
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
@@ -71,7 +72,7 @@ def test_status_queries_keep_work_item_states_without_reading_run_histories(data
     try:
         adopted_project = system.projects.register("已有成果", GOAL)
         _adopted_item, adopted_run = system.projects.start_work_item(adopted_project, "完成一个事项")
-        assert system.run_until_stop(adopted_run).phase == "DONE"
+        assert system.run_until_stop(adopted_run).status == "done"
         system.projects.settle(adopted_run)
         running_project = system.projects.register("正在运行", GOAL)
         _running_item, running_run = system.projects.start_work_item(running_project, "继续工作")
@@ -139,7 +140,7 @@ def test_second_work_item_inherits_adopted_tree_byte_for_byte(data_dir):
     assert (run.project_id, run.work_item_id, run.baseline) == (project_id, work_item_1, None)
     assert run.workspace_digest == capture_public_tree(system.workspace(run_1).root).digest
     assert run.prompt_config_versions == {"product": 0, "engineering": 0, "quality": 0}
-    assert system.run_until_stop(run_1).phase == "DONE"
+    assert system.run_until_stop(run_1).status == "done"
     adopted = system.projects.settle(run_1)
     assert adopted.type == ProjectEventType.DELIVERABLE_ADOPTED
     assert system.projects.settle(run_1) is None
@@ -162,7 +163,7 @@ def test_second_work_item_inherits_adopted_tree_byte_for_byte(data_dir):
         "code_tree_digest": first_adoption.code_tree_digest,
     }
     assert run.workspace_digest == first_adoption.code_tree_digest
-    assert system.run_until_stop(run_2).phase == "DONE"
+    assert system.run_until_stop(run_2).status == "done"
     assert system.projects.settle(run_2).type == ProjectEventType.DELIVERABLE_ADOPTED
     project = system.projects.projection(project_id)
     assert project.current_adoption.run_id == run_2 and project.current_adoption.summary == "v2"
@@ -184,9 +185,9 @@ def test_release_after_baseline_change_is_held_not_adopted(data_dir):
     work_item_a, run_a = system.projects.start_work_item(project_id, "事项 A")
     work_item_b, run_b = system.projects.start_work_item(project_id, "事项 B（在 A 采纳前创建）")
     assert system.project(run_b).baseline is None
-    assert system.run_until_stop(run_a).phase == "DONE"
+    assert system.run_until_stop(run_a).status == "done"
     assert system.projects.settle(run_a).type == ProjectEventType.DELIVERABLE_ADOPTED
-    assert system.run_until_stop(run_b).phase == "DONE"
+    assert system.run_until_stop(run_b).status == "done"
     held = system.projects.settle(run_b)
     assert held.type == ProjectEventType.ADOPTION_HELD
     project = system.projects.projection(project_id)
@@ -208,9 +209,9 @@ def test_release_after_baseline_change_is_held_not_adopted(data_dir):
 # §13.3 取消 / max_cycles 暂停 / provider 失败：stopped，不采纳
 
 @pytest.mark.parametrize("scenario,expected", [
-    ("cancelled", ("FAILED", "cancelled")),
-    ("max_cycles", ("PAUSED", "max_cycles")),
-    ("provider_error", ("FAILED", "provider_error")),
+    ("cancelled", ("failed", "cancelled")),
+    ("max_cycles", ("paused", "max_cycles")),
+    ("provider_error", ("failed", "provider_error")),
 ])
 def test_stopped_runs_keep_stop_reason_and_are_not_adopted(data_dir, scenario, expected):
     script = [product_spec(), FakeTurn(raise_error=ProviderError("upstream 500"))] if scenario == "provider_error" else happy_script()
@@ -222,7 +223,7 @@ def test_stopped_runs_keep_stop_reason_and_are_not_adopted(data_dir, scenario, e
         run = system.cancel(run_id)
     else:
         run = system.run_until_stop(run_id)
-    assert (run.phase, run.stop_reason) == expected
+    assert (run.status, run.stop_reason) == expected
     assert system.projects.settle(run_id) is None
     assert system.projects.settle_pending(project_id) == []
     project = system.projects.projection(project_id)
@@ -230,7 +231,7 @@ def test_stopped_runs_keep_stop_reason_and_are_not_adopted(data_dir, scenario, e
     assert item.status == "stopped"
     assert item.stop_reason == run.stop_reason
     assert item.human_action == run.human_action
-    assert item.department is None and item.phase == run.phase
+    assert item.department is None and item.status == "stopped"
     assert project.current_adoption is None and project.adoptions == [] and project.held == []
     assert project.active_work_item_id is None
     types = {event.type for event in system.store.list_project_events(project_id)}
@@ -379,7 +380,7 @@ def test_project_context_part_is_pinned_between_current_work_and_department_rule
     assert created.payload["project_context_ref"] == run.project_context_ref
     assert "project_context" not in created.payload
     assert "project_context" not in run.to_dict()
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     first_requests = {}
     for request in adapter.invocations:
         first_requests.setdefault(request.department, request)
@@ -440,7 +441,7 @@ def test_compaction_pinned_input_contains_project_part(data_dir):
     _work_item_id, run_id = system.projects.start_work_item(project_id, "小窗口事项", context_window=6000)
     system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
     result = system.activate_once(run_id)
-    assert result.phase == "ENGINEERING", result.error
+    assert has_new_work(result, "engineering"), result.error
     compactions = [request for request in adapter.invocations if request.purpose == "compaction"]
     assert compactions
     project_text = system.artifacts.get_for_run(
@@ -495,7 +496,7 @@ def test_department_setting_versions_conflicts_and_effect_timing(data_dir):
     # run 内没有部门 Prompt 的副本，只记项目部门设置的版本
     assert not hasattr(run, "department_prompts")
     assert run.prompt_config_versions == {"product": 0, "engineering": 1, "quality": 0}
-    assert system.run_until_stop(run_a).phase == "DONE"
+    assert system.run_until_stop(run_a).status == "done"
     system.projects.settle(run_a)
     requests_a = [json.loads(system.artifacts.get_for_run(run_a, ArtifactRef(**manifest.request_ref)))
                   for manifest in system.project(run_a).manifests if manifest.department == "engineering"]
@@ -511,7 +512,7 @@ def test_department_setting_versions_conflicts_and_effect_timing(data_dir):
     _work_item_b, run_b = system.projects.start_work_item(project_id, "v2 期间的事项")
     run = system.project(run_b)
     assert run.prompt_config_versions["engineering"] == 2
-    assert system.run_until_stop(run_b).phase == "DONE"
+    assert system.run_until_stop(run_b).status == "done"
     engineering_b = [request for request in adapter.invocations if request.department == "engineering"][-1]
     assert v2 in engineering_b.input_items[0]["content"] and v1 not in engineering_b.input_items[0]["content"]
     # 已经结束的 run 的请求正文不变；项目部门设置只随新请求生效
@@ -685,18 +686,20 @@ def test_work_item_derived_fields_follow_the_run(data_dir):
     project_id = system.projects.register("Derived", GOAL)
     work_item_id, run_id = system.projects.start_work_item(project_id, "带返工的事项", max_cycles=16)
     item = system.projects.projection(project_id).work_item(work_item_id)
-    assert (item.status, item.department, item.phase, item.cycle_count) == ("in_progress", "product", "PRODUCT_SPEC", 0)
-    assert item.last_handoff["from"] == "CREATED" and item.last_handoff["to"] == "PRODUCT_SPEC"
+    # 还没有部门开始一轮工作：部门由关注的成果决定，阶段不再写部门（工单 #556）
+    assert (item.status, item.department, item.cycle_count) == ("in_progress", None, 0)
+    assert item.last_handoff is None
     assert item.pending_question == system.project(run_id).waiting_reason
     assert system.projects.projection(project_id).active_work_item_id == work_item_id
     system.activate_once(run_id)
     system.activate_once(run_id)
     item = system.projects.projection(project_id).work_item(work_item_id)
     assert item.status == "in_progress"
-    assert system.run_until_stop(run_id).phase == "DONE"
+    assert system.run_until_stop(run_id).status == "done"
     item = system.projects.projection(project_id).work_item(work_item_id)
-    assert item.status == "released_unsettled" and item.department is None and item.phase == "DONE"
-    assert item.last_handoff["to"] == "DONE" and item.last_handoff["seq"] > 0
+    assert item.status == "released_unsettled" and item.department is None
+    assert system.project(run_id).status == "done"
+    assert item.last_handoff is None
     assert [entry["verdict"] for entry in item.rework] == ["rework_engineering"]
     assert item.rework[0]["summary"] == "命名不符" and item.rework[0]["seq"] > 0
     assert system.projects.settle_pending(project_id)[0].type == ProjectEventType.DELIVERABLE_ADOPTED
@@ -867,10 +870,10 @@ def test_mismatched_run_ownership_does_not_derive_work_item(data_dir):
     }, actor="user:local"))
     forged = system.projects.projection(project_b).work_item("wi_forged")
     assert forged.status == "not_started"
-    assert forged.phase is None and forged.department is None
+    assert forged.department is None
     assert forged.last_handoff is None and forged.pending_question is None
     real = system.projects.projection(project_a).work_item(work_a)
-    assert real.status == "in_progress" and real.phase is not None
+    assert real.status == "in_progress" and real.status is not None
 
 def test_register_validates_and_stores_goal_artifact(data_dir):
     system = _system(data_dir, happy_script())

@@ -4,6 +4,7 @@ import shutil
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.models import ArtifactRef, EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
@@ -29,7 +30,8 @@ def _saved_quality_ready(tmp_path, *, runs=1):
     for run_id in run_ids:
         for _ in range(2):
             result = system.activate_once(run_id)
-        assert result.phase == "QUALITY", result.error
+        # 交付到达以后质检开始一轮工作（工单 #556：质检关注新的交付）
+        assert has_new_work(result, "quality"), result.error
     saved = system.data_dir
     system.close()
     return saved, run_ids
@@ -62,7 +64,7 @@ def _accept_with(monkeypatch, system, run_id, change_delivery):
 
     def prepare(transaction, **kwargs):
         projection = kwargs["projection"]
-        if projection.run_id == run_id and projection.phase == "QUALITY":
+        if projection.run_id == run_id and projection.active_department == "quality":
             kwargs = {**kwargs, "projection": replace(projection,
                                                       delivery_spec=change_delivery(projection.delivery_spec))}
         return original_prepare(transaction, **kwargs)
@@ -89,7 +91,7 @@ def test_release_rejects_missing_or_corrupt_persisted_delivery_tree(ready_run, d
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "host_commit_error"
     assert "persisted delivery tree" in result.error
     assert result.last_review is None
@@ -101,7 +103,7 @@ def test_release_verifies_the_persisted_tree_before_marking_done(ready_run):
 
     result = system.activate_once(run_id)
 
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     assert result.last_review.verdict == "release"
     archive = load_tree(system.artifacts, run_id, result.delivery_spec.tree_ref)
     assert archive.digest == result.delivery_spec.code_tree_digest
@@ -115,11 +117,12 @@ def test_release_rejects_a_delivery_archive_bound_to_another_run(two_ready_runs,
     _accept_with(monkeypatch, system, first_run, lambda delivery: replace(delivery, tree_ref=other_tree_ref))
     result = system.activate_once(first_run)
 
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "host_commit_error"
     assert "persisted delivery tree" in result.error
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in _events(system, first_run))
-    assert system.project(second_run).phase == "QUALITY"
+    # 交付到达以后质检开始一轮工作（工单 #556：质检关注新的交付）
+    assert has_new_work(system.project(second_run), "quality")
 
 def test_release_rejects_a_same_run_reference_that_is_not_a_tree_manifest(ready_run, monkeypatch):
     system, run_ids = ready_run
@@ -130,7 +133,7 @@ def test_release_rejects_a_same_run_reference_that_is_not_a_tree_manifest(ready_
     _accept_with(monkeypatch, system, run_id, lambda delivery: replace(delivery, tree_ref=wrong_ref))
     result = system.activate_once(run_id)
 
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "host_commit_error"
     assert "persisted delivery tree" in result.error
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in _events(system, run_id))
@@ -145,7 +148,7 @@ def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(re
     result = system.activate_once(run_id)
     recorded = system.project(run_id)
 
-    assert result.phase == "QUALITY"
+    assert has_new_work(result, "quality")
     assert recorded.rejections[-1]["errors"] == [
         {"field": "code_snapshot_hash", "message": "workspace snapshot no longer matches the current delivery"}
     ]
@@ -169,7 +172,7 @@ def test_release_rejects_a_snapshot_that_differs_before_submission_commit(ready_
     monkeypatch.setattr(system.orchestrator.submissions, "prepare", prepare)
     result = system.activate_once(run_id)
 
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "host_commit_error"
     assert "does not match the validated workspace snapshot" in result.error
     assert not any(event.type in {EventType.QA_SUBMITTED, EventType.RUN_DONE} for event in _events(system, run_id))
@@ -178,7 +181,7 @@ def test_persisted_delivery_tree_restores_independently_of_workspace(ready_run, 
     system, run_ids = ready_run
     run_id = run_ids[0]
     result = system.activate_once(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     delivery = result.delivery_spec
 
     shutil.rmtree(system.workspace(run_id).root)

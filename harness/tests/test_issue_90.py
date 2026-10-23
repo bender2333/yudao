@@ -69,7 +69,7 @@ def _proposal_reply(*, response_id: str, model: str, payload: dict[str, Any]) ->
               _event("response.completed", sequence_number=2, response=response)]
     return 200, "text/event-stream", [sse(*frames)]
 
-def _phase(body: dict[str, Any]) -> str:
+def _department(body: dict[str, Any]) -> str:
     import re
     parts: list[str] = []
     for item in body.get("input", []):
@@ -80,7 +80,7 @@ def _phase(body: dict[str, Any]) -> str:
             for segment in content:
                 if isinstance(segment, dict) and isinstance(segment.get("text"), str):
                     parts.append(segment["text"])
-    match = re.search(r'"phase":"([A-Z_]+)"', "\n".join(parts))
+    match = re.search(r'"department":"(\w+)"', "\n".join(parts))
     return match.group(1) if match else ""
 
 def _department_aware(model: str = "upstream-a", *, on_product=None):
@@ -89,7 +89,7 @@ def _department_aware(model: str = "upstream-a", *, on_product=None):
     # 使运行停在工程进行中（不是终止阶段，事项保持「进行中」且部门是工程部门）
     def responder(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
         chosen = str(body.get("model") or model)
-        if _phase(body) != "ENGINEERING":
+        if _department(body) != "engineering":
             reply = _proposal_reply(response_id="spec", model=chosen, payload={"kind": "product_spec"})
             if on_product is not None:
                 on_product()
@@ -167,7 +167,7 @@ def test_connection_address_change_lists_impact_and_returns_definitions_to_candi
             if parked.get("record") is not None:
                 opened.system.facade._admissions["model-a"] = parked["record"]
             item_a = opened.system.projects.projection(project_a).work_items[-1]
-            assert item_a.status == "in_progress", (item_a.status, item_a.phase)
+            assert item_a.status == "in_progress", (item_a.status, item_a.status)
 
             document = _document(client)
             proposed = _provider("provider-a", "http://127.0.0.1:2/v1", "KEY_A")

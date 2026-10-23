@@ -3,6 +3,7 @@ from threading import Event
 
 import pytest
 
+from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import EventType, Usage, json_dumps
@@ -46,7 +47,7 @@ def test_cancel_does_not_wait_for_provider_or_accept_its_late_error(tmp_path):
         finally:
             release.set()
         result = future.result(timeout=_WAIT_LIMIT)
-    assert result.phase == "FAILED" and result.stop_reason == "cancelled"
+    assert result.status == "failed" and result.stop_reason == "cancelled"
     assert "late provider failure" not in (result.error or "")
     assert sum(event.type == EventType.RUN_FAILED for event in system.store.list_events(run_id)) == 1
 
@@ -97,11 +98,11 @@ def test_completed_observations_are_live_and_survive_later_stop(tmp_path, finish
     messages = [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_MESSAGE]
     assert result.tool_count == (2 if finish == "success" else 1)
     if finish == "success":
-        assert result.phase == "ENGINEERING"
+        assert has_new_work(result, "engineering")
         assert result.token_used == 220 and result.cost == 0.5
         assert len(messages) == 4
     else:
-        assert result.phase == "FAILED"
+        assert result.status == "failed"
         assert result.token_used == 220 and result.cost == 0.5
         assert len(messages) == 3
     assert "durable tool evidence" in system.artifacts.get_text(tool.payload["output_ref"]["content_hash"])
@@ -128,7 +129,7 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
         try:
             assert observed.wait(_WAIT_LIMIT)
             current = system.project(run_id)
-            assert current.phase == "PRODUCT_SPEC" and current.stop_reason is None
+            assert has_new_work(current, "product") and current.stop_reason is None
             assert current.token_used == 3000
             assert not future.done()
             assert not adapter.cancelled
@@ -136,7 +137,7 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
             release.set()
         result = future.result(timeout=_WAIT_LIMIT)
     assert continued
-    assert result.phase == "ENGINEERING" and result.stop_reason is None
+    assert has_new_work(result, "engineering") and result.stop_reason is None
     assert result.product_spec is not None
     assert not any(event.type == EventType.RUN_PAUSED for event in system.store.list_events(run_id))
     assert not any(event.type == EventType.RUN_FAILED for event in system.store.list_events(run_id))
@@ -146,7 +147,7 @@ def test_large_provider_usage_is_recorded_without_stopping_handoff(tmp_path):
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([FakeTurn(product_spec(), usage=Usage(total_tokens=1_000_000))]))
     result = system.activate_once(system.create_run("echo"))
     assert result.token_used == 1_000_000
-    assert result.phase == "ENGINEERING" and result.stop_reason is None
+    assert has_new_work(result, "engineering") and result.stop_reason is None
     assert result.product_spec is not None
     assert result.canonical_state() == system.replay(result.run_id).canonical_state()
 
@@ -172,7 +173,7 @@ def test_cancel_of_another_run_does_not_abort_current_invocation(tmp_path):
             assert not adapter.cancelled
         finally:
             release.set()
-        assert future.result(timeout=_WAIT_LIMIT).phase == "ENGINEERING"
+        assert has_new_work(future.result(timeout=_WAIT_LIMIT), "engineering")
 
 
 @pytest.mark.parametrize("reason", ["provider_error", "max_cycles"])

@@ -61,7 +61,7 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
     run_id = system.create_run("echo")
     system.workspace(run_id).write_file("proof.txt", "CAUSAL_TOOL_OUTPUT")
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE"
+    assert result.status == "done"
     assert [request.step_id for request in adapter.invocations] == [1, 2, 1, 1, 1]
     # 同一连接、同一协议、同一上游模型时推理内容原样回放，紧接它产生的那次输出（工单 #88）
     replayed = adapter.invocations[1].input_items[2]
@@ -191,7 +191,7 @@ def test_cancel_stops_the_running_command_and_does_not_start_following_tool(tmp_
     assert not (signals / "release").exists()
     assert "later.txt" not in system.workspace(run_id).list_files()
     called, output = _tool_output(system, run_id, "command-1")
-    assert called.payload["ok"] is True and called.state_before == "FAILED"
+    assert called.payload["ok"] is True and called.state_before == "failed"
     assert output["status"] == "cancelled" and output["exit_code"] == 130
     assert output["output"].endswith("command cancelled; the process tree was stopped")
     events = system.store.list_events(run_id)
@@ -262,7 +262,7 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
     # A fresh controller restores history from persisted events, not in-memory provider state.
     reloaded = LoopSystem.for_testing(tmp_path, adapter, resume_on_startup=False)
     result = reloaded.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     resumed_product = adapter.invocations[2]
     history = resumed_product.input_items[1:]
     assert history[0]["role"] == "user"

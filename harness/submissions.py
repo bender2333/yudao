@@ -53,8 +53,8 @@ class SubmissionWriter:
         artifact = dict(artifact)
         # 角色任务的提交记录由部门提出（设计第 5.2 节）；接纳事件与预览的 Event 用同一份元数据
         metadata = dict(actor=f"department:{department}", department=department,
-                        parent_event_id=parent_event_id, state_before=projection.phase,
-                        state_after=projection.phase, session_id=session_id, provider=provider, model=model)
+                        parent_event_id=parent_event_id, state_before=projection.status,
+                        state_after=projection.status, session_id=session_id, provider=provider, model=model)
         prepared: list[tuple[str, dict[str, Any], list[str]]] = []
         updates: dict[str, bytes | None] = {}
         materials: dict[str, bytes] = {}

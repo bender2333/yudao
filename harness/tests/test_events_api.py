@@ -167,7 +167,7 @@ def test_the_event_stream_reads_old_events_with_removed_fields(data_dir):
         system = opened.applications[0].system
         run_id = system.create_run("旧事件")
         system.writes.append(run_stream(run_id), NewEvent(
-            EventType.DEPARTMENT_ACTIVATED, state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+            EventType.DEPARTMENT_ACTIVATED, state_before="running", state_after="running",
             actor="department:product", department="product",
             payload={"activation_id": "old-1", "cycle": 1, "effective_contract_hash": None,
                      "request_id": "req_old", "guidance_ids": [], "guidance_only": False,
@@ -175,7 +175,7 @@ def test_the_event_stream_reads_old_events_with_removed_fields(data_dir):
                      "prompt_hash": None, "yielded_work": None}))
         # 旧版本写下的另一种事件：协作请求这个种类已经被删掉
         system.writes.append(run_stream(run_id), NewEvent(
-            "collaboration_requested", state_before="PRODUCT_SPEC", state_after="PRODUCT_SPEC",
+            "collaboration_requested", state_before="running", state_after="running",
             actor="department:engineering", department="engineering",
             payload={"id": "req_old", "requester": "engineering", "recipient": "product",
                      "question": "旧机制留下的请求", "status": "open"}))

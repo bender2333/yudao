@@ -1,4 +1,4 @@
-# 用户看到的说明文字（工单 #303）：阶段与停止原因的中文名必须与状态机和定义同一份取值，
+# 用户看到的说明文字（工单 #303）：run 状态与停止原因的中文名必须与控制核心和定义同一份取值，
 # 说明文字里的内容与中文名一致。
 # 页面直接显示原始标识与原文，不再要求翻译（决策记录 2026-10-22，工单 #717），
 # 因此这里不再检查说明文字里有没有英文内部标识。
@@ -8,16 +8,16 @@ import typing
 
 import pytest
 
-from harness.app.labels import (DECISION_KIND_NAMES, PHASE_NAMES, STOP_REASON_NAMES, _LABELS, decision_kind_name,
-                                event_label, phase_name, stop_reason_name)
+from harness.app.labels import (DECISION_KIND_NAMES, STATUS_NAMES, STOP_REASON_NAMES, _LABELS, decision_kind_name,
+                                event_label, status_name, stop_reason_name)
 from harness.app.payloads import PAYLOADS
 from harness.definitions import DEFINITIONS
-from harness.models import (PHASES, TERMINAL_PHASES, EventType, ProjectEventType, stop_reason_name as core_name,
-                           waiting_reason_for)
+from harness.models import (RUN_STATUSES, TERMINAL_STATUSES, EventType, ProjectEventType,
+                           stop_reason_name as core_name, waiting_reason_for)
 from harness.tests.project_stream_fields import load_manifest
 
-def test_phase_names_cover_the_state_machine_exactly():
-    assert set(PHASE_NAMES) == set(PHASES)
+def test_status_names_cover_the_run_statuses_exactly():
+    assert set(STATUS_NAMES) == set(RUN_STATUSES)
 
 
 def test_stop_reason_names_cover_the_definitions_exactly():
@@ -26,34 +26,32 @@ def test_stop_reason_names_cover_the_definitions_exactly():
 
 
 def test_unknown_values_are_shown_verbatim_instead_of_being_guessed():
-    assert phase_name("NOT_A_PHASE") == "NOT_A_PHASE"
+    assert status_name("NOT_A_STATUS") == "NOT_A_STATUS"
     assert stop_reason_name("not_a_reason") == "not_a_reason"
     assert stop_reason_name(None) == ""
 
 
-@pytest.mark.parametrize("phase", PHASES)
-def test_every_phase_has_a_waiting_reason(phase):
-    reason = waiting_reason_for(phase, "cancelled")
-    if phase == "DONE":
+@pytest.mark.parametrize("status", RUN_STATUSES)
+def test_every_status_has_a_waiting_reason(status):
+    reason = waiting_reason_for(status, "cancelled")
+    if status in {"done", "running"}:
+        # 完成没有等待原因；进行中也没有——部门进行到哪一步不记（进度从成果推算，工单 #556）
         assert reason is None
         return
     assert reason is not None
 
 
-@pytest.mark.parametrize("phase", sorted(TERMINAL_PHASES - {"DONE"}))
-def test_terminal_waiting_reason_names_the_stop_reason_in_chinese(phase):
-    reason = waiting_reason_for(phase, "provider_timeout")
+@pytest.mark.parametrize("status", sorted(TERMINAL_STATUSES - {"done"}))
+def test_terminal_waiting_reason_names_the_stop_reason_in_chinese(status):
+    reason = waiting_reason_for(status, "provider_timeout")
     assert reason is not None and "模型服务请求超时" in reason
 
 
-def test_transition_and_stop_events_name_phases_and_stop_reasons_in_chinese():
-    assert event_label(EventType.TRANSITION, {"from": "PRODUCT_SPEC", "to": "ENGINEERING"}) == \
-        "运行状态从 产品处理中 变为 工程处理中"
+def test_stop_events_name_stop_reasons_in_chinese():
     assert event_label(EventType.RUN_DONE, {"stop_reason": "released"}) == "运行结束：已完成并放行"
     assert event_label(EventType.RUN_PAUSED, {"stop_reason": "max_cycles"}) == \
         "运行暂停，等待用户处理：循环次数已达上限"
-    assert event_label(EventType.RUN_CONTINUED, {"resumed_at_phase": "QUALITY"}) == \
-        "运行从暂停位置继续：质检处理中"
+    assert event_label(EventType.RUN_CONTINUED, {"decision_id": "d1"}) == "运行从暂停位置继续"
 
 def test_decision_kind_names_cover_all_decision_kinds():
     from harness.decisions import DECISION_KINDS

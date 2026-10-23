@@ -29,7 +29,7 @@ def _system_with_delivery(tmp_path):
 def test_first_run_archives_and_restores_every_public_byte_from_a_new_data_directory(tmp_path):
     system, run_id, workspace = _system_with_delivery(tmp_path)
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     delivery = result.delivery_spec
     # 清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）
     assert delivery.files == [".hidden", "src/echo.py", "undeclared.bin"]
@@ -63,7 +63,7 @@ def test_delivery_blob_failure_does_not_accept_or_release_the_delivery(tmp_path,
 
     monkeypatch.setattr(system.artifacts, "put", failing_put)
     result = system.run_until_stop(run_id)
-    assert result.phase == "FAILED"
+    assert result.status == "failed"
     assert result.stop_reason == "host_commit_error"
     assert "simulated artifact write failure" in result.error
     assert result.delivery_spec is None
@@ -82,7 +82,7 @@ def test_source_change_after_blob_storage_rejects_acceptance_without_replacing_c
 
     monkeypatch.setattr(submissions, "store_tree", change_after_storage)
     result = system.run_until_stop(run_id)
-    assert result.phase == "FAILED" and result.stop_reason == "host_commit_error"
+    assert result.status == "failed" and result.stop_reason == "host_commit_error"
     assert result.delivery_spec is None
     assert not any(event.type == EventType.DELIVERY_ACCEPTED for event in system.store.list_events(run_id))
     assert len(stored) == 1
@@ -129,7 +129,7 @@ def test_changed_tree_receipts_are_not_reused_even_when_the_hash_later_matches(t
 def test_move_and_delete_preserve_binary_bytes_and_do_not_delete_old_archives(tmp_path):
     system, run_id, workspace = _system_with_delivery(tmp_path)
     result = system.run_until_stop(run_id)
-    assert result.phase == "DONE", result.error
+    assert result.status == "done", result.error
     reference = result.delivery_spec.tree_ref
     before = load_tree(system.artifacts, run_id, reference)
     result = workspace.move_file("undeclared.bin", "moved/new.bin")

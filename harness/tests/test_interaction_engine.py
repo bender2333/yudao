@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 import harness.interactions as interactions
+from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.compaction import visible_history
 from harness.definitions import DEFINITIONS
@@ -71,7 +72,7 @@ def test_operations_arriving_when_the_request_cannot_fit_find_the_run_ended(tmp_
     after_event(system, EventType.RUN_FAILED, arrive)
     result = system.activate_once(run_id)
     [late] = waiting
-    assert result.phase == "FAILED" and result.stop_reason == "context_overflow"
+    assert result.status == "failed" and result.stop_reason == "context_overflow"
     assert len(late.errors) == 1 and isinstance(late.errors[0], RunTerminalError)
     assert not adapter.invocations
     kinds = {event.type for event in system.store.list_events(run_id)}
@@ -145,7 +146,7 @@ def test_only_complete_product_spec_can_process_received_input(tmp_path):
     old = system.activate_once(run_id)
     system.add_input(run_id, "Print uppercase now")
     decision_rejected = system.activate_once(run_id)
-    assert decision_rejected.phase == "PRODUCT_SPEC"
+    assert has_new_work(decision_rejected, "product")
     assert not decision_rejected.product_decisions and decision_rejected.processed_input_version == 1
     missing_record = system.activate_once(run_id)
     assert missing_record.processed_input_version == 1
@@ -167,7 +168,7 @@ def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_pa
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([old_spec, product_spec(requirements=["Print uppercase output"])]))
     run_id = system.create_run("build echo")
     stale = system.activate_once(run_id)
-    assert stale.phase == "PRODUCT_SPEC" and stale.product_spec is None and stale.processed_input_version == 0
+    assert has_new_work(stale, "product") and stale.product_spec is None and stale.processed_input_version == 0
     assert len(_events(system, run_id, EventType.TOOL_SKIPPED)) == 1
     current = system.activate_once(run_id)
     assert current.product_spec.revision == 1 and current.processed_input_version == 2
@@ -186,7 +187,7 @@ def test_input_before_model_request_start_does_not_send_the_prepared_old_context
 
     after_event(system, EventType.CONTEXT_ASSEMBLED, receive_before_start)
     stopped = system.activate_once(run_id)
-    assert stopped.phase == "PRODUCT_SPEC" and not system.test_adapter.invocations
+    assert has_new_work(stopped, "product") and not system.test_adapter.invocations
     assert not _events(system, run_id, EventType.MODEL_REQUESTED)
     assert system.activate_once(run_id).processed_input_version == 2
     assert _manifest(system, system.test_adapter.invocations[-1]).input_version == 2
@@ -201,7 +202,7 @@ def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_l
                                     step_limits=StepLimits(max_model_steps=1))
     run_id = system.create_run("build echo")
     current = system.activate_once(run_id)
-    assert current.phase == "PRODUCT_SPEC" and current.stop_reason is None
+    assert has_new_work(current, "product") and current.stop_reason is None
     assert current.product_work_input_version == 2 and current.processed_input_version == 0
     assert system.activate_once(run_id).processed_input_version == 2
 
@@ -230,7 +231,7 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
         finally:
             (signals / "release").write_text("go")
         current = future.result(timeout=WAIT_FOR_HOST_WORK_SEC)
-    assert current.phase == "PRODUCT_SPEC" and current.processed_input_version == 1
+    assert has_new_work(current, "product") and current.processed_input_version == 1
     assert system.workspace(run_id).list_files() == ["src/first.py"]
     events = system.store.list_events(run_id)
     started = next(event for event in events if event.type == EventType.TOOL_STARTED and event.payload["id"] == "first")
@@ -253,7 +254,7 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
     run_id = system.create_run("build echo")
     _steps(system, run_id, 2)
     current = system.activate_once(run_id)
-    assert current.phase == "PRODUCT_SPEC" and current.last_review is None
+    assert has_new_work(current, "product") and current.last_review is None
     assert current.input_version == 2 and current.processed_input_version == 1
     assert not _events(system, run_id, EventType.RUN_DONE)
     assert [event.payload["name"] for event in _events(system, run_id, EventType.TOOL_SKIPPED)] == ["run_check", "submit_review"]
@@ -278,7 +279,7 @@ def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_p
     current = system.activate_once(run_id)
     [receiver] = receivers
     assert not receiver.errors
-    assert current.phase != "DONE" and current.input_version == 2
+    assert current.status != "done" and current.input_version == 2
     assert not _events(system, run_id, EventType.RUN_DONE) and not _events(system, run_id, EventType.QA_SUBMITTED)
     [rejected] = _events(system, run_id, EventType.PROPOSAL_REJECTED)
     assert [error["field"] for error in rejected.payload["errors"]] == ["execution_basis"]
@@ -289,7 +290,7 @@ def test_text_stop_commands_preserve_original_before_immediate_cancellation(tmp_
     system = LoopSystem.for_testing(tmp_path, FakeAdapter())
     run_id = system.create_run("original")
     current = system.add_input(run_id, command)
-    assert current.phase == "FAILED" and current.stop_reason == "cancelled"
+    assert current.status == "failed" and current.stop_reason == "cancelled"
     assert current.inputs[-1].text == command and current.inputs[-1].kind == "command"
     assert current.processed_input_version == 0
     assert (tmp_path / "materials" / run_id / "intend.md").read_bytes() == ("original" + command).encode("utf-8")
@@ -387,11 +388,11 @@ def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(
     run_id = system.create_run("build echo", context_window=8000)
     system.workspace(run_id).write_file("notes.txt", "PRESERVED_TOOL_BYTES " * 1800)
     first = system.activate_once(run_id)
-    assert changed and first.phase == "PRODUCT_SPEC", first.error
+    assert has_new_work(changed and first, "product"), first.error
     assert not first.compactions and first.input_version == 2 and first.product_spec is None
     first_ids = {item["source_event_id"] for item in first.compactions}
     second = system.activate_once(run_id)
-    assert second.phase == "ENGINEERING", second.error
+    assert has_new_work(second, "engineering"), second.error
     # bare run 的部门 Prompt 是内置默认 Prompt（版本 0），run 内没有副本
     expected_input, expected_prompt = 2, 0
     assert second.processed_input_version == expected_input
@@ -420,7 +421,7 @@ def test_updated_requirements_flow_through_new_delivery_and_independent_quality(
     old = _steps(system, run_id, 2)
     system.add_input(run_id, "Print the argument in uppercase")
     done = system.run_until_stop(run_id)
-    assert done.phase == "DONE", done.error
+    assert done.status == "done", done.error
     assert done.processed_input_version == done.input_version == 2
     assert done.product_spec.change_record == CHANGE_RECORD
     assert done.effective_contract.content_hash != old.effective_contract.content_hash

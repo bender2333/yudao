@@ -63,7 +63,7 @@ def _legacy_project(data_dir):
         # 旧版本的 run_created：没有 run 事件版本字段，载荷带着登记命令的冻结形态与命令版本
         git_version = {"commit": "0" * 40, "parent_commit": None, "tree": "0" * 40}
         writes.transact(run_stream(run_id), lambda transaction: transaction.append(NewEvent(
-            "run_created", state_before="CREATED", state_after="PRODUCT_SPEC", actor="user:local",
+            "run_created", state_before="running", state_after="running", actor="user:local",
             payload={
                 "task": "旧事项", "kind": "change",
                 "initial_input": {"id": new_id("input"), "version": 1, "text": "旧事项", "kind": "text",
@@ -131,7 +131,7 @@ def test_old_data_with_command_registration_reads_and_starts_new_items(data_dir)
         assert "command_history" not in state.to_dict()
 
         run = project_run(system.store, legacy_run)
-        assert run.phase == "FAILED" and run.stop_reason == "run_event_version_changed"
+        assert run.status == "failed" and run.stop_reason == "run_event_version_changed"
         # 旧载荷里的登记字段按缺省忽略
         assert not hasattr(run, "registered_commands")
         assert not hasattr(run, "command_versions")

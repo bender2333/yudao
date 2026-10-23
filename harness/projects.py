@@ -22,7 +22,7 @@ from .models import (
     ProjectEvent,
     ProjectEventType,
     RunProjection,
-    TERMINAL_PHASES,
+    TERMINAL_STATUSES,
     new_id,
 )
 from .project_projection import (
@@ -47,7 +47,8 @@ from .tree_archive import artifact_run, load_tree
 
 TITLE_LIMIT = 40
 RECENT_LIMIT = 20
-RECENT_RUN_EVENTS = frozenset({EventType.TRANSITION, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED})
+RECENT_RUN_EVENTS = frozenset({EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED, EventType.RUN_DONE,
+                               EventType.RUN_FAILED, EventType.RUN_PAUSED})
 REWORK_VERDICTS = frozenset({"rework_engineering"})
 
 
@@ -164,11 +165,11 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     if run.project_id != project_id or run.work_item_id != item.work_item_id:
         item.status = "not_started"
         return
-    item.phase = run.phase
+    item.status = run.status
     item.stop_reason = run.stop_reason
     item.human_action = run.human_action
     item.cycle_count = run.cycle_count
-    item.department = None if run.phase in TERMINAL_PHASES else run.active_department
+    item.department = None if run.status in TERMINAL_STATUSES else run.active_department
     if run.run_id in adopted:
         item.status = "adopted"
         item.adoption_id = adopted[run.run_id].adoption_id
@@ -180,10 +181,10 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
         item.status = "stopped"
         item.stop_reason = "user_cancelled"
         item.human_action = DEFINITIONS.stop_reason("user_cancelled").human_action
-    elif run.phase == "DONE":
+    elif run.status == "done":
         # 建档 run 结束以后等待用户确认初始 PRD：事项还没有采纳成果，状态是等待确认（工单 #136）
         item.status = "awaiting_initial_prd" if awaiting_initial_prd else "released_unsettled"
-    elif run.phase in TERMINAL_PHASES:
+    elif run.status in TERMINAL_STATUSES:
         item.status = "stopped"
     else:
         item.status = "in_progress"
@@ -202,17 +203,16 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
         item.pending_question = item.human_action
     elif awaiting_initial_prd:
         item.pending_question = f"等待你确认第 {run.round} 轮的初始 PRD"
-    elif run.phase in TERMINAL_PHASES:
+    elif run.status in TERMINAL_STATUSES:
         item.pending_question = run.human_action
     else:
         item.pending_question = run.waiting_reason
 
 
 def work_item_handoffs(events: list[Event]) -> list[dict[str, Any]]:
-    return [
-        {"from": event.state_before, "to": event.state_after, "seq": event.stream_version, "at": event.created_at}
-        for event in events if event.type == EventType.TRANSITION
-    ]
+    # 交接没有了（工单 #556：部门按关注的成果开始工作，控制核心不再决定下一个谁工作）：
+    # 这里给出空的清单，调用方按没有交接处理
+    return []
 
 
 def project_event_card(event: ProjectEvent) -> dict[str, Any]:
@@ -244,8 +244,7 @@ def project_overview(store: EventStore, project: ProjectProjection) -> dict[str,
             recent.append({
                 "kind": "loop", "type": event.type, "at": event.created_at, "position": event.position,
                 "event_id": event.event_id, "work_item_id": item.work_item_id, "run_id": item.run_id,
-                "summary": (f"{event.state_before}->{event.state_after}" if event.type == EventType.TRANSITION
-                            else event.stop_reason or event.type),
+                "summary": event.stop_reason or event.type,
             })
     recent.sort(key=lambda entry: entry["position"], reverse=True)
     pending = [
@@ -1026,7 +1025,7 @@ class ProjectService:
 
     def _settle_run(self, transaction: Transaction, run: RunProjection) -> ProjectEvent | None:
         project = transaction.projection
-        if run.phase != "DONE":
+        if run.status != "done":
             return None
         if any(item.run_id == run.run_id for item in project.adoptions) or any(item.run_id == run.run_id for item in project.held):
             return None

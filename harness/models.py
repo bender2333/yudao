@@ -14,24 +14,12 @@ from .definitions import DEFINITIONS, DefinitionError
 # 部门来自定义中的组织
 DEPARTMENTS = DEFINITIONS.departments
 
-PHASES = (
-    "CREATED",
-    "PRODUCT_SPEC",
-    "ENGINEERING",
-    "DELIVERY",
-    "QUALITY",
-    "REWORK_PRODUCT",
-    "REWORK_ENGINEERING",
-    "DONE",
-    "PAUSED",
-    "FAILED",
-)
+# run 的状态：进行中与三个终态（工单 #556）。
+# 部门进行到哪一步不单独记录：阶段状态机删掉以后，事项的进度从成果推算
+# （当前有效的 PRD、最新一份交付与它依据的 PRD 版本、对最新交付的结论）。
+RUN_STATUSES = ("running", "done", "paused", "failed")
 
-TERMINAL_PHASES = frozenset({"DONE", "PAUSED", "FAILED"})
-
-PRODUCT_ACTIVE = frozenset({"PRODUCT_SPEC", "REWORK_PRODUCT"})
-ENGINEERING_ACTIVE = frozenset({"ENGINEERING", "REWORK_ENGINEERING"})
-QUALITY_ACTIVE = frozenset({"QUALITY", "DELIVERY"})
+TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
 
 QA_VERDICTS = ("rework_engineering", "release")
 # 基线核验逐条结论的状态（工单 #134，docs/design/existing-project-onboarding.md 第 4.5 节）
@@ -79,7 +67,6 @@ class EventType:
     STRUCTURE_ACCEPTED = "structure_accepted"
     BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
-    TRANSITION = "transition"
     RUN_DONE = "run_done"
     RUN_PAUSED = "run_paused"
     RUN_FAILED = "run_failed"
@@ -444,8 +431,6 @@ class Event:
             "goal": payload.get("goal"),
             "question": payload.get("question"),
             "summary": payload.get("summary"),
-            "from": payload.get("from_phase") or payload.get("from"),
-            "to": payload.get("to_phase") or payload.get("to"),
             "errors": payload.get("errors"),
             "human_action": payload.get("human_action"),
         }
@@ -569,7 +554,8 @@ class RunProjection:
     inputs: list[UserInput] = field(default_factory=list)
     department_guidance: list[DepartmentGuidance] = field(default_factory=list)
     yielded_work: dict[str, Any] | None = None
-    phase: str = "CREATED"
+    # run 的状态（工单 #556）：进行中与三个终态。部门进行到哪一步不记在这里
+    status: str = "running"
     active_department: str | None = None
     waiting_reason: str | None = None
     max_cycles: int = DEFINITIONS.rule_value("max_cycles")
@@ -590,7 +576,6 @@ class RunProjection:
     requested_model: str | None = None
     actual_provider: str | None = None
     actual_model: str | None = None
-    outcome: str = "running"
     stop_reason: str | None = None
     human_action: str | None = None
     error: str | None = None
@@ -627,7 +612,6 @@ class RunProjection:
     effective_decisions: list[ProductDecision] = field(default_factory=list)
     manifests: list[ContextManifest] = field(default_factory=list)
     compactions: list[dict[str, Any]] = field(default_factory=list)
-    transitions: list[str] = field(default_factory=list)
     rejections: list[dict[str, Any]] = field(default_factory=list)
     pending_feedback: dict[str, dict[str, Any]] = field(default_factory=dict)
     evidence: list[dict[str, Any]] = field(default_factory=list)
@@ -742,22 +726,15 @@ def stop_reason_name(reason: str | None) -> str:
     return STOP_REASON_LABELS.get(reason or "", reason or "")
 
 
-def waiting_reason_for(phase: str, stop_reason: str | None = None) -> str | None:
-    if phase == "DONE":
+def waiting_reason_for(status: str, stop_reason: str | None = None) -> str | None:
+    # run 停在等待上时给一句话：进行中没有单一阶段可写（进度从成果推算），只有终态有等待说明
+    if status == "done":
         return None
-    if phase in TERMINAL_PHASES:
-        # 暂停与失败都带停止原因的中文名；没有停止原因时只写阶段，不猜具体原因
-        reason = {"PAUSED": "已暂停", "FAILED": "未能完成"}[phase]
+    if status in TERMINAL_STATUSES:
+        # 暂停与失败都带停止原因的中文名；没有停止原因时只写状态，不猜具体原因
+        reason = {"paused": "已暂停", "failed": "未能完成"}[status]
         return f"{reason}：{stop_reason_name(stop_reason)}" if stop_reason else reason
-    return {
-        "CREATED": "等待产品开始处理",
-        "PRODUCT_SPEC": "产品正在整理有效需求",
-        "ENGINEERING": "工程正在按有效需求实现",
-        "DELIVERY": "交付已被接受，正在送到质检",
-        "QUALITY": "质检正在独立核验交付",
-        "REWORK_PRODUCT": "质检已退回产品",
-        "REWORK_ENGINEERING": "质检已退回工程",
-    }[phase]
+    return None
 
 
 def spec_content_hash(kind: str, payload: dict[str, Any], *, parent_hash: str | None, revision: int) -> str:
