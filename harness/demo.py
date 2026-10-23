@@ -254,7 +254,9 @@ async def _wait_for(predicate, timeout_sec: float = 300.0) -> None:
     while asyncio.get_running_loop().time() < deadline:
         if predicate():
             return
-        await asyncio.sleep(0.02)
+        # 轮询的间隔要短：同时运行的会话里，这笔输入应当在质检开始核验以前就进入产品
+        # （工单 #557），否则质检这一轮的依据会在询问的分支会话工作期间变旧
+        await asyncio.sleep(0.002)
     raise RuntimeError("demo did not reach its initial accepted contract")
 
 

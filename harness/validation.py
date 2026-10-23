@@ -508,7 +508,8 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     # 质检的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象。
     # 预测性探索的一轮（工单 #557）没有交付，提交结论在这里被拒绝。
-    if projection.department_delivery_bases.get("quality") is None:
+    if projection.department_bases.get("quality") is not None \
+            and projection.department_delivery_bases.get("quality") is None:
         return ProposalDecision(False, [FieldError("delivery_spec", "this work has no delivery to review")])
     if projection.delivery_spec is None:
         return ProposalDecision(False, [FieldError("delivery_spec", "no active DeliverySpec")])

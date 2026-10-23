@@ -68,7 +68,9 @@ def _open_decisions(system):
 
 @pytest.mark.parametrize("query", ["project_list", "drain"])
 def test_status_queries_keep_work_item_states_without_reading_run_histories(data_dir, query):
-    system = _system(data_dir, [*happy_script(), product_spec()])
+    script = happy_script()
+    script["product"] = [*script["product"], product_spec()]
+    system = _system(data_dir, script)
     try:
         adopted_project = system.projects.register("已有成果", GOAL)
         _adopted_item, adopted_run = system.projects.start_work_item(adopted_project, "完成一个事项")

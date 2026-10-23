@@ -208,7 +208,7 @@ def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
     sys_cancel.close()
 
     # 2. 事项暂停 (paused)
-    sys_pause = LoopSystem.for_testing(tmp_path / "sys_pause", FakeAdapter(list(happy_script())))
+    sys_pause = LoopSystem.for_testing(tmp_path / "sys_pause", FakeAdapter(happy_script()))
     run_pause = sys_pause.create_run("pause test", max_cycles=1)
     env_pause = sys_pause.orchestrator._environment_for(run_pause, "engineering")
     marker_pause = tmp_path / "marker_pause"
@@ -222,7 +222,7 @@ def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
     sys_pause.close()
 
     # 3. 运行到放行 (released)
-    sys_release = LoopSystem.for_testing(tmp_path / "sys_release", FakeAdapter(list(happy_script())))
+    sys_release = LoopSystem.for_testing(tmp_path / "sys_release", FakeAdapter(happy_script()))
     run_release = sys_release.create_run("release test")
     env_release = sys_release.orchestrator._environment_for(run_release, "engineering")
     marker_release = tmp_path / "marker_release"

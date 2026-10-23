@@ -329,7 +329,7 @@ def test_model_input_audit_rejects_changed_received_original(ask_run, field):
 def test_model_input_audit_uses_the_project_department_prompt(tmp_path):
     # 部门 Prompt 来自项目部门设置（run 内没有副本）：装配的请求正文用项目设置中的 Prompt，
     # 审计从项目部门设置取出同一个 Prompt 复核
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([*happy_script()]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
     project_id = system.projects.register("Audit", "目标")
     prompt = "  NEW_ENGINEERING_PROMPT\r\n"
     system.projects.configure_department_settings(

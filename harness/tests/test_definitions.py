@@ -380,7 +380,9 @@ def test_stop_reasons_outside_the_definitions_cannot_be_written(tmp_path):
 
 def test_work_item_creation_model_requests_and_proposal_decisions_record_the_definitions_version(tmp_path):
     invalid_spec = {"kind": "product_spec", "goal": "", "requirements": ["print"], "acceptance_criteria": ["prints"]}
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([invalid_spec, *happy_script()]))
+    script = happy_script()
+    script["product"] = [invalid_spec, *script["product"]]
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(script))
     project_id = system.projects.register("定义版本", "做一个命令行回显工具。")
     work_item_id, run_id = system.projects.start_work_item(project_id, "回显参数")
     assert system.run_until_stop(run_id).status == "done"

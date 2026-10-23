@@ -1,11 +1,27 @@
 import pytest
 
+from harness.adapters.fake import prompt_part
 from harness.projection import replay_events
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
 from harness.tests.helpers import happy_script, run_scripted, system_on_copy
 
 # 需要一份真实运行记录的文件：module 作用域的夹具各跑一次运行并保存数据目录，
 # 每项测试复制一份数据目录，在自己的副本上检查重放。数据来自真实运行，登记为集成层。
+
+_ASK_STATE = {"defect_recorded": False}
+
+
+def _ask_quality_turn(call):
+    # 质检的每一轮按当前有没有交付决定做什么（工单 #557：同时运行的会话轮数随交付到达变化）：
+    # 没有交付时提交结论被拒绝，有交付时先记下缺陷记录，返工以后的交付核验通过以后放行
+    delivery = prompt_part(call, "current_delivery_spec")
+    if not delivery or not _ASK_STATE["defect_recorded"]:
+        if delivery:
+            _ASK_STATE["defect_recorded"] = True
+        return review_turn("rework_engineering", "need a fix",
+                           defects=[{"severity": "minor", "summary": "naming"}])(call)
+    return review_turn("release", "ok")(call)
+
 
 ASK_SCRIPT = {
     "product": [product_spec()],
@@ -27,12 +43,7 @@ ASK_SCRIPT = {
             },
         ),
     ],
-    "quality": [
-        # 预测性探索的一轮：交付还没有到，提交的结论被拒绝（工单 #557）
-        review_turn("rework_engineering", "need a fix", defects=[{"severity": "minor", "summary": "naming"}]),
-        review_turn("rework_engineering", "need a fix", defects=[{"severity": "minor", "summary": "naming"}]),
-        review_turn("release", "ok"),
-    ],
+    "quality": [_ask_quality_turn, _ask_quality_turn, _ask_quality_turn, _ask_quality_turn],
 }
 
 def _saved_run(directory, script, **kwargs):

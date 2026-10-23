@@ -21,8 +21,9 @@ from harness.definitions import DEFINITIONS
 from harness.department_prompts import save_department_prompt
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, ContextManifest, DepartmentPrompt, Event, json_dumps
-from harness.proposals import delivery_turn, guidance_response, product_spec, review_turn
-from harness.environment import LocalEnvironment
+from harness.proposals import (delivery_turn, guidance_response, product_spec, review,
+                        review_turn)
+from harness.environment import LocalEnvironment, QA_TESTS_DIR
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tools import tool_action
@@ -172,12 +173,29 @@ def system_on_copy(source: Path, destination: Path, script=()) -> LoopSystem:
                                   resume_on_startup=False)
 
 
+def explore_turn() -> FakeTurn:
+    # 质检的预测性探索：按 PRD 起草测试用例，写进质检自己的测试材料；
+    # 这一轮没有交付可以核验，提交的结论被拒绝，这一轮到这里结束（工单 #557）
+    return FakeTurn(
+        writes={f"{QA_TESTS_DIR}/test_echo.py":
+                "import subprocess, sys\nr = subprocess.run([sys.executable, 'src/echo.py', 'hello'],"
+                "capture_output=True, text=True)\nassert r.returncode == 0 and r.stdout.strip() == 'hello'\n"},
+        proposal=review("release", "按 PRD 起草了测试用例；还没有交付可以核验"),
+    )
+
+
 def happy_script():
-    return [
-        product_spec(),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 按部门给出的脚本（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [explore_turn(), review_turn("release", "checks passed on the current snapshot")],
+    }
+
+
+def repeat_script(script: dict[str, list[Any]], times: int) -> dict[str, list[Any]]:
+    # 同一个适配器跑多次运行（例如两个项目各完成一个事项）：每个部门的脚本重复若干遍
+    return {department: list(turns) * times for department, turns in script.items()}
 
 
 def list_files_turn(call: ModelCall) -> ModelResponse:
