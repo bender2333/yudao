@@ -12,6 +12,8 @@ import {
   hasCommand, list, pageKey, text, useDraft,
 } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, promptWritten, useDepartmentDraft } from "./department-settings-form";
+import { WritebackSection } from "./writeback";
+import { sourceWritebackText } from "./writeback-text";
 import { departmentName, itemSource } from "./labels";
 import { PageHead } from "../../shell/kit";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
@@ -44,6 +46,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
           <Basics app={props.app} data={data} command={command} />
           <Departments app={props.app} data={data} />
           <SourceDirectories app={props.app} data={data} />
+          <WritebackSection app={props.app} projectId={projectId} />
           <ToolAuthorization />
           <MachineAuthorization />
           <ExecutionPlacement />
@@ -299,11 +302,12 @@ function SourceDirectories(props: { app: ClientApp; data: ProjectSettingsResult 
     <Section title="源目录" note="接入已有项目时登记的源目录；已有的代码只从这里进入 Yudao">
       {entries.length === 0 ? <Empty text="没有登记源目录" /> : (
         <Table
-          head={["名称", "路径", "版本", ""]}
+          head={["名称", "路径", "版本", "写回", ""]}
           rows={entries.map(([key, setting]) => [
             setting.name,
             setting.path,
             `第 ${setting.version} 版`,
+            sourceWritebackText(setting),
             <SourceDirectoryForm key={key} app={props.app} data={data} name={setting.name} />,
           ])}
         />
@@ -318,7 +322,13 @@ function SourceDirectoryForm(props: { app: ClientApp; data: ProjectSettingsResul
   const [open, setOpen] = useState(false);
   const [name, setName] = useDraft(`settings/${data.project_id}/source/${props.name}/name`, props.name);
   const [path, setPath] = useDraft(`settings/${data.project_id}/source/${props.name}/path`, existing?.path ?? "");
-  const command = useCommand(props.app, pageKey([existing?.version, name, path]));
+  // 写回的三项设置（是否打开、远端、目标分支）：界面上填写，随源目录一起保存（工单 #709）
+  const [writebackEnabled, setWritebackEnabled] = useState(existing?.writeback_enabled ?? false);
+  const [targetBranch, setTargetBranch] = useDraft(
+    `settings/${data.project_id}/source/${props.name}/target_branch`, existing?.target_branch ?? "");
+  const [remote, setRemote] = useDraft(
+    `settings/${data.project_id}/source/${props.name}/remote`, existing?.remote ?? "");
+  const command = useCommand(props.app, pageKey([existing?.version, name, path, writebackEnabled, targetBranch, remote]));
 
   if (!open) {
     return (
@@ -330,6 +340,16 @@ function SourceDirectoryForm(props: { app: ClientApp; data: ProjectSettingsResul
     <span className="y10-set-inline inline-form">
       <TextInput label="名称" value={name} onInput={setName} />
       <TextInput label="路径" value={path} onInput={setPath} />
+      <label className="y10-check checkbox">
+        <input
+          type="checkbox"
+          checked={writebackEnabled}
+          onChange={(event) => setWritebackEnabled(event.target.checked)}
+        />
+        <span>打开写回</span>
+      </label>
+      <TextInput label="目标分支" value={targetBranch} onInput={setTargetBranch} />
+      <TextInput label="远端仓库（留空表示源目录本身）" value={remote} onInput={setRemote} />
       <SubmitButton
         label="保存源目录"
         busy={command.busy}
@@ -339,6 +359,12 @@ function SourceDirectoryForm(props: { app: ClientApp; data: ProjectSettingsResul
           name: name.trim(),
           path: path.trim(),
           base_version: existing?.version ?? 0,
+          writeback_enabled: writebackEnabled,
+          target_branch: targetBranch.trim(),
+          remote: remote.trim(),
+          // 写回检查的命令与凭据引用不在这个表单里填写：保存时按原来的值写回，不清空
+          check_commands: existing?.check_commands ?? [],
+          credential_ref: existing?.credential_ref ?? null,
         }).then((ok) => { if (ok) { setOpen(false); } })}
       />
       <button type="button" onClick={() => setOpen(false)}>取消</button>

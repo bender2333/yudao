@@ -39,6 +39,15 @@ def _ref_dict(ref: Any) -> dict[str, Any] | None:
     return asdict(ref)
 
 
+class WritebackTargetUnavailable(Exception):
+    # 写回的目标不可用：远端仓库路径不存在、那个路径不是 git 仓库，或目标分支不存在。
+    # 三种都是源目录登记里的配置问题，由命令层给出中文的拒绝说明（工单 #709）。
+    def __init__(self, reason: str, target: str) -> None:
+        super().__init__(f"{reason}: {target}")
+        self.reason = reason
+        self.target = target
+
+
 def build_git_tree(
     repo: pygit2.Repository,
     tree: CapturedTree,
@@ -304,7 +313,7 @@ def perform_writeback(
     # 3. 准备隔离的 Git 工作仓库（独立目录，不触碰源目录未提交修改）
     remote_repo_path = _resolve_repo_path(source_dir.path, remote_name_or_url)
     if not os.path.exists(remote_repo_path):
-        raise FileNotFoundError(f"Remote repository path not found: {remote_repo_path}")
+        raise WritebackTargetUnavailable("remote_missing", str(remote_repo_path))
 
     scratch_temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
     try:
@@ -314,9 +323,12 @@ def perform_writeback(
 
         # 4. 读取目标提交与目标树
         target_ref_name = f"refs/heads/{target_branch}"
-        remote_repo = pygit2.Repository(str(remote_repo_path))
+        try:
+            remote_repo = pygit2.Repository(str(remote_repo_path))
+        except pygit2.GitError as error:
+            raise WritebackTargetUnavailable("not_a_repository", str(remote_repo_path)) from error
         if target_ref_name not in remote_repo.references:
-            raise ValueError(f"Target branch {target_branch} not found in remote repository")
+            raise WritebackTargetUnavailable("target_branch_missing", target_branch)
 
         remote_target_commit = remote_repo.references[target_ref_name].peel(pygit2.Commit)
         target_commit = repo[remote_target_commit.id]

@@ -937,6 +937,32 @@ test.describe("项目页面（1440×900）", () => {
     }
   });
 
+  // 工单 #709：采纳以后页面上有写回的入口，写回的结果在页面上看得见
+  test("设置页：成果写回一节能发起写回，概览页的当前成果里有一行写回状态", async () => {
+    const client = await openProjectClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      const id = await projectId(page, SAMPLE);
+      await gotoView(page, id, "settings");
+      const writeback = await section(page, "成果写回");
+      await expect(writeback).toContainText("把采纳的成果写回登记的源目录");
+      await expect(writeback.getByRole("button", { name: "写回成果" })).toBeVisible();
+      await expect(writeback).toContainText("还没有写回记录");
+      // 这个项目没有登记源目录：命令被拒绝，页面给出服务端的中文理由（不是 500 内部错误）
+      await writeback.getByRole("button", { name: "写回成果" }).click();
+      await expect(writeback.locator("p.error")).toContainText("没有可写回的东西");
+      // 概览页的「当前成果」里有一行写回状态，没有写回时给出到设置页的入口
+      await gotoView(page, id, "overview");
+      const summary = await section(page, "项目摘要");
+      await expect(summary).toContainText("写回");
+      await expect(summary.getByRole("button", { name: "去项目设置页写回" })).toBeVisible();
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
   test("设置页：改完部门设置并保存以后部门设置那一节自己更新（工单 #674）", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
