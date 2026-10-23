@@ -101,7 +101,7 @@ def test_a_branch_session_continues_after_a_restart(tmp_path):
         assert (answered[0].payload or {}).get("answer") == "The snapshot matches the requirements."
 
         # 事项运行到放行
-        assert run.after.project(run.run_id).phase == "DONE", run.after.project(run.run_id).phase
+        assert run.after.project(run.run_id).status == "done", run.after.project(run.run_id).status
         released = [event for event in after if event.type == EventType.QA_SUBMITTED]
         assert released, "质检没有提交结论"
         assert (released[0].payload or {}).get("verdict") == "release"
@@ -140,7 +140,7 @@ def test_the_delivery_is_verified_after_a_restart(tmp_path):
         assert len(accepted) == 1
         assert (released[0].payload or {}).get("delivery_spec_hash") == (
             accepted[0].payload or {}).get("content_hash")
-        assert run.after.project(run.run_id).phase == "DONE"
+        assert run.after.project(run.run_id).status == "done"
 
 
 def test_session_and_item_usage_accumulate_across_a_restart(tmp_path):
@@ -238,7 +238,7 @@ def test_an_unknown_action_is_handed_back_to_the_session_that_issued_it(tmp_path
         assert "执行被中断" in data["error"] and "结果未知" in data["error"]
 
         # 这个会话接着工作，事项运行到放行
-        assert run.after.project(run.run_id).phase == "DONE", run.after.project(run.run_id).phase
+        assert run.after.project(run.run_id).status == "done", run.after.project(run.run_id).status
         released = [event for event in after if event.type == EventType.QA_SUBMITTED]
         assert len(released) == 1
         assert (released[0].payload or {}).get("verdict") == "release"
