@@ -6,6 +6,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
+from .contracts import current_contract_hash
 from .models import (
     DEPARTMENTS, TERMINAL_STATUSES, Event,
     EventType, RunProjection, hash_bytes, json_dumps,
@@ -85,10 +86,23 @@ def _latest_engineering_basis(projection: RunProjection) -> str | None:
     return None
 
 
-def _has_new_product_spec(projection: RunProjection) -> bool:
-    """PRD 的新版本：当前有效的 PRD 与工程最近一次成果依据的版本不同（还没有成果时为真）。"""
+def _has_new_product_spec(projection: RunProjection, department: str) -> bool:
+    """PRD 的新版本。
+
+    工程关注的是 PRD 与它最近一次成果依据的版本不同（还没有成果时为真）。
+    质检关注的是「PRD 被接纳」：当前有效合同与质检上一次工作的依据不同，
+    并且还没有交付要核验（有交付时质检核验交付，预测性探索在交付到达以前做，
+    循环结构第 3.1 节）。
+    """
     if projection.product_spec is None:
         return False
+    if department == "quality":
+        contract = current_contract_hash(projection)
+        if contract is None:
+            return False
+        if projection.department_bases.get(department) == contract:
+            return False
+        return not _has_new_delivery(projection)
     basis = _latest_engineering_basis(projection)
     if basis is None:
         return True
@@ -139,7 +153,7 @@ def has_new_baseline_review(projection: RunProjection) -> bool:
 _WATCHED_CHECKS = {
     "user_input": lambda projection, department: _has_new_user_input(projection),
     "guidance": _has_new_guidance,
-    "product_spec": lambda projection, department: _has_new_product_spec(projection),
+    "product_spec": _has_new_product_spec,
     "defect_record": lambda projection, department: _has_new_defect_record(projection),
     "delivery": lambda projection, department: _has_new_delivery(projection),
     "structure": lambda projection, department: _has_new_structure(projection),
@@ -216,6 +230,38 @@ def next_department(projection: RunProjection, waiting: set[str] | None = None) 
         if _free(projection, waiting, department) and watched_normal_work(projection, department):
             return department
     return None
+
+
+def ready_departments(projection: RunProjection, waiting: set[str] | None = None) -> list[str]:
+    """现在可以开始一轮工作的部门（按定义顺序），各自一个会话同时运行（工单 #557）。
+
+    关注的成果有了新版本、又在等待工作的部门都列出来：控制核心让它们同时开始，
+    一个部门同一时刻最多一轮工作（循环结构第 3.2 节第 6 条）。
+
+    两类工作分开处理：
+    - 还没回答的询问：提问方的会话要继续，支在它自己的会话里跑；
+    - 被指导提前安排的部门：这一轮只回应指导，让出它自己的那一轮（工单 #556）。
+      同一轮里只安排一个这样的部门，让出的工作由各部门自己记着（部门各自的让出记录）。
+    """
+    normal = normal_department(projection)
+    ready: list[str] = []
+
+    def take(department: str) -> None:
+        if department not in ready:
+            ready.append(department)
+
+    asking = pending_ask_department(projection)
+    if asking is not None and _free(projection, waiting, asking):
+        take(asking)
+    for item in projection.department_guidance:
+        if (item.status in PENDING_GUIDANCE and item.department != normal
+                and _free(projection, waiting, item.department)):
+            take(item.department)
+            break
+    for department in DEFINITIONS.departments:
+        if _free(projection, waiting, department) and watched_normal_work(projection, department):
+            take(department)
+    return ready
 
 
 def guidance_diverted(projection: RunProjection, department: str) -> bool:

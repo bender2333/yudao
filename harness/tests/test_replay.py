@@ -28,6 +28,8 @@ ASK_SCRIPT = {
         ),
     ],
     "quality": [
+        # 预测性探索的一轮：交付还没有到，提交的结论被拒绝（工单 #557）
+        review_turn("rework_engineering", "need a fix", defects=[{"severity": "minor", "summary": "naming"}]),
         review_turn("rework_engineering", "need a fix", defects=[{"severity": "minor", "summary": "naming"}]),
         review_turn("release", "ok"),
     ],

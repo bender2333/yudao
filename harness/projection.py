@@ -309,7 +309,10 @@ def apply_event(state: RunProjection, event: Event) -> None:
                 )
                 break
         # 指导回应以后让出的工作恢复：部门继续它自己那一轮（工单 #556：不再有阶段迁移事件）
-        state.yielded_work = None
+        if event.department:
+            state.department_yielded_work.pop(event.department, None)
+        if not state.department_yielded_work:
+            state.yielded_work = None
         return
 
     if etype == EventType.DEPARTMENT_ACTIVATED:
@@ -325,12 +328,29 @@ def apply_event(state: RunProjection, event: Event) -> None:
             activation_id = payload.get("activation_id")
             if event.department and activation_id:
                 state.last_activations[event.department] = str(activation_id)
+            # 这个部门这一次工作采用的依据：部门关注的成果有了新版本时用它判断
+            # 这个部门是不是已经看过当前这一版（工单 #557）
+            if event.department:
+                basis = payload.get("effective_contract_hash")
+                if isinstance(basis, str):
+                    state.department_bases[event.department] = basis
+                # 这一轮开始时面对的交付：质检的检查工作区由它建立（工单 #557）
+                if state.delivery_spec is not None:
+                    state.department_delivery_bases[event.department] = state.delivery_spec.content_hash
+                else:
+                    state.department_delivery_bases.pop(event.department, None)
         incoming = payload.get("yielded_work")
         if incoming:
+            # 让出的工作由各部门各记各的（工单 #557：同时运行时不让别的部门的让出覆盖这一份）
+            if event.department:
+                state.department_yielded_work[event.department] = dict(incoming)
             if state.yielded_work is None:
                 state.yielded_work = dict(incoming)
         else:
-            state.yielded_work = None
+            if event.department:
+                state.department_yielded_work.pop(event.department, None)
+            if not state.department_yielded_work:
+                state.yielded_work = None
         return
 
     if etype == EventType.CONTEXT_ASSEMBLED:

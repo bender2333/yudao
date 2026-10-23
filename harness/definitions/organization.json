@@ -17,7 +17,7 @@
       "label": "质检",
       "roles": ["quality"],
       "suggested_capabilities": ["image"],
-      "watched": ["delivery", "guidance", "structure"]
+      "watched": ["delivery", "guidance", "structure", "product_spec"]
     }
   ],
   "rules": {

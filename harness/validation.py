@@ -114,10 +114,11 @@ def _evaluate_proposal(
     if department not in DEPARTMENTS:
         return ProposalDecision(False, [FieldError("issuer", f"unknown department: {department}")])
     allowed = allowed_proposal_kinds(projection, department)
-    if projection.active_ask is not None:
-        rec = projection.active_ask.get("recipient")
-        if department == rec and department == "product":
-            allowed = allowed | {"product_spec"}
+    if department == "product" and any(ask.get("recipient") == "product" for ask in projection.ask_stack):
+        # 产品在回答一次询问：可以在回答里修订 PRD（循环结构第 4.3 节）。
+        # 同时运行的会话让待回答的询问不止一条（工单 #557）：看的是还有哪些询问等着产品回答，
+        # 不是最后发起的那一条
+        allowed = allowed | {"product_spec"}
     if kind not in allowed:
         return ProposalDecision(False, [FieldError("kind", f"{department} cannot issue {kind} in the current work")])
 
@@ -505,6 +506,10 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
 def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
+    # 质检的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象。
+    # 预测性探索的一轮（工单 #557）没有交付，提交结论在这里被拒绝。
+    if projection.department_delivery_bases.get("quality") is None:
+        return ProposalDecision(False, [FieldError("delivery_spec", "this work has no delivery to review")])
     if projection.delivery_spec is None:
         return ProposalDecision(False, [FieldError("delivery_spec", "no active DeliverySpec")])
     contract = projection.effective_contract

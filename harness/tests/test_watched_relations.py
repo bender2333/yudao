@@ -75,4 +75,4 @@ def test_removing_the_watch_in_the_definition_stops_the_rework(tmp_path, monkeyp
     assert not has_new_work(projection, "engineering")
     # 只少了这一条关注关系：其它部门的关注关系照旧
     assert definitions.watched_outputs("engineering") == ("product_spec", "guidance")
-    assert definitions.watched_outputs("quality") == ("delivery", "guidance", "structure")
+    assert definitions.watched_outputs("quality") == ("delivery", "guidance", "structure", "product_spec")

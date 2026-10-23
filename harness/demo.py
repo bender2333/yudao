@@ -6,14 +6,15 @@ import asyncio
 import uuid
 from pathlib import Path
 
-from .adapters.fake import FakeAdapter
+from .adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from .app.application import Application
 from .app.contracts import Rejected
 from .app.project_and_work_item_commands import WorkItemAppendInput, WorkItemCreate
 from .app.project_commands import ProjectCreate
 from .definitions import DEFINITIONS
+from .environment import QA_TESTS_DIR
 from .proposals import (ask_turn, answer_turn, delivery_turn, product_spec,
-                        product_spec_turn, review_turn)
+                        product_spec_turn, review, review_turn)
 from .providers.call import ModelResponse, ModelStreamEvent
 from .providers.selection import ModelSelection
 from .runtime import LoopSystem
@@ -90,6 +91,65 @@ def demo_script():
         "    raise SystemExit(2)\n"
         "print(sys.argv[1])\n"
     )
+    # 质检的每一轮按当前有没有交付决定做什么（工单 #557：同时运行的会话轮数随交付到达变化，
+    # 写死的脚本会在交付到达的时机上耗尽）。没有交付时起草测试用例（预测性探索），
+    # 有交付时先记下缺陷记录，返工以后的交付核验通过以后放行。
+    quality_state = {"defect_recorded": False}
+
+    def quality_turn(call):
+        delivery = prompt_part(call, "current_delivery_spec")
+        if not delivery:
+            return FakeTurn(
+                writes={f"{QA_TESTS_DIR}/test_echo.py":
+                        "import subprocess, sys\nr = subprocess.run([sys.executable, 'src/echo.py', 'hello'],"
+                        "capture_output=True, text=True)\nassert r.returncode == 0 and r.stdout.strip() == 'hello'\n"},
+                proposal=review("release", "按 PRD 起草了测试用例；还没有交付可以核验"))
+        if not quality_state["defect_recorded"]:
+            quality_state["defect_recorded"] = True
+            return review_turn(
+                "rework_engineering",
+                "Missing usage text when no argument is provided.",
+                checks={"usage": quality_checks["usage"]},
+                defects=[{"severity": "major", "summary": "no usage text on empty argv"}],
+            )(call)
+        return review_turn(
+            "release",
+            "Quality independently verified preserved ordinary echo and usage, plus the newly accepted dash-prefixed argument behavior.",
+            checks=quality_checks,
+        )(call)
+
+    # 工程的每一轮按它自己的进度决定做什么（工单 #557：同时运行的会话轮数随交付与要求变化，
+    # 写死的脚本会在时机变化时耗尽）：先询问产品，暂停一下让界面看到流式输出，
+    # 然后交付；质检记下缺陷记录以后补上用法说明。
+    engineering_state = {"asked": False, "paused": False}
+
+    def engineering_turn(call):
+        if not engineering_state["asked"]:
+            engineering_state["asked"] = True
+            return ask_turn(
+                recipient="product",
+                question="How should unknown flags be handled?",
+                background="Clarification needed on flags.",
+                expected="Publish requirements for invalid flags and missing arguments.",
+            )
+        if not engineering_state["paused"]:
+            engineering_state["paused"] = True
+            return _pause_generator(call)
+        if prompt_part(call, "qa_defects"):
+            # 质检记下了缺陷记录：这一轮补上用法说明
+            return delivery_turn(
+                "added usage text",
+                files={"src/echo.py": echo_help},
+                checks={"smoke": {"command": "python src/echo.py hello"}},
+                transcript="added usage",
+            )(call)
+        return delivery_turn(
+            "first delivery treats dash-prefixed input as ordinary text",
+            files={"src/echo.py": echo_flags},
+            checks={"smoke": {"command": "python src/echo.py hello"}},
+            transcript="implemented the user's revised argument behavior",
+        )(call)
+
     return {
         "product": [
             ask_turn(
@@ -102,44 +162,26 @@ def demo_script():
             V3,
         ],
         "engineering": [
-            ask_turn(
-                recipient="product",
-                question="How should unknown flags be handled?",
-                background="Clarification needed on flags.",
-                expected="Publish requirements for invalid flags and missing arguments.",
-            ),
-            _pause_generator,
-            delivery_turn(
-                "first delivery treats dash-prefixed input as ordinary text",
-                files={"src/echo.py": echo_flags},
-                checks={"smoke": {"command": "python src/echo.py hello"}},
-                transcript="implemented the user's revised argument behavior",
-            ),
-            delivery_turn(
-                "added usage text",
-                files={"src/echo.py": echo_help},
-                checks={"smoke": {"command": "python src/echo.py hello"}},
-                transcript="added usage",
-            ),
+            engineering_turn,
+            engineering_turn,
+            engineering_turn,
+            engineering_turn,
+            engineering_turn,
+            engineering_turn,
         ],
         "quality": [
+            # 先按 PRD 起草测试用例（预测性探索），再询问工程；交付到达以后核验
+            quality_turn,
             ask_turn(
                 recipient="engineering",
                 question="Where is the CLI entry point?",
                 background="Quality is preparing its independent checks.",
                 expected="Identify the existing executable path without changing the delivery.",
             ),
-            review_turn(
-                "rework_engineering",
-                "Missing usage text when no argument is provided.",
-                checks={"usage": quality_checks["usage"]},
-                defects=[{"severity": "major", "summary": "no usage text on empty argv"}],
-            ),
-            review_turn(
-                "release",
-                "Quality independently verified preserved ordinary echo and usage, plus the newly accepted dash-prefixed argument behavior.",
-                checks=quality_checks,
-            ),
+            quality_turn,
+            quality_turn,
+            quality_turn,
+            quality_turn,
         ],
         "product:ask": [
             answer_turn(

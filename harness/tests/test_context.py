@@ -17,7 +17,7 @@ from harness.smoke import summarize_run
 from harness.tests.helpers import (developer_text, guidance_reply, happy_script, pinned_input_tokens,
                                  recorded_context, run_scripted)
 from harness.tests.protocol_helpers import serve
-from harness.tests.provider_replies import HTTP_REPLIES, http_script
+from harness.tests.provider_replies import HTTP_REPLIES, http_script, reply_index, request_department
 from harness.tools import tool_action
 
 def _part(call, source: str):
@@ -476,13 +476,16 @@ def test_compaction_request_with_widened_output_limit_stays_within_the_window(tm
 @contextmanager
 def _bound_system(tmp_path, *, context_window, max_output_tokens):
     # 三个部门绑定测试内启动的 HTTP 服务上的模型（Responses 协议），模型声明给定的窗口与输出上限；
-    # 服务按请求顺序回放交接脚本中的工具调用，记录收到的请求。提交依据的版本取自本次请求装配好的材料
-    state = {"index": 0}
+    # 服务按部门回放交接脚本中的工具调用，记录收到的请求。提交依据的版本取自本次请求装配好的材料
+    # （工单 #557：同时运行的会话各自取用自己的脚本，按请求里的工具分派到部门）
+    state = {"product": 0, "engineering": 0, "quality": 0}
 
     def responder(body):
-        calls = http_script(body)[state["index"]]
-        state["index"] += 1
-        return 200, "text/event-stream", [HTTP_REPLIES["responses"](state["index"], calls)]
+        department = request_department(body)
+        index = state[department]
+        state[department] += 1
+        calls = http_script(body)[department][index]
+        return 200, "text/event-stream", [HTTP_REPLIES["responses"](reply_index(department, index), calls)]
 
     server, capture, base = serve(responder)
     try:

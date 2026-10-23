@@ -363,6 +363,28 @@
   },
   {
    "event": "<evt#16>",
+   "type": "department_activated",
+   "actor": "system",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": null,
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "cycle": 3,
+    "effective_contract_hash": "<sha256#26>",
+    "guidance_ids": [],
+    "guidance_only": false,
+    "guidance_version": 0,
+    "input_version": 1,
+    "prompt_version": 0
+   }
+  },
+  {
+   "event": "<evt#17>",
    "type": "department_input",
    "actor": "department:engineering",
    "department": "engineering",
@@ -383,7 +405,7 @@
    }
   },
   {
-   "event": "<evt#17>",
+   "event": "<evt#18>",
    "type": "context_assembled",
    "actor": "department:engineering",
    "department": "engineering",
@@ -413,7 +435,7 @@
    }
   },
   {
-   "event": "<evt#18>",
+   "event": "<evt#19>",
    "type": "model_requested",
    "actor": "department:engineering",
    "department": "engineering",
@@ -428,7 +450,7 @@
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
     "attempted": true,
-    "context_event_id": "<evt#17>",
+    "context_event_id": "<evt#18>",
     "definitions_version": "<definitions>",
     "effective_contract_hash": "<sha256#26>",
     "guidance_ids": [],
@@ -444,10 +466,10 @@
    }
   },
   {
-   "event": "<evt#19>",
+   "event": "<evt#20>",
    "type": "run_failed",
    "actor": "system",
-   "department": "engineering",
+   "department": "quality",
    "state_before": "running",
    "state_after": "failed",
    "parent_event_id": null,
@@ -460,7 +482,7 @@
    }
   },
   {
-   "event": "<evt#20>",
+   "event": "<evt#21>",
    "type": "model_attempt_failed",
    "actor": "department:engineering",
    "department": "engineering",
@@ -474,7 +496,7 @@
     "activation_id": "<act#2>",
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
-    "context_event_id": "<evt#17>",
+    "context_event_id": "<evt#18>",
     "effective_contract_hash": "<sha256#26>",
     "guidance_ids": [],
     "guidance_only": false,
@@ -492,7 +514,7 @@
    }
   },
   {
-   "event": "<evt#21>",
+   "event": "<evt#22>",
    "type": "activation_finished",
    "actor": "system",
    "department": "engineering",
@@ -504,7 +526,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#2>",
-    "activations": 2,
+    "activations": 3,
     "guidance_ids": [],
     "guidance_only": false,
     "input_version": 1,
@@ -513,6 +535,31 @@
     "session_activations": 1,
     "session_elapsed_ms": "<duration>",
     "session_model_steps": 1,
+    "stop_reason": "cancelled"
+   }
+  },
+  {
+   "event": "<evt#23>",
+   "type": "activation_finished",
+   "actor": "system",
+   "department": "quality",
+   "state_before": "failed",
+   "state_after": "failed",
+   "parent_event_id": "<evt#16>",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "activations": 3,
+    "guidance_ids": [],
+    "guidance_only": false,
+    "input_version": 1,
+    "model_steps": 2,
+    "prompt_version": 0,
+    "session_activations": 1,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 0,
     "stop_reason": "cancelled"
    }
   }
@@ -524,14 +571,14 @@
   "waiting_reason": "未能完成：运行已被取消",
   "active_department": null,
   "human_action": "运行已被取消。如需继续，作为新事项重新开始。",
-  "cycle_count": 2,
+  "cycle_count": 3,
   "rework_count": 0,
   "round": 0,
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
   "run_event_version": 10,
-  "stream_version": 21,
+  "stream_version": 23,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
  },
