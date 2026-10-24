@@ -191,7 +191,13 @@ def test_spec_and_contract_sqlite_failure_rolls_back_entire_acceptance(tmp_path,
     assert current.product_spec.revision == 2 and current.effective_contract.revision == 2
 
 def test_git_delivery_and_archive_share_binary_bytes_and_complete_directory_manifest(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),delivery_turn()]))
+    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }))
     run_id = system.create_run("build echo")
     workspace = system.workspace(run_id)
     (workspace.root / "empty").mkdir()

@@ -49,7 +49,7 @@ from harness.proposals import (
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import explore_turn, happy_script, merge_scripts
+from harness.tests.helpers import explore_turn, happy_script, merge_scripts, quality_turns
 from harness.tests.api_helpers import running_api
 from harness.tests.saved_rewrite import rewrite_saved_event
 from harness.tree_archive import load_tree
@@ -929,14 +929,13 @@ def test_run_actions_background_commands_running_and_ended(data_dir: Path):
         captured["stopped_actions"] = res.data
         return ModelResponse(output=[])
 
-    script = [
-        product_spec(),
-        eng_step1,
-        eng_step2,
-        eng_step3,
-        delivery_turn(),
-        review_turn("release", "ok"),
-    ]
+    script = {
+        # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+        # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+        "product": [product_spec()],
+        "engineering": [eng_step1, eng_step2, eng_step3, delivery_turn()],
+        "quality": quality_turns("release", "ok"),
+    }
 
     system = _system(data_dir, script)
     run_id = system.create_run("bg action test")
@@ -975,7 +974,12 @@ def test_run_actions_background_commands_cancelled_and_restarted(tmp_path: Path)
         sys_cancel.cancel(call.run_id)
         return ModelResponse(output=[])
 
-    sys_cancel = _system(data_cancel, [product_spec(), eng_cancel_step1, eng_cancel_step2])
+    sys_cancel = _system(data_cancel, {
+        # 脚本按部门给出（工单 #877）
+        "product": [product_spec()],
+        "engineering": [eng_cancel_step1, eng_cancel_step2],
+        "quality": quality_turns("release", "ok"),
+    })
     run_cancel = sys_cancel.create_run("cancel test")
     sys_cancel.run_until_stop(run_cancel)
     app_cancel = Application(sys_cancel)
@@ -998,7 +1002,12 @@ def test_run_actions_background_commands_cancelled_and_restarted(tmp_path: Path)
         captured["running"] = app1.query("run.actions", RunActions(run_id=call.run_id)).data.background_commands[0].status
         raise ProviderError("service stopped for restart", reason="provider_error")
 
-    sys_restart1 = _system(data_restart, [product_spec(), eng_restart_step1, eng_restart_step2])
+    sys_restart1 = _system(data_restart, {
+        # 脚本按部门给出（工单 #877）
+        "product": [product_spec()],
+        "engineering": [eng_restart_step1, eng_restart_step2],
+        "quality": quality_turns("release", "ok"),
+    })
     run_restart = sys_restart1.create_run("restart test")
     sys_restart1.run_until_stop(run_restart)
     assert captured["running"] == "running"
@@ -1064,14 +1073,12 @@ def test_background_job_status_query_does_not_affect_read_output(data_dir: Path)
             "name": "stop_job", "arguments": json.dumps({"job_id": job_id}),
         }])
 
-    script = [
-        product_spec(),
-        eng_step1,
-        eng_step2,
-        eng_step3,
-        delivery_turn(),
-        review_turn("release", "ok"),
-    ]
+    script = {
+        # 脚本按部门给出（工单 #877）
+        "product": [product_spec()],
+        "engineering": [eng_step1, eng_step2, eng_step3, delivery_turn()],
+        "quality": quality_turns("release", "ok"),
+    }
 
     system = _system(data_dir, script)
     run_id = system.create_run("read_output query test")
