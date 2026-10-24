@@ -15,7 +15,7 @@ from ..models import CatalogEventType, Event, EventType, ProjectEvent, ProjectEv
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Snapshot
 from .labels import event_label
-from .registry import CommandDefinition, QueryDefinition
+from .registry import CommandDefinition, QueryDefinition, UnchangedEvent
 
 if TYPE_CHECKING:
     from .application import Application
@@ -201,6 +201,16 @@ HOME_AWAY_REPORT = QueryDefinition(
     name="home.away_report", request=AwayReportRequest, result=AwayReport, handle=_away_report,
     # 已看过也触发重查：点「已看过」以后同一页面立即显示新的上次查看（工单 #301）
     changed_by=tuple(sorted(FACT_TYPES)) + (EventType.MODEL_ATTEMPT_FINISHED, CatalogEventType.HOME_SEEN),
+    unchanged_by=(
+        UnchangedEvent(EventType.CONTEXT_ASSEMBLED, "上下文装配不改变这份报告的汇总与关键事实"),
+        UnchangedEvent(EventType.MODEL_REQUEST_SERIALIZED, "请求序列化不改变这份报告的汇总与关键事实"),
+        UnchangedEvent(EventType.MODEL_REQUESTED, "发出模型请求不改变这份报告的汇总与关键事实"),
+        UnchangedEvent(EventType.MODEL_MESSAGE, "模型消息不改变这份报告的汇总与关键事实"),
+        UnchangedEvent(EventType.MODEL_REASONING, "模型的推理内容不改变这份报告的汇总与关键事实"),
+        UnchangedEvent(EventType.MODEL_STREAM_PROGRESS, "流式进度不改变这份报告的汇总与关键事实"),
+        UnchangedEvent(EventType.TOOL_STARTED, "工具开始不改变这份报告的汇总与关键事实"),
+        UnchangedEvent(EventType.TOOL_CALLED, "工具调用不改变这份报告的汇总与关键事实"),
+    ),
 )
 
 HOME_MARK_SEEN = CommandDefinition(
