@@ -15,6 +15,7 @@ import {
   admissionLabel,
   admissionOf,
   capacityIssueText,
+  collectCandidatesHint,
   connectionTestable,
   defaultModelsUrl,
   effectiveModelsUrl,
@@ -53,6 +54,8 @@ export type ProviderFormProps = {
   credential: CatalogCredential | null;
   candidate: CandidateState | null;
   collecting: boolean;
+  // 点「获取模型列表」以后页面给的说明（连接没有保存时说明先保存什么、为什么，工单 #843）
+  collectNotice: string;
   admissions: CatalogAdmission[];
   impact: string;
   busy: boolean;
@@ -76,6 +79,8 @@ export function ProviderForm(props: ProviderFormProps) {
   const [persist, setPersist] = useState(false);
   const editing = mode === "edit";
   const preset = presetById(props.presets, state.preset_id);
+  // 连接没有保存时候选区的提醒：先告诉用户下一步，不用点才知道（工单 #843）
+  const collectHint = collectCandidatesHint(mode);
   const connectionKey = `connection:${state.id}`;
   const connectionTesting = editing && props.testing[connectionKey] === true;
 
@@ -252,10 +257,17 @@ export function ProviderForm(props: ProviderFormProps) {
       <section className="y10-candidates mm-candidates" data-testid="candidate-section">
         <h4 className="y10-h3">获取模型列表</h4>
         <div className="y10-row mm-actions">
-          <button type="button" className="y10-btn" disabled={!editing || props.collecting} onClick={props.onCollectCandidates}>
+          {/* 连接没有保存时按钮照样可以点：点了以后页面说明先保存什么、为什么（工单 #843） */}
+          <button type="button" className="y10-btn" data-testid="collect-candidates" disabled={props.collecting} onClick={props.onCollectCandidates}>
             {props.collecting ? "候选获取中…" : "获取模型列表"}
           </button>
         </div>
+        {collectHint !== "" && (
+          <p className="y10-small y10-muted mm-hint" data-testid="collect-hint">{collectHint}</p>
+        )}
+        {props.collectNotice !== "" && (
+          <p className="y10-warn-text mm-warn" role="status" data-testid="collect-notice">{props.collectNotice}</p>
+        )}
         {props.candidate === null && <p className="y10-small y10-muted mm-hint">尚未获取；结果只服务本次设置，不写入目录。</p>}
         {props.candidate?.status === "unknown" && (
           <p className="y10-warn-text mm-warn" role="status" data-testid="candidates-unknown">
