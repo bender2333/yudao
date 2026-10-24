@@ -4,6 +4,7 @@
 
 import json
 from dataclasses import asdict
+from typing import Any
 
 from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
@@ -22,8 +23,21 @@ PROJECT_ID = "proj_test"
 def _write_events(run_id):
     return [EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED]
 
+def _product_only_script() -> dict[str, list[Any]]:
+    # 这一轮只有产品回答：PRD 被接纳以后工程与质检同时工作，
+    # 两个部门各自的脚本是空的（模型再被调用就以脚本用尽失败）
+    return {"product": [product_spec()], "engineering": [], "quality": []}
+
+
+def _empty_script() -> dict[str, list[Any]]:
+    # 恢复时不再调用模型：每个部门的脚本都是空的
+    return {"product": [], "engineering": [], "quality": []}
+
+
 def _engineering_run(data_dir, script):
     # 一个已完成产品规格、停在 ENGINEERING 的 run：可以直接继续工程部门的模型步骤
+    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
@@ -66,11 +80,11 @@ def _answer(system, decision_id, option, base_version=1):
 
 def test_a_lost_write_action_is_handed_back_and_is_not_blindly_redone(data_dir):
     # 工具效果尚未确认。恢复不会盲目重做写入，而是交还发出它的会话，不发决定请求
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, run_id = _engineering_run(data_dir, _product_only_script())
     _append_lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()), resume_on_startup=False)
     restarted.orchestrator.resume_incomplete_run(run_id)
     assert _decisions(restarted, run_id, kind="unknown_action") == []
     verified = [e for e in restarted.store.list_events(run_id) if e.type == EventType.ACTION_VERIFIED]
@@ -85,11 +99,11 @@ def test_a_lost_write_action_is_handed_back_and_is_not_blindly_redone(data_dir):
 
 def test_run_actions_reports_unknown_with_snapshots(data_dir):
     # run.actions 返回每个动作的状态与前后快照：中断的写入是 unknown，带动作前快照
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, run_id = _engineering_run(data_dir, _product_only_script())
     _append_lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()), resume_on_startup=False)
     restarted.orchestrator.resume_incomplete_run(run_id)
     actions = Application(restarted).query("run.actions", RunActions(run_id=run_id)).data.actions
     lost = [action for action in actions if action.action_id == "lost-write"]
@@ -100,12 +114,12 @@ def test_run_actions_reports_unknown_with_snapshots(data_dir):
 
 def test_a_partial_model_response_only_executes_the_remaining_calls(data_dir):
     # 部分执行的模型响应只补剩余合法动作，不整批重发、不重新调用模型
-    system, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, run_id = _engineering_run(data_dir, _product_only_script())
     _append_partial_response(system, run_id, executed=("c1",), remaining=("c2",))
     system.close()
 
     # 脚本为空：一旦重新调用模型就会以脚本用尽失败；恢复只补执行剩余动作
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()))
     calls = [event.payload.get("id") for event in _tool_events(restarted, run_id, "write_file")]
     assert calls == ["c1", "c1", "c2", "c2"], calls
     assert restarted.workspace(run_id).list_files() == ["src/c2.py"]
@@ -149,7 +163,7 @@ def _append_partial_response(system, run_id, *, executed, remaining):
 
 def test_a_partial_model_response_executes_remaining_host_tool(data_dir):
     # 恢复路径覆盖主机工具：未处置的主机调用（如 submit_delivery）在恢复时正常执行并记录 tool_called
-    system, run_id = _engineering_run(data_dir, [product_spec()])
+    system, run_id = _engineering_run(data_dir, _product_only_script())
     product_spec_hash = system.project(run_id).product_spec.content_hash
     from harness.models import json_dumps
 
@@ -185,7 +199,7 @@ def test_a_partial_model_response_executes_remaining_host_tool(data_dir):
                                     "output": json.dumps({"ok": True})}}))
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()))
     tool_called_events = [
         event for event in restarted.store.list_events(run_id)
         if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("id") == "hs1"

@@ -337,9 +337,13 @@ def test_project_department_prompt_changes_apply_from_the_next_model_request(tmp
             project_id["value"], "engineering", ModelSelection(department_prompt=replacement), 0)
         return ModelResponse(output=[_call("inspect", "list_files")])
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(), update, delivery_turn(),
-    ]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+        # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+        "product": [product_spec()],
+        "engineering": [update, delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    }))
     project_id["value"] = system.projects.register("P", "验证部门 Prompt 生效时机")
     _work_item_id, run_id = system.projects.start_work_item(project_id["value"], "build echo")
     for _ in range(3):
@@ -367,7 +371,13 @@ def test_identical_requirement_text_for_new_input_still_has_new_contract_binding
         "changed": [], "retained": ["Echo the argument exactly"], "retired": [],
         "rationale": "The new user input confirms the existing behavior",
     })
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),same_requirements]))
+    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec(), same_requirements],
+        "engineering": [],
+        "quality": [],
+    }))
     run_id = system.create_run("build echo")
     old = _steps(system, run_id, 1)
     system.add_input(run_id, "Confirm the existing echo behavior")

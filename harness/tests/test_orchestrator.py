@@ -78,12 +78,14 @@ def test_illegal_workpiece_stays_in_department(data_dir):
     assert projection.rejections[0]["errors"][0]["field"] == "kind"
 
 def test_natural_language_completion_does_not_finish(data_dir):
-    script = [
-        product_spec(),
-        delivery_turn(),
-        *[FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。")
-          for _ in range(DEFINITIONS.rule_value("tool_call_required_limit") + 1)],
-    ]
+    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    script = {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。")
+                    for _ in range(DEFINITIONS.rule_value("tool_call_required_limit") + 1)],
+    }
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
@@ -122,7 +124,14 @@ def test_cancel_is_explicit_failure(data_dir):
     assert projection.stop_reason == "cancelled"
 
 def test_provider_error_is_explicit_failure(data_dir):
-    script = [product_spec(), FakeTurn(raise_error=ProviderError("upstream 500"))]
+    # 脚本按部门给出（工单 #877）：PRD 被接纳以后工程与质检同时工作，
+    # 两个部门各自失败，结果与调度无关
+    failing = FakeTurn(raise_error=ProviderError("upstream 500"))
+    script = {
+        "product": [product_spec()],
+        "engineering": [failing],
+        "quality": [failing],
+    }
     _, projection = run_scripted(data_dir, script)
     assert projection.status == "failed"
     assert projection.stop_reason == "provider_error"
@@ -179,19 +188,22 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
     assert projection.last_review.delivery_spec_hash == projection.delivery_spec.content_hash
 
 def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
-    script = [
-        product_spec(),
-        delivery_turn(),
-        FakeTurn(
-            proposal={"kind": "qa_review", "verdict": "release", "rationale": "OK", "checks": [123], "defects": []},
-            checks={"smoke": 0},
-        ),
-        FakeTurn(
-            proposal={"kind": "qa_review", "verdict": "release", "rationale": "OK", "checks": ["smoke"], "defects": None},
-            checks={"smoke": 0},
-        ),
-        review_turn("release", "ok"),
-    ]
+    # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
+    script = {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [
+            FakeTurn(
+                proposal={"kind": "qa_review", "verdict": "release", "rationale": "OK", "checks": [123], "defects": []},
+                checks={"smoke": 0},
+            ),
+            FakeTurn(
+                proposal={"kind": "qa_review", "verdict": "release", "rationale": "OK", "checks": ["smoke"], "defects": None},
+                checks={"smoke": 0},
+            ),
+            review_turn("release", "ok"),
+        ],
+    }
     system, projection = run_scripted(data_dir, script, max_cycles=12)
     fields = [error["field"] for item in projection.rejections for error in item["errors"]]
     messages = [error["message"] for item in projection.rejections for error in item["errors"]]

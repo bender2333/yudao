@@ -152,18 +152,30 @@ def test_success_cancel_pause_and_rejected_review_do_not_invent_candidates(tmp_p
     invalid["defects"] = None
     # #470 删除工程计划以后，工程激活不再先提交计划：轮次上限回到 3，
     # 质检的整次提交被拒绝以后没有下一段脚本，运行按上限暂停，不因为脚本耗尽失败
+    # 脚本按部门给出（工单 #877）：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
     _system, rejected = run_scripted(
-        tmp_path / "rejected", [product_spec(),delivery_turn(), invalid], max_cycles=3
+        tmp_path / "rejected",
+        {
+            "product": [product_spec()],
+            "engineering": [delivery_turn()],
+            "quality": [invalid],
+        },
+        max_cycles=3,
     )
     assert rejected.status == "paused" and rejected.rejections
     assert rejected.lesson_candidates == []
 
 def test_release_with_defect_keeps_existing_rejection_and_does_not_create_candidate(tmp_path):
-    system, result = run_scripted(tmp_path, [
-        product_spec(),delivery_turn(),
-        review_turn("release", "nonblocking observation", defects=[{"severity": "minor", "summary": "naming could improve"}]),
-        review_turn("release", "no defects remain"),
-    ])
+    # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
+    system, result = run_scripted(tmp_path, {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [
+            review_turn("release", "nonblocking observation", defects=[{"severity": "minor", "summary": "naming could improve"}]),
+            review_turn("release", "no defects remain"),
+        ],
+    })
     assert result.status == "done"
     assert result.lesson_candidates == []
     assert result.rejections[0]["errors"] == [{"field": "defects", "message": "release requires an empty defect list"}]

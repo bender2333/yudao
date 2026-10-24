@@ -299,11 +299,10 @@ def test_link_made_by_a_command_during_a_run_is_refused_as_a_tool_result(tmp_pat
     assert outside.read_text(encoding="utf-8") == "VALUE = 9\n"
 
 def test_two_edits_in_one_activation_produce_a_complete_delivery_tree(tmp_path):
-    adapter = FakeAdapter([product_spec(),])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder = {}
 
     def work_turn(request):
-        environment = LocalEnvironment(system.workspace(request.run_id))
+        environment = LocalEnvironment(holder["system"].workspace(request.run_id))
         return ModelResponse(output=[
             _edit_call("edit-a", "src/a.py", 2, 2, "VALUE = 1", "VALUE = 2",
                        _read_content_hash(environment, "src/a.py", 2, 2)),
@@ -311,13 +310,21 @@ def test_two_edits_in_one_activation_produce_a_complete_delivery_tree(tmp_path):
                        _read_content_hash(environment, "src/b.py", 1, 1)),
         ])
 
-    # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：脚本项是工厂而不是 FakeTurn 实例
-    adapter.script.extend([work_turn, delivery_turn(
-        summary="two range edits",
-        files={"src/a.py": "HEADER = True\nVALUE = 2\nFOOTER = True\n",
-               "src/b.py": "GREETING = 'hello'\n", "src/keep.py": "KEPT = True\n"},
-        checks={"smoke": 0},
-    )])
+    adapter = FakeAdapter({
+        # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+        # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+        "product": [product_spec()],
+        # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：脚本项是工厂而不是 FakeTurn 实例
+        "engineering": [work_turn, delivery_turn(
+            summary="two range edits",
+            files={"src/a.py": "HEADER = True\nVALUE = 2\nFOOTER = True\n",
+                   "src/b.py": "GREETING = 'hello'\n", "src/keep.py": "KEPT = True\n"},
+            checks={"smoke": 0},
+        )],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
     run_id = system.create_run("Apply two range edits")
     # #470 删除工程计划以后，第二次激活就是工程写入轮次：文件要先存在，区间编辑才改得动
     workspace = system.workspace(run_id)
@@ -391,14 +398,16 @@ def test_changed_tree_after_delivery_rejects_the_stale_release(tmp_path):
             checks={"smoke": 0},
         )
 
-    adapter = FakeAdapter([
-        product_spec(),
-        delivery_turn(),
-        review_turn("rework_engineering", "The implementation does not match the requirement.",
-                    defects=[{"severity": "minor", "summary": "needs revision"}]),
-        delivery_turn("revised echo", files={"src/echo.py": "import sys\nprint(str(sys.argv[1]))\n"}),
-        stale_release,
-    ])
+    adapter = FakeAdapter({
+        # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
+        "product": [product_spec()],
+        "engineering": [delivery_turn(), delivery_turn("revised echo", files={"src/echo.py": "import sys\nprint(str(sys.argv[1]))\n"})],
+        "quality": [
+            review_turn("rework_engineering", "The implementation does not match the requirement.",
+                        defects=[{"severity": "minor", "summary": "needs revision"}]),
+            stale_release,
+        ],
+    })
 
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)

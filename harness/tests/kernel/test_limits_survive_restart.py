@@ -23,13 +23,29 @@ def _usage(events) -> tuple[int, int, int] | None:
     return payload.get("elapsed_ms"), payload.get("activations"), payload.get("model_steps")
 
 
-def _script() -> list[dict]:
-    return [{"proposal": product_spec()}, {"transcript": "继续工程工作"}]
+def _script() -> dict[str, list[dict]]:
+    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）。
+    return {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [{"transcript": "继续工程工作"}],
+        "quality": [{"transcript": "继续质检工作"}],
+    }
+
+
+def _tail() -> dict[str, list[dict]]:
+    # 重启以后继续用的脚本，同样按部门给出：工程交付、质检核验
+    return {
+        "engineering": [{"proposal": {"kind": "delivery_spec", "summary": "implemented echo CLI",
+                                      "check_names": ["smoke"], "known_risks": []}}],
+        "quality": [{"proposal": {"kind": "quality_auto", "verdict": "release",
+                                  "rationale": "checks passed on the current snapshot", "times": 4}}],
+    }
 
 
 def test_accumulated_usage_does_not_decrease_across_a_restart(tmp_path):
     data_dir = tmp_path / "data"
-    with killed.interrupted(data_dir, _script(), hold_after=_HOLD) as run:
+    with killed.interrupted(data_dir, _script(), tail=_tail(), hold_after=_HOLD) as run:
         before = _usage(run.before_events)
         after = _usage(run.after.store.list_events(run.run_id))
         assert before is not None, "中断之前没有记录过一次已用量"
@@ -45,7 +61,7 @@ def test_accumulated_usage_does_not_decrease_across_a_restart(tmp_path):
 def test_usage_keeps_accumulating_after_a_restart_instead_of_restarting(tmp_path):
     # 重启以后的累计时间继续加上重启前的那一份，不是重新从零开始计时
     data_dir = tmp_path / "data"
-    with killed.interrupted(data_dir, _script(), hold_after=_HOLD) as run:
+    with killed.interrupted(data_dir, _script(), tail=_tail(), hold_after=_HOLD) as run:
         before = _usage(run.before_events)
         assert before is not None and before[0] > 0, \
             f"重启之前已经用掉 {before[0] if before else None}ms 运行时间，才能核对连续累计"
@@ -58,7 +74,7 @@ def test_usage_keeps_accumulating_after_a_restart_instead_of_restarting(tmp_path
 def test_the_short_time_limit_still_bites_after_a_restart(tmp_path):
     # 达到上限记为失败：累计时间跨重启连续，短上限在重启以后仍然生效，不会因为重新计数而延长
     data_dir = tmp_path / "data"
-    with killed.interrupted(data_dir, _script(), hold_after=_HOLD,
+    with killed.interrupted(data_dir, _script(), tail=_tail(), hold_after=_HOLD,
                             run_time_limit_sec=3) as run:
         projection = run.after.project(run.run_id)
         assert projection.run_time_limit_sec == 3, "上限在重启以后变了"
