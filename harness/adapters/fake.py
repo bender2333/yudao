@@ -16,6 +16,24 @@ from .base import Availability, ProviderError
 TurnFactory = Callable[[ModelCall], "FakeTurn | dict[str, Any] | ModelResponse | Generator"]
 TurnSpec = "FakeTurn | dict[str, Any] | ModelResponse | TurnFactory | BaseException"
 
+# 一条按先后排队的列表脚本被工程与质检同时取用时，谁拿到哪一项随调度变化（工单 #557），
+# 用例时好时坏，坏的时候报的是别处的错。假模型记下这件事（工单 #879）：
+#   - 在进程内：由 harness/tests/conftest.py 在用例结束时核对，让用例失败
+#   - 在子进程里：写进子进程的输出，父进程读到以后让用例失败
+SHARED_LIST_SCRIPT_PREFIX = "假模型的列表脚本被工程与质检同时取用"
+
+_SHARED_LIST_SCRIPTS: list[str] = []
+
+
+def shared_list_scripts() -> list[str]:
+    """这一轮里被工程与质检同时取用的列表脚本（工单 #879）。"""
+    return list(_SHARED_LIST_SCRIPTS)
+
+
+def clear_shared_list_scripts() -> None:
+    """清掉记下的违反（工单 #879）：用例开始时调用。"""
+    _SHARED_LIST_SCRIPTS.clear()
+
 
 @dataclass
 class FakeTurn:
@@ -68,6 +86,10 @@ class FakeAdapter:
             self.script = list(script or [])
         self.invocations: list[ModelCall] = []
         self.cancelled: set[str] = set()
+        # 列表模式下每一项被哪个部门取用过（工单 #879）：工程与质检同时取用同一条列表脚本时，
+        # 记下这件事并让用例失败
+        self.list_script_takes: list[tuple[int, str]] = []
+        self.shared_list_script: str | None = None
         # 流式轮次里片段之间的停顿：需要订阅方在请求进行中读到 attempt.live 时给出（部门房间验收）
         self.stream_gap_sec = stream_gap_sec
 
@@ -86,6 +108,9 @@ class FakeAdapter:
         if not queue:
             raise ProviderError("fake adapter script exhausted")
         item = queue.pop(0)
+        if not self.scripts:
+            # 列表模式：记下这一项被哪个部门取用（工单 #879）
+            self._take_list_script_item(call.department)
         if callable(item):
             item = item(call)
         if isinstance(item, Generator):
@@ -109,6 +134,29 @@ class FakeAdapter:
 
     def _aborted(self) -> ModelResponse:
         return ModelResponse(finish_reason="aborted", error="aborted", provider=self.name, model=self.model)
+
+    def _take_list_script_item(self, department: str) -> None:
+        # 列表模式：记下这一项被哪个部门取用（工单 #879）。
+        # 工程与质检同时取用同一条列表脚本时，谁拿到哪一项随调度变化（工单 #557），
+        # 这样的脚本让用例失败：写明是哪条脚本、被哪两个部门取用、应当按部门给出
+        index = len(self.list_script_takes)
+        self.list_script_takes.append((index, department))
+        if self.shared_list_script is not None:
+            return
+        departments = {taken[1] for taken in self.list_script_takes}
+        if not {"engineering", "quality"} <= departments:
+            return
+        self.shared_list_script = self._shared_list_script_message()
+        _SHARED_LIST_SCRIPTS.append(self.shared_list_script)
+        # 子进程里的违反写进子进程的输出（工单 #879）：父进程读到以后让用例失败
+        print(self.shared_list_script, file=sys.stderr, flush=True)
+
+    def _shared_list_script_message(self) -> str:
+        taken = "；".join(f"第 {index + 1} 项由 {department} 取用"
+                          for index, department in self.list_script_takes)
+        return (f"{SHARED_LIST_SCRIPT_PREFIX}：{taken}。"
+                "一条按先后排队的列表脚本被两个部门同时取用时，谁拿到哪一项随调度变化（工单 #557）。"
+                "请按部门给出脚本：FakeAdapter({\"engineering\": [...], \"quality\": [...]})（工单 #879）。")
 
     def _response(self, call: ModelCall, item: Any) -> ModelResponse:
         if isinstance(item, ModelResponse):

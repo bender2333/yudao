@@ -151,12 +151,16 @@ def test_proposal_contract_and_binding_refs_are_injected(data_dir):
 
 def test_validation_feedback_is_injected_after_rejection(data_dir):
     adapter = FakeAdapter(
-        [
-            {"kind": "product_spec", "goal": "", "requirements": ["r"], "acceptance_criteria": ["a"]},
-            product_spec(),
-            delivery_turn(),
-            review_turn("release", "ok"),
-        ]
+        {
+            # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+            # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+            "product": [
+                {"kind": "product_spec", "goal": "", "requirements": ["r"], "acceptance_criteria": ["a"]},
+                product_spec(),
+            ],
+            "engineering": [delivery_turn()],
+            "quality": quality_turns("release", "ok"),
+        }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo")

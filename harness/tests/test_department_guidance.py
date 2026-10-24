@@ -36,14 +36,16 @@ def _guidance_results(request):
     return [] if part is None else json.loads(part)
 
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
-    adapter = FakeAdapter([product_spec()])
+    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     project_id = system.projects.register("指导", "把文本按行处理清楚")
     work_item_id, run_id = system.projects.start_work_item(project_id, "echo")
     system.activate_once(run_id)
 
     system.add_guidance(run_id, "engineering", "请优先检查错误输出的边界行为。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), status="explained", text="已检查边界行为，当前指导不改变产品合同。"
     )))
     result = system.activate_once(run_id)
@@ -68,7 +70,8 @@ def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_pa
     assert not any(message.get("text") == guidance.text for message in product.data.messages)
 
 def test_guidance_for_previous_department_gets_a_read_only_activation_before_release(tmp_path):
-    adapter = FakeAdapter([product_spec(),delivery_turn()])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -76,7 +79,7 @@ def test_guidance_for_previous_department_gets_a_read_only_activation_before_rel
     assert has_new_work(system.project(run_id), "quality")
 
     system.add_guidance(run_id, "engineering", "请说明本次交付的错误处理边界。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), status="explained", text="已说明错误处理边界；该指导不授权修改交付。"
     )))
     result = system.activate_once(run_id)
@@ -158,12 +161,13 @@ def test_guidance_completed_requires_nonempty_response_text(tmp_path, text, stat
                    for event in system.store.list_events(run_id))
 
 def test_guidance_response_binds_that_guidance_id(tmp_path):
-    adapter = FakeAdapter([product_spec()])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请优先检查错误输出的边界行为。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         "guidance-not-this-id", text="不能绑定到其他指导。",
     )))
     rejected = system.activate_once(run_id)
@@ -171,7 +175,7 @@ def test_guidance_response_binds_that_guidance_id(tmp_path):
     assert rejected.department_guidance[0].status in {"received", "in_input"}
     assert any(error["field"] == "guidance_id" for error in rejected.rejections[-1]["errors"])
 
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), status="explained", text="已检查边界行为，当前指导不改变产品合同。",
     )))
     done = system.activate_once(run_id)
@@ -182,14 +186,15 @@ def test_guidance_response_binds_that_guidance_id(tmp_path):
     assert responded.payload["guidance_id"] == done.department_guidance[0].id
 
 def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
-    adapter = FakeAdapter([product_spec(),])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     assert has_new_work(system.project(run_id), "engineering")
 
     system.add_guidance(run_id, "product", "请确认未知参数是否需要写入验收。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["product"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), status="explained", text="当前合同已覆盖该行为，无需改需求。",
     )))
     result = system.activate_once(run_id)
@@ -207,14 +212,15 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     assert result.department_guidance[0].status == "explained"
     assert has_new_work(result, "engineering")
 
-    adapter.script.append(delivery_turn())
+    adapter.scripts["engineering"].append(delivery_turn())
     resumed = system.activate_once(run_id)
     assert adapter.invocations[-1].department == "engineering"
     assert has_new_work(resumed, "quality")
     assert resumed.delivery_spec is not None
 
 def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
-    adapter = FakeAdapter([product_spec(),delivery_turn()])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
     system.activate_once(run_id)
@@ -224,7 +230,7 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     old_delivery = before.delivery_spec.content_hash
 
     system.add_guidance(run_id, "product", "请把输出改为大写并更新验收。")
-    adapter.script.append(product_spec_turn(
+    adapter.scripts["product"].append(product_spec_turn(
         requirements=["print the given argument in uppercase"],
         acceptance=["running the program with a word prints that word in uppercase"],
         change_record={
@@ -248,7 +254,7 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     assert spec_activation.payload["yielded_work"] == first_yield
     assert revised.yielded_work == first_yield
 
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["product"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), text="已把大写输出写入产品要求。",
     )))
     responded = system.activate_once(run_id)
@@ -260,13 +266,14 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     assert responded.yielded_work is None
 
     # 回应以后由关注的成果决定下一个谁工作：PRD 有了新版本，工程开始一轮返工（工单 #556）
-    adapter.script.append(delivery_turn())
+    adapter.scripts["engineering"].append(delivery_turn())
     next_work = system.activate_once(run_id)
     assert adapter.invocations[-1].department == "engineering"
     assert next_work.delivery_spec is not None
 
 def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
-    adapter = FakeAdapter([product_spec(),delivery_turn()])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -275,7 +282,7 @@ def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
     assert original
 
     system.add_guidance(run_id, "engineering", "请直接改交付文件以处理错误输出。")
-    adapter.script.append(lambda request: FakeTurn(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(
         writes={"src/echo.py": "import sys\nprint('hijacked')\n"},
         proposal=guidance_response(
             _guidance_id(request), status="explained", text="指导不能授权修改交付，已拒绝写文件。",
@@ -321,7 +328,8 @@ def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
                    for event in system.store.list_events(run_id))
 
 def test_qa_release_blocked_until_guidance_response(tmp_path):
-    adapter = FakeAdapter([product_spec(),delivery_turn()])
+    # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
     system.activate_once(run_id)
@@ -329,27 +337,28 @@ def test_qa_release_blocked_until_guidance_response(tmp_path):
     assert has_new_work(system.project(run_id), "quality")
 
     system.add_guidance(run_id, "quality", "放行前请核对错误输出边界。")
-    adapter.script.append(review_turn("release", "Attempt release before the guidance has a recorded response."))
+    adapter.scripts["quality"].append(review_turn("release", "Attempt release before the guidance has a recorded response."))
     blocked = system.activate_once(run_id)
     assert has_new_work(blocked, "quality")
     assert blocked.last_review is None
     assert any(error["field"] == "guidance" for error in blocked.rejections[-1]["errors"])
     assert blocked.department_guidance[0].status in {"received", "in_input"}
 
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["quality"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), status="explained", text="已核对错误输出边界，可以按当前交付独立复检。",
     )))
     responded = system.activate_once(run_id)
     assert responded.department_guidance[0].status == "explained"
     assert has_new_work(responded, "quality")
 
-    adapter.script.append(review_turn("release", "Independent quality check after the guidance response."))
+    adapter.scripts["quality"].append(review_turn("release", "Independent quality check after the guidance response."))
     done = system.activate_once(run_id)
     assert done.status == "done"
     assert done.last_review.verdict == "release"
 
 def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
-    adapter = FakeAdapter([product_spec(),delivery_turn()])
+    # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
     system.activate_once(run_id)
@@ -357,7 +366,7 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     assert has_new_work(system.project(run_id), "quality")
 
     system.add_guidance(run_id, "quality", "返工后仍需独立复检，不能把旧放行当作完成。")
-    adapter.script.append(review_turn(
+    adapter.scripts["quality"].append(review_turn(
         "rework_engineering",
         "Empty input still prints nothing.",
         defects=[{"severity": "major", "summary": "Empty input is not rejected."}],
@@ -370,7 +379,7 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     rework_activation = rejected.last_activations["quality"]
     assert not any(event.type == EventType.RUN_DONE for event in system.store.list_events(run_id))
 
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["quality"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), status="explained", text="已记录返工原因；需要工程修复后再做独立质检。",
     )))
     responded = system.activate_once(run_id)
@@ -382,19 +391,20 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
     assert _guidance_only(system, adapter.invocations[-1]) is True
     assert not any(event.type == EventType.RUN_DONE for event in system.store.list_events(run_id))
 
-    adapter.script.append(delivery_turn())
+    adapter.scripts["engineering"].append(delivery_turn())
     next_work = system.activate_once(run_id)
     assert adapter.invocations[-1].department == "engineering"
     assert next_work.delivery_spec is not None
     assert next_work.last_review.verdict == "rework_engineering"
 
 def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
-    adapter = FakeAdapter([product_spec()])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请说明当前错误输出边界，无需改文件。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), status="explained", text="当前合同已覆盖该边界，无需变更。", result_event_ids=[],
     )))
     result = system.activate_once(run_id)
@@ -405,14 +415,15 @@ def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
     assert responded.payload["result_event_ids"] == []
 
 def test_engineering_write_then_completed_without_tool_id_is_host_bound(tmp_path):
-    adapter = FakeAdapter([product_spec(),])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     assert has_new_work(system.project(run_id), "engineering")
 
     system.add_guidance(run_id, "engineering", "请修改错误输出处理。")
-    adapter.script.append(lambda request: FakeTurn(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(
         writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
         proposal=guidance_response(_guidance_id(request), text="已修改文件，但未引用主机结果。"),
     ))
@@ -445,14 +456,15 @@ def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
             result_event_ids=[write.event_id],
         ))
 
-    adapter = FakeAdapter([product_spec(),])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     holder["system"] = system
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请修改错误输出处理。")
-    adapter.script.append(FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}))
-    adapter.script.append(complete_with_write)
+    adapter.scripts["engineering"].append(FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}))
+    adapter.scripts["engineering"].append(complete_with_write)
     result = system.activate_once(run_id)
     assert result.department_guidance[0].status == "completed", result.rejections
     responded = next(event for event in system.store.list_events(run_id)
@@ -462,12 +474,13 @@ def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
     assert write.payload["ok"] is True
 
 def test_write_then_later_empty_completed_still_binds_tool_id(tmp_path):
-    adapter = FakeAdapter([product_spec(),])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请修改错误输出处理。")
-    adapter.script.append(lambda request: FakeTurn(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(
         writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
         proposal=guidance_response(_guidance_id(request), text=""),
     ))
@@ -476,7 +489,7 @@ def test_write_then_later_empty_completed_still_binds_tool_id(tmp_path):
     write = next(event for event in system.store.list_events(run_id)
                  if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file"
                  and event.payload.get("ok"))
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), text="已按先前写入处理。", result_event_ids=[],
     )))
     done = system.activate_once(run_id)
@@ -531,7 +544,8 @@ def test_guidance_completed_rejects_proposal_rejected_as_result(tmp_path):
 
 @pytest.mark.parametrize("kind", ["delivery", "check"])
 def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_path, kind):
-    adapter = FakeAdapter([product_spec(),delivery_turn()])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
     system.activate_once(run_id)
@@ -547,7 +561,7 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
     cited = old_delivery_id if kind == "delivery" else old_check_id
 
     system.add_guidance(run_id, "product", "请把输出改为大写并更新验收。")
-    adapter.script.append(product_spec_turn(
+    adapter.scripts["product"].append(product_spec_turn(
         requirements=["print the given argument in uppercase"],
         acceptance=["running the program with a word prints that word in uppercase"],
         change_record={
@@ -561,7 +575,7 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
     assert revised.delivery_spec is None
     assert revised.delivery_specs[-1].status == "superseded"
 
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["product"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), text="已把大写输出写入产品要求。",
     )))
     responded = system.activate_once(run_id)
@@ -569,7 +583,7 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
     assert has_new_work(responded, "engineering")
 
     system.add_guidance(run_id, "engineering", "请按新合同处理交付。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request), text="沿用旧交付或旧检查即可。", result_event_ids=[cited],
     )))
     rejected = system.activate_once(run_id)
@@ -583,12 +597,13 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
     )
 
 def test_completed_without_host_action_after_guidance_is_rejected(tmp_path):
-    adapter = FakeAdapter([product_spec(),])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请创建 src/guidance-proof.txt，内容为 VERIFIED。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request),
         text="已创建 src/guidance-proof.txt，内容为 VERIFIED。",
         result_event_ids=[],
@@ -608,13 +623,14 @@ def test_completed_without_host_action_after_guidance_is_rejected(tmp_path):
     )
 
 def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
-    adapter = FakeAdapter([
-        product_spec(),
-        FakeTurn(
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [FakeTurn(
             writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
             proposal=guidance_response("guidance-not-yet", text=""),
-        ),
-    ])
+        )],
+    })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -626,7 +642,7 @@ def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
         and event.payload.get("ok")
     )
     system.add_guidance(run_id, "engineering", "请创建 src/guidance-proof.txt，内容为 VERIFIED。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request),
         text="已按先前写入完成新文件。",
         result_event_ids=[old_write.event_id],
@@ -643,12 +659,13 @@ def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
                    for event in system.store.list_events(run_id))
 
 def test_explained_without_tools_is_recorded_as_explained(tmp_path):
-    adapter = FakeAdapter([product_spec()])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请说明当前错误输出边界，无需改文件。")
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request),
         status="explained",
         text="当前合同已覆盖该边界，无需变更。",
@@ -662,13 +679,14 @@ def test_explained_without_tools_is_recorded_as_explained(tmp_path):
     assert responded.payload["result_event_ids"] == []
 
 def test_one_write_cannot_complete_two_guidance_items(tmp_path):
-    adapter = FakeAdapter([product_spec(),])
+    # 脚本按部门给出（工单 #877）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请创建 src/guidance-a.txt，内容为 A。")
     system.add_guidance(run_id, "engineering", "请创建 src/guidance-b.txt，内容为 B。")
-    adapter.script.append(lambda request: FakeTurn(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(
         writes={"src/guidance-a.txt": "A\n"},
         proposal=guidance_response(_guidance_id(request), text="已创建 src/guidance-a.txt。"),
     ))
@@ -683,7 +701,7 @@ def test_one_write_cannot_complete_two_guidance_items(tmp_path):
         and event.payload.get("ok")
     )
     assert "src/guidance-a.txt" in system.workspace(run_id).list_files()
-    adapter.script.append(lambda request: FakeTurn(proposal=guidance_response(
+    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
         _guidance_id(request),
         text="同一写入也完成了第二条指导。",
         result_event_ids=[],

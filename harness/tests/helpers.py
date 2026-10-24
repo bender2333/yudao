@@ -354,7 +354,11 @@ def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=Fals
             return product_spec() | {"acceptance_criteria": []}
         return product_spec()
 
-    adapter = FakeAdapter([respond] * 100)
+    # 脚本按部门给出（工单 #557、#888）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化。
+    # 同一个回答函数按请求里的部门与轮次决定做什么，各部门各取自己的一份
+    adapter = FakeAdapter({department: [respond] * 100
+                           for department in ("product", "engineering", "quality")})
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
     original = "  Original intent\r\nDo not rewrite this. \n"
     run_id = system.create_run(original, context_window=6000)

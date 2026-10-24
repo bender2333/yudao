@@ -224,7 +224,11 @@ def test_release_after_baseline_change_is_held_not_adopted(data_dir):
     ("provider_error", ("failed", "provider_error")),
 ])
 def test_stopped_runs_keep_stop_reason_and_are_not_adopted(data_dir, scenario, expected):
-    script = [product_spec(), FakeTurn(raise_error=ProviderError("upstream 500"))] if scenario == "provider_error" else happy_script()
+    # 脚本按部门给出（工单 #877）：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    failing = FakeTurn(raise_error=ProviderError("upstream 500"))
+    script = ({"product": [product_spec()], "engineering": [failing], "quality": [failing]}
+              if scenario == "provider_error" else happy_script())
     system = _system(data_dir, script)
     project_id = system.projects.register("Stops", GOAL)
     options = {"max_cycles": 1} if scenario == "max_cycles" else {}
@@ -685,13 +689,15 @@ def test_work_item_title_defaults_to_first_line_truncated(data_dir):
     assert system.projects.projection(project_id).work_item(work_item_2).title == "显式标题"
 
 def test_work_item_derived_fields_follow_the_run(data_dir):
-    script = [
-        product_spec(),
-        delivery_turn(summary="v1"),
-        review_turn("rework_engineering", "命名不符", defects=[{"severity": "minor", "summary": "naming"}]),
-        delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"}),
-        review_turn("release", "ok"),
-    ]
+    # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
+    script = {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary="v1"), delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"})],
+        "quality": [
+            review_turn("rework_engineering", "命名不符", defects=[{"severity": "minor", "summary": "naming"}]),
+            review_turn("release", "ok"),
+        ],
+    }
     system = _system(data_dir, script)
     project_id = system.projects.register("Derived", GOAL)
     work_item_id, run_id = system.projects.start_work_item(project_id, "带返工的事项", max_cycles=16)

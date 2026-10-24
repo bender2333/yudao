@@ -37,8 +37,14 @@ def _review_turn(**kwargs) -> FakeTurn:
     return baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
                                 **kwargs)
 
-def _happy_script() -> list:
-    return [_product_turn(), _structure_turn(), _review_turn()]
+def _happy_script() -> dict:
+    # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化（工单 #879）
+    return {
+        "product": [_product_turn()],
+        "engineering": [_structure_turn()],
+        "quality": [_review_turn()],
+    }
 
 def test_onboarding_run_reaches_baseline_verified(tmp_path):
     system, run_id = _onboarding_run(tmp_path, _happy_script())
@@ -119,9 +125,13 @@ def test_quality_cannot_see_existing_structure(tmp_path):
         captured["reworked"] = True
         return product_rework_turn(call)
 
-    system, run_id = _onboarding_run(tmp_path, [
-        _product_turn(), engineering_turn, quality_turn, product_then_mark, engineering_turn, quality_turn,
-    ])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）：每一轮三个部门各一轮。
+        # 第一轮质检要求产品修改，第二轮产品改完以后质检核验通过
+        "product": [_product_turn(), product_then_mark],
+        "engineering": [engineering_turn, engineering_turn],
+        "quality": [quality_turn, quality_turn],
+    })
     holder["system"] = system
     result = system.run_until_stop(run_id)
     assert result.status == "done", result.error
@@ -135,23 +145,27 @@ def test_quality_cannot_see_existing_structure(tmp_path):
     assert "STRUCTURE.md" not in system.workspace(run_id).list_files()
 
 def test_consistent_with_unsupported_is_rejected(tmp_path):
-    system, run_id = _onboarding_run(tmp_path, [
-        _product_turn(), _structure_turn(),
-        baseline_review_turn(verdict="consistent",
-                             conclusions=[{"requirement": REQUIREMENT, "status": "unsupported", "evidence": "no test covers this"}],
-                             checks={"smoke": 0}),
-    ])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [_product_turn()],
+        "engineering": [_structure_turn()],
+        "quality": [baseline_review_turn(verdict="consistent",
+                                         conclusions=[{"requirement": REQUIREMENT, "status": "unsupported", "evidence": "no test covers this"}],
+                                         checks={"smoke": 0})],
+    })
     result = system.run_until_stop(run_id)
     assert result.status != "done"
     assert EventType.BASELINE_REVIEW_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
 
 def test_rework_product_returns_to_product(tmp_path):
-    system, run_id = _onboarding_run(tmp_path, [
-        _product_turn(), _structure_turn(),
-        baseline_review_turn(verdict="rework_product",
-                             conclusions=[{"requirement": REQUIREMENT, "status": "unsupported", "evidence": "the README says nothing about this"}],
-                             checks={"smoke": 0}),
-    ])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [_product_turn()],
+        "engineering": [_structure_turn()],
+        "quality": [baseline_review_turn(verdict="rework_product",
+                                         conclusions=[{"requirement": REQUIREMENT, "status": "unsupported", "evidence": "the README says nothing about this"}],
+                                         checks={"smoke": 0})],
+    })
     result = system.run_until_stop(run_id)
     assert result.baseline_review["verdict"] == "rework_product"
     # 核验要求产品修改以后，产品开始一轮工作（工单 #556：关注的成果有了新东西，部门在等待工作时开始工作）
@@ -161,12 +175,14 @@ def test_rework_product_returns_to_product(tmp_path):
     assert EventType.BASELINE_REVIEW_ACCEPTED in [event.type for event in system.store.list_events(run_id)]
 
 def test_rework_product_requires_unsupported_or_omission(tmp_path):
-    system, run_id = _onboarding_run(tmp_path, [
-        _product_turn(), _structure_turn(),
-        baseline_review_turn(verdict="rework_product",
-                             conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
-                             checks={"smoke": 0}),
-    ])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [_product_turn()],
+        "engineering": [_structure_turn()],
+        "quality": [baseline_review_turn(verdict="rework_product",
+                                         conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
+                                         checks={"smoke": 0})],
+    })
     result = system.run_until_stop(run_id)
     assert result.active_department != "product"
     assert EventType.BASELINE_REVIEW_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
@@ -176,11 +192,13 @@ def test_failing_existing_test_can_still_be_consistent(tmp_path):
         _source(root)
         (root / "tests" / "test_failing.py").write_text("def test_fail():\n    assert False\n", encoding="utf-8")
         return root
-    system, run_id = _onboarding_run(tmp_path, [
-        _product_turn(), _structure_turn(),
-        baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "existing_defect", "evidence": "failing"}],
-                             checks={"smoke": 0, "failing": 1}),
-    ], source=source(tmp_path / "source"))
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [_product_turn()],
+        "engineering": [_structure_turn()],
+        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "existing_defect", "evidence": "failing"}],
+                                         checks={"smoke": 0, "failing": 1})],
+    }, source=source(tmp_path / "source"))
     result = system.run_until_stop(run_id)
     assert result.status == "done", result.error
     assert result.baseline_review["verdict"] == "consistent"
@@ -188,11 +206,13 @@ def test_failing_existing_test_can_still_be_consistent(tmp_path):
     assert "failing" in referenced
 
 def test_unexplained_failing_check_is_rejected(tmp_path):
-    system, run_id = _onboarding_run(tmp_path, [
-        _product_turn(), _structure_turn(),
-        baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
-                             checks={"smoke": 0, "failing": 1}),
-    ])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [_product_turn()],
+        "engineering": [_structure_turn()],
+        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
+                                         checks={"smoke": 0, "failing": 1})],
+    })
     result = system.run_until_stop(run_id)
     assert result.status != "done"
     assert EventType.BASELINE_REVIEW_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
@@ -205,7 +225,11 @@ def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
     from harness.models import CheckReceipt
     from harness.validation import evaluate_proposal
 
-    system, run_id = _onboarding_run(tmp_path, [_product_turn(), _structure_turn()])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [_product_turn()],
+        "engineering": [_structure_turn()],
+    })
     system.activate_once(run_id)
     result = system.activate_once(run_id)
     assert has_new_work(result, "quality"), result.status
@@ -237,11 +261,16 @@ def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
 
 def test_structure_requires_activation_receipt(tmp_path):
     # build_and_test 的名称没有对应的本次激活 run_check 回执时被拒绝
-    system, run_id = _onboarding_run(tmp_path, [
-        _product_turn(),
-        structure_turn(requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}],
-                       checks={}, build_and_test=[{"name": "smoke", "command": "python src/echo.py", "purpose": "run the CLI"}]),
-    ])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [_product_turn()],
+        "engineering": [
+            structure_turn(requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}],
+                           checks={}, build_and_test=[{"name": "smoke", "command": "python src/echo.py", "purpose": "run the CLI"}]),
+        ],
+        # 质检与工程同时开始一轮工作（工单 #557）：结构说明被拒绝，这一轮提交的结论也被拒绝
+        "quality": [_review_turn()],
+    })
     result = system.run_until_stop(run_id)
     assert result.active_department != "quality"
     assert EventType.STRUCTURE_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
@@ -268,7 +297,11 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
     # 接纳时核对工作区的树摘要等于快照摘要，不相等时拒绝（设计第 4.1 节）
     from harness.validation import evaluate_proposal
 
-    system, run_id = _onboarding_run(tmp_path, [_product_turn()])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [_product_turn()],
+        "engineering": [_structure_turn()],
+    })
     result = system.activate_once(run_id)
     assert has_new_work(result, "engineering"), result.status
     projection = system.project(run_id)
@@ -299,12 +332,13 @@ def _design_doc_source(root: Path) -> Path:
 
 def test_design_only_capability_goes_to_boundary_with_mark(tmp_path):
     # 工单 #346：设计文档描述而代码没有实现的能力出现在初始 PRD 的边界里并带标记，没有出现在现有缺陷里
-    system, run_id = _onboarding_run(tmp_path, [
-        FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"],
-                                      boundaries=[MARKED_BOUNDARY])),
-        _structure_turn(),
-        _review_turn(),
-    ], source=_design_doc_source(tmp_path / "source"))
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"],
+                                      boundaries=[MARKED_BOUNDARY]))],
+        "engineering": [_structure_turn()],
+        "quality": [_review_turn()],
+    }, source=_design_doc_source(tmp_path / "source"))
     result = system.run_until_stop(run_id)
     assert result.status == "done", result.error
     spec = system.project(run_id).product_spec
@@ -322,11 +356,12 @@ def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
     from harness.validation import evaluate_proposal
 
     marked = "导出 PDF 报告（设计中，未实施）：设计文档描述，代码尚未实现"
-    system, run_id = _onboarding_run(tmp_path, [
-        FakeTurn(proposal=product_spec(requirements=[DESIGN_CAPABILITY], acceptance=["run the CLI with a word"],
-                                      boundaries=[marked])),
-        structure_turn(requirement_locations=[{"requirement": DESIGN_CAPABILITY, "locations": ["src/echo.py"]}]),
-    ])
+    system, run_id = _onboarding_run(tmp_path, {
+        # 脚本按部门给出（工单 #557、#879）
+        "product": [FakeTurn(proposal=product_spec(requirements=[DESIGN_CAPABILITY], acceptance=["run the CLI with a word"],
+                                      boundaries=[marked]))],
+        "engineering": [structure_turn(requirement_locations=[{"requirement": DESIGN_CAPABILITY, "locations": ["src/echo.py"]}])],
+    })
     system.activate_once(run_id)
     result = system.activate_once(run_id)
     assert has_new_work(result, "quality"), result.status

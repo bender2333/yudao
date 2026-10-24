@@ -32,6 +32,17 @@ from harness.runtime import LoopSystem
 from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT, quality_turns
 from harness.write_path import NewEvent
 
+def _product_only_script():
+    # 这一轮只有产品回答：PRD 被接纳以后工程与质检同时工作，
+    # 两个部门各自的脚本是空的（模型再被调用就以脚本用尽失败）
+    return {"product": [product_spec()], "engineering": [], "quality": []}
+
+
+def _empty_script():
+    # 恢复时不再调用模型：每个部门的脚本都是空的
+    return {"product": [], "engineering": [], "quality": []}
+
+
 def _application(system: LoopSystem) -> Application:
     return Application(system)
 
@@ -47,6 +58,8 @@ def _work_item_run(system: LoopSystem, task: str):
 def _engineering_run(data_dir, script):
     # 一个已完成产品规格、停在 ENGINEERING 的 run：事件版本相同、未结束，进程在这里退出后
     # 启动时会自动继续它。中断前的回答由 script 给出
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     project_id, _work_item_id, run_id = _work_item_run(system, "被中断的事项")
     system.activate_once(run_id)
@@ -79,10 +92,11 @@ def _answer(system, decision_id, option, *, base_version=1, note=None):
 def test_the_interrupted_state_is_reported_with_the_last_confirmed_position(data_dir):
     # 中断：停在 ENGINEERING，进度已经持久化，进程在下一次激活之前退出。查询给出已确认位置与下一项合法操作。
     # 重新打开时不自动继续，观察中断时的状态本身
-    system, _project_id, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
     assert recovery.state == "interrupted", recovery
@@ -94,11 +108,12 @@ def test_the_interrupted_state_is_reported_with_the_last_confirmed_position(data
 
 def test_an_unknown_action_is_observed_as_pending_verification(data_dir):
     # 重新启动以后结果未知的动作已交还，状态是中断或运行中，verifications 有一条交还记录
-    system, _project_id, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
     _lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
     restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
@@ -127,7 +142,8 @@ def test_an_unavailable_model_is_observed_as_waiting_resume(data_dir):
     system.run_until_stop(run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
     assert recovery.state == "waiting_resume", recovery
@@ -193,8 +209,15 @@ def test_a_failed_run_is_observed_as_stopped(data_dir):
     # 已停止：执行失败的 run 观察状态为已停止，说明写出停止原因的中文名（工单 #747）
     from harness.adapters.base import ProviderError
 
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([
-        product_spec(), ProviderError("模型服务协议不符", reason="provider_protocol")]))
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 工程与质检各自都会遇到同一个失败，与谁先被调度无关
+    failing = ProviderError("模型服务协议不符", reason="provider_protocol")
+    system = LoopSystem.for_testing(data_dir, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [failing],
+        "quality": [failing],
+    }))
     _project_id, _work_item_id, run_id = _work_item_run(system, "没有通过的事项")
     system.run_until_stop(run_id)
     assert system.project(run_id).status == "failed"
@@ -210,7 +233,7 @@ def test_a_failed_run_is_observed_as_stopped(data_dir):
 def test_a_live_run_is_observed_as_running(data_dir):
     # 运行中：有一次没有结束的激活（DEPARTMENT_ACTIVATED 没有 ACTIVATION_FINISHED），
     # 用直接追加事件构造，表示进程仍在执行这个 run
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(_product_only_script()))
     _project_id, _work_item_id, run_id = _work_item_run(system, "进行中的事项")
     system.activate_once(run_id)
     system.writes.append(run_stream(run_id), NewEvent(
@@ -226,7 +249,7 @@ def test_a_live_run_is_observed_as_running(data_dir):
 
 def test_the_event_stream_reconnect_only_adds_observation(data_dir):
     # 事件流重连只补观察事实：从 after 重新读取不新建执行，不重发模型或工具请求
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(_product_only_script()))
     project_id, _work_item_id, run_id = _work_item_run(system, "被观察的事项")
     system.activate_once(run_id)
     application = _application(system)
@@ -260,14 +283,15 @@ def test_the_event_stream_reconnect_only_adds_observation(data_dir):
 
 def test_system_status_counts_match_the_event_log(data_dir):
     # system.status 的恢复汇总：服务重启后自动继续的事项数、待恢复的事项数与事件日志一致
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(_product_only_script()))
     _project_id, _work_item_id, run_id = _work_item_run(system, "中断的事项")
     system.activate_once(run_id)
     _lost_write(system, run_id, action_id="another-unknown")
     assert has_new_work(system.project(run_id), "engineering")
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
     application = _application(restarted)
     status = _query(application, SYSTEM_STATUS, SystemStatusRequest())
     assert status.recovery.waiting_resume == 0
@@ -277,13 +301,14 @@ def test_system_status_counts_match_the_event_log(data_dir):
 
 def test_projects_list_reports_interruption_pending_and_resume_markers(data_dir):
     # projects.list 返回每个项目的中断与待恢复标记（计数），为零时仍是 0
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([product_spec(),]))
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(_product_only_script()))
     project_id, _work_item_id, run_id = _work_item_run(system, "中断的事项")
     system.activate_once(run_id)
     assert has_new_work(system.project(run_id), "engineering")
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
     application = _application(restarted)
     rows = _query(application, PROJECTS_LIST, ProjectsList())
     row = next(item for item in rows.projects if item.project_id == project_id)
@@ -293,11 +318,12 @@ def test_projects_list_reports_interruption_pending_and_resume_markers(data_dir)
 
 def test_project_loop_reports_the_recovery_observation_per_work_item(data_dir):
     # project.loop 返回每个事项的恢复观察状态
-    system, project_id, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, project_id, run_id = _engineering_run(data_dir, _product_only_script())
     _lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
     restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     loop = _query(application, PROJECT_LOOP, ProjectLoop(project_id=project_id))
@@ -307,11 +333,12 @@ def test_project_loop_reports_the_recovery_observation_per_work_item(data_dir):
 
 def test_run_recovery_describes_the_verification_record_and_next_legal_action(data_dir):
     # 交还以后查询返回核实记录：未完成动作消失，核实记录写出依据与结果
-    system, _project_id, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
     _lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
     restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
@@ -327,11 +354,11 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
 
 def test_run_actions_reports_the_unknown_status_and_snapshots(data_dir):
     # run.actions 返回每个动作的状态与前后快照：结果未知的动作状态为 unknown，带动作前快照引用
-    system, _project_id, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
     _lost_write(system, run_id)
     system.close()
 
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()))
     application = _application(restarted)
     actions = _query(application, RUN_ACTIONS, RunActions(run_id=run_id))
     action = next(item for item in actions.actions if item.action_id == "lost-write")
@@ -341,7 +368,7 @@ def test_run_actions_reports_the_unknown_status_and_snapshots(data_dir):
 
 def test_history_queries_export_and_replay_stay_read_only(data_dir):
     # 历史查询、导出与重放保持只读：位置不变，不调用模型，不写入
-    system, project_id, run_id = _engineering_run(data_dir, [product_spec(),])
+    system, project_id, run_id = _engineering_run(data_dir, _product_only_script())
     application = _application(system)
     position = system.store.end_position()
     _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))

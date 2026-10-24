@@ -30,8 +30,11 @@ def _parked_script():
     # 已准入的模型回答用完以后按「模型引用无法使用」收尾：run 停在这次请求之前，并带一个阻塞整个 run 的
     # 待恢复决定请求。重新打开数据目录时它就是「进程在模型回答以后、下一步执行之前退出」留下的状态：
     # 恢复每取得一次执行权恰好推进一次，每一次推进都要重新取得执行权
-    return [_plain_reply(), _plain_reply(), _plain_reply(),
-            ProviderError("Missing configuration: provider credential", reason="provider_unavailable")]
+    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    parked = [_plain_reply(), _plain_reply(), _plain_reply(),
+              ProviderError("Missing configuration: provider credential", reason="provider_unavailable")]
+    return {"engineering": parked, "quality": []}
 
 def _partial_script():
     # 产品提交规格：只走完这一个激活，run 停在 ENGINEERING，之后由完成脚本继续

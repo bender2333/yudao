@@ -31,13 +31,20 @@ def _source(root: Path) -> Path:
 
 def _onboarding_script():
     # 三个部门各一轮的建档脚本；给两轮，覆盖 onboarding.restart 再次建档
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
     def round_turns():
-        return [
-            FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"])),
-            structure_turn(requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}]),
-            baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}]),
-        ]
-    return [*round_turns(), *round_turns()]
+        return {
+            "product": [FakeTurn(proposal=product_spec(requirements=[REQUIREMENT],
+                                                       acceptance=["run the CLI with a word"]))],
+            "engineering": [structure_turn(requirement_locations=[{"requirement": REQUIREMENT,
+                                                                 "locations": ["src/echo.py"]}])],
+            "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
+                                                           "evidence": "smoke"}])],
+        }
+    first = round_turns()
+    second = round_turns()
+    return {department: first[department] + second[department] for department in first}
 
 class _Opened:
     def __init__(self, data_dir, adapter=None) -> None:
@@ -236,7 +243,13 @@ def test_time_limit_stops_the_onboarding_item_and_restart_is_available(data_dir,
         # 运行时间在产品部门的模型调用期间用完：调用本身等待到限制之后，收尾在调用边界发现
         time.sleep(1.5)
         return FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"]))
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([slow_spec, *_onboarding_script()[1:]]))
+    # 脚本按部门给出（工单 #878）：产品这一轮的模型调用慢，运行时间在这一次调用里用完
+    script = _onboarding_script()
+    system = LoopSystem.for_testing(data_dir, FakeAdapter({
+        "product": [slow_spec, *script["product"][1:]],
+        "engineering": script["engineering"],
+        "quality": script["quality"],
+    }))
     project_id, work_item_id, run_id = system.projects.onboard(
         "已有项目", GOAL, "src", str(source), run_time_limit_sec=1)
     result = system.run_until_stop(run_id)

@@ -27,15 +27,25 @@ SECOND_REQUIREMENTS = [
 SECOND_BOUNDARIES = ["do not read files"]
 
 
-def _turn_round(goal: str, requirements: list[str], boundaries: list[str]) -> list:
-    return [
-        FakeTurn(proposal=product_spec(goal=goal, requirements=requirements, boundaries=boundaries,
-                                      acceptance=["run the CLI with a word"])),
-        structure_turn(requirement_locations=[{"requirement": item, "locations": ["src/echo.py"]}
-                                               for item in requirements]),
-        baseline_review_turn(conclusions=[{"requirement": item, "status": "verified", "evidence": "smoke"}
-                                          for item in requirements]),
-    ]
+def _turn_round(goal: str, requirements: list[str], boundaries: list[str]) -> dict:
+    # 一轮建档的三个部门各一轮。脚本按部门给出（工单 #557、#879）：PRD 被接纳以后
+    # 工程与质检同时开始一轮工作，一条按先后排队的列表脚本被两个部门取用时
+    # 谁拿到哪一项随调度变化
+    return {
+        "product": [FakeTurn(proposal=product_spec(goal=goal, requirements=requirements, boundaries=boundaries,
+                                                   acceptance=["run the CLI with a word"]))],
+        "engineering": [structure_turn(requirement_locations=[{"requirement": item, "locations": ["src/echo.py"]}
+                                        for item in requirements])],
+        "quality": [baseline_review_turn(conclusions=[{"requirement": item, "status": "verified", "evidence": "smoke"}
+                                      for item in requirements])],
+    }
+
+
+def _rounds(*items: tuple[str, list[str], list[str]]) -> dict:
+    # 几轮建档接在一起：每个部门的脚本按这个部门自己的先后排列
+    scripts = [_turn_round(*item) for item in items]
+    return {department: [turn for script in scripts for turn in script[department]]
+            for department in scripts[0]}
 
 
 def _answer(client, decision: dict, option: str, note: str | None = None):
@@ -47,10 +57,10 @@ def _answer(client, decision: dict, option: str, note: str | None = None):
 def test_initial_prd_decision_request_and_proposed_event_carry_summary(data_dir, tmp_path):
     # 第一轮：1 条要求、1 条边界
     # 第二轮：2 条要求、1 条边界
-    turns = [
-        *_turn_round(GOAL, FIRST_REQUIREMENTS, FIRST_BOUNDARIES),
-        *_turn_round(GOAL, SECOND_REQUIREMENTS, SECOND_BOUNDARIES),
-    ]
+    turns = _rounds(
+        (GOAL, FIRST_REQUIREMENTS, FIRST_BOUNDARIES),
+        (GOAL, SECOND_REQUIREMENTS, SECOND_BOUNDARIES),
+    )
     opened = _Opened(data_dir, turns=turns)
     with running_api(opened) as client:
         source = _source(tmp_path / "src")

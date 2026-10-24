@@ -34,17 +34,19 @@ def _review_turn(requirements: list[str]) -> FakeTurn:
                                              for item in requirements])
 
 
-def _round_turns(captured: dict, holder: dict, round_number: int, requirements: list[str]) -> list:
-    # 一轮建档的三个部门回答；每个部门第一次被激活时把它收到的上下文材料记下来
+def _round_turns(captured: dict, holder: dict, round_number: int, requirements: list[str]) -> dict:
+    # 一轮建档的三个部门回答；每个部门第一次被激活时把它收到的上下文材料记下来。
+    # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
     def remember(department: str, call, turn: FakeTurn) -> FakeTurn:
         captured[f"round{round_number}_{department}"] = recorded_context(holder["system"], call)
         return turn
 
-    return [
-        lambda call: remember("product", call, _product_turn(round_number, requirements)),
-        lambda call: remember("engineering", call, _structure_turn(round_number, requirements)),
-        lambda call: remember("quality", call, _review_turn(requirements)),
-    ]
+    return {
+        "product": [lambda call: remember("product", call, _product_turn(round_number, requirements))],
+        "engineering": [lambda call: remember("engineering", call, _structure_turn(round_number, requirements))],
+        "quality": [lambda call: remember("quality", call, _review_turn(requirements))],
+    }
 
 
 def _two_round_onboarding(tmp_path: Path) -> dict:
@@ -52,8 +54,10 @@ def _two_round_onboarding(tmp_path: Path) -> dict:
     # 用户回答「提出修改」并附修改意见、第二轮三个部门照常进行
     captured: dict[str, object] = {}
     holder: dict[str, LoopSystem] = {}
-    script = [*_round_turns(captured, holder, 1, [REQUIREMENT]),
-              *_round_turns(captured, holder, 2, [REQUIREMENT, NEW_REQUIREMENT])]
+    rounds = [_round_turns(captured, holder, 1, [REQUIREMENT]),
+              _round_turns(captured, holder, 2, [REQUIREMENT, NEW_REQUIREMENT])]
+    script = {department: [turn for round_script in rounds for turn in round_script[department]]
+              for department in rounds[0]}
     system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter(script))
     holder["system"] = system
     project_id, work_item_id, first_run_id = system.projects.onboard(

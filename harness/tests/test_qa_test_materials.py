@@ -33,11 +33,13 @@ def test_qa_writes_test_and_runs_check(tmp_path: Path) -> None:
             proposal=turn.proposal
         )
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(),
-        qa_turn,
-    ]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+        # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [qa_turn],
+    }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
@@ -86,13 +88,12 @@ def test_next_session_has_saved_test_materials(tmp_path: Path) -> None:
             proposal=turn.proposal
         )
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(summary="first delivery"),
-        qa_turn_1,
-        delivery_turn(summary="fixed delivery"),
-        qa_turn_2,
-    ]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        # 脚本按部门给出（工单 #877）
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary="first delivery"), delivery_turn(summary="fixed delivery")],
+        "quality": [qa_turn_1, qa_turn_2],
+    }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
@@ -128,13 +129,13 @@ def test_pause_and_resume_preserves_qa_tests(tmp_path: Path) -> None:
             proposal=turn.proposal
         )
 
-    script = [
-        product_spec(),
-        delivery_turn(),
-        qa_write_step,
-        *[plain_reply for _ in range(limit + 1)],
-        qa_resumed_step,
-    ]
+    script = {
+        # 脚本按部门给出（工单 #877）：质检的轮数不随其他部门变化，
+        # 质检自己的脚本按它自己的先后排列
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [qa_write_step, *[plain_reply for _ in range(limit + 1)], qa_resumed_step],
+    }
     adapter = FakeAdapter(script)
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build echo")
@@ -171,11 +172,12 @@ def test_qa_tests_dir_excluded_from_public_tree_and_delivery_and_engineering(tmp
             proposal=turn.proposal
         )
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(),
-        qa_turn,
-    ]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        # 脚本按部门给出（工单 #877）
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [qa_turn],
+    }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
@@ -240,13 +242,12 @@ def test_persistence_and_reload_survives_new_loopsystem(tmp_path: Path) -> None:
             proposal=turn.proposal
         )
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(summary="first delivery"),
-        qa_turn_1,
-        delivery_turn(summary="second delivery"),
-        qa_turn_2,
-    ]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        # 脚本按部门给出（工单 #877）
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary="first delivery"), delivery_turn(summary="second delivery")],
+        "quality": [qa_turn_1, qa_turn_2],
+    }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
@@ -290,13 +291,12 @@ def test_no_event_when_unchanged_or_empty_initial(tmp_path: Path) -> None:
             proposal=turn.proposal
         )
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(),
-        qa_turn_1,
-        delivery_turn(summary="delivery 2"),
-        qa_turn_2,
-    ]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        # 脚本按部门给出（工单 #877）
+        "product": [product_spec()],
+        "engineering": [delivery_turn(), delivery_turn(summary="delivery 2")],
+        "quality": [qa_turn_1, qa_turn_2],
+    }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
@@ -347,13 +347,12 @@ def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_reru
             transcript="reran check and proposed release",
         )
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(),
-        qa_step_1,
-        qa_step_2,
-        qa_step_3,
-    ]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [qa_step_1, qa_step_2, qa_step_3],
+    }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
@@ -413,12 +412,12 @@ def test_qa_emptying_test_materials_allows_release(tmp_path: Path) -> None:
             model="fake-script",
         )
 
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(),
-        qa_step_1,
-        qa_step_2,
-    ]))
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        # 脚本按部门给出（工单 #877）
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [qa_step_1, qa_step_2],
+    }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering

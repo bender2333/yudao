@@ -12,7 +12,7 @@ import type { FlowRecord } from "../../src/renderer/src/api/generated/types.gen"
 
 const SAMPLE = "示例项目";
 const SAMPLE_ITEM = "实现回声工具";
-/** 交付历史项目（工单 #415）：同一对部门上有两种非返工流转与一条返工。 */
+/** 交付历史项目（工单 #866）：同一对部门上有一条非返工流转与一条返工那条（质检提交缺陷记录）。 */
 const HISTORY = "交付历史";
 
 let backend: Backend;
@@ -296,9 +296,11 @@ test("两种窗口尺寸下楼层画面都可用，控制台错误为零", async
     }
   }
 });
-// 流转覆盖层（工单 #415 验收标准 1、2）：真实事件在 quality→engineering 上产生「咨询」与「问题反馈」
-// 两种非返工流转，加上质检退回工程产生的「返工」。应有的分段由工单规定并写在这里：
-// 这一对部门上非返工一段（次数 2）、返工一段（次数 1）。端到端的预期不复用实现的聚合公式。
+// 流转覆盖层（工单 #866 验收标准 1、2）：应用层给出的流转种类只有版本交付、询问与问题反馈三种。
+// 真实事件在 quality→engineering 上产生一条「询问」与一条「问题反馈」（质检提交缺陷记录，
+// 返工那条）；工程→quality 上有两条「版本交付」，合成一段。
+// 应有的分段由工单规定并写在这里：quality→engineering 上非返工一段（次数 1）、返工一段（次数 1），
+// 全画面四段。端到端的预期不复用实现的聚合公式。
 test("流转覆盖层：同一对部门的两种非返工流转合成一段，返工另成一段，标签互不遮挡", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = watchErrors(client);
@@ -306,28 +308,30 @@ test("流转覆盖层：同一对部门的两种非返工流转合成一段，�
   try {
     const id = await projectId(HISTORY);
     const flow = await query<{ records: FlowRecord[] }>("project.flow", { project_id: id });
-    // 场景本身来自真实事件：同一对部门至少有返工与两种非返工流转
+    // 场景本身来自真实事件：同一对部门上有一条非返工流转与一条返工那条
     const rows = flow.records.filter((row) => row.direction_from === "quality" && row.direction_to === "engineering");
-    const plainRows = rows.filter((row) => row.kind !== "返工");
-    expect(plainRows.length).toBe(2);
-    expect(new Set(plainRows.map((row) => row.kind)).size).toBe(2);
-    expect(rows.filter((row) => row.kind === "返工").length).toBe(1);
+    expect(rows.filter((row) => row.kind === "询问").length).toBe(1);
+    expect(rows.filter((row) => row.kind === "问题反馈").length).toBe(1);
     await openFloor(page, id);
     await page.locator(".floor-overlay-tabs button", { hasText: "流转" }).click();
     await waitUntil(async () => (await readOverlay(page)).segments.length > 0, "画面写入流转覆盖层的 segments");
     const overlay = await readOverlay(page);
     expect(overlay.id).toBe("flow");
 
-    // 应有的分段写死：quality→engineering 上恰好两段，非返工一段次数 2、返工一段次数 1
+    // 应有的分段写死：quality→engineering 上恰好两段，非返工一段次数 1、返工一段次数 1
     const pair = overlay.segments.filter((seg) => seg.from === "quality" && seg.to === "engineering");
     expect(pair.length).toBe(2);
     const plain = pair.find((seg) => seg.kind !== "rework");
     const rework = pair.find((seg) => seg.kind === "rework");
-    expect(plain?.count).toBe(2);
+    expect(plain?.count).toBe(1);
     expect(rework?.count).toBe(1);
     expect(plain!.count + rework!.count).toBe(rows.length);
-    // 六段：其余部门对各一段，quality→engineering 占非返工与返工两段
-    expect(overlay.segments.length).toBe(6);
+    // 四段：engineering→product、engineering→quality、quality→engineering 的非返工段与返工段
+    expect(overlay.segments.length).toBe(4);
+    // 同一对部门的两种非返工流转合成一段：engineering→quality 的两条版本交付并成一段，次数 2
+    const delivery = overlay.segments.filter((seg) => seg.from === "engineering" && seg.to === "quality");
+    expect(delivery.length).toBe(1);
+    expect(delivery[0].count).toBe(2);
 
     // 标签不遮挡：quality→engineering 的两块牌子各自画出且互不重叠（读最近一帧画出的牌子矩形）
     await waitUntil(async () => {
@@ -346,11 +350,47 @@ test("流转覆盖层：同一对部门的两种非返工流转合成一段，�
       expect(rect.y).toBeGreaterThanOrEqual(0);
       expect(rect.x + rect.w).toBeLessThanOrEqual(640);
     }
+    // 返工那块牌子按红色画，同一条路径上的另一块是白底：一红一白
+    // （牌子按段的顺序画出，overlayLabels 与段的顺序一一对应）
+    const reworkIndex = pair.findIndex((seg) => seg.kind === "rework");
+    const reds = await readSignColors(page, pairRects);
+    expect(reds.length).toBe(2);
+    expect(reds[reworkIndex], `返工那块牌子不是红的：${JSON.stringify(reds)}`).toBeGreaterThan(60);
+    expect(reds[reworkIndex === 0 ? 1 : 0], `非返工那块牌子不是白底：${JSON.stringify(reds)}`).toBeLessThan(40);
     expect(errors).toEqual([]);
   } finally {
     await client.close();
   }
 });
+
+/** 每块牌子里最红的像素（红减蓝）：红底牌子明显大于白底牌子。 */
+async function readSignColors(page: Page, rects: { x: number; y: number; w: number; h: number }[]): Promise<number[]> {
+  return page.evaluate((rects) => {
+    const canvas = document.querySelector(".floor-screen canvas") as HTMLCanvasElement | null;
+    if (!canvas) return [];
+    const off = document.createElement("canvas");
+    off.width = 160;
+    off.height = 80;
+    const ctx = off.getContext("2d");
+    if (!ctx) return [];
+    ctx.drawImage(canvas, 0, 0, 160, 80);
+    const data = ctx.getImageData(0, 0, 160, 80).data;
+    return rects.map((r) => {
+      let best = -999;
+      const x0 = Math.max(0, Math.floor(r.x / 4));
+      const x1 = Math.min(159, Math.ceil((r.x + r.w) / 4));
+      const y0 = Math.max(0, Math.floor(r.y / 4));
+      const y1 = Math.min(79, Math.ceil((r.y + r.h) / 4));
+      for (let y = y0; y <= y1; y += 1) {
+        for (let x = x0; x <= x1; x += 1) {
+          const i = (y * 160 + x) * 4;
+          best = Math.max(best, data[i] - data[i + 2]);
+        }
+      }
+      return best;
+    });
+  }, rects);
+}
 
 /** 在页面里读出最近一帧画出的覆盖层标签矩形（画面逻辑坐标）；逐字段检查再返回。 */
 async function readLabelRects(page: Page): Promise<{ x: number; y: number; w: number; h: number; key: string }[]> {

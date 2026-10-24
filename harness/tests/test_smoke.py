@@ -25,6 +25,7 @@ from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_even
 # 需要一份真实运行记录的文件：module 作用域的夹具各跑一次完整循环并保存数据目录，
 # 每项测试复制一份数据目录，在自己的副本上改写与检查。数据来自真实运行，这些文件登记为集成层。
 
+
 @pytest.fixture(scope="module")
 def saved_native(tmp_path_factory):
     # 一次本机流程走完的运行：产品给要求、工程写入、检查、交付、再检查、质检放行
@@ -403,6 +404,7 @@ def test_model_input_audit_rejects_forged_injected_source_metadata(native_run):
 
 def test_model_input_audit_rebuilds_summary_scope_after_contract_changes(tmp_path):
     system, adapter, run_id, _ = compacted_runner(tmp_path)
+    # 脚本按部门给出（工单 #888）：compacted_runner 直接给每个部门各一份剧本
     first = system.activate_once(run_id)
     assert first.compactions[-1]["effective_contract_hash"] is None
     system.activate_once(run_id)
@@ -565,7 +567,8 @@ def test_audit_rejects_missing_new_work_message_after_product_reactivation(produ
 @pytest.fixture(scope="module")
 def saved_compacted(tmp_path_factory):
     # 上下文窗口只有 6000 的运行：压缩以后继续工程工作，保存到第一次压缩之后
-    system, _adapter, run_id, _original = compacted_runner(tmp_path_factory.mktemp("compacted"))
+    system, adapter, run_id, _original = compacted_runner(tmp_path_factory.mktemp("compacted"))
+    # 脚本按部门给出（工单 #888）：compacted_runner 直接给每个部门各一份剧本
     result = system.activate_once(run_id)
     assert has_new_work(result, "engineering")
     assert len(result.compactions) > 1

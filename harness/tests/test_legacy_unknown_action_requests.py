@@ -25,6 +25,17 @@ from harness.runtime import LoopSystem
 from harness.write_path import NewEvent
 
 
+def _product_only_script():
+    # 这一轮只有产品回答：PRD 被接纳以后工程与质检同时工作，
+    # 两个部门各自的脚本是空的（模型再被调用就以脚本用尽失败）
+    return {"product": [product_spec()], "engineering": [], "quality": []}
+
+
+def _empty_script():
+    # 恢复时不再调用模型：每个部门的脚本都是空的
+    return {"product": [], "engineering": [], "quality": []}
+
+
 def _engineering_run(data_dir, script):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("build echo")
@@ -79,7 +90,7 @@ def _collect(stream, limit: int, timeout: float = 5.0):
 
 def test_unanswered_legacy_unknown_action_is_withdrawn_handed_back_and_resumes(tmp_path):
     data_dir = tmp_path / "data"
-    system, run_id = _engineering_run(data_dir, [product_spec()])
+    system, run_id = _engineering_run(data_dir, _product_only_script())
     _append_lost_write(system, run_id, tool="write_file", action_id="lost-write")
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.DECISION_REQUESTED, actor="system", department="engineering",
@@ -101,7 +112,10 @@ def test_unanswered_legacy_unknown_action_is_withdrawn_handed_back_and_resumes(t
     [legacy_decision] = [e for e in system.store.list_events(run_id) if e.type == EventType.DECISION_REQUESTED]
     system.close()
 
-    adapter = FakeAdapter([delivery_turn()])
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 交付是工程的活，质检这一轮没有交付可核验，给它自己的一份空脚本
+    adapter = FakeAdapter({"engineering": [delivery_turn()], "quality": []})
     restarted = LoopSystem.for_testing(data_dir, adapter, resume_on_startup=True)
 
     # 1. 请求被撤回
@@ -142,7 +156,7 @@ def test_unanswered_legacy_unknown_action_is_withdrawn_handed_back_and_resumes(t
 
 def test_event_stream_and_run_export_read_legacy_decision_and_continue_records(tmp_path):
     data_dir = tmp_path / "data"
-    system, run_id = _engineering_run(data_dir, [product_spec()])
+    system, run_id = _engineering_run(data_dir, _product_only_script())
     activated = [event for event in system.store.list_events(run_id)
                  if event.type == EventType.DEPARTMENT_ACTIVATED]
     activation_id = activated[-1].payload["activation_id"]
@@ -187,7 +201,8 @@ def test_event_stream_and_run_export_read_legacy_decision_and_continue_records(t
     ))
     system.close()
 
-    opened = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
+    opened = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                    resume_on_startup=False)
     app = Application(opened)
 
     # 验证 run.export 读出旧事件与核实记录

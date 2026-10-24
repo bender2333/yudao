@@ -184,7 +184,14 @@ def test_stop_preserves_reported_vendor_and_model_separately_from_adapter(tmp_pa
         usage=CallUsage(total_tokens=10000, reported=True),
         provider="actual-vendor", model="actual-model",
     )
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([response, ProviderError("late failure")]))
+    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    failing = ProviderError("late failure")
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [response],
+        "engineering": [failing],
+        "quality": [failing],
+    }))
     result = system.run_until_stop(system.create_run("echo", max_cycles=1 if reason == "max_cycles" else 8))
     assert result.stop_reason == reason
     assert result.provider == "actual-vendor"
