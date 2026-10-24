@@ -1,0 +1,151 @@
+/* 系统页样式：模型管理、运行与执行槽位、工具与扩展、元观察、预留入口 */
+
+/* ---------------------------------------------------------------- 模型管理 */
+
+.y13-table-compare td:first-child { width: 14%; white-space: nowrap; }
+.y13-table-compare td:nth-child(2) { width: 43%; color: var(--muted); }
+
+.y13-file-row { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; }
+
+.y13-conn-list { display: grid; gap: 10px; }
+.y13-conn-card { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; transition: border-color .15s ease; }
+.y13-conn-card:hover { border-color: color-mix(in srgb, var(--green) 35%, var(--line)); }
+.y13-conn-card.is-open { border-color: color-mix(in srgb, var(--green) 30%, var(--line)); box-shadow: 0 4px 16px var(--shadow-color); }
+.y13-conn-summary {
+  width: 100%; display: grid; grid-template-columns: minmax(170px, 1.2fr) minmax(160px, 1.4fr) minmax(150px, 1fr) auto 20px;
+  align-items: center; gap: 12px 16px; padding: 12px 16px; border: 0; background: transparent; text-align: left;
+}
+.y13-conn-summary:hover { background: color-mix(in srgb, var(--soft) 60%, transparent); }
+.y13-conn-name { display: grid; min-width: 0; }
+.y13-conn-name strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.y13-conn-name small { font-size: 12px; color: var(--muted); }
+.y13-conn-url { min-width: 0; }
+.y13-conn-cred { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.y13-conn-cred small { font-family: var(--mono); font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.y13-conn-count { font-size: 12.5px; color: var(--text); white-space: nowrap; font-weight: 500; }
+.y13-chevron { color: var(--muted); transition: transform .15s ease; }
+.y13-conn-card.is-open .y13-chevron { transform: rotate(180deg); }
+.y13-conn-body { border-top: 1px solid var(--line); padding: 12px 16px 16px; background: var(--surface-2); display: grid; gap: 4px; }
+.y13-conn-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.y13-test-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; margin-top: 6px; }
+.y13-test-line small { color: var(--muted); }
+.y13-test-mini { font-size: 11px; }
+.y13-test-mini.is-ok { color: var(--green); }
+.y13-test-mini.is-fail { color: var(--red); }
+.y13-def-table .y13-table { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.y13-prefill { color: var(--amber); text-decoration: underline dotted; text-underline-offset: 3px; }
+.y13-levels { display: flex; flex-wrap: wrap; gap: 3px; }
+.y13-level { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 0 5px; border-radius: 4px; background: var(--soft-2); color: var(--muted); }
+.y13-level.is-default { background: var(--tint); color: var(--green); font-weight: 600; }
+
+.y13-candidates { margin-top: 4px; }
+.y13-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.y13-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 6px; font-family: var(--mono); font-size: 12px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
+}
+button.y13-chip:hover { border-color: var(--green); color: var(--green); background: var(--tint); }
+.y13-chip .y13-icon { width: 12px; height: 12px; }
+.y13-chip.is-done { color: var(--muted); border-style: dashed; background: transparent; }
+.y13-chip small { font-family: inherit; font-size: 10.5px; }
+
+/* 添加与编辑 Provider 配置 */
+.y13-form-block { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 10%, transparent); }
+.y13-pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.y13-pill { padding: 5px 14px; border-radius: 18px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 13px; }
+.y13-pill:hover { border-color: var(--green); }
+.y13-pill.is-on { background: var(--tint); border-color: var(--green); color: var(--green); font-weight: 600; }
+
+/* 凭据 */
+.y13-grid-cred { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 18px; align-items: start; }
+.y13-cred-form { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); }
+.y13-radio-row { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.y13-radio-row legend { margin-bottom: 4px; }
+.y13-radio-row label { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
+.y13-radio-row input, .y13-check input { accent-color: var(--green); }
+.y13-check-row { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.y13-check { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 12.5px; }
+
+/* 部门默认与角色默认 */
+.y13-dept-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.y13-dept-card { display: grid; gap: 12px; align-content: start; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.y13-dept-card.is-ops { border-style: dashed; }
+.y13-dept-card header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.y13-dept-current { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 13px; }
+.y13-dept-current strong { font-weight: 600; overflow-wrap: anywhere; }
+.y13-role-section + .y13-role-section { margin-top: 6px; }
+.y13-role-section .y13-select { min-width: 180px; }
+
+/* 编辑 JSON */
+.y13-json-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.y13-json { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; min-height: 340px; tab-size: 2; white-space: pre; overflow: auto; }
+.y13-json-errors { border: 1px solid color-mix(in srgb, var(--red) 45%, transparent); background: var(--red-bg); color: var(--red); border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+.y13-json-errors ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; color: var(--text); }
+.y13-json-errors code { font-family: var(--mono); font-size: 12px; color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); border-radius: 4px; padding: 0 4px; margin-right: 8px; }
+.y13-json-errors.is-warn { border-color: color-mix(in srgb, var(--amber) 50%, transparent); background: var(--amber-bg); color: var(--amber); }
+.y13-json-errors.is-warn code { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, transparent); }
+.y13-json-errors .y13-h3 { color: var(--text); }
+.y13-json-errors p { color: var(--text); }
+
+/* ---------------------------------------------------------------- 运行与执行槽位 */
+
+.y13-slot-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
+.y13-lamps { display: flex; gap: 8px; padding: 10px 12px; border-radius: 10px; background: light-dark(#27302b, #111412); }
+.y13-lamp { width: 20px; height: 20px; border-radius: 50%; background: #3a453f; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .35); }
+.y13-lamp.is-on { background: #7ef0c2; box-shadow: 0 0 10px rgba(126, 240, 194, .7), inset 0 -2px 0 rgba(0, 0, 0, .2); }
+.y13-slot-count { display: grid; }
+.y13-slot-count strong { font-size: 22px; font-family: var(--mono); line-height: 1.2; }
+.y13-slot-count span { font-size: 12px; }
+.y13-ticket { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 24px; padding: 0 6px; border-radius: 5px; background: var(--blue-bg); color: var(--blue); font-family: var(--mono); font-weight: 700; border: 1px dashed color-mix(in srgb, var(--blue) 45%, transparent); }
+
+/* ---------------------------------------------------------------- 工具与扩展 */
+
+.y13-mcp + .y13-mcp { margin-top: 8px; }
+
+/* ---------------------------------------------------------------- 元观察 */
+
+.y13-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.y13-stat { display: grid; gap: 2px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); }
+.y13-stat span { font-size: 12px; color: var(--muted); }
+.y13-stat strong { font-size: 26px; font-family: var(--mono); line-height: 1.2; }
+.y13-stat small { font-size: 11.5px; color: var(--muted); }
+.y13-decision { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line)); border-radius: 10px; background: var(--amber-bg); }
+.y13-decision + .y13-decision { margin-top: 10px; }
+.y13-decision header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.y13-decision header strong { font-weight: 600; }
+
+/* ---------------------------------------------------------------- 预留入口 */
+
+.y13-reserved { border-style: dashed; background: var(--surface-2); }
+.y13-reserved .y13-kv { grid-template-columns: minmax(0, 1fr); }
+
+/* ---------------------------------------------------------------- 模型访问定义表 */
+
+.y13-table-defs td { min-width: 0; }
+.y13-table-defs .y13-input { min-width: 84px; }
+.y13-table-defs .y13-select { min-width: 104px; }
+.y13-def-reasoning { display: grid; gap: 6px; min-width: 176px; }
+.y13-def-reasoning .y13-check-row { gap: 4px 10px; }
+.y13-def-reasoning .y13-check { font-size: 12px; }
+
+/* ---------------------------------------------------------------- 窄屏 */
+
+@media (max-width: 1100px) {
+  .y13-conn-summary { grid-template-columns: minmax(0, 1fr) auto 20px; }
+  .y13-conn-url, .y13-conn-cred { grid-column: 1 / -1; }
+  .y13-conn-name { grid-column: 1; grid-row: 1; }
+  .y13-conn-count { grid-column: 2; grid-row: 1; }
+  .y13-chevron { grid-column: 3; grid-row: 1; }
+  .y13-grid-cred { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 720px) {
+  .y13-conn-summary { padding: 11px 12px; }
+  .y13-conn-body { padding: 10px 12px 14px; }
+  .y13-table-compare td:first-child, .y13-table-compare td:nth-child(2) { width: 100%; white-space: normal; }
+  .y13-role-section .y13-select { min-width: 0; }
+  .y13-json { min-height: 260px; font-size: 12px; }
+  .y13-lamps { flex-wrap: wrap; }
+  .y13-table-defs .y13-input, .y13-table-defs .y13-select { min-width: 0; }
+  .y13-def-reasoning { min-width: 0; }
+}
