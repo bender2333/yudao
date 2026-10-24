@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Yudao 总图</title>
+<style>
+  /* 布局：一页两图。主图是围着一份事实的循环，四样固定结构实线、填进去的内容虚线；小图是三环。 */
+  :root {
+    --bg: #fbfaf7; --fg: #1f1f1d; --muted: #6b6a64; --line: #1f1f1d; --soft: #c9c7bf;
+    --s3: #2f5d50; --s2: #9fbfb3; --s1: #e6ede9; --accent: #2f5d50;
+    --font: system-ui, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #17181a; --fg: #ecebe6; --muted: #a09f98; --line: #ecebe6; --soft: #4a4a46;
+    --s3: #8fc7b3; --s2: #3f6f60; --s1: #243a33; --accent: #8fc7b3; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #17181a; --fg: #ecebe6; --muted: #a09f98; --line: #ecebe6; --soft: #4a4a46;
+    --s3: #8fc7b3; --s2: #3f6f60; --s1: #243a33; --accent: #8fc7b3; color-scheme: dark }
+  * { box-sizing: border-box }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font);
+    padding-block: 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px }
+  h1 { font-size: 24px; font-weight: 600; margin: 0 }
+  h2 { font-size: 17px; font-weight: 600; margin: 0 0 6px }
+  p { margin: 0; max-width: 68ch }
+  .muted { color: var(--muted) }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px 22px; font-size: 13px; color: var(--muted); align-items: center }
+  .legend i { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; border: 1px solid var(--soft) }
+  .legend .solid { border: 2px solid var(--line); background: transparent }
+  .legend .dash { border: 1.5px dashed var(--soft); background: transparent }
+
+  /* 方框。data-status: 3 已建 / 2 建了一半 / 1 未建 */
+  .box { position: relative; padding: 10px 12px; border: 1.5px dashed var(--soft); background: var(--s1); min-width: 0 }
+  .box[data-status="3"] { background: var(--s3); color: var(--bg) }
+  .box[data-status="2"] { background: var(--s2) }
+  .box[data-status="2"] .muted, .box[data-status="3"] .muted { color: inherit; opacity: .8 }
+  .fixed { border: 2px solid var(--line) }
+  .box b { display: block; font-weight: 600 }
+  .box small { display: block; font-size: 12.5px; line-height: 1.4 }
+  .box:hover::after, .box:focus-within::after {
+    content: attr(data-tech); position: absolute; left: 0; top: 100%; z-index: 5; margin-top: 4px;
+    background: var(--fg); color: var(--bg); font-size: 12.5px; line-height: 1.4; padding: 8px 10px; max-width: 320px; white-space: pre-line }
+  .box[tabindex] { cursor: default }
+
+  /* 主图 */
+  .ring { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 12px; align-items: stretch }
+  .ring .fact { display: grid; place-items: center; text-align: center; padding: 18px 14px }
+  .ring .fact b { font-size: 17px }
+  .outer { display: grid; grid-template-columns: 170px 1fr 170px; gap: 12px; align-items: stretch }
+  .col { display: grid; gap: 12px; align-content: start }
+  .frame { border: 2px solid var(--line); padding: 12px; display: grid; gap: 12px }
+  .frame > .label { font-size: 13px; color: var(--muted) }
+  .switch { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--line); font-size: 13px }
+  .switch span { padding: 6px 8px; text-align: center }
+  .switch span.on { background: var(--fg); color: var(--bg) }
+  .arrows { font-size: 12.5px; color: var(--muted); text-align: center }
+  @media (max-width: 760px) {
+    .outer { grid-template-columns: 1fr }
+    .ring { grid-template-columns: 1fr }
+  }
+
+  /* 小图：三环 */
+  .rings { display: grid; grid-template-columns: 1fr 240px; gap: 16px; align-items: start }
+  .r { padding: 14px; border: 2px solid var(--line) }
+  .r .r { border-style: dashed; border-width: 1.5px; margin-top: 10px }
+  .r .r .r { border-style: dotted }
+  .r > b { display: block; font-weight: 600 }
+  .r > small { display: block; color: var(--muted); font-size: 12.5px }
+  @media (max-width: 760px) { .rings { grid-template-columns: 1fr } }
+  footer { font-size: 12.5px; color: var(--muted) }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Yudao 总图</h1>
+    <p class="muted">三个部门围着同一份事实循环，写入先过门，结论靠独立的证据。固定不变的只有四样：循环、边界、裁决、独立的证据；部门与轮转方式都是填进去的内容。鼠标放到方框上看对应的技术名词与状态。</p>
+  </header>
+
+  <section>
+    <h2>怎么运转</h2>
+    <div class="legend">
+      <span><i class="solid"></i>固定的结构</span><span><i class="dash"></i>填进去的内容</span>
+      <span><i style="background:var(--s3)"></i>已建</span><span><i style="background:var(--s2)"></i>建了一半</span><span><i style="background:var(--s1)"></i>未建</span>
+    </div>
+    <div class="outer" style="margin-top:14px">
+      <div class="col">
+        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：主机测量（检查回执、树摘要、用量）、判定点、用户决定。
+状态：检查回执与用户决定已建；另一个模型的判断（判定点）未建。">
+          <b>独立的证据</b><small>主机跑的检查回执、另一个模型的判断、你的回答。不信部门自己说的。</small>
+        </div>
+        <div class="box" data-status="1" tabindex="0" data-tech="技术名词：观察者（教训发现、元观察、演化）。
+状态：未建。只按读取范围看事实，只出证据与提案，不动手。">
+          <b>观察者</b><small>只看，只出证据与提案，不动手。</small>
+        </div>
+      </div>
+
+      <div class="frame">
+        <div class="label">循环（固定）</div>
+        <div class="box" data-status="2" tabindex="0" data-tech="技术名词：界面（同步层、翻译层、画面层、页面）、应用层、接口层。
+状态：页面已建；像素画面按新合同重做中。">
+          <b>界面</b><small>你看到的页面与画面，只读事实；命令从这里发。</small>
+        </div>
+        <div class="ring">
+          <div class="col">
+            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：部门定义、成果驱动路由里的产品一轮。
+状态：三部门同时运行的循环正在实施。">
+              <b>产品</b><small>意图 → 要求（PRD）。裁决目标与取舍。</small>
+            </div>
+            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：成果驱动路由里的工程一轮、运行工作区。
+状态：实施中。">
+              <b>工程</b><small>要求 → 交付。写代码、自测、交快照。</small>
+            </div>
+            <div class="box" data-status="1" tabindex="0" data-tech="技术名词：运维部门（Stage 4）。外部动作走「模型与工具」。
+状态：未建。">
+              <b>运维（以后）</b><small>监控与发布。</small>
+            </div>
+          </div>
+          <div class="col">
+            <div class="box fact" data-status="3" tabindex="0" data-tech="技术名词：事件日志、写入口、工件。
+状态：已建。项目流长期保存，run 流只在一次运行里用。">
+              <b>一份事实</b><small>发生过的事只记一份，只追加，谁都不能改。部门之间的询问也在这里。</small>
+            </div>
+            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：路由契约与路由实现（成果驱动；任务池、黑板是第二种实现）。
+状态：按成果在实施；任务池未建。换档位只换「谁开工、一轮怎么结束」。">
+              <b>轮转方式</b>
+              <div class="switch" style="margin-top:6px"><span class="on">按成果</span><span>任务池（以后）</span></div>
+              <small class="muted" style="margin-top:6px">按成果：谁关注的成果有了新版本谁开工，质检放行才结束。任务池：发布、领取、完成、打回。</small>
+            </div>
+          </div>
+          <div class="col">
+            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：成果驱动路由里的质检一轮、检查工作区。
+状态：实施中。">
+              <b>质检</b><small>交付 → 缺陷或放行。只有它能放行。</small>
+            </div>
+            <div class="box" data-status="1" tabindex="0" data-tech="加一个部门只写声明（组织定义），不改其他方框。">
+              <b>下一个部门</b><small>加部门只写声明。</small>
+            </div>
+          </div>
+        </div>
+        <div class="arrows">产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门</div>
+        <div class="box" data-status="2" tabindex="0" data-tech="技术名词：Provider、工具实现、执行环境（本机进程、远程执行代理）、动作合同。
+状态：本机已建；远程执行、网络与 MCP、浏览器未建。">
+          <b>模型与工具</b><small>调模型、改文件、跑命令、查网络；本机或远程。</small>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同。
+状态：裁决与边界已建；裁决改读最小投影未建。">
+          <b>裁决与边界</b><small>每次写入先过这里：有没有资格、引用的是不是最新、到没到上限。保证一定会停。</small>
+        </div>
+        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：评价材料（评测场景与隐藏检查、评分器、发布检查、内核清单）、看门狗。
+状态：评测工具实施中；发布检查与看门狗未建。">
+          <b>评价</b><small>评测题与判分器、发布检查。在系统之外，被开发的版本读不到。</small>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>什么能动</h2>
+    <div class="rings">
+      <div class="r">
+        <b>可以整体重写</b><small>部门的循环、装配、执行、模型与工具、界面、观察者。重写以后外面看不出区别。</small>
+        <div class="r">
+          <b>只能向后兼容</b><small>薄驱动与三道合同（轮转、装配、执行），对外的合同。字段只增，带版本。</small>
+          <div class="r">
+            <b>只由你改</b><small>一份事实的写入口、裁决、边界、评价材料、看门狗。改之前你批准。</small>
+          </div>
+        </div>
+      </div>
+      <div class="box" data-status="3" tabindex="0" data-tech="技术名词：定义与参数（组织、角色、工具、提案合同、上限与规则）。
+状态：已建；参数事件与路由自己的定义未建。">
+        <b>定义</b><small>带版本的数据。部门、角色、工具、上限住在这里。改定义不改代码，能撤回。</small>
+      </div>
+    </div>
+  </section>
+
+  <footer>状态按 main 2026-10-25。已建：在 main 上运行并有测试；建了一半：有代码，设计里标了未实施的部分；未建：只有设计。里程碑结束时由总架构师更新。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
+</main>
+</body>
+</html>
