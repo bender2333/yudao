@@ -41,8 +41,11 @@ def _review_turn(checks: dict | None = None) -> dict:
     return {"proposal": turn.proposal, "checks": checks}
 
 
-def _happy() -> list[dict]:
-    return [_product_turn(), _structure_turn(), _review_turn()]
+def _happy() -> dict[str, list[dict]]:
+    # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化。
+    # 子进程里的脚本是同一个字典（process_kill.build_script 按部门给出）
+    return _sessions([_product_turn()], [_structure_turn()], [_review_turn()])
 
 
 def _sessions(product: list[dict], engineering: list[dict], quality: list[dict]) -> dict:

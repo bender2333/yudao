@@ -25,17 +25,19 @@ DEFAULT_CHECK_COMMAND = f'"{sys.executable.replace(chr(92), "/")}" -c "raise Sys
 
 def _script():
     # 一轮建档的三个部门。质检核验的检查带一个由主机真实执行的命令（FakeAdapter 未给命令时的默认检查），
-    # 主机结算候选时按检查名把它补进基线检查，读侧据此读出 command
-    return [
-        product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"]),
-        structure_turn(checks={"smoke": 0},
-                       build_and_test=[{"name": "smoke", "command": DEFAULT_CHECK_COMMAND,
-                                        "purpose": "run the CLI"}],
-                       requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}]),
-        baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
-                                           "evidence": "smoke"}],
-                             checks={"smoke": 0}),
-    ]
+    # 主机结算候选时按检查名把它补进基线检查，读侧据此读出 command。
+    # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    return {
+        "product": [product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"])],
+        "engineering": [structure_turn(checks={"smoke": 0},
+                                       build_and_test=[{"name": "smoke", "command": DEFAULT_CHECK_COMMAND,
+                                                        "purpose": "run the CLI"}],
+                                       requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}])],
+        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
+                                                       "evidence": "smoke"}],
+                                         checks={"smoke": 0})],
+    }
 
 
 def test_decisions_list_returns_the_baseline_checks_with_their_command(data_dir, tmp_path):

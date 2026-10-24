@@ -30,15 +30,18 @@ def _source(root) -> Path:
 
 
 def _script():
-    # 建档的三个部门各一轮。核验把失败的检查记为现有缺陷：确认以后采纳成果的已知风险与现有缺陷数才有内容
-    return [
-        FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"])),
-        structure_turn(checks={"smoke": 0, "broken": 1},
-                       requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}]),
-        baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "existing_defect",
-                                           "evidence": "broken"}],
-                             checks={"smoke": 0, "broken": 1}),
-    ]
+    # 建档的三个部门各一轮。核验把失败的检查记为现有缺陷：确认以后采纳成果的已知风险与现有缺陷数才有内容。
+    # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    return {
+        "product": [FakeTurn(proposal=product_spec(requirements=[REQUIREMENT],
+                                                   acceptance=["run the CLI with a word"]))],
+        "engineering": [structure_turn(checks={"smoke": 0, "broken": 1},
+                                       requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}])],
+        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "existing_defect",
+                                                       "evidence": "broken"}],
+                                         checks={"smoke": 0, "broken": 1})],
+    }
 
 
 def _onboard(client, opened, tmp_path):

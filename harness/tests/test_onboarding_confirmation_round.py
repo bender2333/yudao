@@ -26,23 +26,33 @@ SECOND_REQUIREMENT = "the CLI explains its usage when started with --help"
 THIRD_REQUIREMENT = "the CLI reports its version"
 
 
-def _round(requirements: list[str]) -> list:
-    # 一轮建档的三个部门：产品写初始 PRD、工程写结构说明、质检核验（结论全部为已验证）
-    return [
-        FakeTurn(proposal=product_spec(requirements=requirements, acceptance=["run the CLI with a word"])),
-        structure_turn(requirement_locations=[{"requirement": item, "locations": ["src/echo.py"]}
-                                               for item in requirements]),
-        baseline_review_turn(conclusions=[{"requirement": item, "status": "verified", "evidence": "smoke"}
-                                          for item in requirements]),
-    ]
+def _round(requirements: list[str]) -> dict:
+    # 一轮建档的三个部门：产品写初始 PRD、工程写结构说明、质检核验（结论全部为已验证）。
+    # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    return {
+        "product": [FakeTurn(proposal=product_spec(requirements=requirements,
+                                                   acceptance=["run the CLI with a word"]))],
+        "engineering": [structure_turn(requirement_locations=[{"requirement": item, "locations": ["src/echo.py"]}
+                                                            for item in requirements])],
+        "quality": [baseline_review_turn(conclusions=[{"requirement": item, "status": "verified", "evidence": "smoke"}
+                                     for item in requirements])],
+    }
 
 
-def _two_rounds() -> list:
-    return [*_round([REQUIREMENT]), *_round([REQUIREMENT, SECOND_REQUIREMENT])]
+def _rounds(*requirements: list[str]) -> dict:
+    # 几轮建档接在一起：每个部门的脚本按这个部门自己的先后排列
+    scripts = [_round(item) for item in requirements]
+    return {department: [turn for script in scripts for turn in script[department]]
+            for department in scripts[0]}
 
 
-def _three_rounds() -> list:
-    return [*_two_rounds(), *_round([REQUIREMENT, SECOND_REQUIREMENT, THIRD_REQUIREMENT])]
+def _two_rounds() -> dict:
+    return _rounds([REQUIREMENT], [REQUIREMENT, SECOND_REQUIREMENT])
+
+
+def _three_rounds() -> dict:
+    return _rounds([REQUIREMENT], [REQUIREMENT, SECOND_REQUIREMENT], [REQUIREMENT, SECOND_REQUIREMENT, THIRD_REQUIREMENT])
 
 
 def _answer(client, decision: dict, option: str, note: str | None = None):

@@ -29,16 +29,22 @@ HIDDEN_BYTES = b"\x00\xff\xfe\r\n"
 
 def _system(data_dir):
     # 建档 run 的三个部门依次提交初始 PRD、现有结构说明与基线核验；
-    # 工程与质检的 run_check 回执运行源目录里可执行的 src/app.py
-    return LoopSystem.for_testing(data_dir, FakeAdapter([
-        FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"])),
-        structure_turn(checks={"smoke": 0},
-                       modules=[{"path": "src/", "responsibility": "the app"}],
-                       entry_points=[{"kind": "command_line", "path": "src/app.py", "how_to_run": "python src/app.py"}],
-                       build_and_test=[{"name": "smoke", "command": "python src/app.py", "purpose": "run it"}],
-                       requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/app.py"]}]),
-        baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}]),
-    ]))
+    # 工程与质检的 run_check 回执运行源目录里可执行的 src/app.py。
+    # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    return LoopSystem.for_testing(data_dir, FakeAdapter({
+        "product": [FakeTurn(proposal=product_spec(requirements=[REQUIREMENT],
+                                                   acceptance=["run the CLI with a word"]))],
+        "engineering": [structure_turn(checks={"smoke": 0},
+                                       modules=[{"path": "src/", "responsibility": "the app"}],
+                                       entry_points=[{"kind": "command_line", "path": "src/app.py",
+                                                      "how_to_run": "python src/app.py"}],
+                                       build_and_test=[{"name": "smoke", "command": "python src/app.py",
+                                                        "purpose": "run it"}],
+                                       requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/app.py"]}])],
+        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
+                                                       "evidence": "smoke"}])],
+    }))
 
 
 def _make_source(root: Path) -> Path:

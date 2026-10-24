@@ -62,6 +62,7 @@
 "test_event_payloads.py" = "integration"
 "test_event_sequence_compare.py" = "unit"
 "test_event_sequence.py" = "integration"
+"test_fake_adapter_scripts.py" = "module"
 "test_event_store_batch.py" = "module"
 "test_event_store_read_only.py" = "module"
 "test_event_stream.py" = "module"
