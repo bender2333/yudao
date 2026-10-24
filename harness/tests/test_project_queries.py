@@ -37,6 +37,7 @@ from harness.app.project_queries import (
     WorkItemMaterials,
 )
 from harness.app.registry import Registry
+from harness.app.read_models import DERIVATION_KEY
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
@@ -45,11 +46,13 @@ from harness.models import ArtifactRef, EventType, ProjectEventType
 from harness.proposals import (
     product_spec, delivery_turn, review_turn,
     ask_turn, answer_turn,
+    baseline_review_turn, structure_turn,
 )
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import explore_turn, happy_script, merge_scripts, quality_turns
+from harness.tests.onboarding_project import onboarding_source
 from harness.tests.api_helpers import running_api
 from harness.tests.saved_rewrite import rewrite_saved_event
 from harness.tree_archive import load_tree
@@ -519,6 +522,9 @@ def test_flow_records_cover_delivery_problem_and_rework(data_dir):
     kinds = [record.kind for record in flow.data.records]
     assert {"版本交付", "问题反馈"} <= set(kinds)
     assert "需求交接" not in set(kinds)
+    # 工单 #882：种类按成果命名，不用「交接」；流转记录里不出现这两个字样
+    assert all("交接" not in record.kind and "交接" not in record.content
+               for record in flow.data.records)
     problem = next(record for record in flow.data.records if record.kind == "问题反馈")
     assert problem.status == "已退回" and problem.direction_to == "engineering"
     assert problem.content == "质检退回" and problem.direction_from == "quality"
@@ -569,6 +575,106 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
     by_kind = {record.kind: record for record in rows}
     assert by_kind["询问"].status == "已回答"
     assert by_kind["问题反馈"].status == "已退回"
+
+
+def _prd_revision_script():
+    # 工单 #882：产品先提交一版 PRD；工程询问产品，产品在回答里修订 PRD（第二版）
+    return {
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn(recipient="product", question="空输入应该打印什么？"),
+            delivery_turn(),
+        ],
+        "product:ask": [answer_turn(
+            answer="空输入打印空行。",
+            requirements=["print the given argument to stdout"],
+            acceptance=["running the program with a word prints that word",
+                        "empty input prints a blank line"],
+            change_record={"changed": ["empty input prints a blank line"],
+                           "retained": ["running the program with a word prints that word"],
+                           "retired": [], "rationale": "验收标准漏了空输入。"})],
+        "quality": quality_turns("release", "checks passed"),
+    }
+
+
+def test_flow_records_give_two_prd_new_versions_for_each_accepted_prd(data_dir):
+    # 工单 #882 验收标准 1：每接纳一版 PRD，产品→工程与产品→质检各一条「PRD 新版本」。
+    # 这个事项接纳了两版（第二版来自产品回答询问时的修订），因此有四条，内容分别写第 1 版与第 2 版
+    system = _system(data_dir, _prd_revision_script())
+    project_id = system.projects.register("PRD 版本", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+    application = _application(system)
+    flow = application.query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
+    rows = [record for record in flow.data.records if record.kind == "PRD 新版本"]
+    assert len(rows) == 4
+    assert sorted((record.direction_from, record.direction_to) for record in rows) == [
+        ("product", "engineering"), ("product", "engineering"),
+        ("product", "quality"), ("product", "quality"),
+    ]
+    assert all(record.status == "已完成" for record in rows)
+    assert all(record.work_item_id == work_item_id for record in rows)
+    # 内容写第几版：第一版两条、第二版两条；第二版附上改动的要点
+    assert sum("第 1 版" in record.content for record in rows) == 2
+    second = [record for record in rows if "第 2 版" in record.content]
+    assert len(second) == 2
+    assert all("empty input prints a blank line" in record.content for record in second)
+    # 两条的编号不同（否则后一条会盖掉前一条）
+    assert len({record.flow_id for record in rows}) == 4
+
+
+def test_flow_records_give_two_prd_new_versions_for_the_onboarding_initial_prd(data_dir, tmp_path):
+    # 工单 #882 验收标准 2：建档事项的初始 PRD 被接纳时同样有两条（产品→工程、产品→质检）
+    requirement = "print the given argument to stdout"
+    source = onboarding_source(tmp_path / "source")
+    system = _system(data_dir, {
+        "product": [product_spec(requirements=[requirement], acceptance=["running the program with a word prints that word"])],
+        "engineering": [structure_turn(requirement_locations=[
+            {"requirement": requirement, "locations": ["src/echo.py"]}])],
+        "quality": [baseline_review_turn(conclusions=[
+            {"requirement": requirement, "status": "verified", "evidence": "smoke"}])],
+    })
+    project_id, work_item_id, run_id = system.projects.onboard("已有项目", GOAL, "src", str(source))
+    system.run_until_stop(run_id)
+    application = _application(system)
+    flow = application.query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
+    rows = [record for record in flow.data.records if record.kind == "PRD 新版本"]
+    assert len(rows) == 2
+    assert sorted((record.direction_from, record.direction_to) for record in rows) == [
+        ("product", "engineering"), ("product", "quality"),
+    ]
+    assert all(record.status == "已完成" for record in rows)
+    assert all("第 1 版" in record.content for record in rows)
+
+
+def test_the_flow_records_are_rebuilt_when_the_derivation_version_changed(data_dir):
+    # 工单 #882 验收标准 3：推导方式变了以后旧行不会自己跟着变；打开读取模型时按推导版本重建一次，
+    # 重建以后「PRD 新版本」的记录重新出现（工单 #684 的做法）
+    system = _system(data_dir, _prd_revision_script())
+    project_id = system.projects.register("推导版本", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+    application = _application(system)
+    flow = application.query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
+    assert len([record for record in flow.data.records if record.kind == "PRD 新版本"]) == 4
+    application.close()
+
+    # 旧读取模型：没有「PRD 新版本」的行，推导版本是第 1 版
+    path = data_dir / "read-models.sqlite"
+    with sqlite3.connect(path) as connection:
+        connection.execute("DELETE FROM app_flows WHERE kind = ?", ("PRD 新版本",))
+        connection.execute("INSERT OR REPLACE INTO app_read_meta (key, value) VALUES (?, ?)",
+                           (DERIVATION_KEY, "1"))
+
+    # 重新打开：保存的推导版本与代码不同，重建以后「PRD 新版本」的记录重新出现
+    reopened = Application(LoopSystem(data_dir))
+    flow = reopened.query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
+    rows = [record for record in flow.data.records if record.kind == "PRD 新版本"]
+    assert len(rows) == 4
+    assert sum("第 1 版" in record.content for record in rows) == 2
+    reopened.close()
+
+
 def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
     system = _system(data_dir, _release_script())
     project_id = system.projects.register("工件", GOAL)
