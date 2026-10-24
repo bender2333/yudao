@@ -3,9 +3,9 @@
   'use strict';
   const Y12 = window.Y12;
 
-  const PRODUCT_PROMPT = '你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标，每条要求至少有一条验收条件；用户的新输入逐版本处理，写明新增、修改或保留了哪些要求。回答其他部门的需求咨询时，只依据有效要求与用户原文；需要取舍时写明理由。';
-  const ENGINEERING_PROMPT = '你是工程部门。依据有效 PRD 先写工程计划，计划项逐条对应要求；再按计划实现代码、编写单元测试，并用登记命令自测。交付说明逐条写明完成的计划项与处理的缺陷；实现有疑问时向产品咨询，不自行改变要求。';
-  const QUALITY_PROMPT = '你是质检部门。依据有效 PRD 在独立副本中验证交付：逐条对照验收条件记录检查结果、证据与主机回执。发现问题时写明复现步骤与违反的验收条件，给出返工结论；全部验收条件都有通过的检查时给出放行结论。';
+  const PRODUCT_PROMPT = '你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标，每条要求至少有一条验收条件；用户的新输入逐版本处理，写明新增、修改或保留了哪些要求。回答其他部门的询问时，只依据有效要求与用户原文；需要取舍时写明理由，澄清的结果写进 PRD。';
+  const ENGINEERING_PROMPT = '你是工程部门。依据有效 PRD 实现代码、编写单元测试，并运行命令自测；怎样安排工作由你自己决定。交付说明写明做了什么与处理的缺陷；要求有疑问时询问产品，不自行改变要求。';
+  const QUALITY_PROMPT = '你是质检部门。依据有效 PRD 在独立副本中验证交付：逐条对照验收条件记录检查结果、证据与主机回执。交付到达之前按 PRD 起草测试用例。发现问题时写明复现步骤与违反的验收条件，提交缺陷记录；要求本身有问题时询问产品；全部验收条件都有通过的检查时给出放行结论。';
 
   const INTEND_TEXT = 'Please implement an advanced to-do list web application where users can create, edit, and delete to-do items. The application should have functionalities for adding new tasks, marking tasks as completed, deleting tasks, filtering tasks, and searching tasks. Users should be able to browse all to-do items, create new tasks, edit existing tasks, and delete unnecessary tasks. Set all pages to have a lavender background and indigo components.';
 
@@ -20,11 +20,11 @@
 
   const BASE_AC = [
     ['AC-1', '新建：填写「新增任务」表单并提交，新任务出现在列表中', 'trial_case', [], [{ name: '试用第 2 步：新增任务「预约体检」', screenshot: 'todo-trial-2.png' }]],
-    ['AC-2', '编辑：修改已有任务的说明并保存，列表中的内容随之更新', 'command_check', ['npm_test：编辑后保存'], []],
-    ['AC-3', '完成：标记任务为已完成，任务有可见的完成标记', 'command_check', ['npm_test：完成标记'], []],
-    ['AC-4', '删除：选择任务旁的删除，任务从列表中移除', 'command_check', ['npm_test：删除任务'], []],
-    ['AC-5', '筛选：按全部、未完成、已完成筛选，列表只显示符合条件的任务', 'trial_case', ['npm_test：按状态筛选'], [{ name: '试用第 3 步：点击「已完成」筛选', screenshot: 'todo-trial-3.png' }]],
-    ['AC-6', '搜索：按标题或说明搜索，结果只包含匹配的任务', 'command_check', ['npm_test：按标题与说明搜索'], []],
+    ['AC-2', '编辑：修改已有任务的说明并保存，列表中的内容随之更新', 'command_check', ['npm test：编辑后保存'], []],
+    ['AC-3', '完成：标记任务为已完成，任务有可见的完成标记', 'command_check', ['npm test：完成标记'], []],
+    ['AC-4', '删除：选择任务旁的删除，任务从列表中移除', 'command_check', ['npm test：删除任务'], []],
+    ['AC-5', '筛选：按全部、未完成、已完成筛选，列表只显示符合条件的任务', 'trial_case', ['npm test：按状态筛选'], [{ name: '试用第 3 步：点击「已完成」筛选', screenshot: 'todo-trial-3.png' }]],
+    ['AC-6', '搜索：按标题或说明搜索，结果只包含匹配的任务', 'command_check', ['npm test：按标题与说明搜索'], []],
     ['AC-7', '导航：页面内的导航可以切换到「全部待办」与「关于」', 'trial_case', [], [{ name: '试用第 1 步：打开页面，切换导航', screenshot: 'todo-trial-1.png' }]],
     ['AC-8', '配色：背景为淡紫色，按钮、卡片与标题栏为靛蓝色', 'judgement', [], [{ name: '截图与参照色板对照（模型阅读）', screenshot: 'todo-trial-1.png' }]]
   ];
@@ -34,10 +34,10 @@
   // AC-6 没有可执行的检验（开环）；第 4 次工程激活里连续 9 步没有被接纳的记录（步骤循环停滞），Stage 5 起写入计划以外路径的比例上升（漂移）
   const CSV_AC = [
     ['AC-1', '选择 CSV 文件导入，文件中的任务出现在列表中', 'trial_case', [], [{ name: '试用：导入 tasks.csv（20 行）', screenshot: 'todo-trial-2.png' }]],
-    ['AC-2', '标题、说明、截止日期三列按表头对应，列的顺序不同也能导入', 'command_check', ['npm_test：csv-columns.test.js'], []],
-    ['AC-3', 'UTF-8 与 GBK 编码的文件都能正确显示中文', 'command_check', ['npm_test：csv-encoding.test.js'], []],
-    ['AC-4', '标题与截止日期都相同的任务不重复导入，导入后提示跳过了几条', 'trial_case', ['npm_test：csv-dedupe.test.js'], [{ name: '试用：同一个文件导入两次', screenshot: 'todo-trial-5.png' }]],
-    ['AC-5', '格式错误的行跳过，并列出行号', 'command_check', ['npm_test：csv-bad-rows.test.js'], []],
+    ['AC-2', '标题、说明、截止日期三列按表头对应，列的顺序不同也能导入', 'command_check', ['npm test：csv-columns.test.js'], []],
+    ['AC-3', 'UTF-8 与 GBK 编码的文件都能正确显示中文', 'command_check', ['npm test：csv-encoding.test.js'], []],
+    ['AC-4', '标题与截止日期都相同的任务不重复导入，导入后提示跳过了几条', 'trial_case', ['npm test：csv-dedupe.test.js'], [{ name: '试用：同一个文件导入两次', screenshot: 'todo-trial-5.png' }]],
+    ['AC-5', '格式错误的行跳过，并列出行号', 'command_check', ['npm test：csv-bad-rows.test.js'], []],
     ['AC-6', '导入大文件（1 万行）时界面不卡顿', 'open', [], []]
   ];
   const CSV_OPEN = ['not_run', '没有可执行的检验：界面是否卡顿只能由人或模型阅读判断'];
@@ -45,13 +45,14 @@
   const CSV_BASE = { project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', level: 'pilot' };
   const csv = (fields) => Object.assign({ department: null, payload: {}, patch: [] }, CSV_BASE, fields);
   const csvRun = (field, value) => ({ path: 'runs[id=r-todo-csv].' + field, value });
-  const csvTo = (from, to, artifact, at, label, extra) => csv({
-    at, type: 'transition', label, payload: { from, to, artifact },
+  // 关注的成果有了新版本，部门开始一轮工作（ADR-0039）
+  const csvAct = (from, to, at, label, extra) => csv({
+    at, type: 'department_activated', department: to, label,
     patch: [csvRun('department', to), csvRun('last_department', from)].concat(extra || [])
   });
   const csvStep = (at, tool, target, planItem, label, extra) => csv({
     at, type: 'tool_started', department: 'engineering', label,
-    payload: Object.assign({ tool }, /run_command/.test(tool) ? { args: target } : { path: target }, planItem === undefined ? {} : { plan_item: planItem }),
+    payload: Object.assign({ tool }, tool === 'bash' ? { command: target } : { path: target }, planItem === undefined ? {} : { plan_item: planItem }),
     patch: extra || []
   });
 
@@ -104,15 +105,16 @@
             }
           ],
           flow: [
-            { seq: 1, at: '2026-09-27T08:00:00+08:00', from: 'user', to: 'product', kind: 'handoff', content: '用户输入 v1：待办清单网页的完整需求', status: '已接收', event_position: null },
-            { seq: 2, at: '2026-09-27T09:10:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: 'PRD r1：待办清单页面与 8 条验收条件', status: '已接收', event_position: null },
+            { seq: 1, at: '2026-09-27T08:00:00+08:00', from: 'user', to: 'product', kind: 'input', content: '用户输入 v1：待办清单网页的完整需求', status: '已接收', event_position: null },
+            { seq: 2, at: '2026-09-27T09:10:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: 'PRD r1：待办清单页面与 8 条验收条件', status: '已接纳', event_position: null },
             { seq: 3, at: '2026-09-27T10:42:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r1：index.html、app.js、styles.css 与 12 条测试', status: '已验收', event_position: null },
-            { seq: 4, at: '2026-09-27T11:52:00+08:00', from: 'quality', to: 'engineering', kind: 'rework', content: '返工：筛选按钮不生效，点击「已完成」列表不变化（D-1，违反 AC-5）', status: '已处理', event_position: null },
+            { seq: 4, at: '2026-09-27T11:52:00+08:00', from: 'quality', to: 'engineering', kind: 'defect', content: '缺陷记录：筛选按钮不生效，点击「已完成」列表不变化（D-1，违反 AC-5）', status: '已处理', event_position: null },
             { seq: 5, at: '2026-09-27T16:42:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r2：修复 D-1，筛选按完成状态过滤', status: '已验收', event_position: null },
             { seq: 6, at: '2026-09-27T18:36:00+08:00', from: 'quality', to: 'library', kind: 'release', content: '放行：8 条验收条件全部通过', status: '已放行', event_position: null },
             { seq: 7, at: '2026-09-27T18:40:00+08:00', from: 'library', to: 'adoption', kind: 'adopt', content: '项目采纳 r1', status: '已采纳', event_position: null }
           ],
-          requests: [],
+          asks: [],
+          departments: null,
           guidance: [],
           messages: {
             product: [
@@ -120,15 +122,15 @@
               { seq: 2, at: '2026-09-27T09:10:00+08:00', source: 'self', from: 'product', text: 'PRD r1 已提交：8 条验收条件', event_position: null }
             ],
             engineering: [
-              { seq: 3, at: '2026-09-27T09:12:00+08:00', source: 'other', from: 'product', text: 'PRD r1 交接', event_position: null },
-              { seq: 4, at: '2026-09-27T09:20:00+08:00', source: 'self', from: 'engineering', text: 'PLAN r1：新建页面文件与 12 条测试', event_position: null },
+              { seq: 3, at: '2026-09-27T09:12:00+08:00', source: 'other', from: 'product', text: 'PRD r1 被接纳', event_position: null },
+              { seq: 4, at: '2026-09-27T09:20:00+08:00', source: 'self', from: 'engineering', text: '先新建页面文件，再写 12 条测试', event_position: null },
               { seq: 5, at: '2026-09-27T10:40:00+08:00', source: 'self', from: 'engineering', text: '交付 r1 已提交：待办清单页面', event_position: null },
-              { seq: 6, at: '2026-09-27T11:52:00+08:00', source: 'other', from: 'quality', text: '返工：筛选按钮不生效（D-1）', event_position: null },
+              { seq: 6, at: '2026-09-27T11:52:00+08:00', source: 'other', from: 'quality', text: '缺陷记录：筛选按钮不生效（D-1）', event_position: null },
               { seq: 7, at: '2026-09-27T16:40:00+08:00', source: 'self', from: 'engineering', text: '交付 r2 已提交：修复 D-1', event_position: null }
             ],
             quality: [
-              { seq: 8, at: '2026-09-27T10:42:00+08:00', source: 'other', from: 'engineering', text: '交付 r1 交接', event_position: null },
-              { seq: 9, at: '2026-09-27T11:50:00+08:00', source: 'self', from: 'quality', text: 'QA：返工工程（D-1：筛选按钮不生效）', event_position: null },
+              { seq: 8, at: '2026-09-27T10:42:00+08:00', source: 'other', from: 'engineering', text: '交付 r1 到达', event_position: null },
+              { seq: 9, at: '2026-09-27T11:50:00+08:00', source: 'self', from: 'quality', text: 'QA：缺陷记录（D-1：筛选按钮不生效）', event_position: null },
               { seq: 10, at: '2026-09-27T18:36:00+08:00', source: 'self', from: 'quality', text: 'QA：放行，8 条验收条件全部通过', event_position: null }
             ],
             operations: []
@@ -136,13 +138,13 @@
           actions: [
             {
               id: 'a-todo-base-1', department: 'engineering', role: null, tool: 'write_file',
-              summary: '新建 index.html：列表、表单与筛选按钮', input: 'PLAN r1 第 1 项', state: 'done', receipt: null,
+              summary: '新建 index.html：列表、表单与筛选按钮', input: 'PRD r1 的 AC-1 至 AC-7', state: 'done', receipt: null,
               before: '工作区 000000（空）', after: '工作区 3f1c20', machine_id: 'm-host', at: '2026-09-27T09:40:00+08:00'
             },
             {
-              id: 'a-todo-base-2', department: 'engineering', role: null, tool: 'run_command',
-              summary: '执行登记命令 npm_test', input: 'PLAN r1 第 3 项：自测', state: 'done',
-              receipt: { command: 'npm_test', argv: ['npm', 'test'], exit_code: 0, output: '12 passing (0.4s)', truncated: false, timed_out: false, duration_ms: 1620, snapshot: 'ws-3f1c20' },
+              id: 'a-todo-base-2', department: 'engineering', role: null, tool: 'bash',
+              summary: '执行命令 npm test', input: '自测', state: 'done',
+              receipt: { command: 'npm test', exit_code: 0, output: '12 passing (0.4s)', truncated: false, timed_out: false, duration_ms: 1620, snapshot: 'ws-3f1c20' },
               before: '工作区 3f1c20', after: '工作区 3f1c20（未改动）', machine_id: 'm-host', at: '2026-09-27T10:20:00+08:00'
             },
             {
@@ -156,9 +158,9 @@
               before: 'app.js @ 3f1c20', after: 'app.js @ a1c3f20', machine_id: 'm-host', at: '2026-09-27T14:10:00+08:00'
             },
             {
-              id: 'a-todo-base-4', department: 'engineering', role: null, tool: 'run_command',
-              summary: '执行登记命令 npm_test（回归与新增用例）', input: 'PLAN 的 D-1 修复项', state: 'done',
-              receipt: { command: 'npm_test', argv: ['npm', 'test'], exit_code: 0, output: '13 passing (0.4s)', truncated: false, timed_out: false, duration_ms: 1740, snapshot: 'ws-a1c3f20' },
+              id: 'a-todo-base-4', department: 'engineering', role: null, tool: 'bash',
+              summary: '执行命令 npm test（回归与新增用例）', input: '缺陷记录 D-1 的修复', state: 'done',
+              receipt: { command: 'npm test', exit_code: 0, output: '13 passing (0.4s)', truncated: false, timed_out: false, duration_ms: 1740, snapshot: 'ws-a1c3f20' },
               before: '工作区 a1c3f20', after: '工作区 a1c3f20（未改动）', machine_id: 'm-host', at: '2026-09-27T16:30:00+08:00'
             },
             {
@@ -200,7 +202,7 @@
                 sources: [{ label: '当前合同', version: 'PRD r1', included: true }, { label: '项目上下文', version: '尚未采纳', included: true }, { label: '工具定义', version: '7 个工具', included: true }]
               },
               {
-                id: 'ctx-todo-base-e2', at: '2026-09-27T14:22:00+08:00', title: '工程激活 2（返工）', attempt_id: 'att-todo-base-05',
+                id: 'ctx-todo-base-e2', at: '2026-09-27T14:22:00+08:00', title: '工程激活 2（缺陷记录 D-1）', attempt_id: 'att-todo-base-05',
                 sources: [{ label: '当前合同', version: 'PRD r1', included: true }, { label: '质检结论', version: '质检结论 r1', included: true }]
               }
             ],
@@ -324,49 +326,50 @@
             }
           ],
           flow: [
-            { seq: 8, at: '2026-09-28T09:58:00+08:00', from: 'user', to: 'product', kind: 'handoff', content: '用户输入 v1：截止日期与逾期提醒', status: '已接收', event_position: null },
-            { seq: 9, at: '2026-09-28T10:40:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: 'PRD r1：截止日期显示与逾期提醒（AC-1 至 AC-5）', status: '已接收', event_position: null },
-            { seq: 10, at: '2026-09-28T11:02:00+08:00', from: 'engineering', to: 'product', kind: 'ask', content: '咨询：逾期是否按本地时区判定？', status: '已回答', event_position: null },
+            { seq: 8, at: '2026-09-28T09:58:00+08:00', from: 'user', to: 'product', kind: 'input', content: '用户输入 v1：截止日期与逾期提醒', status: '已接收', event_position: null },
+            { seq: 9, at: '2026-09-28T10:40:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: 'PRD r1：截止日期显示与逾期提醒（AC-1 至 AC-5）', status: '已接纳', event_position: null },
+            { seq: 10, at: '2026-09-28T11:02:00+08:00', from: 'engineering', to: 'product', kind: 'ask', content: '询问：逾期是否按本地时区判定？', status: '已回答', event_position: null },
             { seq: 11, at: '2026-09-28T11:20:00+08:00', from: 'product', to: 'engineering', kind: 'answer', content: '回答：按本地时区（Asia/Shanghai）判定，跨午夜后按本地日历日期比较', status: '已接收', event_position: null },
             { seq: 12, at: '2026-09-29T14:05:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r1：截止日期与逾期提醒', status: '已验收', event_position: null }
           ],
-          requests: [
+          asks: [
             {
-              id: 'q-todo-due-tz', from: 'engineering', to: 'product', kind: 'ask',
-              question: '逾期是否按本地时区判定？', status: 'open', answer: null,
-              born_at: '2026-09-28T11:02:00+08:00'
+              id: 'q-todo-due-tz', requester: 'engineering', recipient: 'product', parent: null,
+              question: '逾期是否按本地时区判定？', status: 'open', answer: null, reason: null,
+              born_at: '2026-09-28T11:02:00+08:00', answered_at: null
             }
           ],
+          departments: null,
           guidance: [],
           messages: {
             product: [
               { seq: 11, at: '2026-09-28T09:58:00+08:00', source: 'user', from: 'user', text: '用户输入 v1：截止日期与逾期提醒', event_position: null },
               { seq: 12, at: '2026-09-28T10:38:00+08:00', source: 'self', from: 'product', text: 'PRD r1 已提交：5 条验收条件', event_position: null },
-              { seq: 13, at: '2026-09-28T11:02:00+08:00', source: 'other', from: 'engineering', text: '咨询：逾期是否按本地时区判定？', event_position: null },
+              { seq: 13, at: '2026-09-28T11:02:00+08:00', source: 'other', from: 'engineering', text: '询问：逾期是否按本地时区判定？', event_position: null },
               { seq: 14, at: '2026-09-28T11:20:00+08:00', source: 'self', from: 'product', text: '回答：按本地时区（Asia/Shanghai）判定，跨午夜后按本地日历日期比较', event_position: null }
             ],
             engineering: [
-              { seq: 15, at: '2026-09-28T10:40:00+08:00', source: 'other', from: 'product', text: 'PRD r1 交接', event_position: null },
-              { seq: 16, at: '2026-09-28T10:55:00+08:00', source: 'self', from: 'engineering', text: 'PLAN r1：截止日期显示、逾期判定与回归用例', event_position: null },
+              { seq: 15, at: '2026-09-28T10:40:00+08:00', source: 'other', from: 'product', text: 'PRD r1 被接纳', event_position: null },
+              { seq: 16, at: '2026-09-28T10:55:00+08:00', source: 'self', from: 'engineering', text: '先做截止日期显示，再做逾期判定与回归用例', event_position: null },
               { seq: 17, at: '2026-09-28T11:20:00+08:00', source: 'other', from: 'product', text: '回答：跨午夜后按本地日历日期比较', event_position: null },
               { seq: 18, at: '2026-09-29T14:00:00+08:00', source: 'self', from: 'engineering', text: '交付 r1 已提交：截止日期与逾期提醒', event_position: null }
             ],
             quality: [
-              { seq: 19, at: '2026-09-29T14:05:00+08:00', source: 'other', from: 'engineering', text: '交付 r1 交接', event_position: null },
+              { seq: 19, at: '2026-09-29T14:05:00+08:00', source: 'other', from: 'engineering', text: '交付 r1 到达', event_position: null },
               { seq: 20, at: '2026-09-29T14:10:00+08:00', source: 'self', from: 'quality', text: '开始试用：逐步检查截止日期与逾期提醒', event_position: null },
-              { seq: 21, at: '2026-09-29T14:20:00+08:00', source: 'self', from: 'quality', text: '申请取回 MDN 的日期输入控件说明，等待一次批准', event_position: null }
+              { seq: 21, at: '2026-09-29T14:20:00+08:00', source: 'self', from: 'quality', text: '取回了 MDN 的日期输入控件说明，按它检查日期输入', event_position: null }
             ],
             operations: []
           },
           actions: [
             {
               id: 'a-todo-due-1', department: 'engineering', role: null, tool: 'read_range',
-              summary: '阅读列表渲染与日期显示的代码', input: 'PLAN r1 第 1 项', state: 'done', receipt: null,
+              summary: '阅读列表渲染与日期显示的代码', input: 'PRD r1 的 AC-2', state: 'done', receipt: null,
               before: 'app.js @ a1c3f20', after: 'app.js @ a1c3f20（未改动）', machine_id: 'm-host', at: '2026-09-28T11:05:00+08:00'
             },
             {
               id: 'a-todo-due-2', department: 'engineering', role: null, tool: 'edit_range',
-              summary: '按区间编辑 app.js：增加截止日期输入与逾期标记', input: 'PLAN r1 第 1、2 项', state: 'done', receipt: null,
+              summary: '按区间编辑 app.js：增加截止日期输入与逾期标记', input: 'PRD r1 的 AC-1 至 AC-3', state: 'done', receipt: null,
               before: 'app.js @ a1c3f20', after: 'app.js @ b7e91d4（第 1 次交回）', machine_id: 'm-host', at: '2026-09-28T11:40:00+08:00'
             },
             {
@@ -375,15 +378,17 @@
               before: 'app.js @ b7e91d4（第 3 次交回前）', after: 'app.js @ b7e91d4', machine_id: 'm-host', at: '2026-09-29T12:10:00+08:00'
             },
             {
-              id: 'a-todo-due-4', department: 'engineering', role: null, tool: 'run_command',
-              summary: '执行登记命令 npm_test', input: 'PLAN r1 第 3 项：自测与回归', state: 'done',
-              receipt: { command: 'npm_test', argv: ['npm', 'test'], exit_code: 0, output: '16 passing (0.5s)', truncated: false, timed_out: false, duration_ms: 1810, snapshot: 'ws-b7e91d4' },
+              id: 'a-todo-due-4', department: 'engineering', role: null, tool: 'bash',
+              summary: '执行命令 npm test', input: '自测与回归', state: 'done',
+              receipt: { command: 'npm test', exit_code: 0, output: '16 passing (0.5s)', truncated: false, timed_out: false, duration_ms: 1810, snapshot: 'ws-b7e91d4' },
               before: '工作区 b7e91d4', after: '工作区 b7e91d4（未改动）', machine_id: 'm-host', at: '2026-09-29T12:22:00+08:00'
             },
             {
+              // 网络取回可以取回任意地址（ADR-0038），不逐次批准
               id: 'a-todo-mdn-1', department: 'quality', role: null, tool: 'network_fetch',
-              summary: '取回 MDN 的日期输入控件说明（等待一次性批准）', input: '试用第 5 步的准备', state: 'not_sent', receipt: null,
-              before: null, after: null, machine_id: null, at: '2026-09-29T14:18:00+08:00'
+              summary: '取回 MDN 的日期输入控件说明', input: '试用第 5 步的准备', state: 'done',
+              receipt: { target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date', output: '已取回 · 24 KB', truncated: false, timed_out: false, duration_ms: 820, snapshot: null },
+              before: null, after: null, machine_id: 'm-host', at: '2026-09-29T14:18:00+08:00'
             },
             {
               id: 'a-todo-trial-3', department: 'quality', role: null, tool: 'browser',
@@ -448,13 +453,13 @@
             level: 'S5',
             product: [
               { id: 'prod-manager', name: '产品部门经理', kind: 'manager', status: 'idle', model: 'opencode-go-responses/kimi-k2.6', task: null },
-              { id: 'prod-architect', name: '产品架构师', kind: 'architect', status: 'returned', model: 'opencode-go-responses/kimi-k2.6', task: 'PRD r1（截止日期与逾期提醒）已交接；回答工程的时区咨询' },
+              { id: 'prod-architect', name: '产品架构师', kind: 'architect', status: 'returned', model: 'opencode-go-responses/kimi-k2.6', task: 'PRD r1（截止日期与逾期提醒）已被接纳；回答工程的时区询问' },
               { id: 'prod-explorer', name: '产品探索者', kind: 'explorer', status: 'idle', model: 'opencode-go-responses/kimi-k2.6', task: null },
               { id: 'prod-reviewer', name: '产品审查者', kind: 'reviewer', status: 'idle', model: 'opencode-go-responses/kimi-k2.6', task: null }
             ],
             engineering: [
               { id: 'eng-manager', name: '工程经理', kind: 'manager', status: 'idle', model: 'opencode-go-responses/kimi-k2.6', task: '交付 r1 已提交，等待质检结论' },
-              { id: 'eng-architect', name: '工程架构师', kind: 'architect', status: 'returned', model: 'opencode-go-responses/kimi-k2.6', task: 'PLAN r1 已接纳' },
+              { id: 'eng-architect', name: '工程架构师', kind: 'architect', status: 'returned', model: 'opencode-go-responses/kimi-k2.6', task: '计划已交回经理' },
               { id: 'eng-lead', name: '主程', kind: 'lead', status: 'returned', model: 'opencode-go-responses/kimi-k2.6', task: 'P-1 至 P-3 已交回，审查退回 3 次后通过' },
               { id: 'eng-explorer', name: '工程探索者', kind: 'explorer', status: 'idle', model: 'opencode-go-responses/kimi-k2.6', task: null },
               { id: 'eng-reviewer', name: '工程审查者', kind: 'reviewer', status: 'returned', model: 'opencode-go-responses/kimi-k2.6', task: 'P-1 退回 3 次后通过' }
@@ -481,12 +486,12 @@
                   ]
                 },
                 { id: 'P-2', text: '列表与筛选结果显示截止日期', assignee: 'eng-lead', status: 'returned', result: '已交回', reviews: [] },
-                { id: 'P-3', text: 'npm_test 回归与新增跨午夜用例', assignee: 'eng-lead', status: 'returned', result: '退出 0 · 16 条通过', reviews: [] }
+                { id: 'P-3', text: 'npm test 回归与新增跨午夜用例', assignee: 'eng-lead', status: 'returned', result: '退出 0 · 16 条通过', reviews: [] }
               ],
-              facts: ['跨午夜样例在审查中被指出 3 次', 'npm_test 退出 0', '计划条目都有对应实现'],
+              facts: ['跨午夜样例在审查中被指出 3 次', 'npm test 退出 0', '计划条目都有对应实现'],
               questions: [],
               progress: [
-                { cycle: 1, judgment: '有进展', text: 'PLAN 接纳，主程开始实现' },
+                { cycle: 1, judgment: '有进展', text: '计划审查通过，主程开始实现' },
                 { cycle: 2, judgment: '有进展', text: '按审查意见改为本地日期比较并补样例' },
                 { cycle: 3, judgment: '有进展', text: '文案与样例补齐后通过审查' }
               ]
@@ -495,7 +500,7 @@
               items: [
                 { id: 'Q-1', text: '对照 PRD 的 5 条验收条件试用页面', assignee: 'qa-tester', status: 'working', result: null, reviews: [] }
               ],
-              facts: ['试用完成 2 个步骤', '申请取回 MDN 说明，等待批准'],
+              facts: ['试用完成 2 个步骤', '取回了 MDN 的日期输入控件说明'],
               questions: [],
               progress: [{ cycle: 1, judgment: '有进展', text: '试用开始，截止日期显示正常' }]
             }
@@ -602,15 +607,15 @@
             at: '2026-09-29T06:00:00+08:00', progress: 'accepted', bytes: [0, 96]
           }],
           flow: [
-            { seq: 30, at: '2026-09-29T06:32:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: 'PRD r1：导入 CSV（AC-1 至 AC-6）', status: '已接收', event_position: null },
+            { seq: 30, at: '2026-09-29T06:32:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: 'PRD r1：导入 CSV（AC-1 至 AC-6）', status: '已接纳', event_position: null },
             { seq: 31, at: '2026-09-29T07:31:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r1：csv-import.js 与 4 条测试', status: '已验收', event_position: null },
-            { seq: 32, at: '2026-09-29T07:52:00+08:00', from: 'quality', to: 'engineering', kind: 'rework', content: '返工：列顺序不同导入错位（AC-2），GBK 文件乱码（AC-3），重复任务再次导入（AC-4）', status: '已处理', event_position: null },
+            { seq: 32, at: '2026-09-29T07:52:00+08:00', from: 'quality', to: 'engineering', kind: 'defect', content: '缺陷记录：列顺序不同导入错位（AC-2），GBK 文件乱码（AC-3），重复任务再次导入（AC-4）', status: '已处理', event_position: null },
             { seq: 33, at: '2026-09-29T08:31:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r2：按表头对应列', status: '已验收', event_position: null },
-            { seq: 34, at: '2026-09-29T08:52:00+08:00', from: 'quality', to: 'engineering', kind: 'rework', content: '返工：截止日期不同的任务也被当成重复跳过（AC-4），格式错误的行没有列出行号（AC-5）', status: '已处理', event_position: null },
+            { seq: 34, at: '2026-09-29T08:52:00+08:00', from: 'quality', to: 'engineering', kind: 'defect', content: '缺陷记录：截止日期不同的任务也被当成重复跳过（AC-4），格式错误的行没有列出行号（AC-5）', status: '已处理', event_position: null },
             { seq: 35, at: '2026-09-29T09:41:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r3：去重按标题与截止日期比较', status: '已验收', event_position: null },
-            { seq: 36, at: '2026-09-29T10:02:00+08:00', from: 'quality', to: 'engineering', kind: 'rework', content: '返工：导入以后没有提示跳过了几条（AC-4），行号差 1（AC-5）', status: '处理中', event_position: null }
+            { seq: 36, at: '2026-09-29T10:02:00+08:00', from: 'quality', to: 'engineering', kind: 'defect', content: '缺陷记录：导入以后没有提示跳过了几条（AC-4），行号差 1（AC-5）', status: '处理中', event_position: null }
           ],
-          requests: [], guidance: [],
+          asks: [], departments: null, guidance: [],
           messages: { product: [], engineering: [], quality: [], operations: [] },
           actions: [], trials: [],
           contexts: { product: [], engineering: [], quality: [] },
@@ -643,13 +648,7 @@
           id: 'm-todo-base-p1', project_id: 'p-todo', work_item_id: 'w-todo-base', kind: 'prd', version: 1,
           title: 'PRD r1', at: '2026-09-27T09:10:00+08:00', files: null, verdict: null,
           accepted_from: '用户输入 v1',
-          text: '# 目标\n做一个待办清单网页：新增、编辑、删除与标记完成任务，按完成状态筛选与搜索；淡紫色（lavender）背景，靛蓝色（indigo）组件。\n\n# 要求与验收条件\n- AC-1 新建：填写「新增任务」表单并提交，新任务出现在列表中\n- AC-2 编辑：修改已有任务的说明并保存，列表中的内容随之更新\n- AC-3 完成：标记任务为已完成，任务有可见的完成标记（划线或勾选）\n- AC-4 删除：选择任务旁的删除，任务从列表中移除\n- AC-5 筛选：按全部、未完成、已完成筛选，列表只显示符合条件的任务，未筛选的任务状态不变\n- AC-6 搜索：按标题或说明搜索，结果只包含匹配的任务\n- AC-7 导航：页面内的导航链接可以切换到「全部待办」与「关于」，不出现错误\n- AC-8 配色：背景为淡紫色，按钮、卡片与标题栏等组件为靛蓝色\n\n# 边界\n单页面，数据保存在浏览器本地；不要求登录与多用户。\n\n# 验收\n用 Playwright 在浏览器中逐条操作；npm_test 运行单元测试。'
-        },
-        {
-          id: 'm-todo-base-l1', project_id: 'p-todo', work_item_id: 'w-todo-base', kind: 'plan', version: 1,
-          title: 'PLAN r1', at: '2026-09-27T09:20:00+08:00', files: null, verdict: null,
-          goal: '实现待办清单页面与 12 条测试',
-          text: '1. 新建 index.html、styles.css 与 app.js\n2. 用 localStorage 保存任务，实现新增、编辑、删除、完成、筛选与搜索\n3. 编写 tests/todo.test.js 并运行登记命令 npm_test'
+          text: '# 目标\n做一个待办清单网页：新增、编辑、删除与标记完成任务，按完成状态筛选与搜索；淡紫色（lavender）背景，靛蓝色（indigo）组件。\n\n# 要求与验收条件\n- AC-1 新建：填写「新增任务」表单并提交，新任务出现在列表中\n- AC-2 编辑：修改已有任务的说明并保存，列表中的内容随之更新\n- AC-3 完成：标记任务为已完成，任务有可见的完成标记（划线或勾选）\n- AC-4 删除：选择任务旁的删除，任务从列表中移除\n- AC-5 筛选：按全部、未完成、已完成筛选，列表只显示符合条件的任务，未筛选的任务状态不变\n- AC-6 搜索：按标题或说明搜索，结果只包含匹配的任务\n- AC-7 导航：页面内的导航链接可以切换到「全部待办」与「关于」，不出现错误\n- AC-8 配色：背景为淡紫色，按钮、卡片与标题栏等组件为靛蓝色\n\n# 边界\n单页面，数据保存在浏览器本地；不要求登录与多用户。\n\n# 验收\n用 Playwright 在浏览器中逐条操作；npm test 运行单元测试。'
         },
         {
           id: 'm-todo-base-d1', project_id: 'p-todo', work_item_id: 'w-todo-base', kind: 'delivery', version: 1,
@@ -666,7 +665,7 @@
         {
           id: 'm-todo-base-q1', project_id: 'p-todo', work_item_id: 'w-todo-base', kind: 'qa', version: 1,
           title: '质检结论 r1', at: '2026-09-27T11:50:00+08:00', verdict: 'rework_engineering',
-          text: '试用第 3 步发现筛选按钮不生效：点击「已完成」后列表没有按状态过滤（D-1，违反 AC-5）。其余 7 条验收条件通过；npm_test 13 条通过。',
+          text: '试用第 3 步发现筛选按钮不生效：点击「已完成」后列表没有按状态过滤（D-1，违反 AC-5）。其余 7 条验收条件通过；npm test 13 条通过。',
           checks: [
             { label: 'AC-1 至 AC-4、AC-6 至 AC-8', ok: true },
             { label: 'AC-5 按完成状态筛选', ok: false }
@@ -680,7 +679,7 @@
         {
           id: 'm-todo-base-q2', project_id: 'p-todo', work_item_id: 'w-todo-base', kind: 'qa', version: 2,
           title: '质检结论 r2', at: '2026-09-27T18:36:00+08:00', verdict: 'release',
-          text: '重测 D-1：筛选按完成状态过滤；8 条验收条件全部通过（npm_test 13 条）。',
+          text: '重测 D-1：筛选按完成状态过滤；8 条验收条件全部通过（npm test 13 条）。',
           checks: [{ label: 'AC-1 至 AC-8', ok: true }],
           receipts: ['a-todo-base-4'],
           screenshots: ['todo-trial-1.png', 'todo-trial-2.png'],
@@ -697,13 +696,7 @@
           id: 'm-todo-due-p1', project_id: 'p-todo', work_item_id: 'w-todo-due', kind: 'prd', version: 1,
           title: 'PRD r1（截止日期与逾期提醒）', at: '2026-09-28T10:38:00+08:00', files: null, verdict: null,
           accepted_from: '用户输入 v1',
-          text: '# 目标\n为待办清单增加截止日期与逾期提醒，不改变现有的新增、编辑、删除、完成、筛选与搜索行为。\n\n# 要求与验收条件\n- AC-1 新增任务时可以填写截止日期；不填写时任务不显示截止日期\n- AC-2 列表显示每个任务的截止日期\n- AC-3 超过截止日期但没有完成的任务显示逾期提醒；提醒写明截止日期\n- AC-4 逾期按本地时区（Asia/Shanghai）判定，跨午夜后以本地日历日期比较；截止当天不算逾期\n- AC-5 新增、编辑、删除、完成、筛选与搜索的原有行为不变\n\n# 边界\n不做重复任务与通知提醒。\n\n# 验收\n用 Playwright 逐条操作（含跨午夜的样例）；npm_test 全部通过。'
-        },
-        {
-          id: 'm-todo-due-l1', project_id: 'p-todo', work_item_id: 'w-todo-due', kind: 'plan', version: 1,
-          title: 'PLAN r1（截止日期与逾期提醒）', at: '2026-09-28T10:55:00+08:00', files: null, verdict: null,
-          goal: '实现截止日期显示与逾期提醒',
-          text: '1. 在新增表单增加日期输入，任务对象增加 due 字段\n2. 列表与筛选结果里显示截止日期；逾期任务加标记\n3. 逾期判定按本地日历日期比较，补跨午夜用例\n4. 运行 npm_test 回归'
+          text: '# 目标\n为待办清单增加截止日期与逾期提醒，不改变现有的新增、编辑、删除、完成、筛选与搜索行为。\n\n# 要求与验收条件\n- AC-1 新增任务时可以填写截止日期；不填写时任务不显示截止日期\n- AC-2 列表显示每个任务的截止日期\n- AC-3 超过截止日期但没有完成的任务显示逾期提醒；提醒写明截止日期\n- AC-4 逾期按本地时区（Asia/Shanghai）判定，跨午夜后以本地日历日期比较；截止当天不算逾期\n- AC-5 新增、编辑、删除、完成、筛选与搜索的原有行为不变\n\n# 边界\n不做重复任务与通知提醒。\n\n# 验收\n用 Playwright 逐条操作（含跨午夜的样例）；npm test 全部通过。'
         },
         {
           id: 'm-todo-due-d1', project_id: 'p-todo', work_item_id: 'w-todo-due', kind: 'delivery', version: 1,
@@ -727,12 +720,7 @@
           title: 'PRD r1（导入 CSV）', at: '2026-09-29T06:30:00+08:00', files: null, verdict: null, accepted_from: '用户输入 v1',
           text: '# 目标\n从 CSV 文件导入任务，不改变现有的新增、编辑、删除、完成、筛选与搜索行为。\n\n# 要求与验收条件\n' +
             CSV_AC.map((ac) => '- ' + ac[0] + ' ' + ac[1]).join('\n') +
-            '\n\n# 边界\n只导入标题、说明、截止日期三列；不做导出与同步。\n\n# 验收\nnpm_test 覆盖列对应、编码、去重与格式错误；在 m-study 上试用导入。AC-6 目前没有可执行的检验。'
-        },
-        {
-          id: 'm-todo-csv-l1', project_id: 'p-todo', work_item_id: 'w-todo-csv', kind: 'plan', version: 1, level: 'pilot',
-          title: 'PLAN r1（导入 CSV）', at: '2026-09-29T06:50:00+08:00', files: null, verdict: null, goal: '实现 CSV 导入与去重',
-          text: 'P-1 按表头解析三列，识别 UTF-8 与 GBK\nP-2 去重：标题与截止日期都相同的任务跳过，导入后提示跳过的条数\nP-3 格式错误的行跳过并列出行号\nP-4 tests/csv-*.test.js 与登记命令 npm_test'
+            '\n\n# 边界\n只导入标题、说明、截止日期三列；不做导出与同步。\n\n# 验收\nnpm test 覆盖列对应、编码、去重与格式错误；在 m-study 上试用导入。AC-6 目前没有可执行的检验。'
         },
         ...[['d1', 1, '07:30', 'c41a0e2', 'b7e91d4', '新增 src/csv-import.js 与 4 条测试'], ['d2', 2, '08:30', 'd2b7f31', 'c41a0e2', '按表头对应列'], ['d3', 3, '09:40', 'e5c9a04', 'd2b7f31', '去重按标题与截止日期比较']]
           .map(([key, n, time, commit, parent, summary]) => ({
@@ -773,16 +761,9 @@
             engineering: { version: 1, model: null, level: null, prompt_version: null, prompt_text: null },
             quality: { version: 1, model: null, level: null, prompt_version: null, prompt_text: null }
           },
-          commands: [
-            { name: 'npm_test', argv: ['npm', 'test'], args: [], timeout_sec: 600, output_limit: 200000, version: 1 },
-            { name: 'serve_preview', argv: ['npm', 'run', 'preview', '--', '--port', '4173'], args: [], timeout_sec: 300, output_limit: 100000, version: 1 }
-          ],
-          tools: [
-            { id: 'network', label: '网络取回', scope: '只读取回：registry.npmjs.org', approval: '超出范围时逐次批准' }
-          ],
           machines: [
-            { machine_id: 'm-host', dirs: ['工作区'], operations: ['npm_test', 'serve_preview'], runtime_env: false, standing: false },
-            { machine_id: 'm-study', dirs: ['检查副本', '试用浏览器'], operations: ['npm_test', '浏览器试用'], runtime_env: false, standing: false }
+            { machine_id: 'm-host', dirs: ['工作区'], runtime_env: false, standing: false },
+            { machine_id: 'm-study', dirs: ['检查副本', '试用浏览器'], runtime_env: false, standing: false }
           ],
           roles: {
             level: 'S5',
@@ -809,40 +790,6 @@
         }
       },
       decisions: [
-        {
-          id: 'd-todo-mdn', kind: 'tool_once', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
-          status: 'waiting', issued_at: '2026-09-29T14:20:00+08:00', born_at: '2026-09-29T14:20:00+08:00', version: 1,
-          blocks: { scope: 'action', work_item_id: 'w-todo-due', queued_behind: 0 },
-          materials: {
-            tool: '网络取回', target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date',
-            scope: '只读取回：registry.npmjs.org',
-            exceeds: 'developer.mozilla.org 不在本项目的授权域名中'
-          },
-          view: '#/p/p-todo/w/w-todo-due/dept/quality',
-          answer: null,
-          options: [
-            {
-              id: 'approve', label: '批准这一次取回', kind: 'primary', events: [
-                {
-                  type: 'x_network_fetch', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-                  label: '用户批准取回 MDN 的日期输入控件说明',
-                  payload: { tool: '网络取回', target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date', result: '已取回 · 24 KB' },
-                  patch: []
-                }
-              ]
-            },
-            {
-              id: 'deny', label: '不批准', kind: 'danger', events: [
-                {
-                  type: 'tool_skipped', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-                  label: '用户不批准取回 MDN 的说明，质检部门改用页面本身的可访问性结构',
-                  payload: { tool: '网络取回', target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date' },
-                  patch: []
-                }
-              ]
-            }
-          ]
-        },
         {
           id: 'd-todo-rework-1', kind: 'rework_reminder', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
           status: 'waiting', issued_at: '2026-09-28T16:10:00+08:00', born_at: '2026-09-28T16:10:00+08:00', version: 1,
@@ -901,12 +848,12 @@
       },
       {
         at: '2026-09-27T09:10:00+08:00', type: 'spec_accepted', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'product',
-        label: '产品提交 PRD r1，主机接纳（8 条验收条件）', payload: { material_id: 'm-todo-base-p1' },
+        label: '产品提交 PRD r1，主机接纳（8 条验收条件）；工程关注的 PRD 有了新版本', payload: { material_id: 'm-todo-base-p1' },
         patch: [{ path: 'runs[id=r-todo-base].elapsed_sec', value: 4200 }]
       },
       {
-        at: '2026-09-27T09:12:00+08:00', type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base',
-        label: 'PRD r1 交付给工程部门', payload: { from: 'product', to: 'engineering', artifact: 'prd' },
+        at: '2026-09-27T09:12:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'engineering',
+        label: '工程部门开始一轮工作：实现待办清单页面', payload: {},
         patch: [
           { path: 'runs[id=r-todo-base].department', value: 'engineering' },
           { path: 'runs[id=r-todo-base].last_department', value: 'product' },
@@ -916,18 +863,13 @@
         ]
       },
       {
-        at: '2026-09-27T09:20:00+08:00', type: 'plan_accepted', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'engineering',
-        label: '工程提交 PLAN r1，主机接纳', payload: { material_id: 'm-todo-base-l1' },
-        patch: [{ path: 'runs[id=r-todo-base].elapsed_sec', value: 6600 }]
-      },
-      {
         at: '2026-09-27T10:40:00+08:00', type: 'delivery_accepted', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'engineering',
-        label: '工程封存交付 r1：待办清单页面与 12 条测试', payload: { material_id: 'm-todo-base-d1' },
+        label: '工程封存交付 r1：待办清单页面与 12 条测试；质检关注的交付到达', payload: { material_id: 'm-todo-base-d1' },
         patch: [{ path: 'runs[id=r-todo-base].elapsed_sec', value: 9600 }]
       },
       {
-        at: '2026-09-27T10:42:00+08:00', type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base',
-        label: '交付 r1 送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' },
+        at: '2026-09-27T10:42:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'quality',
+        label: '质检部门开始核验交付 r1', payload: {},
         patch: [
           { path: 'runs[id=r-todo-base].department', value: 'quality' },
           { path: 'runs[id=r-todo-base].last_department', value: 'engineering' },
@@ -960,15 +902,15 @@
       },
       {
         at: '2026-09-27T11:50:00+08:00', type: 'qa_submitted', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'quality',
-        label: '质检结论 r1：返工——筛选按钮不生效（D-1）', payload: { verdict: 'rework_engineering', material_id: 'm-todo-base-q1' },
+        label: '质检结论 r1：缺陷记录——筛选按钮不生效（D-1）；工程关注的缺陷记录到达', payload: { verdict: 'rework_engineering', material_id: 'm-todo-base-q1' },
         patch: [
           { path: 'runs[id=r-todo-base].cycle', value: 2 },
           { path: 'runs[id=r-todo-base].elapsed_sec', value: 13800 }
         ]
       },
       {
-        at: '2026-09-27T11:52:00+08:00', type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base',
-        label: '交付 r1 退回工程部门', payload: { from: 'quality', to: 'engineering', artifact: 'defect' },
+        at: '2026-09-27T11:52:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'engineering',
+        label: '工程部门开始第 2 轮：按 D-1 修改筛选逻辑', payload: {},
         patch: [
           { path: 'runs[id=r-todo-base].department', value: 'engineering' },
           { path: 'runs[id=r-todo-base].last_department', value: 'quality' },
@@ -977,17 +919,13 @@
         ]
       },
       {
-        at: '2026-09-27T14:20:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'engineering',
-        label: '工程部门按 D-1 修改筛选逻辑', payload: {}, patch: []
-      },
-      {
         at: '2026-09-27T16:40:00+08:00', type: 'delivery_accepted', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'engineering',
-        label: '工程封存交付 r2：修复筛选按钮', payload: { material_id: 'm-todo-base-d1' },
+        label: '工程封存交付 r2：修复筛选按钮；质检关注的交付到达', payload: { material_id: 'm-todo-base-d1' },
         patch: [{ path: 'runs[id=r-todo-base].elapsed_sec', value: 31000 }]
       },
       {
-        at: '2026-09-27T16:42:00+08:00', type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base',
-        label: '交付 r2 送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' },
+        at: '2026-09-27T16:42:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base', department: 'quality',
+        label: '质检部门开始核验交付 r2', payload: {},
         patch: [
           { path: 'runs[id=r-todo-base].department', value: 'quality' },
           { path: 'runs[id=r-todo-base].last_department', value: 'engineering' },
@@ -1013,16 +951,12 @@
           { path: 'runs[id=r-todo-base].phase', value: 'DONE' },
           { path: 'runs[id=r-todo-base].department', value: null },
           { path: 'runs[id=r-todo-base].last_department', value: 'quality' },
-          { path: 'runs[id=r-todo-base].recovery.state', value: 'terminated' },
+          { path: 'runs[id=r-todo-base].recovery.state', value: 'completed' },
           { path: 'runs[id=r-todo-base].recovery.last_confirmed', value: { seq: 6, text: '质检放行，8 条验收条件全部通过' } },
           { path: 'runs[id=r-todo-base].elapsed_sec', value: 37200 },
-          { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-todo-base' } }
+          { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-todo-base' } },
+          { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-27T18:36:00+08:00' }
         ]
-      },
-      {
-        at: '2026-09-27T18:38:00+08:00', type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base',
-        label: '放行单与交付 r2 送到成果库', payload: { from: 'quality', to: 'library', artifact: 'release' },
-        patch: [{ path: 'projects[id=p-todo].last_activity_at', value: '2026-09-27T18:38:00+08:00' }]
       },
       {
         at: '2026-09-27T18:40:00+08:00', type: 'deliverable_adopted', project_id: 'p-todo', work_item_id: 'w-todo-base', run_id: 'r-todo-base',
@@ -1062,12 +996,12 @@
       },
       {
         at: '2026-09-28T10:38:00+08:00', type: 'spec_accepted', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'product',
-        label: '产品提交 PRD r1（截止日期与逾期提醒），主机接纳', payload: { material_id: 'm-todo-due-p1' },
+        label: '产品提交 PRD r1（截止日期与逾期提醒），主机接纳；工程关注的 PRD 有了新版本', payload: { material_id: 'm-todo-due-p1' },
         patch: [{ path: 'runs[id=r-todo-due].elapsed_sec', value: 2280 }]
       },
       {
-        at: '2026-09-28T10:40:00+08:00', type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
-        label: 'PRD r1 交付给工程部门', payload: { from: 'product', to: 'engineering', artifact: 'prd' },
+        at: '2026-09-28T10:42:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
+        label: '工程部门开始一轮工作：截止日期与逾期提醒', payload: {},
         patch: [
           { path: 'runs[id=r-todo-due].department', value: 'engineering' },
           { path: 'runs[id=r-todo-due].last_department', value: 'product' },
@@ -1077,34 +1011,25 @@
         ]
       },
       {
-        at: '2026-09-28T10:42:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-        label: '工程部门开始计划截止日期与逾期提醒', payload: {}, patch: []
-      },
-      {
         at: '2026-09-28T10:44:00+08:00', type: 'x_role_task_assigned', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-architect',
-        label: '工程经理把「起草 PLAN」任务卡递给工程架构师', payload: { to: 'eng-architect', task: '起草 PLAN r1：截止日期显示与逾期判定' },
+        label: '工程经理把「起草计划」任务卡递给工程架构师', payload: { to: 'eng-architect', task: '起草计划：截止日期显示与逾期判定' },
         patch: [
           { path: 'runs[id=r-todo-due].roles.engineering[id=eng-architect].status', value: 'assigned' },
-          { path: 'runs[id=r-todo-due].roles.engineering[id=eng-architect].task', value: '起草 PLAN r1：截止日期显示与逾期判定' }
+          { path: 'runs[id=r-todo-due].roles.engineering[id=eng-architect].task', value: '起草计划：截止日期显示与逾期判定' }
         ]
       },
       {
         at: '2026-09-28T10:50:00+08:00', type: 'x_role_result_returned', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-architect',
-        label: '工程架构师把 PLAN r1 草案交回经理', payload: { to: 'eng-architect' },
+        label: '工程架构师把计划草案交回经理', payload: { to: 'eng-architect' },
         patch: [{ path: 'runs[id=r-todo-due].roles.engineering[id=eng-architect].status', value: 'returned' }]
       },
       {
         at: '2026-09-28T10:52:00+08:00', type: 'x_review_recorded', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-reviewer',
-        label: '工程审查者审查 PLAN r1：通过', payload: { verdict: 'passed', text: '计划项与 PRD 的 5 条验收条件对应，通过。' },
+        label: '工程审查者审查计划：通过', payload: { verdict: 'passed', text: '计划条目与 PRD 的 5 条验收条件对应，通过。' },
         patch: [
           { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].status', value: 'returned' },
-          { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].task', value: 'PLAN r1 审查通过' }
+          { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].task', value: '计划审查通过' }
         ]
-      },
-      {
-        at: '2026-09-28T10:55:00+08:00', type: 'plan_accepted', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-        label: '工程提交 PLAN r1，主机接纳', payload: { material_id: 'm-todo-due-l1' },
-        patch: [{ path: 'runs[id=r-todo-due].elapsed_sec', value: 3300 }]
       },
       {
         at: '2026-09-28T11:00:00+08:00', type: 'x_role_task_assigned', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-lead',
@@ -1115,20 +1040,21 @@
         ]
       },
       {
-        at: '2026-09-28T11:02:00+08:00', type: 'collaboration_requested', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-        label: '工程询问产品：逾期是否按本地时区判定', payload: { from: 'engineering', to: 'product', request_id: 'q-todo-due-tz' },
+        at: '2026-09-28T11:02:00+08:00', type: 'ask_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
+        label: '工程询问产品：逾期是否按本地时区判定', payload: { ask_id: 'q-todo-due-tz', requester: 'engineering', recipient: 'product', question: '逾期是否按本地时区判定？' },
         patch: [
-          { path: 'runs[id=r-todo-due].requests[id=q-todo-due-tz].status', value: 'open' },
+          { path: 'runs[id=r-todo-due].asks[id=q-todo-due-tz].status', value: 'open' },
           { path: 'runs[id=r-todo-due].elapsed_sec', value: 3720 },
           { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-28T11:02:00+08:00' }
         ]
       },
       {
-        at: '2026-09-28T11:20:00+08:00', type: 'collaboration_responded', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'product',
-        label: '产品回答：按本地时区判定，跨午夜后按本地日历日期比较', payload: { from: 'product', to: 'engineering', request_id: 'q-todo-due-tz' },
+        at: '2026-09-28T11:20:00+08:00', type: 'ask_answered', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'product',
+        label: '产品回答工程：按本地时区判定，跨午夜后按本地日历日期比较', payload: { ask_id: 'q-todo-due-tz', requester: 'engineering', recipient: 'product', result: 'answered', answer: '按本地时区（Asia/Shanghai）判定；跨午夜后按本地日历日期比较，截止当天不显示逾期。' },
         patch: [
-          { path: 'runs[id=r-todo-due].requests[id=q-todo-due-tz].status', value: 'answered' },
-          { path: 'runs[id=r-todo-due].requests[id=q-todo-due-tz].answer', value: '按本地时区（Asia/Shanghai）判定；跨午夜后按本地日历日期比较，截止当天不显示逾期。' },
+          { path: 'runs[id=r-todo-due].asks[id=q-todo-due-tz].status', value: 'answered' },
+          { path: 'runs[id=r-todo-due].asks[id=q-todo-due-tz].answer', value: '按本地时区（Asia/Shanghai）判定；跨午夜后按本地日历日期比较，截止当天不显示逾期。' },
+          { path: 'runs[id=r-todo-due].asks[id=q-todo-due-tz].answered_at', value: '2026-09-28T11:20:00+08:00' },
           { path: 'runs[id=r-todo-due].elapsed_sec', value: 4800 },
           { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-28T11:20:00+08:00' }
         ]
@@ -1224,10 +1150,10 @@
       },
       {
         at: '2026-09-29T12:05:00+08:00', type: 'x_role_task_assigned', level: 'S5', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-lead',
-        label: '工程经理把 P-1 的第三次修改任务递给主程', payload: { to: 'eng-lead', task: '补全提醒文案并重跑 npm_test' },
+        label: '工程经理把 P-1 的第三次修改任务递给主程', payload: { to: 'eng-lead', task: '补全提醒文案并重跑 npm test' },
         patch: [
           { path: 'runs[id=r-todo-due].roles.engineering[id=eng-lead].status', value: 'assigned' },
-          { path: 'runs[id=r-todo-due].roles.engineering[id=eng-lead].task', value: '补全提醒文案并重跑 npm_test' }
+          { path: 'runs[id=r-todo-due].roles.engineering[id=eng-lead].task', value: '补全提醒文案并重跑 npm test' }
         ]
       },
       {
@@ -1250,7 +1176,7 @@
       },
       {
         at: '2026-09-29T14:00:00+08:00', type: 'delivery_accepted', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-        label: '工程封存交付 r1：截止日期与逾期提醒', payload: { material_id: 'm-todo-due-d1' },
+        label: '工程封存交付 r1：截止日期与逾期提醒；质检关注的交付到达', payload: { material_id: 'm-todo-due-d1' },
         patch: [
           { path: 'runs[id=r-todo-due].elapsed_sec', value: 100000 },
           { path: 'runs[id=r-todo-due].recovery.last_confirmed', value: { seq: 12, text: '工程封存交付 r1（截止日期与逾期提醒）' } },
@@ -1259,8 +1185,8 @@
         ]
       },
       {
-        at: '2026-09-29T14:05:00+08:00', type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
-        label: '交付 r1 送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' },
+        at: '2026-09-29T14:05:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
+        label: '质检部门开始核验截止日期与逾期提醒', payload: {},
         patch: [
           { path: 'runs[id=r-todo-due].department', value: 'quality' },
           { path: 'runs[id=r-todo-due].last_department', value: 'engineering' },
@@ -1269,10 +1195,6 @@
           { path: 'runtime.slots.used', push: { work_item_id: 'w-todo-due', department: 'quality', role: null } },
           { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T14:05:00+08:00' }
         ]
-      },
-      {
-        at: '2026-09-29T14:05:00+08:00', type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-        label: '质检部门开始核验截止日期与逾期提醒', payload: {}, patch: []
       },
       {
         at: '2026-09-29T14:10:00+08:00', type: 'x_remote_action_started', level: '3.2C', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
@@ -1289,16 +1211,8 @@
       },
       {
         at: '2026-09-29T14:18:00+08:00', type: 'x_network_fetch', level: '3.2B', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-        label: '质检申请取回 MDN 的日期输入控件说明，超出本项目的网络授权', payload: { tool: '网络取回', target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date', result: '超出授权：等待逐次批准' },
-        patch: []
-      },
-      {
-        at: '2026-09-29T14:20:00+08:00', type: 'x_decision_issued', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
-        label: '发出决定请求：授权取回 MDN 的日期输入控件说明', payload: { decision_id: 'd-todo-mdn', kind: 'tool_once' },
-        patch: [
-          { path: 'decisions[id=d-todo-mdn].status', value: 'waiting' },
-          { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T14:20:00+08:00' }
-        ]
+        label: '质检取回 MDN 的日期输入控件说明', payload: { tool: '网络取回', target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date', result: '已取回 · 24 KB' },
+        patch: [{ path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T14:18:00+08:00' }]
       },
       // Stage 5：带参照材料的判定点由决策模型核对配色，结论带概率
       {
@@ -1315,53 +1229,49 @@
       csv({ at: '2026-09-29T06:00:00+08:00', type: 'run_created', label: '导入 CSV 的 run 创建，产品部门开始' }),
       csv({ at: '2026-09-29T06:00:00+08:00', type: 'department_activated', department: 'product', label: '产品部门整理导入 CSV 的要求' }),
       csv({
-        at: '2026-09-29T06:30:00+08:00', type: 'spec_accepted', department: 'product', label: '产品提交 PRD r1（导入 CSV，6 条验收条件），主机接纳',
+        at: '2026-09-29T06:30:00+08:00', type: 'spec_accepted', department: 'product', label: '产品提交 PRD r1（导入 CSV，6 条验收条件），主机接纳；工程关注的 PRD 有了新版本',
         payload: { material_id: 'm-todo-csv-p1' }, patch: [csvRun('elapsed_sec', 1800)]
       }),
-      csvTo('product', 'engineering', 'prd', '2026-09-29T06:32:00+08:00', 'PRD r1 交付给工程部门', [csvRun('elapsed_sec', 1920)]),
+      csvAct('product', 'engineering', '2026-09-29T06:32:00+08:00', '工程部门开始一轮工作：导入 CSV', [csvRun('elapsed_sec', 1920)]),
       csv({
-        at: '2026-09-29T06:50:00+08:00', type: 'plan_accepted', department: 'engineering', label: '工程提交 PLAN r1（导入 CSV），主机接纳',
-        payload: { material_id: 'm-todo-csv-l1' }, patch: [csvRun('elapsed_sec', 3000)]
-      }),
-      csv({
-        at: '2026-09-29T07:30:00+08:00', type: 'delivery_accepted', department: 'engineering', label: '工程封存交付 r1：csv-import.js 与 4 条测试',
+        at: '2026-09-29T07:30:00+08:00', type: 'delivery_accepted', department: 'engineering', label: '工程封存交付 r1：csv-import.js 与 4 条测试；质检关注的交付到达',
         payload: { material_id: 'm-todo-csv-d1', snapshot: 'c41a0e2' }, patch: [csvRun('elapsed_sec', 5400)]
       }),
-      csvTo('engineering', 'quality', 'box', '2026-09-29T07:31:00+08:00', '交付 r1 送到质检部门', [csvRun('elapsed_sec', 5460)]),
+      csvAct('engineering', 'quality', '2026-09-29T07:31:00+08:00', '质检部门开始核验交付 r1', [csvRun('elapsed_sec', 5460)]),
       csv({
-        at: '2026-09-29T07:50:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r1：返工——列顺序不同导入错位，GBK 文件乱码，重复任务再次导入（3 条未满足）',
+        at: '2026-09-29T07:50:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r1：缺陷记录——列顺序不同导入错位，GBK 文件乱码，重复任务再次导入（3 条未满足）',
         payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q1' }, patch: [csvRun('cycle', 2), csvRun('elapsed_sec', 6600)]
       }),
-      csvTo('quality', 'engineering', 'defect', '2026-09-29T07:52:00+08:00', '交付 r1 退回工程部门'),
+      csvAct('quality', 'engineering', '2026-09-29T07:52:00+08:00', '工程关注的缺陷记录到达，开始第 2 轮'),
       csv({
         at: '2026-09-29T08:30:00+08:00', type: 'delivery_accepted', department: 'engineering', label: '工程封存交付 r2：按表头对应列',
         payload: { material_id: 'm-todo-csv-d2', snapshot: 'd2b7f31' }, patch: [csvRun('elapsed_sec', 8880)]
       }),
-      csvTo('engineering', 'quality', 'box', '2026-09-29T08:31:00+08:00', '交付 r2 送到质检部门'),
+      csvAct('engineering', 'quality', '2026-09-29T08:31:00+08:00', '质检部门开始核验交付 r2'),
       csv({
-        at: '2026-09-29T08:50:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r2：返工——截止日期不同的任务也被当成重复，格式错误的行没有列出行号（2 条未满足）',
+        at: '2026-09-29T08:50:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r2：缺陷记录——截止日期不同的任务也被当成重复，格式错误的行没有列出行号（2 条未满足）',
         payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q2' }, patch: [csvRun('cycle', 3), csvRun('elapsed_sec', 10200)]
       }),
-      csvTo('quality', 'engineering', 'defect', '2026-09-29T08:52:00+08:00', '交付 r2 退回工程部门'),
+      csvAct('quality', 'engineering', '2026-09-29T08:52:00+08:00', '工程关注的缺陷记录到达，开始第 3 轮'),
       csv({
         at: '2026-09-29T09:40:00+08:00', type: 'delivery_accepted', department: 'engineering', label: '工程封存交付 r3：去重按标题与截止日期比较',
         payload: { material_id: 'm-todo-csv-d3', snapshot: 'e5c9a04' }, patch: [csvRun('elapsed_sec', 13200)]
       }),
-      csvTo('engineering', 'quality', 'box', '2026-09-29T09:41:00+08:00', '交付 r3 送到质检部门'),
+      csvAct('engineering', 'quality', '2026-09-29T09:41:00+08:00', '质检部门开始核验交付 r3'),
       csv({
-        at: '2026-09-29T10:00:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r3：返工——导入以后没有提示跳过了几条，行号差 1（2 条未满足）',
+        at: '2026-09-29T10:00:00+08:00', type: 'qa_submitted', department: 'quality', label: '质检结论 r3：缺陷记录——导入以后没有提示跳过了几条，行号差 1（2 条未满足）',
         payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q3' }, patch: [csvRun('cycle', 4), csvRun('elapsed_sec', 14400)]
       }),
-      csvTo('quality', 'engineering', 'defect', '2026-09-29T10:02:00+08:00', '交付 r3 退回工程部门'),
+      csvAct('quality', 'engineering', '2026-09-29T10:02:00+08:00', '工程关注的缺陷记录到达，开始第 4 轮'),
       csvStep('2026-09-29T13:10:00+08:00', 'read_range', 'app.js', 'P-2', '工程部门阅读 app.js 的导入入口'),
       csvStep('2026-09-29T13:22:00+08:00', 'edit_range', 'src/csv-import.js', 'P-2', '工程部门按区间编辑 src/csv-import.js：跳过重复行时计数'),
-      csvStep('2026-09-29T13:35:00+08:00', 'run_command', 'npm test -- csv-import', undefined, '工程部门执行登记命令 npm_test（只跑导入用例）', [csvRun('elapsed_sec', 16200)]),
+      csvStep('2026-09-29T13:35:00+08:00', 'bash', 'npm test -- csv-import', undefined, '工程部门执行命令 npm test -- csv-import（只跑导入用例）', [csvRun('elapsed_sec', 16200)]),
       csvStep('2026-09-29T13:50:00+08:00', 'edit_range', 'src/csv-import.js', 'P-2', '工程部门按区间编辑 src/csv-import.js：导入完成后弹出提示'),
       csvStep('2026-09-29T14:05:00+08:00', 'write_file', 'vendor/papaparse.min.js', null, '工程部门写入 vendor/papaparse.min.js：换用第三方解析库'),
-      csvStep('2026-09-29T14:20:00+08:00', 'run_command', 'npm test -- import', undefined, '工程部门执行登记命令 npm_test（导入相关用例）', [csvRun('elapsed_sec', 18000)]),
+      csvStep('2026-09-29T14:20:00+08:00', 'bash', 'npm test -- import', undefined, '工程部门执行命令 npm test -- import（导入相关用例）', [csvRun('elapsed_sec', 18000)]),
       csvStep('2026-09-29T14:40:00+08:00', 'edit_range', 'styles.css', null, '工程部门按区间编辑 styles.css：导入进度条的样式'),
       csvStep('2026-09-29T15:00:00+08:00', 'write_file', 'src/legacy-import.js', null, '工程部门写入 src/legacy-import.js：保留旧的解析代码'),
-      csvStep('2026-09-29T15:20:00+08:00', 'run_command', 'npm test', undefined, '工程部门执行登记命令 npm_test', [csvRun('elapsed_sec', 19800)])
+      csvStep('2026-09-29T15:20:00+08:00', 'bash', 'npm test', undefined, '工程部门执行命令 npm test', [csvRun('elapsed_sec', 19800)])
     ],
     scenarios: [
       {
@@ -1380,7 +1290,7 @@
                 late_results: [], verifications: [], unfinished: [],
                 limits: { activations: 0, model_steps: 0, retries: 0 }, auto_resumed_at: null
               },
-              inputs: [], flow: [], requests: [], guidance: [],
+              inputs: [], flow: [], asks: [], departments: null, guidance: [],
               messages: { product: [], engineering: [], quality: [], operations: [] },
               actions: [], trials: [],
               contexts: { product: [], engineering: [], quality: [] },
@@ -1461,44 +1371,46 @@
             },
             patch: []
           },
+          // 三个部门同时运行（ADR-0036、ADR-0039）：PRD 被接纳以后工程开始实现，质检同时按 PRD 起草测试用例（预测性探索）；
+          // 工程的询问是一次工具调用，产品在回答里附带 PRD 的新版本
           {
             delay: 1400,
             event: {
               type: 'spec_accepted', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'product',
-              label: '产品提交 PRD r1：导出为 CSV（3 条验收条件），主机接纳', payload: {}
+              label: '产品提交 PRD r1：导出为 CSV（3 条验收条件），主机接纳；工程与质检关注的 PRD 有了新版本', payload: { version: 'r1' }
             },
-            patch: [{ path: 'runs[id=r-todo-export].elapsed_sec', value: 1600 }]
+            patch: [
+              { path: 'runs[id=r-todo-export].elapsed_sec', value: 1600 },
+              { path: 'runs[id=r-todo-export].department', value: 'engineering' },
+              { path: 'runs[id=r-todo-export].last_department', value: 'product' }
+            ]
           },
           {
             delay: 1200,
             event: {
-              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export',
-              label: 'PRD r1 交付给工程部门', payload: { from: 'product', to: 'engineering', artifact: 'prd' }
+              type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering',
+              label: '工程部门开始一轮工作：导出按钮与 CSV 生成', payload: {}
             },
-            patch: [
-              { path: 'runs[id=r-todo-export].department', value: 'engineering' },
-              { path: 'runs[id=r-todo-export].last_department', value: 'product' },
-              { path: 'runs[id=r-todo-export].elapsed_sec', value: 1700 }
-            ]
+            patch: [{ path: 'runs[id=r-todo-export].elapsed_sec', value: 1700 }]
           },
           {
-            delay: 1400,
+            delay: 1200,
             event: {
-              type: 'plan_accepted', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering',
-              label: '工程提交 PLAN r1：导出按钮与 CSV 生成，主机接纳', payload: {}
+              type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'quality',
+              label: '质检部门同时开始预测性探索：交付到达之前按 PRD r1 起草测试用例', payload: { predictive: true }
             },
-            patch: [{ path: 'runs[id=r-todo-export].elapsed_sec', value: 2800 }]
+            patch: [{ path: 'runs[id=r-todo-export].departments', value: { quality: { state: 'working', note: '预测性探索：按 PRD r1 起草测试用例' } } }]
           },
           {
             delay: 1200,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering', tool: 'edit_range',
-              label: '工程部门按区间编辑 app.js：导出为 CSV', payload: {}
+              label: '工程部门按区间编辑 app.js：导出为 CSV', payload: { tool: 'edit_range', target: 'app.js' }
             },
             patch: [{
               path: 'runs[id=r-todo-export].actions', push: {
                 id: 'a-todo-export-1', department: 'engineering', role: null, tool: 'edit_range',
-                summary: '按区间编辑 app.js：导出为 CSV', input: 'PLAN r1 第 1 项', state: 'done', receipt: null,
+                summary: '按区间编辑 app.js：导出为 CSV', input: 'PRD r1 的 AC-1', state: 'done', receipt: null,
                 before: 'app.js @ b7e91d4', after: 'app.js @ c3a7f10', machine_id: 'm-host', at: '2026-09-29T15:30:00+08:00'
               }
             }]
@@ -1506,14 +1418,51 @@
           {
             delay: 1400,
             event: {
-              type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering', tool: 'run_command',
-              label: '工程部门走到终端执行登记命令 npm_test', payload: {}
+              type: 'ask_started', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering',
+              label: '工程询问产品：CSV 用逗号还是分号分隔？中文版 Excel 默认分号',
+              payload: { ask_id: 'q-todo-export-sep', requester: 'engineering', recipient: 'product', question: 'CSV 用逗号还是分号分隔？中文版 Excel 打开逗号分隔的文件会挤在一列。' }
+            },
+            patch: [{
+              path: 'runs[id=r-todo-export].asks', push: {
+                id: 'q-todo-export-sep', requester: 'engineering', recipient: 'product', parent: null,
+                question: 'CSV 用逗号还是分号分隔？中文版 Excel 打开逗号分隔的文件会挤在一列。', status: 'open', answer: null, reason: null, prd_version: null,
+                born_at: '2026-09-29T15:30:00+08:00', answered_at: null
+              }
+            }]
+          },
+          {
+            delay: 1600,
+            event: {
+              type: 'ask_answered', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'product',
+              label: '产品回答工程：用逗号分隔、UTF-8 带 BOM；PRD 修订为 r2，写进 AC-2',
+              payload: { ask_id: 'q-todo-export-sep', requester: 'engineering', recipient: 'product', result: 'answered', answer: '用逗号分隔，文件用 UTF-8 带 BOM，Excel 能直接打开。PRD 修订为 r2，写进 AC-2。', prd_version: 'r2' }
+            },
+            patch: [
+              { path: 'runs[id=r-todo-export].asks[id=q-todo-export-sep].status', value: 'answered' },
+              { path: 'runs[id=r-todo-export].asks[id=q-todo-export-sep].answer', value: '用逗号分隔，文件用 UTF-8 带 BOM，Excel 能直接打开。PRD 修订为 r2，写进 AC-2。' },
+              { path: 'runs[id=r-todo-export].asks[id=q-todo-export-sep].prd_version', value: 'r2' },
+              { path: 'runs[id=r-todo-export].asks[id=q-todo-export-sep].answered_at', value: '2026-09-29T15:30:00+08:00' }
+            ]
+          },
+          {
+            delay: 1200,
+            event: {
+              type: 'spec_accepted', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'product',
+              label: 'PRD r2 被接纳：工程在下一步收到通知接着工作，质检按 r2 补测试用例', payload: { version: 'r2' }
+            },
+            patch: [{ path: 'runs[id=r-todo-export].elapsed_sec', value: 2400 }]
+          },
+          {
+            delay: 1400,
+            event: {
+              type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering', tool: 'bash',
+              label: '工程部门走到终端执行命令 npm test', payload: { tool: 'bash', command: 'npm test' }
             },
             patch: [{
               path: 'runs[id=r-todo-export].actions', push: {
-                id: 'a-todo-export-2', department: 'engineering', role: null, tool: 'run_command',
-                summary: '执行登记命令 npm_test', input: 'PLAN r1 第 3 项：自测', state: 'done',
-                receipt: { command: 'npm_test', argv: ['npm', 'test'], exit_code: 0, output: '19 passing (0.6s)', truncated: false, timed_out: false, duration_ms: 1900, snapshot: 'ws-c3a7f10' },
+                id: 'a-todo-export-2', department: 'engineering', role: null, tool: 'bash',
+                summary: '执行命令 npm test', input: '自测', state: 'done',
+                receipt: { command: 'npm test', exit_code: 0, output: '19 passing (0.6s)', truncated: false, timed_out: false, duration_ms: 1900, snapshot: 'ws-c3a7f10' },
                 before: '工作区 c3a7f10', after: '工作区 c3a7f10（未改动）', machine_id: 'm-host', at: '2026-09-29T15:30:00+08:00'
               }
             }]
@@ -1522,26 +1471,20 @@
             delay: 1400,
             event: {
               type: 'delivery_accepted', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'engineering',
-              label: '工程封存交付 r1：导出为 CSV', payload: {}
-            },
-            patch: [{ path: 'runs[id=r-todo-export].elapsed_sec', value: 5400 }]
-          },
-          {
-            delay: 1200,
-            event: {
-              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export',
-              label: '交付 r1 送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' }
+              label: '工程封存交付 r1：导出为 CSV（依据 PRD r2）；质检关注的交付到达', payload: { prd_version: 'r2' }
             },
             patch: [
+              { path: 'runs[id=r-todo-export].elapsed_sec', value: 5400 },
               { path: 'runs[id=r-todo-export].department', value: 'quality' },
-              { path: 'runs[id=r-todo-export].last_department', value: 'engineering' }
+              { path: 'runs[id=r-todo-export].last_department', value: 'engineering' },
+              { path: 'runs[id=r-todo-export].departments', value: null }
             ]
           },
           {
             delay: 1200,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'quality', tool: 'browser',
-              label: '质检部门在 m-study 上打开页面，检查导出', payload: {}
+              label: '质检部门在 m-study 上打开页面，按起草好的用例检查导出', payload: { tool: 'browser' }
             },
             patch: []
           },
@@ -1556,17 +1499,10 @@
               { path: 'runs[id=r-todo-export].phase', value: 'DONE' },
               { path: 'runs[id=r-todo-export].department', value: null },
               { path: 'runs[id=r-todo-export].last_department', value: 'quality' },
-              { path: 'runs[id=r-todo-export].recovery.state', value: 'terminated' },
-              { path: 'runs[id=r-todo-export].elapsed_sec', value: 6600 }
+              { path: 'runs[id=r-todo-export].recovery.state', value: 'completed' },
+              { path: 'runs[id=r-todo-export].elapsed_sec', value: 6600 },
+              { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T15:30:00+08:00' }
             ]
-          },
-          {
-            delay: 1200,
-            event: {
-              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export',
-              label: '放行单与交付 r1 送到成果库', payload: { from: 'quality', to: 'library', artifact: 'release' }
-            },
-            patch: [{ path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T15:30:00+08:00' }]
           },
           {
             delay: 1400,
@@ -1584,7 +1520,7 @@
         ]
       },
       {
-        no: 2, id: 'sc-todo-rework', name: '返工', level: 'ui', go: '#/p/p-todo/dept/quality',
+        no: 2, id: 'sc-todo-rework', name: '缺陷记录与重新交付', level: 'ui', go: '#/p/p-todo/dept/quality',
         setup: [],
         steps: [
           {
@@ -1652,21 +1588,12 @@
             delay: 1600,
             event: {
               type: 'qa_submitted', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-              label: '质检结论 r1：返工——逾期提醒在跨午夜时显示错误（D-1）',
+              label: '质检结论 r1：缺陷记录——逾期提醒在跨午夜时显示错误（D-1）；工程关注的缺陷记录到达',
               payload: { verdict: 'rework_engineering', material_id: 'm-todo-due-q1' }
             },
             patch: [
               { path: 'runs[id=r-todo-due].cycle', value: 2 },
-              { path: 'runs[id=r-todo-due].elapsed_sec', value: 103800 }
-            ]
-          },
-          {
-            delay: 1400,
-            event: {
-              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
-              label: '交付 r1 退回工程部门', payload: { from: 'quality', to: 'engineering', artifact: 'defect' }
-            },
-            patch: [
+              { path: 'runs[id=r-todo-due].elapsed_sec', value: 103800 },
               { path: 'runs[id=r-todo-due].department', value: 'engineering' },
               { path: 'runs[id=r-todo-due].last_department', value: 'quality' },
               { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-todo-due' } },
@@ -1677,7 +1604,7 @@
             delay: 1200,
             event: {
               type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-              label: '工程部门按 D-1 修改逾期判定', payload: {}
+              label: '工程部门开始第 2 轮：按 D-1 修改逾期判定', payload: {}
             },
             patch: []
           },
@@ -1685,7 +1612,7 @@
             delay: 1400,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', tool: 'edit_range',
-              label: '工程部门按区间编辑 app.js：逾期改为按本地日历日期比较', payload: {}
+              label: '工程部门按区间编辑 app.js：逾期改为按本地日历日期比较', payload: { tool: 'edit_range', target: 'app.js' }
             },
             patch: [{
               path: 'runs[id=r-todo-due].actions', push: {
@@ -1698,14 +1625,14 @@
           {
             delay: 1400,
             event: {
-              type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', tool: 'run_command',
-              label: '工程部门执行登记命令 npm_test，退出 0', payload: {}
+              type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', tool: 'bash',
+              label: '工程部门执行命令 npm test，退出 0', payload: { tool: 'bash', command: 'npm test' }
             },
             patch: [{
               path: 'runs[id=r-todo-due].actions', push: {
-                id: 'a-todo-due-7', department: 'engineering', role: null, tool: 'run_command',
-                summary: '执行登记命令 npm_test（含跨午夜用例）', input: 'D-1 修复项', state: 'done',
-                receipt: { command: 'npm_test', argv: ['npm', 'test'], exit_code: 0, output: '18 passing (0.5s)', truncated: false, timed_out: false, duration_ms: 1980, snapshot: 'ws-e02b7c1' },
+                id: 'a-todo-due-7', department: 'engineering', role: null, tool: 'bash',
+                summary: '执行命令 npm test（含跨午夜用例）', input: '缺陷记录 D-1 的修复', state: 'done',
+                receipt: { command: 'npm test', exit_code: 0, output: '18 passing (0.5s)', truncated: false, timed_out: false, duration_ms: 1980, snapshot: 'ws-e02b7c1' },
                 before: '工作区 e02b7c1', after: '工作区 e02b7c1（未改动）', machine_id: 'm-host', at: '2026-09-29T15:34:00+08:00'
               }
             }]
@@ -1714,17 +1641,10 @@
             delay: 1400,
             event: {
               type: 'delivery_accepted', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-              label: '工程封存交付 r2：修复 D-1', payload: {}
-            },
-            patch: [{ path: 'runs[id=r-todo-due].elapsed_sec', value: 106200 }]
-          },
-          {
-            delay: 1200,
-            event: {
-              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
-              label: '交付 r2 送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' }
+              label: '工程封存交付 r2：修复 D-1；质检关注的交付到达', payload: {}
             },
             patch: [
+              { path: 'runs[id=r-todo-due].elapsed_sec', value: 106200 },
               { path: 'runs[id=r-todo-due].department', value: 'quality' },
               { path: 'runs[id=r-todo-due].last_department', value: 'engineering' },
               { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-todo-due' } },
@@ -1735,7 +1655,7 @@
             delay: 1200,
             event: {
               type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'quality',
-              label: '质检重测跨午夜的样例', payload: {}
+              label: '质检部门开始核验交付 r2：重测跨午夜的样例', payload: {}
             },
             patch: []
           },
@@ -1750,18 +1670,11 @@
               { path: 'runs[id=r-todo-due].phase', value: 'DONE' },
               { path: 'runs[id=r-todo-due].department', value: null },
               { path: 'runs[id=r-todo-due].last_department', value: 'quality' },
-              { path: 'runs[id=r-todo-due].recovery.state', value: 'terminated' },
+              { path: 'runs[id=r-todo-due].recovery.state', value: 'completed' },
               { path: 'runs[id=r-todo-due].elapsed_sec', value: 106800 },
-              { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-todo-due' } }
+              { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-todo-due' } },
+              { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T15:36:00+08:00' }
             ]
-          },
-          {
-            delay: 1400,
-            event: {
-              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due',
-              label: '放行单与交付 r2 送到成果库', payload: { from: 'quality', to: 'library', artifact: 'release' }
-            },
-            patch: [{ path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T15:36:00+08:00' }]
           }
         ]
       },
@@ -1811,7 +1724,7 @@
             delay: 1200,
             event: {
               type: 'model_requested', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-              label: '工程部门按指导更新计划', payload: {}
+              label: '工程部门按指导安排接下来的修改', payload: {}
             },
             patch: []
           },
@@ -1819,7 +1732,7 @@
             delay: 1400,
             event: {
               type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', tool: 'edit_range',
-              label: '工程部门按指导修改逾期提醒的文案', payload: {}
+              label: '工程部门按指导修改逾期提醒的文案', payload: { tool: 'edit_range', target: 'app.js' }
             },
             patch: [{
               path: 'runs[id=r-todo-due].actions', push: {
@@ -1841,28 +1754,13 @@
             delay: 1600,
             event: {
               type: 'department_guidance_responded', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-              label: '工程回应指导：已加入计划与用例', payload: { guidance_id: 'g-todo-due-1' }
+              label: '工程回答指导：已改文案并补了用例', payload: { guidance_id: 'g-todo-due-1' }
             },
             patch: [
-              { path: 'runs[id=r-todo-due].guidance[id=g-todo-due-1].status', value: 'completed' },
-              { path: 'runs[id=r-todo-due].guidance[id=g-todo-due-1].response', value: '已按指导处理：提醒写明截止日期与超期天数，并补了跨午夜的用例（见 PLAN r2，npm_test 18 条通过）。' },
-              {
-                path: 'materials', push: {
-                  id: 'm-todo-due-l2', project_id: 'p-todo', work_item_id: 'w-todo-due', kind: 'plan', version: 2,
-                  title: 'PLAN r2（按指导）', at: '2026-09-29T15:30:00+08:00', files: null, verdict: null,
-                  goal: '按用户指导补文案与跨午夜用例',
-                  text: '1. 逾期提醒写明截止日期与超期天数\n2. 补当天到期的跨午夜用例\n3. 运行 npm_test 回归'
-                }
-              }
+              { path: 'runs[id=r-todo-due].guidance[id=g-todo-due-1].status', value: 'answered' },
+              { path: 'runs[id=r-todo-due].guidance[id=g-todo-due-1].response', value: '已按指导处理：提醒写明截止日期与超期天数，并补了跨午夜的用例（npm test 18 条通过）。' },
+              { path: 'runs[id=r-todo-due].elapsed_sec', value: 102000 }
             ]
-          },
-          {
-            delay: 1400,
-            event: {
-              type: 'plan_accepted', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering',
-              label: '工程提交更新后的 PLAN r2，主机接纳', payload: { material_id: 'm-todo-due-l2' }
-            },
-            patch: [{ path: 'runs[id=r-todo-due].elapsed_sec', value: 102000 }]
           }
         ]
       },
@@ -1970,11 +1868,11 @@
             delay: 1400,
             event: {
               type: 'x_role_task_assigned', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-architect',
-              label: '工程经理把「起草 PLAN」任务卡递给工程架构师', payload: { to: 'eng-architect', task: '起草 PLAN r1：截止日期显示与逾期判定' }
+              label: '工程经理把「起草计划」任务卡递给工程架构师', payload: { to: 'eng-architect', task: '起草计划：截止日期显示与逾期判定' }
             },
             patch: [
               { path: 'runs[id=r-todo-due].roles.engineering[id=eng-architect].status', value: 'assigned' },
-              { path: 'runs[id=r-todo-due].roles.engineering[id=eng-architect].task', value: '起草 PLAN r1：截止日期显示与逾期判定' }
+              { path: 'runs[id=r-todo-due].roles.engineering[id=eng-architect].task', value: '起草计划：截止日期显示与逾期判定' }
             ]
           },
           {
@@ -1992,7 +1890,7 @@
             delay: 1500,
             event: {
               type: 'x_role_result_returned', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-architect',
-              label: '工程架构师把 PLAN r1 草案交回经理', payload: { to: 'eng-architect' }
+              label: '工程架构师把计划草案交回经理', payload: { to: 'eng-architect' }
             },
             patch: [{ path: 'runs[id=r-todo-due].roles.engineering[id=eng-architect].status', value: 'returned' }]
           },
@@ -2000,11 +1898,11 @@
             delay: 1400,
             event: {
               type: 'x_review_recorded', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-reviewer',
-              label: '工程审查者审查 PLAN：通过', payload: { verdict: 'passed', text: '计划项与 PRD 的 5 条验收条件对应，通过。' }
+              label: '工程审查者审查计划：通过', payload: { verdict: 'passed', text: '计划条目与 PRD 的 5 条验收条件对应，通过。' }
             },
             patch: [
               { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].status', value: 'returned' },
-              { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].task', value: 'PLAN 审查通过' }
+              { path: 'runs[id=r-todo-due].roles.engineering[id=eng-reviewer].task', value: '计划审查通过' }
             ]
           },
           {
@@ -2029,7 +1927,7 @@
               {
                 path: 'runs[id=r-todo-due].actions', push: {
                   id: 'a-todo-due-2', department: 'engineering', role: 'eng-lead', tool: 'edit_range',
-                  summary: '按区间编辑 app.js：增加截止日期输入与逾期标记', input: 'PLAN r1 第 1、2 项', state: 'done', receipt: null,
+                  summary: '按区间编辑 app.js：增加截止日期输入与逾期标记', input: '计划条目 P-1、P-2', state: 'done', receipt: null,
                   before: 'app.js @ a1c3f20', after: 'app.js @ b7e91d4（第 1 次交回）', machine_id: 'm-host', at: '2026-09-28T11:40:00+08:00'
                 }
               }
@@ -2095,16 +1993,16 @@
           {
             delay: 1400,
             event: {
-              type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-lead', tool: 'run_command',
-              label: '主程执行登记命令 npm_test，退出 0', payload: { exit_code: 0, timed_out: false }
+              type: 'tool_started', project_id: 'p-todo', work_item_id: 'w-todo-due', run_id: 'r-todo-due', department: 'engineering', role: 'eng-lead', tool: 'bash',
+              label: '主程执行命令 npm test，退出 0', payload: { tool: 'bash', command: 'npm test', exit_code: 0, timed_out: false }
             },
             patch: [
               { path: 'runs[id=r-todo-due].ledger.engineering.items[id=P-3].result', value: '退出 0 · 16 条通过' },
               {
                 path: 'runs[id=r-todo-due].actions', push: {
-                  id: 'a-todo-due-4', department: 'engineering', role: 'eng-lead', tool: 'run_command',
-                  summary: '执行登记命令 npm_test', input: 'PLAN r1 第 3 项：自测与回归', state: 'done',
-                  receipt: { command: 'npm_test', argv: ['npm', 'test'], exit_code: 0, output: '16 passing (0.5s)', truncated: false, timed_out: false, duration_ms: 1810, snapshot: 'ws-b7e91d4' },
+                  id: 'a-todo-due-4', department: 'engineering', role: 'eng-lead', tool: 'bash',
+                  summary: '执行命令 npm test', input: '计划条目 P-3：自测与回归', state: 'done',
+                  receipt: { command: 'npm test', exit_code: 0, output: '16 passing (0.5s)', truncated: false, timed_out: false, duration_ms: 1810, snapshot: 'ws-b7e91d4' },
                   before: '工作区 b7e91d4', after: '工作区 b7e91d4（未改动）', machine_id: 'm-host', at: '2026-09-29T12:22:00+08:00'
                 }
               }
@@ -2154,7 +2052,7 @@
             delay: 1400,
             event: {
               type: 'delivery_accepted', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'engineering',
-              label: '工程封存交付 r4：导入以后提示跳过的条数', payload: { material_id: 'm-todo-csv-d4', snapshot: 'f08d6b3' }
+              label: '工程封存交付 r4：导入以后提示跳过的条数；质检关注的交付到达', payload: { material_id: 'm-todo-csv-d4', snapshot: 'f08d6b3' }
             },
             patch: [
               {
@@ -2171,21 +2069,13 @@
           {
             delay: 1200,
             event: {
-              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv',
-              label: '交付 r4 送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' }
+              type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'quality',
+              label: '质检部门开始核验交付 r4', payload: {}
             },
             patch: [
               { path: 'runs[id=r-todo-csv].department', value: 'quality' },
               { path: 'runs[id=r-todo-csv].last_department', value: 'engineering' }
             ]
-          },
-          {
-            delay: 1200,
-            event: {
-              type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'quality',
-              label: '质检部门开始核验交付 r4', payload: {}
-            },
-            patch: []
           },
           {
             delay: 1400,
@@ -2199,7 +2089,7 @@
             delay: 1600,
             event: {
               type: 'qa_submitted', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'quality',
-              label: '质检结论 r4：返工——提示的跳过条数比实际多 1，标题为空的行没有列出（仍有 2 条未满足）', payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q4' }
+              label: '质检结论 r4：缺陷记录——提示的跳过条数比实际多 1，标题为空的行没有列出（仍有 2 条未满足）', payload: { verdict: 'rework_engineering', material_id: 'm-todo-csv-q4' }
             },
             patch: [
               {
@@ -2218,8 +2108,8 @@
           {
             delay: 1400,
             event: {
-              type: 'transition', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv',
-              label: '交付 r4 退回工程部门', payload: { from: 'quality', to: 'engineering', artifact: 'defect' }
+              type: 'department_activated', project_id: 'p-todo', work_item_id: 'w-todo-csv', run_id: 'r-todo-csv', department: 'engineering',
+              label: '工程关注的缺陷记录到达，开始第 5 轮', payload: {}
             },
             patch: [
               { path: 'runs[id=r-todo-csv].department', value: 'engineering' },

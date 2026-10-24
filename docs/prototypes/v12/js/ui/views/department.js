@@ -6,7 +6,7 @@
   const ui = Y12.ui;
 
   const DEPT = {
-    product: { label: '产品', duty: '维护原始意图与有效规范，回答需求咨询' },
+    product: { label: '产品', duty: '维护原始意图与有效规范，回答其他部门的询问' },
     engineering: { label: '工程', duty: '依据有效规范设计、实现、自测并提交交付' },
     quality: { label: '质检', duty: '在独立副本中验证交付，给出缺陷或放行' },
     operations: { label: '运维', duty: '接收交付物的运行责任，处理运行问题' }
@@ -15,7 +15,7 @@
   const ROLE_STATUS = { idle: 'idle', assigned: 'queued', working: 'running', returned: 'succeeded', failed: 'failed', away: 'asking' };
   const ROLE_STATUS_TEXT = { idle: '空闲', assigned: '已分派', working: '工作中', returned: '已交回', failed: '失败', away: '外出查资料' };
   const ROLE_KIND = { manager: '经理', architect: '连续角色', lead: '连续角色', tester: '连续角色', explorer: '一次性角色', agent: '部门 Agent', ops: '部门 Agent' };
-  const ATTEMPT_KIND = { work: '工作请求', compaction: '压缩请求', collaboration: '协作请求', review: '审查请求' };
+  const ATTEMPT_KIND = { work: '工作请求', compaction: '压缩请求', collaboration: '询问分支', review: '审查请求' };
   const ACTION_STATE_TEXT = { not_sent: '未发送', done: '已完成', unknown: '结果未知', running: '进行中' };
   const ITEM_STATUS = { assigned: ['queued', '已分派'], working: ['running', '进行中'], returned: ['succeeded', '已交回'], failed: ['failed', '失败'], cancelled: ['cancelled', '已取消'] };
   const AT_LEAST_S5 = () => Y12.cap.query('role.detail');
@@ -70,10 +70,20 @@
     return parts.join(' ');
   }
 
+  // 三个部门同时运行（ADR-0036）：标题区写出这个事项里三个部门各自的状态，本部门加粗
+  function statesLine(v) {
+    if (!v.states) return '';
+    return '<p class="y12-ws-item y12-ws-states"><span class="y12-muted">三个部门</span>' + Object.keys(v.states).map((d) => {
+      const s = v.states[d];
+      const name = (DEPT[d] ? DEPT[d].label : d) + ' ' + s.text + (s.note ? '（' + s.note + '）' : '');
+      return d === v.department.id ? '<strong>' + esc(name) + '</strong>' : '<span>' + esc(name) + '</span>';
+    }).join('<span class="y12-muted">·</span>') + '</p>';
+  }
+
   function headInner(v) {
     const item = v.work_item;
     const itemLine = item
-      ? '<p class="y12-ws-item"><span class="y12-muted">事项</span><strong>' + esc(item.title) + '</strong>' + statusOfItem(item) + '</p>'
+      ? '<p class="y12-ws-item"><span class="y12-muted">事项</span><strong>' + esc(item.title) + '</strong>' + statusOfItem(item) + '</p>' + statesLine(v)
       : '<p class="y12-ws-item y12-muted">本项目没有进行中的事项</p>';
     const last = v.last_target;
     const lastLine = last
@@ -92,7 +102,8 @@
     return '<div class="y12-ws-head">' +
         '<div class="y12-ws-titles">' +
           '<p class="y12-eyebrow">部门工作间</p>' +
-          '<div class="y12-ws-title-row"><h1>' + esc(v.department.label) + '部门</h1>' + ui.status(v.status.kind, v.status.text) + '</div>' +
+          '<div class="y12-ws-title-row"><h1>' + esc(v.department.label) + '部门</h1>' + ui.status(v.status.kind, v.status.text) +
+            (v.status.note ? '<small class="y12-muted">' + esc(v.status.note) + '</small>' : '') + '</div>' +
           '<p class="y12-ws-duty">' + esc(v.department.duty) + '</p>' + itemLine +
           '<div class="y12-ws-inline"><span class="y12-ws-k">当前生效模型</span>' + modelHtml(v) + '</div>' +
         '</div>' +
@@ -129,7 +140,7 @@
       ['已用时间 / 上限', v.run ? esc(Y12.ui.duration(v.run.elapsed_sec) + ' / ' + Y12.ui.duration(v.run.limit_sec)) : ''],
       ['执行机器', room.machine ? esc(room.machine) : '<span class="y12-muted">—</span>'],
       ['信箱', esc(String(room.mailbox)) + ' 封未读指导'],
-      ['待核实动作', room.pending_tool ? ui.code(room.pending_tool) : '<span class="y12-muted">没有</span>']
+      ['传信管', room.pipes.letters_waiting ? esc(room.pipes.letters_waiting + ' 封询问等待本部门回答') : '<span class="y12-muted">没有等待回答的询问</span>']
     ], 'is-inline y12-ws-facts');
     const roles = '<div class="y12-ws-roles"><span class="y12-ws-k">房间里的角色</span><ul>' + room.roles.map((role) =>
       '<li><strong>' + esc(role.name) + '</strong>' + ui.status(role.kind === 'ops' ? 'running' : 'idle', role.task || ROLE_STATUS_TEXT[role.status] || role.status) + '</li>'
@@ -168,9 +179,9 @@
           (r.timed_out ? ui.status('failed', '超时') : '') +
           (r.truncated ? ui.tag('输出截断') : '') +
           '<span class="y12-muted">' + esc(Y12.ui.duration(Math.round((r.duration_ms || 0) / 1000))) + '</span></div>' +
+          // 命令按函数直接执行，没有登记名（ADR-0038）；文件与网络工具的回执写目标
           ui.kv([
-            ['登记名', ui.code(r.command || '—')],
-            ['命令', ui.code((r.argv || []).join(' '))],
+            r.command ? ['命令', ui.code(r.command)] : ['目标', ui.code(r.target || '—')],
             ['快照', ui.code(r.snapshot || '—')]
           ], 'is-inline y12-ws-receipt-kv') +
           (r.output ? ui.pre(r.output) : '') + '</div>';
@@ -386,7 +397,23 @@
   // 部门消息与指导
 
   const SOURCE_LABELS = { user: '用户', self: '本部门', other: '其他部门' };
-  const GUIDANCE_KIND = { received: 'queued', in_input: 'running', explained: 'done', completed: 'succeeded', declined: 'cancelled', needs_work: 'pending' };
+  const GUIDANCE_KIND = { received: 'queued', in_input: 'running', answered: 'succeeded' };
+  const ASK_KIND = { open: 'asking', answered: 'succeeded', unable: 'failed' };
+  const deptName = (d) => (DEPT[d] ? DEPT[d].label : d);
+
+  // 询问（三部门的循环结构第 4 节）：本部门发出与收到的询问，写明询问链、问题、状态与回答；产品的回答附带 PRD 的新版本时写出版本
+  function asksList(v) {
+    if (!v.asks || !v.asks.length) return '<p class="y12-muted y12-small">这个事项里本部门还没有发出或收到询问</p>';
+    return '<ul class="y12-ws-guidance y12-ws-asks">' + v.asks.map((a) => {
+      const out = a.requester === v.department.id;
+      return '<li><div class="y12-ws-log-meta"><strong>' + (out ? '问' + esc(deptName(a.recipient)) : esc(deptName(a.requester)) + '问本部门') + '</strong>' +
+        ui.status(ASK_KIND[a.status] || 'idle', a.status_text) +
+        '<span class="y12-muted">询问链 ' + esc(a.chain.map(deptName).join(' → ')) + '</span>' +
+        (a.parent ? ui.tag('回问') : '') + '</div><p>' + esc(a.question) + '</p>' +
+        (a.answer ? '<p class="y12-ws-reply">' + esc(a.answer) + (a.prd_version ? ' ' + ui.tag('附带 PRD ' + a.prd_version) : '') + '</p>' : '') +
+        (a.reason ? '<p class="y12-ws-reply">没能回答：' + esc(a.reason) + '</p>' : '') + '</li>';
+    }).join('') + '</ul>';
+  }
 
   function commsInner(ctx, v) {
     const log = v.messages.length
@@ -409,9 +436,10 @@
         '<label class="y12-field"><span>向' + esc(v.department.label) + '部门下达指导或追加人类反馈</span>' +
         '<textarea class="y12-textarea" rows="3" id="y12-ws-guidance" data-draft="' + esc('dept.guidance.' + v.run.id + '.' + v.department.id) + '" placeholder="追加对话或指导"></textarea></label>' +
         '<div class="y12-row">' + ui.button({ label: '发送指导', kind: 'primary small', act: 'dept.sendGuidance', data: { workItem: v.work_item.id, department: v.department.id, draftKey: 'dept.guidance.' + v.run.id + '.' + v.department.id } }) +
-        '<small class="y12-muted">由目标部门在下一次安全激活中处理；与修改 Prompt、模型回复分开记录。</small></div></div>'
+        '<small class="y12-muted">部门正在工作时，指导在它的下一步作为通知加入；部门在等待工作时，以这段指导开始一轮工作。与修改 Prompt、模型回复分开记录。</small></div></div>'
       : ui.note(v.run ? '事项已结束，不会自动新建；草稿保留在输入框中。' : '本项目没有进行中的事项；在概览页新建事项。', 'info');
-    return '<div class="y12-ws-comms-grid"><div class="y12-ws-col"><h3 class="y12-h3">部门消息 <span class="y12-muted y12-small">最新在上 · 用户、本部门与其他部门分开标记</span></h3>' + log + '</div>' +
+    return '<div class="y12-ws-comms-grid"><div class="y12-ws-col"><h3 class="y12-h3">询问 <span class="y12-muted y12-small">提问方停在询问上等待，被询问的部门在询问分支里回答</span></h3>' + asksList(v) +
+      '<h3 class="y12-h3">部门消息 <span class="y12-muted y12-small">最新在上 · 用户、本部门与其他部门分开标记</span></h3>' + log + '</div>' +
       '<div class="y12-ws-col"><h3 class="y12-h3">部门指导</h3>' + composer + '<h3 class="y12-h3">指导记录</h3>' + records + '</div></div>';
   }
 
@@ -515,7 +543,7 @@
         body: '<div data-ws-checks>' + checksInner(ctx, v) + '</div>'
       }) +
       ui.block({
-        title: '部门消息与指导', query: 'department.workspace', command: 'guidance.send',
+        title: '询问、部门消息与指导', query: 'department.workspace', command: 'guidance.send',
         body: '<div data-ws-comms>' + commsInner(ctx, v) + '</div>'
       }) +
       '<div data-ws-ops>' + opsInner(ctx) + '</div>' +
@@ -562,7 +590,7 @@
       paint(ctx, root);
     },
     onEvent(ctx, root, event) {
-      if (st.scene) st.scene.playEvent(event);
+      if (st.scene) Y12.scenes.playOn(st.scene, event);
     },
     unmount() {
       if (st.modal) {

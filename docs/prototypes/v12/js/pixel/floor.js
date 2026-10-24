@@ -52,19 +52,19 @@
 
   // 画面状态与事实的对照：动作图鉴列出（设计说明第 5.4 节）
   P.FLOOR_VIEWS = [
-    { id: 'working', fact: '部门正在工作', source: '事项的当前部门与 department_activated', picture: '该房间亮灯，房间里的小人在工位工作', level: 'ui', events: ['department_activated'] },
-    { id: 'handoff', fact: '交接', source: 'transition 与交接内容', picture: '包裹在交接管道中移动', level: 'ui', events: ['transition'] },
-    { id: 'rework', fact: '返工', source: 'qa_submitted 的结论为 rework_engineering', picture: '包裹贴红色返工单反向或经回流管道流动，管道闪红色', level: 'ui', events: ['qa_submitted', 'transition'] },
-    { id: 'ask', fact: '询问与回答', source: 'collaboration_requested、collaboration_responded、collaboration_closed', picture: '信件在传信管中往返；未回答的信件停在出口', level: 'ui', events: ['collaboration_requested', 'collaboration_responded'] },
+    { id: 'working', fact: '部门正在工作', source: '部门的状态（工作中、回答询问）与 department_activated', picture: '该房间亮灯，房间里的小人在工位工作；几个部门同时工作时（例如质检的预测性探索）几个房间同时亮灯', level: 'ui', events: ['department_activated'] },
+    { id: 'handoff', fact: '成果的流向', source: '正式成果被接纳（spec_accepted、delivery_accepted、qa_submitted），关注它的部门开始一轮工作', picture: '包裹沿管道走到关注它的部门', level: 'ui', events: ['spec_accepted', 'delivery_accepted', 'qa_submitted'] },
+    { id: 'rework', fact: '缺陷记录', source: 'qa_submitted 的结论为缺陷记录（rework_engineering）', picture: '包裹贴红色单子经回流管道流动，管道闪红色', level: 'ui', events: ['qa_submitted'] },
+    { id: 'ask', fact: '询问与回答', source: 'ask_started、ask_answered（询问是一次工具调用）', picture: '信件在传信管中往返；未回答的信件停在出口；回答询问的部门亮灯工作', level: 'ui', events: ['ask_started', 'ask_answered'] },
     { id: 'cycle', fact: '循环次数与时间', source: 'run 的循环计数、已用时间与时间上限', picture: '信息条显示「第 N 轮」与时间进度条；接近上限时变为警示色', level: 'ui', events: [] },
     { id: 'adopt', fact: '采纳', source: 'deliverable_adopted', picture: '箱子放上成果库的架子，版本号加一', level: 'ui', events: ['deliverable_adopted'] },
     { id: 'waiting_resume', fact: '待恢复', source: '模型引用无法使用的决定请求', picture: '涉及的房间门口立「待恢复」牌，写明缺少的项', level: 'ui', events: ['x_decision_issued'] },
     { id: 'interrupted', fact: '中断', source: '恢复观察状态为中断', picture: '整层变暗，墙上时钟停住，管道停止', level: '3.1', events: ['x_run_interrupted'] },
     { id: 'resumed', fact: '自动继续', source: 'Yudao 启动时自动继续中断的 run', picture: '灯亮起，时钟继续走，管道恢复流动', level: '3.1', events: ['x_run_auto_resumed'] },
-    { id: 'pending', fact: '待核实', source: '恢复观察状态为待核实', picture: '涉及的房间亮黄灯，小人头顶出现问号', level: '3.1', events: ['x_action_unknown'] },
+    { id: 'pending', fact: '结果未知的动作', source: '重新启动时结果未知的动作（x_action_unknown），核实确认或交还发出它的会话', picture: '小人说「这个动作的结果不确定」；处理与依据列在恢复页', level: '3.1', events: ['x_action_unknown', 'action_verified'] },
     { id: 'upgrade', fact: '因升级停止', source: '停止原因为因升级停止', picture: '门口立「因升级停止」牌；该事项的新包裹排到大厅队首', level: '3.1', events: ['x_run_stopped_for_upgrade'] },
     { id: 'remote', fact: '远程动作', source: '动作的执行机器', picture: '通往机房的门上的动作数变化，门缝透出光', level: '3.2C', events: ['x_remote_action_started', 'x_remote_action_finished'] },
-    { id: 'agent_offline', fact: '执行代理离线', source: '心跳超时，动作结果未知', picture: '通往机房的门上出现黄色问号', level: '3.2C', events: ['x_machine_offline'] },
+    { id: 'agent_offline', fact: '执行代理离线', source: '心跳超时，动作结果未知，事项等待机器', picture: '通往机房的门上出现黄色问号；房间门口立「等待机器」牌', level: '3.2C', events: ['x_machine_offline'] },
     { id: 'queue', fact: '同一项目排队', source: '项目的排队顺序', picture: '大厅管道入口前的包裹队列，顺序随调整变化', level: '3.4A', events: ['x_queued', 'x_queue_reordered'] },
     { id: 'slot', fact: '等待执行槽位', source: '执行槽位已满', picture: '大厅的槽位灯全亮，队首包裹停在入口，阀门关闭', level: '3.4A', events: ['x_slot_acquired'] },
     { id: 'provider', fact: '等待模型服务', source: '进入与离开等待模型服务的事件', picture: '涉及部门的管道停止，显示下一次重试时间；房间灯光调暗', level: 'S4', events: ['x_provider_wait_entered', 'x_provider_wait_left'] },
@@ -75,7 +75,7 @@
     { id: 'decision', fact: '等待回答的决定请求', source: '决定请求（decisions.list）与 x_decision_issued', picture: '提出决定的部门的经理走到门口送出决定单，飞到大厅墙上的板子；点板子，卡片在画面里摊开，点章回答；回答过的决定单飞回部门门口，经理收下', level: 'ui', events: ['x_decision_issued', 'x_decision_answered', 'project_decision_requested', 'project_decision_answered'] },
     { id: 'roles', fact: '部门内的分派与交回', source: '角色任务事件（x_role_task_assigned、x_role_result_returned）、审查与探索者事件', picture: '经理走到角色的工位旁递任务卡，角色走到经理身旁交回结果，审查者盖章，探索者走到文件柜；房间里有几个角色就有几个小人', level: 'S5', events: ['x_role_task_assigned', 'x_role_result_returned', 'x_review_recorded', 'x_explorer_fetch'] },
     { id: 'idle', fact: '空闲', source: '部门没有事项，角色没有任务', picture: '坐着喝茶的小人隔几秒自己挑一件事：伸懒腰、走动、翻文件柜、门口抬头看、两个空闲的小人碰头说话；管道停止时光点留在管道里', level: 'ui', events: [] },
-    { id: 'loops', fact: '循环实例与收敛状态', source: 'run.loops：由事件按规则算出的收敛状态与判定依据', picture: '覆盖层「循环」：信息条写 run 的收敛状态，部门房间写这次激活的已用时间与上限，正在工作的角色头顶写步骤循环；颜色与文字一起表示状态，右上角有图例', level: 'pilot', events: ['qa_submitted', 'tool_started', 'transition', 'run_failed'] },
+    { id: 'loops', fact: '循环实例与收敛状态', source: 'run.loops：由事件按规则算出的收敛状态与判定依据', picture: '覆盖层「循环」：信息条写 run 的收敛状态，部门房间写这一轮工作的已用时间与上限，正在工作的角色头顶写步骤循环；颜色与文字一起表示状态，右上角有图例', level: 'pilot', events: ['qa_submitted', 'tool_started', 'department_activated', 'run_failed'] },
     { id: 'sources', fact: '事实来源', source: 'project.loop 按「事件加字段」给出每个事实元素的来源（已用时间这类测量值为主机测量）', picture: '覆盖层「来源」：画面其余部分调暗，事实元素按确定规则、决策模型、角色陈述、主机测量、用户描边，角色陈述与决策模型用加粗的虚线；点元素打开来源卡片', level: 'pilot', events: [] },
     { id: 'coverage', fact: '检验覆盖与开环', source: 'acceptance.coverage：每条验收条件的检验方式、最近的结果与是否开环', picture: '覆盖层「检验」：质检房间写检验覆盖比例、模型阅读与开环的条件数，开环时黄底；点开是逐条清单；放行的盖章旁写这次放行的覆盖比例', level: 'pilot', events: ['qa_submitted', 'x_evidence_checked'] }
   ];
@@ -160,6 +160,12 @@
     const itemById = (id) => model.items.find((it) => it.id === id) || null;
     const dimFor = (itemId) => (focusId && itemId && itemId !== focusId ? 0.3 : 1);
     const itemsIn = (d) => model.items.filter((it) => it.department === d && IN_ROOM.includes(it.status));
+    // 三个部门同时运行（ADR-0036）：事项停在别的房间，这个部门也在工作中或回答询问时（例如质检的预测性探索），
+    // 这个房间同样亮灯、屏幕滚动、小人工作；包裹与门口的小旗仍只在事项所在的房间
+    const BUSY = ['working', 'answering'];
+    const alsoIn = (d) => model.items.filter((it) => it.department !== d && ACTIVE.includes(it.status) &&
+      it.departments && it.departments[d] && BUSY.includes(it.departments[d].state));
+    const busyIn = (d) => itemsIn(d).concat(alsoIn(d));
     const waitingDept = (d) => (model.waiting_provider || []).find((w) => w.department === d) || null;
     const roomById = (id) => (id === 'adopted' || id === 'adoption' ? lay.lib : world.rooms[id] || null);
     const sig = (name) => ECS.signalOn(world, scene, name);
@@ -171,7 +177,7 @@
     // 房间里的小人：每个房间按角色设置有几个，没有角色设置时一个部门一个
 
     function primaryItem(d) {
-      const here = itemsIn(d);
+      const here = busyIn(d);
       return here.find((it) => ACTIVE.includes(it.status)) || here.find((it) => it.status === 'waiting_provider') || here[0] || null;
     }
 
@@ -542,7 +548,7 @@
       if (model.interrupted) return 'stopped';
       const [a, b] = p.id.split(/[>~]/);
       if (waitingDept(a) || waitingDept(b)) return 'stopped';
-      const active = (d) => itemsIn(d).some((it) => ACTIVE.includes(it.status));
+      const active = (d) => busyIn(d).some((it) => ACTIVE.includes(it.status));
       if (ECS.linkActive(world, p.id)) return 'flowing';
       if (p.linkKind === 'tube') return (model.open_requests || []).length ? 'flowing' : 'idle';
       return active(a) || active(b) ? 'flowing' : 'idle';
@@ -745,7 +751,7 @@
 
     function drawDeptRoom(c, r, t) {
       const D = P.DEPTS[r.id];
-      const here = itemsIn(r.id);
+      const here = busyIn(r.id);
       const working = here.some((it) => ACTIVE.includes(it.status));
       const sx = r.x + Math.round(r.w / 2) - 22, sy = TOP + 18;
       RB(c, sx - 2, sy - 2, 32, 22, PAL.beige2);
@@ -1119,7 +1125,7 @@
       lay.depts.forEach((r) => {
         const d = r.id;
         const here = itemsIn(d);
-        const lit = here.some((it) => ACTIVE.includes(it.status) || it.status === 'done') || Boolean(r.def.lit && r.def.lit(ctx));
+        const lit = busyIn(d).some((it) => ACTIVE.includes(it.status) || it.status === 'done') || Boolean(r.def.lit && r.def.lit(ctx));
         if (!lit) { c.fillStyle = 'rgba(14,12,34,0.32)'; c.fillRect(r.x, TOP, r.w, ROOM_B - TOP); }
         if (waitingDept(d)) { c.fillStyle = 'rgba(40,44,60,0.25)'; c.fillRect(r.x, TOP, r.w, ROOM_B - TOP); }
         if (here.some((it) => it.status === 'pending_verification')) {

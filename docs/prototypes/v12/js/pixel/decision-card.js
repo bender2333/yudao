@@ -13,7 +13,10 @@
   const PAPER = { x: 92, y: 26, w: 456, h: 270 };
   const LABEL_W = 78;
   // 卡片左边的色条：需要马上处理的种类偏橙，会造成损失的偏红，通知类偏蓝，其余是琥珀色
-  const KIND_COLOR = { waiting_resume: PAL.orange2, unknown_action: PAL.orange2, rollback_restore: PAL.red2, repair_stopped: PAL.red2, provider_wait: PAL.blue2, rework_reminder: PAL.blue2 };
+  const KIND_COLOR = {
+    waiting_resume: PAL.orange2, paused_continue: PAL.orange2, definitions_changed: PAL.orange2, wait_limit: PAL.blue2,
+    rollback_restore: PAL.red2, repair_stopped: PAL.red2, provider_wait: PAL.blue2, rework_reminder: PAL.blue2
+  };
 
   // face：Y12.cards.face(决定请求) 给出的卡片内容
   // opts：{ onDecide({ decision_id, option, note, base_version }) → 命令的结果, onGo(链接), onChange() }

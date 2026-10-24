@@ -6,7 +6,7 @@
   const ui = Y12.ui;
 
   const STATUS_KIND = { preparing: 'idle', requesting: 'running', running: 'running', succeeded: 'succeeded', failed: 'failed', cancelled: 'cancelled' };
-  const KIND_LABELS = { work: '工作请求', compaction: '压缩请求', collaboration: '协作请求', review: '审查请求' };
+  const KIND_LABELS = { work: '工作请求', compaction: '压缩请求', collaboration: '询问分支', review: '审查请求' };
   const ERROR_LABELS = { timeout: '超时', auth: '认证失败', empty_output: '空输出', rate_limit: '限流', server: '上游服务错误', provider_unavailable: '模型服务不可用' };
   const USAGE_FIELDS = [
     ['input', '输入（含缓存）'],
@@ -175,7 +175,7 @@
     const limits = usage.limits.length
       ? ui.table({
         columns: [
-          { key: 'title', label: '事项', render: (row) => '<div class="y12-cell-stack"><strong>' + esc(row.title) + '</strong><small class="y12-muted">' + esc(row.phase) + '</small></div>' },
+          { key: 'title', label: '事项', render: (row) => '<div class="y12-cell-stack"><strong>' + esc(row.title) + '</strong><small class="y12-muted">' + esc(row.status_text) + '</small></div>' },
           { key: 'time', label: '已用时间 / 时间上限', render: (row) => '<div class="y12-obs-limit"><span>' + esc(Y12.ui.duration(row.elapsed_sec)) + ' / ' + esc(Y12.ui.duration(row.limit_sec)) + '</span>' + ui.meter(row.elapsed_sec, row.limit_sec) + '</div>' },
           { key: 'cycle', label: '循环次数', render: (row) => (row.cycle ? esc('第 ' + row.cycle + ' 轮') : '<span class="y12-muted">未开始</span>') },
           { key: 'waiting', label: '等待模型服务', render: (row) => (row.waiting_provider_sec !== undefined ? esc(Y12.ui.duration(row.waiting_provider_sec)) + '（不计入上限）' : '<span class="y12-muted">—</span>') }
@@ -200,10 +200,10 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 循环（design.md 第 4 节）：每个事项一棵树，项目循环 → run → 各部门的激活 → 每次激活中的步骤循环；取值只来自 run.loops
+  // 循环（design.md 第 4 节）：每个事项一棵树，项目循环 → run → 各部门的一轮工作 → 每轮工作中的步骤循环；取值只来自 run.loops
 
   let openLoop = null;
-  const LAYER_TEXT = { project: '项目循环', run: 'run', activation: '部门激活', step: '步骤循环' };
+  const LAYER_TEXT = { project: '项目循环', run: 'run', activation: '一轮工作', step: '步骤循环' };
   const DEPTH = { project: 0, run: 1, activation: 2, step: 3 };
   const LOOP_COLUMNS = ['层', '实例', '轮次', '已用量与上限', '收敛状态', '停止原因'];
 
@@ -273,7 +273,7 @@
       it.instances.map(loopRow).join('') + '</tbody>').join('');
     return ui.block({
       id: 'obs-loop', title: '循环', query: 'run.loops',
-      subtitle: '每个事项一棵树：项目循环、run、各部门的激活、每次激活中的步骤循环。收敛状态由事件按规则算出；点一行看判定依据与每一轮的数值。',
+      subtitle: '每个事项一棵树：项目循环、run、各部门的一轮工作、每轮工作中的步骤循环。几个部门同时工作时各有各的一轮。收敛状态由事件按规则算出；点一行看判定依据与每一轮的数值。',
       body: '<div class="y12-table-wrap"><table class="y12-table y12-loop-table">' + head + '<tbody>' + loopRow(data.project) + '</tbody>' + groups + '</table></div>'
     });
   }

@@ -1,5 +1,5 @@
-// 外壳：左侧栏、顶栏（路径、事项选择框、亮起的状态项、连接状态、项目菜单）、项目标签、状态项、托盘与系统通知、
-// 连接断开与接口版本不同时的整窗提示（设计说明第 3、4.1、10 节）
+// 外壳：左侧栏、顶栏（路径、事项选择框、亮起的状态项、连接状态、项目菜单）、项目标签、状态项、浏览器的系统通知与标签页标题、
+// 连接断开与接口版本不同时的整窗提示（设计说明第 3、4.1、10 节；界面是网页，没有托盘，网页界面的提供与发布设计说明第 5.3 节）
 (function () {
   'use strict';
   const Y12 = window.Y12;
@@ -54,15 +54,7 @@
       id: 'decisions', label: '待你决定', icon: 'decide', count: waiting.length, lit: waiting.length > 0,
       go: '#/home', anchor: 'home-decisions', query: 'decisions.list'
     }];
-    const itemGo = (first, page) => {
-      if (!first) return null;
-      if (page === 'recovery') return Y12.paths.recovery(first.project_id, first.work_item_id);
-      return Y12.paths.overview(first.project_id, first.work_item_id);
-    };
-    if (hs.unknown_actions) {
-      items.push({ id: 'unknown_actions', label: '结果未知的动作', icon: 'unknown', count: hs.unknown_actions.count, lit: hs.unknown_actions.count > 0,
-        go: itemGo(hs.unknown_actions.first, 'recovery'), query: 'system.status', tag: '3.1' });
-    }
+    const itemGo = (first) => (first ? Y12.paths.overview(first.project_id, first.work_item_id) : null);
     if (hs.offline_machines) {
       items.push({ id: 'offline_machines', label: '离线的机器', icon: 'offline', count: hs.offline_machines.count, lit: hs.offline_machines.count > 0,
         go: '#/sys/machines', query: 'system.status', tag: '3.2C' });
@@ -242,6 +234,18 @@
     return Y12.api.connected() && Y12.cap.get().deployment.api_version !== Y12.CLIENT_API_VERSION;
   }
 
+  // 页面与服务的接口版本不一致时按方向写下一步（网页界面的提供与发布设计说明第 5.1 节，#704）：
+  // 服务比页面新，已经自动重新加载过一次仍然较旧，下一步是重新构建页面文件；页面比服务新，下一步是重启服务
+  function mismatchHtml() {
+    const host = Y12.cap.get().deployment.api_version;
+    const page = Y12.CLIENT_API_VERSION;
+    const versions = '<p>服务的接口版本是第 <b>' + esc(host) + '</b> 版，这个页面是第 <b>' + page + '</b> 版。对齐之前不打开任何页面，也不执行命令。</p>';
+    const next = host > page
+      ? '<h1>页面文件比服务旧</h1>' + versions + '<p>页面已经自动重新加载过一次，服务提供的页面文件仍然较旧，说明页面文件没有跟着更新。下一步：重新构建页面文件，再刷新这一页。</p>'
+      : '<h1>服务比页面旧</h1>' + versions + '<p>服务还在运行旧的代码。下一步：重启 Yudao 服务，页面会自动重新连接。</p>';
+    return '<div class="y12-update-card">' + next + '<p class="y12-muted">原型：在底部工具条的「模拟」中把服务的接口版本改回 ' + page + '。</p></div>';
+  }
+
   function windowNote() {
     const note = Y12.app.dom.window_note;
     document.body.classList.toggle('is-disconnected', !Y12.api.connected());
@@ -249,8 +253,7 @@
     if (versionMismatch()) {
       note.hidden = false;
       note.className = 'y12-window-note is-version';
-      note.innerHTML = '<div class="y12-update-card"><h1>请更新客户端</h1><p>控制主机的接口版本是 <b>' + esc(Y12.cap.get().deployment.api_version) + '</b>，这个客户端的接口版本是 <b>' + Y12.CLIENT_API_VERSION +
-        '</b>。更新客户端之前不打开任何页面，也不执行命令。</p><p class="y12-muted">原型：在底部工具条的「模拟」中把控制主机的接口版本改回 ' + Y12.CLIENT_API_VERSION + '。</p></div>';
+      note.innerHTML = mismatchHtml();
       return;
     }
     if (!Y12.api.connected()) {
@@ -264,14 +267,13 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 托盘与系统通知（设计说明第 10 节）：窗口关闭后仍保持一条不按项目筛选的事件流
+  // 浏览器的系统通知与标签页标题（网页界面的提供与发布设计说明第 5.3 节）：页面打开期间，出现决定请求、
+  // 进入等待模型服务时发出系统通知；标签页的标题前写待决定的数量。界面是网页，没有托盘；页面关闭期间没有通知
 
   const NOTIFY_TYPES = ['x_decision_issued', 'project_decision_requested', 'x_provider_wait_entered'];
 
-  function trayHtml() {
-    const count = Y12.api.connected() ? Y12.api.query('decisions.list', {}).data.length : null;
-    return '<button type="button" class="y12-tray" data-act="shell.tray" title="托盘图标（模拟）：等待回答的决定数">' +
-      Y12.ui.icon('brand', 'y12-icon y12-tray-icon') + (count ? '<span class="y12-tray-badge">' + count + '</span>' : '') + '<span class="y12-tray-label">托盘</span></button>';
+  function waitingCount() {
+    return Y12.api.connected() && !versionMismatch() ? Y12.api.query('decisions.list', {}).data.length : 0;
   }
 
   function notify(title, text, go, anchor) {
@@ -285,7 +287,7 @@
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'y12-notify';
-    el.innerHTML = '<span class="y12-notify-app">' + Y12.ui.icon('brand') + 'Yudao · 系统通知（模拟）</span><strong>' + esc(title) + '</strong><span>' + esc(text) + '</span>';
+    el.innerHTML = '<span class="y12-notify-app">' + Y12.ui.icon('brand') + 'Yudao · 浏览器的系统通知（模拟）</span><strong>' + esc(title) + '</strong><span>' + esc(text) + '</span>';
     el.addEventListener('click', () => {
       el.remove();
       openAt(go, anchor);
@@ -306,8 +308,6 @@
   }
 
   function onStreamEvent(event) {
-    const tray = document.getElementById('y12-tray-host');
-    if (tray) tray.innerHTML = trayHtml();
     if (!NOTIFY_TYPES.includes(event.type)) return;
     if (event.type === 'x_decision_issued' || event.type === 'project_decision_requested') {
       const d = Y12.api.query('decisions.list', {}).data.find((item) => item.id === event.payload.decision_id);
@@ -317,16 +317,17 @@
     }
   }
 
-  function ensureTray() {
-    let tray = document.getElementById('y12-tray-host');
-    if (!tray) {
-      tray = document.createElement('div');
-      tray.id = 'y12-tray-host';
-      tray.className = 'y12-tray-host';
-      document.body.appendChild(tray);
-      Y12.api.subscribe(null, onStreamEvent);
-    }
-    tray.innerHTML = trayHtml();
+  let notifying = false;
+  function ensureNotifications() {
+    if (notifying) return;
+    notifying = true;
+    Y12.api.subscribe(null, onStreamEvent);
+  }
+
+  // 标签页的标题：前面写待决定的数量
+  function pageTitleText(ctx, project) {
+    const n = waitingCount();
+    return (n ? '(' + n + ') ' : '') + pageTitle(ctx) + (project && !isSystemRoute(ctx.route.name) ? ' · ' + project.name : '') + ' · Yudao v12 原型';
   }
 
   // ---------------------------------------------------------------------------
@@ -346,7 +347,7 @@
       }
       disconnectedAt = null;
       windowNote();
-      ensureTray();
+      ensureNotifications();
       if (versionMismatch()) {
         dom.sidebar.innerHTML = '';
         dom.topbar.innerHTML = '';
@@ -360,13 +361,13 @@
       const tabs = project ? tabsHtml(ctx) : '';
       dom.tabs.innerHTML = tabs;
       dom.tabs.hidden = !tabs;
-      document.title = pageTitle(ctx) + (project && !isSystemRoute(ctx.route.name) ? ' · ' + project.name : '') + ' · Yudao v12 原型';
+      document.title = pageTitleText(ctx, project);
       document.documentElement.dataset.level = Y12.level.current();
     },
     simulateNotification() {
       const d = Y12.api.query('decisions.list', {}).data[0];
       if (d) notify('新的决定请求：' + d.kind_label, d.project_name + (d.work_item_title ? ' · ' + d.work_item_title : ''), '#/home', 'decision-' + d.id);
-      else notify('没有等待回答的决定', '托盘图标不显示数字', '#/home');
+      else notify('没有等待回答的决定', '标签页的标题前不写数字', '#/home');
     }
   };
 
@@ -385,8 +386,6 @@
   Y12.actions.register('shell.scope', (el) => Y12.go(Y12.paths.withScope(Y12.route(), el.value || null)));
 
   Y12.actions.register('shell.status', (el) => openAt(el.dataset.goTo, el.dataset.anchor));
-
-  Y12.actions.register('shell.tray', () => openAt('#/home', 'home-decisions'));
 
   Y12.actions.register('shell.decide', (el) => {
     const list = Y12.api.query('decisions.list', { work_item: el.dataset.workItem }).data;
@@ -411,16 +410,21 @@
       body: '<div class="y12-form">' +
         '<label class="y12-field"><span>项目名称</span><input type="text" class="y12-input" id="y12-new-name" data-draft="shell.newProject.name" placeholder="例如：门店排班"></label>' +
         '<label class="y12-field"><span>长期目标</span><textarea class="y12-textarea" id="y12-new-goal" rows="4" data-draft="shell.newProject.goal" placeholder="这个项目长期要达成什么"></textarea></label>' +
+        // 项目的起始文件夹（项目的起始文件夹设计说明第 5 节）：新建时取一次快照，第一个事项从它开始
+        '<label class="y12-field"><span>起始文件夹（可选）</span><input type="text" class="y12-input" id="y12-new-dir" data-draft="shell.newProject.dir" placeholder="例如：D:\\work\\shift-planner">' +
+        '<small class="y12-muted">填写时，新建项目取这个文件夹的一份快照，作为项目的起点；以后对这个文件夹的修改不影响项目。不填时从空目录开始。</small></label>' +
         '<p class="y12-muted y12-small">新建项目不调用模型；之后在概览中记录原文或作为新事项开始。</p></div>',
       actions: [{ label: '取消', close: true }, { label: '新建', kind: 'primary', act: 'shell.createProject' }]
     });
   });
 
   Y12.actions.register('shell.createProject', () => {
-    const result = Y12.run('project.create', { name: document.getElementById('y12-new-name').value, goal: document.getElementById('y12-new-goal').value });
+    const result = Y12.run('project.create', {
+      name: document.getElementById('y12-new-name').value, goal: document.getElementById('y12-new-goal').value,
+      initial_directory: document.getElementById('y12-new-dir').value
+    });
     if (!result.accepted) return;
-    Y12.app.clearDraft('shell.newProject.name');
-    Y12.app.clearDraft('shell.newProject.goal');
+    ['name', 'goal', 'dir'].forEach((k) => Y12.app.clearDraft('shell.newProject.' + k));
     Y12.ui.closeModal();
     setTimeout(() => Y12.go(Y12.paths.overview(result.refs.project_id, null)), Y12.backend.latency + 50);
   });

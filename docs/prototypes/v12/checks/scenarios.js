@@ -78,7 +78,7 @@ const ROOT = v12Url;
     machineScenes: report.filter((r) => r.machines).length,
     events: cnt, errors: errors.length
   }));
-  const ok = errors.length === 0 && report.length === 21 && unfinished.length === 0 &&
+  const ok = errors.length === 0 && report.length === 23 && unfinished.length === 0 &&
     cnt.buildingPlay > 0 && cnt.roomPlay > 0;
   console.log(ok ? 'RESULT: PASS' : 'RESULT: FAIL ' + JSON.stringify({ unfinished, cnt }));
   process.exit(ok ? 0 : 1);

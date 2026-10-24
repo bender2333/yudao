@@ -36,14 +36,26 @@
       case 'waiting_resume':
         kv.push(['部门', text(dept(m.department))], ['模型', code(m.model)], ['具体问题', text(m.problem)]);
         break;
-      case 'unknown_action':
-        kv.push(['动作', code(m.action_id)], ['所属部门', text(dept(m.department))]);
-        if (m.machine_id) kv.push(['执行的机器', text(machineName(m.machine_id))]);
-        kv.push(['输入依据', text(m.input)], ['执行前快照', text(m.before)], ['执行后快照', text(m.after)], ['核实依据', text(m.basis)],
-          ['契约是否声明可以重复', m.repeatable ? '可以重复执行' : '不能重复执行']);
+      // 暂停以后继续（D09）：停止原因与人工处理说明；工作区出现无法表示的条目时列出相对路径
+      case 'paused_continue':
+        kv.push(['部门', text(dept(m.department))], ['停止原因', text(m.reason) + (m.reason_code ? (html ? ' ' + Y12.ui.code(m.reason_code) : '（' + m.reason_code + '）') : '')],
+          ['人工处理说明', text(m.guide)]);
+        if ((m.paths || []).length) kv.push(['无法表示的条目', html ? m.paths.map((p) => Y12.ui.code(p)).join(' ') : m.paths.join('、')]);
         break;
-      case 'tool_once':
-        kv.push(['工具', text(m.tool)], ['目标', code(m.target)], ['本项目的授权范围', text(m.scope)], ['超出的部分', text(m.exceeds)]);
+      // 继续旧事项时定义版本不同（总体架构第 7.4 节）：事项记录的定义版本与当前加载的版本
+      case 'definitions_changed':
+        kv.push(['事项记录的定义版本', code(m.recorded_version)], ['当前加载的定义版本', code(m.current_version)], ['说明', text(m.basis)]);
+        break;
+      // 等待超过时长上限（循环与收敛设计说明第 3 节）：等待的种类、对象、已经等待的时长与上限
+      case 'wait_limit':
+        kv.push(['等待的种类', text(m.wait)], ['等待的对象', text(m.target)],
+          ['开始等待', m.since ? when(m.since) : ''], ['已经等待', text(Y12.ui.duration(Y12.time.between(m.since, Y12.app.now())))],
+          ['时长上限', text(Y12.ui.duration(m.limit_sec))], ['说明', text(m.note)]);
+        break;
+      // 实例升级（可信内核设计说明第 4 节）：当前版本、候选版本与发布检查的结果
+      case 'instance_upgrade':
+        kv.push(['当前版本', code(m.current)], ['候选版本', code(m.candidate) + (m.commit ? (html ? ' ' + esc('（' + m.commit + '）') : '（' + m.commit + '）') : '')]);
+        (m.checks || []).forEach((c) => kv.push([c.name, (c.ok ? '通过：' : '未通过：') + (html ? esc(c.text) : c.text)]));
         break;
       case 'cannot_verify':
         kv.push(['质检模型', code(m.model)], ['输入方式', text(m.input)]);

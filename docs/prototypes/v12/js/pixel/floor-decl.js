@@ -103,6 +103,8 @@
   function deptRest(ctx, d, it) {
     const seat = (pose, icon, iconText) => ({ spot: 'desk', pose, icon: icon || null, iconText: iconText || null });
     if (!it) return seat('tea');
+    // 事项停在别的房间，这个部门同时在工作中或回答询问（ADR-0036）：坐在桌前打字
+    if (it.department !== d && it.departments && it.departments[d]) return seat('type');
     const openFrom = (ctx.model.open_requests || []).find((q) => q.from === d && q.work_item_id === it.id);
     switch (it.status) {
       case 'running': return seat('type');
@@ -171,7 +173,7 @@
     tool_started_search: { label: '翻找资料', spot: 'cabinet', pose: 'magnify', bubble: 'say', ms: 1200 },
     tool_started_read: { label: '阅读文件', spot: 'cabinet', pose: 'read_sit', bubble: 'say', ms: 1100 },
     tool_started_write: { label: '编辑', spot: 'desk', pose: 'type', bubble: 'say', ms: 1200 },
-    tool_started_run_command: { label: '执行登记命令', spot: 'terminal', pose: 'lever', bubble: 'say', ms: 1600 },
+    tool_started_run_command: { label: '执行命令', spot: 'terminal', pose: 'lever', bubble: 'say', ms: 1600 },
     tool_started_fetch: { label: '网络取回', spot: 'port_in', pose: 'side_place', bubble: 'say', ms: 1200 },
     tool_started_mcp: { label: '调用工具', spot: 'terminal', pose: 'lever', bubble: 'say', ms: 1200 },
     tool_started_browser: { label: '试用网页', spot: 'desk', pose: 'type', bubble: 'say', ms: 1400 },
@@ -263,7 +265,7 @@
     if (ev.type === 'tool_started') {
       const tool = String(ev.tool || pl.tool || '');
       if (tool === 'search') return 'tool_started_search';
-      if (tool === 'run_command') return 'tool_started_run_command';
+      if (tool === 'run_command' || tool === 'bash') return 'tool_started_run_command';
       if (tool === 'run_check') return 'qa_started';
       if (/write|edit/.test(tool)) return 'tool_started_write';
       if (/fetch|http|net|url/.test(tool)) return 'tool_started_fetch';

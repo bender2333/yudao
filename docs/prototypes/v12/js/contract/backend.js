@@ -384,7 +384,8 @@
     }
   };
 
-  Y12.CLIENT_API_VERSION = 1;
+  // 页面构建时的接口版本；原型工具条把服务的接口版本改成 1 或 3，看两种方向的不一致
+  Y12.CLIENT_API_VERSION = 2;
 
   // 界面层按能力清单决定显示什么
   let capCache = null;
@@ -421,7 +422,9 @@
     });
     (s.decisions || []).forEach((dec) => {
       need(Y12.registry.has('decision', dec.kind), '决定请求 ' + dec.id + ' 的种类没有登记：' + dec.kind);
-      need(has('projects', dec.project_id), '决定请求 ' + dec.id + ' 的项目不存在');
+      // 写在目录流里的决定请求（实例升级）不属于任何项目
+      if (Y12.registry.entry('decision', dec.kind).stream === 'catalog') need(!dec.project_id, '决定请求 ' + dec.id + ' 写在目录流里，不属于项目');
+      else need(has('projects', dec.project_id), '决定请求 ' + dec.id + ' 的项目不存在');
       if (dec.work_item_id) need(has('work_items', dec.work_item_id), '决定请求 ' + dec.id + ' 的事项不存在');
       if (dec.run_id) need(has('runs', dec.run_id), '决定请求 ' + dec.id + ' 的 run 不存在');
       need(Array.isArray(dec.options) && dec.options.length, '决定请求 ' + dec.id + ' 没有选项');

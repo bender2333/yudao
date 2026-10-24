@@ -35,7 +35,7 @@
 
   const FILE_RE = /([\w\-./]+\.[A-Za-z0-9]{1,5})(?![A-Za-z0-9])/;
   const fileOf = (ev, pl) => pl.path || pl.file || (FILE_RE.exec(String(ev.label || '')) || [])[1] || null;
-  // 登记命令的名称：载荷里有就用载荷，没有就取事件说明末尾的英文名称
+  // 命令：载荷里有就用载荷，没有就取事件说明末尾的英文名称
   const commandOf = (ev, pl) => pl.command || pl.name || (/([A-Za-z][\w.\-]*)\s*$/.exec(String(ev.label || '')) || [])[1] || null;
 
   function toolText(ev, pl) {
@@ -44,9 +44,9 @@
     if (tool === 'search') return '现在翻找资料' + (pl.query ? '：' + cut(pl.query, 12) : '');
     if (/^read/.test(tool)) return '现在阅读' + (file ? ' ' + cut(baseName(file), 16) : '资料');
     if (/^(edit|write)/.test(tool)) return '现在编辑' + (file ? ' ' + cut(baseName(file), 16) : '文件');
-    if (tool === 'run_command') {
+    if (tool === 'run_command' || tool === 'bash') {
       const name = commandOf(ev, pl);
-      return '现在执行' + (name ? ' ' + cut(name, 14) : '登记命令');
+      return '现在执行' + (name ? ' ' + cut(name, 14) : '命令');
     }
     if (tool === 'run_check') return '现在检查交付';
     if (/^browser/.test(tool)) return ev.department === 'quality' ? '现在试用网页' : '现在自测网页';
@@ -79,7 +79,7 @@
     model_attempt_failed: () => '请求失败了',
     tool_started: toolText,
     tool_called: (ev, pl) => {
-      if (String(ev.tool || pl.tool || '') !== 'run_command') return null;
+      if (!['run_command', 'bash'].includes(String(ev.tool || pl.tool || ''))) return null;
       return pl.timed_out ? '命令超时了' : pl.exit_code === 0 ? '命令通过了' : '命令没有通过';
     },
     tool_skipped: () => '这个工具没有获准，换个办法',

@@ -1,4 +1,4 @@
-// 原型工具条：档位切换、标注、场景播放器、模拟（托盘与通知、断开连接、接口版本、离开的时长）、动作图鉴、主题。
+// 原型工具条：档位切换、标注、场景播放器、模拟（系统通知、断开连接、接口版本、离开的时长）、动作图鉴、主题。
 // 原型专用，可以直接读写示例后端（BUILD.md 第 2 节的例外）
 (function () {
   'use strict';
@@ -129,8 +129,8 @@
     const sim = simOpen
       ? '<div class="y12-tb-sim">' +
           '<label><input type="checkbox" data-act="tb.connected"' + (connected ? ' checked' : '') + '><span>与控制主机连接</span></label>' +
-          '<label><span>控制主机的接口版本</span><select class="y12-tb-select" data-act="tb.api">' +
-            [1, 2].map((n) => '<option value="' + n + '"' + (n === apiVersion ? ' selected' : '') + '>' + n + (n === Y12.CLIENT_API_VERSION ? '（与客户端相同）' : '') + '</option>').join('') + '</select></label>' +
+          '<label><span>服务的接口版本</span><select class="y12-tb-select" data-act="tb.api">' +
+            [1, 2, 3].map((n) => '<option value="' + n + '"' + (n === apiVersion ? ' selected' : '') + '>' + n + (n === Y12.CLIENT_API_VERSION ? '（与页面相同）' : n < Y12.CLIENT_API_VERSION ? '（服务较旧）' : '（服务较新）') + '</option>').join('') + '</select></label>' +
           '<label><span>离开的时长</span><select class="y12-tb-select" data-act="tb.away"><option value="">保持</option>' +
             AWAY.map((a) => '<option value="' + a[0] + '">' + a[1] + '</option>').join('') + '</select></label>' +
           '<button type="button" class="y12-tb-btn" data-act="tb.notify">' + Y12.ui.icon('bell') + '<span>模拟一条通知</span></button>' +

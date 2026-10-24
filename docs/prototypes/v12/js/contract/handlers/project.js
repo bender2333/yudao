@@ -8,17 +8,15 @@
 
   const DEPT = { product: '产品', engineering: '工程', quality: '质检', operations: '运维' };
   const PLACE = Object.assign({ user: '用户', hall: '大厅', library: '成果库', adoption: '采纳' }, DEPT);
+  // 流转记录的类型：部门之间流动的是正式成果、询问与回答（ADR-0039 以后没有交接）
   const FLOW_KIND = {
-    handoff: '需求交接', delivery: '版本交付', defect: '问题反馈', ask: '咨询',
-    answer: '回答', rework: '返工', release: '放行', adopt: '采纳'
+    input: '用户输入', prd: 'PRD', delivery: '交付', defect: '缺陷记录', ask: '询问', answer: '回答',
+    release: '放行', adopt: '采纳', structure: '结构说明', baseline: '基线核验'
   };
-  const FLOW_STATUS = { accepted: '已接纳', open: '未完成', closed: '已关闭', rejected: '已拒绝' };
-  const PHASE = {
-    PRODUCT_SPEC: '产品规格', ENGINEERING: '工程实现', DELIVERY: '交付', QUALITY: '质检',
-    REWORK_PRODUCT: '返工到产品', REWORK_ENGINEERING: '返工到工程',
-    DONE: '已完成', PAUSED: '已暂停', FAILED: '已失败', QUEUED: '排队中'
-  };
-  const RECOVERING = ['interrupted', 'pending_verification', 'waiting_resume'];
+  const FLOW_STATUS = { accepted: '已接纳', open: '进行中', closed: '已结束', rejected: '已拒绝' };
+  // 恢复观察状态：运行中、中断、待恢复与四种结束方式（恢复契约第 1 节，工单 #747）
+  const RECOVERY_STATES = ['running', 'interrupted', 'waiting_resume', 'completed', 'paused', 'cancelled', 'stopped'];
+  const RECOVERING = ['interrupted', 'waiting_resume'];
   const TERMINAL_STATUS = ['adopted', 'released', 'stopped'];
 
   function rawById(db, list, id) {
@@ -102,7 +100,6 @@
       waiting_provider: ['waiting_provider', '等待模型服务'],
       waiting_decision: ['waiting', '等待你的决定'],
       interrupted: ['interrupted', '中断'],
-      pending_verification: ['pending', '待核实'],
       waiting_resume: ['waiting', '待恢复'],
       paused: ['paused', '已暂停'],
       failed: ['failed', run && run.stop_reason && run.stop_reason.text ? run.stop_reason.text : '失败'],
@@ -114,16 +111,38 @@
     if (!status) return { kind: 'idle', text: '未开始' };
     const pair = map[status];
     if (!pair) throw new Error('无法显示事项状态：' + status);
-    if (status === 'waiting_resume' && run && run.recovery && run.recovery.unusable && run.recovery.unusable.problem) {
-      return { kind: 'waiting', text: '待恢复：' + run.recovery.unusable.problem };
+    if (status === 'waiting_resume') {
+      const wm = H.waitingMachine(db, run);
+      if (wm) return { kind: 'waiting', text: '等待机器：' + wm.machine_name };
+      if (run && run.recovery && run.recovery.unusable && run.recovery.unusable.problem) {
+        return { kind: 'waiting', text: '待恢复：' + run.recovery.unusable.problem };
+      }
     }
     return { kind: pair[0], text: pair[1] };
   }
 
   function openQuestion(run) {
     if (!run) return null;
-    const open = (run.requests || []).find((request) => request.status === 'open');
+    const open = (run.asks || []).find((a) => a.status === 'open');
     return open ? open.question : null;
+  }
+
+  // 事项的进度按成果写（三部门的循环结构第 2 节）：当前的 PRD 版本、最新的交付与它依据的 PRD 版本、对最新交付的结论。
+  // 不写阶段名称
+  function progressOf(db, item) {
+    const mine = (db.data.materials || []).filter((m) => m.work_item_id === item.id);
+    const last = (kind) => mine.filter((m) => m.kind === kind).sort((a, b) => a.version - b.version).pop() || null;
+    const prd = last('prd');
+    const delivery = last('delivery');
+    const qa = last('qa');
+    const verdict = qa && delivery && Y12.time.ms(qa.at) >= Y12.time.ms(delivery.at) ? qa.verdict : null;
+    if (!prd && !delivery) return null;
+    return {
+      prd: prd ? 'r' + prd.version : null,
+      delivery: delivery ? 'r' + delivery.version : null,
+      delivery_basis: delivery ? (delivery.basis || (prd ? 'PRD r' + prd.version : null)) : null,
+      verdict: verdict === 'release' ? '放行' : verdict === 'rework_engineering' ? '缺陷记录' : null
+    };
   }
 
   function itemOut(db, item) {
@@ -135,8 +154,10 @@
       color_index: item.color_index,
       kind: item.kind || 'request',
       status: item.status,
-      phase: run ? run.phase : null,
       department: run ? (run.department || run.last_department || null) : null,
+      // 三个部门各自的状态与事项按成果写的进度（工单 #477）
+      departments: H.deptStatesOf(db, item, run),
+      progress: progressOf(db, item),
       cycle: run ? run.cycle : 0,
       started_at: run ? run.started_at : null,
       elapsed_sec: run ? run.elapsed_sec : 0,
@@ -152,11 +173,6 @@
     }
     if (db.atLeast('3.1')) out.recovery_state = run && run.recovery ? run.recovery.state : null;
     return out;
-  }
-
-  function phaseText(phase) {
-    if (!PHASE[phase]) throw new Error('未知的 run 阶段：' + phase);
-    return PHASE[phase];
   }
 
   function flowStatusText(status) {
@@ -233,30 +249,53 @@
       id: run.id,
       work_item_id: run.work_item_id,
       yudao_version: run.yudao_version,
-      phase: run.phase,
+      state: run.recovery ? run.recovery.state : null,
       stop_reason: run.stop_reason,
       readonly: true,
       events: db.log({ run: run.id }).map((ev) => ({ position: ev.position, at: ev.at, type: ev.type, label: ev.label }))
     }));
   }
 
-  function unfinishedOut(db, run) {
+  // 重新启动时结果未知的动作（恢复契约第 4 节）：先按动作的核实方法自动核实，核实出确定结果就交回这个结果（核实确认）；
+  // 其余作为工具结果交还发出它的会话，写明执行被中断、结果未知，附上已经收到的输出，由模型决定是否重新执行（交还会话）。
+  // 没有用户的决定；核实产生新的记录，不改写原始观察
+  const HANDLING = { confirmed: '核实确认', returned: '交还会话', waiting: '等待机器恢复以后核实' };
+
+  function unknownActionsOut(db, run) {
     return (run.recovery.unfinished || []).map((entry) => {
       const id = typeof entry === 'string' ? entry : entry.id;
-      if (!id) throw new Error('未完成动作缺少标识');
+      if (!id) throw new Error('结果未知的动作缺少标识');
       const action = (run.actions || []).find((item) => item.id === id);
+      const v = (run.recovery.verifications || []).filter((x) => x.action_id === id).pop() || null;
+      const handling = v ? v.handling : 'waiting';
+      if (!HANDLING[handling]) throw new Error('未知的处理方式：' + handling);
       const out = {
         id,
         label: (entry && entry.label) || (action && action.summary) || id,
         department: action ? action.department : (run.department || null),
-        state: action ? action.state : 'unknown',
+        session: v && v.session ? v.session : null,
         input: action ? action.input : null,
         before: action ? action.before : null,
-        after: action ? action.after : null
+        after: action ? action.after : null,
+        handling, handling_text: HANDLING[handling],
+        basis: v ? v.basis || null : null,
+        result: v ? v.result || null : null,
+        returned: v ? v.returned || null : null,
+        at: v ? v.at || null : null
       };
       if (db.atLeast('3.2C')) out.machine_id = action ? action.machine_id || null : null;
       return out;
     });
+  }
+
+  // 因升级停止的事项用项目的起点重新开始（恢复契约第 6 节第 10 行）：有采纳成果时是采纳成果，
+  // 没有时是起始文件夹快照，都没有时是空树
+  function startPointOf(db, projectId) {
+    const project = db.project(projectId);
+    const adopted = H.adoptions(project);
+    if (adopted.length) return '采纳成果 ' + adopted[adopted.length - 1].version;
+    if (project.initial_snapshot) return '起始文件夹快照（' + project.initial_snapshot.files + ' 个文件）';
+    return '空树';
   }
 
   function upgradeOf(db, item) {
@@ -269,12 +308,26 @@
       stopped_run_id: stopped.id,
       new_run_id: newer ? newer.id : null,
       new_yudao_version: newer ? newer.yudao_version : null,
+      start_point: startPointOf(db, item.project_id),
       queue_pos: item.queue_pos == null ? null : item.queue_pos
     };
   }
 
   // ---------------------------------------------------------------------------
   // 查询
+
+  // 采纳写回的五种结果（应用层与接口层设计说明「写回在页面上的显示」）
+  const WRITEBACK = {
+    completed: '写回完成', verified: '写回已核实', stopped: '写回停止', held: '写回等待', not_needed: '无需写回'
+  };
+
+  function writebacksOf(db, projectId) {
+    const settings = db.settings(projectId);
+    return ((settings && settings.writebacks) || []).map((w) => {
+      if (!WRITEBACK[w.status]) throw new Error('未知的写回结果：' + w.status);
+      return Object.assign({}, w, { status_text: WRITEBACK[w.status] });
+    }).sort((a, b) => Y12.time.ms(b.at) - Y12.time.ms(a.at));
+  }
 
   B.query('project.overview', (params, db) => {
     const project = H.requireProject(db, params.project);
@@ -301,8 +354,29 @@
       },
       work_items: items
     };
-    if (settings && Array.isArray(settings.source_directories)) out.source_directories = settings.source_directories;
+    // 没有采纳成果时写起点（项目的起始文件夹设计说明第 5 节）
+    if (!adopted.length && project.initial_snapshot) out.start_point = '起点：起始文件夹（' + project.initial_snapshot.files + ' 个文件）';
+    if (settings && settings.source_directories) out.source_directories = settings.source_directories.items || [];
+    // 当前成果有没有写回（3.8）：这一行让用户看得出还差没有写回这一步
+    if (db.atLeast('3.8') && adopted.length && (out.source_directories || []).some((dir) => dir.writeback && dir.writeback.enabled)) {
+      const current = adopted[adopted.length - 1];
+      const w = writebacksOf(db, project.id).find((x) => x.adoption === current.version) || null;
+      out.writeback = w ? { status: w.status, status_text: w.status_text, at: w.at } : { status: null, status_text: '还没有写回', at: null };
+    }
     return out;
+  });
+
+  B.query('project.writeback', (params, db) => {
+    const project = H.requireProject(db, params.project);
+    const settings = db.settings(project.id);
+    const dir = settings && settings.source_directories ? (settings.source_directories.items || []).find((d) => d.writeback) || null : null;
+    return {
+      project_id: project.id,
+      enabled: Boolean(dir && dir.writeback && dir.writeback.enabled),
+      source_name: dir ? dir.name : null,
+      target_branch: dir && dir.writeback ? dir.writeback.target_branch : null,
+      records: writebacksOf(db, project.id)
+    };
   });
 
   B.query('project.flow', (params, db) => {
@@ -329,6 +403,13 @@
     };
   });
 
+  B.query('run.asks', (params, db) => {
+    const item = db.workItem(params.work_item);
+    if (!item) throw new Error('事项不存在或不在当前档位：' + params.work_item);
+    const run = item.run_id ? db.run(item.run_id) : null;
+    return { work_item_id: item.id, run_id: run ? run.id : null, asks: run ? H.asksOut(run) : [] };
+  });
+
   B.query('run.recovery', (params, db) => {
     const item = db.workItem(params.work_item);
     if (!item) throw new Error('事项不存在或不在当前档位：' + params.work_item);
@@ -336,28 +417,33 @@
     if (!run) throw new Error('事项没有 run：' + item.id);
     if (!run.recovery) throw new Error('run 没有恢复观察：' + run.id);
     const rec = run.recovery;
+    if (!RECOVERY_STATES.includes(rec.state)) throw new Error('未知的恢复观察状态：' + rec.state);
     const project = db.project(item.project_id);
     const limits = Object.assign({}, rec.limits || {});
     if (db.atLeast('S4')) limits.waiting_provider_sec = run.waiting_provider_sec || 0;
+    const wm = H.waitingMachine(db, run);
     const out = {
       project: { id: project.id, name: project.name, archived: Boolean(project.archived), version: project.version },
       work_item: { id: item.id, title: item.title, status: item.status, kind: item.kind || 'request', version: item.version },
       display: displayOf(db, item, run),
       run: {
-        id: run.id, phase: run.phase, phase_text: phaseText(run.phase), department: run.department, last_department: run.last_department || null,
+        id: run.id, department: run.department, last_department: run.last_department || null,
         cycle: run.cycle, started_at: run.started_at, elapsed_sec: run.elapsed_sec, limit_sec: run.limit_sec,
         stop_reason: run.stop_reason, yudao_version: run.yudao_version
       },
       state: rec.state,
       reason: rec.reason || null,
       unusable: rec.unusable || null,
+      // 机器离线时的待恢复写「等待机器」、机器名与已经等待的时长（执行环境服务设计说明第 6.5 节）
+      waiting_machine: wm ? Object.assign({}, wm, { waited_sec: H.since(db, wm.since) }) : null,
       last_confirmed: rec.last_confirmed || null,
       auto_resumed_at: rec.auto_resumed_at || null,
-      unfinished: unfinishedOut(db, run),
-      verifications: rec.verifications || [],
+      unknown_actions: unknownActionsOut(db, run),
       owner: rec.owner || null,
       late_results: rec.late_results || [],
       limits,
+      // 会话的用量各自累计（三部门的循环结构第 9 节）：部门主线的一轮工作与询问分支各是一个会话
+      sessions: (run.sessions || []).map((s) => Object.assign({}, s, { department_text: DEPT[s.department] || s.department })),
       upgrade: upgradeOf(db, item)
     };
     if (db.atLeast('3.4A') && db.data.runtime && db.data.runtime.slots) {
@@ -374,7 +460,7 @@
     const items = db.workItemsOf(project.id).map((item) => {
       const mine = all.filter((material) => material.work_item_id === item.id);
       const counts = {};
-      ['intend', 'prd', 'plan', 'delivery', 'qa', 'note'].forEach((kind) => {
+      ['intend', 'prd', 'delivery', 'qa', 'note'].forEach((kind) => {
         counts[kind] = mine.filter((material) => material.kind === kind).length;
       });
       const run = item.run_id ? db.run(item.run_id) : null;
@@ -425,7 +511,6 @@
     out.work_item = { id: item.id, title: item.title, kind: item.kind || 'request' };
     out.intend = byKind('intend');
     out.prd = byKind('prd');
-    out.plan = byKind('plan');
     out.delivery = byKind('delivery');
     out.qa = byKind('qa');
     out.notes = out.notes.concat(mine.filter((material) => material.kind === 'note' && !structs.has(material.id)).map((material) => copyMaterial(db, material)));
@@ -455,7 +540,6 @@
   const STEP_REPEAT = 3;     // 步骤循环：范围内名称与参数摘要相同的工具调用出现这么多次为震荡
   const STEP_LIMIT = 40;     // 步骤循环的步数上限
   const LIMIT_CODES = ['time_limit', 'cycle_limit', 'step_limit'];   // 属于限额类的停止原因
-  const ACCEPTED = ['spec_accepted', 'contract_accepted', 'plan_accepted', 'delivery_accepted', 'structure_accepted', 'baseline_review_accepted'];
   const STOPS = ['run_done', 'run_failed', 'run_paused', 'x_run_stopped_for_upgrade'];
   const METHODS = Y12.registry.CHECK_METHODS;
 
@@ -541,46 +625,53 @@
     return { code: run.stop_reason.code, text: run.stop_reason.text || run.stop_reason.code, position: ev ? ev.position : null };
   }
 
-  // 激活：一个部门在 run 里的一次工作，从交接进来（或开始工作、自动继续）到交出去（或 run 停止、中断）
+  // 激活（一轮工作，ADR-0039）：部门在关注的成果有了新版本时开始一轮工作（department_activated），提交正式成果时这一轮结束；
+  // run 停止或控制主机中断时结束，自动继续时中断前在工作的部门接着工作。几个部门同时工作时各有各的一轮
+  const OUTPUT_OF = {
+    spec_accepted: ['product', '提交 PRD'], contract_accepted: ['product', '提交 PRD'],
+    delivery_accepted: ['engineering', '提交交付'], structure_accepted: ['engineering', '提交结构说明'],
+    qa_submitted: ['quality', '提交质检结论'], baseline_review_accepted: ['quality', '提交基线核验']
+  };
+
   function activationsOf(events) {
     const acts = [];
     const count = {};
-    let open = null;
-    let lastDept = null;
+    const open = {};
+    let interrupted = [];
     const start = (dept, ev) => {
       count[dept] = (count[dept] || 0) + 1;
-      open = { department: dept, index: count[dept], start: ev, end: null, endText: null, steps: [], accepted: [], reviews: [] };
-      acts.push(open);
-      lastDept = dept;
+      open[dept] = { department: dept, index: count[dept], start: ev, end: null, endText: null, steps: [], accepted: [], reviews: [] };
+      acts.push(open[dept]);
     };
-    const close = (ev, text) => {
-      if (!open) return;
-      open.end = ev;
-      open.endText = text;
-      open = null;
+    const close = (dept, ev, text) => {
+      const act = open[dept];
+      if (!act) return;
+      act.end = ev;
+      act.endText = text;
+      delete open[dept];
     };
+    const closeAll = (ev, text) => Object.keys(open).forEach((dept) => close(dept, ev, text));
     events.forEach((ev) => {
-      const pl = ev.payload || {};
-      if (ev.type === 'transition') {
-        if (open && (open.department === pl.from || DEPT[pl.to])) close(ev, '交给' + (PLACE[pl.to] || pl.to));
-        if (DEPT[pl.to]) start(pl.to, ev);
-      } else if (ev.type === 'department_activated') {
-        if (ev.department && (!open || open.department !== ev.department)) {
-          close(ev, DEPT[ev.department] + '开始工作');
-          start(ev.department, ev);
-        }
+      if (ev.type === 'department_activated') {
+        if (ev.department && DEPT[ev.department] && !open[ev.department]) start(ev.department, ev);
       } else if (ev.type === 'x_run_interrupted') {
-        close(ev, '控制主机中断');
+        interrupted = Object.keys(open);
+        closeAll(ev, '控制主机中断');
       } else if (ev.type === 'x_run_auto_resumed') {
-        if (!open && lastDept) start(lastDept, ev);
+        interrupted.forEach((dept) => { if (!open[dept]) start(dept, ev); });
+        interrupted = [];
       } else if (STOPS.includes(ev.type)) {
-        close(ev, 'run 停止：' + stopTextOf(ev));
-      } else if (open && ev.type === 'tool_started') {
-        open.steps.push(ev);
-      } else if (open && ACCEPTED.includes(ev.type)) {
-        open.accepted.push(ev);
-      } else if (open && ev.type === 'x_review_recorded') {
-        open.reviews.push(ev);
+        closeAll(ev, 'run 停止：' + stopTextOf(ev));
+      } else if (OUTPUT_OF[ev.type]) {
+        const dept = ev.department || OUTPUT_OF[ev.type][0];
+        if (open[dept]) {
+          open[dept].accepted.push(ev);
+          close(dept, ev, OUTPUT_OF[ev.type][1]);
+        }
+      } else if (ev.type === 'tool_started') {
+        if (open[ev.department]) open[ev.department].steps.push(ev);
+      } else if (ev.type === 'x_review_recorded') {
+        if (open[ev.department]) open[ev.department].reviews.push(ev);
       }
     });
     return acts;
@@ -593,7 +684,7 @@
   }
 
   const stepTool = (ev) => String((ev.payload && ev.payload.tool) || '');
-  const stepDigest = (ev) => (stepTool(ev) + ' ' + ((ev.payload && (ev.payload.args || ev.payload.path)) || '')).trim();
+  const stepDigest = (ev) => (stepTool(ev) + ' ' + ((ev.payload && (ev.payload.command || ev.payload.path)) || '')).trim();
 
   // 激活层（Stage 5 起判定）：漂移看写入的路径中不属于任何计划条目的比例，其余看审查通过的计划条目数
   function judgeActivation(act) {
@@ -615,7 +706,7 @@
       if (ev.payload.verdict === 'passed') done.add(ev.payload.plan_item);
       return { round: i + 1, value: done.size, position: ev.position, source: Y12.registry.sourceOf(ev, 'review') };
     });
-    if (!series.length) return { state: 'not_judged', missing: '这次激活还没有计划条目的审查记录' };
+    if (!series.length) return { state: 'not_judged', missing: '这一轮工作还没有计划条目的审查记录' };
     const measure = { name: '审查通过的计划条目数', field: 'review', series };
     const values = series.map((p) => p.value);
     const win = values.slice(-ROUNDS);
@@ -633,7 +724,7 @@
     const j = db.atLeast('S5') ? judgeActivation(act) : { state: 'not_judged', missing: '计划条目没有主机记录的完成事实（Stage 5 起判定）' };
     return {
       id: 'act:' + run.id + ':' + act.department + ':' + act.index, parent: 'run:' + run.id, layer: 'activation',
-      label: DEPT[act.department] + ' · 第 ' + act.index + ' 次激活', department: act.department, role: null, round: act.index,
+      label: DEPT[act.department] + ' · 第 ' + act.index + ' 轮工作', department: act.department, role: null, round: act.index,
       // Stage 3 没有为激活单独声明时间上限：上限取激活开始时 run 剩下的时间（上一层的剩余量）
       used: [{ name: '已用时间', value, limit, unit: '秒', at_bound: limit > 0 && value >= limit }],
       state: j.state, missing: j.missing || null, stop_reason: act.end ? act.endText : null,
@@ -670,13 +761,13 @@
       basis = '连续 ' + tail + ' 步没有被接纳的记录（阈值 ' + STEP_WINDOW + ' 步）：停滞';
     } else {
       state = 'converging';
-      basis = tail ? '距激活开始或上一条被接纳的记录 ' + tail + ' 步，不到 ' + STEP_WINDOW + ' 步：收敛中' : '最近一步之后有被接纳的记录：收敛中';
+      basis = tail ? '距这一轮工作开始或上一条被接纳的记录 ' + tail + ' 步，不到 ' + STEP_WINDOW + ' 步：收敛中' : '最近一步之后有被接纳的记录：收敛中';
     }
     return {
       id: parentId + ':step', parent: parentId, layer: 'step', label: DEPT[act.department] + ' · 步骤循环',
       department: act.department, role: last.role || null, round: steps.length,
       used: [{ name: '步数', value: steps.length, limit: STEP_LIMIT, unit: '步', at_bound: steps.length >= STEP_LIMIT }],
-      state, missing: null, stop_reason: act.end ? '激活结束：' + act.endText : null,
+      state, missing: null, stop_reason: act.end ? '这一轮工作结束：' + act.endText : null,
       measure: { name: '连续没有被接纳记录的步数', field: 'steps', series }, basis, position: last.position
     };
   }
@@ -866,13 +957,13 @@
 
   function defaultSettings(sourceDirectories) {
     const dept = () => ({ version: 1, model: null, level: null, prompt_version: null, prompt_text: null });
+    const dirs = sourceDirectories || [];
     return {
       version: 1,
       departments: { product: dept(), engineering: dept(), quality: dept(), operations: null },
-      commands: [],
-      tools: [],
       machines: [],
-      source_directories: sourceDirectories || [],
+      source_directories: { version: dirs.length ? 1 : 0, items: dirs },
+      writebacks: [],
       roles: { level: 'S5' }
     };
   }
@@ -892,7 +983,7 @@
       },
       born_at: now, version: 1,
       inputs: [{ version: 1, kind: 'user', text, at: now, progress: 'received', bytes: bytesOf(text) }],
-      flow: [], requests: [], guidance: [], messages,
+      flow: [], asks: [], guidance: [], messages, sessions: [],
       actions: [], contexts: { product: [], engineering: [], quality: [], operations: [] },
       prompts: {
         product: { config_version: 0, request_version: null, text: null },
@@ -989,22 +1080,35 @@
     return plan;
   }
 
+  // 起始文件夹（项目的起始文件夹设计说明第 3 节）：只读采集公开树，快照是第一次采纳之前每个事项的起点；
+  // 不可读、含宿主私有路径或有无法表示的条目时拒绝，不建立项目。示例后端不读文件，写一份固定的示例快照
+  function initialSnapshotOf(path) {
+    return { source: textOf(path), files: 3, tree_digest: 'snap-1f3c9a2' };
+  }
+
   B.command('project.create', (params, db) => {
     const name = textOf(params.name);
     if (!name) throw new Error('请填写项目名称');
     if ((db.raw.projects || []).some((project) => project.name === name)) return H.reject('already_exists', '已经有同名项目：' + name);
+    const dir = textOf(params.initial_directory);
+    if (dir) {
+      const problem = sourceProblem('起始文件夹', dir);
+      if (problem) return H.reject('source_invalid', problem.replace('源目录', '起始文件夹'));
+    }
     const id = Y12.uid('p');
     const goal = textOf(params.goal);
+    const project = {
+      id, name, goal, pinned: false, archived: false, version: 1, source: 'idea',
+      created_at: db.now, last_activity_at: db.now, born_at: db.now, adoptions: []
+    };
+    if (dir) project.initial_snapshot = initialSnapshotOf(dir);
     return {
       events: [{
         type: 'project_registered', project_id: id,
-        label: '用户从想法建立项目「' + name + '」',
-        payload: { name, goal, source: 'idea' },
+        label: '用户从想法建立项目「' + name + '」' + (dir ? '，带起始文件夹' : ''),
+        payload: Object.assign({ name, goal, source: 'idea' }, dir ? { initial_snapshot: project.initial_snapshot } : {}),
         patch: [
-          { path: 'projects', push: {
-            id, name, goal, pinned: false, archived: false, version: 1, source: 'idea',
-            created_at: db.now, last_activity_at: db.now, born_at: db.now, adoptions: []
-          } },
+          { path: 'projects', push: project },
           { path: 'project_settings', put: { key: id, value: defaultSettings([]) } }
         ]
       }],
@@ -1097,7 +1201,7 @@
     const active = db.workItemsOf(project.id).some((item) => item.kind === 'onboarding' && (item.status === 'in_progress' || item.status === 'queued'));
     if (waiting || active) return H.reject('not_allowed', '已有进行中或等待确认的建档事项');
     const settings = db.raw.project_settings && db.raw.project_settings[project.id];
-    const dirs = settings && settings.source_directories || [];
+    const dirs = settings && settings.source_directories ? settings.source_directories.items || [] : [];
     const source = dirs.find((dir) => dir.name === params.source_name);
     if (!source) return H.reject('source_invalid', '没有这个源目录：' + (params.source_name || ''));
     const workId = Y12.uid('w');
@@ -1169,6 +1273,58 @@
       }],
       refs: { project_id: project.id },
       message: '已提交：项目已重命名为「' + name + '」'
+    };
+  });
+
+  // 修改长期目标（应用层与接口层设计说明第 3.2 节）：之后开始的事项使用新目标，进行中的事项使用开始时的目标
+  B.command('project.set_goal', (params, db) => {
+    const project = visibleProject(db, params.project);
+    if (project.reject) return project;
+    const denied = archived(project) || stale(project, params);
+    if (denied) return denied;
+    const goal = textOf(params.goal);
+    if (!goal) return H.reject('not_allowed', '长期目标不能为空');
+    return {
+      events: [{
+        type: 'project_goal_changed', project_id: project.id,
+        label: '修改项目「' + project.name + '」的长期目标',
+        payload: { goal },
+        patch: [{ path: 'projects[id=' + project.id + '].goal', value: goal }]
+      }],
+      refs: { project_id: project.id },
+      message: '已提交：之后开始的事项使用新目标'
+    };
+  });
+
+  // 对一次采纳重新发起采纳写回（ADR-0034，工单 #709）：示例后端按源目录的设置给出结果。
+  // 写回目标不可用时按 not_allowed 拒绝并写明原因；合并请求在当前版本只是本地记录
+  B.command('writeback.execute', (params, db) => {
+    const project = visibleProject(db, params.project);
+    if (project.reject) return project;
+    const denied = archived(project);
+    if (denied) return denied;
+    const adopted = H.adoptions(db.project(project.id));
+    if (!adopted.length) return H.reject('not_allowed', '还没有采纳成果，没有可写回的对象');
+    const version = params.adoption || adopted[adopted.length - 1].version;
+    const settings = db.raw.project_settings[project.id];
+    const dir = settings.source_directories && (settings.source_directories.items || []).find((d) => d.writeback && d.writeback.enabled);
+    if (!dir) return H.reject('not_allowed', '源目录没有打开采纳写回，先在源目录一节里打开并写明远端与目标分支');
+    const branch = 'yudao/' + version;
+    return {
+      events: [{
+        type: 'writeback_completed', project_id: project.id,
+        label: '采纳成果 ' + version + ' 写回到 ' + dir.name + '：推送分支 ' + branch + '，目标分支 ' + dir.writeback.target_branch,
+        payload: { adoption: version, pushed_branch: branch, target_branch: dir.writeback.target_branch },
+        patch: [{
+          path: 'project_settings.' + project.id + '.writebacks', push: {
+            id: Y12.uid('wb'), adoption: version, work_item_id: null, status: 'completed', at: db.now,
+            target_branch: dir.writeback.target_branch, pushed_branch: branch,
+            merge_request: { title: '采纳成果 ' + version, local_only: true }, conflicts: [], stop_reason: null
+          }
+        }]
+      }],
+      refs: { project_id: project.id },
+      message: '已提交：写回成果 ' + version
     };
   });
 
@@ -1279,8 +1435,9 @@
     let message = '已提交：已新建事项，进入产品部门';
     if (plan.queueReason === 'slot') message = '已提交：执行槽位已满，事项进入队列';
     if (plan.queueReason === 'project') message = '已提交：本项目已有进行中的事项，新事项进入队列';
+    // 事项从项目的起点开始（项目的起始文件夹设计说明第 2 节）；已有代码经接入已有项目进入，新建事项不选源目录
     const runExtra = plan.status === 'in_progress' ? startFields(db.now) : { phase: 'QUEUED' };
-    if (params.source_dir) runExtra.source = { dir: textOf(params.source_dir), digest: null, files: null };
+    runExtra.start_point = startPointOf(db, project.id);
     const run = emptyRun(runId, workId, project.id, db.now, text, runExtra);
     const item = {
       id: workId, project_id: project.id, title: titleFrom(text, params.title), color_index: nextColor(items),
@@ -1291,7 +1448,7 @@
       {
         type: 'work_item_created', project_id: project.id, work_item_id: workId, run_id: runId,
         label: '用户提出事项「' + item.title + '」',
-        payload: { title: item.title, source_dir: params.source_dir || null },
+        payload: { title: item.title, start_point: runExtra.start_point },
         patch: [
           { path: 'work_items', push: item },
           { path: 'projects[id=' + project.id + '].last_activity_at', value: db.now }
@@ -1348,7 +1505,7 @@
         { path: 'runs[id=' + run.id + '].department', value: null },
         { path: 'runs[id=' + run.id + '].last_department', value: run.department || run.last_department },
         { path: 'runs[id=' + run.id + '].stop_reason', value: { code: 'cancelled', text: '用户取消事项' } },
-        { path: 'runs[id=' + run.id + '].recovery.state', value: 'terminated' },
+        { path: 'runs[id=' + run.id + '].recovery.state', value: 'cancelled' },
         { path: 'runs[id=' + run.id + '].recovery.reason', value: '事项已取消' },
         { path: 'projects[id=' + item.project_id + '].last_activity_at', value: db.now }
       ]

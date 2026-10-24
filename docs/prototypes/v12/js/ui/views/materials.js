@@ -1,18 +1,20 @@
-// 资料（设计说明第 7.3 节）：按事项只读查看 intend、PRD、PLAN、交付、质检、项目材料、结构说明与旧版本的 run
+// 资料（设计说明第 7.3 节）：按事项只读查看 intend、PRD、交付、质检、项目材料、结构说明与旧版本的 run。
+// 工程计划不是正式成果（ADR-0037），资料页没有 PLAN
 (function () {
   'use strict';
   const Y12 = window.Y12;
   const esc = Y12.esc;
 
   const DEPT_LABEL = { product: '产品', engineering: '工程', quality: '质检', operations: '运维' };
+  // 质检的结论只有缺陷记录与放行（ADR-0039）
   const VERDICT = {
     release: { cls: 'is-release', kind: 'released', label: '放行' },
-    rework_engineering: { cls: 'is-rework', kind: 'failed', label: '退回工程' }
+    rework_engineering: { cls: 'is-rework', kind: 'failed', label: '缺陷记录' }
   };
-  const PHASE = {
-    PRODUCT_SPEC: '产品规格', ENGINEERING: '工程实现', DELIVERY: '交付', QUALITY: '质检',
-    REWORK_PRODUCT: '返工到产品', REWORK_ENGINEERING: '返工到工程',
-    DONE: '已完成', PAUSED: '已暂停', FAILED: '已失败', QUEUED: '排队中'
+  // 旧 run 写它的恢复观察状态（结束方式），不写阶段
+  const RUN_STATE = {
+    running: '运行中', interrupted: '中断', waiting_resume: '待恢复',
+    completed: '已完成', paused: '已暂停', cancelled: '已取消', stopped: '已停止'
   };
 
   function materials(pid, workItemId) {
@@ -51,7 +53,7 @@
     const cards = m.items.map((entry) => {
       const counts = entry.counts;
       const total = Object.keys(counts).reduce((sum, kind) => sum + counts[kind], 0);
-      const label = { intend: 'intend', prd: 'PRD', plan: 'PLAN', delivery: '交付', qa: '质检', note: '材料' };
+      const label = { intend: 'intend', prd: 'PRD', delivery: '交付', qa: '质检', note: '材料' };
       const chips = Object.keys(counts).map((kind) =>
         '<span class="' + (counts[kind] ? '' : 'is-zero') + '">' + esc(label[kind]) + ' ' + counts[kind] + '</span>').join('');
       const current = m.work_item && m.work_item.id === entry.id;
@@ -63,7 +65,7 @@
     }).join('');
     return Y12.ui.block({
       id: 'mt-index', title: '按事项查看', query: 'work_item.materials',
-      subtitle: '资料按事项保存；点击事项查看它的 intend、PRD、PLAN、交付、质检与项目材料',
+      subtitle: '资料按事项保存；点击事项查看它的 intend、PRD、交付、质检与项目材料',
       body: m.items.length ? '<div class="y12-mt-index">' + cards + '</div>' : Y12.ui.empty('项目还没有事项')
     });
   }
@@ -91,16 +93,6 @@
     });
   }
 
-  function planBlock(m) {
-    if (!m.plan) return '';
-    const latest = m.plan.length ? m.plan[m.plan.length - 1] : null;
-    const body = m.plan.length
-      ? '<ol class="y12-mt-list">' + m.plan.slice().reverse().map((doc) => '<li class="y12-mt-doc' + (doc === latest ? ' is-current' : ' is-old') + '">' +
-        docHead(doc, doc.goal ? Y12.ui.tag('目标：' + doc.goal) : '') + '<p class="y12-clamp">' + esc(doc.text) + '</p>' + viewButton(doc) + '</li>').join('') + '</ol>'
-      : Y12.ui.empty('工程部门还没有提交计划');
-    return Y12.ui.block({ id: 'mt-plan', title: 'PLAN', query: 'work_item.materials', subtitle: '工程部门的计划各版本', body });
-  }
-
   function deliveryBlock(m) {
     if (!m.delivery) return '';
     const latest = m.delivery.length ? m.delivery[m.delivery.length - 1] : null;
@@ -122,7 +114,7 @@
       : Y12.ui.empty('工程部门还没有封存交付');
     return Y12.ui.block({
       id: 'mt-delivery', title: '交付', query: ['work_item.materials', 'delivery.file'],
-      subtitle: '各版本的封存快照：文件清单、摘要、Git 差异与文件下载', body
+      subtitle: '各版本的封存快照：文件清单由主机从交付快照得出，不取自交付说明；另有摘要、Git 差异与文件下载', body
     });
   }
 
@@ -218,14 +210,14 @@
   function oldRunsBlock(m) {
     if (!m.old_runs || !m.old_runs.length) return '';
     const body = '<ol class="y12-mt-list">' + m.old_runs.map((run) => {
-      if (!PHASE[run.phase]) throw new Error('未知的 run 阶段：' + run.phase);
+      if (!RUN_STATE[run.state]) throw new Error('未知的恢复观察状态：' + run.state);
       const events = run.events.length
         ? '<ul class="y12-mt-oldevents">' + run.events.map((ev) =>
           '<li><span class="y12-muted">' + esc(fullTime(ev.at)) + '</span>' + Y12.ui.code(ev.type) + '<span>' + esc(ev.label) + '</span></li>').join('') + '</ul>'
         : '<p class="y12-muted y12-small">没有记录的事件</p>';
       return '<li class="y12-mt-doc is-old">' +
         '<header class="y12-mt-doc-head"><strong>旧 run ' + esc(run.id) + '</strong>' + Y12.ui.tag('只读') + Y12.ui.tag('Yudao ' + run.yudao_version) +
-        '<span class="y12-muted">' + esc(PHASE[run.phase]) + (run.stop_reason ? ' · ' + esc(run.stop_reason.text || run.stop_reason.code) : '') + '</span></header>' +
+        '<span class="y12-muted">' + esc(RUN_STATE[run.state]) + (run.stop_reason ? ' · ' + esc(run.stop_reason.text || run.stop_reason.code) : '') + '</span></header>' +
         events + '</li>';
     }).join('') + '</ol>';
     return Y12.ui.block({
@@ -244,7 +236,7 @@
         '<p class="y12-block-sub">' + esc(m.project.name) + ' · 按事项查看的资料全部只读</p></header>'
       : '<header class="y12-pp-head"><h1>资料</h1><p class="y12-block-sub">' + esc(m.project.name) + ' · 在顶栏选择事项以后查看这个事项的完整资料</p></header>';
     return '<div class="y12-pp y12-mt">' + head + indexBlock(m) +
-      intendBlock(m) + prdBlock(m) + planBlock(m) + deliveryBlock(m) + qaBlock(m) +
+      intendBlock(m) + prdBlock(m) + deliveryBlock(m) + qaBlock(m) +
       notesBlock(m, ctx.workItemId) + structureBlock(m) + oldRunsBlock(m) +
     '</div>';
   }
@@ -275,7 +267,6 @@
     refresh(root, '#mt-index', indexBlock(m));
     refreshOrHide(root, '#mt-intend', intendBlock(m), 'mt-intend');
     refreshOrHide(root, '#mt-prd', prdBlock(m), 'mt-prd');
-    refreshOrHide(root, '#mt-plan', planBlock(m), 'mt-plan');
     refreshOrHide(root, '#mt-delivery', deliveryBlock(m), 'mt-delivery');
     refreshOrHide(root, '#mt-qa', qaBlock(m), 'mt-qa');
     refresh(root, '#mt-notes', notesBlock(m, ctx.workItemId));
@@ -299,7 +290,7 @@
 
   function materialOf(materialId) {
     const data = currentMaterials();
-    const lists = ['intend', 'prd', 'plan', 'delivery', 'qa', 'notes', 'structure'];
+    const lists = ['intend', 'prd', 'delivery', 'qa', 'notes', 'structure'];
     const found = [];
     lists.forEach((key) => (data[key] || []).forEach((doc) => found.push(doc)));
     const doc = found.find((entry) => entry.id === materialId);

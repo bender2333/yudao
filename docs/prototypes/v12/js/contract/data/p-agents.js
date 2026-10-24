@@ -3,9 +3,9 @@
   'use strict';
   const Y12 = window.Y12;
 
-  const PRODUCT_PROMPT = '你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标，每条要求至少有一条验收条件；用户的新输入逐版本处理，写明新增、修改或保留了哪些要求。回答其他部门的需求咨询时，只依据有效要求与用户原文；需要取舍时写明理由。';
-  const ENGINEERING_PROMPT = '你是工程部门。依据有效 PRD 先写工程计划，计划项逐条对应要求；再按计划实现代码、编写单元测试，并用登记命令自测。交付说明逐条写明完成的计划项与处理的缺陷；实现有疑问时向产品咨询，不自行改变要求。';
-  const QUALITY_PROMPT = '你是质检部门。依据有效 PRD 在独立副本中验证交付：逐条对照验收条件记录检查结果、证据与主机回执。发现问题时写明复现步骤与违反的验收条件，给出返工结论；全部验收条件都有通过的检查时给出放行结论。';
+  const PRODUCT_PROMPT = '你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标，每条要求至少有一条验收条件；用户的新输入逐版本处理，写明新增、修改或保留了哪些要求。回答其他部门的询问时，只依据有效要求与用户原文；需要取舍时写明理由，澄清的结果写进 PRD。';
+  const ENGINEERING_PROMPT = '你是工程部门。依据有效 PRD 实现代码、编写单元测试，并运行命令自测；怎样安排工作由你自己决定。交付说明写明做了什么与处理的缺陷；要求有疑问时询问产品，不自行改变要求。';
+  const QUALITY_PROMPT = '你是质检部门。依据有效 PRD 在独立副本中验证交付：逐条对照验收条件记录检查结果、证据与主机回执。交付到达之前按 PRD 起草测试用例。发现问题时写明复现步骤与违反的验收条件，提交缺陷记录；要求本身有问题时询问产品；全部验收条件都有通过的检查时给出放行结论。';
 
   const ISSUE_TEXT = 'I want to be able to pass custom parameters directly to my model provider\'s API when making requests, even if those parameters aren\'t explicitly supported by the standard configuration options. Sometimes different model providers have unique parameters that aren\'t covered by the standard settings, and I need an escape hatch to access these provider-specific features without waiting for the system to add official support.\n\nWhen I configure my model settings, I want to be able to specify a dictionary of arbitrary keyword arguments called "extra_args" that will be passed through to the underlying model API call. These parameters should be completely flexible and not restricted to any predefined set, allowing me to experiment with provider-specific capabilities.\n\nI need this extra_args configuration to work consistently across all my model integrations. When I make API calls through the system, any extra_args I\'ve specified should be merged with other request parameters and passed directly to the model provider. The system should handle cases where I don\'t provide any extra_args by simply not including them in the API call.\n\nWhen I have multiple layers of model settings (like base settings and override settings), I want the extra_args from different configuration levels to be merged together rather than having one completely replace the other. If both my base configuration and my override configuration include extra_args, I want the final settings to combine all the parameters from both sources, with override values taking precedence if there are conflicting keys.\n\nThe system should automatically filter out any None values from the extra_args to ensure clean API requests. I also want appropriate documentation and cautionary notes since not all model providers will support all possible parameters, and I understand that using unsupported parameters might cause errors.\n\nThis functionality should work seamlessly with my existing model configuration workflow without breaking any current features. I should be able to continue using all the standard model settings while having this additional flexibility for provider-specific parameters when I need it.';
 
@@ -55,12 +55,12 @@
             }
           ],
           flow: [
-            { seq: 1, at: '2026-09-27T09:00:00+08:00', from: 'user', to: 'product', kind: 'handoff', content: '用户要求：接入 openai-agents-python 并确认现有行为', status: '已接收', event_position: null },
-            { seq: 2, at: '2026-09-27T09:45:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: '初始 PRD r1：9 条要求（模型设置、模型调用、运行、工具、会话、追踪）', status: '已接收', event_position: null },
-            { seq: 3, at: '2026-09-27T09:52:00+08:00', from: 'engineering', to: 'quality', kind: 'handoff', content: '现有结构说明（STRUCTURE.md）与构建、测试回执', status: '已接收', event_position: null },
-            { seq: 4, at: '2026-09-27T10:02:00+08:00', from: 'quality', to: 'library', kind: 'delivery', content: '基线核验：9 条要求全部核实，8 条失败用例列为已知缺陷', status: '已接收', event_position: null }
+            { seq: 1, at: '2026-09-27T09:00:00+08:00', from: 'user', to: 'product', kind: 'input', content: '用户要求：接入 openai-agents-python 并确认现有行为', status: '已接收', event_position: null },
+            { seq: 2, at: '2026-09-27T09:45:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: '初始 PRD r1：9 条要求（模型设置、模型调用、运行、工具、会话、追踪）', status: '已接纳', event_position: null },
+            { seq: 3, at: '2026-09-27T09:50:00+08:00', from: 'engineering', to: 'quality', kind: 'structure', content: '现有结构说明（STRUCTURE.md）与构建、测试回执', status: '已接纳', event_position: null },
+            { seq: 4, at: '2026-09-27T10:00:00+08:00', from: 'quality', to: 'library', kind: 'baseline', content: '基线核验：9 条要求全部核实，8 条失败用例列为已知缺陷', status: '已接纳', event_position: null }
           ],
-          requests: [],
+          asks: [],
           guidance: [],
           messages: {
             product: [
@@ -68,11 +68,11 @@
               { seq: 2, at: '2026-09-27T09:45:00+08:00', source: 'self', from: 'product', text: '初始 PRD r1 已提交：9 条要求', event_position: null }
             ],
             engineering: [
-              { seq: 3, at: '2026-09-27T09:46:00+08:00', source: 'other', from: 'product', text: '初始 PRD r1 交接', event_position: null },
+              { seq: 3, at: '2026-09-27T09:46:00+08:00', source: 'other', from: 'product', text: '收到初始 PRD r1 被接纳的通知', event_position: null },
               { seq: 4, at: '2026-09-27T09:52:00+08:00', source: 'self', from: 'engineering', text: '现有结构说明已提交：模块、入口、构建与测试', event_position: null }
             ],
             quality: [
-              { seq: 5, at: '2026-09-27T09:53:00+08:00', source: 'other', from: 'engineering', text: '现有结构说明交接', event_position: null },
+              { seq: 5, at: '2026-09-27T09:53:00+08:00', source: 'other', from: 'engineering', text: '收到现有结构说明被接纳的通知', event_position: null },
               { seq: 6, at: '2026-09-27T10:02:00+08:00', source: 'self', from: 'quality', text: '基线核验结论：一致（9 条要求全部核实）', event_position: null }
             ],
             operations: []
@@ -94,21 +94,21 @@
               before: '快照 8dfd6ff', after: '快照 8dfd6ff（只读）', machine_id: 'm-host', at: '2026-09-27T09:30:00+08:00'
             },
             {
-              id: 'a-agents-4', department: 'engineering', role: null, tool: 'run_command',
-              summary: '执行登记命令 pytest 核实构建与测试', input: '现有结构说明的构建与测试一节', state: 'done',
-              receipt: { command: 'pytest', argv: ['python', '-m', 'pytest', '-q'], exit_code: 1, output: '8 failed, 331 passed in 13.2s', truncated: false, timed_out: false, duration_ms: 13400, snapshot: 'snap-8dfd6ff' },
+              id: 'a-agents-4', department: 'engineering', role: null, tool: 'bash',
+              summary: '执行命令 python -m pytest -q，核实构建与测试', input: '现有结构说明的构建与测试一节', state: 'done',
+              receipt: { command: 'python -m pytest -q', exit_code: 1, output: '8 failed, 331 passed in 13.2s', truncated: false, timed_out: false, duration_ms: 13400, snapshot: 'snap-8dfd6ff' },
               before: '快照 8dfd6ff', after: '快照 8dfd6ff（未改动）', machine_id: 'm-host', at: '2026-09-27T09:48:00+08:00'
             },
             {
               id: 'a-agents-5', department: 'quality', role: null, tool: 'run_check',
               summary: '质检独立运行已有测试（检查副本）', input: '初始 PRD 的验收一节', state: 'done',
-              receipt: { command: 'pytest', argv: ['python', '-m', 'pytest', '-q'], exit_code: 1, output: '8 failed, 331 passed in 13.4s', truncated: false, timed_out: false, duration_ms: 13600, snapshot: 'qa-8dfd6ff' },
+              receipt: { command: 'python -m pytest -q', exit_code: 1, output: '8 failed, 331 passed in 13.4s', truncated: false, timed_out: false, duration_ms: 13600, snapshot: 'qa-8dfd6ff' },
               before: '检查副本 8dfd6ff', after: '检查副本 8dfd6ff（未改动）', machine_id: 'm-study', at: '2026-09-27T09:56:00+08:00'
             },
             {
               id: 'a-agents-6', department: 'quality', role: null, tool: 'run_check',
               summary: '运行 ruff check 核实静态检查', input: '现有结构说明的构建与测试一节', state: 'done',
-              receipt: { command: 'ruff', argv: ['ruff', 'check', 'src', 'tests'], exit_code: 0, output: 'All checks passed!', truncated: false, timed_out: false, duration_ms: 900, snapshot: 'qa-8dfd6ff' },
+              receipt: { command: 'ruff check src tests', exit_code: 0, output: 'All checks passed!', truncated: false, timed_out: false, duration_ms: 900, snapshot: 'qa-8dfd6ff' },
               before: '检查副本 8dfd6ff', after: '检查副本 8dfd6ff（未改动）', machine_id: 'm-study', at: '2026-09-27T09:58:00+08:00'
             }
           ],
@@ -241,16 +241,21 @@
             engineering: { version: 1, model: null, level: null, prompt_version: null, prompt_text: null },
             quality: { version: 1, model: null, level: null, prompt_version: null, prompt_text: null }
           },
-          commands: [
-            { name: 'pytest', argv: ['python', '-m', 'pytest', '-q'], args: [], timeout_sec: 900, output_limit: 200000, version: 1 },
-            { name: 'ruff', argv: ['ruff', 'check', 'src', 'tests'], args: [], timeout_sec: 300, output_limit: 100000, version: 1 }
-          ],
-          tools: [
-            { id: 'network', label: '网络取回', scope: '只读取回：pypi.org、docs.python.org', approval: '超出范围时逐次批准' }
-          ],
           machines: [
-            { machine_id: 'm-host', dirs: ['工作区'], operations: ['pytest', 'ruff'], runtime_env: false, standing: false }
+            { machine_id: 'm-host', dirs: ['工作区'], runtime_env: false, standing: false }
           ],
+          // 接入时登记的源目录；采纳写回的设置与写回检查的命令在这里填写（应用层与接口层设计说明「写回在页面上的显示」）
+          source_directories: {
+            version: 1,
+            items: [
+              {
+                name: 'openai-agents-python', path: 'D:\\code\\openai-agents-python',
+                writeback: { enabled: true, remote: 'origin', target_branch: 'main' },
+                check_commands: ['python -m pytest -q', 'ruff check src tests']
+              }
+            ]
+          },
+          writebacks: [],
           roles: {
             level: 'S5',
             product: [
@@ -320,7 +325,7 @@
                           late_results: [], verifications: [], unfinished: [],
                           limits: { activations: 0, model_steps: 0, retries: 0 }, auto_resumed_at: null
                         },
-                        inputs: [], flow: [], requests: [], guidance: [],
+                        inputs: [], flow: [], asks: [], guidance: [],
                         messages: { product: [], engineering: [], quality: [], operations: [] },
                         actions: [], trials: [],
                         contexts: { product: [], engineering: [], quality: [] },
@@ -447,8 +452,8 @@
         patch: [{ path: 'runs[id=r-agents-onboard].elapsed_sec', value: 2700 }]
       },
       {
-        at: '2026-09-27T09:46:00+08:00', type: 'transition', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', level: '3.8',
-        label: '初始 PRD r1 交给工程部门核对现有结构', payload: { from: 'product', to: 'engineering', artifact: 'prd' },
+        at: '2026-09-27T09:47:00+08:00', type: 'department_activated', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'engineering', level: '3.8',
+        label: '工程部门关注的初始 PRD 被接纳，开始读清单、构建与测试配置并核实命令', payload: {},
         patch: [
           { path: 'runs[id=r-agents-onboard].department', value: 'engineering' },
           { path: 'runs[id=r-agents-onboard].last_department', value: 'product' },
@@ -458,27 +463,19 @@
         ]
       },
       {
-        at: '2026-09-27T09:47:00+08:00', type: 'department_activated', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'engineering', level: '3.8',
-        label: '工程部门读清单、构建与测试配置，核实命令', payload: {}, patch: []
-      },
-      {
         at: '2026-09-27T09:50:00+08:00', type: 'structure_accepted', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'engineering', level: '3.8',
         label: '工程的现有结构说明被接纳，主机生成 STRUCTURE.md', payload: { material_id: 'm-agents-structure-1' },
         patch: [{ path: 'runs[id=r-agents-onboard].elapsed_sec', value: 3000 }]
       },
       {
-        at: '2026-09-27T09:52:00+08:00', type: 'transition', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', level: '3.8',
-        label: '结构说明与回执送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' },
+        at: '2026-09-27T09:53:00+08:00', type: 'department_activated', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'quality', level: '3.8',
+        label: '质检部门关注的结构说明被接纳，自己找出测试命令并运行已有测试', payload: {},
         patch: [
           { path: 'runs[id=r-agents-onboard].department', value: 'quality' },
           { path: 'runs[id=r-agents-onboard].last_department', value: 'engineering' },
           { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-agents-onboard' } },
           { path: 'runtime.slots.used', push: { work_item_id: 'w-agents-onboard', department: 'quality', role: null } }
         ]
-      },
-      {
-        at: '2026-09-27T09:53:00+08:00', type: 'department_activated', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'quality', level: '3.8',
-        label: '质检部门自己找出测试命令并运行已有测试', payload: {}, patch: []
       },
       {
         at: '2026-09-27T10:00:00+08:00', type: 'baseline_review_accepted', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'quality', level: '3.8',
@@ -493,7 +490,7 @@
           { path: 'runs[id=r-agents-onboard].department', value: null },
           { path: 'runs[id=r-agents-onboard].last_department', value: 'quality' },
           { path: 'runs[id=r-agents-onboard].stop_reason', value: { code: 'baseline_verified', text: '基线核验通过' } },
-          { path: 'runs[id=r-agents-onboard].recovery.state', value: 'terminated' },
+          { path: 'runs[id=r-agents-onboard].recovery.state', value: 'completed' },
           { path: 'runs[id=r-agents-onboard].recovery.reason', value: '基线核验通过，run 结束，等待用户确认初始 PRD' },
           { path: 'runs[id=r-agents-onboard].elapsed_sec', value: 3720 },
           { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-agents-onboard' } }
@@ -572,8 +569,8 @@
           {
             delay: 1200,
             event: {
-              type: 'transition', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard',
-              label: '初始 PRD r1 交给工程部门核对现有结构', payload: { from: 'product', to: 'engineering', artifact: 'prd' }
+              type: 'department_activated', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'engineering',
+              label: '工程关注的初始 PRD 被接纳：读清单、构建与测试配置，并运行命令核实', payload: {}
             },
             patch: [
               { path: 'runs[id=r-agents-onboard].department', value: 'engineering' },
@@ -582,14 +579,6 @@
               { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-agents-onboard' } },
               { path: 'runtime.slots.used', push: { work_item_id: 'w-agents-onboard', department: 'engineering', role: null } }
             ]
-          },
-          {
-            delay: 1200,
-            event: {
-              type: 'department_activated', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'engineering',
-              label: '工程读清单、构建与测试配置，并用登记命令核实', payload: {}
-            },
-            patch: []
           },
           {
             delay: 1600,
@@ -610,8 +599,8 @@
           {
             delay: 1200,
             event: {
-              type: 'transition', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard',
-              label: '结构说明与回执送到质检部门', payload: { from: 'engineering', to: 'quality', artifact: 'box' }
+              type: 'department_activated', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'quality',
+              label: '质检关注的结构说明被接纳：自己找出测试命令，在检查副本中运行', payload: {}
             },
             patch: [
               { path: 'runs[id=r-agents-onboard].department', value: 'quality' },
@@ -619,14 +608,6 @@
               { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-agents-onboard' } },
               { path: 'runtime.slots.used', push: { work_item_id: 'w-agents-onboard', department: 'quality', role: null } }
             ]
-          },
-          {
-            delay: 1200,
-            event: {
-              type: 'department_activated', project_id: 'p-agents', work_item_id: 'w-agents-onboard', run_id: 'r-agents-onboard', department: 'quality',
-              label: '质检自己找出测试命令，在检查副本中运行', payload: {}
-            },
-            patch: []
           },
           {
             delay: 1600,
@@ -647,7 +628,7 @@
               { path: 'runs[id=r-agents-onboard].department', value: null },
               { path: 'runs[id=r-agents-onboard].last_department', value: 'quality' },
               { path: 'runs[id=r-agents-onboard].stop_reason', value: { code: 'baseline_verified', text: '基线核验通过' } },
-              { path: 'runs[id=r-agents-onboard].recovery.state', value: 'terminated' },
+              { path: 'runs[id=r-agents-onboard].recovery.state', value: 'completed' },
               { path: 'runs[id=r-agents-onboard].elapsed_sec', value: 3720 },
               { path: 'runtime.slots.used', remove: { key: 'work_item_id', value: 'w-agents-onboard' } }
             ]
@@ -752,7 +733,7 @@
                     late_results: [], verifications: [], unfinished: [],
                     limits: { activations: 0, model_steps: 0, retries: 0 }, auto_resumed_at: null
                   },
-                  inputs: [], flow: [], requests: [], guidance: [],
+                  inputs: [], flow: [], asks: [], guidance: [],
                   messages: { product: [], engineering: [], quality: [], operations: [] },
                   actions: [], trials: [],
                   contexts: { product: [], engineering: [], quality: [] },
@@ -819,6 +800,20 @@
               label: '产品部门开始处理 issue 842：extra_args 的透传参数', payload: {}
             },
             patch: [{ path: 'projects[id=p-agents].last_activity_at', value: '2026-09-29T15:30:00+08:00' }]
+          },
+          {
+            // 基线就是源目录里已有的代码：采纳以后自动发起的写回发现变更已经在目标分支上（ADR-0034）
+            delay: 1400, go: '#/p/p-agents/settings',
+            event: {
+              type: 'writeback_not_needed', project_id: 'p-agents', work_item_id: 'w-agents-onboard',
+              label: '基线采纳以后的写回：变更已经在目标分支 main 上，无需写回', payload: { adoption: '基线', target_branch: 'main' }
+            },
+            patch: [{
+              path: 'project_settings.p-agents.writebacks', push: {
+                id: 'wb-agents-1', adoption: '基线', work_item_id: 'w-agents-onboard', status: 'not_needed', at: '2026-09-29T15:30:00+08:00',
+                target_branch: 'main', pushed_branch: null, merge_request: null, conflicts: [], stop_reason: null
+              }
+            }]
           }
         ]
       }

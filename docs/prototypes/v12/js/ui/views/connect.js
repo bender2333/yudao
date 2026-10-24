@@ -7,8 +7,8 @@
     const client = Y12.CLIENT_API_VERSION;
     const same = dep.api_version === client;
     return Y12.ui.kv([
-      ['控制主机的接口版本', Y12.ui.code(String(dep.api_version)) + (same ? Y12.ui.status('succeeded', '与客户端相同') : Y12.ui.status('failed', '与客户端不同'))],
-      ['客户端的接口版本', Y12.ui.code(String(client))],
+      ['服务的接口版本', Y12.ui.code(String(dep.api_version)) + (same ? Y12.ui.status('succeeded', '与页面相同') : Y12.ui.status('failed', dep.api_version > client ? '比页面新' : '比页面旧'))],
+      ['页面的接口版本', Y12.ui.code(String(client))],
       ['连接日志', Y12.ui.code(dep.log_id)],
       ['本次启动', Y12.ui.code(dep.boot_id) + ' · 服务版本 ' + Y12.esc(dep.service_version)],
       ['访问方式', dep.access === 'lan' ? '局域网内使用' : Y12.esc(dep.access)]

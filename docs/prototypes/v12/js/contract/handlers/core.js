@@ -26,7 +26,7 @@
 
   function sceneStatus(db, item, run) {
     const rec = run && run.recovery ? run.recovery.state : null;
-    if (rec === 'interrupted' || rec === 'pending_verification' || rec === 'waiting_resume') return rec;
+    if (rec === 'interrupted' || rec === 'waiting_resume') return rec;
     if (run && run.waiting_provider) return 'waiting_provider';
     switch (item.status) {
       case 'queued':
@@ -34,7 +34,8 @@
         if (item.queue_reason === 'decision' && run) return 'waiting_decision';
         return item.queue_reason === 'slot' ? 'waiting_slot' : 'queued';
       case 'in_progress': {
-        const asking = (run.requests || []).some((r) => r.status === 'open' && r.from === run.department);
+        // 所在部门停在自己发出的询问上，等待回答
+        const asking = (run.asks || []).some((a) => a.status === 'open' && a.requester === run.department);
         return asking ? 'asking' : 'running';
       }
       case 'adopted': return 'adopted';
@@ -53,9 +54,17 @@
   }
 
   const SIGN = {
-    interrupted: '中断', pending_verification: '待核实', waiting_provider: '等待模型服务', paused: '已暂停',
+    interrupted: '中断', waiting_provider: '等待模型服务', paused: '已暂停',
     done: '已完成', cancelled: '已取消', stopped_for_upgrade: '因升级停止'
   };
+
+  // 待恢复的一种：执行代理离线或需要升级，动作没有发出，等机器恢复（执行环境服务设计说明第 6.5 节）
+  function waitingMachine(db, run) {
+    const w = run && run.recovery ? run.recovery.waiting_machine : null;
+    if (!w) return null;
+    const m = db ? db.machine(w.machine_id) : null;
+    return { machine_id: w.machine_id, machine_name: m ? m.name : w.machine_id, since: w.since, problem: w.problem || '离线' };
+  }
 
   function signOf(status, run, db, item) {
     if (status === 'waiting_decision') {
@@ -63,6 +72,8 @@
       return '待你决定' + (d ? '：' + Y12.registry.entry('decision', d.kind).label : '');
     }
     if (status === 'waiting_resume') {
+      const wm = waitingMachine(db, run);
+      if (wm) return '等待机器：' + wm.machine_name;
       const u = run.recovery && run.recovery.unusable;
       return '待恢复' + (u && u.problem ? '：' + u.problem : '');
     }
@@ -72,6 +83,77 @@
 
   function adoptions(project) {
     return Array.isArray(project.adoptions) ? project.adoptions : [];
+  }
+
+  // ---------------------------------------------------------------------------
+  // 部门的状态（三部门的循环结构第 2 节，工单 #477）：三个部门同时运行，每个部门是工作中、等待工作、回答询问、
+  // 等待用户四种之一。run.departments 写明了的照它（例如质检的预测性探索）；没写的由事实推出：
+  // 所在部门在工作（事项停在用户的决定上时等待用户），被询问的部门回答询问，其余等待工作。
+  // 正在工作的部门停在自己发出的询问上时，等待原因写成「在等待产品的回答」
+
+  const DEPT_NAMES = { product: '产品', engineering: '工程', quality: '质检' };
+  const DEPT_STATES = {
+    working: { text: '工作中', kind: 'running' },
+    waiting: { text: '等待工作', kind: 'idle' },
+    answering: { text: '回答询问', kind: 'asking' },
+    waiting_user: { text: '等待用户', kind: 'waiting' }
+  };
+
+  function deptStatesOf(db, item, run) {
+    if (!item || !run) return null;
+    const blocked = item.status === 'queued' && item.queue_reason === 'decision';
+    if (item.status !== 'in_progress' && !blocked) return null;
+    const rec = run.recovery ? run.recovery.state : null;
+    if (rec === 'interrupted') return null;
+    const asks = (run.asks || []).filter((a) => a.status === 'open');
+    const out = {};
+    Object.keys(DEPT_NAMES).forEach((d) => {
+      const given = run.departments && run.departments[d];
+      let state = given ? given.state : null;
+      let note = given ? given.note || null : null;
+      if (!state) {
+        if (asks.some((a) => a.recipient === d)) {
+          state = 'answering';
+          const a = asks.find((x) => x.recipient === d);
+          note = '回答' + DEPT_NAMES[a.requester] + '的询问';
+        } else if (d === run.department) {
+          state = blocked || rec === 'waiting_resume' ? 'waiting_user' : 'working';
+        } else {
+          state = 'waiting';
+        }
+      }
+      if (!DEPT_STATES[state]) throw new Error('未知的部门状态：' + state);
+      const mine = asks.find((a) => a.requester === d);
+      const waitingFor = state === 'working' && mine ? '在等待' + DEPT_NAMES[mine.recipient] + '的回答' : null;
+      out[d] = { state, text: DEPT_STATES[state].text, kind: DEPT_STATES[state].kind, note: waitingFor || note };
+    });
+    return out;
+  }
+
+  // 一个事项中的询问（三部门的循环结构第 4.7 节，查询 run.asks）：提问方、被询问的部门、问题、状态与回答。
+  // 嵌套的询问与回问写明 parent，询问链是从最外层的提问方起经过的部门
+  const ASK_STATUS = { open: '进行中', answered: '已回答', unable: '没能回答' };
+
+  function asksOut(run) {
+    const list = run.asks || [];
+    const byId = new Map(list.map((a) => [a.id, a]));
+    return list.map((a) => {
+      if (!ASK_STATUS[a.status]) throw new Error('未知的询问状态：' + a.status);
+      const line = [];
+      let cur = a;
+      while (cur) {
+        line.unshift(cur);
+        cur = cur.parent ? byId.get(cur.parent) : null;
+      }
+      const chain = [line[0].requester].concat(line.map((x) => x.recipient));
+      return {
+        id: a.id, requester: a.requester, recipient: a.recipient, parent: a.parent || null,
+        question: a.question, status: a.status, status_text: ASK_STATUS[a.status],
+        answer: a.answer || null, reason: a.reason || null, prd_version: a.prd_version || null,
+        born_at: a.born_at || null, answered_at: a.answered_at || null,
+        chain, depth: line.length
+      };
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -130,12 +212,20 @@
       if (db.atLeast('3.4A')) out.queue_pos = status === 'waiting_decision' ? null : item.queue_pos || null;
       if (db.atLeast('S4')) out.waiting_provider_sec = run ? run.waiting_provider_sec || 0 : 0;
       if (withRefs) out.refs = itemRefs(db, item, run, status);
+      // 几个部门同时在工作时画面上几个房间都亮灯：只写不等待工作的部门
+      const states = deptStatesOf(db, item, run);
+      if (states) {
+        const active = {};
+        Object.keys(states).forEach((d) => { if (states[d].state !== 'waiting') active[d] = states[d].state; });
+        out.departments = active;
+      }
       return out;
     }).filter(Boolean);
     const runs = db.workItemsOf(projectId).map((item) => (item.run_id ? db.run(item.run_id) : null)).filter(Boolean);
+    // 进行中的询问：信件停在被询问部门的传信管出口（画面沿用 v11 的 open_requests 形状）
     const openRequests = [];
-    runs.forEach((run) => (run.requests || []).forEach((r) => {
-      if (r.status === 'open') openRequests.push({ from: r.from, to: r.to, work_item_id: run.work_item_id, request_id: r.id, since: r.born_at || null, question: r.question || null });
+    runs.forEach((run) => (run.asks || []).forEach((a) => {
+      if (a.status === 'open') openRequests.push({ from: a.requester, to: a.recipient, work_item_id: run.work_item_id, request_id: a.id, since: a.born_at || null, question: a.question || null });
     }));
     const project = db.project(projectId);
     const out = {
@@ -188,7 +278,7 @@
 
   // 项目的状态标记（左侧栏、楼层的状态灯）
   const MARKER_ORDER = [
-    ['waiting_resume', 'waiting', '待恢复'], ['pending_verification', 'pending', '待核实'], ['interrupted', 'interrupted', '中断'],
+    ['waiting_resume', 'waiting', '待恢复'], ['interrupted', 'interrupted', '中断'],
     ['waiting_decision', 'waiting', '等待你的决定'],
     ['waiting_provider', 'waiting_provider', '等待模型服务'], ['waiting_slot', 'waiting_slot', '等待执行槽位'],
     ['running', 'running', '运行中'], ['asking', 'running', '运行中'], ['queued', 'queued', '排队中']
@@ -229,13 +319,7 @@
     };
     if (db.atLeast('3.1')) {
       out.auto_resumed = s.auto_resumed;
-      out.pending_verification = activeRuns.filter((run) => run.recovery && run.recovery.state === 'pending_verification').length;
       out.drain = s.drain;
-      const unknown = [];
-      activeRuns.forEach((run) => (run.actions || []).forEach((a) => {
-        if (a.state === 'unknown') unknown.push({ project_id: run.project_id, work_item_id: run.work_item_id, action_id: a.id });
-      }));
-      out.home_status.unknown_actions = { count: unknown.length, first: firstOf(unknown) };
     }
     if (db.atLeast('3.2C')) {
       const offline = (db.data.machines || []).filter((m) => !m.online);
@@ -282,7 +366,8 @@
     const out = Y12.clone(d);
     out.options = d.options.map((o) => ({ id: o.id, label: o.label, kind: o.kind || null, requires: o.requires || null, note_required: Boolean(o.note_required) }));
     out.kind_label = Y12.registry.entry('decision', d.kind).label;
-    out.project_name = project ? project.name : d.project_id;
+    // 写在目录流里的决定请求（实例升级）不属于任何项目
+    out.project_name = project ? project.name : (d.project_id || '这台电脑上安装的 Yudao');
     out.work_item_title = item ? item.title : null;
     out.waited_sec = since(db, d.issued_at);
     if (out.blocks) out.blocks.work_item_title = blocked ? blocked.title : null;
@@ -475,5 +560,5 @@
   });
 
   // 供其他处理文件使用
-  B.helpers = { sceneStatus, signOf, loopOf, markerOf, requireProject, reject, since, TERMINAL_PHASES, adoptions };
+  B.helpers = { sceneStatus, signOf, loopOf, markerOf, requireProject, reject, since, TERMINAL_PHASES, adoptions, deptStatesOf, waitingMachine, DEPT_STATES, asksOut, DEPT_NAMES };
 })();

@@ -1,6 +1,4 @@
 // 部门工作间、观测、设置的查询与命令（BUILD.md 第 5.3 节）
-// 登记表还没有命令登记与源目录的事件种类，这里补上，交付说明里写明需要写入 registry.js。
-// execution_placement.save、machine_authorization.save 需要 not_allowed，登记表的拒绝原因里没有，这里补上。
 (function () {
   'use strict';
   const Y12 = window.Y12;
@@ -11,25 +9,25 @@
   const TERMINAL = B.helpers.TERMINAL_PHASES;
   const DEPTS = ['product', 'engineering', 'quality', 'operations'];
   const LABELS = { product: '产品', engineering: '工程', quality: '质检', operations: '运维' };
+  const ITEM_STATUS_TEXT = { not_started: '未开始', queued: '排队中', in_progress: '进行中', released: '已放行', adopted: '已采纳', stopped: '已停止' };
   const DUTY = {
-    product: '维护原始意图与有效规范，回答需求咨询',
+    product: '维护原始意图与有效规范，回答其他部门的询问',
     engineering: '依据有效规范设计、实现、自测并提交交付',
     quality: '在独立副本中验证交付，给出缺陷或放行',
     operations: '接收交付物的运行责任，处理运行问题'
   };
   const PROTOCOL_LABELS = { responses: 'Responses', chat: 'Chat Completions', messages: 'Anthropic Messages' };
-  const GUIDANCE_LABELS = {
-    received: '已接收', in_input: '已进入模型输入', explained: '已解释',
-    completed: '动作已核实', declined: '已说明边界', needs_work: '需要后续处理'
-  };
-  const PINNED = ['in_input', 'explained', 'completed', 'declined', 'needs_work'];
+  // 指导的三种状态（部门指导的处理设计第 3 节）：接收、进入模型输入、回答各写成事件；没有正式回应
+  const GUIDANCE_LABELS = { received: '已接收', in_input: '已进入模型输入', answered: '已回答' };
+  const PINNED = ['in_input', 'answered'];
+  // 房间画面的状态（部门房间的画法沿用 v11）：工作中与回答询问都在工作，等待工作与等待用户坐着
   const STATUS_TEXT = {
-    idle: '未工作', working: '工作中', asking: '等待回答', paused: '已暂停', failed: '失败',
-    done: '已完成', cancelled: '已取消', interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复'
+    idle: '等待工作', working: '工作中', asking: '工作中', paused: '已暂停', failed: '失败',
+    done: '已完成', cancelled: '已取消', interrupted: '中断', waiting_resume: '待恢复'
   };
   const STATUS_KIND = {
     idle: 'idle', working: 'running', asking: 'asking', paused: 'paused', failed: 'failed',
-    done: 'done', cancelled: 'cancelled', interrupted: 'interrupted', pending_verification: 'pending', waiting_resume: 'waiting'
+    done: 'done', cancelled: 'cancelled', interrupted: 'interrupted', waiting_resume: 'waiting'
   };
   const ACTION_TEXT = { not_sent: '未发送', done: '已完成', unknown: '结果未知', running: '进行中' };
   const ATTEMPT_TEXT = {
@@ -37,8 +35,8 @@
   };
   const LIVE = ['preparing', 'requesting', 'running'];
   const OPS_KINDS = ['external_action', 'rollback_restore', 'repair_stopped'];
+  // 执行位置只有本机进程与授权的机器（ADR-0022：不使用容器）
   const LOCAL_PROCESS = 'local_process';
-  const LOCAL_CONTAINER = 'local_container';
   const PAGE = 30;
 
   function models() {
@@ -183,20 +181,25 @@
     return items.slice().sort((a, b) => Y12.time.ms(b.created_at) - Y12.time.ms(a.created_at))[0] || null;
   }
 
-  function roomStatus(db, run, department) {
+  // 房间画面的状态：结束方式与恢复状态落在所在部门；其余按部门的状态（core.js 的 deptStatesOf），
+  // 停在自己发出的询问上的部门在传信管口等待
+  function roomStatus(db, item, run, department) {
     if (!run) return 'idle';
     const mine = run.department === department || run.last_department === department;
     if (run.department === department) {
       const recovery = db.atLeast('3.1') && run.recovery ? run.recovery.state : null;
       if (recovery === 'interrupted') return 'interrupted';
-      if (recovery === 'pending_verification') return 'pending_verification';
       if (recovery === 'waiting_resume') return 'waiting_resume';
-      if ((run.requests || []).some((req) => req.to === department && req.status === 'open')) return 'asking';
       if (run.phase === 'PAUSED') return 'paused';
       if (run.phase === 'FAILED') return 'failed';
       if (run.phase === 'DONE') return 'done';
-      return 'working';
     }
+    const states = B.helpers.deptStatesOf(db, item, run);
+    const s = states && states[department];
+    if (s && (s.state === 'working' || s.state === 'answering')) {
+      return (run.asks || []).some((a) => a.status === 'open' && a.requester === department) ? 'asking' : 'working';
+    }
+    if (s) return 'idle';
     if (!mine) return 'idle';
     if (run.stop_reason && run.stop_reason.code === 'cancelled') return 'cancelled';
     if (run.phase === 'FAILED') return 'failed';
@@ -208,8 +211,7 @@
   function doorOf(status, run) {
     if (status === 'paused') return '已暂停';
     if (status === 'interrupted') return '中断';
-    if (status === 'waiting_resume') return '待恢复';
-    if (status === 'pending_verification') return '待核实';
+    if (status === 'waiting_resume') return run && run.recovery && run.recovery.waiting_machine ? '等待机器' : '待恢复';
     if (status === 'failed') return run && run.stop_reason ? '失败：' + (run.stop_reason.text || run.stop_reason.code) : '失败';
     if (status === 'done') return '已完成';
     if (status === 'cancelled') return '已取消';
@@ -387,7 +389,8 @@
     const settings = db.settings(project.id);
     const item = focusItem(db, project.id, params.work_item || null);
     const run = item ? db.runOf(item.id) : null;
-    const status = roomStatus(db, run, department);
+    const status = roomStatus(db, item, run, department);
+    const states = item && run ? B.helpers.deptStatesOf(db, item, run) : null;
     const resolved = models().resolve(db, project.id, department);
     const deptAttempts = run ? (run.attempts || []).filter((attempt) => attempt.department === department) : [];
     const last = deptAttempts.slice().sort((a, b) => Y12.time.ms(b.started_at) - Y12.time.ms(a.started_at))[0] || null;
@@ -398,7 +401,7 @@
     const actions = run ? (run.actions || []).filter((action) => action.department === department) : [];
     const unknown = db.atLeast('3.1') ? actions.find((action) => action.state === 'unknown') : null;
     const remote = db.atLeast('3.2C') ? actions.slice().reverse().find((action) => action.machine_id) : null;
-    const openLetters = (run && run.requests || []).filter((req) => req.to === department && req.status === 'open').length;
+    const openLetters = (run && run.asks || []).filter((a) => a.recipient === department && a.status === 'open').length;
     const entry = deptEntry(settings, department);
     const targetTitle = item ? item.title : '—';
     const roles = [];
@@ -433,7 +436,8 @@
       pose: status === 'working' && primary ? { role_id: primary.id, action: 'typing' } : null,
       door: doorOf(status, run),
       hold_card: status === 'waiting_resume' && run && run.recovery && run.recovery.unusable ? run.recovery.unusable.problem : null,
-      pending_tool: unknown ? unknown.tool : null,
+      // 待核实这个状态已经删除（ADR-0038）：结果未知的动作自动核实或交还会话，房间里没有闪烁的未完成动作
+      pending_tool: null,
       mailbox: guidance.filter((entryItem) => entryItem.status === 'received').length,
       summaries: compactions.reduce((max, entryItem) => Math.max(max, entryItem.n || 0), 0),
       scrolls: department === 'product' ? prdCount : 0,
@@ -472,7 +476,13 @@
         id: run.id, phase: run.phase, cycle: run.cycle, elapsed_sec: run.elapsed_sec, limit_sec: run.limit_sec,
         department: run.department, yudao_version: run.yudao_version
       } : null,
-      status: { id: status, kind: STATUS_KIND[status], text: STATUS_TEXT[status] },
+      // 标题区的部门状态：事项进行中时是四种部门状态之一，其余按事项的结束方式
+      status: states && states[department]
+        ? { id: states[department].state, kind: states[department].kind, text: states[department].text, note: states[department].note }
+        : { id: status, kind: STATUS_KIND[status], text: STATUS_TEXT[status], note: null },
+      // 三个部门的状态（同时工作）与本部门发出或收到的询问
+      states: states,
+      asks: run ? B.helpers.asksOut(run).filter((a) => a.requester === department || a.recipient === department) : [],
       model: {
         definition: resolved.definition,
         label: resolved.definition ? models().label(resolved.definition) : '未设置',
@@ -758,7 +768,8 @@
           run_id: run.id,
           work_item_id: run.work_item_id,
           title: item ? item.title : run.work_item_id,
-          phase: run.phase,
+          // 事项的状态；v11 写的是 run 的阶段，三个部门同时运行以后没有阶段（ADR-0039）
+          status_text: item ? ITEM_STATUS_TEXT[item.status] || item.status : '',
           cycle: run.cycle,
           elapsed_sec: run.elapsed_sec,
           limit_sec: run.limit_sec
@@ -825,26 +836,25 @@
       project: { id: project.id, name: project.name, goal: project.goal, pinned: Boolean(project.pinned), archived: Boolean(project.archived), version: project.version },
       version: settings.version,
       departments: deptOut,
-      commands: (settings.commands || []).map((command) => ({
-        name: command.name, argv: command.argv, args: command.args || [], timeout_sec: command.timeout_sec,
-        output_limit: command.output_limit, version: command.version
-      })),
+      // 源目录：名称与路径；3.8 起另有采纳写回的三项设置与写回检查的命令（工单 #709、#815）
       source_directories: {
         version: settings.source_directories && typeof settings.source_directories.version === 'number' ? settings.source_directories.version : 0,
-        items: settings.source_directories && settings.source_directories.items ? settings.source_directories.items : []
+        items: (settings.source_directories && settings.source_directories.items ? settings.source_directories.items : []).map((dir) => {
+          const row = { name: dir.name, path: dir.path };
+          if (db.atLeast('3.8')) {
+            row.writeback = dir.writeback || { enabled: false, remote: null, target_branch: null };
+            row.check_commands = dir.check_commands || [];
+          }
+          return row;
+        })
       }
     };
-    if (db.atLeast('3.2B')) {
-      out.tools = (settings.tools || []).map((tool) => ({ id: tool.id, label: tool.label, scope: tool.scope, approval: tool.approval }));
-      out.tools_version = typeof settings.tools_version === 'number' ? settings.tools_version : 0;
-    }
     if (db.atLeast('3.2C')) {
       out.machines = (settings.machines || []).map((item) => {
         const row = {
           machine_id: item.machine_id,
           machine_name: machineName(db, item.machine_id),
-          dirs: item.dirs || [],
-          operations: item.operations || []
+          dirs: item.dirs || []
         };
         if (db.atLeast('S4')) {
           row.runtime_env = Boolean(item.runtime_env);
@@ -857,8 +867,7 @@
       out.execution_placement = {
         version: place && typeof place.version === 'number' ? place.version : 0,
         workspace: place && place.workspace ? place.workspace : LOCAL_PROCESS,
-        checks: place && place.checks ? place.checks : { product: null, engineering: null, quality: null },
-        image: place ? place.image || null : null
+        checks: place && place.checks ? place.checks : { product: null, engineering: null, quality: null }
       };
     }
     if (db.atLeast('3.2D')) out.warnings = warnings;
@@ -972,37 +981,8 @@
     }, deptSettingsPatch(db, project.id, department, next))], { warning: warning });
   });
 
-  B.command('command_registration.save', (params, db) => {
-    const project = projectOf(db, requireText(params.project, '项目'));
-    if (!project) return reject('not_found', '项目不存在');
-    const denied = archived(project);
-    if (denied) return denied;
-    const name = requireText(params.name, '登记名').trim();
-    const settings = db.settings(project.id);
-    if (!settings) return reject('not_found', '项目设置不存在');
-    const commands = settings.commands || [];
-    const existing = commands.find((command) => command.name === name);
-    const current = existing ? existing.version : 0;
-    if (versionParam(params) !== current) return stale(current);
-    const next = {
-      name: name,
-      argv: Array.isArray(params.argv) ? params.argv : String(params.argv || ''),
-      args: listParam(params.args),
-      timeout_sec: numOrNull(params.timeout_sec) || 60,
-      output_limit: numOrNull(params.output_limit) || 200000,
-      version: current === 0 ? 1 : current
-    };
-    const path = 'project_settings.' + project.id + '.commands';
-    const patch = existing
-      ? [{ path: path + '[name=' + name + ']', value: next }]
-      : [{ path: path, push: next }];
-    return accepted([event('command_configured', {
-      project_id: project.id,
-      label: (existing ? '修改' : '登记') + '命令 ' + name,
-      payload: { name: name }
-    }, patch)]);
-  });
-
+  // 源目录的登记（应用层与接口层设计说明第 3.2 节 source_directory.save）：同名登记覆盖原路径。3.8 起同时保存采纳写回的
+  // 三项设置与写回检查的命令；没有给出的项按原来的值写回，改路径不清空写回的设置（工单 #709、#815）
   B.command('source_directory.save', (params, db) => {
     const project = projectOf(db, requireText(params.project, '项目'));
     if (!project) return reject('not_found', '项目不存在');
@@ -1014,8 +994,22 @@
     const store = raw.source_directories;
     const current = store && typeof store.version === 'number' ? store.version : 0;
     if (versionParam(params) !== current) return stale(current);
+    const prev = (store && store.items ? store.items : []).find((item) => item.name === name) || {};
     const items = (store && store.items ? store.items.slice() : []).filter((item) => item.name !== name);
-    items.push({ name: name, path: dirPath });
+    const entry = { name: name, path: dirPath };
+    if (db.atLeast('3.8')) {
+      const wb = prev.writeback || { enabled: false, remote: null, target_branch: null };
+      entry.writeback = {
+        enabled: params.writeback_enabled === undefined ? wb.enabled : (params.writeback_enabled === true || params.writeback_enabled === 'true'),
+        remote: params.remote === undefined ? wb.remote : (String(params.remote).trim() || null),
+        target_branch: params.target_branch === undefined ? wb.target_branch : (String(params.target_branch).trim() || null)
+      };
+      if (entry.writeback.enabled && (!entry.writeback.remote || !entry.writeback.target_branch)) {
+        return reject('not_allowed', '打开采纳写回时需要写明远端与目标分支');
+      }
+      entry.check_commands = params.check_commands === undefined ? (prev.check_commands || []) : listParam(params.check_commands);
+    }
+    items.push(entry);
     const next = { version: current === 0 ? 1 : current, items: items };
     const base = 'project_settings.' + project.id;
     const patch = store
@@ -1028,42 +1022,7 @@
     }, patch)]);
   });
 
-  B.command('tool_authorization.save', (params, db) => {
-    const project = projectOf(db, requireText(params.project, '项目'));
-    if (!project) return reject('not_found', '项目不存在');
-    const denied = archived(project);
-    if (denied) return denied;
-    const raw = settingsRaw(db, project.id);
-    const current = typeof raw.tools_version === 'number' ? raw.tools_version : 0;
-    if (versionParam(params) !== current) return stale(current);
-    const tools = (raw.tools || []).map((tool) => Object.assign({}, tool));
-    const incoming = Array.isArray(params.tools) ? params.tools : [{ id: params.id, label: params.label, scope: params.scope, approval: params.approval }];
-    incoming.forEach((item) => {
-      const id = requireText(item.id, '工具');
-      const prev = tools.find((tool) => tool.id === id);
-      const next = {
-        id: id,
-        label: item.label || (prev ? prev.label : id),
-        scope: item.scope || '',
-        approval: item.approval || ''
-      };
-      if (prev && prev.level) next.level = prev.level;
-      const index = tools.findIndex((tool) => tool.id === id);
-      if (index >= 0) tools[index] = next;
-      else tools.push(next);
-    });
-    const base = 'project_settings.' + project.id;
-    const patch = [
-      versionKeyPatch(project.id, 'tools_version', current, keyExists(raw, 'tools_version')),
-      { path: base + '.tools', value: tools }
-    ];
-    return accepted([event('x_tool_authorization_saved', {
-      project_id: project.id,
-      label: '保存工具授权',
-      payload: { ids: incoming.map((item) => item.id) }
-    }, patch)]);
-  });
-
+  // 机器授权只有登记的目录与 Stage 4 的运行环境、常设授权（ADR-0038 删除了「可以执行的操作」）
   B.command('machine_authorization.save', (params, db) => {
     const project = projectOf(db, requireText(params.project, '项目'));
     if (!project) return reject('not_found', '项目不存在');
@@ -1084,8 +1043,7 @@
       const prev = (raw.machines || []).find((entry) => entry.machine_id === id) || {};
       const row = {
         machine_id: id,
-        dirs: listParam(item.dirs),
-        operations: listParam(item.operations)
+        dirs: listParam(item.dirs)
       };
       if (prev.level) row.level = prev.level;
       if (db.atLeast('S4')) {
@@ -1099,21 +1057,17 @@
     });
     if (next.some((item) => item && item.reject)) return next.find((item) => item && item.reject);
     if (place) {
+      // 删除本项目执行位置用到的机器的授权时拒绝（执行环境服务设计说明第 7.2 节）
       const needed = [];
-      if (place.workspace && place.workspace !== LOCAL_PROCESS && place.workspace !== LOCAL_CONTAINER) needed.push({ id: place.workspace, kind: 'workspace' });
+      if (place.workspace && place.workspace !== LOCAL_PROCESS) needed.push({ id: place.workspace, kind: 'workspace' });
       ['product', 'engineering', 'quality'].forEach((department) => {
         const location = place.checks && place.checks[department];
-        if (location && location !== LOCAL_PROCESS && location !== LOCAL_CONTAINER) needed.push({ id: location, kind: 'check' });
+        if (location && location !== LOCAL_PROCESS) needed.push({ id: location, kind: 'check' });
       });
       for (const entry of needed) {
         const kept = next.find((item) => item.machine_id === entry.id);
         if (!kept) return reject('not_allowed', '执行位置「' + entry.id + '」仍在使用这台机器，不能取消授权');
-        if (entry.kind === 'workspace' && (!kept.dirs.length || !kept.operations.length)) {
-          return reject('not_allowed', '执行位置「' + entry.id + '」需要登记的目录与可以执行的操作，授权不能减少到这些以下');
-        }
-        if (entry.kind === 'check' && !kept.operations.length) {
-          return reject('not_allowed', '执行位置「' + entry.id + '」需要可以执行的操作，授权不能减少到这些以下');
-        }
+        if (!kept.dirs.length) return reject('not_allowed', '执行位置「' + entry.id + '」需要登记的目录，授权不能减少到这些以下');
       }
     }
     const patch = [
@@ -1127,20 +1081,12 @@
     }, patch)]);
   });
 
-  function placementProblem(db, projectId, location, kind) {
+  function placementProblem(db, projectId, location) {
     if (!location || location === LOCAL_PROCESS) return null;
-    if (location === LOCAL_CONTAINER) {
-      const host = (db.data.machines || []).find((machine) => machine.kind === 'host');
-      if (!host || !host.online) return '控制主机的容器引擎不可用';
-      return null;
-    }
     const settings = db.settings(projectId);
     const auth = settings && (settings.machines || []).find((item) => item.machine_id === location);
     if (!auth) return '机器不在本项目的授权中：' + location;
-    const dirs = auth.dirs || [];
-    const operations = auth.operations || [];
-    if (kind === 'workspace' && (!dirs.length || !operations.length)) return '运行工作区需要登记的目录，以及读取、写入与登记的命令';
-    if (kind === 'check' && !operations.length) return '检查的位置需要可以执行的操作';
+    if (!(auth.dirs || []).length) return '这台机器在本项目还没有登记的目录：' + location;
     return null;
   }
 
@@ -1162,13 +1108,12 @@
         product: checks.product || null,
         engineering: checks.engineering || null,
         quality: checks.quality || null
-      },
-      image: params.image || null
+      }
     };
-    const problem = placementProblem(db, project.id, next.workspace, 'workspace')
-      || placementProblem(db, project.id, next.checks.product, 'check')
-      || placementProblem(db, project.id, next.checks.engineering, 'check')
-      || placementProblem(db, project.id, next.checks.quality, 'check');
+    const problem = placementProblem(db, project.id, next.workspace)
+      || placementProblem(db, project.id, next.checks.product)
+      || placementProblem(db, project.id, next.checks.engineering)
+      || placementProblem(db, project.id, next.checks.quality);
     if (problem) return reject('not_allowed', problem);
     const base = 'project_settings.' + project.id;
     const patch = place

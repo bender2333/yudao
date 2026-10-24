@@ -68,7 +68,7 @@
     if (!Y12.cap.query('run.recovery')) return map;
     Y12.api.query('projects.list', {}).data.forEach((project) => {
       Y12.api.query('project.overview', { project: project.id }).data.work_items.forEach((item) => {
-        if (item.status !== 'in_progress' || !item.phase) return;
+        if (item.status !== 'in_progress') return;
         const data = Y12.api.query('run.recovery', { work_item: item.id }).data;
         if (data.run && data.run.id) map[data.run.id] = item.title;
       });
@@ -88,7 +88,8 @@
       (drain.state === 'draining' ? Y12.ui.button({ label: '强制升级', kind: 'danger', act: 'runtime.forceUpgrade' }) : '');
     return Y12.ui.block({
       title: '排空', query: 'system.status', command: ['runtime.start_drain', 'runtime.force_upgrade'],
-      subtitle: '排空期间停止开始新事项，等正在进行的 run 结束；强制升级时正在进行的 run 记为因升级停止，对应事项用已采纳成果重新开始并排在队列最前面',
+      // 排空在服务下一次启动时结束（应用层与接口层设计说明第 3.2 节，#731）；重新开始用项目的起点（恢复契约第 6 节第 10 行）
+      subtitle: '排空期间停止开始新事项，等正在进行的 run 结束；排空在服务下一次启动时结束。强制升级时正在进行的 run 记为因升级停止，对应事项用项目的起点（采纳成果；没有时是起始文件夹快照，都没有时是空树）重新开始并排在队列最前面',
       body: Y12.ui.kv([
         ['状态', Y12.esc(DRAIN_LABELS[drain.state] || drain.state)],
         ['开始时间', drain.since ? Y12.ui.time(drain.since) : '<span class="y12-muted">—</span>'],

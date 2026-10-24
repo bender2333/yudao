@@ -7,16 +7,43 @@
   const P = Y12.pixel;
 
   const DEPT = { product: '产品', engineering: '工程', quality: '质检', operations: '运维' };
-  const ROOM_STATUS = ['running', 'asking', 'pending_verification'];
-  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'waiting_decision', 'stopped_for_upgrade'];
+  const ROOM_STATUS = ['running', 'asking'];
+  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'waiting_resume', 'waiting_decision', 'stopped_for_upgrade'];
   const STATUS_TEXT = {
     waiting_decision: '等待你的决定',
     queued: '排队中', waiting_slot: '等待执行槽位', running: '运行中', asking: '询问中', waiting_provider: '等待模型服务', paused: '已暂停',
-    failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复',
+    failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', waiting_resume: '待恢复',
     stopped_for_upgrade: '因升级停止', adopted: '已采纳'
   };
 
   const q = (name, params, at) => Y12.api.query(name, Object.assign({}, params || {}, at !== null && at !== undefined ? { at } : {})).data;
+
+  // ---------------------------------------------------------------------------
+  // 像素画面沿用 v11 的事件词汇（BUILD.md 第 3 节）：正式成果被接纳以后关注它的部门开始一轮工作，
+  // 画面上是包裹沿管道走到那个部门（transition）；询问是一次工具调用，画面上是信件在传信管里往返
+  // （collaboration_requested、collaboration_responded、collaboration_closed）。这里把 v12 的事件转成画面认得的事件，像素代码不改
+  const FLOW_OF = {
+    spec_accepted: () => ({ from: 'product', to: 'engineering', artifact: 'prd' }),
+    contract_accepted: () => ({ from: 'product', to: 'engineering', artifact: 'prd' }),
+    delivery_accepted: () => ({ from: 'engineering', to: 'quality', artifact: 'box' }),
+    structure_accepted: () => ({ from: 'engineering', to: 'quality', artifact: 'box' }),
+    qa_submitted: (pl) => (pl.verdict === 'release'
+      ? { from: 'quality', to: pl.release_to || 'library', artifact: 'release' }
+      : { from: 'quality', to: 'engineering', artifact: 'defect' })
+  };
+
+  function pixelEvents(ev) {
+    const pl = ev.payload || {};
+    const as = (type, payload) => Object.assign({}, ev, { type, payload: Object.assign({}, pl, payload) });
+    if (ev.type === 'ask_started') return [as('collaboration_requested', { from: pl.requester, to: pl.recipient, request_id: pl.ask_id })];
+    if (ev.type === 'ask_answered') {
+      const ids = { from: pl.recipient, to: pl.requester, request_id: pl.ask_id };
+      return [as('collaboration_responded', ids), as('collaboration_closed', { from: pl.requester, to: pl.recipient, request_id: pl.ask_id })];
+    }
+    const flow = FLOW_OF[ev.type];
+    return flow ? [ev, as('transition', flow(pl))] : [ev];
+  }
+  const playOn = (scene, ev) => pixelEvents(ev).forEach((e) => scene.playEvent(e));
 
   // ---------------------------------------------------------------------------
   // 楼与机房的模型
@@ -26,8 +53,10 @@
     const floors = projects.map((p) => {
       const loop = q('project.loop', { project: p.id }, at);
       const lit = {};
+      // 几个部门同时工作时（预测性探索、回答询问）几个房间同时亮灯
+      const busy = (it, d) => Boolean(it.departments && it.departments[d] && ['working', 'answering'].includes(it.departments[d].state));
       ['product', 'engineering', 'quality', 'operations'].forEach((d) => {
-        lit[d] = loop.items.some((it) => it.department === d && ROOM_STATUS.includes(it.status));
+        lit[d] = loop.items.some((it) => ROOM_STATUS.includes(it.status) && (it.department === d || busy(it, d)));
       });
       if (loop.ops && loop.ops.version) lit.operations = true;
       const inUse = (loop.machines || []).filter((m) => m.actions > 0).map((m) => m.id);
@@ -71,7 +100,7 @@
 
   const STATUS_LABEL = {
     waiting_decision: '等待你的决定',
-    running: '运行中', queued: '排队中', waiting_slot: '等待执行槽位', waiting_provider: '等待模型服务', pending_verification: '待核实',
+    running: '运行中', queued: '排队中', waiting_slot: '等待执行槽位', waiting_provider: '等待模型服务',
     waiting_resume: '待恢复', interrupted: '中断', idle: '空闲'
   };
 
@@ -133,8 +162,10 @@
       const groups = {};
       rows.forEach((r) => {
         if (!r.from || !r.to) return;
-        const key = r.from + '>' + r.to + '>' + (r.kind === 'rework' ? 'rework' : '');
-        const g = groups[key] || (groups[key] = { from: r.from, to: r.to, kind: r.kind === 'rework' ? 'rework' : r.kind, count: 0, last_at: r.at });
+        // 缺陷记录的流向在画面上沿用 v11 的返工画法
+        const back = r.kind === 'defect';
+        const key = r.from + '>' + r.to + '>' + (back ? 'rework' : '');
+        const g = groups[key] || (groups[key] = { from: r.from, to: r.to, kind: back ? 'rework' : r.kind, count: 0, last_at: r.at });
         g.count += 1;
         if (Y12.time.ms(r.at) > Y12.time.ms(g.last_at)) g.last_at = r.at;
       });
@@ -159,7 +190,7 @@
       return { entries };
     }
     if (id === 'recovery') {
-      return { entries: loop.items.filter((it) => ['interrupted', 'pending_verification', 'waiting_resume'].includes(it.status) && it.department)
+      return { entries: loop.items.filter((it) => ['interrupted', 'waiting_resume'].includes(it.status) && it.department)
         .map((it) => ({ department: it.department, state: it.status, text: STATUS_TEXT[it.status] + '：' + it.title })) };
     }
     if (id === 'context_usage') return Y12.api.query('overlay.context_usage', { project: projectId }).data;
@@ -251,14 +282,14 @@
     const replay = Y12.replay.create({
       el: el.querySelector('.y12-floor-timeline'), project: o.projectId,
       onPosition(pos) { at = pos; refresh(); el.classList.toggle('is-replay', pos !== null); },
-      onFact(f) { floor.playEvent(f.event); }
+      onFact(f) { playOn(floor, f.event); }
     });
     const panel = {
       floor,
       replay,
       setOverlay,
       update() { if (at === null) refresh(); replay.reload(); },
-      onEvent(ev) { if (at === null && ev.project_id === o.projectId) floor.playEvent(ev); },
+      onEvent(ev) { if (at === null && ev.project_id === o.projectId) playOn(floor, ev); },
       destroy() {
         if (activeFloor === panel) activeFloor = null;
         floor.destroy();
@@ -284,5 +315,5 @@
   });
 
   // activeFloor：当前挂载的项目楼层面板（验收脚本读取它的画面）
-  Y12.scenes = { mountBuilding, mountMachineRoom, mountFloor, buildingModels, activeFloor: () => activeFloor };
+  Y12.scenes = { mountBuilding, mountMachineRoom, mountFloor, buildingModels, pixelEvents, playOn, activeFloor: () => activeFloor };
 })();

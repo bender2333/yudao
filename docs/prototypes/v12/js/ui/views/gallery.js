@@ -25,7 +25,7 @@
   };
   const STATUS_LABEL = {
     idle: '部门未工作', paused: '已暂停', failed: '失败', done: '已完成', cancelled: '已取消',
-    interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复'
+    interrupted: '中断', waiting_resume: '待恢复'
   };
   const LEVEL_OPTIONS = Y12.LEVELS.map((lv) => [lv, Y12.LEVEL_LABELS[lv]]);
 

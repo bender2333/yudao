@@ -11,11 +11,12 @@
   const DEPT_IDS = ['product', 'engineering', 'quality', 'operations'];
   const DEPT_LABEL = { product: '产品', engineering: '工程', quality: '质检', operations: '运维' };
   const PLACE = Object.assign({ user: '用户', hall: '大厅', library: '成果库', adoption: '采纳' }, DEPT_LABEL);
+  // 流转的种类按成果写（三部门的循环结构第 2 节）：没有「交接」，部门在关注的成果有了新版本时开始工作
   const KIND_LABEL = {
-    handoff: '需求交接', delivery: '版本交付', defect: '问题反馈', ask: '咨询',
-    answer: '回答', rework: '返工', release: '放行', adopt: '采纳'
+    input: '用户输入', prd: 'PRD', delivery: '交付', defect: '缺陷记录', ask: '询问', answer: '回答',
+    release: '放行', adopt: '采纳', structure: '结构说明', baseline: '基线核验'
   };
-  const RECOVERING = ['interrupted', 'pending_verification', 'waiting_resume'];
+  const RECOVERING = ['interrupted', 'waiting_resume'];
   const ACTIVE_STATUS = ['not_started', 'queued', 'in_progress'];
 
   function overview(pid) {
@@ -66,8 +67,13 @@
     return Y12.ui.block({
       id: 'ov-summary', query: 'project.overview', className: 'y12-ov-summary',
       body: '<div class="y12-ov-hero"><div class="y12-ov-hero-main"><h1 class="y12-ov-title">' + esc(p.name) + '</h1>' +
-        '<div class="y12-ov-goal"><span class="y12-muted">长期目标</span><span>' + esc(p.goal || '—') + '</span></div>' +
+        '<div class="y12-ov-goal"><span class="y12-muted">长期目标</span><span>' + esc(p.goal || '—') + '</span>' +
+          (Y12.cap.command('project.set_goal') && !p.archived ? Y12.ui.button({ label: '修改', kind: 'small', act: 'ov.goal', data: { project: p.id } }) : '') + '</div>' +
         (p.source === 'existing' ? '<p class="y12-ov-source">' + Y12.ui.tag('已有项目') + '<span class="y12-muted">从已有代码接入，初始 PRD 由你确认</span></p>' : '') +
+        // 没有采纳成果时写项目的起点（起始文件夹快照）；当前成果有没有写回源目录
+        (ov.start_point ? '<p class="y12-ov-source"><span class="y12-muted">' + esc(ov.start_point) + '</span></p>' : '') +
+        (ov.writeback ? '<p class="y12-ov-source">' + Y12.ui.status(ov.writeback.status ? (ov.writeback.status === 'stopped' ? 'failed' : 'succeeded') : 'waiting', '成果写回：' + ov.writeback.status_text) +
+          Y12.ui.button({ label: '查看写回', kind: 'small', go: Y12.paths.settings(p.id) }) + '</p>' : '') +
         archived + '</div>' + adopt + '</div>' +
         '<div class="y12-ov-stats">' +
           stat('进行中', ov.stats.in_progress, 'running') +
@@ -116,15 +122,47 @@
     }).join('') + '</ol>';
   }
 
+  // 三个部门同时运行（ADR-0036）：事项进行中时写三个部门各自的状态，结束以后写最后所在的部门
+  function deptStatesText(item) {
+    if (!item.departments) return '所在部门：' + (item.department ? DEPT_LABEL[item.department] : '大厅');
+    return Object.keys(item.departments).map((d) => {
+      const s = item.departments[d];
+      return DEPT_LABEL[d] + ' ' + s.text + (s.note ? '（' + s.note + '）' : '');
+    }).join(' · ');
+  }
+
+  // 进度按成果写：当前的 PRD 版本、最新的交付与它依据的 PRD、对最新交付的结论
+  function progressText(p) {
+    if (!p) return '';
+    return [p.prd ? 'PRD ' + p.prd : null, p.delivery ? '交付 ' + p.delivery + (p.delivery_basis ? '（依据 ' + p.delivery_basis + '）' : '') : '还没有交付',
+      p.verdict ? '结论：' + p.verdict : null].filter(Boolean).join(' · ');
+  }
+
   function itemMeta(item) {
     const parts = [];
-    parts.push('<span>所在部门：' + esc(item.department ? DEPT_LABEL[item.department] : '大厅') + '</span>');
+    parts.push('<span>' + esc(deptStatesText(item)) + '</span>');
+    if (item.progress) parts.push('<span>' + esc(progressText(item.progress)) + '</span>');
     if (item.cycle) parts.push('<span>第 ' + esc(item.cycle) + ' 轮</span>');
     if (item.started_at) {
       parts.push('<span class="y12-ov-time">已用 ' + esc(Y12.ui.duration(item.elapsed_sec)) + ' / ' + esc(Y12.ui.duration(item.limit_sec)) +
         Y12.ui.meter(item.elapsed_sec, item.limit_sec, { warnAt: 0.8 }) + '</span>');
     }
     return '<div class="y12-ov-item-meta">' + parts.join('') + '</div>';
+  }
+
+  // 这个事项里的询问（查询 run.asks）：询问链、问题、状态与回答；回问写明回问
+  const ASK_KIND = { open: 'asking', answered: 'succeeded', unable: 'failed' };
+  function asksList(item) {
+    if (!Y12.cap.query('run.asks')) return '';
+    const asks = Y12.api.query('run.asks', { work_item: item.id }).data.asks;
+    if (!asks.length) return '';
+    return '<h4 class="y12-h3">询问</h4><ul class="y12-ov-asks">' + asks.map((a) =>
+      '<li style="--depth:' + (a.depth - 1) + '"><div class="y12-ov-input-head">' + Y12.ui.status(ASK_KIND[a.status] || 'idle', a.status_text) +
+        '<strong>' + esc(a.chain.map((d) => DEPT_LABEL[d]).join(' → ')) + '</strong>' + (a.parent ? Y12.ui.tag('回问') : '') +
+        '<span class="y12-muted">' + esc(Y12.ui.time(a.born_at)) + '</span></div>' +
+        '<p class="y12-ov-input-text">' + esc(a.question) + '</p>' +
+        (a.answer ? '<p class="y12-ov-input-text y12-muted">回答：' + esc(a.answer) + (a.prd_version ? ' ' + Y12.ui.tag('附带 PRD ' + a.prd_version) : '') + '</p>' : '') +
+        (a.reason ? '<p class="y12-ov-input-text y12-muted">没能回答：' + esc(a.reason) + '</p>' : '') + '</li>').join('') + '</ul>';
   }
 
   function currentBody(ov, target, ctx) {
@@ -141,12 +179,12 @@
     const note = recovering
       ? Y12.ui.note(Y12.ui.status(target.display.kind, target.display.text) + ' ' + esc(target.display.text) +
         '<span class="y12-note-actions">' + Y12.ui.button({ label: '查看恢复与动作核实', kind: 'small primary', go: Y12.paths.recovery(pid, target.id) }) + '</span>', 'warn')
-      : (target.pending_question ? Y12.ui.note('待决问题：' + esc(target.pending_question), 'warn') : '');
+      : '';
     const switcher = !ctx.workItemId && ov.work_items.length > 1
       ? '<div class="y12-ov-switch"><span class="y12-muted y12-small">全部事项：</span>' + ov.work_items.map((item) =>
         '<button type="button" class="y12-pp-chip" data-go="' + esc(Y12.paths.overview(pid, item.id)) + '">' + swatch(item.color_index) + esc(item.title) + '</button>').join('') + '</div>'
       : '';
-    return switcher + head + note + inputList(target) + composerHtml(ov, target);
+    return switcher + head + note + asksList(target) + inputList(target) + composerHtml(ov, target);
   }
 
   function composerHtml(ov, target) {
@@ -162,12 +200,8 @@
             Y12.ui.button({ label: '追加需求', kind: 'small primary', act: 'ov.append', data: { workItem: target.id } }) +
           '</div></div></div>';
     }
-    const dirs = ov.source_directories || [];
-    const source = dirs.length
-      ? '<label class="y12-field"><span>可信源目录（可选，作为新事项的代码快照来源）</span>' +
-        '<select class="y12-input" id="ov-new-src"><option value="">不使用源目录</option>' +
-        dirs.map((dir) => '<option value="' + esc(dir.path) + '">' + esc(dir.name) + ' · ' + esc(dir.path) + '</option>').join('') + '</select></label>'
-      : '';
+    // 新事项从项目的起点开始（采纳成果、起始文件夹快照或空树），不再逐个事项选择源目录
+    const source = ov.start_point ? '<p class="y12-muted y12-small">新事项从' + esc(ov.start_point.replace(/^起点：/, '')) + '开始</p>' : '';
     return '<div class="y12-ov-composer">' +
       '<label class="y12-field"><span>新的想法或材料</span>' +
         '<textarea class="y12-textarea" rows="3" id="ov-new-text" data-draft="ov.new.' + esc(pid) + '" placeholder="描述这次要改变什么，或先记下原文"></textarea></label>' +
@@ -200,10 +234,17 @@
   }
 
   function cardDetail(item) {
-    if (RECOVERING.includes(item.recovery_state)) return '待恢复或待核实：' + item.display.text;
-    if (item.pending_question) return '待决：' + item.pending_question;
+    if (RECOVERING.includes(item.recovery_state)) return item.display.text;
+    if (item.pending_question) return '询问中：' + item.pending_question;
     if (item.stop_reason) return item.stop_reason.text || item.stop_reason.code;
     return '';
+  }
+
+  // 卡片上写正在工作的部门（几个部门同时工作时都写）；没有部门在工作时写最后所在的部门
+  function workingText(item) {
+    const busy = item.departments ? Object.keys(item.departments).filter((d) => ['working', 'answering'].includes(item.departments[d].state)) : [];
+    if (busy.length) return busy.map((d) => DEPT_LABEL[d]).join('、') + '在工作';
+    return item.department ? DEPT_LABEL[item.department] : '大厅';
   }
 
   function boardCard(pid, item) {
@@ -217,7 +258,7 @@
       '<header class="y12-ov-card-head">' + swatch(item.color_index) + '<strong class="y12-ov-card-title"><button type="button" class="y12-pp-title" data-go="' + esc(Y12.paths.overview(pid, item.id)) + '">' + esc(item.title) + '</button></strong>' +
         (item.kind === 'repair' ? Y12.ui.tag('修复') : '') + '</header>' +
       '<div class="y12-ov-card-status">' + Y12.ui.status(item.display.kind, item.display.text) + '</div>' +
-      '<div class="y12-ov-card-meta">' + esc(item.department ? DEPT_LABEL[item.department] : '大厅') + (item.cycle ? ' · 第 ' + esc(item.cycle) + ' 轮' : '') +
+      '<div class="y12-ov-card-meta">' + esc(workingText(item)) + (item.cycle ? ' · 第 ' + esc(item.cycle) + ' 轮' : '') +
         (item.status === 'queued' && item.queue_pos != null ? ' · 第 ' + esc(item.queue_pos) + ' 位' : '') + '</div>' +
       (detail ? '<p class="y12-ov-card-detail">' + esc(detail) + '</p>' : '') + actions +
     '</article>';
@@ -270,7 +311,7 @@
     } else {
       const head = '<li class="y12-ov-flow-row is-head"><span>时间</span>' + (showItem ? '<span>事项</span>' : '') +
         '<span>方向</span><span>类型</span><span>内容</span><span>状态</span><span>原始事件</span></li>';
-      const list = shown.map((row) => '<li class="y12-ov-flow-row' + (row.kind === 'rework' ? ' is-rework' : '') + '">' +
+      const list = shown.map((row) => '<li class="y12-ov-flow-row' + (row.kind === 'defect' ? ' is-rework' : '') + '">' +
         '<span class="y12-ov-flow-time">' + esc(Y12.ui.time(row.at)) + '</span>' +
         (showItem ? '<span class="y12-ov-flow-item">' + esc(itemTitle(pid, row.work_item_id)) + '</span>' : '') +
         '<span class="y12-ov-flow-dir">' + directionText(row.from, row.to) + '</span>' +
@@ -285,7 +326,7 @@
     }
     return Y12.ui.block({
       id: 'ov-flow', title: '流转记录', query: 'project.flow',
-      subtitle: workItemId ? '所选事项的流转' : '整个项目；返工行用醒目的颜色标出', body
+      subtitle: workItemId ? '所选事项的流转' : '整个项目；缺陷记录行用醒目的颜色标出', body
     });
   }
 
@@ -427,11 +468,9 @@
     const pid = el.dataset.project;
     const box = document.getElementById('ov-new-text');
     const titleEl = document.getElementById('ov-new-title');
-    const srcEl = document.getElementById('ov-new-src');
     const result = Y12.run('work_item.create', {
       project: pid, text: box.value,
-      title: titleEl ? titleEl.value : null,
-      source_dir: srcEl && srcEl.value ? srcEl.value : null
+      title: titleEl ? titleEl.value : null
     });
     if (!result.accepted) return;
     box.value = '';
@@ -439,6 +478,26 @@
     Y12.app.clearDraft('ov.new.' + pid);
     Y12.app.clearDraft('ov.title.' + pid);
     Y12.go(Y12.paths.overview(pid, result.refs.work_item_id));
+  });
+
+  // 修改长期目标（应用层与接口层设计说明第 3.2 节 project.set_goal）：之后开始的事项使用新目标
+  Y12.actions.register('ov.goal', (el) => {
+    const p = overview(el.dataset.project).project;
+    Y12.ui.modal({
+      title: '修改长期目标',
+      body: '<label class="y12-field"><span>长期目标</span><textarea class="y12-textarea" rows="4" id="ov-goal-text">' + esc(p.goal || '') + '</textarea>' +
+        '<small class="y12-muted">进行中的事项不受影响；之后开始的事项使用新目标。</small></label>',
+      actions: [
+        { label: '取消', close: true },
+        { label: '保存', kind: 'primary', act: 'ov.goalSave', data: { project: p.id, base: p.version } }
+      ]
+    });
+  });
+
+  Y12.actions.register('ov.goalSave', (el) => {
+    const box = document.getElementById('ov-goal-text');
+    const result = Y12.run('project.set_goal', { project: el.dataset.project, goal: box ? box.value : '', base_version: Number(el.dataset.base) });
+    if (result.accepted) Y12.ui.closeModal();
   });
 
   Y12.actions.register('ov.flowAll', () => {

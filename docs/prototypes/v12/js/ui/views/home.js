@@ -37,7 +37,7 @@
   }
 
   // 两个汇总项的明细（自举试点）：收敛状态的变化逐条写事项、层与前后两种状态；带开环条件的放行先列开环的条件，每条可以跳到资料页的逐条结论表
-  const LAYER_TEXT = { run: 'run', project: '项目循环', activation: '激活', step: '步骤循环' };
+  const LAYER_TEXT = { run: 'run', project: '项目循环', activation: '一轮工作', step: '步骤循环' };
 
   function stateChip(state) {
     const s = Y12.pixel.LOOP_STATES[state];

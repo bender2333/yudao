@@ -100,34 +100,32 @@
   // 「夜间票价」（自举试点的示例数据，design.md 第 8.1 节）：AC-2 的结论通过、不通过、通过、不通过（run 层震荡），
   // run 用完运行时间（7200/7200 秒）停止（达到边界）；最后一次工程激活里同名同参数的工具调用重复 3 次（步骤循环震荡）
   const NIGHT_AC = [
-    ['AC-1', '23:00 至次日 5:00 进站的行程按夜间票价计算', 'command_check', ['unit_tests：test_night_fare.py::test_window']],
-    ['AC-2', '夜间票价在分段票价上加 1 元；跨过 5:00 出站的行程仍按进站时间判定', 'command_check', ['unit_tests：test_night_fare.py::test_cross_dawn']],
-    ['AC-3', '夜间行程在文本与 JSON 导出中标出「夜间」', 'command_check', ['unit_tests：test_export.py::test_night_flag']],
-    ['AC-4', '22:59 与 23:00 两个边界时刻各有一条断言', 'command_check', ['unit_tests：test_night_fare.py::test_edges']]
+    ['AC-1', '23:00 至次日 5:00 进站的行程按夜间票价计算', 'command_check', ['pytest：tests/test_night_fare.py::test_window']],
+    ['AC-2', '夜间票价在分段票价上加 1 元；跨过 5:00 出站的行程仍按进站时间判定', 'command_check', ['pytest：tests/test_night_fare.py::test_cross_dawn']],
+    ['AC-3', '夜间行程在文本与 JSON 导出中标出「夜间」', 'command_check', ['pytest：tests/test_export.py::test_night_flag']],
+    ['AC-4', '22:59 与 23:00 两个边界时刻各有一条断言', 'command_check', ['pytest：tests/test_night_fare.py::test_edges']]
   ];
   const NIGHT = { work_item_id: 'w-metro-night', run_id: 'r-metro-night', level: 'pilot' };
   const night = (fields) => ev(Object.assign({}, NIGHT, fields));
   const nightRun = (field, value) => ({ path: 'runs[id=r-metro-night].' + field, value });
-  const nightTo = (from, to, artifact, at, label, extra) => night({
-    at, type: 'transition', label, payload: { from, to, artifact },
-    patch: [nightRun('department', to), nightRun('last_department', from)].concat(extra || [])
-  });
-  // 一轮：封存交付、送到质检、质检结论、退回工程
+  // 一轮：工程的交付被接纳（质检关注的交付到达），质检开始一轮工作并提交缺陷记录，工程关注的缺陷记录到达，开始下一轮
   const nightRound = (n, times, snapshot, elapsed, label) => [
     night({
       at: '2026-09-28T' + times[0] + ':00+08:00', type: 'delivery_accepted', department: 'engineering',
-      label: '工程封存交付 r' + n + '（夜间票价）', payload: { snapshot }, patch: [nightRun('elapsed_sec', elapsed[0])]
+      label: '工程的交付 r' + n + ' 被接纳，质检关注的交付到达（夜间票价）', payload: { snapshot },
+      patch: [nightRun('elapsed_sec', elapsed[0]), nightRun('department', 'quality'), nightRun('last_department', 'engineering')]
     }),
-    nightTo('engineering', 'quality', 'box', '2026-09-28T' + times[1] + ':00+08:00', '交付 r' + n + ' 送到质检部门'),
+    night({ at: '2026-09-28T' + times[1] + ':00+08:00', type: 'department_activated', department: 'quality', label: '质检部门开始核验交付 r' + n }),
     night({
       at: '2026-09-28T' + times[2] + ':00+08:00', type: 'qa_submitted', department: 'quality', label,
-      payload: { verdict: 'rework_engineering', material_id: 'm-metro-night-q' + n }, patch: [nightRun('cycle', n + 1), nightRun('elapsed_sec', elapsed[1])]
+      payload: { verdict: 'rework_engineering', material_id: 'm-metro-night-q' + n },
+      patch: [nightRun('cycle', n + 1), nightRun('elapsed_sec', elapsed[1]), nightRun('department', 'engineering'), nightRun('last_department', 'quality')]
     }),
-    nightTo('quality', 'engineering', 'defect', '2026-09-28T' + times[3] + ':00+08:00', '交付 r' + n + ' 退回工程部门')
+    night({ at: '2026-09-28T' + times[3] + ':00+08:00', type: 'department_activated', department: 'engineering', label: '工程部门关注的缺陷记录到达，开始第 ' + (n + 1) + ' 轮' })
   ];
   const nightStep = (time, tool, target, label, extra) => night({
     at: '2026-09-28T' + time + ':00+08:00', type: 'tool_started', department: 'engineering', label,
-    payload: Object.assign({ tool }, tool === 'run_command' ? { args: target } : { path: target, plan_item: 'P-2' }), patch: extra || []
+    payload: Object.assign({ tool }, tool === 'bash' ? { command: target } : { path: target, plan_item: 'P-2' }), patch: extra || []
   });
   const nightQa = (n, snapshot, results, text) => ({
     id: 'm-metro-night-q' + n, project_id: P, work_item_id: 'w-metro-night', kind: 'qa', version: n, level: 'pilot',
@@ -196,14 +194,14 @@
             text: '按 PRDBench 44 做北京地铁票价。先完成分段票价、行程时间和命令行查询，换乘路径放到下一个事项。'
           }],
           flow: [
-            { seq: 1, at: '2026-09-26T18:41:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: 'PRD r1：分段票价与 12 公里整按 4 元', status: 'accepted', event_position: null },
+            { seq: 1, at: '2026-09-26T18:36:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: 'PRD r1：分段票价与 12 公里整按 4 元', status: 'accepted', event_position: null },
             { seq: 2, at: '2026-09-28T10:51:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r1：fare_calculator、cli、文本与 JSON 导出', status: 'accepted', event_position: null },
             { seq: 3, at: '2026-09-28T11:21:00+08:00', from: 'quality', to: 'library', kind: 'release', content: '放行：12000 米票价为 4 元', status: 'accepted', event_position: null }
           ],
-          requests: [{
-            id: 'q-fare-12km', from: 'engineering', to: 'product', kind: 'consult',
-            question: fareAsk, status: 'open', answer: fareAnswer,
-            born_at: '2026-09-26T19:05:00+08:00'
+          asks: [{
+            id: 'q-fare-12km', requester: 'engineering', recipient: 'product', parent: null,
+            question: fareAsk, status: 'open', answer: null, reason: null,
+            born_at: '2026-09-26T19:05:00+08:00', answered_at: null
           }],
           guidance: [],
           messages: {
@@ -213,11 +211,11 @@
             operations: []
           },
           actions: [{
-            id: 'a-metro-fare-pytest', department: 'engineering', role: 'eng-lead', tool: 'run_command',
-            summary: '登记命令 pytest：边界 12000 米', input: 'python -m pytest tests/test_fare.py',
+            id: 'a-metro-fare-pytest', department: 'engineering', role: 'eng-lead', tool: 'bash',
+            summary: '执行命令 python -m pytest tests/test_fare.py：边界 12000 米', input: '分段票价的边界自测',
             state: 'done', machine_id: 'm-host', at: '2026-09-28T10:40:00+08:00',
             before: '测试文件已写入 12000 米期望 4 元', after: '1 passed',
-            receipt: { command: 'pytest', argv: ['python', '-m', 'pytest', 'tests/test_fare.py'], exit_code: 0, output: '1 passed', truncated: false, timed_out: false, duration_ms: 2400, snapshot: 'tests/test_fare.py' }
+            receipt: { command: 'python -m pytest tests/test_fare.py', exit_code: 0, output: '1 passed', truncated: false, timed_out: false, duration_ms: 2400, snapshot: 'tests/test_fare.py' }
           }],
           contexts: {
             product: [{ id: 'ctx-fare-p1', at: '2026-09-26T18:16:00+08:00', title: '产品激活 1', attempt_id: 'att-fare-p1', sources: [{ label: '用户原文', version: 'v1', included: true }] }],
@@ -261,26 +259,34 @@
           waiting_provider_sec: 0, waiting_provider: null, stop_reason: null,
           recovery: {
             state: 'running', reason: '运行中', unusable: null,
-            last_confirmed: { seq: 17, text: '工程已写完换乘站去重与最短路径，登记命令 unit_tests 已开始、尚未收到退出码' },
+            last_confirmed: { seq: 17, text: '工程已写完换乘站去重与最短路径，命令 python -m pytest tests 已开始、尚未收到退出码' },
             owner: { id: '工程部门', since: '2026-09-29T03:02:00+08:00' },
-            late_results: [], verifications: [],
-            unfinished: [{ id: 'a-metro-unit-17', label: '登记命令 unit_tests' }],
+            late_results: [], verifications: [], unfinished: [], waiting_machine: null,
             limits: { elapsed_sec: 4980, limit_sec: 7200, activations: 6, model_steps: 11, retries: 1 },
             auto_resumed_at: null
           },
+          // 会话的用量各自累计（三部门的循环结构第 9 节）：质检在 PRD 被接纳以后做过一轮预测性探索
+          sessions: [
+            { id: 's-xfer-product', department: 'product', kind: 'main', label: '产品：写三种路径与换乘限制的 PRD', elapsed_sec: 720, activations: 1, model_steps: 3 },
+            { id: 's-xfer-engineering', department: 'engineering', kind: 'main', label: '工程：换乘站去重与最短路径', elapsed_sec: 3780, activations: 4, model_steps: 6 },
+            { id: 's-xfer-quality', department: 'quality', kind: 'main', label: '质检：预测性探索，按 PRD r1 起草测试用例', elapsed_sec: 480, activations: 1, model_steps: 2 }
+          ],
           born_at: '2026-09-28T13:00:00+08:00',
           inputs: [{
             version: 1, kind: 'user', progress: 'accepted', at: '2026-09-28T13:00:00+08:00', bytes: 640,
             text: '接着做换乘站与最短路径：三种路径模式、最大换乘数、线路偏好。换乘站在一条路径里只计一次。'
           }],
           flow: [
-            { seq: 1, at: '2026-09-28T13:40:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: 'PRD r1：三种路径、最大换乘数、线路偏好、换乘站只计一次', status: 'accepted', event_position: null }
+            { seq: 1, at: '2026-09-28T13:40:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: 'PRD r1：三种路径、最大换乘数、线路偏好、换乘站只计一次', status: 'accepted', event_position: null },
+            { seq: 2, at: '2026-09-28T13:40:00+08:00', from: 'product', to: 'quality', kind: 'prd', content: 'PRD r1 被接纳：质检开始预测性探索', status: 'accepted', event_position: null }
           ],
-          requests: [],
+          asks: [],
+          // 写明了的部门状态（例如预测性探索）；没写的由事实推出
+          departments: null,
           guidance: [],
           messages: {
             product: [],
-            engineering: [{ seq: 1, at: '2026-09-29T03:02:00+08:00', source: 'self', from: 'engineering', text: '开始执行登记命令 unit_tests。', event_id: null }],
+            engineering: [{ seq: 1, at: '2026-09-29T03:02:00+08:00', source: 'self', from: 'engineering', text: '开始执行命令 python -m pytest tests。', event_id: null }],
             quality: [],
             operations: []
           },
@@ -290,11 +296,11 @@
               summary: '阅读 subway_data.json 的换乘站', input: 'subway_data.json',
               state: 'done', machine_id: 'm-host', at: '2026-09-28T15:10:00+08:00',
               before: '文件未读', after: '换乘站按站名出现在多条线路',
-              receipt: { command: 'read_file', argv: ['subway_data.json'], exit_code: 0, output: 'stations 328', truncated: false, timed_out: false, duration_ms: 180, snapshot: null }
+              receipt: { target: 'subway_data.json', output: 'stations 328', truncated: false, timed_out: false, duration_ms: 180, snapshot: null }
             },
             {
-              id: 'a-metro-unit-17', department: 'engineering', role: 'eng-lead', tool: 'run_command',
-              summary: '登记命令 unit_tests', input: '契约声明可以重复。命令：python -m pytest tests',
+              id: 'a-metro-unit-17', department: 'engineering', role: 'eng-lead', tool: 'bash',
+              summary: '执行命令 python -m pytest tests', input: '换乘站去重与最短路径的自测',
               state: 'running', machine_id: null, at: '2026-09-29T03:02:00+08:00',
               before: '工作区 src/pathfinding.py 已写入换乘站去重，测试尚未开始', after: null,
               receipt: null
@@ -302,13 +308,13 @@
           ],
           contexts: {
             product: [{ id: 'ctx-xfer-p1', at: '2026-09-28T13:06:00+08:00', title: '产品激活 1', attempt_id: 'att-xfer-p1', sources: [{ label: '用户原文', version: 'v1', included: true }, { label: '已采纳', version: 'r1', included: true }] }],
-            engineering: [{ id: 'ctx-xfer-e2', at: '2026-09-28T14:32:00+08:00', title: '工程激活 2', attempt_id: 'att-xfer-e1', sources: [{ label: '当前合同', version: 'PRD r1', included: true }, { label: '计划', version: 'PLAN r1', included: true }] }],
+            engineering: [{ id: 'ctx-xfer-e2', at: '2026-09-28T14:32:00+08:00', title: '工程激活 2', attempt_id: 'att-xfer-e1', sources: [{ label: '当前合同', version: 'PRD r1', included: true }] }],
             quality: []
           },
           prompts: {
             product: { config_version: 1, request_version: 1, text: '三种路径模式、最大换乘数、线路偏好写进 PRD。换乘站只计一次。' },
-            engineering: { config_version: 1, request_version: 1, text: '按 PLAN 实现 pathfinding。自测使用登记命令 unit_tests。' },
-            quality: { config_version: 1, request_version: 1, text: '本事项尚未交给质检。' }
+            engineering: { config_version: 1, request_version: 1, text: '实现 pathfinding 的三种路径与换乘站去重，运行 python -m pytest tests 自测。' },
+            quality: { config_version: 1, request_version: 1, text: '交付到达之前按 PRD r1 起草换乘与路径的测试用例。' }
           },
           compactions: [],
           effective_model: {
@@ -316,12 +322,12 @@
             engineering: modelOf('opencode-go-responses/kimi-k2.6', '部门默认', null),
             quality: modelOf('opencode-go-responses/mimo-v2.5', '部门默认', null)
           },
-          roles: roles({ id: 'eng-lead', status: 'working', task: '登记命令 unit_tests 的结果尚未收回' }),
+          roles: roles({ id: 'eng-lead', status: 'working', task: '命令 python -m pytest tests 的结果尚未收回' }),
           ledger: ledger({
             engineering: {
               items: [
                 { id: 'P-1', text: '换乘站在路径中只计一次', assignee: 'eng-lead', status: 'returned', result: 'pathfinding.py 已按站名去重' },
-                { id: 'P-2', text: '跑通登记命令 unit_tests', assignee: 'eng-lead', status: 'working', result: null }
+                { id: 'P-2', text: '跑通 python -m pytest tests', assignee: 'eng-lead', status: 'working', result: null }
               ],
               facts: ['综合最优的评分公式按距离（米）加换乘次数乘 800'],
               questions: [],
@@ -343,7 +349,7 @@
           recovery: { state: 'running', reason: '排队中', unusable: null, last_confirmed: null, owner: null, late_results: [], verifications: [], unfinished: [], limits: { elapsed_sec: 0, limit_sec: 7200, activations: 0, model_steps: 0, retries: 0 }, auto_resumed_at: null },
           born_at: '2026-09-28T15:40:00+08:00', level: '3.4A',
           inputs: [{ version: 1, kind: 'user', progress: 'received', at: '2026-09-28T15:40:00+08:00', bytes: 180, text: '公交卡折扣：普通卡 9 折，学生卡 5 折，折扣后四舍五入到角。' }],
-          flow: [], requests: [], guidance: [],
+          flow: [], asks: [], guidance: [],
           messages: { product: [], engineering: [], quality: [], operations: [] },
           actions: [], contexts: { product: [], engineering: [], quality: [] },
           prompts: { product: { config_version: 1, request_version: 1, text: '' }, engineering: { config_version: 1, request_version: 1, text: '' }, quality: { config_version: 1, request_version: 1, text: '' } },
@@ -361,7 +367,7 @@
           recovery: { state: 'running', reason: '排队中', unusable: null, last_confirmed: null, owner: null, late_results: [], verifications: [], unfinished: [], limits: { elapsed_sec: 0, limit_sec: 7200, activations: 0, model_steps: 0, retries: 0 }, auto_resumed_at: null },
           born_at: '2026-09-28T16:10:00+08:00', level: '3.4A',
           inputs: [{ version: 1, kind: 'user', progress: 'received', at: '2026-09-28T16:10:00+08:00', bytes: 160, text: '导出月度出行统计：按自然月汇总次数、总里程和总票价，文本与 JSON 各一份。' }],
-          flow: [], requests: [], guidance: [],
+          flow: [], asks: [], guidance: [],
           messages: { product: [], engineering: [], quality: [], operations: [] },
           actions: [], contexts: { product: [], engineering: [], quality: [] },
           prompts: { product: { config_version: 1, request_version: 1, text: '' }, engineering: { config_version: 1, request_version: 1, text: '' }, quality: { config_version: 1, request_version: 1, text: '' } },
@@ -379,7 +385,7 @@
           recovery: { state: 'running', reason: '运行中', unusable: null, last_confirmed: null, owner: null, late_results: [], verifications: [], unfinished: [], limits: { elapsed_sec: 0, limit_sec: 7200, activations: 10, model_steps: 27, retries: 0 }, auto_resumed_at: null },
           born_at: '2026-09-28T10:58:00+08:00', level: 'pilot',
           inputs: [{ version: 1, kind: 'user', progress: 'accepted', at: '2026-09-28T10:58:00+08:00', bytes: 150, text: '夜间票价：23:00 到次日 5:00 进站的行程在分段票价上加 1 元，导出里标出夜间。' }],
-          flow: [], requests: [], guidance: [],
+          flow: [], asks: [], guidance: [],
           messages: { product: [], engineering: [], quality: [], operations: [] },
           actions: [], contexts: { product: [], engineering: [], quality: [] },
           prompts: { product: { config_version: 1, request_version: 1, text: '' }, engineering: { config_version: 1, request_version: 1, text: '' }, quality: { config_version: 1, request_version: 1, text: '' } },
@@ -390,63 +396,129 @@
           attempts: [], source: null
         }
       ],
-      decisions: [{
-        id: 'd-metro-unknown', kind: 'unknown_action', project_id: P,
-        work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
-        status: 'waiting', issued_at: '2026-09-29T03:14:00+08:00', born_at: '2026-09-29T03:14:00+08:00',
-        version: 1, level: '3.1',
-        blocks: { scope: 'action', work_item_id: 'w-metro-transfer', action_id: 'a-metro-unit-17' },
-        materials: {
-          action_id: 'a-metro-unit-17', department: 'engineering', machine_id: 'm-laptop',
-          input: '契约声明可以重复。命令：python -m pytest tests',
-          before: '工作区 src/pathfinding.py 已写入换乘站去重，测试尚未开始',
-          after: null,
-          basis: '控制主机 03:12 断电。03:13 自动继续后，登记命令 unit_tests 没有退出码。',
-          repeatable: true
+      // 三张只在场景中发出的决定请求（场景 22、23），发出之前不显示
+      decisions: [
+        {
+          id: 'd-metro-paused', kind: 'paused_continue', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
+          status: 'withdrawn', issued_at: '2026-09-29T15:30:00+08:00', version: 1, level: '3.1',
+          blocks: { scope: 'run', work_item_id: 'w-metro-transfer', queued_behind: null },
+          materials: {
+            department: 'engineering', reason_code: 'no_tool_call', reason: '工程部门的模型连续 4 次回复没有调用工具',
+            guide: '可以先在项目设置中更换工程部门的模型，从下一次请求起生效。继续以后从暂停的位置开始：已确认的工具结果不重新执行，已用的激活次数、模型步数与运行时间不重新计算，连续不调用工具的计数从零开始。',
+            paths: [], links: ['#/p/p-metro/settings']
+          },
+          view: '#/p/p-metro/w/w-metro-transfer/recovery', answer: null,
+          options: [
+            {
+              id: 'continue', label: '处理以后继续执行', kind: 'primary',
+              events: [{
+                type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
+                label: '用户选择处理以后继续执行，工程从暂停的位置继续', payload: {},
+                patch: [
+                  { path: 'runs[id=r-metro-transfer].phase', value: 'ENGINEERING' },
+                  { path: 'runs[id=r-metro-transfer].stop_reason', value: null },
+                  { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
+                  { path: 'runs[id=r-metro-transfer].recovery.reason', value: '从暂停的位置继续，连续不调用工具的计数从零开始' },
+                  { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' },
+                  { path: 'work_items[id=w-metro-transfer].queue_reason', value: null }
+                ]
+              }]
+            },
+            {
+              id: 'stop', label: '停止事项', kind: 'danger',
+              events: [{
+                type: 'run_failed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
+                label: '用户停止换乘站的事项，停止原因保持暂停时的原因', payload: { reason: 'no_tool_call' },
+                patch: [
+                  { path: 'work_items[id=w-metro-transfer].status', value: 'stopped' },
+                  { path: 'work_items[id=w-metro-transfer].queue_reason', value: null },
+                  { path: 'runs[id=r-metro-transfer].phase', value: 'FAILED' },
+                  { path: 'runs[id=r-metro-transfer].recovery.state', value: 'stopped' },
+                  { path: 'runs[id=r-metro-transfer].recovery.reason', value: '用户在暂停以后停止事项' }
+                ]
+              }]
+            }
+          ]
         },
-        view: '#/p/p-metro/w/w-metro-transfer/recovery',
-        answer: null,
-        options: [
-          {
-            id: 'retry', label: '重新执行', kind: 'primary',
-            events: [{
-              type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
-              label: '用户选择重新执行，工程部门再次启动登记命令 unit_tests',
-              payload: { tool: 'run_command', action_id: 'a-metro-unit-17' },
-              patch: [
-                { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
-                { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'running' }
-              ]
-            }]
+        {
+          id: 'd-metro-defs', kind: 'definitions_changed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
+          status: 'withdrawn', issued_at: '2026-09-29T15:30:00+08:00', version: 1, level: '3.1',
+          blocks: { scope: 'run', work_item_id: 'w-metro-transfer', queued_behind: null },
+          materials: {
+            recorded_version: 'v14', current_version: 'v15',
+            basis: '事项开始时记录了它使用的定义版本 v14；控制主机重新启动以后加载的定义是 v15。中断的 run 自动继续之前先由你决定。'
           },
-          {
-            id: 'accept', label: '按已完成继续', kind: null,
-            events: [{
-              type: 'tool_called', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
-              label: '用户确认该动作按已完成继续',
-              payload: { tool: 'run_command', exit_code: 0, timed_out: false },
-              patch: [
-                { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
-                { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'done' }
-              ]
-            }]
+          view: '#/p/p-metro/w/w-metro-transfer/recovery', answer: null,
+          options: [
+            {
+              id: 'continue_new', label: '按新版本继续', kind: 'primary',
+              events: [{
+                type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
+                label: '用户选择按新版本继续，工程按定义版本 v15 继续', payload: {},
+                patch: [
+                  { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
+                  { path: 'runs[id=r-metro-transfer].recovery.reason', value: '按定义版本 v15 继续' },
+                  { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' },
+                  { path: 'work_items[id=w-metro-transfer].queue_reason', value: null }
+                ]
+              }]
+            },
+            {
+              id: 'stop', label: '停止事项', kind: 'danger',
+              events: [{
+                type: 'run_failed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
+                label: '用户停止换乘站的事项', payload: { reason: 'stopped_by_user' },
+                patch: [
+                  { path: 'work_items[id=w-metro-transfer].status', value: 'stopped' },
+                  { path: 'work_items[id=w-metro-transfer].queue_reason', value: null },
+                  { path: 'runs[id=r-metro-transfer].phase', value: 'FAILED' },
+                  { path: 'runs[id=r-metro-transfer].stop_reason', value: { code: 'stopped_by_user', text: '定义版本不同，用户停止事项' } },
+                  { path: 'runs[id=r-metro-transfer].recovery.state', value: 'stopped' },
+                  { path: 'runs[id=r-metro-transfer].recovery.reason', value: '定义版本不同，用户停止事项' }
+                ]
+              }]
+            }
+          ]
+        },
+        {
+          id: 'd-metro-wait', kind: 'wait_limit', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
+          status: 'withdrawn', issued_at: '2026-09-29T15:30:00+08:00', version: 1, level: '3.2C',
+          blocks: { scope: 'run', work_item_id: 'w-metro-transfer', queued_behind: null },
+          materials: {
+            wait: '等待机器', target: '笔记本', machine_id: 'm-laptop', since: '2026-09-28T15:30:00+08:00', limit_sec: 86400,
+            note: '等待期间不计入运行时间上限。选择继续等待以后重新计时，再次超过上限时再问一次。'
           },
-          {
-            id: 'stop', label: '停止事项', kind: 'danger',
-            events: [{
-              type: 'run_failed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
-              label: '用户停止换乘站事项',
-              payload: { reason: 'stopped_by_user' },
-              patch: [
-                { path: 'work_items[id=w-metro-transfer].status', value: 'stopped' },
-                { path: 'runs[id=r-metro-transfer].phase', value: 'FAILED' },
-                { path: 'runs[id=r-metro-transfer].stop_reason', value: { code: 'stopped_by_user', text: '用户在核实中停止事项' } },
-                { path: 'runs[id=r-metro-transfer].recovery.state', value: 'terminated' }
-              ]
-            }]
-          }
-        ]
-      }],
+          view: '#/p/p-metro/w/w-metro-transfer/recovery', answer: null,
+          options: [
+            {
+              id: 'keep_waiting', label: '继续等待', kind: 'primary',
+              events: [{
+                type: 'x_wait_restarted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
+                label: '继续等待笔记本，重新计时', payload: { wait: 'machine', machine_id: 'm-laptop' },
+                patch: [
+                  { path: 'runs[id=r-metro-transfer].recovery.waiting_machine.since', value: '2026-09-29T15:30:00+08:00' },
+                  { path: 'runs[id=r-metro-transfer].recovery.reason', value: '继续等待笔记本恢复在线，从 15:30 起重新计时' }
+                ]
+              }]
+            },
+            {
+              id: 'stop', label: '停止事项', kind: 'danger',
+              events: [{
+                type: 'run_failed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer',
+                label: '用户停止换乘站的事项', payload: { reason: 'stopped_by_user' },
+                patch: [
+                  { path: 'work_items[id=w-metro-transfer].status', value: 'stopped' },
+                  { path: 'runs[id=r-metro-transfer].phase', value: 'FAILED' },
+                  { path: 'runs[id=r-metro-transfer].stop_reason', value: { code: 'stopped_by_user', text: '等待机器超过时长上限，用户停止事项' } },
+                  { path: 'runs[id=r-metro-transfer].recovery.state', value: 'stopped' },
+                  { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null },
+                  { path: 'runs[id=r-metro-transfer].recovery.reason', value: '等待机器超过时长上限，用户停止事项' }
+                ]
+              }]
+            }
+          ]
+        }
+      ],
       materials: [
         {
           id: 'm-metro-intend', project_id: P, work_item_id: null, kind: 'intend', version: 1,
@@ -459,11 +531,6 @@
           text: '北京地铁票价计算系统。用户给出起点站与终点站，系统读取 subway_data.json。\n路径三种：最短距离、最少换乘、综合最优。综合分 = 距离（米）+ 换乘次数 × 800，取综合分最小的路径。换乘站在一条路径中只计一次。\n换乘限制：用户可设置最大换乘数，超过的路径不可用。线路偏好：指定优先线路后，该线路上的边权按 0.8 计入综合分，不改变最短距离模式的实际距离。\n票价由 Sum_money 计算，输入单位为米。6 公里及以内 3 元；超过 6 公里至 12 公里（含）4 元；超过 12 公里至 22 公里 5 元；超过 22 公里至 32 公里 6 元；超过 32 公里至 52 公里 7 元；超过 52 公里至 72 公里 8 元；超过 72 公里至 92 公里 9 元；超过 92 公里 10 元。12 公里整为 4 元。\n行程时间：calculate_estimated_time(米, 换乘数)，每公里 2 分钟，每次换乘另加 5 分钟。\n程序入口 src/cli.py，支持连续查询、文本导出与 JSON 导出。启动时检查站点唯一、边的两端站点存在、距离为正。\n模块：models、data_loader、pathfinding、fare_calculator。类型：Edge、Graph、ShortestPath、PathfindingConfig。load_subway_data 与 DATA_FILE_PATH。\n本事项先交付票价、行程时间、命令行与导出。三种路径与换乘限制由下一事项交付。'
         },
         {
-          id: 'm-metro-plan', project_id: P, work_item_id: 'w-metro-fare', kind: 'plan', version: 1,
-          title: 'PLAN r1 分段票价', at: '2026-09-27T10:20:00+08:00',
-          text: '1. fare_calculator.Sum_money：输入米，按 PRD 的分段表返回元；12000 米必须返回 4。\n2. calculate_estimated_time(米, 换乘数)。\n3. src/cli.py 连续查询，文本版面与 JSON 字段名按接口约定。\n4. data_loader 做完整性检查。\n5. 登记命令 pytest 覆盖 6000 米、12000 米、12001 米三个边界。'
-        },
-        {
           id: 'm-metro-delivery', project_id: P, work_item_id: 'w-metro-fare', kind: 'delivery', version: 1,
           title: '交付 r1', at: '2026-09-28T10:50:00+08:00',
           files: [
@@ -472,7 +539,7 @@
             { path: 'src/data_loader.py', bytes: 3560 },
             { path: 'tests/test_fare.py', bytes: 1680 }
           ],
-          text: '完成计划 1 至 5。Sum_money(12000) 返回 4。文本导出含起点、终点、距离、票价、预计时间。JSON 字段为 origin、destination、distance_m、fare_yuan、estimated_min。pytest 3 passed。路径搜索留在换乘事项。'
+          text: '实现 PRD r1 的票价、行程时间、命令行与导出。Sum_money(12000) 返回 4。文本导出含起点、终点、距离、票价、预计时间。JSON 字段为 origin、destination、distance_m、fare_yuan、estimated_min。pytest 3 passed。路径搜索留在换乘事项。'
         },
         {
           id: 'm-metro-qa', project_id: P, work_item_id: 'w-metro-fare', kind: 'qa', version: 1,
@@ -483,7 +550,7 @@
         {
           id: 'm-metro-night-prd', project_id: P, work_item_id: 'w-metro-night', kind: 'prd', version: 1, level: 'pilot',
           title: 'PRD r1 夜间票价', at: '2026-09-28T11:06:00+08:00',
-          text: '夜间票价。\n' + NIGHT_AC.map((ac) => ac[0] + ' ' + ac[1]).join('\n') + '\n验收：登记命令 unit_tests 覆盖每条验收条件。'
+          text: '夜间票价。\n' + NIGHT_AC.map((ac) => ac[0] + ' ' + ac[1]).join('\n') + '\n验收：python -m pytest tests 覆盖每条验收条件。'
         },
         nightQa(1, 'n1a7c02', { 'AC-3': ['fail', 'JSON 导出没有 night 字段'], 'AC-4': ['fail', '缺少 22:59 的断言'] }, '导出没有标出夜间（AC-3），缺少 22:59 的边界断言（AC-4）。'),
         nightQa(2, 'n2b3e15', { 'AC-2': ['fail', '跨过 5:00 出站时按出站时间判定，少收 1 元'] }, '跨过 5:00 出站的行程按出站时间判定，少收 1 元（AC-2）。'),
@@ -499,17 +566,9 @@
         'p-metro': {
           version: 1,
           departments: { product: null, engineering: null, quality: null, operations: null },
-          commands: [
-            { name: 'pytest', argv: 'python -m pytest', args: ['tests'], timeout_sec: 120, output_limit: 200000, version: 1 },
-            { name: 'fare_cli', argv: 'python src/cli.py', args: [], timeout_sec: 30, output_limit: 20000, version: 1 },
-            { name: 'unit_tests', argv: 'python -m pytest tests', args: ['tests'], timeout_sec: 180, output_limit: 200000, version: 1 }
-          ],
-          tools: [
-            { id: 'network', label: '网络取回', scope: '只读取回：docs.python.org、pypi.org', approval: '超出范围时逐次批准', level: '3.2B' }
-          ],
           machines: [
-            { machine_id: 'm-host', dirs: ['/work/p-metro'], operations: ['构建', '测试'], level: '3.2C' },
-            { machine_id: 'm-laptop', dirs: ['/work/p-metro'], operations: ['测试'], level: '3.2C' }
+            { machine_id: 'm-host', dirs: ['/work/p-metro'], level: '3.2C' },
+            { machine_id: 'm-laptop', dirs: ['/work/p-metro'], level: '3.2C' }
           ],
           ops: { observe_hours: 24, max_repair_failures: 2, level: 'S4' },
           roles: {
@@ -574,19 +633,14 @@
       }),
       ev({
         at: '2026-09-26T18:36:00+08:00', type: 'spec_accepted', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'product',
-        label: '主机接纳 PRD r1，12 公里整写明按 4 元',
-        payload: { material_id: 'm-metro-prd' }
-      }),
-      ev({
-        at: '2026-09-26T18:41:00+08:00', type: 'transition', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'product',
-        label: '产品把 PRD 交给工程',
-        payload: { from: 'product', to: 'engineering', artifact: 'prd' },
+        label: '主机接纳 PRD r1，12 公里整写明按 4 元；工程关注的 PRD 有了新版本',
+        payload: { material_id: 'm-metro-prd' },
         patch: [
           { path: 'runs[id=r-metro-fare].department', value: 'engineering' },
           { path: 'runs[id=r-metro-fare].last_department', value: 'product' },
           { path: 'runs[id=r-metro-fare].phase', value: 'ENGINEERING' },
           { path: 'runtime.slots.used[work_item_id=w-metro-fare].department', value: 'engineering' },
-          { path: 'projects[id=p-metro].last_activity_at', value: '2026-09-26T18:41:00+08:00' }
+          { path: 'projects[id=p-metro].last_activity_at', value: '2026-09-26T18:36:00+08:00' }
         ]
       }),
       ev({
@@ -595,30 +649,21 @@
         payload: {}
       }),
       ev({
-        at: '2026-09-26T19:05:00+08:00', type: 'collaboration_requested', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'engineering',
-        label: '工程向产品询问：12 公里整是否按 6 元',
-        payload: { from: 'engineering', to: 'product', request_id: 'q-fare-12km' },
+        at: '2026-09-26T19:05:00+08:00', type: 'ask_started', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'engineering',
+        label: '工程询问产品：12 公里整是否按 6 元',
+        payload: { ask_id: 'q-fare-12km', requester: 'engineering', recipient: 'product', question: fareAsk },
         patch: [{ path: 'projects[id=p-metro].last_activity_at', value: '2026-09-26T19:05:00+08:00' }]
       }),
       ev({
-        at: '2026-09-26T19:22:00+08:00', type: 'collaboration_responded', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'product',
-        label: '产品回答：12 公里整按 4 元，不进入 6 元档',
-        payload: { from: 'product', to: 'engineering', request_id: 'q-fare-12km' },
+        at: '2026-09-26T19:22:00+08:00', type: 'ask_answered', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'product',
+        label: '产品回答工程：12 公里整按 4 元，不进入 6 元档',
+        payload: { ask_id: 'q-fare-12km', requester: 'engineering', recipient: 'product', result: 'answered', answer: fareAnswer },
         patch: [
-          { path: 'runs[id=r-metro-fare].requests[id=q-fare-12km].status', value: 'answered' },
+          { path: 'runs[id=r-metro-fare].asks[id=q-fare-12km].status', value: 'answered' },
+          { path: 'runs[id=r-metro-fare].asks[id=q-fare-12km].answer', value: fareAnswer },
+          { path: 'runs[id=r-metro-fare].asks[id=q-fare-12km].answered_at', value: '2026-09-26T19:22:00+08:00' },
           { path: 'projects[id=p-metro].last_activity_at', value: '2026-09-26T19:22:00+08:00' }
         ]
-      }),
-      ev({
-        at: '2026-09-26T19:23:00+08:00', type: 'collaboration_closed', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'engineering',
-        label: '12 公里整的询问已关闭',
-        payload: { from: 'engineering', to: 'product', request_id: 'q-fare-12km' }
-      }),
-      ev({
-        at: '2026-09-27T10:20:00+08:00', type: 'plan_accepted', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'engineering',
-        label: '主机接纳 PLAN r1，边界测试先于实现',
-        payload: { material_id: 'm-metro-plan' },
-        patch: [{ path: 'projects[id=p-metro].last_activity_at', value: '2026-09-27T10:20:00+08:00' }]
       }),
       ev({
         at: '2026-09-27T16:40:00+08:00', type: 'compaction_recorded', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'engineering',
@@ -631,19 +676,14 @@
       }),
       ev({
         at: '2026-09-28T10:40:00+08:00', type: 'tool_called', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'engineering',
-        label: '登记命令 pytest 通过，12000 米为 4 元',
-        payload: { tool: 'run_command', exit_code: 0, timed_out: false },
+        label: '命令 python -m pytest tests/test_fare.py 通过，12000 米为 4 元',
+        payload: { tool: 'bash', command: 'python -m pytest tests/test_fare.py', exit_code: 0, timed_out: false },
         patch: [{ path: 'runs[id=r-metro-fare].elapsed_sec', value: 5200 }]
       }),
       ev({
         at: '2026-09-28T10:50:00+08:00', type: 'delivery_accepted', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'engineering',
-        label: '主机接纳交付 r1',
-        payload: { material_id: 'm-metro-delivery' }
-      }),
-      ev({
-        at: '2026-09-28T10:51:00+08:00', type: 'transition', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'engineering',
-        label: '工程把交付交给质检',
-        payload: { from: 'engineering', to: 'quality', artifact: 'box' },
+        label: '主机接纳交付 r1，质检关注的交付到达',
+        payload: { material_id: 'm-metro-delivery' },
         patch: [
           { path: 'runs[id=r-metro-fare].department', value: 'quality' },
           { path: 'runs[id=r-metro-fare].last_department', value: 'engineering' },
@@ -663,16 +703,9 @@
         patch: [
           { path: 'work_items[id=w-metro-fare].status', value: 'released' },
           { path: 'runs[id=r-metro-fare].elapsed_sec', value: 5400 },
-          { path: 'projects[id=p-metro].last_activity_at', value: '2026-09-28T11:20:00+08:00' }
-        ]
-      }),
-      ev({
-        at: '2026-09-28T11:21:00+08:00', type: 'transition', work_item_id: 'w-metro-fare', run_id: 'r-metro-fare', department: 'quality',
-        label: '放行的交付送到成果库',
-        payload: { from: 'quality', to: 'library', artifact: 'release' },
-        patch: [
           { path: 'runs[id=r-metro-fare].department', value: null },
-          { path: 'runs[id=r-metro-fare].last_department', value: 'quality' }
+          { path: 'runs[id=r-metro-fare].last_department', value: 'quality' },
+          { path: 'projects[id=p-metro].last_activity_at', value: '2026-09-28T11:20:00+08:00' }
         ]
       }),
       ev({
@@ -713,9 +746,9 @@
         ]
       }),
       ev({
-        at: '2026-09-28T13:40:00+08:00', type: 'transition', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product',
-        label: '产品把换乘规则交给工程',
-        payload: { from: 'product', to: 'engineering', artifact: 'prd' },
+        at: '2026-09-28T13:40:00+08:00', type: 'spec_accepted', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product',
+        label: '主机接纳换乘路径的 PRD r1，工程与质检关注的 PRD 有了新版本',
+        payload: {},
         patch: [
           { path: 'runs[id=r-metro-transfer].department', value: 'engineering' },
           { path: 'runs[id=r-metro-transfer].last_department', value: 'product' },
@@ -730,9 +763,9 @@
         payload: {}
       }),
       ev({
-        at: '2026-09-28T14:30:00+08:00', type: 'plan_accepted', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
-        label: '主机接纳换乘路径的计划，进入第 2 轮实现',
-        payload: { material_id: 'm-metro-note' },
+        at: '2026-09-28T14:30:00+08:00', type: 'department_activated', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
+        label: '工程部门进入第 2 轮：按站名合并换乘站以后实现最短路径',
+        payload: {},
         patch: [
           { path: 'runs[id=r-metro-transfer].cycle', value: 2 },
           { path: 'runs[id=r-metro-transfer].elapsed_sec', value: 3200 },
@@ -782,8 +815,8 @@
       }),
       ev({
         at: '2026-09-29T03:02:00+08:00', type: 'tool_started', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
-        label: '工程部门开始执行登记命令 unit_tests',
-        payload: { tool: 'run_command' },
+        label: '工程部门开始执行命令 python -m pytest tests',
+        payload: { tool: 'bash', command: 'python -m pytest tests' },
         patch: [
           { path: 'runs[id=r-metro-transfer].elapsed_sec', value: 4980 },
           { path: 'projects[id=p-metro].last_activity_at', value: '2026-09-29T03:02:00+08:00' }
@@ -791,20 +824,20 @@
       }),
       ev({
         at: '2026-09-29T03:02:00+08:00', type: 'x_remote_action_started', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', level: '3.2C',
-        label: '登记命令 unit_tests 在笔记本上开始执行',
-        payload: { machine_id: 'm-laptop', action_id: 'a-metro-unit-17', label: '登记命令 unit_tests' },
+        label: '命令 python -m pytest tests 在笔记本上开始执行',
+        payload: { machine_id: 'm-laptop', action_id: 'a-metro-unit-17', label: '命令 python -m pytest tests' },
         patch: [
           { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].machine_id', value: 'm-laptop' },
           {
             path: 'machines[id=m-laptop].actions',
-            push: { project_id: P, work_item_id: 'w-metro-transfer', department: 'engineering', action_id: 'a-metro-unit-17', label: '登记命令 unit_tests', state: 'running' }
+            push: { project_id: P, work_item_id: 'w-metro-transfer', department: 'engineering', action_id: 'a-metro-unit-17', label: '命令 python -m pytest tests', state: 'running' }
           }
         ]
       }),
       ev({
         at: '2026-09-29T03:11:00+08:00', type: 'model_stream_progress', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering',
-        label: '工程仍在等待 unit_tests 的退出码',
-        payload: { text: 'unit_tests 仍在笔记本上运行，还没有退出码。' },
+        label: '工程仍在等待测试命令的退出码',
+        payload: { text: 'python -m pytest tests 还在运行，还没有退出码。' },
         patch: [{ path: 'projects[id=p-metro].last_activity_at', value: '2026-09-29T03:11:00+08:00' }]
       }),
       ev({
@@ -827,28 +860,59 @@
           { path: 'runs[id=r-metro-transfer].recovery.reason', value: '已自动继续，正在核实断电前的动作' }
         ]
       }),
+      // 重新启动时结果未知的动作（恢复契约第 4 节）：本机进程在断电时一起结束，命令不能按快照核实，
+      // 作为工具结果交还工程的会话，由模型检查以后决定是否重新执行（3.1）；
+      // 3.2C 起这条命令在笔记本上执行，笔记本 03:10 起离线，事项待恢复，显示等待机器，等它恢复在线以后按尝试身份核实
       ev({
         at: '2026-09-29T03:14:00+08:00', type: 'x_action_unknown', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', level: '3.1',
-        label: '登记命令 unit_tests 的结果未知，事项进入待核实',
+        label: '命令 python -m pytest tests 的结果未知：断电时没有收到退出码',
         payload: { action_id: 'a-metro-unit-17' },
         patch: [
           { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'unknown' },
-          { path: 'runs[id=r-metro-transfer].recovery.state', value: 'pending_verification' },
-          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '最后已确认的位置是换乘站去重已写入，unit_tests 已开始但没有退出码' },
+          { path: 'runs[id=r-metro-transfer].recovery.unfinished', push: { id: 'a-metro-unit-17', label: '命令 python -m pytest tests' } },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '最后已确认的位置是换乘站去重已写入，测试命令已开始但没有退出码' },
           { path: 'projects[id=p-metro].last_activity_at', value: '2026-09-29T03:14:00+08:00' }
         ]
       }),
       ev({
-        at: '2026-09-29T03:14:00+08:00', type: 'x_action_unknown', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', level: '3.2C',
-        label: '笔记本上的 unit_tests 标记为结果未知',
-        payload: { action_id: 'a-metro-unit-17', machine_id: 'm-laptop' },
-        patch: [{ path: 'machines[id=m-laptop].actions[action_id=a-metro-unit-17].state', value: 'unknown' }]
+        at: '2026-09-29T03:14:00+08:00', type: 'action_verified', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', level: '3.1', until: '3.2C',
+        label: '结果未知的命令交还工程的会话：执行被中断、结果未知，附上已经收到的输出',
+        payload: { action_id: 'a-metro-unit-17', handling: 'returned', session: 's-xfer-engineering' },
+        patch: [
+          {
+            path: 'runs[id=r-metro-transfer].recovery.verifications', push: {
+              action_id: 'a-metro-unit-17', handling: 'returned', session: '工程：换乘站去重与最短路径', at: '2026-09-29T03:14:00+08:00',
+              basis: '本机进程：控制主机断电时进程树一起结束，没有退出码；命令没有可以按快照核实的结果',
+              returned: '执行被中断，结果未知。已经收到的输出：tests/test_pathfinding.py ........（8 个用例通过，其余没有输出）。请检查工作区的实际状态以后决定是否重新执行。'
+            }
+          },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '已自动继续；断电前的测试命令结果未知，已交还工程的会话' }
+        ]
       }),
       ev({
-        at: '2026-09-29T03:14:00+08:00', type: 'x_decision_issued', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', level: '3.1',
-        label: '发出决定请求：核实结果未知的登记命令 unit_tests',
-        payload: { decision_id: 'd-metro-unknown', kind: 'unknown_action' },
-        patch: [{ path: 'decisions[id=d-metro-unknown].status', value: 'waiting' }]
+        at: '2026-09-29T03:16:00+08:00', type: 'tool_started', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', level: '3.1', until: '3.2C',
+        label: '工程读到交还的工具结果，重新执行 python -m pytest tests',
+        payload: { tool: 'bash', command: 'python -m pytest tests' },
+        patch: [{
+          path: 'runs[id=r-metro-transfer].actions', push: {
+            id: 'a-metro-unit-18', department: 'engineering', role: 'eng-lead', tool: 'bash',
+            summary: '执行命令 python -m pytest tests（重新执行）', input: '交还的工具结果：上一次执行被中断、结果未知',
+            state: 'done', machine_id: null, at: '2026-09-29T03:16:00+08:00',
+            before: '工作区与断电前相同', after: '12 passed',
+            receipt: { command: 'python -m pytest tests', exit_code: 0, output: '12 passed in 4.1s', truncated: false, timed_out: false, duration_ms: 4100, snapshot: 'ws-9c04e1b' }
+          }
+        }]
+      }),
+      ev({
+        at: '2026-09-29T03:14:00+08:00', type: 'x_action_unknown', work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', level: '3.2C',
+        label: '笔记本离线，命令 python -m pytest tests 的结果未知，事项等待机器',
+        payload: { action_id: 'a-metro-unit-17', machine_id: 'm-laptop' },
+        patch: [
+          { path: 'machines[id=m-laptop].actions[action_id=a-metro-unit-17].state', value: 'unknown' },
+          { path: 'runs[id=r-metro-transfer].recovery.state', value: 'waiting_resume' },
+          { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: { machine_id: 'm-laptop', since: '2026-09-29T03:10:00+08:00', problem: '离线' } },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '笔记本 03:10 起离线：测试命令的结果要等它恢复在线以后按尝试身份核实' }
+        ]
       }),
       // 「夜间票价」：四轮质检 AC-2 来回翻转，run 在 12:58 用完运行时间
       night({
@@ -858,20 +922,19 @@
       night({ at: '2026-09-28T10:58:00+08:00', type: 'run_created', label: '夜间票价的 run 创建，产品部门开始' }),
       night({ at: '2026-09-28T10:58:00+08:00', type: 'department_activated', department: 'product', label: '产品部门整理夜间票价的要求' }),
       night({
-        at: '2026-09-28T11:06:00+08:00', type: 'spec_accepted', department: 'product', label: '产品提交 PRD r1（夜间票价，4 条验收条件），主机接纳',
-        payload: { material_id: 'm-metro-night-prd' }, patch: [nightRun('elapsed_sec', 480)]
+        at: '2026-09-28T11:06:00+08:00', type: 'spec_accepted', department: 'product', label: '产品提交 PRD r1（夜间票价，4 条验收条件），主机接纳；工程关注的 PRD 有了新版本',
+        payload: { material_id: 'm-metro-night-prd' }, patch: [nightRun('elapsed_sec', 540), nightRun('department', 'engineering'), nightRun('last_department', 'product')]
       }),
-      nightTo('product', 'engineering', 'prd', '2026-09-28T11:07:00+08:00', 'PRD r1 交付给工程部门', [nightRun('elapsed_sec', 540)]),
-      night({ at: '2026-09-28T11:16:00+08:00', type: 'plan_accepted', department: 'engineering', label: '工程提交 PLAN r1（夜间票价），主机接纳', patch: [nightRun('elapsed_sec', 1080)] }),
-      ...nightRound(1, ['11:24', '11:25', '11:30', '11:31'], 'n1a7c02', [1560, 1920], '质检结论 r1：返工——导出没有标出夜间，缺少 22:59 的断言（2 条未满足）'),
-      ...nightRound(2, ['11:40', '11:41', '11:46', '11:47'], 'n2b3e15', [2700, 3300], '质检结论 r2：返工——跨过 5:00 出站时按出站时间判定（1 条未满足）'),
-      ...nightRound(3, ['11:56', '11:57', '12:02', '12:03'], 'n3c9d40', [3900, 4500], '质检结论 r3：返工——23:00 整进站被算成日间（1 条未满足）'),
-      ...nightRound(4, ['12:12', '12:13', '12:18', '12:19'], 'n4d1f88', [5100, 5700], '质检结论 r4：返工——跨过 5:00 又按出站时间判定（1 条未满足）'),
+      night({ at: '2026-09-28T11:07:00+08:00', type: 'department_activated', department: 'engineering', label: '工程部门开始实现夜间票价', patch: [nightRun('elapsed_sec', 1080)] }),
+      ...nightRound(1, ['11:24', '11:25', '11:30', '11:31'], 'n1a7c02', [1560, 1920], '质检结论 r1：缺陷记录——导出没有标出夜间，缺少 22:59 的断言（2 条未满足）'),
+      ...nightRound(2, ['11:40', '11:41', '11:46', '11:47'], 'n2b3e15', [2700, 3300], '质检结论 r2：缺陷记录——跨过 5:00 出站时按出站时间判定（1 条未满足）'),
+      ...nightRound(3, ['11:56', '11:57', '12:02', '12:03'], 'n3c9d40', [3900, 4500], '质检结论 r3：缺陷记录——23:00 整进站被算成日间（1 条未满足）'),
+      ...nightRound(4, ['12:12', '12:13', '12:18', '12:19'], 'n4d1f88', [5100, 5700], '质检结论 r4：缺陷记录——跨过 5:00 又按出站时间判定（1 条未满足）'),
       nightStep('12:24', 'edit_range', 'src/fare_calculator.py', '工程部门按区间编辑 src/fare_calculator.py：夜间判定按进站时间'),
-      nightStep('12:32', 'run_command', 'python -m pytest tests/test_night_fare.py', '工程部门执行登记命令 unit_tests（夜间票价用例）', [nightRun('elapsed_sec', 6300)]),
+      nightStep('12:32', 'bash', 'python -m pytest tests/test_night_fare.py', '工程部门执行命令 python -m pytest tests/test_night_fare.py', [nightRun('elapsed_sec', 6300)]),
       nightStep('12:40', 'edit_range', 'src/fare_calculator.py', '工程部门按区间编辑 src/fare_calculator.py：23:00 整算作夜间'),
-      nightStep('12:48', 'run_command', 'python -m pytest tests/test_night_fare.py', '工程部门再次执行同一条 unit_tests', [nightRun('elapsed_sec', 6720)]),
-      nightStep('12:54', 'run_command', 'python -m pytest tests/test_night_fare.py', '工程部门第三次执行同一条 unit_tests', [nightRun('elapsed_sec', 6960)]),
+      nightStep('12:48', 'bash', 'python -m pytest tests/test_night_fare.py', '工程部门再次执行同一条测试命令', [nightRun('elapsed_sec', 6720)]),
+      nightStep('12:54', 'bash', 'python -m pytest tests/test_night_fare.py', '工程部门第三次执行同一条测试命令', [nightRun('elapsed_sec', 6960)]),
       night({
         at: '2026-09-28T12:58:00+08:00', type: 'run_failed', department: 'engineering', label: '夜间票价的 run 用完运行时间（7200/7200 秒），停止',
         payload: { reason: 'time_limit' },
@@ -879,25 +942,33 @@
           { path: 'work_items[id=w-metro-night].status', value: 'stopped' },
           nightRun('phase', 'FAILED'), nightRun('department', null), nightRun('last_department', 'engineering'),
           nightRun('stop_reason', { code: 'time_limit', text: '运行时间上限' }), nightRun('elapsed_sec', 7200),
-          nightRun('recovery.state', 'terminated'), nightRun('recovery.reason', '用完运行时间')
+          nightRun('recovery.state', 'stopped'), nightRun('recovery.reason', '用完运行时间')
         ]
       })
     ],
     scenarios: [
       {
         no: 3, id: 'sc-metro-ask', name: '询问与回答', level: 'ui', go: '#/p/p-metro/overview',
-        setup: [],
+        // 询问是一次工具调用（三部门的循环结构第 4 节）：提问方停在这次调用上，被询问的部门在询问分支里回答；
+        // 产品回答前回问工程（询问链：工程 → 产品 → 工程），回答里附带 PRD 的新版本，质检关注的 PRD 被接纳，开始预测性探索
+        setup: [
+          { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
+          { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '运行中' },
+          { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' }
+        ],
         steps: [
-          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门站在传信管前，准备询问产品', payload: {} }, patch: [] },
-          { delay: 1200, event: { type: 'collaboration_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程向产品询问：线路偏好是否改变最短距离', payload: { from: 'engineering', to: 'product', request_id: 'q-sc-prefer' } }, patch: [{ path: 'runs[id=r-metro-transfer].requests', push: { id: 'q-sc-prefer', from: 'engineering', to: 'product', kind: 'consult', question: '线路偏好是否改变最短距离模式的实际距离？', status: 'open', answer: null, born_at: '2026-09-29T15:31:00+08:00' } }] },
-          { delay: 1400, event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product', label: '产品部门展开询问信', payload: {} }, patch: [] },
-          { delay: 1400, event: { type: 'collaboration_responded', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product', label: '产品回答：最短距离不乘 0.8，只影响综合最优', payload: { from: 'product', to: 'engineering', request_id: 'q-sc-prefer' } }, patch: [{ path: 'runs[id=r-metro-transfer].requests[id=q-sc-prefer].status', value: 'answered' }] },
-          { delay: 1000, event: { type: 'collaboration_closed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '线路偏好的询问已关闭，信件离开传信管', payload: { from: 'engineering', to: 'product', request_id: 'q-sc-prefer' } }, patch: [] },
-          { delay: 1200, event: { type: 'transition', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程把当前实现交给质检看一眼边界', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, patch: [{ path: 'runs[id=r-metro-transfer].department', value: 'quality' }] },
-          { delay: 1200, event: { type: 'collaboration_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'quality', label: '质检向工程询问：西直门是否只计一次换乘', payload: { from: 'quality', to: 'engineering', request_id: 'q-sc-xzm' } }, patch: [{ path: 'runs[id=r-metro-transfer].requests', push: { id: 'q-sc-xzm', from: 'quality', to: 'engineering', kind: 'consult', question: '西直门同时在 2 号线与 4 号线，一条路径是否只计一次换乘？', status: 'open', answer: null, born_at: '2026-09-29T15:33:00+08:00' } }] },
-          { delay: 1400, event: { type: 'collaboration_responded', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程回答：按站名合并，西直门只计一次', payload: { from: 'engineering', to: 'quality', request_id: 'q-sc-xzm' } }, patch: [{ path: 'runs[id=r-metro-transfer].requests[id=q-sc-xzm].status', value: 'answered' }] },
-          { delay: 1200, event: { type: 'collaboration_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'quality', label: '质检又问最大换乘数默认值，信件停在工程传信管出口', payload: { from: 'quality', to: 'engineering', request_id: 'q-sc-max' } }, patch: [{ path: 'runs[id=r-metro-transfer].requests', push: { id: 'q-sc-max', from: 'quality', to: 'engineering', kind: 'consult', question: '用户不填最大换乘数时，默认不限制，还是默认 3 次？', status: 'open', answer: null, born_at: '2026-09-29T15:34:00+08:00' } }] },
-          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程小人等在传信管出口，这封信还没有回答', payload: {} }, patch: [] }
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门在一轮工作中，要先弄清线路偏好的含义', payload: {} }, patch: [] },
+          { delay: 1200, event: { type: 'ask_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程询问产品：线路偏好是否改变最短距离模式的实际距离', payload: { ask_id: 'q-sc-prefer', requester: 'engineering', recipient: 'product', question: '线路偏好是否改变最短距离模式的实际距离？' } }, patch: [{ path: 'runs[id=r-metro-transfer].asks', push: { id: 'q-sc-prefer', requester: 'engineering', recipient: 'product', parent: null, question: '线路偏好是否改变最短距离模式的实际距离？', status: 'open', answer: null, reason: null, prd_version: null, born_at: '2026-09-29T15:31:00+08:00', answered_at: null } }] },
+          { delay: 1400, event: { type: 'ask_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product', label: '产品在询问分支里回问工程：综合最优现在怎样计算权重', payload: { ask_id: 'q-sc-back', requester: 'product', recipient: 'engineering', question: '综合最优现在怎样计算权重？我要先看现有实现再回答。' } }, patch: [{ path: 'runs[id=r-metro-transfer].asks', push: { id: 'q-sc-back', requester: 'product', recipient: 'engineering', parent: 'q-sc-prefer', question: '综合最优现在怎样计算权重？我要先看现有实现再回答。', status: 'open', answer: null, reason: null, born_at: '2026-09-29T15:31:00+08:00', answered_at: null } }] },
+          { delay: 1400, event: { type: 'ask_answered', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程在另开的询问分支里回答产品：综合分 = 距离 + 换乘次数 × 800', payload: { ask_id: 'q-sc-back', requester: 'product', recipient: 'engineering', result: 'answered', answer: '综合分 = 距离（米）+ 换乘次数 × 800；线路偏好的边权在 pathfinding.weight() 里乘 0.8。' } }, patch: [{ path: 'runs[id=r-metro-transfer].asks[id=q-sc-back].status', value: 'answered' }, { path: 'runs[id=r-metro-transfer].asks[id=q-sc-back].answer', value: '综合分 = 距离（米）+ 换乘次数 × 800；线路偏好的边权在 pathfinding.weight() 里乘 0.8。' }, { path: 'runs[id=r-metro-transfer].asks[id=q-sc-back].answered_at', value: '2026-09-29T15:32:00+08:00' }] },
+          { delay: 1400, event: { type: 'ask_answered', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product', label: '产品回答工程：最短距离不乘 0.8，只影响综合最优；PRD 修订为 r2', payload: { ask_id: 'q-sc-prefer', requester: 'engineering', recipient: 'product', result: 'answered', answer: '最短距离模式按实际距离，不乘 0.8；线路偏好只影响综合最优。PRD 修订为 r2，写明这一点。', prd_version: 'r2' } }, patch: [{ path: 'runs[id=r-metro-transfer].asks[id=q-sc-prefer].status', value: 'answered' }, { path: 'runs[id=r-metro-transfer].asks[id=q-sc-prefer].answer', value: '最短距离模式按实际距离，不乘 0.8；线路偏好只影响综合最优。PRD 修订为 r2，写明这一点。' }, { path: 'runs[id=r-metro-transfer].asks[id=q-sc-prefer].prd_version', value: 'r2' }, { path: 'runs[id=r-metro-transfer].asks[id=q-sc-prefer].answered_at', value: '2026-09-29T15:32:00+08:00' }] },
+          { delay: 1400, event: { type: 'spec_accepted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'product', label: 'PRD r2 被接纳：工程在下一步收到通知接着工作，质检关注的 PRD 有了新版本', payload: { version: 'r2' } }, patch: [] },
+          { delay: 1200, event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'quality', label: '质检开始预测性探索：交付到达之前按 PRD r2 起草测试用例，与工程同时工作', payload: { predictive: true } }, patch: [{ path: 'runs[id=r-metro-transfer].departments', value: { quality: { state: 'working', note: '预测性探索：按 PRD r2 起草测试用例' } } }] },
+          { delay: 1200, event: { type: 'ask_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'quality', label: '质检询问工程：西直门是否只计一次换乘', payload: { ask_id: 'q-sc-xzm', requester: 'quality', recipient: 'engineering', question: '西直门同时在 2 号线与 4 号线，一条路径是否只计一次换乘？' } }, patch: [{ path: 'runs[id=r-metro-transfer].asks', push: { id: 'q-sc-xzm', requester: 'quality', recipient: 'engineering', parent: null, question: '西直门同时在 2 号线与 4 号线，一条路径是否只计一次换乘？', status: 'open', answer: null, reason: null, born_at: '2026-09-29T15:33:00+08:00', answered_at: null } }] },
+          { delay: 1400, event: { type: 'ask_answered', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程回答质检：按站名合并，西直门只计一次', payload: { ask_id: 'q-sc-xzm', requester: 'quality', recipient: 'engineering', result: 'answered', answer: '按站名合并，西直门在一条路径里只计一次换乘。' } }, patch: [{ path: 'runs[id=r-metro-transfer].asks[id=q-sc-xzm].status', value: 'answered' }, { path: 'runs[id=r-metro-transfer].asks[id=q-sc-xzm].answer', value: '按站名合并，西直门在一条路径里只计一次换乘。' }, { path: 'runs[id=r-metro-transfer].asks[id=q-sc-xzm].answered_at', value: '2026-09-29T15:34:00+08:00' }] },
+          { delay: 1200, event: { type: 'ask_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'quality', label: '质检又问最大换乘数的默认值，信件停在工程的传信管出口', payload: { ask_id: 'q-sc-max', requester: 'quality', recipient: 'engineering', question: '用户不填最大换乘数时，默认不限制，还是默认 3 次？' } }, patch: [{ path: 'runs[id=r-metro-transfer].asks', push: { id: 'q-sc-max', requester: 'quality', recipient: 'engineering', parent: null, question: '用户不填最大换乘数时，默认不限制，还是默认 3 次？', status: 'open', answer: null, reason: null, born_at: '2026-09-29T15:34:00+08:00', answered_at: null } }] },
+          { delay: 1200, go: '#/p/p-metro/overview', label: '概览列出这个事项的询问与询问链；质检写着「在等待工程的回答」，工程一边工作一边回答质检的询问' }
         ]
       },
       {
@@ -909,7 +980,7 @@
           { delay: 1400, event: { type: 'compaction_recorded', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '小人把桌上的纸整理进摘要档案盒，编号变为 1', payload: { n: 1 } }, patch: [{ path: 'runs[id=r-metro-transfer].compactions', push: { department: 'engineering', n: 1, at: '2026-09-29T15:32:00+08:00', coverage: 'seq 1–40', event_id: null } }] },
           { delay: 1200, event: { type: 'context_assembled', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '下一次请求使用摘要 1 与最近的原始记录', payload: {} }, patch: [] },
           { delay: 1200, event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门再次请求模型，上下文已经用上摘要', payload: {} }, patch: [] },
-          { delay: 1400, event: { type: 'compaction_failed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '第二次整理没有生效，纸堆散落', payload: { reason: '摘要没有覆盖未完成的 unit_tests' } }, patch: [] },
+          { delay: 1400, event: { type: 'compaction_failed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '第二次整理没有生效，纸堆散落', payload: { reason: '摘要没有覆盖未完成的测试命令' } }, patch: [] },
           { delay: 1400, event: { type: 'context_assembled', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '小人重新整理散落的纸，先拣出未完成动作', payload: {} }, patch: [] },
           { delay: 1400, event: { type: 'compaction_recorded', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '重新整理完成，摘要编号变为 2', payload: { n: 2 } }, patch: [{ path: 'runs[id=r-metro-transfer].compactions', push: { department: 'engineering', n: 2, at: '2026-09-29T15:34:00+08:00', coverage: 'seq 1–52', event_id: null } }] },
           { delay: 1200, event: { type: 'model_attempt_finished', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '使用摘要 2 的请求完成', payload: {} }, patch: [] },
@@ -923,8 +994,8 @@
           { path: 'runs[id=r-metro-transfer].recovery.reason', value: '运行中' }
         ],
         steps: [
-          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程正在跑登记命令，管道正常流动', payload: {} }, patch: [] },
-          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门在终端前执行 unit_tests', payload: { tool: 'run_command' } }, patch: [] },
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程正在执行测试命令，管道正常流动', payload: {} }, patch: [] },
+          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门在终端前执行命令 python -m pytest tests', payload: { tool: 'bash', command: 'python -m pytest tests' } }, patch: [] },
           { delay: 1400, event: { type: 'x_run_interrupted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '控制主机断电，整层变暗，时钟停住，管道停止', payload: { reason: '控制主机断电' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.state', value: 'interrupted' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '控制主机断电，时钟停住' }] },
           { delay: 1600, go: '#/p/p-metro/overview', event: { type: 'model_stream_progress', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '中断期间没有新的模型输出，小人静止', payload: { text: '' } }, patch: [] },
           { delay: 1400, event: { type: 'x_run_auto_resumed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '控制主机重新启动，灯亮起，时钟继续走，管道恢复流动', payload: { boot_id: 'boot-0929-0313' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].recovery.auto_resumed_at', value: '2026-09-29T15:33:00+08:00' }] },
@@ -936,44 +1007,59 @@
         ]
       },
       {
-        no: 8, id: 'sc-metro-unknown', name: '结果未知的动作与决定', level: '3.1', go: '#/p/p-metro/overview',
+        // 重新启动时结果未知的动作（恢复契约第 4 节）：有核实方法的文件编辑按快照核实确认；命令没有核实方法，
+        // 作为工具结果交还发出它的会话，由模型检查以后决定重新执行。没有用户的决定
+        no: 8, id: 'sc-metro-unknown', name: '结果未知的动作：核实与交还会话', level: '3.1', go: '#/p/p-metro/overview',
         setup: [
           { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
-          { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'running' },
-          { path: 'decisions[id=d-metro-unknown].status', value: 'withdrawn' }
+          { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '运行中' },
+          { path: 'runs[id=r-metro-transfer].recovery.unfinished', value: [] },
+          { path: 'runs[id=r-metro-transfer].recovery.verifications', value: [] },
+          { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' }
         ],
         steps: [
-          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门执行登记命令 unit_tests', payload: { tool: 'run_command' } }, patch: [] },
-          { delay: 1400, event: { type: 'x_action_unknown', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: 'unit_tests 没有退出码，未完成动作开始闪烁', payload: { action_id: 'a-metro-unit-17' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'unknown' }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'pending_verification' }] },
-          { delay: 1200, event: { type: 'x_decision_issued', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '发出决定请求：核实结果未知的动作', payload: { decision_id: 'd-metro-unknown', kind: 'unknown_action' } }, patch: [{ path: 'decisions[id=d-metro-unknown].status', value: 'waiting' }] },
-          { delay: 1400, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程房间亮黄灯，小人头顶出现问号', payload: {} }, patch: [] },
-          { delay: 1400, event: { type: 'x_decision_answered', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', actor: 'user', label: '用户选择「重新执行」', payload: { decision_id: 'd-metro-unknown', kind: 'unknown_action', option: 'retry' } }, patch: [{ path: 'decisions[id=d-metro-unknown].status', value: 'answered' }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'running' }] },
-          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门按决定重新执行 unit_tests', payload: { tool: 'run_command', action_id: 'a-metro-unit-17' } }, patch: [] },
-          { delay: 1400, event: { type: 'tool_called', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: 'unit_tests 重新执行完成，退出码 0', payload: { tool: 'run_command', exit_code: 0, timed_out: false } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'done' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].after', value: '12 passed' }] },
-          { delay: 1200, event: { type: 'model_attempt_finished', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门读完回执，问号消失', payload: {} }, patch: [] },
-          { delay: 1000, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程回到工位，准备提交交付', payload: {} }, patch: [] },
-          { delay: 1000, event: { type: 'proposal_submitted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程提交换乘路径的交付说明', payload: {} }, patch: [] }
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门按区间编辑 src/pathfinding.py：最大换乘数默认不限制', payload: { tool: 'edit_range', target: 'src/pathfinding.py' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions', push: { id: 'a-metro-sc-edit', department: 'engineering', role: 'eng-lead', tool: 'edit_range', summary: '按区间编辑 src/pathfinding.py：最大换乘数默认不限制', input: 'PRD r2：用户不填最大换乘数时不限制', state: 'running', machine_id: null, at: '2026-09-29T15:30:00+08:00', before: '快照 ws-9c04e1b：max_transfers 默认 3', after: null, receipt: null } }] },
+          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门执行命令 python -m pytest tests/test_transfer.py', payload: { tool: 'bash', command: 'python -m pytest tests/test_transfer.py' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions', push: { id: 'a-metro-sc-test', department: 'engineering', role: 'eng-lead', tool: 'bash', summary: '执行命令 python -m pytest tests/test_transfer.py', input: '最大换乘数的自测', state: 'running', machine_id: null, at: '2026-09-29T15:30:00+08:00', before: '测试尚未开始', after: null, receipt: null } }] },
+          { delay: 1400, event: { type: 'x_run_interrupted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '控制主机断电，整层变暗，两个动作都没有收到结果', payload: { reason: '控制主机断电' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.state', value: 'interrupted' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '控制主机断电，时钟停住' }] },
+          { delay: 1400, event: { type: 'x_run_auto_resumed', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '控制主机重新启动，自动继续，先处理断电前没有结果的动作', payload: { boot_id: 'boot-0929-1531' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].recovery.auto_resumed_at', value: '2026-09-29T15:31:00+08:00' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '已自动继续，正在核实断电前的动作' }] },
+          { delay: 1200, event: { type: 'x_action_unknown', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '编辑 src/pathfinding.py 的结果未知', payload: { action_id: 'a-metro-sc-edit' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-sc-edit].state', value: 'unknown' }, { path: 'runs[id=r-metro-transfer].recovery.unfinished', push: { id: 'a-metro-sc-edit', label: '按区间编辑 src/pathfinding.py' } }] },
+          { delay: 1200, event: { type: 'x_action_unknown', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '命令 python -m pytest tests/test_transfer.py 的结果未知', payload: { action_id: 'a-metro-sc-test' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-sc-test].state', value: 'unknown' }, { path: 'runs[id=r-metro-transfer].recovery.unfinished', push: { id: 'a-metro-sc-test', label: '命令 python -m pytest tests/test_transfer.py' } }] },
+          { delay: 1400, event: { type: 'action_verified', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '编辑按快照核实确认：文件内容与这次编辑的结果相同', payload: { action_id: 'a-metro-sc-edit', handling: 'confirmed' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-sc-edit].state', value: 'done' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-sc-edit].after', value: 'max_transfers 默认不限制' }, { path: 'runs[id=r-metro-transfer].recovery.verifications', push: { action_id: 'a-metro-sc-edit', handling: 'confirmed', session: '工程：换乘站去重与最短路径', at: '2026-09-29T15:31:00+08:00', basis: '文件工具按动作前后的快照核实：src/pathfinding.py 的当前内容与这次编辑的结果相同', result: '编辑已经写入，交回工程的会话', returned: null } }] },
+          { delay: 1400, event: { type: 'action_verified', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '命令没有核实方法，作为工具结果交还工程的会话', payload: { action_id: 'a-metro-sc-test', handling: 'returned', session: 's-xfer-engineering' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.verifications', push: { action_id: 'a-metro-sc-test', handling: 'returned', session: '工程：换乘站去重与最短路径', at: '2026-09-29T15:31:00+08:00', basis: '本机进程：控制主机断电时进程树一起结束，没有退出码；命令没有可以按快照核实的结果', result: null, returned: '执行被中断，结果未知。已经收到的输出：tests/test_transfer.py ...（3 个用例通过，其余没有输出）。请检查工作区的实际状态以后决定是否重新执行。' } }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '已自动继续；断电前的编辑已核实确认，测试命令结果未知，已交还工程的会话' }] },
+          { delay: 1400, go: '#/p/p-metro/w/w-metro-transfer/recovery', label: '恢复页列出两条结果未知的动作：编辑核实确认，命令交还会话，各写明依据；没有要你回答的决定' },
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'model_requested', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程读到交还的工具结果，决定重新执行测试', payload: {} }, patch: [] },
+          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门重新执行命令 python -m pytest tests/test_transfer.py', payload: { tool: 'bash', command: 'python -m pytest tests/test_transfer.py' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions', push: { id: 'a-metro-sc-test2', department: 'engineering', role: 'eng-lead', tool: 'bash', summary: '执行命令 python -m pytest tests/test_transfer.py（重新执行）', input: '交还的工具结果：上一次执行被中断、结果未知', state: 'running', machine_id: null, at: '2026-09-29T15:32:00+08:00', before: '工作区与核实时相同', after: null, receipt: null } }] },
+          { delay: 1400, event: { type: 'tool_called', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '测试命令执行完成，退出码 0', payload: { tool: 'bash', command: 'python -m pytest tests/test_transfer.py', exit_code: 0, timed_out: false } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-sc-test2].state', value: 'done' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-sc-test2].after', value: '6 passed' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-sc-test2].receipt', value: { command: 'python -m pytest tests/test_transfer.py', exit_code: 0, output: '6 passed in 1.8s', truncated: false, timed_out: false, duration_ms: 1800, snapshot: 'ws-9c05a20' } }] },
+          { delay: 1000, event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程回到工位继续工作', payload: {} }, patch: [] }
         ]
       },
       {
-        no: 10, id: 'sc-metro-offline', name: '执行代理离线导致结果未知', level: '3.2C', go: '#/p/p-metro/overview',
+        // 远程动作的结果未知（执行环境服务设计说明第 6.3 至 6.5 节）：笔记本离线时事项待恢复，显示等待机器；
+        // 恢复在线以后按尝试身份取得动作记录，已结束的取得回执，核实确认，事项自动继续
+        no: 10, id: 'sc-metro-offline', name: '执行代理离线：等待机器与按尝试身份核实', level: '3.2C', go: '#/p/p-metro/overview',
         setup: [
           { path: 'machines[id=m-laptop].online', value: true },
           { path: 'machines[id=m-laptop].actions', remove: { key: 'action_id', value: 'a-metro-unit-17' } },
           { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
-          { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'running' }
+          { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '运行中' },
+          { path: 'runs[id=r-metro-transfer].recovery.unfinished', value: [] },
+          { path: 'runs[id=r-metro-transfer].recovery.verifications', value: [] },
+          { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'running' },
+          { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' }
         ],
         steps: [
-          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'x_remote_action_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '笔记本开始执行登记命令 unit_tests', payload: { machine_id: 'm-laptop', action_id: 'a-metro-unit-17', label: '登记命令 unit_tests' } }, patch: [{ path: 'machines[id=m-laptop].actions', push: { project_id: P, work_item_id: 'w-metro-transfer', department: 'engineering', action_id: 'a-metro-unit-17', label: '登记命令 unit_tests', state: 'running' } }] },
-          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '通往机房的门上出现笔记本的动作', payload: { tool: 'run_command' } }, patch: [] },
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'x_remote_action_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '笔记本开始执行命令 python -m pytest tests', payload: { machine_id: 'm-laptop', action_id: 'a-metro-unit-17', label: '命令 python -m pytest tests' } }, patch: [{ path: 'machines[id=m-laptop].actions', push: { project_id: P, work_item_id: 'w-metro-transfer', department: 'engineering', action_id: 'a-metro-unit-17', label: '命令 python -m pytest tests', state: 'running' } }] },
+          { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '通往机房的门上出现笔记本的动作', payload: { tool: 'bash', command: 'python -m pytest tests' } }, patch: [] },
           { delay: 1400, event: { type: 'x_machine_offline', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', label: '笔记本的执行代理心跳中断', payload: { machine_id: 'm-laptop' } }, patch: [{ path: 'machines[id=m-laptop].online', value: false }] },
-          { delay: 1400, event: { type: 'x_action_unknown', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '笔记本离线，unit_tests 的结果未知', payload: { action_id: 'a-metro-unit-17', machine_id: 'm-laptop' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'unknown' }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'pending_verification' }, { path: 'machines[id=m-laptop].actions[action_id=a-metro-unit-17].state', value: 'unknown' }] },
-          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '通往机房的门上出现黄色问号', payload: {} }, patch: [] },
+          { delay: 1400, event: { type: 'x_action_unknown', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '40 秒没有心跳，测试命令的结果未知，事项等待机器', payload: { action_id: 'a-metro-unit-17', machine_id: 'm-laptop' } }, patch: [{ path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'unknown' }, { path: 'runs[id=r-metro-transfer].recovery.unfinished', push: { id: 'a-metro-unit-17', label: '命令 python -m pytest tests' } }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'waiting_resume' }, { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: { machine_id: 'm-laptop', since: '2026-09-29T15:30:00+08:00', problem: '离线' } }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '笔记本离线：测试命令的结果要等它恢复在线以后按尝试身份核实' }, { path: 'machines[id=m-laptop].actions[action_id=a-metro-unit-17].state', value: 'unknown' }] },
+          { delay: 1200, go: '#/p/p-metro/overview', label: '工程房间门口写着「等待机器：笔记本」；等待期间不计入运行时间上限' },
+          { delay: 1200, go: '#/p/p-metro/w/w-metro-transfer/recovery', label: '恢复页写着等待机器、机器名与已经等待的时长，可以取消事项' },
           { delay: 1400, event: { type: 'x_machine_online', project_id: P, label: '笔记本重新上线', payload: { machine_id: 'm-laptop' } }, patch: [{ path: 'machines[id=m-laptop].online', value: true }] },
-          { delay: 1400, event: { type: 'x_late_receipt', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '笔记本送来迟到回执，只作为历史事实列出，不推进状态', payload: { machine_id: 'm-laptop' } }, patch: [{ path: 'machines[id=m-laptop].late_receipts', push: { at: '2026-09-29T15:36:00+08:00', action_id: 'a-metro-unit-17', text: '迟到回执：unit_tests 退出码 0。不改变恢复观察状态，也不把动作标成已完成。' } }] },
-          { delay: 1200, event: { type: 'model_stream_progress', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '恢复观察状态仍是待核实，迟到回执没有改写它', payload: { text: '迟到回执已列入历史，动作状态仍是结果未知。' } }, patch: [] },
-          { delay: 1000, go: '#/home', event: { type: 'x_decision_issued', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '结果未知仍等待用户核实', payload: { decision_id: 'd-metro-unknown', kind: 'unknown_action' } }, patch: [{ path: 'decisions[id=d-metro-unknown].status', value: 'waiting' }] },
-          { delay: 1000, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程仍站在问号旁，等待用户决定', payload: {} }, patch: [] }
+          { delay: 1400, event: { type: 'x_late_receipt', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '按尝试身份取得动作记录：已结束，回执写成迟到回执', payload: { machine_id: 'm-laptop' } }, patch: [{ path: 'machines[id=m-laptop].late_receipts', push: { at: '2026-09-29T15:32:00+08:00', action_id: 'a-metro-unit-17', text: '迟到回执：命令 python -m pytest tests 退出码 0，12 passed。不改写结果未知的记录；核实引用这份回执。' } }, { path: 'machines[id=m-laptop].actions[action_id=a-metro-unit-17].state', value: 'done' }] },
+          { delay: 1400, event: { type: 'action_verified', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '核实确认：交回取得的回执，事项自动继续', payload: { action_id: 'a-metro-unit-17', handling: 'confirmed' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.verifications', push: { action_id: 'a-metro-unit-17', handling: 'confirmed', session: '工程：换乘站去重与最短路径', at: '2026-09-29T15:32:00+08:00', basis: '笔记本恢复在线以后按尝试身份查询动作记录：已结束，取得回执', result: '退出码 0，12 passed；交回工程的会话', returned: null } }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'done' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].after', value: '12 passed' }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '笔记本恢复在线，测试命令已核实确认，自动继续' }] },
+          { delay: 1000, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程拿到核实的结果，继续工作', payload: {} }, patch: [] }
         ]
       },
       {
@@ -984,7 +1070,10 @@
           { path: 'work_items[id=w-metro-card].queue_pos', value: null },
           { path: 'work_items[id=w-metro-report].status', value: 'not_started' },
           { path: 'work_items[id=w-metro-report].queue_reason', value: null },
-          { path: 'work_items[id=w-metro-report].queue_pos', value: null }
+          { path: 'work_items[id=w-metro-report].queue_pos', value: null },
+          { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
+          { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '运行中' }
         ],
         steps: [
           { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'user_input_received', project_id: P, work_item_id: 'w-metro-card', run_id: 'r-metro-card', actor: 'user', label: '用户投入新要求：公交卡折扣', payload: { progress: 'received' } }, patch: [] },
@@ -994,9 +1083,55 @@
           { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '当前事项仍在工程，两个包裹在大厅管道入口排队', payload: {} }, patch: [] },
           { delay: 1400, event: { type: 'x_queue_reordered', project_id: P, actor: 'user', label: '用户把月度出行统计调到公交卡折扣前面', payload: { order: ['w-metro-report', 'w-metro-card'] } }, patch: [{ path: 'work_items[id=w-metro-report].queue_pos', value: 1 }, { path: 'work_items[id=w-metro-card].queue_pos', value: 2 }] },
           { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'model_stream_progress', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '队列顺序已变为月度统计、公交卡折扣', payload: { text: '大厅包裹顺序已调整。' } }, patch: [] },
-          { delay: 1400, event: { type: 'deliverable_adopted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', actor: 'user', label: '当前事项换乘站被采纳，执行槽位空出', payload: { version: 'r2' } }, patch: [{ path: 'work_items[id=w-metro-transfer].status', value: 'adopted' }, { path: 'runs[id=r-metro-transfer].phase', value: 'DONE' }, { path: 'runs[id=r-metro-transfer].department', value: null }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'done' }, { path: 'projects[id=p-metro].adoptions', push: { version: 'r2', work_item_id: 'w-metro-transfer', summary: '三种路径与换乘站去重', adopted_at: '2026-09-29T15:36:00+08:00' } }] },
+          { delay: 1400, event: { type: 'deliverable_adopted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', actor: 'user', label: '当前事项换乘站被采纳，执行槽位空出', payload: { version: 'r2' } }, patch: [{ path: 'work_items[id=w-metro-transfer].status', value: 'adopted' }, { path: 'runs[id=r-metro-transfer].phase', value: 'DONE' }, { path: 'runs[id=r-metro-transfer].department', value: null }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'completed' }, { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null }, { path: 'runs[id=r-metro-transfer].actions[id=a-metro-unit-17].state', value: 'done' }, { path: 'projects[id=p-metro].adoptions', push: { version: 'r2', work_item_id: 'w-metro-transfer', summary: '三种路径与换乘站去重', adopted_at: '2026-09-29T15:36:00+08:00' } }] },
           { delay: 1400, event: { type: 'x_slot_acquired', project_id: P, work_item_id: 'w-metro-report', run_id: 'r-metro-report', department: 'product', label: '队首的月度出行统计取得执行槽位并开始', payload: {} }, patch: [{ path: 'work_items[id=w-metro-report].status', value: 'in_progress' }, { path: 'work_items[id=w-metro-report].queue_reason', value: null }, { path: 'work_items[id=w-metro-report].queue_pos', value: null }, { path: 'runs[id=r-metro-report].phase', value: 'PRODUCT_SPEC' }, { path: 'runs[id=r-metro-report].department', value: 'product' }, { path: 'runs[id=r-metro-report].cycle', value: 1 }, { path: 'runtime.slots.used', push: { work_item_id: 'w-metro-report', department: 'product', role: null } }] },
           { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-report', run_id: 'r-metro-report', department: 'product', label: '产品开始处理队首事项，公交卡折扣仍排在大厅', payload: {} }, patch: [] }
+        ]
+      },
+      {
+        // 暂停以后继续（D09）与继续旧事项时定义版本不同（总体架构第 7.4 节）：两种 3.1 的决定请求，阻塞范围都是 run
+        no: 22, id: 'sc-metro-paused', name: '暂停以后继续与定义版本不同', level: '3.1', go: '#/p/p-metro/overview',
+        setup: [
+          { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
+          { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '运行中' },
+          { path: 'runs[id=r-metro-transfer].recovery.unfinished', value: [] },
+          { path: 'runs[id=r-metro-transfer].recovery.verifications', value: [] },
+          { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' }
+        ],
+        steps: [
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'model_attempt_finished', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程部门的模型回复只有文字，没有调用工具（连续第 4 次）', payload: {} }, patch: [] },
+          { delay: 1400, event: { type: 'run_paused', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '模型连续 4 次回复没有调用工具，事项暂停', payload: { reason: 'no_tool_call' } }, patch: [{ path: 'runs[id=r-metro-transfer].phase', value: 'PAUSED' }, { path: 'runs[id=r-metro-transfer].stop_reason', value: { code: 'no_tool_call', text: '模型连续不调用工具' } }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'paused' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '工程部门的模型连续 4 次回复没有调用工具，已暂停' }, { path: 'work_items[id=w-metro-transfer].status', value: 'queued' }, { path: 'work_items[id=w-metro-transfer].queue_reason', value: 'decision' }] },
+          { delay: 1200, event: { type: 'x_decision_issued', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '发出决定请求：暂停以后继续', payload: { decision_id: 'd-metro-paused', kind: 'paused_continue' } }, patch: [{ path: 'decisions[id=d-metro-paused].status', value: 'waiting' }] },
+          { delay: 1400, go: '#/home', label: '首页「待你决定」出现暂停以后继续的卡片：停止原因与人工处理说明，选项是处理以后继续执行、停止事项' },
+          { delay: 1400, event: { type: 'x_decision_answered', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', actor: 'user', label: '用户选择「处理以后继续执行」', payload: { decision_id: 'd-metro-paused', kind: 'paused_continue', option: 'continue' } }, patch: [{ path: 'decisions[id=d-metro-paused].status', value: 'answered' }, { path: 'decisions[id=d-metro-paused].answer', value: { option: 'continue', label: '处理以后继续执行', note: '', at: '2026-09-29T15:30:00+08:00' } }, { path: 'runs[id=r-metro-transfer].phase', value: 'ENGINEERING' }, { path: 'runs[id=r-metro-transfer].stop_reason', value: null }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '从暂停的位置继续，连续不调用工具的计数从零开始' }, { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' }, { path: 'work_items[id=w-metro-transfer].queue_reason', value: null }] },
+          { delay: 1200, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程从暂停的位置继续，已用的次数与时间不重新计算', payload: {} }, patch: [] },
+          { delay: 1400, event: { type: 'x_run_interrupted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '控制主机重新启动，加载的定义版本变为 v15', payload: { reason: '控制主机重新启动' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.state', value: 'interrupted' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '控制主机重新启动' }] },
+          { delay: 1400, event: { type: 'x_decision_issued', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '事项记录的定义版本 v14 与当前加载的 v15 不同，自动继续之前发出决定请求', payload: { decision_id: 'd-metro-defs', kind: 'definitions_changed' } }, patch: [{ path: 'decisions[id=d-metro-defs].status', value: 'waiting' }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'waiting_resume' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '事项记录的定义版本是 v14，当前加载的是 v15：等你决定按新版本继续还是停止事项' }, { path: 'work_items[id=w-metro-transfer].status', value: 'queued' }, { path: 'work_items[id=w-metro-transfer].queue_reason', value: 'decision' }] },
+          { delay: 1400, go: '#/p/p-metro/w/w-metro-transfer/recovery', label: '恢复页写着待恢复、两个定义版本与这张决定请求' },
+          { delay: 1400, event: { type: 'x_decision_answered', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', actor: 'user', label: '用户选择「按新版本继续」', payload: { decision_id: 'd-metro-defs', kind: 'definitions_changed', option: 'continue_new' } }, patch: [{ path: 'decisions[id=d-metro-defs].status', value: 'answered' }, { path: 'decisions[id=d-metro-defs].answer', value: { option: 'continue_new', label: '按新版本继续', note: '', at: '2026-09-29T15:30:00+08:00' } }, { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' }, { path: 'runs[id=r-metro-transfer].recovery.auto_resumed_at', value: '2026-09-29T15:30:00+08:00' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '按定义版本 v15 继续' }, { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' }, { path: 'work_items[id=w-metro-transfer].queue_reason', value: null }] },
+          { delay: 1000, go: '#/p/p-metro/overview', event: { type: 'department_activated', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '工程按新版本的定义继续工作', payload: {} }, patch: [] }
+        ]
+      },
+      {
+        // 等待超过时长上限（循环与收敛设计说明第 3 节）：等待机器的上限是 24 小时（规则登记第 8 节），
+        // 超过时发出决定请求并通知一次；选择继续等待以后重新计时
+        no: 23, id: 'sc-metro-wait-limit', name: '等待机器超过时长上限', level: '3.2C', go: '#/p/p-metro/overview',
+        setup: [
+          { path: 'machines[id=m-laptop].online', value: false },
+          { path: 'machines[id=m-laptop].last_heartbeat_at', value: '2026-09-28T15:29:40+08:00' },
+          { path: 'runs[id=r-metro-transfer].recovery.state', value: 'waiting_resume' },
+          { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: { machine_id: 'm-laptop', since: '2026-09-28T15:30:00+08:00', problem: '离线' } },
+          { path: 'runs[id=r-metro-transfer].recovery.reason', value: '笔记本离线：测试命令的结果要等它恢复在线以后按尝试身份核实' },
+          { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' }
+        ],
+        steps: [
+          { delay: 1200, go: '#/p/p-metro/overview', label: '换乘站的事项等待机器：笔记本，已经等了 24 小时' },
+          { delay: 1400, event: { type: 'x_decision_issued', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', department: 'engineering', label: '等待机器达到时长上限 24 小时，发出决定请求并通知一次', payload: { decision_id: 'd-metro-wait', kind: 'wait_limit' } }, patch: [{ path: 'decisions[id=d-metro-wait].status', value: 'waiting' }] },
+          { delay: 1400, go: '#/home', label: '首页「待你决定」出现等待超过时长上限的卡片：等待的种类、机器、已经等待的时长与上限' },
+          { delay: 1400, event: { type: 'x_decision_answered', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', actor: 'user', label: '用户选择「继续等待」，重新计时', payload: { decision_id: 'd-metro-wait', kind: 'wait_limit', option: 'keep_waiting' } }, patch: [{ path: 'decisions[id=d-metro-wait].status', value: 'answered' }, { path: 'decisions[id=d-metro-wait].answer', value: { option: 'keep_waiting', label: '继续等待', note: '', at: '2026-09-29T15:30:00+08:00' } }] },
+          { delay: 1200, event: { type: 'x_wait_restarted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', label: '继续等待笔记本，重新计时', payload: { wait: 'machine', machine_id: 'm-laptop' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.waiting_machine.since', value: '2026-09-29T15:30:00+08:00' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '继续等待笔记本恢复在线，从 15:30 起重新计时' }] },
+          { delay: 1200, go: '#/p/p-metro/w/w-metro-transfer/recovery', label: '恢复页的已等待时长从零开始，24 小时以后再问一次' }
         ]
       }
     ]

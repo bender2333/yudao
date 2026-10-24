@@ -1,4 +1,5 @@
-// 设置（设计说明第 7.5 节）：基本信息、部门设置、登记命令、源目录、工具授权（3.2B）、机器授权与执行位置（3.2C）、运维（Stage 4）、角色设置（Stage 5）
+// 设置（设计说明第 7.5 节）：基本信息、部门设置、源目录与成果写回（3.8）、机器授权与执行位置（3.2C）、运维（Stage 4）、角色设置（Stage 5）。
+// 命令按函数直接执行、网络取回可以取回任意地址（ADR-0038），设置页没有「登记命令」与「工具授权」；MCP 服务器一节按网络取回与 MCP 工具设计说明第 11.1 节的文字实施，原型不画
 (function () {
   'use strict';
   const Y12 = window.Y12;
@@ -8,9 +9,8 @@
   const DEPTS = ['product', 'engineering', 'quality', 'operations'];
   const LABELS = { product: '产品', engineering: '工程', quality: '质检', operations: '运维' };
   const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
-  const PLACE_LABELS = { local_process: '本机进程', local_container: '本机容器' };
-
-  const st = { form: null };
+  // 执行位置只有本机进程与授权的机器（ADR-0022：不使用容器）
+  const PLACE_LABELS = { local_process: '本机进程' };
 
   function rerender() {
     Y12.app.renderContent(true);
@@ -34,11 +34,6 @@
     return String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   }
 
-  function machineName(list, id) {
-    const found = list ? list.find((machine) => machine.id === id) : null;
-    return found ? found.name : id;
-  }
-
   // ---------------------------------------------------------------------------
   // 区块
 
@@ -51,17 +46,21 @@
       ? '<label class="y12-field"><span>名称</span><div class="y12-set-inline"><input class="y12-input" type="text" id="y12-set-name" value="' + esc(s.project.name) + '"' + (s.project.archived ? ' readonly' : '') + '>' +
         ui.button({ label: '重命名', act: 'set.rename', disabled: s.project.archived }) + '</div></label>'
       : '<div class="y12-field"><span>名称</span><div class="y12-set-stack"><strong>' + esc(s.project.name) + '</strong></div></div>';
+    // 长期目标可以修改（project.set_goal）：之后开始的事项使用新目标
+    const goalRow = Y12.cap.command('project.set_goal')
+      ? '<label class="y12-field"><span>长期目标</span><div class="y12-set-stack"><textarea class="y12-textarea" rows="3" id="y12-set-goal"' + (s.project.archived ? ' readonly' : '') + '>' + esc(s.project.goal || '') + '</textarea>' +
+        '<div class="y12-set-inline">' + ui.button({ label: '保存长期目标', kind: 'small', act: 'set.goal', disabled: s.project.archived }) +
+        '<small class="y12-muted">进行中的事项不受影响；之后开始的事项使用新目标。</small></div></div></label>'
+      : '<div class="y12-field"><span>长期目标</span><p class="y12-set-goal">' + esc(s.project.goal || '尚未填写') + '</p></div>';
     const pinRow = '<div class="y12-field"><span>置顶</span><div class="y12-set-inline">' + (s.project.pinned ? ui.status('done', '已置顶') : '<span class="y12-muted">未置顶</span>') +
       (canPin ? ui.button({ label: s.project.pinned ? '取消置顶' : '置顶', kind: 'small', cmd: 'project.pin', data: { project: s.project.id, pinned: String(!s.project.pinned), base_version: s.project.version } }) : '') + '</div></div>';
     const archiveRow = '<div class="y12-field"><span>归档</span><div class="y12-set-inline">' + (s.project.archived ? ui.status('cancelled', '已归档') : '<span class="y12-muted">未归档</span>') +
       (s.project.archived
         ? (canRestore ? ui.button({ label: '恢复项目', kind: 'small primary', cmd: 'project.restore', data: { project: s.project.id, base_version: s.project.version } }) : '')
         : (canArchive ? ui.button({ label: '归档', kind: 'small danger', cmd: 'project.archive', data: { project: s.project.id, base_version: s.project.version } }) : '')) + '</div></div>';
-    const body = '<div class="y12-set-basic">' + nameRow +
-      '<div class="y12-field"><span>长期目标</span><p class="y12-set-goal">' + esc(s.project.goal || '尚未填写') + '</p></div>' +
-      pinRow + archiveRow + '</div>' +
+    const body = '<div class="y12-set-basic">' + nameRow + goalRow + pinRow + archiveRow + '</div>' +
       (s.project.archived ? ui.note('归档只读：查询仍可用，写命令会返回冲突。', 'warn') : '');
-    return ui.block({ title: '基本信息', query: 'project.settings', body: body });
+    return ui.block({ title: '基本信息', query: 'project.settings', command: Y12.cap.command('project.set_goal') ? 'project.set_goal' : null, body: body });
   }
 
   function deptCard(ctx, s, department) {
@@ -92,85 +91,84 @@
     });
   }
 
-  function commandForm(s) {
-    const f = st.form;
-    const current = f.mode === 'edit' ? s.commands.find((entry) => entry.name === f.name) : null;
-    if (f.mode === 'edit' && !current) throw new Error('找不到登记命令：' + f.name);
-    const key = 'set.cmd.' + s.project.id + '.' + (f.mode === 'edit' ? f.name : 'new') + '.';
-    const base = current || { name: '', argv: '', args: [], timeout_sec: 60, output_limit: 200000 };
-    const argvText = Array.isArray(base.argv) ? base.argv.join('\n') : String(base.argv || '');
-    return '<div class="y12-set-form" id="y12-set-cmd-form"><h3 class="y12-h3">' + (f.mode === 'edit' ? '修改登记命令「' + esc(f.name) + '」 · 基于 v' + esc(f.base_version) : '新增登记命令') + '</h3>' +
-      '<div class="y12-set-form-grid">' +
-      '<label class="y12-field"><span>登记名</span><input class="y12-input" type="text" id="y12-set-cmd-name" value="' + esc(base.name) + '"' + (f.mode === 'edit' ? ' readonly' : ' data-draft="' + esc(key + 'name') + '"') + ' placeholder="例如 unit_tests"><small class="y12-muted">小写字母、数字与下划线</small></label>' +
-      '<label class="y12-field"><span>时限（秒）</span><input class="y12-input" type="number" min="1" id="y12-set-cmd-timeout" value="' + esc(base.timeout_sec) + '" data-draft="' + esc(key + 'timeout') + '"></label>' +
-      '<label class="y12-field"><span>输出上限（字节）</span><input class="y12-input" type="number" min="1" id="y12-set-cmd-limit" value="' + esc(base.output_limit) + '" data-draft="' + esc(key + 'limit') + '"></label>' +
-      '<label class="y12-field y12-set-wide"><span>固定参数（每行一个）</span><textarea class="y12-textarea y12-set-mono" rows="4" id="y12-set-cmd-argv" data-draft="' + esc(key + 'argv') + '">' + esc(argvText) + '</textarea></label>' +
-      '<label class="y12-field y12-set-wide"><span>允许的额外参数（每行一个）</span><textarea class="y12-textarea y12-set-mono" rows="3" id="y12-set-cmd-args" data-draft="' + esc(key + 'args') + '">' + esc((base.args || []).join('\n')) + '</textarea><small class="y12-muted">模型只能在这些参数中选择；私有路径与越界参数会被拒绝。</small></label>' +
-      '</div>' +
-      '<div class="y12-row">' + ui.button({ label: '保存', kind: 'primary', act: 'set.saveCommand' }) + ui.button({ label: '取消', act: 'set.cancelCommand' }) + '</div></div>';
-  }
-
-  function commandsBlock(s) {
-    const argvText = (row) => (Array.isArray(row.argv) ? row.argv.join(' ') : String(row.argv || ''));
-    const table = ui.table({
-      columns: [
-        { key: 'name', label: '登记名', render: (row) => ui.code(row.name) },
-        { key: 'argv', label: '固定参数', render: (row) => ui.code(argvText(row)) },
-        { key: 'args', label: '允许的额外参数', render: (row) => (row.args && row.args.length ? row.args.map((arg) => ui.code(arg)).join(' ') : '<span class="y12-muted">不允许</span>') },
-        { key: 'timeout_sec', label: '时限', render: (row) => esc(row.timeout_sec + ' 秒') },
-        { key: 'output_limit', label: '输出上限', render: (row) => esc(Y12.ui.num(row.output_limit) + ' 字节') },
-        { key: 'version', label: '版本', render: (row) => ui.code('v' + row.version) },
-        { key: 'ops', label: '操作', className: 'y12-col-actions', render: (row) => ui.button({ label: '修改', kind: 'small', act: 'set.editCommand', data: { name: row.name }, disabled: s.project.archived }) }
-      ],
-      rows: s.commands,
-      empty: '本项目还没有登记命令'
-    });
-    return ui.block({
-      title: '登记命令', query: 'project.settings', command: 'command_registration.save',
-      subtitle: '部门只能执行这里登记的命令：固定参数不可改，额外参数只能从允许的列表中选；版本冲突时提示重新读取。',
-      actions: st.form ? '' : ui.button({ label: '新增登记命令', icon: 'plus', kind: 'small', act: 'set.addCommand', disabled: s.project.archived }),
-      body: table + (st.form && st.form.project_id === s.project.id ? commandForm(s) : '')
-    });
+  // 源目录（3.8 起另有采纳写回的三项设置与写回检查的命令，工单 #709、#815）
+  function writebackText(dir) {
+    const w = dir.writeback;
+    if (!w || !w.enabled) return '<span class="y12-muted">没有打开</span>';
+    return ui.status('succeeded', '打开') + ' <span>' + esc(w.remote) + ' → ' + esc(w.target_branch) + '</span>';
   }
 
   function sourceBlock(s) {
     const store = s.source_directories;
-    const table = store.items.length
-      ? ui.table({
-        columns: [
-          { key: 'name', label: '名称', render: (row) => ui.code(row.name) },
-          { key: 'path', label: '路径', render: (row) => '<span class="y12-set-url">' + esc(row.path) + '</span>' }
-        ],
-        rows: store.items
-      })
-      : ui.empty('还没有登记源目录');
+    const withWriteback = Y12.cap.command('writeback.execute');
+    const columns = [
+      { key: 'name', label: '名称', render: (row) => ui.code(row.name) },
+      { key: 'path', label: '路径', render: (row) => '<span class="y12-set-url">' + esc(row.path) + '</span>' }
+    ];
+    if (withWriteback) {
+      columns.push(
+        { key: 'writeback', label: '采纳写回', render: (row) => writebackText(row) },
+        { key: 'checks', label: '写回检查的命令', render: (row) => ((row.check_commands || []).length ? row.check_commands.map((cmd) => ui.code(cmd)).join(' ') : '<span class="y12-muted">没有</span>') }
+      );
+    }
+    const table = store.items.length ? ui.table({ columns, rows: store.items }) : ui.empty('还没有登记源目录');
+    const writebackFields = withWriteback
+      ? '<label class="y12-field"><span>采纳写回</span><select class="y12-select" id="y12-set-src-wb"><option value="">保持原来的设置</option><option value="on">打开：采纳以后把成果写回这个目录</option><option value="off">关闭</option></select></label>' +
+        '<label class="y12-field"><span>远端</span><input class="y12-input y12-set-mono" type="text" id="y12-set-src-remote" placeholder="例如 origin" data-draft="set.src.remote"></label>' +
+        '<label class="y12-field"><span>目标分支</span><input class="y12-input y12-set-mono" type="text" id="y12-set-src-branch" placeholder="例如 main" data-draft="set.src.branch"></label>' +
+        '<label class="y12-field y12-set-wide"><span>写回检查的命令（每行一条，可选）</span><textarea class="y12-textarea y12-set-mono" rows="2" id="y12-set-src-checks" data-draft="set.src.checks" placeholder="例如 python -m pytest tests"></textarea>' +
+        '<small class="y12-muted">写回之前在目标仓库里运行；命令原样执行，不需要登记。不填的项保留原来的设置。</small></label>'
+      : '';
     const form = '<div class="y12-set-form"><h3 class="y12-h3">登记源目录 · 基于 v' + esc(store.version) + '</h3>' +
       '<div class="y12-set-form-grid">' +
       '<label class="y12-field"><span>名称</span><input class="y12-input" type="text" id="y12-set-src-name" placeholder="例如 webapp" data-draft="set.src.name"></label>' +
       '<label class="y12-field y12-set-wide"><span>路径</span><input class="y12-input y12-set-mono" type="text" id="y12-set-src-path" placeholder="/work/webapp 或服务所在机器上的绝对路径" data-draft="set.src.path"></label>' +
+      writebackFields +
       '</div><div class="y12-row">' + ui.button({ label: '保存源目录', kind: 'primary', act: 'set.saveSource', disabled: s.project.archived }) +
-      '<small class="y12-muted">新建事项时可以选择登记过的源目录作为代码快照来源。</small></div></div>';
+      '<small class="y12-muted">同名登记覆盖原来的设置，版本加一。</small></div></div>';
     return ui.block({
       title: '源目录', query: 'project.settings', command: 'source_directory.save',
-      subtitle: '新建事项的代码快照来源；同名登记覆盖原路径，版本加一。',
+      subtitle: '登记在这台控制主机上的代码目录：接入已有项目时建档从这里采集快照' + (withWriteback ? '，采纳的成果写回这里' : '') + '。新事项从项目的起点开始，不再逐个事项选择源目录。',
       body: table + form
     });
   }
 
-  function toolsBlock(s) {
-    if (!s.tools) return '';
-    const rows = s.tools.map((tool) => {
-      return '<div class="y12-set-dept" data-tool-id="' + esc(tool.id) + '"><header><h3>' + esc(tool.label) + '</h3>' + ui.tag(tool.id) + '</header>' +
-        '<label class="y12-field"><span>授权范围</span><input class="y12-input" type="text" data-tool-scope value="' + esc(tool.scope) + '">' +
-        '<small class="y12-muted">例如允许取回的域名；不授权时写「未授权」。</small></label>' +
-        '<label class="y12-field"><span>批准方式</span><input class="y12-input" type="text" data-tool-approval value="' + esc(tool.approval || '') + '" placeholder="超出范围时逐次批准"></label>' +
-        '</div>';
-    }).join('');
+  // 成果写回（应用层与接口层设计说明「写回在页面上的显示」）：发起写回、写回记录的五种结果；合并请求还只是本地记录时照实写明
+  const WB_KIND = { completed: 'succeeded', verified: 'succeeded', stopped: 'failed', held: 'waiting', not_needed: 'idle' };
+
+  function writebackRow(row) {
+    const parts = [];
+    if (row.pushed_branch) parts.push('推送分支 ' + row.pushed_branch + ' → 目标分支 ' + row.target_branch);
+    if (row.status === 'held') parts.push('等前一次采纳合入目标分支');
+    if (row.status === 'not_needed') parts.push('变更已经在目标分支上');
+    if (row.stop_reason) parts.push('停止原因：' + (row.stop_reason.text || row.stop_reason));
+    if ((row.conflicts || []).length) parts.push('冲突的文件：' + row.conflicts.join('、'));
+    return parts.join('；');
+  }
+
+  function writebackBlock(s) {
+    if (!Y12.cap.query('project.writeback')) return '';
+    const data = Y12.api.query('project.writeback', { project: s.project.id }).data;
+    const head = data.enabled
+      ? '<p>' + ui.status('succeeded', '采纳写回已打开') + ' <span class="y12-muted">写回到源目录 ' + esc(data.source_name) + '，目标分支 ' + esc(data.target_branch) + '</span></p>'
+      : ui.note('源目录还没有打开采纳写回：在上面的源目录一节里打开，并写明远端与目标分支。', 'info');
+    const table = data.records.length
+      ? ui.table({
+        columns: [
+          { key: 'adoption', label: '采纳成果', render: (row) => ui.code(row.adoption) },
+          { key: 'status', label: '结果', render: (row) => ui.status(WB_KIND[row.status] || 'idle', row.status_text) },
+          { key: 'at', label: '时间', render: (row) => esc(Y12.ui.time(row.at)) },
+          { key: 'detail', label: '说明', render: (row) => esc(writebackRow(row)) || '<span class="y12-muted">—</span>' },
+          { key: 'mr', label: '合并请求', render: (row) => (row.merge_request ? esc(row.merge_request.title) + (row.merge_request.local_only ? ' ' + ui.tag('还只是本地记录') : '') : '<span class="y12-muted">没有</span>') }
+        ],
+        rows: data.records
+      })
+      : ui.empty('还没有写回记录');
     return ui.block({
-      title: '工具授权', query: 'project.settings', command: 'tool_authorization.save',
-      subtitle: '网络取回与各 MCP 工具在本项目的授权范围；超出授权时逐次批准，批准一次不作为永久授权。当前版本 v' + esc(s.tools_version) + '。',
-      body: '<div class="y12-set-depts">' + rows + '</div>' +
-        '<div class="y12-row">' + ui.button({ label: '保存工具授权', kind: 'primary', act: 'set.saveTools', disabled: s.project.archived }) + '</div>'
+      title: '成果写回', query: 'project.writeback', command: 'writeback.execute',
+      subtitle: '把采纳的成果写回登记的源目录。结果有五种：写回完成、写回已核实、写回停止、写回等待、无需写回；当前版本只在本地记录合并请求，还没有在代码托管平台上创建。',
+      actions: ui.button({ label: '写回成果', icon: 'import', kind: 'small primary', act: 'set.writeback', data: { project: s.project.id }, disabled: s.project.archived }),
+      body: head + table
     });
   }
 
@@ -180,7 +178,6 @@
       '<label class="y12-field is-inline"><input type="checkbox" data-machine-use' + (auth ? ' checked' : '') + '><span>授权使用</span></label></header>' +
       '<p class="y12-muted y12-small">' + esc(machine.address) + ' · ' + esc(machine.purpose || '') + (machine.online ? '' : ' · 离线') + '</p>' +
       '<label class="y12-field"><span>登记的目录（每行一个）</span><textarea class="y12-textarea y12-set-mono" rows="2" data-machine-dirs>' + esc((auth && auth.dirs ? auth.dirs : []).join('\n')) + '</textarea></label>' +
-      '<label class="y12-field"><span>可以执行的操作（每行一个）</span><textarea class="y12-textarea y12-set-mono" rows="2" data-machine-ops>' + esc((auth && auth.operations ? auth.operations : []).join('\n')) + '</textarea></label>' +
       (Y12.cap.query('ops.status')
         ? '<label class="y12-field is-inline"><input type="checkbox" data-machine-runtime' + (auth && auth.runtime_env ? ' checked' : '') + '><span>作为运行环境</span></label>' +
           '<label class="y12-field"><span>常设授权清单（每行一个）</span><textarea class="y12-textarea y12-set-mono" rows="2" data-machine-standing>' + esc((auth && auth.standing ? auth.standing : []).join('\n')) + '</textarea></label>'
@@ -194,7 +191,7 @@
     const rows = list.map((machine) => machineRow(list, s, machine)).join('');
     return ui.block({
       title: '机器授权', query: ['project.settings', 'machines.list'], command: 'machine_authorization.save',
-      subtitle: '从系统登记的机器中选择本项目可以使用的机器，每台写明登记的目录与可以执行的操作；Stage 4 起可以指定为本项目的运行环境并批准常设授权清单。当前版本 v' + esc(s.machines_version) + '。',
+      subtitle: '从系统登记的机器中选择本项目可以使用的机器，每台写明登记的目录；命令在登记的目录里原样执行，不逐条授权。Stage 4 起可以指定为本项目的运行环境并批准常设授权清单。当前版本 v' + esc(s.machines_version) + '。',
       body: '<div class="y12-set-depts">' + rows + '</div>' +
         '<div class="y12-row">' + ui.button({ label: '保存机器授权', kind: 'primary', act: 'set.saveMachines', disabled: s.project.archived }) + '</div>'
     });
@@ -202,8 +199,7 @@
 
   function placementOptions(list, current, extraLabel) {
     const options = ['<option value=""' + (current ? '' : ' selected') + '>' + esc(extraLabel) + '</option>',
-      '<option value="local_process"' + (current === 'local_process' ? ' selected' : '') + '>' + esc(PLACE_LABELS.local_process) + '</option>',
-      '<option value="local_container"' + (current === 'local_container' ? ' selected' : '') + '>' + esc(PLACE_LABELS.local_container) + '</option>'];
+      '<option value="local_process"' + (current === 'local_process' ? ' selected' : '') + '>' + esc(PLACE_LABELS.local_process) + '</option>'];
     (list || []).forEach((machine) => {
       options.push('<option value="' + esc(machine.id) + '"' + (current === machine.id ? ' selected' : '') + '>' + esc(machine.name) + '</option>');
     });
@@ -219,11 +215,10 @@
       '<select class="y12-select" data-place-check="' + department + '">' + placementOptions(list, checks[department] || '', '与运行工作区相同') + '</select></label>';
     return ui.block({
       title: '执行位置', query: ['project.settings', 'machines.list'], command: 'execution_placement.save',
-      subtitle: '运行工作区的位置、产品·工程·质检各自检查的位置与容器基础镜像；位置是登记的机器时，它必须在本项目的机器授权中。当前版本 v' + esc(place.version) + '。',
+      subtitle: '运行工作区的位置与产品·工程·质检各自检查的位置：本机进程或授权的机器；位置是登记的机器时，它必须在本项目的机器授权中。当前版本 v' + esc(place.version) + '。',
       body: '<div class="y12-set-form-grid">' +
         '<label class="y12-field"><span>运行工作区</span><select class="y12-select" id="y12-set-place-workspace">' + placementOptions(list, place.workspace, '本机进程') + '</select></label>' +
         checkRow('product') + checkRow('engineering') + checkRow('quality') +
-        '<label class="y12-field y12-set-wide"><span>容器基础镜像（可选）</span><input class="y12-input y12-set-mono" type="text" id="y12-set-place-image" value="' + esc(place.image || '') + '" placeholder="留空使用 Yudao 默认基础镜像"></label>' +
         '</div><div class="y12-row">' + ui.button({ label: '保存执行位置', kind: 'primary', act: 'set.savePlacement', disabled: s.project.archived }) + '</div>'
     });
   }
@@ -276,11 +271,10 @@
 
   function render(ctx) {
     const s = settings(ctx);
-    if (st.form && st.form.project_id !== s.project.id) st.form = null;
     return '<div class="y12-set">' +
       '<header class="y12-page-head"><div class="y12-page-titles"><p class="y12-eyebrow">项目设置</p><h1>' + esc(s.project.name) + '</h1>' +
-      '<p class="y12-subtitle">基本信息、部门设置、登记命令、源目录、工具授权、机器授权、执行位置与角色设置。</p></div></header>' +
-      basicBlock(s) + deptBlock(ctx, s) + commandsBlock(s) + sourceBlock(s) + toolsBlock(s) + machinesBlock(s) + placementBlock(s) + opsBlock(s) + rolesBlock(s) +
+      '<p class="y12-subtitle">基本信息、部门设置、源目录与成果写回、机器授权、执行位置与角色设置。</p></div></header>' +
+      basicBlock(s) + deptBlock(ctx, s) + sourceBlock(s) + writebackBlock(s) + machinesBlock(s) + placementBlock(s) + opsBlock(s) + rolesBlock(s) +
       '</div>';
   }
 
@@ -302,77 +296,36 @@
     Y12.run('project.rename', { project: ctx.projectId, name: name, base_version: s.project.version });
   });
 
-  Y12.actions.register('set.addCommand', () => {
-    const ctx = Y12.app.ctx();
-    st.form = { project_id: ctx.projectId, mode: 'add', name: null, base_version: null };
-    rerender();
-  });
-
-  Y12.actions.register('set.editCommand', (el) => {
+  Y12.actions.register('set.goal', () => {
     const ctx = Y12.app.ctx();
     const s = settings(ctx);
-    const command = s.commands.find((entry) => entry.name === el.dataset.name);
-    if (!command) throw new Error('找不到登记命令：' + el.dataset.name);
-    st.form = { project_id: ctx.projectId, mode: 'edit', name: command.name, base_version: command.version };
-    rerender();
-  });
-
-  Y12.actions.register('set.cancelCommand', () => {
-    st.form = null;
-    rerender();
-  });
-
-  Y12.actions.register('set.saveCommand', () => {
-    const f = st.form;
-    if (!f) return;
-    const nameEl = document.getElementById('y12-set-cmd-name');
-    const argvEl = document.getElementById('y12-set-cmd-argv');
-    const argsEl = document.getElementById('y12-set-cmd-args');
-    const timeoutEl = document.getElementById('y12-set-cmd-timeout');
-    const limitEl = document.getElementById('y12-set-cmd-limit');
-    const result = Y12.run('command_registration.save', {
-      project: f.project_id,
-      name: nameEl.value.trim(),
-      argv: lines(argvEl.value),
-      args: lines(argsEl.value),
-      timeout_sec: Number(timeoutEl.value),
-      output_limit: Number(limitEl.value),
-      base_version: f.base_version === null ? 0 : f.base_version
-    });
-    if (!result.accepted) return;
-    st.form = null;
-    rerender();
+    const box = document.getElementById('y12-set-goal');
+    Y12.run('project.set_goal', { project: ctx.projectId, goal: box ? box.value : '', base_version: s.project.version });
   });
 
   Y12.actions.register('set.saveSource', () => {
     const ctx = Y12.app.ctx();
     const s = settings(ctx);
-    const name = document.getElementById('y12-set-src-name');
-    const path = document.getElementById('y12-set-src-path');
-    const result = Y12.run('source_directory.save', {
-      project: ctx.projectId,
-      name: name ? name.value.trim() : '',
-      path: path ? path.value.trim() : '',
-      base_version: s.source_directories.version
-    });
+    const value = (id) => {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    };
+    const params = { project: ctx.projectId, name: value('y12-set-src-name'), path: value('y12-set-src-path'), base_version: s.source_directories.version };
+    const wb = document.getElementById('y12-set-src-wb');
+    if (wb) {
+      if (wb.value) params.writeback_enabled = wb.value === 'on';
+      if (value('y12-set-src-remote')) params.remote = value('y12-set-src-remote');
+      if (value('y12-set-src-branch')) params.target_branch = value('y12-set-src-branch');
+      if (value('y12-set-src-checks')) params.check_commands = lines(value('y12-set-src-checks'));
+    }
+    const result = Y12.run('source_directory.save', params);
     if (!result.accepted) return;
-    Y12.app.clearDraft('set.src.name');
-    Y12.app.clearDraft('set.src.path');
+    ['name', 'path', 'remote', 'branch', 'checks'].forEach((k) => Y12.app.clearDraft('set.src.' + k));
     rerender();
   });
 
-  Y12.actions.register('set.saveTools', () => {
-    const ctx = Y12.app.ctx();
-    const s = settings(ctx);
-    const rows = Array.prototype.slice.call(document.querySelectorAll('[data-tool-id]'));
-    const tools = rows.map((row) => ({
-      id: row.dataset.toolId,
-      scope: row.querySelector('[data-tool-scope]').value.trim(),
-      approval: row.querySelector('[data-tool-approval]').value.trim()
-    }));
-    const result = Y12.run('tool_authorization.save', { project: ctx.projectId, tools: tools, base_version: s.tools_version });
-    if (!result.accepted) return;
-    rerender();
+  Y12.actions.register('set.writeback', (el) => {
+    Y12.run('writeback.execute', { project: el.dataset.project });
   });
 
   Y12.actions.register('set.saveMachines', () => {
@@ -382,8 +335,7 @@
     const list = rows.filter((row) => row.querySelector('[data-machine-use]').checked).map((row) => {
       const entry = {
         machine_id: row.dataset.machineId,
-        dirs: lines(row.querySelector('[data-machine-dirs]').value),
-        operations: lines(row.querySelector('[data-machine-ops]').value)
+        dirs: lines(row.querySelector('[data-machine-dirs]').value)
       };
       if (Y12.cap.query('ops.status')) {
         entry.runtime_env = row.querySelector('[data-machine-runtime]').checked;
@@ -408,7 +360,6 @@
       project: ctx.projectId,
       workspace: value('#y12-set-place-workspace'),
       checks: { product: check('product'), engineering: check('engineering'), quality: check('quality') },
-      image: value('#y12-set-place-image'),
       base_version: s.execution_placement.version
     });
     if (!result.accepted) return;

@@ -113,7 +113,7 @@
       waiting_provider_sec: 0, waiting_provider: null, stop_reason: null,
       recovery: { state: 'running', reason: '排队中', unusable: null, last_confirmed: null, owner: null, late_results: [], verifications: [], unfinished: [], limits: { elapsed_sec: 0, limit_sec: 7200, activations: 0, model_steps: 0, retries: 0 }, auto_resumed_at: null },
       born_at: bornAt,
-      inputs: [], flow: [], requests: [], guidance: [],
+      inputs: [], flow: [], asks: [], guidance: [],
       messages: emptyMessages(), actions: [], contexts: emptyContexts(),
       prompts: blankPrompts(), compactions: [],
       effective_model: {
@@ -186,17 +186,17 @@
             { version: 2, kind: 'user', progress: 'accepted', at: '2026-09-24T08:40:00+08:00', bytes: 260, text: '读取失败重试 3 次；输出结构化日志，每行一条 JSON，运维按这个格式读取；启动时输出版本号。' }
           ],
           flow: [
-            { seq: 1, at: '2026-09-10T09:50:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: 'PRD r1：每分钟采样、SQLite 写入、网页曲线', status: 'accepted', event_position: null },
+            { seq: 1, at: '2026-09-10T09:50:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: 'PRD r1：每分钟采样、SQLite 写入、网页曲线', status: 'accepted', event_position: null },
             { seq: 2, at: '2026-09-12T14:40:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r1：reader、store、web 与 systemd 单元', status: 'accepted', event_position: null },
             { seq: 3, at: '2026-09-12T15:30:00+08:00', from: 'quality', to: 'library', kind: 'release', content: '放行 r1：读数误差 ±0.5 摄氏度以内', status: 'accepted', event_position: null },
             { seq: 4, at: '2026-09-24T15:30:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付 r2：重试 3 次、结构化日志、版本号输出', status: 'accepted', event_position: null },
             { seq: 5, at: '2026-09-24T16:20:00+08:00', from: 'quality', to: 'library', kind: 'release', content: '放行 r2：日志逐行 JSON，可被运维读取', status: 'accepted', event_position: null }
           ],
-          requests: [{
-            id: 'q-sensor-dht', from: 'engineering', to: 'product', kind: 'consult',
-            question: 'DHT22 接在哪个引脚？采样间隔可以调整吗？', status: 'closed',
-            answer: '接 GPIO 4。间隔固定每分钟，不做成可配置。',
-            born_at: '2026-09-10T10:05:00+08:00'
+          asks: [{
+            id: 'q-sensor-dht', requester: 'engineering', recipient: 'product', parent: null,
+            question: 'DHT22 接在哪个引脚？采样间隔可以调整吗？', status: 'answered',
+            answer: '接 GPIO 4。间隔固定每分钟，不做成可配置。', reason: null,
+            born_at: '2026-09-10T10:05:00+08:00', answered_at: '2026-09-10T10:20:00+08:00'
           }],
           guidance: [],
           messages: {
@@ -211,14 +211,14 @@
               summary: '写入 store.py：SQLite WAL 与每分钟写入', input: 'src/store.py',
               state: 'done', machine_id: 'm-host', at: '2026-09-11T16:20:00+08:00',
               before: '文件不存在', after: '写入 148 行',
-              receipt: { command: 'write_file', argv: ['src/store.py'], exit_code: 0, output: '148 lines', truncated: false, timed_out: false, duration_ms: 210, snapshot: 'src/store.py' }
+              receipt: { target: 'src/store.py', output: '148 lines', truncated: false, timed_out: false, duration_ms: 210, snapshot: 'src/store.py' }
             },
             {
-              id: 'a-sensor-pytest', department: 'engineering', role: 'eng-lead', tool: 'run_command',
-              summary: '登记命令 pytest', input: 'python -m pytest tests',
+              id: 'a-sensor-pytest', department: 'engineering', role: 'eng-lead', tool: 'bash',
+              summary: '执行命令 python -m pytest tests', input: '重试与结构化日志的自测',
               state: 'done', machine_id: 'm-host', at: '2026-09-24T15:10:00+08:00',
               before: '重试与日志测试已写入', after: '6 passed',
-              receipt: { command: 'pytest', argv: ['python', '-m', 'pytest', 'tests'], exit_code: 0, output: '6 passed', truncated: false, timed_out: false, duration_ms: 3100, snapshot: 'tests' }
+              receipt: { command: 'python -m pytest tests', exit_code: 0, output: '6 passed', truncated: false, timed_out: false, duration_ms: 3100, snapshot: 'tests' }
             }
           ],
           contexts: {
@@ -278,10 +278,10 @@
           born_at: '2026-09-28T09:00:00+08:00', until: 'S4',
           inputs: [{ version: 1, kind: 'user', progress: 'accepted', at: '2026-09-28T09:00:00+08:00', bytes: 190, text: '网页上增加最近 7 天的温湿度曲线，按住小时聚合。' }],
           flow: [
-            { seq: 1, at: '2026-09-28T09:15:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: 'PRD：7 天窗口、按小时聚合', status: 'accepted', event_position: null },
+            { seq: 1, at: '2026-09-28T09:15:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: 'PRD：7 天窗口、按小时聚合', status: 'accepted', event_position: null },
             { seq: 2, at: '2026-09-28T09:30:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付：曲线页与聚合查询', status: 'accepted', event_position: null }
           ],
-          requests: [],
+          asks: [],
           guidance: [],
           messages: {
             product: [],
@@ -294,7 +294,7 @@
             summary: '阅读 store.py 的读写方式', input: 'src/store.py',
             state: 'done', machine_id: 'm-host', at: '2026-09-28T09:20:00+08:00',
             before: '文件未读', after: '按分钟一行，聚合需要按小时分组',
-            receipt: { command: 'read_file', argv: ['src/store.py'], exit_code: 0, output: '148 lines', truncated: false, timed_out: false, duration_ms: 160, snapshot: null }
+            receipt: { target: 'src/store.py', output: '148 lines', truncated: false, timed_out: false, duration_ms: 160, snapshot: null }
           }],
           contexts: {
             product: [{ id: 'ctx-schart-p1', at: '2026-09-28T09:02:00+08:00', title: '产品激活 1', attempt_id: 'att-schart-p1', sources: [{ label: '用户原文', version: 'v1', included: true }, { label: '已采纳', version: 'r2', included: true }] }],
@@ -347,11 +347,11 @@
             text: '故障 F-1：树莓派重启后传感器读取超时，服务反复重启。证据：02:05 至 02:14 之间 journal 记录 5 次重启。'
           }],
           flow: [
-            { seq: 1, at: '2026-09-28T03:40:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: '故障成立：读取超时发生在重启后的第一次采样', status: 'accepted', event_position: null },
+            { seq: 1, at: '2026-09-28T03:40:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: '故障成立：读取超时发生在重启后的第一次采样', status: 'accepted', event_position: null },
             { seq: 2, at: '2026-09-28T05:20:00+08:00', from: 'engineering', to: 'quality', kind: 'delivery', content: '交付：重启后延迟首次采样，并加大读取超时到 3 秒', status: 'accepted', event_position: null },
             { seq: 3, at: '2026-09-28T06:20:00+08:00', from: 'quality', to: 'operations', kind: 'release', content: '核验通过，交运维部署', status: 'accepted', event_position: null }
           ],
-          requests: [],
+          asks: [],
           guidance: [],
           messages: {
             product: [],
@@ -361,25 +361,25 @@
           },
           actions: [
             {
-              id: 'a-sensor-fix1-journal', department: 'engineering', role: 'eng-explorer', tool: 'run_command',
-              summary: '读取 journal 的重启记录', input: 'journalctl -u sensor --since "02:00"',
+              id: 'a-sensor-fix1-journal', department: 'engineering', role: 'eng-explorer', tool: 'bash',
+              summary: '读取 journal 的重启记录', input: '故障 F-1 的证据',
               state: 'done', machine_id: 'm-pi', at: '2026-09-28T03:20:00+08:00',
               before: '尚未读取', after: '5 次重启，都在重启后第一次采样超时',
-              receipt: { command: 'run_command', argv: ['journalctl', '-u', 'sensor'], exit_code: 0, output: '5 restarts, timeout on first read', truncated: false, timed_out: false, duration_ms: 900, snapshot: null }
+              receipt: { command: 'journalctl -u sensor --since "02:00"', exit_code: 0, output: '5 restarts, timeout on first read', truncated: false, timed_out: false, duration_ms: 900, snapshot: null }
             },
             {
               id: 'a-sensor-fix1-edit', department: 'engineering', role: 'eng-lead', tool: 'edit_range',
               summary: '重启后延迟首次采样', input: 'src/reader.py',
               state: 'done', machine_id: 'm-host', at: '2026-09-28T04:40:00+08:00',
               before: '首次采样立即执行', after: '等待 5 秒；超时放宽到 3 秒',
-              receipt: { command: 'edit_range', argv: ['src/reader.py'], exit_code: 0, output: '2 hunks', truncated: false, timed_out: false, duration_ms: 240, snapshot: 'src/reader.py' }
+              receipt: { target: 'src/reader.py', output: '2 hunks', truncated: false, timed_out: false, duration_ms: 240, snapshot: 'src/reader.py' }
             },
             {
-              id: 'a-sensor-fix1-check', department: 'engineering', role: 'eng-lead', tool: 'run_command',
-              summary: '登记命令 deploy_check', input: 'python scripts/deploy_check.py',
+              id: 'a-sensor-fix1-check', department: 'engineering', role: 'eng-lead', tool: 'bash',
+              summary: '执行命令 python scripts/deploy_check.py', input: '修复以后的自测',
               state: 'done', machine_id: 'm-host', at: '2026-09-28T05:10:00+08:00',
               before: '修复已写入', after: '检查通过',
-              receipt: { command: 'deploy_check', argv: ['python', 'scripts/deploy_check.py'], exit_code: 0, output: 'ok', truncated: false, timed_out: false, duration_ms: 1500, snapshot: null }
+              receipt: { command: 'python scripts/deploy_check.py', exit_code: 0, output: 'ok', truncated: false, timed_out: false, duration_ms: 1500, snapshot: null }
             }
           ],
           contexts: {
@@ -434,9 +434,9 @@
             text: '故障 F-2：夜间写入数据库失败。证据：01:10 至 12:20 之间 journal 记录 14 次 database is locked。'
           }],
           flow: [
-            { seq: 1, at: '2026-09-29T12:50:00+08:00', from: 'product', to: 'engineering', kind: 'handoff', content: '故障成立：夜间上传任务与采样写入并发', status: 'accepted', event_position: null }
+            { seq: 1, at: '2026-09-29T12:50:00+08:00', from: 'product', to: 'engineering', kind: 'prd', content: '故障成立：夜间上传任务与采样写入并发', status: 'accepted', event_position: null }
           ],
-          requests: [],
+          asks: [],
           guidance: [],
           messages: {
             product: [],
@@ -445,11 +445,11 @@
             operations: []
           },
           actions: [{
-            id: 'a-sensor-fix2-journal', department: 'engineering', role: 'eng-explorer', tool: 'run_command',
-            summary: '读取 journal 的锁表记录', input: 'journalctl -u sensor --since "01:00"',
+            id: 'a-sensor-fix2-journal', department: 'engineering', role: 'eng-explorer', tool: 'bash',
+            summary: '读取 journal 的锁表记录', input: '故障 F-2 的证据',
             state: 'done', machine_id: 'm-pi', at: '2026-09-29T12:45:00+08:00',
             before: '尚未读取', after: '14 次 database is locked，集中在夜间上传时段',
-            receipt: { command: 'run_command', argv: ['journalctl', '-u', 'sensor'], exit_code: 0, output: '14 database is locked', truncated: false, timed_out: false, duration_ms: 800, snapshot: null }
+            receipt: { command: 'journalctl -u sensor --since "01:00"', exit_code: 0, output: '14 database is locked', truncated: false, timed_out: false, duration_ms: 800, snapshot: null }
           }],
           contexts: {
             product: [{ id: 'ctx-sfix2-p1', at: '2026-09-29T12:36:00+08:00', title: '产品激活 1', attempt_id: 'att-sfix2-p1', sources: [{ label: '故障证据', version: 'F-2', included: true }, { label: '当前合同', version: 'PRD r2', included: true }] }],
@@ -521,7 +521,7 @@
                   { path: 'work_items[id=w-sensor-chart].status', value: 'stopped' },
                   { path: 'runs[id=r-sensor-chart].phase', value: 'FAILED' },
                   { path: 'runs[id=r-sensor-chart].stop_reason', value: { code: 'stopped_by_user', text: '用户在待恢复中停止事项' } },
-                  { path: 'runs[id=r-sensor-chart].recovery.state', value: 'terminated' }
+                  { path: 'runs[id=r-sensor-chart].recovery.state', value: 'stopped' }
                 ]
               }]
             }
@@ -570,11 +570,6 @@
           text: '树莓派读取 DHT22（GPIO 4），每分钟采样一次，写入 SQLite（表 readings：at、temperature、humidity）。网页显示当前值与最近曲线。服务由 systemd 管理，开机自启。\n验收条件：读数与标准温度计的误差在 ±0.5 摄氏度以内；断网不影响写入；每分钟恰好一行记录。\n非目标：告警、远程访问、数据导出。'
         },
         {
-          id: 'm-sensor-plan', project_id: P, work_item_id: 'w-sensor-base', kind: 'plan', version: 1,
-          title: 'PLAN r1', at: '2026-09-10T10:40:00+08:00',
-          text: '1. reader.py 采样循环（每分钟）\n2. store.py SQLite 写入（WAL）\n3. web.py 当前值与曲线\n4. deploy/sensor.service\n5. pytest 覆盖误差与写入频率'
-        },
-        {
           id: 'm-sensor-delivery', project_id: P, work_item_id: 'w-sensor-base', kind: 'delivery', version: 1,
           title: '交付 r1', at: '2026-09-12T14:40:00+08:00',
           files: [
@@ -583,7 +578,7 @@
             { path: 'src/web.py', bytes: 2360 },
             { path: 'deploy/sensor.service', bytes: 420 }
           ],
-          text: '完成计划 1 至 5。读数误差 +/-0.5 摄氏度以内；每分钟一行；断网时写入继续。'
+          text: '实现 PRD r1 的采样、写入、网页与 systemd 单元。读数误差 +/-0.5 摄氏度以内；每分钟一行；断网时写入继续。'
         },
         {
           id: 'm-sensor-qa', project_id: P, work_item_id: 'w-sensor-base', kind: 'qa', version: 1,
@@ -594,11 +589,6 @@
           id: 'm-sensor-prd-v2', project_id: P, work_item_id: 'w-sensor-base', kind: 'prd', version: 2,
           title: 'PRD r2 增量：可运维性', at: '2026-09-24T08:50:00+08:00',
           text: '在 r1 之上增量：读取失败重试 3 次，仍失败则记一条错误日志；输出结构化日志，每行一条 JSON（字段：time、level、event），运维按这个格式读取；启动时输出版本号。其余要求不变。'
-        },
-        {
-          id: 'm-sensor-plan-v2', project_id: P, work_item_id: 'w-sensor-base', kind: 'plan', version: 2,
-          title: 'PLAN r2', at: '2026-09-24T09:05:00+08:00',
-          text: '1. reader.py 重试 3 次\n2. 日志改逐行 JSON\n3. 启动输出版本号\n4. pytest 覆盖重试与日志格式'
         },
         {
           id: 'm-sensor-delivery-v2', project_id: P, work_item_id: 'w-sensor-base', kind: 'delivery', version: 2,
@@ -631,17 +621,10 @@
             quality: { model: 'opencode-go-responses/glm-5', level: null, prompt_version: 2, prompt_text: '对照验收条件逐项检查；曲线只读数据库，不写入。' },
             operations: null
           },
-          commands: [
-            { name: 'pytest', argv: 'python -m pytest', args: ['tests'], timeout_sec: 120, output_limit: 200000, version: 1 },
-            { name: 'deploy_check', argv: 'python scripts/deploy_check.py', args: [], timeout_sec: 60, output_limit: 20000, version: 1 }
-          ],
-          tools: [
-            { id: 'network', label: '网络取回', scope: '未授权', approval: '每次使用逐次批准', level: '3.2B' }
-          ],
           machines: [
-            { machine_id: 'm-host', dirs: ['/work/p-sensor'], operations: ['构建', '测试'], level: '3.2C' },
+            { machine_id: 'm-host', dirs: ['/work/p-sensor'], level: '3.2C' },
             {
-              machine_id: 'm-pi', dirs: ['/srv/sensor'], operations: ['重启服务', '查看日志', '部署'], level: '3.2C',
+              machine_id: 'm-pi', dirs: ['/srv/sensor'], level: '3.2C',
               runtime_env: true, standing: ['重启服务', '查看日志', '部署已放行的版本']
             }
           ],
@@ -702,9 +685,9 @@
         ]
       }),
       ev({
-        at: '2026-09-24T15:30:00+08:00', type: 'transition', work_item_id: 'w-sensor-base', run_id: 'r-sensor-base', department: 'engineering',
-        label: '工程把 r2 交付交给质检',
-        payload: { from: 'engineering', to: 'quality', artifact: 'box' },
+        at: '2026-09-24T15:30:00+08:00', type: 'delivery_accepted', work_item_id: 'w-sensor-base', run_id: 'r-sensor-base', department: 'engineering',
+        label: '工程的交付 r2 被接纳，质检关注的交付到达',
+        payload: { material_id: 'm-sensor-delivery-v2' },
         patch: [
           { path: 'runs[id=r-sensor-base].department', value: 'quality' },
           { path: 'runs[id=r-sensor-base].last_department', value: 'engineering' }
@@ -714,13 +697,8 @@
         at: '2026-09-24T16:20:00+08:00', type: 'qa_submitted', work_item_id: 'w-sensor-base', run_id: 'r-sensor-base', department: 'quality',
         label: '质检放行可运维性的 r2',
         payload: { verdict: 'release', material_id: 'm-sensor-qa-v2' },
-        patch: [{ path: 'projects[id=p-sensor].last_activity_at', value: '2026-09-24T16:20:00+08:00' }]
-      }),
-      ev({
-        at: '2026-09-24T16:25:00+08:00', type: 'transition', work_item_id: 'w-sensor-base', run_id: 'r-sensor-base', department: 'quality',
-        label: 'r2 送到成果库',
-        payload: { from: 'quality', to: 'library', artifact: 'release' },
         patch: [
+          { path: 'projects[id=p-sensor].last_activity_at', value: '2026-09-24T16:20:00+08:00' },
           { path: 'runs[id=r-sensor-base].department', value: null },
           { path: 'runs[id=r-sensor-base].last_department', value: 'quality' }
         ]
@@ -789,9 +767,9 @@
         ]
       }),
       ev({
-        at: '2026-09-28T03:40:00+08:00', type: 'transition', work_item_id: 'w-sensor-fix1', run_id: 'r-sensor-fix1', department: 'product', level: 'S4',
-        label: '故障成立，修复交给工程',
-        payload: { from: 'product', to: 'engineering', artifact: 'defect' },
+        at: '2026-09-28T03:40:00+08:00', type: 'spec_accepted', work_item_id: 'w-sensor-fix1', run_id: 'r-sensor-fix1', department: 'product', level: 'S4',
+        label: '故障成立，产品写明修复范围的 PRD 被接纳，工程关注的 PRD 有了新版本',
+        payload: {},
         patch: [
           { path: 'runs[id=r-sensor-fix1].department', value: 'engineering' },
           { path: 'runs[id=r-sensor-fix1].last_department', value: 'product' },
@@ -800,9 +778,9 @@
         ]
       }),
       ev({
-        at: '2026-09-28T05:20:00+08:00', type: 'transition', work_item_id: 'w-sensor-fix1', run_id: 'r-sensor-fix1', department: 'engineering', level: 'S4',
-        label: '修复交给质检核验',
-        payload: { from: 'engineering', to: 'quality', artifact: 'box' },
+        at: '2026-09-28T05:20:00+08:00', type: 'delivery_accepted', work_item_id: 'w-sensor-fix1', run_id: 'r-sensor-fix1', department: 'engineering', level: 'S4',
+        label: '修复的交付被接纳，质检关注的交付到达',
+        payload: {},
         patch: [
           { path: 'runs[id=r-sensor-fix1].department', value: 'quality' },
           { path: 'runs[id=r-sensor-fix1].last_department', value: 'engineering' },
@@ -811,9 +789,10 @@
         ]
       }),
       ev({
-        at: '2026-09-28T06:20:00+08:00', type: 'transition', work_item_id: 'w-sensor-fix1', run_id: 'r-sensor-fix1', department: 'quality', level: 'S4',
-        label: '核验通过，交运维部署',
-        payload: { from: 'quality', to: 'operations', artifact: 'release' },
+        at: '2026-09-28T06:20:00+08:00', type: 'qa_submitted', work_item_id: 'w-sensor-fix1', run_id: 'r-sensor-fix1', department: 'quality', level: 'S4',
+        label: '质检放行修复 F-1 的交付，运维接手部署',
+        // 运维关注放行的修复（release_to），画面上放行单送往运维房间
+        payload: { verdict: 'release', release_to: 'operations' },
         patch: [
           { path: 'runs[id=r-sensor-fix1].department', value: 'operations' },
           { path: 'runs[id=r-sensor-fix1].last_department', value: 'quality' },
@@ -876,9 +855,9 @@
         ]
       }),
       ev({
-        at: '2026-09-28T09:15:00+08:00', type: 'transition', work_item_id: 'w-sensor-chart', run_id: 'r-sensor-chart', department: 'product',
-        label: '曲线要求交给工程',
-        payload: { from: 'product', to: 'engineering', artifact: 'prd' },
+        at: '2026-09-28T09:15:00+08:00', type: 'spec_accepted', work_item_id: 'w-sensor-chart', run_id: 'r-sensor-chart', department: 'product',
+        label: '曲线要求的 PRD 被接纳，工程与质检关注的 PRD 有了新版本',
+        payload: {},
         patch: [
           { path: 'runs[id=r-sensor-chart].department', value: 'engineering' },
           { path: 'runs[id=r-sensor-chart].last_department', value: 'product' },
@@ -886,9 +865,9 @@
         ]
       }),
       ev({
-        at: '2026-09-28T09:30:00+08:00', type: 'transition', work_item_id: 'w-sensor-chart', run_id: 'r-sensor-chart', department: 'engineering',
-        label: '曲线页交给质检',
-        payload: { from: 'engineering', to: 'quality', artifact: 'box' },
+        at: '2026-09-28T09:30:00+08:00', type: 'delivery_accepted', work_item_id: 'w-sensor-chart', run_id: 'r-sensor-chart', department: 'engineering',
+        label: '曲线页的交付被接纳，质检关注的交付到达',
+        payload: {},
         patch: [
           { path: 'runs[id=r-sensor-chart].department', value: 'quality' },
           { path: 'runs[id=r-sensor-chart].last_department', value: 'engineering' },
@@ -967,9 +946,9 @@
         ]
       }),
       ev({
-        at: '2026-09-29T12:50:00+08:00', type: 'transition', work_item_id: 'w-sensor-fix2', run_id: 'r-sensor-fix2', department: 'product', level: 'S4',
-        label: '故障成立，修复交给工程，写入改为单写者队列',
-        payload: { from: 'product', to: 'engineering', artifact: 'defect' },
+        at: '2026-09-29T12:50:00+08:00', type: 'spec_accepted', work_item_id: 'w-sensor-fix2', run_id: 'r-sensor-fix2', department: 'product', level: 'S4',
+        label: '故障成立，产品写明修复范围的 PRD 被接纳：写入改为单写者队列',
+        payload: {},
         patch: [
           { path: 'runs[id=r-sensor-fix2].department', value: 'engineering' },
           { path: 'runs[id=r-sensor-fix2].last_department', value: 'product' },
@@ -1059,12 +1038,11 @@
           { delay: 1200, go: '#/p/p-sensor/overview', event: { type: 'x_fault_recorded', project_id: P, label: '记录故障 F-3：凌晨上传任务占用内存过高，服务重启', payload: { fault_id: 'F-3', machine_id: 'm-pi' } }, patch: [{ path: 'ops.p-sensor.faults', push: { id: 'F-3', title: '凌晨上传任务占用内存过高，服务重启', status: 'open', repair_work_item_ids: [], failures: 0, observe_until: null, born_at: '2026-09-29T15:30:00+08:00' } }, { path: 'machines[id=m-pi].last_heartbeat_at', value: '2026-09-29T15:30:00+08:00' }] },
           { delay: 1400, event: { type: 'x_repair_created', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', label: '自动建立修复事项 w-sensor-fix3', payload: { fault_id: 'F-3' } }, patch: [{ path: 'ops.p-sensor.faults[id=F-3].status', value: 'repairing' }, { path: 'ops.p-sensor.faults[id=F-3].repair_work_item_ids', push: 'w-sensor-fix3' }, { path: 'work_items', push: repairItem('w-sensor-fix3', '修复内存占用过高', '2026-09-29T15:30:00+08:00') }, { path: 'runs', push: repairRun('r-sensor-fix3', 'w-sensor-fix3', '2026-09-29T15:30:00+08:00') }] },
           { delay: 1200, event: { type: 'department_activated', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'product', label: '产品判断故障成立，修复范围只限上传任务', payload: {} }, patch: [{ path: 'work_items[id=w-sensor-fix3].status', value: 'in_progress' }, { path: 'work_items[id=w-sensor-fix3].queue_reason', value: null }, { path: 'work_items[id=w-sensor-fix3].queue_pos', value: null }, { path: 'runs[id=r-sensor-fix3].department', value: 'product' }, { path: 'runs[id=r-sensor-fix3].phase', value: 'PRODUCT_SPEC' }] },
-          { delay: 1200, event: { type: 'transition', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'product', label: '修复交给工程', payload: { from: 'product', to: 'engineering', artifact: 'defect' } }, patch: [{ path: 'runs[id=r-sensor-fix3].department', value: 'engineering' }, { path: 'runs[id=r-sensor-fix3].last_department', value: 'product' }, { path: 'runs[id=r-sensor-fix3].phase', value: 'ENGINEERING' }] },
+          { delay: 1200, event: { type: 'spec_accepted', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'product', label: '修复范围的 PRD 被接纳，工程关注的 PRD 有了新版本', payload: {} }, patch: [{ path: 'runs[id=r-sensor-fix3].department', value: 'engineering' }, { path: 'runs[id=r-sensor-fix3].last_department', value: 'product' }, { path: 'runs[id=r-sensor-fix3].phase', value: 'ENGINEERING' }] },
           { delay: 1200, event: { type: 'tool_started', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'engineering', label: '工程阅读上传任务的内存记录', payload: { tool: 'read_file' } }, patch: [] },
-          { delay: 1400, event: { type: 'tool_called', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'engineering', label: '登记命令 deploy_check 通过', payload: { tool: 'run_command', exit_code: 0, timed_out: false } }, patch: [] },
-          { delay: 1200, event: { type: 'transition', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'engineering', label: '修复交给质检', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, patch: [{ path: 'runs[id=r-sensor-fix3].department', value: 'quality' }, { path: 'runs[id=r-sensor-fix3].last_department', value: 'engineering' }, { path: 'runs[id=r-sensor-fix3].phase', value: 'QUALITY' }] },
-          { delay: 1400, event: { type: 'qa_submitted', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'quality', label: '质检放行修复', payload: { verdict: 'release' } }, patch: [{ path: 'work_items[id=w-sensor-fix3].status', value: 'released' }] },
-          { delay: 1200, event: { type: 'transition', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'quality', label: '放行的修复交运维部署', payload: { from: 'quality', to: 'operations', artifact: 'release' } }, patch: [{ path: 'runs[id=r-sensor-fix3].department', value: 'operations' }, { path: 'runs[id=r-sensor-fix3].last_department', value: 'quality' }] },
+          { delay: 1400, event: { type: 'tool_called', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'engineering', label: '命令 python scripts/deploy_check.py 通过', payload: { tool: 'bash', command: 'python scripts/deploy_check.py', exit_code: 0, timed_out: false } }, patch: [] },
+          { delay: 1200, event: { type: 'delivery_accepted', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'engineering', label: '修复的交付被接纳，质检关注的交付到达', payload: {} }, patch: [{ path: 'runs[id=r-sensor-fix3].department', value: 'quality' }, { path: 'runs[id=r-sensor-fix3].last_department', value: 'engineering' }, { path: 'runs[id=r-sensor-fix3].phase', value: 'QUALITY' }] },
+          { delay: 1400, event: { type: 'qa_submitted', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'quality', label: '质检放行修复，运维接手部署', payload: { verdict: 'release', release_to: 'operations' } }, patch: [{ path: 'work_items[id=w-sensor-fix3].status', value: 'released' }, { path: 'runs[id=r-sensor-fix3].department', value: 'operations' }, { path: 'runs[id=r-sensor-fix3].last_department', value: 'quality' }] },
           { delay: 1200, event: { type: 'x_backup_taken', project_id: P, label: '部署 r4 之前备份数据', payload: { backup_id: 'b-sensor-sc16', version: 'r3' } }, patch: [{ path: 'ops.p-sensor.backups', push: { id: 'b-sensor-sc16', at: '2026-09-29T15:30:00+08:00', version: 'r3', note: '部署 r4 之前的备份' } }] },
           { delay: 1400, event: { type: 'x_deployed', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'operations', label: '部署 r4，进入观察窗口', payload: { version: 'r4', machine_id: 'm-pi' } }, patch: [{ path: 'ops.p-sensor.env.version', value: 'r4' }, { path: 'ops.p-sensor.releases', push: { version: 'r4', at: '2026-09-29T15:30:00+08:00', method: '常设授权以内', note: '修复 F-3' } }, { path: 'ops.p-sensor.faults[id=F-3].status', value: 'observing' }, { path: 'work_items[id=w-sensor-fix3].status', value: 'adopted' }, { path: 'runs[id=r-sensor-fix3].phase', value: 'DONE' }, { path: 'runs[id=r-sensor-fix3].department', value: null }, { path: 'machines[id=m-pi].actions', push: { project_id: P, work_item_id: 'w-sensor-fix3', department: 'operations', action_id: 'a-sensor-deploy-r4', label: '部署 r4', state: 'done' } }] },
           { delay: 1400, event: { type: 'department_activated', project_id: P, work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', department: 'operations', label: '运维发现 r4 的数据库结构不兼容，发出回滚决定请求', payload: {} }, patch: [{ path: 'decisions', push: decision('d-sensor-rollback', 'rollback_restore', { fault_id: 'F-3', to_version: 'r3', backup: { id: 'b-sensor-sc16', at: '2026-09-29T15:30:00+08:00' }, incompatible: 'r4 把 readings 表加了一列默认值，回滚到 r3 需要恢复备份' }, '#/p/p-sensor/overview', '2026-09-29T15:30:00+08:00', { work_item_id: 'w-sensor-fix3', run_id: 'r-sensor-fix3', options: [{ id: 'rollback', label: '回滚并恢复备份', kind: 'primary', events: [] }, { id: 'keep', label: '不回滚', kind: null, events: [] }] }) }] },
@@ -1082,8 +1060,8 @@
           { delay: 1200, go: '#/p/p-sensor/overview', event: { type: 'x_fault_recorded', project_id: P, label: '记录故障 F-4：传感器读数间歇性为零', payload: { fault_id: 'F-4', machine_id: 'm-pi' } }, patch: [{ path: 'machines[id=m-pi].last_heartbeat_at', value: '2026-09-29T15:30:00+08:00' }] },
           { delay: 1400, event: { type: 'x_repair_created', project_id: P, work_item_id: 'w-sensor-fix4', run_id: 'r-sensor-fix4', label: '自动建立第 1 个修复事项 w-sensor-fix4', payload: { fault_id: 'F-4' } }, patch: [{ path: 'ops.p-sensor.faults[id=F-4].status', value: 'repairing' }, { path: 'ops.p-sensor.faults[id=F-4].repair_work_item_ids', push: 'w-sensor-fix4' }, { path: 'work_items', push: repairItem('w-sensor-fix4', '修复读数间歇性为零', '2026-09-29T15:30:00+08:00') }, { path: 'runs', push: repairRun('r-sensor-fix4', 'w-sensor-fix4', '2026-09-29T15:30:00+08:00') }] },
           { delay: 1200, event: { type: 'department_activated', project_id: P, work_item_id: 'w-sensor-fix4', run_id: 'r-sensor-fix4', department: 'product', label: '产品判断故障成立', payload: {} }, patch: [{ path: 'work_items[id=w-sensor-fix4].status', value: 'in_progress' }, { path: 'work_items[id=w-sensor-fix4].queue_reason', value: null }, { path: 'work_items[id=w-sensor-fix4].queue_pos', value: null }, { path: 'runs[id=r-sensor-fix4].department', value: 'product' }, { path: 'runs[id=r-sensor-fix4].phase', value: 'PRODUCT_SPEC' }] },
-          { delay: 1200, event: { type: 'transition', project_id: P, work_item_id: 'w-sensor-fix4', run_id: 'r-sensor-fix4', department: 'product', label: '第 1 个修复交给工程', payload: { from: 'product', to: 'engineering', artifact: 'defect' } }, patch: [{ path: 'runs[id=r-sensor-fix4].department', value: 'engineering' }, { path: 'runs[id=r-sensor-fix4].last_department', value: 'product' }, { path: 'runs[id=r-sensor-fix4].phase', value: 'ENGINEERING' }] },
-          { delay: 1400, event: { type: 'tool_called', project_id: P, work_item_id: 'w-sensor-fix4', run_id: 'r-sensor-fix4', department: 'engineering', label: '工程把采样改为读两遍取中值，deploy_check 通过', payload: { tool: 'run_command', exit_code: 0, timed_out: false } }, patch: [] },
+          { delay: 1200, event: { type: 'spec_accepted', project_id: P, work_item_id: 'w-sensor-fix4', run_id: 'r-sensor-fix4', department: 'product', label: '第 1 个修复的 PRD 被接纳，工程关注的 PRD 有了新版本', payload: {} }, patch: [{ path: 'runs[id=r-sensor-fix4].department', value: 'engineering' }, { path: 'runs[id=r-sensor-fix4].last_department', value: 'product' }, { path: 'runs[id=r-sensor-fix4].phase', value: 'ENGINEERING' }] },
+          { delay: 1400, event: { type: 'tool_called', project_id: P, work_item_id: 'w-sensor-fix4', run_id: 'r-sensor-fix4', department: 'engineering', label: '工程把采样改为读两遍取中值，命令 python scripts/deploy_check.py 通过', payload: { tool: 'bash', command: 'python scripts/deploy_check.py', exit_code: 0, timed_out: false } }, patch: [] },
           { delay: 1400, event: { type: 'x_deployed', project_id: P, department: 'operations', work_item_id: 'w-sensor-fix4', run_id: 'r-sensor-fix4', label: '部署第 1 个修复 r5，进入观察窗口', payload: { version: 'r5', machine_id: 'm-pi' } }, patch: [{ path: 'ops.p-sensor.env.version', value: 'r5' }, { path: 'ops.p-sensor.releases', push: { version: 'r5', at: '2026-09-29T15:31:00+08:00', method: '常设授权以内', note: '修复 F-4 的第 1 次' } }, { path: 'ops.p-sensor.faults[id=F-4].observe_until', value: '2026-09-30T15:31:00+08:00' }] },
           { delay: 1400, go: '#/p/p-sensor/overview', event: { type: 'x_fault_recorded', project_id: P, label: '观察窗口内同一故障再次出现', payload: { fault_id: 'F-4', machine_id: 'm-pi' } }, patch: [{ path: 'ops.p-sensor.faults[id=F-4].status', value: 'open' }] },
           { delay: 1400, event: { type: 'x_repair_failed', project_id: P, work_item_id: 'w-sensor-fix4', run_id: 'r-sensor-fix4', label: '第 1 次修复记为失败，自动建立第 2 个修复事项 w-sensor-fix5', payload: { fault_id: 'F-4' } }, patch: [{ path: 'ops.p-sensor.faults[id=F-4].failures', value: 1 }, { path: 'ops.p-sensor.faults[id=F-4].status', value: 'repairing' }, { path: 'ops.p-sensor.faults[id=F-4].repair_work_item_ids', push: 'w-sensor-fix5' }, { path: 'work_items', push: repairItem('w-sensor-fix5', '再次修复读数间歇性为零', '2026-09-29T15:31:00+08:00') }, { path: 'runs', push: repairRun('r-sensor-fix5', 'w-sensor-fix5', '2026-09-29T15:31:00+08:00') }] },

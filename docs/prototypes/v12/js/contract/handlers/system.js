@@ -528,14 +528,15 @@
     return out;
   });
 
+  // 工具与扩展页的只读汇总（网络取回与 MCP 工具设计说明第 11.3 节）：各项目最近的取回记录；
+  // 各项目的 MCP 服务器、最近一次状态与工具。服务器写在项目设置里，这里不修改
   B.query('tools.registry', (params, db) => {
     const tools = db.data.tools;
     if (!tools) throw new Error('当前档位没有工具登记');
+    const projects = db.data.projects || [];
     const out = {
-      design_note: '设计待定',
       network: Y12.clone(tools.network),
-      mcp: Y12.clone(tools.mcp),
-      hooks: { note: 'Stage 6 设计' }
+      mcp: (tools.mcp || []).filter((server) => projects.some((p) => p.id === server.project_id)).map((server) => Y12.clone(server))
     };
     if (db.atLeast('3.2D') && tools.browser) out.browser = Y12.clone(tools.browser);
     if (db.atLeast('3.2D') && tools.computer_use) out.computer_use = Y12.clone(tools.computer_use);
@@ -1361,8 +1362,11 @@
       if (!run) throw new Error('排空列表中的 run 不存在：' + runId);
       const item = db.workItem(run.work_item_id);
       if (!item) throw new Error('run 的事项不存在：' + run.work_item_id);
+      // 因升级重新开始的事项取项目的起点（恢复契约第 6 节第 10 行）：采纳成果，没有时是起始文件夹快照，都没有时是空树
       const project = db.project(item.project_id);
       const adoption = project ? B.helpers.adoptions(project).slice(-1)[0] : null;
+      const startPoint = adoption ? '采纳成果 ' + adoption.version
+        : project && project.initial_snapshot ? '起始文件夹快照（' + project.initial_snapshot.files + ' 个文件）' : '空树';
       const newId = run.id + '-upgrade';
       restartedIds.add(item.id);
       const restarted = byProject.get(item.project_id) || [];
@@ -1376,11 +1380,11 @@
         run_id: run.id,
         department: run.department,
         label: item.title + ' 的 run 记为因升级停止',
-        payload: { stop_reason: { code: 'upgrade', text: '因升级停止' }, recovery_state: 'terminated' },
+        payload: { stop_reason: { code: 'upgrade', text: '因升级停止' }, recovery_state: 'stopped' },
         patch: [
           { path: 'runs[id=' + run.id + '].phase', value: 'DONE' },
           { path: 'runs[id=' + run.id + '].stop_reason', value: { code: 'upgrade', text: '因升级停止' } },
-          { path: 'runs[id=' + run.id + '].recovery.state', value: 'terminated' },
+          { path: 'runs[id=' + run.id + '].recovery.state', value: 'stopped' },
           { path: 'runs[id=' + run.id + '].recovery.reason', value: '因升级停止，旧 run 保留只读' },
           { path: 'work_items[id=' + item.id + '].status', value: 'stopped' }
         ]
@@ -1390,8 +1394,8 @@
         project_id: item.project_id,
         work_item_id: item.id,
         run_id: newId,
-        label: item.title + ' 用已采纳成果重新开始，排在队列最前面',
-        payload: { from_adoption: adoption ? adoption.version : null, queue_pos: pos, upgrade_restart: true },
+        label: item.title + ' 用项目的起点（' + startPoint + '）重新开始，排在队列最前面',
+        payload: { start_point: startPoint, queue_pos: pos, upgrade_restart: true },
         patch: [{
           path: 'runs',
           push: {
