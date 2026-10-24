@@ -95,6 +95,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - `agents_jour/`：执行者与审查者的日记，一张工单一个文件（`agents_jour/<工单编号>.md`）；2026-10-06 之前的日记已归档为 `docs/archive/agents_jour.md`，不再追加。
 
 ### docs/
+- `docs/architecture.html`：总图，给用户看的一页：怎么运转、什么能动、建到哪了。只由总架构师改。
 - `docs/program-roadmap.md`：总体路线图，阶段定义与依赖的入口。
 - `docs/current-baseline.md`：当前验收基线与证据状态。
 - `docs/foundation-rules.md`：六条基础规则与属于它们的具体规则，属于可信内核，只由用户修改。

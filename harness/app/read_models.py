@@ -28,14 +28,16 @@ ATTEMPT_TYPES = frozenset({
     EventType.MODEL_REQUEST_SERIALIZED, EventType.MODEL_MESSAGE, EventType.MODEL_ATTEMPT_FINISHED,
     EventType.MODEL_ATTEMPT_FAILED, EventType.MODEL_RETRY_SCHEDULED, EventType.MODEL_STREAM_PROGRESS,
 })
-# 流转记录吸收的事件种类：部门之间的请求与回答、交付到达与质检退回
+# 流转记录吸收的事件种类：部门之间的请求与回答、交付到达与质检退回、PRD 被接纳
 FLOW_TYPES = frozenset({
     EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
+    EventType.SPEC_ACCEPTED,
 })
 # 读取模型的推导版本：改了调用尝试表或流转记录的推导方式就把它加一。
 # 服务打开读取模型时，保存的版本与这个不同（含旧文件里没有这一行）就从事件重放重建一次——
 # 读模型是增量投影，修了算法不会让旧行跟着变（工单 #684）。
-DERIVATION_VERSION = 1
+# 第 2 版：流转记录开始吸收 PRD 被接纳（工单 #882）。
+DERIVATION_VERSION = 2
 # 推导版本在读取模型自己的表里：app_read_meta 的 key 是 "derivation_version"
 DERIVATION_KEY = "derivation_version"
 # 质检退回的判定到承接部门的对应；与项目流使用的退回判定必须是同一个集合，启动时核对
@@ -376,6 +378,16 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
         "position": event.position, "seq": event.stream_version, "event_id": event.event_id,
         "created_at": event.created_at,
     }
+    if event.type == EventType.SPEC_ACCEPTED:
+        # PRD 被接纳（工单 #882）：产品→工程与产品→质检各一条，两个部门都关注 PRD 的新版本。
+        # 两条的编号不同（事件编号加接收部门），否则后一条会盖掉前一条。
+        content = _spec_version_content(payload)
+        return [{**base, "flow_id": f"{event.event_id}:engineering", "kind": "PRD 新版本",
+                 "direction_from": "product", "direction_to": "engineering",
+                 "status": "已完成", "content": content},
+                {**base, "flow_id": f"{event.event_id}:quality", "kind": "PRD 新版本",
+                 "direction_from": "product", "direction_to": "quality",
+                 "status": "已完成", "content": content}]
     if event.type == EventType.DELIVERY_ACCEPTED:
         # 交付到达（工单 #556：不再有阶段迁移事件，版本交付的记录由交付到达给出）
         return [{**base, "flow_id": event.event_id, "kind": "版本交付",
@@ -396,3 +408,17 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
                  "direction_from": "quality", "direction_to": _REWORK_DEPARTMENTS[payload["verdict"]],
                  "status": "已退回", "content": payload.get("rationale", "")}]
     return []
+
+
+def _spec_version_content(payload: dict[str, Any]) -> str:
+    # PRD 新版本的记录内容：第几版；有改动记录时附上改动的要点（改了哪些、为什么改）
+    revision = payload.get("revision")
+    text = f"第 {revision} 版" if isinstance(revision, int) else "PRD 新版本"
+    change = payload.get("change_record") or {}
+    changed = [str(item).strip() for item in (change.get("changed") or []) if str(item).strip()]
+    rationale = str(change.get("rationale") or "").strip()
+    if changed:
+        text = f"{text}；改动：{'、'.join(changed)}"
+    if rationale:
+        text = f"{text}；说明：{rationale}"
+    return text

@@ -31,7 +31,7 @@
 后果：
 
 - 取代 ADR-0027 的两处：可信内核里的「裁决读取的运行状态投影」改为「骨架自己算的最小投影」；内核清单里 `harness/projection.py` 与 `harness/models.py` 的条目改为最小投影模块与事件信封、骨架事件的数据结构，应用的投影与应用事件的数据结构移出内核文件。清单的修改由用户在合并对应工单时批准。
-- [总体架构](../design/architecture/overall-architecture.md)第 1.1、2、6.1 节、[可信内核设计说明](../design/trusted-kernel.md)第 2、3 节、[三部门的循环结构](../design/department-loop.md)（成果驱动路由的设计说明）、[测试分层设计说明](../design/test-pyramid.md)第 4 节按本 ADR 修改；设计见[骨架与应用设计说明](../design/skeleton-and-application.md)。
+- [总体架构](../design/architecture/overall-architecture.md)第 1.5（2026-10-25 之前是第 1.1 节）、2、6.1 节、[可信内核设计说明](../design/trusted-kernel.md)第 2、3 节、[三部门的循环结构](../design/department-loop.md)（成果驱动路由的设计说明）、[测试分层设计说明](../design/test-pyramid.md)第 4 节按本 ADR 修改；设计见[骨架与应用设计说明](../design/skeleton-and-application.md)。
 - 术语表增加骨架、应用、最小投影、薄驱动、路由契约、装配契约、执行契约、骨架事件、看门狗、金丝雀任务、健康协议。
 - Stage 3 新增工作包「骨架与应用」与里程碑 M0.5，排在 M0 之后、M2 之前；M2 的核心工单在新结构上做。迭代底座的 B2 已随 #350 完成（`harness/bounds.py`），B1、B7 继续。
 - 看门狗的健康协议是骨架的对外合同之一，设计在 Stage 4 补全；真实用户场景验收进入测试分层的发布前一层，运行器的工单在评测工作线。
