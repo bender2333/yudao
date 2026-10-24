@@ -436,7 +436,7 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
             `${departmentName(record.direction_from) || "没有"} → ${departmentName(record.direction_to) || "没有"}`,
             record.kind,
             record.content,
-            <span key={`${record.flow_id}-status`} className={record.kind === "返工" || record.status === "已退回" ? "rework" : undefined}>
+            <span key={`${record.flow_id}-status`} className={record.status === "已退回" ? "rework" : undefined}>
               {record.status}
             </span>,
           ])}
