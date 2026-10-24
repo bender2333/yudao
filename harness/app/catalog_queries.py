@@ -6,12 +6,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Literal, Mapping
 
-from ..models import DEPARTMENTS, CatalogEventType
+from ..models import DEPARTMENTS, CatalogEventType, EventType, ProjectEventType
 from ..providers import DEFAULT_TIMEOUT_SEC, capabilities
 from ..providers.errors import CatalogValidationError
 from .contracts import Contract, Snapshot
 from .project_queries import NotFound
-from .registry import QueryDefinition
+from .registry import QueryDefinition, UnchangedEvent
 
 if TYPE_CHECKING:
     from .application import Application
@@ -236,6 +236,18 @@ def _catalog_document(application: Application, _request: None) -> Snapshot[Cata
 _CATALOG_EVENTS = (CatalogEventType.CATALOG_REVISED, CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
                    CatalogEventType.CATALOG_TEST_FINISHED, CatalogEventType.CREDENTIAL_CHANGED)
 
+# 模型调用的过程事件：这些高频事件不改变目录的内容（工单 #891）
+_CATALOG_UNCHANGED_EVENTS = (
+    UnchangedEvent(EventType.CONTEXT_ASSEMBLED, "上下文装配不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_REQUEST_SERIALIZED, "请求序列化不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_REQUESTED, "发出模型请求不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_MESSAGE, "模型消息不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_REASONING, "模型的推理内容不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_STREAM_PROGRESS, "流式进度不改变目录的内容"),
+    UnchangedEvent(EventType.TOOL_STARTED, "工具开始不改变目录的内容"),
+    UnchangedEvent(EventType.TOOL_CALLED, "工具调用不改变目录的内容"),
+)
+
 
 def _definition_identity(item: Mapping[str, Any]) -> ImpactDefinition:
     return ImpactDefinition(model_id=str(item.get("id") or ""),
@@ -372,9 +384,15 @@ def _change_impact(application: Application, request: ChangeImpactRequest) -> Sn
 
 
 CATALOG_QUERY = QueryDefinition(name="catalog", request=None, result=Catalog, handle=_catalog,
-                                changed_by=_CATALOG_EVENTS)
+                                changed_by=_CATALOG_EVENTS, unchanged_by=_CATALOG_UNCHANGED_EVENTS)
 CATALOG_DOCUMENT_QUERY = QueryDefinition(name="catalog.document", request=None, result=CatalogDocument,
-                                         handle=_catalog_document, changed_by=_CATALOG_EVENTS)
+                                         handle=_catalog_document, changed_by=_CATALOG_EVENTS,
+                                         unchanged_by=_CATALOG_UNCHANGED_EVENTS)
 CATALOG_CHANGE_IMPACT_QUERY = QueryDefinition(name="catalog.change_impact", request=ChangeImpactRequest,
                                               result=ChangeImpact, handle=_change_impact,
-                                              changed_by=_CATALOG_EVENTS)
+                                              # 结果里列出进行中的事项：事项开始与结束改变这份清单
+                                              changed_by=(*_CATALOG_EVENTS,
+                                                          EventType.RUN_CREATED, EventType.RUN_DONE,
+                                                          EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                                                          ProjectEventType.WORK_ITEM_CREATED,
+                                                          ProjectEventType.WORK_ITEM_START_FAILED))

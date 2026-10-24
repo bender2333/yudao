@@ -6,10 +6,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from ..definitions import DEFINITIONS
-from ..models import CatalogEventType
+from ..models import CatalogEventType, EventType
 from ..parameters import current_values, history
 from .contracts import Contract, Snapshot
-from .registry import QueryDefinition
+from .registry import QueryDefinition, UnchangedEvent
 from .replay import ReplayRequest, check_position
 
 if TYPE_CHECKING:
@@ -92,4 +92,14 @@ def _rules_registry(application: Application, request: RulesRegistryRequest) -> 
 RULES_REGISTRY = QueryDefinition(
     name="rules.registry", request=RulesRegistryRequest, result=RuleRegistry,
     handle=_rules_registry, changed_by=(CatalogEventType.PARAMETER_SET,), replayable=True,
+    unchanged_by=(
+        UnchangedEvent(EventType.CONTEXT_ASSEMBLED, "上下文装配不改变规则登记：登记的现值只由参数事件改变"),
+        UnchangedEvent(EventType.MODEL_REQUEST_SERIALIZED, "请求序列化不改变规则登记：登记的现值只由参数事件改变"),
+        UnchangedEvent(EventType.MODEL_REQUESTED, "发出模型请求不改变规则登记：登记的现值只由参数事件改变"),
+        UnchangedEvent(EventType.MODEL_MESSAGE, "模型消息不改变规则登记：登记的现值只由参数事件改变"),
+        UnchangedEvent(EventType.MODEL_REASONING, "模型的推理内容不改变规则登记：登记的现值只由参数事件改变"),
+        UnchangedEvent(EventType.MODEL_STREAM_PROGRESS, "流式进度不改变规则登记：登记的现值只由参数事件改变"),
+        UnchangedEvent(EventType.TOOL_STARTED, "工具开始不改变规则登记：登记的现值只由参数事件改变"),
+        UnchangedEvent(EventType.TOOL_CALLED, "工具调用不改变规则登记：登记的现值只由参数事件改变"),
+    ),
 )
