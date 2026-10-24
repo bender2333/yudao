@@ -8,7 +8,9 @@ import uuid
 from dataclasses import asdict
 from pathlib import Path
 
+import pygit2
 import pytest
+from pygit2.enums import RepositoryOpenFlag
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
@@ -364,3 +366,82 @@ def test_provenance_is_empty_for_directories_that_are_not_work_trees(tmp_path):
     subprocess.run(["git", "init", "-q", str(unborn)], check=True, env=_git_environment())
     with pytest.raises(TreeError):
         git_provenance(unborn)
+
+
+def _unreadable_repository(root: Path) -> Path:
+    # 一个 libgit2 打不开的仓库：仓库的 config 损坏，模拟「仓库不属于当前用户」的归属检查失败（工单 #841）
+    _git(root, "init", "-q")
+    (root / ".git" / "config").write_text("this is not a git config\n", encoding="utf-8")
+    return root
+
+
+def _assert_cannot_be_opened(root: Path) -> None:
+    # 这个前提要成立：仓库确实存在，但 libgit2 打开它时报错
+    with pytest.raises(pygit2.GitError):
+        pygit2.Repository(str(root), flags=RepositoryOpenFlag.NO_SEARCH)
+
+
+def _create_project_over_http(client, name: str, initial_directory: Path):
+    return client.post("/api/commands/project.create", json={
+        "command_id": str(uuid.uuid4()), "name": name, "goal": GOAL,
+        "initial_directory": str(initial_directory)})
+
+
+def test_provenance_ignores_the_repository_above_the_source_directory(data_dir, tmp_path):
+    # 验收（#841）：上层目录里的 .git 打不开（模拟归属检查失败）时，起始文件夹照常建成，来源为空。
+    # 上层目录的仓库不是这个文件夹的来源，也不被打开。
+    parent = tmp_path / "home"
+    parent.mkdir()
+    _unreadable_repository(parent)
+    _assert_cannot_be_opened(parent)
+    source = _make_source(parent / "project")
+    assert git_provenance(source) == {}
+    system = _system(data_dir)
+    application = Application(system)
+    with running_api(lambda: application) as client:
+        response = _create_project_over_http(client, "上层有仓库的项目", source)
+        assert response.status_code == 200, response.text
+        project_id = response.json()["refs"]["project_id"]
+        events = system.store.list_project_events(project_id)
+        assert events[0].payload["initial_snapshot"]["provenance"] == {}
+
+
+def test_provenance_is_empty_when_the_repository_above_has_no_commits(data_dir, tmp_path):
+    # 验收（#841）：上层目录是当前用户的仓库但还没有提交时，起始文件夹照常建成，来源为空。
+    # 上层仓库读不出 HEAD，但那个仓库不是这个文件夹的来源。
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    pygit2.init_repository(str(parent))
+    with pytest.raises(pygit2.GitError):
+        pygit2.Repository(str(parent), flags=RepositoryOpenFlag.NO_SEARCH).head
+    source = _make_source(parent / "src")
+    assert git_provenance(source) == {}
+    system = _system(data_dir)
+    application = Application(system)
+    with running_api(lambda: application) as client:
+        response = _create_project_over_http(client, "上层有未提交仓库的项目", source)
+        assert response.status_code == 200, response.text
+        project_id = response.json()["refs"]["project_id"]
+        events = system.store.list_project_events(project_id)
+        assert events[0].payload["initial_snapshot"]["provenance"] == {}
+
+
+def test_create_rejects_a_source_directory_whose_repository_cannot_be_opened(data_dir, tmp_path):
+    # 验收（#841）：源目录本身是仓库但打不开时，project.create 以 source_invalid 拒绝，
+    # 说明里有这个目录与原因，不是 500
+    source = _make_source(tmp_path / "source")
+    _unreadable_repository(source)
+    _assert_cannot_be_opened(source)
+    system = _system(data_dir)
+    application = Application(system)
+    with running_api(lambda: application) as client:
+        response = _create_project_over_http(client, "打不开的仓库", source)
+        assert response.status_code == 409, response.text
+        body = response.json()
+        assert body["reason"] == "source_invalid"
+        # 说明写明目录与原因
+        assert str(source.absolute()) in body["message"]
+        assert "Git" in body["message"]
+        # 没有建立项目
+        assert client.get("/api/queries/projects.list").json()["data"]["projects"] == []
+
