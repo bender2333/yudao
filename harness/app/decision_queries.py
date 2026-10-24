@@ -13,7 +13,7 @@ from ..projects import ProjectNotFoundError, project_projection
 from ..projection import saved_decisions
 from .contracts import CommandId, Contract, Snapshot
 from .payloads import DecisionRequestedPayload, InstanceUpgradeRequested, ProjectDecisionRequestedPayload
-from .registry import QueryDefinition
+from .registry import QueryDefinition, UnchangedEvent
 from .replay import ReplayRequest, check_position, decisions_through
 
 if TYPE_CHECKING:
@@ -131,5 +131,15 @@ DECISIONS_LIST = QueryDefinition(
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN,
                 CatalogEventType.INSTANCE_UPGRADE_REQUESTED, CatalogEventType.INSTANCE_UPGRADE_ANSWERED,
                 CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN),
+    unchanged_by=(
+        UnchangedEvent(EventType.CONTEXT_ASSEMBLED, "上下文装配不改变决定请求的列表"),
+        UnchangedEvent(EventType.MODEL_REQUEST_SERIALIZED, "请求序列化不改变决定请求的列表"),
+        UnchangedEvent(EventType.MODEL_REQUESTED, "发出模型请求不改变决定请求的列表"),
+        UnchangedEvent(EventType.MODEL_MESSAGE, "模型消息不改变决定请求的列表"),
+        UnchangedEvent(EventType.MODEL_REASONING, "模型的推理内容不改变决定请求的列表"),
+        UnchangedEvent(EventType.MODEL_STREAM_PROGRESS, "流式进度不改变决定请求的列表"),
+        UnchangedEvent(EventType.TOOL_STARTED, "工具开始不改变决定请求的列表"),
+        UnchangedEvent(EventType.TOOL_CALLED, "工具调用不改变决定请求的列表"),
+    ),
     replayable=True,
 )
