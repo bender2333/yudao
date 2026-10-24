@@ -77,6 +77,27 @@ def lan_address() -> str:
     return "127.0.0.1"
 
 
+def explore_turn() -> FakeTurn:
+    # 质检的预测性探索（循环结构第 3.1 节、工单 #557）：PRD 被接纳以后还没有交付，
+    # 质检按 PRD 起草测试用例，写进质检自己的测试材料。这一轮没有交付可以核验，
+    # 提交的结论被拒绝，这一轮到此结束；交付到达以后质检开始新一轮工作。
+    return FakeTurn(
+        writes={f"{QA_TESTS_DIR}/test_echo.py": "assert True\n"},
+        proposal=review("release", "按 PRD 起草了测试用例；还没有交付可以核验"))
+
+
+def quality_turn(review_factory):
+    # 质检的每一轮按这一轮开始时有没有交付决定做什么（工单 #852）：没有交付的一轮是预测性探索，
+    # 有交付的一轮是核验。写死的轮次在部门同时运行以后会被打乱（先到的会话取走后面那个项目的轮次），
+    # 因此按请求里看到的事实决定，与 harness/demo.py 同一做法。
+    def turn(call):
+        if not prompt_part(call, "current_delivery_spec"):
+            return explore_turn()
+        return review_factory(call)
+
+    return turn
+
+
 def script():
     # 预置脚本按部门给出（工单 #852）。
     #
@@ -128,15 +149,13 @@ def script():
             return delivery_turn()(call)
         return delivery_turn()(call)
 
-    def quality_turn(call):
+    def project_quality_turn(call):
         item = item_text(call)
         seen = marks(item, "quality")
         if not prompt_part(call, "current_delivery_spec"):
             # 预测性探索：这一轮没有交付可以核验，提交的结论被拒绝，这一轮到此结束
             # （循环结构第 3.1 节）。交付到达以后质检开始新一轮工作
-            return FakeTurn(
-                writes={f"{QA_TESTS_DIR}/test_echo.py": "assert True\n"},
-                proposal=review("release", "按 PRD 起草了测试用例；还没有交付可以核验"))
+            return explore_turn()
         if item == HISTORY_ITEM:
             # 交付历史：质检先询问工程（质检 → 工程），回答以后记下缺陷记录；
             # 返工以后的交付核验通过以后放行
@@ -164,7 +183,7 @@ def script():
     return {
         "product": [product_turn] * 8,
         "engineering": [engineering_turn] * 16,
-        "quality": [quality_turn] * 16,
+        "quality": [project_quality_turn] * 16,
         "product:ask": [answer_product_turn] * 4,
         "engineering:ask": [answer_engineering_turn] * 4,
     }
@@ -174,13 +193,16 @@ def initial_script():
     # 起始文件夹的端到端验收（工单 #323）：产品先列出工作区里的文件、再读一个起点文件夹里的文件，
     # 然后走完一轮三部门。工作区由起始文件夹的快照建成，这两次读取的输出因此在部门工作间的
     # 「动作与回执」与事件详情里给出起点文件夹里的文件。
-    return [
-        read_turn("list-initial", "list_files", {}),
-        read_turn("read-initial", "read_file", {"path": "README.md"}),
-        product_spec(),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 脚本按部门给出（工单 #852）：部门同时运行以后，一份按先后排队的脚本会被打乱。
+    return {
+        "product": [
+            read_turn("list-initial", "list_files", {}),
+            read_turn("read-initial", "read_file", {"path": "README.md"}),
+            product_spec(),
+        ],
+        "engineering": [delivery_turn()],
+        "quality": [quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 2,
+    }
 
 def room_script():
     # 部门房间的端到端验收（工单 #177）：产品的模型请求分三段流式返回，每段之间停顿；
@@ -224,6 +246,8 @@ def room_script():
 
     return {
         # 预置事项与端到端测试事项都按部门会话推进；询问回答单独走 quality:ask。
+        # 质检的轮次按这一轮有没有交付决定做什么（工单 #852）：预置的事项先预测性探索再核验，
+        # 端到端测试开始的事项先预测性探索再流式核验。
         "product": [product_spec(), product_stream],
         "engineering": [
             delivery_turn(),
@@ -233,9 +257,8 @@ def room_script():
             delivery_turn(),
         ],
         "quality": [
-            review_turn("release", "checks passed on the current snapshot"),
-            review_stream,
-        ],
+            quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 2
+            + [quality_turn(review_stream)] * 2,
         "quality:ask": [answer_stream],
     }
 
@@ -274,12 +297,14 @@ def waiting_script():
 def kernel_script():
     # 路径守卫的端到端验收（工单 #354）：预置的事项交付改动了内核清单里的路径，结算因此不采纳，
     # 发出内核修改决定请求；用例在界面上核对卡片给出改动的路径与差异，批准以后交付被采纳。
-    return [
-        product_spec(),
-        delivery_turn(summary="implemented echo CLI", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n",
-                                                             KERNEL_PATH: "# 交付改动的内核文件\n"}),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 脚本按部门给出（工单 #852）：质检在交付到达以前还有一轮预测性探索，写死的轮次不够用。
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary="implemented echo CLI",
+                                      files={"src/echo.py": "import sys\nprint(sys.argv[1])\n",
+                                             KERNEL_PATH: "# 交付改动的内核文件\n"})],
+        "quality": [quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 2,
+    }
 
 
 def read_turn(identity: str, tool: str, arguments: dict):
