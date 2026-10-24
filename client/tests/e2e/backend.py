@@ -29,7 +29,7 @@ import uvicorn
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from harness.adapters.base import ProviderError  # noqa: E402
-from harness.adapters.fake import FakeAdapter, FakeTurn  # noqa: E402
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part  # noqa: E402
 from harness.api.app import create_app  # noqa: E402
 from harness.app.access_tokens import AccessTokenStore  # noqa: E402
 from harness.app.application import Application  # noqa: E402
@@ -44,10 +44,11 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
     WorkItemCreate,
 )
 from harness.app.project_queries import ProjectsList  # noqa: E402
+from harness.environment import QA_TESTS_DIR  # noqa: E402
 from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
     answer_turn, ask_turn, baseline_review_turn, delivery_turn, product_spec,
-    review_turn, structure_turn,
+    review, review_turn, structure_turn,
 )
 from harness.providers.call import ModelResponse  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
@@ -60,6 +61,12 @@ UNAVAILABLE = "Missing configuration: provider credential"
 # 路径守卫的端到端验收（工单 #354）：交付改动的这个路径落在运行实例的内核清单里
 KERNEL_PATH = "harness/bounds.py"
 
+# 预置的四个项目与它们的事项原文（脚本按事项原文分清这是哪一个项目的轮次）
+SAMPLE_ITEM = "实现回声工具"
+HISTORY_ITEM = "实现交付历史"
+BLOCKED_ITEM = "实现逐行处理"
+LIVE_GOAL = "在界面上走完一个事项"
+
 
 def lan_address() -> str:
     # 本机的局域网地址：从另一台机器访问控制主机时用的就是它；没有时用回环
@@ -70,61 +77,132 @@ def lan_address() -> str:
     return "127.0.0.1"
 
 
+def explore_turn() -> FakeTurn:
+    # 质检的预测性探索（循环结构第 3.1 节、工单 #557）：PRD 被接纳以后还没有交付，
+    # 质检按 PRD 起草测试用例，写进质检自己的测试材料。这一轮没有交付可以核验，
+    # 提交的结论被拒绝，这一轮到此结束；交付到达以后质检开始新一轮工作。
+    return FakeTurn(
+        writes={f"{QA_TESTS_DIR}/test_echo.py": "assert True\n"},
+        proposal=review("release", "按 PRD 起草了测试用例；还没有交付可以核验"))
+
+
+def quality_turn(review_factory):
+    # 质检的每一轮按这一轮开始时有没有交付决定做什么（工单 #852）：没有交付的一轮是预测性探索，
+    # 有交付的一轮是核验。写死的轮次在部门同时运行以后会被打乱（先到的会话取走后面那个项目的轮次），
+    # 因此按请求里看到的事实决定，与 harness/demo.py 同一做法。
+    def turn(call):
+        if not prompt_part(call, "current_delivery_spec"):
+            return explore_turn()
+        return review_factory(call)
+
+    return turn
+
+
 def script():
-    # 第一个事项：正常走完一轮三部门（产品 → 工程 → 质检放行），供项目列表与看板显示
-    return [
-        product_spec(),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-        # 第二个项目（交付历史）：一轮包含询问与回答、返工、放行与采纳的运行，
-        # 供首页与概览的时间轴核对交接、返工、询问与回答、采纳都有关键事实（工单 #180 的验收）
-        product_spec(),
-        # 工程向产品提出询问，产品回答（ask_started / ask_answered）
-        ask_turn("product", "How should unknown flags be handled?",
-                 background="Engineering is preparing its independent delivery.",
-                 expected="Explain the intended behavior without changing files."),
-        answer_turn("Print the argument as defined in the current requirement."),
-        delivery_turn(),
-        # 质检向工程提出询问，工程回答（工单 #415）：quality→engineering 因此有「询问」与
-        # 「问题反馈」两种非返工流转，与「返工」一起构成同一对部门上的三种流转
-        ask_turn("engineering", "Which acceptance line governs the rework?",
-                 background="Quality is preparing its verdict on the current delivery.",
-                 expected="Name the acceptance line to follow."),
-        answer_turn("Follow the acceptance line recorded in the requirement."),
-        # 质检退回工程（qa_submitted 的结论为 rework_engineering，返工）
-        review_turn("rework_engineering", "Missing usage text when no argument is provided.",
-                    defects=[{"severity": "major", "summary": "no usage text on empty argv"}]),
-        delivery_turn("added usage text"),
-        # 放行（qa_submitted 的结论为 release），随后由项目采纳（deliverable_adopted）
-        review_turn("release", "checks passed on the current snapshot"),
-        # 第三个项目：产品提交规格以后，工程部门的请求被提供方报告为不可用，
-        # run 停在这次请求之前并发出 model_unavailable 的决定请求（供顶栏待你决定的验收）
-        FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20)),
-        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        # 回答「继续执行」以后再次遇到不可用：发出第二个决定请求，供新的决定请求到达的验收
-        ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-        # 再次回答「继续执行」以后走完剩下的三部门：端到端测试核对一个事项的全过程随事件流完成
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-        # 第四个项目：预置时没有事项。执行槽位空出来以后，端到端测试在界面上提交需求并开始事项，
-        # 这四轮让第二个事项的全过程也在浏览器里随事件流走完
-        product_spec(),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 预置脚本按部门给出（工单 #852）。
+    #
+    # 以前是一份按先后排队的脚本：三个部门轮流来取，谁先来谁先取。部门同时运行以后（工单 #557）
+    # 这个前提没有了——PRD 被接纳以后工程与质检一起开始，质检还多一轮预测性探索，
+    # 先到的会话会把后面那个项目的轮次取走，项目之间因此串了位：预置跑到第二个项目时，
+    # 它的轮次取的是第三个项目的脚本，事项停在等待回答的决定请求上，执行槽位没有空出来，
+    # 第三个项目的新建事项被服务端以「已有事项正在执行」拒绝，后端提前退出。
+    #
+    # 改为每个部门一份脚本，每一轮按请求里看到的事实决定做什么（与 harness/demo.py 同一做法）：
+    # 质检在没有交付的一轮是预测性探索（提交的结论被拒绝，这一轮到此结束），有交付的一轮是核验；
+    # 工程按有没有缺陷记录决定交付什么。这样脚本项的先后不影响结果，项目的顺序也就无关了。
+    state: dict[tuple[str, str], dict[str, bool]] = {}
+
+    def marks(item: str, department: str) -> dict[str, bool]:
+        # 每个部门各自记着自己走到哪一步（工程问过产品、质检问过工程是各自的一次）
+        return state.setdefault((item, department), {})
+
+    def item_text(call) -> str:
+        # 事项原文在请求的 intend 材料里；用它分清这是哪一个项目的轮次
+        return prompt_part(call, "intend") or ""
+
+    def product_turn(call):
+        # 产品：每个事项提交一次规格。「文本工具」那一次带用量，供观测页核对用量记录
+        if item_text(call) == BLOCKED_ITEM:
+            return FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))
+        return FakeTurn(proposal=product_spec())
+
+    def engineering_turn(call):
+        item = item_text(call)
+        seen = marks(item, "engineering")
+        if item == HISTORY_ITEM:
+            # 交付历史：先询问产品（工程 → 产品），回答以后交付；质检记下缺陷记录以后补上用法说明
+            if not seen.get("asked"):
+                seen["asked"] = True
+                return ask_turn("product", "How should unknown flags be handled?",
+                                background="Engineering is preparing its independent delivery.",
+                                expected="Explain the intended behavior without changing files.")
+            if prompt_part(call, "qa_defects"):
+                return delivery_turn("added usage text")(call)
+            return delivery_turn()(call)
+        if item == BLOCKED_ITEM:
+            # 文本工具：前两次请求提供方不可用（回答「继续执行」以后再失败一次），
+            # 以后走完剩下的三部门
+            failures = seen.get("failures", 0)
+            if failures < 2:
+                seen["failures"] = failures + 1
+                return ProviderError(UNAVAILABLE, reason="provider_unavailable")
+            return delivery_turn()(call)
+        return delivery_turn()(call)
+
+    def project_quality_turn(call):
+        item = item_text(call)
+        seen = marks(item, "quality")
+        if not prompt_part(call, "current_delivery_spec"):
+            # 预测性探索：这一轮没有交付可以核验，提交的结论被拒绝，这一轮到此结束
+            # （循环结构第 3.1 节）。交付到达以后质检开始新一轮工作
+            return explore_turn()
+        if item == HISTORY_ITEM:
+            # 交付历史：质检先询问工程（质检 → 工程），回答以后记下缺陷记录；
+            # 返工以后的交付核验通过以后放行
+            if not seen.get("asked"):
+                seen["asked"] = True
+                return ask_turn("engineering", "Which acceptance line governs the rework?",
+                                background="Quality is preparing its verdict on the current delivery.",
+                                expected="Name the acceptance line to follow.")
+            if not seen.get("defect_recorded"):
+                seen["defect_recorded"] = True
+                return review_turn("rework_engineering", "Missing usage text when no argument is provided.",
+                                   defects=[{"severity": "major", "summary": "no usage text on empty argv"}])(call)
+        return review_turn("release", "checks passed on the current snapshot")(call)
+
+    def answer_product_turn(call):
+        # 产品的询问分支：回答工程的问题（交付历史项目）
+        return answer_turn("Print the argument as defined in the current requirement.")(call)
+
+    def answer_engineering_turn(call):
+        # 工程的询问分支：回答质检的问题（交付历史项目）
+        return answer_turn("Follow the acceptance line recorded in the requirement.")(call)
+
+    # 每一项都是同一个按事实决定做什么的轮次，队列只表示「够用多少轮」：
+    # 实际的轮数由运行决定（每个项目一次规格、一次交付、质检的探索与核验各一轮）
+    return {
+        "product": [product_turn] * 8,
+        "engineering": [engineering_turn] * 16,
+        "quality": [project_quality_turn] * 16,
+        "product:ask": [answer_product_turn] * 4,
+        "engineering:ask": [answer_engineering_turn] * 4,
+    }
 
 
 def initial_script():
     # 起始文件夹的端到端验收（工单 #323）：产品先列出工作区里的文件、再读一个起点文件夹里的文件，
     # 然后走完一轮三部门。工作区由起始文件夹的快照建成，这两次读取的输出因此在部门工作间的
     # 「动作与回执」与事件详情里给出起点文件夹里的文件。
-    return [
-        read_turn("list-initial", "list_files", {}),
-        read_turn("read-initial", "read_file", {"path": "README.md"}),
-        product_spec(),
-        delivery_turn(),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 脚本按部门给出（工单 #852）：部门同时运行以后，一份按先后排队的脚本会被打乱。
+    return {
+        "product": [
+            read_turn("list-initial", "list_files", {}),
+            read_turn("read-initial", "read_file", {"path": "README.md"}),
+            product_spec(),
+        ],
+        "engineering": [delivery_turn()],
+        "quality": [quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 2,
+    }
 
 def room_script():
     # 部门房间的端到端验收（工单 #177）：产品的模型请求分三段流式返回，每段之间停顿；
@@ -168,6 +246,8 @@ def room_script():
 
     return {
         # 预置事项与端到端测试事项都按部门会话推进；询问回答单独走 quality:ask。
+        # 质检的轮次按这一轮有没有交付决定做什么（工单 #852）：预置的事项先预测性探索再核验，
+        # 端到端测试开始的事项先预测性探索再流式核验。
         "product": [product_spec(), product_stream],
         "engineering": [
             delivery_turn(),
@@ -177,9 +257,8 @@ def room_script():
             delivery_turn(),
         ],
         "quality": [
-            review_turn("release", "checks passed on the current snapshot"),
-            review_stream,
-        ],
+            quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 2
+            + [quality_turn(review_stream)] * 2,
         "quality:ask": [answer_stream],
     }
 
@@ -218,12 +297,14 @@ def waiting_script():
 def kernel_script():
     # 路径守卫的端到端验收（工单 #354）：预置的事项交付改动了内核清单里的路径，结算因此不采纳，
     # 发出内核修改决定请求；用例在界面上核对卡片给出改动的路径与差异，批准以后交付被采纳。
-    return [
-        product_spec(),
-        delivery_turn(summary="implemented echo CLI", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n",
-                                                             KERNEL_PATH: "# 交付改动的内核文件\n"}),
-        review_turn("release", "checks passed on the current snapshot"),
-    ]
+    # 脚本按部门给出（工单 #852）：质检在交付到达以前还有一轮预测性探索，写死的轮次不够用。
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary="implemented echo CLI",
+                                      files={"src/echo.py": "import sys\nprint(sys.argv[1])\n",
+                                             KERNEL_PATH: "# 交付改动的内核文件\n"})],
+        "quality": [quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 2,
+    }
 
 
 def read_turn(identity: str, tool: str, arguments: dict):
@@ -249,9 +330,8 @@ async def seed(application: Application, system: LoopSystem) -> None:
     # 决定请求，run 没有进终态，system.status 的 running_runs 因此大于 0（工单 #207 的停止确认与
     # 「正在运行的事项」验收用它）；第四个只建档，端到端测试在界面上提交需求开始事项。
     # 执行槽位一次一个事项，因此每个项目的事项在当前事项结算以后再建
-    created = await application.command(
-        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="示例项目", goal="实现一个回声工具"),
-        actor="user:local")
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name="示例项目", goal="实现一个回声工具"))
     project_id = created.refs.project_id
     # 项目设置页需要真实的行：写入一个部门 Prompt、记录一条项目材料
     await accept(application, "department_settings.save", DepartmentSettingsSave(
@@ -260,57 +340,48 @@ async def seed(application: Application, system: LoopSystem) -> None:
     await accept(application, "material.record", MaterialRecord(
         command_id=str(uuid.uuid4()), project_id=project_id,
         text="回声工具要能在终端里逐行回显输入。", department="product"))
-    item = await application.command(
-        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=project_id, text="实现回声工具"),
-        actor="user:local")
+    item = await accept(application, "work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=project_id, text=SAMPLE_ITEM))
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
     # 第二个项目（交付历史）：走完一轮包含询问与回答、返工、放行与采纳的事项（工单 #180 的时间轴与回放）
-    created = await application.command(
-        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="交付历史", goal="回放关键事实"),
-        actor="user:local")
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name="交付历史", goal="回放关键事实"))
     history_project = created.refs.project_id
-    item = await application.command(
-        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=history_project, text="实现交付历史"),
-        actor="user:local")
+    item = await accept(application, "work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=history_project, text=HISTORY_ITEM))
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
     # 第三个项目：第二个事项停在模型不可用，留下一个等待回答的决定请求
-    created = await application.command(
-        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="文本工具", goal="逐行处理文本"),
-        actor="user:local")
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name="文本工具", goal="逐行处理文本"))
     blocked_project = created.refs.project_id
-    item = await application.command(
-        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=blocked_project, text="实现逐行处理"),
-        actor="user:local")
+    item = await accept(application, "work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=blocked_project, text=BLOCKED_ITEM))
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
     # 第四个项目：只建档、不建事项。端到端测试在界面上提交需求开始事项，
     # 由事件流把第二个事项的全过程（产品 → 工程 → 质检 → 采纳）走完
-    await application.command(
-        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="实时项目", goal="在界面上走完一个事项"),
-        actor="user:local")
+    await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name="实时项目", goal=LIVE_GOAL))
 
 async def seed_onboarding(application: Application) -> None:
     # 建档脚本的预置（工单 #332）：只建一个空项目，不跑事项。建档轮次全部留给接入已有项目用：
     # 接入的建档 run 要走过产品、工程与质检共六次模型调用，重新开始建档再来六次，
     # 大屏用例再一轮；预置事项消耗这些轮次会让接入的建档 run 在第一次模型请求就耗尽脚本
-    await application.command(
-        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="预置项目", goal="接入前的空项目"),
-        actor="user:local")
+    await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name="预置项目", goal="接入前的空项目"))
 
 async def seed_kernel(application: Application, system: LoopSystem) -> None:
     # 路径守卫的预置（工单 #354）：一个项目、一个改动内核清单路径的事项，跑完以后结算发出决定请求
-    created = await application.command(
-        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="内核改动", goal="改动一个内核文件"),
-        actor="user:local")
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name="内核改动", goal="改动一个内核文件"))
     project_id = created.refs.project_id
-    item = await application.command(
-        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=project_id, text="改动内核文件"),
-        actor="user:local")
+    item = await accept(application, "work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=project_id, text="改动内核文件"))
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
@@ -319,23 +390,24 @@ async def seed_room(application: Application, system: LoopSystem) -> str:
     # 部门房间的端到端验收（工单 #177）：建一个项目并跑完第一个事项（让部门工作间有默认选中的事项，
     # 房间照常渲染）。端到端测试随后打开房间，再经命令开始第二个事项：命令在接口进程的事件循环里
     # 启动这个 run，产品的模型请求因此在房间打开期间分三段流式返回。返回项目标识。
-    created = await application.command(
-        "project.create", ProjectCreate(command_id=str(uuid.uuid4()), name="房间项目", goal="观察部门房间"),
-        actor="user:local")
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name="房间项目", goal="观察部门房间"))
     project_id = created.refs.project_id
-    item = await application.command(
-        "work_item.create", WorkItemCreate(command_id=str(uuid.uuid4()), project_id=project_id, text="预置的已完成事项"),
-        actor="user:local")
+    item = await accept(application, "work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=project_id, text="预置的已完成事项"))
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
     return project_id
 
-async def accept(application: Application, name: str, request) -> None:
-    # 预置数据必须是真实被服务端接受的结果：被拒绝时立即失败，不在客户端一侧兜底
+async def accept(application: Application, name: str, request):
+    # 预置数据必须是真实被服务端接受的结果：被拒绝时立即失败，不在客户端一侧兜底。
+    # 失败时写明服务端给的拒绝理由与说明（工单 #852：以前这里直接取 item.refs，
+    # 被拒绝时抛的是 AttributeError，真正的原因被盖住了）
     result = await application.command(name, request, actor="user:local")
     if not isinstance(result, Accepted):
         raise AssertionError(f"预置 {name} 被拒绝：{result.reason} {result.message}")
+    return result
 
 
 def rejecting_responder(body: dict):

@@ -7,6 +7,8 @@
 
 ---
 
+solo-minimax-M3.1-Flash / 2026-10-24 10:20 / 工单 #852：`docs/design/test-pyramid.md` 第 7 节补两条——端到端装置的模型回答脚本按部门给出、每一轮按请求里看到的事实决定做什么（工单 #557 以后部门同时运行，一份按先后排队的脚本会被先到的会话打乱，项目之间因此串了位，预置第三个项目的事项被服务端以 `busy` 拒绝，后端提前退出）；装置的预置由 `client/tests/e2e/seed.spec.ts` 钉住 / 预置脚本原来是一份按先后排队的队列，三个部门谁先来谁先取；部门同时运行以后这个前提不成立，第一个项目取走了第二个项目的轮次，第二个项目取走了第三个项目的脚本，停在等待回答的决定请求上，执行槽位没有空出来
+
 claude-opus-5-5 / 2026-10-24 10:40 / 试用 d9b7d115 的工单分诊：`docs/design/model-management.md` 第 8.7 节增加「不无限压缩」（同一会话的压缩连续 `compaction.stalled_limit` 次没有推进时以 `compaction_failed` 停止，#840），第 4.7 节写明启动时没有目录文件是「没有文件」不是被删除（#844）；`docs/design/existing-project-onboarding.md` 第 4.6 节写明 Git 来源只看源目录自己、不向上层目录查找，读不出时以 `source_invalid` 拒绝（#841）；`docs/design/app-and-interface.md` 的 `run.export` 一行写明导出是原始记录、不脱敏、分享前用户自己清理（#845）；`docs/design/department-loop.md` 第 4.2 节写明轮次只计主线会话的激活（#857）；`docs/architecture-issues.md` 中 #842 那一条补处理行；`docs/decision.md` 记这次分诊；仓库根的 README 导出命令加一句说明，`.claude/skills/trial/SKILL.md` 的机械扫描只把凭据的值算作问题 / 用户要求诊断与整理 #840 至 #845；#840 的根因是询问修订 PRD 以后记录器仍用旧的工作依据，压缩检查点因此永远找不到；#841、#844 是代码偏离设计；#845 需要架构师给结论
 
 solo-minimax-M3.1-Flash / 2026-10-24 08:43 / 工单 #843：`docs/design/model-management.md` 第 4.3 节与第 9.1 节补一条——连接还没有保存时，模型管理页的「获取模型列表」写明要先保存这份连接与原因，不发请求 / 未保存的连接上这个按钮是禁用的，点击既没有反应也不发请求，用户看不出下一步是先保存（第 4.3 节本来就只对已保存的连接采集）
