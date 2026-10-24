@@ -1074,3 +1074,5 @@ claude-sonnet-5-5 / 2026-10-24 09:14 / 工单与文档的减法审核（#837）�
 claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 补第 5.5 节「裁决的分工」，修改第 3.1 节（`collaboration.py` 是成果驱动的路由，移出内核）、第 4 节（最小投影补齐的几样、成果失效写成事件）、第 7 节、第 12 节（六张拆成 13 张，内核行数与用户批准两条约束，S5 改做法）与第 14 节；新增 docs/research/kernel-projection-reads-2026-10-24.md 并登记索引；ADR-0042 追加补充；D40 第 16 条；docs/decision.md 新增条目 / 用户为 M0.5 要任务分解与排期，清点发现内核读取 59 处投影字段，用户选「分开放」
 
 claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 第 12 节写入 13 张工单的编号，S1c 只改 `validation.py` 的五条、S1c 与 S3 不依赖 S1a；路线图第 2 节第 17 项、Stage 3 计划第 3、9 节、D40「实现状态」改为 13 张的编号 / 按拆分建立与改写工单 #824 至 #829、#858 至 #864
+
+claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 第 12 节加 S0（#871）一行与「开工之前」一条，「用户批准」一条写明 solo 范围下七张等用户合并；docs/decision.md 新增条目；docs/agents/autopilot-runtime.md 第 7 节「唤醒架构师」改为关（solo 进行期间） / 用户决定 M0.5 另开 solo 范围，改内核的七张停在 ready-for-human
