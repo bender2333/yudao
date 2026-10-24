@@ -111,11 +111,13 @@ def test_the_read_model_records_its_derivation_version_and_rebuilds_when_it_chan
 
 def test_the_usage_report_shows_the_breakdown_again_after_the_read_model_rebuilt(data_dir):
     # 观测页的用量统计读的是 project.usage：重建以后这一栏要重新有分项
-    script = [
-        FakeTurn(proposal=product_spec(), usage=USAGE),
-        FakeTurn(proposal=delivery_turn(), usage=USAGE),
-        FakeTurn(proposal=review_turn("release", "checks passed"), usage=USAGE),
-    ]
+    # 脚本按部门给出（工单 #557、#888）：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被这两个部门取用时谁拿到哪一项随调度变化
+    script = {
+        "product": [FakeTurn(proposal=product_spec(), usage=USAGE)],
+        "engineering": [FakeTurn(proposal=delivery_turn(), usage=USAGE)],
+        "quality": [FakeTurn(proposal=review_turn("release", "checks passed"), usage=USAGE)],
+    }
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     project_id = system.projects.register("用量", GOAL)
     work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")

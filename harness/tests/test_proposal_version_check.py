@@ -40,6 +40,13 @@ def _system(tmp_path, *script):
     return system, system.create_run("build an echo CLI")
 
 
+def _system_by_department(tmp_path, scripts):
+    # 脚本按部门给出（工单 #557、#888）：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被这两个部门取用时谁拿到哪一项随调度变化
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(scripts))
+    return system, system.create_run("build an echo CLI")
+
+
 def _events(system, run_id, event_type):
     return [event for event in system.store.list_events(run_id) if event.type == event_type]
 
@@ -235,10 +242,12 @@ def test_a_delivery_bound_to_a_stale_spec_is_rejected(tmp_path):
 
 def test_a_review_bound_to_a_stale_delivery_is_rejected(tmp_path):
     # 质检拿着已被返工取代的 DeliverySpec 提交复核：整次提交被拒绝
-    system, run_id = _system(tmp_path, product_spec(), delivery_turn(), review_turn(
-        "rework_engineering", "naming does not match the requirements",
-        defects=[{"severity": "minor", "summary": "naming"}]),
-        delivery_turn(summary="revised implementation"))
+    system, run_id = _system_by_department(tmp_path, {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(), delivery_turn(summary="revised implementation")],
+        "quality": [review_turn("rework_engineering", "naming does not match the requirements",
+                                 defects=[{"severity": "minor", "summary": "naming"}])],
+    })
     # 跑到质检阶段且已有两个交付版本：第一个已被返工取代，不是当前版本
     projection = system.project(run_id)
     while len(projection.delivery_specs) < 2:
@@ -247,7 +256,7 @@ def test_a_review_bound_to_a_stale_delivery_is_rejected(tmp_path):
     stale_review = FakeTurn(proposal=review(
         "release", "the superseded delivery passed", checks=["smoke"],
         basis_delivery_spec_hash=projection.delivery_specs[0].content_hash), checks={"smoke": 0})
-    system.test_adapter.script = [stale_review]
+    system.test_adapter.scripts = {"quality": [stale_review]}
     submitted_before = len(_events(system, run_id, EventType.QA_SUBMITTED))
     rejected = system.activate_once(run_id)
     [error] = [item for rejection in rejected.rejections for item in rejection["errors"]]
@@ -375,10 +384,12 @@ def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_cur
 
 def test_a_review_with_a_stale_basis_is_rejected_then_resubmitted_with_the_current_version(tmp_path):
     # 质检提交过期的交付依据被拒，读过反馈以后按当前版本重交，放行进入 DONE
-    system, run_id = _system(tmp_path, product_spec(), delivery_turn(),
-                              review_turn("rework_engineering", "naming does not match the requirements",
-                                          defects=[{"severity": "minor", "summary": "naming"}]),
-                              delivery_turn(summary="revised implementation"))
+    system, run_id = _system_by_department(tmp_path, {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(), delivery_turn(summary="revised implementation")],
+        "quality": [review_turn("rework_engineering", "naming does not match the requirements",
+                                 defects=[{"severity": "minor", "summary": "naming"}])],
+    })
     projection = system.project(run_id)
     while len(projection.delivery_specs) < 2:
         projection = system.activate_once(run_id)
@@ -388,7 +399,7 @@ def test_a_review_with_a_stale_basis_is_rejected_then_resubmitted_with_the_curre
         "release", "the superseded delivery passed", checks=["smoke"],
         basis_delivery_spec_hash=projection.delivery_specs[0].content_hash), checks={"smoke": 0})
     submitted_before = len(_events(system, run_id, EventType.QA_SUBMITTED))
-    system.test_adapter.script = [stale]
+    system.test_adapter.scripts = {"quality": [stale]}
     rejected = system.activate_once(run_id)
     [error] = _basis_errors(rejected)
     assert error["field"] == "basis_delivery_spec_hash" and current_hash in error["message"]
@@ -403,7 +414,7 @@ def test_a_review_with_a_stale_basis_is_rejected_then_resubmitted_with_the_curre
             "release", "the current delivery passed", checks=["smoke"],
             basis_delivery_spec_hash=current_hash), checks={"smoke": 0})
 
-    system.test_adapter.script = [resubmit]
+    system.test_adapter.scripts = {"quality": [resubmit]}
     accepted = system.activate_once(run_id)
     assert len(_events(system, run_id, EventType.QA_SUBMITTED)) == submitted_before + 1
     assert accepted.status == "done"

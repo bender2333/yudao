@@ -74,11 +74,14 @@ def _source(root):
 
 
 def _onboarding_script():
-    return [
-        product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"]),
-        structure_turn(requirement_locations=[{"requirement": REQUIREMENT, "locations": [ECHO_FILE]}]),
-        baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}]),
-    ]
+    # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    return {
+        "product": [product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"])],
+        "engineering": [structure_turn(requirement_locations=[{"requirement": REQUIREMENT, "locations": [ECHO_FILE]}])],
+        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
+                                                      "evidence": "smoke"}])],
+    }
 
 
 def _started_work_items(system, project_id):
