@@ -1145,3 +1145,5 @@ claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 补第 5.
 claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 第 12 节写入 13 张工单的编号，S1c 只改 `validation.py` 的五条、S1c 与 S3 不依赖 S1a；路线图第 2 节第 17 项、Stage 3 计划第 3、9 节、D40「实现状态」改为 13 张的编号 / 按拆分建立与改写工单 #824 至 #829、#858 至 #864
 
 claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 第 12 节加 S0（#871）一行与「开工之前」一条，「用户批准」一条写明 solo 范围下七张等用户合并；docs/decision.md 新增条目；docs/agents/autopilot-runtime.md 第 7 节「唤醒架构师」改为关（solo 进行期间） / 用户决定 M0.5 另开 solo 范围，改内核的七张停在 ready-for-human
+
+claude-sonnet-5-5 / 2026-10-25 01:40 / 新增 docs/prototypes/v13/（由 v12 整份复制：画面合同 `js/pixel/contract.js`、翻译层 `js/translate/`、播放时间线 `js/pixel/timeline.js`、三张声明表、场景 24 与 25、工具条「节奏」调节面板，设计说明 design.md 与构建约定 BUILD.md 只写与 v12 的差异）；docs/prototypes/CHANGELOG.md 加 v13 条目，状态「待用户确认」，「当前定稿」仍是 v12 / 画面与播放设计说明第 10 节第 1 条、ADR-0043 要求先做原型；楼层回放对 v12 的逐像素比较与两项页面矩阵检查还没有通过或运行，写在 v13 design.md 第 9 节
