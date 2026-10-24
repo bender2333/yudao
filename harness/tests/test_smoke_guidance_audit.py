@@ -12,7 +12,7 @@ from harness.proposals import (
     answer_turn, ask_turn, delivery_turn, guidance_response,
     product_spec, product_spec_turn,
 )
-from harness.providers.call import ModelResponse
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
 from harness.tests.helpers import quality_turns, recorded_context, system_on_copy
@@ -20,8 +20,15 @@ from harness.tests.saved_rewrite import rewrite_saved_event, rewrite_saved_event
 
 INPUT_V2 = "Also print a status column in the export.\r\n"
 
+# 等 PRD 第 2 版被接纳时让出的次数上限（每次让出 10 毫秒，最多两秒）
+WAIT_LIMIT = 200
+
 def _guidance_ids(request):
     return [item["id"] for item in json.loads(prompt_part(request, "department_guidance"))]
+
+def _spec_revision(system, run_id):
+    projection = system.project(run_id)
+    return 0 if projection.product_spec is None else projection.product_spec.revision
 
 def _list_files(request):
     return ModelResponse(output=[{
@@ -44,6 +51,15 @@ def saved_combined(tmp_path_factory):
         system.add_guidance(request.run_id, "engineering", "请解释当前导出格式的处理边界。")
         system.add_guidance(request.run_id, "engineering", "请在交付文件头部标注导出格式。")
         system.add_input(request.run_id, INPUT_V2)
+        # 等 PRD 第 2 版被接纳以后再交出这一轮的回答：工程处理指导的那一轮因此一定在第 2 版之后开始。
+        # 这一轮跑出来的检查绑定的是它开始时的 PRD 版本（第 2 版），回执才会被采用；
+        # 早于第 2 版开始的回执按当前 PRD 核对时算过时，guidance_results 为空，用例会报 StopIteration。
+        # 等待写成生成器：逐条交出流式片段，把控制权还给事件循环，产品的那一轮才有机会跑完。
+        for _ in range(WAIT_LIMIT):
+            if _spec_revision(system, request.run_id) >= 2:
+                break
+            yield ModelStreamEvent(kind="stream_event", id="wait-for-spec-v2")
+        assert _spec_revision(system, request.run_id) >= 2, "PRD 第 2 版没有被接纳"
         return _list_files(request)
 
     def remember_guidance_then_check(request):
@@ -91,7 +107,7 @@ def saved_combined(tmp_path_factory):
         # 质检关注「PRD 被接纳」：PRD 的每一次修订与每一份新交付都让质检开始一轮工作。
         # 每一轮按这一轮开始时有没有交付决定做什么（预测性探索或核验）
         "quality": quality_turns("release", "Independent quality check passed on the current delivery."),
-    })
+    }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path_factory.mktemp("combined"), adapter)
     holder["system"] = system
     run_id = system.create_run("build an export CLI", max_cycles=20)
