@@ -339,7 +339,7 @@ flowchart TB
 
 ## 14. 与现有设计的关系
 
-- [总体架构](architecture/overall-architecture.md)第 1.1 节的内核段落、第 2 节的可信内核一行、第 6.1 节的流程编排一行按本文修改；第 5 节的依赖方向不变，薄驱动在原来流程编排的位置。
+- [总体架构](architecture/overall-architecture.md)第 1.5 节（2026-10-25 之前是第 1.1 节）的内核段落、第 2 节的可信内核一行、第 6.1 节的流程编排一行按本文修改；第 5 节的依赖方向不变，薄驱动在原来流程编排的位置。
 - [可信内核设计说明](trusted-kernel.md)第 2 节「裁决读取的运行状态投影」改为最小投影，第 3 节清单的 `projection.py`、`models.py`、`collaboration.py` 条目随 S1d、S2a、S5a 修改。
 - [三部门的循环结构](department-loop.md)是成果驱动路由实现的设计说明；[循环与收敛设计说明](loops-and-convergence.md)第 6 节的五条判据对每个路由实现适用。
 - [规则登记与参数设计说明](rules-and-parameters.md)：路由实现的名称是定义，随定义版本改变，不是参数。
