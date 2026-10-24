@@ -7,6 +7,8 @@
 #   3) 删除其下有定义但都没有被引用的 Provider 配置，定义一并删除；有引用时返回 in_use 与引用方；
 #   4) 导入移除了被引用定义的目录文档被整份拒绝，错误写出引用方（部门默认与项目部门设置两类引用方都写出）；
 #   5) 移除定义写入的 catalog_revised 事件载荷通过合同类型校验，operation 记为 remove_model。
+# 工单 #872：进行中事项按（事项，部门）逐条列出——事项里哪个部门的模型选择（项目部门设置，
+# 没有时取部门默认）落在受影响的定义上就列出这个部门，不论它此刻在不在工作（设计说明第 4.4 节）。
 
 from __future__ import annotations
 
@@ -182,10 +184,15 @@ def test_connection_address_change_lists_impact_and_returns_definitions_to_candi
             assert {item["department"] for item in impact["project_settings"]} == {"engineering"}
             assert {item["project_id"] for item in impact["work_items"]} == {project_a}
             assert {item["work_item_id"] for item in impact["work_items"]} == {item_a.work_item_id}
-            # 影响列表里的进行中事项写出它当前所在的部门（工单 #557：同时运行的会话下，
-            # 事项当前所在的部门是最后激活的那一个会话的部门；设计说明第 4.4 节只写
-            # 「正在使用它们的进行中事项」，部门这一项的口径由架构师定，已登记在 docs/architecture-issues.md）
-            assert {item["department"] for item in impact["work_items"]} == {item_a.department}
+            # 影响列表里的进行中事项按（事项，部门）逐条列出（工单 #872，设计说明第 4.4 节）：
+            # 事项里哪个部门的模型选择（项目部门设置，没有时取部门默认）落在受影响的定义上，
+            # 就列出这个部门，不论它此刻在不在工作；一个事项可以出现几次。
+            # 这里三个部门都选中 model-a（项目的工程部门设置与产品、质检两个部门的部门默认），因此列出三行。
+            assert [(item["work_item_id"], item["department"]) for item in impact["work_items"]] == [
+                (item_a.work_item_id, "product"),
+                (item_a.work_item_id, "engineering"),
+                (item_a.work_item_id, "quality")]
+            # 事项此刻所在的部门由最后激活的主线会话决定（工单 #557、#842），与影响列表里写哪个部门无关
             assert item_a.department in {"engineering", "quality"}
             assert impact["revision"] == document["revision"]
 
@@ -205,6 +212,76 @@ def test_connection_address_change_lists_impact_and_returns_definitions_to_candi
     finally:
         server.shutdown()
         server.server_close()
+
+def _impact_with_in_progress_item(tmp_path, *, settings: dict[str, str]) -> tuple[dict[str, Any], Any]:
+    # 起一个进行中的事项并算出改 provider-b 的地址时的影响列表（工单 #872）。
+    # settings 写这个项目的项目部门设置（部门 → 定义），没有写设置的部门按部门默认判断。
+    # 产品交完产品要求以后作废 model-a 与 model-b 的准入，工程与质检此时刻解析不到目标，
+    # 运行停在这些请求之前（设计说明第 5.5 节），事项保持「进行中」；停稳以后把准入放回，
+    # 使影响列表与候选判断仍在有效准入上比较。
+    parked: dict[str, Any] = {}
+
+    def park() -> None:
+        for model_id in ("model-a", "model-b"):
+            record = opened.system.facade._admissions.pop(model_id, None)
+            if record is not None:
+                parked[model_id] = record
+
+    server, _capture, base_url = serve(_department_aware(on_product=park))
+    try:
+        opened = _Opened(tmp_path, base_url=base_url)
+        with running_api(opened) as client:
+            opened.admit(("provider-a", "model-a"), ("provider-b", "model-b"))
+            project_id = _create_project(client, "P")
+            for department, model_id in settings.items():
+                provider_id = "provider-b" if model_id == "model-b" else "provider-a"
+                _set_model(client, project_id, department, provider_id=provider_id, model_id=model_id)
+            run_id = _start_work_item(client, project_id)
+            _finish(opened.system, run_id)
+            for model_id, record in parked.items():
+                opened.system.facade._admissions[model_id] = record
+            item = opened.system.projects.projection(project_id).work_items[-1]
+            proposed = _provider("provider-b", "http://127.0.0.1:2/v1", "KEY_B")
+            impact = _impact(client, kind="connection", provider_id="provider-b",
+                             document=json.dumps({"provider": proposed}, ensure_ascii=False))
+            return impact, item
+    finally:
+        server.shutdown()
+        server.server_close()
+
+def test_work_item_impact_lists_the_department_whose_selection_is_affected(tmp_path):
+    # 只有质检的项目部门设置选中被修改的定义：影响列表里有这个事项，部门是质检
+    # （工单 #872：按（事项，部门）逐条列出，与事项此刻在不在工作无关）
+    impact, item = _impact_with_in_progress_item(tmp_path, settings={"quality": "model-b"})
+    assert item.status == "in_progress", (item.status, item.stop_reason)
+    assert [entry["model_id"] for entry in impact["impacted"]] == ["model-b"]
+    # 产品与工程没有项目部门设置，按部门默认判断：默认是 model-a，不在受影响的定义里，因此不列出
+    assert [(entry["work_item_id"], entry["department"]) for entry in impact["work_items"]] == [
+        (item.work_item_id, "quality")]
+
+def test_work_item_impact_lists_engineering_when_only_engineering_selects_the_definition(tmp_path):
+    # 只有工程的模型选择落在受影响的定义上：影响列表里这个事项写工程。
+    # 事项此刻在哪个部门由最后激活的主线会话决定，与影响列表里写哪个部门无关（工单 #872）
+    impact, item = _impact_with_in_progress_item(tmp_path, settings={"engineering": "model-b"})
+    assert item.status == "in_progress", (item.status, item.stop_reason)
+    assert [(entry["work_item_id"], entry["department"]) for entry in impact["work_items"]] == [
+        (item.work_item_id, "engineering")]
+
+def test_work_item_impact_lists_two_departments_when_both_select_the_definition(tmp_path):
+    # 工程与质检都选中被修改的定义：这个事项出现两行，分别写工程与质检
+    impact, item = _impact_with_in_progress_item(tmp_path, settings={"engineering": "model-b",
+                                                                     "quality": "model-b"})
+    assert item.status == "in_progress", (item.status, item.stop_reason)
+    assert [(entry["work_item_id"], entry["department"]) for entry in impact["work_items"]] == [
+        (item.work_item_id, "engineering"),
+        (item.work_item_id, "quality")]
+
+def test_work_item_impact_omits_the_item_when_no_department_selects_the_definition(tmp_path):
+    # 三个部门都没有选中受影响的定义：这个事项不出现
+    impact, item = _impact_with_in_progress_item(tmp_path, settings={})
+    assert item.status == "in_progress", (item.status, item.stop_reason)
+    assert [entry["model_id"] for entry in impact["impacted"]] == ["model-b"]
+    assert impact["work_items"] == []
 
 def test_remove_definition_referenced_by_project_is_rejected_and_unreferenced_succeeds(tmp_path):
     # 移除被项目部门设置引用的定义返回 in_use 与引用方；移除没有被引用的定义成功

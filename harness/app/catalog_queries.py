@@ -157,7 +157,9 @@ class ImpactProjectSetting(Contract):
     provider_id: str
 
 class ImpactWorkItem(Contract):
-    # 正在使用受影响定义的进行中事项（设计说明第 5.3 节的生效模型：项目部门设置优先，否则部门默认）
+    # 正在使用受影响定义的进行中事项（设计说明第 5.3 节的生效模型：项目部门设置优先，否则部门默认）。
+    # 按（事项，部门）逐条列出：事项里哪个部门的模型选择落在受影响的定义上就写哪个部门，
+    # 与它此刻在不在工作无关（设计说明第 4.4 节，工单 #872）
     project_id: str
     project_name: str
     work_item_id: str
@@ -349,13 +351,17 @@ def _change_impact(application: Application, request: ChangeImpactRequest) -> Sn
                     model_id=str(setting.model_id or ""), provider_id=str(setting.provider_id or "")))
         item = (None if project.active_work_item_id is None
                 else project.work_item(project.active_work_item_id))
-        if item is None or item.status != "in_progress" or not item.department:
+        if item is None or item.status != "in_progress":
             continue
-        department = item.department
-        setting = settings.get(department) if isinstance(settings, Mapping) else None
-        selected = str((setting.model_id if setting is not None else None) or "") or \
-            str((bindings.get(department) or {}).get("model_id") or "")
-        if selected in affected:
+        # 进行中事项按（事项，部门）逐条列出（设计说明第 4.4 节，工单 #872）：
+        # 事项里哪个部门的模型选择（项目部门设置，没有时取部门默认）落在受影响的定义上，就列出这个部门，
+        # 不论它此刻在不在工作——它下一次开始工作时同样会被挡住。一个事项可以出现几次。
+        for department in DEPARTMENTS:
+            setting = settings.get(department) if isinstance(settings, Mapping) else None
+            selected = str((setting.model_id if setting is not None else None) or "") or \
+                str((bindings.get(department) or {}).get("model_id") or "")
+            if selected not in affected:
+                continue
             work_items.append(ImpactWorkItem(
                 project_id=project.project_id, project_name=project.name,
                 work_item_id=item.work_item_id, title=item.title, department=department))
