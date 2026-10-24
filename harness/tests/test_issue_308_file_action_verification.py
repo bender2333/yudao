@@ -39,6 +39,20 @@ def _settle() -> dict:
     return {"writes": {"src/done.txt": "done"},
             "checks": {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}}
 
+def _tool_started(system, run_id: str, action_id: str) -> list[dict]:
+    # 整个 run 里这一个调用编号的 tool_started（工单 #943）：
+    # 动作被重新执行时这里会多出几条——结果没有交还、命令被再运行，用例要在它上面失败
+    return [event.payload for event in killed.events(system, run_id, "tool_started")
+            if (event.payload or {}).get("id") == action_id]
+
+def _tool_output(invocation, call_id: str) -> dict:
+    # 一次模型请求的输入里这一次调用的工具结果；没有就返回空
+    for item in invocation.input_items:
+        if (isinstance(item, dict) and item.get("type") == "function_call_output"
+                and item.get("call_id") == call_id):
+            return item
+    return {}
+
 def test_a_write_that_never_happened_is_retried_once_without_asking_the_user(tmp_path):
     # 验收一（没有发生）：写入执行前终止进程，重启以后工作区与动作前快照相同，
     # 记一条 action_verified（resolution=handed_back），交还模型，没有决定请求
@@ -46,12 +60,16 @@ def test_a_write_that_never_happened_is_retried_once_without_asking_the_user(tmp
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
     # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    # 质检也要给脚本（工单 #943：工单 #935 查出的同一处隐患。PRD 被接纳以后质检会话也发起模型请求，
+    # 没有它的脚本时假模型报「脚本用尽」，整个 run 以 provider_error 提前结束，
+    # 用例在到达中断点以前就失败；这里的日志是空的，风险窗口比 #935 窄，但成因相同）
     script = {
         "product": [{"proposal": product_spec()}],
         "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
     }
 
-    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": [{"proposal": {"kind": "quality_auto"}}]},
                             hold_after="tool_started", hold_action="call-write") as run:
         attempts = killed.tool_attempts(run.after, run.run_id, "call-write")
         assert len(attempts) == 1, "没有发生时交还模型，不再自动重新执行"
@@ -63,6 +81,11 @@ def test_a_write_that_never_happened_is_retried_once_without_asking_the_user(tmp
         assert verified[0].payload["ok"] is False
         assert verified[0].payload["verification"]["verdict"] == "not_happened"
         assert killed.unknown_action_requests(run.after, run.run_id) == []
+        # 结果确实交还了模型（工单 #943）：运行因为提供方报错提前结束的时候，
+        # 重启与交还都没有发生，「没有重新执行」就成了一句空话
+        assert verified[0].payload["id"] == "call-write"
+        # 命令没有被再运行：整个 run 里只有最初那一次调用
+        assert len(_tool_started(run.after, run.run_id, "call-write")) == 1
 def test_a_write_that_happened_is_recorded_as_auto_verified(tmp_path):
     # 验收二（已完成）：写入已经落盘、回执还没写的时候进程终止。重启以后只有目标路径变成目标内容，
     # 记一条 action_verified（resolution=auto_verify），不补造原来的 tool_called，也不问用户
@@ -70,12 +93,16 @@ def test_a_write_that_happened_is_recorded_as_auto_verified(tmp_path):
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
     # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    # 质检也要给脚本（工单 #943：工单 #935 查出的同一处隐患。PRD 被接纳以后质检会话也发起模型请求，
+    # 没有它的脚本时假模型报「脚本用尽」，整个 run 以 provider_error 提前结束，
+    # 用例在到达中断点以前就失败；这里的日志是空的，风险窗口比 #935 窄，但成因相同）
     script = {
         "product": [{"proposal": product_spec()}],
         "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
     }
 
-    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": [{"proposal": {"kind": "quality_auto"}}]},
                             await_file=("src/note.txt", "hello\n")) as run:
         attempts = killed.tool_attempts(run.after, run.run_id, "call-write")
 
@@ -87,8 +114,20 @@ def test_a_write_that_happened_is_recorded_as_auto_verified(tmp_path):
         payload = verified[0].payload
         assert payload["resolution"] == "auto_verify"
         assert payload["id"] == "call-write"
+        assert payload["ok"] is True
         assert payload["verification"]["verdict"] == "completed"
         assert "input_item" in payload, "结果进入部门历史，模型据此继续"
+        # 命令没有被再运行：整个 run 里只有最初那一次调用（工单 #943）
+        assert len(_tool_started(run.after, run.run_id, "call-write")) == 1
+        # 结果确实交还了模型（工单 #943）：模型的下一次请求里带着这一次调用的确定结果。
+        # 这一条场景的结果是自动核实（工单 #308 的验收二），交还的方式与 handed_back 不同，
+        # 但「结果确实回到了模型那里」同样要在用例上核对
+        outputs = [item for item in (_tool_output(invocation, "call-write")
+                                     for invocation in run.after.test_adapter.invocations) if item]
+        assert outputs, "模型没有收到这一次调用的结果"
+        output_data = json.loads(outputs[0]["output"])
+        assert output_data["ok"] is True
+        assert output_data["output"]["resolved"] == "auto_verify"
 
         assert killed.unknown_action_requests(run.after, run.run_id) == [], "已经完成，不必问用户"
 
@@ -109,11 +148,15 @@ def test_other_changes_after_the_snapshot_ask_the_user(tmp_path):
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
     # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    # 质检也要给脚本（工单 #943：工单 #935 查出的同一处隐患。PRD 被接纳以后质检会话也发起模型请求，
+    # 没有它的脚本时假模型报「脚本用尽」，整个 run 以 provider_error 提前结束，
+    # 用例在到达中断点以前就失败；这里的日志是空的，风险窗口比 #935 窄，但成因相同）
     script = {
         "product": [{"proposal": product_spec()}],
         "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
     }
-    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": [{"proposal": {"kind": "quality_auto"}}]},
                             resume_after=False,
                             hold_after="tool_started", hold_action="call-write") as run:
         run.before.workspace(run.run_id).write_file("src/other.txt", "someone else\n")
@@ -128,6 +171,11 @@ def test_other_changes_after_the_snapshot_ask_the_user(tmp_path):
         assert verified[0].payload["resolution"] == "handed_back"
         assert verified[0].payload["ok"] is False
         assert verified[0].payload["verification"]["verdict"] == "unclear"
+        # 结果确实交还了模型（工单 #943）：运行因为提供方报错提前结束的时候，
+        # 重启与交还都没有发生，「没有重新执行」就成了一句空话
+        assert verified[0].payload["id"] == "call-write"
+        # 命令没有被再运行：整个 run 里只有最初那一次调用
+        assert len(_tool_started(run.after, run.run_id, "call-write")) == 1
 
 def test_an_edit_delete_and_move_are_verified_the_same_way(tmp_path):
     # 验收三续：编辑、删除、移动与写入走同一条对比判断。
@@ -174,12 +222,16 @@ def test_a_retry_that_stays_unknown_after_the_chance_is_gone_asks_the_user(tmp_p
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
     # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    # 质检也要给脚本（工单 #943：工单 #935 查出的同一处隐患。PRD 被接纳以后质检会话也发起模型请求，
+    # 没有它的脚本时假模型报「脚本用尽」，整个 run 以 provider_error 提前结束，
+    # 用例在到达中断点以前就失败；这里的日志是空的，风险窗口比 #935 窄，但成因相同）
     script = {
         "product": [{"proposal": product_spec()}],
         "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
     }
 
-    first = killed.interrupted(data_dir, script, tail={"engineering": [], "quality": []},
+    first = killed.interrupted(data_dir, script, tail={"engineering": [], "quality": [{"proposal": {"kind": "quality_auto"}}]},
                                hold_after="tool_started",
                                hold_action="call-write", resume_after=False)
     attempts = killed.tool_attempts(first.before, first.run_id, "call-write")
@@ -189,12 +241,14 @@ def test_a_retry_that_stays_unknown_after_the_chance_is_gone_asks_the_user(tmp_p
     first.close()
 
     # 第二次启动：恢复入口直接交还，写 action_verified(resolution="handed_back")
-    second = killed.restarted(data_dir, {"engineering": [_settle()], "quality": []}, resume_after=False)
+    second = killed.restarted(data_dir, {"engineering": [_settle()], "quality": [{"proposal": {"kind": "quality_auto"}}]}, resume_after=False)
     assert killed.unknown_action_requests(second.after, run_id) == []
     verified = [e for e in killed.events(second.after, run_id, "action_verified")
                 if (e.payload or {}).get("id") == "call-write"]
     assert len(verified) == 1
     assert verified[0].payload["resolution"] == "handed_back"
     assert verified[0].payload["ok"] is False
+    # 命令没有被再运行：整个 run 里只有最初那一次调用（工单 #943）
+    assert len(_tool_started(second.after, run_id, "call-write")) == 1
 
     second.close()

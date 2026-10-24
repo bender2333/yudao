@@ -226,9 +226,12 @@ def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
     from harness.validation import evaluate_proposal
 
     system, run_id = _onboarding_run(tmp_path, {
-        # 脚本按部门给出（工单 #557、#879）
+        # 脚本按部门给出（工单 #557、#879），三个部门都写上（工单 #943）：
+        # 质检在这些用例里不工作，给它的是空脚本——脚本里没有它的名字时，
+        # 假模型在它真的发请求时报「脚本用尽」，整个 run 以 provider_error 提前结束
         "product": [_product_turn()],
         "engineering": [_structure_turn()],
+        "quality": [],
     })
     system.activate_once(run_id)
     result = system.activate_once(run_id)
@@ -298,9 +301,12 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
     from harness.validation import evaluate_proposal
 
     system, run_id = _onboarding_run(tmp_path, {
-        # 脚本按部门给出（工单 #557、#879）
+        # 脚本按部门给出（工单 #557、#879），三个部门都写上（工单 #943）：
+        # 质检在这些用例里不工作，给它的是空脚本——脚本里没有它的名字时，
+        # 假模型在它真的发请求时报「脚本用尽」，整个 run 以 provider_error 提前结束
         "product": [_product_turn()],
         "engineering": [_structure_turn()],
+        "quality": [],
     })
     result = system.activate_once(run_id)
     assert has_new_work(result, "engineering"), result.status
@@ -357,10 +363,11 @@ def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
 
     marked = "导出 PDF 报告（设计中，未实施）：设计文档描述，代码尚未实现"
     system, run_id = _onboarding_run(tmp_path, {
-        # 脚本按部门给出（工单 #557、#879）
+        # 脚本按部门给出（工单 #557、#879），三个部门都写上（工单 #943）
         "product": [FakeTurn(proposal=product_spec(requirements=[DESIGN_CAPABILITY], acceptance=["run the CLI with a word"],
                                       boundaries=[marked]))],
         "engineering": [structure_turn(requirement_locations=[{"requirement": DESIGN_CAPABILITY, "locations": ["src/echo.py"]}])],
+        "quality": [],
     })
     system.activate_once(run_id)
     result = system.activate_once(run_id)
