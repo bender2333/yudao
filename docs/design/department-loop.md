@@ -23,6 +23,8 @@
 ```mermaid
 flowchart LR
     U[用户的输入与指导] --> P[产品]
+    U -. 指导 .-> E
+    U -. 指导 .-> Q
     P -- PRD 被接纳 --> E[工程]
     P -- PRD 被接纳 --> Q[质检]
     E -- 交付 --> Q
