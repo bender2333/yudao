@@ -11,6 +11,8 @@ solo-minimax-M3.1-Flash / 2026-10-24 23:30 / 工单 #876：进程被结束以后
 
 claude-opus-5-5 / 2026-10-24 23:25 / `docs/design/app-and-interface.md` 第 4.3 节 `home.away_report` 的关键事实去掉「交接」，返工注明是质检提交缺陷记录；开放工单 #154 的原型代码路径从 v10 改到 v12；#831 随 v12 定稿关闭 / v12 列出的设计不一致之一：#556 以后关键事实里已经没有交接（`harness/app/home.py` 的 `FACT_KINDS`），术语表也不用「交接」；原型定稿时开放工单里引用旧版本代码的路径改为新版本
 
+solo-minimax-M3.1-Flash / 2026-10-24 23:21 / 工单 #870：`harness/tests/test_smoke_guidance_audit.py` 的夹具 `saved_combined` 在工程第一次请求在途里给完指导与连续输入以后，等 PRD 第 2 版被接纳再交出这一轮的回答（等待写成生成器，逐条交出流式片段把控制权还给事件循环，适配器给 10 毫秒的片段间隔），夹具里加了一句注释说明为什么要等第 2 版 / 部门同时运行以后（#557）产品接纳 PRD 第 2 版与工程处理指导的那一轮的先后随调度变化：工程那一轮若在第 2 版之前开始，它跑出来的检查回执绑定的是第 1 版（`harness/orchestrator.py` 在激活开始时 `bind_check`），`harness/collaboration.py` 的 `_usable_tool_result` 按当前 PRD 核对时不再采用它，`guidance_results` 为空，用例报 `StopIteration`（main 运行 40049559837，本地 64 次里 10 次）；产品行为是对的，过时的依据本来就不该被采用；断言没有放宽，用例没有删除
+
 claude-opus-5-5 / 2026-10-24 23:10 / 原型 v12 定稿：`docs/prototypes/CHANGELOG.md` 的「当前定稿」改为 v12，删除「下一版原型的待办」四条（v12 已处理），[v12] 一节写明已定稿 / 用户看完 v12 同意定稿；开放工单里的原型路径、客户端按 v12 重新生成的登记表与录制、v12 列出的几处设计说明不一致另行处理
 
 claude-opus-5-5 / 2026-10-24 22:50 / `docs/design/test-pyramid.md` 第 11.1 节加一条：基准按会话比较时，会话里的事件只保留不随会话之间先后变化的值——引用别的事件的字段写成被引用事件在它自己会话里的位置，整个事项的累计数（`activations`、`model_steps`、`cycle`）不进会话内事件的比较，依据的版本随先后变化时把场景的先后定下来 / main 的集成层两次有事件序列基准失败（`guidance_response_explained` 的 `context_event_id`、`activation_start_unavailable` 的 `activations` 与 `model_steps`）：#557 把其他编号改成了按会话分组的固定顺序，事件之间的引用仍按全局位置编号，会话事件里还带着整个事项的累计数
