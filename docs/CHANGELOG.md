@@ -7,7 +7,19 @@
 
 ---
 
+claude-sonnet-5-5 / 2026-10-25 00:20 / `docs/prototypes/CHANGELOG.md` 开头加「下一版原型（v13）的待办」：v12 设计说明第 5 节没有定的九处，每处附架构师的推荐，等用户确认 / v12 已冻结，这些未决事项不再改 v12，留给 v13；v13 的主体由画面与数据解耦（ADR-0043）定
+
+claude-sonnet-5-5 / 2026-10-25 00:07 / `docs/design/department-loop.md` 加第 2.1 节「部门的状态」：三个部门各自的状态（等待用户、回答询问、工作中、等待工作）由已记录的事实推出，带一句原因；第 4.7 节写明询问的上一层、询问链与层数；`docs/design/app-and-interface.md` 第 4.3 节 `project.overview`、`project.loop`、`department.workspace`、`run.asks` 各加对应字段 / #477 要界面按部门显示状态与询问，但查询只有「所在部门」一个值，`run.asks` 没有询问链，房间的传信数写死为 0，设计里没有写这些字段，页面没法做；M0 试用的像素画面按 ADR-0043 移到 M0.5，几个部门同时工作只能从页面文字看出，页面这一侧要先补足
+
+claude-opus-5-5 / 2026-10-24 23:49 / 新增 `docs/design/visualization.md`（画面与播放设计说明：服务端、同步层、翻译层、画面层四层与依赖方向，画面合同，声明表与动作三级，播放时间线，翻译覆盖核对，不变式 H1 至 H9，原型 v13 与客户端工单范围）与 `docs/adr/0043-scene-contract-and-playback-belong-to-the-view.md`；`docs/design/app-and-interface.md` 第 5.7 节像素画面一条改为经翻译层，第 5.8 节的不变式移到新说明第 8 节（标题保留、留指向），第 4.3 节 `project.loop` 与第 9 节第 16 条改指新说明；ADR-0021 状态一栏补一行；`docs/requirements/system-intent.md` N-V5 的链接改指新说明；`CONTEXT.md` 新增「画面合同」「播放时间线」；设计索引新增一条 / 用户给出与 Sonnet 讨论的可视化缓冲方案，要求结合视图同步重构，逐项确认（事实只来自数据库，画面的独立是表现形式的独立）
+
 solo-minimax-M3.1-Flash / 2026-10-24 23:30 / 工单 #876：进程被结束以后重新打开事件库时，可写打开（含设置 WAL）也在等待上限内重试——`harness/tests/process_kill.py` 增加 `_open_writable_after_kill` 与 `_open_system_after_kill`，`interrupted` 与 `restarted` 结束进程以后打开系统的四处改用它；只读打开原有的重试不变；产品代码不动（`harness/event_store.py` 没有改）/ GitHub 的 Windows 运行机上进程刚被结束时事件库文件还会被短暂占用，可写打开失败在 `PRAGMA journal_mode=WAL`（2026-10-23 run 39998093540：集成层两条用例报 disk I/O error）；用这个辅助的 8 个文件一起生效，不在各个用例里加重试
+
+minimax-M3.1-Flash / 2026-10-24 23:35 / `docs/agents/triage-labels.md` 补一段：循环交回外部的三条通道（连着三次没过 → `needs-triage` 升级；架构、需求、设计问题 → `needs-triage` 提问题，写结构化评论；执行环境挡住任务 → `ready-for-human` 转给用户，写清哪一步被挡住、试过什么、需要什么），外部处理完标签改回 `ready-for-agent` 后循环刷新时重新排上 / 用户要求工人遇到执行环境问题要有一条通道与用户沟通，由编排者转给用户
+
+minimax-M3.1-Flash / 2026-10-24 23:12 / `docs/agents/triage-labels.md` 补一条：Ralph 循环每一批派活前按外部状态刷新台账（已关闭的标完成、别人在做的这一轮不派、交回人的标成等前提条件）/ 用户补充要求工单与提交都要署名，并问还有什么要加的：solo 署名定为 `solo-minimax-code`（沿用 `solo-<标识>` 形式，标识换成工具名），六处必须署名（提交信息末行、PR 正文末行、工单评论末行、PR 交付说明末行、日记记录行首、变更记录条目行首），提交身份 `GIT_AUTHOR_NAME`/`GIT_COMMITTER_NAME` 也用同一个署名（运行配置第 3 节本来就这么要求，以前没做）；规则本体写在 `.ralph/m0-solo/handoff.md` 与插件的工人契约里，不改仓库规则文件
+
+minimax-M3.1-Flash / 2026-10-24 22:53 / `docs/agents/triage-labels.md`：`needs-triage` 的适用情况从三种增到四种（第四种是 Ralph 循环里同一张工单连续三次没有通过，循环停止重试、交回架构师），solo 模式一节补一段升级通道的写法（标签从 `in-progress` 改成 `needs-triage`，工单上留一条评论写清三次分别卡在哪）与一条刷新规则（派活前按外部状态刷新台账：别人领走的单子这一轮不派，交回人的标成等前提条件）/ 用户要求升级 ralph-loop 技能：工单连续三次失败就升级给架构师，一轮最多并发 4 个、每个任务在自己的 worktree 里；用户指出工单状态会变、台账要在派活前刷新
 
 claude-opus-5-5 / 2026-10-24 23:25 / `docs/design/app-and-interface.md` 第 4.3 节 `home.away_report` 的关键事实去掉「交接」，返工注明是质检提交缺陷记录；开放工单 #154 的原型代码路径从 v10 改到 v12；#831 随 v12 定稿关闭 / v12 列出的设计不一致之一：#556 以后关键事实里已经没有交接（`harness/app/home.py` 的 `FACT_KINDS`），术语表也不用「交接」；原型定稿时开放工单里引用旧版本代码的路径改为新版本
 
