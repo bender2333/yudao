@@ -40,7 +40,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import SHARED_LIST_SCRIPT_PREFIX, FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.project_queries import RunActions, RunRecovery
 from harness.event_store import Command, EventStore
@@ -371,6 +371,16 @@ def _log_text(log: Path) -> str:
     return log.read_text(encoding="utf-8", errors="replace")
 
 
+def _assert_no_shared_list_script(log: Path) -> None:
+    # 子进程里的违反写进子进程的输出（工单 #879）：假模型发现一条列表脚本被工程与质检同时取用时
+    # 把这件事写进输出，父进程读到以后让用例失败（失败落在用例上，不是模型服务的错误）
+    text = _log_text(log)
+    if SHARED_LIST_SCRIPT_PREFIX not in text:
+        return
+    line = next(line for line in text.splitlines() if SHARED_LIST_SCRIPT_PREFIX in line)
+    raise AssertionError(f"子进程里的假模型脚本被工程与质检同时取用：{line}")
+
+
 def _wait_for_marker(marker: Path, process: subprocess.Popen, log: Path) -> None:
     # 等待工具执行中的进程写下标记；进程在此之前退出时报告它的日志
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
@@ -528,6 +538,8 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]] | Mapping[str, 
     finally:
         _kill(process, None if started is None else Path(started).parent)
 
+    _assert_no_shared_list_script(log)
+
     # 只读地观察终止以后、任何系统打开数据目录以前的事件
     observed = _observe(data_dir, onboard is not None, revision)
     before = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
@@ -571,6 +583,8 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]] | Mapping[str, Se
     finally:
         if kill:
             _kill(process, None if started is None else Path(started).parent)
+
+    _assert_no_shared_list_script(log)
 
     # revision 为真时 run_id 取修改轮的 run（建档场景，见 interrupted）
     observed = _observe(data_dir, revision, revision)
