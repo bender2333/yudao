@@ -7,7 +7,9 @@
 
 ---
 
-claude-sonnet-5-5 / 2026-10-25 00:15 / `docs/design/department-loop.md` 加第 2.1 节「部门的状态」：三个部门各自的状态（等待用户、回答询问、工作中、等待工作）由已记录的事实推出，带一句原因；第 4.7 节写明询问的上一层、询问链与层数；`docs/design/app-and-interface.md` 第 4.3 节 `project.overview`、`project.loop`、`department.workspace`、`run.asks` 各加对应字段 / #477 要界面按部门显示状态与询问，但查询只有「所在部门」一个值，`run.asks` 没有询问链，房间的传信数写死为 0，设计里没有写这些字段，页面没法做；M0 试用的像素画面按 ADR-0043 移到 M0.5，几个部门同时工作只能从页面文字看出，页面这一侧要先补足
+claude-sonnet-5-5 / 2026-10-25 00:20 / `docs/prototypes/CHANGELOG.md` 开头加「下一版原型（v13）的待办」：v12 设计说明第 5 节没有定的九处，每处附架构师的推荐，等用户确认 / v12 已冻结，这些未决事项不再改 v12，留给 v13；v13 的主体由画面与数据解耦（ADR-0043）定
+
+claude-sonnet-5-5 / 2026-10-25 00:07 / `docs/design/department-loop.md` 加第 2.1 节「部门的状态」：三个部门各自的状态（等待用户、回答询问、工作中、等待工作）由已记录的事实推出，带一句原因；第 4.7 节写明询问的上一层、询问链与层数；`docs/design/app-and-interface.md` 第 4.3 节 `project.overview`、`project.loop`、`department.workspace`、`run.asks` 各加对应字段 / #477 要界面按部门显示状态与询问，但查询只有「所在部门」一个值，`run.asks` 没有询问链，房间的传信数写死为 0，设计里没有写这些字段，页面没法做；M0 试用的像素画面按 ADR-0043 移到 M0.5，几个部门同时工作只能从页面文字看出，页面这一侧要先补足
 
 claude-opus-5-5 / 2026-10-24 23:49 / 新增 `docs/design/visualization.md`（画面与播放设计说明：服务端、同步层、翻译层、画面层四层与依赖方向，画面合同，声明表与动作三级，播放时间线，翻译覆盖核对，不变式 H1 至 H9，原型 v13 与客户端工单范围）与 `docs/adr/0043-scene-contract-and-playback-belong-to-the-view.md`；`docs/design/app-and-interface.md` 第 5.7 节像素画面一条改为经翻译层，第 5.8 节的不变式移到新说明第 8 节（标题保留、留指向），第 4.3 节 `project.loop` 与第 9 节第 16 条改指新说明；ADR-0021 状态一栏补一行；`docs/requirements/system-intent.md` N-V5 的链接改指新说明；`CONTEXT.md` 新增「画面合同」「播放时间线」；设计索引新增一条 / 用户给出与 Sonnet 讨论的可视化缓冲方案，要求结合视图同步重构，逐项确认（事实只来自数据库，画面的独立是表现形式的独立）
 
