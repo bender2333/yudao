@@ -7,6 +7,8 @@
 
 ---
 
+claude-opus-5-5 / 2026-10-24 10:40 / 试用 d9b7d115 的工单分诊：`docs/design/model-management.md` 第 8.7 节增加「不无限压缩」（同一会话的压缩连续 `compaction.stalled_limit` 次没有推进时以 `compaction_failed` 停止，#840），第 4.7 节写明启动时没有目录文件是「没有文件」不是被删除（#844）；`docs/design/existing-project-onboarding.md` 第 4.6 节写明 Git 来源只看源目录自己、不向上层目录查找，读不出时以 `source_invalid` 拒绝（#841）；`docs/design/app-and-interface.md` 的 `run.export` 一行写明导出是原始记录、不脱敏、分享前用户自己清理（#845）；`docs/design/department-loop.md` 第 4.2 节写明轮次只计主线会话的激活（#857）；`docs/architecture-issues.md` 中 #842 那一条补处理行；`docs/decision.md` 记这次分诊；仓库根的 README 导出命令加一句说明，`.claude/skills/trial/SKILL.md` 的机械扫描只把凭据的值算作问题 / 用户要求诊断与整理 #840 至 #845；#840 的根因是询问修订 PRD 以后记录器仍用旧的工作依据，压缩检查点因此永远找不到；#841、#844 是代码偏离设计；#845 需要架构师给结论
+
 solo-minimax-M3.1-Flash / 2026-10-24 08:43 / 工单 #843：`docs/design/model-management.md` 第 4.3 节与第 9.1 节补一条——连接还没有保存时，模型管理页的「获取模型列表」写明要先保存这份连接与原因，不发请求 / 未保存的连接上这个按钮是禁用的，点击既没有反应也不发请求，用户看不出下一步是先保存（第 4.3 节本来就只对已保存的连接采集）
 
 solo-minimax-M3.1-Flash / 2026-10-24 06:57 / 工单 #842：`docs/design/department-loop.md` 第 4.2 节补一条——询问分支是提问方这一轮里的一次旁支工作，它不接管事项的所在部门；事项的所在部门（事项卡、概览与楼层页写的部门）由主线会话的激活推出，分支的激活不改写它 / 分支的激活以前无条件改写所在部门，提问方拿到回答以后继续工作，页面上仍然停在被询问的部门（工单正文里的 run_874f4b3925164593：工程在工作，显示产品，67 分钟没变）
