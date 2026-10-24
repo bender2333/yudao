@@ -560,6 +560,17 @@
     "tighten_when": "摘要质量不足导致返工",
     "origin": "ADR-0006，摘要与整理请求使用模型声明的最低推理档位"
   },
+  "compaction.stalled_limit": {
+    "value": 3,
+    "bounds": [1, 10],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "压缩连续没有推进，部门不做工作也不停止",
+    "cost": "压缩真的卡住时提前结束，事项要另开一次",
+    "relax_when": "超过现值的压缩仍然接得上上一次，覆盖范围继续往前走",
+    "tighten_when": "回归场景里压缩接得上上一次却在现值以内就停了",
+    "origin": "#840 与 F1：试用里工程部连续 31 次压缩、35 分钟没有推进也没有停止"
+  },
   "screenshot.max_width": {
     "value": 1280,
     "bounds": [320, 7680],

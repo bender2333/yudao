@@ -148,6 +148,26 @@ class _Unassembled:
     reason: str
     error: Exception
 
+
+@dataclass(frozen=True)
+class _CompactionOutcome:
+    # 一次压缩的结果：没有推进时的原因（推进时为空），以及这次压缩覆盖的范围摘要
+    stalled: str | None = None
+    covered_digest: str | None = None
+
+
+class _LiveScope:
+    # 记录器读到的工作依据：始终指向步骤驱动当前采用的激活范围（工单 #840）。
+    # 询问带回新合同以后只改步骤驱动那一份，记录器、装配与请求自动用同一份，
+    # 不再另外保存一份需要同步的副本
+    def __init__(self, driver: "StepDriver") -> None:
+        self._driver = driver
+
+    def __getattr__(self, name: str) -> Any:
+        if name == "_driver":
+            raise AttributeError(name)
+        return getattr(self._driver.scope, name)
+
 @dataclass(frozen=True)
 class _RecoveredCall:
     # 补执行上一次激活里没有处置的工具调用、以及自动重新执行结果未知的动作时用的请求身份（工单 #17、#307）。
@@ -218,7 +238,8 @@ class StepDriver:
         self._writes = writes
         self._artifacts = artifacts
         self._assembly = assembly
-        self._recorder = StepRecorder(writes, artifacts, scope, max_attempts=limits.max_provider_attempts)
+        # 记录器读到的是步骤驱动当前采用的激活范围（工单 #840）：询问带回新合同以后自动跟着变
+        self._recorder = StepRecorder(writes, artifacts, _LiveScope(self), max_attempts=limits.max_provider_attempts)
         self._adapter = adapter
         self._facade = facade
         self._environment = environment
@@ -238,6 +259,29 @@ class StepDriver:
         self._call_public: dict[str, Any] | None = None
         # 最后一次核对运行状态时 run 流的版本，随停止结果交回
         self._version = 0
+        # 压缩有没有在推进：连续没有推进的次数、上一次的原因、上一次压缩的覆盖范围与当时的有效合同
+        self._compaction_stalls = 0
+        self._compaction_reason = ""
+        self._compaction_coverage: str | None = None
+        self._compaction_contract: str | None = None
+
+    @property
+    def scope(self) -> ActivationScope:
+        # 这次激活当前采用的工作依据：询问带回新合同以后换成新的那一份（工单 #840）
+        return self._scope
+
+    def _adopt_contract(self, contract_hash: str) -> None:
+        # 询问带回新合同以后，引擎、装配与记录器用同一份工作依据（工单 #840）：
+        # 步骤驱动这一份是唯一的来源，记录器读到的是它的当前值，记录器写的事件因此带新合同
+        self._scope = replace(self._scope, basis=replace(self._scope.basis, effective_contract_hash=contract_hash))
+        self._frame = replace(self._frame, effective_contract_hash=contract_hash)
+        projection = self._writes.read(self._stream).projection
+        self._environment.bind_check(
+            activation_id=self._scope.activation_id,
+            product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
+            delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
+            effective_contract_hash=contract_hash,
+        )
 
     def cancel(self) -> None:
         # 之后的核对都得到停止；正在进行的动作按动作身份取消（进程类动作结束整个进程树，回执记为已取消）；
@@ -490,15 +534,7 @@ class StepDriver:
                         self._consumed_steps += branch_steps
                         ok, output, error = ask_ok, ask_output, ask_error
                         if ok and new_contract_hash is not None:
-                            self._scope = replace(self._scope, basis=replace(self._scope.basis, effective_contract_hash=new_contract_hash))
-                            self._frame = replace(self._frame, effective_contract_hash=new_contract_hash)
-                            projection = self._writes.read(self._stream).projection
-                            self._environment.bind_check(
-                                activation_id=self._scope.activation_id,
-                                product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
-                                delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
-                                effective_contract_hash=new_contract_hash,
-                            )
+                            self._adopt_contract(new_contract_hash)
                     elif name == "answer":
                         # 工程回答质检时回答分两部分：facts 是事实部分，explanation 是解释部分（工单 #554）
                         text = args.get("answer") or args.get("text") or args.get("facts") or ""
@@ -673,15 +709,7 @@ class StepDriver:
                 self._consumed_steps += branch_steps
                 ok, output, error = ask_ok, ask_output, ask_error
                 if ok and new_contract_hash is not None:
-                    self._scope = replace(self._scope, basis=replace(self._scope.basis, effective_contract_hash=new_contract_hash))
-                    self._frame = replace(self._frame, effective_contract_hash=new_contract_hash)
-                    projection = self._writes.read(self._stream).projection
-                    self._environment.bind_check(
-                        activation_id=self._scope.activation_id,
-                        product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
-                        delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
-                        effective_contract_hash=new_contract_hash,
-                    )
+                    self._adopt_contract(new_contract_hash)
             elif tool_kind(name) == "host":
                 ok, output, error = True, _run_host_tool(name, args), None
             else:
@@ -870,22 +898,55 @@ class StepDriver:
     def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> None:
         scope = self._scope
 
-        def finish(transaction: Transaction) -> None:
+        def finish(transaction: Transaction) -> _CompactionOutcome | None:
+            # 压缩请求的回答生成检查点。这次压缩不生效或者覆盖范围没有往前走时，
+            # 结果里写明没有推进的原因；连续没有推进的次数由调用方在事务提交以后判断
             projection = transaction.projection
             self._version = projection.stream_version
             if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
-                return
+                return None
             if scope.basis.changed(projection, scope.department):
-                return
+                return None
             try:
                 result = self._assembly.finish_compaction(self._step, response.output)
             except CompactionError as exc:
                 raise ProviderError(str(exc), reason="compaction_failed") from exc
             if result is None:
-                return
+                # 摘要为空或超过上限：这次压缩不生效，下一步还会再压同一段历史
+                return _CompactionOutcome(stalled="整理没有生效：摘要为空或超过上限")
             self._recorder.compaction(transaction, request, result, response)
+            return _CompactionOutcome(covered_digest=result.checkpoint.covered_digest)
 
-        self._writes.transact(self._stream, finish)
+        outcome = self._writes.transact(self._stream, finish)
+        message = self._advance_compaction(outcome)
+        if message is not None:
+            raise ProviderError(message, reason="compaction_failed")
+
+    def _advance_compaction(self, outcome: _CompactionOutcome | None) -> str | None:
+        # 压缩连续没有推进时计数，达到上限就以压缩失败停止（设计说明第 8.7 节，工单 #840）。
+        # 没有推进有两种：整理不生效（摘要为空或超过上限），或者这一次压缩的覆盖范围与上一次相同
+        # （下一次压缩没有被上一次接上）。合同变了以后检查点作废、从原始记录重建是现在的行为，不算没有推进。
+        # 返回停止说明（写明连续的次数与最后一次的原因），没有达到上限时返回空
+        if outcome is None:
+            return None
+        contract = self._scope.basis.effective_contract_hash
+        if outcome.stalled is not None:
+            self._compaction_stalls += 1
+            self._compaction_reason = outcome.stalled
+        elif self._compaction_coverage is not None and self._compaction_contract == contract \
+                and outcome.covered_digest == self._compaction_coverage:
+            self._compaction_stalls += 1
+            self._compaction_reason = "覆盖范围没有往前走：这一次压缩与上一次覆盖同一段历史"
+        else:
+            self._compaction_stalls = 0
+            self._compaction_reason = ""
+            self._compaction_coverage = outcome.covered_digest
+            self._compaction_contract = contract
+        limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+        if self._compaction_stalls >= limit:
+            return (f"压缩连续 {self._compaction_stalls} 次没有推进（{self._compaction_reason}），"
+                    f"达到 compaction.stalled_limit={limit}，以压缩失败停止。")
+        return None
 
     def _begin_tool(self, request: ModelRequest, call: dict[str, Any]) -> tuple[ToolPermission, WorkspaceFacts]:
         # 工具许可依据的工作区事实向执行环境查询，作为输入交给 U；同一份事实是动作的前置条件
