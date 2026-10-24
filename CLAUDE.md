@@ -92,7 +92,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - `CLAUDE.md`：架构师规则（本文件）。
 - `AGENTS.md`：执行者与审查者规则。
 - `claude_jour.md`：架构师日记。
-- `agents_jour/`：执行者与审查者的日记，一张工单一个文件（`agents_jour/<工单编号>.md`）；`agents_jour.md` 是 2026-10-06 之前的日记，不再追加。
+- `agents_jour/`：执行者与审查者的日记，一张工单一个文件（`agents_jour/<工单编号>.md`）；2026-10-06 之前的日记已归档为 `docs/archive/agents_jour.md`，不再追加。
 
 ### docs/
 - `docs/program-roadmap.md`：总体路线图，阶段定义与依赖的入口。
