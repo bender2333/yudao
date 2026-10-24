@@ -47,11 +47,15 @@ def test_restart_keeps_accumulated_time_and_counts(tmp_path):
     # 验收一：run 在运行中被终止进程，重启以后自动继续，已用的运行时间、激活次数与模型步数
     # 与终止之前连续，恢复不重新计数
     data_dir = tmp_path / "data"
-    script = [{"proposal": product_spec()},
-              {"output": [_call("call-read", "read_file", {"path": "notes.txt"})]}]
-    tail = [{"proposal": delivery(check_names=["smoke"]), "writes": {"src/echo.py": ECHO},
-             "checks": CHECKS},
-            {"proposal": review("release", "checks passed on the current snapshot"), "checks": CHECKS}]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 子进程里产品提交规格、工程读取文件；重启以后父进程里工程交付、质检核验
+    script = {"product": [{"proposal": product_spec()}],
+              "engineering": [{"output": [_call("call-read", "read_file", {"path": "notes.txt"})]}]}
+    tail = {"engineering": [{"proposal": delivery(check_names=["smoke"]), "writes": {"src/echo.py": ECHO},
+                             "checks": CHECKS}],
+            "quality": [{"proposal": review("release", "checks passed on the current snapshot"),
+                         "checks": CHECKS}]}
 
     with killed.interrupted(data_dir, script, tail=tail,
                             workspace_files={"notes.txt": "re-execute reads the same bytes\n"},

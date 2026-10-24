@@ -183,12 +183,16 @@ def test_c_killed_append_bash_is_not_reexecuted(tmp_path):
     )
     cmd = f'"{sys.executable.replace(chr(92), "/")}" -c "{append_script}" "{append_file.as_posix()}" "{signals.as_posix()}"'
 
-    script = [
-        {"proposal": product_spec()},
-        {"output": [_call("call-append", "bash", {"command": cmd})]},
-    ]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 产品提交规格，命令执行是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [{"output": [_call("call-append", "bash", {"command": cmd})]}],
+    }
 
-    with killed.interrupted(data_dir, script, tail=[_settle()], started=signals / "started") as run:
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+                            started=signals / "started") as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
         assert append_file.exists()
         lines = append_file.read_text(encoding="utf-8").splitlines()
@@ -198,12 +202,16 @@ def test_c_killed_append_bash_is_not_reexecuted(tmp_path):
 def test_d_file_action_completed_receives_confirmed_result(tmp_path):
     # (d1) 写入文件的动作结果未知，自动核实确认已完成，模型收到确定的结果
     data_dir = tmp_path / "data"
-    script = [
-        {"proposal": product_spec()},
-        {"output": [_write("call-write", "src/note.txt", "hello\n")]},
-    ]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+    }
 
-    with killed.interrupted(data_dir, script, tail=[_settle()], await_file=("src/note.txt", "hello\n")) as run:
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+                            await_file=("src/note.txt", "hello\n")) as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
 
         started = [
@@ -237,12 +245,15 @@ def test_d_file_action_completed_receives_confirmed_result(tmp_path):
 def test_d_file_action_not_happened_receives_handed_back(tmp_path):
     # (d2) 写入文件的动作结果未知，自动核实确认没有发生，模型收到「核实确认没有发生」
     data_dir = tmp_path / "data"
-    script = [
-        {"proposal": product_spec()},
-        {"output": [_write("call-write", "src/note.txt", "hello\n")]},
-    ]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+    }
 
-    with killed.interrupted(data_dir, script, tail=[_settle()],
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
                             hold_after="tool_started", hold_action="call-write") as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
 

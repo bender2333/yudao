@@ -307,7 +307,14 @@ def test_departments_without_write_tools_cannot_change_files(tmp_path, departmen
         _call("delete", "delete_file", path="src/echo.py", reason="remove replaced implementation"),
         _call("move", "move_file", source="src/echo.py", destination="src/moved.py", reason="organize module"),
     ])
-    script = [calls] if department == "product" else [product_spec(),delivery_turn(), calls]
+    if department == "product":
+        # 事项没有走到 PRD 被接纳以后（工单 #878）：这条脚本只有产品一个部门取用
+        script = [calls]
+    else:
+        # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+        # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+        # 交付是工程的活，这组写入调用是质检的活
+        script = {"product": [product_spec()], "engineering": [delivery_turn()], "quality": [calls]}
     system = LoopSystem.for_testing(tmp_path, FakeAdapter(script))
     run_id = system.create_run("echo")
     workspace = system.workspace(run_id)

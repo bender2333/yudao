@@ -25,6 +25,20 @@ from harness.tests.saved_rewrite import (delete_saved_events, rewrite_saved_even
 # 需要一份真实运行记录的文件：module 作用域的夹具各跑一次完整循环并保存数据目录，
 # 每项测试复制一份数据目录，在自己的副本上改写与检查。数据来自真实运行，这些文件登记为集成层。
 
+def _by_department(adapter: FakeAdapter) -> FakeAdapter:
+    # 假模型脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）。
+    # compacted_runner 给的是一条共用的列表脚本（helpers.py 不在本工单的只改清单里），
+    # 剧本项本身按请求的部门与目的分派：这里给每个部门（含询问分支）各一份同样的剧本，
+    # 取用顺序就不再互相影响
+    turns = list(adapter.script)
+    adapter.script = []
+    adapter.scripts = {key: list(turns) for key in
+                       ("product", "engineering", "quality",
+                        "product:ask", "engineering:ask", "quality:ask")}
+    return adapter
+
+
 @pytest.fixture(scope="module")
 def saved_native(tmp_path_factory):
     # 一次本机流程走完的运行：产品给要求、工程写入、检查、交付、再检查、质检放行
@@ -403,6 +417,8 @@ def test_model_input_audit_rejects_forged_injected_source_metadata(native_run):
 
 def test_model_input_audit_rebuilds_summary_scope_after_contract_changes(tmp_path):
     system, adapter, run_id, _ = compacted_runner(tmp_path)
+    # 脚本按部门给出（工单 #878）：这条用例走到 PRD 被接纳以后，共用的列表脚本要拆成按部门的
+    _by_department(adapter)
     first = system.activate_once(run_id)
     assert first.compactions[-1]["effective_contract_hash"] is None
     system.activate_once(run_id)
@@ -565,7 +581,9 @@ def test_audit_rejects_missing_new_work_message_after_product_reactivation(produ
 @pytest.fixture(scope="module")
 def saved_compacted(tmp_path_factory):
     # 上下文窗口只有 6000 的运行：压缩以后继续工程工作，保存到第一次压缩之后
-    system, _adapter, run_id, _original = compacted_runner(tmp_path_factory.mktemp("compacted"))
+    system, adapter, run_id, _original = compacted_runner(tmp_path_factory.mktemp("compacted"))
+    # 脚本按部门给出（工单 #878）：compacted_runner 给的是一条共用的列表脚本
+    _by_department(adapter)
     result = system.activate_once(run_id)
     assert has_new_work(result, "engineering")
     assert len(result.compactions) > 1
