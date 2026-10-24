@@ -2347,3 +2347,10 @@ claude-opus-5-5 / 2026-10-25 00:03 / 用户贴来与 Sonnet 讨论的可视化�
 - 主工作区里 minimax 的 Ralph 循环正在改 `claude_jour.md`、`docs/CHANGELOG.md`、`docs/agents/triage-labels.md`，没有提交，本地 main 也落后 origin 两个提交。我在单独的 worktree（`.claude/worktrees/arch-visualization`，基于 origin/main）里改文档、提交、推送，没有碰主工作区。
 - GitHub：#900（楼层进行中的事项，M0）；#477 退回 `needs-triage`、改正文与验收、写任务评论、放回 `ready-for-agent`；#396、#398、#154 引用的第 5.8 节移走，各留一条任务评论；#823 留一条评论说明画面工单会进 M0.5。
 - 下一步：原型 v13（由 v12 复制，翻译层、播放时间线、三张声明表、两个新场景、调节面板），定稿后用 `/to-tickets` 拆 M0.5 的画面工单。写回远程为空的缺陷还等用户决定要不要开工单。
+
+claude-sonnet-5-5 / 2026-10-25 00:15 / 用户给我一段另一个架构会话的总结（画面与数据解耦，「刚刚讨论完，还没写进文档」），随后补一句「这是个正在准备做的工单」。
+
+- 我正准备写同样的 ADR 和设计说明，ADR 编号也会是 0043。动手前看了一眼 `git worktree list` 和那个会话的工作树，发现它已经在 `arch-visualization` 里写好了 ADR-0043 和 `docs/design/visualization.md`，而且很快推到了 main（d27f8865）。差一点两边撞车。教训：用户转来一段「还没写进文档」的讨论时，先查有没有别的会话在写（工作树、未提交的文件、`list_sessions`），再动手。
+- 它的结论回答了我上一轮问用户的两个问题：v13 只重构像素画面，页面照 v12；像素画面的几个部门同时亮灯、成果事件驱动包裹都进 M0.5，#477 的像素一条移出 M0。我据此不开像素的三张工单，页面这一侧按 v12 做足：M0 试用只能从页面文字看出几个部门同时工作。
+- 页面做足有个前提：查询得给出数据。读了 v12 原型的 `deptStatesOf`、`asksOut` 和服务端的 `SessionRecord`、`ask_stack`，部门状态可以由已记录的事实推出（会话的状态、进行中的询问、没回答的决定请求），不用加事件、不改投影。写进部门循环结构第 2.1 节和接口设计 4.3，这是 #477 拆开后其余几张的前提。
+- 主工作区里有 minimax 会话（Ralph 循环）没提交的三个文件：`docs/agents/triage-labels.md`、`claude_jour.md`、`docs/CHANGELOG.md`，它们让主工作区 `git pull` 失败。我没动它们，在独立工作树里提交，推送前先 `git fetch` 再变基。它们提交时会和我的条目在 CHANGELOG 与日记上冲突，要合并，两条都保留。
