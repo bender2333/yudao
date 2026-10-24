@@ -373,7 +373,7 @@ function InputRecords(props: {
   );
 }
 
-function Board(props: { items: WorkItemCard[] }) {
+export function Board(props: { items: WorkItemCard[] }) {
   const columns = boardColumns(props.items);
 
   return (
