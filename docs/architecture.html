@@ -68,6 +68,21 @@
   .r > b { display: block; font-weight: 600 }
   .r > small { display: block; color: var(--muted); font-size: 12.5px }
   @media (max-width: 760px) { .rings { grid-template-columns: 1fr } }
+  /* 第三、四节：系统的形状与要守的缝 */
+  h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; color: var(--muted) }
+  .deploy { display: grid; grid-template-columns: 1fr 220px; gap: 12px; align-items: start }
+  .host { border: 2px solid var(--line); padding: 12px; display: grid; gap: 12px }
+  .host > .label { font-size: 13px; color: var(--muted) }
+  .flow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px }
+  .flow .box + .box::before { content: "→"; position: absolute; left: -10px; top: 8px; color: var(--muted); font-size: 12px }
+  .seams { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px }
+  .seam { border: 1.5px solid var(--line); padding: 10px 12px; font-size: 13px; min-width: 0 }
+  .seam[data-state="open"] { border-style: dashed; border-color: var(--soft) }
+  .seam b { display: block; font-weight: 600; font-size: 14px }
+  .seam i { display: block; font-style: normal; color: var(--muted); font-size: 12px }
+  .seam em { display: block; font-style: normal; margin: 6px 0 }
+  .seam ul { margin: 0; padding-left: 16px; color: var(--muted) }
+  @media (max-width: 760px) { .deploy, .flow { grid-template-columns: 1fr } .flow .box + .box::before { content: none } }
   footer { font-size: 12.5px; color: var(--muted) }
 </style>
 </head>
@@ -75,7 +90,7 @@
 <main>
   <header>
     <h1>Yudao 总图</h1>
-    <p class="muted">三个部门围着同一份事实循环，写入先过门，结论靠独立的证据。固定不变的只有四样：循环、边界、裁决、独立的证据；部门与轮转方式都是填进去的内容。鼠标放到方框上看对应的技术名词与状态。</p>
+    <p class="muted">四节，从上往下越来越具体：怎么运转、什么能动、系统的形状、要守的缝。三个部门围着同一份事实循环，写入先过门，结论靠独立的证据。固定不变的只有四样：循环、边界、裁决、独立的证据；部门与轮转方式都是填进去的内容。鼠标放到方框上看对应的技术名词与状态。</p>
   </header>
 
   <section>
@@ -178,7 +193,60 @@
     </div>
   </section>
 
-  <footer>状态按 main 2026-10-25。已建：在 main 上运行并有测试；建了一半：有代码，设计里标了未实施的部分；未建：只有设计。里程碑结束时由总架构师更新。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
+  <section>
+    <h2>系统的形状</h2>
+    <p class="muted">这一节与下一节写的是应当如此：与代码不符的地方，由子架构师把代码改到图这样。</p>
+    <h3>落地</h3>
+    <div class="deploy">
+      <div class="host">
+        <div class="label">一台电脑</div>
+        <div class="box"><b>服务进程</b><small>循环、裁决与边界、投影都在它里面；一个进程管一个数据目录。</small></div>
+        <div class="box"><b>页面</b><small>浏览器里的一页，只读投影，命令从这里发；关掉页面，循环照跑。</small></div>
+        <div class="box"><b>数据目录</b><small>一份事实（事件库与工件）、材料、带版本的定义、凭据。凭据只在这台机器，不进事实与导出。</small></div>
+      </div>
+      <div class="col">
+        <div class="box"><b>模型服务</b><small>外面的 API。每次请求按定义解析调用目标，用量记进事实。</small></div>
+        <div class="box" style="border-style:dashed"><b>执行机器（以后）</b><small>登记的另一台电脑，照同一份动作合同干活，回执进事实。</small></div>
+        <div class="box fixed"><b>评价材料</b><small>在系统之外：被开发的版本读不到评它的题。</small></div>
+      </div>
+    </div>
+    <h3>一轮工作的经过</h3>
+    <div class="flow">
+      <div class="box"><b>写入口</b><small>命令或结果要进事实，先到这里。</small></div>
+      <div class="box"><b>路由</b><small>决定谁开工、一轮怎么结束。</small></div>
+      <div class="box"><b>装配</b><small>从事实里减出这一轮要看的。</small></div>
+      <div class="box"><b>模型</b><small>给出下一步。</small></div>
+      <div class="box"><b>工具</b><small>改文件、跑命令，交回回执。</small></div>
+      <div class="box"><b>裁决</b><small>每次写入与每个动作：有没有资格、到没到上限。</small></div>
+      <div class="box"><b>投影</b><small>事实折成页面与内核要看的。</small></div>
+    </div>
+    <p class="muted" style="margin-top:8px">分支不画：询问是嵌在一轮里的另一轮；决定请求停在写入口等你；边界在任何一步都能停下。</p>
+  </section>
+
+  <section>
+    <h2>要守的缝</h2>
+    <p class="muted">一道缝连接两边，各自可以重写，合同不能偷偷改。<b>已定</b>：规矩不再改，子架构师现在就守；<b>未定</b>：我还在定，先别依赖。代码里叫什么由子架构师定，写在设计说明里。</p>
+    <div class="seams">
+      <div class="seam" data-state="set"><b>写入口</b><i>一切写入方 ↔ 一份事实</i><em>事实只从这里进，进了就不改。</em><ul><li>先过裁决与边界再写</li><li>同一事务里核对执行权与版本</li><li>只追加</li></ul></div>
+      <div class="seam" data-state="set"><b>路由</b><i>薄驱动 ↔ 路由实现</i><em>换轮转方式，循环本身不动。</em><ul><li>只回答谁开工、一轮怎么结束、事项怎么结束</li><li>部门的名字不进代码，来自定义</li><li>合同带版本，只增</li></ul></div>
+      <div class="seam" data-state="set"><b>装配</b><i>执行 ↔ 装配实现</i><em>一轮看到的是事实的一个视图，不改事实。</em><ul><li>只读事实与定义，输出请求与清单</li><li>同样的输入得同样的输出</li><li>交给模型的那份记进事实</li></ul></div>
+      <div class="seam" data-state="set"><b>执行</b><i>薄驱动 ↔ 执行实现</i><em>一轮里的每一步都停得下来。</em><ul><li>每一步先问边界</li><li>工具调用经裁决</li><li>结果写回事实，不自己存</li></ul></div>
+      <div class="seam" data-state="set"><b>模型</b><i>执行 ↔ 模型服务</i><em>换模型不改循环。</em><ul><li>每次请求解析一次调用目标</li><li>用量记进事实</li><li>凭据不进事实与导出</li></ul></div>
+      <div class="seam" data-state="set"><b>动作</b><i>工具 ↔ 执行环境</i><em>每个动作有回执；结果未知时有核实办法。</em><ul><li>按类别带合同：成功证据、核实方法、能否取消</li><li>本机与远程同一份合同</li><li>效果记进事实</li></ul></div>
+      <div class="seam" data-state="set"><b>投影</b><i>一份事实 → 读的人</i><em>任何投影都能从事实重算。</em><ul><li>内核只读最小投影：固定的几样</li><li>其余投影推倒重算，不写回事实</li><li>骨架事件只增，应用事件可以排空</li></ul></div>
+      <div class="seam" data-state="set"><b>接口</b><i>页面、命令行、评测 ↔ 应用层</i><em>外面只经这里读与发。</em><ul><li>只有命令、查询、事件流三种</li><li>带版本号；改了合同版本必升</li></ul></div>
+      <div class="seam" data-state="set"><b>画面</b><i>翻译层 ↔ 画面层</i><em>画面整个换掉，事实与页面不动。</em><ul><li>画面只收状态与动作，不读事实</li><li>回放走同一份合同</li></ul></div>
+      <div class="seam" data-state="set"><b>定义</b><i>定义文件 ↔ 加载与校验</i><em>改定义不改代码，能撤回。</em><ul><li>带版本；创建事项时冻结</li><li>字段只增，旧文件新版本能读</li></ul></div>
+    </div>
+    <h3>系统之外的三道</h3>
+    <div class="seams">
+      <div class="seam" data-state="set"><b>评价</b><i>评价材料 → 系统</i><em>被开发的版本读不到评它的题。</em><ul><li>只经接口层运行</li><li>材料由运行中的上一版提供</li><li>只由你改</li></ul></div>
+      <div class="seam" data-state="open"><b>看门狗</b><i>看门狗 ↔ 实例</i><em>候选失败能退回。</em><ul><li>两个槽位</li><li>心跳与冒烟</li><li>只由你改</li></ul></div>
+      <div class="seam" data-state="open"><b>观察者</b><i>观察者 ↔ 应用层</i><em>只看，不动手。</em><ul><li>按读取范围看事实</li><li>只出证据与提案，提案经裁决</li></ul></div>
+    </div>
+  </section>
+
+  <footer>状态按 main 2026-10-25。已建：在 main 上运行并有测试；建了一半：有代码，设计里标了未实施的部分；未建：只有设计。里程碑结束时由总架构师更新。第三、四节写的是应当如此，没有状态；缝的已定、未定由总架构师改。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
 </main>
 </body>
 </html>
