@@ -323,10 +323,11 @@
 
   function writebacksOf(db, projectId) {
     const settings = db.settings(projectId);
-    return ((settings && settings.writebacks) || []).map((w) => {
+    // 最新的在前：时间相同时后写入的在前
+    return ((settings && settings.writebacks) || []).map((w, i) => {
       if (!WRITEBACK[w.status]) throw new Error('未知的写回结果：' + w.status);
-      return Object.assign({}, w, { status_text: WRITEBACK[w.status] });
-    }).sort((a, b) => Y12.time.ms(b.at) - Y12.time.ms(a.at));
+      return { w: Object.assign({}, w, { status_text: WRITEBACK[w.status] }), i };
+    }).sort((a, b) => (Y12.time.ms(b.w.at) - Y12.time.ms(a.w.at)) || (b.i - a.i)).map((x) => x.w);
   }
 
   B.query('project.overview', (params, db) => {

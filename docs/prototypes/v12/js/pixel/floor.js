@@ -161,10 +161,10 @@
     const dimFor = (itemId) => (focusId && itemId && itemId !== focusId ? 0.3 : 1);
     const itemsIn = (d) => model.items.filter((it) => it.department === d && IN_ROOM.includes(it.status));
     // 三个部门同时运行（ADR-0036）：事项停在别的房间，这个部门也在工作中或回答询问时（例如质检的预测性探索），
-    // 这个房间同样亮灯、屏幕滚动、小人工作；包裹与门口的小旗仍只在事项所在的房间
+    // 这个房间同样亮灯、屏幕滚动、小人工作；包裹与门口的小旗仍只在事项所在的房间。快照的 departments 是「部门 → 状态」
     const BUSY = ['working', 'answering'];
     const alsoIn = (d) => model.items.filter((it) => it.department !== d && ACTIVE.includes(it.status) &&
-      it.departments && it.departments[d] && BUSY.includes(it.departments[d].state));
+      it.departments && BUSY.includes(it.departments[d]));
     const busyIn = (d) => itemsIn(d).concat(alsoIn(d));
     const waitingDept = (d) => (model.waiting_provider || []).find((w) => w.department === d) || null;
     const roomById = (id) => (id === 'adopted' || id === 'adoption' ? lay.lib : world.rooms[id] || null);

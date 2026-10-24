@@ -180,9 +180,10 @@
           (r.truncated ? ui.tag('输出截断') : '') +
           '<span class="y12-muted">' + esc(Y12.ui.duration(Math.round((r.duration_ms || 0) / 1000))) + '</span></div>' +
           // 命令按函数直接执行，没有登记名（ADR-0038）；文件与网络工具的回执写目标
+          // 网络取回与 MCP 调用的结果另存为外部来源工件（网络取回与 MCP 工具设计说明第 11.2 节）
           ui.kv([
             r.command ? ['命令', ui.code(r.command)] : ['目标', ui.code(r.target || '—')],
-            ['快照', ui.code(r.snapshot || '—')]
+            r.artifact ? ['外部来源工件', ui.code(r.artifact)] : ['快照', ui.code(r.snapshot || '—')]
           ], 'is-inline y12-ws-receipt-kv') +
           (r.output ? ui.pre(r.output) : '') + '</div>';
       }

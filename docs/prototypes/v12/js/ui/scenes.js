@@ -54,7 +54,7 @@
       const loop = q('project.loop', { project: p.id }, at);
       const lit = {};
       // 几个部门同时工作时（预测性探索、回答询问）几个房间同时亮灯
-      const busy = (it, d) => Boolean(it.departments && it.departments[d] && ['working', 'answering'].includes(it.departments[d].state));
+      const busy = (it, d) => Boolean(it.departments && ['working', 'answering'].includes(it.departments[d]));
       ['product', 'engineering', 'quality', 'operations'].forEach((d) => {
         lit[d] = loop.items.some((it) => ROOM_STATUS.includes(it.status) && (it.department === d || busy(it, d)));
       });

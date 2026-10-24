@@ -6,6 +6,8 @@
 //   决定卡片  决定单贴在大厅的板上，点开在画面里回答；提出决定时小人送单
 //   声明      去掉一个房间、加一个房间，都只改声明，ecs.js 与 floor.js 没有任何具体的部门名
 //   自举试点  覆盖层的档位、H1、H4、H5、覆盖层「来源」的着色、run 层只计有可执行检验的条件、两个新场景（pilotChecks）
+//   v12       事件对照表、删掉的登记与决定、三个部门同时工作、询问链、恢复页七种状态与结果未知的处理、等待机器、
+//             新的决定卡片、成果写回、标签页标题、接口版本按方向（v12Checks）
 // 用法：node docs/prototypes/v12/checks/behaviors.js
 const fs = require('fs');
 const path = require('path');
@@ -339,7 +341,8 @@ const DRIVER = async () => {
       say({ type: 'proposal_submitted', department: 'engineering', label: '工程经理代表部门提交交付说明', payload: {} }) === '现在提交交付说明');
     check('说话气泡：提交事件带着提案种类时用提案种类', say({ type: 'proposal_submitted', department: 'quality', payload: { kind: 'qa_review' } }) === '现在提交质检结论');
     check('说话气泡：工具事件的话带着文件名', say({ type: 'tool_started', tool: 'edit_range', department: 'engineering', label: '工程部门按区间编辑 app.js：导出为 CSV', payload: {} }) === '现在编辑 app.js');
-    check('说话气泡：登记命令的话带着命令名', say({ type: 'tool_started', tool: 'run_command', department: 'engineering', label: '工程部门走到终端执行登记命令 npm_test', payload: {} }) === '现在执行 npm_test');
+    check('说话气泡：命令的话带着事件说明末尾的命令名', say({ type: 'tool_started', tool: 'run_command', department: 'engineering', label: '工程部门走到终端执行命令 npm_test', payload: {} }) === '现在执行 npm_test');
+    check('说话气泡：bash 工具的话写命令原文（ADR-0038）', say({ type: 'tool_started', department: 'engineering', label: '工程部门执行命令', payload: { tool: 'bash', command: 'npm test' } }) === '现在执行 npm test');
     check('说话气泡：交接的两端说不同的话',
       P.say({ type: 'transition', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, { dept: 'engineering' }) === '现在把交付箱送给质检'
       && P.say({ type: 'transition', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, { dept: 'quality' }) === '收到交付箱，来自工程');
@@ -826,6 +829,260 @@ async function pilotChecks(ctx) {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// v12 的新行为（design.md 第 2、3 节）：在示例后端与页面上逐项核对
+async function v12Checks(ctx) {
+  const out = [];
+  const push = (name, ok, detail) => out.push({ name: 'v12 ' + name, ok: Boolean(ok), detail: detail === undefined ? '' : String(detail).slice(0, 400) });
+  const open = async (level, hash) => {
+    const p = await ctx.newPage();
+    const errs = [];
+    p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    p.on('pageerror', (e) => errs.push(String(e)));
+    await p.addInitScript((lv) => sessionStorage.setItem('y12.level', JSON.stringify(lv)), level);
+    await p.goto(v12Url + hash);
+    await p.waitForTimeout(1200);
+    return { p, errs };
+  };
+  // 在页面里播放场景，probe(第几步, seen) 在每一步之后取数
+  const PLAY = async ({ id, probe }) => {
+    const Y = window.Y12;
+    const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+    Y.scenario.select(id);
+    await wait(500);
+    const seen = {};
+    const total = Y.scenario.current().steps.length;
+    // page.evaluate 只能传数据：取数的代码以字符串传进来
+    const fn = probe ? new Function('n', 'seen', 'Y', probe) : null;
+    while (Y.scenario.state().step < total) {
+      Y.scenario.step();
+      await wait(380);
+      if (fn) fn(Y.scenario.state().step, seen, Y);
+    }
+    return seen;
+  };
+
+  // 事件对照表与登记表
+  {
+    const { p, errs } = await open('ui', '#/home');
+    const r = await p.evaluate(() => {
+      const Y = window.Y12;
+      const map = (ev) => Y.scenes.pixelEvents(ev).map((e) => e.type + (e.type === 'transition' || /^collaboration/.test(e.type) ? ':' + e.payload.from + '>' + e.payload.to + (e.payload.artifact ? ':' + e.payload.artifact : '') : '')).join(',');
+      const reg = Y.registry;
+      return {
+        ask: map({ type: 'ask_started', payload: { ask_id: 'q', requester: 'engineering', recipient: 'product' } }),
+        answer: map({ type: 'ask_answered', department: 'product', payload: { ask_id: 'q', requester: 'engineering', recipient: 'product' } }),
+        prd: map({ type: 'spec_accepted', department: 'product', payload: {} }),
+        delivery: map({ type: 'delivery_accepted', department: 'engineering', payload: {} }),
+        defect: map({ type: 'qa_submitted', department: 'quality', payload: { verdict: 'rework_engineering' } }),
+        release: map({ type: 'qa_submitted', department: 'quality', payload: { verdict: 'release' } }),
+        repair: map({ type: 'qa_submitted', department: 'quality', payload: { verdict: 'release', release_to: 'operations' } }),
+        other: map({ type: 'tool_started', department: 'engineering', payload: { tool: 'bash', command: 'npm test' } }),
+        gone: ['transition', 'collaboration_requested', 'collaboration_responded', 'collaboration_closed', 'plan_accepted'].filter((t) => reg.has('event', t))
+          .concat(['unknown_action', 'tool_once'].filter((k) => reg.has('decision', k)))
+          .concat(['command_registration.save', 'tool_authorization.save'].filter((c) => reg.has('command', c))),
+        added: ['paused_continue', 'definitions_changed', 'wait_limit', 'instance_upgrade'].every((k) => reg.has('decision', k)) &&
+          ['ask_started', 'ask_answered', 'action_verified', 'project_goal_changed', 'writeback_completed'].every((t) => reg.has('event', t)) &&
+          ['run.asks', 'project.writeback'].every((q) => reg.has('query', q)) && ['project.set_goal', 'writeback.execute'].every((c) => reg.has('command', c))
+      };
+    });
+    push('事件对照表：询问变成传信，回答变成回信并关闭询问',
+      r.ask === 'collaboration_requested:engineering>product' && r.answer === 'collaboration_responded:product>engineering,collaboration_closed:engineering>product', r.ask + ' | ' + r.answer);
+    push('事件对照表：PRD、交付、缺陷记录与放行各自带出一次包裹的流向',
+      r.prd === 'spec_accepted,transition:product>engineering:prd' && r.delivery === 'delivery_accepted,transition:engineering>quality:box' &&
+      r.defect === 'qa_submitted,transition:quality>engineering:defect' && r.release === 'qa_submitted,transition:quality>library:release' &&
+      r.repair === 'qa_submitted,transition:quality>operations:release', JSON.stringify(r));
+    push('事件对照表：其余事件原样交给画面', r.other === 'tool_started');
+    push('登记表：没有交接、协作请求、计划接纳、结果未知与一次性授权的决定、登记命令与工具授权的命令', r.gone.length === 0, r.gone.join());
+    push('登记表：新增四种决定请求、询问与写回的事件、run.asks、project.writeback、project.set_goal、writeback.execute', r.added);
+    push('事件对照表的检查没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // 三个部门同时工作（场景 1）：质检开始预测性探索时，工程与质检都在工作中
+  {
+    const { p, errs } = await open('ui', '#/home');
+    const seen = await p.evaluate(PLAY, {
+      id: 'sc-todo-loop',
+      probe: "if (n === 6) { const it = Y.api.query('project.overview', { project: 'p-todo' }).data.work_items.find((x) => x.id === 'w-todo-export');" +
+        " seen.states = it && it.departments;" +
+        " const ws = Y.api.query('department.workspace', { project: 'p-todo', department: 'quality', work_item: 'w-todo-export' }).data; seen.qa = ws.status; }" +
+        " if (n === 8) { seen.asks = Y.api.query('run.asks', { work_item: 'w-todo-export' }).data.asks.map((a) => a.status + ':' + a.chain.join('>')); }" +
+        " if (n === 9) { seen.answer = Y.api.query('run.asks', { work_item: 'w-todo-export' }).data.asks[0]; }" +
+        " if (n === 12) { seen.after = Y.api.query('project.overview', { project: 'p-todo' }).data.work_items.find((x) => x.id === 'w-todo-export'); }"
+    });
+    const st = seen.states || {};
+    push('三个部门同时工作：工程工作中，质检同时工作中，写明预测性探索',
+      st.engineering && st.engineering.state === 'working' && st.quality && st.quality.state === 'working' && st.quality.note.indexOf('预测性探索') === 0 && st.product.state === 'waiting', JSON.stringify(st));
+    push('部门工作间的标题区写本部门的状态与原因', seen.qa && seen.qa.text === '工作中' && seen.qa.note.indexOf('预测性探索') === 0, JSON.stringify(seen.qa));
+    push('询问：工程询问产品，询问链是工程 → 产品', (seen.asks || []).join() === 'open:engineering>product', (seen.asks || []).join());
+    push('询问：产品的回答附带 PRD 的新版本', seen.answer && seen.answer.status === 'answered' && seen.answer.prd_version === 'r2', JSON.stringify(seen.answer));
+    push('进度按成果写：交付依据 PRD r2，没有阶段名称', seen.after && seen.after.progress && seen.after.progress.prd === 'r2' && !('phase' in seen.after), JSON.stringify(seen.after && seen.after.progress));
+    push('场景 1 播放没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // 询问链与回问（场景 3）：产品回问工程，询问链是工程 → 产品 → 工程；质检停在自己的询问上时写「在等待工程的回答」
+  {
+    const { p, errs } = await open('ui', '#/home');
+    const seen = await p.evaluate(PLAY, {
+      id: 'sc-metro-ask',
+      probe: "if (n === 3) { seen.back = Y.api.query('run.asks', { work_item: 'w-metro-transfer' }).data.asks.find((a) => a.id === 'q-sc-back');" +
+        " seen.states = Y.api.query('project.loop', { project: 'p-metro' }).data.items.find((x) => x.id === 'w-metro-transfer').departments; }" +
+        " if (n === 7) { const f = Y.scenes.buildingModels(null).building.floors.find((x) => x.project_id === 'p-metro'); seen.lit = f && f.lit;" +
+        " const fl = Y.scenes.activeFloor(); const ch = fl && fl.floor.inspect().world.characters.quality; seen.qaItem = ch && ch.item && ch.item.id; }" +
+        " if (n === 11) { seen.qa = Y.api.query('project.overview', { project: 'p-metro' }).data.work_items.find((x) => x.id === 'w-metro-transfer').departments; seen.html = document.body.innerText; }"
+    });
+    push('询问链：产品回问工程，询问链写成工程 → 产品 → 工程', seen.back && seen.back.chain.join() === 'engineering,product,engineering' && seen.back.depth === 2 && seen.back.parent === 'q-sc-prefer', JSON.stringify(seen.back));
+    push('询问链：被询问的部门显示回答询问（楼层快照的 departments 写「部门 → 状态」）', seen.states && seen.states.product === 'answering' && seen.states.engineering === 'answering', JSON.stringify(seen.states));
+    push('三个部门同时工作：质检预测性探索时首页的楼里工程与质检两个房间都亮灯', seen.lit && seen.lit.engineering && seen.lit.quality && !seen.lit.product, JSON.stringify(seen.lit));
+    push('三个部门同时工作：项目楼层上质检房间的小人在做这个事项（事项停在工程）', seen.qaItem === 'w-metro-transfer', seen.qaItem);
+    push('询问：质检停在自己的询问上，写「在等待工程的回答」', seen.qa && seen.qa.quality.state === 'working' && seen.qa.quality.note === '在等待工程的回答', JSON.stringify(seen.qa && seen.qa.quality));
+    push('概览列出询问与询问链', seen.html && seen.html.indexOf('工程 → 产品 → 工程') >= 0 && seen.html.indexOf('回问') >= 0);
+    push('场景 3 播放没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // 恢复页：七种状态、结果未知的动作的处理（场景 8）、等待机器（3.2C 的种子与场景 10、23）
+  {
+    const { p, errs } = await open('3.1', '#/p/p-metro/w/w-metro-transfer/recovery');
+    const seed = await p.evaluate(() => {
+      const r = window.Y12.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data;
+      return { state: r.state, unknown: r.unknown_actions.map((a) => a.id + ':' + a.handling), returned: r.unknown_actions[0] && r.unknown_actions[0].returned, pills: document.querySelectorAll('.y12-rc-state').length, text: document.body.innerText };
+    });
+    push('恢复页：恢复观察状态是七种，没有待核实', seed.pills === 7 && seed.text.indexOf('待核实') < 0 && seed.text.indexOf('已终止') < 0, seed.pills);
+    push('恢复页（3.1）：断电前的测试命令作为工具结果交还工程的会话，写明交还的内容', seed.unknown.join() === 'a-metro-unit-17:returned' && seed.returned && seed.returned.indexOf('执行被中断，结果未知') === 0, JSON.stringify(seed.unknown));
+    push('恢复页没有「核实结果未知的动作」的决定请求', seed.text.indexOf('核实结果未知的动作') < 0);
+    const s8 = await p.evaluate(PLAY, {
+      id: 'sc-metro-unknown',
+      probe: "if (n === 9) { const r = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data; seen.unknown = r.unknown_actions.map((a) => a.id + ':' + a.handling_text); seen.cards = document.querySelectorAll('#rc-verify .y12-rc-action').length; seen.decisions = Y.api.query('decisions.list', {}).data.filter((d) => d.work_item_id === 'w-metro-transfer').length; }"
+    });
+    push('场景 8：文件编辑按快照核实确认，命令交还会话，恢复页各一张卡片，没有决定请求',
+      (s8.unknown || []).join() === 'a-metro-sc-edit:核实确认,a-metro-sc-test:交还会话' && s8.cards === 2 && s8.decisions === 0, JSON.stringify(s8));
+    push('恢复页（3.1）与场景 8 没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+  {
+    const { p, errs } = await open('3.2C', '#/p/p-metro/w/w-metro-transfer/recovery');
+    const r = await p.evaluate(() => {
+      const Y = window.Y12;
+      const rec = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data;
+      const item = Y.api.query('project.overview', { project: 'p-metro' }).data.work_items.find((x) => x.id === 'w-metro-transfer');
+      return { state: rec.state, wm: rec.waiting_machine, handling: rec.unknown_actions.map((a) => a.handling), display: item.display.text, text: document.querySelector('#rc-reason').innerText };
+    });
+    push('等待机器（3.2C）：事项待恢复，写「等待机器：笔记本」、机器名与已经等待的时长',
+      r.state === 'waiting_resume' && r.wm && r.wm.machine_name === '笔记本' && r.wm.waited_sec > 0 && r.display === '等待机器：笔记本' && r.text.indexOf('已经等待') >= 0, JSON.stringify(r));
+    push('等待机器（3.2C）：结果未知的命令等机器恢复在线以后核实', r.handling.join() === 'waiting', r.handling.join());
+    const s10 = await p.evaluate(PLAY, {
+      id: 'sc-metro-offline',
+      probe: "if (n === 4) seen.wait = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data.waiting_machine;" +
+        " if (n === 9) { const r = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data; seen.done = r.state + ':' + r.unknown_actions.map((a) => a.handling).join(); }"
+    });
+    push('场景 10：笔记本离线时等待机器，恢复在线以后按尝试身份核实确认，自动继续', s10.wait && s10.wait.machine_id === 'm-laptop' && s10.done === 'running:confirmed', JSON.stringify(s10));
+    const s23 = await p.evaluate(PLAY, {
+      id: 'sc-metro-wait-limit',
+      probe: "if (n === 3) { const c = document.querySelector('.y12-card.is-wait_limit'); seen.card = c && c.textContent; }" +
+        " if (n === 5) seen.waited = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data.waiting_machine.waited_sec;"
+    });
+    push('场景 23：等待超过时长上限的决定卡片写等待的种类、对象、已经等待的时长与上限', s23.card && s23.card.indexOf('等待机器') >= 0 && s23.card.indexOf('时长上限1 天') >= 0 && s23.card.indexOf('已经等待1 天') >= 0 && s23.card.indexOf('继续等待') >= 0, s23.card);
+    push('场景 23：选择继续等待以后重新计时', s23.waited === 0, s23.waited);
+    push('等待机器与场景 10、23 没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // 暂停以后继续与定义版本不同（场景 22）
+  {
+    const { p, errs } = await open('3.1', '#/home');
+    const s22 = await p.evaluate(PLAY, {
+      id: 'sc-metro-paused',
+      probe: "if (n === 4) { const c = document.querySelector('.y12-card.is-paused_continue'); seen.paused = c && c.textContent; seen.state = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data.state; }" +
+        " if (n === 9) { const c = document.querySelector('.y12-card.is-definitions_changed'); seen.defs = c && c.textContent; }" +
+        " if (n === 11) seen.end = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data.state;"
+    });
+    push('场景 22：暂停以后继续的卡片写停止原因与人工处理说明，恢复观察状态是已暂停',
+      s22.paused && s22.paused.indexOf('no_tool_call') >= 0 && s22.paused.indexOf('人工处理说明') >= 0 && s22.paused.indexOf('处理以后继续执行') >= 0 && s22.state === 'paused', JSON.stringify({ state: s22.state }));
+    push('场景 22：定义版本不同的卡片写两个版本，选项是按新版本继续与停止事项', s22.defs && s22.defs.indexOf('v14') >= 0 && s22.defs.indexOf('v15') >= 0 && s22.defs.indexOf('按新版本继续') >= 0, s22.defs);
+    push('场景 22：回答以后事项继续运行', s22.end === 'running', s22.end);
+    push('场景 22 没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // 设置页、工具与扩展页、资料页：删掉的内容不再出现；成果写回（3.8）
+  {
+    const { p, errs } = await open('3.8', '#/p/p-agents/settings');
+    const r = await p.evaluate(async () => {
+      const Y = window.Y12;
+      const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+      const text = document.body.innerText;
+      // 还没有采纳成果时，写回按 not_allowed 拒绝并给出中文说明
+      const early = Y.run('writeback.execute', { project: 'p-agents' });
+      const goal = Y.run('project.set_goal', { project: 'p-agents', goal: '新的长期目标', base_version: Y.api.query('project.overview', { project: 'p-agents' }).data.project.version });
+      await wait(400);
+      return {
+        noOld: ['登记命令', '工具授权', '可以执行的操作', '容器基础镜像', '本机容器'].filter((w) => text.indexOf(w) >= 0),
+        hasNew: ['成果写回', '采纳写回', '写回检查的命令'].every((w) => text.indexOf(w) >= 0),
+        early: !early.accepted && early.reason === 'not_allowed' ? early.message : JSON.stringify(early),
+        goal: goal.accepted && Y.api.query('project.overview', { project: 'p-agents' }).data.project.goal === '新的长期目标'
+      };
+    });
+    // 接入已有项目的场景采纳基线以后再写回一次
+    await p.evaluate(PLAY, { id: 'sc-agents-onboard' });
+    const wb = await p.evaluate(async () => {
+      const Y = window.Y12;
+      const before = Y.api.query('project.writeback', { project: 'p-agents' }).data.records.length;
+      const res = Y.run('writeback.execute', { project: 'p-agents' });
+      await new Promise((res2) => setTimeout(res2, 500));
+      const data = Y.api.query('project.writeback', { project: 'p-agents' }).data;
+      const ov = Y.api.query('project.overview', { project: 'p-agents' }).data;
+      return { accepted: res.accepted, added: data.records.length - before, rec: data.records[0], overview: ov.writeback };
+    });
+    push('设置页：没有登记命令、工具授权、可以执行的操作与容器', r.noOld.length === 0, r.noOld.join());
+    push('设置页：源目录写采纳写回与写回检查的命令，新增「成果写回」一节', r.hasNew);
+    push('成果写回：还没有采纳成果时按 not_allowed 拒绝并写明原因', r.early.indexOf('还没有采纳成果') >= 0, r.early);
+    push('成果写回：采纳以后发起写回，记录写回完成，合并请求标明还只是本地记录，概览写写回状态',
+      wb.accepted && wb.added === 1 && wb.rec.status_text === '写回完成' && wb.rec.merge_request.local_only && wb.overview && wb.overview.status_text === '写回完成', JSON.stringify(wb));
+    push('长期目标可以修改（project.set_goal）', r.goal);
+    const tools = await open('3.2B', '#/sys/tools');
+    const t = await tools.p.evaluate(() => document.body.innerText);
+    push('工具与扩展页：只有最近的取回记录与各项目的 MCP 服务器，没有授权表、恢复约定与准入钩子',
+      t.indexOf('最近的取回记录') >= 0 && t.indexOf('各项目的授权') < 0 && t.indexOf('恢复约定') < 0 && t.indexOf('准入钩子') < 0 && t.indexOf('在项目设置中修改') >= 0);
+    await tools.p.close();
+    const mt = await open('ui', '#/p/p-todo/materials?w=w-todo-base');
+    const m = await mt.p.evaluate(() => ({ plan: Boolean(document.querySelector('#mt-plan')), text: document.querySelector('#mt-delivery').innerText }));
+    push('资料页没有 PLAN，交付一项写明文件清单由主机从交付快照得出', !m.plan && m.text.indexOf('由主机从交付快照得出') >= 0, JSON.stringify(m.plan));
+    await mt.p.close();
+    push('设置页、工具页与资料页没有控制台错误', errs.length === 0 && tools.errs.length === 0 && mt.errs.length === 0, errs.concat(tools.errs, mt.errs).slice(0, 2).join(' | '));
+    await p.close();
+  }
+
+  // 外壳：标签页标题写待决定的数量；接口版本不同时按方向写下一步
+  {
+    const { p, errs } = await open('S5', '#/home');
+    const r = await p.evaluate(async () => {
+      const Y = window.Y12;
+      const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+      const n = Y.api.query('decisions.list', {}).data.length;
+      const title = document.title;
+      Y.backend.sim.setApiVersion(3);
+      await wait(300);
+      const newer = document.querySelector('.y12-window-note').innerText;
+      Y.backend.sim.setApiVersion(1);
+      await wait(300);
+      const older = document.querySelector('.y12-window-note').innerText;
+      Y.backend.sim.setApiVersion(Y.CLIENT_API_VERSION);
+      await wait(300);
+      return { n, title, newer, older, tray: Boolean(document.querySelector('.y12-tray')) };
+    });
+    push('标签页的标题前写待决定的数量', r.n > 0 && r.title.indexOf('(' + r.n + ') ') === 0, r.title);
+    push('接口版本：服务比页面新时写重新构建页面文件', r.newer.indexOf('重新构建页面文件') >= 0 && r.newer.indexOf('第 3 版') >= 0, r.newer);
+    push('接口版本：页面比服务新时写重启服务', r.older.indexOf('重启 Yudao 服务') >= 0 && r.older.indexOf('第 1 版') >= 0, r.older);
+    push('外壳没有托盘的模拟', !r.tray);
+    push('外壳的检查没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
+    await p.close();
+  }
+  return out;
+}
+
 (async () => {
   const results = staticChecks();
   const browser = await chromium.launch({ executablePath: EXE });
@@ -869,6 +1126,7 @@ async function pilotChecks(ctx) {
   const loadAt = await replayPage(seek.hashAfter.includes('at=') ? seek.hashAfter : '#/p/p-todo/overview?at=40', async () => 0);
   results.push({ name: '回放：带回放位置的地址直接打开概览页能装载楼层画面', ok: loadAt.errs.length === 0 && loadAt.canvas === 1, detail: loadAt.canvas + ' 个画布；' + loadAt.errs.slice(0, 2).join(' | ') });
   results.push(...await pilotChecks(ctx));
+  results.push(...await v12Checks(ctx));
   await browser.close();
   results.forEach((r) => console.log((r.ok ? 'PASS ' : 'FAIL ') + r.name + (r.ok || !r.detail ? '' : '  ← ' + r.detail)));
   const bad = results.filter((r) => !r.ok);

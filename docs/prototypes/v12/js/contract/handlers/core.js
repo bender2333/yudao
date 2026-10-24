@@ -287,7 +287,9 @@
   function markerOf(loop, project) {
     if (project.archived) return { kind: 'cancelled', status: 'archived', text: '已归档' };
     for (const [status, kind, text] of MARKER_ORDER) {
-      if (loop.items.some((it) => it.status === status)) return { kind, status, text };
+      const it = loop.items.find((x) => x.status === status);
+      // 机器离线时的待恢复在左侧栏写「等待机器」（执行环境服务设计说明第 6.5 节）
+      if (it) return { kind, status, text: status === 'waiting_resume' && it.sign && it.sign.indexOf('等待机器') === 0 ? '等待机器' : text };
     }
     return { kind: 'idle', status: 'idle', text: '空闲' };
   }

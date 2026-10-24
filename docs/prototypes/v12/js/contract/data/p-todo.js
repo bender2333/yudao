@@ -387,8 +387,15 @@
               // 网络取回可以取回任意地址（ADR-0038），不逐次批准
               id: 'a-todo-mdn-1', department: 'quality', role: null, tool: 'network_fetch',
               summary: '取回 MDN 的日期输入控件说明', input: '试用第 5 步的准备', state: 'done',
-              receipt: { target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date', output: '已取回 · 24 KB', truncated: false, timed_out: false, duration_ms: 820, snapshot: null },
+              receipt: { target: 'https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/input/date', output: '已取回 · 24 KB', truncated: false, timed_out: false, duration_ms: 820, snapshot: null, artifact: 'ext-mdn-input-date' },
               before: null, after: null, machine_id: 'm-host', at: '2026-09-29T14:18:00+08:00'
+            },
+            {
+              // MCP 服务器的工具全部直接提供给项目设置里写明的部门（ADR-0038）
+              id: 'a-todo-mcp-1', department: 'engineering', role: null, tool: 'mcp:search_code',
+              summary: '调用 MCP 工具 search_code（GitHub 官方 MCP 服务）：搜索日期输入控件的写法', input: '逾期提醒的日期比较', state: 'done',
+              receipt: { target: 'GitHub（官方 MCP 服务） · search_code', output: '找到 3 处 input[type=date] 的用法', truncated: false, timed_out: false, duration_ms: 1300, snapshot: null, artifact: 'ext-gh-search-date' },
+              before: null, after: null, machine_id: 'm-host', at: '2026-09-28T11:10:00+08:00'
             },
             {
               id: 'a-todo-trial-3', department: 'quality', role: null, tool: 'browser',
@@ -1382,7 +1389,14 @@
             patch: [
               { path: 'runs[id=r-todo-export].elapsed_sec', value: 1600 },
               { path: 'runs[id=r-todo-export].department', value: 'engineering' },
-              { path: 'runs[id=r-todo-export].last_department', value: 'product' }
+              { path: 'runs[id=r-todo-export].last_department', value: 'product' },
+              {
+                path: 'materials', push: {
+                  id: 'm-todo-export-p1', project_id: 'p-todo', work_item_id: 'w-todo-export', kind: 'prd', version: 1,
+                  title: 'PRD r1（导出为 CSV）', at: '2026-09-29T15:30:00+08:00', files: null, verdict: null, accepted_from: '用户输入 v1',
+                  text: '# 目标\n把待办导出为 CSV 文件。\n\n# 要求与验收条件\n- AC-1 列表页有「导出为 CSV」按钮，点击后下载文件\n- AC-2 文件包含标题、说明、截止日期与完成状态四列\n- AC-3 新增、编辑、删除、完成、筛选与搜索的原有行为不变'
+                }
+              }
             ]
           },
           {
@@ -1450,7 +1464,16 @@
               type: 'spec_accepted', project_id: 'p-todo', work_item_id: 'w-todo-export', run_id: 'r-todo-export', department: 'product',
               label: 'PRD r2 被接纳：工程在下一步收到通知接着工作，质检按 r2 补测试用例', payload: { version: 'r2' }
             },
-            patch: [{ path: 'runs[id=r-todo-export].elapsed_sec', value: 2400 }]
+            patch: [
+              { path: 'runs[id=r-todo-export].elapsed_sec', value: 2400 },
+              {
+                path: 'materials', push: {
+                  id: 'm-todo-export-p2', project_id: 'p-todo', work_item_id: 'w-todo-export', kind: 'prd', version: 2,
+                  title: 'PRD r2（导出为 CSV）', at: '2026-09-29T15:30:00+08:00', files: null, verdict: null, accepted_from: '回答工程的询问',
+                  text: '# 目标\n把待办导出为 CSV 文件。\n\n# 要求与验收条件\n- AC-1 列表页有「导出为 CSV」按钮，点击后下载文件\n- AC-2 文件包含标题、说明、截止日期与完成状态四列，用逗号分隔，文件用 UTF-8 带 BOM，Excel 能直接打开\n- AC-3 新增、编辑、删除、完成、筛选与搜索的原有行为不变'
+                }
+              }
+            ]
           },
           {
             delay: 1400,
@@ -1477,7 +1500,16 @@
               { path: 'runs[id=r-todo-export].elapsed_sec', value: 5400 },
               { path: 'runs[id=r-todo-export].department', value: 'quality' },
               { path: 'runs[id=r-todo-export].last_department', value: 'engineering' },
-              { path: 'runs[id=r-todo-export].departments', value: null }
+              { path: 'runs[id=r-todo-export].departments', value: null },
+              {
+                path: 'materials', push: {
+                  id: 'm-todo-export-d1', project_id: 'p-todo', work_item_id: 'w-todo-export', kind: 'delivery', version: 1,
+                  title: '交付 r1（导出为 CSV）', at: '2026-09-29T15:30:00+08:00', verdict: null, basis: 'PRD r2',
+                  summary: '导出为 CSV：四列、逗号分隔、UTF-8 带 BOM；19 条测试通过', text: '交付 r1：依据 PRD r2 实现导出为 CSV。',
+                  files: [{ path: 'app.js', bytes: 6480 }, { path: 'tests/export.test.js', bytes: 1260 }],
+                  git: { commit: 'c3a7f10', parent: 'b7e91d4', stat: '2 个文件 · +58' }, diff: '修改 app.js：导出按钮与 CSV 生成\n新增 tests/export.test.js'
+                }
+              }
             ]
           },
           {
@@ -1501,7 +1533,15 @@
               { path: 'runs[id=r-todo-export].last_department', value: 'quality' },
               { path: 'runs[id=r-todo-export].recovery.state', value: 'completed' },
               { path: 'runs[id=r-todo-export].elapsed_sec', value: 6600 },
-              { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T15:30:00+08:00' }
+              { path: 'projects[id=p-todo].last_activity_at', value: '2026-09-29T15:30:00+08:00' },
+              {
+                path: 'materials', push: {
+                  id: 'm-todo-export-q1', project_id: 'p-todo', work_item_id: 'w-todo-export', kind: 'qa', version: 1,
+                  title: '质检结论 r1（导出为 CSV）', at: '2026-09-29T15:30:00+08:00', verdict: 'release', files: null,
+                  text: '3 条验收条件全部通过：用 Excel 打开导出的文件，中文与四列都正确；原有行为没有变化。',
+                  checks: [{ label: 'AC-1 至 AC-3', ok: true }], receipts: [], screenshots: []
+                }
+              }
             ]
           },
           {
