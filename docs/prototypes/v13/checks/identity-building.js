@@ -1,13 +1,13 @@
 // 用法：node docs/prototypes/v12/checks/identity-building.js
-// 楼与机房的确定性逐像素比较：在 v9 与 v12 的页面里用同一份数据建楼与机房，
+// 楼与机房的确定性逐像素比较：在 v9 与 v13 的页面里用同一份数据建楼与机房，
 // 冻结画面、把所有小人与时间基准摆成同一状态，再截同一块 canvas 逐像素比较。
 // 楼里随时间变化的元素（状态灯闪动、管线流动、小人动画相位、随机走动位置）全部固定住之后，
 // 两版画面应当完全相同；任何残余差异都是真实画面差异，不是动画相位差。
 // 自检：同一份设置在同一版本里跑两次，第二次换时间基准，两次的画面必须不同（证明比较确实在看内容，
 // 不会因两次都截到空白而假通过）。
-const { chromium, EXE, v9Url, v12Url, spaceOf } = require('./env.js');
+const { chromium, EXE, v9Url, v13Url, spaceOf } = require('./env.js');
 
-const V12 = v12Url;
+const V13 = v13Url;
 const V9 = v9Url;
 
 const SETUP = (opts) => {
@@ -15,14 +15,18 @@ const SETUP = (opts) => {
   const P = window[opts.space].pixel;
   // 自主行为（管线光点的惯性）关掉：静止的画面只由数据决定，才能与 v9 逐像素比较
   if (P.ecs) P.ecs.config.autonomy = false;
+  // v9 的画面直接认 setModel 与 v9 的状态词；v13 的画面只认画面合同（jump 与 working）。两边用同一份内容
+  const NEW = opts.space !== 'Y9';
+  const load = (scene, m) => (NEW ? scene.jump(Object.assign({ position: 0 }, m)) : scene.setModel(m));
+  const word = (s) => (NEW && s === 'running' ? 'working' : s);
   const mk = (pid, lit, status, decisions) => ({
-    project_id: pid, name: pid.toUpperCase(), status,
+    project_id: pid, name: pid.toUpperCase(), status: word(status),
     lit: { product: false, engineering: false, quality: false, operations: false, ...lit },
     has_ops: false, flags: [], valve_closed: false, machine_ids: [], link_active: false,
     decisions: decisions || 0, runtime_machine: null
   });
   const floors = [mk('p-a', {}, 'running', 2), mk('p-b', { engineering: true }, 'waiting_slot'),
-    mk('p-c', { quality: true, product: true }, 'idle'), mk('p-d', {}, 'pending_verification')];
+    mk('p-c', { quality: true, product: true }, 'idle'), mk('p-d', {}, 'waiting_resume')];
   const room = {
     machines: [
       { id: 'm-host', kind: 'host', name: '家里主机', online: true, containers: 4,
@@ -49,10 +53,10 @@ const SETUP = (opts) => {
   };
   const b = box('probe-building');
   const building = P.createBuildingScene(b.canvas, {});
-  building.setModel({ floors, show_basement: true });
+  load(building, { floors, show_basement: true });
   const m = box('probe-room');
   const machine = P.createMachineRoomScene(m.canvas, { onMachineClick: () => {} });
-  machine.setModel(room);
+  load(machine, room);
   const pin = (sc) => {
     sc.frozen = true;
     sc.reduced = false;
@@ -143,24 +147,24 @@ async function analyse(cmp, aB64, bB64) {
   const cmp = await browser.newPage();
   await cmp.goto('about:blank');
   const v9a = await shoot(browser, V9, '.probe-building canvas', 2400);
-  const v12a = await shoot(browser, V12, '.probe-building canvas', 2400);
+  const v13a = await shoot(browser, V13, '.probe-building canvas', 2400);
   const v9b = await shoot(browser, V9, '.probe-building canvas', 5200);
   console.log('v9 info', JSON.stringify(v9a.info));
-  console.log('v12 info', JSON.stringify(v12a.info));
-  const b = await analyse(cmp, v9a.building, v12a.building);
-  const r = await analyse(cmp, v9a.room, v12a.room);
+  console.log('v13 info', JSON.stringify(v13a.info));
+  const b = await analyse(cmp, v9a.building, v13a.building);
+  const r = await analyse(cmp, v9a.room, v13a.room);
   const self = await analyse(cmp, v9a.building, v9b.building);
   console.log('building', JSON.stringify(b));
   console.log('room', JSON.stringify(r));
   console.log('自检（同版本换时间基准）', JSON.stringify(self));
   await browser.close();
-  const errors = v9a.errors.concat(v12a.errors);
-  const sameShape = JSON.stringify(v9a.info) === JSON.stringify(v12a.info);
+  const errors = v9a.errors.concat(v13a.errors);
+  const sameShape = JSON.stringify(v9a.info) === JSON.stringify(v13a.info);
   const ok = errors.length === 0 && sameShape && !b.mismatch && !r.mismatch &&
     b.diffPixels === 0 && r.diffPixels === 0 &&
     // 自检：换时间基准后画面确有变化（状态灯与管线光点在闪），且画面确有内容（非空白）
     self.diffPixels > 0 && b.inkPixels > 10000 && r.inkPixels > 5000;
-  console.log(ok ? 'RESULT: PASS 同一数据、同一时间基准、同一小人位置下，v9 与 v12 的楼画面与机房画面逐像素相同'
+  console.log(ok ? 'RESULT: PASS 同一数据、同一时间基准、同一小人位置下，v9 与 v13 的楼画面与机房画面逐像素相同'
     : 'RESULT: FAIL');
   process.exit(ok ? 0 : 1);
 })();

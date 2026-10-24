@@ -7,7 +7,7 @@ const ROOT = v13Url;
 
 function floor(pid, lit) {
   return {
-    project_id: pid, name: pid, status: 'running',
+    project_id: pid, name: pid, status: 'working',
     lit: { product: false, engineering: false, quality: false, operations: false, ...lit },
     has_ops: false, flags: [], valve_closed: false, machine_ids: [], link_active: false,
     decisions: 0, runtime_machine: null
@@ -35,7 +35,7 @@ function floor(pid, lit) {
     host.appendChild(canvas);
     document.body.appendChild(host);
     const building = window.Y13.pixel.createBuildingScene(canvas, {});
-    building.setModel({ floors: JSON.parse(floorsJson), show_basement: false });
+    building.jump({ position: 0, floors: JSON.parse(floorsJson), show_basement: false });
     const sc = building.scene;
     const sample = () => sc.actors.filter((a) => a.data.walker).map((a) => ({
       id: a.id, x: Math.round(a.x), y: Math.round(a.y), anim: a.anim,
@@ -54,7 +54,7 @@ function floor(pid, lit) {
       });
     }
     // 层数减少后旧的 actor 与角色实体要一并清掉
-    building.setModel({ floors: [JSON.parse(floorsJson)[0]], show_basement: false });
+    building.jump({ position: 0, floors: [JSON.parse(floorsJson)[0]], show_basement: false });
     await new Promise((r) => setTimeout(r, 200));
     const afterShrink = sc.actors.filter((a) => a.data.walker).map((a) => a.id);
     building.destroy();
@@ -73,9 +73,9 @@ function floor(pid, lit) {
     host.appendChild(canvas);
     document.body.appendChild(host);
     const building = window.Y13.pixel.createBuildingScene(canvas, {});
-    building.setModel({
+    building.jump({ position: 0,
       floors: [
-        { project_id: 'p-a', name: 'p-a', status: 'running',
+        { project_id: 'p-a', name: 'p-a', status: 'working',
           lit: { product: false, engineering: false, quality: true, operations: false },
           has_ops: false, flags: [], valve_closed: false, machine_ids: [], link_active: false,
           decisions: 0, runtime_machine: null },

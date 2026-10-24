@@ -13,11 +13,11 @@
   // ---------------------------------------------------------------------------
   // 第 3.1 节：世界
 
-  // catalog：{ tasks, idle, keyOf }，见第 3.4 节；每个世界带着自己的目录
+  // catalog：{ tasks, idle }，见第 3.4 节；每个世界带着自己的目录
   ECS.world = function world(catalog) {
     return {
       rooms: {}, roomOrder: [], links: {}, characters: {}, packages: {}, signals: {},
-      catalog: Object.assign({ tasks: {}, idle: [], keyOf: (ev) => ev.type }, catalog || {})
+      catalog: Object.assign({ tasks: {}, idle: [] }, catalog || {})
     };
   };
 
@@ -238,15 +238,15 @@
   // ---------------------------------------------------------------------------
   // 第 3.4 节：任务目录、待机活动与信号（内容全部来自声明）
   //
-  // 任务：{ label, spot, pose, bubble, ms, icon, facing, dept, by, actor, toward, then, start, done }
+  // 任务：{ label, spot, pose, bubble, ms, icon, facing, dept, by, actor, toward, then, start, done, actionId }
   //   spot：'desk'｜'stand'｜'cabinet'｜'terminal'｜'monitor'｜'inspect'｜'port_in'｜'port_out'
   //         ｜'peer'（另一个角色的工位旁，toward 指定是谁）｜'at'（任务自带的坐标 at）
   //   dept：由哪个部门做（事件没有部门字段时用，例如故障记录由运维做）
   //   by：事件没有指定角色时由哪种角色做；actor：不管事件指定了谁，都由这种角色做（分派任务是经理做的）
   //   toward：spot 为 'peer' 时走向谁：'role'（事件指定的角色）或者角色种类；then：做完以后放进走向对象队列的任务
-  //   start／done：任务开始（到达位置）与做完时的回调，由 floor.js 按声明的效果装上
+  //   start／done：任务开始（到达位置）与做完时的回调，由 floor.js 按声明的效果装上；actionId：这个任务属于时间线上的哪一个动作
   // 待机活动：[{ key（任务目录里的键）, weight, kinds（限定角色种类）, needs: 'mate'（需要一个空闲的同伴）, at: 'wander'｜'door' }]
-  // keyOf(事件)：事件落在哪个任务上；没有命中任务目录的事件是信号。
+  // 演什么、什么时候演、丢什么由播放时间线决定（timeline.js）：一个角色的队列里只有它正在演的那个动作的几步。
 
   // 信号：不需要角色去做什么的画面指示（门缝亮灯、信箱闪、监控屏告警、设备闪光……），在 ms 毫秒内为真，可以带一个值（例如颜色）
   ECS.signal = function signal(world, scene, name, ms, value) {
@@ -261,12 +261,8 @@
     return ECS.signalOn(world, scene, name) ? world.signals[name].value : null;
   };
 
-  // 队列里最多留几个可以被挤掉的任务（must 的任务不受限制）；房间里的动作排队太长时，画面会落后于事实
-  const MAX_QUEUE = 3;
-
   // 把一个任务放进角色的队列。who 是角色 id 或部门 id（部门按 extra.role 与任务的 by 找角色），key 取自任务目录，
-  // extra 覆盖任务的字段（label、facing、onDone……）。
-  // extra.front 为真：插到队首，并放弃正在做的非 must 任务；extra.must 为真：不会被队列上限挤掉。
+  // extra 覆盖任务的字段（label、facing、onDone、actionId……）。
   ECS.enqueue = function enqueue(world, who, key, extra) {
     const def = world.catalog.tasks[key];
     if (!def) return null;
@@ -279,53 +275,55 @@
       if (ch.current && ch.current.idle) ch.current = null;
       ch.queue = ch.queue.filter((t) => !t.idle);
     }
-    if (e.front) {
-      ch.queue.unshift(task);
-      if (ch.current && !ch.current.must) ch.current = null;
-    } else {
-      ch.queue.push(task);
-    }
-    while (ch.queue.filter((t) => !t.must).length > MAX_QUEUE) ch.queue.splice(ch.queue.findIndex((t) => !t.must), 1);
+    ch.queue.push(task);
     return task;
   };
 
-  // 事件到达：命中任务目录则入队（角色的动作走队列）；没有任务的事件返回 false，由调用方按信号处理
-  // 参数 make(task 定义, 事件, 执行的角色, 一方)：调用方为任务装上事件相关的字段（效果回调、气泡文字……），可以省略；
-  // 一方为 'to' 表示这个任务是事件里收东西的一方做的（任务的 then 后续任务）
-  ECS.dispatch = function dispatch(world, ev, make) {
-    if (!ev || !ev.type) throw new Error('dispatch 需要事件对象');
-    const key = world.catalog.keyOf(ev);
-    const def = world.catalog.tasks[key];
-    if (!def) return false;
-    // 任务声明了 dept 就由那个部门做（事件本身可以没有部门字段），否则是事件的部门
-    const dept = def.dept || ev.department;
-    if (!dept) return false;
-    const ch = ECS.charFor(world, dept, def.actor ? null : ev.role, def.actor || def.by);
-    if (!ch) return false;
-    const pl = ev.payload || {};
-    if (def.streaming) {
-      // 流式输出：文字接在正在做的模型请求上（第一段文字取代默认的标签），任务从最后一段文字起多留一会儿；
-      // 没有正在做的请求就不产生任务
-      const cur = ch.current;
-      if (cur && cur.taskKey === 'model_requested') {
-        cur.label = ((cur.streamed ? cur.label : '') + (pl.text || '')).slice(-120);
-        cur.streamed = true;
-        cur._t0 = null;
-        return true;
-      }
-      return false;
-    }
-    const extra = { workItemId: ev.work_item_id };
-    if (pl.n !== undefined && pl.of !== undefined) extra.iconText = String(pl.n) + '/' + String(pl.of);
-    // 走向另一个角色的任务：对象是事件指定的角色，或者部门里某种角色
+  // 一个由角色做的动作（画面合同的动作，kind 是任务目录里的键）：找到做它的角色，放进它的队列。
+  // 返回放进去的任务；找不到角色时返回 null。参数 make(task 定义, 动作, 执行的角色, 一方)：调用方为任务装上动作相关的字段
+  // （效果回调、气泡文字、actionId……）；一方为 'to' 表示这个任务是动作里收东西的一方做的（任务的 then 后续任务）
+  ECS.dispatch = function dispatch(world, action, make) {
+    const def = world.catalog.tasks[action.kind];
+    if (!def) throw new Error('任务目录里没有这种动作：' + action.kind);
+    // 任务声明了 dept 就由那个部门做，否则是动作所在的房间
+    const ch = ECS.doerOf(world, action);
+    if (!ch) return null;
+    const extra = { workItemId: action.item || null };
+    if (action.count) extra.iconText = action.count;
+    // 走向另一个角色的任务：对象是动作指定的角色，或者部门里某种角色
     if (def.spot === 'peer') {
-      const to = def.toward === 'role' ? ECS.charFor(world, dept, ev.role) : ECS.charFor(world, dept, null, def.toward);
-      if (!to || to === ch) return false;
+      const to = ECS.peerOf(world, action);
+      if (!to) return null;
       extra.withId = to.id;
-      if (def.then) extra.onDone = () => { ECS.enqueue(world, to.id, def.then, make ? make(world.catalog.tasks[def.then], ev, to, 'to') : null); };
+      if (def.then) extra.onDone = () => { ECS.enqueue(world, to.id, def.then, make ? make(world.catalog.tasks[def.then], action, to, 'to') : null); };
     }
-    if (make) Object.assign(extra, make(def, ev, ch));
-    return Boolean(ECS.enqueue(world, ch.id, key, extra));
+    if (make) Object.assign(extra, make(def, action, ch));
+    return ECS.enqueue(world, ch.id, action.kind, extra);
+  };
+
+  // 做这个动作的角色，与走向的另一个角色（分派与交回）
+  ECS.doerOf = function doerOf(world, action) {
+    const def = world.catalog.tasks[action.kind];
+    const dept = (def && def.dept) || action.room;
+    if (!dept) return null;
+    return ECS.charFor(world, dept, def && def.actor ? null : action.role, def ? def.actor || def.by : null);
+  };
+  ECS.peerOf = function peerOf(world, action) {
+    const def = world.catalog.tasks[action.kind];
+    if (!def || def.spot !== 'peer') return null;
+    const dept = def.dept || action.room;
+    const ch = ECS.doerOf(world, action);
+    const to = def.toward === 'role' ? ECS.charFor(world, dept, action.role) : ECS.charFor(world, dept, null, def.toward);
+    return to && to !== ch ? to : null;
+  };
+
+  // 时间线截断一个动作：它在各个角色队列里的步骤与沿管道走的包裹立刻去掉，不再执行做完以后的效果
+  ECS.dropAction = function dropAction(world, actionId) {
+    Object.values(world.characters).forEach((ch) => {
+      if (ch.current && ch.current.actionId === actionId) ch.current = null;
+      ch.queue = ch.queue.filter((t) => t.actionId !== actionId);
+    });
+    Object.keys(world.packages).forEach((id) => { if (world.packages[id].actionId === actionId) delete world.packages[id]; });
   };
 
   function spotXY(world, ch, kind, task) {
@@ -362,8 +360,9 @@
   }
 
   // 每帧调用一次。scene 用于驱动 v7/v8 已有的 actor 补间（scene.run/scene.play），不重写走动与缓动逻辑。
-  // ch.rest 是调用方按当前快照写入的"现在该干什么"（形状同任务：spot、pose、icon、iconText、facing、hold；away 为真表示不在房间里），
-  // 只在没有事件任务在做时生效：画面上的持续状态取自快照，动作的起点取自事件，两者走同一段推进代码。
+  // ch.rest 是调用方按当前状态写入的"现在该干什么"（形状同任务：spot、pose、icon、iconText、facing、hold；away 为真表示不在房间里），
+  // 只在没有任务在做时生效：画面上的持续姿势取自状态，动作的起点取自时间线，两者走同一段推进代码。
+  // ch.progress 是进度一级的动作合并成的持续姿势（形状同任务，until 为保持到的时间），没有任务在做时取代 ch.rest。
   ECS.stepCharacters = function stepCharacters(world, scene) {
     Object.values(world.characters).forEach((ch) => stepOne(world, scene, ch));
   };
@@ -380,7 +379,7 @@
       ch.current._t0 = null;
     }
     const task = ch.current;
-    const goal = task || ch.rest || null;
+    const goal = task || ECS.progressOf(ch, scene) || ch.rest || null;
     const room = ECS.roomOf(world, ch.department);
     // 不在房间里（外出）：从画面上消失，回来时从门口走进来
     if (goal && goal.away) {
@@ -402,7 +401,7 @@
         scene.run(a, steps, {});
         a.data.idleWalk = Boolean(goal && goal.idle);
       }
-      ch.bubble = ECS.bubbleFor(ch);
+      ch.bubble = ECS.bubbleFor(ch, scene);
       return;
     }
     if (!a.script) {
@@ -433,8 +432,13 @@
       if (ch.idleAt == null) ch.idleAt = scene.realT + (5000 + Math.random() * 7000) * (1 + 0.15 * (ECS.charsOf(world, ch.department).length - 1));
       else if (scene.realT >= ch.idleAt) { ch.idleAt = null; startIdle(world, ch); }
     }
-    ch.bubble = ECS.bubbleFor(ch);
+    ch.bubble = ECS.bubbleFor(ch, scene);
   }
+
+  // 还在保持的进度姿势
+  ECS.progressOf = function progressOf(ch, scene) {
+    return ch.progress && ch.progress.until > scene.realT ? ch.progress : null;
+  };
 
   // 空闲的角色自己挑一件事：从目录的待机活动里按权重抽一项（限定角色种类、需要空闲的同伴的都要满足条件）。
   // 待机活动不产生事实，头顶没有对话框，遇到真正的任务立刻放弃。
@@ -468,8 +472,8 @@
   }
 
   // 第 3.4 节：P.ecs.bubbleFor —— 只读取已有的任务数据，不产生新的事实
-  ECS.bubbleFor = function bubbleFor(ch) {
-    const cur = ch.current;
+  ECS.bubbleFor = function bubbleFor(ch, scene) {
+    const cur = ch.current || (scene && ECS.progressOf(ch, scene));
     if (cur && cur.bubble === 'say' && cur.label) return { text: cur.label, kind: 'say', tail: Boolean(cur.streamed) };
     const next = ch.queue[0];
     if (next && next.bubble === 'say' && next.label) return { text: next.label, kind: 'think' };

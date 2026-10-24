@@ -31,11 +31,13 @@
     Y13.app.renderContent(true);
   }
 
-  function workspace(ctx) {
+  // 带位置的查询结果（房间画面的状态要位置）
+  function workspaceQuery(ctx) {
     const params = { project: ctx.projectId, department: ctx.department };
     if (ctx.workItemId) params.work_item = ctx.workItemId;
-    return Y13.api.query('department.workspace', params).data;
+    return Y13.api.query('department.workspace', params);
   }
+  function workspace(ctx) { return workspaceQuery(ctx).data; }
 
   function actions(ctx, v) {
     if (!Y13.cap.query('run.actions')) return null;
@@ -552,7 +554,8 @@
   }
 
   function paint(ctx, root) {
-    const v = workspace(ctx);
+    const r = workspaceQuery(ctx);
+    const v = r.data;
     const head = root.querySelector('[data-ws-head]');
     if (head) head.innerHTML = headInner(v);
     const info = root.querySelector('[data-ws-info]');
@@ -563,15 +566,15 @@
     if (comms) comms.innerHTML = commsInner(ctx, v);
     const ops = root.querySelector('[data-ws-ops]');
     if (ops) ops.innerHTML = opsInner(ctx);
-    if (st.scene) st.scene.setModel(v.room);
+    if (st.scene) st.scene.show(r, false);
   }
 
+  // 部门房间画面：经翻译层取得状态与动作（js/ui/scenes.js 的 mountRoom）；打开时直接显示最新的状态
   function mountRoom(ctx, root) {
     const canvas = root.querySelector('canvas.y13-ws-canvas');
     if (!canvas) throw new Error('部门工作间缺少房间画布');
-    const v = workspace(ctx);
-    st.scene = Y13.pixel.createRoomScene(canvas, { department: ctx.department });
-    st.scene.setModel(v.room);
+    st.scene = Y13.scenes.mountRoom(canvas, { department: ctx.department, latest: () => workspaceQuery(ctx) });
+    st.scene.show(workspaceQuery(ctx), true);
   }
 
   Y13.views.register('dept', {
@@ -591,7 +594,7 @@
       paint(ctx, root);
     },
     onEvent(ctx, root, event) {
-      if (st.scene) Y13.scenes.playOn(st.scene, event);
+      if (st.scene) st.scene.onEvent(event);
     },
     unmount() {
       if (st.modal) {

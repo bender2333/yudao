@@ -61,10 +61,17 @@
       player.step += 1;
       if (player.step >= sc.steps.length) stop();
       if (st.go && location.hash !== st.go) Y13.go(st.go);
+      const emit = (one) => {
+        const spec = Object.assign({ project_id: null, work_item_id: null, run_id: null, department: null, role: null, payload: {} }, Y13.clone(one.event));
+        spec.patch = Y13.clone(one.patch || []);
+        return Y13.backend.emit(spec);
+      };
       if (st.event) {
-        const spec = Object.assign({ project_id: null, work_item_id: null, run_id: null, department: null, role: null, payload: {} }, Y13.clone(st.event));
-        spec.patch = Y13.clone(st.patch || []);
-        player.last = Y13.backend.emit(spec);
+        player.last = emit(st);
+      } else if (st.burst) {
+        // 一下子到达的一批事件（原型 v13 的堆积场景）：同一刻逐条推送
+        st.burst.forEach(emit);
+        player.last = { type: st.burst.length + ' 条事件', label: st.label };
       } else if (st.act) {
         player.last = { type: st.act, label: st.label || st.act };
         // 界面动作的参数照页面元素的 data-* 给出
@@ -106,6 +113,45 @@
   // 离开的时长：上次查看的时间设为现在往前若干小时
   const AWAY = [['3d', '三天', 72], ['1d', '一天', 24], ['8h', '八小时', 8], ['1h', '一小时', 1]];
 
+  // ---------------------------------------------------------------------------
+  // 节奏（原型 v13 的调节面板）：画面的落后上限、缩短时的最短时长与声明时长的倍率，三个场景共用（js/pixel/timeline.js 的 settings）；
+  // 读数写出挂着的画面现在落后几秒、排着几个动作，以及丢掉、合并、缩短、到了上限强制上画面的次数。设置留在这个浏览器里
+
+  const PACE_DEFAULT = { lagMs: 5000, minMs: 300, speed: 1 };
+  const PACE = [
+    { key: 'lagMs', label: '落后上限', min: 1000, max: 15000, step: 500, text: (v) => (v / 1000).toFixed(1) + ' 秒' },
+    { key: 'minMs', label: '最短时长', min: 100, max: 1000, step: 50, text: (v) => (v / 1000).toFixed(2) + ' 秒' },
+    { key: 'speed', label: '时长倍率', min: 0.25, max: 3, step: 0.25, text: (v) => '× ' + v }
+  ];
+  let paceOpen = false;
+  let paceTimer = null;
+  Object.assign(Y13.pixel.timeline.settings, PACE_DEFAULT, Y13.store.get('playback', {}, true));
+
+  function paceReadout() {
+    const list = Y13.scenes.panels().map((p) => [p.floor, p.building, p.room].filter(Boolean)).reduce((a, b) => a.concat(b), []);
+    if (!list.length) return '这一页没有画面';
+    return list.map((sc) => {
+      const t = sc.inspect().timeline;
+      const s = t.stats;
+      return '落后 ' + (t.lag / 1000).toFixed(1) + ' 秒（最多 ' + (s.maxLag / 1000).toFixed(1) + '）· 排着 ' + t.queued + ' · 在演 ' + t.playing.length +
+        ' · 丢掉 ' + s.dropped + ' · 合并 ' + s.merged + ' · 缩短 ' + s.shortened + ' · 强制 ' + s.forced;
+    }).join('　|　');
+  }
+
+  function pacePanel() {
+    const s = Y13.pixel.timeline.settings;
+    return '<div class="y13-tb-sim y13-tb-pace">' + PACE.map((p) =>
+      '<label><span>' + p.label + '</span><input type="range" data-act="tb.pace.set" data-key="' + p.key + '" min="' + p.min + '" max="' + p.max + '" step="' + p.step + '" value="' + s[p.key] + '">' +
+      '<output data-pace-value="' + p.key + '">' + p.text(s[p.key]) + '</output></label>').join('') +
+      '<button type="button" class="y13-tb-btn" data-act="tb.pace.reset"><span>恢复默认</span></button>' +
+      '<span class="y13-tb-hint" data-pace-readout>' + Y13.esc(paceReadout()) + '</span></div>';
+  }
+
+  function paceTick() {
+    const el = document.querySelector('[data-pace-readout]');
+    if (el) el.textContent = paceReadout();
+  }
+
   function render() {
     const host = Y13.app.dom.toolbar;
     if (!host) return;
@@ -134,8 +180,10 @@
           '<label><span>离开的时长</span><select class="y13-tb-select" data-act="tb.away"><option value="">保持</option>' +
             AWAY.map((a) => '<option value="' + a[0] + '">' + a[1] + '</option>').join('') + '</select></label>' +
           '<button type="button" class="y13-tb-btn" data-act="tb.notify">' + Y13.ui.icon('bell') + '<span>模拟一条通知</span></button>' +
+          '<label><input type="checkbox" data-act="sim.hidden"' + (Y13.pixel.hidden ? ' checked' : '') + '><span>标签页在后台（画面暂停，事件照样到达）</span></label>' +
         '</div>'
       : '';
+    const pace = paceOpen ? pacePanel() : '';
     host.className = 'y13-toolbar' + (open ? ' is-open' : '');
     host.innerHTML =
       '<div class="y13-tb-bar">' +
@@ -150,9 +198,10 @@
         '<span class="y13-tb-count">' + (sc ? player.step + ' / ' + total : '— / —') + '</span>' +
         '<span class="y13-tb-sep"></span>' +
         '<button type="button" class="y13-tb-btn' + (simOpen ? ' is-on' : '') + '" data-act="tb.sim" aria-expanded="' + simOpen + '">' + Y13.ui.icon('plug') + '<span>模拟</span></button>' +
+        '<button type="button" class="y13-tb-btn' + (paceOpen ? ' is-on' : '') + '" data-act="tb.pace" aria-expanded="' + paceOpen + '">' + Y13.ui.icon('step') + '<span>节奏</span></button>' +
         '<a class="y13-tb-link" href="#/gallery">动作图鉴</a>' +
         '<select class="y13-tb-select is-theme" data-act="tb.theme" aria-label="主题">' + themeOptions + '</select>' +
-      '</div>' + sim +
+      '</div>' + sim + pace +
       '<div class="y13-tb-event">' + eventLine + '</div>' +
       '<button type="button" class="y13-tb-toggle" data-act="tb.toggle" aria-expanded="' + open + '">' +
         '<span class="y13-tb-mini">原型工具 · ' + Y13.esc(Y13.LEVEL_LABELS[level]) + (sc ? ' · ' + player.step + '/' + total : '') + '</span>' +
@@ -187,6 +236,31 @@
     Y13.backend.sim.setLastSeen(Y13.time.add(Y13.app.now(), -entry[2] * 3600));
   });
   Y13.actions.register('tb.notify', () => Y13.shell.simulateNotification());
+  // 标签页在后台：画面的动画暂停（浏览器在后台不推进动画帧），切回前台时挂着的画面跳到最新
+  Y13.actions.register('sim.hidden', (el) => {
+    const on = el.dataset.hidden !== undefined ? el.dataset.hidden === 'true' : Boolean(el.checked);
+    Y13.pixel.hidden = on;
+    if (!on) Y13.bus.emit('tab-visible');
+    render();
+  });
+  Y13.actions.register('tb.pace', () => {
+    paceOpen = !paceOpen;
+    if (paceTimer) clearInterval(paceTimer);
+    paceTimer = paceOpen ? setInterval(paceTick, 300) : null;
+    render();
+  });
+  Y13.actions.register('tb.pace.set', (el) => {
+    const p = PACE.find((x) => x.key === el.dataset.key);
+    Y13.pixel.timeline.settings[p.key] = Number(el.value);
+    Y13.store.set('playback', Y13.pixel.timeline.settings, true);
+    const out = document.querySelector('[data-pace-value="' + p.key + '"]');
+    if (out) out.textContent = p.text(Number(el.value));
+  });
+  Y13.actions.register('tb.pace.reset', () => {
+    Object.assign(Y13.pixel.timeline.settings, PACE_DEFAULT);
+    Y13.store.set('playback', Y13.pixel.timeline.settings, true);
+    render();
+  });
 
   Y13.toolbar = { render, updateSpace };
   window.addEventListener('resize', () => { if (Y13.app.dom.toolbar) updateSpace(); });

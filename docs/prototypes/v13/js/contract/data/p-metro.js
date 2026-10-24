@@ -74,6 +74,113 @@
     return out;
   }
 
+  // ---------------------------------------------------------------------------
+  // 原型 v13 的两个播放场景（场景 24、25）：换乘站的事项在工程手里，质检同时做预测性探索
+
+  const W = 'w-metro-transfer', RUN = 'r-metro-transfer';
+  const BURST_SETUP = [
+    { path: 'runs[id=r-metro-transfer].recovery.state', value: 'running' },
+    { path: 'runs[id=r-metro-transfer].recovery.waiting_machine', value: null },
+    { path: 'runs[id=r-metro-transfer].recovery.reason', value: '运行中' },
+    { path: 'runs[id=r-metro-transfer].department', value: 'engineering' },
+    { path: 'runs[id=r-metro-transfer].cycle', value: 1 },
+    { path: 'runs[id=r-metro-transfer].departments', value: { quality: { state: 'working', note: '预测性探索：按 PRD r2 起草测试用例' } } },
+    { path: 'work_items[id=w-metro-transfer].status', value: 'in_progress' }
+  ];
+  // 一条事件与它的补丁（extra.patch）；extra 的其余字段写进事件；at 不写时是示例时间的「现在」
+  const happen = (type, department, role, label, payload, extra) => {
+    const x = Object.assign({}, extra || {});
+    const patch = x.patch || [];
+    delete x.patch;
+    return { event: Object.assign({ type, project_id: P, work_item_id: W, run_id: RUN, department, role: role || null, label, payload: payload || {} }, x), patch };
+  };
+  const tool = (department, role, name, label, payload) => happen('tool_started', department, role, label, Object.assign({ tool: name }, payload || {}), { tool: name });
+  const ran = (department, role, command, code) => happen('tool_called', department, role, '命令 ' + command + (code === 0 ? ' 通过' : ' 没有通过'), { tool: 'bash', command, exit_code: code, timed_out: false }, { tool: 'bash' });
+  const think = (department, role, what) => happen('model_requested', department, role, what, {});
+  const ask = (id, from, to, question) => happen('ask_started', from, null, (from === 'quality' ? '质检' : '工程') + '询问' + (to === 'engineering' ? '工程' : '产品') + '：' + question,
+    { ask_id: id, requester: from, recipient: to, question },
+    { patch: [{ path: 'runs[id=r-metro-transfer].asks', push: { id, requester: from, recipient: to, parent: null, question, status: 'open', answer: null, reason: null, prd_version: null, born_at: '2026-09-29T15:30:00+08:00', answered_at: null } }] });
+  const answer = (id, from, to, text) => happen('ask_answered', to, null, (to === 'engineering' ? '工程' : '产品') + '回答：' + text,
+    { ask_id: id, requester: from, recipient: to, result: 'answered', answer: text },
+    { patch: [{ path: 'runs[id=r-metro-transfer].asks[id=' + id + '].status', value: 'answered' }, { path: 'runs[id=r-metro-transfer].asks[id=' + id + '].answer', value: text }, { path: 'runs[id=r-metro-transfer].asks[id=' + id + '].answered_at', value: '2026-09-29T15:30:00+08:00' }] });
+  const deliver = (version) => happen('delivery_accepted', 'engineering', 'eng-manager', '交付 ' + version + ' 被接纳：换乘站去重与最短路径，质检关注的交付有了新版本', { version },
+    { patch: [{ path: 'runs[id=r-metro-transfer].department', value: 'quality' }, { path: 'runs[id=r-metro-transfer].last_department', value: 'engineering' }] });
+
+  const BURST_FIRST = [
+    think('engineering', 'eng-architect', '工程架构师整理换乘站去重的思路'),
+    tool('engineering', 'eng-explorer', 'read_file', '工程探索者阅读 subway_data.json', { path: 'subway_data.json' }),
+    tool('engineering', 'eng-lead', 'edit_range', '主程按区间编辑 pathfinding.py：换乘站按站名合并', { path: 'pathfinding.py' }),
+    happen('model_stream_progress', 'engineering', 'eng-architect', '输出片段', { text: '换乘站按站名合并，一条路径里只计一次换乘……' }),
+    tool('engineering', 'eng-lead', 'bash', '主程执行命令 python -m pytest tests/test_transfer.py', { command: 'python -m pytest tests/test_transfer.py' }),
+    ran('engineering', 'eng-lead', 'python -m pytest tests/test_transfer.py', 1),
+    tool('quality', 'qa-tester', 'read_file', '测试工程师阅读 PRD r2 的验收条件', { path: 'PRD.md' }),
+    think('quality', 'qa-tester', '测试工程师起草换乘站的测试用例'),
+    happen('context_assembled', 'product', 'prod-architect', '产品架构师整理询问用到的资料', {}),
+    happen('x_role_task_assigned', 'engineering', 'eng-reviewer', '工程经理把审查交给工程审查者', { to: 'eng-reviewer', task: '审查换乘站去重' }),
+    tool('engineering', 'eng-lead', 'edit_range', '主程按区间编辑 transfer.py：修正同站多线', { path: 'transfer.py' }),
+    tool('engineering', 'eng-explorer', 'read_range', '工程探索者阅读 pathfinding.py 的权重函数', { path: 'pathfinding.py' }),
+    tool('quality', 'qa-tester', 'edit_range', '测试工程师编辑 tests/test_transfer_cases.py', { path: 'tests/test_transfer_cases.py' }),
+    ask('q-burst-xzm', 'quality', 'engineering', '西直门同时在 2 号线与 4 号线，一条路径是否只计一次换乘？'),
+    tool('engineering', 'eng-lead', 'bash', '主程执行命令 python -m pytest tests/test_transfer.py', { command: 'python -m pytest tests/test_transfer.py' }),
+    ran('engineering', 'eng-lead', 'python -m pytest tests/test_transfer.py', 0),
+    think('engineering', 'eng-architect', '工程架构师核对最短路径的结果'),
+    answer('q-burst-xzm', 'quality', 'engineering', '按站名合并，西直门在一条路径里只计一次换乘。'),
+    happen('x_role_result_returned', 'engineering', 'eng-reviewer', '工程审查者把审查结果交回经理', { to: 'eng-manager' }),
+    happen('x_review_recorded', 'engineering', 'eng-reviewer', '工程审查者审查通过', { verdict: 'passed' }),
+    tool('engineering', 'eng-lead', 'edit_range', '主程按区间编辑 README.md：写明换乘的计法', { path: 'README.md' }),
+    think('product', 'prod-architect', '产品架构师核对 PRD r2 的说法'),
+    tool('quality', 'qa-tester', 'edit_range', '测试工程师补一条最大换乘数的用例', { path: 'tests/test_transfer_cases.py' }),
+    happen('proposal_submitted', 'engineering', 'eng-manager', '工程经理代表部门提交交付说明', { kind: 'delivery_spec' }),
+    deliver('r1'),
+    happen('department_activated', 'quality', null, '质检开始检查交付 r1', {}),
+    tool('quality', 'qa-tester', 'run_check', '测试工程师运行检查 python -m pytest tests', { command: 'python -m pytest tests' }),
+    think('quality', 'qa-tester', '测试工程师比对检查结果与验收条件'),
+    tool('quality', 'qa-explorer', 'read_file', '质检探索者阅读交付说明', { path: 'DELIVERY.md' }),
+    tool('quality', 'qa-tester', 'run_check', '测试工程师运行检查 python -m pytest tests/test_transfer_cases.py', { command: 'python -m pytest tests/test_transfer_cases.py' })
+  ];
+
+  const BURST_SECOND = [
+    think('quality', 'qa-tester', '测试工程师写缺陷记录'),
+    tool('quality', 'qa-tester', 'run_check', '测试工程师复核最大换乘数为 0 的路径', {}),
+    happen('qa_submitted', 'quality', 'qa-manager', '质检记下缺陷记录：最大换乘数为 0 时仍然返回换乘路径（D-1）', { verdict: 'rework_engineering' },
+      { patch: [{ path: 'runs[id=r-metro-transfer].department', value: 'engineering' }, { path: 'runs[id=r-metro-transfer].last_department', value: 'quality' }, { path: 'runs[id=r-metro-transfer].cycle', value: 2 }] }),
+    happen('department_activated', 'engineering', null, '工程开始修复 D-1', {}),
+    think('engineering', 'eng-architect', '工程架构师分析 D-1'),
+    tool('engineering', 'eng-lead', 'edit_range', '主程按区间编辑 pathfinding.py：最大换乘数为 0 时只走同一条线', { path: 'pathfinding.py' }),
+    tool('engineering', 'eng-lead', 'bash', '主程执行命令 python -m pytest tests', { command: 'python -m pytest tests' }),
+    ran('engineering', 'eng-lead', 'python -m pytest tests', 0),
+    tool('engineering', 'eng-lead', 'edit_range', '主程按区间编辑 transfer.py', { path: 'transfer.py' }),
+    think('engineering', 'eng-architect', '工程架构师写交付说明'),
+    happen('proposal_submitted', 'engineering', 'eng-manager', '工程经理代表部门提交交付说明', { kind: 'delivery_spec' }),
+    deliver('r2'),
+    happen('department_activated', 'quality', null, '质检检查交付 r2', {}),
+    tool('quality', 'qa-tester', 'run_check', '测试工程师运行检查 python -m pytest tests', { command: 'python -m pytest tests' }),
+    happen('qa_submitted', 'quality', 'qa-manager', '质检放行：验收条件全部通过', { verdict: 'release' },
+      { patch: [{ path: 'work_items[id=w-metro-transfer].status', value: 'released' }, { path: 'runs[id=r-metro-transfer].phase', value: 'DONE' }] })
+  ];
+
+  // 标签页在后台的几分钟里到达的事件：时间相隔二三十秒
+  const at = (min, sec) => '2026-09-29T15:' + String(31 + min).padStart(2, '0') + ':' + String(sec).padStart(2, '0') + '+08:00';
+  const stamp = (step, t) => Object.assign({}, step, { event: Object.assign({}, step.event, { at: t }) });
+  const AWAY_EVENTS = [
+    stamp(tool('engineering', 'eng-lead', 'edit_range', '主程按区间编辑 pathfinding.py', { path: 'pathfinding.py' }), at(0, 10)),
+    stamp(tool('engineering', 'eng-lead', 'bash', '主程执行命令 python -m pytest tests', { command: 'python -m pytest tests' }), at(0, 40)),
+    stamp(ran('engineering', 'eng-lead', 'python -m pytest tests', 0), at(1, 5)),
+    stamp(ask('q-away-max', 'quality', 'engineering', '用户不填最大换乘数时，默认不限制还是默认 3 次？'), at(1, 30)),
+    stamp(answer('q-away-max', 'quality', 'engineering', '默认不限制，界面上写明「不限」。'), at(2, 0)),
+    stamp(happen('proposal_submitted', 'engineering', 'eng-manager', '工程经理代表部门提交交付说明', { kind: 'delivery_spec' }), at(2, 30)),
+    stamp(deliver('r1'), at(2, 50)),
+    stamp(happen('department_activated', 'quality', null, '质检开始检查交付 r1', {}), at(3, 10)),
+    stamp(tool('quality', 'qa-tester', 'run_check', '测试工程师运行检查 python -m pytest tests', { command: 'python -m pytest tests' }), at(3, 40)),
+    stamp(happen('qa_submitted', 'quality', 'qa-manager', '质检记下缺陷记录：最大换乘数为 0 时仍然返回换乘路径（D-1）', { verdict: 'rework_engineering' },
+      { patch: [{ path: 'runs[id=r-metro-transfer].department', value: 'engineering' }, { path: 'runs[id=r-metro-transfer].last_department', value: 'quality' }, { path: 'runs[id=r-metro-transfer].cycle', value: 2 }] }), at(4, 20)),
+    stamp(happen('department_activated', 'engineering', null, '工程开始修复 D-1', {}), at(4, 40)),
+    stamp(tool('engineering', 'eng-lead', 'edit_range', '主程按区间编辑 pathfinding.py：最大换乘数为 0 时只走同一条线', { path: 'pathfinding.py' }), at(5, 10)),
+    stamp(tool('engineering', 'eng-lead', 'bash', '主程执行命令 python -m pytest tests', { command: 'python -m pytest tests' }), at(5, 40)),
+    stamp(ran('engineering', 'eng-lead', 'python -m pytest tests', 0), at(6, 5)),
+    stamp(think('engineering', 'eng-architect', '工程架构师写交付说明'), at(6, 30))
+  ];
+
   function ev(fields) {
     return Object.assign({
       project_id: P, work_item_id: null, run_id: null, department: null, role: null,
@@ -1133,6 +1240,30 @@
           { delay: 1200, event: { type: 'x_wait_restarted', project_id: P, work_item_id: 'w-metro-transfer', run_id: 'r-metro-transfer', label: '继续等待笔记本，重新计时', payload: { wait: 'machine', machine_id: 'm-laptop' } }, patch: [{ path: 'runs[id=r-metro-transfer].recovery.waiting_machine.since', value: '2026-09-29T15:30:00+08:00' }, { path: 'runs[id=r-metro-transfer].recovery.reason', value: '继续等待笔记本恢复在线，从 15:30 起重新计时' }] },
           { delay: 1200, go: '#/p/p-metro/w/w-metro-transfer/recovery', label: '恢复页的已等待时长从零开始，24 小时以后再问一次' }
         ]
+      },
+      {
+        // 原型 v13（画面与播放设计说明第 7.2 节）：几秒内到达几十条事件。工具调用与模型请求是进度，不排队；普通动作排队，
+        // 画面落后接近上限时丢掉排在后面的；交接、询问这类关键动作全部演，来不及时缩短；状态跟在它之前的动作后面上画面，最多落后 5 秒
+        no: 24, id: 'sc-metro-burst', name: '短时间内大量事件堆积', level: 'S5', go: '#/p/p-metro/overview',
+        setup: BURST_SETUP,
+        steps: [
+          { delay: 1200, go: '#/p/p-metro/overview', label: '工程与质检同时在工作；下一步一下子到达三十多条事件。打开工具条的「节奏」看画面落后几秒' },
+          { delay: 4000, go: '#/p/p-metro/overview', label: '第一批：工程连续调用工具、分派与审查，质检起草测试用例，中间夹着一次询问与回答和一次交付', burst: BURST_FIRST },
+          { delay: 9000, go: '#/p/p-metro/overview', label: '第一批还没演完，第二批又到：质检检查交付、记下缺陷记录，工程修复以后再交付，质检放行', burst: BURST_SECOND },
+          { delay: 1200, go: '#/p/p-metro/overview', label: '画面最多落后 5 秒：普通动作丢掉，关键动作缩短，同一个角色连续的同类动作合并；最后显示的是最新的状态' }
+        ]
+      },
+      {
+        // 原型 v13（画面与播放设计说明第 5.2 节「跳到最新」）：标签页在后台时浏览器暂停画面的动画，事件照样到达；
+        // 切回来时画面清空时间线，直接显示最新的状态，不补播。错过的经过由离开报告交代
+        no: 25, id: 'sc-metro-background', name: '标签页在后台放几分钟以后切回', level: 'S5', go: '#/p/p-metro/overview',
+        setup: BURST_SETUP,
+        steps: [
+          { delay: 1200, go: '#/p/p-metro/overview', label: '画面在前台，工程在工作' },
+          { delay: 1200, act: 'sim.hidden', data: { hidden: 'true' }, label: '标签页切到后台：浏览器暂停画面的动画，事件照样到达（原型工具条模拟）' }
+        ].concat(AWAY_EVENTS.map((s) => Object.assign({ delay: 400 }, s))).concat([
+          { delay: 1600, act: 'sim.hidden', data: { hidden: 'false' }, label: '过了几分钟切回前台：画面直接显示最新的状态，积下的动作不补播；错过的经过看离开期间的报告' }
+        ])
       }
     ]
   });

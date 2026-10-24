@@ -20,8 +20,8 @@ function rig(opts) {
   const T = load();
   Object.assign(T.settings, { lagMs: 5000, minMs: 300, speed: 1 }, (opts && opts.settings) || {});
   const DECL = Object.assign({
-    handoff: { level: 'key', ms: 2000 }, stamp: { level: 'key', ms: 1000 }, read: { level: 'normal', ms: 1200 },
-    write: { level: 'normal', ms: 1200 }, think: { level: 'progress', ms: 0 }, flash: { level: 'normal', ms: 700 }
+    handoff: { tier: 'key', ms: 2000 }, stamp: { tier: 'key', ms: 1000 }, read: { tier: 'normal', ms: 1200 },
+    write: { tier: 'normal', ms: 1200 }, think: { tier: 'progress', ms: 0 }, flash: { tier: 'normal', ms: 700 }
   }, (opts && opts.decl) || {});
   let now = 0;
   const log = [];
@@ -34,7 +34,7 @@ function rig(opts) {
   const tl = T.create({
     clock: () => now,
     classify: (a) => Object.assign({ lanes: a.lanes || [] }, DECL[a.kind]),
-    begin(e) { r.begun.push({ at: now, kind: e.action.kind, pos: e.pos, ms: e.ms, lanes: e.lanes.slice(), level: e.level }); live.set(e.id, now + natural(e.action, e.ms)); },
+    begin(e) { r.begun.push({ at: now, kind: e.action.kind, pos: e.pos, ms: e.ms, lanes: e.lanes.slice(), tier: e.tier }); live.set(e.id, now + natural(e.action, e.ms)); },
     cut(e) { r.cut.push({ at: now, kind: e.action.kind, pos: e.pos }); live.delete(e.id); },
     apply(s) { r.applied.push({ at: now, pos: s.position }); },
     progress(a) { r.progress.push({ at: now, kind: a.kind }); }
@@ -158,7 +158,7 @@ function burst(seed, settings, frame, overrun, count) {
   check('H8 落后有上限' + tag, st.maxLag <= lagMs + frame, '最大落后 ' + st.maxLag + ' 毫秒');
   check('H9 关键动作不丢' + tag, st.droppedKey === 0 && st.startedKey === st.pushedKey, JSON.stringify(st));
   check('堆积：普通动作被丢掉，关键动作被缩短或合并' + tag, st.dropped > 0 && (st.shortened > 0 || st.merged > 0), JSON.stringify(st));
-  check('堆积：缩短的关键动作不短于最短时长' + tag, r.begun.filter((b) => b.level === 'key').every((b) => b.ms >= T_MIN(settings)), r.begun.filter((b) => b.ms < T_MIN(settings)).length);
+  check('堆积：缩短的关键动作不短于最短时长' + tag, r.begun.filter((b) => b.tier === 'key').every((b) => b.ms >= T_MIN(settings)), r.begun.filter((b) => b.ms < T_MIN(settings)).length);
   check('堆积：最后显示的是最新的状态' + tag, r.applied[r.applied.length - 1].pos === r.pos(), r.applied[r.applied.length - 1].pos + ' / ' + r.pos());
 });
 function T_MIN(settings) { return (settings && settings.minMs) || 300; }

@@ -1,7 +1,7 @@
 // 用法：node docs/prototypes/v13/checks/scenarios.js
 // 场景播放验证：逐个选择全部场景，按步骤播到最后一步，统计控制台错误与页面异常
-// 同时统计楼（building.playEvent）与机房（room.playEvent）实际收到的事件数，
-// 保证涉及首页与机房的播放路径被走到
+// 同时统计楼（building.play）与机房（room.play）实际收到的动作数，保证首页的播放路径被走到；
+// 机房只收机器事件翻成的动作，场景里没有在首页上发机器事件，机房的动作由 playback.js 核对
 const { chromium, EXE, v13Url } = require('./env.js');
 
 const ROOT = v13Url;
@@ -21,7 +21,7 @@ const ROOT = v13Url;
   await page.goto(ROOT + '#/home');
   await page.waitForTimeout(900);
 
-  // 先离开首页再回来，让楼与机房在包装之后重新挂载；计数器统计 playEvent 的调用
+  // 先离开首页再回来，让楼与机房在包装之后重新挂载；计数器统计画面收到的动作（play，画面合同的动作）
   await page.evaluate(async () => {
     window.Y13.go('#/sys/machines');
     await new Promise((r) => setTimeout(r, 500));
@@ -32,8 +32,8 @@ const ROOT = v13Url;
       P[name] = function wrapped() {
         const obj = orig.apply(this, arguments);
         cnt[key + 'Mount']++;
-        const origPlay = obj.playEvent;
-        obj.playEvent = function (ev) { cnt[key + 'Play']++; return origPlay.call(this, ev); };
+        const origPlay = obj.play;
+        obj.play = function (a) { cnt[key + 'Play']++; return origPlay.call(this, a); };
         return obj;
       };
     };
@@ -78,8 +78,8 @@ const ROOT = v13Url;
     machineScenes: report.filter((r) => r.machines).length,
     events: cnt, errors: errors.length
   }));
-  const ok = errors.length === 0 && report.length === 23 && unfinished.length === 0 &&
-    cnt.buildingPlay > 0 && cnt.roomPlay > 0;
+  const ok = errors.length === 0 && report.length === 25 && unfinished.length === 0 &&
+    cnt.buildingPlay > 0;
   console.log(ok ? 'RESULT: PASS' : 'RESULT: FAIL ' + JSON.stringify({ unfinished, cnt }));
   process.exit(ok ? 0 : 1);
 })();

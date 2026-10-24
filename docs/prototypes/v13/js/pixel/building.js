@@ -14,17 +14,33 @@
   const W = 640;
   const ROOF = 34, FH = 66, BASE = 10;
   const ROOMS = ['product', 'engineering', 'quality', 'operations'];
+  // 每层的状态灯（画面合同 FLOOR_SIGNS）
   const STATUS = {
-    running: { text: '运行中', color: PAL.green2 },
+    working: { text: '运行中', color: PAL.green2 },
     queued: { text: '排队中', color: PAL.grey2 },
     waiting_slot: { text: '等待执行槽位', color: PAL.orange2 },
-    waiting_provider: { text: '等待模型服务', color: PAL.grey3 },
-    pending_verification: { text: '待核实', color: PAL.yellow2 },
+    waiting_model: { text: '等待模型服务', color: PAL.grey3 },
     waiting_resume: { text: '待恢复', color: PAL.yellow2 },
-    waiting_decision: { text: '等待你的决定', color: PAL.yellow2 },
+    waiting_user: { text: '等待你的决定', color: PAL.yellow2 },
     interrupted: { text: '中断', color: PAL.grey4 },
     idle: { text: '空闲', color: PAL.grey2 }
   };
+  // 闪光的颜色（动作写颜色的名字）与机房里设备闪光的时长
+  const FLASH = { red: PAL.red2, yellow: PAL.yellow2, green: PAL.green2, white: PAL.white, grey: PAL.grey3 };
+  const MACHINE_FLASH_MS = { grey: 1500, green: 1200, yellow: 1500, red: 2500 };
+
+  // 楼与机房的动作都是闪光与包裹，不占参与方；开始时就算演完，时间线按声明的最短时长结束它
+  function effectsTimeline(scene, kinds, perform, apply) {
+    const tl = P.timeline.create({
+      clock: () => scene.realT,
+      classify: (a) => ({ tier: kinds[a.kind].tier, ms: kinds[a.kind].ms, lanes: [] }),
+      begin(e) { perform(e.action); tl.done(e.id); },
+      cut() {},
+      apply,
+      progress() { throw new Error('楼与机房没有进度一级的动作'); }
+    });
+    return tl;
+  }
   // 每个项目的管线颜色：取项目在楼中的序号
   const LINK_COLORS = ['#e8505b', '#3fc1e8', '#8fd14f', '#f7c948', '#f27ec2', '#b98558'];
   P.LINK_COLORS = LINK_COLORS;
@@ -102,6 +118,7 @@
     const shaftKey = (pid) => 'floor:' + pid + '>basement';
 
     function update() {
+      tl.tick();
       model.floors.forEach((f) => {
         const ch = world.characters[f.project_id];
         if (!ch) return;
@@ -144,7 +161,7 @@
       RB(c, 18, y + 8, 104, 20, PAL.paper);
       P.text(c, f.name, 22, y + 15, { size: 7, weight: 700, color: PAL.ink, max: 96 });
       RB(c, 22, y + 22, 6, 6, st.color);
-      if (!scene.reduced && ['running', 'waiting_slot', 'pending_verification', 'waiting_resume'].includes(f.status) && Math.floor(t / 500) % 2) R(c, 23, y + 23, 2, 2, PAL.white);
+      if (!scene.reduced && ['working', 'waiting_slot', 'waiting_resume'].includes(f.status) && Math.floor(t / 500) % 2) R(c, 23, y + 23, 2, 2, PAL.white);
       P.text(c, st.text, 32, y + 25.5, { size: 5.5, weight: 700, color: PAL.ink2, max: 88 });
       if (f.decisions) {
         RB(c, 106, y + 5, 14, 9, PAL.yellow2);
@@ -257,30 +274,33 @@
       ECS.sendPackage(world, id, link.id, pts, travelMs(pts), () => ECS.removePackage(world, id));
     }
 
+    function apply(m) {
+      model = m;
+      scene.setSize(W, ROOF + Math.max(1, m.floors.length) * FH + BASE);
+      declareShafts();
+      syncWalkers();
+    }
+
+    // 楼的动作：这一层闪一下、采纳时撒彩带（同时闪绿光）、包裹沿通往机房的管线走
+    function perform(a) {
+      if (a.kind === 'floor_flash' || a.kind === 'celebrate') {
+        flashes[a.project] = { color: FLASH[a.kind === 'celebrate' ? 'green' : a.color], until: scene.realT + 1200 };
+      }
+      if (a.kind === 'celebrate') {
+        const i = model.floors.findIndex((f) => f.project_id === a.project);
+        if (i >= 0) scene.emit('confetti', W / 2, floorY(i), 24, { spread: 400 });
+      }
+      if (a.kind === 'shaft') sendOnShaft(a.project, a.bmp, a.up);
+    }
+
+    const tl = effectsTimeline(scene, P.buildingDecl.kinds, perform, apply);
+
     return {
       scene,
-      inspect: () => ({ world, model }),
-      setModel(m) {
-        if (!m || !Array.isArray(m.floors)) throw new Error('setModel 需要 buildingModel');
-        model = m;
-        scene.setSize(W, ROOF + Math.max(1, m.floors.length) * FH + BASE);
-        declareShafts();
-        syncWalkers();
-      },
-      playEvent(ev) {
-        if (!ev || !ev.project_id) return;
-        const key = Y13.registry.keyOf(ev);
-        const color = key === 'rework' || key === 'fault' ? PAL.red2 : key === 'decision' ? PAL.yellow2 : key === 'adopt' || key === 'release' ? PAL.green2 : PAL.white;
-        if (key || ev.type === 'department_activated') flashes[ev.project_id] = { color, until: scene.realT + 1200 };
-        if (ev.type === 'deliverable_adopted') {
-          const i = model.floors.findIndex((f) => f.project_id === ev.project_id);
-          if (i >= 0) scene.emit('confetti', W / 2, floorY(i), 24, { spread: 400 });
-        }
-        if (ev.type === 'x_remote_action_started') sendOnShaft(ev.project_id, 'folder', false);
-        else if (ev.type === 'x_remote_action_finished') sendOnShaft(ev.project_id, 'letter', true);
-        else if (ev.type === 'x_deployed') sendOnShaft(ev.project_id, 'box_sealed', false);
-        else if (ev.type === 'x_rolled_back') sendOnShaft(ev.project_id, 'box_sealed', true);
-      },
+      inspect: () => ({ world, model, timeline: tl.inspect() }),
+      setState: (s) => tl.state(P.contract.buildingState(s)),
+      jump: (s) => tl.jump(P.contract.buildingState(s)),
+      play: (a) => tl.push(P.contract.action('楼', a, P.buildingDecl.kinds)),
       resize: () => scene.resize(),
       destroy: () => scene.destroy()
     };
@@ -363,6 +383,7 @@
     }
 
     function update() {
+      tl.tick();
       ECS.stepPipes(world, scene, (p) => (p.def.active ? 'flowing' : 'idle'));
       ECS.stepPackages(world, scene);
     }
@@ -434,9 +455,9 @@
 
     let packageSeq = 0;
     // 包裹沿这个项目通往这台设备的管线走（往下是送到设备，往上是回执与回滚取回）；管线还没有画出来时从天花板直接落到设备上
-    function sendToMachine(ev, machineId, bmp, up) {
+    function sendToMachine(projectId, machineId, bmp, up) {
       if (scene.reduced) return;
-      const link = world.links['shaft:' + ev.project_id + '>' + machineId];
+      const link = world.links['shaft:' + projectId + '>' + machineId];
       let pts = link ? link.pts : [[xOf(machineId), CEIL], [xOf(machineId), CEIL + 50]];
       if (up) pts = pts.slice().reverse();
       const id = 'pk-' + (++packageSeq);
@@ -445,31 +466,29 @@
       ECS.sendPackage(world, id, link ? link.id : null, pts, travelMs(pts), () => ECS.removePackage(world, id));
     }
 
+    function apply(m) {
+      model = Object.assign({ links: [] }, m);
+      declareWorld();
+      scene.setSize(W, MH + (model.machines.some((x) => (x.actions || []).length > 1) ? 12 : 0));
+    }
+
+    // 机房的动作：设备闪光、包裹沿项目的管线到设备；机房里没有这台机器时不画
+    function perform(a) {
+      if (xOf(a.machine) === null) return;
+      if (a.kind === 'machine_flash') ECS.signal(world, scene, 'flash:' + a.machine, MACHINE_FLASH_MS[a.color], FLASH[a.color]);
+      if (a.kind === 'machine_send') sendToMachine(a.project, a.machine, a.bmp, a.up);
+    }
+
+    const tl = effectsTimeline(scene, P.buildingDecl.machineKinds, perform, apply);
+
     return {
       scene,
-      inspect: () => ({ world, model }),
-      setModel(m) {
-        if (!m || !Array.isArray(m.machines)) throw new Error('setModel 需要 machineRoomModel');
-        model = Object.assign({ links: [] }, m);
-        declareWorld();
-        scene.setSize(W, MH + (model.machines.some((x) => (x.actions || []).length > 1) ? 12 : 0));
-      },
+      inspect: () => ({ world, model, timeline: tl.inspect() }),
+      setState: (s) => tl.state(P.contract.machineRoomState(s)),
+      jump: (s) => tl.jump(P.contract.machineRoomState(s)),
+      play: (a) => tl.push(P.contract.action('机房', a, P.buildingDecl.machineKinds)),
       highlight(ids) {
         (ids || []).forEach((id) => { ECS.signal(world, scene, 'flash:' + id, 2500, PAL.yellow2); });
-      },
-      playEvent(ev) {
-        const pl = (ev && ev.payload) || {};
-        const x = pl.machine_id ? xOf(pl.machine_id) : null;
-        if (x === null) return;
-        const flash = (color, ms) => ECS.signal(world, scene, 'flash:' + pl.machine_id, ms, color);
-        if (ev.type === 'x_machine_offline') flash(PAL.grey3, 1500);
-        if (ev.type === 'x_machine_online' || ev.type === 'x_remote_action_finished') flash(PAL.green2, 1200);
-        if (ev.type === 'x_action_unknown' || ev.type === 'x_late_receipt') flash(PAL.yellow2, 1500);
-        if (ev.type === 'x_fault_recorded') flash(PAL.red2, 2500);
-        if (ev.type === 'x_remote_action_started') sendToMachine(ev, pl.machine_id, 'folder', false);
-        else if (ev.type === 'x_remote_action_finished') sendToMachine(ev, pl.machine_id, 'letter', true);
-        else if (ev.type === 'x_deployed') sendToMachine(ev, pl.machine_id, 'box_sealed', false);
-        else if (ev.type === 'x_rolled_back') sendToMachine(ev, pl.machine_id, 'box_sealed', true);
       },
       resize: () => scene.resize(),
       destroy: () => scene.destroy()

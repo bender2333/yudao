@@ -22,10 +22,11 @@
   // 一个参与方排着的普通动作最多几条，再多就丢掉最早的一条
   const MAX_NORMAL = 3;
 
-  const LEVELS = ['key', 'normal', 'progress'];
+  // 动作的级别（tier）：关键、普通、进度
+  const TIERS = ['key', 'normal', 'progress'];
 
-  // o：{ clock(), classify(动作) → { level, ms, lanes }, begin(条目), cut(条目), apply(状态), progress(动作) }
-  // 条目：{ id, action, pos, level, ms, lanes, arrivedAt, startAt, doneAt, cutAt, short, merged }
+  // o：{ clock(), classify(动作) → { tier, ms, lanes }, begin(条目), cut(条目), apply(状态), progress(动作) }
+  // 条目：{ id, action, pos, tier, ms, lanes, arrivedAt, startAt, doneAt, cutAt, short, merged }
   function create(o) {
     ['clock', 'classify', 'begin', 'cut', 'apply', 'progress'].forEach((k) => {
       if (typeof o[k] !== 'function') throw new Error('播放时间线缺少回调：' + k);
@@ -46,7 +47,7 @@
     function drop(e) {
       remove(e);
       stats.dropped += 1;
-      if (e.level === 'key') throw new Error('关键动作不能丢掉：' + e.action.kind);
+      if (e.tier === 'key') throw new Error('关键动作不能丢掉：' + e.action.kind);
     }
 
     function end(e, byCut) {
@@ -58,13 +59,13 @@
       if (!action || !action.kind) throw new Error('时间线需要画面合同的动作');
       if (!Number.isFinite(action.position)) throw new Error('动作没有位置：' + action.kind);
       const c = o.classify(action);
-      if (!c || !LEVELS.includes(c.level)) throw new Error('动作的级别无效：' + action.kind);
+      if (!c || !TIERS.includes(c.tier)) throw new Error('动作的级别无效：' + action.kind);
       stats.pushed += 1;
-      if (c.level === 'progress') { o.progress(action); return null; }
+      if (c.tier === 'progress') { o.progress(action); return null; }
       if (!(c.ms >= 0)) throw new Error('动作没有声明时长：' + action.kind);
-      if (c.level === 'key') stats.pushedKey += 1;
+      if (c.tier === 'key') stats.pushedKey += 1;
       const e = {
-        id: ++seq, action, pos: action.position, level: c.level, ms: c.ms * settings.speed, lanes: c.lanes || [],
+        id: ++seq, action, pos: action.position, tier: c.tier, ms: c.ms * settings.speed, lanes: c.lanes || [],
         arrivedAt: o.clock(), startAt: null, doneAt: null, cutAt: null, short: false, merged: 0
       };
       // 按位置插入：位置更大的、还没有开始的动作排在它后面
@@ -73,7 +74,7 @@
       entries.splice(i, 0, e);
       // 队伍过长：这个动作经过的每个参与方，排着的普通动作超过上限时丢掉最早的一条
       e.lanes.forEach((lane) => {
-        let list = entries.filter((x) => queued(x) && x.level === 'normal' && x.lanes.includes(lane));
+        let list = entries.filter((x) => queued(x) && x.tier === 'normal' && x.lanes.includes(lane));
         while (list.length > MAX_NORMAL) { drop(list[0]); list = list.slice(1); }
       });
       return e;
@@ -132,7 +133,7 @@
     function fastForward(now) {
       let w = tightest(now);
       if (!w || w.ratio >= 1) return;
-      blockersOf(w.p.pos).filter((e) => e.level === 'normal').forEach((e) => {
+      blockersOf(w.p.pos).filter((e) => e.tier === 'normal').forEach((e) => {
         if (playing(e)) end(e, true);
         else drop(e);
       });
@@ -188,7 +189,7 @@
         e.startAt = now;
         if (e.short) e.cutAt = now + e.ms;
         stats.started += 1;
-        if (e.level === 'key') stats.startedKey += 1 + e.merged;
+        if (e.tier === 'key') stats.startedKey += 1 + e.merged;
         o.begin(e);
       });
       // 4. 状态上画面：前面的动作都结束了的最新一份；或者到了落后上限的最新一份（它前面正在演的动作立刻结束，排着的普通动作丢掉）。
@@ -206,7 +207,7 @@
           stats.forced += 1;
           left.forEach((e) => {
             if (playing(e)) end(e, true);
-            else if (e.level === 'normal') drop(e);
+            else if (e.tier === 'normal') drop(e);
           });
         }
         pending = pending.slice(k + 1);
@@ -219,7 +220,7 @@
       const now = o.clock();
       return {
         shown, pending: pending.length, lag: pending.length ? now - pending[0].arrivedAt : 0,
-        queued: entries.filter(queued).length, playing: entries.filter(playing).map((e) => ({ id: e.id, kind: e.action.kind, lanes: e.lanes.slice(), level: e.level, ms: e.ms })),
+        queued: entries.filter(queued).length, playing: entries.filter(playing).map((e) => ({ id: e.id, kind: e.action.kind, lanes: e.lanes.slice(), tier: e.tier, ms: e.ms })),
         stats: Object.assign({}, stats)
       };
     }
@@ -227,5 +228,5 @@
     return { push, state, jump, done, tick, inspect };
   }
 
-  P.timeline = { settings, create, MAX_NORMAL };
+  P.timeline = { settings, create, MAX_NORMAL, TIERS };
 })();

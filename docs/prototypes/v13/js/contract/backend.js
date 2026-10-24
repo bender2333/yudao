@@ -460,8 +460,10 @@
       need(Y13.isLevel(sc.level || 'ui'), '场景 ' + sc.id + ' 的档位无效');
       need(Array.isArray(sc.steps) && sc.steps.length, '场景 ' + sc.id + ' 没有步骤');
       sc.steps.forEach((st, i) => {
-        need(st.event || st.act || (st.go && st.label), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步没有 event、act，也不是带 label 的跳转');
+        need(st.event || st.burst || st.act || (st.go && st.label), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步没有 event、burst、act，也不是带 label 的跳转');
         if (st.event) need(Y13.registry.has('event', st.event.type), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步的事件种类没有登记：' + st.event.type);
+        // burst：同一刻到达的一批事件（原型 v13 的堆积场景），每条都要登记
+        if (st.burst) st.burst.forEach((one) => need(Y13.registry.has('event', one.event.type), '场景 ' + sc.id + ' 第 ' + (i + 1) + ' 步的事件种类没有登记：' + one.event.type));
       });
     });
     // 在全部档位上折叠一次，确认每条补丁都能应用

@@ -18,7 +18,7 @@
     rollback_restore: PAL.red2, repair_stopped: PAL.red2, provider_wait: PAL.blue2, rework_reminder: PAL.blue2
   };
 
-  // face：Y13.cards.face(决定请求) 给出的卡片内容
+  // face：卡片内容（实时内容，翻译层由决定请求写成）
   // opts：{ onDecide({ decision_id, option, note, base_version }) → 命令的结果, onGo(链接), onChange() }
   P.createDecisionCard = function createDecisionCard(scene, canvas, opts) {
     const o = opts || {};

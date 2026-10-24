@@ -1,5 +1,5 @@
 // 像素画面引擎：小人合成与离屏缓存、姿势与动作帧、画布缩放与动画循环、路径移动与缓动、粒子、
-// 共用物件的绘制，以及事件到动作的对照表（设计说明第 8.3 节）。
+// 共用物件的绘制，以及动作图鉴的动作说明（设计说明第 8.3 节）。
 (function () {
   const Y13 = window.Y13;
   const P = Y13.pixel;
@@ -9,69 +9,70 @@
   P.FONT = FONT;
 
   // ===========================================================================
-  // 1. 事实与动作对照表
+  // 1. 动作说明
 
-  function act(label, fact, source, action, room, level, anim) {
-    return { label, fact, source, action, room, level, anim };
+  function act(label, fact, action, room, level, anim) {
+    return { label, fact, action, room, level, anim };
   }
 
-  // 动作名称到说明：与设计说明第 8.3 节逐行对应（「暂停、失败、完成、取消」一行拆成四个动作）
+  // 动作名称到说明：与设计说明第 8.3 节逐行对应（「暂停、失败、完成、取消」一行拆成四个动作）。
+  // 每个动作由哪种事件给出写在翻译层（js/translate/sources.js 的 ROOM_SOURCES），画面层不认事件
   P.ACTIONS = {
-    tea: act('喝茶与伸懒腰', '部门未工作', '部门状态', '坐在工位喝茶，偶尔起身在房间里走动、伸懒腰', '灯光调暗', 'ui', 'tea'),
-    activate: act('起身走到工位', '部门开始工作', 'department_activated', '起身走到工位', '屏幕亮起，CRT 显示目标', 'ui', 'walk'),
-    fetch_folder: act('取出文件夹', '装配上下文', 'context_assembled', '从文件柜取出文件夹放到桌上', '—', 'ui', 'rummage'),
-    type_think: act('打字与思考气泡', '模型请求中', 'model_requested、model_request_serialized', '打字，头顶思考气泡', '屏幕滚动字符', 'ui', 'type'),
-    stream_text: act('气泡逐字出现', '流式输出', 'model_stream_progress', '气泡中逐字出现文字', '—', 'ui', 'type'),
-    idea: act('气泡变成灯泡', '请求完成', 'model_attempt_finished', '气泡变成灯泡', '—', 'ui', 'sit_happy'),
-    retry_wait: act('沙漏与重试次数', '等待重试', 'model_retry_scheduled', '头顶沙漏与「第 n/m 次」', '—', 'ui', 'sit_wait'),
-    slump: act('趴在桌上', '请求失败', 'model_attempt_failed', '趴在桌上', '桌上红灯', 'ui', 'slump'),
-    search: act('翻文件柜举放大镜', '搜索', 'tool_started（search）', '翻文件柜，举放大镜', '文件柜抽屉打开', 'ui', 'magnify'),
-    read: act('捧着文件阅读', '按区间阅读', 'tool_started（read_range、read_file）', '捧着文件阅读', '—', 'ui', 'read_sit'),
-    write: act('在文件上写字', '编辑', 'tool_started（edit_range、write_file）', '在文件上写字', '屏幕显示增删的行', 'ui', 'write'),
-    run_command: act('走到终端拉下拉杆', '执行命令', 'tool_started（bash）到 tool_called','走到终端拉下拉杆', '终端滚动输出；结束时退出状态灯亮绿灯或红灯；超时时终端冒烟', 'ui', 'lever'),
-    toss: act('摇头扔纸团', '工具被拒绝', 'tool_skipped', '摇头，把纸团扔进废纸篓', '—', 'ui', 'shake'),
-    submit: act('放进提案托盘', '提交提案', 'proposal_submitted', '把文件放进提案托盘', '—', 'ui', 'side_place'),
-    returned: act('文件退回挠头', '提案被退回', 'proposal_rejected', '文件被退回，小人挠头', '—', 'ui', 'scratch'),
-    stamp_valid: act('卷轴盖「有效」章', '需求接纳', 'spec_accepted、contract_accepted', '产品在卷轴上盖「有效」章，卷起后放进管道口', '卷轴放上卷轴架', 'ui', 'stamp'),
-    seal: act('装箱贴封条盖章', '交付封存', 'delivery_accepted', '工程装箱、贴封条、盖封存章，把箱子推进管道口', '—', 'ui', 'stamp'),
-    take_box: act('从管道口取出箱子', '质检取件', '质检关注的交付到达（delivery_accepted）', '从管道口取出箱子放上检验台', '—', 'ui', 'reach'),
-    inspect: act('放大镜检查箱子', '质检核验', '质检的检查动作（tool_started：run_check）', '用放大镜检查箱子，清单逐项打勾', '—', 'ui', 'inspect'),
-    stamp_release: act('盖绿色「放行」章', '放行', 'qa_submitted（release）', '盖绿色「放行」章，把放行单与箱子放进通往成果库的管道', '—', 'ui', 'stamp'),
-    stamp_rework: act('盖红色「返工」章', '缺陷记录', 'qa_submitted（rework_engineering）', '盖红色「返工」章，把箱子放进回流管道', '—', 'ui', 'stamp'),
-    send_letter: act('写纸条塞进传信管口', '发出询问', 'ask_started（询问是一次工具调用）', '写纸条装进信筒，塞进传信管口，在管道口等待', '—', 'ui', 'side_place'),
-    answer_letter: act('取出信筒并回答', '收到询问并回答', 'ask_started 到 ask_answered（被询问的部门在询问分支里回答）', '从传信管口取出信筒，写回答后塞回', '—', 'ui', 'catch'),
-    guidance_in: act('门缝塞进纸条', '收到指导', 'department_guidance_received', '—', '门缝塞进纸条，信箱灯亮', 'ui', 'sit'),
-    guidance_read: act('阅读并钉上纸条', '指导进入输入', 'department_guidance_applied', '拿起纸条阅读，钉在墙上', '—', 'ui', 'read_stand'),
-    guidance_reply: act('在纸条上写回复', '回应指导', 'department_guidance_responded', '在纸条上写回复', '—', 'ui', 'board_write'),
-    compact: act('纸堆整理进档案盒', '压缩', 'compaction_recorded', '把桌上成堆的纸整理进「摘要」档案盒', '档案盒上的编号加一', 'ui', 'gather'),
-    compact_fail: act('纸堆散落重新整理', '压缩未生效', 'compaction_failed', '纸堆散落，小人重新整理', '—', 'ui', 'crouch'),
-    paused: act('坐下', '暂停', 'run_paused', '坐下', '门口立「已暂停」牌', 'ui', 'sit_relax'),
-    failed: act('趴下', '失败', 'run_failed', '趴下', '门口立「失败」牌与停止原因', 'ui', 'slump'),
-    done: act('举手欢呼', '完成', 'run_done', '举手欢呼', '门口立「已完成」牌', 'ui', 'cheer'),
-    cancelled: act('收拾桌面', '取消', 'run_failed（reason 为 cancelled）', '收拾桌面', '门口立「已取消」牌', 'ui', 'tidy'),
-    hold_card: act('举牌写明缺少的项', '待恢复', '模型引用无法使用（waiting_resume）', '举牌，牌上写缺少的项', '门口立「待恢复」牌', 'ui', 'hold_sign'),
-    freeze: act('静止不动', '中断', '恢复观察状态（x_run_interrupted）', '静止不动', '灯灭，墙上时钟停住', '3.1', 'freeze'),
-    resume: act('伸懒腰回到工位', '自动继续', 'Yudao 启动时自动继续（x_run_auto_resumed）', '伸懒腰后回到工位', '灯亮起，时钟继续走', '3.1', 'stretch'),
-    puzzled: act('头顶黄色问号', '结果未知的动作', '重新启动时结果未知的动作（x_action_unknown），核实确认或交还会话以前', '站在未完成动作的物件旁，头顶黄色问号', '物件闪烁', '3.1', 'puzzled'),
-    remote_run: act('终端显示机器名称与线', '远程执行', '动作在登记的机器上执行（x_remote_action_started）', '走到终端，终端屏幕上显示机器名称与一根通往门外的线', '动作结束前线上有流动的光点', '3.2C', 'lever'),
-    remote_unknown: act('盯着终端头顶问号', '远程动作结果未知', '执行代理心跳超时（x_machine_offline）', '盯着终端，头顶黄色问号', '终端屏幕变为雪花', '3.2C', 'watch_r'),
-    read_existing: act('搬旧档案逐本阅读', '阅读已有项目', '建档事项中的 tool_started（read_file、read_range、search）', '从大厅搬来一摞旧档案，逐本阅读并做摘录', '白板上出现「现有行为」清单', '3.8', 'read_sit'),
-    net_fetch: act('邮筒寄出请求取回资料', '网络取回', '网络取回工具（x_network_fetch）', '走到门口的邮筒寄出请求，取回资料', '—', '3.2B', 'walk'),
-    mcp_press: act('按下工具面板的按钮', '调用 MCP 工具', 'MCP 工具调用（x_mcp_called）', '在墙上的工具面板上按下对应的按钮', '面板上该按钮亮灯', '3.2B', 'reach'),
-    trial: act('坐在试用台前点击与输入', '试用网页或桌面程序', '浏览器与 computer use 工具调用（x_trial_step）', '测试工程师坐在试用台前点击与输入', '试用台显示器嵌入最近一张真实截图的缩略图（像素边框）；模型不能看图时显示可访问性结构的文字行', '3.2D', 'type'),
-    self_test: act('在自己的显示器前点击', '工程自测网页', '工程的浏览器工具调用（tool_started：browser）', '工程在自己的显示器前点击', '显示器嵌入截图缩略图', '3.2D', 'type'),
-    deploy: act('推车把箱子推进门', '部署', '运维的部署记录（x_deployed）', '运维推车把箱子推进通往机房的门', '备份柜先亮一格（部署前备份）', 'S4', 'push'),
-    rollback: act('从门里取回旧版本', '回滚', '运维的回滚记录（x_rolled_back）', '运维从门里取回旧版本的箱子', '—', 'S4', 'carry'),
-    fault: act('跑向监控屏写故障信', '发现故障', '故障记录（x_fault_recorded）', '运维跑向监控屏，写故障信件放进通往大厅的管道', '监控屏变红', 'S4', 'run'),
-    wait_provider: act('坐着看墙上的时钟', '等待模型服务', '进入等待模型服务（x_provider_wait_entered）', '坐在工位上看着墙上的时钟', '灯光调暗，管道停止流动', 'S4', 'sit_wait'),
-    hold_form: act('举着申请单在门口等待', '外部动作待授权', '运维对常设授权清单以外动作的决定请求（external_action）', '举着申请单在门口等待', '—', 'S4', 'hold_form'),
-    assign: act('递任务卡', '分派角色任务', '角色任务事件（x_role_task_assigned）', '中心角色把任务卡递到工具角色的桌上', '白板上的计划条目标上分派对象', 'S5', 'give'),
-    hand_back: act('交回结果卡', '角色交回结果', '角色结果事件（x_role_result_returned）', '工具角色把结果卡交回中心角色', '条目改为已交回', 'S5', 'give'),
-    review: act('红笔批注盖章', '审查', '审查任务（x_review_recorded）', '审查者拿红笔在成果上批注，盖「通过」或「退回」', '—', 'S5', 'stamp'),
-    explore: act('背包出门查资料', '探索者查资料', '探索者的网络取回（x_explorer_fetch）', '背上背包走出门，回来时抱着资料', '—', 'S5', 'walk'),
-    replan: act('擦掉计划重写', '停滞后重新规划', '部门账本的进展判断（x_replanned）', '中心角色在白板上擦掉计划重写', '—', 'S5', 'board_erase'),
-    manager_out: act('经理走到管道口', '经理对外', '经理转交询问、提交部门成果（Stage 5）', '经理走到管道口与传信管口', '—', 'S5', 'walk'),
-    semantic: act('卡片放进语义记录柜', '语义整理', '语义整理事件（x_semantic_recorded）', '—', '墙边的语义记录柜里卡片增加', 'S5', 'side_place')
+    tea: act('喝茶与伸懒腰', '部门未工作', '坐在工位喝茶，偶尔起身在房间里走动、伸懒腰', '灯光调暗', 'ui', 'tea'),
+    activate: act('起身走到工位', '部门开始工作', '起身走到工位', '屏幕亮起，CRT 显示目标', 'ui', 'walk'),
+    fetch_folder: act('取出文件夹', '装配上下文', '从文件柜取出文件夹放到桌上', '—', 'ui', 'rummage'),
+    type_think: act('打字与思考气泡', '模型请求中', '打字，头顶思考气泡', '屏幕滚动字符', 'ui', 'type'),
+    stream_text: act('气泡逐字出现', '流式输出', '气泡中逐字出现文字', '—', 'ui', 'type'),
+    idea: act('气泡变成灯泡', '请求完成', '气泡变成灯泡', '—', 'ui', 'sit_happy'),
+    retry_wait: act('沙漏与重试次数', '等待重试', '头顶沙漏与「第 n/m 次」', '—', 'ui', 'sit_wait'),
+    slump: act('趴在桌上', '请求失败', '趴在桌上', '桌上红灯', 'ui', 'slump'),
+    search: act('翻文件柜举放大镜', '搜索', '翻文件柜，举放大镜', '文件柜抽屉打开', 'ui', 'magnify'),
+    read: act('捧着文件阅读', '按区间阅读', '捧着文件阅读', '—', 'ui', 'read_sit'),
+    write: act('在文件上写字', '编辑', '在文件上写字', '屏幕显示增删的行', 'ui', 'write'),
+    run_command: act('走到终端拉下拉杆', '执行命令', '走到终端拉下拉杆', '终端滚动输出；结束时退出状态灯亮绿灯或红灯；超时时终端冒烟', 'ui', 'lever'),
+    toss: act('摇头扔纸团', '工具被拒绝', '摇头，把纸团扔进废纸篓', '—', 'ui', 'shake'),
+    submit: act('放进提案托盘', '提交提案', '把文件放进提案托盘', '—', 'ui', 'side_place'),
+    returned: act('文件退回挠头', '提案被退回', '文件被退回，小人挠头', '—', 'ui', 'scratch'),
+    stamp_valid: act('卷轴盖「有效」章', '需求接纳', '产品在卷轴上盖「有效」章，卷起后放进管道口', '卷轴放上卷轴架', 'ui', 'stamp'),
+    seal: act('装箱贴封条盖章', '交付封存', '工程装箱、贴封条、盖封存章，把箱子推进管道口', '—', 'ui', 'stamp'),
+    take_box: act('从管道口取出箱子', '质检取件', '从管道口取出箱子放上检验台', '—', 'ui', 'reach'),
+    inspect: act('放大镜检查箱子', '质检核验', '用放大镜检查箱子，清单逐项打勾', '—', 'ui', 'inspect'),
+    stamp_release: act('盖绿色「放行」章', '放行', '盖绿色「放行」章，把放行单与箱子放进通往成果库的管道', '—', 'ui', 'stamp'),
+    stamp_rework: act('盖红色「返工」章', '缺陷记录', '盖红色「返工」章，把箱子放进回流管道', '—', 'ui', 'stamp'),
+    send_letter: act('写纸条塞进传信管口', '发出询问', '写纸条装进信筒，塞进传信管口，在管道口等待', '—', 'ui', 'side_place'),
+    answer_letter: act('取出信筒并回答', '收到询问并回答', '从传信管口取出信筒，写回答后塞回', '—', 'ui', 'catch'),
+    guidance_in: act('门缝塞进纸条', '收到指导', '—', '门缝塞进纸条，信箱灯亮', 'ui', 'sit'),
+    guidance_read: act('阅读并钉上纸条', '指导进入输入', '拿起纸条阅读，钉在墙上', '—', 'ui', 'read_stand'),
+    guidance_reply: act('在纸条上写回复', '回应指导', '在纸条上写回复', '—', 'ui', 'board_write'),
+    compact: act('纸堆整理进档案盒', '压缩', '把桌上成堆的纸整理进「摘要」档案盒', '档案盒上的编号加一', 'ui', 'gather'),
+    compact_fail: act('纸堆散落重新整理', '压缩未生效', '纸堆散落，小人重新整理', '—', 'ui', 'crouch'),
+    paused: act('坐下', '暂停', '坐下', '门口立「已暂停」牌', 'ui', 'sit_relax'),
+    failed: act('趴下', '失败', '趴下', '门口立「失败」牌与停止原因', 'ui', 'slump'),
+    done: act('举手欢呼', '完成', '举手欢呼', '门口立「已完成」牌', 'ui', 'cheer'),
+    cancelled: act('收拾桌面', '取消', '收拾桌面', '门口立「已取消」牌', 'ui', 'tidy'),
+    hold_card: act('举牌写明缺少的项', '待恢复', '举牌，牌上写缺少的项', '门口立「待恢复」牌', 'ui', 'hold_sign'),
+    freeze: act('静止不动', '中断', '静止不动', '灯灭，墙上时钟停住', '3.1', 'freeze'),
+    resume: act('伸懒腰回到工位', '自动继续', '伸懒腰后回到工位', '灯亮起，时钟继续走', '3.1', 'stretch'),
+    puzzled: act('头顶黄色问号', '结果未知的动作', '站在原处，头顶黄色问号', '—', '3.1', 'puzzled'),
+    remote_run: act('终端显示机器名称与线', '远程执行', '走到终端，终端屏幕上显示机器名称与一根通往门外的线', '动作结束前线上有流动的光点', '3.2C', 'lever'),
+    remote_unknown: act('盯着终端头顶问号', '远程动作结果未知', '盯着终端，头顶黄色问号', '终端屏幕变为雪花', '3.2C', 'watch_r'),
+    read_existing: act('搬旧档案逐本阅读', '阅读已有项目', '从大厅搬来一摞旧档案，逐本阅读并做摘录', '白板上出现「现有行为」清单', '3.8', 'read_sit'),
+    net_fetch: act('邮筒寄出请求取回资料', '网络取回', '走到门口的邮筒寄出请求，取回资料', '—', '3.2B', 'walk'),
+    mcp_press: act('按下工具面板的按钮', '调用 MCP 工具', '在墙上的工具面板上按下对应的按钮', '面板上该按钮亮灯', '3.2B', 'reach'),
+    trial: act('坐在试用台前点击与输入', '试用网页或桌面程序', '测试工程师坐在试用台前点击与输入', '试用台显示器嵌入最近一张真实截图的缩略图（像素边框）；模型不能看图时显示可访问性结构的文字行', '3.2D', 'type'),
+    self_test: act('在自己的显示器前点击', '工程自测网页', '工程在自己的显示器前点击', '显示器嵌入截图缩略图', '3.2D', 'type'),
+    deploy: act('推车把箱子推进门', '部署', '运维推车把箱子推进通往机房的门', '备份柜先亮一格（部署前备份）', 'S4', 'push'),
+    rollback: act('从门里取回旧版本', '回滚', '运维从门里取回旧版本的箱子', '—', 'S4', 'carry'),
+    fault: act('跑向监控屏写故障信', '发现故障', '运维跑向监控屏，写故障信件放进通往大厅的管道', '监控屏变红', 'S4', 'run'),
+    wait_provider: act('坐着看墙上的时钟', '等待模型服务', '坐在工位上看着墙上的时钟', '灯光调暗，管道停止流动', 'S4', 'sit_wait'),
+    hold_form: act('举着申请单在门口等待', '外部动作待授权', '举着申请单在门口等待', '—', 'S4', 'hold_form'),
+    assign: act('递任务卡', '分派角色任务', '中心角色把任务卡递到工具角色的桌上', '白板上的计划条目标上分派对象', 'S5', 'give'),
+    hand_back: act('交回结果卡', '角色交回结果', '工具角色把结果卡交回中心角色', '条目改为已交回', 'S5', 'give'),
+    review: act('红笔批注盖章', '审查', '审查者拿红笔在成果上批注，盖「通过」或「退回」', '—', 'S5', 'stamp'),
+    explore: act('背包出门查资料', '探索者查资料', '背上背包走出门，回来时抱着资料', '—', 'S5', 'walk'),
+    replan: act('擦掉计划重写', '停滞后重新规划', '中心角色在白板上擦掉计划重写', '—', 'S5', 'board_erase'),
+    manager_out: act('经理走到管道口', '经理对外', '经理走到管道口与传信管口', '—', 'S5', 'walk'),
+    semantic: act('卡片放进语义记录柜', '语义整理', '—', '墙边的语义记录柜里卡片增加', 'S5', 'side_place')
   };
 
   // 由状态驱动的动作：部门状态或恢复观察状态对应的持续姿势
@@ -88,69 +89,6 @@
     run: { label: '跑步', fact: '发现故障时赶往监控屏', anim: 'run' },
     sit: { label: '坐在工位', fact: '在工位上', anim: 'sit' },
     type: { label: '打字', fact: '在工位工作', anim: 'type' }
-  };
-
-  // 事件类型到动作名称：与设计说明第 8.3 节的「来源」一列对应
-  P.EVENT_ACTIONS = {
-    department_activated: 'activate',
-    context_assembled: 'fetch_folder',
-    model_requested: 'type_think',
-    model_request_serialized: 'type_think',
-    model_stream_progress: 'stream_text',
-    model_attempt_finished: 'idea',
-    model_retry_scheduled: 'retry_wait',
-    model_attempt_failed: 'slump',
-    tool_started: { by: 'tool', map: { search: 'search', read_range: 'read', read_file: 'read', edit_range: 'write', write_file: 'write', bash: 'run_command', run_command: 'run_command', run_check: 'inspect', browser: 'self_test' } },
-    tool_called: { by: 'tool', map: { bash: 'run_command', run_command: 'run_command', browser: 'self_test' } },
-    tool_skipped: 'toss',
-    proposal_submitted: 'submit',
-    proposal_rejected: 'returned',
-    spec_accepted: 'stamp_valid',
-    contract_accepted: 'stamp_valid',
-    delivery_accepted: 'seal',
-    qa_submitted: { by: 'verdict', map: { release: 'stamp_release', rework_engineering: 'stamp_rework' } },
-    collaboration_requested: 'send_letter',
-    collaboration_responded: 'answer_letter',
-    department_guidance_received: 'guidance_in',
-    department_guidance_applied: 'guidance_read',
-    department_guidance_responded: 'guidance_reply',
-    compaction_recorded: 'compact',
-    compaction_failed: 'compact_fail',
-    run_paused: 'paused',
-    run_failed: { by: 'reason', map: { cancelled: 'cancelled' }, default: 'failed' },
-    run_done: 'done',
-    x_run_interrupted: 'freeze',
-    x_run_auto_resumed: 'resume',
-    x_action_unknown: 'puzzled',
-    x_decision_issued: { by: 'kind', map: { external_action: 'hold_form', waiting_resume: 'hold_card' }, default: null },
-    x_remote_action_started: 'remote_run',
-    x_machine_offline: 'remote_unknown',
-    x_network_fetch: 'net_fetch',
-    x_mcp_called: 'mcp_press',
-    x_trial_step: 'trial',
-    x_deployed: 'deploy',
-    x_rolled_back: 'rollback',
-    x_fault_recorded: 'fault',
-    x_provider_wait_entered: 'wait_provider',
-    x_role_task_assigned: 'assign',
-    x_role_result_returned: 'hand_back',
-    x_review_recorded: 'review',
-    x_explorer_fetch: 'explore',
-    x_replanned: 'replan',
-    x_semantic_recorded: 'semantic'
-  };
-
-  P.resolveAction = function resolveAction(event) {
-    if (!event || !event.type) throw new Error('事件缺少 type');
-    const entry = P.EVENT_ACTIONS[event.type];
-    if (!entry) return null;
-    if (typeof entry === 'string') return entry;
-    const payload = event.payload || {};
-    const key = entry.by === 'tool' ? (event.tool || payload.tool)
-      : entry.by === 'reason' ? (payload.reason || payload.stopReason)
-        : entry.by === 'kind' ? payload.kind
-          : payload.verdict;
-    return entry.map[key] || entry.default || null;
   };
 
   // 档位比较：按 Y13.LEVELS 的顺序；level 为空时取界面工作线
@@ -1099,8 +1037,9 @@
       if (scene.destroyed) return;
       const dt = Math.min(50, Math.max(0, now - last));
       last = now;
-      // paused 为不在视口内的画面（动作图鉴中滚出屏幕的小画布），暂停推进与绘制
-      if (scene.paused) {
+      // paused 为不在视口内的画面（动作图鉴中滚出屏幕的小画布），暂停推进与绘制；
+      // P.hidden 为原型工具条模拟的「标签页在后台」：浏览器在后台不推进动画帧，画面的时钟停住
+      if (scene.paused || P.hidden) {
         scene.raf = requestAnimationFrame(frame);
         return;
       }

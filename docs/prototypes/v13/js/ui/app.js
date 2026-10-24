@@ -283,17 +283,20 @@
     Y13.bus.emit('content-rendered', ctx);
   }
 
+  // 一条事件：先交给页面的画面（事件翻成动作，进播放时间线），再按事件刷新查询（新的状态等它之前的动作演完才上画面）。
+  // 顺序与真实客户端相同：事件流先到，重新查询的结果后到
   function onPageEvent(entry, event) {
     if (entry !== mounted) return;
     const ctx = buildCtx();
     entry.ctx = ctx;
+    if (entry.view.onEvent) entry.view.onEvent(ctx, dom.content, event);
+    if (entry !== mounted) return;
     if (entry.view.update) {
       entry.view.update(ctx, dom.content, event);
       restoreDrafts(dom.content);
     } else {
       renderContent(true);
     }
-    if (entry === mounted && entry.view.onEvent) entry.view.onEvent(ctx, dom.content, event);
   }
 
   function renderAll(keepScroll) {

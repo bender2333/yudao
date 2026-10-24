@@ -1,17 +1,19 @@
-// 回放比较：把 record.js 录下的楼层画面调用，按确定的时钟回放给 v9 与 v12 的项目楼层画面，
+// 回放比较：把 record.js 在 v12 上录下的楼层画面调用，按确定的时钟回放给 v12 与 v13 的项目楼层画面，
 // 在「静止检查点」（事件播完、静置一段时间以后）比较整张 canvas 的像素与小人的位置姿势。
 // 时钟、随机数与动画相位都固定，同一串调用下两版应当得到完全相同的画面。
+// v13 的画面只认画面合同：录到的 floorModel 与事件经过真正的翻译层（js/translate/）再交给它，
+// 状态等它之前的动作演完才上画面，所以检查点放在静置 14 秒以后，动作都演完了。
 //
-// 用法：node docs/prototypes/v12/checks/replay.js [--v12 <index.html 的 file:// 地址>] [--only 场景编号,场景编号] [--mode step|burst] [--keep 4]
-// 先运行 record.js 生成 .tmp/v12-checks/recordings.json；有差异的检查点会把 v9、v12 与差异图存进 .tmp/v12-checks/replay/。
+// 用法：node docs/prototypes/v13/checks/replay.js [--v13 <index.html 的 file:// 地址>] [--only 场景编号,场景编号] [--mode step|burst] [--keep 4]
+// 先运行 record.js 生成 .tmp/v13-checks/recordings.json；有差异的检查点会把 v12、v13 与差异图存进 .tmp/v13-checks/replay/。
 // step：每个事件之后静置 14 秒再比较；burst：事件连续播放，只在最后静置以后比较；--reduced：系统设置为减少动画。
 const fs = require('fs');
 const path = require('path');
-const { chromium, EXE, v9Url, v12Url, outDir, spaceOf } = require('./env');
+const { chromium, EXE, v12Url, v13Url, outDir, spaceOf } = require('./env');
 
 const arg = (name, dflt) => { const i = process.argv.indexOf('--' + name); return i >= 0 ? process.argv[i + 1] : dflt; };
-const V9 = v9Url;
-const V12 = arg('v12', v12Url);
+const V12 = v12Url;
+const V13 = arg('v13', v13Url);
 const ONLY = arg('only', '') ? arg('only').split(',') : null;
 const MODE = arg('mode', 'step');
 const KEEP = Number(arg('keep', 4));
@@ -42,10 +44,10 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space }) =>
     }
   };
 
-  // 统计 v12 画面对 ecs.js 的使用
+  // 统计画面对 ecs.js 的使用
   const counts = {};
   const E = P.ecs;
-  // 自主行为（待机活动、管道的惯性）关掉：静止的画面只由快照决定，才能与 v9 逐像素比较
+  // 自主行为（待机活动、管道的惯性）关掉：静止的画面只由快照决定，才能与 v12 逐像素比较
   if (E && E.config) E.config.autonomy = false;
   if (E) {
     ['dispatch', 'declareRooms', 'declareLinks', 'syncCharacters', 'stepCharacters', 'spawnPackage', 'sendPackage', 'stepPackages', 'stepPipes', 'bubbleFor'].forEach((k) => {
@@ -62,7 +64,44 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space }) =>
   document.body.appendChild(host);
 
   const clone = (v) => JSON.parse(JSON.stringify(v));
-  const isWorker = (a) => /\.(agent|ops)$/.test(a.sprite);
+  // 全部角色实体（S5 的角色也算）：动画时钟固定，位置与姿势逐个比较
+  const isWorker = (a) => Boolean(a.data && a.data.ecsChar);
+
+  // v13 的画面只认画面合同：录到的 floorModel 与事件（v12 的说法）经过真正的翻译层再交给它。
+  // 录制里的 transition 与 collaboration_* 是 v12 的界面层从成果事件与询问事件派生出来的，翻译层自己会翻出交接与传信，这里不重复放
+  const adapt = (f) => {
+    const T = window[space].translate;
+    const Y = window[space];
+    let pos = 0;
+    let roles = [];
+    let firstState = true;
+    const names = { roleName: (id) => { const h = roles.find((r) => r.id === id || r.kind === id); return h ? h.name : null; } };
+    f.setModel = (model) => {
+      roles = Object.values(model.roles || {}).reduce((l, r) => l.concat(r), []);
+      const s = T.floor.state({ position: ++pos, loop: model, roles: model.roles, focus: model.focus_id });
+      if (firstState) { f.jump(s); firstState = false; } else f.setState(s);
+      f.setDecisions(model.decisions || []);
+    };
+    f.playEvent = (ev) => {
+      if (ev.type === 'transition' || /^collaboration_/.test(ev.type)) return;
+      const s = T.stream(ev);
+      if (s) f.stream(s.who, s.text);
+      T.floor.actions(Object.assign({ position: ++pos }, ev), names).forEach((a) => f.play(a));
+    };
+    const setOverlay = f.setOverlay;
+    // 覆盖层的取值在录制里是 v12 页面拼好的形状，这里换成合同里的形状
+    f.setOverlay = (id, data) => {
+      if (!data) return setOverlay(id, null);
+      const src = () => 'rule';
+      let out;
+      if (id === 'flow') out = { segments: data.segments.map((s) => ({ from: s.from, to: s.to, kind: s.kind, count: s.count, last_text: Y.time.clock(s.last_at) })) };
+      else if (id === 'waiting') out = { entries: data.entries.map((e) => ({ department: e.department, text: e.text, waited_text: Y.time.duration(e.waited_sec), row: e.row })) };
+      else if (id === 'loops' || id === 'coverage') out = T.floor.overlay(id, data, src);
+      else out = data;
+      return setOverlay(id, out);
+    };
+    return f;
+  };
   let fl = null;
   const cps = [];
   let failure = null;
@@ -87,7 +126,7 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space }) =>
     let first = true;
     for (let i = 0; i < ops.length; i++) {
       const o = ops[i];
-      if (o.op === 'mount') { fl = P.createFloorScene(canvas, { onDoorClick() {} }); first = true; continue; }
+      if (o.op === 'mount') { fl = P.createFloorScene(canvas, { onDoorClick() {} }); if (space === 'Y13') fl = adapt(fl); first = true; continue; }
       if (!fl) continue;
       if (o.op === 'destroy') { fl.destroy(); fl = null; continue; }
       if (o.op === 'setModel') fl.setModel(clone(o.arg));
@@ -172,10 +211,10 @@ const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.fr
   await cmp.goto('about:blank');
   const summary = [];
   async function runOne(rec) {
-    const a = await version(browser, V9, rec);
-    const b = await version(browser, V12, rec);
-    const row = { id: rec.id, checkpoints: a.cps.length, pixelDiff: 0, stateDiff: 0, v9fail: a.failure, v12fail: b.failure,
-      v9errors: a.errors.length, v12errors: b.errors.length, ecs: b.counts, notes: [] };
+    const a = await version(browser, V12, rec);
+    const b = await version(browser, V13, rec);
+    const row = { id: rec.id, checkpoints: a.cps.length, pixelDiff: 0, stateDiff: 0, v12fail: a.failure, v13fail: b.failure,
+      v12errors: a.errors.length, v13errors: b.errors.length, ecs: b.counts, notes: [] };
     if (a.cps.length !== b.cps.length) row.notes.push('检查点数量不同 ' + a.cps.length + ' / ' + b.cps.length);
     const n = Math.min(a.cps.length, b.cps.length);
     let kept = 0;
@@ -204,7 +243,7 @@ const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.fr
         if (kept < KEEP && d.png) {
           kept++;
           const tag = rec.id + '-' + String(i).padStart(2, '0');
-          save(tag + '-v9.png', A.png); save(tag + '-v12.png', B.png); save(tag + '-diff.png', d.png);
+          save(tag + '-v12.png', A.png); save(tag + '-v13.png', B.png); save(tag + '-diff.png', d.png);
         }
       }
     }
@@ -225,7 +264,7 @@ const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.fr
     console.log(JSON.stringify(row));
   }
   await browser.close();
-  const bad = summary.filter((r) => r.pixelDiff || r.stateDiff || r.v9fail || r.v12fail || r.v9errors || r.v12errors);
+  const bad = summary.filter((r) => r.pixelDiff || r.stateDiff || r.v12fail || r.v13fail || r.v12errors || r.v13errors);
   console.log(JSON.stringify({ recordings: summary.length, checkpoints: summary.reduce((s, r) => s + r.checkpoints, 0), badRecordings: bad.length, pixelDiff: summary.reduce((s, r) => s + r.pixelDiff, 0), stateDiff: summary.reduce((s, r) => s + r.stateDiff, 0) }));
   console.log(bad.length ? 'RESULT: DIFF' : 'RESULT: PASS');
   process.exit(bad.length ? 1 : 0);

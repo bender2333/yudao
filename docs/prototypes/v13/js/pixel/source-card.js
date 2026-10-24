@@ -18,15 +18,15 @@
     role_statement: ['xxxxxxx', 'x.....x', 'x.x.x.x', 'x.....x', 'xxxxxxx', '.xx....', '.x.....'],
     decision_model: ['...x...', 'xxxxxxx', 'x..x..x', 'x..x..x', 'xx.x.xx', '...x...', '.xxxxx.']
   };
-  // 覆盖层「来源」的描边：确定规则灰、主机测量蓝、用户绿；角色陈述与决策模型没有经过主机核实，用加粗的虚线
+  // 五种来源的名称与覆盖层「来源」的描边：确定规则灰、主机测量蓝、用户绿；角色陈述与决策模型没有经过主机核实（unverified），用加粗的虚线
   P.SOURCE_STYLE = {
-    rule: { line: PAL.grey1, dash: false },
-    host_measurement: { line: PAL.blue2, dash: false },
-    user: { line: PAL.green2, dash: false },
-    role_statement: { line: PAL.yellow2, dash: true },
-    decision_model: { line: PAL.orange2, dash: true }
+    rule: { label: '确定规则', line: PAL.grey1, dash: false, unverified: false },
+    host_measurement: { label: '主机测量', line: PAL.blue2, dash: false, unverified: false },
+    user: { label: '用户', line: PAL.green2, dash: false, unverified: false },
+    role_statement: { label: '角色陈述', line: PAL.yellow2, dash: true, unverified: true },
+    decision_model: { label: '决策模型', line: PAL.orange2, dash: true, unverified: true }
   };
-  const kindOf = (source) => Y13.registry.SOURCE_KINDS[source];
+  const kindOf = (source) => P.SOURCE_STYLE[source];
 
   // 角标：11×11；没有经过主机核实的来源为黄底并加粗边框，其余为浅色底
   P.drawSourceIcon = function drawSourceIcon(c, source, x, y) {
@@ -55,7 +55,8 @@
     return lines;
   }
 
-  // opts：{ onSeek(position) 时间轴跳到这条事件, fetchEvent(position) → 事件对象 }
+  // opts：{ onSeek(position) 时间轴跳到这条事件, describe(position) → 给出这条事实的事件的说明（翻译层写好：
+  //   { position, source, lines: [事件说明, 种类与时间, 提出者与位置], probability } }
   // fact：{ kind, rect: { x, y, w, h }, position, source, title, notes: [文字], missing }
   P.createSourceCard = function createSourceCard(scene, canvas, opts) {
     const o = opts || {};
@@ -73,7 +74,7 @@
     }
 
     function open(fact) {
-      const ev = fact.position && o.fetchEvent ? o.fetchEvent(fact.position) : null;
+      const ev = fact.position && o.describe ? o.describe(fact.position) : null;
       show({ mode: 'fact', fact, ev, anchor: fact.rect });
     }
 
@@ -117,11 +118,9 @@
       // 事实的来源按「事件加字段」：事件里的测量值（例如已用时间）是主机测量，可以与事件本身的来源不同
       const source = f.source || (ev ? ev.source : null);
       if (ev) {
-        add(ev.label, { weight: 600, color: PAL.ink });
-        add(ev.type + ' · ' + Y13.time.format(ev.at), { color: PAL.grey3 });
-        add('提出者 ' + ev.actor + ' · 全局位置 ' + ev.position, { color: PAL.grey3 });
+        ev.lines.forEach((text, i) => add(text, i === 0 ? { weight: 600, color: PAL.ink } : { color: PAL.grey3 }));
         if (source !== ev.source) add('这条事实是事件里由主机测出的数值；事件本身的来源是' + kindOf(ev.source).label, { color: PAL.grey3 });
-        if (source === 'decision_model' && ev.payload && ev.payload.probability !== undefined) add('概率 ' + ev.payload.probability, { weight: 700, color: PAL.orange2 });
+        if (source === 'decision_model' && ev.probability !== undefined && ev.probability !== null) add('概率 ' + ev.probability, { weight: 700, color: PAL.orange2 });
       }
       const h = 26 + lines.length * 9 + (ev ? 20 : 4);
       const p = paper = place(w, h);

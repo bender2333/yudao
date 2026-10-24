@@ -65,15 +65,11 @@
 
   const STATUS_TEXT = {
     idle: '未工作', working: '工作中', asking: '等待回答', paused: '已暂停', failed: '失败', done: '已完成',
-    cancelled: '已取消', interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复'
+    cancelled: '已取消', interrupted: '中断', waiting_resume: '待恢复'
   };
   const STATUS_COLOR = {
     working: PAL.screen3, asking: PAL.blue1, paused: PAL.blue1, failed: PAL.red1, done: PAL.green1,
-    cancelled: PAL.grey1, interrupted: PAL.grey2, pending_verification: PAL.yellow2, waiting_resume: PAL.yellow2, idle: PAL.screen2
-  };
-  const POSE_ALIAS = {
-    typing: 'type', type: 'type', reading: 'read_sit', read: 'read_sit', writing: 'write', write: 'write', thinking: 'think', think: 'think',
-    searching: 'rummage', waiting: 'sit_wait', tea: 'tea', idle: 'sit', inspecting: 'inspect'
+    cancelled: PAL.grey1, interrupted: PAL.grey2, waiting_resume: PAL.yellow2, idle: PAL.screen2
   };
   const BENCH_LABEL = { product: '卷轴台', engineering: '封存台', quality: '检验台' };
 
@@ -98,11 +94,12 @@
     P.levelAtLeast(level, 'ui');
     if (level !== 'ui' && !Y13.LEVELS.includes(level)) throw new Error('未知档位：' + level);
 
-    // 画面上的数量（信箱、档案盒编号、卷轴、钉着的纸条、语义卡片）一律取自 roomModel；
-    // st 只保存动作过程中的临时状态，动作结束后画面回到只由数据决定的样子
+    // 画面上的数量（信箱、档案盒编号、卷轴、钉着的纸条、语义卡片）一律取自房间的状态（画面合同 roomState）；
+    // st 只保存动作过程中的临时状态，动作结束后画面回到只由状态决定的样子。状态等它之前的动作演完才上画面，
+    // 所以新加的一件（卷轴、纸条、卡片）在动作把它放上去以后才出现
     let model = {
       department: dept, level, status: 'idle', crt: {}, roles: [], pose: null, door: null,
-      hold_card: null, pending_tool: null, mailbox: 0, summaries: 0, scrolls: 0, pinned_notes: 0, semantic_cards: 0,
+      hold_card: null, mailbox: 0, summaries: 0, scrolls: 0, pinned_notes: 0, semantic_cards: 0,
       machine: null, remote_unknown: false, waiting_provider: false, pipes: null, existing_read: false,
       trial: null, tool_panel: null, self_test: null
     };
@@ -110,10 +107,9 @@
       dark: 0.36, darkTarget: 0.36, yellow: false,
       clock: 15.5 * 3600000, crtBoot: 1,
       drawer: 0, lever: 0, exit: null, termRun: false, smokeUntil: 0,
-      // scrollHide、noteHide、cardHide：新加的一件在动作放上去之前先不显示，值为最迟恢复显示的时间
-      trayPaper: false, scrollFlash: 0, scrollHide: 0, noteHide: 0, replyUntil: 0, cardHide: 0, cardFlash: 0,
+      trayPaper: false, scrollFlash: 0, replyUntil: 0, cardFlash: 0,
       archiveFlash: 0,
-      door: 0, doorEvent: null, eventStatus: null, eventCard: null, eventTool: null, lastPendingTool: null,
+      door: 0, doorEvent: null, eventStatus: null, eventCard: null,
       bench: { item: null, mark: null, slip: null, slipMark: null, ticks: 0, tape: 0, until: 0 },
       wbSheetUntil: 0, wbErase: 0, wbSeed: 1, wbTags: {}, wbDone: {}, wbExisting: false,
       binUntil: 0, alarmUntil: 0, cart: { x: 296, box: null, pushed: false },
@@ -207,10 +203,11 @@
       return list.find((a) => a.data.role.kind === CENTER_KIND[dept])
         || list.find((a) => a.data.role.kind === 'manager') || list[0];
     }
-    function actorFor(ev) {
+    // 做这个动作的角色：动作指定的角色（id、种类或名称），否则是中心角色
+    function actorFor(act) {
       const list = roleActors();
-      if (ev && ev.role) {
-        const hit = list.find((a) => a.id === ev.role || a.data.role.kind === ev.role || a.data.role.name === ev.role);
+      if (act && act.role) {
+        const hit = list.find((a) => a.id === act.role || a.data.role.kind === act.role || a.data.role.name === act.role);
         if (hit) return hit;
       }
       return primary();
@@ -221,23 +218,11 @@
     function drop(a, key) { ds(a)[key] = 0; }
     function shown(s, key) { return s[key] > scene.realT; }
 
-    // 说话气泡：小人开始做一件事时头顶说一句话（内容来自 P.say，js/pixel/say.js），说完在头顶留一段时间
-    function nameOfRole(k) {
-      const x = roleActors().find((r) => r.id === k || r.data.role.kind === k || r.data.role.name === k);
-      return x ? x.data.role.name : null;
-    }
-    // side 为 'to' 表示这个小人是事件里收东西的一方
-    function say(ev, a, side) {
-      const text = P.say(ev, { dept, side, roleName: nameOfRole });
+    // 说话气泡：小人开始做一件事时头顶说一句话（翻译层写在动作的 say 与 sayTo 里），说完在头顶留一段时间。
+    // side 为 'to' 表示这个小人是动作里收东西的一方
+    function say(act, a, side) {
+      const text = side === 'to' ? act.sayTo : act.say;
       if (a && text) a.data.say = { text, until: scene.realT + P.sayMs(text) };
-    }
-
-    // 询问信的两端：发问的部门与回答的部门（示例数据里回答事件的 from 是回答方，v8 构建约定里 to 是回答方）
-    function letterSides(ev) {
-      const pl = ev.payload || {};
-      if (ev.type === 'collaboration_requested') return { asker: pl.from || ev.department, answerer: pl.to };
-      const answerer = ev.department || pl.to;
-      return { asker: pl.from === answerer ? pl.to : pl.from, answerer };
     }
     // 工作台上的物件：每次改动后保留 12 秒，之后工作台回到空的样子
     function tickBench() {
@@ -358,7 +343,7 @@
     function applyLights() {
       const s = effStatus();
       const wait = waitingProvider();
-      const target = s === 'interrupted' ? 0.74 : wait ? 0.42 : (s === 'working' || s === 'asking' || s === 'pending_verification' || s === 'done') ? 0 : 0.36;
+      const target = s === 'interrupted' ? 0.74 : wait ? 0.42 : (s === 'working' || s === 'asking' || s === 'done') ? 0 : 0.36;
       if (target !== st.darkTarget) {
         st.darkTarget = target;
         if (s === 'interrupted' && !scene.reduced) {
@@ -372,7 +357,6 @@
           scene.tween(st, 'dark', target, 600, 'inOut');
         }
       }
-      st.yellow = s === 'pending_verification';
       scene.frozen = s === 'interrupted';
     }
 
@@ -384,13 +368,6 @@
       const isPrim = a === primary();
       const seatRest = (anim, extra) => Object.assign({ x: d.seatX, y: d.seatY, seat: d, anim, facing: 1 }, extra || {});
       const standRest = (x, y, anim, extra) => Object.assign({ x, y, seat: null, anim }, extra || {});
-      if (s === 'pending_verification' && isPrim) {
-        const tool = st.eventTool || model.pending_tool;
-        const spot = toolSpot(tool);
-        if (spot === 'desk') return seatRest('sit_scratch', { icon: { kind: 'question' } });
-        const sp = SPOT[spot];
-        return standRest(sp[0], sp[1], 'puzzled', { icon: { kind: 'question' }, facing: sp[2] || 1 });
-      }
       if (s === 'waiting_resume' && isPrim) {
         return standRest(SPOT.center[0], SPOT.center[1], 'hold_sign', { sign: model.hold_card || st.eventCard || '待恢复' });
       }
@@ -420,19 +397,10 @@
       if (r.status === 'returned') return seatRest('sit_happy');
       if (r.status === 'failed') return seatRest('slump');
       if (model.pose && (model.pose.role_id === a.id || (!model.pose.role_id && isPrim))) {
-        const act = model.pose.action;
-        const anim = POSE_ALIAS[act] || (P.ANIMS[act] ? act : (P.ACTIONS[act] ? P.ACTIONS[act].anim : null));
-        if (!anim) throw new Error('roomModel.pose.action 无法对应到动作：' + act);
+        const anim = model.pose.anim;
         return seatRest(anim, { hold: anim === 'read_sit' ? 'doc' : null });
       }
       return seatRest('type');
-    }
-
-    function toolSpot(tool) {
-      if (tool === 'run_command') return 'terminal';
-      if (tool === 'search') return 'cabinet';
-      if (tool === 'run_check') return 'bench';
-      return 'desk';
     }
 
     function applyRest(a) {
@@ -499,23 +467,19 @@
     }
 
     function update() {
+      tl.tick();
       if (effStatus() !== 'interrupted') st.clock += 16.7 * (scene.reduced ? 0 : 1);
-      roleActors().forEach((a) => {
-        // 排队的动作：当前动作的关键步骤做完（或进入收尾步骤）后立即开始；
-        // 等了 0.9 秒仍未轮到时打断当前动作，只让刚开始的关键步骤再显示到 0.6 秒
-        const q = a.data.queue;
-        if (q && q.length && !scene.frozen) {
-          const waited = scene.realT - q[0].at;
-          const keyJustStarted = a.step && a.step.st.key && (scene.realT - a.step.t0) < 600;
-          // 交接与盖章先做完：它们在做的时候不打断（v11 第 2 条）
-          const currentIsKeep = (!!a.data.handoff || (a.data.doing && KEEP_ACTIONS.has(a.data.doing))) && !scene.inTail(a);
-          if (!currentIsKeep && (scene.inTail(a) || (waited >= 900 && !keyJustStarted))) {
-            const next = q.shift();
-            if (a.script) scene.cancel(a);
-            next.fn();
-            return;
-          }
+      // 时间线上正在演的动作：做它的小人做完主要的部分（进入收尾步骤，例如走回工位）就算演完，下一个动作可以接上
+      runs.forEach((run, id) => {
+        const a = run.actor;
+        if (!a || a.data.runId !== id || scene.inTail(a)) {
+          runs.delete(id);
+          tl.done(id);
+          // 演的时候到达的进度，演完以后接上最近的一项
+          if (a && a.data.pendingProgress) { const next = a.data.pendingProgress; a.data.pendingProgress = null; showProgress(next, a); }
         }
+      });
+      roleActors().forEach((a) => {
         if (!a.script) applyRest(a);
       });
       tickBench();
@@ -531,15 +495,9 @@
     }
 
     // -------------------------------------------------------------------------
-    // 事件
+    // 动作：每一种怎么演。参数 (act, a)：act 是画面合同的动作（字段见 contract.js 与翻译层），a 是做它的小人
 
     function setPersist(a, ps) { a.data.persist = ps; }
-
-    // 事件说明中用「」括起的部分：没有 payload.text 时作为气泡与举牌上的文字
-    function quoted(label) {
-      const m = /「([^」]+)」/.exec(String(label || ''));
-      return m ? m[1] : (label || null);
-    }
 
     // 盖章：在工作台上盖章，impact 为落章时的回调
     function stampSteps(item, hitFn, anim) {
@@ -557,7 +515,7 @@
     }
 
     const handlers = {
-      activate(ev, a) {
+      activate(act, a) {
         if ((model.status || 'idle') === 'idle') st.eventStatus = 'working';
         applyLights();
         setPersist(a, null);
@@ -570,7 +528,7 @@
         p.add(S.anim('type', 500));
         p.run(() => { st.crtBoot = 1; });
       },
-      fetch_folder(ev, a) {
+      fetch_folder(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.spot('cabinet');
@@ -582,7 +540,7 @@
         p.add(S.call(place), S.hold(null), S.anim('sit_happy', 600));
         p.run(() => { st.drawer = 0; a.hold = null; place(); });
       },
-      type_think(ev, a) {
+      type_think(act, a) {
         setPersist(a, { anim: 'type', icon: { kind: 'think' } });
         ds(a).redLamp = false;
         const p = plan(a);
@@ -590,16 +548,16 @@
         p.add(S.icon({ kind: 'think' }), S.anim('type', 1200, true));
         p.run();
       },
-      stream_text(ev, a) {
-        const pl = ev.payload || {};
-        const text = pl.text || pl.delta || pl.chunk || quoted(ev.label) || '……';
+      // 流式文字是实时内容（stream），不经时间线
+      stream_text(act, a) {
+        const text = act.text || '……';
         setPersist(a, { anim: 'type', icon: { kind: 'stream', text } });
         const p = plan(a);
         p.sit();
         p.add(S.icon({ kind: 'stream', text }), S.anim('type', 1500, true));
         p.run();
       },
-      idea(ev, a) {
+      idea(act, a) {
         setPersist(a, { anim: 'sit_happy', icon: { kind: 'bulb' }, until: scene.realT + 2600 });
         const p = plan(a);
         p.sit();
@@ -609,18 +567,15 @@
         }), S.anim('sit_happy', 1600, true));
         p.run();
       },
-      retry_wait(ev, a) {
-        const pl = ev.payload || {};
-        const n = pl.n || pl.attempt || pl.attempt_no || 2;
-        const of = pl.of || pl.max || pl.max_attempts || 3;
-        const text = '第 ' + n + '/' + of + ' 次';
+      retry_wait(act, a) {
+        const text = '第 ' + (act.count || '2/3') + ' 次';
         setPersist(a, { anim: 'sit_wait', icon: { kind: 'hourglass', text } });
         const p = plan(a);
         p.sit();
         p.add(S.icon({ kind: 'hourglass', text }), S.anim('sit_wait', 1600, true));
         p.run();
       },
-      slump(ev, a) {
+      slump(act, a) {
         setPersist(a, { anim: 'slump' });
         ds(a).redLamp = true;
         const p = plan(a);
@@ -628,7 +583,7 @@
         p.add(S.anim('shock', 300), S.anim('slump', 1600, true));
         p.run();
       },
-      search(ev, a) {
+      search(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.spot('cabinet');
@@ -637,22 +592,22 @@
         p.back();
         p.run(() => { st.drawer = 0; });
       },
-      read(ev, a) {
+      read(act, a) {
         setPersist(a, { anim: 'read_sit', hold: 'doc' });
         const p = plan(a);
         p.sit();
         p.add(S.hold('doc'), S.anim('read_sit', 1800, true));
         p.run();
       },
-      write(ev, a) {
+      write(act, a) {
         setPersist(a, { anim: 'write', write: true });
         const p = plan(a);
         p.sit();
         p.add(S.call(() => { keep(a, 'doc'); }), S.anim('write', 1800, true));
         p.run();
       },
-      run_command(ev, a) {
-        if (ev.type === 'tool_called') return commandDone(ev, a);
+      command_done(act, a) { commandDone(act, a); },
+      run_command(act, a) {
         setPersist(a, null);
         st.exit = null;
         const p = plan(a);
@@ -666,7 +621,7 @@
         p.add(S.anim('watch_r', 14000));
         p.run();
       },
-      toss(ev, a) {
+      toss(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.stand();
@@ -677,7 +632,7 @@
         p.back();
         p.run(() => { a.hold = null; });
       },
-      submit(ev, a) {
+      submit(act, a) {
         setPersist(a, null);
         let placed = false;
         // 托盘里的纸只在提案送进去之后出现，提案被接纳或退回时清空
@@ -690,7 +645,7 @@
         p.back();
         p.run(place);
       },
-      returned(ev, a) {
+      returned(act, a) {
         setPersist(a, null);
         const d = a.data.desk;
         st.trayPaper = false;
@@ -700,12 +655,12 @@
         p.add(S.anim('sit_up', 700), S.icon({ kind: 'question' }), S.anim('sit_scratch', 1800, true), S.icon(null));
         p.run(() => { keep(a, 'doc'); });
       },
-      stamp_valid(ev, a) {
+      stamp_valid(act, a) {
         setPersist(a, null);
         // 盖章之后卷轴要放上卷轴架；被下一个动作打断时直接放上去
         let shelved = false;
-        // 卷轴数取自 roomModel.scrolls；新卷轴在放上架子之前先不显示
-        const shelve = () => { if (!shelved) { shelved = true; st.scrollHide = 0; st.scrollFlash = scene.realT + 1500; st.bench.item = null; st.bench.mark = null; } };
+        // 卷轴数取自房间的状态；新卷轴的状态等这个动作演完才上画面
+        const shelve = () => { if (!shelved) { shelved = true; st.scrollFlash = scene.realT + 1500; st.bench.item = null; st.bench.mark = null; } };
         const p = plan(a);
         p.add(S.call(() => { st.bench.item = 'scroll_open'; st.bench.mark = null; }));
         p.spot('bench');
@@ -719,17 +674,7 @@
         p.back();
         p.run(() => { a.hold = null; shelve(); });
       },
-      pin_plan(ev, a) {
-        setPersist(a, null);
-        const p = plan(a);
-        p.stand();
-        p.add(S.hold('doc'));
-        p.spot('wb', 'carry');
-        p.add(S.anim('board_pin', undefined, true), S.call(() => { st.wbSheetUntil = scene.realT + PROP_KEEP; }), S.hold(null), S.anim('back', 500), S.anim('idle_happy', 400));
-        p.back();
-        p.run(() => { if (st.wbSheetUntil < scene.realT) st.wbSheetUntil = scene.realT + PROP_KEEP; a.hold = null; });
-      },
-      seal(ev, a) {
+      seal(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.add(S.call(() => { st.bench.item = 'box_open'; st.bench.mark = null; st.bench.tape = 0; }));
@@ -763,7 +708,7 @@
           p2.run(() => { pa.hold = null; });
         });
       },
-      inspect(ev, a) {
+      inspect(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.add(S.call(() => { if (!st.bench.item) st.bench.item = 'box_sealed'; st.bench.ticks = 0; }));
@@ -774,7 +719,7 @@
         p.back();
         p.run(() => { st.bench.ticks = 3; });
       },
-      stamp_release(ev, a) {
+      stamp_release(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.add(S.call(() => { st.bench.slip = 'release'; st.bench.slipMark = null; }));
@@ -793,7 +738,7 @@
         p.back();
         p.run(() => { a.hold = null; st.bench.item = null; st.bench.slip = null; st.bench.slipMark = null; });
       },
-      stamp_rework(ev, a) {
+      stamp_rework(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.add(S.call(() => { st.bench.slip = 'defect'; st.bench.slipMark = null; if (!st.bench.item) st.bench.item = 'box_sealed'; }));
@@ -819,7 +764,7 @@
         });
       },
       // 发出询问：写纸条装进信筒，塞进传信管口，在管道口等待（设计说明第 8.3 节）
-      send_letter(ev, a) {
+      send_letter(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.sit();
@@ -830,10 +775,10 @@
         p.run(() => { a.hold = null; });
       },
       // 从传信管口取出信筒：收到询问的一方与收到回答的一方读信，回答方读完询问以后写回答塞回；发问方在管道口接住回答
-      answer_letter(ev, a) {
+      // act.reads：只读不回（收到询问的一方读问题、发问的一方读回答）；否则读完写回答塞回
+      answer_letter(act, a) {
         setPersist(a, null);
-        const sides = letterSides(ev);
-        const reads = ev.type === 'collaboration_requested' || sides.asker === dept;
+        const reads = Boolean(act.reads);
         const p = plan(a);
         const take = (ms) => S.call(() => {
           scene.fly({ bmp: 'letter', from: [L.tube.x + 4, L.tube.base - 8], to: [a.x + 4, a.y - 20], ms, arc: 8, onDone: () => { a.hold = 'letter'; } });
@@ -849,29 +794,28 @@
         p.back();
         p.run(() => { a.hold = null; });
       },
-      // 信箱数字以 roomModel.mailbox 为准，这里只播放纸条从门缝滑进信箱
+      // 信箱数字以房间的状态为准，这里只播放纸条从门缝滑进信箱
       guidance_in() {
         const slot = [L.door.x + 18, L.door.base - 9];
         scene.fly({ bmp: 'note', from: slot, to: [L.mailbox.x + 7, L.mailbox.base - 9], ms: 700, arc: 2, ease: 'out' });
       },
-      // 钉着的纸条数取自 roomModel.pinned_notes；读完的纸条在钉上之前先不显示
-      guidance_read(ev, a) {
+      // 钉着的纸条数取自房间的状态；读完的纸条钉到已有纸条的下一个位置，新的状态在这个动作演完以后才上画面
+      guidance_read(act, a) {
         setPersist(a, null);
-        const pin = () => { st.noteHide = 0; };
         const p = plan(a);
         p.spot('mailbox');
         p.add(S.anim('crouch', 700), S.hold('note'), S.anim('read_stand', 1400));
         p.spot('cork');
         p.add(S.call(() => scene.after(scene.reduced ? 0 : 450, () => {
           a.hold = null;
-          const k = Math.max(0, (model.pinned_notes || 1) - 1) % 6;
-          scene.fly({ bmp: 'note', from: [SPOT.cork[0], SPOT.cork[1] - 24], to: [L.cork.x + 3 + (k % 3) * 9, L.cork.y + 4 + Math.floor(k / 3) * 13], ms: 350, arc: 4, onDone: pin });
+          const k = (model.pinned_notes || 0) % 6;
+          scene.fly({ bmp: 'note', from: [SPOT.cork[0], SPOT.cork[1] - 24], to: [L.cork.x + 3 + (k % 3) * 9, L.cork.y + 4 + Math.floor(k / 3) * 13], ms: 350, arc: 4 });
         })), S.anim('note_pin', undefined, true), S.hold(null), S.anim('back', 500));
         p.back();
-        p.run(() => { a.hold = null; pin(); });
+        p.run(() => { a.hold = null; });
       },
       // 在最新的纸条上写回复：写完时纸条上出现勾，过一会儿恢复
-      guidance_reply(ev, a) {
+      guidance_reply(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.spot('cork');
@@ -879,7 +823,7 @@
         p.back();
         p.run();
       },
-      compact(ev, a) {
+      compact(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.stand();
@@ -893,7 +837,7 @@
         p.back();
         p.run(() => { a.hold = null; ds(a).hidePapers = false; });
       },
-      compact_fail(ev, a) {
+      compact_fail(act, a) {
         setPersist(a, null);
         const d = a.data.desk;
         ds(a).hidePapers = true;
@@ -908,7 +852,7 @@
         p.back();
         p.run(() => { ds(a).hidePapers = false; a.hold = null; });
       },
-      paused(ev, a) {
+      paused(act, a) {
         st.doorEvent = '已暂停';
         st.eventStatus = 'paused';
         applyLights();
@@ -917,9 +861,8 @@
         p.add(S.anim('sit_relax', 1200, true));
         p.run();
       },
-      failed(ev, a) {
-        const pl = ev.payload || {};
-        st.doorEvent = '失败' + (pl.reason || pl.stopReason ? '：' + (pl.reason || pl.stopReason) : '');
+      failed(act, a) {
+        st.doorEvent = '失败' + (act.text ? '：' + act.text : '');
         st.eventStatus = 'failed';
         applyLights();
         ds(a).redLamp = true;
@@ -928,7 +871,7 @@
         p.add(S.anim('slump', 1400, true));
         p.run();
       },
-      done(ev, a) {
+      done(act, a) {
         st.doorEvent = '已完成';
         st.eventStatus = 'done';
         applyLights();
@@ -937,7 +880,7 @@
         p.add(S.call(() => scene.emit('confetti', 240, 8, 60, { spread: 460 })), S.anim('cheer', 2200, true));
         p.run();
       },
-      cancelled(ev, a) {
+      cancelled(act, a) {
         st.doorEvent = '已取消';
         st.eventStatus = 'cancelled';
         applyLights();
@@ -947,70 +890,25 @@
         p.add(S.anim('tidy', 1800, true), S.anim('idle', 400));
         p.run();
       },
-      freeze() {
-        st.eventStatus = 'interrupted';
-        st.doorEvent = '中断';
-        applyLights();
-      },
-      puzzled(ev) {
-        st.eventStatus = 'pending_verification';
-        st.eventTool = (ev.payload && ev.payload.tool) || ev.tool || 'run_command';
-        st.lastPendingTool = st.eventTool;
-        scene.frozen = false;
-        applyLights();
-      },
-      // 用户对结果未知的动作作出决定：从门缝接过决定单，读完后照着做；物件停止闪烁
-      decided(ev, a) {
-        const pl = ev.payload || {};
-        const choice = pl.choice || 'accept_current';
-        const tool = ev.tool || pl.tool || st.lastPendingTool || model.pending_tool || 'run_command';
-        const words = { rerun: '重新执行', accept_current: '按当前实际状态继续', stop: '停止事项' }[choice] || choice;
-        st.eventStatus = choice === 'stop' ? 'cancelled' : 'working';
-        st.eventTool = null;
-        if (choice === 'stop') st.doorEvent = '已停止';
-        applyLights();
+      // 结果未知的动作（3.1）：小人站在原处，头顶黄色问号；处理与依据列在恢复页
+      puzzled(act, a) {
         setPersist(a, null);
         const p = plan(a);
-        p.to(SPOT.door[0] - 14, SPOT.door[1] + 2);
-        p.add(S.turn(1), S.call(() => {
-          scene.fly({ bmp: 'decision', from: [L.door.x + 18, L.door.base - 9], to: [a.x + 6, a.y - 2], ms: 500, arc: 2, ease: 'out' });
-        }), S.anim('crouch', 700), S.hold('decision'), S.icon({ kind: 'text', text: words }), S.anim('read_stand', 1500, true), S.icon(null), S.hold(null));
-        if (choice === 'rerun') {
-          const spot = toolSpot(tool);
-          if (spot === 'terminal') {
-            p.spot('terminal');
-            p.add(S.call(() => scene.after(scene.reduced ? 0 : 450, () => { scene.tween(st, 'lever', 1, 220, 'out'); st.termRun = true; st.exit = null; })), S.anim('lever', 1000), S.anim('watch_r', 1600));
-          } else if (spot === 'cabinet') {
-            p.spot('cabinet');
-            p.add(S.call(() => scene.tween(st, 'drawer', 1, 300, 'out')), S.anim('rummage', 1200), S.call(() => scene.tween(st, 'drawer', 0, 300, 'inOut')));
-          } else if (spot === 'bench') {
-            p.spot('bench');
-            p.add(S.anim('inspect', 1400));
-          } else {
-            p.sit();
-            p.add(S.anim('write', 1400));
-          }
-          p.back();
-        } else if (choice === 'stop') {
-          p.to(a.data.desk.seatX, a.data.desk.seatY);
-          p.add(S.anim('tidy', 1600));
-        } else {
-          p.back();
-          p.add(S.anim('type', 800));
-        }
-        p.run(() => { a.hold = null; });
+        p.stand();
+        p.add(S.icon({ kind: 'question' }), S.anim('puzzled', 1800, true), S.icon(null));
+        p.back();
+        p.run();
       },
-      hold_card(ev) {
-        const pl = ev.payload || {};
+      hold_card(act) {
         st.eventStatus = 'waiting_resume';
-        st.eventCard = pl.missing || pl.text || quoted(ev.label) || '待恢复';
+        st.eventCard = act.text || '待恢复';
         st.doorEvent = '待恢复';
         scene.frozen = false;
         applyLights();
       },
-      resume(ev, a) {
+      resume(act, a) {
         st.eventStatus = 'working';
-        st.eventCard = null; st.eventTool = null;
+        st.eventCard = null;
         st.doorEvent = null;
         scene.frozen = false;
         applyLights();
@@ -1023,9 +921,9 @@
           p.run();
         });
       },
-      assign(ev, a) {
+      assign(act, a) {
         const mgr = byKind('manager') || primary();
-        const target = roleActors().find((x) => x.id === ((ev.payload && ev.payload.to) || ev.role) && x !== mgr) || roleActors().find((x) => x !== mgr);
+        const target = roleActors().find((x) => x.id === act.role && x !== mgr) || roleActors().find((x) => x !== mgr);
         if (!target) return;
         const d = target.data.desk;
         const gs = giveSpot(d);
@@ -1036,18 +934,18 @@
         p.add(S.turn(gs[2]), S.anim('give', undefined, true), S.call(() => {
           keep(target, 'card');
           st.wbTags[target.id] = true;
-          say(ev, target, 'to');
+          say(act, target, 'to');
         }), S.hold(null), S.anim('idle_happy', 400));
         p.back();
         p.run(() => { mgr.hold = null; if (!shown(ds(target), 'card')) keep(target, 'card'); st.wbTags[target.id] = true; });
         if (scene.inTail(target)) scene.run(target, [S.anim('sit_up', 1600)], { tail: 0 });
       },
-      hand_back(ev, a) {
+      hand_back(act, a) {
         const mgr = byKind('manager') || primary();
         const worker = a === mgr ? roleActors().find((x) => x !== mgr) : a;
         if (!worker) return;
         const gs = giveSpot(mgr.data.desk);
-        say(ev, worker);
+        say(act, worker);
         const p = plan(worker);
         p.stand();
         p.add(S.call(() => { drop(worker, 'card'); }), S.hold('card_result'));
@@ -1055,13 +953,13 @@
         p.add(S.turn(gs[2]), S.anim('give', undefined, true), S.call(() => {
           keep(mgr, 'cardResult');
           st.wbDone[worker.id] = true;
-          say(ev, mgr, 'to');
+          say(act, mgr, 'to');
         }), S.hold(null), S.anim('idle_happy', 400));
         p.back();
         p.run(() => { worker.hold = null; if (!shown(ds(mgr), 'cardResult')) keep(mgr, 'cardResult'); st.wbDone[worker.id] = true; });
         if (scene.inTail(mgr)) scene.run(mgr, [S.anim(mgr.seat ? 'sit_happy' : 'idle_happy', 1800)], { tail: 0 });
       },
-      explore(ev, a) {
+      explore(act, a) {
         const ex = byKind('explorer') || a;
         setPersist(ex, null);
         let filed = false;
@@ -1078,7 +976,7 @@
         p.add(S.call(file), S.hold(null), S.anim('sit_happy', 800));
         p.run(() => { ex.alpha = 1; ex.hold = null; st.door = 0; file(); });
       },
-      replan(ev, a) {
+      replan(act, a) {
         const mgr = byKind('manager') || primary();
         // 擦掉后重写：被打断时直接换成新的计划
         let rewritten = false;
@@ -1090,15 +988,14 @@
         p.back();
         p.run(rewrite);
       },
-      semantic(ev, a) {
+      semantic(act, a) {
         const d = a.data.desk;
-        // 卡片数取自 roomModel.semantic_cards；新卡片在飞进柜子之前先不显示
-        if ((model.semantic_cards || 0) > 0) st.cardHide = scene.realT + 5000;
-        scene.fly({ bmp: 'card', from: [d.seatX, ROW_B - 22], to: [L.cards.x + 12, L.cards.base - 32], ms: 900, arc: 30, onDone: () => { st.cardHide = 0; st.cardFlash = scene.realT + 1600; } });
+        // 卡片数取自房间的状态；新卡片的状态等它飞进柜子以后才上画面
+        scene.fly({ bmp: 'card', from: [d.seatX, ROW_B - 22], to: [L.cards.x + 12, L.cards.base - 32], ms: 900, arc: 30, onDone: () => { st.cardFlash = scene.realT + 1600; } });
         if (scene.inTail(a)) scene.run(a, [S.anim(a.seat ? 'sit_up' : 'look_l', 1200)], { tail: 0 });
       },
       // 部署：推车把箱子推进通往机房的门，备份柜先亮一格（Stage 4）
-      deploy(ev, a) {
+      deploy(act, a) {
         const p = plan(a);
         st.cart.box = 'box_sealed';
         st.cart.pushed = true;
@@ -1118,7 +1015,7 @@
         p.run(() => { st.mdoorGlow = 0; st.cart.pushed = false; st.cart.box = null; st.cart.x = 296; });
       },
       // 回滚：从门里取回旧版本的箱子
-      rollback(ev, a) {
+      rollback(act, a) {
         const p = plan(a);
         p.spot('mdoor');
         p.add(S.call(() => { st.mdoorGlow = 1; }), S.anim('reach', 700, true), S.call(() => {
@@ -1128,7 +1025,7 @@
         p.run(() => { a.hold = null; st.mdoorGlow = 0; });
       },
       // 发现故障：跑向监控屏，写故障信件放进通往大厅的管道
-      fault(ev, a) {
+      fault(act, a) {
         const p = plan(a);
         p.stand();
         p.add(S.icon({ kind: 'exclaim' }), S.anim('shock', 400));
@@ -1143,7 +1040,7 @@
         p.run(() => { a.hold = null; st.monitorAlarmUntil = scene.realT + 9000; });
       },
       // 等待模型服务：坐在工位上看着墙上的时钟，灯光调暗，管道停止（Stage 4）
-      wait_provider(ev, a) {
+      wait_provider(act, a) {
         setPersist(a, null);
         st.eventWaiting = true;
         applyLights();
@@ -1153,20 +1050,18 @@
         p.run(() => { st.eventWaiting = false; applyLights(); });
       },
       // 远程执行：走到终端，屏幕上显示机器名称与一根通往门外的线；线上有流动的光点（3.2C）
-      remote_run(ev, a) {
+      remote_run(act, a) {
         setPersist(a, null);
-        const pl = ev.payload || {};
-        st.eventMachine = pl.machine_name || pl.label || model.machine || '登记的机器';
+        st.eventMachine = act.text || model.machine || '登记的机器';
         const p = plan(a);
         p.spot('terminal');
         p.add(S.call(() => scene.after(scene.reduced ? 0 : 400, () => { scene.tween(st, 'lever', 1, 220, 'out'); st.termRun = true; st.exit = null; })), S.anim('lever', 1000), S.anim('watch_r', 2600, true));
         p.run(() => { st.eventMachine = null; st.termRun = false; });
       },
       // 远程动作结果未知：盯着终端，头顶黄色问号；终端屏幕变为雪花（3.2C）
-      remote_unknown(ev, a) {
-        const pl = ev.payload || {};
+      remote_unknown(act, a) {
         st.eventRemote = true;
-        st.eventMachine = pl.machine_name || model.machine || null;
+        st.eventMachine = act.text || model.machine || null;
         st.termRun = false;
         const p = plan(a);
         p.spot('terminal');
@@ -1174,7 +1069,7 @@
         p.run(() => { st.eventRemote = false; });
       },
       // 网络取回：走到门口的邮筒寄出请求，取回资料（3.2B）
-      net_fetch(ev, a) {
+      net_fetch(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.spot('post', 'carry');
@@ -1187,10 +1082,9 @@
         p.run(() => { a.hold = null; st.postFlag = 0; });
       },
       // 调用 MCP 工具：在墙上的工具面板上按下对应的按钮，按钮亮灯（3.2B）
-      mcp_press(ev, a) {
+      mcp_press(act, a) {
         setPersist(a, null);
-        const pl = ev.payload || {};
-        const idx = pl.index !== undefined ? pl.index : pl.button !== undefined ? pl.button : 0;
+        const idx = act.index || 0;
         const panel = model.tool_panel || {};
         const n = (panel.buttons && panel.buttons.length) || panel.buttons || 3;
         const k = Math.max(0, Math.min(n - 1, idx));
@@ -1204,12 +1098,11 @@
         p.run(() => { st.toolLit = -1; });
       },
       // 试用网页或桌面程序：测试工程师坐在试用台前点击与输入；显示器嵌入最近一张截图的缩略图（3.2D）
-      trial(ev, a) {
+      trial(act, a) {
         setPersist(a, null);
-        const pl = ev.payload || {};
         const t = byKind('tester') || a;
-        st.eventStep = pl.step || (model.trial && model.trial.step) || 1;
-        if (pl.text_lines) st.eventLines = pl.text_lines;
+        st.eventStep = act.step || (model.trial && model.trial.step) || 1;
+        if (act.lines) st.eventLines = act.lines;
         if (!st.trialSeat) return;
         const p = plan(t);
         p.to(st.trialSeat.seatX, st.trialSeat.seatY);
@@ -1220,7 +1113,7 @@
         p.run(() => { st.eventStep = 0; st.eventLines = null; });
       },
       // 工程自测网页：工程在自己的显示器前点击，显示器嵌入截图缩略图（3.2D）
-      self_test(ev, a) {
+      self_test(act, a) {
         setPersist(a, { anim: 'type' });
         st.selfShot = true;
         const p = plan(a);
@@ -1229,7 +1122,7 @@
         p.run(() => { st.selfShot = true; });
       },
       // 阅读已有项目：从门口搬来一摞旧档案，逐本阅读，白板出现「现有行为」清单（3.8）
-      read_existing(ev, a) {
+      read_existing(act, a) {
         setPersist(a, null);
         const p = plan(a);
         p.to(SPOT.door[0], SPOT.door[1]);
@@ -1242,10 +1135,9 @@
         p.run(() => { a.hold = null; st.wbExisting = true; });
       },
       // 审查：审查者拿红笔在成果上批注，盖「通过」或「退回」（Stage 5）
-      review(ev, a) {
+      review(act, a) {
         setPersist(a, null);
-        const pl = ev.payload || {};
-        const verdict = pl.verdict === 'return' || pl.verdict === 'reject' ? '退回' : '通过';
+        const verdict = act.verdict === 'return' ? '退回' : '通过';
         const color = verdict === '通过' ? PAL.green2 : PAL.red2;
         const rv = byKind('reviewer') || a;
         const p = plan(rv);
@@ -1256,23 +1148,8 @@
         p.back();
         p.run(() => { st.bench.mark = { text: verdict, color }; });
       },
-      // 经理对外：经理走到管道口与传信管口（Stage 5）
-      manager_out(ev, a) {
-        setPersist(a, null);
-        const mgr = byKind('manager') || a;
-        const p = plan(mgr);
-        p.stand();
-        p.spot('pipe', 'carry');
-        p.add(S.hold('box_sealed'), S.anim('side_reach', 800, true), S.call(() => { mgr.hold = null; }), S.anim('idle', 400));
-        p.spot('tube', 'carry');
-        p.add(S.hold('letter'), S.anim('side_place', 800, true), S.call(() => { mgr.hold = null; }), S.anim('idle', 500));
-        p.back();
-        p.run(() => { mgr.hold = null; });
-      },
-      hold_form(ev, a) {
-        const pl = ev.payload || {};
-        const what = pl.action || (pl.kind === 'external_action' ? '外部动作' : pl.kind) || quoted(ev.label) || '外部动作';
-        const text = '待授权：' + what;
+      hold_form(act, a) {
+        const text = '待授权：' + (act.text || '外部动作');
         // 举着申请单在门口等待（设计说明第 8.3 节）
         const p = plan(a);
         p.stand();
@@ -1285,12 +1162,11 @@
       }
     };
 
-    function commandDone(ev, a) {
-      const pl = ev.payload || {};
-      const code = pl.exit_code;
-      const timedOut = Boolean(pl.timed_out);
+    // 命令结束：act.ok 为命令通过，act.timed_out 为超时
+    function commandDone(act, a) {
+      const timedOut = Boolean(act.timed_out);
       st.termRun = false;
-      st.exit = timedOut ? 'red' : code === 0 ? 'green' : 'red';
+      st.exit = timedOut ? 'red' : act.ok ? 'green' : 'red';
       if (timedOut) st.smokeUntil = scene.realT + 4200;
       scene.tween(st, 'lever', 0, 300, 'inOut');
       const ok = st.exit === 'green';
@@ -1301,16 +1177,13 @@
       p.run();
     }
 
-    // 交接：本部门把包裹放进管道口，或从管道口取出（设计说明第 8.1 与 8.3 节）
-    const ART_BMP = { prd: 'scroll', box: 'box_sealed', defect: 'box_rework', release: 'box_release', letter: 'letter' };
-    function transition(ev) {
-      const pl = ev.payload || {};
-      const art = pl.artifact;
+    // 交接：本部门把包裹放进管道口，或从管道口取出（设计说明第 8.1 与 8.3 节）；act.from、act.to、act.artifact
+    const ART_BMP = { prd: 'scroll', box: 'box_sealed', defect: 'box_rework', release: 'box_release' };
+    handlers.handoff = function handoff(act, a) {
+      const art = act.artifact;
       const bmp = ART_BMP[art];
-      if (!bmp) return;
-      const a = primary();
-      if (pl.from === dept) {
-        say(ev, a, 'from');
+      if (act.from === dept) {
+        say(act, a);
         // 交出的物件先在工作台上或卷轴架上取走
         const p = plan(a);
         p.stand();
@@ -1324,11 +1197,10 @@
         })), S.anim('side_reach', 900, true));
         p.back();
         p.run(() => { a.hold = null; });
-      } else if (pl.to === dept) {
+      } else if (act.to === dept) {
         // 收到的一方在动作开始时说话（v11 第 1 条）：随后从管道口取出，带到工作台或桌上放下
-        say(ev, a, 'to');
+        say(act, a, 'to');
         const p = plan(a);
-        a.data.handoff = true;
         p.spot('pipe');
         p.add(S.call(() => {
           scene.fly({ bmp, from: [L.pipe.x + 10, L.pipe.base - 8], to: [a.x + 6, a.y - 18], ms: 620, arc: 8, ease: 'out', onDone: () => { a.hold = bmp; } });
@@ -1341,102 +1213,111 @@
           p.add(S.anim('place', 700), S.hold(null), S.call(() => arrivalArt(a, art)));
         }
         p.back();
-        p.run(() => { a.hold = null; a.data.handoff = false; });
+        p.run(() => { a.hold = null; });
       }
-    }
+    };
 
-    function playEvent(ev) {
-      if (!ev || !ev.type) throw new Error('playEvent 需要事件对象');
-      const pl = ev.payload || {};
-      const related = !ev.department || ev.department === dept || pl.from === dept || pl.to === dept;
-      if (!related) return;
-      // 提案被接纳或退回后托盘清空
-      if (PROPOSAL_DONE.has(ev.type)) st.trayPaper = false;
-      // 数据中已经加上的卷轴与纸条，在动作把它们放上去之前先不显示
-      if ((ev.type === 'spec_accepted' || ev.type === 'contract_accepted') && dept === 'product' && (model.scrolls || 0) > 0) st.scrollHide = scene.realT + 15000;
-      if (ev.type === 'department_guidance_applied' && (model.pinned_notes || 0) > 0) st.noteHide = scene.realT + 15000;
-      if (ev.type === 'transition') { transition(ev); return; }
-      if (ev.type === 'collaboration_closed') {
-        roleActors().forEach((x) => { if (x.script && x.anim === 'wait') scene.cancel(x); });
-        if (st.eventStatus === 'asking') st.eventStatus = null;
-        return;
+    // -------------------------------------------------------------------------
+    // 播放时间线：什么时候演由时间线决定（timeline.js），每种动作的级别与时长来自声明表（room-decl.js）
+
+    // 做这个动作的小人：分派与重新规划由经理做，探索、审查、试用由对应的角色做，交接与传信由中心角色做，交回结果由交回的角色做
+    function doerOf(act) {
+      const k = act.kind;
+      if (k === 'assign' || k === 'replan') return byKind('manager') || primary();
+      if (k === 'explore') return byKind('explorer') || actorFor(act);
+      if (k === 'review') return byKind('reviewer') || actorFor(act);
+      if (k === 'trial') return byKind('tester') || actorFor(act);
+      if (k === 'handoff' || k === 'send_letter' || k === 'answer_letter') return primary();
+      if (k === 'hand_back') {
+        const mgr = byKind('manager') || primary();
+        const a = actorFor(act);
+        return a === mgr ? roleActors().find((x) => x !== mgr) || a : a;
       }
-      let action = P.resolveAction(ev);
-      // 建档事项（3.8）中读取与搜索工具的 tool_started 播放「阅读已有项目」：接入已有项目设计说明第 3.3 节
-      if (model.existing_read && (action === 'read' || action === 'search')) action = 'read_existing';
-      // 收到询问的部门走到传信管口取信阅读
-      if (action === 'send_letter') {
-        const sides = letterSides(ev);
-        if (sides.answerer === dept && sides.asker !== dept) action = 'answer_letter';
-      }
-      if (!action) {
-        if (ev.type === 'tool_started') {
-          const a = actorFor(ev);
-          setPersist(a, { anim: 'type' });
-          if (!scene.frozen) say(ev, a);
-        }
-        return;
-      }
-      const fn = handlers[action];
-      if (!fn) return;
-      // 分派任务与重新规划由经理做，探索由探索者做；事件的 role 为被分派的角色
-      const a = (action === 'assign' || action === 'replan') ? (byKind('manager') || primary())
-        : action === 'explore' ? (byKind('explorer') || actorFor(ev)) : actorFor(ev);
-      if (scene.frozen && action !== 'resume' && action !== 'puzzled' && action !== 'hold_card') return;
-      if (a.data.role && a.data.role.status === 'away' && action !== 'explore') return;
-      // 只改变房间物件的事件不影响小人正在做和排队的动作
-      if (SIDE_ONLY.has(action)) { say(ev, a); fn(ev, a); return; }
-      // 正在做同一个动作时，重复的事件并入当前动作（告警只延长告警灯）
-      if (!IMMEDIATE.has(action) && !scene.inTail(a) && a.data.doing === action) {
-        if (action === 'run_alarm') st.alarmUntil = scene.realT + 9000;
-        return;
-      }
-      if (action !== 'slump' && action !== 'failed') ds(a).redLamp = false;
-      // 新动作开始时去掉上一个动作留在头顶的图标
-      const start = () => {
-        a.icon = null;
-        a.data.doing = action;
-        a.data.handoff = false;
-        if (!OWN_SPEECH.has(action) && !THINK_ACTIONS.has(action)) say(ev, a);
-        fn(ev, a);
-      };
-      // 状态类动作立即执行；其他动作在当前动作的主要部分做完后执行
-      if (IMMEDIATE.has(action) || scene.inTail(a)) {
-        if (keepPending(a)) {
-          // 交接与盖章先做完：普通的排队动作仍然清掉，状态类动作排在它们后面（v11 第 2 条）
-          a.data.queue = (a.data.queue || []).filter((item) => KEEP_ACTIONS.has(item.action));
-          a.data.queue.push({ fn: start, at: scene.realT, action });
-          return;
-        }
-        a.data.queue = [];
-        start();
-        return;
-      }
-      a.data.queue = a.data.queue || [];
-      a.data.queue.push({ fn: start, at: scene.realT, action });
-      if (a.data.queue.length > 3) {
-        // 队满时挤掉最早的一条；交接与盖章不挤掉（v11 第 2 条）
-        const index = a.data.queue.findIndex((item) => !KEEP_ACTIONS.has(item.action));
-        a.data.queue.splice(index >= 0 ? index : 0, 1);
-      }
+      return actorFor(act);
     }
-    const SIDE_ONLY = new Set(['guidance_in', 'semantic', 'freeze']);
-    // hand_back 由动作自己让交回结果的角色与收下结果的经理各说一句；打字思考时头顶已经有思考气泡
-    const OWN_SPEECH = new Set(['hand_back']);
+    // 只改变房间物件、没有小人要走动的动作
+    const PROPS_ONLY = new Set(['guidance_in', 'semantic', 'hold_card']);
+    // 提案有了结果（盖章或退回），托盘清空
+    const TRAY_CLEAR = new Set(['stamp_valid', 'seal', 'stamp_release', 'stamp_rework', 'returned']);
+    // 动作自己让两端的小人各说一句（交接的两端、交回结果的两端）
+    const OWN_SPEECH = new Set(['hand_back', 'handoff']);
+    // 打字思考时头顶已经有思考气泡，不再说话
     const THINK_ACTIONS = new Set(['type_think', 'stream_text']);
-    const PROPOSAL_DONE = new Set(['spec_accepted', 'contract_accepted', 'plan_accepted', 'delivery_accepted', 'qa_submitted', 'proposal_rejected']);
-    const IMMEDIATE = new Set(['paused', 'failed', 'done', 'cancelled', 'puzzled', 'hold_card', 'resume']);
-    // 交接与盖章这两类先做完（v11 第 2 条）：它们还在做或排在队里时，状态类动作排在它们后面，
-    // 说出的话停留到读得完；队满时也不挤掉它们
-    const KEEP_ACTIONS = new Set(['seal', 'stamp_valid', 'stamp_release', 'stamp_rework']);
 
-    function keepPending(a) {
-      // 正在做或排在队里的交接与盖章（队里的任何一条，不只是队首）
-      if (a.data.handoff) return true;
-      if (a.data.doing && KEEP_ACTIONS.has(a.data.doing)) return true;
-      const q = a.data.queue;
-      return !!(q && q.some((item) => KEEP_ACTIONS.has(item.action)));
+    // 参与方：做它的小人；分派还占着接任务的角色，交回还占着收结果的经理，自动继续占着所有人
+    function lanesOf(act) {
+      if (PROPS_ONLY.has(act.kind)) return [];
+      if (act.kind === 'resume') return roleActors().map((x) => x.id);
+      const a = doerOf(act);
+      if (!a) return [];
+      const lanes = [a.id];
+      if (act.kind === 'assign') {
+        const t = roleActors().find((x) => x.id === act.role && x !== a);
+        if (t) lanes.push(t.id);
+      }
+      if (act.kind === 'hand_back') {
+        const mgr = byKind('manager') || primary();
+        if (mgr && mgr !== a) lanes.push(mgr.id);
+      }
+      return lanes;
     }
+
+    // 时间线上正在演的动作：id → 做它的小人；小人进入收尾步骤（update 里检查）就告诉时间线演完了
+    const runs = new Map();
+
+    function begin(e) {
+      const act = e.action;
+      // 建档事项（3.8）里的阅读与搜索演成「阅读已有项目」（接入已有项目设计说明第 3.3 节）
+      const kind = model.existing_read && (act.kind === 'read' || act.kind === 'search') ? 'read_existing' : act.kind;
+      const a = doerOf(act);
+      if (TRAY_CLEAR.has(kind)) st.trayPaper = false;
+      // 整层静止（中断）或角色外出时不演；自动继续与待恢复的牌子照样演
+      const skip = !a || (scene.frozen && kind !== 'resume' && kind !== 'hold_card') || (a.data.role.status === 'away' && kind !== 'explore');
+      if (skip) { tl.done(e.id); return; }
+      if (PROPS_ONLY.has(kind)) { say(act, a); handlers[kind](act, a); tl.done(e.id); return; }
+      if (kind !== 'slump' && kind !== 'failed') ds(a).redLamp = false;
+      // 新动作开始时去掉上一个动作留在头顶的图标
+      a.icon = null;
+      a.data.doing = kind;
+      a.data.runId = e.id;
+      if (!OWN_SPEECH.has(kind)) say(act, a);
+      handlers[kind](act, a);
+      runs.set(e.id, { actor: a });
+    }
+
+    function cut(e) {
+      runs.delete(e.id);
+      roleActors().forEach((x) => { if (x.data.runId === e.id && x.script) scene.cancel(x); });
+    }
+
+    // 进度：不排队。小人空着时演一小段（思考、整理资料、有想法、等待重试）；正在演时间线上的动作时记下最近的一项，演完以后接上
+    function showProgress(act, a) {
+      if (act.kind === 'tool_progress') { setPersist(a, { anim: 'type' }); say(act, a); return; }
+      if (!THINK_ACTIONS.has(act.kind)) say(act, a);
+      handlers[act.kind](act, a);
+    }
+    function progress(act) {
+      const a = doerOf(act);
+      if (!a || scene.frozen || a.data.role.status === 'away') return;
+      if (runs.has(a.data.runId)) { a.data.pendingProgress = act; return; }
+      showProgress(act, a);
+    }
+    // 流式文字（实时内容）：接在这个小人的进度上
+    function stream(who, text) {
+      progress({ kind: 'stream_text', role: who.role, text, position: 0 });
+    }
+
+    const tl = P.timeline.create({
+      clock: () => scene.realT,
+      classify(act) {
+        const k = P.roomDecl.kinds[act.kind];
+        return { tier: k.tier, ms: k.ms, lanes: lanesOf(act) };
+      },
+      begin,
+      cut,
+      apply,
+      progress
+    });
 
     // -------------------------------------------------------------------------
     // 绘制：背景
@@ -1541,12 +1422,12 @@
       if (!isOps()) paint.window(c, L.window.x, L.window.y, { w: L.window.w, h: L.window.h, night: off }, t);
       paint.clock(c, L.clock.x, L.clock.y, st.clock, { stopped: off });
       paint.whiteboard(c, L.wb.x, L.wb.y, whiteboardOpts(), t);
-      const pinned = Math.max(0, (model.pinned_notes || 0) - (st.noteHide > sc.realT ? 1 : 0));
+      const pinned = model.pinned_notes || 0;
       paint.corkboard(c, L.cork.x, L.cork.y, { w: L.cork.w, h: L.cork.h, notes: pinned, doneIndex: st.replyUntil > sc.realT ? Math.min(pinned, 6) - 1 : -1, label: '部门指导' });
       const doorInfo = paint.door(c, L.door.x, L.door.base, { w: L.door.w, h: L.door.h, open: st.door });
       R(c, L.door.x + 4, L.door.base - L.door.h - 12, L.door.w - 8, 8, PAL.ink);
       R(c, L.door.x + 5, L.door.base - L.door.h - 11, L.door.w - 10, 6, D.main);
-      if (P.levelAtLeast(level, '3.1')) paint.beacon(c, L.beacon.x, L.beacon.y, { on: st.yellow }, t);
+      if (P.levelAtLeast(level, '3.1')) paint.beacon(c, L.beacon.x, L.beacon.y, { on: false }, t);
       if (isOps()) paint.beacon(c, L.back.x + 11, L.back.y !== undefined ? L.back.y : 50, { on: alarmOn(), color: 'red' }, t);
       if (P.levelAtLeast(level, '3.2B')) {
         paint.toolPanel(c, L.tool.x, L.tool.y, { w: L.tool.w, h: L.tool.h, buttons: toolLabels().length, lit: toolLit(), labels: toolLabels() }, t);
@@ -1556,8 +1437,8 @@
 
       // 地面物件与小人：按深度排序
       const items = [];
-      items.push({ y: BASE, draw: () => { paint.cabinet(c, L.cabinet.x, L.cabinet.base, { open: st.drawer, blink: blinkTool('search') }, t); paint.archive(c, L.cabinet.x + 2, L.cabinet.base - 40, { n: model.summaries || 0, flash: sc.realT < st.archiveFlash }, t); } });
-      if (P.levelAtLeast(level, 'S5')) items.push({ y: BASE, draw: () => paint.cardCabinet(c, L.cards.x, L.cards.base, { cards: Math.max(0, (model.semantic_cards || 0) - (st.cardHide > sc.realT ? 1 : 0)), flash: sc.realT < st.cardFlash, label: '语义记录' }, t) });
+      items.push({ y: BASE, draw: () => { paint.cabinet(c, L.cabinet.x, L.cabinet.base, { open: st.drawer, blink: false }, t); paint.archive(c, L.cabinet.x + 2, L.cabinet.base - 40, { n: model.summaries || 0, flash: sc.realT < st.archiveFlash }, t); } });
+      if (P.levelAtLeast(level, 'S5')) items.push({ y: BASE, draw: () => paint.cardCabinet(c, L.cards.x, L.cards.base, { cards: model.semantic_cards || 0, flash: sc.realT < st.cardFlash, label: '语义记录' }, t) });
       items.push({ y: BASE, draw: () => { st.termInfo = paint.terminal(c, L.terminal.x, L.terminal.base, termOpts(), t); } });
       items.push({ y: BASE + 2, draw: () => paint.tray(c, L.tray.x, L.tray.base, { count: st.trayPaper ? 1 : 0 }) });
       items.push({ y: BASE, draw: () => drawBackPiece(c, t) });
@@ -1594,11 +1475,6 @@
 
       // 灯光
       if (st.dark > 0.01) { c.fillStyle = 'rgba(14,12,34,' + st.dark.toFixed(3) + ')'; c.fillRect(0, 0, W, H); }
-      if (st.yellow) {
-        const k = sc.reduced ? 0.1 : 0.07 + 0.05 * Math.sin(t / 240);
-        c.fillStyle = 'rgba(255,196,40,' + k.toFixed(3) + ')';
-        c.fillRect(0, 0, W, H);
-      }
       if (alarmOn()) {
         const k = sc.reduced ? 0.1 : 0.06 + 0.06 * Math.max(0, Math.sin(t / 160));
         c.fillStyle = 'rgba(255,50,50,' + k.toFixed(3) + ')';
@@ -1610,7 +1486,6 @@
       paint.crt(c, L.crt.x, L.crt.y, crtOpts(), t);
       drawScreens(c, t);
       if (dept === 'engineering' && P.levelAtLeast(level, '3.2D') && (st.selfShot || model.self_test)) drawSelfShot(c, t);
-      if (P.levelAtLeast(level, '3.1')) paint.beaconLight(c, L.beacon.x, L.beacon.y, { on: st.yellow, reduced: sc.reduced, len: 90 }, t);
       if (isOps()) paint.beaconLight(c, L.back.x + 11, 50, { on: alarmOn(), color: 'red', reduced: sc.reduced, len: 120 }, t);
       if (st.mailInfo && mailCount() > 0) paint.glow(c, st.mailInfo.lamp[0], st.mailInfo.lamp[1], 7, PAL.yellow2, 0.7);
 
@@ -1671,17 +1546,11 @@
       return [a.x + (a.facing > 0 ? 6 : -32), a.y + 1];
     }
     function mailCount() { return model.mailbox || 0; }
-    function blinkTool(tool) {
-      if (effStatus() !== 'pending_verification') return false;
-      const pt = st.eventTool || model.pending_tool;
-      if (tool === 'desk') return pt === 'edit_range' || pt === 'write_file' || pt === 'read_file' || pt === 'read_range' || (pt && toolSpot(pt) === 'desk');
-      return pt === tool;
-    }
 
     function termOpts() {
       const off = effStatus() === 'interrupted';
       const snow = remoteUnknown();
-      return { lever: st.lever, exit: off ? null : st.exit, screen: off ? 'off' : snow ? 'snow' : st.termRun ? 'term' : 'idle', blink: blinkTool('run_command') || snow };
+      return { lever: st.lever, exit: off ? null : st.exit, screen: off ? 'off' : snow ? 'snow' : st.termRun ? 'term' : 'idle', blink: snow };
     }
 
     // 墙上的 MCP 工具面板：按钮与亮灯（3.2B）
@@ -1750,7 +1619,7 @@
         { k: '状态', v: cr.status || STATUS_TEXT[s] || s, color: STATUS_COLOR[s] },
         { k: '循环', v: cr.cycle ? '第 ' + cr.cycle + ' 轮' : '—' }
       ];
-      return { w: L.crt.w, h: L.crt.h, lines, power, boot: st.crtBoot < 1 ? st.crtBoot : undefined, dim: s === 'idle', cursor: s === 'working', alert: s === 'pending_verification' || s === 'waiting_resume', label: D.name + ' CRT' };
+      return { w: L.crt.w, h: L.crt.h, lines, power, boot: st.crtBoot < 1 ? st.crtBoot : undefined, dim: s === 'idle', cursor: s === 'working', alert: s === 'waiting_resume', label: D.name + ' CRT' };
     }
 
     function whiteboardOpts() {
@@ -1845,7 +1714,6 @@
         P.drawBitmap(c, bs.slip === 'release' ? 'slip_release' : 'slip_defect', cx + 14, b.y - 8);
         if (bs.slipMark) P.stampMark(c, cx + 17, b.y - 8, bs.slipMark.text, bs.slipMark.color, { size: 6, rot: -0.2 });
       }
-      if (blinkTool('run_check')) paint.blinkFrame(c, b.x, b.y - 12, b.w, 24);
     }
 
     function monitorMode(a, d) {
@@ -1856,7 +1724,6 @@
       if (s === 'failed' || ds(a).redLamp) return 'error';
       if (s === 'done') return 'ok';
       if (s === 'idle' || s === 'paused' || s === 'cancelled' || s === 'waiting_resume') return 'idle';
-      if (s === 'pending_verification') return a === primary() ? 'alert' : 'idle';
       if (a.anim === 'write' || (a.data.persist && a.data.persist.write)) return 'diff';
       if (a.anim === 'type' || a.anim === 'think') return 'code';
       return 'idle';
@@ -1885,7 +1752,6 @@
         P.drawActor(c, scene, a, 'front');
         c.restore();
       }
-      if (blinkTool('desk') && a === primary()) paint.blinkFrame(c, d.x + d.w - 22, d.y - 19, 20, 16);
     }
 
     // 灯光之上重画屏幕，暗处的屏幕仍然发光
@@ -1895,8 +1761,7 @@
         const mode = monitorMode(a, d);
         const mx = d.x + d.w - 22 + 3, my = d.y - 19 + 2;
         paint.screen(c, mx, my, 14, 9, mode, t, { seed: d.i, k: st.crtBoot });
-        if (mode !== 'off' && mode !== 'idle') paint.glow(c, mx + 7, my + 4, 12, mode === 'error' ? PAL.red2 : mode === 'alert' ? PAL.yellow2 : PAL.screen3, 0.18);
-        if (blinkTool('desk') && a === primary() && Math.floor(t / 300) % 2 === 0) R(c, mx, my, 14, 9, 'rgba(247,203,70,0.5)');
+        if (mode !== 'off' && mode !== 'idle') paint.glow(c, mx + 7, my + 4, 12, mode === 'error' ? PAL.red2 : PAL.screen3, 0.18);
         if (ds(a).redLamp) {
           const on = scene.reduced || Math.floor(t / 350) % 2 === 0;
           if (on) paint.glow(c, d.x + d.w - 3, d.y - 8, 8, PAL.red2, 0.7);
@@ -1915,29 +1780,24 @@
     // -------------------------------------------------------------------------
     // 接口
 
-    function setModel(m) {
-      if (!m) throw new Error('setModel 需要 roomModel');
-      if (m.department && m.department !== dept) throw new Error('roomModel 的部门与画面不一致：' + m.department);
+    // 一份状态上画面（时间线决定什么时候）。动作在状态之前演完，状态的变化不打断正在演的动作
+    function apply(m) {
+      if (m.department && m.department !== dept) throw new Error('房间的状态与画面的部门不一致：' + m.department);
       const prevStatus = effStatus();
       model = Object.assign({}, m);
       if (m.level && m.level !== level) {
         if (m.level !== 'ui' && !Y13.LEVELS.includes(m.level)) throw new Error('未知档位：' + m.level);
         level = m.level;
       }
-      st.eventStatus = null; st.eventCard = null; st.eventTool = null;
+      st.eventStatus = null; st.eventCard = null;
       st.eventRemote = false; st.eventMachine = null; st.eventWaiting = false; st.eventStep = 0; st.eventLines = null;
-      if (m.pending_tool) st.lastPendingTool = m.pending_tool;
       if (m.door !== undefined) st.doorEvent = null;
       // 白板上的分派标记以角色状态为准
       st.wbTags = {}; st.wbDone = {};
       syncRoles();
       const s = effStatus();
       if (s !== prevStatus) {
-        roleActors().forEach((a) => {
-          if (s === 'interrupted') return;
-          if (a.script && (s === 'waiting_resume' || s === 'pending_verification' || s === 'asking' || prevStatus === 'asking')) scene.cancel(a);
-          if (s !== 'working') { a.data.persist = null; a.data.queue = (a.data.queue || []).filter((item) => KEEP_ACTIONS.has(item.action) || IMMEDIATE.has(item.action)); }
-        });
+        roleActors().forEach((a) => { if (s !== 'interrupted' && s !== 'working') a.data.persist = null; });
         if (s !== 'failed') roleActors().forEach((a) => { if (!a.data.persist) ds(a).redLamp = false; });
       }
       applyLights();
@@ -1947,10 +1807,20 @@
     applyLights();
     st.dark = st.darkTarget;
 
+    Object.keys(P.roomDecl.kinds).forEach((k) => {
+      if (k !== 'tool_progress' && !handlers[k]) throw new Error('房间的声明表里有动作，room.js 没有它的演法：' + k);
+    });
+    const kinds = P.roomDecl.kinds;
     return {
       scene,
-      setModel,
-      playEvent,
+      // 状态：等它之前的动作演完再上画面；jump 清空时间线，直接显示（打开、重新同步、从后台切回）
+      setState: (s) => tl.state(P.contract.roomState(s)),
+      jump: (s) => tl.jump(P.contract.roomState(s)),
+      // 动作：按位置进入时间线
+      play: (a) => tl.push(P.contract.action('房间', a, kinds)),
+      // 实时内容：流式文字
+      stream,
+      inspect: () => ({ model, timeline: tl.inspect() }),
       resize: () => scene.resize(),
       destroy: () => scene.destroy()
     };

@@ -1,13 +1,14 @@
-// 录制：在 v9 页面里播放全部场景，记录项目楼层画面（createFloorScene）收到的每一次调用，
-// 之后由 replay.js 把同一串调用按确定的时钟回放给 v9 与 v12 的楼层画面，比较结果。
-// 用法：node docs/prototypes/v12/checks/record.js [--root <index.html 的 file:// 地址，默认是 v9>] [--out 文件名，默认 recordings.json]
-// 写出 .tmp/v12-checks/<文件名>。在 v9 页面上录的调用给 replay.js 与 v9 逐像素比较；在 v12 页面上录的调用带着部门角色，给 life.js 看多角色。
+// 录制：在 v12（当前定稿）页面里播放全部场景，记录项目楼层画面（createFloorScene）收到的每一次调用，
+// 之后由 replay.js 把同一串调用按确定的时钟回放给 v12 与 v13 的楼层画面，比较结果。v13 的画面只认画面合同，
+// 回放时录到的查询结果和事件经过翻译层再交给它（replay.js 的适配）。
+// 用法：node docs/prototypes/v13/checks/record.js [--root <index.html 的 file:// 地址，默认是 v12>] [--out 文件名，默认 recordings.json]
+// 写出 .tmp/v13-checks/<文件名>。在 v12 页面上录的调用带着部门角色，给 replay.js 与 life.js 用。
 const fs = require('fs');
 const path = require('path');
-const { chromium, EXE, v9Url, outDir, spaceOf } = require('./env');
+const { chromium, EXE, v12Url, outDir, spaceOf } = require('./env');
 
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; };
-const ROOT = arg('root', v9Url);
+const ROOT = arg('root', v12Url);
 const OUT = path.join(outDir, arg('out', 'recordings.json'));
 const { ns, prefix } = spaceOf(ROOT);
 

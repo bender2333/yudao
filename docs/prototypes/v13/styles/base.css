@@ -570,6 +570,9 @@ body.is-version-mismatch .y13-app { display: none; }
 .y13-tb-btn.is-on { background: #9c86ff; color: #16122c; }
 .y13-tb-sim { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 4px 14px 6px; color: #c9cbe2; font-size: 12px; }
 .y13-tb-sim label { display: inline-flex; align-items: center; gap: 6px; }
+.y13-tb-pace input[type="range"] { width: 110px; }
+.y13-tb-pace output { min-width: 56px; font-variant-numeric: tabular-nums; }
+.y13-tb-pace [data-pace-readout] { flex-basis: 100%; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 720px) {
   .y13-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

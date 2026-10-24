@@ -8,10 +8,10 @@
 //   自举试点  覆盖层的档位、H1、H4、H5、覆盖层「来源」的着色、run 层只计有可执行检验的条件、两个新场景（pilotChecks）
 //   v12       事件对照表、删掉的登记与决定、三个部门同时工作、询问链、恢复页七种状态与结果未知的处理、等待机器、
 //             新的决定卡片、成果写回、标签页标题、接口版本按方向（v12Checks）
-// 用法：node docs/prototypes/v12/checks/behaviors.js
+// 用法：node docs/prototypes/v13/checks/behaviors.js
 const fs = require('fs');
 const path = require('path');
-const { chromium, EXE, v12Url } = require('./env');
+const { chromium, EXE, v13Url } = require('./env');
 
 // ---------------------------------------------------------------------------
 // 声明与引擎的分离：去掉注释以后，ecs.js、floor.js、decision-card.js、source-card.js 里不能出现具体的部门名
@@ -29,7 +29,7 @@ function staticChecks() {
 // ---------------------------------------------------------------------------
 // 在页面里运行的检查
 const DRIVER = async () => {
-  const P = window.Y12.pixel;
+  const P = window.Y13.pixel;
   const E = P.ecs;
   const results = [];
   const check = (name, ok, detail) => results.push({ name, ok: Boolean(ok), detail: detail === undefined ? '' : String(detail) });
@@ -57,13 +57,72 @@ const DRIVER = async () => {
     document.body.appendChild(host);
     return { host, canvas };
   };
+  // 检查用的接口：旧的调用形状（楼层的 floorModel 与事件、房间的 roomModel 与事件）经过真正的翻译层交给画面，
+  // 检查走的就是页面上的那条路：查询结果 → 状态，事件 → 动作。第一次放状态直接显示，之后的状态等它之前的动作演完
+  const T = window.Y13.translate;
+  let pos = 0;
+  const rolesOf = (roles) => Object.values(roles || {}).reduce((l, r) => l.concat(r), []);
+  const namer = (roles) => ({ roleName: (id) => { const h = roles.find((r) => r.id === id || r.kind === id); return h ? h.name : null; } });
+  // 交接与传信是画面合同里直接的动作（检查用画面层的说法，不借事件）
+  const direct = (ev, ctx) => {
+    const pl = ev.payload || {};
+    if (ev.type === 'transition') return [Object.assign({ kind: 'handoff', item: ev.work_item_id || null, from: pl.from, to: pl.to, artifact: pl.artifact }, T.sayHandoff(pl.artifact, pl.from, pl.to))];
+    return null;
+  };
+  const adaptFloor = (fl) => {
+    let roles = [];
+    let first = true;
+    fl.setModel = (model) => {
+      const m = clone(model);
+      roles = rolesOf(m.roles);
+      const s = T.floor.state({ position: ++pos, loop: m, roles: m.roles, focus: m.focus_id });
+      if (first) { fl.jump(s); first = false; } else fl.setState(s);
+      fl.setDecisions(m.decisions || []);
+    };
+    fl.playEvent = (ev) => {
+      const e = Object.assign({ position: ++pos }, clone(ev));
+      (direct(e) || T.floor.actions(e, namer(roles))).forEach((a) => fl.play(Object.assign({ position: e.position }, a)));
+    };
+    return fl;
+  };
+  const adaptRoom = (rm, dept) => {
+    let roles = [];
+    let first = true;
+    rm.setModel = (model) => {
+      const m = clone(model);
+      roles = m.roles || [];
+      const s = T.room.state({ position: ++pos, workspace: { room: m } });
+      if (first) { rm.jump(s); first = false; } else rm.setState(s);
+    };
+    rm.playEvent = (ev) => {
+      const e = Object.assign({ position: ++pos }, clone(ev));
+      const d = direct(e);
+      if (d) { if (d[0].from === dept || d[0].to === dept) rm.play(Object.assign({ position: e.position, room: dept }, d[0])); return; }
+      T.room.actions(e, dept, namer(roles)).forEach((a) => rm.play(a));
+    };
+    return rm;
+  };
+  const adaptBuilding = (bld, room) => {
+    bld.setModel = (m) => bld.jump(Object.assign({ position: ++pos }, clone(m)));
+    if (room) room.setModel = (m) => room.jump(Object.assign({ position: ++pos }, clone(m)));
+    bld.playEvent = (ev) => {
+      const e = Object.assign({ position: ++pos }, clone(ev));
+      T.building.actions(e).forEach((a) => {
+        if (a.kind.indexOf('machine_') === 0) { if (room) room.play(a); } else bld.play(a);
+      });
+    };
+    if (room) room.playEvent = bld.playEvent;
+    return bld;
+  };
   const mountFloor = (model, opts) => {
     const b = box();
-    const fl = P.createFloorScene(b.canvas, opts || {});
-    fl.setModel(clone(model));
+    const fl = adaptFloor(P.createFloorScene(b.canvas, opts || {}));
+    fl.setModel(model);
     return Object.assign(b, { fl });
   };
   const drop = (m) => { m.fl.destroy(); m.host.remove(); };
+  // 一个任务正在做的事：队列里的任务，或者进度合并成的姿势
+  const doing = (m, c) => c.current || (c.progress && c.progress.until > m.fl.scene.realT ? c.progress : null);
 
   const role = (id, kind, name, status) => ({ id, kind, name, status: status || 'idle', task: null });
   const ROLES = {
@@ -98,14 +157,14 @@ const DRIVER = async () => {
     m.fl.playEvent(ev('model_request_serialized', 'e-arch'));
     step(600);
     ins = m.fl.inspect();
-    const busy = E.charsOf(ins.world, 'engineering').filter((c) => c.current);
-    check('多角色：同一个部门里至少 4 个角色同时有正在做的任务', busy.length >= 4, busy.map((c) => c.id + ':' + c.current.taskKey).join(' '));
-    check('多角色：任务各不相同', new Set(busy.map((c) => c.current.taskKey)).size >= 4, busy.map((c) => c.current.taskKey).join(' '));
-    check('多角色：分派任务由经理做', ins.world.characters['e-mgr'].current && ins.world.characters['e-mgr'].current.taskKey === 'x_role_task_assigned');
+    const busy = E.charsOf(ins.world, 'engineering').filter((c) => doing(m, c));
+    check('多角色：同一个部门里至少 4 个角色同时有正在做的任务', busy.length >= 4, busy.map((c) => c.id + ':' + doing(m, c).taskKey).join(' '));
+    check('多角色：任务各不相同', new Set(busy.map((c) => doing(m, c).taskKey)).size >= 4, busy.map((c) => doing(m, c).taskKey).join(' '));
+    check('多角色：分派任务由经理做', ins.world.characters['e-mgr'].current && ins.world.characters['e-mgr'].current.taskKey === 'assign');
     check('多角色：分派走到接任务的角色的工位旁', ins.world.characters['e-mgr'].current && ins.world.characters['e-mgr'].current.withId === 'e-lead');
-    check('多角色：探索者查资料', ins.world.characters['e-exp'].current && ins.world.characters['e-exp'].current.taskKey === 'x_explorer_fetch');
-    check('多角色：审查者盖章', ins.world.characters['e-rev'].current && ins.world.characters['e-rev'].current.taskKey === 'x_review_recorded_passed');
-    check('多角色：架构师打字', ins.world.characters['e-arch'].current && ins.world.characters['e-arch'].current.taskKey === 'model_requested');
+    check('多角色：探索者查资料', ins.world.characters['e-exp'].current && ins.world.characters['e-exp'].current.taskKey === 'explore');
+    check('多角色：审查者盖章', ins.world.characters['e-rev'].current && ins.world.characters['e-rev'].current.taskKey === 'review_pass');
+    check('多角色：架构师打字（进度一级，合并成坐在桌前的姿势）', doing(m, ins.world.characters['e-arch']) && doing(m, ins.world.characters['e-arch']).taskKey === 'think');
     // 交回结果：工具角色走向经理，经理收下
     m.fl.playEvent(ev('x_role_result_returned', 'e-lead', { to: 'e-lead' }));
     step(6000);
@@ -159,7 +218,7 @@ const DRIVER = async () => {
     if (victim) {
       m.fl.playEvent({ type: 'model_request_serialized', department: 'engineering', role: victim.id, work_item_id: 'w1', payload: {} });
       step(100);
-      check('自主行为：真正的任务来了，待机活动立刻放弃', victim.current && victim.current.taskKey === 'model_requested', victim.current && victim.current.taskKey);
+      check('自主行为：真正的任务来了，待机活动立刻放弃', doing(m, victim) && doing(m, victim).taskKey === 'think' && !(victim.current && victim.current.idle), doing(m, victim) && doing(m, victim).taskKey);
     }
     E.enqueue = orig;
     drop(m);
@@ -191,6 +250,7 @@ const DRIVER = async () => {
     // ------------------------------------------------------------------ 机房与楼
     let b = box();
     const room = P.createMachineRoomScene(b.canvas, {});
+    adaptBuilding({ jump() {}, play() {} }, room);
     room.setModel({
       machines: [{ id: 'm1', name: '主机', kind: 'host', online: true, containers: 2, actions: [], runtime_for: [], late_receipts: [] }],
       links: [{ project_id: 'p1', color_index: 0, machine_id: 'm1', active: true }]
@@ -210,7 +270,8 @@ const DRIVER = async () => {
     room.destroy(); b.host.remove();
     b = box();
     const bld = P.createBuildingScene(b.canvas, {});
-    bld.setModel({ floors: [{ project_id: 'p1', name: 'p1', status: 'running', lit: {}, has_ops: false, flags: [], valve_closed: false, machine_ids: ['m1'], link_active: true, decisions: 0, runtime_machine: null }], show_basement: true });
+    adaptBuilding(bld, null);
+    bld.setModel({ floors: [{ project_id: 'p1', name: 'p1', status: 'working', lit: {}, has_ops: false, flags: [], valve_closed: false, machine_ids: ['m1'], link_active: true, decisions: 0, runtime_machine: null }], show_basement: true });
     check('楼：通往机房的管线是管道实体', Boolean(bld.inspect().world.links['floor:p1>basement']));
     bld.playEvent({ type: 'x_remote_action_started', project_id: 'p1', payload: { machine_id: 'm1' } });
     step(200);
@@ -293,7 +354,7 @@ const DRIVER = async () => {
     // 回答的方向：回答方是事件所在的部门
     m = mountFloor(MODEL());
     step(500);
-    m.fl.playEvent({ type: 'collaboration_responded', department: 'product', work_item_id: 'w1', payload: { from: 'product', to: 'engineering', request_id: 'q1' } });
+    m.fl.playEvent({ type: 'ask_answered', department: 'product', work_item_id: 'w1', payload: { ask_id: 'q1', requester: 'engineering', recipient: 'product' } });
     step(200);
     ins = m.fl.inspect();
     const answerTask = ins.world.characters['p-mgr'].current || ins.world.characters['p-mgr'].queue[0];
@@ -302,7 +363,7 @@ const DRIVER = async () => {
     for (let i = 0; i < 60 && !flew; i++) { step(100); flew = Object.values(m.fl.inspect().world.packages).some((pk) => pk.transit && pk.transit.linkKey === 'product~engineering'); }
     check('询问的回答：回信沿产品到工程的传信管走', flew);
     drop(m);
-    // 快照里运维数据出现：房间重新声明，在途的包裹、角色与任务原样保留
+    // 状态里运维数据出现：状态等在途的交接演完才上画面；上画面时房间重新声明，角色实体原样保留
     m = mountFloor(MODEL());
     step(500);
     m.fl.playEvent({ type: 'transition', work_item_id: 'w1', payload: { from: 'engineering', to: 'quality', artifact: 'box' } });
@@ -312,11 +373,12 @@ const DRIVER = async () => {
     m.fl.setModel(clone(MODEL({ ops: { version: 'r1', fault: false } })));
     step(100);
     ins = m.fl.inspect();
-    check('运维数据出现：房间重新声明，运维房间出现', ins.world.roomOrder.indexOf('operations') >= 0);
-    check('运维数据出现：在途的包裹与原来的角色实体保留', inFlightPk === 1 && Object.keys(ins.world.packages).length === 1 && ins.world.characters['e-mgr'] === before);
+    check('运维数据出现：交接还在演时，新状态等着，房间还没有重新声明', inFlightPk === 1 && ins.world.roomOrder.indexOf('operations') < 0 && ins.timeline.pending === 1, JSON.stringify({ inFlightPk, pending: ins.timeline.pending }));
+    check('运维数据出现：交接没有被新状态打断', Object.keys(ins.world.packages).length === 1);
     step(8000);
     ins = m.fl.inspect();
-    check('运维数据出现：包裹照常走完，接收方的经理取出', Object.keys(ins.world.packages).length === 0 && !ins.world.characters['q-mgr'].current && !ins.world.characters['q-mgr'].queue.length);
+    check('运维数据出现：交接演完以后状态上画面，运维房间出现，角色实体原样保留', ins.world.roomOrder.indexOf('operations') >= 0 && ins.world.characters['e-mgr'] === before && ins.timeline.pending === 0, ins.world.roomOrder.join());
+    check('运维数据出现：包裹走完，接收方的经理取出', Object.keys(ins.world.packages).length === 0 && !ins.world.characters['q-mgr'].current && !ins.world.characters['q-mgr'].queue.length);
     drop(m);
     // 决定请求发出：提出决定的部门的经理走到门口送出决定单
     m = mountFloor(MODEL({ decisions: [face('d3')] }));
@@ -325,7 +387,7 @@ const DRIVER = async () => {
     step(200);
     ins = m.fl.inspect();
     const post = ins.world.characters['e-mgr'].current || ins.world.characters['e-mgr'].queue[0];
-    check('决定卡片：提出决定的部门的经理去门口送决定单', post && post.taskKey === 'x_decision_issued', post && post.taskKey);
+    check('决定卡片：提出决定的部门的经理去门口送决定单', post && post.taskKey === 'decision_give', post && post.taskKey);
     let flying = 0;
     for (let i = 0; i < 80 && !flying; i++) { step(100); flying = m.fl.scene.flyers.length; }
     check('决定卡片：送出以后决定单飞向大厅的板子', flying === 1, flying);
@@ -335,27 +397,29 @@ const DRIVER = async () => {
 
     // ------------------------------------------------------------------ 说话气泡
     // 目录：每个会引起动作的事件都有一句话；话的内容来自事件已经带着的事实
-    const say = (ev) => P.say(ev);
-    check('说话气泡：每个会引起动作的事件类型都在目录里', Object.keys(P.EVENT_ACTIONS).every((k) => k in P.say.catalog), Object.keys(P.EVENT_ACTIONS).filter((k) => !(k in P.say.catalog)).join());
+    const say = (ev) => T.say(ev);
+    // 翻译层在房间里翻出的每种动作，事件都有一句话（目录里有，或者取事件说明）
+    // （交接的两端、询问与回答的话由翻译层单独写：sayHandoff、sayAsk、sayAnswer）
+    const speaking = T.coverage.room.drawn.filter((k) => !['model_stream_progress', 'structure_accepted', 'ask_started', 'ask_answered'].includes(k) && !(k in T.say.catalog));
+    check('说话气泡：房间里会引起动作的事件类型都在目录里', speaking.length === 0, speaking.join());
     check('说话气泡：提交事件取事件说明里「提交」后面的部分',
       say({ type: 'proposal_submitted', department: 'engineering', label: '工程经理代表部门提交交付说明', payload: {} }) === '现在提交交付说明');
     check('说话气泡：提交事件带着提案种类时用提案种类', say({ type: 'proposal_submitted', department: 'quality', payload: { kind: 'qa_review' } }) === '现在提交质检结论');
     check('说话气泡：工具事件的话带着文件名', say({ type: 'tool_started', tool: 'edit_range', department: 'engineering', label: '工程部门按区间编辑 app.js：导出为 CSV', payload: {} }) === '现在编辑 app.js');
     check('说话气泡：命令的话带着事件说明末尾的命令名', say({ type: 'tool_started', tool: 'run_command', department: 'engineering', label: '工程部门走到终端执行命令 npm_test', payload: {} }) === '现在执行 npm_test');
     check('说话气泡：bash 工具的话写命令原文（ADR-0038）', say({ type: 'tool_started', department: 'engineering', label: '工程部门执行命令', payload: { tool: 'bash', command: 'npm test' } }) === '现在执行 npm test');
-    check('说话气泡：交接的两端说不同的话',
-      P.say({ type: 'transition', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, { dept: 'engineering' }) === '现在把交付箱送给质检'
-      && P.say({ type: 'transition', payload: { from: 'engineering', to: 'quality', artifact: 'box' } }, { dept: 'quality' }) === '收到交付箱，来自工程');
+    const hs = T.sayHandoff('box', 'engineering', 'quality');
+    check('说话气泡：交接的两端说不同的话', hs.say === '现在把交付箱送给质检' && hs.sayTo === '收到交付箱，来自工程', JSON.stringify(hs));
 
     // 部门房间：工程经理提交交付说明时头顶冒泡
     const roomModel = (department, roles) => ({
-      department, level: 'S5', status: 'working', crt: {}, roles, pose: null, door: null, hold_card: null, pending_tool: null,
+      department, level: 'S5', status: 'working', crt: {}, roles, pose: null, door: null, hold_card: null,
       mailbox: 0, summaries: 0, scrolls: 0, pinned_notes: 0, semantic_cards: 0, machine: null, remote_unknown: false,
       waiting_provider: false, pipes: null, existing_read: false, trial: null, tool_panel: null, self_test: null
     });
     const mountRoom = (department, roles) => {
       const bx = box();
-      const rm = P.createRoomScene(bx.canvas, { department });
+      const rm = adaptRoom(P.createRoomScene(bx.canvas, { department }), department);
       rm.setModel(roomModel(department, roles));
       return Object.assign(bx, { rm });
     };
@@ -415,8 +479,8 @@ const DRIVER = async () => {
     dropRoom(qr);
     dropRoom(rm);
     // 询问与回答：发问方、回答方各说各的；收到询问的房间走到传信管口取信，而不是写信
-    const ask = { type: 'collaboration_requested', department: 'engineering', work_item_id: 'w1', label: '工程询问产品：线路偏好是否改变最短距离', payload: { from: 'engineering', to: 'product', request_id: 'q1' } };
-    const reply = { type: 'collaboration_responded', department: 'product', work_item_id: 'w1', label: '产品回答：不改变', payload: { from: 'product', to: 'engineering', request_id: 'q1' } };
+    const ask = { type: 'ask_started', department: 'engineering', work_item_id: 'w1', label: '工程询问产品：线路偏好是否改变最短距离', payload: { ask_id: 'q1', requester: 'engineering', recipient: 'product', question: '线路偏好是否改变最短距离' } };
+    const reply = { type: 'ask_answered', department: 'product', work_item_id: 'w1', label: '产品回答：不改变', payload: { ask_id: 'q1', requester: 'engineering', recipient: 'product', answer: '不改变' } };
     rm = mountRoom('engineering', engRoles);
     const pr = mountRoom('product', proR);
     step(500);
@@ -500,7 +564,7 @@ const DRIVER = async () => {
     m.fl.playEvent({ type: 'x_deployed', work_item_id: 'w1', payload: { version: 'r1', machine_id: 'm1' } });
     step(200);
     const opsCh = Object.values(m.fl.inspect().world.characters).find((c) => c.department === 'operations');
-    check('声明：运维的部署事件变成运维小人的任务', opsCh && opsCh.current && opsCh.current.taskKey === 'x_deployed', opsCh && opsCh.current && opsCh.current.taskKey);
+    check('声明：运维的部署事件变成运维小人的任务', opsCh && opsCh.current && opsCh.current.taskKey === 'deploy', opsCh && opsCh.current && opsCh.current.taskKey);
     drop(m);
     D.rooms.splice(opsAt, 1);
     m = mountFloor(opsModel);
@@ -516,12 +580,13 @@ const DRIVER = async () => {
       id: 'audit', label: '审计', roomKind: 'dept', w: 100, agentKind: 'agent', ports: ['in', 'out'],
       props(c, r) { c.fillStyle = '#5a6070'; c.fillRect(r.x + r.w - 30, 190, 20, 12); }
     });
-    D.tasks.x_audit_done = { dept: 'audit', label: '审计完成', spot: 'desk', pose: 'sit_happy', bubble: 'say', ms: 800 };
+    D.tasks.audit_done = { tier: 'normal', dept: 'audit', label: '审计完成', spot: 'desk', pose: 'sit_happy', bubble: 'say', ms: 800 };
+    D.kinds.audit_done = { tier: 'normal', ms: 800 };
     let threw = null;
     try {
       m = mountFloor(MODEL());
       step(300);
-      m.fl.playEvent({ type: 'x_audit_done', work_item_id: 'w1', payload: {} });
+      m.fl.play({ kind: 'audit_done', position: ++pos, item: 'w1', room: 'audit' });
       step(200);
       ins = m.fl.inspect();
       const order = ins.world.roomOrder;
@@ -529,14 +594,15 @@ const DRIVER = async () => {
       const rooms = order.map((id) => ins.world.rooms[id]);
       check('声明：新房间与其他房间不重叠', rooms.every((r, i) => i === 0 || r.x >= rooms[i - 1].x + rooms[i - 1].w));
       check('声明：新房间里有它的小人', Object.values(ins.world.characters).some((c) => c.department === 'audit'));
-      check('声明：新任务落在新房间的小人身上', ins.world.characters.audit && ins.world.characters.audit.current && ins.world.characters.audit.current.taskKey === 'x_audit_done');
+      check('声明：新任务落在新房间的小人身上', ins.world.characters.audit && ins.world.characters.audit.current && ins.world.characters.audit.current.taskKey === 'audit_done');
       m.fl.scene.drawNow();
       drop(m);
     } catch (e) {
       threw = e;
     }
     D.rooms.splice(0, D.rooms.length, ...savedRooms);
-    delete D.tasks.x_audit_done;
+    delete D.tasks.audit_done;
+    delete D.kinds.audit_done;
     delete P.DEPTS.audit;
     check('声明：加一个只有声明的房间不抛出错误', !threw, threw && (threw.stack || threw).toString().slice(0, 300));
   } catch (e) {
@@ -556,21 +622,21 @@ async function pilotChecks(ctx) {
     const errs = [];
     p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
     p.on('pageerror', (e) => errs.push(String(e)));
-    await p.addInitScript((lv) => sessionStorage.setItem('y12.level', JSON.stringify(lv)), level);
-    await p.goto(v12Url + hash);
+    await p.addInitScript((lv) => sessionStorage.setItem('y13.level', JSON.stringify(lv)), level);
+    await p.goto(v13Url + hash);
     await p.waitForTimeout(1200);
     return { p, errs };
   };
   // 在页面里用到的小工具：当前楼层、按事实元素的位置点击画布
   const helpers = () => {
-    window.__fl = () => window.Y12.scenes.activeFloor().floor;
+    window.__fl = () => window.Y13.scenes.activeFloor().floor;
     window.__click = (f) => {
       const cv = window.__fl().scene.canvas;
       const b = cv.getBoundingClientRect();
       cv.dispatchEvent(new MouseEvent('click', { clientX: b.left + ((f.rect.x + f.rect.w / 2) * b.width) / 640, clientY: b.top + ((f.rect.y + f.rect.h / 2) * b.height) / 320, bubbles: true }));
     };
     window.__texts = () => {
-      const P = window.Y12.pixel;
+      const P = window.Y13.pixel;
       const orig = P.text;
       const seen = [];
       P.text = function (c, str) { seen.push(String(str)); return orig.apply(this, arguments); };
@@ -583,7 +649,7 @@ async function pilotChecks(ctx) {
   // 覆盖层与查询的档位；事件对象的 source
   {
     const { p, errs } = await open('3.2D', '#/sys/machines');
-    const capsAt = (lv) => p.evaluate((l) => { window.Y12.level.set(l); const c = window.Y12.cap.get(); return { ov: c.overlays.map((o) => o.id), q: c.queries.map((x) => x.name) }; }, lv);
+    const capsAt = (lv) => p.evaluate((l) => { window.Y13.level.set(l); const c = window.Y13.cap.get(); return { ov: c.overlays.map((o) => o.id), q: c.queries.map((x) => x.name) }; }, lv);
     const d = await capsAt('3.2D');
     const pl = await capsAt('pilot');
     const NEW = ['loops', 'sources', 'coverage'];
@@ -591,7 +657,7 @@ async function pilotChecks(ctx) {
     push('覆盖层：自举试点起列出「循环」「来源」「检验」', NEW.every((id) => pl.ov.includes(id)), pl.ov.join());
     push('查询：acceptance.coverage 与 run.loops 在自举试点出现，3.2D 档没有', !d.q.includes('acceptance.coverage') && !d.q.includes('run.loops') && pl.q.includes('acceptance.coverage') && pl.q.includes('run.loops'));
     const src = await p.evaluate(() => {
-      const Y = window.Y12;
+      const Y = window.Y13;
       Y.level.set('3.2D');
       const a = Y.api.query('event.detail', { position: 5 }).data.event;
       Y.level.set('pilot');
@@ -612,11 +678,11 @@ async function pilotChecks(ctx) {
     await p.waitForTimeout(500);
     const loops = await p.evaluate(() => {
       const ins = window.__fl().inspect();
-      const q = window.Y12.api.query('run.loops', { project_id: 'p-todo' }).data;
+      const q = window.Y13.api.query('run.loops', { project_id: 'p-todo' }).data;
       const byId = {};
       [q.project].concat(...q.items.map((i) => i.instances)).forEach((x) => { byId[x.id] = x; });
       const labels = ins.overlay.labels.filter((l) => l.id);
-      const bad = labels.filter((l) => !byId[l.id] || byId[l.id].state !== l.state || l.text.indexOf(window.Y12.pixel.LOOP_STATES[l.state].label) < 0);
+      const bad = labels.filter((l) => !byId[l.id] || byId[l.id].state !== l.state || l.text.indexOf(window.Y13.pixel.LOOP_STATES[l.state].label) < 0);
       const missing = ins.facts.filter((f) => f.kind === 'missing');
       return { n: labels.length, layers: Array.from(new Set(labels.map((l) => l.layer))), bad, missing: missing.length, missingText: missing.every((f) => f.missing && !f.position) };
     });
@@ -627,7 +693,7 @@ async function pilotChecks(ctx) {
     const cov = await p.evaluate(async () => {
       const fl = window.__fl();
       const ins = fl.inspect();
-      const q = window.Y12.api.query('acceptance.coverage', { project_id: 'p-todo' }).data.items;
+      const q = window.Y13.api.query('acceptance.coverage', { project_id: 'p-todo' }).data.items;
       const l = ins.overlay.labels.find((x) => x.kind === 'coverage');
       const it = l && q.find((x) => x.work_item_id === l.work_item_id);
       const rel = ins.overlay.labels.find((x) => x.kind === 'release');
@@ -638,8 +704,8 @@ async function pilotChecks(ctx) {
       const openRows = s && s.rows ? s.rows.filter((r) => r.open).map((r) => r.label.split(' ')[0]) : null;
       const drawn = window.__texts().filter((t) => t === '开环').length;
       return {
-        same: Boolean(it) && ['covered', 'total', 'model_read', 'open_count'].every((k) => it[k] === l[k]) && l.text.indexOf(window.Y12.coverageText(it)) >= 0 &&
-          s && s.title.indexOf(window.Y12.coverageText(it)) >= 0,
+        same: Boolean(it) && ['covered', 'total', 'model_read', 'open_count'].every((k) => it[k] === l[k]) && l.text.indexOf(window.Y13.coverageText(it)) >= 0 &&
+          s && s.title.indexOf(window.Y13.coverageText(it)) >= 0,
         rel: Boolean(relIt) && relIt.release.ratio.covered === rel.covered && relIt.release.ratio.total === rel.total,
         list: s && s.mode, openRows, openIds: it ? it.criteria.filter((c) => c.open).map((c) => c.id) : null, drawn, label: l
       };
@@ -657,9 +723,9 @@ async function pilotChecks(ctx) {
     const r = await p.evaluate((w) => {
       const rows = Array.from(document.querySelectorAll('#mt-qa tr[data-criterion]'));
       const openRows = rows.filter((tr) => tr.dataset.open === '1');
-      const tagged = openRows.every((tr) => tr.querySelector('.y12-tag.is-open') && tr.querySelector('.y12-tag.is-open').textContent === '开环');
-      const untagged = rows.filter((tr) => tr.dataset.open !== '1').every((tr) => !tr.querySelector('.y12-tag.is-open'));
-      const cov = window.Y12.api.query('acceptance.coverage', { project_id: 'p-todo', work_item_id: w }).data.items[0];
+      const tagged = openRows.every((tr) => tr.querySelector('.y13-tag.is-open') && tr.querySelector('.y13-tag.is-open').textContent === '开环');
+      const untagged = rows.filter((tr) => tr.dataset.open !== '1').every((tr) => !tr.querySelector('.y13-tag.is-open'));
+      const cov = window.Y13.api.query('acceptance.coverage', { project_id: 'p-todo', work_item_id: w }).data.items[0];
       const ids = new Set(openRows.map((tr) => tr.dataset.criterion));
       return { rows: rows.length, open: openRows.length, tagged, untagged, covOpen: cov.criteria.filter((c) => c.open).map((c) => c.id), inTable: cov.criteria.filter((c) => c.open).every((c) => ids.has(c.id)) };
     }, wid);
@@ -674,7 +740,7 @@ async function pilotChecks(ctx) {
       const { p, errs } = await open(level, '#/p/' + pid + '/overview');
       await p.evaluate(helpers);
       const r = await p.evaluate(async () => {
-        const Y = window.Y12;
+        const Y = window.Y13;
         const fl = window.__fl();
         fl.scene.drawNow();
         const ins = fl.inspect();
@@ -711,9 +777,9 @@ async function pilotChecks(ctx) {
     await p.waitForTimeout(500);
     const r = await p.evaluate(async () => {
       const fl = window.__fl();
-      const it = window.Y12.api.query('acceptance.coverage', { project_id: 'p-todo', work_item_id: 'w-todo-base' }).data.items[0];
+      const it = window.Y13.api.query('acceptance.coverage', { project_id: 'p-todo', work_item_id: 'w-todo-base' }).data.items[0];
       const ac8 = it.criteria.find((c) => c.id === 'AC-8');
-      const ev = window.Y12.api.query('event.detail', { position: ac8.position }).data.event;
+      const ev = window.Y13.api.query('event.detail', { position: ac8.position }).data.event;
       fl.openFact('coverage');
       await window.__wait(300);
       const row = fl.inspect().sourceCard.state().rows.find((x) => x.label.indexOf('AC-8') === 0);
@@ -747,7 +813,7 @@ async function pilotChecks(ctx) {
     await p.waitForTimeout(500);
     const after = await pixelsAt([spotIn, spotOut, [inside.rect.x - 1.5, inside.rect.y + inside.rect.h / 2]]);
     const r = await p.evaluate((src) => {
-      const P = window.Y12.pixel;
+      const P = window.Y13.pixel;
       const ins = window.__fl().inspect();
       const label = ins.overlay.labels.find((l) => l.kind === 'sources');
       const tally = {};
@@ -767,7 +833,7 @@ async function pilotChecks(ctx) {
   {
     const { p, errs } = await open('pilot', '#/home');
     const r = await p.evaluate(async () => {
-      const Y = window.Y12;
+      const Y = window.Y13;
       const wait = (ms) => new Promise((res) => setTimeout(res, ms));
       const ids = Y.api.query('home.away_report', {}).data.summary.map((s) => s.id);
       const play = async (id, probe) => {
@@ -789,10 +855,10 @@ async function pilotChecks(ctx) {
       });
       const csv = Y.api.query('run.loops', { project_id: 'p-todo' }).data.items.find((i) => i.work_item_id === 'w-todo-csv').instances.find((x) => x.layer === 'run');
       const change = Y.api.query('home.away_report', {}).data.summary.find((s) => s.id === 'loop_changes').changes.find((c) => c.work_item_id === 'w-todo-csv');
-      const openRow = document.querySelector('#obs-loop .y12-loop-row.is-open');
-      const bars = document.querySelectorAll('#obs-loop .y12-loop-detail .y12-loop-bar').length;
-      const kinds = Array.from(document.querySelectorAll('#obs-loop .y12-loop-detail .y12-loop-bar .y12-source-kind')).map((el) => el.textContent);
-      const opens = Array.from(document.querySelectorAll('#obs-loop .y12-loop-detail .y12-loop-open')).map((el) => el.textContent);
+      const openRow = document.querySelector('#obs-loop .y13-loop-row.is-open');
+      const bars = document.querySelectorAll('#obs-loop .y13-loop-detail .y13-loop-bar').length;
+      const kinds = Array.from(document.querySelectorAll('#obs-loop .y13-loop-detail .y13-loop-bar .y13-source-kind')).map((el) => el.textContent);
+      const opens = Array.from(document.querySelectorAll('#obs-loop .y13-loop-detail .y13-loop-open')).map((el) => el.textContent);
       const s21 = await play('sc-todo-sources', (n, seen) => {
         const f = Y.scenes.activeFloor();
         const st = f && f.floor.inspect().sourceCard.state();
@@ -804,7 +870,7 @@ async function pilotChecks(ctx) {
         if (n === 7) seen.materials = document.querySelectorAll('#mt-qa tr[data-open="1"]').length;
       });
       await wait(400);
-      const item = document.querySelector('.y12-report-item.is-open');
+      const item = document.querySelector('.y13-report-item.is-open');
       return {
         ids, s20, state: csv.state, values: csv.measure.series.map((x) => x.value), sources: csv.measure.series.map((x) => x.source), opensData: csv.measure.series.map((x) => x.open),
         basis: csv.basis, change, open: openRow && openRow.dataset.id, bars, kinds, opens, s21, report: item ? item.textContent : null
@@ -839,14 +905,15 @@ async function v12Checks(ctx) {
     const errs = [];
     p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
     p.on('pageerror', (e) => errs.push(String(e)));
-    await p.addInitScript((lv) => sessionStorage.setItem('y12.level', JSON.stringify(lv)), level);
-    await p.goto(v12Url + hash);
+    await p.addInitScript((lv) => sessionStorage.setItem('y13.level', JSON.stringify(lv)), level);
+    await p.goto(v13Url + hash);
     await p.waitForTimeout(1200);
     return { p, errs };
   };
   // 在页面里播放场景，probe(第几步, seen) 在每一步之后取数
-  const PLAY = async ({ id, probe }) => {
-    const Y = window.Y12;
+  // tail：场景播完以后再等多少毫秒，然后用「总步数加一」再取一次数（画面上的状态等它之前的动作演完才上画面）
+  const PLAY = async ({ id, probe, tail }) => {
+    const Y = window.Y13;
     const wait = (ms) => new Promise((res) => setTimeout(res, ms));
     Y.scenario.select(id);
     await wait(500);
@@ -859,15 +926,21 @@ async function v12Checks(ctx) {
       await wait(380);
       if (fn) fn(Y.scenario.state().step, seen, Y);
     }
+    if (tail) {
+      await wait(tail);
+      if (fn) fn(total + 1, seen, Y);
+    }
     return seen;
   };
 
-  // 事件对照表与登记表
+  // 翻译层的事件对照与登记表
   {
     const { p, errs } = await open('ui', '#/home');
     const r = await p.evaluate(() => {
-      const Y = window.Y12;
-      const map = (ev) => Y.scenes.pixelEvents(ev).map((e) => e.type + (e.type === 'transition' || /^collaboration/.test(e.type) ? ':' + e.payload.from + '>' + e.payload.to + (e.payload.artifact ? ':' + e.payload.artifact : '') : '')).join(',');
+      const Y = window.Y13;
+      const ctx = { roleName: () => null };
+      const map = (ev) => Y.translate.floor.actions(Object.assign({ position: 1 }, ev), ctx)
+        .map((a) => a.kind + (a.kind === 'handoff' || a.kind === 'letter' ? ':' + a.from + '>' + a.to + (a.artifact ? ':' + a.artifact : '') + (a.kind === 'letter' ? (a.answer ? ':answer' : ':ask') : '') : '')).join(',');
       const reg = Y.registry;
       return {
         ask: map({ type: 'ask_started', payload: { ask_id: 'q', requester: 'engineering', recipient: 'product' } }),
@@ -886,13 +959,13 @@ async function v12Checks(ctx) {
           ['run.asks', 'project.writeback'].every((q) => reg.has('query', q)) && ['project.set_goal', 'writeback.execute'].every((c) => reg.has('command', c))
       };
     });
-    push('事件对照表：询问变成传信，回答变成回信并关闭询问',
-      r.ask === 'collaboration_requested:engineering>product' && r.answer === 'collaboration_responded:product>engineering,collaboration_closed:engineering>product', r.ask + ' | ' + r.answer);
-    push('事件对照表：PRD、交付、缺陷记录与放行各自带出一次包裹的流向',
-      r.prd === 'spec_accepted,transition:product>engineering:prd' && r.delivery === 'delivery_accepted,transition:engineering>quality:box' &&
-      r.defect === 'qa_submitted,transition:quality>engineering:defect' && r.release === 'qa_submitted,transition:quality>library:release' &&
-      r.repair === 'qa_submitted,transition:quality>operations:release', JSON.stringify(r));
-    push('事件对照表：其余事件原样交给画面', r.other === 'tool_started');
+    push('翻译层：询问翻成一封信，回答翻成回信',
+      r.ask === 'letter:engineering>product:ask' && r.answer === 'letter:product>engineering:answer', r.ask + ' | ' + r.answer);
+    push('翻译层：PRD、交付、缺陷记录与放行各自带出一次包裹的流向',
+      r.prd === 'stamp_valid,handoff:product>engineering:prd' && r.delivery === 'seal,handoff:engineering>quality:box' &&
+      r.defect === 'stamp_defect,handoff:quality>engineering:defect' && r.release === 'stamp_release,handoff:quality>library:release' &&
+      r.repair === 'stamp_release,handoff:quality>operations:release', JSON.stringify(r));
+    push('翻译层：命令工具翻成画面的「执行命令」', r.other === 'command', r.other);
     push('登记表：没有交接、协作请求、计划接纳、结果未知与一次性授权的决定、登记命令与工具授权的命令', r.gone.length === 0, r.gone.join());
     push('登记表：新增四种决定请求、询问与写回的事件、run.asks、project.writeback、project.set_goal、writeback.execute', r.added);
     push('事件对照表的检查没有控制台错误', errs.length === 0, errs.slice(0, 2).join(' | '));
@@ -929,9 +1002,12 @@ async function v12Checks(ctx) {
       id: 'sc-metro-ask',
       probe: "if (n === 3) { seen.back = Y.api.query('run.asks', { work_item: 'w-metro-transfer' }).data.asks.find((a) => a.id === 'q-sc-back');" +
         " seen.states = Y.api.query('project.loop', { project: 'p-metro' }).data.items.find((x) => x.id === 'w-metro-transfer').departments; }" +
-        " if (n === 7) { const f = Y.scenes.buildingModels(null).building.floors.find((x) => x.project_id === 'p-metro'); seen.lit = f && f.lit;" +
-        " const fl = Y.scenes.activeFloor(); const ch = fl && fl.floor.inspect().world.characters.quality; seen.qaItem = ch && ch.item && ch.item.id; }" +
-        " if (n === 11) { seen.qa = Y.api.query('project.overview', { project: 'p-metro' }).data.work_items.find((x) => x.id === 'w-metro-transfer').departments; seen.html = document.body.innerText; }"
+        " if (n === 7) { const f = Y.scenes.buildingStates(null).building.floors.find((x) => x.project_id === 'p-metro'); seen.lit = f && f.lit;" +
+        " }" +
+        // 楼层的状态等它之前的动作演完才上画面：场景播完以后再等一会儿，看质检房间的小人
+        " if (n === 12) { const fl = Y.scenes.activeFloor(); const ch = fl && fl.floor.inspect().world.characters.quality; seen.qaItem = ch && ch.item && ch.item.id; }" +
+        " if (n === 11) { seen.qa = Y.api.query('project.overview', { project: 'p-metro' }).data.work_items.find((x) => x.id === 'w-metro-transfer').departments; seen.html = document.body.innerText; }",
+      tail: 12000
     });
     push('询问链：产品回问工程，询问链写成工程 → 产品 → 工程', seen.back && seen.back.chain.join() === 'engineering,product,engineering' && seen.back.depth === 2 && seen.back.parent === 'q-sc-prefer', JSON.stringify(seen.back));
     push('询问链：被询问的部门显示回答询问（楼层快照的 departments 写「部门 → 状态」）', seen.states && seen.states.product === 'answering' && seen.states.engineering === 'answering', JSON.stringify(seen.states));
@@ -947,15 +1023,15 @@ async function v12Checks(ctx) {
   {
     const { p, errs } = await open('3.1', '#/p/p-metro/w/w-metro-transfer/recovery');
     const seed = await p.evaluate(() => {
-      const r = window.Y12.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data;
-      return { state: r.state, unknown: r.unknown_actions.map((a) => a.id + ':' + a.handling), returned: r.unknown_actions[0] && r.unknown_actions[0].returned, pills: document.querySelectorAll('.y12-rc-state').length, text: document.body.innerText };
+      const r = window.Y13.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data;
+      return { state: r.state, unknown: r.unknown_actions.map((a) => a.id + ':' + a.handling), returned: r.unknown_actions[0] && r.unknown_actions[0].returned, pills: document.querySelectorAll('.y13-rc-state').length, text: document.body.innerText };
     });
     push('恢复页：恢复观察状态是七种，没有待核实', seed.pills === 7 && seed.text.indexOf('待核实') < 0 && seed.text.indexOf('已终止') < 0, seed.pills);
     push('恢复页（3.1）：断电前的测试命令作为工具结果交还工程的会话，写明交还的内容', seed.unknown.join() === 'a-metro-unit-17:returned' && seed.returned && seed.returned.indexOf('执行被中断，结果未知') === 0, JSON.stringify(seed.unknown));
     push('恢复页没有「核实结果未知的动作」的决定请求', seed.text.indexOf('核实结果未知的动作') < 0);
     const s8 = await p.evaluate(PLAY, {
       id: 'sc-metro-unknown',
-      probe: "if (n === 9) { const r = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data; seen.unknown = r.unknown_actions.map((a) => a.id + ':' + a.handling_text); seen.cards = document.querySelectorAll('#rc-verify .y12-rc-action').length; seen.decisions = Y.api.query('decisions.list', {}).data.filter((d) => d.work_item_id === 'w-metro-transfer').length; }"
+      probe: "if (n === 9) { const r = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data; seen.unknown = r.unknown_actions.map((a) => a.id + ':' + a.handling_text); seen.cards = document.querySelectorAll('#rc-verify .y13-rc-action').length; seen.decisions = Y.api.query('decisions.list', {}).data.filter((d) => d.work_item_id === 'w-metro-transfer').length; }"
     });
     push('场景 8：文件编辑按快照核实确认，命令交还会话，恢复页各一张卡片，没有决定请求',
       (s8.unknown || []).join() === 'a-metro-sc-edit:核实确认,a-metro-sc-test:交还会话' && s8.cards === 2 && s8.decisions === 0, JSON.stringify(s8));
@@ -965,7 +1041,7 @@ async function v12Checks(ctx) {
   {
     const { p, errs } = await open('3.2C', '#/p/p-metro/w/w-metro-transfer/recovery');
     const r = await p.evaluate(() => {
-      const Y = window.Y12;
+      const Y = window.Y13;
       const rec = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data;
       const item = Y.api.query('project.overview', { project: 'p-metro' }).data.work_items.find((x) => x.id === 'w-metro-transfer');
       return { state: rec.state, wm: rec.waiting_machine, handling: rec.unknown_actions.map((a) => a.handling), display: item.display.text, text: document.querySelector('#rc-reason').innerText };
@@ -981,7 +1057,7 @@ async function v12Checks(ctx) {
     push('场景 10：笔记本离线时等待机器，恢复在线以后按尝试身份核实确认，自动继续', s10.wait && s10.wait.machine_id === 'm-laptop' && s10.done === 'running:confirmed', JSON.stringify(s10));
     const s23 = await p.evaluate(PLAY, {
       id: 'sc-metro-wait-limit',
-      probe: "if (n === 3) { const c = document.querySelector('.y12-card.is-wait_limit'); seen.card = c && c.textContent; }" +
+      probe: "if (n === 3) { const c = document.querySelector('.y13-card.is-wait_limit'); seen.card = c && c.textContent; }" +
         " if (n === 5) seen.waited = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data.waiting_machine.waited_sec;"
     });
     push('场景 23：等待超过时长上限的决定卡片写等待的种类、对象、已经等待的时长与上限', s23.card && s23.card.indexOf('等待机器') >= 0 && s23.card.indexOf('时长上限1 天') >= 0 && s23.card.indexOf('已经等待1 天') >= 0 && s23.card.indexOf('继续等待') >= 0, s23.card);
@@ -995,8 +1071,8 @@ async function v12Checks(ctx) {
     const { p, errs } = await open('3.1', '#/home');
     const s22 = await p.evaluate(PLAY, {
       id: 'sc-metro-paused',
-      probe: "if (n === 4) { const c = document.querySelector('.y12-card.is-paused_continue'); seen.paused = c && c.textContent; seen.state = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data.state; }" +
-        " if (n === 9) { const c = document.querySelector('.y12-card.is-definitions_changed'); seen.defs = c && c.textContent; }" +
+      probe: "if (n === 4) { const c = document.querySelector('.y13-card.is-paused_continue'); seen.paused = c && c.textContent; seen.state = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data.state; }" +
+        " if (n === 9) { const c = document.querySelector('.y13-card.is-definitions_changed'); seen.defs = c && c.textContent; }" +
         " if (n === 11) seen.end = Y.api.query('run.recovery', { work_item: 'w-metro-transfer' }).data.state;"
     });
     push('场景 22：暂停以后继续的卡片写停止原因与人工处理说明，恢复观察状态是已暂停',
@@ -1011,7 +1087,7 @@ async function v12Checks(ctx) {
   {
     const { p, errs } = await open('3.8', '#/p/p-agents/settings');
     const r = await p.evaluate(async () => {
-      const Y = window.Y12;
+      const Y = window.Y13;
       const wait = (ms) => new Promise((res) => setTimeout(res, ms));
       const text = document.body.innerText;
       // 还没有采纳成果时，写回按 not_allowed 拒绝并给出中文说明
@@ -1028,7 +1104,7 @@ async function v12Checks(ctx) {
     // 接入已有项目的场景采纳基线以后再写回一次
     await p.evaluate(PLAY, { id: 'sc-agents-onboard' });
     const wb = await p.evaluate(async () => {
-      const Y = window.Y12;
+      const Y = window.Y13;
       const before = Y.api.query('project.writeback', { project: 'p-agents' }).data.records.length;
       const res = Y.run('writeback.execute', { project: 'p-agents' });
       await new Promise((res2) => setTimeout(res2, 500));
@@ -1059,19 +1135,19 @@ async function v12Checks(ctx) {
   {
     const { p, errs } = await open('S5', '#/home');
     const r = await p.evaluate(async () => {
-      const Y = window.Y12;
+      const Y = window.Y13;
       const wait = (ms) => new Promise((res) => setTimeout(res, ms));
       const n = Y.api.query('decisions.list', {}).data.length;
       const title = document.title;
       Y.backend.sim.setApiVersion(3);
       await wait(300);
-      const newer = document.querySelector('.y12-window-note').innerText;
+      const newer = document.querySelector('.y13-window-note').innerText;
       Y.backend.sim.setApiVersion(1);
       await wait(300);
-      const older = document.querySelector('.y12-window-note').innerText;
+      const older = document.querySelector('.y13-window-note').innerText;
       Y.backend.sim.setApiVersion(Y.CLIENT_API_VERSION);
       await wait(300);
-      return { n, title, newer, older, tray: Boolean(document.querySelector('.y12-tray')) };
+      return { n, title, newer, older, tray: Boolean(document.querySelector('.y13-tray')) };
     });
     push('标签页的标题前写待决定的数量', r.n > 0 && r.title.indexOf('(' + r.n + ') ') === 0, r.title);
     push('接口版本：服务比页面新时写重新构建页面文件', r.newer.indexOf('重新构建页面文件') >= 0 && r.newer.indexOf('第 3 版') >= 0, r.newer);
@@ -1091,8 +1167,8 @@ async function v12Checks(ctx) {
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript((lv) => sessionStorage.setItem('y12.level', JSON.stringify(lv)), 'S5');
-  await page.goto(v12Url + '#/sys/machines');
+  await page.addInitScript((lv) => sessionStorage.setItem('y13.level', JSON.stringify(lv)), 'S5');
+  await page.goto(v13Url + '#/sys/machines');
   await page.waitForTimeout(700);
   const inPage = await page.evaluate(DRIVER);
   results.push(...inPage);
@@ -1104,20 +1180,20 @@ async function v12Checks(ctx) {
     const errs = [];
     p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
     p.on('pageerror', (e) => errs.push(String(e)));
-    await p.addInitScript((lv) => sessionStorage.setItem('y12.level', JSON.stringify(lv)), 'S5');
-    await p.goto(v12Url + hash);
+    await p.addInitScript((lv) => sessionStorage.setItem('y13.level', JSON.stringify(lv)), 'S5');
+    await p.goto(v13Url + hash);
     await p.waitForTimeout(1500);
     const info = await act(p);
-    const canvas = await p.locator('.y12-floor-wrap canvas').count();
+    const canvas = await p.locator('.y13-floor-wrap canvas').count();
     const hashAfter = new URL(p.url()).hash;
     await p.close();
     return { errs, canvas, info, hashAfter };
   };
   const seek = await replayPage('#/p/p-todo/overview', async (p) => {
-    const ticks = p.locator('.y12-floor-timeline [data-act="replay.seek"]');
+    const ticks = p.locator('.y13-floor-timeline [data-act="replay.seek"]');
     const n = await ticks.count();
     if (n) { await ticks.nth(Math.min(3, n - 1)).click(); await p.waitForTimeout(600); }
-    await p.locator('.y12-floor-timeline [data-act="replay.step"]').first().click();
+    await p.locator('.y13-floor-timeline [data-act="replay.step"]').first().click();
     await p.waitForTimeout(600);
     return n;
   });

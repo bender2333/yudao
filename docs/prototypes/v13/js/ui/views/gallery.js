@@ -1,5 +1,5 @@
 // 动作图鉴（原型专用，#/gallery）：按角色与动作列出全部小人动画，每一项写明驱动它的事实、来源事件与所属档位；
-// 另有一节「管道与画面」，列出楼层画面的状态（由 floor.js 的 Y13.pixel.FLOOR_VIEWS 提供）。
+// 另有一节「管道与画面」，列出楼层画面的状态。来源事件与楼层画面的对照属于翻译层（js/translate/sources.js）。
 (function () {
   const Y13 = window.Y13;
   const P = Y13.pixel;
@@ -71,14 +71,15 @@
   // ---------------------------------------------------------------------------
   // 动作
 
-  function actionCard(name, def) {
+  // source：驱动这个动作的事件（翻译层的 ROOM_SOURCES）；基础动作没有
+  function actionCard(name, def, source) {
     const level = def.level || 'ui';
     const locked = reached(level) ? '' : ' is-locked';
     const sprite = spriteForAction(name);
-    const facts = def.source === undefined
+    const facts = source === undefined
       ? '<dl class="y13-g-facts"><dt>用途</dt><dd>' + esc(def.fact) + '</dd></dl>'
       : '<dl class="y13-g-facts"><dt>事实</dt><dd>' + esc(def.fact) + '</dd>' +
-        '<dt>来源</dt><dd class="y13-g-mono">' + esc(def.source) + '</dd>' +
+        '<dt>来源</dt><dd class="y13-g-mono">' + esc(source) + '</dd>' +
         '<dt>小人动作</dt><dd>' + esc(def.action) + '</dd>' +
         '<dt>房间变化</dt><dd>' + esc(def.room) + '</dd></dl>';
     return '<figure class="y13-g-card' + locked + '" data-act-card="' + esc(name) + '">' +
@@ -88,7 +89,7 @@
 
   function actionCards() {
     const base = Object.keys(P.BASE_MOTIONS).map((name) => actionCard(name, P.BASE_MOTIONS[name])).join('');
-    const list = Object.keys(P.ACTIONS).map((name) => actionCard(name, P.ACTIONS[name])).join('');
+    const list = Object.keys(P.ACTIONS).map((name) => actionCard(name, P.ACTIONS[name], Y13.translate.ROOM_SOURCES[name])).join('');
     return '<h3 class="y13-g-sub">基础动作</h3><div class="y13-g-grid">' + base + '</div>' +
       '<h3 class="y13-g-sub">事实驱动的动作</h3><div class="y13-g-grid">' + list + '</div>';
   }
@@ -102,13 +103,9 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 管道与画面（floor.js 提供 FLOOR_VIEWS）
+  // 管道与画面（翻译层的 FLOOR_VIEWS）
 
   function floorViewsBlock() {
-    const views = P.FLOOR_VIEWS;
-    if (!Array.isArray(views) || !views.length) {
-      return Y13.ui.note(esc('楼层画面的说明由 floor.js 提供'));
-    }
     return Y13.ui.table({
       columns: [
         { key: 'fact', label: '事实' },
@@ -117,7 +114,7 @@
         { key: 'level', label: '档位', render: (r) => levelTag(r.level) },
         { key: 'events', label: '事件', className: 'y13-g-mono', render: (r) => esc((r.events || []).join('、')) }
       ],
-      rows: views
+      rows: Y13.translate.FLOOR_VIEWS
     });
   }
 

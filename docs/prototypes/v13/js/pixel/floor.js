@@ -1,6 +1,6 @@
 // 项目楼层（设计说明第 5.2 至 5.6 节）：大厅（信箱、排队的包裹、槽位灯）、部门房间与交接管道、传信管、
 // 回流管道、成果库、通往机房的门（3.2C）、上方信息条。房间、管道、任务、陈设都来自 floor-decl.js 的声明，这里没有具体的部门名。
-// 状态以 setModel 为准，事件变成角色的任务或者信号
+// 只认画面合同（contract.js）：状态经播放时间线（timeline.js）上画面，动作由时间线决定什么时候演；决定卡片、流式文字与覆盖层到了就显示
 (function () {
   'use strict';
   const Y13 = window.Y13;
@@ -8,6 +8,7 @@
   if (!P || !P.createScene) throw new Error('floor.js 需要先加载 js/pixel/engine.js');
   if (!P.ecs) throw new Error('floor.js 需要先加载 js/pixel/ecs.js');
   if (!P.floorDecl) throw new Error('floor.js 需要先加载 js/pixel/floor-decl.js');
+  if (!P.timeline || !P.contract) throw new Error('floor.js 需要先加载 js/pixel/timeline.js 与 js/pixel/contract.js');
   const ECS = P.ecs;
   const DECL = P.floorDecl;
   const G = ECS.GEO;
@@ -24,18 +25,18 @@
   const TUBE_Y = G.TUBE_Y;        // 相邻房间之间传信管的高度
   const CORR_Y = 238;             // 走廊
   const ART_BMP = { prd: 'scroll', box: 'box_sealed', defect: 'box_rework', release: 'box_release', letter: 'letter' };
-  const IN_ROOM = ['running', 'asking', 'waiting_provider', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'pending_verification', 'waiting_resume', 'waiting_decision', 'stopped_for_upgrade'];
-  const ACTIVE = ['running', 'asking', 'pending_verification'];
+  const IN_ROOM = ['working', 'asking', 'waiting_model', 'paused', 'failed', 'done', 'cancelled', 'interrupted', 'waiting_resume', 'waiting_user', 'upgrade_stopped'];
+  const ACTIVE = ['working', 'asking'];
   const STATUS_TEXT = {
-    queued: '排队中', waiting_slot: '等待执行槽位', running: '运行中', asking: '询问中', waiting_provider: '等待模型服务', paused: '已暂停',
-    failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', pending_verification: '待核实', waiting_resume: '待恢复',
-    stopped_for_upgrade: '因升级停止', adopted: '已采纳', waiting_decision: '等待你的决定'
+    queued: '排队中', waiting_slot: '等待执行槽位', working: '运行中', asking: '询问中', waiting_model: '等待模型服务', paused: '已暂停',
+    failed: '失败', done: '已完成', cancelled: '已取消', interrupted: '中断', waiting_resume: '待恢复',
+    upgrade_stopped: '因升级停止', adopted: '已采纳', waiting_user: '等待你的决定'
   };
   const STATUS_CHIP = {
-    waiting_decision: PAL.yellow2,
-    running: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, waiting_slot: PAL.grey2, waiting_provider: PAL.grey3, paused: PAL.blue1,
-    failed: PAL.red2, done: PAL.green1, cancelled: PAL.grey2, interrupted: PAL.grey3, pending_verification: PAL.yellow2,
-    waiting_resume: PAL.yellow2, stopped_for_upgrade: PAL.orange2, adopted: PAL.green3
+    waiting_user: PAL.yellow2,
+    working: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, waiting_slot: PAL.grey2, waiting_model: PAL.grey3, paused: PAL.blue1,
+    failed: PAL.red2, done: PAL.green1, cancelled: PAL.grey2, interrupted: PAL.grey3,
+    waiting_resume: PAL.yellow2, upgrade_stopped: PAL.orange2, adopted: PAL.green3
   };
   const TUBE = '#7fc3e8', TUBE_D = '#3f86b0';
 
@@ -50,36 +51,6 @@
   };
   const RESULT_TEXT = { pass: '通过', fail: '未通过', not_run: '还没有在当前快照上运行' };
 
-  // 画面状态与事实的对照：动作图鉴列出（设计说明第 5.4 节）
-  P.FLOOR_VIEWS = [
-    { id: 'working', fact: '部门正在工作', source: '部门的状态（工作中、回答询问）与 department_activated', picture: '该房间亮灯，房间里的小人在工位工作；几个部门同时工作时（例如质检的预测性探索）几个房间同时亮灯', level: 'ui', events: ['department_activated'] },
-    { id: 'handoff', fact: '成果的流向', source: '正式成果被接纳（spec_accepted、delivery_accepted、qa_submitted），关注它的部门开始一轮工作', picture: '包裹沿管道走到关注它的部门', level: 'ui', events: ['spec_accepted', 'delivery_accepted', 'qa_submitted'] },
-    { id: 'rework', fact: '缺陷记录', source: 'qa_submitted 的结论为缺陷记录（rework_engineering）', picture: '包裹贴红色单子经回流管道流动，管道闪红色', level: 'ui', events: ['qa_submitted'] },
-    { id: 'ask', fact: '询问与回答', source: 'ask_started、ask_answered（询问是一次工具调用）', picture: '信件在传信管中往返；未回答的信件停在出口；回答询问的部门亮灯工作', level: 'ui', events: ['ask_started', 'ask_answered'] },
-    { id: 'cycle', fact: '循环次数与时间', source: 'run 的循环计数、已用时间与时间上限', picture: '信息条显示「第 N 轮」与时间进度条；接近上限时变为警示色', level: 'ui', events: [] },
-    { id: 'adopt', fact: '采纳', source: 'deliverable_adopted', picture: '箱子放上成果库的架子，版本号加一', level: 'ui', events: ['deliverable_adopted'] },
-    { id: 'waiting_resume', fact: '待恢复', source: '模型引用无法使用的决定请求', picture: '涉及的房间门口立「待恢复」牌，写明缺少的项', level: 'ui', events: ['x_decision_issued'] },
-    { id: 'interrupted', fact: '中断', source: '恢复观察状态为中断', picture: '整层变暗，墙上时钟停住，管道停止', level: '3.1', events: ['x_run_interrupted'] },
-    { id: 'resumed', fact: '自动继续', source: 'Yudao 启动时自动继续中断的 run', picture: '灯亮起，时钟继续走，管道恢复流动', level: '3.1', events: ['x_run_auto_resumed'] },
-    { id: 'pending', fact: '结果未知的动作', source: '重新启动时结果未知的动作（x_action_unknown），核实确认或交还发出它的会话', picture: '小人说「这个动作的结果不确定」；处理与依据列在恢复页', level: '3.1', events: ['x_action_unknown', 'action_verified'] },
-    { id: 'upgrade', fact: '因升级停止', source: '停止原因为因升级停止', picture: '门口立「因升级停止」牌；该事项的新包裹排到大厅队首', level: '3.1', events: ['x_run_stopped_for_upgrade'] },
-    { id: 'remote', fact: '远程动作', source: '动作的执行机器', picture: '通往机房的门上的动作数变化，门缝透出光', level: '3.2C', events: ['x_remote_action_started', 'x_remote_action_finished'] },
-    { id: 'agent_offline', fact: '执行代理离线', source: '心跳超时，动作结果未知，事项等待机器', picture: '通往机房的门上出现黄色问号；房间门口立「等待机器」牌', level: '3.2C', events: ['x_machine_offline'] },
-    { id: 'queue', fact: '同一项目排队', source: '项目的排队顺序', picture: '大厅管道入口前的包裹队列，顺序随调整变化', level: '3.4A', events: ['x_queued', 'x_queue_reordered'] },
-    { id: 'slot', fact: '等待执行槽位', source: '执行槽位已满', picture: '大厅的槽位灯全亮，队首包裹停在入口，阀门关闭', level: '3.4A', events: ['x_slot_acquired'] },
-    { id: 'provider', fact: '等待模型服务', source: '进入与离开等待模型服务的事件', picture: '涉及部门的管道停止，显示下一次重试时间；房间灯光调暗', level: 'S4', events: ['x_provider_wait_entered', 'x_provider_wait_left'] },
-    { id: 'deploy', fact: '发布与回滚', source: '运维的部署与回滚记录', picture: '包裹从运维房间送进通往机房的门；回滚时旧版本的包裹从门里送出', level: 'S4', events: ['x_deployed', 'x_rolled_back'] },
-    { id: 'fault', fact: '故障与修复', source: '故障记录与修复事项', picture: '运维房间监控屏变红；故障信件经地板下的管道送回大厅成为修复事项包裹', level: 'S4', events: ['x_fault_recorded', 'x_repair_created'] },
-    { id: 'repair_stopped', fact: '停止自动修复', source: '同一故障连续修复失败', picture: '运维房间门口立「停止自动修复」牌', level: 'S4', events: ['x_auto_repair_stopped'] },
-    { id: 'terminal', fact: '终止', source: 'run_done、run_failed、run_paused、取消', picture: '门口立完成、失败（停止原因）、暂停或已取消的牌子', level: 'ui', events: ['run_done', 'run_failed', 'run_paused'] },
-    { id: 'decision', fact: '等待回答的决定请求', source: '决定请求（decisions.list）与 x_decision_issued', picture: '提出决定的部门的经理走到门口送出决定单，飞到大厅墙上的板子；点板子，卡片在画面里摊开，点章回答；回答过的决定单飞回部门门口，经理收下', level: 'ui', events: ['x_decision_issued', 'x_decision_answered', 'project_decision_requested', 'project_decision_answered'] },
-    { id: 'roles', fact: '部门内的分派与交回', source: '角色任务事件（x_role_task_assigned、x_role_result_returned）、审查与探索者事件', picture: '经理走到角色的工位旁递任务卡，角色走到经理身旁交回结果，审查者盖章，探索者走到文件柜；房间里有几个角色就有几个小人', level: 'S5', events: ['x_role_task_assigned', 'x_role_result_returned', 'x_review_recorded', 'x_explorer_fetch'] },
-    { id: 'idle', fact: '空闲', source: '部门没有事项，角色没有任务', picture: '坐着喝茶的小人隔几秒自己挑一件事：伸懒腰、走动、翻文件柜、门口抬头看、两个空闲的小人碰头说话；管道停止时光点留在管道里', level: 'ui', events: [] },
-    { id: 'loops', fact: '循环实例与收敛状态', source: 'run.loops：由事件按规则算出的收敛状态与判定依据', picture: '覆盖层「循环」：信息条写 run 的收敛状态，部门房间写这一轮工作的已用时间与上限，正在工作的角色头顶写步骤循环；颜色与文字一起表示状态，右上角有图例', level: 'pilot', events: ['qa_submitted', 'tool_started', 'department_activated', 'run_failed'] },
-    { id: 'sources', fact: '事实来源', source: 'project.loop 按「事件加字段」给出每个事实元素的来源（已用时间这类测量值为主机测量）', picture: '覆盖层「来源」：画面其余部分调暗，事实元素按确定规则、决策模型、角色陈述、主机测量、用户描边，角色陈述与决策模型用加粗的虚线；点元素打开来源卡片', level: 'pilot', events: [] },
-    { id: 'coverage', fact: '检验覆盖与开环', source: 'acceptance.coverage：每条验收条件的检验方式、最近的结果与是否开环', picture: '覆盖层「检验」：质检房间写检验覆盖比例、模型阅读与开环的条件数，开环时黄底；点开是逐条清单；放行的盖章旁写这次放行的覆盖比例', level: 'pilot', events: ['qa_submitted', 'x_evidence_checked'] }
-  ];
-
   // ---------------------------------------------------------------------------
   // 房间与管道：按声明排布（floor-decl.js）；有些房间只在快照带着对应字段时出现（声明里的 when，例如运维房间）
 
@@ -90,7 +61,7 @@
   }
 
   function declareWorld(flags) {
-    const world = ECS.world({ tasks: DECL.tasks, idle: DECL.idle, keyOf: DECL.keyOf });
+    const world = ECS.world({ tasks: DECL.tasks, idle: DECL.idle });
     ECS.declareRooms(world, DECL.rooms, flags);
     ECS.declareLinks(world, DECL.links);
     return world;
@@ -112,40 +83,33 @@
 
   P.createFloorScene = function createFloorScene(canvas, opts) {
     const o = opts || {};
-    let model = { items: [], open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [], machines: null, ops: null, interrupted: false, roles: null, decisions: [] };
+    let model = { items: [], open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [], machines: null, ops: null, interrupted: false, roles: null };
+    // 等待回答的决定请求：实时内容，到了就贴到大厅的板上，不等时间线
+    let decisions = [];
     let flags = flagsOf(model);
     let world = declareWorld(flags);
     let lay = layOf(world);
     let focusId = null;
     let overlay = { id: null, data: null };
     const st = {
-      clock: 15.5 * 3600000, flash: {}, pipeFlash: {}, arrows: [], hidden: {}, remoteDots: [], queueX: {}, n: 0, said: {},
+      clock: 15.5 * 3600000, flash: {}, pipeFlash: {}, arrows: [], remoteDots: [], queueX: {}, n: 0, said: {},
       facts: [], labels: [], barX: 0, wantFact: null
     };
     const scene = P.createScene(canvas, { W, H, draw, update });
     // 世界里的决定卡片：决定单贴在大厅的板上，点开在画面里回答（decision-card.js）
     const card = P.createDecisionCard(scene, canvas, { onDecide: o.onDecide, onGo: o.onGo });
-    // 来源卡片：点事实元素打开，写给出这条事实的事件与来源种类（source-card.js）
-    const sourceCard = P.createSourceCard(scene, canvas, { onSeek: o.onSeek, fetchEvent: o.fetchEvent });
+    // 来源卡片：点事实元素打开，写这条事实的来源种类与给出它的事件（source-card.js）；事件的说明由页面经 describe 给出
+    const sourceCard = P.createSourceCard(scene, canvas, { onSeek: o.onSeek, describe: o.describe });
     let bg = null, bgKey = '';
 
     // -------------------------------------------------------------------------
     // 事实元素（design.md 第 5 节）：每帧画的时候收集 { kind, rect, position, field, source }，供覆盖层「来源」、点击与验收脚本使用。
-    // 来源按「事件加字段」由读取模型给出（refs 写成 { position, field, source }）；覆盖层的标签只有事件位置时按事件种类。
-    // 快照里没有来源（自举试点以前的档位）时，画面照旧，元素不是事实元素
-
-    const sourceCache = new Map();
-    function sourceOf(position) {
-      if (!position || !o.fetchEvent) return null;
-      if (!sourceCache.has(position)) {
-        const ev = o.fetchEvent(position);
-        sourceCache.set(position, ev && ev.source ? ev.source : null);
-      }
-      return sourceCache.get(position);
-    }
+    // 来源按「事件加字段」由翻译层给出（{ position, field, source }）。
+    // 状态里没有来源（自举试点以前的档位）时，画面照旧，元素不是事实元素
 
     function fact(kind, rect, ref, extra) {
-      const r = ref && typeof ref === 'object' ? ref : { position: ref || null, field: null, source: sourceOf(ref) };
+      if (ref !== null && ref !== undefined && typeof ref !== 'object') throw new Error('事实元素的来源要写成 { position, field, source }：' + kind);
+      const r = ref || {};
       const f = Object.assign({
         kind, rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.w), h: Math.round(rect.h) },
         position: r.position || null, field: r.field || null, source: r.source || null
@@ -171,14 +135,14 @@
     const sig = (name) => ECS.signalOn(world, scene, name);
 
     // 声明里的规则读取画面数据的窗口
-    const ctx = { model, order: world.roomOrder, waitingDept, time: Y13.time, sig, get reduced() { return scene.reduced; } };
+    const ctx = { model, order: world.roomOrder, waitingDept, sig, get reduced() { return scene.reduced; } };
 
     // -------------------------------------------------------------------------
     // 房间里的小人：每个房间按角色设置有几个，没有角色设置时一个部门一个
 
     function primaryItem(d) {
       const here = busyIn(d);
-      return here.find((it) => ACTIVE.includes(it.status)) || here.find((it) => it.status === 'waiting_provider') || here[0] || null;
+      return here.find((it) => ACTIVE.includes(it.status)) || here.find((it) => it.status === 'waiting_model') || here[0] || null;
     }
 
     function specsFor() {
@@ -191,7 +155,7 @@
       return out;
     }
 
-    // 每个角色一个实体（P.ecs）：快照决定小人现在该干什么（ch.rest），事件变成任务放进队列
+    // 每个角色一个实体（P.ecs）：状态决定小人现在该干什么（ch.rest），时间线开始的动作变成任务放进队列
     function syncWorkers() {
       ctx.model = model;
       ctx.order = world.roomOrder;
@@ -208,10 +172,9 @@
 
     function workerOf(ch) { return ECS.actorOf(world, scene, ch.id); }
 
-    // 小人头顶说的内容：来自事件（P.say，js/pixel/say.js）；目录里没有这类事件时，任务用自己声明的标签。
-    // side 为 'to' 表示说话的小人是事件里收东西的一方
-    function sayOf(ev, dept, side) {
-      const text = P.say(ev, { dept, side, roleName: (id) => (world.characters[id] || {}).name || null });
+    // 小人头顶说的内容：动作带着的话（翻译层给出，say 是做事的一方，sayTo 是收东西的一方）；没有时任务用自己声明的标签
+    function sayOf(a, side) {
+      const text = side === 'to' ? a.sayTo : a.say;
       return text ? { label: text } : {};
     }
 
@@ -219,17 +182,18 @@
       st.said[ch.id] = { text, kind: 'say', until: scene.realT + P.sayMs(text) };
     }
 
-    // 小人走到管道口放下或取出包裹：任务放到队首（交接不排队），做完以后执行 after；没有角色时直接执行。
-    // 减少动画时小人不走动，只在原处说话
-    function trip(d, key, after, extra) {
+    // 小人走到管道口放下或取出包裹：做完以后执行 after；没有角色时直接执行。减少动画时小人不走动，只在原处说话。
+    // run 是这个动作的演出（perform 给出），截断以后 after 不再执行
+    function trip(run, d, key, after, extra) {
+      const next = () => { if (run.alive() && after) after(); };
       if (scene.reduced) {
         const def = world.catalog.tasks[key];
         const ch = def && ECS.charFor(world, d, null, def.actor || def.by);
         if (ch && extra && extra.label) said(ch, extra.label);
-        if (after) after();
+        next();
         return;
       }
-      if (!ECS.enqueue(world, d, key, Object.assign({ front: true, must: true, onDone: after }, extra))) { if (after) after(); }
+      if (!ECS.enqueue(world, d, key, Object.assign({ onDone: next, actionId: run.id }, extra))) next();
     }
 
     // -------------------------------------------------------------------------
@@ -250,22 +214,25 @@
       return l ? l.key : null;
     }
 
-    // 包裹是 world.packages 里的实体：沿管道移动，到达终点后销毁并执行 onDone；linkKey 标出它经过的管道
+    // 包裹是 world.packages 里的实体：沿管道移动，到达终点后销毁并执行 onDone；linkKey 标出它经过的管道。
+    // option.run 是这个包裹属于的演出：截断时包裹立刻去掉，onDone 不再执行
     let packageSeq = 0;
     function send(pts, bmp, opt) {
       const option = opt || {};
-      if (!pts) { if (option.onDone) option.onDone(); return; }
+      const run = option.run;
+      const next = () => { if ((!run || run.alive()) && option.onDone) option.onDone(); };
+      if (!pts) { next(); return; }
       if (scene.reduced) {
         st.arrows.push({ pts, color: option.color || PAL.white, bmp, until: scene.realT + 3600, itemId: option.itemId, dash: option.small });
-        if (option.onDone) option.onDone();
+        next();
         return;
       }
       const id = 'pk-' + (++packageSeq);
       const pk = ECS.spawnPackage(world, id, option.itemId || null, null, option.artifact || null, null);
-      Object.assign(pk, { bmp, color: option.color, small: option.small, fact: option.fact || null });
+      Object.assign(pk, { bmp, color: option.color, small: option.small, fact: option.fact || null, actionId: run ? run.id : null });
       ECS.sendPackage(world, id, option.linkKey || null, pts, option.ms, () => {
         ECS.removePackage(world, id);
-        if (option.onDone) option.onDone();
+        next();
       });
     }
 
@@ -287,197 +254,268 @@
           rect = { x: x - b.w / 2, y: y - b.h / 2, w: b.w, h: b.h + 2 };
         }
         c.globalAlpha = 1;
-        // 管道中的包裹：来源是引起这次交接或传信的事件（事件对象带 source）
+        // 管道中的包裹：来源是引起这次交接或传信的事件（翻译层写在动作的 fact 里）
         if (pk.fact) fact('package', rect, pk.fact, { title: pk.fact.title });
       });
     }
 
-    // 管道中的包裹：来源是引起这次移动的事件，按事件种类
-    const transitFact = (ev) => (ev.source && ev.position ? { position: ev.position, field: null, source: ev.source, title: '管道中的包裹：' + (ev.label || ev.type) } : null);
-
     // -------------------------------------------------------------------------
-    // 事件
+    // 动作：播放时间线决定什么时候开始；一个动作的演出在几个角色、管道与飞行物之间接力，最后一步做完时告诉时间线
 
     function flash(id, color, ms) { st.flash[id] = { color, until: scene.realT + (ms || 900) }; }
 
     // 任务声明里的效果（floor-decl.js 的 fx）：信号、房间闪光、包裹沿管道走
-    function applyFx(f, ev, ch) {
+    function applyFx(f, a, ch, run, after) {
       if (f.signal) ECS.signal(world, scene, f.signal, f.ms);
       if (f.flash) flash(f.flash.room === 'self' ? ch.department : f.flash.room, PAL[f.flash.color], f.flash.ms);
       if (f.send) {
         const link = world.links[f.send.link];
-        if (!link) return;
+        if (!link) { if (after) after(); return; }
         send(f.send.reverse ? link.pts.slice().reverse() : link.pts, f.send.bmp, {
-          color: f.send.color ? PAL[f.send.color] : null, linkKey: link.id, fact: transitFact(ev),
-          onDone: () => (f.send.then || []).forEach((g) => applyFx(g, ev, ch))
+          color: f.send.color ? PAL[f.send.color] : null, linkKey: link.id, fact: a.fact || null, run,
+          onDone: () => { (f.send.then || []).forEach((g) => applyFx(g, a, ch, run)); if (after) after(); }
         });
+        return;
       }
+      if (after) after();
     }
 
-    // 交给 ECS.dispatch 的 make：任务头顶说的内容与声明里的效果
-    function extrasOf(def, ev, ch, side) {
-      const out = sayOf(ev, ch.department, side);
-      if (def.fx) {
-        const run = (when) => () => def.fx.filter((f) => f.when === when).forEach((f) => applyFx(f, ev, ch));
-        out.start = run('start');
-        out.done = run('done');
-      }
-      return out;
+    // 交给 ECS.dispatch 的 make：任务头顶说的内容、声明里的效果、属于哪个动作；动作的最后一步做完时告诉时间线
+    function extrasOf(run) {
+      return (def, a, ch, side) => {
+        const out = Object.assign(sayOf(a, side), { actionId: run.id });
+        const last = side === 'to' || !def.then;
+        const sends = def.fx && def.fx.some((f) => f.when === 'done' && f.send);
+        if (def.fx) out.start = () => def.fx.filter((f) => f.when === 'start').forEach((f) => applyFx(f, a, ch, run));
+        out.done = () => {
+          const fx = def.fx ? def.fx.filter((f) => f.when === 'done') : [];
+          // 做完以后有包裹要走的，等包裹走完再算这个动作演完
+          fx.forEach((f) => applyFx(f, a, ch, run, f.send && last ? run.finish : null));
+          if (last && !sends) run.finish();
+        };
+        return out;
+      };
     }
 
-    function dispatchTask(ev) { return ECS.dispatch(world, ev, extrasOf); }
+    // 一个角色的任务：找不到做它的角色时这个动作没有可演的
+    function task(run) {
+      if (!ECS.dispatch(world, run.action, extrasOf(run))) run.finish();
+    }
 
-    function playEvent(ev) {
-      if (!ev || !ev.type) throw new Error('playEvent 需要事件对象');
-      const pl = ev.payload || {};
-      const wid = ev.work_item_id;
-      const it = itemById(wid);
+    // 时间线上的一个动作在这里演：run = { id, action, alive(), finish() }
+    function perform(run) {
+      const a = run.action;
+      const it = itemById(a.item);
       const color = it ? P.ITEM_COLORS[it.color_index % P.ITEM_COLORS.length] : null;
       const order = world.roomOrder;
-      switch (ev.type) {
-        case 'user_input_received':
-        case 'work_item_created':
-          if (!scene.reduced) scene.fly({ bmp: 'letter', from: [-6, PIPE_Y - 20], to: [lay.hall.x + 16, PIPE_Y + 6], ms: 900, arc: 20, onDone: () => { ECS.signal(world, scene, 'mail', 1500); } });
-          else ECS.signal(world, scene, 'mail', 1500);
+      // 整层静止（中断）时不演动作；自动继续本身让画面重新动起来
+      if (scene.frozen && a.kind !== 'resume') { run.finish(); return; }
+      switch (a.kind) {
+        case 'mail':
+          if (!scene.reduced) scene.fly({ bmp: 'letter', from: [-6, PIPE_Y - 20], to: [lay.hall.x + 16, PIPE_Y + 6], ms: 900, arc: 20, actionId: run.id, onDone: () => { ECS.signal(world, scene, 'mail', 1500); run.finish(); } });
+          else { ECS.signal(world, scene, 'mail', 1500); run.finish(); }
           return;
-        case 'department_activated':
-          if (ev.department && roomById(ev.department)) flash(ev.department, PAL.yellow1, 700);
+        case 'room_light':
+          if (a.room && roomById(a.room)) flash(a.room, PAL.yellow1, 700);
+          run.finish();
           return;
-        case 'transition': {
-          let to = pl.to;
-          if (to === 'adopted' || to === 'adoption') to = lay.lib.id;
-          const from = pl.from;
+        case 'handoff': {
+          const to = a.to;
+          const from = a.from;
           // 两个房间之间没有直接的管道时，包裹沿声明的管道一段一段走过去（例如质检放行交给运维，中间经过成果库）
           const hops = ECS.route(world, from, to);
-          if (!hops.length) return;
+          if (!hops.length) { run.finish(); return; }
           const ids = lay.depts.map((r) => r.id);
-          const rework = pl.artifact === 'defect' || hops[0].link.linkKind === 'return' || (ids.includes(from) && ids.includes(to) && order.indexOf(from) > order.indexOf(to));
+          const rework = a.artifact === 'defect' || hops[0].link.linkKind === 'return' || (ids.includes(from) && ids.includes(to) && order.indexOf(from) > order.indexOf(to));
           if (rework) hops.forEach((h) => { st.pipeFlash[h.key] = scene.realT + 2600; });
-          const bmp = ART_BMP[pl.artifact] || 'box_sealed';
-          // 交出方走到管道口放下包裹，包裹沿管道移动，接收方走到管道口取出：两端各是一个任务
-          const arrive = () => { flash(to, PAL.white, 500); trip(to, rework ? 'package_return_in' : 'package_handoff_in', null, sayOf(ev, to, 'to')); };
-          const leg = (i) => send(hops[i].pts, bmp, { itemId: wid, color, linkKey: hops[i].key, fact: transitFact(ev), onDone: () => (i + 1 < hops.length ? leg(i + 1) : arrive()) });
-          trip(from, rework ? 'package_return_out' : 'package_handoff_out', () => leg(0), sayOf(ev, from, 'from'));
+          const bmp = ART_BMP[a.artifact];
+          // 交出方走到管道口放下包裹，包裹沿管道移动，接收方走到管道口取出：两端各是一步
+          const arrive = () => { flash(to, PAL.white, 500); trip(run, to, rework ? 'package_return_in' : 'package_handoff_in', run.finish, sayOf(a, 'to')); };
+          const leg = (i) => send(hops[i].pts, bmp, { itemId: a.item, color, linkKey: hops[i].key, fact: a.fact || null, run, onDone: () => (i + 1 < hops.length ? leg(i + 1) : arrive()) });
+          trip(run, from, rework ? 'package_return_out' : 'package_handoff_out', () => leg(0), sayOf(a, 'from'));
           return;
         }
-        case 'qa_submitted':
-          if (ev.department) flash(ev.department, pl.verdict === 'release' ? PAL.green2 : PAL.red2, 1200);
-          dispatchTask(ev);
+        case 'stamp_release':
+        case 'stamp_defect':
+          if (a.room) flash(a.room, a.kind === 'stamp_release' ? PAL.green2 : PAL.red2, 1200);
+          task(run);
           return;
-        // 传信：发信的经理走到管口塞进信，信沿传信管走，收信的经理走到信来的那一侧管口取信
-        case 'collaboration_requested': {
-          const pts = tubeFor(pl.from, pl.to);
-          const forward = order.indexOf(pl.to) > order.indexOf(pl.from);
-          trip(pl.from, forward ? 'letter_out' : 'letter_in', () => send(pts, 'letter', {
-            small: true, itemId: wid, color: PAL.blue2, linkKey: tubeKeyOf(pl.from, pl.to), fact: transitFact(ev),
-            onDone: () => trip(pl.to, forward ? 'letter_arrive_in' : 'letter_arrive_out', null, sayOf(ev, pl.to, 'to'))
-          }), sayOf(ev, pl.from, 'from'));
-          return;
-        }
-        case 'collaboration_responded': {
-          // 回答方是事件所在的部门（示例数据里 from 是回答方，v8 构建约定里 to 是回答方），另一头是发问方
-          const answerer = ev.department || pl.to;
-          const asker = pl.from === answerer ? pl.to : pl.from;
-          const pts = tubeFor(answerer, asker);
-          const forward = order.indexOf(asker) > order.indexOf(answerer);
-          trip(answerer, forward ? 'letter_out' : 'letter_in', () => send(pts, 'letter', {
-            small: true, itemId: wid, color: PAL.green2, linkKey: tubeKeyOf(answerer, asker), fact: transitFact(ev),
-            onDone: () => trip(asker, forward ? 'letter_arrive_in' : 'letter_arrive_out', null, sayOf(ev, asker, 'to'))
-          }), sayOf(ev, answerer, 'from'));
+        // 传信：发信的经理走到管口塞进信，信沿传信管走，收信的经理走到信来的那一侧管口取信；回答的信是绿色
+        case 'letter': {
+          const pts = tubeFor(a.from, a.to);
+          const forward = order.indexOf(a.to) > order.indexOf(a.from);
+          trip(run, a.from, forward ? 'letter_out' : 'letter_in', () => send(pts, 'letter', {
+            small: true, itemId: a.item, color: a.answer ? PAL.green2 : PAL.blue2, linkKey: tubeKeyOf(a.from, a.to), fact: a.fact || null, run,
+            onDone: () => trip(run, a.to, forward ? 'letter_arrive_in' : 'letter_arrive_out', run.finish, sayOf(a, 'to'))
+          }), sayOf(a, 'from'));
           return;
         }
-        case 'deliverable_adopted':
+        case 'adopt':
           ECS.signal(world, scene, 'shelf', 1800);
           scene.emit('spark', lay.lib.x + lay.lib.w / 2, 110, 16);
+          run.finish();
           return;
-        case 'x_queued':
-        case 'x_repair_created':
+        case 'parcel_in':
           ECS.signal(world, scene, 'mail', 1500);
-          if (!scene.reduced) scene.fly({ bmp: ev.type === 'x_repair_created' ? 'box_rework' : 'box', from: [lay.hall.x + 16, PIPE_Y + 10], to: [lay.hall.x + 50, PIPE_Y - 4], ms: 700, arc: 14 });
+          if (!scene.reduced) scene.fly({ bmp: a.repair ? 'box_rework' : 'box', from: [lay.hall.x + 16, PIPE_Y + 10], to: [lay.hall.x + 50, PIPE_Y - 4], ms: 700, arc: 14, actionId: run.id, onDone: run.finish });
+          else run.finish();
           return;
-        case 'x_slot_acquired': {
+        case 'parcel_enter':
           st.flash[lay.hall.id] = { color: PAL.green2, until: scene.realT + 900 };
-          send(lay.out.pts, 'box', { itemId: wid, color, linkKey: lay.out.id, fact: transitFact(ev), onDone: () => trip(lay.out.to, 'package_handoff_in') });
+          send(lay.out.pts, 'box', { itemId: a.item, color, linkKey: lay.out.id, fact: a.fact || null, run, onDone: () => trip(run, lay.out.to, 'package_handoff_in', run.finish) });
           return;
-        }
-        case 'x_queue_reordered':
+        case 'queue_moved':
           st.flash[lay.hall.id] = { color: PAL.blue1, until: scene.realT + 900 };
+          run.finish();
           return;
-        case 'x_run_interrupted':
-          return;
-        case 'x_run_auto_resumed':
-          Object.keys(world.characters).forEach((id) => ECS.enqueue(world, id, 'x_run_auto_resumed'));
+        case 'resume': {
+          // 自动继续：画面重新动起来，每个角色伸一个懒腰，部门房间亮一下；都伸完了才算演完
+          scene.frozen = false;
+          const ids = Object.keys(world.characters);
+          let left = ids.length;
+          const one = () => { left -= 1; if (left <= 0) run.finish(); };
+          ids.forEach((id) => { if (!ECS.enqueue(world, id, 'stretch', { actionId: run.id, onDone: one })) one(); });
+          if (!ids.length) run.finish();
           lay.depts.forEach((r) => flash(r.id, PAL.yellow1, 700));
           return;
-        case 'x_action_unknown':
-          if (ev.department) flash(ev.department, PAL.yellow2, 1400);
+        }
+        case 'unsure':
+          if (a.room) flash(a.room, PAL.yellow2, 1400);
+          run.finish();
           return;
-        case 'x_remote_action_started':
-        case 'x_remote_action_finished':
-        case 'x_late_receipt': {
+        case 'remote': {
           ECS.signal(world, scene, 'door', 1800);
-          const r = ev.department ? roomById(ev.department) : null;
+          const r = a.room ? roomById(a.room) : null;
           if (r && !scene.reduced) {
-            const from = ev.type === 'x_remote_action_started' ? [r.door, ROOM_B + 6] : [lay.door.x, CORR_Y];
-            const to = ev.type === 'x_remote_action_started' ? [lay.door.x, CORR_Y] : [r.door, ROOM_B + 6];
+            const from = a.out ? [r.door, ROOM_B + 6] : [lay.door.x, CORR_Y];
+            const to = a.out ? [lay.door.x, CORR_Y] : [r.door, ROOM_B + 6];
             st.remoteDots.push({ from, to, t0: scene.realT, ms: 1400 });
           }
+          run.finish();
           return;
         }
-        case 'x_decision_issued':
-        case 'project_decision_requested': {
-          // 提出决定的部门的小人走到门口送出决定单，决定单飞到大厅的板上；决定单在路上的时候板上还看不到它
-          const d = ev.department || (it && it.department);
-          const room = d && world.rooms[d] && world.rooms[d].roomKind === 'dept' ? world.rooms[d] : null;
+        case 'decision_out': {
+          // 提出决定的部门的小人走到门口送出决定单，决定单飞到大厅的板上（板上的决定单是实时内容，已经贴着）
+          const room = a.room && world.rooms[a.room] && world.rooms[a.room].roomKind === 'dept' ? world.rooms[a.room] : null;
           const b = boardRect();
-          if (pl.decision_id) st.hidden[pl.decision_id] = scene.realT + 12000;
-          let posted = false;
           const post = () => {
-            if (posted) return;
-            posted = true;
             scene.fly({
-              bmp: 'decision', from: room ? [room.door, ROOM_B + 4] : [b.x + b.w / 2, TOP - 6], to: [b.x + b.w / 2, b.y + b.h / 2], ms: 1000, arc: 26,
-              onDone: () => { delete st.hidden[pl.decision_id]; ECS.signal(world, scene, 'board', 1600); }
+              bmp: 'decision', from: room ? [room.door, ROOM_B + 4] : [b.x + b.w / 2, TOP - 6], to: [b.x + b.w / 2, b.y + b.h / 2], ms: 1000, arc: 26, actionId: run.id,
+              onDone: () => { ECS.signal(world, scene, 'board', 1600); run.finish(); }
             });
           };
-          if (room && !scene.reduced && ECS.dispatch(world, Object.assign({}, ev, { department: d }), () => ({ done: post }))) scene.after(8000, post);
-          else post();
+          if (room && !scene.reduced) trip(run, a.room, 'decision_give', post, sayOf(a));
+          else if (!scene.reduced) post();
+          else run.finish();
           return;
         }
-        case 'x_decision_answered':
-        case 'project_decision_answered': {
+        case 'decision_back': {
           // 回答过的决定单从板上飞回提出决定的部门的门口，小人在门口收下
-          const d = ev.department || (it && it.department);
-          const room = d && world.rooms[d] && world.rooms[d].roomKind === 'dept' ? world.rooms[d] : null;
+          const room = a.room && world.rooms[a.room] && world.rooms[a.room].roomKind === 'dept' ? world.rooms[a.room] : null;
           const b = boardRect();
-          if (pl.decision_id && card.openId() === pl.decision_id) card.stamp(pl.decision_id, '已回答');
-          if (room) {
-            scene.fly({
-              bmp: 'decision', from: [b.x + b.w / 2, b.y + b.h / 2], to: [room.door, ROOM_B + 4], ms: 1000, arc: 26,
-              onDone: () => { if (!scene.reduced) ECS.dispatch(world, Object.assign({}, ev, { department: d })); }
-            });
-          }
+          if (a.decision && card.openId() === a.decision) card.stamp(a.decision, '已回答');
+          if (!room || scene.reduced) { run.finish(); return; }
+          scene.fly({
+            bmp: 'decision', from: [b.x + b.w / 2, b.y + b.h / 2], to: [room.door, ROOM_B + 4], ms: 1000, arc: 26, actionId: run.id,
+            onDone: () => trip(run, a.room, 'decision_take', run.finish, sayOf(a))
+          });
           return;
         }
-        case 'x_provider_wait_entered':
-        case 'x_provider_wait_left':
-          if (ev.department) flash(ev.department, ev.type === 'x_provider_wait_entered' ? PAL.grey3 : PAL.yellow1, 900);
-          if (ev.type === 'x_provider_wait_left') dispatchTask(ev);
+        case 'model_wait':
+          if (a.room) flash(a.room, PAL.grey3, 900);
+          run.finish();
           return;
-        case 'run_done':
+        case 'model_back':
+          if (a.room) flash(a.room, PAL.yellow1, 900);
+          task(run);
+          return;
+        case 'done':
           scene.emit('confetti', W / 2, 60, 40, { spread: 560 });
-          dispatchTask(ev);
+          task(run);
           return;
         default:
-          // 其余事件由任务目录决定：命中的事件变成角色的任务，没有命中的事件在画面上没有小人的动作
-          dispatchTask(ev);
+          // 其余动作是任务目录里的一件事：变成做它的角色的任务
+          task(run);
       }
     }
+
+    // 进度：不排队，合并成做它的角色的一个持续姿势，头顶写最近的一项；流式文字接在后面（实时内容）
+    function progress(a) {
+      if (scene.frozen) return;
+      const ch = ECS.doerOf(world, a);
+      if (!ch) return;
+      const def = world.catalog.tasks[a.kind];
+      // 真正的事情优先：正在做和排着的待机活动放弃
+      if (ch.current && ch.current.idle) ch.current = null;
+      ch.queue = ch.queue.filter((t) => !t.idle);
+      ch.progress = Object.assign({ taskKey: a.kind }, def, sayOf(a), { until: scene.realT + def.ms * P.timeline.settings.speed, iconText: a.count || null });
+    }
+
+    function stream(who, text) {
+      const ch = ECS.charFor(world, who.room, who.role, null);
+      if (!ch || scene.frozen) return;
+      const base = ECS.progressOf(ch, scene) || Object.assign({ taskKey: 'think' }, world.catalog.tasks.think);
+      ch.progress = Object.assign({}, base, {
+        label: ((base.streamed ? base.label : '') + text).slice(-120), streamed: true,
+        until: scene.realT + world.catalog.tasks.think.ms * P.timeline.settings.speed
+      });
+    }
+
+    // 时间线：动作的级别与时长来自声明表，参与方是做这件事的角色（大厅与成果库按房间算）
+    const laneOf = (room, by) => {
+      if (!room) return null;
+      if (!world.rooms[room] || world.rooms[room].roomKind !== 'dept') return 'room:' + room;
+      const ch = ECS.charFor(world, room, null, by || 'manager');
+      return ch ? ch.id : 'room:' + room;
+    };
+    function lanesOf(a) {
+      const def = world.catalog.tasks[a.kind];
+      if (def) {
+        const ch = ECS.doerOf(world, a);
+        const peer = ECS.peerOf(world, a);
+        return [ch && ch.id, peer && peer.id].filter(Boolean);
+      }
+      switch (a.kind) {
+        case 'handoff': case 'letter': return [laneOf(a.from), laneOf(a.to)].filter(Boolean);
+        case 'decision_out': case 'decision_back': return [laneOf(a.room)].filter(Boolean);
+        case 'adopt': return ['room:' + lay.lib.id];
+        case 'mail': case 'parcel_in': case 'queue_moved': return ['room:' + lay.hall.id];
+        case 'parcel_enter': return ['room:' + lay.hall.id, laneOf(lay.out.to)].filter(Boolean);
+        case 'resume': return Object.keys(world.characters);
+        default: return [];
+      }
+    }
+    const runs = new Map();
+    const tl = P.timeline.create({
+      clock: () => scene.realT,
+      classify(a) {
+        const k = DECL.kinds[a.kind];
+        return { tier: k.tier, ms: k.ms, lanes: lanesOf(a) };
+      },
+      begin(e) {
+        const run = {
+          id: e.id, action: e.action, ms: e.ms, dead: false, alive: () => !run.dead,
+          finish: () => { if (!run.dead && runs.has(e.id)) { runs.delete(e.id); tl.done(e.id); } }
+        };
+        runs.set(e.id, run);
+        perform(run);
+      },
+      cut(e) {
+        const run = runs.get(e.id);
+        if (run) run.dead = true;
+        runs.delete(e.id);
+        ECS.dropAction(world, e.id);
+        scene.flyers = scene.flyers.filter((f) => f.actionId !== e.id);
+      },
+      apply,
+      progress
+    });
 
     // -------------------------------------------------------------------------
     // 更新
 
     function update() {
+      tl.tick();
       if (!model.interrupted) st.clock += scene.reduced ? 0 : 16.7;
       ECS.stepPackages(world, scene);
       ECS.stepPipes(world, scene, pipeState);
@@ -622,7 +660,7 @@
       (model.waiting_provider || []).forEach((w) => {
         const r = roomById(w.department);
         if (!r) return;
-        const text = '等待模型服务' + (w.next_retry_at ? ' · ' + Y13.time.clock(w.next_retry_at) + ' 重试' : '');
+        const text = '等待模型服务' + (w.retry_text ? ' · ' + w.retry_text : '');
         P.sign(c, r.x + r.w / 2, PIPE_Y - 12, text, { size: 5.5, bg: PAL.grey1, stripe: PAL.grey3, maxW: r.w + 20 });
       });
       // 未回答的询问：信件停在接收方的传信管出口
@@ -696,15 +734,13 @@
       drawBoard(c);
     }
 
-    // 大厅的决定板：立在大厅地面上的告示板，等待回答的决定请求一张一张贴在上面（还在路上的不算），点板子打开卡片。
+    // 大厅的决定板：立在大厅地面上的告示板，等待回答的决定请求一张一张贴在上面，点板子打开卡片。
+    // 决定请求是实时内容：一到就贴上（用户点通知进来时要已经在板上），部门门口飞来的决定单是送出它的动作。
     // 板子在地面上，不与墙上的钟、槽位灯、管道重叠
     function boardRect() {
       const h = lay.hall;
       return { x: h.x + 62, y: FLOOR_LINE + 10, w: 32, h: 24 };
     }
-
-    // 决定单还在路上（从部门门口飞往板子）：最长藏 12 秒，落到板上时提前解除
-    const inFlight = (id) => (st.hidden[id] || 0) > scene.realT;
 
     function decisionColor(d) {
       const it = d.work_item_id ? itemById(d.work_item_id) : null;
@@ -712,7 +748,7 @@
     }
 
     function drawBoard(c) {
-      const ds = model.decisions || [];
+      const ds = decisions;
       if (!ds.length) return;
       const b = boardRect();
       P.sign(c, b.x + b.w / 2, b.y - 3, '待你决定', { size: 5.5, bg: PAL.yellow1, stripe: PAL.orange2 });
@@ -720,21 +756,20 @@
       R(c, b.x + b.w - 5, b.y + b.h + 2, 2, 8, PAL.wood4);
       RB(c, b.x - 2, b.y - 2, b.w + 4, b.h + 4, PAL.wood3);
       R(c, b.x, b.y, b.w, b.h, '#c9955c');
-      const shown = ds.filter((d) => !inFlight(d.id));
-      shown.slice(0, 6).forEach((d, i) => {
+      ds.slice(0, 6).forEach((d, i) => {
         const nx = b.x + 3 + (i % 3) * 10, ny = b.y + 3 + Math.floor(i / 3) * 12;
         RB(c, nx, ny, 8, 10, PAL.white);
         R(c, nx, ny, 8, 2, decisionColor(d));
         R(c, nx + 2, ny + 4, 4, 1, PAL.grey2);
         R(c, nx + 2, ny + 6, 4, 1, PAL.grey2);
       });
-      if (shown.length > 6) P.text(c, '+' + (shown.length - 6), b.x + b.w - 3, b.y + b.h - 4, { size: 5.5, weight: 800, align: 'right', color: PAL.ink });
+      if (ds.length > 6) P.text(c, '+' + (ds.length - 6), b.x + b.w - 3, b.y + b.h - 4, { size: 5.5, weight: 800, align: 'right', color: PAL.ink });
       if (sig('board') && !scene.reduced) paint.blinkFrame(c, b.x - 3, b.y - 3, b.w + 6, b.h + 6);
     }
 
     const overBoard = (x, y) => {
       const b = boardRect();
-      return (model.decisions || []).length > 0 && x >= b.x - 2 && x <= b.x + b.w + 2 && y >= b.y - 12 && y <= b.y + b.h + 10;
+      return decisions.length > 0 && x >= b.x - 2 && x <= b.x + b.w + 2 && y >= b.y - 12 && y <= b.y + b.h + 10;
     };
 
     // -------------------------------------------------------------------------
@@ -746,7 +781,7 @@
       // 房间里有多个角色时，中心角色的屏幕反映事项的状态，其余角色的屏幕看自己有没有在工作
       if (info && ECS.primaryOf(world, ch.department) !== ch) return info.status === 'working' ? 'code' : 'idle';
       const it = ch.item;
-      return it && it.status === 'running' ? 'code' : it && it.status === 'failed' ? 'error' : it && it.status === 'pending_verification' ? 'alert' : 'idle';
+      return it && it.status === 'working' ? 'code' : it && it.status === 'failed' ? 'error' : 'idle';
     }
 
     function drawDeptRoom(c, r, t) {
@@ -878,18 +913,18 @@
           const path = pathFor(s.from, s.to) || { pts: tubeFor(s.from, s.to) };
           if (!path || !path.pts) return;
           const [x, y] = ECS.pointAt(path.pts, ECS.polyLength(path.pts) / 2);
-          label(x, y - 6, s.count + ' 次 · ' + Y13.time.clock(s.last_at), s.kind === 'rework' ? PAL.red1 : PAL.white);
+          label(x, y - 6, s.count + ' 次 · ' + s.last_text, s.kind === 'rework' ? PAL.red1 : PAL.white);
         });
       } else if (overlay.id === 'waiting') {
         (data.entries || []).forEach((e) => {
           const r = roomById(e.department) || lay.hall;
-          label(r.x + r.w / 2, (e.row || 0) * 14 + TOP + 44, e.text + ' · ' + Y13.time.duration(e.waited_sec), PAL.yellow1);
+          label(r.x + r.w / 2, (e.row || 0) * 14 + TOP + 44, e.text + ' · ' + e.waited_text, PAL.yellow1);
         });
       } else if (overlay.id === 'recovery') {
         (data.entries || []).forEach((e) => {
           const r = roomById(e.department);
           if (!r) return;
-          label(r.x + r.w / 2, TOP + 44, e.text, e.state === 'pending_verification' ? PAL.yellow1 : PAL.white);
+          label(r.x + r.w / 2, TOP + 44, e.text, PAL.white);
         });
       } else if (overlay.id === 'context_usage') {
         // 每个角色头顶显示自己的用量：标签落在这个角色的工位上方，相邻的角色错开一行
@@ -917,21 +952,18 @@
     }
 
     // -------------------------------------------------------------------------
-    // 覆盖层「循环」（design.md 第 3 节）：取值只来自 run.loops 的结果
+    // 覆盖层「循环」（design.md 第 3 节）：取值只来自 run.loops 的结果，用量的文字（u.text）由翻译层写好
 
-    function usedText(u) {
-      const fmt = (v) => (u.unit === '秒' ? Y13.time.duration(v) : v + ' ' + u.unit);
-      return u.limit === null || u.limit === undefined ? fmt(u.value) : fmt(u.value) + ' / ' + fmt(u.limit);
-    }
+    function usedText(u) { return u.text; }
 
     // 标签也是事实元素：判定过的写给出状态的事件，「不判定」写缺少的事实。
-    // 状态由进展度量的某一轮给出时，来源是这一轮数值的来源（按事件加字段，例如检查结果是主机测量）
+    // 状态由进展度量的某一轮给出时，来源是这一轮数值的来源（按事件加字段，例如检查结果是主机测量），否则是给出状态的事件（inst.ref）
     function loopFact(inst, rect) {
       const title = inst.label + '：' + P.LOOP_STATES[inst.state].label;
       if (inst.state === 'not_judged') return fact('missing', rect, null, { title, missing: inst.missing, instanceId: inst.id });
       const notes = [inst.basis].concat(inst.stop_reason ? ['停止原因：' + inst.stop_reason] : []).filter(Boolean);
       const point = inst.measure && inst.measure.series.find((p) => p.position === inst.position);
-      const ref = point ? { position: inst.position, field: inst.measure.field, source: point.source } : inst.position;
+      const ref = point ? { position: inst.position, field: inst.measure.field, source: point.source } : inst.ref;
       return fact('loop', rect, ref, { title, notes, instanceId: inst.id });
     }
 
@@ -1022,10 +1054,9 @@
       const subject = coverageSubject(data);
       if (r && subject) {
         const title = (itemById(subject.work_item_id) || { title: subject.work_item_id }).title;
-        const text = title + '\n' + Y13.coverageText(subject);
+        const text = title + '\n' + subject.text;
         const rect = P.sign(c, r.x + r.w / 2, TOP + 60, text, { size: 6, bg: subject.open_count > 0 ? PAL.yellow1 : PAL.white, stripe: PAL.blue2, maxW: r.w + 40 });
-        const pos = Math.max.apply(null, subject.criteria.map((cr) => cr.position));
-        fact('coverage', rect, pos, { title: title + '：' + Y13.coverageText(subject), subject });
+        fact('coverage', rect, subject.ref, { title: title + '：' + subject.text, subject });
         st.labels.push({ kind: 'coverage', work_item_id: subject.work_item_id, covered: subject.covered, total: subject.total, model_read: subject.model_read, open_count: subject.open_count, text });
       }
       drawStamp(c, data);
@@ -1044,10 +1075,10 @@
       const cov = data && (data.items || []).find((x) => x.release && x.release.position === stamp.ref.position);
       if (cov) {
         // 写在盖章下方：第一行覆盖比例，第二行开环（放不下一行）
-        const full = '放行时 ' + Y13.coverageText(cov.release.ratio);
+        const full = '放行时 ' + cov.release.text;
         const text = full.replace(' · ', '\n');
         const rect = P.sign(c, r.x + r.w / 2, FLOOR_LINE + 8, text, { size: 6, bg: PAL.white, stripe: PAL.green3, maxW: r.w - 4 });
-        fact('release', rect, cov.release.position, { title: full });
+        fact('release', rect, cov.release.ref, { title: full });
         st.labels.push({ kind: 'release', work_item_id: cov.work_item_id, covered: cov.release.ratio.covered, total: cov.release.ratio.total, text });
       }
     }
@@ -1087,7 +1118,7 @@
       facts.forEach((f) => strokeSource(c, f.source, f.rect.x - 1.5, f.rect.y - 1.5, f.rect.w + 3, f.rect.h + 3));
       const counts = {};
       facts.forEach((f) => { counts[f.source] = (counts[f.source] || 0) + 1; });
-      drawLegend(c, Object.keys(Y13.registry.SOURCE_KINDS).map((k) => ({ source: k, text: Y13.registry.SOURCE_KINDS[k].label + ' ' + (counts[k] || 0) })));
+      drawLegend(c, P.contract.SOURCES.map((k) => ({ source: k, text: P.SOURCE_STYLE[k].label + ' ' + (counts[k] || 0) })));
       st.labels.push({ kind: 'sources', counts });
     }
 
@@ -1121,19 +1152,12 @@
       sc.drawFlyers(c);
       sc.drawParticles(c);
 
-      // 灯光：未工作的房间调暗、闪光、待核实黄灯、等待模型服务调暗、整层中断变暗
+      // 灯光：未工作的房间调暗、闪光、等待模型服务调暗、整层中断变暗
       lay.depts.forEach((r) => {
         const d = r.id;
-        const here = itemsIn(d);
         const lit = busyIn(d).some((it) => ACTIVE.includes(it.status) || it.status === 'done') || Boolean(r.def.lit && r.def.lit(ctx));
         if (!lit) { c.fillStyle = 'rgba(14,12,34,0.32)'; c.fillRect(r.x, TOP, r.w, ROOM_B - TOP); }
         if (waitingDept(d)) { c.fillStyle = 'rgba(40,44,60,0.25)'; c.fillRect(r.x, TOP, r.w, ROOM_B - TOP); }
-        if (here.some((it) => it.status === 'pending_verification')) {
-          const k = sc.reduced ? 0.14 : 0.1 + 0.08 * Math.sin(t / 240);
-          c.fillStyle = 'rgba(255,196,40,' + k.toFixed(3) + ')';
-          c.fillRect(r.x, TOP, r.w, ROOM_B - TOP);
-          paint.beacon(c, r.x + r.w - 14, TOP + 4, { on: true }, t);
-        }
         const fl = st.flash[d];
         if (fl && fl.until > sc.realT) {
           c.fillStyle = P.rgba(fl.color, Math.min(0.35, ((fl.until - sc.realT) / 900) * 0.35));
@@ -1199,7 +1223,7 @@
 
     // 信息条上写的事项：聚焦的事项，否则是正在进行的事项
     function infoItem() {
-      return (focusId && itemById(focusId)) || model.items.find((x) => ACTIVE.includes(x.status) || x.status === 'waiting_provider') || model.items.find((x) => IN_ROOM.includes(x.status)) || null;
+      return (focusId && itemById(focusId)) || model.items.find((x) => ACTIVE.includes(x.status) || x.status === 'waiting_model') || model.items.find((x) => IN_ROOM.includes(x.status)) || null;
     }
 
     function drawInfoBar(c) {
@@ -1227,7 +1251,7 @@
         const rect = chip('当前部门：' + P.DEPTS[it.department].name, P.DEPTS[it.department].light);
         if (it.refs) fact('department', rect, it.refs.department, { title: '信息条：当前部门 ' + P.DEPTS[it.department].name, itemId: it.id });
       }
-      const statusRect = chip(STATUS_TEXT[it.status] || it.status, STATUS_CHIP[it.status] || PAL.grey2, ['running', 'failed', 'adopted', 'asking'].includes(it.status) ? PAL.white : PAL.ink);
+      const statusRect = chip(STATUS_TEXT[it.status], STATUS_CHIP[it.status] || PAL.grey2, ['working', 'failed', 'adopted', 'asking'].includes(it.status) ? PAL.white : PAL.ink);
       if (it.refs) fact('status', statusRect, it.refs.sign, { title: '信息条：' + (STATUS_TEXT[it.status] || it.status), itemId: it.id });
       st.barX = x;
       if (it.limit_sec) {
@@ -1274,12 +1298,11 @@
     // 点开事实元素：覆盖层「检验」的标签打开逐条清单，其余打开来源卡片
     function openFact(f) {
       if (f.kind !== 'coverage') { sourceCard.open(f); return; }
-      const methods = Y13.registry.CHECK_METHODS;
       const rows = f.subject.criteria.map((cr) => ({
-        label: cr.id + ' ' + cr.text, method: methods[cr.method].label, result: cr.result, resultText: RESULT_TEXT[cr.result], open: cr.open,
+        label: cr.id + ' ' + cr.text, method: cr.method_text, result: cr.result, resultText: RESULT_TEXT[cr.result], open: cr.open,
         fact: {
           kind: 'criterion', rect: f.rect, position: cr.position, field: cr.field, source: cr.source, title: cr.id + ' ' + cr.text,
-          notes: ['检验方式：' + methods[cr.method].label + ' · 最近一次结果：' + RESULT_TEXT[cr.result]].concat(cr.open ? ['开环：没有可执行的检验'] : [])
+          notes: ['检验方式：' + cr.method_text + ' · 最近一次结果：' + RESULT_TEXT[cr.result]].concat(cr.open ? ['开环：没有可执行的检验'] : [])
         }
       }));
       sourceCard.openList(f.title + ' · 逐条清单', rows, f.rect);
@@ -1304,9 +1327,9 @@
     // -------------------------------------------------------------------------
     // 接口
 
-    function setModel(m) {
-      if (!m || !Array.isArray(m.items)) throw new Error('setModel 需要 floorModel');
-      model = Object.assign({ open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [], machines: null, ops: null, interrupted: false, roles: null, decisions: [] }, m);
+    // 一份状态上画面（时间线决定什么时候）
+    function apply(m) {
+      model = Object.assign({ open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [], machines: null, ops: null, interrupted: false, roles: null }, m);
       const next = flagsOf(model);
       if (JSON.stringify(next) !== JSON.stringify(flags)) {
         // 快照里的运维数据出现或消失：房间与管道按新的条件重新声明，角色、包裹、信号与管道的流动状态原样带过去
@@ -1321,19 +1344,25 @@
         bg = null;
       }
       if (m.focus_id !== undefined && focusId === null) focusId = m.focus_id;
-      card.setDecisions(model.decisions || []);
       syncWorkers();
       scene.frozen = Boolean(model.interrupted);
     }
 
     syncWorkers();
 
+    const kinds = DECL.kinds;
     return {
       scene,
-      // 验收脚本读取世界的当前状态、决定卡片与来源卡片、这一帧的事实元素与覆盖层上写出的标签
-      inspect: () => ({ world, model, card, sourceCard, facts: st.facts.slice(), overlay: { id: overlay.id, data: overlay.data, labels: st.labels.slice() } }),
-      setModel,
-      playEvent,
+      // 验收脚本读取世界的当前状态、决定卡片与来源卡片、这一帧的事实元素、覆盖层上写出的标签与时间线
+      inspect: () => ({ world, model, decisions, card, sourceCard, facts: st.facts.slice(), overlay: { id: overlay.id, data: overlay.data, labels: st.labels.slice() }, timeline: tl.inspect() }),
+      // 状态：等它之前的动作演完再上画面；jump 清空时间线，直接显示（打开、重新同步、从后台切回、回放）
+      setState: (s) => tl.state(P.contract.floorState(s)),
+      jump: (s) => tl.jump(P.contract.floorState(s)),
+      // 动作：按位置进入时间线
+      play: (a) => tl.push(P.contract.action('楼层', a, kinds)),
+      // 实时内容：决定卡片与流式文字到了就显示
+      setDecisions(list) { decisions = list || []; card.setDecisions(decisions); },
+      stream,
       focus(id) { focusId = id || null; },
       setOverlay(id, data) {
         if (id !== overlay.id) sourceCard.close();
