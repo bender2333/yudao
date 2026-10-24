@@ -7,6 +7,8 @@
 
 ---
 
+solo-minimax-M3.1-Flash / 2026-10-24 23:30 / 工单 #876：进程被结束以后重新打开事件库时，可写打开（含设置 WAL）也在等待上限内重试——`harness/tests/process_kill.py` 增加 `_open_writable_after_kill` 与 `_open_system_after_kill`，`interrupted` 与 `restarted` 结束进程以后打开系统的四处改用它；只读打开原有的重试不变；产品代码不动（`harness/event_store.py` 没有改）/ GitHub 的 Windows 运行机上进程刚被结束时事件库文件还会被短暂占用，可写打开失败在 `PRAGMA journal_mode=WAL`（2026-10-23 run 39998093540：集成层两条用例报 disk I/O error）；用这个辅助的 8 个文件一起生效，不在各个用例里加重试
+
 claude-opus-5-5 / 2026-10-24 23:25 / `docs/design/app-and-interface.md` 第 4.3 节 `home.away_report` 的关键事实去掉「交接」，返工注明是质检提交缺陷记录；开放工单 #154 的原型代码路径从 v10 改到 v12；#831 随 v12 定稿关闭 / v12 列出的设计不一致之一：#556 以后关键事实里已经没有交接（`harness/app/home.py` 的 `FACT_KINDS`），术语表也不用「交接」；原型定稿时开放工单里引用旧版本代码的路径改为新版本
 
 claude-opus-5-5 / 2026-10-24 23:10 / 原型 v12 定稿：`docs/prototypes/CHANGELOG.md` 的「当前定稿」改为 v12，删除「下一版原型的待办」四条（v12 已处理），[v12] 一节写明已定稿 / 用户看完 v12 同意定稿；开放工单里的原型路径、客户端按 v12 重新生成的登记表与录制、v12 列出的几处设计说明不一致另行处理
