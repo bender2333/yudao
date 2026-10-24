@@ -99,7 +99,7 @@ Windows 的解释器在 `Scripts\`，其他系统在 `bin\`。不用默认数据
 
 定位不到具体一步的卡点，本身记一条「查不出原因」，属于可诊断的问题。
 
-另做一次机械扫描：把导出写到文件，搜 `key`、`token`、`password`、`Authorization`、盘符开头与 `/home/` 开头的路径。命中就是问题。
+另做一次机械扫描：把导出写到文件，搜 `key`、`token`、`password`、`Authorization`、盘符开头与 `/home/` 开头的路径。凭据的值（Key、token、密码、Authorization 头的内容）命中就是问题。路径与本机用户名出现在部门执行的命令与输出、或用户给的起始文件夹里，不算问题：导出是原始记录，不脱敏（[应用层与接口层设计说明](../../../docs/design/app-and-interface.md) `run.export` 一行，#845）；出现在 Yudao 自己写的其他字段里才算。
 
 ## 6. 读数与对照
 

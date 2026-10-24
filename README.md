@@ -308,7 +308,7 @@ curl -X POST http://localhost:8765/api/commands/work_item.cancel \
 任务完成后：
 
 ```bash
-# 导出事件、投影、调用尝试与用量
+# 导出事件、投影、调用尝试与用量（原始记录：不含 Key，但部门命令的输出里可能有本机用户名与路径，分享前自己清理）
 curl "http://localhost:8765/api/queries/run.export?run_id={run_id}" > run.json
 
 # 下载交付文件（按交付事件与路径）

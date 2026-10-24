@@ -53,4 +53,4 @@ solo-minimax-M3.1-Flash / 2026-10-24 03:45 / 工单 #557 / 影响列表（`catal
 处理：待架构师决定（solo-minimax-M3.1-Flash 2026-10-24 03:45）
 
 solo-minimax-M3.1-Flash / 2026-10-24 06:57 / 工单 #842 / 询问分支会话的激活仍然推进轮次计数：投影的 `cycle_count` 对每次 `DEPARTMENT_ACTIVATED` 加一（`harness/projection.py`），询问分支会话的激活也算一次，于是旁支工作占用主线的轮次上限（`harness/bounds.py` 的 `activation_bound` 按 `cycle_count >= max_cycles` 判断），页面上「第 N 轮」也多一次。工单 #842 的期望写「事项的所在部门与轮次由实际进行的部门激活推出」，轮次这一半与现在的实现不一致；本工单只改「所在部门」（分支的激活不改写所在部门），轮次口径留给架构师定 / 轮次上限是事项级的预算，一次询问吃掉一次预算，主线真正的工作因此提前触顶（工单正文里的运行第 4 轮就是一次询问带来的）
-处理：待架构师决定（solo-minimax-M3.1-Flash 2026-10-24 06:57）
+处理：轮次只计主线会话的激活，分支的激活不推进轮次、不占用轮次上限；写进 docs/design/department-loop.md 第 4.2 节，由 #857 实现（claude-opus-5-5 2026-10-24）
