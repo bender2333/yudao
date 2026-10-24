@@ -41,19 +41,31 @@ def ingest_snapshot(source_dir: str | Path, artifacts: ArtifactStore, scope: str
 
 def git_provenance(source_dir: str | Path) -> dict[str, Any]:
     # 在进程内用 libgit2 读取基线对应的提交、分支与是否有未提交的修改；源目录不是工作树时为空
+    # 只看源目录自己（工单 #841，设计第 4.6 节）：源目录本身是 Git 工作树的根目录（有自己的 .git）时才读取，
+    # 不向上层目录查找——上层目录里的仓库（例如用户主目录下的 .git）既不影响结果也不被打开。
+    # 源目录本身是仓库但打不开时抛 TreeError：建项目命令把它变成 source_invalid 拒绝并写明目录与原因，
+    # 不是 500。快照是这个文件夹，上层仓库的提交与「有没有未提交的修改」说的是整个仓库，会误导。
     base = Path(source_dir).absolute()
-    found = pygit2.discover_repository(str(base))
-    if found is None or not os.path.exists(found):
+    if not os.path.lexists(str(base / ".git")):
         return {}
-    repository = pygit2.Repository(found, flags=RepositoryOpenFlag.NO_SEARCH)
+    try:
+        repository = pygit2.Repository(str(base), flags=RepositoryOpenFlag.NO_SEARCH)
+    except (pygit2.GitError, OSError) as error:
+        raise TreeError(f"源目录的 Git 仓库打不开：{base}：{error}") from error
     if repository.is_bare:
         # 裸库没有工作树：与 Git 命令行的 rev-parse --is-inside-work-tree 相同，来源为空
         return {}
     try:
-        commit = str(repository.head.target)
-    except pygit2.GitError as error:
-        raise TreeError(f"git rev-parse HEAD 失败：{error}") from error
-    return {"commit": commit, "branch": repository.head.shorthand, "dirty": bool(repository.status())}
+        head = repository.head
+        commit = str(head.target)
+        branch = head.shorthand
+    except (pygit2.GitError, KeyError) as error:
+        raise TreeError(f"源目录的 Git 提交读不出：{base}：{error}") from error
+    try:
+        dirty = bool(repository.status())
+    except (pygit2.GitError, OSError) as error:
+        raise TreeError(f"源目录的 Git 状态读不出：{base}：{error}") from error
+    return {"commit": commit, "branch": branch, "dirty": dirty}
 
 def restore_snapshot(
     artifacts: ArtifactStore, scope: str, snapshot: dict[str, Any], destination: str | Path
