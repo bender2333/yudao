@@ -32,6 +32,7 @@ import {
   canJoinCandidates,
   candidateToRow,
   capacityIssueText,
+  collectCandidatesAction,
   collectImpact,
   confirmImpactText,
   credentialStatusLabel,
@@ -85,6 +86,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, Record<string, boolean>>>({});
   const [candidateCapacity, setCandidateCapacity] = useState<Record<string, Record<string, CandidateCustomCapacity>>>({});
   const [collecting, setCollecting] = useState<string | null>(null);
+  // 点「获取模型列表」以后页面给的说明：连接没有保存时说明先保存什么、为什么（工单 #843）
+  const [collectNotice, setCollectNotice] = useState("");
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [tests, setTests] = useState<Record<string, string>>({});
   const [formStatus, setFormStatus] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
@@ -249,6 +252,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       return;
     }
     setFormStatus(null);
+    setCollectNotice("");
     setForm({ mode: "edit", state: formStateFromProvider(provider) });
   }, []);
 
@@ -259,6 +263,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       return;
     }
     setFormStatus(null);
+    setCollectNotice("");
     setForm({ mode: "add", state: emptyFormState(current.default_timeout_sec) });
   }, []);
 
@@ -442,6 +447,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
 
 
   const collectCandidates = useCallback(async (providerId: string, modelsUrl: string) => {
+    // 真的开始采集以后，表单里那句「先保存」的说明不再适用
+    setCollectNotice("");
     setCollecting(providerId);
     const result = await submit("catalog.candidates.collect", {
       provider_id: providerId,
@@ -976,6 +983,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           credential={formCredential}
           candidate={candidates[form.state.id] ?? null}
           collecting={collecting === form.state.id}
+          collectNotice={collectNotice}
           admissions={catalog.admissions}
           impact={confirmImpactText(saveImpact)}
           busy={busy}
@@ -986,7 +994,16 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           onCancel={() => setForm(null)}
           onDelete={() => void deleteProvider(form.state.id)}
           onTestConnection={() => void testConnection(form.state.id)}
-          onCollectCandidates={() => void collectCandidates(form.state.id, form.state.models_url)}
+          onCollectCandidates={() => {
+            // 连接没有保存时按服务端合同采不到候选（第 4.3 节只对已保存的连接采集）：
+            // 页面说明先保存什么、为什么，不发请求（工单 #843）
+            const action = collectCandidatesAction(form.mode);
+            if (action.kind === "explain") {
+              setCollectNotice(action.message);
+              return;
+            }
+            void collectCandidates(form.state.id, form.state.models_url);
+          }}
           onCredential={(action, secret, persist) => {
             if (action === "set") {
               void saveCredential(form.state.credential_ref, secret, persist, formCredential?.version ?? 0);

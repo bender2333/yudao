@@ -782,6 +782,29 @@ export function effectiveModelsUrl(state: { base_url: string; models_url: string
   return effectiveModelsUrl(state, preset).trim() !== "";
  }
 
+// 候选区一直显示的一句提醒：连接还没有保存时，先告诉用户下一步（工单 #843）
+export function collectCandidatesHint(mode: "add" | "edit"): string {
+  return mode === "add" ? "获取模型列表要先保存这份连接。" : "";
+}
+
+// 点「获取模型列表」时页面做什么（工单 #843）：
+// 连接没有保存时按服务端合同采不到候选（第 4.3 节只对已保存的连接采集，
+// 服务端按 provider_id 查连接，查不到就拒绝），所以页面把先保存什么、为什么写出来，
+// 而不是让点击没有反应、不发请求。已保存的连接照旧采集。
+export type CollectCandidatesAction =
+  | { kind: "collect" }
+  | { kind: "explain"; message: string };
+
+export function collectCandidatesAction(mode: "add" | "edit"): CollectCandidatesAction {
+  if (mode === "edit") {
+    return { kind: "collect" };
+  }
+  return {
+    kind: "explain",
+    message: "请先点「添加」保存这份连接：获取模型列表按已保存的连接执行，保存以后再点「获取模型列表」就能拿到候选。",
+  };
+}
+
 // 部门默认与项目设置的模型选项：按连接分组的已准入定义（第 9.1 节）
 export function admittedModels(
   models: CatalogModel[],

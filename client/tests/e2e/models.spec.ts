@@ -744,6 +744,39 @@ test("获取模型列表失败时页面显示请求的地址与状态码（工�
   }
 });
 
+// 新建连接时点「获取模型列表」（工单 #843）：连接没有保存，页面要说明先保存什么、为什么，不发请求
+test("新建连接时点「获取模型列表」：页面说明先保存，不发请求", async () => {
+  test.setTimeout(300_000);
+  const { backend, client } = await openModels({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const commands: string[] = [];
+  client.page.on("request", (request) => {
+    if (request.url().includes("/api/commands/")) {
+      commands.push(request.url());
+    }
+  });
+  try {
+    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
+    const form = client.page.locator(".mm-form");
+    await form.getByTestId("provider-base-url").fill("https://example.invalid/v1");
+    await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("repro1");
+    await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("repro1");
+    await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("REPRO_KEY");
+    // 不用点就知道下一步：候选区写着要先保存这份连接
+    await expect(form.getByTestId("collect-hint")).toContainText("保存");
+    // 按钮可以点；点了以后页面说明先保存什么、为什么
+    await form.getByTestId("collect-candidates").click();
+    await expect(form.getByTestId("collect-notice")).toContainText("保存");
+    // 没有发出采集请求，也没有停在「候选获取中…」
+    expect(commands.filter((url) => url.includes("candidates"))).toEqual([]);
+    await expect(form.getByTestId("collect-candidates")).toHaveText("获取模型列表");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+    await backend.stop();
+  }
+});
+
 test("新建自定义连接保存 Key 后直接获取模型列表并测试空连接", async () => {
   test.setTimeout(300_000);
   const received: string[] = [];
