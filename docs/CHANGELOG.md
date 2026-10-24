@@ -13,6 +13,12 @@ claude-opus-5-5 / 2026-10-24 23:49 / 新增 `docs/design/visualization.md`（画
 
 solo-minimax-M3.1-Flash / 2026-10-24 23:30 / 工单 #876：进程被结束以后重新打开事件库时，可写打开（含设置 WAL）也在等待上限内重试——`harness/tests/process_kill.py` 增加 `_open_writable_after_kill` 与 `_open_system_after_kill`，`interrupted` 与 `restarted` 结束进程以后打开系统的四处改用它；只读打开原有的重试不变；产品代码不动（`harness/event_store.py` 没有改）/ GitHub 的 Windows 运行机上进程刚被结束时事件库文件还会被短暂占用，可写打开失败在 `PRAGMA journal_mode=WAL`（2026-10-23 run 39998093540：集成层两条用例报 disk I/O error）；用这个辅助的 8 个文件一起生效，不在各个用例里加重试
 
+minimax-M3.1-Flash / 2026-10-24 23:35 / `docs/agents/triage-labels.md` 补一段：循环交回外部的三条通道（连着三次没过 → `needs-triage` 升级；架构、需求、设计问题 → `needs-triage` 提问题，写结构化评论；执行环境挡住任务 → `ready-for-human` 转给用户，写清哪一步被挡住、试过什么、需要什么），外部处理完标签改回 `ready-for-agent` 后循环刷新时重新排上 / 用户要求工人遇到执行环境问题要有一条通道与用户沟通，由编排者转给用户
+
+minimax-M3.1-Flash / 2026-10-24 23:12 / `docs/agents/triage-labels.md` 补一条：Ralph 循环每一批派活前按外部状态刷新台账（已关闭的标完成、别人在做的这一轮不派、交回人的标成等前提条件）/ 用户补充要求工单与提交都要署名，并问还有什么要加的：solo 署名定为 `solo-minimax-code`（沿用 `solo-<标识>` 形式，标识换成工具名），六处必须署名（提交信息末行、PR 正文末行、工单评论末行、PR 交付说明末行、日记记录行首、变更记录条目行首），提交身份 `GIT_AUTHOR_NAME`/`GIT_COMMITTER_NAME` 也用同一个署名（运行配置第 3 节本来就这么要求，以前没做）；规则本体写在 `.ralph/m0-solo/handoff.md` 与插件的工人契约里，不改仓库规则文件
+
+minimax-M3.1-Flash / 2026-10-24 22:53 / `docs/agents/triage-labels.md`：`needs-triage` 的适用情况从三种增到四种（第四种是 Ralph 循环里同一张工单连续三次没有通过，循环停止重试、交回架构师），solo 模式一节补一段升级通道的写法（标签从 `in-progress` 改成 `needs-triage`，工单上留一条评论写清三次分别卡在哪）与一条刷新规则（派活前按外部状态刷新台账：别人领走的单子这一轮不派，交回人的标成等前提条件）/ 用户要求升级 ralph-loop 技能：工单连续三次失败就升级给架构师，一轮最多并发 4 个、每个任务在自己的 worktree 里；用户指出工单状态会变、台账要在派活前刷新
+
 claude-opus-5-5 / 2026-10-24 23:25 / `docs/design/app-and-interface.md` 第 4.3 节 `home.away_report` 的关键事实去掉「交接」，返工注明是质检提交缺陷记录；开放工单 #154 的原型代码路径从 v10 改到 v12；#831 随 v12 定稿关闭 / v12 列出的设计不一致之一：#556 以后关键事实里已经没有交接（`harness/app/home.py` 的 `FACT_KINDS`），术语表也不用「交接」；原型定稿时开放工单里引用旧版本代码的路径改为新版本
 
 solo-minimax-M3.1-Flash / 2026-10-24 23:21 / 工单 #870：`harness/tests/test_smoke_guidance_audit.py` 的夹具 `saved_combined` 在工程第一次请求在途里给完指导与连续输入以后，等 PRD 第 2 版被接纳再交出这一轮的回答（等待写成生成器，逐条交出流式片段把控制权还给事件循环，适配器给 10 毫秒的片段间隔），夹具里加了一句注释说明为什么要等第 2 版 / 部门同时运行以后（#557）产品接纳 PRD 第 2 版与工程处理指导的那一轮的先后随调度变化：工程那一轮若在第 2 版之前开始，它跑出来的检查回执绑定的是第 1 版（`harness/orchestrator.py` 在激活开始时 `bind_check`），`harness/collaboration.py` 的 `_usable_tool_result` 按当前 PRD 核对时不再采用它，`guidance_results` 为空，用例报 `StopIteration`（main 运行 40049559837，本地 64 次里 10 次）；产品行为是对的，过时的依据本来就不该被采用；断言没有放宽，用例没有删除
