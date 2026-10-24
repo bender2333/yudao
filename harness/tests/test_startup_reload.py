@@ -147,6 +147,13 @@ def test_file_created_after_starting_without_one_is_loaded(tmp_path):
     facade.reload()
     assert facade.config_status()["config_state"] == "missing"
 
+    # 创建空目录文件：状态是「空目录」
+    _write_json(config_path, {"providers": [], "models": [], "bindings": {}})
+    result = facade.reload()
+    assert result["ok"] is True
+    assert facade.config_status()["config_state"] == "empty"
+
+    # 创建有内容的目录文件：状态是「已加载」，内容生效
     _write_json(config_path, _fake_doc())
     result = facade.reload()
     assert result["ok"] is True
