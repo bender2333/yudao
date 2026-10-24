@@ -50,8 +50,12 @@ def test_restart_keeps_accumulated_time_and_counts(tmp_path):
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
     # 子进程里产品提交规格、工程读取文件；重启以后父进程里工程交付、质检核验
+    # 质检也要给脚本（工单 #943：工单 #935 查出的同一处隐患。PRD 被接纳以后质检会话也发起模型请求，
+    # 没有它的脚本时假模型报「脚本用尽」，整个 run 以 provider_error 提前结束，
+    # 用例在到达中断点以前就失败；这里的日志是空的，风险窗口比 #935 窄，但成因相同）
     script = {"product": [{"proposal": product_spec()}],
-              "engineering": [{"output": [_call("call-read", "read_file", {"path": "notes.txt"})]}]}
+              "engineering": [{"output": [_call("call-read", "read_file", {"path": "notes.txt"})]}],
+              "quality": [{"proposal": {"kind": "quality_auto"}}]}
     tail = {"engineering": [{"proposal": delivery(check_names=["smoke"]), "writes": {"src/echo.py": ECHO},
                              "checks": CHECKS}],
             "quality": [{"proposal": review("release", "checks passed on the current snapshot"),
@@ -70,6 +74,18 @@ def test_restart_keeps_accumulated_time_and_counts(tmp_path):
 
         finished = run.after.run_until_stop(run.run_id)
         assert finished.status == "done", "重启以后自动继续到放行"
+
+        # 结果确实交还了模型（工单 #943）：运行因为提供方报错提前结束的时候，
+        # 重启与交还都没有发生，「已用的时间连续」就成了一句空话
+        verified = [event.payload for event in killed.events(run.after, run.run_id, "action_verified")
+                    if (event.payload or {}).get("id") == "call-read"]
+        assert len(verified) == 1, "这一次读取的结果交还了模型"
+        assert verified[0]["resolution"] == "handed_back"
+        assert verified[0]["ok"] is False
+        # 读取没有被再运行：整个 run 里只有最初那一次调用
+        started = [event.payload for event in killed.events(run.after, run.run_id, "tool_started")
+                   if (event.payload or {}).get("id") == "call-read"]
+        assert len(started) == 1
 
         after = run.after.store.list_events(run.run_id)
         after_elapsed, after_activations, after_steps = _usage(after)
