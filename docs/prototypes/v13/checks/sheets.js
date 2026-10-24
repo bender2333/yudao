@@ -1,6 +1,9 @@
-// 截图联系表（design.md 第 9 节）：自举试点首批画面，每个画面在两种宽度（1440、1920）与两种主题下各截一张，
+// 截图联系表：自举试点首批画面，每个画面在两种宽度（1440、1920）与两种主题下各截一张，
 // 存进 .tmp/v13-checks/sheets/，再拼成每个画面一张的联系表（左右为两种宽度，上下为浅色与深色），交给用户确认画面。
-// 用法：node docs/prototypes/v13/checks/sheets.js [--only 画面名,画面名]
+// 画面都从页面的入口打开（路由、覆盖层按钮、场景的步骤、命令），楼层画面由页面经翻译层交给画面合同的接口，
+// 这里直接对楼层画面做的只有合同里的 openFact。
+// 用法：node docs/prototypes/v13/checks/sheets.js [--only 画面编号,画面编号]（编号是 SCREENS 里的 id，例如 loops,coverage）
+// 零页面错误时输出 RESULT: PASS。
 const fs = require('fs');
 const path = require('path');
 const { chromium, EXE, v13Url, outDir } = require('./env');
