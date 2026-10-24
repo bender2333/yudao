@@ -32,7 +32,7 @@
   // 楼与机房的动作都是闪光与包裹，不占参与方；开始时就算演完，时间线按声明的最短时长结束它
   function effectsTimeline(scene, kinds, perform, apply) {
     const tl = P.timeline.create({
-      clock: () => scene.realT,
+      clock: () => scene.wallT,
       classify: (a) => ({ tier: kinds[a.kind].tier, ms: kinds[a.kind].ms, lanes: [] }),
       begin(e) { perform(e.action); tl.done(e.id); },
       cut() {},

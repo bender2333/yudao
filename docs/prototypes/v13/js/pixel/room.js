@@ -357,6 +357,8 @@
           scene.tween(st, 'dark', target, 600, 'inOut');
         }
       }
+      // 整层静止（中断）时，演到一半的动作停在原处，时间线不再等它们
+      if (s === 'interrupted' && !scene.frozen) Array.from(runs.keys()).forEach((id) => { runs.delete(id); tl.done(id); });
       scene.frozen = s === 'interrupted';
     }
 
@@ -468,6 +470,7 @@
 
     function update() {
       tl.tick();
+      scene.rate = tl.rate();
       if (effStatus() !== 'interrupted') st.clock += 16.7 * (scene.reduced ? 0 : 1);
       // 时间线上正在演的动作：做它的小人做完主要的部分（进入收尾步骤，例如走回工位）就算演完，下一个动作可以接上
       runs.forEach((run, id) => {
@@ -1308,7 +1311,7 @@
     }
 
     const tl = P.timeline.create({
-      clock: () => scene.realT,
+      clock: () => scene.wallT,
       classify(act) {
         const k = P.roomDecl.kinds[act.kind];
         return { tier: k.tier, ms: k.ms, lanes: lanesOf(act) };

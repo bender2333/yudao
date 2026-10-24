@@ -143,7 +143,7 @@ const DRIVER = async () => {
       const r = burst(kind, null, n, 16);
       const st = r.tl.stats;
       check('H8 ' + r.name + '：堆积时落后不超过上限', st.maxLag <= r.lagMs + 2 * DT, '最大落后 ' + st.maxLag + ' 毫秒，上限 ' + r.lagMs);
-      check('H9 ' + r.name + '：关键动作全部开始演，一个也不丢', st.droppedKey === 0 && st.startedKey === st.pushedKey, JSON.stringify(st));
+      check('H9 ' + r.name + '：关键动作全部开始演，一个也不丢，正在演的不截断，限时的都在限定的时间内演完', st.droppedKey === 0 && st.startedKey === st.pushedKey && st.cutKey === 0 && st.late === 0, JSON.stringify(st));
       check(r.name + '：堆积以后最后显示的是最新的状态，时间线清空', r.tl.shown === r.last && !r.tl.pending && !r.tl.queued && !r.tl.playing.length, JSON.stringify({ shown: r.tl.shown, last: r.last, pending: r.tl.pending, queued: r.tl.queued }));
       if (kind !== 'building') check(r.name + '：堆积时普通动作被丢掉、关键动作被缩短或合并', st.dropped > 0 && (st.shortened > 0 || st.merged > 0), JSON.stringify(st));
     });
@@ -151,7 +151,7 @@ const DRIVER = async () => {
     const tight = burst('floor', { lagMs: 2000 }, 140, 16);
     check('调节面板：落后上限调到 2 秒，H8 照样成立', tight.tl.stats.maxLag <= 2000 + 2 * DT, tight.tl.stats.maxLag);
     const slow = burst('floor', { speed: 2 }, 60, 16);
-    check('调节面板：动作时长倍率 2，H8 与 H9 照样成立', slow.tl.stats.maxLag <= 5000 + 2 * DT && slow.tl.stats.droppedKey === 0 && slow.tl.stats.startedKey === slow.tl.stats.pushedKey, JSON.stringify(slow.tl.stats));
+    check('调节面板：动作时长倍率 2，H8 与 H9 照样成立', slow.tl.stats.maxLag <= 5000 + 2 * DT && slow.tl.stats.droppedKey === 0 && slow.tl.stats.startedKey === slow.tl.stats.pushedKey && slow.tl.stats.cutKey === 0, JSON.stringify(slow.tl.stats));
     Object.assign(P.timeline.settings, { lagMs: 5000, minMs: 300, speed: 1 });
     {
       const m = SCENES.floor();
@@ -324,7 +324,7 @@ const DRIVER = async () => {
     const st = r.tl.stats;
     check('页面 场景 24（短时间内大量事件堆积）：播完没有控制台错误', errors.length === 0, errors.slice(0, 2).join(' | '));
     check('页面 场景 24：画面落后不超过上限（H8）', st.maxLag <= r.lagMs + 150, st.maxLag + ' 毫秒，上限 ' + r.lagMs);
-    check('页面 场景 24：关键动作不丢（H9）', st.droppedKey === 0 && st.startedKey === st.pushedKey, JSON.stringify(st));
+    check('页面 场景 24：关键动作不丢，正在演的不截断（H9）', st.droppedKey === 0 && st.startedKey === st.pushedKey && st.cutKey === 0 && st.late === 0, JSON.stringify(st));
     check('页面 场景 24：确实发生了堆积（普通动作被丢掉）', st.dropped > 0, JSON.stringify(st));
     check('页面 场景 24：播完以后时间线清空', !r.tl.pending && !r.tl.queued && !r.tl.playing.length, JSON.stringify(r.tl));
   }

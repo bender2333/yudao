@@ -15,7 +15,8 @@ function load() {
   return window.Y13.pixel.timeline;
 }
 
-// 一条时间线与它的渲染：natural(动作) 给出渲染自己演完需要多久（默认等于声明时长）
+// 一条时间线与它的渲染：natural(动作, 声明时长) 给出渲染自己演完需要多久（默认等于声明时长）。
+// 渲染的时间按时间线给出的加快倍率 rate() 推进，限时演完的动作能不能赶上由倍率决定
 function rig(opts) {
   const T = load();
   Object.assign(T.settings, { lagMs: 5000, minMs: 300, speed: 1 }, (opts && opts.settings) || {});
@@ -34,19 +35,21 @@ function rig(opts) {
   const tl = T.create({
     clock: () => now,
     classify: (a) => Object.assign({ lanes: a.lanes || [] }, DECL[a.kind]),
-    begin(e) { r.begun.push({ at: now, kind: e.action.kind, pos: e.pos, ms: e.ms, lanes: e.lanes.slice(), tier: e.tier }); live.set(e.id, now + natural(e.action, e.ms)); },
-    cut(e) { r.cut.push({ at: now, kind: e.action.kind, pos: e.pos }); live.delete(e.id); },
+    begin(e) { r.begun.push({ at: now, kind: e.action.kind, pos: e.pos, ms: e.ms, lanes: e.lanes.slice(), tier: e.tier }); live.set(e.id, natural(e.action, e.ms0)); },
+    cut(e) { r.cut.push({ at: now, kind: e.action.kind, pos: e.pos, tier: e.tier }); live.delete(e.id); },
     apply(s) { r.applied.push({ at: now, pos: s.position }); },
     progress(a) { r.progress.push({ at: now, kind: a.kind }); }
   });
   r.tl = tl;
-  // 推进时钟：每帧 dt 毫秒，先把到时间的渲染报告演完，再推进时间线
+  // 推进时钟：每帧 dt 毫秒，渲染的时间按加快倍率走，先把演完的动作报告给时间线，再推进时间线
   r.run = (ms, dt) => {
     const step = dt || 16;
     const until = now + ms;
     while (now < until) {
-      now = Math.min(until, now + step);
-      live.forEach((at, id) => { if (now >= at) { tl.done(id); live.delete(id); } });
+      const d = Math.min(until, now + step) - now;
+      const rate = tl.rate();
+      now += d;
+      live.forEach((left, id) => { live.set(id, left - d * rate); if (left - d * rate <= 0) { tl.done(id); live.delete(id); } });
       tl.tick();
     }
   };
@@ -157,6 +160,7 @@ function burst(seed, settings, frame, overrun, count) {
   const tag = '（种子 ' + seed + '，上限 ' + lagMs + '，每帧 ' + frame + ' 毫秒' + (overrun ? '，渲染常常超时' : '') + '）';
   check('H8 落后有上限' + tag, st.maxLag <= lagMs + frame, '最大落后 ' + st.maxLag + ' 毫秒');
   check('H9 关键动作不丢' + tag, st.droppedKey === 0 && st.startedKey === st.pushedKey, JSON.stringify(st));
+  check('H9 正在演的关键动作不截断，限时的都在限定的时间内演完' + tag, st.cutKey === 0 && !r.cut.some((c) => c.tier === 'key') && st.late === 0, JSON.stringify(st));
   check('堆积：普通动作被丢掉，关键动作被缩短或合并' + tag, st.dropped > 0 && (st.shortened > 0 || st.merged > 0), JSON.stringify(st));
   check('堆积：缩短的关键动作不短于最短时长' + tag, r.begun.filter((b) => b.tier === 'key').every((b) => b.ms >= T_MIN(settings)), r.begun.filter((b) => b.ms < T_MIN(settings)).length);
   check('堆积：最后显示的是最新的状态' + tag, r.applied[r.applied.length - 1].pos === r.pos(), r.applied[r.applied.length - 1].pos + ' / ' + r.pos());
@@ -169,14 +173,14 @@ function T_MIN(settings) { return (settings && settings.minMs) || 300; }
   const st = r.tl.inspect().stats;
   const tag = '（种子 ' + seed + '）';
   check('放得下的堆积：快进赶在上限之前，不用强制' + tag, st.forced === 0, JSON.stringify(st));
-  check('放得下的堆积：H8 与 H9' + tag, st.maxLag <= 5016 && st.droppedKey === 0 && st.startedKey === st.pushedKey, JSON.stringify(st));
+  check('放得下的堆积：H8 与 H9' + tag, st.maxLag <= 5016 && st.droppedKey === 0 && st.startedKey === st.pushedKey && st.cutKey === 0, JSON.stringify(st));
 });
 
-// 7. 极端堆积：一个参与方一下子到达 40 条不同种类交替的关键动作，缩到最短也演不完：状态照样在上限之内上画面，关键动作接着演完
+// 7. 极端堆积：一个参与方一下子到达 120 条不同种类交替的关键动作，缩到最短也演不完：状态照样在上限之内上画面，关键动作接着演完
 {
   const r = rig();
   r.jump();
-  for (let i = 0; i < 40; i++) r.act(i % 2 ? 'stamp' : 'handoff', ['e']);
+  for (let i = 0; i < 120; i++) r.act(i % 2 ? 'stamp' : 'handoff', ['e']);
   r.state();
   r.run(5200);
   const st = r.tl.inspect().stats;
@@ -184,7 +188,28 @@ function T_MIN(settings) { return (settings && settings.minMs) || 300; }
   check('极端堆积：到了上限算一次强制', st.forced === 1, st.forced);
   r.run(30000);
   const st2 = r.tl.inspect().stats;
-  check('极端堆积：排着的关键动作全部演完', st2.startedKey === 40 && st2.droppedKey === 0, JSON.stringify(st2));
+  check('极端堆积：排着的关键动作全部演完', st2.startedKey === 120 && st2.droppedKey === 0, JSON.stringify(st2));
+  check('极端堆积：到了上限正在演的关键动作限时演完，没有被截断', st2.rushed >= 1 && st2.cutKey === 0 && r.cut.length === 0 && st2.late === 0, JSON.stringify(st2));
+}
+
+// 7b. 限时演完：来不及时正在演的关键动作不截断；渲染的时间按加快倍率走，在限定的时间内演完，走路与包裹的时间也算在里面
+{
+  const r = rig({ settings: { lagMs: 1500 }, natural: (a, ms) => ms + 2000 });
+  r.jump();
+  r.act('handoff', ['e']); r.act('handoff', ['e']);
+  r.state();
+  r.run(16);
+  r.run(200);
+  const ins = r.tl.inspect();
+  const first = ins.playing[0];
+  check('限时演完：来不及时正在演的关键动作被限定演完的时间，倍率大于 1', first && first.rushBy !== null && ins.rate > 1, JSON.stringify(ins));
+  const by = first.rushBy;
+  check('限时演完：限定的时间不短于最短时长', by - r.now >= 0 && first.rushBy >= 16 + 300, by);
+  r.run(by - r.now + 150);
+  const after = r.tl.inspect();
+  check('限时演完：限定的时间之内演完，没有被截断', !after.playing.some((p) => p.id === first.id) && r.cut.length === 0 && after.stats.late === 0, JSON.stringify(after));
+  r.run(20000);
+  check('限时演完：没有限时的动作时倍率是 1', r.tl.inspect().rate === 1, r.tl.inspect().rate);
 }
 
 // 8. 合并：同一个参与方连续的同类关键动作在来不及时合并成一次

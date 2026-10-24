@@ -735,7 +735,7 @@
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const scene = {
       canvas, ctx, W: spec.W, H: spec.H,
-      realT: 0, animT: 0, scale: 1, reduced: mq.matches, frozen: false, destroyed: false,
+      realT: 0, wallT: 0, rate: 1, animT: 0, scale: 1, reduced: mq.matches, frozen: false, destroyed: false,
       actors: [], particles: [], flyers: [], timers: [], tweens: [],
       lastDraw: -1e9, spec
     };
@@ -1032,6 +1032,16 @@
       scene.tweens = scene.tweens.filter((tw) => !tw.done);
     }
 
+    function step(dt) {
+      scene.realT += dt;
+      if (!scene.frozen && !scene.reduced) scene.animT += dt;
+      updateTimers();
+      scene.actors.slice().forEach((a) => updateActor(a, dt));
+      updateParticles(dt);
+      updateFlyers();
+      if (spec.update) spec.update(scene, dt);
+    }
+
     let last = performance.now();
     function frame(now) {
       if (scene.destroyed) return;
@@ -1043,13 +1053,11 @@
         scene.raf = requestAnimationFrame(frame);
         return;
       }
-      scene.realT += dt;
-      if (!scene.frozen && !scene.reduced) scene.animT += dt;
-      updateTimers();
-      scene.actors.slice().forEach((a) => updateActor(a, dt));
-      updateParticles(dt);
-      updateFlyers();
-      if (spec.update) spec.update(scene, dt);
+      // 真实经过的时间（播放时间线用它）；画面里的时间按 scene.rate 加快（播放时间线要求赶进度时大于 1），
+      // 分成不超过 50 毫秒的小段推进，每一段的行为与平时相同
+      scene.wallT += dt;
+      const n = Math.max(1, Math.ceil((dt * scene.rate) / 50));
+      for (let i = 0; i < n; i++) step((dt * scene.rate) / n);
       const interval = scene.reduced ? 250 : (spec.interval || 0);
       if (scene.realT - scene.lastDraw >= interval) {
         scene.lastDraw = scene.realT;

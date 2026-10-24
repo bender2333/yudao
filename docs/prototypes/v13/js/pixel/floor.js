@@ -487,7 +487,7 @@
     }
     const runs = new Map();
     const tl = P.timeline.create({
-      clock: () => scene.realT,
+      clock: () => scene.wallT,
       classify(a) {
         const k = DECL.kinds[a.kind];
         return { tier: k.tier, ms: k.ms, lanes: lanesOf(a) };
@@ -516,6 +516,7 @@
 
     function update() {
       tl.tick();
+      scene.rate = tl.rate();
       if (!model.interrupted) st.clock += scene.reduced ? 0 : 16.7;
       ECS.stepPackages(world, scene);
       ECS.stepPipes(world, scene, pipeState);
@@ -1345,6 +1346,8 @@
       }
       if (m.focus_id !== undefined && focusId === null) focusId = m.focus_id;
       syncWorkers();
+      // 整层静止（中断）时，演到一半的动作停在原处，时间线不再等它们；自动继续以后画面接着动起来
+      if (model.interrupted && !scene.frozen) Array.from(runs.values()).forEach((run) => run.finish());
       scene.frozen = Boolean(model.interrupted);
     }
 
