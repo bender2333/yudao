@@ -186,14 +186,36 @@ def test_c_killed_append_bash_is_not_reexecuted(tmp_path):
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
     # 产品提交规格，命令执行是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    # 质检也要给脚本（工单 #935）：PRD 被接纳以后质检会话也发起模型请求，
+    # 没有它的脚本时假模型报「脚本用尽」，运行以 provider_error 提前结束，
+    # 用例在到达中断点以前就失败（运行机负载重的时候必现）
     script = {
         "product": [{"proposal": product_spec()}],
         "engineering": [{"output": [_call("call-append", "bash", {"command": cmd})]}],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
     }
 
-    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()],
+                                                     "quality": [{"proposal": {"kind": "quality_auto"}}]},
                             started=signals / "started") as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
+        # 运行确实被中断过以后重启：这次调用的结果交还模型（工单 #935：
+        # 运行因为提供方报错提前结束的时候，重启与交还都没有发生，
+        # 「文件只有一行」就成了一句空话）
+        verified = [
+            e.payload
+            for e in killed.events(run.after, run.run_id, "action_verified")
+            if (e.payload or {}).get("id") == "call-append"
+        ]
+        assert len(verified) == 1
+        assert verified[0]["resolution"] == "handed_back"
+        # 命令没有被再运行：整个 run 里只有最初那一次调用
+        started = [
+            e.payload
+            for e in killed.events(run.after, run.run_id, "tool_started")
+            if (e.payload or {}).get("id") == "call-append"
+        ]
+        assert len(started) == 1
         assert append_file.exists()
         lines = append_file.read_text(encoding="utf-8").splitlines()
         assert lines == ["line"], f"文件应该只有一行，实际为 {lines}（命令被重新运行了）"
@@ -205,12 +227,17 @@ def test_d_file_action_completed_receives_confirmed_result(tmp_path):
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
     # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    # 质检也要给脚本（工单 #935）：PRD 被接纳以后质检会话也发起模型请求，
+    # 没有它的脚本时假模型报「脚本用尽」，运行以 provider_error 提前结束，
+    # 用例在到达中断点以前就失败（运行机负载重的时候必现）
     script = {
         "product": [{"proposal": product_spec()}],
         "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
     }
 
-    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()],
+                                                     "quality": [{"proposal": {"kind": "quality_auto"}}]},
                             await_file=("src/note.txt", "hello\n")) as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
 
@@ -248,12 +275,17 @@ def test_d_file_action_not_happened_receives_handed_back(tmp_path):
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
     # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    # 质检也要给脚本（工单 #935）：PRD 被接纳以后质检会话也发起模型请求，
+    # 没有它的脚本时假模型报「脚本用尽」，运行以 provider_error 提前结束，
+    # 用例在到达中断点以前就失败（运行机负载重的时候必现）
     script = {
         "product": [{"proposal": product_spec()}],
         "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+        "quality": [{"proposal": {"kind": "quality_auto"}}],
     }
 
-    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()],
+                                                     "quality": [{"proposal": {"kind": "quality_auto"}}]},
                             hold_after="tool_started", hold_action="call-write") as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
 

@@ -199,6 +199,21 @@ def _workspace_of(data_dir: Path, frame: Any, path: str) -> Path | None:
     return candidate if candidate.exists() else None
 
 
+def _failed_attempt(system: LoopSystem, run_id: str) -> dict[str, Any]:
+    # 运行因为模型侧的失败结束时，写明是哪一次请求出的问题（工单 #935）：
+    # 「运行提前结束」这句话本身看不出原因，读者只看到 stop_reason，
+    # 不知道是哪个会话失败、按部门给出的脚本是不是用尽了
+    failed = [event for event in system.store.list_events(run_id)
+              if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    if not failed:
+        return {}
+    event = failed[-1]
+    department = event.department or ""
+    session = event.session_id or ""
+    return {"failed_session": f"{session}（{department}）" if department else session,
+            "failed_error": event.error or ""}
+
+
 # ---------------------------------------------------------------------------
 # 子进程入口：运行一个事项直到结束或被外部终止
 
@@ -271,7 +286,8 @@ def main() -> None:
     try:
         result = system.run_until_stop(run_id)
         print(json.dumps({"run_id": run_id, "status": result.status,
-                          "stop_reason": result.stop_reason}, ensure_ascii=False), flush=True)
+                          "stop_reason": result.stop_reason, "error": result.error,
+                          **_failed_attempt(system, run_id)}, ensure_ascii=False), flush=True)
         if args.settle:
             system.projects.settle(run_id)
         if args.answer_revise is not None:
@@ -383,12 +399,16 @@ def _assert_no_shared_list_script(log: Path) -> None:
 
 def _wait_for_marker(marker: Path, process: subprocess.Popen, log: Path) -> None:
     # 等待工具执行中的进程写下标记；进程在此之前退出时报告它的日志
+    # 工单 #935：子进程打印的运行结果里带着停止原因与出错的会话（见 main），
+    # 「运行提前结束」这句话本身看不出原因，这里把它写明
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
     while time.monotonic() < deadline:
         if marker.exists():
             return
         if process.poll() is not None:
-            raise AssertionError(f"the run ended before the interrupt point: {_log_text(log)}")
+            raise AssertionError(
+                f"the run ended before the interrupt point: {_log_text(log)}"
+                "（运行在到达中断点以前就结束了；上面的 JSON 写着停止原因与出错的会话）")
         time.sleep(0.05)
     raise TimeoutError(f"the interrupt point was not reached: {_log_text(log)}")
 
