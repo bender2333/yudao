@@ -52,7 +52,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 - 查看工单与评论：`gh issue view <编号> --comments`
 - 查看工单的 PR（交付说明与审查）：`gh pr view issue-<编号> --comments`；只取最近一次审查：`gh pr view issue-<编号> --json reviews --jq '.reviews[-1]'`
 - 等待 CI 的结果：`gh pr checks issue-<编号> --watch`
-- 在 GitHub 的运行机上运行集成层（只在工单要求，或要修的失败只出现在运行机上时）：`gh workflow run CI --ref issue-<编号>`，再用 `gh run list --workflow CI --branch issue-<编号> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果，失败项用 `gh run view <运行编号> --log-failed | grep FAILED` 读取。一次约 15 分钟。
+- 在 GitHub 的运行机上运行集成层（工单带 `touches-core`、工单要求，或要修的失败只出现在运行机上时）：`gh workflow run CI --ref issue-<编号>`，再用 `gh run list --workflow CI --branch issue-<编号> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果，失败项用 `gh run view <运行编号> --log-failed | grep FAILED` 读取。一次约 15 分钟。
 - 认领工单：`gh issue edit <编号> --add-assignee @me`
 - 筛选已就绪工单：`gh issue list --state open --label "ready-for-agent"`
 - 追加进展评论：`gh issue comment <编号> --body "<进展说明与测试证据>"`
@@ -76,6 +76,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 4. 自测：运行与改动相关的测试文件（包括本次改动或新增的集成层文件）；改动涉及 `client/` 时再运行相关的前端测试；逐项核对工单的验收标准。
 5. 推送与 CI：推送分支；还没有 PR 时用 `gh pr create` 创建，正文写 `Closes #<编号>` 与一句摘要，一张工单只开一个 PR。用 `gh pr checks issue-<编号> --watch` 等 CI 的结果，失败时修改、提交、推送，直到通过。
    - 失败的测试与本次改动无关时，把失败的运行重新运行一次（`gh run rerun <运行编号> --failed`）：重新运行通过时，在交付说明里写明这个不稳定的测试，并评论到不稳定测试的工单；仍然失败时按本次改动的问题修。
+   - 工单带 `touches-core` 时，`check` 通过以后在运行机上跑一次集成层（命令见「GitHub Issues 规则」）。失败项与最近 7 天 main 上集成层的失败项比较（[派发者规则](docs/agents/dispatcher.md)第 5 节第 2 步的做法）：main 上失败过的是不稳定项，在交付说明里列出；main 上没有失败过的按本次改动的问题修，修好再跑。交付说明写这次运行的链接。
    - 时间用完仍然没有通过时，在 PR 上评论卡在哪里，标签保持 `in-progress`，结束这一轮。
 6. 交付：CI 通过以后在 PR 上评论，第一行写 `DELIVERY: 第 <k> 轮`，下面写改动清单、相关测试的命令与结尾的计数行、CI 运行的链接、逐条的验收核对，删除了用例时逐条写用例名与依据（与 CI「用例变化」的删除清单一致；工单没有写到的删除先按「请架构师处理」交回），不粘贴测试输出；然后把工单标签从 `in-progress` 改为 `needs-review`。
 7. 不合并 PR，不关闭工单：审查批准以后由 GitHub 合并，工单随之关闭。
@@ -98,7 +99,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 
 ## 审查流程
 工作目录是工单的 worktree，工单标签为 `needs-review`。
-1. 规范检查：分支名为 `issue-<编号>`，PR 正文写了 `Closes #<编号>`，CI 在 PR 的当前提交上通过，最近一条 `DELIVERY:` 评论齐全。
+1. 规范检查：分支名为 `issue-<编号>`，PR 正文写了 `Closes #<编号>`，CI 在 PR 的当前提交上通过，最近一条 `DELIVERY:` 评论齐全；工单带 `touches-core` 时，交付说明里有分支上集成层运行的链接，失败项都是 main 上最近 7 天失败过的（执行者第 5 步）。
 2. 内容核对：阅读工单正文与任务评论、链接的设计文档、PR 上的交付说明与以前的审查，以及改动（`git diff origin/main...HEAD`）；逐条核对验收标准，检查是否违反共同规则，例如 mock、兼容层、绕过逻辑；新增与修改的测试按 `docs/design/test-pyramid.md` 第 10 节的写法，新增测试文件已在登记表中，所属层符合第 2 节；交付说明列出的删除用例逐条核对依据，并与 CI「用例变化」列出的删除与换层对照，对不上时要求修改。PR 上已经有审查时，先核对上一次审查的各项，再核对上一次审查以后的提交；合并 main 带进来的改动只核对冲突的解决。
 3. 测试：运行与改动相关的测试文件，并做反向验证：把被测的行为改坏，确认对应的测试失败，再还原，还原后工作区与审查前相同。不运行单元层与模块层全部，CI 在这个提交上的结果就是证据。
 
@@ -128,7 +129,7 @@ solo 模式下没有独立审查，质量由两道检查承担：你自己对照
 1. 领取：先查看 main 最近的 CI 结果（第 8 步），有未处理的失败时先处理。然后从范围内取 `ready-for-agent`、没有未关闭阻塞方、没有负责人的工单，较早里程碑的先取。带 `touches-core` 的工单，处在 `in-progress` 与 `needs-review` 的张数达到运行配置第 7 节的上限时，先取其他工单。清理已经关闭的工单的 worktree（运行配置第 3 节的清理命令）。领取：`gh issue edit <编号> --add-assignee @me`，标签从 `ready-for-agent` 改为 `in-progress`。
 2. 准备、任务、实现、自测、推送与 CI：与「执行者」自主推进模式第 1 至 5 步相同，包括动手之前的三项核对。差异一处：PR 正文在 `Closes #<编号>` 之外多写一行 `Solo: 无独立审查，由 solo 执行者自行合并`。
 3. 交付：CI 通过以后在 PR 上评论，格式与「执行者」第 6 步相同，第一行写 `DELIVERY: 第 <k> 轮`，逐条验收核对要写出每条验收标准对应的证据；然后把工单标签从 `in-progress` 改为 `needs-review`，表示交付已写好、正在做合并前的自我核对。
-4. 合并前的核对：`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过；工作区没有未提交也未推送的改动；交付说明里的每条验收核对都有证据。三项都满足才合并，任何一项不满足就把标签改回 `in-progress`，继续修改，修好并通过 CI 以后回到第 3 步，没有例外。
+4. 合并前的核对：`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过；工作区没有未提交也未推送的改动；交付说明里的每条验收核对都有证据；工单带 `touches-core` 时，交付说明里有分支上集成层运行的链接，失败项都是 main 上最近 7 天失败过的（「执行者」第 5 步）。各项都满足才合并，任何一项不满足就把标签改回 `in-progress`，继续修改，修好并通过 CI 以后回到第 3 步，没有例外。
 5. 合并：`gh pr merge issue-<编号> --admin --squash`。main 的规则要求一个其他人的批准，solo 模式没有这个批准，所以合并使用仓库所有者的豁免，这是 solo 模式唯一允许使用豁免的场合。`--admin` 绕开所有规则，包括 `check`，所以第 4 步的核对只能由你自己做，规则不会替你拦住。合并时标签应当是 `needs-review`。
 6. 合并以后：确认 PR 已合并、工单已随 `Closes` 关闭；未关闭时 `gh issue close <编号>` 并评论原因。工单关闭以后去掉 `needs-review` 标签（`gh issue edit <编号> --remove-label needs-review`）。记录合并提交号写入日记。
 7. 卡住：时间用完仍然没有通过 CI，在 PR 上评论卡在哪里，标签保持 `in-progress`，结束这一轮；下一轮从这张工单继续。遇到的问题先按「自己解决的问题」处理，只有那里写明交给用户的情形才改为 `ready-for-human`。
@@ -156,4 +157,4 @@ solo 执行者在工单与 PR 上的每条评论、PR 正文和审查式的自�
 ## 约束
 - 不对自己的工单以外的 PR 使用 `--admin`，不修改 main 的规则与 CI 工作流。
 - 不在 `check` 没有通过的提交上合并，包括 CI 不稳定的情形：测试不稳定时按「执行者」第 5 步的做法重新运行失败的作业，通过以后再合并。
-- 修改接口合同、控制核心（`touches-core`）的工单与其他工单一样合并，没有额外放宽。
+- 修改接口合同、控制核心（`touches-core`）的工单不放宽任何一项核对；控制核心的工单还要在分支上跑通集成层（第 4 步）。
