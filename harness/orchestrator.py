@@ -87,10 +87,12 @@ _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GU
 @dataclass
 class _Activation:
     # 流程编排持有的一次激活：身份、采用的版本与工作依据（scope），提示词与适配器，
-    # 中止信号，激活开始时 run 流的版本，步骤驱动，以及在安全节点等待重试时的唤醒
+    # 这个会话自己的停止开关，激活开始时 run 流的版本，步骤驱动，以及在安全节点等待重试时的唤醒。
+    # 停止开关是每个会话自己的（工单 #856）：停下一个会话只停这个会话，不改变事项的状态；
+    # 事项自己的开关（self._abort）是用户取消用的，它打开时全部会话停下，事项以取消结束
     scope: ActivationScope
     prompt: DepartmentPrompt
-    abort_flag: Event
+    stop_flag: Event
     adapter: ModelAdapter
     yielded_work: dict[str, Any] | None
     version: int
@@ -222,6 +224,8 @@ class Orchestrator:
         self.test_model = test_model
         self.assembly = ContextAssembly(artifacts, store)
         self.sessions = sessions or SessionFactory(self.workspace_root)
+        # 事项自己的停止开关：用户取消（cancel、_abort_run）打开它，之后的核对都得到停止，
+        # 事项以取消结束；停下一个会话不用它（工单 #856）
         self._abort: dict[str, Event] = {}
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
         self._cancellers: dict[str, set[object]] = {}
@@ -625,8 +629,15 @@ class Orchestrator:
             raise stop_error
         return self.project(run_id)
 
+    def _aborted(self, run_id: str) -> bool:
+        # 事项自己被中止（用户取消）：之后的核对都得到停止，事项以取消结束。
+        # 停下一个会话不算中止（工单 #856）
+        flag = self._abort.get(run_id)
+        return flag is not None and flag.is_set()
+
     def _abort_run(self, run_id: str) -> tuple[_Activation | None, Exception | None]:
-        # 中止运行：之后的核对都得到停止，正在进行的步骤立即取消；交回正在进行的激活与取消它时的错误。
+        # 中止运行（用户取消）：事项的开关打开，之后的核对都得到停止，正在进行的步骤立即取消；
+        # 交回正在进行的激活与取消它时的错误。
         # 同时运行（工单 #557）：取消与暂停作用于事项的全部会话，这里取消这个 run 的每一个会话
         self._abort.setdefault(run_id, Event()).set()
         activations = list(self._active.get(run_id, {}).values())
@@ -662,7 +673,8 @@ class Orchestrator:
 
     def _settled(self, run_id: str) -> RunProjection:
         # 激活与运行循环结束时交回的运行状态。有正在进行的取消（cancel 或 /stop）时，等待它结束，
-        # 交回它写入以后的状态；运行已经中止而没有正在进行的取消（例如它的写入失败了）时在这里写入取消
+        # 交回它写入以后的状态；运行已经中止而没有正在进行的取消（例如它的写入失败了）时在这里写入取消。
+        # 停下一个会话（因决定请求阻塞或事项到终态）不算中止：事项的状态不变（工单 #856）
         projection = self.project(run_id)
         if projection.status in TERMINAL_STATUSES:
             return projection
@@ -670,7 +682,7 @@ class Orchestrator:
         projection = self.project(run_id)
         if projection.status in TERMINAL_STATUSES:
             return projection
-        if self._abort.get(run_id) is not None and self._abort[run_id].is_set():
+        if self._aborted(run_id):
             return self.cancel(run_id)
         return projection
 
@@ -691,7 +703,7 @@ class Orchestrator:
         # 已经结束或已经中止的运行不再接收输入、指导与提示词
         if not projection.run_id:
             raise RunNotFoundError(run_id)
-        if projection.status in TERMINAL_STATUSES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        if projection.status in TERMINAL_STATUSES or self._aborted(run_id):
             raise RunTerminalError(message)
 
     def _assign_new_inputs(self, transaction: Transaction) -> RunProjection:
@@ -709,7 +721,8 @@ class Orchestrator:
         # 安全节点：激活没有中止、运行时间没有用完时先分派新输入，再作停止判断；回答是否继续与判断时的流版本
         def judge(transaction: Transaction) -> Judgment:
             projection = transaction.projection
-            if not (activation.abort_flag.is_set()
+            if not (activation.stop_flag.is_set()
+                    or self._aborted(activation.run_id)
                     or (activation.deadline is not None and time.monotonic() >= activation.deadline)
                     or time_used_up(projection, self._elapsed_sec(activation.run_id))):
                 projection = self._assign_new_inputs(transaction)
@@ -720,10 +733,13 @@ class Orchestrator:
 
     def _stop_requested(self, activation: _Activation, projection: RunProjection,
                         decisions: Iterable[DecisionRequest]) -> bool:
-        # 停止判断：中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求、输入版本改变或有新的指导；
-        # 只读取，不写入
+        # 停止判断：这个会话自己的停止开关、事项被中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求、
+        # 输入版本改变或有新的指导；只读取，不写入。
+        # 会话自己的开关与事项的开关都看（工单 #856）：停下一个会话只停这个会话，
+        # 用户取消事项时全部会话都停
         basis = activation.scope.basis
-        return (activation.abort_flag.is_set()
+        return (activation.stop_flag.is_set()
+                or self._aborted(activation.run_id)
                 or (activation.deadline is not None and time.monotonic() >= activation.deadline)
                 or time_used_up(projection, self._elapsed_sec(activation.run_id))
                 or projection.status in TERMINAL_STATUSES or blocks_run(decisions)
@@ -1096,7 +1112,10 @@ class Orchestrator:
         return epoch, self.project(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:
-        # 取消步骤驱动（正在进行的调用尝试按身份取消），在安全节点等待重试的激活立即醒来；取消调用尝试出错时同样唤醒
+        # 停下这个会话：打开它自己的停止开关，正在进行的步骤立即取消；
+        # 在安全节点等待重试的激活立即醒来；取消调用尝试出错时同样唤醒。
+        # 只停这个会话，不改变事项的状态（工单 #856）
+        activation.stop_flag.set()
         try:
             if activation.driver is not None:
                 activation.driver.cancel()
@@ -1107,7 +1126,9 @@ class Orchestrator:
         # 运行到终态，或者到 run 被未回答的决定请求阻塞、等待用户回答为止。
         # 一次运行期间的模型调用复用同一组连接，连接只在这个事件循环中使用。
         # 同时运行（工单 #557）：等待工作的部门各开始一轮工作，各自一个会话，
-        # 这个循环等全部会话结束或事项到终态
+        # 这个循环等全部会话结束或事项到终态。
+        # 停下其余会话只停这些会话，不改变事项的状态（工单 #856）：
+        # 停下以后重新读取再交回，交回的投影里被停下的会话已经收尾
         connections = ProviderConnections()
         tasks: dict[str, asyncio.Task[RunProjection]] = {}
         try:
@@ -1118,13 +1139,13 @@ class Orchestrator:
                     raise RunNotFoundError(run_id)
                 if projection.status in TERMINAL_STATUSES:
                     await self._stop_sessions(run_id, tasks)
-                    return projection
-                if self._abort.get(run_id) and self._abort[run_id].is_set():
+                    return self.project(run_id)
+                if self._aborted(run_id):
                     await self._stop_sessions(run_id, tasks)
                     return await asyncio.to_thread(self._settled, run_id)
                 if blocks_run(snapshot.decisions.values()):
                     await self._stop_sessions(run_id, tasks)
-                    return projection
+                    return self.project(run_id)
                 for department in self._ready_departments(run_id):
                     task = tasks.get(department)
                     if task is not None and not task.done():
@@ -1149,6 +1170,7 @@ class Orchestrator:
 
     async def _stop_sessions(self, run_id: str, tasks: dict[str, asyncio.Task[RunProjection]]) -> None:
         # 事项到终态或被未回答的决定请求阻塞：其余会话停止并收尾。
+        # 只停这些会话，不改变事项的状态（工单 #856）：事项自己的开关只有用户取消才打开。
         # 取消与暂停作用于事项的全部会话，立即生效（工单 #557）
         pending = [task for task in tasks.values() if not task.done()]
         if not pending:
@@ -1343,7 +1365,7 @@ class Orchestrator:
         # 会话自己的累计用量同样从事件恢复（工单 #475）：重新启动以后各会话的已用时间与次数连续累计
         self._recover_session_usage(run_id, transaction.events())
         self._resume_run_clock(run_id)
-        if self._abort.get(run_id) and self._abort[run_id].is_set():
+        if self._aborted(run_id):
             return None
         if blocks_run(transaction.decisions.values()):
             # 等待用户回答阻塞 run 或某个动作的决定请求：不开始新的激活，什么也不写
@@ -1436,7 +1458,8 @@ class Orchestrator:
         )
         # 会话这一段工作的起点（工单 #475）：这一段用掉的时间算到这个会话的累计已用时间里
         self._start_session_segment(run_id, session.session_id)
-        return _Activation(scope, prompt, self._abort.setdefault(run_id, Event()), adapter, yielded_work,
+        # 这个会话自己的停止开关（工单 #856）：停这个会话只停这个会话，不改变事项的状态
+        return _Activation(scope, prompt, Event(), adapter, yielded_work,
                            transaction.projection.stream_version)
 
     def _project_department_setting(self, projection: RunProjection, department: str):
@@ -1552,7 +1575,7 @@ class Orchestrator:
                 scope, activation.prompt, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
-                nodes=_SafeNode(self, activation), cancelled=activation.abort_flag,
+                nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
                 limits=self._session_limits(run_id, scope.session_id),
                 deltas=self.deltas,
             )
@@ -1940,14 +1963,16 @@ class Orchestrator:
         )
 
         branch_activation = _Activation(
-            branch_scope, prompt, Event(), activation.adapter, None, projection.stream_version,
+            # 询问分支属于提问方的那个会话：它的停止开关就是那个会话的（工单 #856），
+            # 那个会话停下时分支一起停下
+            branch_scope, prompt, activation.stop_flag, activation.adapter, None, projection.stream_version,
             deadline=deadline,
         )
         driver = StepDriver.start(
             branch_scope, prompt, writes=self.writes, artifacts=self.artifacts,
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
             environment=environment,
-            nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.abort_flag,
+            nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.stop_flag,
             limits=StepLimits(
                 max_provider_attempts=self.step_limits.max_provider_attempts,
                 max_model_steps=max_model_steps if max_model_steps is not None else self.step_limits.max_model_steps,
@@ -2056,7 +2081,7 @@ class Orchestrator:
         # 提交的事务：读取的流版本就是校验时的版本
         run_id = transaction.projection.run_id
         current = transaction.projection
-        if current.status in TERMINAL_STATUSES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        if current.status in TERMINAL_STATUSES or self._aborted(run_id):
             return
         current = self._assign_new_inputs(transaction)
         snapshot = environment.snapshot()
@@ -2116,7 +2141,7 @@ class Orchestrator:
     ) -> None:
         projection = transaction.projection
         run_id = projection.run_id
-        if projection.status in TERMINAL_STATUSES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        if projection.status in TERMINAL_STATUSES or self._aborted(run_id):
             return
         try:
             acceptance = self.submissions.prepare(
@@ -2217,7 +2242,7 @@ class Orchestrator:
         # 写明部门、模型与具体问题；不改用其他模型。已经结束或正在取消的运行不再写入
         projection = transaction.projection
         run_id = projection.run_id
-        if projection.status in TERMINAL_STATUSES or (self._abort.get(run_id) and self._abort[run_id].is_set()):
+        if projection.status in TERMINAL_STATUSES or self._aborted(run_id):
             return
         kind = MODEL_UNAVAILABLE
         model = "（没有找到调用目标）" if target is None else target["requested_model"]

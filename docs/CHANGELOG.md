@@ -41,6 +41,8 @@ claude-sonnet-5-5 / 2026-10-25 00:07 / `docs/design/department-loop.md` 加第 2
 
 claude-opus-5-5 / 2026-10-24 23:49 / 新增 `docs/design/visualization.md`（画面与播放设计说明：服务端、同步层、翻译层、画面层四层与依赖方向，画面合同，声明表与动作三级，播放时间线，翻译覆盖核对，不变式 H1 至 H9，原型 v13 与客户端工单范围）与 `docs/adr/0043-scene-contract-and-playback-belong-to-the-view.md`；`docs/design/app-and-interface.md` 第 5.7 节像素画面一条改为经翻译层，第 5.8 节的不变式移到新说明第 8 节（标题保留、留指向），第 4.3 节 `project.loop` 与第 9 节第 16 条改指新说明；ADR-0021 状态一栏补一行；`docs/requirements/system-intent.md` N-V5 的链接改指新说明；`CONTEXT.md` 新增「画面合同」「播放时间线」；设计索引新增一条 / 用户给出与 Sonnet 讨论的可视化缓冲方案，要求结合视图同步重构，逐项确认（事实只来自数据库，画面的独立是表现形式的独立）
 
+solo-minimax-code / 2026-10-24 23:40 / 工单 #856：`docs/design/department-loop.md` 第 5 节补「停下一个会话与结束整个事项是两件事」三条——停下一个会话只停这个会话、不改变事项的状态（事项被未回答的决定请求挡住时运行循环停下其余会话，停下不是取消）；回答以后运行循环照常按各部门关注的成果重新开始一轮，各会话从停下的位置接着工作；用户取消事项仍然让事项进入取消并停下全部会话 / 工单正文写明了这套口径，实现里停下其余会话时打开了整个事项的取消开关，暂停或待恢复以后回答「继续」，事项被记成已取消（`run_failed`，停止原因 `cancelled`）；这次把设计说明补成与口径一致
+
 solo-minimax-M3.1-Flash / 2026-10-24 23:30 / 工单 #876：进程被结束以后重新打开事件库时，可写打开（含设置 WAL）也在等待上限内重试——`harness/tests/process_kill.py` 增加 `_open_writable_after_kill` 与 `_open_system_after_kill`，`interrupted` 与 `restarted` 结束进程以后打开系统的四处改用它；只读打开原有的重试不变；产品代码不动（`harness/event_store.py` 没有改）/ GitHub 的 Windows 运行机上进程刚被结束时事件库文件还会被短暂占用，可写打开失败在 `PRAGMA journal_mode=WAL`（2026-10-23 run 39998093540：集成层两条用例报 disk I/O error）；用这个辅助的 8 个文件一起生效，不在各个用例里加重试
 
 minimax-M3.1-Flash / 2026-10-24 23:35 / `docs/agents/triage-labels.md` 补一段：循环交回外部的三条通道（连着三次没过 → `needs-triage` 升级；架构、需求、设计问题 → `needs-triage` 提问题，写结构化评论；执行环境挡住任务 → `ready-for-human` 转给用户，写清哪一步被挡住、试过什么、需要什么），外部处理完标签改回 `ready-for-agent` 后循环刷新时重新排上 / 用户要求工人遇到执行环境问题要有一条通道与用户沟通，由编排者转给用户
