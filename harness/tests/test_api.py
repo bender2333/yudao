@@ -239,12 +239,15 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     ]
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]
+    # 影响清单里还列出进行中的事项：事项开始与结束改变这份清单（工单 #891）
+    catalog_impact_changed_by = catalog_changed_by + [
+        "run_created", "run_done", "run_failed", "run_paused", "work_item_created", "work_item_start_failed"]
     catalog_queries = ("catalog", "catalog.document", "catalog.change_impact")
     assert [{"name": item["name"], "changed_by": item["changed_by"], "replayable": item["replayable"]}
             for item in capabilities["queries"] if item["name"] in catalog_queries] == [
         {"name": "catalog", "changed_by": catalog_changed_by, "replayable": False},
         {"name": "catalog.document", "changed_by": catalog_changed_by, "replayable": False},
-        {"name": "catalog.change_impact", "changed_by": catalog_changed_by, "replayable": False},
+        {"name": "catalog.change_impact", "changed_by": catalog_impact_changed_by, "replayable": False},
     ]
     assert capabilities["queries"][-2] == {
         "name": "home.away_report", "replayable": False,
