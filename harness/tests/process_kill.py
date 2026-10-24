@@ -430,6 +430,37 @@ def _open_after_kill(path: Path) -> EventStore:
             time.sleep(0.2)
 
 
+def _open_writable_after_kill(data_dir: Path) -> None:
+    # 进程刚被终止时，GitHub 的 Windows 运行机上事件库的文件还会被短暂占用（同上，2026-10-18
+    # run 39103301202）：只读打开能重试过去，紧接着的可写打开（含设置 WAL，harness/event_store.py）
+    # 没有重试，失败在 PRAGMA journal_mode=WAL，报 disk I/O error（2026-10-23 run 39998093540：
+    # 集成层两条用例因此失败）。这里先把事件库可写地打开一次（含设置 WAL），能打开才继续；
+    # 等待上限与只读打开一样，超过上限照常抛出原来的错误，不吞掉。
+    # 只打开一次就够：这一步不写事件（建表与 log 登记都是 IF NOT EXISTS / OR IGNORE），
+    # 系统随后打开事件库时不会因此多出内容
+    path = Path(data_dir) / "events.sqlite"
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
+    while True:
+        try:
+            store = EventStore(path)
+        except sqlite3.OperationalError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.2)
+            continue
+        store.close()
+        return
+
+
+def _open_system_after_kill(data_dir: Path, adapter: FakeAdapter, *,
+                            resume_on_startup: bool) -> LoopSystem:
+    # 系统打开数据目录时会以可写方式打开事件库（含设置 WAL）：先等到这一次可写打开能成功，
+    # 再打开系统。系统在启动序列里做的事（补做结算、补建 run、启动恢复）因此仍然只做一次，
+    # 不会因为重试而重复
+    _open_writable_after_kill(data_dir)
+    return LoopSystem.for_testing(data_dir, adapter, resume_on_startup=resume_on_startup)
+
+
 def _observe(data_dir: Path, onboarding: bool, revision: bool) -> dict[str, Any]:
     # 只读地读出终止以后、任何系统打开它以前的事件与决定请求：LoopSystem 打开数据目录时会补做结算与补建
     # 缺少的 run，「补做之前」的状态只能这样取得。读出的是一份快照，连接随即关闭，之后回读它得到的
@@ -542,9 +573,9 @@ def interrupted(data_dir: Path, script: Sequence[dict[str, Any]] | Mapping[str, 
 
     # 只读地观察终止以后、任何系统打开数据目录以前的事件
     observed = _observe(data_dir, onboard is not None, revision)
-    before = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
-    after = LoopSystem.for_testing(data_dir, FakeAdapter(build_script(tail or [])),
-                                   resume_on_startup=resume_after)
+    before = _open_system_after_kill(data_dir, FakeAdapter([]), resume_on_startup=False)
+    after = _open_system_after_kill(data_dir, FakeAdapter(build_script(tail or [])),
+                                    resume_on_startup=resume_after)
     return Interrupted(before, after, observed, log)
 
 
@@ -588,8 +619,8 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]] | Mapping[str, Se
 
     # revision 为真时 run_id 取修改轮的 run（建档场景，见 interrupted）
     observed = _observe(data_dir, revision, revision)
-    before = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
-    after = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=resume_after)
+    before = _open_system_after_kill(data_dir, FakeAdapter([]), resume_on_startup=False)
+    after = _open_system_after_kill(data_dir, FakeAdapter([]), resume_on_startup=resume_after)
     return Interrupted(before, after, observed, log)
 
 
