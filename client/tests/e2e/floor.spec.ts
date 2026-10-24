@@ -385,6 +385,50 @@ test("流转覆盖层：同一对部门的两种非返工流转合成一段，�
   }
 });
 
+// 流转覆盖层（工单 #913）：同一对部门的反向两段（产品→工程 与 工程→产品）走同一条路径，
+// 两块「N 次」牌子原来落在同一个位置，后画的一块把先画的一块盖住，只能看见其中一段的次数。
+// 车道键改成无序的部门对以后两块牌子错开，都看得见；段的数量、次数与箭头方向不变。
+test("流转覆盖层：同一对部门的正反两段牌子错开，都看得见", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    const id = await projectId(HISTORY);
+    await openFloor(page, id);
+    await page.locator(".floor-overlay-tabs button", { hasText: "流转" }).click();
+    await waitUntil(async () => (await readOverlay(page)).segments.length > 0, "画面写入流转覆盖层的 segments");
+    const overlay = await readOverlay(page);
+    expect(overlay.id).toBe("flow");
+    // 正反两段都在：产品→工程 与 工程→产品（同一对部门，方向相反）
+    const forward = overlay.segments.filter((seg) => seg.from === "product" && seg.to === "engineering");
+    const backward = overlay.segments.filter((seg) => seg.from === "engineering" && seg.to === "product");
+    expect(forward.length).toBe(1);
+    expect(backward.length).toBe(1);
+    // 两段各画出一块牌子（牌子的键带方向，用例据此分清哪一块是哪一段）
+    await waitUntil(async () => {
+      const drawn = await readLabelRects(page);
+      return drawn.filter((rect) => rect.key === "product>engineering").length === 1
+        && drawn.filter((rect) => rect.key === "engineering>product").length === 1;
+    }, "画面为产品→工程与工程→产品各画出一块标签", 20_000);
+    const rects = await readLabelRects(page);
+    const a = rects.find((rect) => rect.key === "product>engineering")!;
+    const b = rects.find((rect) => rect.key === "engineering>product")!;
+    // 两块牌子的纵向位置不同（同一条路径上的第二块往上抬一行）
+    expect(a.y, `两块牌子的纵向位置相同：${JSON.stringify([a, b])}`).not.toBe(b.y);
+    const covered = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(covered, `产品→工程与工程→产品的两块牌子重叠：${JSON.stringify([a, b])}`).toBe(false);
+    // 两块牌子都落在画面内
+    for (const rect of [a, b]) {
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.w).toBeLessThanOrEqual(640);
+    }
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
 /** 每块牌子里最红的像素（红减蓝）：红底牌子明显大于白底牌子。 */
 async function readSignColors(page: Page, rects: { x: number; y: number; w: number; h: number }[]): Promise<number[]> {
   return page.evaluate((rects) => {

@@ -27,7 +27,9 @@ PARAMETERS_VERSION = initial_version()
 #    错误与载荷里的关键字段；去掉事件编号（event_id）、事件在日志中的全局位置、所属的流与流内版本
 #    （position、stream、stream_version）、日志为范围读取保存的列（project_id、work_item_id）、
 #    写入方的执行权编号（epoch）、run_id 与创建时间。role 在 Stage 5 之前为空，不进入基准。
-#    引用其他事件的字段（parent_event_id、载荷中的事件编号）换成被引用事件的位置 <evt#N>。
+#    引用其他事件的字段（parent_event_id、载荷中的 context_event_id、compaction_event_id、
+#    source_event_id、guidance_created_event_id、result_event_ids 等）换成被引用事件在它自己会话里的
+#    位置 <会话>#<条数>：会话之间谁先写事件不改变这个写法（工单 #892）。
 #    投影的 stream_version 是 run 流的事件数，与运行时刻无关，原样保留。
 # 2. 其他随机生成的编号（act_、request_、spec_、ses_pro_ 等前缀加 16 位十六进制）按首次出现的顺序编为 <前缀#N>；
 #    sha256 摘要编为 <sha256#N>（「sha256:」开头、单独出现的摘要与工件路径中的摘要都按摘要本身编号），
@@ -48,12 +50,18 @@ PARAMETERS_VERSION = initial_version()
 # 10. 只保留关键字段：载荷只保留 KEY_FIELDS 按事件种类列出的键，工具回执只保留 receipt 里的四项，
 #     投影只保留 PROJECTION_KEY_FIELDS 列出的字段。先筛选、后规整：编号只按保留下来的字段的出现顺序产生。
 #     增删表以外的字段不改动基准；表以内的字段变化必须让对应的场景失败。
+#     会话事件里整个事项的累计数（激活结束的 activations、model_steps，激活开始的 cycle）不在表里：
+#     它们数的是整件事项，别的会话先做一步就多一（工单 #892）；会话自己的累计数
+#     （session_activations、session_model_steps）保留，事项的总数在投影里比较。
 # 11. prompt_snapshot.json 按 <部门>/<用途>[/guidance|/guidance_only|/request|/ask] 收同一个场景里的请求：
 #     工作请求记 department_rules、work_item_guidance、input_handling、professional_completion、
 #     collaboration_rules、proposal_contract、allowed_tools 七个提示正文与这次请求带的工具说明；
 #     压缩请求只记摘要提示词，其中两个限额写成占位。部门提示与工具说明本身不再逐字进基准。
 
 BASELINE_DIR = Path(__file__).parent / "event_sequences"
+
+# 没有会话的事件（运行级的事件）归到这一组
+RUN_GROUP = "__run__"
 
 _TIME_KEYS = frozenset({"duration_ms", "latency_ms", "elapsed_ms", "session_elapsed_ms"})
 _ISO_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)")
@@ -65,6 +73,8 @@ _ARTIFACT_PATH_DIGEST = re.compile(r"(?<![0-9a-f])[0-9a-f]{2}/([0-9a-f]{64})(?![
 _BARE_DIGEST = re.compile(r"(?<![0-9a-f])([0-9a-f]{64})(?![0-9a-f])")
 _GIT_SHA = re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])")
 _ARTIFACT_KEYS = frozenset({"kind", "content_hash", "path", "media_type"})
+# 引用别的事件的写法：被引用事件在它自己会话里的位置 <会话>#<条数>（会话是基准里的会话编号）
+_SESSION_POSITION = re.compile(r"^(?:<[^>]+>|__run__)#\d+$")
 _EVENT_FIELDS = ("type", "actor", "department", "state_before", "state_after", "parent_event_id", "session_id",
                  "stop_reason", "error", "payload")
 _SHARED_TEXT = 300
@@ -83,15 +93,15 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "department_guidance_applied": ("activation_id", "context_event_id", "guidance_ids", "input_version"),
     "department_guidance_responded": ("content_hash", "department", "guidance_created_event_id", "guidance_id",
                                       "guidance_version", "issuer", "kind", "result_event_ids", "status"),
-    "department_activated": ("activation_id", "cycle", "effective_contract_hash", "guidance_ids", "guidance_only",
+    "department_activated": ("activation_id", "effective_contract_hash", "guidance_ids", "guidance_only",
                              "guidance_version", "input_version", "prompt_version"),
     "department_input": ("activation_id", "effective_contract_hash", "guidance_ids", "guidance_only",
                          "input_version", "prompt_version", "step_id"),
     "tool_call_required": ("activation_id", "attempt_id", "context_event_id", "count", "effective_contract_hash",
                            "guidance_ids", "guidance_only", "input_version", "limit", "prompt_version",
                            "purpose", "step_id"),
-    "activation_finished": ("activation_id", "activations", "guidance_ids", "guidance_only", "input_version",
-                            "model_steps", "prompt_version", "session_activations", "session_elapsed_ms",
+    "activation_finished": ("activation_id", "guidance_ids", "guidance_only", "input_version",
+                            "prompt_version", "session_activations", "session_elapsed_ms",
                             "session_model_steps", "stop_reason"),
     "context_assembled": ("activation_id", "admitted", "attempt", "attempt_id",
                           "compaction_event_id", "department", "effective_contract_hash", "guidance_ids",
@@ -200,6 +210,9 @@ class _Normalizer:
         self.event_positions = {event.event_id: f"<evt#{index}>" for index, event in enumerate(events, start=1)}
         self.labels: dict[str, str] = {}
         self.counters: dict[str, int] = {}
+        # 引用别的事件的字段写成被引用事件在它自己会话里的位置（工单 #892）：
+        # 会话内部的事件顺序不随会话之间的先后变化，这个写法也不变。
+        self.session_positions = self._session_positions(events)
         data_dir = Path(system.data_dir)
         executable = Path(sys.executable)
         # 同一个路径可能以反斜杠、正斜杠或 JSON 转义后的反斜杠出现
@@ -224,6 +237,27 @@ class _Normalizer:
             self.labels[key] = label
         return label
 
+    def _session_positions(self, events: list[Any]) -> dict[str, str]:
+        # 每个事件在它自己会话里的位置：<会话>#<会话内的第几条>。
+        # 会话编号按会话分组的确定顺序产生（与会话里其他编号同一套规则），
+        # 会话内的条数按事件在该会话里的先后；两个会话谁先写事件都不影响这两个数。
+        positions: dict[str, str] = {}
+        for group, items in _groups_in_order(events).items():
+            label = self._group_label(group)
+            for index, event in enumerate(items, start=1):
+                positions[event.event_id] = f"{label}#{index}"
+        return positions
+
+    def _group_label(self, group: str | None) -> str:
+        # 运行级的事件（没有会话）归到 __run__ 组；会话编号用同一套编号规则，
+        # 编号的先后与事件在分组顺序里第一次出现时相同。
+        if group is None:
+            return RUN_GROUP
+        match = _GENERATED_ID.fullmatch(group)
+        if match is None:
+            return group
+        return self._label(match.group(1), group)
+
     def text(self, value: str) -> str:
         if value in self.python_names:
             return "<python>"
@@ -241,6 +275,11 @@ class _Normalizer:
         value = _GIT_SHA.sub(lambda match: self._label("git", match.group(0)), value)
 
         def generated(match: re.Match[str]) -> str:
+            # 事件编号换成被引用事件在它自己会话里的位置（工单 #892）；
+            # 不在这次运行里的事件编号仍旧按编号表编号。
+            known = self.session_positions.get(match.group(0))
+            if known is not None:
+                return known
             known = self.event_positions.get(match.group(0))
             return known if known is not None else self._label(match.group(1), match.group(0))
 
@@ -368,6 +407,14 @@ def _in_group_order(events: list[Any]) -> list[Any]:
         key=lambda item: (item[0], item[1]))]
 
 
+def _groups_in_order(events: list[Any]) -> dict[str | None, list[Any]]:
+    # 事件按会话分组，每组内部按原来的先后；组的顺序与 _in_group_order 一致
+    groups: dict[str | None, list[Any]] = {}
+    for event in _in_group_order(events):
+        groups.setdefault(event.session_id, []).append(event)
+    return groups
+
+
 def normalized_run(system: Any, run_id: str, replacements: dict[str, str] | None = None) -> dict[str, Any]:
     # replacements：场景自己的机器相关值（例如本机 HTTP 服务的地址）与它的占位写法
     events = system.store.list_events(run_id)
@@ -489,8 +536,6 @@ def compare_with_baseline(name: str, covers: str, run: dict[str, Any], *, write:
     compare_documents(name, expected, json.loads(actual))
 
 
-RUN_GROUP = "__run__"
-
 _TOOL_RESULT_TYPES = frozenset({
     "tool_called", "tool_started", "proposal_submitted", "spec_accepted", "contract_accepted",
     "plan_accepted", "delivery_accepted", "qa_submitted",
@@ -523,6 +568,31 @@ def _session_groups(events):
     return groups
 
 
+def _reference(value: Any, positions: dict[str, str]) -> Any:
+    # 引用（指向别的事件）写成被引用事件在它自己会话里的位置 <会话>#<条数>：
+    # 本序列里的旧写法 <evt#N> 按编号表换算成同一写法；不在序列里的事件当作没有引用。
+    if not isinstance(value, str) or not value:
+        return None
+    if value in positions:
+        return positions[value]
+    if _SESSION_POSITION.match(value):
+        return value
+    return None
+
+
+def _payload_reference(value: Any, positions: dict[str, str]) -> Any:
+    # 载荷里的引用字段（context_event_id 等）：指向别的事件时写成会话内的位置；
+    # 不是引用的值原样保留。
+    if isinstance(value, list):
+        return [_payload_reference(item, positions) for item in value]
+    if isinstance(value, str) and value:
+        if value in positions:
+            return positions[value]
+        if _SESSION_POSITION.match(value):
+            return value
+    return value
+
+
 def _group_records(document):
     shared = document.get("shared") or {}
     events = [_inline(event, shared, {}) for event in document["events"]]
@@ -537,8 +607,11 @@ def _group_records(document):
         for index, item in enumerate(items, start=1):
             record = dict(item)
             record["event"] = index
-            parent = item.get("parent_event_id")
-            record["parent_event_id"] = positions.get(parent) if parent else None
+            record["parent_event_id"] = _reference(item.get("parent_event_id"), positions)
+            payload = record.get("payload")
+            if isinstance(payload, dict):
+                record["payload"] = {name: _payload_reference(value, positions)
+                                     for name, value in payload.items()}
             group_records.append(record)
         records[key] = group_records
     return records

@@ -621,15 +621,19 @@ export class FloorRenderer {
     const data = overlay.data;
     if (overlay.id === "flow") {
       const segments = (data.segments ?? []) as { from: string; to: string; count: number; last_at: string; kind: string }[];
-      // 同一对部门的非返工行与返工行走同一条路径（工单 #415 的分组）：都画在中点时两块牌子叠在一起。
-      // 同一条路径上的第二块牌子往上抬一行，两块牌子因此错开，落点仍在这条路径的中点上
+      // 同一对部门的非返工行与返工行走同一条路径（工单 #415 的分组），方向相反的两段也走同一条路径
+      // （pathFor 取的是同一条几何路径，只是点的顺序反过来）：都画在中点时多块牌子叠在一起。
+      // 同一条路径上的第二块牌子往上抬一行，几块牌子因此错开，落点仍在这条路径的中点上。
+      // 车道键按无序的部门对记（工单 #913）：方向相反的两段共用一个车道，因而错开，都看得见。
+      // 牌子的键仍带方向，用例据此分清哪一块牌子是哪一段
       const lanes = new Map<string, number>();
       for (const seg of segments) {
         const path = pathFor(world, seg.from, seg.to);
         if (!path) continue;
         const key = `${seg.from}>${seg.to}`;
-        const lane = lanes.get(key) ?? 0;
-        lanes.set(key, lane + 1);
+        const laneKey = [seg.from, seg.to].sort().join("<>");
+        const lane = lanes.get(laneKey) ?? 0;
+        lanes.set(laneKey, lane + 1);
         const [x, y] = pointAt(path, polyLength(path) / 2);
         label(key, x, y - 6 - lane * 15, `${seg.count} 次`, seg.kind === "rework" ? PAL.red1 : PAL.white);
       }
