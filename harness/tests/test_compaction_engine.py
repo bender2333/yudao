@@ -300,21 +300,20 @@ def test_single_empty_summary_does_not_fail_the_run_and_department_continues(tmp
     assert len(compaction_invocations) >= 1
 
 
-def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path):
-    """空摘要以后可以重新尝试压缩：下一次整理生效并留下检查点（工单 #840）。"""
-    current_activation = [0]
+def test_empty_compaction_summary_allows_retry_in_the_next_compaction(tmp_path):
+    """一次空摘要以后可以重新尝试压缩：下一次整理接上上一次的检查点（工单 #840）。"""
     summaries = []
 
     def respond(request):
         if request.purpose == "compaction":
             summaries.append(request)
-            # 第一次整理返回空摘要（不生效，不留下检查点），下一次整理生效
-            if len(summaries) == 1:
+            # 第二次整理返回空摘要（不生效，不留下检查点），第三次接上第一次的检查点
+            if len(summaries) == 2:
                 return ModelResponse(output=[_message(request, "")])
             return ModelResponse(output=[_message(request, "Product memory: prior evidence was read.")])
         if request.department == "engineering":
             return delivery_turn()(request)
-        return _read(request, "large.txt") if current_activation[0] <= 1 else product_spec()
+        return _read(request, "large.txt")
 
     adapter = FakeAdapter([respond] * 200)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=32))
@@ -323,19 +322,15 @@ def test_empty_compaction_summary_allows_retry_on_next_activation(tmp_path):
     window = pinned_input_tokens(system, measure_id) + SUMMARY_OUTPUT_TOKENS * 2
     run_id = system.create_run("Original intent", context_window=window)
     system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * (window * 8 // 11))
+    result = system.activate_once(run_id)
 
-    # 第一次激活：空摘要没有留下检查点，下一次整理生效并被记录，运行不失败
-    current_activation[0] = 1
-    first = system.activate_once(run_id)
-    assert first.status != "failed"
-    assert len(summaries) >= 2
-    assert first.compactions
-    assert all(record["checkpoint"]["summary"] for record in first.compactions)
-
-    # 第二次激活：不失败
-    current_activation[0] = 2
-    second = system.activate_once(run_id)
-    assert second.status != "failed"
+    # 一次空摘要不终止运行
+    assert result.status != "failed"
+    assert len(summaries) >= 3
+    assert len(result.compactions) >= 2
+    # 空的那一次没有留下检查点：后一次整理接上前一次记录的检查点
+    assert result.compactions[1]["previous_compaction_event_id"] == result.compactions[0]["source_event_id"]
+    assert all(record["checkpoint"]["summary"] for record in result.compactions)
 
 
 # 工单 #840：工程询问产品，产品在回答里修订 PRD（合同换版本），工程接着工作到历史超过阈值。
