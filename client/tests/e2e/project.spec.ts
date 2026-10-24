@@ -658,24 +658,25 @@ test.describe("项目页面（1440×900）", () => {
       const record = await section(page, "请求记录与用量");
       await expect(record.locator(".section-head .note")).toContainText("范围：整个项目");
       const all = page.locator("section.card table").first();
-      // 第一轮三部门各一次模型请求（#470 删工程计划以后没有 plan_turn）：共三条
-      await expect(all.locator("tbody tr")).toHaveCount(3);
+      // 第一轮：产品、工程各一次模型请求，质检两次（PRD 被接纳以后先做一轮预测性探索，
+      // 交付到达以后核验，循环结构第 3.1 节）：共四条
+      await expect(all.locator("tbody tr")).toHaveCount(4);
       await expect(all.locator("tbody tr").first()).toContainText("fake-script");
       // 用量列（工单 #744）：列名是「用量」，与请求详情同一口径；预置项目的模型回答没有上报用量，写「未上报」
       await expect(all.locator("thead th").nth(7)).toHaveText("用量");
       await expect(all.locator("tbody tr").first().locator("td").nth(7)).toHaveText("未上报");
-      // 关键词筛选：命中三条（请求的模型都是 fake-script）
+      // 关键词筛选：命中四条（请求的模型都是 fake-script）
       const keyword = record.locator("label.field").filter({ hasText: "关键词" }).locator("input");
       await keyword.fill("fake");
       await record.getByRole("button", { name: "按条件筛选" }).click();
-      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(3);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
       // 没有命中的关键词：写明这个范围没有请求记录
       await keyword.fill("不存在的关键词zzz");
       await record.getByRole("button", { name: "按条件筛选" }).click();
       await expect(record).toContainText("这个范围没有请求记录");
       await keyword.fill("");
       await record.getByRole("button", { name: "按条件筛选" }).click();
-      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(3);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
       // Provider 配置筛选（第 7.4 节）：命中 0 条时写明没有请求记录，改回空条件以后恢复
       const providerFilter = record.locator("label.field").filter({ hasText: "Provider 配置" }).locator("input");
       await providerFilter.fill("no-such-provider");
@@ -683,7 +684,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(record).toContainText("这个范围没有请求记录");
       await providerFilter.fill("");
       await record.getByRole("button", { name: "按条件筛选" }).click();
-      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(3);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
       // 请求详情：点第一行的「详情」，顶栏路径换成请求详情
       await page.locator("section.card table").first().locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
       await expect.poll(async () => pathText(page)).toBe(`${SAMPLE} / 请求详情`);
@@ -722,7 +723,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(usage.locator(".y10-usage-note")).toContainText("用量只读显示，不是事项的预算");
       await expect(usage).toContainText("请求数");
       // 「上报用量的请求」（工单 #744）：这个范围里上报了用量的请求数，一个都没有时写「未上报」
-      await expect(usage.locator('.line:has(.term:text-is("请求数")) .value')).toHaveText("3");
+      await expect(usage.locator('.line:has(.term:text-is("请求数")) .value')).toHaveText("4");
       await expect(usage.locator('.line:has(.term:text-is("上报用量的请求")) .value')).toHaveText("未上报");
       // 分组表同样给出这个数，页面上「上报了多少个」与请求记录里的显示对得上
       await expect(await table(page, "按部门")).toContainText("上报用量的请求");
@@ -759,17 +760,17 @@ test.describe("项目页面（1440×900）", () => {
     const page = client.page;
     try {
       const id = await projectId(page, SAMPLE);
-      // 整个项目：三部门各一次模型请求
+      // 整个项目：产品、工程各一次模型请求，质检两次（预测性探索与核验）
       await gotoView(page, id, "observe");
       const all = page.locator("section.card table").first();
-      await expect(all.locator("tbody tr")).toHaveCount(3);
+      await expect(all.locator("tbody tr")).toHaveCount(4);
       // 部门工作间里的入口：点「本部门的模型请求」
       await gotoView(page, id, "dept/quality");
       await page.getByRole("link", { name: "本部门的模型请求" }).click();
       await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?dept=quality`);
-      // 观测页按这个部门筛选：只剩质检的请求，不是整个项目的三条
+      // 观测页按这个部门筛选：只剩质检的两条请求，不是整个项目的四条
       const filtered = page.locator("section.card table").first();
-      await expect(filtered.locator("tbody tr")).toHaveCount(1);
+      await expect(filtered.locator("tbody tr")).toHaveCount(2);
       await expect(filtered.locator("tbody tr").first().locator("td").nth(3)).toHaveText("质检");
       // 部门这一格显示当前筛选的部门；页面上说明当前只看这个部门的请求
       const record = await section(page, "请求记录与用量");
@@ -777,14 +778,14 @@ test.describe("项目页面（1440×900）", () => {
       await expect(record.locator(".section-head .note")).toContainText("只看质检的请求");
       // 用量统计页签用同一组筛选：请求数与请求记录表里的一样
       await record.getByRole("tab", { name: "用量统计" }).click();
-      await expect(record.locator('.line:has(.term:text-is("请求数")) .value')).toHaveText("1");
+      await expect(record.locator('.line:has(.term:text-is("请求数")) .value')).toHaveText("2");
       await record.getByRole("tab", { name: "请求记录" }).click();
       // 进请求详情再回来：这一格筛选不丢
       await filtered.locator("tbody tr").first().getByRole("button", { name: "详情" }).click();
       await expect.poll(async () => page.evaluate(() => window.location.hash)).toContain("dept=quality");
       await page.getByRole("button", { name: "返回请求记录" }).click();
       await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?dept=quality`);
-      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(1);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(2);
       // 换部门筛选：地址跟着改，表格按新的部门过滤
       await record.getByLabel("部门").selectOption("product");
       await record.getByRole("button", { name: "按条件筛选" }).click();
@@ -794,7 +795,7 @@ test.describe("项目页面（1440×900）", () => {
       // 清除筛选：地址里去掉部门，表格回到整个项目
       await record.getByRole("button", { name: "清除筛选" }).click();
       await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe`);
-      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(3);
+      await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
       // 换事项范围：这一格筛选不丢（?w= 与 ?dept= 各自保留）
       await record.getByLabel("部门").selectOption("quality");
       await record.getByRole("button", { name: "按条件筛选" }).click();
@@ -857,13 +858,14 @@ test.describe("项目页面（1440×900）", () => {
         await gotoView(page, id, "observe");
         const record = await section(page, "请求记录与用量");
         const all = page.locator("section.card table").first();
-        // 整个项目：两个事项各三次模型请求，共六条
-        await expect(all.locator("tbody tr")).toHaveCount(6);
+        // 整个项目：两个事项各四次模型请求，共八条
+        // （产品、工程各一次，质检两次：预测性探索与核验，循环结构第 3.1 节）
+        await expect(all.locator("tbody tr")).toHaveCount(8);
         // 在观测页用顶栏的范围选一个事项：仍留在观测页，表格按该事项过滤
         await page.getByLabel("事项范围").selectOption(first.work_item_id);
         await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?w=${first.work_item_id}`);
         await expect(record.locator(".section-head .note")).toContainText(`范围：${SAMPLE_ITEM}`);
-        await expect(all.locator("tbody tr")).toHaveCount(3);
+        await expect(all.locator("tbody tr")).toHaveCount(4);
         // 切页签：范围不丢（页签的地址带着 ?w=）
         await page.locator(".tabbar .tab", { hasText: "质检" }).click();
         await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/dept/quality?w=${first.work_item_id}`);
@@ -877,11 +879,11 @@ test.describe("项目页面（1440×900）", () => {
         // 回到观测页：范围仍然是另一个事项，表格按它过滤
         await page.locator(".tabbar .tab", { hasText: "观测" }).click();
         await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe?w=${second.work_item_id}`);
-        await expect(all.locator("tbody tr")).toHaveCount(3);
+        await expect(all.locator("tbody tr")).toHaveCount(4);
         // 清空范围：回到整个项目，地址里不留 ?w=
         await page.getByLabel("事项范围").selectOption("");
         await expect.poll(async () => page.evaluate(() => window.location.hash)).toBe(`#/p/${id}/observe`);
-        await expect(all.locator("tbody tr")).toHaveCount(6);
+        await expect(all.locator("tbody tr")).toHaveCount(8);
         expect(errors).toEqual([]);
       } finally {
         await client.close();

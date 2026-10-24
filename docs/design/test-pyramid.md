@@ -195,6 +195,8 @@ flowchart LR
 ## 7. 前端与浏览器测试
 
 - 旧 Web 控制台的界面测试已随旧控制台删除：`test_web_ui.js`、`test_b3_shell_browser.spec.js` 与 `test_s3_acceptance_browser.spec.js`（后两者是 Stage 2 的验收证据脚本，固定日期、固定端口、写死的 Chromium 路径，没有接入任何运行入口）。界面的端到端测试用 Playwright 驱动浏览器打开 Yudao 服务提供的页面（[ADR-0032](../adr/0032-interface-served-as-web-pages.md)、[D30](../requirements/web-game-frontend.md)、#71）。
+- 端到端装置的模型回答由 `FakeAdapter` 的脚本给出（`client/tests/e2e/backend.py`）。**脚本按部门给出**，每个部门一份；每一轮按请求里看到的事实决定做什么（质检在没有交付的一轮是预测性探索，有交付的一轮是核验；工程按有没有缺陷记录决定交付什么），与 `harness/demo.py` 同一做法（工单 #852）。一份按先后排队的脚本在部门同时运行以后不再成立：先到的会话会把后面那个项目的轮次取走，项目之间因此串了位。
+- 装置的预置是端到端用例的底座，它的状态由 `client/tests/e2e/seed.spec.ts` 钉住（四个项目各自的状态、停在等待回答的决定请求上的那个项目、还没有事项的那个项目，以及执行槽位被占时新建事项被拒）。
 
 ## 8. 模块交互
 
