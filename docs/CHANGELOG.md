@@ -7,6 +7,8 @@
 
 ---
 
+claude-opus-5-5 / 2026-10-24 22:36 / `docs/design/app-and-interface.md` 第 4.2 节加三条：刷新清单宁多勿漏，改变结果的种类不在刷新清单就在「不刷新」清单里并写明理由；由集成层的重放核对检查；不从读取来源推导，并写明理由与什么时候重新考虑。第 5.7 节加一句指向第 4.2 节，第 9 节加验收第 18 条。`docs/decision.md` 记一条 / 架构审查的候选 1，用户采纳建议；实测九个查询的刷新清单漏了十几种
+
 solo-minimax-M3.1-Flash / 2026-10-24 22:05 / 工单 #879：建档的 8 个测试文件的假模型脚本按部门给出（`test_onboarding.py`、`test_onboarding_revision_context.py`、`test_onboarding_confirmation_round.py`、`test_onboarding_confirmation_queries.py`、`test_onboarding_baseline_check_command.py`、`test_initial_prd_summary.py`、`test_snapshot.py`、`test_issue_317_onboarding_interruption.py`），并给假模型加上检查：一条按先后排队的列表脚本被工程与质检先后取用时让用例失败，写明是哪条脚本、被哪两个部门取用、应当按部门给出 / PRD 被接纳以后工程与质检同时工作（#557），一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化；失败落在用例上（适配器只记下这件事，`harness/tests/conftest.py` 在用例结束时核对；子进程里的违反写进子进程的输出，`harness/tests/process_kill.py` 读到以后让用例失败），只在适配器里抛错会被当成模型服务的错误，事项停在 provider_error，用例报的是别处的错；检查找出来的另外 5 个文件拆成工单 #888 / 断言没有放宽，用例没有删除
 
 solo-minimax-M3.1-Flash / 2026-10-24 21:45 / 工单 #888：#879 的检查（假模型发现一条列表脚本被工程与质检同时取用就让用例失败）找出来的 5 个测试文件的假模型脚本按部门给出——`harness/tests/helpers.py` 的 `compacted_runner` 不再给一条共用的列表脚本，`harness/tests/test_smoke.py` 里 #878 写的按部门拆开的辅助不再需要（共用夹具直接按部门给出），`harness/tests/test_startup_run_version.py` 的建档脚本、`harness/tests/test_proposal_version_check.py` 的两个用例的脚本与 `harness/tests/test_read_model_derivation.py` 的一个用例的脚本都从把产品、工程、质检混在一起的列表脚本改成 `FakeAdapter({"product": [...], "engineering": [...], "quality": [...]})` / PRD 被接纳以后工程与质检同时工作（#557），一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化；断言没有放宽，用例没有删除
