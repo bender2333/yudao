@@ -7,6 +7,10 @@
 
 ---
 
+solo-minimax-M3.1-Flash / 2026-10-24 10:20 / 工单 #852：`docs/design/test-pyramid.md` 第 7 节补两条——端到端装置的模型回答脚本按部门给出、每一轮按请求里看到的事实决定做什么（工单 #557 以后部门同时运行，一份按先后排队的脚本会被先到的会话打乱，项目之间因此串了位，预置第三个项目的事项被服务端以 `busy` 拒绝，后端提前退出）；装置的预置由 `client/tests/e2e/seed.spec.ts` 钉住 / 预置脚本原来是一份按先后排队的队列，三个部门谁先来谁先取；部门同时运行以后这个前提不成立，第一个项目取走了第二个项目的轮次，第二个项目取走了第三个项目的脚本，停在等待回答的决定请求上，执行槽位没有空出来
+
+claude-opus-5-5 / 2026-10-24 10:40 / 试用 d9b7d115 的工单分诊：`docs/design/model-management.md` 第 8.7 节增加「不无限压缩」（同一会话的压缩连续 `compaction.stalled_limit` 次没有推进时以 `compaction_failed` 停止，#840），第 4.7 节写明启动时没有目录文件是「没有文件」不是被删除（#844）；`docs/design/existing-project-onboarding.md` 第 4.6 节写明 Git 来源只看源目录自己、不向上层目录查找，读不出时以 `source_invalid` 拒绝（#841）；`docs/design/app-and-interface.md` 的 `run.export` 一行写明导出是原始记录、不脱敏、分享前用户自己清理（#845）；`docs/design/department-loop.md` 第 4.2 节写明轮次只计主线会话的激活（#857）；`docs/architecture-issues.md` 中 #842 那一条补处理行；`docs/decision.md` 记这次分诊；仓库根的 README 导出命令加一句说明，`.claude/skills/trial/SKILL.md` 的机械扫描只把凭据的值算作问题 / 用户要求诊断与整理 #840 至 #845；#840 的根因是询问修订 PRD 以后记录器仍用旧的工作依据，压缩检查点因此永远找不到；#841、#844 是代码偏离设计；#845 需要架构师给结论
+
 solo-minimax-M3.1-Flash / 2026-10-24 08:43 / 工单 #843：`docs/design/model-management.md` 第 4.3 节与第 9.1 节补一条——连接还没有保存时，模型管理页的「获取模型列表」写明要先保存这份连接与原因，不发请求 / 未保存的连接上这个按钮是禁用的，点击既没有反应也不发请求，用户看不出下一步是先保存（第 4.3 节本来就只对已保存的连接采集）
 
 solo-minimax-M3.1-Flash / 2026-10-24 06:57 / 工单 #842：`docs/design/department-loop.md` 第 4.2 节补一条——询问分支是提问方这一轮里的一次旁支工作，它不接管事项的所在部门；事项的所在部门（事项卡、概览与楼层页写的部门）由主线会话的激活推出，分支的激活不改写它 / 分支的激活以前无条件改写所在部门，提问方拿到回答以后继续工作，页面上仍然停在被询问的部门（工单正文里的 run_874f4b3925164593：工程在工作，显示产品，67 分钟没变）
@@ -1066,3 +1070,7 @@ solo-minimax-M3.1-Flash / 2026-10-24 02:20 / 工单 #557：集成层的用例按
 solo-minimax-M3.1-Flash / 2026-10-24 03:50 / 工单 #557：集成层剩下的用例按同时运行以后的结构改写——共用一个队列的脚本改成按部门给出（`harness/tests/test_event_payloads.py`、`test_engine.py`、`test_onboarding.py`、`test_issue_317_onboarding_upgrade.py`、`test_issue_317_onboarding_interruption.py`、`test_department_providers.py`），`harness/tests/process_kill.py` 的 `restarted` 改成也能写按会话给出的脚本；数模型调用次数与轮次的断言按测试分层设计说明第 10 节改成断言结果（`test_definitions.py`、`test_department_providers.py`、`test_engine.py`）；`docs/architecture-issues.md` 登记两条：同时被挡住时待恢复的决定请求是合发一条还是各发一条、被挡住的那一轮在回答以后要不要接着做；影响列表里的进行中事项只写一个部门（取事项投影的当前部门）/ 上一轮登记的两处由架构师定口径；本轮按现在的实现把用例写对：两个会话被挡住时各有一条待恢复的决定请求、各写明自己的部门，影响列表写的部门与事项投影当前所在部门一致
 
 claude-sonnet-5-5 / 2026-10-24 09:14 / 工单与文档的减法审核（#837）：用 `git mv` 把 `docs/stage-3/contact-sheets/{138,386,573}`（三张工单的验收截图，约 9.5 MB）归档到 `docs/archive/stage-3/contact-sheets/`，把 `docs/evaluation/milestones/stage3-m0-retro-2026-10-19.md` 与 `stage3-m0.md` 归档到 `docs/archive/evaluation/milestones/`，把根目录的 `agents_jour.md` 归档到 `docs/archive/agents_jour.md`；`CLAUDE.md`、`docs/agents/issue-tracker.md`、`docs/agents/shared-rules.md` 里指向 `agents_jour.md` 的三句改为指向归档位置；复盘文档里唯一的相对链接按新目录深度加了一级 `../` / 这些都是证据或 2026-10-06 之前不再追加的日记，除这三句以外没有活动文档、代码或测试引用；`stage3-m0.json` 是评测数据，没有动；生成截图的脚本仍把新截图写到 `docs/stage-3/contact-sheets/<工单号>/`，不受影响
+
+claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 补第 5.5 节「裁决的分工」，修改第 3.1 节（`collaboration.py` 是成果驱动的路由，移出内核）、第 4 节（最小投影补齐的几样、成果失效写成事件）、第 7 节、第 12 节（六张拆成 13 张，内核行数与用户批准两条约束，S5 改做法）与第 14 节；新增 docs/research/kernel-projection-reads-2026-10-24.md 并登记索引；ADR-0042 追加补充；D40 第 16 条；docs/decision.md 新增条目 / 用户为 M0.5 要任务分解与排期，清点发现内核读取 59 处投影字段，用户选「分开放」
+
+claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 第 12 节写入 13 张工单的编号，S1c 只改 `validation.py` 的五条、S1c 与 S3 不依赖 S1a；路线图第 2 节第 17 项、Stage 3 计划第 3、9 节、D40「实现状态」改为 13 张的编号 / 按拆分建立与改写工单 #824 至 #829、#858 至 #864
