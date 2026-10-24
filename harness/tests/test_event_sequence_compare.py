@@ -4,14 +4,18 @@
 # 不重新走事件规整，shared 与 artifacts 的标签编号保持稳定，只断言分组比较与因果边的差异点。
 # 第四个探针用最小合成文档覆盖询问链（基准里询问链与同组事件交织，单步移动必然先碰到分组比较）；
 # 第五、六个探针覆盖投影比较（#541）：只改投影字段、事件与投影同时改两种情况。
+# 后面的探针（#892）覆盖事件引用与事项累计数：引用写成被引用事件在它自己会话里的位置，
+# 两个会话交错的先后不同不影响比较；会话内引用换了指向要失败并写明会话、第几条与字段名。
 
 import copy
 import json
+import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from harness.tests.event_sequence import compare_documents
+from harness.tests.event_sequence import compare_documents, normalized_run
 
 BASELINE_DIR = Path(__file__).resolve().parent / "event_sequences"
 
@@ -179,3 +183,156 @@ def test_payload_field_difference_fails_with_fields_line():
     assert "session <ses_qua#1>" in message, message
     assert "event #" in message, message
     assert "payload.verdict" in message, message
+
+
+# 工单 #892：事件引用与事项累计数。
+# 两个会话的事件各写一份，交错的先后不同；引用写成被引用事件在它自己会话里的位置，
+# 规整以后两份按会话比较相等（不靠运行碰运气，直接构造两份事件序列）。
+
+_ENGINEERING_SESSION = "ses_eng_0123456789abcdef"
+_QUALITY_SESSION = "ses_qua_fedcba9876543210"
+
+
+class _StubStore:
+    def __init__(self, events):
+        self._events = events
+
+    def list_events(self, run_id):
+        return list(self._events)
+
+
+class _StubSystem:
+    # 规整一次事件序列只需要事件、投影与数据目录；合成的事件没有工件引用，用不到工件存储
+    def __init__(self, events):
+        self.store = _StubStore(events)
+        self.data_dir = "C:/yudao-synthetic-data"
+        self.artifacts = None
+
+    def project(self, run_id):
+        return SimpleNamespace(canonical_state=dict)
+
+
+def _event(event_id, session_id, type_, department, payload, parent=None):
+    return SimpleNamespace(
+        event_id=event_id, run_id="run_synthetic", type=type_, role=None, parent_event_id=parent,
+        state_before="running", state_after="running", payload=payload, artifact_hashes=[],
+        session_id=session_id, actor="system", department=department, stop_reason=None, error=None)
+
+
+def _session_events(session_id, department, suffix, reference="activation"):
+    # 一个会话的三条事件：开始、一次模型请求、结束。模型请求引用开始那条事件；
+    # reference 换成 request 时就是「引用换了指向」（指向同会话的另一条）。
+    activation = f"evt_{suffix}000000000000001"
+    request = f"evt_{suffix}000000000000002"
+    finished = f"evt_{suffix}000000000000003"
+    return [
+        _event(activation, session_id, "department_activated", department,
+               {"activation_id": f"act_{suffix}000000000000001", "cycle": 1,
+                "effective_contract_hash": None, "guidance_ids": [], "guidance_only": False,
+                "guidance_version": 0, "input_version": 1, "prompt_version": 0}),
+        _event(request, session_id, "model_requested", department,
+               {"activation_id": f"act_{suffix}000000000000001", "attempt": 1,
+                "attempt_id": f"att_{suffix}000000000000001", "attempted": True,
+                "context_event_id": activation if reference == "activation" else request,
+                "effective_contract_hash": None, "guidance_ids": [], "guidance_only": False,
+                "input_version": 1, "logical_call_id": f"call_{suffix}000000000000001",
+                "max_attempts": 3, "prompt_version": 0, "purpose": "work",
+                "retry_of_step_id": None, "step_id": f"step_{suffix}000000000000001"},
+               parent=activation),
+        _event(finished, session_id, "activation_finished", department,
+               {"activation_id": f"act_{suffix}000000000000001", "activations": 2, "model_steps": 3,
+                "guidance_ids": [], "guidance_only": False, "input_version": 1, "prompt_version": 0,
+                "session_activations": 1, "session_elapsed_ms": 120, "session_model_steps": 1,
+                "stop_reason": None},
+               parent=activation),
+    ]
+
+
+def _two_sessions(reference="activation"):
+    engineering = _session_events(_ENGINEERING_SESSION, "engineering", "a", reference)
+    quality = _session_events(_QUALITY_SESSION, "quality", "b", reference)
+    return engineering, quality
+
+
+def _normalized(events):
+    return normalized_run(_StubSystem(events), "run_synthetic")
+
+
+# 事项的累计数不进会话内事件的比较（工单 #892）：会话事件里不再有 activations、model_steps、cycle，
+# 会话自己的累计数 session_activations、session_model_steps 保留，事项的总数在投影里比较。
+_ITEM_TOTALS = ("activations", "model_steps", "cycle")
+_GLOBAL_POSITION = re.compile(r"^<evt#\d+>$")
+_SESSION_POSITION = re.compile(r"^(?:<[^>]+>|__run__)#\d+$")
+
+
+def test_interleaved_sessions_compare_equal():
+    # 同一份事件，两个会话交错的先后不同（每个会话内部的事件相同）：
+    # 规整以后引用写成会话内的位置，两份按会话比较相等（工单 #892）
+    engineering, quality = _two_sessions()
+    first = _normalized([engineering[0], quality[0], engineering[1], quality[1],
+                         engineering[2], quality[2]])
+    second = _normalized([quality[0], engineering[0], quality[1], engineering[1],
+                          quality[2], engineering[2]])
+    assert first != second, "两份事件记录的交错应当不同"
+    compare_documents("synthetic", first, second)
+
+
+def test_session_reference_change_fails_with_fields_line():
+    # 会话内某条事件引用的事件变了（模型请求改为引用同会话的另一条）：
+    # 比较失败，信息写明会话、会话内第几条与字段名（工单 #892）
+    engineering, quality = _two_sessions()
+    expected = _normalized([engineering[0], quality[0], engineering[1], quality[1],
+                            engineering[2], quality[2]])
+    changed, _ = _two_sessions(reference="request")
+    actual = _normalized([changed[0], quality[0], changed[1], quality[1],
+                           changed[2], quality[2]])
+    with pytest.raises(AssertionError) as raised:
+        compare_documents("synthetic", expected, actual)
+    message = str(raised.value)
+    assert "session <ses_eng#1>" in message, message
+    assert "event #" in message, message
+    assert "payload.context_event_id" in message, message
+
+
+def test_normalized_references_are_session_positions():
+    # 规整以后引用写成被引用事件在它自己会话里的位置，不写全局位置（工单 #892）
+    engineering, quality = _two_sessions()
+    document = _normalized([engineering[0], quality[0], engineering[1], quality[1],
+                            engineering[2], quality[2]])
+    references = [event["parent_event_id"] for event in document["events"]]
+    references += [event["payload"].get("context_event_id") for event in document["events"]
+                   if "context_event_id" in event["payload"]]
+    assert "<ses_eng#1>#1" in references
+    assert "<ses_qua#1>#1" in references
+    assert all(reference is None or not _GLOBAL_POSITION.match(reference)
+               for reference in references), references
+
+
+# 事项的累计数不进会话内事件的比较（工单 #892）：会话事件里不再有 activations、model_steps、cycle，
+# 会话自己的累计数 session_activations、session_model_steps 保留，事项的总数在投影里比较。
+def test_baselines_keep_session_totals_only():
+    for path in sorted(BASELINE_DIR.glob("*.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for event in document["events"]:
+            payload = event.get("payload") or {}
+            if event.get("session_id"):
+                for field in _ITEM_TOTALS:
+                    assert field not in payload, f"{path.name} 的会话事件里还有事项累计数 {field}"
+            if event["type"] == "activation_finished":
+                assert "session_activations" in payload, f"{path.name} 少了 session_activations"
+                assert "session_model_steps" in payload, f"{path.name} 少了 session_model_steps"
+
+
+def test_baseline_references_are_session_positions():
+    # 基准里的引用写成会话内的位置：父事件与载荷里的事件编号都不写全局位置（工单 #892）
+    for path in sorted(BASELINE_DIR.glob("*.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for event in document["events"]:
+            parent = event.get("parent_event_id")
+            if parent:
+                assert _SESSION_POSITION.match(parent), f"{path.name} 的父事件是全局位置 {parent}"
+            for name, value in (event.get("payload") or {}).items():
+                items = value if isinstance(value, list) else [value]
+                for item in items:
+                    if isinstance(item, str) and _GLOBAL_POSITION.match(item):
+                        raise AssertionError(f"{path.name} 的 {name} 是全局位置 {item}")
