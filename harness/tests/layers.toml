@@ -192,3 +192,4 @@
 "test_issue_709.py" = "module"
 "test_issue_740.py" = "integration"
 "test_issue_842.py" = "integration"
+"test_issue_865.py" = "integration"
