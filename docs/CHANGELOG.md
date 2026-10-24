@@ -7,6 +7,8 @@
 
 ---
 
+claude-opus-5-5 / 2026-10-24 22:50 / `docs/design/test-pyramid.md` 第 11.1 节加一条：基准按会话比较时，会话里的事件只保留不随会话之间先后变化的值——引用别的事件的字段写成被引用事件在它自己会话里的位置，整个事项的累计数（`activations`、`model_steps`、`cycle`）不进会话内事件的比较，依据的版本随先后变化时把场景的先后定下来 / main 的集成层两次有事件序列基准失败（`guidance_response_explained` 的 `context_event_id`、`activation_start_unavailable` 的 `activations` 与 `model_steps`）：#557 把其他编号改成了按会话分组的固定顺序，事件之间的引用仍按全局位置编号，会话事件里还带着整个事项的累计数
+
 claude-opus-5-5 / 2026-10-24 22:36 / `docs/design/app-and-interface.md` 第 4.2 节加三条：刷新清单宁多勿漏，改变结果的种类不在刷新清单就在「不刷新」清单里并写明理由；由集成层的重放核对检查；不从读取来源推导，并写明理由与什么时候重新考虑。第 5.7 节加一句指向第 4.2 节，第 9 节加验收第 18 条。`docs/decision.md` 记一条 / 架构审查的候选 1，用户采纳建议；实测九个查询的刷新清单漏了十几种
 
 solo-minimax-M3.1-Flash / 2026-10-24 22:05 / 工单 #879：建档的 8 个测试文件的假模型脚本按部门给出（`test_onboarding.py`、`test_onboarding_revision_context.py`、`test_onboarding_confirmation_round.py`、`test_onboarding_confirmation_queries.py`、`test_onboarding_baseline_check_command.py`、`test_initial_prd_summary.py`、`test_snapshot.py`、`test_issue_317_onboarding_interruption.py`），并给假模型加上检查：一条按先后排队的列表脚本被工程与质检先后取用时让用例失败，写明是哪条脚本、被哪两个部门取用、应当按部门给出 / PRD 被接纳以后工程与质检同时工作（#557），一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化；失败落在用例上（适配器只记下这件事，`harness/tests/conftest.py` 在用例结束时核对；子进程里的违反写进子进程的输出，`harness/tests/process_kill.py` 读到以后让用例失败），只在适配器里抛错会被当成模型服务的错误，事项停在 provider_error，用例报的是别处的错；检查找出来的另外 5 个文件拆成工单 #888 / 断言没有放宽，用例没有删除

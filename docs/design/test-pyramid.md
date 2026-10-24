@@ -267,6 +267,10 @@ flowchart LR
 - 投影保留阶段、停止原因、结果、错误、等待原因、计数与版本，以及当前 PRD、交付说明、审查与有效合同的修订号、状态与内容摘要。
 - 可信内核的两项测试（`kernel/test_every_stop_has_reason.py`、`kernel/test_tool_needs_permission.py`）读取的字段都在保留之列，内核测试不需要修改。
 - 比较不一致时，信息写明场景、会话、会话内第几个事件、事件种类与不一致的字段名。
+- 部门同时运行以后（#557）基准按会话比较：会话内的事件按顺序比，会话之间只比因果关系。会话里的事件只保留不随会话之间先后变化的值（2026-10-24 架构师补充）：
+  - 引用别的事件的字段，`parent_event_id` 与载荷里的 `context_event_id`、`compaction_event_id`、`source_event_id`、`guidance_created_event_id`、`result_event_ids` 等，都写成被引用事件在它自己会话里的位置，不写全局位置。
+  - 整个事项的累计数不进会话内事件的比较：激活结束里的 `activations`、`model_steps`，激活开始里的轮次 `cycle`。会话自己的累计数（`session_activations`、`session_model_steps`）保留，事项的总数在投影里比较。
+  - 依据的版本（`input_version`、`guidance_version`、PRD 修订号）随先后变化时，说明场景本身的先后没有定下来：用按部门给出的脚本把先后定下来（第 10 节第 6 条），不从比较里去掉。
 
 快照：
 
