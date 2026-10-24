@@ -19,8 +19,10 @@ def _slow(turn):
 
 def test_time_limit_stops_run_with_failed_state(data_dir):
     # 运行时间限制为 1 秒，第一次模型调用期间运行时间用完
-    script = [_slow(product_spec()),delivery_turn(),
-              *[FakeTurn(proposal=None, transcript="working") for _ in range(100)]]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    script = {"product": [_slow(product_spec())], "engineering": [delivery_turn()],
+              "quality": [FakeTurn(proposal=None, transcript="working") for _ in range(100)]}
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1, max_cycles=999)
     result = system.activate_once(run_id)
@@ -32,8 +34,10 @@ def test_time_limit_stops_run_with_failed_state(data_dir):
 def test_time_limit_checked_between_activations(data_dir):
     # #470 删除工程计划以后工程激活只有交付一步：第一次激活提交产品约定，
     # 第二次激活提交交付并转入质检
-    script = [product_spec(), delivery_turn(),
-              review_turn("release", "ok")]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    script = {"product": [product_spec()], "engineering": [delivery_turn()],
+              "quality": [review_turn("release", "ok")]}
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=10)
     # 第一次激活正常完成；两次激活之间的等待不计入运行时间（工单 #350，按 #410 对齐短时限到 10 秒避免负载抖动），
@@ -80,8 +84,10 @@ def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
     assert result.status == "done"
 
 def test_small_cycle_limit_still_pauses(data_dir):
-    script = [product_spec(),delivery_turn(),
-              review_turn("release", "ok")]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    script = {"product": [product_spec()], "engineering": [delivery_turn()],
+              "quality": [review_turn("release", "ok")]}
     _, projection = run_scripted(data_dir, script, max_cycles=1, run_time_limit_sec=7200)
     assert projection.status == "paused"
     assert projection.stop_reason == "max_cycles"
@@ -110,12 +116,13 @@ def test_convergence_with_defaults_always_terminates(data_dir):
 
 def test_convergence_with_long_script_reaches_terminal(data_dir):
     # 用较长脚本验证收敛：即使有很多步骤，最终仍到达终态
-    long_script = [
-        product_spec(),
-        *[list_files_turn for _ in range(100)],
-        delivery_turn(),
-        review_turn("release", "ok"),
-    ]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    long_script = {
+        "product": [product_spec()],
+        "engineering": [*[list_files_turn for _ in range(100)], delivery_turn()],
+        "quality": [review_turn("release", "ok")],
+    }
     system = LoopSystem.for_testing(data_dir, FakeAdapter(long_script))
     run_id = system.create_run("echo", run_time_limit_sec=7200)
     result = system.run_until_stop(run_id)
@@ -123,8 +130,10 @@ def test_convergence_with_long_script_reaches_terminal(data_dir):
     assert result.status in TERMINAL_STATUSES
 
 def test_time_limit_event_recorded(data_dir):
-    script = [_slow(product_spec()),delivery_turn(),
-              *[FakeTurn(proposal=None, transcript="working") for _ in range(50)]]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    script = {"product": [_slow(product_spec())], "engineering": [delivery_turn()],
+              "quality": [FakeTurn(proposal=None, transcript="working") for _ in range(50)]}
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=1, max_cycles=999)
     system.activate_once(run_id)
@@ -161,8 +170,10 @@ def test_per_request_timeout_still_applies_inside_step(data_dir):
 
 def test_explicit_small_max_cycles_with_large_time_limit(data_dir):
     # 明确设置小的 max_cycles 和大的时间限制，验证 max_cycles 仍然生效
-    script = [product_spec(),delivery_turn(),
-              review_turn("release", "ok")]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+    script = {"product": [product_spec()], "engineering": [delivery_turn()],
+              "quality": [review_turn("release", "ok")]}
     _, projection = run_scripted(data_dir, script, max_cycles=1, run_time_limit_sec=7200)
     assert projection.status == "paused"
     assert projection.stop_reason == "max_cycles"

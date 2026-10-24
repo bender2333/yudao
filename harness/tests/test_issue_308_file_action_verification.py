@@ -43,10 +43,15 @@ def test_a_write_that_never_happened_is_retried_once_without_asking_the_user(tmp
     # 验收一（没有发生）：写入执行前终止进程，重启以后工作区与动作前快照相同，
     # 记一条 action_verified（resolution=handed_back），交还模型，没有决定请求
     data_dir = tmp_path / "data"
-    script = [{"proposal": product_spec()},
-              {"output": [_write("call-write", "src/note.txt", "hello\n")]}]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+    }
 
-    with killed.interrupted(data_dir, script, tail=[_settle()],
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
                             hold_after="tool_started", hold_action="call-write") as run:
         attempts = killed.tool_attempts(run.after, run.run_id, "call-write")
         assert len(attempts) == 1, "没有发生时交还模型，不再自动重新执行"
@@ -62,10 +67,15 @@ def test_a_write_that_happened_is_recorded_as_auto_verified(tmp_path):
     # 验收二（已完成）：写入已经落盘、回执还没写的时候进程终止。重启以后只有目标路径变成目标内容，
     # 记一条 action_verified（resolution=auto_verify），不补造原来的 tool_called，也不问用户
     data_dir = tmp_path / "data"
-    script = [{"proposal": product_spec()},
-              {"output": [_write("call-write", "src/note.txt", "hello\n")]}]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+    }
 
-    with killed.interrupted(data_dir, script, tail=[_settle()],
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
                             await_file=("src/note.txt", "hello\n")) as run:
         attempts = killed.tool_attempts(run.after, run.run_id, "call-write")
 
@@ -96,9 +106,15 @@ def test_other_changes_after_the_snapshot_ask_the_user(tmp_path):
     # 验收三（另有改动）：中断以后工作区里除了目标路径还有别的变化，核实无法断定动作是否发生（unclear），
     # 按非文件动作交还模型处理，没有决定请求
     data_dir = tmp_path / "data"
-    script = [{"proposal": product_spec()},
-              {"output": [_write("call-write", "src/note.txt", "hello\n")]}]
-    with killed.interrupted(data_dir, script, tail=[_settle()], resume_after=False,
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+    }
+    with killed.interrupted(data_dir, script, tail={"engineering": [_settle()], "quality": []},
+                            resume_after=False,
                             hold_after="tool_started", hold_action="call-write") as run:
         run.before.workspace(run.run_id).write_file("src/other.txt", "someone else\n")
         run.after.resume_startup_runs()
@@ -155,10 +171,16 @@ def test_an_edit_delete_and_move_are_verified_the_same_way(tmp_path):
 def test_a_retry_that_stays_unknown_after_the_chance_is_gone_asks_the_user(tmp_path):
     # 改写为新行为：写入没有发生时交还会话，没有自动重新执行，不发决定请求
     data_dir = tmp_path / "data"
-    script = [{"proposal": product_spec()},
-              {"output": [_write("call-write", "src/note.txt", "hello\n")]}]
+    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
+    # 产品提交规格，写文件是工程的活；重启以后父进程里接着跑的后半脚本同样按部门给出
+    script = {
+        "product": [{"proposal": product_spec()}],
+        "engineering": [{"output": [_write("call-write", "src/note.txt", "hello\n")]}],
+    }
 
-    first = killed.interrupted(data_dir, script, tail=[], hold_after="tool_started",
+    first = killed.interrupted(data_dir, script, tail={"engineering": [], "quality": []},
+                               hold_after="tool_started",
                                hold_action="call-write", resume_after=False)
     attempts = killed.tool_attempts(first.before, first.run_id, "call-write")
     assert len(attempts) == 1
@@ -167,7 +189,7 @@ def test_a_retry_that_stays_unknown_after_the_chance_is_gone_asks_the_user(tmp_p
     first.close()
 
     # 第二次启动：恢复入口直接交还，写 action_verified(resolution="handed_back")
-    second = killed.restarted(data_dir, [_settle()], resume_after=False)
+    second = killed.restarted(data_dir, {"engineering": [_settle()], "quality": []}, resume_after=False)
     assert killed.unknown_action_requests(second.after, run_id) == []
     verified = [e for e in killed.events(second.after, run_id, "action_verified")
                 if (e.payload or {}).get("id") == "call-write"]
