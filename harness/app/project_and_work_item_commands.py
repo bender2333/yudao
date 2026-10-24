@@ -374,6 +374,15 @@ def _no_refs(events: list[Event | ProjectEvent]) -> "NoRefs":
     return NoRefs()
 
 
+def _department_settings_refs(events: list[Event | ProjectEvent]) -> "DepartmentSettingsSaveRefs":
+    # 保存以后该部门模型不具备建议能力时的提醒（设计说明第 5.6 节「保存时」）：提醒随事件保存。
+    # 保存的内容与现值完全相同时这次保存不追加任何事件（服务层已经判断过「没有改动」），
+    # 这时接受结果的提醒为空，不再按「一定有事件」去取最后一条（工单 #865）
+    if not events:
+        return DepartmentSettingsSaveRefs(reminders=[])
+    return DepartmentSettingsSaveRefs(reminders=list(events[-1].payload.get("reminders") or ()))
+
+
 async def _save_source_directory(application: "Application", command: Command,
                                  request: SourceDirectorySave) -> None:
     try:
@@ -466,8 +475,7 @@ GUIDANCE_SEND = CommandDefinition(
 DEPARTMENT_SETTINGS_SAVE = CommandDefinition(
     name="department_settings.save", request=DepartmentSettingsSave, refs=DepartmentSettingsSaveRefs,
     handle=_save_department_settings,
-    derive_refs=lambda events: DepartmentSettingsSaveRefs(
-        reminders=list(events[-1].payload.get("reminders") or ())),
+    derive_refs=_department_settings_refs,
     reasons=("not_found", "stale_base", "project_archived", "not_allowed"))
 SOURCE_DIRECTORY_SAVE = CommandDefinition(
     name="source_directory.save", request=SourceDirectorySave, refs=NoRefs, handle=_save_source_directory,

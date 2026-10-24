@@ -222,14 +222,30 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
       const prompt = dialog.getByLabel("部门 Prompt");
       await prompt.fill("工程部门先读有效需求，再写实现计划。");
 
-      // 界面之外修改同一个部门设置：设置版本 +1，弹窗手里的基准版本因此过期
+      // 界面之外修改同一个部门设置：设置版本 +1，弹窗手里的基准版本因此过期。
+      // 写入与点保存放在同一个页面任务里：事件流把新设置送到页面以前就提交，
+      // 弹窗里的基准版本因此确实是过期的（事件流送到以后草稿会随新版本重置，
+      // 那时保存的是当前值，服务端按「没有改动」接受，工单 #865 的那条路径）
       const version = await settingsVersion(page, id, "engineering");
-      await expectAccepted(page, "department_settings.save", {
-        project_id: id, department: "engineering", base_version: version,
-        department_prompt: "界面之外写入的部门 Prompt。",
-      });
+      const written = await page.evaluate(async (payload) => {
+        const response = await fetch(`${payload.address}/api/commands/department_settings.save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            command_id: crypto.randomUUID(),
+            project_id: payload.id,
+            department: "engineering",
+            base_version: payload.version,
+            department_prompt: "界面之外写入的部门 Prompt。",
+          }),
+        });
+        const button = Array.from(document.querySelectorAll("button"))
+          .find((item) => item.textContent?.trim() === "保存部门设置");
+        button?.click();
+        return response.status;
+      }, { address: backend.address, id, version });
+      expect(written).toBe(200);
 
-      await dialog.getByRole("button", { name: "保存部门设置" }).click();
       const error = dialog.locator('p.error[role="status"]');
       await expect(error).toContainText("部门设置已经被修改，请重新读取以后提交");
       // 不覆盖别人的修改：服务端仍是界面之外写入的内容
@@ -339,6 +355,42 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
       // 无法使用时只说明原因与所引用的模型，不显示其他连接或模型（不改成解析顺序中的下一层）
       expect(await workshopModelText(title)).not.toContain("fake-script");
       expect(await workshopModelText(title)).toContain("准入已作废");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+  test("不改任何内容直接保存：服务端按「没有改动」接受，页面上没有错误", async () => {
+    const client = await openClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      const id = await projectId(page, SAMPLE);
+      // 先写一段部门 Prompt：这一段由本项目写入，弹窗里读到的是同一段
+      await expectAccepted(page, "department_settings.save", {
+        project_id: id, department: "engineering", base_version: await settingsVersion(page, id, "engineering"),
+        department_prompt: "工程部门先读有效需求，再写实现计划。",
+      });
+
+      await gotoView(page, id, "dept/engineering");
+      const title = await section(page, "工程部门");
+      await title.getByRole("button", { name: "部门设置" }).click();
+      const dialog = page.locator(".modal-backdrop");
+      await expect(dialog.locator(".modal-head h2")).toHaveText("本项目 · 工程设置");
+
+      // 弹窗读到的就是当前值：等事件流把新的设置送到页面，基准版本与设置页读到的一致
+      const version = await settingsVersion(page, id, "engineering");
+      await waitUntil(async () => (await dialog.innerText()).includes(`第 ${version} 版`), page,
+        "弹窗读到的部门设置是最新的");
+      await expect(dialog.getByLabel("部门 Prompt")).toHaveValue("工程部门先读有效需求，再写实现计划。");
+
+      // 不改任何内容直接保存：服务端按「没有改动」接受，不再返回 500（工单 #865）
+      await dialog.getByRole("button", { name: "保存部门设置" }).click();
+      await expect(page.locator(".modal-backdrop")).toHaveCount(0);
+
+      // 页面上没有错误说明，服务端的设置也没有变化
+      await expect(page.locator('p.error[role="status"]')).toHaveCount(0);
+      expect(await settingsVersion(page, id, "engineering")).toBe(version);
       expect(errors).toEqual([]);
     } finally {
       await client.close();
