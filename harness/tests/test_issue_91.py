@@ -184,10 +184,14 @@ def _start_work_item(client, project_id: str) -> str:
     return started.json()["refs"]["run_id"]
 
 def _finish(system, run_id: str) -> None:
+    # 事项的执行任务与接续任务都要结束：回答决定请求以后 run 由 orchestrator.start 接着运行，
+    # 那个任务由 execution(run_id) 跟踪（工单 #855）。只等 work_item_execution 会在接续任务
+    # 还没走到下一次模型请求时就返回，下面的断言就会读到空的待恢复请求。
     deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
     while time.monotonic() < deadline:
-        task = system.orchestrator.work_item_execution(run_id)
-        if task is None or task.done():
+        tasks = (system.orchestrator.work_item_execution(run_id),
+                 system.orchestrator.execution(run_id))
+        if all(task is None or task.done() for task in tasks):
             return
         time.sleep(0.02)
     raise AssertionError(f"run {run_id} did not stop")
