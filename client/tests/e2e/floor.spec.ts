@@ -296,12 +296,14 @@ test("两种窗口尺寸下楼层画面都可用，控制台错误为零", async
     }
   }
 });
-// 流转覆盖层（工单 #866 验收标准 1、2）：应用层给出的流转种类只有版本交付、询问与问题反馈三种。
-// 真实事件在 quality→engineering 上产生一条「询问」与一条「问题反馈」（质检提交缺陷记录，
-// 返工那条）；工程→quality 上有两条「版本交付」，合成一段。
+// 流转覆盖层（工单 #866 验收标准 1、2；工单 #882 加 PRD 新版本）：应用层给出的流转种类有
+// 版本交付、询问、问题反馈与 PRD 新版本四种。真实事件在 quality→engineering 上产生一条「询问」与
+// 一条「问题反馈」（质检提交缺陷记录，返工那条）；工程→quality 上有两条「版本交付」，合成一段；
+// 产品接纳 PRD 以后，产品→工程与产品→质检各有一条「PRD 新版本」，各成一段。
 // 应有的分段由工单规定并写在这里：quality→engineering 上非返工一段（次数 1）、返工一段（次数 1），
-// 全画面四段。端到端的预期不复用实现的聚合公式。
-test("流转覆盖层：同一对部门的两种非返工流转合成一段，返工另成一段，标签互不遮挡", async () => {
+// 产品→工程与产品→质检各一段（次数等于这个事项接纳过的 PRD 版本数），全画面六段。
+// 端到端的预期不复用实现的聚合公式。
+test("流转覆盖层：同一对部门的两种非返工流转合成一段，返工另成一段，PRD 新版本各成一段，标签互不遮挡", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = watchErrors(client);
   const page = client.page;
@@ -312,6 +314,12 @@ test("流转覆盖层：同一对部门的两种非返工流转合成一段，�
     const rows = flow.records.filter((row) => row.direction_from === "quality" && row.direction_to === "engineering");
     expect(rows.filter((row) => row.kind === "询问").length).toBe(1);
     expect(rows.filter((row) => row.kind === "问题反馈").length).toBe(1);
+    // PRD 新版本（工单 #882）：每接纳一版 PRD，产品→工程与产品→质检各一条；
+    // 这个事项接纳过的 PRD 版本数由真实事件数出来
+    const prdRows = flow.records.filter((row) => row.kind === "PRD 新版本" && row.direction_from === "product");
+    const prdVersions = prdRows.filter((row) => row.direction_to === "engineering").length;
+    expect(prdVersions).toBeGreaterThan(0);
+    expect(prdRows.filter((row) => row.direction_to === "quality").length).toBe(prdVersions);
     await openFloor(page, id);
     await page.locator(".floor-overlay-tabs button", { hasText: "流转" }).click();
     await waitUntil(async () => (await readOverlay(page)).segments.length > 0, "画面写入流转覆盖层的 segments");
@@ -326,8 +334,22 @@ test("流转覆盖层：同一对部门的两种非返工流转合成一段，�
     expect(plain?.count).toBe(1);
     expect(rework?.count).toBe(1);
     expect(plain!.count + rework!.count).toBe(rows.length);
-    // 四段：engineering→product、engineering→quality、quality→engineering 的非返工段与返工段
-    expect(overlay.segments.length).toBe(4);
+    // PRD 新版本：产品→工程与产品→质检各一段，次数等于这个事项接纳过的 PRD 版本数
+    const toEngineering = overlay.segments.filter((seg) => seg.from === "product" && seg.to === "engineering");
+    expect(toEngineering.length).toBe(1);
+    expect(toEngineering[0].count).toBe(prdVersions);
+    const toQuality = overlay.segments.filter((seg) => seg.from === "product" && seg.to === "quality");
+    expect(toQuality.length).toBe(1);
+    expect(toQuality[0].count).toBe(prdVersions);
+    // 六段：engineering→product、product→engineering、product→quality、engineering→quality、
+    // quality→engineering 的非返工段与返工段。段数由真实事件的流转数出来：
+    // 同一对部门的非返工流转合成一段，返工那条另成一段
+    const expected = new Set<string>();
+    for (const row of flow.records) {
+      expected.add(`${row.direction_from}>${row.direction_to}>${row.kind === "问题反馈" ? "rework" : ""}`);
+    }
+    expect(overlay.segments.length).toBe(expected.size);
+    expect(overlay.segments.length).toBe(6);
     // 同一对部门的两种非返工流转合成一段：engineering→quality 的两条版本交付并成一段，次数 2
     const delivery = overlay.segments.filter((seg) => seg.from === "engineering" && seg.to === "quality");
     expect(delivery.length).toBe(1);
