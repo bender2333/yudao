@@ -311,13 +311,17 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.DEPARTMENT_ACTIVATED:
-        state.cycle_count += 1
         if event.session_id not in state.branch_sessions:
             # 主线会话的激活：部门主线的会话记录与最近激活由它更新（工单 #473）。
             # 询问分支是另一条会话，它的激活不改主线：主线的检查回执按主线的激活编号核对。
             # 事项的「所在部门」也只由主线会话的激活推出（工单 #842）：询问分支是被询问方的
             # 一次旁支工作，它的激活不接管所在部门，否则提问方拿到回答以后继续工作，
             # 页面上仍然显示被询问的部门。
+            # 轮次同样只计主线会话的激活（工单 #857，设计第 4.2 节）：分支是提问方这一轮里
+            # 的一次旁支工作，它不推进轮次、不占用轮次上限（harness/bounds.py 的
+            # activation_bound 按 cycle_count 判断），页面上的「第 N 轮」也不因询问多一轮；
+            # 分支激活事件里的 cycle 本来就写提问方所在的这一轮。
+            state.cycle_count += 1
             state.active_department = event.department
             session = state.sessions.get(event.department or "")
             if session:

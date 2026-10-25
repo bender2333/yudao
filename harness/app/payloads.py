@@ -960,6 +960,22 @@ class ModelUnavailableRequested(Payload):
     message: str
 
 
+class DefinitionsChangedRequested(Payload):
+    # 继续旧事项时事项记录的定义版本与当前加载的不同（ADR-0014，工单 #16、#894；设计说明第 3.3 节、
+    # 总体架构第 7.4 节）：回答之前这个 run 不推进。recorded_definitions_version 是事项开始时记录的版本
+    # （旧事项没有记录时为空），current_definitions_version 是当前加载的版本；reason 恒为
+    # definitions_version_changed；facts 为空，请求不引用事实
+    kind: Literal["definitions_changed"]
+    blocks: Literal["run"]
+    options: list[DecisionOption]
+    facts: list[str]
+    department: Department
+    reason: Literal["definitions_version_changed"]
+    recorded_definitions_version: str
+    current_definitions_version: str
+    description: str
+
+
 class PauseRequested(Payload):
     # 暂停以后继续（D09，工单 #204）：模型连续多次没有调用工具，或者工作区出现无法表示的条目，
     # run 暂停并发出这个请求，回答之前这个 run 不推进。description 写明停止原因与人工处理说明；
@@ -1045,8 +1061,8 @@ class KernelModificationRequested(Payload):
     held_adoption: DeliverableAdoptedPayload
 
 # 决定请求的载荷：以 kind 区分的各种决定请求（UnknownActionRequested 为旧事件保留，新版本不再写）
-DecisionRequestedPayload = (ModelUnavailableRequested | UnknownActionRequested | PauseRequested
-                            | InitialPrdRequested)
+DecisionRequestedPayload = (ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested
+                            | PauseRequested | InitialPrdRequested)
 # 项目流中的决定请求（工单 #136、#354）：写在项目流中的那几种，run 流中没有它们
 ProjectDecisionRequestedPayload = InitialPrdRequested | KernelModificationRequested
 
