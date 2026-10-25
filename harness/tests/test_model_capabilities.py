@@ -109,6 +109,18 @@ def test_extractor_fails_fast_on_unmapped_provider_npm():
     assert "mistral-large-4（@ai-sdk/mistral）" in message
 
 
+@pytest.mark.parametrize(("entry", "expected"), [
+    ({}, ""),
+    ({"provider": "openai"}, ""),
+    ({"provider": {"npm": 3}}, ""),
+    ({"provider": {"npm": "  @ai-sdk/openai  "}}, "@ai-sdk/openai"),
+])
+def test_declared_npm_reads_only_string_provider_npm(entry, expected):
+    # 模型单独声明的 provider.npm：只有字符串取值有效，去掉首尾空白；其余输入返回空串，由调用方取默认协议
+    module = _extractor()
+    assert module.declared_npm(entry) == expected
+
+
 def test_extractor_output_is_stable(tmp_path):
     module = _extractor()
     out_a, out_b = tmp_path / "a.json", tmp_path / "b.json"
