@@ -1,12 +1,16 @@
 # 恢复入口与执行权限（工单 #16）。数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，
 # 模型回答由 FakeAdapter 给出；中断由「进程关闭、重新以新的系统打开同一数据目录」表示，不模拟异常。
 
+import asyncio
 import json
 import sqlite3
 
 from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.app.application import Application
+from harness.app.decision_queries import DecisionsList
+from harness.app.event_stream import EventScope
 from harness.definitions import DEFINITIONS
 from harness.event_store import Command, StaleExecutionRight, run_stream
 from harness.models import EventType, TERMINAL_STATUSES, new_id
@@ -279,6 +283,57 @@ def test_a_run_with_an_older_definitions_version_asks_the_user_before_continuing
     kinds = [decision.request["kind"] for decision in again.writes.read(run_stream(run_id)).decisions.values()]
     assert kinds.count("definitions_changed") == 1, kinds
     again.close()
+
+def _collect(stream, limit: int, timeout: float = 5.0):
+    # 读事件流的前几条消息（与其他事件流用例的做法相同）
+    async def run():
+        messages = []
+        async for message in stream.messages():
+            messages.append(message)
+            if len(messages) >= limit:
+                break
+        return messages
+    return asyncio.run(asyncio.wait_for(run(), timeout))
+
+def test_the_definitions_changed_request_is_read_through_the_decisions_query(data_dir):
+    # 定义版本不同的请求在接口合同里（工单 #894）：decisions.list 读得出这条请求，载荷里带两个定义版本与两个选项。
+    # 合同里缺这一种时，只要有一条这样的请求，列表就构造不出来，首页的「待你决定」读不出（设计说明第 3.3 节）
+    _system, _project_id, run_id = _unfinished_run(data_dir)
+    recorded = _older_definitions_version(data_dir)
+
+    application = Application(LoopSystem.for_testing(data_dir, FakeAdapter(_completion_script())))
+    try:
+        listed = application.query("decisions.list", DecisionsList(status=["open"])).data
+    finally:
+        application.close()
+
+    requests = [item for item in listed.decisions if item.kind == "definitions_changed"]
+    assert len(requests) == 1, [item.kind for item in listed.decisions]
+    request = requests[0]
+    assert request.run_id == run_id
+    assert request.blocks == "run"
+    assert [option.id for option in request.request.options] == ["continue", "stop"]
+    assert request.request.recorded_definitions_version == recorded
+    assert request.request.current_definitions_version == DEFINITIONS.version
+
+def test_the_two_definition_versions_survive_reading_the_event_stream(data_dir):
+    # 读事件流时两个定义版本不再被丢掉（工单 #894）：事件对象按合同过滤载荷，
+    # 合同里没有这两个字段时它们从读到的事件里消失
+    _system, _project_id, run_id = _unfinished_run(data_dir)
+    recorded = _older_definitions_version(data_dir)
+
+    application = Application(LoopSystem.for_testing(data_dir, FakeAdapter(_completion_script())))
+    try:
+        stream = application.open_event_stream(
+            EventScope(runs=(run_id,), types=(EventType.DECISION_REQUESTED,)), after=0, live=False)
+        messages = _collect(stream, 1)
+    finally:
+        application.close()
+
+    payload = messages[0].event.payload
+    assert payload.kind == "definitions_changed"
+    assert payload.recorded_definitions_version == recorded
+    assert payload.current_definitions_version == DEFINITIONS.version
 
 def test_continuing_on_the_new_definitions_version_records_it_in_later_events(data_dir):
     # 选择「按新版本继续」以后，后续的模型请求与裁决照常记录新版本（ADR-0014）

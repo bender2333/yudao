@@ -1653,8 +1653,50 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | KernelModificationRequested | InstanceUpgradeRequested;
+    request: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | KernelModificationRequested | InstanceUpgradeRequested;
     answer: DecisionAnswerRecord | null;
+};
+
+/**
+ * DefinitionsChangedRequested
+ */
+export type DefinitionsChangedRequested = {
+    /**
+     * Kind
+     */
+    kind: 'definitions_changed';
+    /**
+     * Blocks
+     */
+    blocks: 'run';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality';
+    /**
+     * Reason
+     */
+    reason: 'definitions_version_changed';
+    /**
+     * Recorded Definitions Version
+     */
+    recorded_definitions_version: string;
+    /**
+     * Current Definitions Version
+     */
+    current_definitions_version: string;
+    /**
+     * Description
+     */
+    description: string;
 };
 
 /**
@@ -7562,7 +7604,7 @@ export type DecisionRequestedEvent = {
     /**
      * Payload
      */
-    payload: ModelUnavailableRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested;
+    payload: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested;
 };
 
 /**

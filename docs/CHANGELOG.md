@@ -538,5 +538,7 @@ claude-fable-5-1（子架构师） / 2026-10-25 22:40 / 新增三个技能：`.c
 
 claude-fable-5-1（总架构师） / 2026-10-25 22:50 / `AGENTS.md` Solo 署名：`docs/` 与日记的记录行首也写 `solo-<模型 ID>`，与循环和已有条目一致 / 子架构师写 solo-worker 时报的不一致（1）；（2）执行者第 2 步与 Solo 一节对「只改」以外文件的处理不同是有意的：自主推进有派发者与架构师，solo 没有，不改。
 
+solo-deepseek-v4.1-flash / 2026-10-25 21:35 / 工单 #894 事件载荷合同补上 definitions_changed：harness/app/payloads.py 新增 DefinitionsChangedRequested（九个字段与 orchestrator._await_definitions 写出的逐一对应）并加进 DecisionRequestedPayload，重新生成接口快照与客户端类型，harness/tests/test_issue_16_recovery.py 加两条经 decisions.list 与事件流读取的用例，新增 agents_jour/894.md / 升级以后继续旧事项时只要有这条请求，decisions.list 就构造不出来（DecisionView 报 48 个校验错误），首页「待你决定」读不出；payload_for_reading 也把两个定义版本字段丢掉
+
 solo-deepseek-v4.1-flash / 2026-10-25 22:03 / 工单 #903 [M0] 查询给出三个部门各自的状态与原因、询问链，房间的传信数取真实值：`harness/app/project_queries.py` 新增 `DepartmentState`（`state` 取 `waiting_user`、`working`、`asking`、`verifying`、`waiting`，`note` 是一句话）并挂到 `WorkItemCard`、`WorkItemLoop`、`DepartmentWorkspaceResult` 的 `departments`；`_item_sources` 一次读出 run 投影、决定请求与事件，`_departments` 按设计第 2.1 节的顺序与原因现算；`AskView` 加 `id`、`parent`、`chain`、`depth`、`prd_revision`、`started_at`、`ended_at`，回问的上一层由 `ask_started` 所在的会话找回；`_room_view` 的 `letters_waiting` 改为问本部门、还没有回答的询问数；三个查询的刷新清单补上 `department_activated`、`activation_finished`、`ask_started`、`ask_answered`、`decision_requested`、`decision_answered`、`decision_withdrawn`、`delivery_accepted`、`qa_submitted` 中缺的那些；新增 `harness/tests/test_department_states.py`（十项，登记集成层），重新生成 openapi 快照与客户端类型，新增 `agents_jour/903.md` / 完成工单 #903 验收标准：按部门的状态与原因、询问链、房间传信数取真实值，页面在后面的工单
 

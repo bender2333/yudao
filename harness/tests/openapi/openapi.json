@@ -6485,6 +6485,9 @@
                 "$ref": "#/components/schemas/ModelUnavailableRequested"
               },
               {
+                "$ref": "#/components/schemas/DefinitionsChangedRequested"
+              },
+              {
                 "$ref": "#/components/schemas/UnknownActionRequested"
               },
               {
@@ -6530,6 +6533,74 @@
           "answer"
         ],
         "title": "DecisionView"
+      },
+      "DefinitionsChangedRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "definitions_changed",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "run",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "reason": {
+            "type": "string",
+            "const": "definitions_version_changed",
+            "title": "Reason"
+          },
+          "recorded_definitions_version": {
+            "type": "string",
+            "title": "Recorded Definitions Version"
+          },
+          "current_definitions_version": {
+            "type": "string",
+            "title": "Current Definitions Version"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "facts",
+          "department",
+          "reason",
+          "recorded_definitions_version",
+          "current_definitions_version",
+          "description"
+        ],
+        "title": "DefinitionsChangedRequested"
       },
       "DeliverableAdoptedPayload": {
         "properties": {
@@ -17216,6 +17287,9 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ModelUnavailableRequested"
+              },
+              {
+                "$ref": "#/components/schemas/DefinitionsChangedRequested"
               },
               {
                 "$ref": "#/components/schemas/UnknownActionRequested"
