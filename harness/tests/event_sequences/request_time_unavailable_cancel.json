@@ -716,7 +716,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#3>",
-    "content_hash": "<sha256#62>",
+    "content_hash": "<sha256#63>",
     "version": 1
    }
   },

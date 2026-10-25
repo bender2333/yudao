@@ -35,7 +35,9 @@ def _permission(system, projection, name, args, *, basis=None, aborted=False, gu
         aborted=aborted, facts=_environment(system, projection).query(facts_query(call)),
     )
 
-def test_tool_permission_stops_after_cancel_end_or_changed_basis(tmp_path):
+def test_tool_permission_stops_after_cancel_end_or_changed_input(tmp_path):
+    # 工单 #558：有效合同与指导变了不再停止这次激活（它们作为通知送达，部门接着工作）；
+    # 用户输入变了仍然停止：输入分派给产品部门，由产品在下一轮处理
     system, projection = _engineering(tmp_path)
     write = ("write_file", {"path": "src/echo.py", "content": "print(1)\n"})
     assert _permission(system, projection, *write).allowed
@@ -44,7 +46,9 @@ def test_tool_permission_stops_after_cancel_end_or_changed_basis(tmp_path):
     newer_input = replace(WorkBasis.current(projection, "engineering"), input_version=projection.input_version - 1)
     assert _permission(system, projection, *write, basis=newer_input).stopped
     other_contract = replace(WorkBasis.current(projection, "engineering"), effective_contract_hash="sha256:other")
-    assert _permission(system, projection, *write, basis=other_contract).stopped
+    assert _permission(system, projection, *write, basis=other_contract).allowed
+    other_guidance = replace(WorkBasis.current(projection, "engineering"), guidance_version=99)
+    assert _permission(system, projection, *write, basis=other_guidance).allowed
 
 def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
     system, projection = _engineering(tmp_path)
@@ -55,7 +59,9 @@ def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
     missing_command = _permission(system, projection, "bash", {})
     assert missing_command.reason is None
 
-def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_path):
+def test_commit_decision_rejects_results_whose_workspace_changed(tmp_path):
+    # 工单 #558：依据变了不再让这次提交作废（PRD 的新版本与指导作为通知送达，部门接着工作）；
+    # 校验以后工作区改变仍然拒绝：回执不能重新绑定到已经改变的快照上
     system, projection = _engineering(tmp_path)
     environment = _environment(system, projection)
     ws = system.workspace(projection.run_id)
@@ -84,7 +90,7 @@ def test_commit_decision_rejects_results_whose_basis_or_workspace_changed(tmp_pa
     other_contract = replace(projection, effective_contract=replace(projection.effective_contract,
                                                                      content_hash="sha256:other"))
     rebound = commit_decision(first, current=other_contract, current_facts=facts, **arguments)
-    assert [error.field for error in rebound.errors] == ["execution_basis"]
+    assert not rebound.accepted, "当前工作变了仍然拒绝"
     system.workspace(projection.run_id).write_file("src/echo.py", "print('changed after validation')\n")
     changed = commit_decision(first, current=projection, current_facts=environment.query(FactsQuery(tree=True)).tree,
                               **arguments)

@@ -40,7 +40,9 @@ def guidance_version(projection: RunProjection, department: str) -> int:
 
 @dataclass(frozen=True)
 class WorkBasis:
-    # 激活开始时采用的工作依据；依据改变以后，这次激活不能再开始模型请求与工具
+    # 激活开始时采用的工作依据；有效合同与指导变了以后，这个会话在下一步收到通知
+    # （新版本与改动），接着工作，一轮工作不因此结束（工单 #558，循环结构第 5 节与第 6 节）。
+    # 用户输入变了仍然结束这一轮：输入分派给产品部门，由产品在下一轮处理（工单 #556）
     effective_contract_hash: str | None
     input_version: int
     guidance_version: int
@@ -54,10 +56,9 @@ class WorkBasis:
         )
 
     def changed(self, projection: RunProjection, department: str) -> bool:
-        current = WorkBasis.current(projection, department)
-        return (current.effective_contract_hash != self.effective_contract_hash
-                or current.input_version != self.input_version
-                or current.guidance_version > self.guidance_version)
+        # 依据变了没有：只有用户输入算——输入分派给产品部门，已经装配好的请求不再发出；
+        # 有效合同与指导的变化作为通知送达，部门接着工作（工单 #558）
+        return projection.input_version != self.input_version
 
 
 @dataclass(frozen=True)
@@ -158,6 +159,8 @@ def tool_permission(
     facts: WorkspaceFacts,
 ) -> ToolPermission:
     # facts 是执行环境按 facts_query(call) 查询的结果
+    # 有效合同与指导变了不再停止这次激活：它们作为通知送达，部门接着工作（工单 #558）；
+    # 用户输入变了仍然停止：输入分派给产品部门，已经装配好的请求不再发出
     if projection.status in TERMINAL_STATUSES or aborted or basis.changed(projection, department):
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
@@ -198,12 +201,12 @@ def commit_decision(
     current_facts: TreeFacts,
     events: list[Event],
 ) -> ProposalDecision:
-    # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。激活开始以后输入、指导、合同或当前工作改变，
-    # 或者校验以后工作区改变，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验
+    # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。激活开始以后输入改变，
+    # 或者校验以后工作区改变，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
+    # 有效合同与指导变了不再拒绝：它们作为通知送达，部门接着工作，提交的成果按当前版本核对
+    # （工单 #558，循环结构第 5 节、第 6 节与第 7 节）
     now = WorkBasis.current(current, department)
     if (now.input_version != basis.input_version
-            or now.guidance_version != basis.guidance_version
-            or now.effective_contract_hash != basis.effective_contract_hash
             or submission_basis(current) != submission_basis(evaluated)):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
     if current_facts != facts:

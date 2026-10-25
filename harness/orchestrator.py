@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -76,6 +76,7 @@ from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS,
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
+from .tools import tool_action
 from .validation import PRD_REVISION_FIELDS, ProposalDecision, evaluate_proposal
 from .collaboration import (guidance_diverted, has_new_work, next_department,
                            ready_departments)
@@ -228,6 +229,9 @@ class Orchestrator:
         # 事项自己的停止开关：用户取消（cancel、_abort_run）打开它，之后的核对都得到停止，
         # 事项以取消结束；停下一个会话不用它（工单 #856）
         self._abort: dict[str, Event] = {}
+        # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：
+        # 新的交付封存以后，质检的会话在下一步从这份交付重建
+        self._inspection_source: dict[tuple[str, str], str | None] = {}
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
         self._cancellers: dict[str, set[object]] = {}
         self._cancellers_changed = Condition()
@@ -491,10 +495,10 @@ class Orchestrator:
         return workspace_tree(self.workspace_root / projection.run_id)
 
     def _inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
-        # 会话的检查工作区（工单 #481）：根在运行工作区以外，激活开始时从当前源
-        # （质检从最新交付，其他从当前运行工作区）建立；提案提交按同一根打开，
-        # 不重新建立，激活里写入的文件与检查回执在提交判断时仍然可见。
-        # 根按会话一个（工单 #473）：主线会话与它在询问分支里的会话各用各的
+        # 会话的检查工作区（工单 #481）：根在运行工作区以外，按会话一个（工单 #473）：
+        # 主线会话与它在询问分支里的会话各用各的。
+        # 检查工作区按会话保留（工单 #558）：激活开始与提案提交都按同一根打开，不重新建立，
+        # 激活里写入的文件与检查回执在提交判断时仍然可见。
         if not session_id:
             raise RuntimeError(f"inspection workspace for {department} needs a session id")
         root = inspection_root(self.workspace_root / run_id, session_id)
@@ -504,6 +508,34 @@ class Orchestrator:
             jobs=jobs,
             session_id=session_id,
         )
+
+    def _session_inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None,
+                                         jobs: Any | None = None) -> LocalEnvironment:
+        # 会话的检查工作区（工单 #558，本地通用工具设计说明第 2 节）：
+        # 会话还没有用过文件工具或命令时，每次激活都从当前源建立（会话建立阶段，
+        # 源是最新的）；会话用过以后就保留，不再每次激活重建；
+        # 质检的会话进行中有新的交付封存时，在质检的下一步从这份交付重建（_workspace_refresh）。
+        # 询问与通知都不重建。
+        if not session_id:
+            raise RuntimeError(f"inspection workspace for {department} needs a session id")
+        if self._session_used_inspection(run_id, session_id):
+            return self._inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
+        return self._new_inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
+
+    def _session_used_inspection(self, run_id: str, session_id: str) -> bool:
+        # 这个会话用过文件工具或命令没有：用过以后它的检查工作区按会话保留（工单 #558）
+        events = self.writes.read(run_stream(run_id)).events()
+        return any(event.type == EventType.TOOL_CALLED and event.session_id == session_id
+                   and tool_action(str((event.payload or {}).get("name") or "")) is not None
+                   for event in events)
+
+    def _inspection_source_hash(self, department: str, projection: RunProjection) -> str | None:
+        # 质检的检查工作区从它当前面对的交付建立：这份交付的摘要就是工作区的来源；
+        # 其他会话的检查工作区来自运行工作区，不随交付变化（没有交付时为空）
+        if department != "quality":
+            return None
+        delivery = projection.delivery_spec
+        return None if delivery is None else delivery.content_hash
 
     def _new_inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
         # 激活开始：旧的检查工作区按工单的重试清理删除，再按当前源建立；
@@ -545,12 +577,43 @@ class Orchestrator:
                 env.place_qa_tests(qa_tree)
             else:
                 env.place_qa_tests(None)
+        # 这份工作区是从哪一份交付建立的：新的交付封存以后据此判断要不要重建（工单 #558）
+        self._inspection_source[(run_id, session_id)] = self._inspection_source_hash(department, projection)
         return env
+
+    def _workspace_refresh(self, activation: _Activation) -> Callable[[], LocalEnvironment | None]:
+        # 检查工作区按会话保留（工单 #558）：质检的会话进行中有新的交付封存时，
+        # 在质检的下一步从这份交付重建（本地通用工具设计说明第 2 节）；
+        # 询问与通知都不重建
+        run_id = activation.run_id
+        department = activation.scope.department
+        session_id = activation.scope.session_id
+
+        def refresh() -> LocalEnvironment | None:
+            if department != "quality":
+                return None
+            projection = self.project(run_id)
+            current = self._inspection_source_hash(department, projection)
+            if current is None:
+                return None
+            if self._inspection_source.get((run_id, session_id)) == current:
+                return None
+            environment = self._new_inspection_environment(run_id, department, session_id=session_id)
+            environment.bind_check(
+                activation_id=activation.scope.activation_id,
+                product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
+                delivery_spec_hash=current,
+                effective_contract_hash=activation.scope.basis.effective_contract_hash,
+            )
+            return environment
+
+        return refresh
 
     def _environment_for(self, run_id: str, department: str, *, refresh: bool = False) -> LocalEnvironment:
         # 给定部门在当前阶段下的执行环境：持有交接的工程使用运行工作区，其他会话使用检查工作区。
-        # refresh 只在激活开始时为真：按当前源重新建立检查工作区；提案提交时为假，
-        # 沿用激活内的同一份工作区，使写入与检查回执在提交判断时仍然可见
+        # refresh 只在激活开始时为真：按会话保留检查工作区（会话建立阶段从当前源建立，
+        # 用过以后保留）；提案提交时为假，沿用激活内的同一份工作区，
+        # 使写入与检查回执在提交判断时仍然可见
         projection = self.project(run_id)
         session_id = None
         jobs = None
@@ -567,7 +630,8 @@ class Orchestrator:
         if self._is_handoff_session(department, session_id, projection):
             return self._environment(run_id, session_id=session_id, jobs=jobs)
         if refresh:
-            return self._new_inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
+            # 激活开始：检查工作区按会话保留，只在会话建立时建立（工单 #558）
+            return self._session_inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
         return self._inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
 
     def add_input(self, run_id: str, text: str, *, base_version: int | None = None,
@@ -740,17 +804,19 @@ class Orchestrator:
     def _stop_requested(self, activation: _Activation, projection: RunProjection,
                         decisions: Iterable[DecisionRequest]) -> bool:
         # 停止判断：这个会话自己的停止开关、事项被中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求、
-        # 输入版本改变或有新的指导；只读取，不写入。
+        # 输入版本改变；只读取，不写入。
         # 会话自己的开关与事项的开关都看（工单 #856）：停下一个会话只停这个会话，
         # 用户取消事项时全部会话都停
+        # 有效合同与指导变了不再停止：它们作为通知送达，部门接着工作，一轮工作因此不结束
+        # （工单 #558，循环结构第 5 节与第 6 节）。用户输入仍然结束这一轮：
+        # 输入分派给产品部门，由产品在下一轮处理（工单 #556）
         basis = activation.scope.basis
         return (activation.stop_flag.is_set()
                 or self._aborted(activation.run_id)
                 or (activation.deadline is not None and time.monotonic() >= activation.deadline)
                 or time_used_up(projection, self._elapsed_sec(activation.run_id))
                 or projection.status in TERMINAL_STATUSES or blocks_run(decisions)
-                or projection.input_version != basis.input_version
-                or guidance_version(projection, activation.department) > basis.guidance_version)
+                or projection.input_version != basis.input_version)
 
     def _elapsed_sec(self, run_id: str) -> float:
         # 这个 run 已经用的运行时间（秒）：已持久化的累计加上当前运行段。等待（重试退避、
@@ -1584,6 +1650,7 @@ class Orchestrator:
                 nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
                 limits=self._session_limits(run_id, scope.session_id),
                 deltas=self.deltas,
+                refresh_workspace=self._workspace_refresh(activation),
             )
             result = await activation.driver.result()
         except UnrepresentableWorkspace as exc:
@@ -1866,8 +1933,9 @@ class Orchestrator:
 
     def _stale_branch_reason(self, run_id: str, department: str, branch_session_id: str) -> str | None:
         # 分支会话开始时采用的工作依据与此刻的依据：变了就说明这个分支不能继续工作
-        # （设计说明第 5 节、第 9 节）。写明是哪一种变化，提问方拿到的原因才有内容
-        # （设计说明第 4.5 节）。
+        # （设计说明第 9 节）。写明是哪一种变化，提问方拿到的原因才有内容
+        # （设计说明第 4.5 节）。PRD 的新版本不再算：它作为通知送达，分支接着回答
+        # （工单 #558，循环结构第 5 节）。
         events = self.writes.read(run_stream(run_id)).events()
         started = next((event for event in events
                         if event.type == EventType.DEPARTMENT_ACTIVATED
@@ -1881,14 +1949,8 @@ class Orchestrator:
             guidance_version=int(payload.get("guidance_version") or 0),
         )
         current = WorkBasis.current(self.project(run_id), department)
-        if current.effective_contract_hash != basis.effective_contract_hash:
-            return ("the PRD was revised by another session while this branch was working; "
-                    "the basis of this branch is stale, so it could not answer")
         if current.input_version != basis.input_version:
             return ("new user input arrived while this branch was working; "
-                    "the basis of this branch is stale, so it could not answer")
-        if current.guidance_version > basis.guidance_version:
-            return ("new guidance arrived while this branch was working; "
                     "the basis of this branch is stale, so it could not answer")
         return None
 
@@ -1985,6 +2047,7 @@ class Orchestrator:
                 department_max_model_steps=self.step_limits.department_max_model_steps,
                 department_max_time_sec=self.step_limits.department_max_time_sec,
             ), deltas=self.deltas,
+            refresh_workspace=self._workspace_refresh(branch_activation),
         )
         started = time.monotonic()
         try:

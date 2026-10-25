@@ -826,7 +826,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#3>",
-    "content_hash": "<sha256#96>",
+    "content_hash": "<sha256#100>",
     "version": 1
    }
   },
@@ -1992,7 +1992,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#96>",
+    "qa_tests_hash": "<sha256#100>",
     "tree_changed": false
    }
   },

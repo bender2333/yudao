@@ -72,9 +72,8 @@ def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path):
     assert "NEW USER ORIGINAL\nwith exact spacing" in content
 
 
-@pytest.mark.parametrize("action", ["input", "guidance"])
-def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_path, action):
-    # 重试等待 30 秒；等待期间到达的新输入或指导使激活立即回到安全节点并停止，不等到间隔结束
+def test_input_during_a_long_retry_wait_ends_the_wait_at_once(tmp_path):
+    # 重试等待 30 秒；等待期间到达的新输入使激活立即回到安全节点并停止，不等到间隔结束
     scheduled = Event()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter,
@@ -85,10 +84,7 @@ def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_pa
         future = pool.submit(system.activate_once, run_id)
         assert scheduled.wait(_WAIT_LIMIT)
         started = time.monotonic()
-        if action == "input":
-            system.add_input(run_id, "NEW USER ORIGINAL")
-        else:
-            system.add_guidance(run_id, "product", "Keep the output short")
+        system.add_input(run_id, "NEW USER ORIGINAL")
         result = future.result(timeout=20)
 
     # 界限 20 秒明显小于配置的 30 秒等待：要证明的是等待没有被走满，结束以后由阶段与停止原因核对；
@@ -97,6 +93,26 @@ def test_input_or_guidance_during_a_long_retry_wait_ends_the_wait_at_once(tmp_pa
     assert time.monotonic() - started < 20
     assert has_new_work(result, "product") and result.stop_reason is None
     assert len(adapter.invocations) == 1
+
+
+def test_guidance_during_a_retry_wait_does_not_end_it_and_the_retry_carries_it(tmp_path):
+    # 工单 #558：指导在工作期间到达时，它在这个会话的下一步作为通知加入历史，
+    # 这一轮不因此结束：重试照常进行，重试的请求里带着这条指导
+    scheduled = Event()
+    adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
+    system = LoopSystem.for_testing(tmp_path, adapter,
+                                    step_limits=StepLimits(retry_initial_delay_sec=1, retry_max_delay_sec=1))
+    run_id = system.create_run("original task")
+    after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(system.activate_once, run_id)
+        assert scheduled.wait(_WAIT_LIMIT)
+        system.add_guidance(run_id, "product", "Keep the output short")
+        result = future.result(timeout=_WAIT_LIMIT)
+
+    assert result.stop_reason is None
+    assert len(adapter.invocations) == 2, "重试照常进行"
+    assert "Keep the output short" in adapter.invocations[1].input_items[0]["content"]
 
 
 class _CancelFailsAdapter(FakeAdapter):

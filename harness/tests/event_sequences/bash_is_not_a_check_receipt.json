@@ -895,7 +895,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#5>",
-    "content_hash": "<sha256#93>",
+    "content_hash": "<sha256#96>",
     "version": 1
    }
   },
@@ -2027,8 +2027,8 @@
     "check_names": [
      "unit-tests"
     ],
-    "code_tree_digest": "<sha256#70>",
-    "content_hash": "<sha256#75>",
+    "code_tree_digest": "<sha256#73>",
+    "content_hash": "<sha256#78>",
     "effective_contract_hash": "<sha256#26>",
     "id": "<del#1>",
     "issuer": "engineering",
@@ -2324,7 +2324,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#93>",
+    "qa_tests_hash": "<sha256#96>",
     "tree_changed": false
    }
   },
@@ -2414,9 +2414,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "code_snapshot_hash": "<sha256#70>",
-    "content_hash": "<sha256#108>",
-    "delivery_spec_hash": "<sha256#75>",
+    "code_snapshot_hash": "<sha256#73>",
+    "content_hash": "<sha256#114>",
+    "delivery_spec_hash": "<sha256#78>",
     "effective_contract_hash": "<sha256#26>",
     "id": "<qa#1>",
     "issuer": "quality",

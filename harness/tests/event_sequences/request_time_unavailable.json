@@ -716,7 +716,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "content_hash": "<sha256#76>",
+    "content_hash": "<sha256#80>",
     "version": 1
    }
   },
@@ -1399,8 +1399,8 @@
     "check_names": [
      "smoke"
     ],
-    "code_tree_digest": "<sha256#54>",
-    "content_hash": "<sha256#58>",
+    "code_tree_digest": "<sha256#58>",
+    "content_hash": "<sha256#62>",
     "effective_contract_hash": "<sha256#26>",
     "id": "<del#1>",
     "issuer": "engineering",
@@ -1696,7 +1696,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#76>",
+    "qa_tests_hash": "<sha256#80>",
     "tree_changed": false
    }
   },
@@ -1786,9 +1786,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "code_snapshot_hash": "<sha256#54>",
-    "content_hash": "<sha256#92>",
-    "delivery_spec_hash": "<sha256#58>",
+    "code_snapshot_hash": "<sha256#58>",
+    "content_hash": "<sha256#99>",
+    "delivery_spec_hash": "<sha256#62>",
     "effective_contract_hash": "<sha256#26>",
     "id": "<qa#1>",
     "issuer": "quality",

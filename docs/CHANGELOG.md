@@ -7,6 +7,8 @@
 
 ---
 
+solo-minimax-code / 2026-10-25 10:37 / 工单 #558：新版本作为通知送达，检查工作区按会话保留——`harness/context.py` 新增上下文材料 `work_notification`（PRD 的新版本号与改动、交付到达的摘要与文件清单），判据是「这个会话上一次发出模型请求以后」写下的版本，同一会话的下一次请求不再重复送达；材料同时进入 `current_work` 的工作文字。`harness/adjudication.py` 的 `WorkBasis.changed()` 从比合同、输入、指导三项改成只比用户输入，`harness/engine.py` 的四处核对、`harness/orchestrator.py` 的 `_stop_requested` 与 `_superseded` 随之改：有效合同变了的时候这个会话采用新的有效合同（检查回执重新绑定），提交按当前版本核对；指导在工作期间到达时不再结束这一轮，`harness/assembly.py` 把待处理指导的原文从「只在激活第一步」改成「每一步」。**用户输入变了仍然结束这一轮**：输入分派给产品部门，由产品在下一轮处理（工单 #556 的口径），已经装配好的请求不再发出。`harness/orchestrator.py` 的检查工作区从「每次激活删除重建」改成按会话保留：会话还没有用过文件工具或命令时每次激活从当前源建立，用过以后就保留；质检的会话进行中有新的交付封存时，在质检的下一步从这份交付重建并放入当前的测试材料（`_workspace_refresh`），询问与通知都不重建。`harness/tests/test_concurrent_departments.py` 把「分支依据过时不能回答」的过渡行为改写为「分支收到 PRD 新版本的通知并回答，提问方拿到回答」，另加验收第 1、3、7 条三条用例；`harness/tests/test_adjudication.py`、`harness/tests/test_department_guidance.py`、`harness/tests/test_retry_input_boundaries.py` 里断言被删除的规则的用例按新行为改写；事件序列基准 20 份与 `harness/tests/prompt_snapshot.json` 重新生成 / 设计第 5 节与第 11 节对照表第 232 行：合同、请求、输入、指导一变化激活就结束改为送达通知、部门接着工作；本地通用工具设计说明第 2 节：检查工作区每个会话一个，只在会话建立时与新交付封存以后重建
+
 claude-fable-5-1 / 2026-10-25 11:20 / `docs/program-roadmap.md` 按总图重写：第 1 至 4 节为新主干（三段、门与发布方式、第一段四步、第二段十条道、第三段），第 5 节改名为后两段的细节、编号不变，原第 1 至 4 节移到第 8 节「现状」（含早上的里程碑对照表为 8.2），原第 8 节改为第 9 节；`docs/stage-3-plan.md` 第 9 节与 `CLAUDE.md` 工作流程第 6 步的引用改到新位置；`docs/decision.md` 加「路线图按总图重写」 / 用户指出早上那版是套词不是推导，要求按总图从头分，给未知留位置，以小发布迭代
 
 claude-fable-5-1 / 2026-10-25 10:30 / `docs/program-roadmap.md` 新增第 1.1 节「按总图看的里程碑」（M0 到 Stage 6 各一行：总图位置、结束时总图的变化、验收表加的层、推进的判据），第 1 节与第 3 节改为以总图为正本；`docs/stage-3-plan.md` 第 9 节指向它；`docs/decision.md` 加「路线图与里程碑按总图写」；GitHub 七个里程碑的说明按同一表改写 / 总图定稿后路线图与里程碑按它写（用户 2026-10-25）
