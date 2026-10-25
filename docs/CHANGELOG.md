@@ -1167,3 +1167,7 @@ claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 补第 5.
 claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 第 12 节写入 13 张工单的编号，S1c 只改 `validation.py` 的五条、S1c 与 S3 不依赖 S1a；路线图第 2 节第 17 项、Stage 3 计划第 3、9 节、D40「实现状态」改为 13 张的编号 / 按拆分建立与改写工单 #824 至 #829、#858 至 #864
 
 claude-opus-5-5 / 2026-10-24 / docs/design/skeleton-and-application.md 第 12 节加 S0（#871）一行与「开工之前」一条，「用户批准」一条写明 solo 范围下七张等用户合并；docs/decision.md 新增条目；docs/agents/autopilot-runtime.md 第 7 节「唤醒架构师」改为关（solo 进行期间） / 用户决定 M0.5 另开 solo 范围，改内核的七张停在 ready-for-human
+
+claude-sonnet-5-5 / 2026-10-25 01:40 / 新增 docs/prototypes/v13/（由 v12 整份复制：画面合同 `js/pixel/contract.js`、翻译层 `js/translate/`、播放时间线 `js/pixel/timeline.js`、三张声明表、场景 24 与 25、工具条「节奏」调节面板，设计说明 design.md 与构建约定 BUILD.md 只写与 v12 的差异）；docs/prototypes/CHANGELOG.md 加 v13 条目，状态「待用户确认」，「当前定稿」仍是 v12 / 画面与播放设计说明第 10 节第 1 条、ADR-0043 要求先做原型；楼层回放对 v12 的逐像素比较与两项页面矩阵检查还没有通过或运行，写在 v13 design.md 第 9 节
+
+claude-sonnet-5-5 / 2026-10-25 08:05 / docs/prototypes/v13/：播放时间线不再截断关键动作（`timeline.js` 新增 `rate()`、`rushBy`，引擎 `scene.wallT`、`scene.rate` 与 50 毫秒小段推进，楼层与房间按 `tl.rate()` 加快画面时间；到了落后上限正在演的关键动作与被缩短的关键动作限定在最短时长内演完，包裹加快走到终点）；整层中断与角色被撤走时时间线不再等演到一半的动作；`replay.js` 改为每段录制最后一个检查点对 v12、中间检查点对 v13 自己的基线（`--rebaseline`、`--free-anim`）并把 v12 的询问事件映射成原始事件；`life.js` 改成对画面合同回放；`checks/timeline.js`、`checks/playback.js` 增加不截断、限时演完、极端设置的检查；场景 24 的末步文字与「节奏」读数加「加快演完」与「现在几倍」；design.md 第 5、7、8、9 节与 BUILD.md、docs/prototypes/CHANGELOG.md 同步 / 架构师 2026-10-25 的决定（画面与播放设计说明第 5.2 节、H9：正在演的关键动作不截断，加快演完）；回放差异查明为动画计时的差，不是缺陷
