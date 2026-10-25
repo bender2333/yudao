@@ -113,6 +113,7 @@ def test_run_failed_carries_the_department_that_was_working(tmp_path: Path):
     failed = next(event for event in events if event.type == EventType.RUN_FAILED)
     assert failed.department == "engineering"
 
+
 def test_ask_branch_activation_does_not_count_as_a_cycle(tmp_path: Path):
     # 工单 #857：轮次只计主线会话的激活。工程询问产品，产品在分支里回答，
     # 分支的那一次激活不算一轮，事项的 cycle_count 仍等于主线激活的次数。
