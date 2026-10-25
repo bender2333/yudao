@@ -25,7 +25,7 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | 后台架构师 | 设计、需求、范围上的裁定 | 另一个会话，随时在改工单与里程碑 |
 | 用户 | 执行环境、规则文件、验收标准 | 工单评论 |
 
-设计问题不自己拍板，但也不要停下来等：**把问题写成评论、交回架构师、接着做别的工单**。这是这个循环与 `AGENTS.md`「Solo 模式」的差别（那里没有架构师，设计由执行者自己解决），`docs/agents/triage-labels.md` 已把这条写成 Ralph 循环的规则。
+设计问题不自己拍板，但也不要停下来等：**把问题写成评论、交回架构师、接着做别的工单**。这与 `AGENTS.md`「Solo 模式」是同一份规矩（任何 harness 的 solo 执行者都按它与 `docs/agents/triage-labels.md` 做事）；工人逐步的做法在 [`/solo-worker`](../solo-worker/SKILL.md)。
 
 ## 三条通道
 
@@ -170,7 +170,7 @@ pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency
 【本轮任务】<工单号 + 一句话>
 【验收标准】<1-3 条可检查的条件，从工单正文抄>
 【工作目录】<worktree 绝对路径>（分支 <分支>）。文件读写都用这里的路径，命令先切到这个目录；不要动主工作区。
-【规则】先读 <仓库>/.claude/skills/solo/worker.md，按它做；工单正文、评论与链接的设计说明是验收标准的唯一来源。
+【规则】先读 <仓库>/.claude/skills/solo-worker/SKILL.md，按「在 /solo 循环里」那一栏做；工单正文、评论与链接的设计说明是验收标准的唯一来源。
 【通道】设计问题：写 .tmp/<编号>-question.md，收尾 blocked + [设计]；执行环境：写 .tmp/<编号>-env.md，收尾 blocked + [环境]。
 【署名】<signature>：六处都要署（提交信息末行、PR 正文末行、工单每条评论末行、交付说明末行、日记记录行首、变更记录条目行首）。
 【历史】本上下文是全新的。前几轮在 <循环目录>/progress.md，需要时自己读。<这里写 handover 的输出：上一轮做到哪、还差什么>
@@ -185,21 +185,7 @@ NEXT: 建议的下一轮任务；没有写 none
 
 ## 一张工单的完整链路
 
-工人照这个做，编排者收账时按这个核对：
-
-1. 领取：`gh issue edit <编号> --add-assignee @me`，标签从 `ready-for-agent` 改成 `in-progress`。
-2. 读工单正文、最近的任务评论、链接的设计说明；「依据」一行指向的设计说明在 main 上有改动时，以 main 现状为准，在日记里写明差异怎么处理。
-3. 实现（测试先行），在分支提交；日记 `agents_jour/<编号>.md` 随分支提交。
-4. 自测：跑与改动相关的测试文件（含新增的集成层文件）；涉及 `client/` 再跑相关前端测试；逐条核对验收标准。
-5. 推送分支，开 PR：正文写 `Closes #<编号>`、`Solo: 无独立审查，由 solo 执行者自行合并`、一句摘要、署名。
-6. 等 CI：`gh pr checks issue-<编号> --watch`。**不要开自动合并**——自动合并会跳过合并前的核对。失败项明显与本次改动无关时先 `gh run rerun <运行号> --failed` 重跑一次。带 `touches-core` 的工单，`check` 绿了以后还要在分支上跑集成层：`gh workflow run CI --ref issue-<编号>` → `gh run watch <运行号>`；失败项与 main 最近 7 天比（main 上也红的是不稳定项，写进交付说明），修好再跑。
-7. 交付：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾计数行、CI 运行链接（touches-core 加分支集成层那次）、逐条验收核对、删除用例的「用例名 + 依据」，最后一行 `— <署名>`（署名单独成行）；标签从 `in-progress` 改成 `needs-review`。
-8. 合并前核对：`git fetch origin main && git merge origin/main`；`gh pr checks issue-<编号> --required` 显示 `check` 通过；工作区没有未提交也未推送的东西；每条验收核对都有证据。
-9. 合并：`gh pr merge issue-<编号> --admin --squash`。`--admin` 是仓库所有者的豁免，solo 唯一允许用的场合，它同时绕开 `check`——所以第 8 步只能自己做。
-10. 合并以后：确认 PR 已合并、工单随 `Closes` 关闭（没关就 `gh issue close` 并说明原因）；去掉 `needs-review`；合并提交号写进日记。
-11. 清理：关掉自己开的页面与进程（按进程号）；临时文件可以留着——**不要删 worktree**，留给编排者的 `gc` 统一清（先归档证据再删，删不掉会重试）。
-12. 收尾按四行格式输出。
-
+工人按 [`/solo-worker`](../solo-worker/SKILL.md)「一张工单的完整做法」做，编排者收账时按它的步骤核对：领取与 `in-progress`（第 1 步）、三项核对（第 3 步）、PR 正文带 `Solo:` 一行（第 7 步）、CI 与 `touches-core` 的分支集成层（第 8 步）、`DELIVERY:` 交付说明与 `needs-review`（第 9 步）、合并前五项核对含 `kernel-approved`（第 10 步）、`--admin --squash` 合并（第 11 步）、工单关闭与去标签（第 12 步）、清理但不删 worktree（第 13、14 步）。
 ## UI 工单
 
 界面工单多两步：**对着原型核**、**留机器可查的证据**。无人值守时没有人替你看页面，所以「看起来对」不算完成。
