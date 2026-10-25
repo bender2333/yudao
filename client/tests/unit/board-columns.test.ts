@@ -4,7 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BOARD_TITLES, boardColumns } from "../../src/renderer/src/views/project/board.ts";
-import { DECISION_BLOCKS, RUN_STATUS_LABELS, STOP_REASON, departmentName, label } from "../../src/renderer/src/views/project/labels.ts";
+import { DECISION_BLOCKS, RUN_STATUS_LABELS, STOP_REASON, departmentName, label,
+  workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
 import type { WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 const RUN_STATUSES = ["running", "done", "failed", "paused"];
@@ -92,4 +93,50 @@ test("停止的事项没有部门时不写「未知部门」，页面自己决�
   assert.equal(departmentName(null), "");
   assert.equal(departmentName(""), "");
   assert.equal(departmentName("engineering"), "工程");
+});
+
+// 看板卡片上正在工作的部门（三部门的循环结构第 3.1 节，工单 #904）：
+// 状态是一轮工作中或询问中的部门，按产品、工程、质检的顺序；没有这样的部门时不写这一格。
+test("看板卡片写正在工作的部门，按产品、工程、质检的顺序", () => {
+  assert.equal(
+    workingDepartmentsText({
+      department: "product",
+      departments: {
+        product: { state: "waiting", note: null },
+        engineering: { state: "asking", note: "在等待产品的回答" },
+        quality: { state: "working", note: "预测性探索：按 PRD r1 起草测试用例" },
+      },
+    }),
+    "工程、质检在工作",
+  );
+  assert.equal(
+    workingDepartmentsText({
+      department: null,
+      departments: {
+        product: { state: "waiting" },
+        engineering: { state: "working" },
+        quality: { state: "waiting" },
+      },
+    }),
+    "工程在工作",
+  );
+});
+
+test("没有部门在工作时看板卡片不写这一格", () => {
+  assert.equal(
+    workingDepartmentsText({
+      department: "engineering",
+      departments: {
+        product: { state: "waiting" },
+        engineering: { state: "waiting_user", note: null },
+        quality: { state: "verifying", note: "等质检核验交付 r1" },
+      },
+    }),
+    "",
+  );
+});
+
+test("查询结果里没有 departments 时看板卡片照旧写事项所在的部门（工单 #842）", () => {
+  assert.equal(workingDepartmentsText({ department: "engineering" }), "工程");
+  assert.equal(workingDepartmentsText({ department: null }), "");
 });

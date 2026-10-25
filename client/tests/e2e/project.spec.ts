@@ -342,6 +342,70 @@ test.describe("项目页面（1440×900）", () => {
     }
   });
 
+  // 工单 #904：概览写三个部门各自的状态、按成果写的进度与这个事项里的询问。
+  // 用种子里的项目，不靠时序：「交付历史」那个事项走完了一轮、留下了询问与回答；
+  // 「文本工具」那个事项停在模型不可用（工程等用户）。
+  test("概览：三个部门各自的状态、按成果写的进度与询问", async () => {
+    const client = await openProjectClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      // 交付历史：选中那个事项，概览列出它的两次询问，状态与回答都来自 run.asks
+      const history = await projectId(page, "交付历史");
+      const historyItems = await fetchQuery<{ work_items: { work_item_id: string }[] }>(
+        page, "project.overview", { project_id: history });
+      const historyItem = historyItems.work_items[0];
+      if (historyItem === undefined) {
+        throw new Error("交付历史项目里没有事项");
+      }
+      await page.evaluate((hash) => { window.location.hash = hash; },
+        `${navHash(history, "overview")}?w=${historyItem.work_item_id}`);
+      const asks = await section(page, "询问");
+      await expect(asks).toBeVisible();
+      const rows = asks.locator("li");
+      await expect(rows).toHaveCount(2);
+      // 工程问产品（询问链、已回答、回答）
+      await expect(rows.nth(0)).toContainText("已回答");
+      await expect(rows.nth(0)).toContainText("工程 → 产品");
+      await expect(rows.nth(0)).toContainText("How should unknown flags be handled?");
+      await expect(rows.nth(0)).toContainText("回答：Print the argument as defined in the current requirement.");
+      // 质检问工程
+      await expect(rows.nth(1)).toContainText("已回答");
+      await expect(rows.nth(1)).toContainText("质检 → 工程");
+      await expect(rows.nth(1)).toContainText("回答：Follow the acceptance line recorded in the requirement.");
+      // 这个事项已经结束：没有部门状态，所在部门一行照旧写所在部门
+      const historyCurrent = await section(page, "当前事项");
+      await expect(historyCurrent.locator(".department-line")).toContainText("所在部门：");
+      // 进度按成果写：当前的 PRD、最新的交付与它依据的 PRD、对最新交付的结论
+      await expect(historyCurrent).toContainText("PRD r1 · 交付 r2（依据 PRD r1）· 结论：放行");
+
+      // 文本工具：停在模型不可用的事项，对应的部门显示「等用户」，其他部门等待工作
+      const blocked = await projectId(page, BLOCKED);
+      await gotoView(page, blocked, "overview");
+      const blockedCurrent = await section(page, "当前事项");
+      const blockedStates = blockedCurrent.locator(".department-line");
+      await expect(blockedStates).toContainText("工程 等用户");
+      await expect(blockedStates).toContainText("产品 等待工作");
+      // 还没有交付：进度行写「PRD r1 · 还没有交付」
+      await expect(blockedCurrent).toContainText("PRD r1 · 还没有交付");
+      // 这个事项还没有询问：询问一节不出现
+      await expect(page.locator("section.card").filter({ has: page.getByRole("heading", { name: "询问", exact: true }) })).toHaveCount(0);
+      // 概览与看板上没有阶段名称、工程计划与协作请求
+      const overviewText = await bodyText(page);
+      expect(overviewText).not.toContain("阶段");
+      expect(overviewText).not.toContain("协作请求");
+      expect(overviewText).not.toContain("计划");
+      const board = await section(page, "事项看板");
+      const boardText = await board.innerText();
+      expect(boardText).not.toContain("阶段");
+      expect(boardText).not.toContain("协作请求");
+      expect(boardText).not.toContain("计划");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+
   test("概览：没有进行中的事项时，记录原文写入事件流", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);

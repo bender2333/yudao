@@ -11,6 +11,7 @@ import { createServer, type ViteDevServer } from "vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEPARTMENT_STATE, departmentLine, departmentsText, progressLabel } from "../../src/renderer/src/views/project/labels.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const clientRoot = resolve(here, "..", "..");
@@ -278,4 +279,68 @@ test("离开这一页再回来：两个框各自保留自己的草稿，互不�
   const after = report.after as Record<string, unknown>;
   assert.equal(after.record, "写进记录原文的文字", "回到这一页以后「记录原文」保留自己的草稿");
   assert.equal(after.requirement, "写进新要求的文字", "回到这一页以后「新的要求」保留自己的草稿");
+});
+
+// ---------------------------------------------------------------------------
+// 概览「当前事项」的两行文字（工单 #904）：所在部门一行写三个部门各自的状态与原因，进度行按成果写。
+// 两者都是纯函数，期望值写成字面值，不复用实现的公式。
+
+test("所在部门一行写三个部门各自的状态与原因，按产品、工程、质检的顺序", () => {
+  assert.equal(
+    departmentLine({
+      product: { state: "waiting" },
+      engineering: { state: "working" },
+      quality: { state: "working", note: "预测性探索：按 PRD r1 起草测试用例" },
+    }, "quality"),
+    "产品 等待工作 · 工程 一轮工作中 · 质检 一轮工作中（预测性探索：按 PRD r1 起草测试用例）",
+  );
+  // 只有一个部门有状态时只写它（查询给几个部门就写几个）
+  assert.equal(
+    departmentsText({ engineering: { state: "verifying", note: "等质检核验交付 r1" } }),
+    "工程 核验中（等质检核验交付 r1）",
+  );
+});
+
+test("没有 departments 时照旧写所在部门，没有部门时写大厅", () => {
+  assert.equal(departmentLine(null, "engineering"), "所在部门：工程");
+  assert.equal(departmentLine(undefined, null), "所在部门：大厅");
+  assert.equal(departmentsText(null), null);
+  assert.equal(departmentLine({}, "product"), "所在部门：产品");
+});
+
+test("部门状态的中文名用总图外环的五个词，只写这一处", () => {
+  assert.deepEqual(Object.keys(DEPARTMENT_STATE).sort(), ["asking", "verifying", "waiting", "waiting_user", "working"]);
+  assert.equal(DEPARTMENT_STATE.waiting_user, "等用户");
+  assert.equal(DEPARTMENT_STATE.working, "一轮工作中");
+  assert.equal(DEPARTMENT_STATE.asking, "询问中");
+  assert.equal(DEPARTMENT_STATE.verifying, "核验中");
+  assert.equal(DEPARTMENT_STATE.waiting, "等待工作");
+});
+
+test("进度行的三种写法：有交付、没有交付、没有结论", () => {
+  // 有交付：当前 PRD 版本、交付版本与它依据的 PRD、对最新交付的结论
+  assert.equal(
+    progressLabel({
+      product_spec_revision: 2,
+      delivery_revision: 1,
+      delivery_product_spec_revision: 2,
+      conclusion: "release",
+    }),
+    "PRD r2 · 交付 r1（依据 PRD r2）· 结论：放行",
+  );
+  // 没有交付
+  assert.equal(
+    progressLabel({ product_spec_revision: 2, delivery_revision: null, delivery_product_spec_revision: null, conclusion: null }),
+    "PRD r2 · 还没有交付",
+  );
+  // 没有结论：这一项不写
+  assert.equal(
+    progressLabel({ product_spec_revision: 1, delivery_revision: 1, delivery_product_spec_revision: 1, conclusion: null }),
+    "PRD r1 · 交付 r1（依据 PRD r1）",
+  );
+  // 还没有成果时不写这一行
+  assert.equal(
+    progressLabel({ product_spec_revision: null, delivery_revision: null, delivery_product_spec_revision: null, conclusion: null }),
+    null,
+  );
 });

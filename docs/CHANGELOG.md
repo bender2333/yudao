@@ -559,3 +559,5 @@ claude-fable-5-1（总架构师） / 2026-10-25 23:45 / `CLAUDE.md` 用户的参
 claude-opus-5-5（子架构师） / 2026-10-26 00:50 / docs/design/test-pyramid.md 新增第 11.2 节「只为真实变化重写」并在状态行记一句；docs/design/skeleton-and-application.md 第 12 节加 #1019 一行，排序改为 S0、#1019 → S1a；docs/decision.md 追加 2026-10-26 一条 / 用户确认走查候选 2 的四问
 
 claude-fable-5-1（总架构师） / 2026-10-26 00:30 / `docs/decision.md` 把插在顶部的两条 10-25 条目（最小投影、内核工单批准）挪到末尾按正序，只动位置；`docs/agents/shared-rules.md`「文档与记录」补一条：decision.md 按时间正序追加末尾 / 10-25 23:30 已改为正序，我后来两条又插了顶部；子架构师问顺序，定下来写进规则。
+
+solo-deepseek-v4.1-flash / 2026-10-26 01:10 / 工单 #904 [M0] 概览与看板写三个部门各自的状态、按成果写的进度与询问列表：`client/src/renderer/src/views/project/labels.ts` 新增部门状态五个词（等用户、一轮工作中、询问中、核验中、等待工作）与所在部门一行、按成果写的进度行，`client/src/renderer/src/views/project/asks-text.ts` 新建（询问一行的文字，部门工作间的工单 #905 共用），`overview.tsx` 的当前事项写三个部门各自的状态与原因、新增「询问」一节、看板卡片写正在工作的部门，三个单元测试与 `client/tests/e2e/project.spec.ts` 跟上；本行以外 `docs/` 没有别的改动；依据的原型 v12 设计说明已由 e2e75ad7 归档到 `docs/archive/prototypes/v12/`（git mv，内容未变），按归档路径读第 3.1 至 3.3 节 / 完成工单 #904 的验收标准
