@@ -164,7 +164,7 @@ S0（技能外、常先发生）：`submit_plan`。本技能**不包含**改计�
 
 ## 3. 五条路径的具体例子
 
-场景背景与[组织比较样例](organization-comparison-samples.md)相同：第二次变更，给 echo 增加文件输入。`check_names` = `echo_literal`、`echo_file`、`echo_empty_file`、`echo_missing`。
+场景背景与[组织比较样例](../archive/stage-3/organization-comparison-samples.md)相同：第二次变更，给 echo 增加文件输入。`check_names` = `echo_literal`、`echo_file`、`echo_empty_file`、`echo_missing`。
 
 ### 3.1 正常使用
 

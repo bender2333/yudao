@@ -106,7 +106,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - `CONTEXT.md`：领域术语表。输出时使用这里规定的词汇。
 - `CLAUDE.md`：架构师规则（本文件）。
 - `AGENTS.md`：执行者与审查者规则。
-- `claude_jour.md`：架构师日记。
+- `claude_jour.md`：架构师日记；2026-10-19 之前的条目在 `docs/archive/claude_jour-2026-09-24-2026-10-18.md`。
 - `agents_jour/`：执行者与审查者的日记，一张工单一个文件（`agents_jour/<工单编号>.md`）；2026-10-06 之前的日记已归档为 `docs/archive/agents_jour.md`，不再追加。
 
 ### docs/
@@ -115,7 +115,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - `docs/current-baseline.md`：当前验收基线与证据状态。
 - `docs/foundation-rules.md`：六条基础规则与属于它们的具体规则，属于可信内核，只由用户修改。
 - `docs/stage-3-plan.md`、`docs/stage-3/`：Stage 3 计划，以及验收合同与重排方案。
-- `docs/decision.md`：按日期记录的决策。
+- `docs/decision.md`：按日期记录的决策；2026-09-30 及以前的在 `docs/archive/decision-2026-09.md`。
 - `docs/adr/`：架构决策记录（ADR），记录难以撤销的决定。
 - `docs/requirements/`：逐项需求记录，索引见 `docs/requirements/README.md`。
 - `docs/design/`：模块设计、架构图与设计说明，索引见 `docs/design/README.md`。计划与工单引用这里的文档。
@@ -125,7 +125,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 - `docs/examples/`：配置文件的格式示例。
 - `docs/agents/`：共同规则、自主推进的运行配置、验收证据规则，以及技能读取的工单、标签与领域文档配置。
 - `docs/architecture-issues.md`：执行者登记的架构问题，只留未处理的条目。
-- `docs/CHANGELOG.md`：`docs/` 的变更记录。
+- `docs/CHANGELOG.md`：`docs/` 的变更记录；2026-10-20 及以前的在 `docs/archive/CHANGELOG-2026-09-24-2026-10-20.md`。
 - `docs/archive/`：归档文档，包括证据、被取代的规范、已经写进设计的调研、已处理的架构问题。除非用户指定，不读取。
 
 ## 工作流程

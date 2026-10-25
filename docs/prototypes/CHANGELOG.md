@@ -70,7 +70,7 @@
 ## [v10] - 2026-10-07
 
 ### 2026-10-22 的更新（工单 #658）
-- 动作目录里执行命令的说明由「执行登记命令」改为「执行命令」：[ADR-0038](../../adr/0038-function-first-commands-without-registration.md) 删除了命令登记，命令不再有登记名，动作列表显示命令原文。
+- 动作目录里执行命令的说明由「执行登记命令」改为「执行命令」：[ADR-0038](../adr/0038-function-first-commands-without-registration.md) 删除了命令登记，命令不再有登记名，动作列表显示命令原文。
 - 客户端按这一版重新生成像素登记表（`client/src/renderer/src/pixel/generated/`），画面与原型一致。
 
 ### 原型交付

@@ -329,7 +329,7 @@ flowchart LR
 
 所有验收使用真实运行的系统；自动化测试中的模型回答由 FakeAdapter 脚本给出，事件日志、工件与工作区都是真实实现，不使用模拟对象。真实项目验收使用真实模型。
 
-1. **真实项目建档（Stage 3 计划 3.8 行）。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v9 的示例项目；约 1.3 万行，有完整的测试集）经 `project.onboard` 使用真实模型完成建档，用户在界面的决定卡片中确认初始 PRD，随后一个事项在它的基础上实现 issue 842 并被采纳；这个事项的工作区从快照建立，质检按变更后的完整 PRD 核验，采纳链为「建档基线 → 本事项」。登记的测试命令写明 Python 3.13，例如 `uv run --python 3.13 pytest`：Python 3.9 在 Windows 上的时钟精度使 tracing 的 20 条测试结果不稳定，Python 3.13 上全部通过（2026-09-30 核对，[决策记录](../decision.md)同日「不使用容器以后的执行环境」一条）。
+1. **真实项目建档（Stage 3 计划 3.8 行）。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v9 的示例项目；约 1.3 万行，有完整的测试集）经 `project.onboard` 使用真实模型完成建档，用户在界面的决定卡片中确认初始 PRD，随后一个事项在它的基础上实现 issue 842 并被采纳；这个事项的工作区从快照建立，质检按变更后的完整 PRD 核验，采纳链为「建档基线 → 本事项」。登记的测试命令写明 Python 3.13，例如 `uv run --python 3.13 pytest`：Python 3.9 在 Windows 上的时钟精度使 tracing 的 20 条测试结果不稳定，Python 3.13 上全部通过（2026-09-30 核对，[决策记录](../archive/decision-2026-09.md)同日「不使用容器以后的执行环境」一条）。
 2. **界面。** 接入入口、建档状态与阅读动作、`initial_prd` 决定卡片（含第 3.2 节的材料与两个选项）、资料页的各轮初始 PRD、确认记录、结构说明与基线核验，在真实运行的系统上通过 Playwright 端到端测试，页面上的数据都来自查询与事件流。
 3. **修改的往返。** 用户提出修改并附说明：出现第二轮 run，产品的 ProductSpec 处理了修改意见，质检重新核验，新的决定请求出现；空说明的「提出修改」被拒绝。
 4. **退回产品。** 质检提交带 `unsupported` 或遗漏的基线核验时，run 退回产品；提交 `consistent` 时有 `unsupported` 或未说明的失败检查被拒绝。

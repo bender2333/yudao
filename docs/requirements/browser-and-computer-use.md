@@ -1,6 +1,6 @@
 # D34 浏览器与 computer use
 
-确认时间：2026-09-28。状态：需求已确认，设计已确认，未实施；2026-09-30 按 [ADR-0022](../adr/0022-run-directly-without-containers.md) 修改：试用在 run 的执行位置上直接进行；2026-10-02 专题 2 决定 computer use 在控制主机的交互桌面上用真实输入进行（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)），启动命令按系统给出；2026-10-07 用户决定：Stage 3 实施浏览器的部分，computer use 的部分作为以后阶段的专题，放在哪个阶段在专题讨论时确定（[各阶段需求概览](stage-requirements-overview.md)第 6 节「以后阶段的讨论」）。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。工单：父工单 [#123](https://github.com/bender2333/yudao/issues/123)「[3.2D] 浏览器：质检操作交付的网页」，子工单 #147 至 #149、#151 至 #155；computer use 的工单 #150、#246、#247 属于以后阶段的专题。路线位置：浏览器的部分在[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与执行环境的合同（#128），排在 3.9 之前。调研：[浏览器与 computer use 调研](../archive/research/browser-and-computer-use.md)。
+确认时间：2026-09-28。状态：需求已确认，设计已确认，未实施；2026-09-30 按 [ADR-0022](../adr/0022-run-directly-without-containers.md) 修改：试用在 run 的执行位置上直接进行；2026-10-02 专题 2 决定 computer use 在控制主机的交互桌面上用真实输入进行（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)），启动命令按系统给出；2026-10-07 用户决定：Stage 3 实施浏览器的部分，computer use 的部分作为以后阶段的专题，放在哪个阶段在专题讨论时确定（见本文「computer use 专题待重新确定的事项」）。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。工单：父工单 [#123](https://github.com/bender2333/yudao/issues/123)「[3.2D] 浏览器：质检操作交付的网页」，子工单 #147 至 #149、#151 至 #155；computer use 的工单 #150、#246、#247 属于以后阶段的专题。路线位置：浏览器的部分在[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与执行环境的合同（#128），排在 3.9 之前。调研：[浏览器与 computer use 调研](../archive/research/browser-and-computer-use.md)。
 
 ## 用户原话
 
@@ -52,6 +52,14 @@
 4. 启动方式由工程写在交付说明中：网页应用写启动命令与就绪条件（一个地址有 HTTP 响应），桌面程序写启动命令与就绪条件（出现可见窗口），就绪时限的暂定默认值是 300 秒，包含安装与构建，见规则登记；质检按交付说明启动，用户不需要另外登记启动命令。交付说明没有写启动方式、而验收条件需要试用时，质检退回工程补写。
 5. 不提供 `browser_evaluate` 与 `browser_run_code_unsafe`。
 6. 屏幕工具使用 Yudao 自己的 8 个函数工具。
+
+## computer use 专题待重新确定的事项
+
+2026-10-25 从已归档的[各阶段需求概览](../archive/requirements/stage-requirements-overview.md)第 6 节搬来。
+
+- 已有的设计：2026-10-02 的决定（[决策记录](../decision.md)同日「computer use 在控制主机的交互桌面上进行」一条、[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)、[设计说明](../design/browser-and-computer-use.md)中 computer use 的部分）：只考虑 Windows，桌面程序在控制主机上、用户的交互桌面上用真实输入试用，开始前经用户同意，整台控制主机同一时刻只有一个桌面会话。
+- 要重新确定的事项：界面改为网页以后（[ADR-0032](../adr/0032-interface-served-as-web-pages.md)），桌面会话期间的提示框（置顶、不出现在截图中）与「停止使用桌面」由谁提供；Stage 4 把 Yudao 服务做成系统服务以后，系统服务看不到用户的交互桌面。
+- 工单 #150 不属于任何里程碑，标为 `waiting`，作为专题的占位；#246、#247 于 2026-10-19 关闭，专题讨论以后按结论重新拆分。
 
 ## 实现状态
 
