@@ -124,6 +124,10 @@ def test_requests_carry_no_remaining_cycles_while_the_host_enforces_the_limit(da
         "product": [product_spec()],
         "engineering": [ask_turn(), delivery_turn()],
         "product:ask": [answer_turn()],
+        # 质检在这条用例里不工作，给它的是空脚本（工单 #943：三个部门都写上，
+        # 脚本里没有它的名字时，假模型在它真的发请求时报「脚本用尽」，
+        # 整个 run 以 provider_error 提前结束）
+        "quality": [],
     })
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build echo", max_cycles=2)
