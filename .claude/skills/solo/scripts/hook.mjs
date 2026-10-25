@@ -54,7 +54,30 @@ function loadState(input) {
     progressFile: path.join(dir, 'progress.md'),
     workersDir: path.join(dir, 'workers'),
     guardFile: path.join(dir, '.stop-guard.json'),
+    ownerFile: path.join(dir, '.owner.json'),
   };
+}
+
+/** 一个账本同一时刻只让一个会话推进：别的会话可以看，但不能派活。 */
+const OWNER_TTL_MS = 15 * 60 * 1000;
+
+function ownerOf(loop) {
+  const owner = readJson(loop.ownerFile);
+  if (!owner || typeof owner.session !== 'string' || !owner.session) return null;
+  const at = owner.at ? Date.parse(owner.at) : 0;
+  if (!at || Date.now() - at > OWNER_TTL_MS) return null;
+  return owner;
+}
+
+function claimOwnership(loop, sessionId) {
+  const current = ownerOf(loop);
+  if (current && current.session !== sessionId) return current;
+  try {
+    writeJson(loop.ownerFile, { session: sessionId, at: new Date().toISOString(), pid: process.pid });
+  } catch {
+    /* fail open */
+  }
+  return null;
 }
 
 function isLive(loop) {
@@ -81,6 +104,15 @@ function onSessionStart(input) {
   const loop = loadState(input);
   if (!loop) return;
   if (loop.status !== 'running' && loop.status !== 'paused') return;
+  const sessionId = typeof input.session_id === 'string' ? input.session_id : '';
+  const other = claimOwnership(loop, sessionId);
+  if (other) {
+    const note = '[solo] 循环「' + loop.name + '」正由另一个会话推进（会话 ' + other.session + '，心跳 '
+      + other.at + '）。**不要在这里派活或收账**：两边同时编排会在同一个 worktree 里互相覆盖。'
+      + '确要接管：等那个会话停 15 分钟，或者先 solo.mjs pause 再 resume，然后重开会话。';
+    emit({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: note } });
+    return;
+  }
   const tasks = parseTasks(loop);
   const conc = concurrencyOf(loop);
   const done = tasks.filter((t) => t.status === 'done').length;
@@ -193,6 +225,10 @@ function onStop(input) {
   const loop = loadState(input);
   if (!loop || !isLive(loop)) return;
   if (loop.state.autoContinue !== true) return;
+
+  const mySession = typeof input.session_id === 'string' ? input.session_id : '';
+  const owner = claimOwnership(loop, mySession);
+  if (owner) return;
 
   const conc = concurrencyOf(loop);
   const iteration = num(loop.state.iteration, 0);
