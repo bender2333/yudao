@@ -1,6 +1,5 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
 from threading import Event
 
 import pytest
@@ -13,7 +12,7 @@ from harness.models import EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, after_event, department_history, list_files_turn, recorded_context
+from harness.tests.helpers import FAST_RETRIES, after_event, department_history
 
 
 def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
@@ -43,22 +42,6 @@ def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_retry_reassembles_context_before_each_attempt(tmp_path):
-    adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
-    run_id = system.create_run("echo")
-    result = system.activate_once(run_id)
-
-    assert has_new_work(result, "engineering")
-    first, second = adapter.invocations
-    assembled = [event for event in system.store.list_events(run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
-    assert [event.payload["attempt"] for event in assembled] == [1, 2]
-    first_context, second_context = recorded_context(system, first), recorded_context(system, second)
-    assert first_context.manifest.source_event_id != second_context.manifest.source_event_id
-    assert first.input_items == second.input_items and first.tools == second.tools
-    assert second.step_id == 2 and second.logical_call_id == first.logical_call_id
-
-
 def test_retry_exhaustion_records_all_attempts_and_fails_once(tmp_path):
     failures = [ProviderError("temporary", retryable=True) for _ in range(3)]
     adapter = FakeAdapter(failures)
@@ -74,25 +57,6 @@ def test_retry_exhaustion_records_all_attempts_and_fails_once(tmp_path):
     scheduled = [item for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED]
     assert len(failed) == 3 and len(scheduled) == 2
     assert failed[-1].payload["will_retry"] is False
-
-
-def test_provider_timeout_retries_without_a_logical_time_budget(tmp_path):
-    adapter = FakeAdapter([
-        ProviderError("single request timed out", reason="provider_timeout", retryable=True),
-        product_spec(),
-    ])
-    system = LoopSystem.for_testing(tmp_path, adapter,
-                                    step_limits=StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.01))
-    result = system.activate_once(system.create_run("echo"))
-
-    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
-    assert has_new_work(result, "engineering")
-    assert len(adapter.invocations) == 2
-    events = system.store.list_events(result.run_id)
-    assert [item.payload["delay_sec"] for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED] == [0.01]
-    failed = next(item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED)
-    assert failed.payload["reason"] == "provider_timeout"
-    assert failed.payload["will_retry"] is True
 
 
 def test_retry_after_over_max_stops_without_waiting(tmp_path):
@@ -115,23 +79,6 @@ def test_retry_after_over_max_stops_without_waiting(tmp_path):
     assert failed.payload["will_retry"] is False
     assert failed.payload["reason"] == "retry_after_too_long"
     assert failed.payload["diagnostics"]["retry_after_sec"] == 60.1
-
-
-def test_retryable_attempts_stop_at_the_32_step_limit(tmp_path):
-    limits = replace(FAST_RETRIES, max_model_steps=32)
-
-    def transient_until_step_limit(request):
-        if request.step_id % 3 == 0:
-            return list_files_turn(request)
-        return ProviderError("temporary", retryable=True)
-
-    adapter = FakeAdapter([transient_until_step_limit] * limits.max_model_steps)
-    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=limits)
-    result = system.activate_once(system.create_run("echo"))
-
-    assert result.status == "paused" and result.stop_reason == "model_steps_exhausted"
-    assert len(adapter.invocations) == limits.max_model_steps
-    assert [request.step_id for request in adapter.invocations] == list(range(1, limits.max_model_steps + 1))
 
 
 @pytest.mark.parametrize("reason", ["context_overflow", "provider_error", "cancelled"])

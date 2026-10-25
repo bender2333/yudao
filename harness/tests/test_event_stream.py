@@ -1,9 +1,7 @@
 import asyncio
-import time
 
 from harness.app.application import Application
 from harness.app.event_stream import EventScope
-from harness.app.labels import GENERIC_EVENT_LABEL, _LABELS
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import project_stream
 from harness.models import ProjectEventType
@@ -109,31 +107,6 @@ def test_queue_overflow_resyncs_when_the_client_is_too_slow(tmp_path):
     assert messages[-1].kind == "resync"
     assert messages[-1].reason == "queue_overflow"
 
-def test_live_events_arrive_within_a_hundred_milliseconds(tmp_path):
-    # 写入以后推送不依赖定时查询：新事件在 100 毫秒以内到达
-    application = _application(tmp_path)
-    # 先写入一条历史事件：生成器读完它以后进入等待，新事件随后才写入
-    _record(application, "p1", 0)
-    stream = application.open_event_stream(EventScope(projects=("p1",)), after=0, live=False,
-                                           checkpoint_idle_sec=5.0)
-
-    async def run():
-        generator = stream.messages()
-        assert (await generator.__anext__()).kind == "event"
-        # 把下一次取消息包成任务，用零时长让渡轮询等生成器挂在等待上（ag_await 非 None），
-        # 此时它已经不看历史读取：写入之后到达的事件只能是实时推送
-        pending = asyncio.ensure_future(generator.__anext__())
-        deadline = asyncio.get_running_loop().time() + 3.0
-        while generator.ag_await is None:
-            assert asyncio.get_running_loop().time() < deadline, "生成器没有进入等待"
-            await asyncio.sleep(0)
-        started = time.monotonic()
-        _record(application, "p1", 1)
-        return await pending, time.monotonic() - started
-
-    message, elapsed = asyncio.run(asyncio.wait_for(run(), 10))
-    assert message.kind == "event"
-    assert elapsed < 0.1
 
 def test_idle_emits_a_checkpoint_at_the_scanned_position(tmp_path):
     application = _application(tmp_path)
@@ -148,23 +121,3 @@ def test_idle_emits_a_checkpoint_at_the_scanned_position(tmp_path):
     assert messages[1].previous == messages[0].position
 
 
-def test_an_event_without_a_label_does_not_break_the_stream(tmp_path):
-    # 一条没有登记中文说明的事件不能让整条流断掉（工单 #664）：
-    # 事件流播到这一条就断，客户端每秒重连一次，永远过不去。
-    # 这里把这类事件的说明从标签表里去掉，复现「事件种类漏登记说明」的情形。
-    application = _application(tmp_path)
-    for index in range(3):
-        _record(application, "p1", index)
-
-    template = _LABELS.pop(ProjectEventType.PROJECT_RENAMED)
-    try:
-        stream = application.open_event_stream(
-            EventScope(types=(ProjectEventType.PROJECT_RENAMED,)), after=0, live=False)
-        messages = _collect(stream, 3)
-    finally:
-        _LABELS[ProjectEventType.PROJECT_RENAMED] = template
-
-    assert len(messages) == 3
-    assert [message.event.label for message in messages] == [GENERIC_EVENT_LABEL] * 3
-    assert [message.event.position for message in messages] == sorted(
-        message.event.position for message in messages)

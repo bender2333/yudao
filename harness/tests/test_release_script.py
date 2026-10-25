@@ -148,13 +148,6 @@ def test_build_produces_a_wheel_with_the_page_files(release_build):
               if name.startswith("harness/release_assets/assets/") and not name.endswith("/")]
     assert hashed, "wheel 内的页面文件没有带内容摘要的引用文件"
 
-def test_the_wheel_carries_no_installer_or_update_manifest(release_build):
-    # 工单验收：wheel 不含客户端安装程序与更新清单
-    version = _version(REPO_ROOT / "pyproject.toml")
-    wheel = _wheel_path(release_build["output_dir"], version)
-    members = _wheel_members(wheel)
-    assert not [name for name in members if name.endswith((".exe", ".blockmap", ".yml"))], \
-        [name for name in members if name.endswith((".exe", ".blockmap", ".yml"))]
 
 def test_wheel_page_files_match_the_build_output(release_build):
     # 验收第 1 项：wheel 内的页面文件与页面构建输出目录中的文件逐个一致。

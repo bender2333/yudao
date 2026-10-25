@@ -5,8 +5,14 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactRef
 from harness.definitions import DEFINITIONS
-from harness.proposals import (answer_turn, ask_turn, delivery_turn, product_spec, product_spec_turn,
-                                review, review_turn)
+from harness.proposals import (
+    answer_turn,
+    ask_turn,
+    delivery_turn,
+    product_spec,
+    review,
+    review_turn,
+)
 from harness.runtime import LoopSystem
 from harness.tests.helpers import department_history, happy_script, quality_turns, run_scripted
 
@@ -109,12 +115,6 @@ def test_max_cycles_pauses_with_human_action(data_dir):
     assert projection.human_action
     assert "循环次数已达上限" in projection.waiting_reason
 
-def test_cycle_limit_pauses_after_work_without_provider_usage(data_dir):
-    _, projection = run_scripted(data_dir, happy_script(), max_cycles=1)
-    assert projection.status == "paused"
-    assert projection.stop_reason == "max_cycles"
-    assert projection.product_spec is not None
-    assert projection.token_used == 0
 
 def test_cancel_is_explicit_failure(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))

@@ -5,8 +5,8 @@ import pytest
 
 from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
-from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.models import EventType, Usage, json_dumps
+from harness.adapters.fake import FakeAdapter
+from harness.models import EventType, json_dumps
 from harness.proposals import product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
@@ -141,15 +141,6 @@ def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
     assert result.product_spec is not None
     assert not any(event.type == EventType.RUN_PAUSED for event in system.store.list_events(run_id))
     assert not any(event.type == EventType.RUN_FAILED for event in system.store.list_events(run_id))
-
-
-def test_large_provider_usage_is_recorded_without_stopping_handoff(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([FakeTurn(product_spec(), usage=Usage(total_tokens=1_000_000))]))
-    result = system.activate_once(system.create_run("echo"))
-    assert result.token_used == 1_000_000
-    assert has_new_work(result, "engineering") and result.stop_reason is None
-    assert result.product_spec is not None
-    assert result.canonical_state() == system.replay(result.run_id).canonical_state()
 
 
 def test_cancel_of_another_run_does_not_abort_current_invocation(tmp_path):

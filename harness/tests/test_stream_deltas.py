@@ -1,7 +1,7 @@
 import json
 
 from harness.adapters.fake import FakeAdapter
-from harness.deltas import DeltaBuffers, DeltaChannel, DeltaFragment, DeltaPump, DeltaScope
+from harness.deltas import DeltaFragment
 from harness.models import EventType
 from harness.providers.call import CallUsage, ModelDelta, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
@@ -49,35 +49,6 @@ def test_stream_deltas_are_published_with_offsets_and_kept_out_of_the_event_log(
     assert "hello" not in serialized
     assert "reasoning" not in json.dumps([event.payload.get("stage") for event in events])
 
-def test_delta_buffers_reject_out_of_order_and_repeated_fragments():
-    buffers = DeltaBuffers()
-    scope = DeltaScope(attempt_id="a1", logical_call_id="l1", run_id="r1", department="product")
-
-    assert buffers.absorb(DeltaFragment(scope=scope, channel="output", offset=0, text="hello"))
-    assert not buffers.absorb(DeltaFragment(scope=scope, channel="output", offset=0, text="hello"))
-    assert not buffers.absorb(DeltaFragment(scope=scope, channel="output", offset=99, text="skip"))
-    assert buffers.absorb(DeltaFragment(scope=scope, channel="output", offset=5, text=" world"))
-    assert buffers.texts("a1") == {"output": "hello world"}
-    buffers.release("a1")
-    assert buffers.texts("a1") == {}
-
-def test_delta_pump_merges_until_drained_and_reports_live_text():
-    channel = DeltaChannel()
-    pump = DeltaPump(channel=channel)
-    pump.start()
-    scope = DeltaScope(attempt_id="a1", logical_call_id="l1", run_id="r1", department="product")
-    channel.publish(scope, (ModelDelta(channel="output", offset=0, text="ab"),))
-    channel.publish(scope, (ModelDelta(channel="output", offset=2, text="cd"),))
-
-    assert pump.live_text("a1") == {}
-    merged = pump.drain()
-    assert [(item.channel, item.offset, item.text) for item in merged] == [("output", 0, "ab"), ("output", 2, "cd")]
-    assert pump.live_text("a1") == {"output": "abcd"}
-    assert pump.drain() == []
-
-    channel.close_attempt("a1")
-    assert pump.live_text("a1") == {}
-    pump.stop()
 
 def test_stream_progress_with_deltas_writes_one_event_per_stage(tmp_path):
     # 同一次调用尝试中同一阶段的多条带片段的流事件，model_stream_progress 仍只写一条

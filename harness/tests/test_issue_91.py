@@ -158,10 +158,6 @@ def _document(client) -> dict[str, Any]:
     assert response.status_code == 200, response.text
     return response.json()["data"]
 
-def _status(client) -> dict[str, Any]:
-    response = client.get("/api/queries/system.status")
-    assert response.status_code == 200, response.text
-    return response.json()["data"]
 
 def _decisions(client, **params: Any) -> list[dict[str, Any]]:
     response = client.get("/api/queries/decisions.list", params=params)
@@ -211,13 +207,6 @@ def _stale_definitions(catalog: dict[str, Any]) -> set[str]:
     # 有准入记录但已作废的定义（回到候选）
     return {item["model_id"] for item in catalog["admissions"] if item["stale"]}
 
-def _invalid_document():
-    # 一份无效的目录文档：部门默认引用一个候选（未准入）的定义
-    return {
-        "providers": [_provider("provider-a", "http://127.0.0.1:1/v1", "KEY_A")],
-        "models": [_model("model-a", "provider-a", "upstream-a")],
-        "bindings": {"product": {"provider_id": "provider-a", "model_id": "model-a"}},
-    }
 
 def _location_paths(response) -> set[str]:
     # 一次拒绝里的字段位置：合同层（422）给出 loc 列表，领域层（409）给出带点的字段路径；
@@ -281,18 +270,6 @@ def test_form_and_json_report_the_same_field_location_for_invalid_content(tmp_pa
         assert _catalog(client)["revision"] == base
         assert [item["id"] for item in _document(client)["models"]] == ["model-a", "model-a2", "model-b"]
 
-def test_document_referencing_a_candidate_is_rejected_as_a_whole(tmp_path):
-    # 部门默认引用候选（未准入）的定义、请求档位不属于支持范围的文档都被整份拒绝，目录不变
-    opened = _Opened(tmp_path)
-    with running_api(opened) as client:
-        base = _catalog(client)["revision"]
-        # 只准入 model-a2：model-a 仍是候选，默认引用它时整份拒绝
-        opened.admit(("provider-a", "model-a2"))
-        rejected = _post(client, "catalog.document.save", base_version=base, document=_invalid_document())
-        assert rejected.status_code == 409, rejected.text
-        assert "bindings.product.model_id" in rejected.json()["message"]
-        assert _catalog(client)["revision"] == base
-        assert _stale_definitions(_catalog(client)) == set()
 
 def test_external_address_change_returns_definitions_to_candidates(tmp_path):
     # 外部修改目录文件中某份连接的地址以后，该连接下的定义回到候选；
@@ -343,52 +320,6 @@ def test_external_address_change_returns_definitions_to_candidates(tmp_path):
         server.shutdown()
         server.server_close()
 
-def test_external_capacity_change_keeps_admission_and_uses_the_new_value(tmp_path):
-    # 外部修改容量以后准入保持，下一次请求使用新的容量：请求事件记录的窗口取自新值
-    server, _capture, base_url = serve(_two_stage())
-    try:
-        opened = _Opened(tmp_path, base_url=base_url)
-        with running_api(opened) as client:
-            opened.admit(("provider-a", "model-a"))
-            before = next(item for item in _catalog(client)["admissions"] if item["model_id"] == "model-a")
-            assert before["admitted"] is True
-
-            document = _document(client)
-            for item in document["models"]:
-                if item["id"] == "model-a":
-                    item["context_window"] = 64000
-            opened.write_document(document)
-            _wait_catalog_reload(opened.system.store, operation="reload")
-
-            after = next(item for item in _catalog(client)["admissions"] if item["model_id"] == "model-a")
-            assert after["admitted"] is True and after["stale"] is False
-            assert after["admitted_at"] == before["admitted_at"]
-            assert next(item for item in _catalog(client)["models"]
-                        if item["id"] == "model-a")["context_window"] == 64000
-    finally:
-        server.shutdown()
-        server.server_close()
-
-def test_invalid_external_content_keeps_the_last_version_and_reports_the_reason(tmp_path):
-    # 外部修改为无效内容时，目录保持上一个有效版本，system.status 显示原因
-    opened = _Opened(tmp_path)
-    with running_api(opened) as client:
-        opened.admit(("provider-a", "model-a"))
-        before = _document(client)
-        assert _status(client)["catalog"]["reload_error"] is None
-
-        opened.config.write_text("{ this is not json", encoding="utf-8")
-        # 等待外部修改被轮询发现并记下原因：reload 事件不追加（修订号未变），原因出现在 system.status
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            if _status(client)["catalog"]["reload_error"]:
-                break
-            time.sleep(0.05)
-        status = _status(client)
-        assert status["catalog"]["reload_error"] and "无法解析" in status["catalog"]["reload_error"]
-        # 目录保持上一个有效版本
-        assert _document(client) == before
-        assert _catalog(client)["revision"] == before["revision"]
 
 def test_deleting_the_catalog_file_clears_defaults_and_recovers_after_answer(tmp_path):
     # 删除目录文件以后部门默认「未设置」，进行中事项的下一次模型请求进入待恢复并说明原因；

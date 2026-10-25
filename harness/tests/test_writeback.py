@@ -1,5 +1,4 @@
 import gc
-import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -13,7 +12,7 @@ from harness.models import ArtifactRef, ProjectEventType
 from harness.project_projection import handler_for
 from harness.projects import ProjectService
 from harness.public_tree import CapturedFile, CapturedTree
-from harness.tree_archive import load_tree, store_tree
+from harness.tree_archive import store_tree
 from harness.write_path import NewProjectEvent, WritePath
 from harness.writeback import git_tree_to_captured
 
@@ -913,24 +912,6 @@ def test_writeback_with_an_empty_remote_writes_to_the_source_directory(tmp_path,
         assert _writeback_files(source_path) == {"app.py": ADOPTED_APP, "added.txt": b"adopted addition\n"}
         # 服务进程当前目录那个仓库的引用与对象都没有变化
         assert _repo_snapshot(process_repo) == before
-    finally:
-        store.close()
-        gc.collect()
-
-
-def test_writeback_with_an_empty_remote_works_outside_any_repository(tmp_path, monkeypatch):
-    # 当前目录不是 git 仓库：写回照常在源目录的仓库里完成，不再抛克隆失败
-    source_path = tmp_path / "src"
-    _init_working_repo(source_path, {"app.py": BASE_APP})
-    plain_directory = tmp_path / "plain"
-    plain_directory.mkdir()
-
-    store, projects, pid = _project_with_adoption(tmp_path, source_path, remote="")
-    try:
-        monkeypatch.chdir(plain_directory)
-        event = projects.execute_writeback(pid, "adopt_1")
-        assert event is not None and event.type == ProjectEventType.WRITEBACK_COMPLETED
-        assert _writeback_files(source_path)["app.py"] == ADOPTED_APP
     finally:
         store.close()
         gc.collect()

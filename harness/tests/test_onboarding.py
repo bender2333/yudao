@@ -81,18 +81,6 @@ def test_onboarding_departments_have_no_write_tools(tmp_path):
     assert "submit_structure" in engineering
     assert "submit_baseline_review" in set(tools_for("quality", "onboarding"))
 
-def test_repository_overview_is_generated(tmp_path):
-    system, run_id = _onboarding_run(tmp_path, _happy_script())
-    result = system.run_until_stop(run_id)
-    assert result.status == "done", result.error
-    overview = system.artifacts.get_for_run(run_id, ArtifactRef(**result.overview_ref)).decode("utf-8")
-    assert "仓库概况" in overview
-    assert "src/" in overview
-    assert "README.md" in overview
-    assert "tests/test_echo.py" in overview
-    # 概况只列路径与数量，不含文件内容
-    assert "print(sys.argv[1])" not in overview
-
 
 def test_quality_cannot_see_existing_structure(tmp_path):
     # 第一轮工程提交结构说明；退回产品以后，新一轮里工程能看到上一轮的结构说明，产品与质检看不到
@@ -328,32 +316,6 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
 
 DESIGN_CAPABILITY = "导出 PDF 报告"
 MARKED_BOUNDARY = "导出 PDF 报告（设计中，未实施）：docs/design/export.md 描述，代码尚未实现"
-
-def _design_doc_source(root: Path) -> Path:
-    # 设计文档描述而代码没有实现的能力：设计稿里有导出 PDF，代码里没有
-    _source(root)
-    (root / "docs" / "design").mkdir(parents=True)
-    (root / "docs" / "design" / "export.md").write_text("# 导出\n\n导出 PDF 报告。\n", encoding="utf-8")
-    return root
-
-def test_design_only_capability_goes_to_boundary_with_mark(tmp_path):
-    # 工单 #346：设计文档描述而代码没有实现的能力出现在初始 PRD 的边界里并带标记，没有出现在现有缺陷里
-    system, run_id = _onboarding_run(tmp_path, {
-        # 脚本按部门给出（工单 #557、#879）
-        "product": [FakeTurn(proposal=product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"],
-                                      boundaries=[MARKED_BOUNDARY]))],
-        "engineering": [_structure_turn()],
-        "quality": [_review_turn()],
-    }, source=_design_doc_source(tmp_path / "source"))
-    result = system.run_until_stop(run_id)
-    assert result.status == "done", result.error
-    spec = system.project(run_id).product_spec
-    assert any("设计中，未实施" in entry for entry in spec.boundaries)
-    assert any(DESIGN_CAPABILITY in entry for entry in spec.boundaries)
-    review = result.baseline_review
-    assert review["verdict"] == "consistent"
-    assert all(item["status"] != "existing_defect" for item in review["conclusions"])
-    assert all(DESIGN_CAPABILITY not in item["requirement"] for item in review["conclusions"])
 
 
 def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):

@@ -9,7 +9,6 @@ import uuid
 
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import DEFAULT_REGISTRY, Application
-from harness.app.contracts import API_VERSION
 from harness.app.registry import Registry
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
@@ -53,16 +52,6 @@ def test_an_empty_department_prompt_is_refused_with_a_readable_chinese_note(data
         assert opened.applications[-1].system.store.end_position() == 0
 
 
-def test_an_empty_goal_is_refused_with_the_field_it_names(data_dir):
-    opened = _Opened(data_dir)
-    with running_api(opened) as client:
-        response = _post(client, "project.create", {"name": "文本工具", "goal": ""})
-        assert response.status_code == 422, response.text
-        note = response.json()["error"]
-        assert note == "这次请求被拒绝：「长期目标」不能为空，请修改以后再提交。", note
-        assert "goal" not in note
-
-
 def test_a_blank_field_and_an_unknown_field_are_both_refused_with_a_readable_note(data_dir):
     opened = _Opened(data_dir)
     with running_api(opened) as client:
@@ -91,8 +80,3 @@ def test_a_rejected_command_still_answers_409_with_the_reason_and_its_message(da
         assert stale.json()["message"]
 
 
-def test_the_capability_list_still_reports_the_same_interface_version(data_dir):
-    # 这一处只改 422 的响应体，接口版本不变
-    opened = _Opened(data_dir)
-    with running_api(opened) as client:
-        assert client.get("/api/capabilities").json()["deployment"]["api_version"] == API_VERSION

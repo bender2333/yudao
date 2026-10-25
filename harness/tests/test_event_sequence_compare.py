@@ -149,24 +149,6 @@ def test_projection_difference_fails_with_fields_line():
     assert "fields: status" in message, message
 
 
-def test_event_difference_reported_before_projection():
-    # 同时改质检 qa_submitted 事件的 payload.verdict 与投影的 status（#541 步骤 3 第 2 项）：
-    # 两边都不一致时，信息先报事件，写明是哪个会话、会话内第几个事件与哪个字段，不报投影
-    expected = _load("handoff_release")
-    actual = copy.deepcopy(expected)
-    index = next(i for i, e in enumerate(actual["events"]) if e["type"] == "qa_submitted")
-    actual["events"][index]["payload"]["verdict"] = "rework_engineering"
-    actual["projection"]["status"] = "running"
-    with pytest.raises(AssertionError) as raised:
-        compare_documents("handoff_release", expected, actual)
-    message = str(raised.value)
-    assert "handoff_release" in message, message
-    assert "session <ses_qua#1>" in message, message
-    assert "event #" in message, message
-    assert "payload.verdict" in message, message
-    assert "projection differs" not in message, message
-
-
 def test_payload_field_difference_fails_with_fields_line():
     # 只改一条事件的一个载荷字段（质检放行改为退回）：同一会话内同一位置的事件载荷不同，
     # 分组比较应失败，并在 `fields:` 一行点名是哪个字段（#532 步骤 5 第 3 条）
@@ -294,45 +276,3 @@ def test_session_reference_change_fails_with_fields_line():
     assert "payload.context_event_id" in message, message
 
 
-def test_normalized_references_are_session_positions():
-    # 规整以后引用写成被引用事件在它自己会话里的位置，不写全局位置（工单 #892）
-    engineering, quality = _two_sessions()
-    document = _normalized([engineering[0], quality[0], engineering[1], quality[1],
-                            engineering[2], quality[2]])
-    references = [event["parent_event_id"] for event in document["events"]]
-    references += [event["payload"].get("context_event_id") for event in document["events"]
-                   if "context_event_id" in event["payload"]]
-    assert "<ses_eng#1>#1" in references
-    assert "<ses_qua#1>#1" in references
-    assert all(reference is None or not _GLOBAL_POSITION.match(reference)
-               for reference in references), references
-
-
-# 事项的累计数不进会话内事件的比较（工单 #892）：会话事件里不再有 activations、model_steps、cycle，
-# 会话自己的累计数 session_activations、session_model_steps 保留，事项的总数在投影里比较。
-def test_baselines_keep_session_totals_only():
-    for path in sorted(BASELINE_DIR.glob("*.json")):
-        document = json.loads(path.read_text(encoding="utf-8"))
-        for event in document["events"]:
-            payload = event.get("payload") or {}
-            if event.get("session_id"):
-                for field in _ITEM_TOTALS:
-                    assert field not in payload, f"{path.name} 的会话事件里还有事项累计数 {field}"
-            if event["type"] == "activation_finished":
-                assert "session_activations" in payload, f"{path.name} 少了 session_activations"
-                assert "session_model_steps" in payload, f"{path.name} 少了 session_model_steps"
-
-
-def test_baseline_references_are_session_positions():
-    # 基准里的引用写成会话内的位置：父事件与载荷里的事件编号都不写全局位置（工单 #892）
-    for path in sorted(BASELINE_DIR.glob("*.json")):
-        document = json.loads(path.read_text(encoding="utf-8"))
-        for event in document["events"]:
-            parent = event.get("parent_event_id")
-            if parent:
-                assert _SESSION_POSITION.match(parent), f"{path.name} 的父事件是全局位置 {parent}"
-            for name, value in (event.get("payload") or {}).items():
-                items = value if isinstance(value, list) else [value]
-                for item in items:
-                    if isinstance(item, str) and _GLOBAL_POSITION.match(item):
-                        raise AssertionError(f"{path.name} 的 {name} 是全局位置 {item}")

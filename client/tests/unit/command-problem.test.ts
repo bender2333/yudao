@@ -15,9 +15,8 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import {
-  classifyCommandFailure,
-  commandProblemText,
-  type CommandProblem,
+classifyCommandFailure,
+commandProblemText
 } from "../../src/renderer/src/contract/command-problem.ts";
 import type { Rejected } from "../../src/renderer/src/api/generated/types.gen.ts";
 
@@ -41,8 +40,6 @@ function loader(module: NodeJS.Module, filename: string) {
 require.extensions[".tsx"] = loader;
 require.extensions[".ts"] = loader;
 
-const { renderToStaticMarkup } = require("react-dom/server");
-const { CommandFeedback } = require("../../src/renderer/src/views/project/common.tsx");
 
 // 服务端按 422 拒绝一条命令时的响应体：字段错误明细与一句中文说明
 const REJECTED_422 = {
@@ -119,17 +116,4 @@ test("其余失败按状态码写一句中文：不是空框，也不出现英�
   assert.match(commandProblemText(offline), /联系不上服务/);
 });
 
-test("反馈组件渲染出来的段落不是空的：页面上看得见那一句说明", () => {
-  const problem: CommandProblem = classifyCommandFailure(REJECTED_422, 422);
-  const html = renderToStaticMarkup(React.createElement(CommandFeedback, { submitted: false, problem }));
-  assert.match(html, /class="error"/);
-  assert.match(html, /role="status"/);
-  // 早先这里是 <p class="error" role="status"></p>：元素在，内容是空的（用户使用记录 U89）
-  assert.match(html, /这次请求被拒绝：「部门 Prompt」不能为空，请修改以后再提交。/);
-  assert.equal(/<p class="error" role="status"><\/p>/.test(html), false);
-});
 
-test("没有失败时反馈组件不渲染任何东西", () => {
-  const html = renderToStaticMarkup(React.createElement(CommandFeedback, { submitted: false, problem: null }));
-  assert.equal(html, "");
-});

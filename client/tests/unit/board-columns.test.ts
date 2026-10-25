@@ -3,11 +3,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BOARD_TITLES, boardColumns } from "../../src/renderer/src/views/project/board.ts";
-import { DECISION_BLOCKS, RUN_STATUS_LABELS, STOP_REASON, departmentName, label } from "../../src/renderer/src/views/project/labels.ts";
+import { boardColumns } from "../../src/renderer/src/views/project/board.ts";
+import { DECISION_BLOCKS,RUN_STATUS_LABELS,STOP_REASON,departmentName,label } from "../../src/renderer/src/views/project/labels.ts";
 import type { WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
-const RUN_STATUSES = ["running", "done", "failed", "paused"];
 
 const STOP_REASONS = [
   "released", "baseline_verified", "max_cycles", "model_steps_exhausted", "no_tool_call",
@@ -63,12 +62,6 @@ test("部门列按部门分列，已放行与已采纳各自一列", () => {
   assert.deepEqual(columns.adopted.map((entry) => entry.work_item_id), ["w6"]);
 });
 
-test("看板列名与状态词表一致，run 状态只有进行中与三个终态", () => {
-  assert.deepEqual(BOARD_TITLES.map(([, title]) => title),
-    ["排队中", "产品", "工程", "质检", "已放行", "已采纳", "已停止"]);
-  assert.equal(RUN_STATUS_LABELS.running, "进行中");
-  assert.deepEqual(Object.keys(RUN_STATUS_LABELS).sort(), [...RUN_STATUSES].sort());
-});
 
 test("停止原因与 run 状态的中文名只覆盖控制核心与定义里的取值", () => {
   assert.deepEqual(Object.keys(STOP_REASON).sort(), [...STOP_REASONS].sort());

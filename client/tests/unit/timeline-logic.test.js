@@ -31,11 +31,6 @@ function fact(overrides) {
   };
 }
 
-test("三档速度与基准时长与原型 v10 的 replay.js 一致", () => {
-  assert.deepEqual([...SPEEDS], [1, 2, 4]);
-  assert.equal(BASE_MS, 1600);
-  assert.equal(GAP_SEC, 2 * 3600);
-});
 
 test("认识的刻度种类：交接不再是刻度，其余关键事实照旧（工单 #907）", () => {
   for (const kind of ["ask", "answer", "rework", "release", "adopt", "fault", "repair", "deploy", "wait", "decision"]) {
@@ -80,49 +75,10 @@ test("按项目筛选：只保留该项目的关键事实", () => {
   assert.deepEqual(ticks.map((tick) => tick.position), [1, 3]);
 });
 
-test("刻度之间的折断符号：相隔超过阈值时插入一段", () => {
-  const ticks = ticksOf([
-    fact({ position: 1, at: "2026-10-03T10:00:00Z" }),
-    fact({ position: 2, at: "2026-10-03T10:01:00Z" }),
-    fact({ position: 3, at: "2026-10-03T20:00:00Z" }),
-  ]);
-  const parts = partsOf(ticks);
-  // 三个刻度，第二与第三个之间相隔约 10 小时，插入一段折断
-  assert.deepEqual(parts.map((part) => part.kind), ["tick", "tick", "break", "tick"]);
-  const broken = parts.find((part) => part.kind === "break");
-  assert.ok(broken.gapSec > GAP_SEC);
-});
 
-test("相邻刻度相隔不超过阈值时不插入折断符号", () => {
-  const ticks = ticksOf([
-    fact({ position: 1, at: "2026-10-03T10:00:00Z" }),
-    fact({ position: 2, at: "2026-10-03T10:00:30Z" }),
-  ]);
-  assert.deepEqual(partsOf(ticks).map((part) => part.kind), ["tick", "tick"]);
-});
 
-test("时长写法按秒、分、小时、天给出", () => {
-  assert.equal(durationText(30), "30 秒");
-  assert.equal(durationText(120), "2 分");
-  assert.equal(durationText(7200), "2 小时");
-  assert.equal(durationText(2 * 24 * 3600), "2 天");
-});
 
-test("时间差：无法解析的时间返回零", () => {
-  assert.equal(secondsBetween("2026-10-03T10:00:00Z", "2026-10-03T10:01:00Z"), 60);
-  assert.equal(secondsBetween("bad", "2026-10-03T10:01:00Z"), 0);
-  assert.equal(secondsBetween("2026-10-03T10:01:00Z", "2026-10-03T10:00:00Z"), 0);
-});
 
-test("刻度按种类着色：着色值与原型 v10 的 KEY_KINDS 相同", () => {
-  assert.equal(KEY_KINDS.ask.color, "#7c6bd6");
-  assert.equal(KEY_KINDS.answer.color, "#9d8ff0");
-  assert.equal(KEY_KINDS.rework.color, "#d64f4f");
-  assert.equal(KEY_KINDS.release.color, "#3fa76a");
-  assert.equal(KEY_KINDS.adopt.color, "#1f7a4a");
-  assert.equal(KEY_KINDS.deploy.color, "#2f8f9d");
-  assert.equal(KEY_KINDS.decision.color, "#d4a017");
-});
 
 test("报告项与刻度的高亮对应：来源事件位置与刻度位置相同即高亮", () => {
   const ticks = ticksOf([

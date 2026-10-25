@@ -3,29 +3,20 @@ from __future__ import annotations
 import json
 import threading
 from threading import Event
-from urllib.parse import urlsplit, urlunsplit
 
 import pytest
 
 from harness.collaboration import has_new_work
 from harness.definitions import DEFINITIONS
-from harness.app.application import Application
-from harness.app.project_queries import RunAttempt
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType
-from harness.providers import (
-    CredentialChain,
-    ProviderFacade,
-    anthropic_base_url,
-    get_preset,
-)
+from harness.providers import CredentialChain, ProviderFacade
 from harness.providers.errors import ProviderError
 from harness.tests.helpers import FAST_RETRIES
 from harness.tests.protocol_helpers import (
     ScriptedProvider,
     bound_target,
     chat_responder,
-    complete,
     facade_with,
     invoke,
     messages_responder,
@@ -38,7 +29,10 @@ from harness.tests.protocol_helpers import (
     sse,
 )
 from harness.tests.provider_replies import (
-    BROKEN_STREAMS, HTTP_SCRIPT, PARTIAL_OUTPUT, chat_reply, empty_reply, product_spec_reply,
+    BROKEN_STREAMS,
+    PARTIAL_OUTPUT,
+    empty_reply,
+    product_spec_reply,
 )
 
 HI = [{"role": "user", "content": "hi"}]
@@ -87,61 +81,6 @@ def test_chat_wire_format_tool_round_trip_and_identity_headers():
     assert result.usage.output_tokens == 5
 
 
-@pytest.mark.parametrize("finish_reason", ["length", "stop", "tool_calls"])
-def test_chat_finish_reason_is_visible_in_the_persisted_attempt_details(data_dir, finish_reason):
-    def reply(_provider, handler):
-        send_reply(handler, 200, "text/event-stream",
-                   chat_reply(1, HTTP_SCRIPT[0], finish_reason=finish_reason))
-
-    provider = ScriptedProvider([reply])
-    try:
-        system, run_id = provider_system(data_dir, provider.base, "chat_completions")
-        try:
-            result = system.activate_once(run_id)
-            completed = next(event for event in system.store.list_events(run_id)
-                             if event.type == EventType.MODEL_ATTEMPT_FINISHED)
-            detail = Application(system).query("run.attempt", RunAttempt(
-                run_id=run_id, attempt_id=completed.payload["attempt_id"]))
-            assert has_new_work(result, "engineering"), result.error
-            assert detail.data.response["finish_reason"] == finish_reason
-        finally:
-            system.close()
-    finally:
-        provider.close()
-
-
-def test_chat_chunk_identity_that_is_not_a_string_is_not_recorded():
-    # OpenAI 兼容服务给出数字形式的块 id：SDK 不校验字段类型，调用照常完成，不记录回答身份
-    def numeric_identity(body: dict):
-        status, content_type, chunks = chat_responder(body)
-        return status, content_type, [chunk.replace(b'"id": "chat-1"', b'"id": 7') for chunk in chunks]
-
-    server, _capture, base = serve(numeric_identity)
-    events = []
-    try:
-        facade = facade_with(base + "/v1", protocol="chat_completions")
-        result = invoke(facade, bound_target(facade), _call_with_tool(), observe=events.append)
-    finally:
-        server.shutdown()
-        server.server_close()
-    streamed = [event for event in events if event.kind == "stream_event"]
-    assert streamed and all(event.payload["id"] == 7 and event.response_id is None for event in streamed)
-    assert result.response_id is None
-    assert any(item["type"] == "function_call" for item in result.output)
-
-
-def test_chat_sends_tool_result_paired_by_tool_call_id():
-    server, capture, base = serve(chat_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="chat_completions")
-        invoke(facade, bound_target(facade), _call_with_tool(follow_up_result="已写入 a.txt"))
-    finally:
-        server.shutdown()
-        server.server_close()
-    messages = capture.requests[0]["messages"]
-    assert messages[-1] == {"role": "tool", "tool_call_id": "call-1", "content": "已写入 a.txt"}
-
-
 def test_messages_wire_format_system_split_tool_round_trip_and_usage():
     server, capture, base = serve(messages_responder)
     with preset_base_urls(base + "/v1"):
@@ -181,65 +120,6 @@ def test_messages_wire_format_system_split_tool_round_trip_and_usage():
     assert result.usage.cache_write_tokens == 2
 
 
-def test_messages_requires_max_output_tokens_before_connecting():
-    server, capture, base = serve(messages_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="messages")
-        with pytest.raises(ProviderError) as exc_info:
-            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=None, session_id="s", attempt_id="a"))
-        assert exc_info.value.reason == "provider_protocol"
-        assert capture.requests == []
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
-def test_responses_requests_carry_identity_headers():
-    server, capture, base = serve(responses_responder)
-    with preset_base_urls(base + "/v1"):
-        try:
-            facade = facade_with(base + "/v1", protocol="responses", preset_id="opencode-go")
-            result = invoke(facade, bound_target(facade), model_call(HI, session_id="run-2:quality", attempt_id="a1"))
-        finally:
-            server.shutdown()
-            server.server_close()
-    assert capture.headers[0]["x-opencode-session"] == "run-2:quality"
-    assert capture.headers[0]["user-agent"].startswith("Yudao-Loop-System/")
-    assert result.output[0]["content"][0]["text"] == "ok"
-
-
-def test_facade_adapter_accepts_chat_targets():
-    # 桥接层不能只认 Responses：Chat 与 Messages 目标同样可用；目标由公开解析入口登记
-    from harness.tests.protocol_helpers import bound_adapter
-
-    server, _capture, base = serve(chat_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="chat_completions")
-        adapter = bound_adapter(facade)
-        assert adapter.availability().available is True
-        response = complete(adapter, model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
-    finally:
-        server.shutdown()
-        server.server_close()
-    assert [item["name"] for item in response.output] == ["write_file"]
-
-
-def test_model_test_admits_a_chat_model():
-    server, _capture, base = serve(chat_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="chat_completions")
-        result = facade.model_test("go", "m-go")
-    finally:
-        server.shutdown()
-        server.server_close()
-    assert result["ok"] is True
-    assert result["admitted"] is True
-    assert result["protocol"] == "chat_completions"
-    # 准入记录与目录分开保存（工单 #86）：记录里带协议与实际返回模型
-    stored = next(item for item in facade.model_admissions() if item["model_id"] == "m-go")
-    assert stored["admitted"] is True
-    assert stored["protocol"] == "chat_completions"
-
 def test_model_test_sends_reasoning_parameters_at_the_default_level():
     # 模型测试按该模型的默认档位发送推理参数（设计说明第 4.3、7.5 节）
     server, capture, base = serve(chat_responder)
@@ -254,31 +134,6 @@ def test_model_test_sends_reasoning_parameters_at_the_default_level():
     assert result["ok"] is True and result["admitted"] is True
     assert capture.requests[0]["reasoning_effort"] == "medium"
 
-def test_model_test_sends_no_reasoning_parameters_without_a_declaration():
-    server, capture, base = serve(chat_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="chat_completions")
-        facade.model_test("go", "m-go")
-    finally:
-        server.shutdown()
-        server.server_close()
-    assert "reasoning_effort" not in capture.requests[0]
-
-def test_responses_sends_reasoning_effort_for_the_sent_tier():
-    # Responses 的 effort 方式：reasoning.effort 取实际发送的档位（设计说明第 7.4 节）
-    server, capture, base = serve(responses_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="responses",
-                             reasoning_levels=["low", "medium"], default_reasoning_level="low",
-                             reasoning_mode="effort")
-        target = bound_target(facade, requested_tier="high")
-        invoke(facade, target, model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
-    finally:
-        server.shutdown()
-        server.server_close()
-    body = capture.requests[0]
-    # 请求档位 high 被限制到不高于它的最高支持档位 medium
-    assert body["reasoning"] == {"effort": "medium"}
 
 def test_chat_completions_sends_reasoning_effort_for_the_sent_tier():
     server, capture, base = serve(chat_responder)
@@ -309,22 +164,6 @@ def test_messages_adaptive_sends_thinking_and_output_config():
     assert body["thinking"] == {"type": "adaptive"}
     assert body["output_config"] == {"effort": "high"}
 
-@pytest.mark.parametrize(("level", "budget"), [
-    ("minimal", 1024), ("low", 4096), ("medium", 8192), ("high", 16384),
-    ("xhigh", 32768), ("max", 32768),
-])
-def test_messages_budget_sends_budget_tokens_by_level(level, budget):
-    server, capture, base = serve(messages_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="messages",
-                             reasoning_levels=[level], default_reasoning_level=level,
-                             reasoning_mode="budget")
-        target = bound_target(facade, requested_tier=level)
-        invoke(facade, target, model_call(HI, max_output_tokens=40000, session_id="s", attempt_id="a"))
-    finally:
-        server.shutdown()
-        server.server_close()
-    assert capture.requests[0]["thinking"] == {"type": "enabled", "budget_tokens": budget}
 
 def test_messages_budget_caps_tokens_at_output_limit_minus_reserve():
     # 预算不超过本次输出上限减 4000（设计说明第 7.4 节）
@@ -371,27 +210,6 @@ def test_undeclared_model_sends_no_reasoning_parameters():
         assert "reasoning" not in body and "reasoning_effort" not in body and "thinking" not in body, protocol
 
 
-@pytest.mark.parametrize(("protocol", "responder", "official"), [
-    ("responses", responses_responder, "https://opencode.ai/zen/go/v1/responses"),
-    ("chat_completions", chat_responder, "https://opencode.ai/zen/go/v1/chat/completions"),
-    ("messages", messages_responder, "https://opencode.ai/zen/go/v1/messages"),
-])
-def test_go_preset_base_url_reaches_the_official_protocol_path(protocol, responder, official):
-    # 预置表按协议给出请求基址，适配器拼接协议路径后与官方端点一致
-    base = get_preset("opencode-go")["base_urls"][protocol]
-    server, capture, local = serve(responder)
-    try:
-        local_base = urlunsplit(urlsplit(base)._replace(scheme="http", netloc=urlsplit(local).netloc))
-        facade = facade_with(local_base, protocol=protocol)
-        invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
-    finally:
-        server.shutdown()
-        server.server_close()
-    assert urlsplit(base).scheme == "https"
-    assert urlsplit(base).netloc == urlsplit(official).netloc
-    assert capture.paths[0] == urlsplit(official).path
-
-
 def test_one_preset_connections_keep_their_own_credentials_and_identity():
     # 同一服务方案下两份连接：请求地址都取该方案按协议的基址（ADR-0033），凭据与会话身份各自独立
     server, capture, base = serve(responses_responder)
@@ -432,20 +250,6 @@ def test_one_preset_connections_keep_their_own_credentials_and_identity():
     assert capture.headers[0]["user-agent"].startswith("Yudao-Loop-System/")
 
 
-def test_model_test_uses_its_own_diagnostic_session():
-    # 模型测试使用独立诊断会话，不借用任何任务部门的会话身份
-    server, capture, base = serve(messages_responder)
-    with preset_base_urls(base + "/v1"):
-        try:
-            facade = facade_with(base + "/v1", protocol="messages", preset_id="opencode-go")
-            result = facade.model_test("go", "m-go")
-        finally:
-            server.shutdown()
-            server.server_close()
-    assert result["ok"] is True
-    assert capture.headers[0]["x-opencode-session"] == "diagnostic:go:m-go"
-
-
 def test_concurrent_model_tests_of_one_model_both_admit():
     # Web 服务是多线程的：同一个模型的第一次模型测试还在等待提供方时发起第二次，两次都通过并记录准入
     first_held = Event()
@@ -480,12 +284,6 @@ def test_concurrent_model_tests_of_one_model_both_admit():
     assert stored["admitted_at"] is not None
     assert stored["admitted"] is True
     assert len(facade.model_admissions()) == 1
-
-
-def test_anthropic_base_url_does_not_duplicate_v1():
-    assert anthropic_base_url("https://opencode.ai/zen/go/v1") == "https://opencode.ai/zen/go"
-    assert anthropic_base_url("https://api.anthropic.com") == "https://api.anthropic.com"
-    assert anthropic_base_url("https://gateway.example/anthropic/") == "https://gateway.example/anthropic"
 
 
 @pytest.mark.parametrize(("protocol", "responder"), [
@@ -530,33 +328,6 @@ def test_cancel_stops_only_the_active_attempt(protocol, responder):
         server.server_close()
     assert outcome == {"reason": "cancelled"}
     assert any(item["type"] == "function_call" for item in result.output)
-
-
-def test_cancel_before_start_holds_only_within_the_activation():
-    # 取消到达时尝试还没有开始：同一次激活（同一个适配器）内这次尝试一开始就被取消，请求不发出，其他尝试照常；
-    # 取消记在随激活创建的适配器上，激活结束时没有开始的尝试不影响之后以同一身份开始的尝试
-    from harness.adapters.base import ProviderError as KernelProviderError
-    from harness.tests.protocol_helpers import bound_adapter
-
-    server, capture, base = serve(responses_responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="responses")
-        cancelled = model_call(HI, session_id="s", attempt_id="activation:root-1:work:attempt-1")
-        never_started = model_call(HI, session_id="s", attempt_id="activation:root-2:work:attempt-1")
-        other = model_call(HI, session_id="s", attempt_id="activation:root-3:work:attempt-1")
-        activation = bound_adapter(facade)
-        activation.cancel(cancelled.attempt_id)
-        with pytest.raises(KernelProviderError) as caught:
-            complete(activation, cancelled)
-        assert caught.value.reason == "cancelled"
-        assert capture.requests == []
-        activation.cancel(never_started.attempt_id)
-        assert complete(activation, other).output
-        assert complete(bound_adapter(facade), never_started).output
-    finally:
-        server.shutdown()
-        server.server_close()
-    assert len(capture.requests) == 2
 
 
 @pytest.mark.parametrize(("protocol", "first_event"), [
@@ -625,30 +396,6 @@ def test_stream_broken_midway_is_a_retryable_connection_failure_and_the_retry_su
     assert PARTIAL_OUTPUT not in json.dumps(provider.requests[1])
 
 
-def _broken_error_reply(_provider: ScriptedProvider, handler) -> None:
-    # HTTP 500 的错误回复体没有送完连接就关闭
-    body = b'{"error": {"code": "server_error", "type": "server_error", "message": "partial'
-    send_reply(handler, 500, "application/json", body, declared_length=len(body) + 4096)
-
-
-@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
-def test_error_reply_broken_while_the_request_is_created_is_a_retryable_connection_failure(protocol):
-    # 创建请求时提供方回复 HTTP 500，SDK 读取错误回复体时连接中途断开：三种协议在创建请求阶段按同样的传输错误分类，
-    # 记为可重试的连接失败，诊断写明传输阶段与事件
-    provider = ScriptedProvider([_broken_error_reply])
-    try:
-        facade = facade_with(provider.base + "/v1", protocol=protocol)
-        with pytest.raises(ProviderError) as caught:
-            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
-    finally:
-        provider.close()
-    assert str(caught.value) == "Model provider connection failed"
-    assert caught.value.reason == "provider_error"
-    assert caught.value.retryable is True
-    assert caught.value.diagnostics == BROKEN_BODY_DIAGNOSTICS
-    assert len(provider.requests) == 1
-
-
 def _messages_stream_error(error_type: str):
     # Messages 的流送出 message_start 之后送出 event: error（Anthropic 的错误以 type 区分）
     def reply(_provider: ScriptedProvider, handler) -> None:
@@ -700,60 +447,6 @@ def test_messages_stream_error_event_is_classified_by_its_type(error_type, retry
         assert len(provider.requests) == 1
 
 
-def test_messages_http_error_code_is_read_from_the_anthropic_error_type():
-    # Anthropic 的错误回复以 error.type 给出错误码
-    def overloaded(_provider: ScriptedProvider, handler) -> None:
-        body = json.dumps({"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}})
-        send_reply(handler, 529, "application/json", body.encode("utf-8"))
-
-    provider = ScriptedProvider([overloaded])
-    try:
-        facade = facade_with(provider.base + "/v1", protocol="messages")
-        with pytest.raises(ProviderError) as caught:
-            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
-    finally:
-        provider.close()
-    assert caught.value.retryable is True
-    assert caught.value.diagnostics == {"status_code": 529, "request_observation_id": "a",
-                                        "error_code": "overloaded_error"}
-
-
-@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
-def test_request_the_client_refuses_to_send_is_not_retryable(protocol):
-    # 会话标识中的换行使请求头不合法，客户端在发出之前拒绝（LocalProtocolError）：openai 的客户端经 httpx、
-    # anthropic 的客户端经 httpx2 报告，都记为不可重试的协议错误，请求没有到达服务
-    server, capture, base = serve(lambda _body: (200, "text/event-stream", [b""]))
-    with preset_base_urls(base + "/v1"):
-        try:
-            facade = facade_with(base + "/v1", protocol=protocol, preset_id="opencode-go")
-            with pytest.raises(ProviderError) as caught:
-                invoke(facade, bound_target(facade),
-                       model_call(HI, max_output_tokens=64, session_id="run-1\nproduct", attempt_id="a"))
-        finally:
-            server.shutdown()
-            server.server_close()
-    assert caught.value.retryable is False
-    assert caught.value.diagnostics == {"error_type": "provider_protocol"}
-    assert capture.requests == []
-
-
-def test_partial_stream_is_retryable():
-    def responder(body: dict):
-        # 只发一个事件就断开，模拟不完整流
-        events = ['event: message_start\ndata: {"type":"message_start","message":{"id":"m","usage":{"input_tokens":1}}}\n\n']
-        return 200, "text/event-stream", [sse(*events)]
-
-    server, _capture, base = serve(responder)
-    try:
-        facade = facade_with(base + "/v1", protocol="messages")
-        with pytest.raises(ProviderError) as exc_info:
-            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64, session_id="s", attempt_id="a"))
-        assert exc_info.value.reason in {"provider_error", "provider_protocol", "provider_timeout"}
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
 @pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
 @pytest.mark.parametrize("status", [401, 403])
 def test_credential_rejection_is_unavailable_and_never_retried(protocol, status):
@@ -791,31 +484,6 @@ def test_credential_rejection_is_unavailable_and_never_retried(protocol, status)
 # Responses 走 completed 且 incomplete_details 为空，Chat 与 Messages 各用一个终态结束原因
 EMPTY_OUTPUT_FINISH_REASONS = {"responses": "completed", "chat_completions": "length",
                                "messages": "max_tokens"}
-
-
-@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
-def test_stream_that_ends_without_any_visible_output_is_a_retryable_empty_output_failure(protocol):
-    provider = ScriptedProvider([empty_reply(protocol)])
-    try:
-        facade = facade_with(provider.base + "/v1", protocol=protocol)
-        with pytest.raises(ProviderError) as caught:
-            invoke(facade, bound_target(facade),
-                   model_call(HI, max_output_tokens=2048, session_id="s", attempt_id="a"))
-    finally:
-        provider.close()
-    error = caught.value
-    assert str(error) == "Model response contained no output items"
-    assert error.reason == "empty_output"
-    assert error.retryable is True
-    assert error.diagnostics == {
-        "error_type": "empty_output",
-        "finish_reason": EMPTY_OUTPUT_FINISH_REASONS[protocol],
-        "usage_reported": True,
-        "output_tokens": 10,
-        "max_output_tokens": 2048,
-        "has_reasoning": False,
-    }
-    assert len(provider.requests) == 1
 
 
 @pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])

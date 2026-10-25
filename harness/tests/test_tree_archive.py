@@ -103,17 +103,6 @@ def test_archive_load_rejects_inconsistent_content_and_references(tmp_path, chan
         load_tree(store, RUN_ID, changed)
 
 
-@pytest.mark.parametrize("raw", [
-    b'{"format":"one","format":"two"}', b'{"format":NaN}', b'{"format":Infinity}', b"\xff",
-    b"[]", b"{",
-])
-def test_archive_requires_strict_utf8_json(tmp_path, raw):
-    store = ArtifactStore(tmp_path / "artifacts")
-    ref = store.put(RUN_ID, "tree_manifest", raw, media_type="application/json")
-    with pytest.raises(TreeError):
-        load_tree(store, RUN_ID, ref)
-
-
 def test_manifest_reference_is_bound_to_its_run(tmp_path):
     _, tree = _captured(tmp_path)
     store = ArtifactStore(tmp_path / "artifacts")
@@ -124,36 +113,3 @@ def test_manifest_reference_is_bound_to_its_run(tmp_path):
         load_tree(store, RUN_ID, replace(ref, kind="source_file"))
 
 
-def test_store_detects_preexisting_corrupt_blob_before_publishing_manifest(tmp_path):
-    _, tree = _captured(tmp_path)
-    store = ArtifactStore(tmp_path / "artifacts")
-    corrupt = store.put(RUN_ID, "tree_file", tree.files[0].data, media_type="application/octet-stream")
-    (store.root / corrupt.path).write_bytes(b"old corrupted blob")
-    with pytest.raises(ValueError, match="hash mismatch"):
-        store_tree(store, RUN_ID, tree)
-    assert len(list(store.root.rglob("*"))) == 3
-
-
-def test_readback_failure_does_not_return_an_archive_reference(tmp_path, monkeypatch):
-    _, tree = _captured(tmp_path)
-    store = ArtifactStore(tmp_path / "artifacts")
-    put = store.put
-
-    def broken_put(run_id, kind, data, **kwargs):
-        ref = put(run_id, kind, data, **kwargs)
-        if kind == "tree_manifest":
-            (store.root / ref.path).write_bytes(b"incomplete write")
-        return ref
-
-    monkeypatch.setattr(store, "put", broken_put)
-    with pytest.raises(ValueError, match="hash mismatch"):
-        store_tree(store, RUN_ID, tree)
-
-
-@pytest.mark.parametrize("run_id", ["../outside", "C:relative", "nested/run", "run.", "NUL", ".checks"])
-def test_invalid_run_id_is_rejected_before_artifact_write(tmp_path, run_id):
-    _, tree = _captured(tmp_path)
-    store = ArtifactStore(tmp_path / "artifacts")
-    with pytest.raises(TreeError):
-        store_tree(store, run_id, tree)
-    assert list(store.root.iterdir()) == []

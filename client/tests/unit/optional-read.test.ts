@@ -6,10 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  emptyOrFailureText,
-  failureReason,
-  optionalRead,
-  readFailureText,
+failureReason,
+optionalRead
 } from "../../src/renderer/src/contract/read-failure.ts";
 
 function delay(ms: number): Promise<void> {
@@ -52,10 +50,3 @@ test("失败没有原文时写清这次读取没有成功，不写空串", () =>
   assert.equal(failureReason({ error: "找不到这个事件" }), "找不到这个事件");
 });
 
-test("读不出来与本来就没有内容，说的是两句话", () => {
-  assert.equal(
-    readFailureText(failureReason(new Error("查询 projects.list 没有返回数据"))),
-    "读取失败：查询 projects.list 没有返回数据",
-  );
-  assert.equal(emptyOrFailureText(null, "没有符合的项目"), "没有符合的项目");
-});

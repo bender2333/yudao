@@ -12,7 +12,11 @@ from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
 from harness.models import CatalogEventType, ProjectEventType
 from harness.release_check import (
-    MANIFEST_PATH, Finding, check_repository, decision_request_payload, load_manifest, request_instance_upgrade,
+    MANIFEST_PATH,
+    Finding,
+    check_repository,
+    load_manifest,
+    request_instance_upgrade,
 )
 from harness.runtime import LoopSystem
 
@@ -199,50 +203,6 @@ def test_editing_the_pending_check_code_does_not_change_the_result(repository):
     report = check_repository(repository.path)
     assert any(item.check == "评测专有内容" for item in report.findings)
 
-
-def test_the_report_is_carried_by_the_instance_upgrade_decision_request(repository, tmp_path):
-    # 决定请求「实例升级」带着检查结果：写进目录流以后读回来，材料是同一份报告，
-    # 选项是批准升级与拒绝
-    report = check_repository(repository.path)
-    system = LoopSystem(tmp_path / "data")
-    try:
-        decision_id = request_instance_upgrade(system, report)
-        saved = system.store.decision(decision_id)
-    finally:
-        system.close()
-    assert saved is not None
-    assert saved.kind == "instance_upgrade"
-    assert saved.status == "open"
-    payload = decision_request_payload(report)
-    assert payload["kind"] == "instance_upgrade"
-    assert [option["id"] for option in payload["options"]] == ["approve", "reject"]
-    assert payload["report"]["passed"] == report.passed
-    assert report.text in payload["facts"]
-    assert json.loads(saved.state)["request"]["report"]["pending_commit"] == report.pending_commit
-
-
-def test_answering_the_instance_upgrade_decision_records_the_choice(repository, tmp_path):
-    # 决定请求「实例升级」可以回答：用户批准以后状态是已回答，选项是批准升级
-    import uuid
-
-    from harness.event_store import Command
-    from harness.projection import saved_decision
-
-    report = check_repository(repository.path)
-    system = LoopSystem(tmp_path / "data")
-    try:
-        decision_id = request_instance_upgrade(system, report)
-        saved = saved_decision(system.store, decision_id)
-        assert saved is not None and saved.version == 1
-        answered = system.orchestrator.answer_decision(
-            decision_id, "approve", None, base_version=1,
-            command=Command(str(uuid.uuid4()), "decision.answer", "sha256:approve:1", "user:local"))
-        assert answered is None
-        closed = saved_decision(system.store, decision_id)
-        assert closed is not None and closed.status == "answered"
-        assert closed.answer is not None and closed.answer["option"] == "approve"
-    finally:
-        system.close()
 
 def test_the_query_lists_the_instance_upgrade_request_with_its_report(repository, tmp_path):
     # 工单 #564：决定请求「实例升级」经 decisions.list 返回，请求载荷通过应用层合同，

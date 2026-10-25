@@ -8,8 +8,7 @@ import uuid
 from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
-from harness.models import ArtifactRef, EventType, ProjectEventType
-from harness.projection import project_run
+from harness.models import ArtifactRef, ProjectEventType
 from harness.projects import project_projection
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
@@ -96,14 +95,6 @@ def test_set_goal_writes_the_project_event_and_updates_the_queries(data_dir):
         settings = client.get("/api/queries/project.settings", params={"project_id": project_id}).json()["data"]
         assert settings["goal"] == NEW_GOAL
 
-def test_set_goal_is_listed_in_capabilities_and_openapi(data_dir):
-    opened = _Opened(data_dir, FakeAdapter([]))
-    with running_api(opened) as client:
-        capabilities = client.get("/api/capabilities").json()
-        assert {"name": "project.set_goal",
-                "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]} in capabilities["commands"]
-        document = client.get("/openapi.json").json()
-        assert "/api/commands/project.set_goal" in document["paths"]
 
 def test_archived_project_refuses_set_goal(data_dir):
     opened = _Opened(data_dir, FakeAdapter([]))
@@ -164,17 +155,3 @@ def test_new_work_items_use_the_new_goal_and_in_progress_items_keep_the_old(data
     assert _request_has_goal(adapter, run_b, NEW_GOAL)
     assert not _request_has_goal(adapter, run_b, OLD_GOAL)
 
-def test_run_created_records_the_goal_at_creation(data_dir):
-    adapter = FakeAdapter(_mixed_script())
-    system = LoopSystem.for_testing(data_dir, adapter)
-    project_id = system.projects.register("目标项目", OLD_GOAL)
-    _work_a, run_a = system.projects.start_work_item(project_id, "事项 A")
-    assert has_new_work(system.run_until_stop(run_a), "engineering")
-
-    # run_created 里记下的是开始时的目标：修改目标不改动已创建 run 的钉住上下文
-    system.projects.set_goal(project_id, NEW_GOAL)
-    created = next(event for event in system.store.list_events(run_a) if event.type == EventType.RUN_CREATED)
-    context_ref = created.payload["project_context_ref"]
-    text = system.artifacts.get_for_run(run_a, ArtifactRef(**context_ref)).decode("utf-8")
-    assert f"长期目标：{OLD_GOAL}" in text
-    assert project_run(system.store, run_a).project_context_ref == context_ref

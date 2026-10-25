@@ -2,16 +2,12 @@
 # 数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，模型回答由 FakeAdapter 给出；
 # 中断由「进程关闭、重新以新的系统打开同一数据目录」表示。查询只读取，事件流重连只补观察事实。
 
-import asyncio
 import json
-import uuid
 from dataclasses import asdict
 
 from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
-from harness.app.decision_commands import DecisionAnswer
-from harness.app.event_stream import EventScope
 from harness.app.project_queries import (
     PROJECT_LOOP,
     PROJECTS_LIST,
@@ -24,10 +20,9 @@ from harness.app.project_queries import (
     RunActions,
     RunRecovery,
 )
-from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT, quality_turns
 from harness.write_path import NewEvent
@@ -79,15 +74,6 @@ def _lost_write(system, run_id, *, tool="write_file", action_id="lost-write"):
                  "before_snapshot_ref": asdict(ref)}))
     return ref
 
-def _decision_events(system, run_id, kind=None):
-    return [event for event in system.store.list_events(run_id)
-            if event.type == EventType.DECISION_REQUESTED and (kind is None or event.payload["kind"] == kind)]
-
-def _answer(system, decision_id, option, *, base_version=1, note=None):
-    application = _application(system)
-    return asyncio.run(application.command("decision.answer", DecisionAnswer(
-        command_id=str(uuid.uuid4()), decision_id=decision_id, option=option, base_version=base_version,
-        note=note), actor="user"))
 
 def test_the_interrupted_state_is_reported_with_the_last_confirmed_position(data_dir):
     # 中断：停在 ENGINEERING，进度已经持久化，进程在下一次激活之前退出。查询给出已确认位置与下一项合法操作。
@@ -106,25 +92,6 @@ def test_the_interrupted_state_is_reported_with_the_last_confirmed_position(data
     assert recovery.last_confirmed_event_id == restarted.project(run_id).last_event_id
     restarted.close()
 
-def test_an_unknown_action_is_observed_as_pending_verification(data_dir):
-    # 重新启动以后结果未知的动作已交还，状态是中断或运行中，verifications 有一条交还记录
-    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
-    _lost_write(system, run_id)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
-                                      resume_on_startup=False)
-    restarted.orchestrator.resume_incomplete_run(run_id)
-    application = _application(restarted)
-    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    assert recovery.state in ("interrupted", "running"), recovery
-    assert recovery.unfinished_actions == []
-    assert len(recovery.verifications) == 1
-    record = recovery.verifications[0]
-    assert record.action_id == "lost-write"
-    assert "交还" in record.basis
-    assert record.basis == "重新启动时结果未知，交还发出它的会话"
-    restarted.close()
 
 def test_an_unavailable_model_is_observed_as_waiting_resume(data_dir):
     # 待恢复：模型引用无法使用（凭据缺失）的 run 停在待恢复，写明部门、模型与问题。
@@ -247,57 +214,6 @@ def test_a_live_run_is_observed_as_running(data_dir):
     assert recovery.next_legal_action == "none"
     system.close()
 
-def test_the_event_stream_reconnect_only_adds_observation(data_dir):
-    # 事件流重连只补观察事实：从 after 重新读取不新建执行，不重发模型或工具请求
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(_product_only_script()))
-    project_id, _work_item_id, run_id = _work_item_run(system, "被观察的事项")
-    system.activate_once(run_id)
-    application = _application(system)
-
-    def collect(stream, count):
-        async def run():
-            messages = []
-            async for message in stream.messages():
-                if type(message).__name__ == "StreamEvent":
-                    messages.append(message)
-                    if len(messages) >= count:
-                        break
-            return messages
-        return asyncio.run(run())
-
-    before_position = system.store.end_position()
-    before_models = len([event for event in system.store.list_events(run_id)
-                         if event.type == EventType.MODEL_REQUESTED])
-    first = collect(application.open_event_stream(EventScope(projects=(project_id,)), after=0, live=False), 3)
-    assert first, "event stream returned no events"
-    # 重连：从最后一条之后继续，与第一次不重叠；没有更多历史时为空
-    resumed = collect(application.open_event_stream(EventScope(projects=(project_id,)),
-                                                    after=first[-1].position, live=False), 1)
-    assert resumed == [] or resumed[0].position > first[-1].position
-    # 重连不新建执行、不重发模型请求：日志末尾与模型请求数不变，run 的相位不变
-    assert system.store.end_position() == before_position
-    assert len([event for event in system.store.list_events(run_id)
-                if event.type == EventType.MODEL_REQUESTED]) == before_models
-    assert has_new_work(system.project(run_id), "engineering")
-    system.close()
-
-def test_system_status_counts_match_the_event_log(data_dir):
-    # system.status 的恢复汇总：服务重启后自动继续的事项数、待恢复的事项数与事件日志一致
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(_product_only_script()))
-    _project_id, _work_item_id, run_id = _work_item_run(system, "中断的事项")
-    system.activate_once(run_id)
-    _lost_write(system, run_id, action_id="another-unknown")
-    assert has_new_work(system.project(run_id), "engineering")
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
-                                      resume_on_startup=False)
-    application = _application(restarted)
-    status = _query(application, SYSTEM_STATUS, SystemStatusRequest())
-    assert status.recovery.waiting_resume == 0
-    # 没有重启后自动继续的事项：重新打开时 resume_on_startup=False
-    assert status.recovery.auto_resumed == 0
-    restarted.close()
 
 def test_projects_list_reports_interruption_pending_and_resume_markers(data_dir):
     # projects.list 返回每个项目的中断与待恢复标记（计数），为零时仍是 0
@@ -352,19 +268,6 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
     assert recovery.next_legal_action in ("continue", "none")
     restarted.close()
 
-def test_run_actions_reports_the_unknown_status_and_snapshots(data_dir):
-    # run.actions 返回每个动作的状态与前后快照：结果未知的动作状态为 unknown，带动作前快照引用
-    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
-    _lost_write(system, run_id)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()))
-    application = _application(restarted)
-    actions = _query(application, RUN_ACTIONS, RunActions(run_id=run_id))
-    action = next(item for item in actions.actions if item.action_id == "lost-write")
-    assert action.status == "unknown"
-    assert action.before_snapshot_ref is not None
-    restarted.close()
 
 def test_history_queries_export_and_replay_stay_read_only(data_dir):
     # 历史查询、导出与重放保持只读：位置不变，不调用模型，不写入

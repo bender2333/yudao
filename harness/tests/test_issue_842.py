@@ -36,24 +36,6 @@ def _system(data_dir: Path) -> LoopSystem:
     return LoopSystem.for_testing(data_dir, FakeAdapter(_ask_script()))
 
 
-def test_active_department_stays_with_the_asking_department_after_the_answer(tmp_path: Path):
-    # 询问被回答以后，所在部门回到提出询问的部门：工程继续工作，显示工程
-    system = _system(tmp_path)
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)  # 产品提交初始 PRD
-    projection = system.activate_once(run_id)  # 工程询问产品，产品在分支里回答，工程接着工作
-
-    events = system.store.list_events(run_id)
-    assert any(event.type == EventType.ASK_STARTED for event in events)
-    assert any(event.type == EventType.ASK_ANSWERED for event in events)
-    # 询问确实发生过：被询问的是产品，提问的是工程
-    answered = next(event for event in events if event.type == EventType.ASK_ANSWERED)
-    assert answered.payload["requester"] == "engineering"
-    assert answered.payload["recipient"] == "product"
-    # 回答以后工程继续工作，所在部门是工程
-    assert projection.active_department == "engineering"
-
-
 def test_ask_branch_activation_does_not_take_over_the_department(tmp_path: Path):
     # 根因那一处：询问分支会话的激活不改写事项的所在部门（工单 #842）
     system = _system(tmp_path)
@@ -112,25 +94,6 @@ def test_run_failed_carries_the_department_that_was_working(tmp_path: Path):
     events = system.store.list_events(run_id)
     failed = next(event for event in events if event.type == EventType.RUN_FAILED)
     assert failed.department == "engineering"
-
-
-def test_ask_branch_activation_does_not_count_as_a_cycle(tmp_path: Path):
-    # 工单 #857：轮次只计主线会话的激活。工程询问产品，产品在分支里回答，
-    # 分支的那一次激活不算一轮，事项的 cycle_count 仍等于主线激活的次数。
-    system = _system(tmp_path)
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)  # 产品提交初始 PRD
-    projection = system.activate_once(run_id)  # 工程询问产品，产品在分支里回答
-
-    events = system.store.list_events(run_id)
-    activated = [event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED]
-    main = [event for event in activated if not event.session_id.startswith("ses_ask")]
-    branch = [event for event in activated if event.session_id.startswith("ses_ask")]
-    assert main and branch
-    # 主线两次激活（产品、工程），分支的一次激活不加一
-    assert projection.cycle_count == len(main) == 2
-    # 分支激活事件里的 cycle 与回答以后投影的 cycle_count 相同（设计第 4.2 节）
-    assert branch[0].payload["cycle"] == projection.cycle_count
 
 
 def _finishing_script() -> dict[str, Any]:

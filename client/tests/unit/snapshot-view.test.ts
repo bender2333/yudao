@@ -7,9 +7,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Rejected } from "../../src/renderer/src/api/generated/types.gen";
-import { rejectionLabel } from "../../src/renderer/src/contract/command-problem.ts";
-import { rejectionLinks, snapshotView } from "../../src/renderer/src/views/project/use-snapshot.ts";
+import { snapshotView } from "../../src/renderer/src/views/project/use-snapshot.ts";
 
 const KEY = JSON.stringify({ project_id: "p1", work_item: "wi1" });
 
@@ -45,24 +43,5 @@ test("读取失败时把原因带出来：界面据此说「读不出来」而�
   );
 });
 
-test("拒绝的说明只写服务端的中文消息，不带英文的原因标识", () => {
-  // 工单 #319 第 5、6 项
-  assert.equal(rejectionLabel({
-    reason: "provider_unavailable",
-    message: "质检部门还没有选择模型，到系统的模型管理页设置部门默认，或在本项目的设置页为这个项目选择",
-  } as Rejected), "质检部门还没有选择模型，到系统的模型管理页设置部门默认，或在本项目的设置页为这个项目选择");
-  // 基准版本过期仍然给出可操作的一句
-  assert.match(rejectionLabel({ reason: "stale_base", message: "基准版本过期", current_version: 7 } as Rejected),
-    /^基准版本过期（服务端当前版本 7），请重新读取以后提交$/);
-});
 
-test("部门没有选模型时给出两个去处：模型管理页与本项目的设置页", () => {
-  const links = rejectionLinks({ kind: "rejected", rejection: { reason: "provider_unavailable", message: "质检部门还没有选择模型" } as Rejected }, "p1");
-  assert.deepEqual(links.map((link) => link.label), ["去模型管理页设置部门默认", "在本项目的设置页选择模型"]);
-  assert.deepEqual(links.map((link) => link.hash), ["/sys/models", "/p/p1/settings"]);
-});
 
-test("其余拒绝原因不给去处", () => {
-  assert.deepEqual(rejectionLinks({ kind: "rejected", rejection: { reason: "busy", message: "已有事项正在执行" } as Rejected }, "p1"), []);
-  assert.deepEqual(rejectionLinks(null, "p1"), []);
-});

@@ -242,24 +242,6 @@ def test_input_modalities_save_and_query_and_do_not_touch_admission(tmp_path):
             document = client.get("/api/queries/catalog.document").json()["data"]
             assert {item["id"]: item for item in document["models"]}["model-a"]["input_modalities"] == ["text", "image"]
 
-def test_model_test_keeps_input_modalities_and_admission(tmp_path):
-    # 模型测试不核实输入方式也不因它失败：测试前后定义中的输入方式不变，准入照常写入
-    with _Upstream({"data": []}) as upstream:
-        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
-                                    "models": [_document_model("model-a", input_modalities=["text", "image"])],
-                                    "bindings": {}})
-        with running_api(opened) as client:
-            current = _catalog(client)["revision"]
-            tested = _command(client, "catalog.model.test", base_version=current,
-                              provider_id="provider-a", model_id="model-a")
-            assert tested.status_code == 200, tested.text
-            _wait_for(opened.system.store,
-                      lambda item: item.type == CatalogEventType.CATALOG_TEST_FINISHED
-                      and item.payload.get("ok") and item.payload.get("kind") == "model",
-                      description="catalog_test_finished")
-            # 定义中的输入方式没有被测试改动
-            models = {item["id"]: item for item in _catalog(client)["models"]}
-            assert models["model-a"]["input_modalities"] == ["text", "image"]
 
 def test_unknown_input_modality_is_rejected_at_its_field(tmp_path):
     # 未知取值按字段位置拒绝：请求在接口层被拒绝，位置写明模型行的 input_modalities

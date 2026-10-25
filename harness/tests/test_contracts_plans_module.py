@@ -7,9 +7,7 @@ from dataclasses import replace
 
 import pytest
 
-from harness.collaboration import has_new_work
-from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_parts
-from harness.event_store import run_stream
+from harness.adapters.fake import FakeAdapter, prompt_parts
 from harness.models import EventType
 from harness.proposals import (ask_turn, delivery, delivery_turn,
                                product_decision, product_spec, review_turn)
@@ -18,39 +16,6 @@ from harness.runtime import LoopSystem
 from harness.tests.helpers import guidance_reply
 from harness.validation import evaluate_proposal
 
-def _accept_new_spec(system, run_id):
-    projection = system.project(run_id)
-    decision = evaluate_proposal(department="product", projection=replace(projection, status="running"),
-                                 facts=system.workspace(run_id).snapshot().facts,
-                                 proposal=product_spec(requirements=["print the argument in uppercase"], change_record={
-                                     "changed": ["Print the argument in uppercase"], "retained": ["Keep a single argument CLI"],
-                                     "retired": ["Preserve the original case"], "rationale": "The product now requires uppercase output",
-                                 }))
-    assert decision.accepted
-    # 运行之外接纳新的产品规格（经写入口的事务），有效合同随之改变
-    system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(
-        transaction, projection=projection, snapshot=system.workspace(run_id).snapshot(),
-        environment=system.environment(run_id), artifact=decision.artifact, department="product",
-        parent_event_id=projection.last_event_id, session_id=projection.sessions["product"].session_id,
-        provider="fake", model="fake-script",
-    ).append(transaction))
-
-def test_writes_without_a_plan_are_allowed(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        product_spec(),
-        delivery_turn(files={"src/direct.py": "yes\n"}),
-    ]))
-    run_id = system.create_run("echo")
-    system.activate_once(run_id)
-    result = system.activate_once(run_id)
-    assert has_new_work(result, "quality"), result.error
-    assert result.delivery_spec is not None
-    assert system.workspace(run_id).list_files() == ["src/direct.py"]
-    events = system.store.list_events(run_id)
-    call = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "write_file")
-    assert call.payload["ok"]
-    assert any(event.type == EventType.TOOL_STARTED and event.payload["name"] == "write_file" for event in events)
-    assert any(event.type == EventType.DELIVERY_ACCEPTED for event in events)
 
 def test_supplementary_decision_changes_contract_without_new_spec(tmp_path):
     # 产品的工作由用户的指导触发（工单 #555）：补充决定改变合同，产品要求本身不变

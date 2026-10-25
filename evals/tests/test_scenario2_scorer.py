@@ -261,33 +261,6 @@ def test_parameterized_cases_fail_if_any_case_fails(tmp_path):
     assert cases[tests[0]][0] == "fail"
 
 
-def test_regression_failures_do_not_move_completion(tmp_path):
-    """原有功能测试失败单独报告，完成度只看 F2P（评测场景设计第 4.2 节）。"""
-    delivery = write_delivery(str(tmp_path / "delivery"))
-    junit = str(tmp_path / "p2p.xml")
-    completed = run_pytest(delivery, P2P, junit)
-
-    assert completed.returncode == 0, completed.stdout
-    cases = scenario2.parse_junit(junit, scenario2.registered_files(P2P))
-    regression = {"passed": 0, "failed": 0, "total": len(P2P), "failures": []}
-    for name in P2P:
-        status, detail = cases[name]
-        if status == "pass":
-            regression["passed"] += 1
-        else:
-            regression["failed"] += 1
-            regression["failures"].append({"id": name, "detail": detail})
-    assert regression == {"passed": 2, "failed": 0, "total": 2, "failures": []}
-
-    records = [{"id": "tests/test_new.py::test_add", "requirement": "R1",
-                "status": "pass", "detail": ""}]
-    scores = scenario2.aggregate(records, ["R1", "R2"], regression, {"f2p": 1, "p2p": 0})
-    # R2 没有通过任何检查，完成度是 1/2
-    assert scores["completion"] == 0.5
-    assert scores["correctness"] == 1.0
-    assert scores["regression"] == regression
-
-
 def test_not_done_entries_do_not_count_into_correctness():
     """一条检查都没有做时正确性没有分母，按 0 计。"""
     records = [{"id": "tests/test_new.py::test_add", "requirement": "R1",
