@@ -822,6 +822,22 @@ function commandClaim(args) {
   return emit(args, payload, '#' + issue + ' 领取：' + (result.status === 0 ? '负责人 @me，标签 in-progress' : '失败，见上面的错误') + (drop.length ? '，摘掉 ' + drop.join(',') : ''));
 }
 
+/** 把子会话号记到正在跑的那张任务上：hook 靠它判断谁交卷了。 */
+function commandAttach(args) {
+  const loop = openLedger(args);
+  return withLock(loop, () => {
+    const session = str(args.session, '');
+    if (!session) fail('要给子会话号：--session <id>');
+    const conc = concurrencyOf(loop);
+    const entry = conc.active.find((a) => a.task === args.task);
+    if (!entry) fail(args.task + ' 不在并发位置上（先 start）');
+    entry.session = session;
+    loop.state.concurrency = { max: conc.max, exclusiveLimit: conc.exclusiveLimit, active: conc.active };
+    saveLedger(loop);
+    return emit(args, entry, entry.task + ' 记下子会话 ' + session);
+  });
+}
+
 /* ------------------------------------------------------------------- start */
 
 function commandStart(args) {
@@ -1652,7 +1668,7 @@ const USAGE = [
   '',
   '  state | tasks | summary | note --text "..."',
   '  refresh | sync [--apply] | next [--max N] [--concurrency N] [--dry-run]',
-  '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004',
+  '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004 | attach --task T-004 --session <id>',
   '  finish --task T-004 --status done|failed|blocked | check --task T-004',
   '  escalate|question|askhuman --task T-004 | handover --task T-004 | reap [--stale 90]',
   '  pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1',
@@ -1672,6 +1688,7 @@ switch (command) {
   case 'claim': commandClaim(args); break;
   case 'worktree': commandWorktree(args); break;
   case 'start': commandStart(args); break;
+  case 'attach': commandAttach(args); break;
   case 'finish': commandFinish(args); break;
   case 'check': commandCheck(args); break;
   case 'escalate': handOff(args, 'escalate'); break;

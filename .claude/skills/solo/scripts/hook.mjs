@@ -200,7 +200,16 @@ function onStop(input) {
   const pending = num(loop.state.pendingTasks, parseTasks(loop).filter((t) => t.status === 'pending').length);
 
   let phase = '';
-  if (conc.active.length) phase = 'collect';
+  if (conc.active.length) {
+    // 有工人交卷了才叫回来收账；都在跑就等它们的完成通知，不要空转。
+    const finishedNow = conc.active.filter((a) => a.session && fs.existsSync(path.join(loop.workersDir, safeFileName(a.session) + '.md')));
+    const allTracked = conc.active.every((a) => a.session);
+    const guardAt = readJson(loop.guardFile);
+    const sinceLast = guardAt && guardAt.at ? Date.now() - Date.parse(guardAt.at) : Infinity;
+    // 有交卷的立刻叫回来；都在跑就等完成通知，最多 10 分钟看一眼（防止宿主不给完成通知时静默停住）。
+    if (!finishedNow.length && allTracked && sinceLast < 10 * 60 * 1000) return;
+    phase = 'collect';
+  }
   else if (pending > 0 && iteration < max) phase = 'dispatch';
   if (!phase) return;
 
