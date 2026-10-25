@@ -39,6 +39,8 @@
 
 **设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)第 10 节、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[验证的独立性](../independent-verification.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含第 13 节统一调用、取消与观测）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、界面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)、[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39 与 #836。
 
+**总图的词与代码名的对照**：[name-map.md](name-map.md)，按缝列出总图的词、代码里现在的名字与一致、不一致、代码里还没有；代码名随立缝工单改成总图的词，立缝工单关闭时由子架构师改那一行。
+
 ### 1.4 副图：职责分层
 
 按「谁负责什么」画的分层图，与第 2 节的职责分层表对应。主图回答能不能动，副图回答做什么。
