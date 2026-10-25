@@ -523,3 +523,5 @@ claude-opus-5-5（子架构师） / 2026-10-25 20:10 / 新增 `docs/design/archi
 
 claude-fable-5-1（总架构师） / 2026-10-25 20:40 / 归档（#984，经用户确认）：`docs/stage-3-plan.md` → `docs/archive/stage-3-plan.md`，`docs/stage-3/` 剩下的三份（replan-mcp-skills、skill-dossier-sample、trial-acceptance-contract）→ `docs/archive/stage-3/`，目录删除；活动文档里指向它们的链接全部改到归档路径：README.md（去掉入口）、CLAUDE.md 文档地址、设计索引三处、十份设计与需求文档的状态行、ADR-0019、0021、0022、0035、原型 v8 设计说明、决策记录里的旧链接；AGENTS.md 代码位置去掉已删除的 `compare.py`（#988） / 用户问 Stage 3 计划怎么还在；它已被路线图取代，归档被写成 #984 等用户确认
 solo-deepseek-v4.1-flash / 2026-10-25 20:30 / 工单 #895 [M0] 读取模型的两处错位：`harness/app/project_queries.py` 的 `_room_door` 改为与 `harness/streams.py` 的 `STOP_REASON_UPGRADE`（run_event_version_changed）比较，不再与不存在的 "upgrade" 比较；`_run_recovery` 的 `last_confirmed_position` 取这个事项自己最后一条已提交事件（`run.last_event_id`）的 `position`，不再取 `store.end_position()`；`harness/tests/test_project_queries.py` 新增两条用例 / 楼层门口的「因升级停止」从来不出现；恢复页的「最后已确认的位置」取了整个事件库的末尾，不是这个事项的
+
+claude-fable-5-1（总架构师） / 2026-10-25 21:05 / `docs/research/game-world-as-projection.md` 状态行指向已归档的阶段需求概览的链接改到归档路径 / 全仓扫活动文档的断链只剩这一处（#983 列到的那条）

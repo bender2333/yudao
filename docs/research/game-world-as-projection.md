@@ -395,7 +395,7 @@ flowchart LR
 3. 城作为新的需求记录：实体是建筑，证据让蓝图变成实体，访客与烟来自记录；路线位置 Stage 5 的界面一节。
 4. 指向式输入：事项输入与指导的命令增加实体引用，进入产品部门的焦点；随 Stage 5 实施。
 5. 传送带的边界：部门之间与部门之内画传送带，城里的路画实体之间的依赖，函数内部用文字。
-6. 本专题加入[各阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节的待讨论清单。
+6. 本专题加入[各阶段需求概览](../archive/requirements/stage-requirements-overview.md)第 6 节的待讨论清单。
 
 确认这六项用 `/grill-with-docs`，决定写成 ADR 与需求记录，再写设计文档。
 
