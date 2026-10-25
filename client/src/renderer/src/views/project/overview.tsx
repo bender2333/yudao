@@ -11,6 +11,7 @@ import type {
   EventDetailResult,
   ProjectFlowResult,
   ProjectOverviewResult,
+  RunAsksResult,
   WorkItemCard,
   WorkItemInputsResult,
 } from "../../api/generated/types.gen";
@@ -23,7 +24,9 @@ import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, Submit
 import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { ticksOf } from "../timeline/logic";
-import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, formatTime, label, progressLabel } from "./labels";
+import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, departmentLine, formatTime, label,
+  progressLabel, workingDepartmentsText } from "./labels";
+import { askIndent, askLine } from "./asks-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { WritebackState } from "./writeback";
 import { BOARD_TITLES, boardColumns } from "./board";
@@ -105,6 +108,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
             ) : null}
           </Section>
           <CurrentItem app={props.app} projectId={projectId} item={current} command={command} startPoint={data.start_point ?? null} />
+          <Asks app={props.app} item={current} />
           <RestartOnboarding app={props.app} projectId={projectId} />
           <Board items={items} />
           <FlowTable app={props.app} flow={flow} />
@@ -221,11 +225,9 @@ function CurrentItem(props: {
       ? (inputs.loading ? "正在读取" : "没有输入记录")
       : `已接收第 ${data.input_version} 版输入，已由有效需求接纳到第 ${data.processed_input_version} 版`
         + `${data.input_version > data.processed_input_version ? "（还有输入没有接纳）" : ""}`;
-  // 停止的事项没有在处理的部门，这一项不写进去
-  const department = departmentName(item.department);
-  const note = `${item.title}（事项标识 ${item.work_item_id}，第 ${item.round} 轮${department === "" ? "" : `，部门 ${department}`}）`;
-  // 事项的进度：从成果推算（工单 #556）
+  // 事项的进度：从成果推算（工单 #556）；部门状态按三个部门各自写（工单 #904，下面那一行）
   const progress = progressLabel(item.progress);
+  const note = `${item.title}（事项标识 ${item.work_item_id}，第 ${item.round} 轮）`;
   return (
     <Section id="ov-current" title="当前事项" note={note}>
       <KeyValue
@@ -237,6 +239,8 @@ function CurrentItem(props: {
           ["处理进度", processing],
         ]}
       />
+      {/* 三个部门各自的状态与原因（三部门的循环结构第 2.1 节，工单 #904）：没有 departments 时照旧写所在部门 */}
+      <p className="y10-note note department-line">{departmentLine(item.departments, item.department)}</p>
       <InputRecords app={props.app} inputs={data === null ? [] : data.inputs} loading={inputs.loading} error={inputs.error} />
       {item.status === "in_progress" && hasCommand(props.app, "work_item.append_input") ? (
         <div className="y10-ov-composer composer">
@@ -268,6 +272,34 @@ function CurrentItem(props: {
           <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
         </div>
       ) : null}
+    </Section>
+  );
+}
+
+// 询问（三部门的循环结构第 4.7 节、原型 v12 第 3.3 节，工单 #904）：这个事项里的询问，一次一行，
+// 写状态、询问链、回问标记、时间与问题，有回答时写回答（附带 PRD 时标版本），没能回答写原因；回问按深度缩进。
+// 没有询问时这一节不出现。
+function Asks(props: { app: ClientApp; item: WorkItemCard | null }) {
+  const runId = props.item?.run_id ?? "";
+  const asks = useSnapshot<RunAsksResult>(props.app, "page.overview.asks", "run.asks", { run_id: runId }, props.item === null);
+  const rows = asks.data?.asks ?? [];
+  if (asks.error !== null) {
+    return (
+      <Section id="ov-asks" title="询问">
+        <p className="y10-note note" role="status">{readFailureText(asks.error)}</p>
+      </Section>
+    );
+  }
+  if (rows.length === 0) {
+    return null;
+  }
+  return (
+    <Section id="ov-asks" title="询问" note="这个事项里的询问：状态、询问链、时间与问题；有回答时写回答，没能回答写原因">
+      <ul className="y10-ov-asks ask-list">
+        {rows.map((ask) => (
+          <li key={ask.id} data-depth={ask.depth} style={{ marginLeft: askIndent(ask) }}>{askLine(ask)}</li>
+        ))}
+      </ul>
     </Section>
   );
 }
@@ -390,7 +422,7 @@ export function Board(props: { items: WorkItemCard[] }) {
   const columns = boardColumns(props.items);
 
   return (
-    <Section id="ov-board" title="事项看板" note="卡片显示标题、状态、所在部门与轮次；排队中的顺序就是执行顺序">
+    <Section id="ov-board" title="事项看板" note="卡片显示标题、状态、正在工作的部门与轮次；排队中的顺序就是执行顺序">
       {props.items.length === 0 ? <Empty text="项目还没有事项" /> : (
         <div className="y10-ov-board board">
           {BOARD_TITLES.map(([key, title]) => (
@@ -401,7 +433,8 @@ export function Board(props: { items: WorkItemCard[] }) {
                   <strong>{item.title}</strong>
                   <div className="y10-ov-card-meta card-meta">
                     <span>{itemStatus(item.status)}</span>
-                    {departmentName(item.department) === "" ? null : <span>{departmentName(item.department)}</span>}
+                    {/* 正在工作的部门（工单 #904）：一轮工作中或询问中的部门；没有时不写这一格（工单 #842 的旧数据显示所在部门） */}
+                    {workingDepartmentsText(item) === "" ? null : <span>{workingDepartmentsText(item)}</span>}
                     <span>第 {item.round} 轮</span>
                   </div>
                   {item.pending_question ? <p className="y10-muted card-note">待决问题：{item.pending_question}</p> : null}
