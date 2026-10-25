@@ -1,7 +1,7 @@
 // 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、部门设置与登记的源目录。
 // 数据全部来自 project.settings；每项修改提交对应的命令，基准版本取快照里的 version，
 // 过期时拒绝并提示重新读取（工单验收第 3 条）。部门设置里的模型与档位由 #95 加入，
-// 工具授权（3.2B）与机器授权（3.2C）的命令尚未登记，入口按能力清单不出现。
+// 机器授权（3.2C）的命令尚未登记，入口按能力清单不出现。
 
 import { useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
@@ -34,7 +34,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
       <PageHead
         eyebrow="项目设置"
         title={data ? data.name : "项目设置"}
-        subtitle="基本信息、部门设置、源目录、工具授权、机器授权、执行位置与角色设置。"
+        subtitle="基本信息、部门设置、源目录、机器授权、执行位置与角色设置。"
       />
       <Loading state={settings} />
       {settings.error !== null ? (
@@ -47,7 +47,6 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
           <Departments app={props.app} data={data} />
           <SourceDirectories app={props.app} data={data} />
           <WritebackSection app={props.app} projectId={projectId} />
-          <ToolAuthorization />
           <MachineAuthorization />
           <ExecutionPlacement />
           <Operations />
@@ -58,7 +57,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
   );
 }
 
-// 工具授权（3.2B）、机器授权（3.2C）、执行位置、运维与本项目各角色设置：
+// 机器授权（3.2C）、执行位置、运维与本项目各角色设置：
 // 命令与查询还在所属工作包，登记以后这里改成对应的表单；在此之前如实写明等待登记，不造表
 function PendingBlock(props: { title: string; note: string; text: string }) {
   return (
@@ -68,19 +67,11 @@ function PendingBlock(props: { title: string; note: string; text: string }) {
   );
 }
 
-function ToolAuthorization() {
-  return <PendingBlock
-    title="工具授权"
-    note="各工具在本项目的授权范围"
-    text="工具授权的命令还没有登记，等 3.2B 工作包登记以后在这里填写授权范围与批准方式"
-  />;
-}
-
 function MachineAuthorization() {
   return <PendingBlock
     title="机器授权"
     note="本项目可以使用的机器"
-    text="机器授权的命令还没有登记，等 3.2C 工作包登记以后在这里选择机器并写明登记的目录与可以执行的操作"
+    text="机器授权的命令还没有登记，等 3.2C 工作包登记以后在这里选择机器并写明登记的目录"
   />;
 }
 
