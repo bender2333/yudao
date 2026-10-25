@@ -145,7 +145,7 @@
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
 | 评价 | 第一节「评价」；第四节评价 | `evals/`（`scenarios/*/checks`、`scorer/`、`runner/`、`baseline/`）；发布检查 `harness/release_check.py`、`scripts/release.py`；内核清单 `harness/definitions/kernel-manifest.json` | 评价；道 08 | 一致（方框的技术名词是评测场景与隐藏检查、评分器、发布检查） |
-| 观察者 | 第一节「观察者」；第四节观察者 | 离线的叫 analysis：`harness/analysis/`（`review.py`、`trajectory.py`、`batch.py`）；教训候选由 `Orchestrator._record_lesson_candidate` 在控制核心里写，事件 `lesson_candidate_recorded`，不经观察者缝 | 观察者；道 07 | 不一致：离线的叫 analysis；教训候选由流程编排在内部写，没有观察者这个模块 |
+| 观察者 | 第一节「观察者」；第四节观察者 | 无；教训候选由 `Orchestrator._record_lesson_candidate` 在控制核心里写，事件 `lesson_candidate_recorded`，不经观察者缝 | 观察者；道 07 | 代码里还没有 |
 | 读取范围、振荡信号 | 第四节观察者「交换」 | 无 | 观察者；道 07 | 代码里还没有 |
 | 看门狗（健康探针、切换命令、排空命令） | 第一节「看门狗」；第四节看门狗 | 看门狗与健康探针、切换命令都没有；排空已有：`streams.py` 的 `DrainState`、命令 `runtime.start_drain`、`runtime.force_upgrade`，事件 `runtime_drain_started`、`runtime_drain_finished` | 看门狗；道 10 | 代码里还没有（排空命令一项一致） |
 
