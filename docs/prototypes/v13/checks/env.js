@@ -1,5 +1,5 @@
 // 验收脚本共用的环境：Playwright、Chromium、各版页面的地址与输出目录。
-// 脚本按自己所在的检出目录找 v9、v12 与 v13，换一个检出目录（例如 worktree）运行就检查那一份。
+// 脚本按自己所在的检出目录找 v9、v12（2026-10-25 起在 docs/archive/prototypes/）与 v13，换一个检出目录（例如 worktree）运行就检查那一份。
 const path = require('path');
 const { pathToFileURL } = require('url');
 const fs = require('fs');
@@ -9,8 +9,8 @@ const playwrightPath = process.env.PLAYWRIGHT_PATH || path.join(repoRoot, '.tmp/
 const { chromium } = require(playwrightPath);
 
 const EXE = process.env.CHROMIUM_EXE || 'C:/Users/BA_H3C_Pad/AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe';
-const v9Url = pathToFileURL(path.resolve(__dirname, '../../v9/index.html')).href;
-const v12Url = pathToFileURL(path.resolve(__dirname, '../../v12/index.html')).href;
+const v9Url = pathToFileURL(path.resolve(__dirname, '../../../archive/prototypes/v9/index.html')).href;
+const v12Url = pathToFileURL(path.resolve(__dirname, '../../../archive/prototypes/v12/index.html')).href;
 const v13Url = process.env.V13_URL || pathToFileURL(path.resolve(__dirname, '../index.html')).href;
 const outDir = path.join(repoRoot, '.tmp/v13-checks');
 fs.mkdirSync(outDir, { recursive: true });

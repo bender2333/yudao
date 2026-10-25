@@ -25,7 +25,7 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | 后台架构师 | 设计、需求、范围上的裁定 | 另一个会话，随时在改工单与里程碑 |
 | 用户 | 执行环境、规则文件、验收标准 | 工单评论 |
 
-设计问题不自己拍板，但也不要停下来等：**把问题写成评论、交回架构师、接着做别的工单**。这是这个循环与 `AGENTS.md`「Solo 模式」的差别（那里没有架构师，设计由执行者自己解决），`docs/agents/triage-labels.md` 已把这条写成 Ralph 循环的规则。
+设计问题不自己拍板，但也不要停下来等：**把问题写成评论、交回架构师、接着做别的工单**。这与 `AGENTS.md`「Solo 模式」是同一份规矩（任何 harness 的 solo 执行者都按它与 `docs/agents/triage-labels.md` 做事）；工人逐步的做法在 [`/solo-worker`](../solo-worker/SKILL.md)。
 
 ## 三条通道
 
@@ -96,8 +96,20 @@ finish --task T-004 --status done|failed|blocked [--summary "..."] [--raw-file <
 check --task T-004
 escalate --task T-004 [--reason "..."] | question --task T-004 --comment-file <文件>
 askhuman --task T-004 --comment-file <文件> | handover --task T-004 | reap [--task T-004] [--stale 90]
+gc [--keep N] [--force] [--from <旧根目录>] | worktrees --root C:/w
 pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1
 ```
+
+## 机器配置（开循环之前配一次）
+
+| 项 | 配在哪 | 值 |
+| --- | --- | --- |
+| worktree 根目录 | `state.json` 的 `worktrees.root`，用 `solo.mjs worktrees --root <路径>` 改 | Windows 用短路径 **`C:/w`**（`C:/w/issue-559` 比 `C:/project/yudao-worktrees/issue-559` 少 20 多个字符，`node_modules` 的深路径才不会撞 260 的上限）；类 Unix 用 `/tmp/w` |
+| 这个目录的写权限 | `.codebuddy/settings.json` 的 `permissions.allow` | `Edit(//C:/w/**)` 与 `Read(//C:/w/**)`（`//` 开头表示文件系统绝对路径）。沙箱默认只允许写当前工作目录，不放行的话 subagent 在 worktree 里写文件、删临时文件都会被拦——**这是 subagent 报“权限不够”的最常见原因** |
+| 依赖复用 | 写进 `handoff.md`，任务书里带一句 | `UV_PROJECT_ENVIRONMENT=C:/code/yudao/.venv`（Python）与主仓库的 `client/node_modules`（前端）。每个 worktree 各装一份会把目录撑到几千文件，建得慢、删的时候被进程锁住 |
+| 账本保护 | `hook.mjs` 已内置 | `state.json`、`tasks.md`、`active.json`、`.lock`、`.owner.json`、`.stop-guard.json` 只由命令改；`goal.md`、`handoff.md`、`notes/` 人可以改 |
+
+换过根目录以后，旧目录里的 worktree 用 `solo.mjs gc --from <旧根目录>` 清（按已关闭工单逐张删，正在跑的跳过）。
 
 ## 起一个循环，或者接一个循环
 
@@ -144,7 +156,7 @@ pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency
     - 先 `solo.mjs check --task T-004`：工作区干净、没有未推送的提交、分支含 `origin/main`、PR 开着没冲突、检查全绿、有 `DELIVERY:` 交付说明且带署名、标签是 `needs-review`。有一条 ✗ 就不许合并。
     - 再 `solo.mjs finish --task T-004 --status done`：`done` 会自己核对工单已关、PR 已合并、检查全绿，不成立就退出、不写 `[x]`。
     - 工人报 `ERROR` 行带前缀时按前缀分流：`[环境]` → `askhuman`，`[设计]` → `question`，没有前缀 → 算一次失败。
-    - 顺手核对资源有没有释放（worktree、进程、浏览器）；目录残留用 `worktree --task T-004 --remove` 清，删之前它会检查未提交与未推送的东西。
+    - 顺手核对资源有没有释放（进程、浏览器）；**worktree 不在这里逐张删**：收账以后跑 `solo.mjs gc` 统一清——它先把 `.tmp/` 的证据归档到 `.ralph/<循环>/evidence/<编号>/`，再删；删不掉的重试，还不行就留在残留清单里，不影响工单。
     - `refresh` 报「工单正文在工作中被改过」时，让下一轮的工人按最新正文重核。
 12. **判停**：见「停止条件」。长说明写 `solo.mjs note --text "..."`，`progress.md` 只留每段那几行。
 
@@ -158,7 +170,7 @@ pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency
 【本轮任务】<工单号 + 一句话>
 【验收标准】<1-3 条可检查的条件，从工单正文抄>
 【工作目录】<worktree 绝对路径>（分支 <分支>）。文件读写都用这里的路径，命令先切到这个目录；不要动主工作区。
-【规则】先读 <仓库>/.claude/skills/solo/worker.md，按它做；工单正文、评论与链接的设计说明是验收标准的唯一来源。
+【规则】先读 <仓库>/.claude/skills/solo-worker/SKILL.md，按「在 /solo 循环里」那一栏做；工单正文、评论与链接的设计说明是验收标准的唯一来源。
 【通道】设计问题：写 .tmp/<编号>-question.md，收尾 blocked + [设计]；执行环境：写 .tmp/<编号>-env.md，收尾 blocked + [环境]。
 【署名】<signature>：六处都要署（提交信息末行、PR 正文末行、工单每条评论末行、交付说明末行、日记记录行首、变更记录条目行首）。
 【历史】本上下文是全新的。前几轮在 <循环目录>/progress.md，需要时自己读。<这里写 handover 的输出：上一轮做到哪、还差什么>
@@ -173,20 +185,34 @@ NEXT: 建议的下一轮任务；没有写 none
 
 ## 一张工单的完整链路
 
-工人照这个做，编排者收账时按这个核对：
+工人按 [`/solo-worker`](../solo-worker/SKILL.md)「一张工单的完整做法」做，编排者收账时按它的步骤核对：领取与 `in-progress`（第 1 步）、三项核对（第 3 步）、PR 正文带 `Solo:` 一行（第 7 步）、CI 与 `touches-core` 的分支集成层（第 8 步）、`DELIVERY:` 交付说明与 `needs-review`（第 9 步）、合并前五项核对含 `kernel-approved`（第 10 步）、`--admin --squash` 合并（第 11 步）、工单关闭与去标签（第 12 步）、清理但不删 worktree（第 13、14 步）。
+## UI 工单
 
-1. 领取：`gh issue edit <编号> --add-assignee @me`，标签从 `ready-for-agent` 改成 `in-progress`。
-2. 读工单正文、最近的任务评论、链接的设计说明；「依据」一行指向的设计说明在 main 上有改动时，以 main 现状为准，在日记里写明差异怎么处理。
-3. 实现（测试先行），在分支提交；日记 `agents_jour/<编号>.md` 随分支提交。
-4. 自测：跑与改动相关的测试文件（含新增的集成层文件）；涉及 `client/` 再跑相关前端测试；逐条核对验收标准。
-5. 推送分支，开 PR：正文写 `Closes #<编号>`、`Solo: 无独立审查，由 solo 执行者自行合并`、一句摘要、署名。
-6. 等 CI：`gh pr checks issue-<编号> --watch`。**不要开自动合并**——自动合并会跳过合并前的核对。失败项明显与本次改动无关时先 `gh run rerun <运行号> --failed` 重跑一次。带 `touches-core` 的工单，`check` 绿了以后还要在分支上跑集成层：`gh workflow run CI --ref issue-<编号>` → `gh run watch <运行号>`；失败项与 main 最近 7 天比（main 上也红的是不稳定项，写进交付说明），修好再跑。
-7. 交付：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾计数行、CI 运行链接（touches-core 加分支集成层那次）、逐条验收核对、删除用例的「用例名 + 依据」，最后一行 `— <署名>`（署名单独成行）；标签从 `in-progress` 改成 `needs-review`。
-8. 合并前核对：`git fetch origin main && git merge origin/main`；`gh pr checks issue-<编号> --required` 显示 `check` 通过；工作区没有未提交也未推送的东西；每条验收核对都有证据。
-9. 合并：`gh pr merge issue-<编号> --admin --squash`。`--admin` 是仓库所有者的豁免，solo 唯一允许用的场合，它同时绕开 `check`——所以第 8 步只能自己做。
-10. 合并以后：确认 PR 已合并、工单随 `Closes` 关闭（没关就 `gh issue close` 并说明原因）；去掉 `needs-review`；合并提交号写进日记。
-11. 清理：关掉自己开的页面与进程（按进程号），删临时文件，删自己那张的 worktree（`worktree --task <编号> --remove`，删之前它会拦未提交与未推送的东西）。
-12. 收尾按四行格式输出。
+界面工单多两步：**对着原型核**、**留机器可查的证据**。无人值守时没有人替你看页面，所以「看起来对」不算完成。
+
+1. 开工读 `docs/prototypes/CHANGELOG.md` 的「当前定稿」与工单链接的原型；工单说法与原型冲突时按工单做，冲突写进工单评论。
+2. **验证分四层，从便宜到贵，能用便宜的就别用贵的**：
+
+   | 层 | 用什么 | 什么时候够 |
+   | --- | --- | --- |
+   | 纯函数单测 | 把视图里的判断抽成纯函数（这个仓库的 `floorModelOf`、`page-version.ts` 就是这么做的），`cd client && npm test` 跑相关文件 | 状态→文案/可见性的映射：**优先全部放这一层**，快、能并发 |
+   | 构建 | `npm run build:pages` | 改到视图文件就必须过一次（页面能编译） |
+   | 端到端 | `npx playwright test tests/e2e/<相关>.spec.ts` | 需要真实渲染、交互、事件流驱动画面时；**只跑相关 spec** |
+   | 截图 | `page.screenshot()` 存 `.tmp/<编号>-shots/` | 给人看，不作为判据 |
+
+3. **端到端是贵操作，当一个互斥资源用**：每个 spec 会自己启动真后端、占端口与数据目录（`workers: 1` 是文件内串行），后端在负载下要 60–75 秒。所以同一时刻只让一个 worktree 跑 e2e——编排者安排时不要同时派两张都要跑 e2e 的 UI 单；同一张单里也别重复起后端，把要验的场景放进同一个 spec。
+4. **像素判断用「区域差」，不用截图基线**：这个仓库的做法是读画布的内容签名/逐格 RGB 差（#900：只有工程房间那一片最大差 61.7，其余为 0）。**不要引入 `toHaveScreenshot` 基线**——跨机器字体与抗锯齿会让它变成不稳定测试的主要来源。
+5. **收账前跑一次识图**（`scripts/vision.mjs`）：把关键截图交给视觉模型，按这张工单的验收条目逐条问。
+   ```
+   node .claude/skills/solo/scripts/vision.mjs --image <截图> --image <截图> \
+     --ask "按这张工单的验收条目逐条回答，每条写「对得上/对不上/看不到」：1) … 2) … 3) …"
+   ```
+   端点与凭据走 `SOLO_VISION_BASE_URL` / `SOLO_VISION_API_KEY`（没有就沿用 `YUDAO_EVAL_*`），模型用 `--model` 或 `SOLO_VISION_MODEL`，**默认 `gemini`**——`YUDAO_EVAL_MODEL` 的 `ds` 没有视觉，网关会把图换成占位符 `[image omitted: model has no vision support]`。
+   这个仓库里楼层画面是 PixiJS 画的，「成果库」「大厅」「信箱」这些牌子只存在于画布像素里，DOM 断言读不到——识图是唯一能读出它们的手段。
+   没有凭据时跳过这一步，但要在交付说明与收尾里写「未识图」，不能默认它过了。
+6. 断言只落在可判定的东西上：某段文案出现/不出现、某个元素可见/不可见、某个状态词被换掉、某片区域的像素有没有变。工单只写「看起来不对」这类没法判的要求，按设计问题交回架构师，不要自己猜。
+4. **截图放 worktree 的 `.tmp/<编号>-shots/`**，文件名写清页面与状态；收账时 `solo.mjs evidence --task T-004` 把它们归档到 `.ralph/<循环>/evidence/<编号>/`，交付说明里列路径。`gc` 删 worktree 前也会自动归档一次。
+5. 收尾给用户的总结里**单列一段「UI 待肉眼确认」**：哪几张工单、截图在哪、你据什么判定它对了。不要把「看起来没问题」写成交付结论——那一步只能由人做。
 
 ## 硬规则
 

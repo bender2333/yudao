@@ -1,6 +1,6 @@
 # 原型 v10 构建约定
 
-本文件只写跟 [v9 BUILD.md](../v9/BUILD.md) 不一样的地方，其余（以及 v9 BUILD.md 引用的 [v8 BUILD.md](../v8/BUILD.md) 各节）照旧。画面与交互见 [design.md](design.md)。
+本文件只写跟 [v9 BUILD.md](../../archive/prototypes/v9/BUILD.md) 不一样的地方，其余（以及 v9 BUILD.md 引用的 [v8 BUILD.md](../../archive/prototypes/v8/BUILD.md) 各节）照旧。画面与交互见 [design.md](design.md)。
 
 命名随版本改名：v10 的全局对象是 `window.Y10`，CSS 类名以 `y10-` 开头，存储键以 `y10.` 开头，脚本是 `js/y10.js`，页面标题与顶栏的标签写「v10 原型」。v9 BUILD.md 里出现的 `Y9`、`y9-`、`js/y9.js` 在 v10 读作 `Y10`、`y10-`、`js/y10.js`。验收脚本以 v9 为对照页面、v10 为被检查的页面（`checks/env.js` 的 `spaceOf`）。
 

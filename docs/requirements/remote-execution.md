@@ -48,7 +48,7 @@
 设计时确定的内容见[执行环境服务设计说明](../design/execution-environment.md)：
 
 - 执行位置上需要的程序与依赖缓存：第 5.2 节。
-- 执行代理的安装、启动与升级方式：第 4.7、5.3 节。登记机器、项目授权与执行位置的命令见[应用层与接口层设计说明](../design/app-and-interface.md)第 3.2 节（`machine.save`、`machine_authorization.save`、`execution_placement.save`），界面见[原型 v8](../prototypes/v8/design.md)（机器系统页、系统首页地下室的机房）。
+- 执行代理的安装、启动与升级方式：第 4.7、5.3 节。登记机器、项目授权与执行位置的命令见[应用层与接口层设计说明](../design/app-and-interface.md)第 3.2 节（`machine.save`、`machine_authorization.save`、`execution_placement.save`），界面见[原型 v8](../archive/prototypes/v8/design.md)（机器系统页、系统首页地下室的机房）。
 - 心跳间隔与超时时长：第 6.1 节。
 - 各部门的动作在哪台机器上执行的选择规则：第 7 节的执行位置。
 

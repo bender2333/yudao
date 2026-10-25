@@ -315,6 +315,19 @@ def perform_writeback(
     if not os.path.exists(remote_repo_path):
         raise WritebackTargetUnavailable("remote_missing", str(remote_repo_path))
 
+    # 先确认目标是 git 仓库再克隆：克隆一个不是仓库的目录抛出的 GitError 与「目标不可用」是
+    # 同一类配置问题，命令层照「不是 git 仓库」拒绝，接口层不再回 500（工单 #902）
+    target_ref_name = f"refs/heads/{target_branch}"
+    try:
+        remote_repo = pygit2.Repository(str(remote_repo_path))
+    except pygit2.GitError as error:
+        raise WritebackTargetUnavailable("not_a_repository", str(remote_repo_path)) from error
+    if target_ref_name not in remote_repo.references:
+        raise WritebackTargetUnavailable("target_branch_missing", target_branch)
+    remote_target_commit = remote_repo.references[target_ref_name].peel(pygit2.Commit)
+    target_is_bare = remote_repo.is_bare
+    del remote_repo
+
     scratch_temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
     try:
         scratch_dir = Path(scratch_temp.name) / "scratch.git"
@@ -322,15 +335,6 @@ def perform_writeback(
         repo = pygit2.clone_repository(str(remote_repo_path), str(scratch_dir), bare=False)
 
         # 4. 读取目标提交与目标树
-        target_ref_name = f"refs/heads/{target_branch}"
-        try:
-            remote_repo = pygit2.Repository(str(remote_repo_path))
-        except pygit2.GitError as error:
-            raise WritebackTargetUnavailable("not_a_repository", str(remote_repo_path)) from error
-        if target_ref_name not in remote_repo.references:
-            raise WritebackTargetUnavailable("target_branch_missing", target_branch)
-
-        remote_target_commit = remote_repo.references[target_ref_name].peel(pygit2.Commit)
         target_commit = repo[remote_target_commit.id]
         if target_ref_name not in repo.references:
             repo.create_reference(target_ref_name, target_commit.id, force=True)
@@ -568,9 +572,14 @@ def perform_writeback(
                 branch_ref_name, sig, sig, commit_msg, final_tree_oid, [target_commit.id]
             )
 
-            # 推送到远端裸仓库
-            remote_obj = repo.remotes["origin"]
-            remote_obj.push([f"{branch_ref_name}:{branch_ref_name}"])
+            if target_is_bare:
+                # 推送到远端裸仓库
+                remote_obj = repo.remotes["origin"]
+                remote_obj.push([f"{branch_ref_name}:{branch_ref_name}"])
+            else:
+                # 远端留空时目标是源目录这个普通仓库：libgit2 不支持向非裸仓库推送，
+                # 把写回分支直接写进目标仓库（工单 #902）
+                _write_local_branch(remote_repo_path, repo, branch_ref_name, writeback_commit_oid)
 
             if simulate_unknown_push:
                 # 模拟推送已在远端完成但调用方收到未知结果中断
@@ -629,23 +638,75 @@ def perform_writeback(
             pass
 
 
+def _write_local_branch(
+    target_path: Path,
+    scratch_repo: pygit2.Repository,
+    ref_name: str,
+    commit_id: pygit2.Oid,
+) -> None:
+    """把写回分支写进本地的目标仓库。
+
+    libgit2 不支持向非裸仓库推送（local push doesn't (yet) support pushing to non-bare
+    repos），而远端留空时目标正是源目录这个普通仓库（工单 #902）。这里把新提交缺的对象
+    补进目标仓库，再建立分支引用；目标仓库的工作区与 main 都不动。
+    """
+    target_repo = pygit2.Repository(str(target_path))
+    copied: set[str] = set()
+
+    def _copy(oid: pygit2.Oid) -> None:
+        key = str(oid)
+        if key in copied:
+            return
+        copied.add(key)
+        try:
+            target_repo[oid]
+            return
+        except KeyError:
+            pass
+        obj = scratch_repo[oid]
+        if obj.type_str == "commit":
+            _copy(obj.tree.id)
+            for parent in obj.parents:
+                _copy(parent.id)
+        elif obj.type_str == "tree":
+            for entry in obj:
+                _copy(entry.id)
+        target_repo.odb.write(obj.type, obj.read_raw())
+
+    _copy(commit_id)
+    target_repo.references.create(ref_name, commit_id)
+
+
 def _resolve_repo_path(source_dir_path: str, remote_setting: str) -> Path:
-    """Resolve the git repository path for remote bare repo or source directory."""
-    candidate = Path(remote_setting)
-    if candidate.exists():
-        return candidate.resolve()
+    """Resolve the git repository path for remote bare repo or source directory.
 
-    if (Path(source_dir_path) / remote_setting).exists():
-        return (Path(source_dir_path) / remote_setting).resolve()
-
+    远端留空表示源目录本身；相对路径只按源目录解析，任何情况下都不按 Yudao 服务进程的
+    当前目录解析；远端是源目录仓库里登记的远端名时取它登记的地址（工单 #902）。
+    """
     source_path = Path(source_dir_path)
-    if (source_path / ".git").exists() or (source_path / "HEAD").exists():
-        repo = pygit2.Repository(str(source_path))
-        if remote_setting in repo.remotes:
-            remote_url = repo.remotes[remote_setting].url
-            remote_path = Path(remote_url)
-            if remote_path.exists():
-                return remote_path.resolve()
+    setting = (remote_setting or "").strip()
+    if not setting:
         return source_path.resolve()
 
-    return candidate.resolve()
+    candidate = Path(setting)
+    if candidate.is_absolute():
+        return candidate.resolve()
+
+    under_source = source_path / setting
+    if under_source.exists():
+        return under_source.resolve()
+
+    try:
+        repo = pygit2.Repository(str(source_path))
+    except pygit2.GitError:
+        return under_source.resolve()
+    if setting in repo.remotes:
+        remote_url = repo.remotes[setting].url
+        remote_path = Path(remote_url)
+        if not remote_path.is_absolute():
+            remote_path = source_path / remote_path
+        if remote_path.exists():
+            return remote_path.resolve()
+        return source_path.resolve()
+
+    return under_source.resolve()

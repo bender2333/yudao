@@ -38,7 +38,7 @@ disable-model-invocation: true
 
 ### 5. 发布
 
-按依赖顺序创建或改写子工单，用下面的模板，挂成父工单的子工单，阻塞边用 GitHub 原生依赖，命令见 `docs/agents/issue-tracker.md`，里程碑跟父工单。标签：环是可重写或只增的标 `ready-for-agent`；需你批准的标 `ready-for-human`，评论写清要用户批准什么；「只改」里有核心文件的加 `touches-core`。父工单保持 `waiting`，不改不关。完成：表里每一行都在 GitHub 上落实，把编号列给用户。
+按依赖顺序创建或改写子工单，用下面的模板，挂成父工单的子工单，阻塞边用 GitHub 原生依赖，命令见 `docs/agents/issue-tracker.md`，里程碑跟父工单。标签：环是可重写或只增的标 `ready-for-agent`；需你批准的：拆单时把「只改」清单念给在场的用户，用户同意的在「环」一行后写 `批准：用户 <日期> 在会话中批准「只改」清单`、加 `kernel-approved`、标 `ready-for-agent`（`CLAUDE.md`「工单规范」）；用户不在场或没同意的标 `ready-for-human`，评论写清要用户批准什么；「只改」里有核心文件的加 `touches-core`。父工单保持 `waiting`，不改不关。完成：表里每一行都在 GitHub 上落实，把编号列给用户。
 
 ## 子工单模板
 

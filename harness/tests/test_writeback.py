@@ -815,6 +815,186 @@ def test_writeback_push_unknown_outcome_and_recovery(tmp_path):
         gc.collect()
 
 
+# 工单 #902：写回的目标只按源目录解析。远端留空表示源目录本身，相对路径按源目录解析，
+# 任何情况下都不按 Yudao 服务进程的当前目录解析；目标不是 git 仓库时命令拒绝，不回 500。
+
+BASE_APP = b"print('base')\n"
+ADOPTED_APP = b"print('adopted')\n"
+
+
+def _init_working_repo(path: Path, files: dict[str, bytes], branch: str = "main") -> pygit2.Oid:
+    # 一个带工作区的仓库：源目录就是这样登记的，写回的分支要推进到它上面
+    path.mkdir(parents=True, exist_ok=True)
+    repo = pygit2.init_repository(str(path), bare=False)
+    signature = pygit2.Signature("Yudao Test", "test@yudao.invalid")
+    builder = repo.TreeBuilder()
+    for name, content in files.items():
+        builder.insert(name, repo.create_blob(content), pygit2.enums.FileMode.BLOB)
+    tree_oid = builder.write()
+    repo.set_head(f"refs/heads/{branch}")
+    commit_oid = repo.create_commit(
+        f"refs/heads/{branch}", signature, signature, "初始提交", tree_oid, [])
+    del repo
+    gc.collect()
+    return commit_oid
+
+
+def _repo_snapshot(path: Path) -> tuple[tuple[tuple[str, str], ...], frozenset[str]]:
+    # 引用与对象各一份：写回前后比较，确认写回没有碰这个仓库
+    repo = pygit2.Repository(str(path))
+    refs = tuple(sorted((name, str(repo.references[name].target)) for name in repo.references))
+    objects = frozenset(str(object_id) for object_id in repo.odb)
+    del repo
+    gc.collect()
+    return refs, objects
+
+
+def _writeback_files(repo_path: Path, branch: str = "writeback/adopt_1") -> dict[str, bytes]:
+    repo = pygit2.Repository(str(repo_path))
+    commit = repo.references[f"refs/heads/{branch}"].peel(pygit2.Commit)
+    captured = git_tree_to_captured(repo, commit.tree)
+    files = {item.path: item.data for item in captured.files}
+    del repo
+    gc.collect()
+    return files
+
+
+def _project_with_adoption(root: Path, source_path: Path, *, remote: str,
+                           target_branch: str = "main"):
+    store, writes, artifacts, projects = _setup_yudao_env(root)
+    pid = projects.register("WritebackTarget", "Goal")
+    projects.configure_source_directory(
+        pid, "default", str(source_path), base_version=0,
+        writeback_enabled=True, remote=remote, target_branch=target_branch,
+        check_commands=[_pass_command()],
+    )
+    base_captured = CapturedTree((), (CapturedFile("app.py", BASE_APP),))
+    base_ref = store_tree(artifacts, "r1", base_captured)
+    adopted_captured = CapturedTree(
+        (), (CapturedFile("added.txt", b"adopted addition\n"), CapturedFile("app.py", ADOPTED_APP)))
+    adopted_ref = store_tree(artifacts, "r1", adopted_captured)
+    writes.transact(project_stream(pid), lambda tx: tx.append(NewProjectEvent(
+        ProjectEventType.WORK_ITEM_CREATED,
+        {
+            "work_item_id": "w1", "title": "改一处", "text": "任务说明", "run_id": "r1",
+            "baseline": {"tree_ref": asdict(base_ref), "code_tree_digest": base_captured.digest},
+            "project_context_ref": {"path": "dummy"}, "prompt_config_versions": {},
+            "max_cycles": 1, "run_time_limit_sec": 60, "context_window": 1000,
+        },
+        actor="user",
+    )))
+    writes.transact(project_stream(pid), lambda tx: tx.append(NewProjectEvent(
+        ProjectEventType.DELIVERABLE_ADOPTED,
+        {
+            "adoption_id": "adopt_1", "work_item_id": "w1", "run_id": "r1",
+            "delivery_event_id": "d1", "qa_event_id": "q1",
+            "tree_ref": asdict(adopted_ref), "code_tree_digest": adopted_captured.digest,
+            "summary": "交付说明", "files": ["app.py", "added.txt"],
+            "check_names": [], "known_risks": [], "previous_adoption_id": None,
+        },
+        actor="user",
+    )))
+    return store, projects, pid
+
+
+def test_writeback_with_an_empty_remote_writes_to_the_source_directory(tmp_path, monkeypatch):
+    # 远端留空（设置页的默认）：写回的目标是源目录本身，不是 Yudao 服务进程的当前目录
+    source_path = tmp_path / "src"
+    _init_working_repo(source_path, {"app.py": BASE_APP})
+    process_repo = tmp_path / "process-cwd"
+    _init_working_repo(process_repo, {"other.txt": b"unrelated\n"})
+    before = _repo_snapshot(process_repo)
+
+    store, projects, pid = _project_with_adoption(tmp_path, source_path, remote="")
+    try:
+        monkeypatch.chdir(process_repo)
+        event = projects.execute_writeback(pid, "adopt_1")
+        assert event is not None and event.type == ProjectEventType.WRITEBACK_COMPLETED
+        assert _writeback_files(source_path) == {"app.py": ADOPTED_APP, "added.txt": b"adopted addition\n"}
+        # 服务进程当前目录那个仓库的引用与对象都没有变化
+        assert _repo_snapshot(process_repo) == before
+    finally:
+        store.close()
+        gc.collect()
+
+
+def test_writeback_with_an_empty_remote_works_outside_any_repository(tmp_path, monkeypatch):
+    # 当前目录不是 git 仓库：写回照常在源目录的仓库里完成，不再抛克隆失败
+    source_path = tmp_path / "src"
+    _init_working_repo(source_path, {"app.py": BASE_APP})
+    plain_directory = tmp_path / "plain"
+    plain_directory.mkdir()
+
+    store, projects, pid = _project_with_adoption(tmp_path, source_path, remote="")
+    try:
+        monkeypatch.chdir(plain_directory)
+        event = projects.execute_writeback(pid, "adopt_1")
+        assert event is not None and event.type == ProjectEventType.WRITEBACK_COMPLETED
+        assert _writeback_files(source_path)["app.py"] == ADOPTED_APP
+    finally:
+        store.close()
+        gc.collect()
+
+
+def test_a_relative_remote_is_resolved_under_the_source_directory(tmp_path, monkeypatch):
+    # 相对路径只按源目录解析：当前目录下的同名仓库不被写回碰
+    source_path = tmp_path / "src"
+    _init_working_repo(source_path, {"app.py": BASE_APP})
+    source_mirror = source_path / "mirror.git"
+    _create_bare_repo(source_mirror, {"app.py": BASE_APP})
+    process_directory = tmp_path / "process-cwd"
+    process_directory.mkdir()
+    process_mirror = process_directory / "mirror.git"
+    _create_bare_repo(process_mirror, {"app.py": b"unrelated\n"})
+    before = _repo_snapshot(process_mirror)
+
+    store, projects, pid = _project_with_adoption(tmp_path, source_path, remote="mirror.git")
+    try:
+        monkeypatch.chdir(process_directory)
+        event = projects.execute_writeback(pid, "adopt_1")
+        assert event is not None and event.type == ProjectEventType.WRITEBACK_COMPLETED
+        assert _writeback_files(source_mirror)["app.py"] == ADOPTED_APP
+        assert _repo_snapshot(process_mirror) == before
+    finally:
+        store.close()
+        gc.collect()
+
+
+def test_the_writeback_command_rejects_a_target_that_is_not_a_git_repository(tmp_path):
+    # 远端指向一个存在但不是 git 仓库的目录：命令给出「写回的目标不是 git 仓库」，不回 500
+    import asyncio
+    from harness.app.commands import Rejection
+    from harness.app.project_and_work_item_commands import WritebackExecute, _execute_writeback
+    from harness.event_store import Command
+
+    source_path = tmp_path / "src"
+    _init_working_repo(source_path, {"app.py": BASE_APP})
+    not_a_repository = tmp_path / "not-a-repository"
+    not_a_repository.mkdir()
+    (not_a_repository / "notes.txt").write_text("这里不是仓库\n", encoding="utf-8")
+
+    store, projects, pid = _project_with_adoption(
+        tmp_path, source_path, remote=str(not_a_repository))
+    try:
+        class _App:
+            def __init__(self, project_service):
+                self.system = type("System", (), {"projects": project_service})()
+
+        command = Command(command_id="00000000-0000-0000-0000-000000000902",
+                          name="writeback.execute", digest="d", actor="user")
+        with pytest.raises(Rejection) as rejected:
+            asyncio.run(_execute_writeback(
+                _App(projects), command,
+                WritebackExecute(command_id="00000000-0000-0000-0000-000000000902", project_id=pid)))
+        assert rejected.value.reason == "not_allowed"
+        assert "写回的目标不是 git 仓库" in rejected.value.message
+        assert str(not_a_repository) in rejected.value.message
+        assert projects.projection(pid).writebacks == []
+    finally:
+        store.close()
+        gc.collect()
+
+
 def test_writeback_command_dispatch_and_rejections(tmp_path):
     import asyncio
     from harness.app.project_and_work_item_commands import WritebackExecute, _execute_writeback

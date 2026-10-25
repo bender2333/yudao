@@ -18,7 +18,7 @@ import { itemColor } from "../../pixel/world/floor.ts";
 import { face, sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
 import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
-import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
+import { WORK_ITEM_STATUS, WORK_ITEM_STATUS_KIND, departmentName, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
 
 /** 画面里的事项：project.loop 的行加上队列位置与等待模型服务的时间。 */
@@ -41,6 +41,25 @@ const OVERLAY_LABELS: [string, string][] = [
   ["semantic_records", "语义记录"],
 ];
 
+/** 事项状态换成画面的状态名（工单 #900）：`project.loop` 给的是项目流里事项的状态（in_progress 等），
+ *  楼层只认 IN_ROOM 与 ACTIVE 里的名字，所以在这里换一次，规则只写这一处。
+ *  进行中按恢复观察状态分开：中断、待恢复、已暂停各自有画法，其余算运行中；
+ *  其余状态按页面用的 WORK_ITEM_STATUS_KIND 换（例如 awaiting_initial_prd → asking），表里没有的原样保留。
+ *  这个对应以后搬进画面的翻译层（ADR-0043、画面与播放设计说明第 6 节），本工单不搬。 */
+function floorStatusOf(row: { status: string; recovery_state?: string | null }): string {
+  if (row.status === "in_progress") {
+    const recovery = row.recovery_state ?? null;
+    if (recovery === "interrupted" || recovery === "waiting_resume" || recovery === "paused") return recovery;
+    return "running";
+  }
+  return WORK_ITEM_STATUS_KIND[row.status] ?? row.status;
+}
+
+/** 文字列表里写的是事项本身的状态，不是画面的状态名（工单 #900）。 */
+function workItemStatusOf(item: LoopItem): string {
+  return typeof item.work_item_status === "string" ? item.work_item_status : item.status;
+}
+
 /** 把查询结果组装成楼层画面数据：事项、角色列表、决定请求（纯文字版本）、执行槽位与运维数据。 */
 export function floorModelOf(input: {
   loop: ProjectLoopResult | null;
@@ -55,6 +74,9 @@ export function floorModelOf(input: {
   const items: LoopItem[] = (input.loop?.work_items ?? []).map((row, index) => ({
     ...(row as LoopRow),
     color_index: row.color_index ?? index + 1,
+    // 楼层只认画面的状态名：换成画面的名字，原始的事项状态留在 work_item_status 里给文字列表（工单 #900）
+    status: floorStatusOf(row),
+    work_item_status: row.status,
   }));
   const roles: Record<string, { id: string; name: string; kind: string; status: string }[]> = {};
   for (const [department, workspace] of Object.entries(input.workspaces)) {
@@ -338,7 +360,7 @@ function FloorTextList(props: {
                 <strong>{item.sign}</strong>
                 <span>{item.department === null || item.department === "" ? "大厅" : departmentName(item.department)}</span>
                 <span>第 {item.round} 轮</span>
-                <span>{label(WORK_ITEM_STATUS, item.status)}</span>
+                <span>{label(WORK_ITEM_STATUS, workItemStatusOf(item))}</span>
                 {item.kind === "onboarding" ? <span className="y10-tag tag">建档</span> : null}
               </li>
             ))}
