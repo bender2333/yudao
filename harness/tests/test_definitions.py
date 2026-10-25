@@ -411,7 +411,7 @@ def test_work_item_creation_model_requests_and_proposal_decisions_record_the_def
 
 @pytest.mark.parametrize("names", [
     ("handoff_release", "quality_rework", "ask_answer_with_spec_revision", "guidance_response_explained",
-     "tool_denied_guidance_only", "compaction_success", "proposal_rejected"),
+     "compaction_success", "proposal_rejected"),
     ("http_responses_handoff", "http_chat_handoff", "http_messages_handoff"),
 ])
 def test_no_code_path_changes_the_loaded_definitions(tmp_path, names):

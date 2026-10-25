@@ -164,8 +164,6 @@ class Tool(_Definition):
     # 声明这个工具需要图像输入（设计说明第 5.6 节与浏览器设计第 6.1 节）：调用目标不含图像时
     # 步骤驱动不在这次请求的工具定义中提供它。现在声明为需要的工具由 3.2D 的浏览器与 computer use 提供
     requires_image_input: bool = False
-    # 许可规则：因待处理指导被提前安排、只能回应指导的激活可以使用
-    guidance_only: bool
     # 提供给模型的描述与参数（JSON Schema），原样放进请求
     description: str = Field(min_length=1)
     parameters: Mapping[str, Any]

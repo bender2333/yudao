@@ -47,12 +47,6 @@ def submit_tool(kind: str) -> str | None:
     return next((name for name, tool in DEFINITIONS.tools.items() if tool.proposal == kind), None)
 
 
-def usable_when_guidance_only(name: str) -> bool:
-    # 因待处理指导被提前安排、只能回应指导的激活可以使用的工具
-    tool = DEFINITIONS.tools.get(name)
-    return tool is not None and tool.guidance_only
-
-
 def offers_with_input(tool_names: list[str], input_modalities: tuple[str, ...]) -> list[str]:
     # 这次请求提供的工具：按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具
     # （设计说明第 5.6 节「请求时」；浏览器设计第 6.1 节的屏幕工具与 browser_take_screenshot 属于这一类）

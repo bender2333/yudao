@@ -78,8 +78,7 @@ from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .tools import tool_action
 from .validation import PRD_REVISION_FIELDS, ProposalDecision, evaluate_proposal
-from .collaboration import (guidance_diverted, has_new_work, next_department,
-                           ready_departments)
+from .collaboration import has_new_work, next_department, ready_departments
 from .workspace import WorkspaceSnapshot
 
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
@@ -96,7 +95,6 @@ class _Activation:
     prompt: DepartmentPrompt
     stop_flag: Event
     adapter: ModelAdapter
-    yielded_work: dict[str, Any] | None
     version: int
     driver: StepDriver | None = None
     wakeup: tuple[asyncio.AbstractEventLoop, asyncio.Event] | None = None
@@ -1457,14 +1455,6 @@ class Orchestrator:
         # 这时不再开始一轮工作。
         if not self._department_ready(run_id, projection, department):
             return None
-        guidance_only = False
-        yielded_work = None
-        if guidance_diverted(projection, department):
-            # 这一轮被指导提前安排：只回应指导，让出它自己的那一轮
-            # （工单 #560 以后指导按四种送达方式分开处理）
-            guidance_only = department != "product"
-            prior = projection.department_yielded_work.get(department)
-            yielded_work = dict(prior) if prior else self._work_basis(projection)
 
         if self.test_adapter_factory is not None:
             # 确定性测试适配器没有目录条目：表示成一个 fake 协议的模型访问定义并绑定三个部门，
@@ -1516,8 +1506,6 @@ class Orchestrator:
             payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
                      "effective_contract_hash": basis.effective_contract_hash,
                      "guidance_ids": list(guidance_ids),
-                     "guidance_only": guidance_only,
-                     "yielded_work": yielded_work,
                      "guidance_version": basis.guidance_version,
                      "input_version": basis.input_version, "prompt_version": prompt.version,
                      "prompt_hash": prompt.prompt_ref.content_hash},
@@ -1525,12 +1513,12 @@ class Orchestrator:
         scope = ActivationScope(
             run_id, department, session.session_id, activation_id, parent.event_id,
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=guidance_ids,
-            guidance_only=guidance_only, basis=basis, provider=provider_name,
+            basis=basis, provider=provider_name,
         )
         # 会话这一段工作的起点（工单 #475）：这一段用掉的时间算到这个会话的累计已用时间里
         self._start_session_segment(run_id, session.session_id)
         # 这个会话自己的停止开关（工单 #856）：停这个会话只停这个会话，不改变事项的状态
-        return _Activation(scope, prompt, Event(), adapter, yielded_work,
+        return _Activation(scope, prompt, Event(), adapter,
                            transaction.projection.stream_version)
 
     def _project_department_setting(self, projection: RunProjection, department: str):
@@ -1565,13 +1553,6 @@ class Orchestrator:
             prompt_ref=ArtifactRef(**setting.prompt_ref),
             created_event_id="" if setting.event_id is None else setting.event_id,
         )
-
-    @staticmethod
-    def _work_basis(projection: RunProjection) -> dict[str, Any]:
-        return {
-            "effective_contract_hash": current_contract_hash(projection),
-            "delivery_spec_hash": None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
-        }
 
     def _activation_provider(self, adapter: ModelAdapter) -> str:
         # 激活事件上的提供方名称：确定性测试适配器用它的名称；目录驱动的运行在每次请求解析出连接
@@ -1686,7 +1667,6 @@ class Orchestrator:
                 run_id, department=department, projection=current, proposal=submission.proposal,
                 transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
                 session_id=scope.session_id,
-                yielded_work=activation.yielded_work,
                 provider=submission.response.provider or self._activation_provider(activation.adapter),
                 model=submission.response.model,
             )
@@ -1978,8 +1958,6 @@ class Orchestrator:
                     "prompt_version": prompt.version,
                     "prompt_hash": prompt.prompt_ref.content_hash,
                     "guidance_ids": [],
-                    "guidance_only": False,
-                    "yielded_work": None,
                 },
             ))
             return events[0]
@@ -1991,7 +1969,7 @@ class Orchestrator:
         branch_scope = ActivationScope(
             run_id, department, session_id, activation_id, act_event.event_id,
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash,
-            guidance_ids=[], guidance_only=False, basis=basis,
+            guidance_ids=[], basis=basis,
             provider=self._activation_provider(activation.adapter),
         )
 
@@ -2073,7 +2051,6 @@ class Orchestrator:
         session_id: str,
         provider: str | None,
         model: str | None,
-        yielded_work: dict[str, Any] | None = None,
     ) -> None:
         # 提案先按读取时的运行状态与工作区事实校验，并记下读取的流版本；提交以这个版本作为期望版本：
         # 事务中关闭过时的协作请求以后，由 U 按事务中的运行状态与工作区事实作提交判断，再写入提交、拒绝或接纳的事件。
@@ -2094,7 +2071,7 @@ class Orchestrator:
                     transaction, evaluated=evaluated, facts=facts, decision=decision, environment=environment,
                     department=department, proposal=proposal,
                     transcript_ref=transcript_ref, parent_event_id=parent_event_id, session_id=session_id,
-                    provider=provider, model=model, yielded_work=yielded_work,
+                    provider=provider, model=model,
                 ), expected_version=evaluated.version)
                 return
             except StreamVersionConflict:
@@ -2115,7 +2092,6 @@ class Orchestrator:
         session_id: str,
         provider: str | None,
         model: str | None,
-        yielded_work: dict[str, Any] | None,
     ) -> None:
         # 提交的事务：读取的流版本就是校验时的版本
         run_id = transaction.projection.run_id
@@ -2160,7 +2136,6 @@ class Orchestrator:
             transaction, department=department, snapshot=snapshot, environment=environment,
             artifact=judged.artifact or {}, ends_run=judged.ends_run,
             parent_event_id=parent_event_id, session_id=session_id, provider=provider, model=model,
-            yielded_work=yielded_work,
         )
 
     def _commit_accepted(
@@ -2176,7 +2151,6 @@ class Orchestrator:
         session_id: str,
         provider: str | None,
         model: str | None,
-        yielded_work: dict[str, Any] | None = None,
     ) -> None:
         projection = transaction.projection
         run_id = projection.run_id

@@ -53,7 +53,7 @@ PARAMETERS_VERSION = initial_version()
 #     会话事件里整个事项的累计数（激活结束的 activations、model_steps，激活开始的 cycle）不在表里：
 #     它们数的是整件事项，别的会话先做一步就多一（工单 #892）；会话自己的累计数
 #     （session_activations、session_model_steps）保留，事项的总数在投影里比较。
-# 11. prompt_snapshot.json 按 <部门>/<用途>[/guidance|/guidance_only|/request|/ask] 收同一个场景里的请求：
+# 11. prompt_snapshot.json 按 <部门>/<用途>[/guidance|/request|/ask] 收同一个场景里的请求：
 #     工作请求记 department_rules、work_item_guidance、input_handling、professional_completion、
 #     collaboration_rules、proposal_contract、allowed_tools 七个提示正文与这次请求带的工具说明；
 #     压缩请求只记摘要提示词，其中两个限额写成占位。部门提示与工具说明本身不再逐字进基准。
@@ -93,65 +93,65 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "department_guidance_applied": ("activation_id", "context_event_id", "guidance_ids", "input_version"),
     "department_guidance_responded": ("content_hash", "department", "guidance_created_event_id", "guidance_id",
                                       "guidance_version", "issuer", "kind", "result_event_ids", "status"),
-    "department_activated": ("activation_id", "effective_contract_hash", "guidance_ids", "guidance_only",
+    "department_activated": ("activation_id", "effective_contract_hash", "guidance_ids",
                              "guidance_version", "input_version", "prompt_version"),
-    "department_input": ("activation_id", "effective_contract_hash", "guidance_ids", "guidance_only",
+    "department_input": ("activation_id", "effective_contract_hash", "guidance_ids",
                          "input_version", "prompt_version", "step_id"),
     "tool_call_required": ("activation_id", "attempt_id", "context_event_id", "count", "effective_contract_hash",
-                           "guidance_ids", "guidance_only", "input_version", "limit", "prompt_version",
+                           "guidance_ids", "input_version", "limit", "prompt_version",
                            "purpose", "step_id"),
-    "activation_finished": ("activation_id", "guidance_ids", "guidance_only", "input_version",
+    "activation_finished": ("activation_id", "guidance_ids", "input_version",
                             "prompt_version", "session_activations", "session_elapsed_ms",
                             "session_model_steps", "stop_reason"),
     "context_assembled": ("activation_id", "admitted", "attempt", "attempt_id",
                           "compaction_event_id", "department", "effective_contract_hash", "guidance_ids",
-                          "guidance_only", "input_version", "logical_call_id", "prompt_version", "purpose",
+                          "input_version", "logical_call_id", "prompt_version", "purpose",
                           "retry_of_step_id", "source_event_id", "step_id"),
     "model_request_serialized": ("activation_id", "attempt", "attempt_id",
-                                 "context_event_id", "effective_contract_hash", "guidance_ids", "guidance_only",
+                                 "context_event_id", "effective_contract_hash", "guidance_ids",
                                  "input_version", "logical_call_id", "prompt_version", "purpose",
                                  "retry_of_step_id", "step_id"),
     "model_reasoning": ("activation_id", "attempt_id", "context_event_id",
-                        "effective_contract_hash", "guidance_ids", "guidance_only", "input_version",
+                        "effective_contract_hash", "guidance_ids", "input_version",
                         "logical_call_id", "prompt_version", "purpose", "step_id"),
     "model_message": ("activation_id", "attempt_id", "context_event_id",
-                      "effective_contract_hash", "guidance_ids", "guidance_only", "input_version",
+                      "effective_contract_hash", "guidance_ids", "input_version",
                       "logical_call_id", "prompt_version", "purpose", "step_id", "stop_reason"),
     "model_requested": ("activation_id", "attempt", "attempt_id", "attempted",
                         "context_event_id", "definitions_version", "effective_contract_hash", "guidance_ids",
-                        "guidance_only", "input_version", "logical_call_id", "max_attempts", "parameters_version",
+                        "input_version", "logical_call_id", "max_attempts", "parameters_version",
                         "prompt_version", "purpose", "retry_of_step_id", "step_id"),
     "model_stream_progress": ("activation_id", "attempt", "attempt_id",
-                              "context_event_id", "guidance_ids", "guidance_only", "input_version",
+                              "context_event_id", "guidance_ids", "input_version",
                               "logical_call_id", "prompt_version", "purpose", "step_id"),
     "model_attempt_finished": ("activation_id", "attempt", "attempt_id",
-                               "context_event_id", "guidance_ids", "guidance_only", "input_version",
+                               "context_event_id", "guidance_ids", "input_version",
                                "logical_call_id", "prompt_version", "purpose", "retry_of_step_id", "status",
                                "step_id"),
     "model_attempt_failed": ("activation_id", "attempt", "attempt_id", "context_event_id",
-                             "effective_contract_hash", "guidance_ids", "guidance_only", "input_version",
+                             "effective_contract_hash", "guidance_ids", "input_version",
                              "logical_call_id", "max_attempts", "prompt_version", "purpose",
                              "reason", "retry_of_step_id", "retryable", "status", "step_id",
                              "will_retry"),
     "model_retry_scheduled": ("activation_id", "attempt", "attempt_id", "context_event_id",
-                              "delay_sec", "effective_contract_hash", "guidance_ids", "guidance_only",
+                              "delay_sec", "effective_contract_hash", "guidance_ids",
                               "input_version", "logical_call_id", "max_attempts", "next_attempt",
                               "next_step_id", "prompt_version", "purpose", "reason",
                               "retry_of_step_id", "retryable", "step_id"),
     "compaction_recorded": ("activation_id", "department", "effective_contract_hash", "guidance_ids",
-                            "guidance_only", "input_version", "previous_compaction_event_id", "prompt_version",
+                            "input_version", "previous_compaction_event_id", "prompt_version",
                             "purpose", "step_id"),
     "tool_called": ("activation_id", "attempt_id", "context_event_id",
-                    "effective_contract_hash", "error", "guidance_ids", "guidance_only", "id", "input_version",
+                    "effective_contract_hash", "error", "guidance_ids", "id", "input_version",
                     "logical_call_id", "name", "ok", "prompt_version", "purpose", "step_id"),
     "tool_started": ("activation_id", "attempt", "attempt_id", "context_event_id",
-                     "effective_contract_hash", "guidance_ids", "guidance_only", "id", "input_version",
+                     "effective_contract_hash", "guidance_ids", "id", "input_version",
                      "logical_call_id", "name", "prompt_version", "step_id"),
     "tool_skipped": ("activation_id", "attempt_id", "context_event_id",
-                     "effective_contract_hash", "error", "guidance_ids", "guidance_only", "id", "input_version",
+                     "effective_contract_hash", "error", "guidance_ids", "id", "input_version",
                      "logical_call_id", "name", "ok", "prompt_version", "purpose", "step_id"),
     "action_verified": ("activation_id", "attempt_id", "context_event_id",
-                        "decision_id", "error", "guidance_ids", "guidance_only", "id", "input_version",
+                        "decision_id", "error", "guidance_ids", "id", "input_version",
                         "logical_call_id", "name", "ok", "prompt_version", "purpose", "resolution",
                         "step_id"),
     "proposal_submitted": ("definitions_version", "input_version", "kind", "parameters_version"),
@@ -461,9 +461,7 @@ def prompt_entries(system: Any, run_id: str) -> dict[str, dict[str, Any]]:
                                if part.get("source") in PROMPT_PART_SOURCES},
                      "tools": _tool_entries(request, normalizer)}
         key = f"{payload.get('department')}/{payload.get('purpose')}"
-        if payload.get("guidance_only"):
-            key += "/guidance_only"
-        elif payload.get("guidance_ids"):
+        if payload.get("guidance_ids"):
             key += "/guidance"
         if str(payload.get("session_id", "")).startswith("ses_ask_") or any(
             item.get("source") == "pending_ask" for item in payload.get("injected", [])

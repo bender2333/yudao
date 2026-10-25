@@ -33,7 +33,3 @@ def work(department):
 ])
 def test_normal_proposals_remain_available(department, kind):
     assert kind in allowed_proposal_kinds(work(department), department)
-
-def test_a_department_that_is_not_working_can_only_answer_the_guidance():
-    # 不在工作的部门（被提前安排的）只拿回应指导的种类
-    assert allowed_proposal_kinds(work("quality"), "engineering") == set()

@@ -308,11 +308,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
                     response_text=payload.get("text"),
                 )
                 break
-        # 指导回应以后让出的工作恢复：部门继续它自己那一轮（工单 #556：不再有阶段迁移事件）
-        if event.department:
-            state.department_yielded_work.pop(event.department, None)
-        if not state.department_yielded_work:
-            state.yielded_work = None
         return
 
     if etype == EventType.DEPARTMENT_ACTIVATED:
@@ -346,18 +341,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
                     state.department_delivery_bases[event.department] = state.delivery_spec.content_hash
                 else:
                     state.department_delivery_bases.pop(event.department, None)
-        incoming = payload.get("yielded_work")
-        if incoming:
-            # 让出的工作由各部门各记各的（工单 #557：同时运行时不让别的部门的让出覆盖这一份）
-            if event.department:
-                state.department_yielded_work[event.department] = dict(incoming)
-            if state.yielded_work is None:
-                state.yielded_work = dict(incoming)
-        else:
-            if event.department:
-                state.department_yielded_work.pop(event.department, None)
-            if not state.department_yielded_work:
-                state.yielded_work = None
         return
 
     if etype == EventType.CONTEXT_ASSEMBLED:
@@ -729,7 +712,6 @@ def _manifest_from_payload(payload: dict[str, Any], event_id: str) -> ContextMan
         output_reserve_tokens=int(payload.get("output_reserve_tokens", payload.get("max_output_tokens") or 0)),
         parts_ref=payload.get("parts_ref"),
         guidance_ids=list(payload.get("guidance_ids", [])),
-        guidance_only=bool(payload.get("guidance_only", False)),
         step_id=payload["step_id"],
         request_ref=payload["request_ref"],
         admitted=payload["admitted"],

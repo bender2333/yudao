@@ -187,25 +187,6 @@ def _guidance_id(call) -> str:
     return json.loads(prompt_part(call, "department_guidance"))[0]["id"]
 
 
-def tool_denied_guidance_only(data_dir):
-    # 按部门给出的脚本（工单 #557：同时运行的会话各自取用自己的脚本）
-    system, adapter, run_id = _system(data_dir, {
-        "product": [product_spec()],
-        "engineering": [_deliver()],
-        "quality": [_explore(), _release()],
-    })
-    for _ in range(2):
-        system.activate_once(run_id)
-    system.add_guidance(run_id, "engineering", "请直接改交付文件以处理错误输出。")
-    adapter.scripts["engineering"].extend([
-        lambda request: FakeTurn(
-            writes={"src/echo.py": "import sys\nprint('changed by guidance')\n"},
-            proposal=guidance_response(_guidance_id(request), status="explained",
-                                       text="指导不能授权修改交付，写文件被拒绝。"),
-        ),
-    ])
-    system.run_until_stop(run_id)
-    return system, run_id, {}
 
 
 def ask_answer_with_spec_revision(data_dir):
@@ -714,10 +695,6 @@ SCENARIOS: dict[str, Scenario] = {
     "invalid_tool_arguments": Scenario(
         "模型给出无法解析的工具参数：工具不启动，错误作为工具结果返回模型，记入历史的参数换成 {}；下一步提交成功。",
         invalid_tool_arguments),
-
-    "tool_denied_guidance_only": Scenario(
-        "质检阶段收到给工程部门的指导：工程部门以只能回应指导的方式激活，写文件被工具许可拒绝，回应指导（explained）后回到质检并放行。",
-        tool_denied_guidance_only),
     "ask_answer_with_spec_revision": Scenario(
         "工程询问产品，产品在分支里修订 PRD 并回答，工程收到回答与 PRD 新版本，接着交付，质检放行。",
         ask_answer_with_spec_revision),
