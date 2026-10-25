@@ -73,6 +73,17 @@ def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:
     return any(decision.status == "open" and decision.blocks == "run" for decision in decisions)
 
 
+def blocked_by_other_session(decisions: Iterable[DecisionRequest], department: str) -> bool:
+    # 别的会话已经写下待恢复的决定请求（模型管理设计说明第 5.5 节：同一事项里同时有几个会话被挡住时，
+    # 各发一条决定请求，各写明自己的部门、模型与问题，事项等这几条都回答以后再继续）。
+    # 这个部门自己已经有一条时不重复：它写下以后就停在那里
+    items = list(decisions)
+    if not blocks_run(items):
+        return False
+    return not any(decision.status == "open" and decision.blocks == "run"
+                   and decision.request.get("department") == department for decision in items)
+
+
 
 class DecisionNotFound(KeyError):
     def __init__(self, decision_id: str) -> None:

@@ -30,7 +30,8 @@ from .contracts import current_contract_hash
 from .decisions import (
     DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
     DecisionClosed,
-    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_run,
+    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocked_by_other_session,
+    blocks_run,
 )
 from .environment import (
     LocalEnvironment, QA_TESTS_DIR, cleanup_inspection_workspace, inspection_root, workspace_tree,
@@ -726,8 +727,13 @@ class Orchestrator:
                     or (activation.deadline is not None and time.monotonic() >= activation.deadline)
                     or time_used_up(projection, self._elapsed_sec(activation.run_id))):
                 projection = self._assign_new_inputs(transaction)
-            stop = self._stop_requested(activation, projection, transaction.decisions.values())
-            return Judgment(not stop, projection.stream_version)
+            decisions = list(transaction.decisions.values())
+            stop = self._stop_requested(activation, projection, decisions)
+            # 别的会话已经写下待恢复的决定请求：这个会话照常停下（事项的状态不变，工单 #856）；
+            # 它自己也被挡住时（这次的模型请求发不出去），它要写下自己的那一条，
+            # 各写明自己的部门、模型与问题（模型管理设计说明第 5.5 节）
+            blocked = blocked_by_other_session(decisions, activation.department)
+            return Judgment(not stop, projection.stream_version, blocked)
 
         return self.writes.transact(run_stream(activation.run_id), judge)
 
