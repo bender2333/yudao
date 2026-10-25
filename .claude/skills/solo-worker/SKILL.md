@@ -56,7 +56,7 @@ argument-hint: "<工单编号> [里程碑标题]"
    - **带 `touches-core` 的工单**：`check` 绿了以后在分支上跑一次集成层：`gh workflow run CI --ref issue-<编号>` → `gh run list --workflow CI --branch issue-<编号> --limit 1` 拿运行号 → `gh run watch <运行号>`（约 15 分钟）。失败项与 main 最近 7 天比（`gh run list --workflow CI --branch main --event push --limit 5`）：main 上也失败过的是不稳定项，写进交付说明；main 上没失败过的按自己的问题修，修好再跑。这次运行的链接写进交付说明。
 9. **交付**：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾的计数行、CI 运行链接（`touches-core` 加集成层那次）、逐条验收核对（每条写证据，对不上的照实写）、删掉的用例逐条写「用例名 + 依据（哪条 ADR 或工单删的）」，最后一行署名；然后把工单标签从 `in-progress` 改成 `needs-review`。工单没写到的删除不要自己删，按「三条通道」交回。
 10. **合并前的核对**（`AGENTS.md`「Solo 模式」第 4 步，五项都成立才合并）：
-    - 「环」是需你批准的工单带 `kernel-approved` 标签与批准行；没有的改为 `ready-for-human`，不合并。
+    - 「环」是需你批准的工单带 `kernel-approved` 标签与总架构师的批准行；没有的交回（`needs-triage`，评论写明缺批准），不合并。
     - `git fetch origin main && git merge origin/main`（冲突在自己的分支上解，解不开按「前提变了」报 blocked）；`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过。
     - 工作区没有未提交也未推送的改动。
     - 交付说明里每条验收核对都有证据。

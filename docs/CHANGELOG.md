@@ -553,3 +553,5 @@ claude-fable-5-1（总架构师） / 2026-10-25 23:05 / `docs/architecture.html`
 执行者 executor-cn:deepseek-v4.1-flash / 2026-10-25 23:27 / 工单 #1003：删除 `harness/analysis/` 七个文件与 `harness/tests/test_analysis_l1.py`、`test_analysis_l2.py`、`test_analysis_l3.py`，`harness/tests/layers.toml` 去掉三行登记；`docs/design/architecture/name-map.md` 观察者一行的「代码里现在的名字」改为「无」、状态改为「代码里还没有」 / #987 的结论：观察者是系统之外、经接口只读订阅事件的东西，离线分析模块没有生产模块导入、没有需求编号与设计说明，不承接
 
 claude-opus-5-5（子架构师） / 2026-10-26 00:05 / docs/design/skeleton-and-application.md 第 12 节加 S1e 一行（#1015），排序改为 S1d → S1e、S2a / 第 4 节末尾第 3、4 条（95f93c07）要求另开一张子工单
+
+claude-fable-5-1（总架构师） / 2026-10-25 23:45 / `CLAUDE.md` 用户的参与方式与工单规范、`AGENTS.md` 审查者核对与 solo 合并前核对、`docs/agents/triage-labels.md` kernel-approved 一节与 waiting 清单、`/to-children`、`/module-sync`、`/solo-worker`：需你批准环的批准由总架构师给，子架构师拆出的标 waiting 交总架构师；缺批准的交回 needs-triage / 用户不逐张批准工单，决策见 docs/decision.md 同日「内核工单的批准由总架构师给」。
