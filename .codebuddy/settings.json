@@ -1,9 +1,10 @@
 {
   "permissions": {
     "allow": [
+      "Edit(//C:/w/**)",
+      "Read(//C:/w/**)",
       "Edit(//C:/project/yudao-worktrees/**)",
-      "Read(//C:/project/yudao-worktrees/**)",
-      "Edit(/harness/**)"
+      "Read(//C:/project/yudao-worktrees/**)"
     ],
     "deny": [
       "Edit(/docs/agents/**)"

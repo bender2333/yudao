@@ -96,9 +96,20 @@ finish --task T-004 --status done|failed|blocked [--summary "..."] [--raw-file <
 check --task T-004
 escalate --task T-004 [--reason "..."] | question --task T-004 --comment-file <文件>
 askhuman --task T-004 --comment-file <文件> | handover --task T-004 | reap [--task T-004] [--stale 90]
-gc [--keep N] [--force]
+gc [--keep N] [--force] [--from <旧根目录>] | worktrees --root C:/w
 pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1
 ```
+
+## 机器配置（开循环之前配一次）
+
+| 项 | 配在哪 | 值 |
+| --- | --- | --- |
+| worktree 根目录 | `state.json` 的 `worktrees.root`，用 `solo.mjs worktrees --root <路径>` 改 | Windows 用短路径 **`C:/w`**（`C:/w/issue-559` 比 `C:/project/yudao-worktrees/issue-559` 少 20 多个字符，`node_modules` 的深路径才不会撞 260 的上限）；类 Unix 用 `/tmp/w` |
+| 这个目录的写权限 | `.codebuddy/settings.json` 的 `permissions.allow` | `Edit(//C:/w/**)` 与 `Read(//C:/w/**)`（`//` 开头表示文件系统绝对路径）。沙箱默认只允许写当前工作目录，不放行的话 subagent 在 worktree 里写文件、删临时文件都会被拦——**这是 subagent 报“权限不够”的最常见原因** |
+| 依赖复用 | 写进 `handoff.md`，任务书里带一句 | `UV_PROJECT_ENVIRONMENT=C:/code/yudao/.venv`（Python）与主仓库的 `client/node_modules`（前端）。每个 worktree 各装一份会把目录撑到几千文件，建得慢、删的时候被进程锁住 |
+| 账本保护 | `hook.mjs` 已内置 | `state.json`、`tasks.md`、`active.json`、`.lock`、`.owner.json`、`.stop-guard.json` 只由命令改；`goal.md`、`handoff.md`、`notes/` 人可以改 |
+
+换过根目录以后，旧目录里的 worktree 用 `solo.mjs gc --from <旧根目录>` 清（按已关闭工单逐张删，正在跑的跳过）。
 
 ## 起一个循环，或者接一个循环
 

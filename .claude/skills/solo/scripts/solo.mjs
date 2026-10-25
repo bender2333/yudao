@@ -1633,35 +1633,43 @@ function commandGc(args) {
   const skipped = [];
   for (const task of targets) {
     const target = worktreeTarget(loop, task);
-    if (!fs.existsSync(target.dir)) {
-      skipped.push({ issue: task.issue, reason: '目录不在' });
-      continue;
-    }
-    const residue = worktreeResidue(target.dir, target.branch, target.base);
-    if ((residue.dirty || residue.unpushed) && !args.force) {
-      residual.push({ issue: task.issue, dir: target.dir, reason: '有未提交 ' + residue.dirty + ' 处、未推送 ' + residue.unpushed + ' 个提交（要强删加 --force）' });
-      continue;
-    }
-    const archived = archiveEvidence(loop, target.dir, task.issue);
-    git(root, ['worktree', 'remove', '--force', target.dir]);
-    let gone = !fs.existsSync(target.dir);
-    for (let attempt = 0; !gone && attempt < 3; attempt += 1) {
-      try {
-        fs.rmSync(target.dir, { recursive: true, force: true });
-      } catch {
-        /* 下一轮重试 */
+    const dirs = [target.dir];
+    if (args.from) dirs.push(path.join(String(args.from), target.branch));
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) {
+        skipped.push({ issue: task.issue, reason: '目录不在' });
+        continue;
       }
-      gone = !fs.existsSync(target.dir);
-      if (!gone) sleepSync(500 * (attempt + 1));
+      const residue = worktreeResidue(dir, target.branch, target.base);
+      if ((residue.dirty || residue.unpushed) && !args.force) {
+        residual.push({ issue: task.issue, dir, reason: '有未提交 ' + residue.dirty + ' 处、未推送 ' + residue.unpushed + ' 个提交（要强删加 --force）' });
+        continue;
+      }
+      const archived = archiveEvidence(loop, dir, task.issue);
+      git(root, ['worktree', 'remove', '--force', dir]);
+      let gone = !fs.existsSync(dir);
+      for (let attempt = 0; !gone && attempt < 3; attempt += 1) {
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+        } catch {
+          /* 下一轮重试 */
+        }
+        gone = !fs.existsSync(dir);
+        if (!gone) sleepSync(500 * (attempt + 1));
+      }
+      if (!gone && process.platform === 'win32') {
+        spawnSync('cmd', ['/c', 'rd', '/s', '/q', dir], { encoding: 'utf8' });
+        gone = !fs.existsSync(dir);
+      }
+      if (gone) removed.push({ issue: task.issue, dir, archived });
+      else residual.push({ issue: task.issue, dir, reason: '目录删不掉（多半有进程占用），下一次 gc 再试' });
     }
-    if (!gone && process.platform === 'win32') {
-      spawnSync('cmd', ['/c', 'rd', '/s', '/q', target.dir], { encoding: 'utf8' });
-      gone = !fs.existsSync(target.dir);
-    }
-    if (gone) removed.push({ issue: task.issue, archived });
-    else residual.push({ issue: task.issue, dir: target.dir, reason: '目录删不掉（多半有进程占用），下一次 gc 再试' });
+    continue;
   }
   git(root, ['worktree', 'prune']);
+  {
+    const removedUnused = removed;
+  }
 
   const payload = { removed, residual, skipped: skipped.length };
   if (args.json) return emit(args, payload);
@@ -1711,6 +1719,20 @@ function commandSignature(args) {
   saveLedger(loop);
   appendText(loop, '## 署名（编排者）\n\n- ' + (before || '(空)') + ' → ' + value);
   return emit(args, { signature: value }, '署名：' + before + ' → ' + value);
+}
+
+/** worktree 的根目录与分支前缀、起点提交。短根目录能省 Windows 的 260 字符。 */
+function commandWorktrees(args) {
+  const loop = openLedger(args);
+  const cfg = worktreeOf(loop);
+  const root = str(args.root, cfg.root);
+  const base = str(args.base, cfg.base);
+  const branchPrefix = str(args.prefix, cfg.branchPrefix);
+  loop.state.worktrees = { root, optional: undefined, branchPrefix, base };
+  delete loop.state.worktrees.optional;
+  saveLedger(loop);
+  appendText(loop, '## worktree 配置（编排者）\n\n- 根目录 ' + cfg.root + ' → ' + root + '，分支前缀 ' + branchPrefix + '，起点 ' + base);
+  return emit(args, { root, branchPrefix, base }, 'worktree 根目录：' + root + '（分支 ' + branchPrefix + '<编号>，起点 ' + base + '）');
 }
 
 /** 预算：无人值守跑多少轮以内。用完就停，这是唯一的花钱闸。 */
@@ -1832,7 +1854,8 @@ const USAGE = [
   '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004 | attach --task T-004 --session <id>',
   '  finish --task T-004 --status done|failed|blocked | check --task T-004',
   '  escalate|question|askhuman --task T-004 | handover --task T-004 | reap [--stale 90]',
-  '  gc [--keep N] [--force]   清掉已关闭工单的 worktree（先归档 .tmp 证据）',
+  '  gc [--keep N] [--force] [--from <旧根目录>]   清掉已关闭工单的 worktree（先归档 .tmp 证据）',
+  '  worktrees --root C:/w --base origin/main        worktree 根目录、分支前缀、起点',
   '  pause | resume [--no-auto] | auto on|off | budget --iterations 120 | signature --value solo-<模型 ID>',
   '  concurrency --max 4 --exclusive 1',
   '',
@@ -1859,6 +1882,7 @@ switch (command) {
   case 'askhuman': handOff(args, 'askhuman'); break;
   case 'handover': commandHandover(args); break;
   case 'gc': commandGc(args); break;
+  case 'worktrees': commandWorktrees(args); break;
   case 'reap': commandReap(args); break;
   case 'pause': commandPause(args); break;
   case 'resume': commandResume(args); break;
