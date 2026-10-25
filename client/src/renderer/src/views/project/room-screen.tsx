@@ -51,7 +51,7 @@ export function roomEventOf(event: EventObject, department: string): PixelFloorE
   let payload = raw;
   let eventDept: string | null = event.department;
   if (event.type === "delivery_accepted") {
-    // 交付到达：交付箱从工程送到质检（原型 v11 的交接画面）
+    // 交付到达：交付箱从工程送到质检（原型 v11 的交付到达画面）
     payload = { ...raw, from: "engineering", to: "quality", artifact: "box" };
     if (department !== "engineering" && department !== "quality") return null;
     type = "transition";

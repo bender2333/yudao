@@ -550,7 +550,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(engineering.locator(".kv").first()).toContainText("内置默认");
       await gotoView(page, id, "dept/quality");
       expect(await pathText(page)).toBe(`${SAMPLE} / ${PATH_LABEL["dept/quality"]}`);
-      await expect(await section(page, "质检部门")).toContainText("按验收条件核验并给出放行或返工");
+      await expect(await section(page, "质检部门")).toContainText("按验收条件核验并给出放行或缺陷记录");
       const quality = page.locator('section.card:has([role="tablist"])').first();
       await quality.locator('[role="tab"]').nth(2).click();
       await expect(quality.locator(".kv").first()).toContainText("第 0 版");

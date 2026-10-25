@@ -6,7 +6,7 @@ import type { StreamState } from "../../contract/stream-state";
 export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   product: { name: "产品", role: "把用户的要求整理成有效需求" },
   engineering: { name: "工程", role: "按有效需求实现并封存交付" },
-  quality: { name: "质检", role: "按验收条件核验并给出放行或返工" },
+  quality: { name: "质检", role: "按验收条件核验并给出放行或缺陷记录" },
 };
 
 export const WORK_ITEM_STATUS: Record<string, string> = {
