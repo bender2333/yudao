@@ -50,7 +50,24 @@
 | 日记 `agents_jour/<编号>.md` | 每条记录行首写 `执行者 <署名> / 日期 时间 /` |
 | `docs/CHANGELOG.md` 的条目 | 行首写 `<署名> / 日期 时间 /`（沿用「模型 ID / 时间 / 改动 / 原因」格式） |
 
-另外两条：提交前把 `GIT_AUTHOR_NAME` 与 `GIT_COMMITTER_NAME` 设成同一个署名；不要拿人的名字冒充，也不要手写 `Co-authored-by:`。
+另外三条：
+
+- 署名的形式是 `solo-<模型 ID>`（例如 `solo-deepseek-v4.1-flash`），**值以任务书为准**，不要沿用上一轮的。
+- **提交信息的署名单独成行**：正文（列表最后一条）→ 空行 → `— <署名>`。粘在列表末尾（`…改了 X— solo-xxx`）是错的。
+- 提交前把 `GIT_AUTHOR_NAME` 与 `GIT_COMMITTER_NAME` 设成同一个署名；不要拿人的名字冒充，也不要手写 `Co-authored-by:`。
+
+## CI 与交付的硬要求
+
+- PR 的 `check` 必须在这个提交上绿；合并前用 `gh pr checks issue-<编号> --required` 再确认一次。
+- **带 `touches-core` 的工单**：`check` 绿了以后还要在分支上跑一次集成层——
+  `gh workflow run CI --ref issue-<编号>` → `gh run list --workflow CI --branch issue-<编号> --limit 1` 拿运行号 →
+  `gh run watch <运行号>`（约 15 分钟）。失败项先跟 main 最近 7 天的失败比
+  （`gh run list --workflow CI --branch main --event push --limit 5`），main 上也失败过的是不稳定项、写进交付说明；
+  main 上没失败过的按自己的问题修，修好再跑。**这次运行的链接写进交付说明。**
+- 失败项明显与本次改动无关时，先 `gh run rerun <运行号> --failed` 重跑一次，再判断是不是自己的问题。
+- 交付说明（`DELIVERY: 第 <k> 轮`）里必须有：改动清单、相关测试的命令与结尾的计数行、CI 运行链接（touches-core 加集成层那次）、逐条验收核对、署名的最后一行。
+- 删掉了用例：逐条写「用例名 + 依据（哪条 ADR 或工单删的）」；工单没写到的删除不要自己删，报 blocked 交给架构师。
+- 新增测试文件：在 `harness/tests/layers.toml` 补一行登记，放在第一个能到达其结论的层。
 
 ## 两条上报通道
 
