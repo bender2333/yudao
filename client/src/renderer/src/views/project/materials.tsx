@@ -383,7 +383,7 @@ function DeliveryBlock(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
   const view = readView(file);
 
   return (
-    <Section id="mt-delivery" title="交付" note="各版本的封存快照：文件清单、摘要与文件下载" className="y10-mt">
+    <Section id="mt-delivery" title="交付" note="各版本的封存快照：文件清单、摘要与文件下载；文件清单由主机从交付快照得出，不取自交付说明" className="y10-mt">
       {props.rows.length === 0 ? <Empty text="工程部门还没有封存交付" /> : (
         <ol className="y10-mt-list">
           {props.rows.map((entry, index) => (
@@ -487,7 +487,7 @@ function verdictClass(verdict: string): string {
 
 const VERDICT_LABELS: Record<string, string> = {
   release: "放行",
-  rework_engineering: "退回工程",
+  rework_engineering: "缺陷记录",
 };
 
 function checkRow(value: Record<string, unknown>): string {

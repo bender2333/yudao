@@ -6,14 +6,15 @@
 import type { ReportFact } from "../../api/generated/types.gen";
 
 // 关键事实的种类：由应用层按事件的种类与载荷判定（harness/app/home.py 的 _fact_kind），
-// 客户端按它给出刻度着色、图例与标题。取值与原型 v10 contract/registry.js 的 KEY_KINDS 一致
-export type KeyKind = "handoff" | "ask" | "answer" | "rework" | "release" | "adopt" | "fault" | "repair" | "deploy" | "wait" | "decision";
+// 客户端按它给出刻度着色、图例与标题。取值与原型 v10 contract/registry.js 的 KEY_KINDS 一致，
+// 只有 handoff 不再认识：阶段状态机删掉以后服务端不再产生它（工单 #556、#907）
+export type KeyKind = "ask" | "answer" | "rework" | "release" | "adopt" | "fault" | "repair" | "deploy" | "wait" | "decision";
 
 export const KEY_KINDS: Record<KeyKind, { label: string; color: string }> = {
-  handoff: { label: "交接", color: "#4f8fd6" },
   ask: { label: "询问", color: "#7c6bd6" },
   answer: { label: "回答", color: "#9d8ff0" },
-  rework: { label: "返工", color: "#d64f4f" },
+  // 取值仍是 rework（服务端 harness/app/home.py 的 _fact_kind 这样给），页面上叫「缺陷记录」（工单 #907）
+  rework: { label: "缺陷记录", color: "#d64f4f" },
   release: { label: "放行", color: "#3fa76a" },
   adopt: { label: "采纳", color: "#1f7a4a" },
   fault: { label: "故障", color: "#c2331f" },
