@@ -83,6 +83,8 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | `self` | 本机 `gh` 登录名，用来分清「我们的单」与「别人在做」 |
 | `taskState` | 每张的失败次数、`interrupted`、`external`、`blockedBy`、`history` |
 | `worktrees` | worktree 根目录、分支前缀、起点提交 |
+| `flight` | 在跑的每张：开派分钟数、最近一次提交、工作区改动数；`state` 直接打印成「在跑: …」 |
+| `waitMode` | 无人值守靠什么收账：`hook`（Claude Code 的 Stop hook）或 `notify`（宿主通知，派完就结束回合）。`resume --wait notify` 写 |
 
 **不手改 JSON。**所有改动走命令（脚本路径相对仓库根）：
 
@@ -96,8 +98,8 @@ finish --task T-004 --status done|failed|blocked [--summary "..."] [--raw-file <
 check --task T-004
 escalate --task T-004 [--reason "..."] | question --task T-004 --comment-file <文件>
 askhuman --task T-004 --comment-file <文件> | handover --task T-004 | reap [--task T-004] [--stale 90]
-gc [--keep N] [--force] [--from <旧根目录>] | worktrees --root C:/w
-pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1
+gc [--task T-004] [--keep N] [--force] [--from <旧根目录>] | worktrees --root C:/w
+pause | resume [--no-auto] [--wait hook|notify] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1
 ```
 
 ## 机器配置（开循环之前配一次）
@@ -145,6 +147,7 @@ pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency
 1. **读账**：`solo.mjs state`。以文件为准，不以记忆为准。
 2. **回收停住的位置**：`state` 报「可能停住的并发位置」时，先 `solo.mjs reap`，再对每张 `solo.mjs handover --task T-004`，把「上一次做到哪」写进新任务书。被取消的子会话不等于进程已停：`handover` 会看远端分支、PR、未提交改动与没解决的 merge。
 3. **刷新**：`solo.mjs refresh`。关掉的标完成，交回的标 `[~]`，等条件的标 waiting，别人领走的记成 `external`；**我们自己的 `in-progress` / `needs-review` 记成「待续」，不会当成别人的**。
+   刷新也会报「同时带多个流程标签」：一张工单挂两个流程标签时，`claim` 只会顺手修，之前没人发现。
 4. **对账**：`solo.mjs sync`。看外部有没有台账没覆盖的、标签对不对、有没有已经离开范围的。报「外部 0 张」时先怀疑 `scope` 过期（里程碑改过名）。
 5. **看 main 的健康**：`gh run list --workflow CI --branch main --event push --limit 5`。`check` 红了就停下先修（重新打开引起失败的工单），不要继续领新活。
 6. **挑活**：`solo.mjs next --max <并发数>`。它已经排掉：已完成、已交回、正在跑、别人在做、被外部依赖挡着、依赖没满足、互斥超额、不在范围。挑不到就跳到第 12 步。
@@ -154,7 +157,8 @@ pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency
 10. **派活**：每张一份**新的**子代理调用（不要复用上一轮的子会话），同一条回复里发 N 个。任务书用下面的模板，写清它自己的 worktree。
 11. **收账**：逐个收结果，收一个记一个，收完立刻用 `next` 补一个。
     - 先 `solo.mjs check --task T-004`：工作区干净、没有未推送的提交、分支含 `origin/main`、PR 开着没冲突、检查全绿、有 `DELIVERY:` 交付说明且带署名、标签是 `needs-review`。有一条 ✗ 就不许合并。
-    - 再 `solo.mjs finish --task T-004 --status done`：`done` 会自己核对工单已关、PR 已合并、检查全绿，不成立就退出、不写 `[x]`。
+    - 再 `solo.mjs finish --task T-004 --status done`：`done` 会自己核对工单已关、PR 已合并、检查全绿，不成立就退出、不写 `[x]`。父工单随子单被 GitHub 关闭（没有分支也没有 PR）时直接认，不必加 `--no-verify`。记完 done 会顺手 `gc --task` 清这一张的 worktree（先归档 `.tmp` 证据；删不掉只提示，不拦收账）。
+- `check` 认得「工单已关闭 + PR 已合并」这种形状：合并以后工人又开了一张补记日记的小 PR，不会因为它而判成「没交付」；它按正文里的 `Closes #<编号>` 认本单那张 PR。
     - 工人报 `ERROR` 行带前缀时按前缀分流：`[环境]` → `askhuman`，`[设计]` → `question`，没有前缀 → 算一次失败。
     - 顺手核对资源有没有释放（进程、浏览器）；**worktree 不在这里逐张删**：收账以后跑 `solo.mjs gc` 统一清——它先把 `.tmp/` 的证据归档到 `.ralph/<循环>/evidence/<编号>/`，再删；删不掉的重试，还不行就留在残留清单里，不影响工单。
     - `refresh` 报「工单正文在工作中被改过」时，让下一轮的工人按最新正文重核。
@@ -239,6 +243,18 @@ NEXT: 建议的下一轮任务；没有写 none
 - 同时被 hook 挡住的两件事：**写 `.ralph/**`**（账本只由命令改）、**`task_append`**（会复用子会话上下文）。派活超过并发上限、任务书过长时会给提醒。
 - 停下：`solo.mjs pause`（同时关掉无人值守），或者用户直接打断。跑到没有可派的、预算用尽、全部完成时自己停。
 - 没有生效时的查法：新的会话开头应当看到 `[solo] 本工作区有一个…循环` 那段注入；看不到就是宿主没执行项目 hooks，这时退回手动模式——每轮结束时由用户说「继续」。需要 `node` 在 `PATH` 上。
+
+### 宿主没有 Stop hook 时（DSH / OpenCode / Hermes 等）
+
+先把收账方式记进台账：`solo.mjs resume --wait notify`，`state` 会写「无人值守 开（收账靠 宿主通知：派完就结束回合）」。
+
+hook 是 Claude Code 的机制。没有它的宿主上，编排者**不要用 sleep 轮询**：那会把主会话卡在等待里，白烧上下文，人也插不进话。做法是：
+
+1. 派完活、写完 `start`、把这一轮几行摘要记进 `progress.md` 以后，**直接结束回合**。
+2. 宿主的子代理跑完会自己把结果送回来（DSH 是会话里的完成通知），那一刻再收账：`check` → `finish` → `next` → 派下一批。
+3. 收账一律以账本与 GitHub 为准（`solo.mjs state`、`gh pr list`），不以「上一次看到的」为准。
+4. 确实要主动等（例如等 CI）就用**一条带超时**的命令等：`gh pr checks <PR> --watch`，或者把等待放在工人那一侧；不要把等待写进编排者自己的循环。一条命令超过执行上限，就先结束回合，下次收账再查。
+5. 一个回合只收一个工人的账：先到的先收，收完立刻补一张，其余继续跑。
 
 无人值守只省掉「说继续」这一步，不改变任何核对：`check`、`finish` 的证据要求照样成立，`maxIterations` 是唯一的预算闸，跑之前把它设成你能接受的轮数。
 
