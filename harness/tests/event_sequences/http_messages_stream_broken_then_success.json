@@ -33,11 +33,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#1>",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
-    "guidance_version": 0,
-    "input_version": 1,
-    "prompt_version": 0
+    "input_version": 1
    }
   },
   {
@@ -53,10 +49,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#1>",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
-    "prompt_version": 0,
     "step_id": 1
    }
   },
@@ -76,16 +69,10 @@
     "admitted": true,
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
-    "compaction_event_id": null,
     "department": "product",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
-    "retry_of_step_id": null,
-    "source_event_id": null,
     "step_id": 1
    }
   },
@@ -107,15 +94,11 @@
     "attempted": true,
     "context_event_id": "<ses_pro#1>#3",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
     "parameters_version": "<parameters>",
-    "prompt_version": 0,
     "purpose": "work",
-    "retry_of_step_id": null,
     "step_id": 1
    }
   },
@@ -135,13 +118,9 @@
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
-    "retry_of_step_id": null,
     "step_id": 1
    }
   },
@@ -161,10 +140,8 @@
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 1
    }
@@ -185,10 +162,8 @@
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 1
    }
@@ -209,15 +184,11 @@
     "attempt": 1,
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
-    "prompt_version": 0,
     "purpose": "work",
     "reason": "provider_error",
-    "retry_of_step_id": null,
     "retryable": true,
     "status": "failed",
     "step_id": 1,
@@ -241,17 +212,13 @@
     "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
     "delay_sec": 0.01,
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
     "next_attempt": 2,
     "next_step_id": 2,
-    "prompt_version": 0,
     "purpose": "work",
     "reason": "provider_error",
-    "retry_of_step_id": null,
     "retryable": true,
     "step_id": 1
    }
@@ -272,16 +239,11 @@
     "admitted": true,
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
-    "compaction_event_id": null,
     "department": "product",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "retry_of_step_id": 1,
-    "source_event_id": null,
     "step_id": 2
    }
   },
@@ -303,13 +265,10 @@
     "attempted": true,
     "context_event_id": "<ses_pro#1>#10",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
     "parameters_version": "<parameters>",
-    "prompt_version": 0,
     "purpose": "work",
     "retry_of_step_id": 1,
     "step_id": 2
@@ -331,11 +290,8 @@
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "retry_of_step_id": 1,
     "step_id": 2
@@ -357,10 +313,8 @@
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 2
    }
@@ -381,10 +335,8 @@
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 2
    }
@@ -405,10 +357,8 @@
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 2
    }
@@ -429,10 +379,8 @@
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 2
    }
@@ -453,10 +401,8 @@
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 2
    }
@@ -474,11 +420,9 @@
    "error": null,
    "payload": {
     "activation_id": "<act#1>",
-    "guidance_ids": [],
     "input_version": 1,
     "name": "provider_usage",
     "ok": true,
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 2
    }
@@ -498,14 +442,10 @@
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
-    "step_id": 2,
-    "stop_reason": null
+    "step_id": 2
    }
   },
   {
@@ -524,10 +464,8 @@
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "guidance_ids": [],
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
-    "prompt_version": 0,
     "purpose": "work",
     "retry_of_step_id": 1,
     "status": "completed",
@@ -550,13 +488,10 @@
     "attempt": 2,
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
     "id": "toolu-1-0",
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "name": "submit_product_spec",
-    "prompt_version": 0,
     "step_id": 2
    }
   },
@@ -575,15 +510,11 @@
     "activation_id": "<act#1>",
     "attempt_id": "<act#1>:root-1:work:attempt-2",
     "context_event_id": "<ses_pro#1>#10",
-    "effective_contract_hash": null,
-    "error": null,
-    "guidance_ids": [],
     "id": "toolu-1-0",
     "input_version": 1,
     "logical_call_id": "<act#1>:root-1:work",
     "name": "submit_product_spec",
     "ok": true,
-    "prompt_version": 0,
     "purpose": "work",
     "step_id": 2
    }
@@ -623,7 +554,6 @@
     "input_version": 1,
     "issuer": "product",
     "kind": "product_spec",
-    "parent_hash": null,
     "revision": 1,
     "status": "active"
    }
@@ -659,13 +589,10 @@
    "error": null,
    "payload": {
     "activation_id": "<act#1>",
-    "guidance_ids": [],
     "input_version": 1,
-    "prompt_version": 0,
     "session_activations": 1,
     "session_elapsed_ms": "<duration>",
-    "session_model_steps": 2,
-    "stop_reason": null
+    "session_model_steps": 2
    }
   }
  ],
@@ -682,7 +609,6 @@
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
-  "run_event_version": 10,
   "stream_version": 27,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"

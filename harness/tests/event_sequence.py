@@ -15,6 +15,9 @@ PARAMETERS_VERSION = initial_version()
 # 事件序列对照：把一次 run 的完整事件序列规整成与运行时刻、机器路径无关的形式，与 event_sequences/ 下的基准比较。
 # 比较方式（#469）：每个会话内部的事件按顺序比较，会话之间只比较因果关系
 # （询问 → 分支开始 → 回答 → 工具结果，提交 → 下一个部门开始），见文件尾的 compare_documents。
+# 只为真实变化重写的两条口径（#1019）：编号按一一对应比较，数字本身不比（同一个值在各处是同一个
+# 编号、不同的值是不同的编号，这层相等关系照样核对）；投影里的事件版本号（run_event_version）不进
+# 每个场景的比对，由 test_event_sequence.py 的一条单独测试核对当前值。
 #
 # 基准文件的结构：
 #   scenario   场景名；covers  场景覆盖的行为
@@ -50,6 +53,10 @@ PARAMETERS_VERSION = initial_version()
 # 10. 只保留关键字段：载荷只保留 KEY_FIELDS 按事件种类列出的键，工具回执只保留 receipt 里的四项，
 #     投影只保留 PROJECTION_KEY_FIELDS 列出的字段。先筛选、后规整：编号只按保留下来的字段的出现顺序产生。
 #     增删表以外的字段不改动基准；表以内的字段变化必须让对应的场景失败。
+#     关键字段的值等于默认值（false、0、null、空串、空列表、空对象）时不写进这条事件（工单 #1019）：
+#     新加一个默认值字段不改基准，删掉一个几乎总是默认值的字段只改它不是默认值的场景。工具调用的 ok
+#     是内核测试按值区分的字段，照写不省略。字段缺了还是等于默认值，比对不区分，由载荷合同
+#     （harness/app/payloads.py 的严格校验）与接口快照负责。
 #     会话事件里整个事项的累计数（激活结束的 activations、model_steps，激活开始的 cycle）不在表里：
 #     它们数的是整件事项，别的会话先做一步就多一（工单 #892）；会话自己的累计数
 #     （session_activations、session_model_steps）保留，事项的总数在投影里比较。
@@ -75,6 +82,8 @@ _GIT_SHA = re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])")
 _ARTIFACT_KEYS = frozenset({"kind", "content_hash", "path", "media_type"})
 # 引用别的事件的写法：被引用事件在它自己会话里的位置 <会话>#<条数>（会话是基准里的会话编号）
 _SESSION_POSITION = re.compile(r"^(?:<[^>]+>|__run__)#\d+$")
+# 生成物编号的写法 <种类#数字>（#1019：比对时按一一对应比较，数字本身不比）
+_PLACEHOLDER = re.compile(r"<([a-z][a-z0-9_]*)#(\d+)>")
 _EVENT_FIELDS = ("type", "actor", "department", "state_before", "state_after", "parent_event_id", "session_id",
                  "stop_reason", "error", "payload")
 _SHARED_TEXT = 300
@@ -187,10 +196,12 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "decision_withdrawn": ("decision_id", "reason"),
 }
 
-# 投影在基准里保留的字段；带下划线的四项各自再保留下面列出的键
+# 投影在基准里保留的字段；带下划线的四项各自再保留下面列出的键。
+# run_event_version 不在其中（工单 #1019）：它在每个场景都是同一个常数，升版不该让全部基准一起重写，
+# 由 test_event_sequence.py 的一条单独测试核对当前值。
 PROJECTION_KEY_FIELDS = ("status", "stop_reason", "error", "waiting_reason", "active_department",
                          "human_action", "cycle_count", "rework_count", "round", "input_version",
-                         "processed_input_version", "product_work_input_version", "run_event_version",
+                         "processed_input_version", "product_work_input_version",
                          "stream_version", "definitions_version", "parameters_version")
 _PROJECTION_NESTED = {
     "product_spec": ("revision", "status", "content_hash"),
@@ -198,9 +209,29 @@ _PROJECTION_NESTED = {
     "last_review": ("revision", "status", "verdict", "content_hash"),
     "effective_contract": ("revision", "content_hash"),
 }
+# 投影里不进比对的字段（工单 #1019）：事件版本号不进每个场景的投影比对
+PROJECTION_NOT_COMPARED = frozenset({"run_event_version"})
 # 工具回执保留的四项：从 output_ref 指向的工件内容里取，工件内容不是 JSON 对象时不记回执
 _RECEIPT_KEYS = ("exit_code", "qa_tests_hash", "status", "tree_changed")
 _RECEIPT_TYPES = frozenset({"tool_called", "tool_skipped"})
+# 关键字段等于默认值时省略的例外（工单 #1019）：内核测试按值区分这些字段，等于默认值也照写。
+# 现在是工具调用结果的 ok：被拒绝的调用写 ok: false，内核测试按它区分「没有许可却报告成功」。
+VALUE_SENSITIVE_KEY_FIELDS = frozenset({"ok"})
+
+
+def _is_default_value(value: Any) -> bool:
+    # 关键字段的默认值：false、0、null、空串、空列表、空对象（工单 #1019）
+    if value is None or value is False:
+        return True
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return value == 0
+    if isinstance(value, str):
+        return value == ""
+    if isinstance(value, (list, dict)):
+        return len(value) == 0
+    return False
 
 
 class _Normalizer:
@@ -323,8 +354,15 @@ class _Normalizer:
         for field in _EVENT_FIELDS:
             record[field] = self.value(getattr(event, field), field)
         payload = event.payload if isinstance(event.payload, dict) else {}
-        # 先筛选、后规整：编号只按保留下来的字段的出现顺序产生
-        record["payload"] = {key: self.value(payload[key], key) for key in keys if key in payload}
+        # 先筛选、后规整：编号只按保留下来的字段的出现顺序产生。
+        # 关键字段等于默认值时不写进这条事件（工单 #1019），按值区分的 ok 照写。
+        # 默认值按规整以后的值判断：时间类字段规整成 <duration> 以后不是默认值，
+        # 否则一次 0 毫秒的激活会让基准随运行时长变化。
+        normalized = {key: self.value(payload[key], key) for key in keys if key in payload}
+        record["payload"] = {
+            key: value for key, value in normalized.items()
+            if key in VALUE_SENSITIVE_KEY_FIELDS or not _is_default_value(value)
+        }
         if event.type in _RECEIPT_TYPES:
             self.receipt(payload, record)
         return record
@@ -526,6 +564,16 @@ def compare_with_baseline(name: str, covers: str, run: dict[str, Any], *, write:
     path = BASELINE_DIR / f"{name}.json"
     actual = baseline_text(name, covers, run)
     if write:
+        # --write-event-baselines 只重写比对不过的文件（工单 #1019）：比对通过的不动，
+        # 第二次运行不改任何文件；同时运行的会话让事件在数组里的交错顺序随运行变化，
+        # 这些只影响写法、不影响会话内顺序与因果的差异不该落进提交
+        if path.exists():
+            try:
+                compare_documents(name, json.loads(path.read_text(encoding="utf-8")), json.loads(actual))
+            except AssertionError:
+                pass
+            else:
+                return
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(actual, encoding="utf-8", newline="\n")
         return
@@ -591,9 +639,75 @@ def _payload_reference(value: Any, positions: dict[str, str]) -> Any:
     return value
 
 
-def _group_records(document):
+def _without_numbers(value):
+    # 去掉编号里的数字、保留种类与位置，用来给会话排一个与编号无关的确定顺序
+    if isinstance(value, str):
+        return _PLACEHOLDER.sub(lambda match: f"<{match.group(1)}>", value)
+    if isinstance(value, dict):
+        return {key: _without_numbers(item) for key, item in sorted(value.items())}
+    if isinstance(value, list):
+        return [_without_numbers(item) for item in value]
+    return value
+
+
+def _renumbered(body):
+    # 编号按一一对应比较（工单 #1019）：同一份文件里按统一的遍历顺序把 <种类#数字> 重新编为
+    # 1、2、3……。同一个值在各处仍是同一个编号、不同的值仍是不同的编号，这层相等关系照样核对；
+    # 数字本身不参与比较，前面多一个产物、编号整体顺移不再让基准重写。
+    # 遍历顺序先按会话的确定顺序（运行级、部门顺序、事件种类序列、去掉编号后的内容），
+    # 再按事件在数组里的顺序：会话之间谁先写事件不改变编号（工单 #557）。
+    counters: dict[str, dict[str, int]] = {}
+
+    def walk(value):
+        if isinstance(value, str):
+            def number(match: re.Match[str]) -> str:
+                kind, index = match.group(1), match.group(2)
+                mapping = counters.setdefault(kind, {})
+                if index not in mapping:
+                    mapping[index] = len(mapping) + 1
+                return f"<{kind}#{mapping[index]}>"
+
+            return _PLACEHOLDER.sub(number, value)
+        if isinstance(value, dict):
+            return {key: walk(value[key]) for key in sorted(value)}
+        if isinstance(value, list):
+            return [walk(item) for item in value]
+        return value
+
+    events = body.get("events") or []
+    groups: dict[str, list] = {}
+    for event in events:
+        groups.setdefault(event.get("session_id") or RUN_GROUP, []).append(event)
+    rank = {department: index for index, department in enumerate(DEFINITIONS.departments)}
+
+    def group_order(key):
+        items = groups[key]
+        return (0 if key == RUN_GROUP else 1,
+                rank.get(str(items[0].get("department") or ""), len(rank)),
+                [str(event.get("type")) for event in items],
+                _canon(_without_numbers(items)))
+
+    for key in sorted(groups, key=group_order):
+        for event in groups[key]:
+            walk(event)
+    walk(body.get("projection"))
+    return walk(body)
+
+
+def _comparison_view(document):
+    # 比对用的视图：先把 shared 展开（编号在展开后的内容里统一重编），投影去掉不进比对的字段
     shared = document.get("shared") or {}
-    events = [_inline(event, shared, {}) for event in document["events"]]
+    events = [_inline(event, shared, {}) for event in document.get("events") or []]
+    projection = document.get("projection")
+    if isinstance(projection, dict):
+        projection = {name: value for name, value in projection.items()
+                      if name not in PROJECTION_NOT_COMPARED}
+    return _renumbered({"events": events, "projection": projection})
+
+
+def _group_records(document):
+    # document 是 _comparison_view 的结果：shared 已展开、编号已按一一对应重编
+    events = document["events"]
     groups = _session_groups(events)
     positions = {}
     for key, items in groups.items():
@@ -608,8 +722,13 @@ def _group_records(document):
             record["parent_event_id"] = _reference(item.get("parent_event_id"), positions)
             payload = record.get("payload")
             if isinstance(payload, dict):
-                record["payload"] = {name: _payload_reference(value, positions)
-                                     for name, value in payload.items()}
+                # 关键字段等于默认值时不写进这条事件（工单 #1019）：字段缺了还是等于默认值，
+                # 比对不区分；按值区分的 ok 照写，不按默认值省略
+                record["payload"] = {
+                    name: _payload_reference(value, positions)
+                    for name, value in payload.items()
+                    if name in VALUE_SENSITIVE_KEY_FIELDS or not _is_default_value(value)
+                }
             group_records.append(record)
         records[key] = group_records
     return records
@@ -676,7 +795,8 @@ def compare_documents(name, expected, actual):
         if expected.get(field) != actual.get(field):
             raise AssertionError(f"event sequence of {name} differs from its baseline:\n"
                                  f"{field} differs: {expected.get(field)!r} != {actual.get(field)!r}")
-    expected_groups, actual_groups = _group_records(expected), _group_records(actual)
+    expected_view, actual_view = _comparison_view(expected), _comparison_view(actual)
+    expected_groups, actual_groups = _group_records(expected_view), _group_records(actual_view)
     if set(expected_groups) != set(actual_groups):
         raise AssertionError(f"event sequence of {name} differs from its baseline:\nsessions differ: "
                              f"{sorted(set(expected_groups) - set(actual_groups))} missing, "
@@ -693,14 +813,15 @@ def compare_documents(name, expected, actual):
             raise AssertionError(f"event sequence of {name} differs from its baseline:\n"
                                  f"session {key} event #{index} differs:\n{_fields_line(expected_groups, actual_groups, key, index)}"
                                  + _diff_lines(wanted, got))
-    expected_edges, actual_edges = _causal_edges(expected["events"]), _causal_edges(actual["events"])
+    expected_edges, actual_edges = _causal_edges(expected_view["events"]), _causal_edges(actual_view["events"])
     if expected_edges != actual_edges:
         missing = sorted(expected_edges - actual_edges)
         unexpected = sorted(actual_edges - expected_edges)
         raise AssertionError(f"event sequence of {name} differs from its baseline:\ncausal edges differ:\n"
                              f"missing: {missing}\nunexpected: {unexpected}")
-    # 投影是事件推出来的结果：事件一致以后才比较投影，差异先写是哪一项再写 diff
-    expected_projection, actual_projection = expected.get("projection"), actual.get("projection")
+    # 投影是事件推出来的结果：事件一致以后才比较投影，差异先写是哪一项再写 diff；
+    # 投影里不进比对的字段已经在视图里去掉（工单 #1019）
+    expected_projection, actual_projection = expected_view.get("projection"), actual_view.get("projection")
     if _canon(expected_projection) != _canon(actual_projection):
         raise AssertionError(f"event sequence of {name} differs from its baseline:\nprojection differs:\n"
                              + _projection_fields_line(expected_projection, actual_projection)

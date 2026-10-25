@@ -7,10 +7,11 @@ from harness.adapters.fake import clear_shared_list_scripts, shared_list_scripts
 
 def pytest_addoption(parser):
     # 只在第一次建立事件序列基准、或行为有意改变并经架构师确认时使用；同时重写 event_sequences/*.json
-    # 与 prompt_snapshot.json
+    # 与 prompt_snapshot.json。只重写比对不过的基准文件，比对通过的不动（工单 #1019）
     parser.addoption("--write-event-baselines", action="store_true", default=False,
-                     help="write harness/tests/event_sequences/*.json and prompt_snapshot.json from the current "
-                          "run instead of comparing")
+                     help="write the event sequence baselines under harness/tests/event_sequences/ and "
+                          "prompt_snapshot.json that differ from the current run; baselines that still compare "
+                          "equal are left untouched")
     # 只在合同有意改变时使用：重写 OpenAPI 快照，提交前用 git diff 核对变化
     parser.addoption("--write-openapi-snapshot", action="store_true", default=False,
                      help="write harness/tests/openapi/openapi.json from the running service instead of comparing")

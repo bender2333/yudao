@@ -1,7 +1,8 @@
 # 事件序列基准（docs/design/test-pyramid.md，ADR-0019）：每个场景跑完以后，把规整后的事件序列与
 # harness/tests/event_sequences/<场景名>.json 比较；规整规则与基准文件的结构见 event_sequence.py。
 # 基准与当前运行不一致说明行为改变：修正代码，不更新基准。只有架构师确认的有意改变才用
-# python -m pytest harness/tests/test_event_sequence.py --write-event-baselines 重写基准，并在提交说明中写明原因。
+# python -m pytest harness/tests/test_event_sequence.py --write-event-baselines 重写基准，并在提交说明中写明原因；
+# 这个开关只重写比对不过的文件，比对通过的不动（工单 #1019），第二次运行不改任何文件。
 # 场景本身（脚本、驱动与替换规则）在 event_scenarios.py，其他测试也按名字取一个场景跑完整序列。
 
 import difflib
@@ -13,6 +14,18 @@ import pytest
 from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.tests.event_scenarios import SCENARIOS
 from harness.tests.event_sequence import compare_with_baseline, normalized_run, prompt_entries
+from harness.streams import RUN_EVENT_VERSION
+
+# 投影里的事件版本号不进每个场景的比对（工单 #1019）：升版不让全部基准一起重写，由下面这一条
+# 单独核对当前值。升版时把这里的数字一起改，改动本身就是要评审的那一处。
+# 基准的投影里没有它（生成规则）、只差这一项时比对通过，各自在 test_event_sequence_compare.py。
+EXPECTED_RUN_EVENT_VERSION = 10
+
+
+def test_the_current_run_event_version_is_the_expected_one():
+    assert RUN_EVENT_VERSION == EXPECTED_RUN_EVENT_VERSION, (
+        f"当前 run 事件版本是 {RUN_EVENT_VERSION}，基准与这条测试记的是 {EXPECTED_RUN_EVENT_VERSION}；"
+        "有意升版时改这里，事件序列基准不再随版本号重写")
 
 
 @pytest.mark.parametrize("name", list(SCENARIOS))
