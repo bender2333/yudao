@@ -12,7 +12,7 @@ import asyncio
 import json
 import math
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import aclosing
 from dataclasses import asdict, dataclass, field, replace
 from threading import Event
@@ -24,6 +24,7 @@ from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .compaction import CompactionError
+from .contracts import current_contract_hash
 from .definitions import DEFINITIONS
 from .deltas import DeltaChannel, DeltaScope
 from .environment import LocalEnvironment, QA_TESTS_DIR, qa_tests_digest
@@ -221,18 +222,21 @@ class StepDriver:
     def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
               facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-              cancelled: Event, limits: StepLimits, deltas: DeltaChannel) -> StepDriver:
+              cancelled: Event, limits: StepLimits, deltas: DeltaChannel,
+              refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(scope, prompt, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, facade=facade, environment=environment, nodes=nodes,
-                     cancelled=cancelled, limits=limits, deltas=deltas)
+                     cancelled=cancelled, limits=limits, deltas=deltas,
+                     refresh_workspace=refresh_workspace)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
     def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
                  facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-                 cancelled: Event, limits: StepLimits, deltas: DeltaChannel) -> None:
+                 cancelled: Event, limits: StepLimits, deltas: DeltaChannel,
+                 refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> None:
         self._scope = scope
         basis = scope.basis
         self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt, scope.guidance_only,
@@ -250,6 +254,9 @@ class StepDriver:
         self._cancelled = cancelled
         self._limits = limits
         self._deltas = deltas
+        # 检查工作区按会话保留（工单 #558）：新交付封存以后质检的检查工作区要重建，
+        # 由编排层给出重建好的工作区，这里只接着用
+        self._refresh_workspace = refresh_workspace
         self._request: ModelRequest | None = None
         self._action: Action | None = None
         self._step: StepRequest | None = None
@@ -400,6 +407,8 @@ class StepDriver:
             judgment = self._proceed()
             if not judgment.proceed:
                 return self._stop_now(judgment)
+            self._adopt_current_contract()
+            self._refresh_workspace_now()
             prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id,
                                      replies_without_tool_call)
             if isinstance(prepared, Stopped):
@@ -962,6 +971,25 @@ class StepDriver:
             return (f"压缩连续 {self._compaction_stalls} 次没有推进（{self._compaction_reason}），"
                     f"达到 compaction.stalled_limit={limit}，以压缩失败停止。")
         return None
+
+    def _adopt_current_contract(self) -> None:
+        # PRD 有了新版本：这个会话在下一步收到通知（新版本与改动），采用新的有效合同并接着工作，
+        # 这一轮不因此结束（工单 #558，循环结构第 5 节）。采用以后检查回执绑定新的合同，
+        # 部门按新版本重做的检查才能被交付与放行认下。
+        projection = self._writes.read(self._stream).projection
+        current = current_contract_hash(projection)
+        if current == self._scope.basis.effective_contract_hash:
+            return
+        self._adopt_contract(current)
+
+    def _refresh_workspace_now(self) -> None:
+        # 检查工作区按会话保留（工单 #558）：检查工作区只在会话建立时与新交付封存以后重建，
+        # 询问与通知都不重建。新的交付封存以后，质检的会话在下一步从这份交付重建（local-tools 第 2 节）。
+        if self._refresh_workspace is None:
+            return
+        refreshed = self._refresh_workspace()
+        if refreshed is not None:
+            self._environment = refreshed
 
     def _begin_tool(self, request: ModelRequest, call: dict[str, Any]) -> tuple[ToolPermission, WorkspaceFacts]:
         # 工具许可依据的工作区事实向执行环境查询，作为输入交给 U；同一份事实是动作的前置条件

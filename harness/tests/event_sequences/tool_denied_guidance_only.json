@@ -773,8 +773,8 @@
     "check_names": [
      "smoke"
     ],
-    "code_tree_digest": "<sha256#52>",
-    "content_hash": "<sha256#56>",
+    "code_tree_digest": "<sha256#53>",
+    "content_hash": "<sha256#57>",
     "effective_contract_hash": "<sha256#27>",
     "id": "<del#1>",
     "issuer": "engineering",
@@ -1405,7 +1405,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "content_hash": "<sha256#92>",
+    "content_hash": "<sha256#94>",
     "version": 1
    }
   },
@@ -1524,7 +1524,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#74>",
+    "content_hash": "<sha256#75>",
     "department": "engineering",
     "guidance_created_event_id": "__run__#2",
     "guidance_id": "<guidance#1>",
@@ -1537,56 +1537,6 @@
   },
   {
    "event": "<evt#61>",
-   "type": "proposal_submitted",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "definitions_version": "<definitions>",
-    "input_version": 1,
-    "kind": "qa_review",
-    "parameters_version": "<parameters>"
-   }
-  },
-  {
-   "event": "<evt#62>",
-   "type": "proposal_rejected",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "definitions_version": "<definitions>",
-    "errors": [
-     {
-      "field": "basis_delivery_spec_hash",
-      "message": "submitted artifact is based on None; current version is '<sha256#56>'. Read the current version and submit again."
-     },
-     {
-      "field": "checks",
-      "message": "quality must run smoke against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"
-     },
-     {
-      "field": "checks",
-      "message": "release requires quality-run evidence bound to the current snapshot"
-     }
-    ],
-    "input_version": 1,
-    "kind": "qa_review",
-    "parameters_version": "<parameters>"
-   }
-  },
-  {
-   "event": "<evt#63>",
    "type": "activation_finished",
    "actor": "system",
    "department": "engineering",
@@ -1608,6 +1558,56 @@
     "session_elapsed_ms": "<duration>",
     "session_model_steps": 2,
     "stop_reason": null
+   }
+  },
+  {
+   "event": "<evt#62>",
+   "type": "proposal_submitted",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "definitions_version": "<definitions>",
+    "input_version": 1,
+    "kind": "qa_review",
+    "parameters_version": "<parameters>"
+   }
+  },
+  {
+   "event": "<evt#63>",
+   "type": "proposal_rejected",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "definitions_version": "<definitions>",
+    "errors": [
+     {
+      "field": "basis_delivery_spec_hash",
+      "message": "submitted artifact is based on None; current version is '<sha256#57>'. Read the current version and submit again."
+     },
+     {
+      "field": "checks",
+      "message": "quality must run smoke against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"
+     },
+     {
+      "field": "checks",
+      "message": "release requires quality-run evidence bound to the current snapshot"
+     }
+    ],
+    "input_version": 1,
+    "kind": "qa_review",
+    "parameters_version": "<parameters>"
    }
   },
   {
@@ -1895,7 +1895,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#92>",
+    "qa_tests_hash": "<sha256#94>",
     "tree_changed": false
    }
   },
@@ -1985,9 +1985,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "code_snapshot_hash": "<sha256#52>",
-    "content_hash": "<sha256#104>",
-    "delivery_spec_hash": "<sha256#56>",
+    "code_snapshot_hash": "<sha256#53>",
+    "content_hash": "<sha256#108>",
+    "delivery_spec_hash": "<sha256#57>",
     "effective_contract_hash": "<sha256#27>",
     "id": "<qa#1>",
     "issuer": "quality",

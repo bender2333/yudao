@@ -268,9 +268,10 @@ class ContextAssembly:
     def pin(self, projection: RunProjection, frame: StepFrame, limits: ModelLimits, *, step_id: int,
             events: list[Event], snapshot_hash: str, call_target: dict[str, Any] | None = None,
             input_modalities: tuple[str, ...] = ("text",)) -> PinnedStep:
-        # 装配这一步的固定部分。待处理指导的原文只在激活第一步交给部门；
-        # guidance_results 按给定的事件与工作区快照计算
-        guidance = pending_guidance(projection, frame.department) if step_id == 1 else []
+        # 装配这一步的固定部分。待处理指导的原文在这个会话的每一步交给部门：
+        # 指导在工作期间到达时，它在这个会话的下一步作为通知加入它的历史
+        # （工单 #558，循环结构第 6 节）；guidance_results 按给定的事件与工作区快照计算
+        guidance = pending_guidance(projection, frame.department)
         context = self.assembler.assemble(
             projection, department=frame.department, session_id=frame.session_id,
             activation_id=frame.activation_id, step_id=step_id, prompt=frame.prompt,

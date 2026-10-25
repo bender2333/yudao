@@ -874,7 +874,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "content_hash": "<sha256#87>",
+    "content_hash": "<sha256#88>",
     "version": 1
    }
   },
@@ -993,7 +993,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#49>",
+    "content_hash": "<sha256#50>",
     "department": "engineering",
     "guidance_created_event_id": "__run__#2",
     "guidance_id": "<guidance#1>",
@@ -1006,48 +1006,6 @@
   },
   {
    "event": "<evt#41>",
-   "type": "proposal_submitted",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "definitions_version": "<definitions>",
-    "input_version": 1,
-    "kind": "qa_review",
-    "parameters_version": "<parameters>"
-   }
-  },
-  {
-   "event": "<evt#42>",
-   "type": "proposal_rejected",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "definitions_version": "<definitions>",
-    "errors": [
-     {
-      "field": "delivery_spec",
-      "message": "this work has no delivery to review"
-     }
-    ],
-    "input_version": 1,
-    "kind": "qa_review",
-    "parameters_version": "<parameters>"
-   }
-  },
-  {
-   "event": "<evt#43>",
    "type": "activation_finished",
    "actor": "system",
    "department": "engineering",
@@ -1069,6 +1027,48 @@
     "session_elapsed_ms": "<duration>",
     "session_model_steps": 1,
     "stop_reason": null
+   }
+  },
+  {
+   "event": "<evt#42>",
+   "type": "proposal_submitted",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "definitions_version": "<definitions>",
+    "input_version": 1,
+    "kind": "qa_review",
+    "parameters_version": "<parameters>"
+   }
+  },
+  {
+   "event": "<evt#43>",
+   "type": "proposal_rejected",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "definitions_version": "<definitions>",
+    "errors": [
+     {
+      "field": "delivery_spec",
+      "message": "this work has no delivery to review"
+     }
+    ],
+    "input_version": 1,
+    "kind": "qa_review",
+    "parameters_version": "<parameters>"
    }
   },
   {
@@ -1531,8 +1531,8 @@
     "check_names": [
      "smoke"
     ],
-    "code_tree_digest": "<sha256#65>",
-    "content_hash": "<sha256#69>",
+    "code_tree_digest": "<sha256#66>",
+    "content_hash": "<sha256#70>",
     "effective_contract_hash": "<sha256#27>",
     "id": "<del#1>",
     "issuer": "engineering",
@@ -1828,7 +1828,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#87>",
+    "qa_tests_hash": "<sha256#88>",
     "tree_changed": false
    }
   },
@@ -1918,9 +1918,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "code_snapshot_hash": "<sha256#65>",
-    "content_hash": "<sha256#103>",
-    "delivery_spec_hash": "<sha256#69>",
+    "code_snapshot_hash": "<sha256#66>",
+    "content_hash": "<sha256#107>",
+    "delivery_spec_hash": "<sha256#70>",
     "effective_contract_hash": "<sha256#27>",
     "id": "<qa#1>",
     "issuer": "quality",

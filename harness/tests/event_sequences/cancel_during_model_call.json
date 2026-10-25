@@ -512,29 +512,6 @@
    "event": "<evt#22>",
    "type": "activation_finished",
    "actor": "system",
-   "department": "engineering",
-   "state_before": "failed",
-   "state_after": "failed",
-   "parent_event_id": "<ses_eng#1>#1",
-   "session_id": "<ses_eng#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#2>",
-    "guidance_ids": [],
-    "guidance_only": false,
-    "input_version": 1,
-    "prompt_version": 0,
-    "session_activations": 1,
-    "session_elapsed_ms": "<duration>",
-    "session_model_steps": 1,
-    "stop_reason": "cancelled"
-   }
-  },
-  {
-   "event": "<evt#23>",
-   "type": "activation_finished",
-   "actor": "system",
    "department": "quality",
    "state_before": "failed",
    "state_after": "failed",
@@ -551,6 +528,29 @@
     "session_activations": 1,
     "session_elapsed_ms": "<duration>",
     "session_model_steps": 0,
+    "stop_reason": "cancelled"
+   }
+  },
+  {
+   "event": "<evt#23>",
+   "type": "activation_finished",
+   "actor": "system",
+   "department": "engineering",
+   "state_before": "failed",
+   "state_after": "failed",
+   "parent_event_id": "<ses_eng#1>#1",
+   "session_id": "<ses_eng#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#2>",
+    "guidance_ids": [],
+    "guidance_only": false,
+    "input_version": 1,
+    "prompt_version": 0,
+    "session_activations": 1,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 1,
     "stop_reason": "cancelled"
    }
   }

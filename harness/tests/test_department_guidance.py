@@ -96,7 +96,9 @@ def test_guidance_for_previous_department_gets_a_read_only_activation_before_rel
         "read_file", "list_files", "run_check", "submit_guidance_response",
     ]
 
-def test_guidance_received_during_model_request_invalidates_old_submission(tmp_path):
+def test_guidance_received_during_model_request_becomes_a_notification(tmp_path):
+    # 工单 #558：指导在工作期间到达时，它在这个会话的下一步作为通知加入历史；
+    # 这次提交不再因为指导到达而作废（循环结构第 6 节）
     holder = {}
 
     def old_response(request):
@@ -109,10 +111,10 @@ def test_guidance_received_during_model_request_invalidates_old_submission(tmp_p
     run_id = system.create_run("echo")
     result = system.activate_once(run_id)
 
-    assert result.product_spec is None
-    assert result.department_guidance[0].status == "received"
-    assert not any(event.type == EventType.SPEC_ACCEPTED for event in system.store.list_events(run_id))
-    assert any(event.type == EventType.PROPOSAL_SUBMITTED for event in system.store.list_events(run_id)) is False
+    assert result.product_spec is not None
+    assert result.department_guidance[0].status in {"received", "in_input"}
+    assert any(event.type == EventType.SPEC_ACCEPTED for event in system.store.list_events(run_id))
+    assert any(event.type == EventType.PROPOSAL_SUBMITTED for event in system.store.list_events(run_id))
 
 def test_guidance_command_returns_persisted_target_record(data_dir):
     system = LoopSystem.for_testing(data_dir, FakeAdapter([]))

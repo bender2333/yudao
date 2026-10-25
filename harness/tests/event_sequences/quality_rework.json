@@ -895,7 +895,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "content_hash": "<sha256#89>",
+    "content_hash": "<sha256#92>",
     "version": 1
    }
   },
@@ -1172,8 +1172,8 @@
     "check_names": [
      "smoke"
     ],
-    "code_tree_digest": "<sha256#51>",
-    "content_hash": "<sha256#55>",
+    "code_tree_digest": "<sha256#52>",
+    "content_hash": "<sha256#56>",
     "effective_contract_hash": "<sha256#26>",
     "id": "<del#1>",
     "issuer": "engineering",
@@ -1469,7 +1469,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#89>",
+    "qa_tests_hash": "<sha256#92>",
     "tree_changed": false
    }
   },
@@ -1559,9 +1559,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "code_snapshot_hash": "<sha256#51>",
-    "content_hash": "<sha256#105>",
-    "delivery_spec_hash": "<sha256#55>",
+    "code_snapshot_hash": "<sha256#52>",
+    "content_hash": "<sha256#111>",
+    "delivery_spec_hash": "<sha256#56>",
     "effective_contract_hash": "<sha256#26>",
     "id": "<qa#1>",
     "issuer": "quality",
@@ -1585,7 +1585,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "delivery_spec_hash": "<sha256#55>",
+    "delivery_spec_hash": "<sha256#56>",
     "id": "<lesson#1>",
     "kind": "lesson_candidate",
     "product_spec_hash": "<sha256#25>",
@@ -2053,13 +2053,13 @@
     "check_names": [
      "smoke"
     ],
-    "code_tree_digest": "<sha256#68>",
-    "content_hash": "<sha256#71>",
+    "code_tree_digest": "<sha256#71>",
+    "content_hash": "<sha256#74>",
     "effective_contract_hash": "<sha256#26>",
     "id": "<del#2>",
     "issuer": "engineering",
     "kind": "delivery_spec",
-    "parent_hash": "<sha256#55>",
+    "parent_hash": "<sha256#56>",
     "product_spec_hash": "<sha256#25>",
     "revision": 2,
     "status": "active"
@@ -2350,7 +2350,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#89>",
+    "qa_tests_hash": "<sha256#92>",
     "tree_changed": false
    }
   },
@@ -2440,14 +2440,14 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "code_snapshot_hash": "<sha256#68>",
-    "content_hash": "<sha256#118>",
-    "delivery_spec_hash": "<sha256#71>",
+    "code_snapshot_hash": "<sha256#71>",
+    "content_hash": "<sha256#127>",
+    "delivery_spec_hash": "<sha256#74>",
     "effective_contract_hash": "<sha256#26>",
     "id": "<qa#2>",
     "issuer": "quality",
     "kind": "qa_review",
-    "parent_hash": "<sha256#105>",
+    "parent_hash": "<sha256#111>",
     "product_spec_hash": "<sha256#25>",
     "revision": 2,
     "status": "active",

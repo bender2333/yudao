@@ -59,6 +59,71 @@ def department_work_text(pinned: AssembledContext) -> str:
     return "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
 
 
+def work_notifications(projection: RunProjection, events: list[Any] | None, department: str,
+                       session_id: str | None) -> list[dict[str, Any]]:
+    # 这个会话还没有看到的新版本（工单 #558）：PRD 的新版本与交付到达。
+    # 判据是「这个会话上一次发出模型请求以后」写下的版本：它在这个会话的下一步作为通知送达，
+    # 部门接着工作。通知只在会话之间比较，同一会话里下一次请求不再重复送达同一份通知。
+    if session_id is None:
+        return []
+    items = list(events or [])
+    positions: dict[str, int] = {}
+    producers: dict[str, str | None] = {}
+    seen = -1
+    for event in items:
+        positions[event.event_id] = event.position
+        producers[event.event_id] = event.session_id
+        if event.type == EventType.MODEL_REQUESTED and event.session_id == session_id:
+            seen = event.position
+    notifications: list[dict[str, Any]] = []
+    for spec in projection.product_specs:
+        if spec.status != "active":
+            continue
+        position = positions.get(spec.created_event_id)
+        if position is None or position <= seen:
+            continue
+        if producers.get(spec.created_event_id) == session_id:
+            # 这个会话自己写下的版本：不用通知自己
+            continue
+        notifications.append({
+            "kind": "product_spec_revised",
+            "revision": spec.revision,
+            "content_hash": spec.content_hash,
+            "change_record": spec.change_record,
+            "decision_changes": spec.decision_changes,
+        })
+    if department == "quality":
+        # 交付到达只通知质检：它面对的代码随交付变化，检查工作区因此重建（local-tools 第 2 节）
+        for delivery in projection.delivery_specs:
+            if delivery.status != "active":
+                continue
+            position = positions.get(delivery.created_event_id)
+            if position is None or position <= seen:
+                continue
+            if producers.get(delivery.created_event_id) == session_id:
+                continue
+            notifications.append({
+                "kind": "delivery_arrived",
+                "revision": delivery.revision,
+                "content_hash": delivery.content_hash,
+                "files": delivery.files,
+                "product_spec_hash": delivery.product_spec_hash,
+            })
+    return notifications
+
+
+def _notification_text(item: dict[str, Any]) -> str:
+    if item["kind"] == "product_spec_revised":
+        record = item.get("change_record") or {}
+        changed = record.get("changed") if isinstance(record, dict) else None
+        detail = f"；改动：{'；'.join(changed)}" if changed else ""
+        return (f"产品要求有了新版本 r{item['revision']}{detail}。"
+                "这份要求现在有效，已经做的工作还算不算数由你自己判断，接着当前工作。")
+    # 交付到达的通知只给事实部分（工单 #554）：交付说明里的解释部分在质检下结论以前不给
+    return (f"新的交付到达了（r{item['revision']}，{len(item.get('files') or [])} 个文件）。"
+            "检查工作区已经从这份交付重建，交付之前写的测试材料仍然在；接着当前工作。")
+
+
 class ContextAssembler:
     def __init__(self, artifacts: ArtifactStore | None = None, store: EventStore | None = None) -> None:
         self.artifacts = artifacts
@@ -102,12 +167,19 @@ class ContextAssembler:
         engineering = (quality_engineering_content(events or [], delivery=current_delivery)
                        if department == "quality" else None)
         # 钉住材料顺序：intend → current_work → project（项目 run）→ department_guidance（有待处理指导）→ department_rules。
-        current_work = _current_work(projection, department, engineering)
+        notifications = work_notifications(projection, events, department, session_id)
+        current_work = _current_work(projection, department, engineering, notifications)
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
             ContextPart("current_work", _current_work_version(current_work),
                         json_dumps(current_work)),
         ]
+        if notifications:
+            parts.append(ContextPart(
+                "work_notification",
+                canonical_hash(notifications)[:12],
+                json_dumps(notifications),
+            ))
         if projection.project_context_ref is not None:
             if self.artifacts is None:
                 raise ValueError("project context requires an artifact store")
@@ -430,7 +502,8 @@ def _current_work_version(current_work: dict[str, Any]) -> str:
 
 
 def _current_work(projection: RunProjection, department: str,
-                  engineering: dict[str, Any] | None = None) -> dict[str, Any]:
+                  engineering: dict[str, Any] | None = None,
+                  notifications: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     if projection.kind == "onboarding":
         # 建档事项中的工作文字（工单 #134）：读取与核验现有代码，没有实现与放行
         work = {
@@ -470,6 +543,8 @@ def _current_work(projection: RunProjection, department: str,
                  "completed 表示本指导被采用后的动作已有主机结果。"
                  "guidance_results 只列出本指导被采用后可由宿主绑定的结果；completed 时宿主绑定这些结果，不必手抄事件 id；"
                  "指导不能替代产品要求、交付说明或质检放行。")
+    for item in notifications or []:
+        work += " " + _notification_text(item)
     return {
         "department": department, "work": work,
         "current_goal": projection.product_spec.goal if projection.product_spec else None,
