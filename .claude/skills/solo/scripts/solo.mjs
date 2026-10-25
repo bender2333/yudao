@@ -1668,7 +1668,9 @@ function commandSummary(args) {
     waiting: group((t) => t.status === 'waiting'),
     forUser: Object.keys(state).filter((id) => state[id] && state[id].waitFor === 'user'),
     running: conc.active.map((a) => (a.issue ? '#' + a.issue : a.task)),
-    free: group((t) => t.status === 'pending' && !inScopeAnnotated(t) && !(state[t.id] && (state[t.id].external || (state[t.id].blockedBy || []).length))),
+    free: group((t) => t.status === 'pending' && !inScopeAnnotated(t)
+      && !conc.active.some((a) => a.task === t.id)
+      && !(state[t.id] && (state[t.id].external || state[t.id].escalated || (state[t.id].blockedBy || []).length))),
   };
   if (args.json) return emit(args, summary);
   const lines = [
