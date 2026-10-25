@@ -96,6 +96,7 @@ finish --task T-004 --status done|failed|blocked [--summary "..."] [--raw-file <
 check --task T-004
 escalate --task T-004 [--reason "..."] | question --task T-004 --comment-file <文件>
 askhuman --task T-004 --comment-file <文件> | handover --task T-004 | reap [--task T-004] [--stale 90]
+gc [--keep N] [--force]
 pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1
 ```
 
@@ -144,7 +145,7 @@ pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency
     - 先 `solo.mjs check --task T-004`：工作区干净、没有未推送的提交、分支含 `origin/main`、PR 开着没冲突、检查全绿、有 `DELIVERY:` 交付说明且带署名、标签是 `needs-review`。有一条 ✗ 就不许合并。
     - 再 `solo.mjs finish --task T-004 --status done`：`done` 会自己核对工单已关、PR 已合并、检查全绿，不成立就退出、不写 `[x]`。
     - 工人报 `ERROR` 行带前缀时按前缀分流：`[环境]` → `askhuman`，`[设计]` → `question`，没有前缀 → 算一次失败。
-    - 顺手核对资源有没有释放（worktree、进程、浏览器）；目录残留用 `worktree --task T-004 --remove` 清，删之前它会检查未提交与未推送的东西。
+    - 顺手核对资源有没有释放（进程、浏览器）；**worktree 不在这里逐张删**：收账以后跑 `solo.mjs gc` 统一清——它先把 `.tmp/` 的证据归档到 `.ralph/<循环>/evidence/<编号>/`，再删；删不掉的重试，还不行就留在残留清单里，不影响工单。
     - `refresh` 报「工单正文在工作中被改过」时，让下一轮的工人按最新正文重核。
 12. **判停**：见「停止条件」。长说明写 `solo.mjs note --text "..."`，`progress.md` 只留每段那几行。
 
@@ -185,7 +186,7 @@ NEXT: 建议的下一轮任务；没有写 none
 8. 合并前核对：`git fetch origin main && git merge origin/main`；`gh pr checks issue-<编号> --required` 显示 `check` 通过；工作区没有未提交也未推送的东西；每条验收核对都有证据。
 9. 合并：`gh pr merge issue-<编号> --admin --squash`。`--admin` 是仓库所有者的豁免，solo 唯一允许用的场合，它同时绕开 `check`——所以第 8 步只能自己做。
 10. 合并以后：确认 PR 已合并、工单随 `Closes` 关闭（没关就 `gh issue close` 并说明原因）；去掉 `needs-review`；合并提交号写进日记。
-11. 清理：关掉自己开的页面与进程（按进程号），删临时文件，删自己那张的 worktree（`worktree --task <编号> --remove`，删之前它会拦未提交与未推送的东西）。
+11. 清理：关掉自己开的页面与进程（按进程号）；临时文件可以留着——**不要删 worktree**，留给编排者的 `gc` 统一清（先归档证据再删，删不掉会重试）。
 12. 收尾按四行格式输出。
 
 ## 硬规则

@@ -169,7 +169,9 @@ function onPreToolUse(input) {
 
   const target = [toolInput.file_path, toolInput.path, toolInput.notebook_path].filter((v) => typeof v === 'string').join(' ');
   const mutating = ['write', 'edit', 'multiedit', 'notebookedit', 'str_replace_editor'].includes(lower);
-  if (mutating && /(^|[\\/])\.ralph[\\/]/.test(target)) {
+  // 账本里只有这几样是命令独占的；goal.md / handoff.md / notes/ 人可以编辑。
+  const ledgerState = /(^|[\\/])\.ralph[\\/].*(state\.json|tasks\.md|active\.json|\.lock|\.owner\.json|\.stop-guard\.json)$/;
+  if (mutating && ledgerState.test(target)) {
     emit({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',

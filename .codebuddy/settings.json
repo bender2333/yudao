@@ -1,30 +1,56 @@
 {
+  "permissions": {
+    "allow": [
+      "Edit(//C:/project/yudao-worktrees/**)",
+      "Read(//C:/project/yudao-worktrees/**)",
+      "Edit(/harness/**)"
+    ],
+    "deny": [
+      "Edit(/docs/agents/**)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "node \"${CODEBUDDY_PROJECT_DIR:-.}/.claude/skills/solo/scripts/hook.mjs\"", "timeout": 10 }
+          {
+            "type": "command",
+            "command": "node \"${CODEBUDDY_PROJECT_DIR:-.}/.claude/skills/solo/scripts/hook.mjs\"",
+            "timeout": 10
+          }
         ]
       }
     ],
     "PreToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "node \"${CODEBUDDY_PROJECT_DIR:-.}/.claude/skills/solo/scripts/hook.mjs\"", "timeout": 10 }
+          {
+            "type": "command",
+            "command": "node \"${CODEBUDDY_PROJECT_DIR:-.}/.claude/skills/solo/scripts/hook.mjs\"",
+            "timeout": 10
+          }
         ]
       }
     ],
     "SubagentStop": [
       {
         "hooks": [
-          { "type": "command", "command": "node \"${CODEBUDDY_PROJECT_DIR:-.}/.claude/skills/solo/scripts/hook.mjs\"", "timeout": 10 }
+          {
+            "type": "command",
+            "command": "node \"${CODEBUDDY_PROJECT_DIR:-.}/.claude/skills/solo/scripts/hook.mjs\"",
+            "timeout": 10
+          }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "node \"${CODEBUDDY_PROJECT_DIR:-.}/.claude/skills/solo/scripts/hook.mjs\"", "timeout": 10 }
+          {
+            "type": "command",
+            "command": "node \"${CODEBUDDY_PROJECT_DIR:-.}/.claude/skills/solo/scripts/hook.mjs\"",
+            "timeout": 10
+          }
         ]
       }
     ]
