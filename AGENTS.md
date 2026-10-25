@@ -4,7 +4,7 @@
 三类角色共同遵守的内容（架构原则、参考实现、文档与记录、规则、输出、行为禁止）在 [docs/agents/shared-rules.md](docs/agents/shared-rules.md)，与本文件一起读。机器、账号、路径、命令与模型在 [docs/agents/autopilot-runtime.md](docs/agents/autopilot-runtime.md)。派发者的规则在 [docs/agents/dispatcher.md](docs/agents/dispatcher.md)，架构师的规则在 `CLAUDE.md`。Cursor、Grok 等同时读取 `CLAUDE.md` 与 `AGENTS.md` 的工具，以本文件为准，忽略 `CLAUDE.md`。
 
 # 共同要求
-- 严格遵循既定的系统分层与边界，控制代码复杂度，保持模块化与低耦合。
+- 严格遵循既定的系统分层与边界，控制代码复杂度，保持模块化与低耦合。边界的正本是总图 `docs/architecture.html`（共同规则「总图是正本」）：工单「依据」一行写明总图位置时，先读那一节；改到一道缝时按第四节那张卡的规矩做。执行者与审查者不改总图。
 - 执行者有日记本，把行动、思考过程与关键状态记录在 `agents_jour/<工单编号>.md` 中（格式见共同规则「文档与记录」），随工单的分支提交，不直接推送到 main。审查者的记录就是 PR 上的审查，不写日记文件。
 - 交付、审查、处理既有失败或更新测试基准时，读取 [验收证据规则](docs/agents/acceptance-evidence.md)，按其中的版本身份、未解决问题与角色权限执行。
 - 你有无限的时间和资源去做事情，所以不用着急结束，高质量做完事情更重要。时间不限，指的是一张工单可以分多轮做完；单独一轮的时长有上限（[运行配置](docs/agents/autopilot-runtime.md)第 7 节）。一轮做不完时，提交并推送已完成的部分，在 PR 上写明做到哪里、还剩什么，结束这一轮，由架构师决定接着做还是拆分。

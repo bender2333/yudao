@@ -1,6 +1,6 @@
 # 网页界面的提供与发布设计说明
 
-更新：2026-10-07（界面由 Yudao 服务以网页提供，见 [ADR-0032](../adr/0032-interface-served-as-web-pages.md)；发布检查由已安装的实例提供，发布脚本只负责构建与上传，见 [ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)，第 6.3、6.4、6.5 节）。状态：设计已确认（发布的做法 2026-10-01、局域网访问方式 2026-10-02、网页界面 2026-10-07，用户逐轮采纳推荐，第 9 节）。命令行入口、数据目录与发布脚本由 #206、#209 实施；接口层提供页面文件、启动以后打开浏览器、系统通知与发布脚本构建页面文件的部分未实施。路线位置：[Stage 3 计划](../stage-3-plan.md)界面工作线。工单见第 11 节。
+更新：2026-10-07（界面由 Yudao 服务以网页提供，见 [ADR-0032](../adr/0032-interface-served-as-web-pages.md)；发布检查由已安装的实例提供，发布脚本只负责构建与上传，见 [ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)，第 6.3、6.4、6.5 节）。状态：设计已确认（发布的做法 2026-10-01、局域网访问方式 2026-10-02、网页界面 2026-10-07，用户逐轮采纳推荐，第 9 节）。命令行入口、数据目录与发布脚本由 #206、#209 实施；接口层提供页面文件、启动以后打开浏览器、系统通知与发布脚本构建页面文件的部分未实施。路线位置：[Stage 3 计划](../stage-3-plan.md)界面工作线。工单见第 11 节。 总图位置：第一节「界面」方框；第四节「接口」的缝；第五节第一层自举的发布、排空与看门狗。
 
 依据：[ADR-0032](../adr/0032-interface-served-as-web-pages.md)（界面由 Yudao 服务以网页提供，服务手动启动）；[ADR-0015](../adr/0015-desktop-client-and-http-contracts.md)（FastAPI 接口层与 HTTP 合同，页面使用的技术）；[ADR-0018](../adr/0018-single-control-host-remote-execution.md)（一台控制主机）；[ADR-0019](../adr/0019-project-stream-across-versions.md)（升级与排空）；[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)（像素画面与定稿原型的核对）；[ADR-0022](../adr/0022-run-directly-without-containers.md)；[ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)（发布检查）；[应用层与接口层设计说明](app-and-interface.md)第 5.7、6、7.2、10 节；[执行环境服务设计说明](execution-environment.md)第 5.3 节。用词以 `CONTEXT.md` 为准。
 

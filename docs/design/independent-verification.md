@@ -1,6 +1,6 @@
 # 验证的独立性设计说明
 
-更新：2026-10-07；2026-10-13 第 4 节加入询问通道（询问在 [ADR-0036](../adr/0036-concurrent-departments-and-nested-asks.md) 改为工具调用以后多出的解释来源），用户确认。状态：设计已确认（2026-10-07 用户确认按意图校准整理项目），未实施。路线位置：可见范围词表的扩充、交付说明的事实与解释、先判断后看解释是 Stage 3「迭代底座」工作包的 B5（M4，3.9 之前）；检验方式、覆盖比例与开环并入 3.2D 的 #151；试用浏览器的拒绝规则并入 #149；共享上下文的一组对照在 3.9（#100）；验证密度的调节规则在 Stage 5。
+更新：2026-10-07；2026-10-13 第 4 节加入询问通道（询问在 [ADR-0036](../adr/0036-concurrent-departments-and-nested-asks.md) 改为工具调用以后多出的解释来源），用户确认。状态：设计已确认（2026-10-07 用户确认按意图校准整理项目），未实施。路线位置：可见范围词表的扩充、交付说明的事实与解释、先判断后看解释是 Stage 3「迭代底座」工作包的 B5（M4，3.9 之前）；检验方式、覆盖比例与开环并入 3.2D 的 #151；试用浏览器的拒绝规则并入 #149；共享上下文的一组对照在 3.9（#100）；验证密度的调节规则在 Stage 5。 总图位置：第一节「独立的证据」方框；第四节「装配」的缝里作者与验证者的可见范围。
 
 依据：[D38 系统意图与基础规则](../requirements/system-intent.md)（N-I1 至 N-I7、N-K1、N-K2、N-V7）、[ADR-0029](../adr/0029-departments-form-by-information-cohesion.md)、[ADR-0020](../adr/0020-block-only-when-no-downstream-check.md)、[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)、[语义系统设计说明](semantic-system.md)、[浏览器与 computer use 设计说明](browser-and-computer-use.md)、[网络取回与 MCP 设计说明](network-and-mcp.md)。
 
