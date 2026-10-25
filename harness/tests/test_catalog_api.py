@@ -89,10 +89,6 @@ def _wait_for(store, predicate, *, timeout=WAIT_FOR_HOST_WORK_SEC, description="
     raise AssertionError(f"timed out waiting for {description}")
 
 
-def _payload_of(event):
-    return event.payload
-
-
 def _assert_no_secret(client, opened, secret=SECRET):
     dumped = json.dumps([event.payload for event in _catalog_events(opened.store)], ensure_ascii=False)
     assert secret not in dumped
