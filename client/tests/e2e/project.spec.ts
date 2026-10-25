@@ -590,8 +590,12 @@ test.describe("项目页面（1440×900）", () => {
       await expect(page.locator(".page")).not.toContainText("正在读取数据");
       // 文本工具：给产品部门发一条指导，指导列表由事件流更新
       await gotoView(page, blockedId, "dept/product");
-      // 工单 #556：阶段没有了，部门页写 run 的状态与本部门是不是在工作的部门
-      await expect(await section(page, "产品部门")).toContainText("这次运行不在本部门");
+      // 工单 #905：部门页写三个部门各自的状态，本部门那一段加粗；「这次运行不在本部门」的旧写法没有了
+      const productHead = await section(page, "产品部门");
+      await expect(productHead.locator(".department-line")).toContainText("三个部门");
+      await expect(productHead.locator(".department-line")).toContainText("等待工作");
+      await expect(page.locator(".page")).not.toContainText("这次运行不在本部门");
+      await expect(page.locator(".page")).not.toContainText("正在工作 ·");
       const guidance = await section(page, "部门指导");
       const note = `界面发出的指导 ${Date.now()}`;
       await guidance.getByLabel("向产品下达指导").fill(note);
