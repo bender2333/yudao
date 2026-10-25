@@ -506,3 +506,5 @@ claude-sonnet-5-5 / 2026-10-25 17:30 / 路线图 1.4 节阶段一 · 2 的问题
 deepseek-v4.1-flash / 2026-10-25 18:17 / 新增仓库内技能 `.claude/skills/solo`：`SKILL.md`（技能正文）、`worker.md`（工人契约）、`scripts/solo.mjs` 与 `scripts/state.mjs`（账本命令），重写自仓库外的 ralph-loop 插件——范围与并发变成参数、范围每轮按外部工单重算并认里程碑编号（工单会进出里程碑、里程碑会改名）、领取与合并前核对进流程、 核对「PR 已合并 / 工单已关 / 检查全绿」才写完成、 回收停住的并发位置、区分「我们自己的单」与「别人在做」、账本加锁且写前比条数、删 worktree 前拦未提交与未推送 / 用户要求把这个技能放进仓库重新做，名字改为 solo；技能里「设计问题交回后台架构师」一条按用户确认有意保留
 
 deepseek-v4.1-flash / 2026-10-25 18:50 / `.claude/skills/solo` 增加无人值守：新增 `scripts/hook.mjs`（SessionStart / SubagentStart / PreToolUse / SubagentStop / Stop 五个事件）、新增 `.claude/settings.json` 注册这些 hooks、`scripts/solo.mjs` 增加 `auto on|off` 与 `resume --no-auto`（`state.autoContinue`）；Stop 在「还有工人在跑」时把会话叫回来收账、在「没有工人但还有待办」时叫回来派下一批，同一会话最多续 200 次（`.ralph/<循环>/.stop-guard.json`）；同一套 hook 拒绝写 `.ralph/**`、拒绝 `task_append`、并发超限与任务书过长时提醒 / 用户要求无人值守自己往下跑
+
+solo-minimax-code / 2026-10-25 19:20 / docs/design/web-interface-and-release.md 第 5.1 节：服务比页面新那一条的末句由「下一步是重新构建页面文件，不再给「重新加载」」改为「下一步是重新构建页面文件，重新构建以后重新加载本页（这一条路径上保留「重新加载」按钮）」 / 工单 #909 定清了按钮的去向：服务比页面新时保留（重新构建页面文件以后要重载本页），页面比服务新时不出现（重载取回来的还是同一份）；原句字面与工单第 2 条相反，按工单改正，让设计说明与代码一致

@@ -8,7 +8,6 @@ import { rememberToken, storedToken } from "./contract/access-token";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
 import { mismatchAdvice } from "./contract/page-version";
-import { PAGE_RELEASE } from "./contract/page-release";
 import { optionalRead } from "./contract/read-failure.ts";
 import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
 import { Sidebar } from "./shell/sidebar";
@@ -273,12 +272,12 @@ export function App() {
     return <div className="y10-gate gate"><div className="y10-gate-card card"><h1>连接中…</h1></div></div>;
   }
   if (state.kind === "outdated") {
-    // 页面与服务出自同一个发布，接口版本不同时页面不能使用这个服务（工单 #704）：
-    // 说清两边各是哪个版本、该做什么；「重新加载」只在有用时出现
+    // 页面与服务按接口版本对齐，不同时页面不能使用这个服务（工单 #704、#909）：
+    // 说清两边各是哪个版本、该做什么；「重新加载」只在有用时出现（服务比页面新，
+    // 重新构建页面文件以后重新加载本页；页面比服务新时重载取回来的还是这一份）
     const advice = mismatchAdvice({
       pageVersion: state.clientVersion,
       serverVersion: state.serverVersion,
-      sameRelease: state.serverRelease === PAGE_RELEASE,
     });
     return (
       <div className="y10-gate gate"><div className="y10-gate-card card">
