@@ -36,7 +36,9 @@ async function driver(input: { scenario: string }): Promise<Record<string, unkno
       return true;
     },
   };
-  const props = { projectId: "p_overview", command, canRecord: true, canCreate: true };
+  type ComposerProps = Parameters<typeof NewItemComposer>[0];
+  // 起点说明由调用方给出：有起点时新建事项处写「新事项从……开始」，没有时不写（工单 #907）
+  let props: ComposerProps = { projectId: "p_overview", command, canRecord: true, canCreate: true };
 
   let container: HTMLDivElement | null = null;
   let root: ReturnType<typeof ReactDOMClient.createRoot> | null = null;
@@ -82,6 +84,15 @@ async function driver(input: { scenario: string }): Promise<Record<string, unkno
     setter.call(target, value);
     target.dispatchEvent(new Event("input", { bubbles: true }));
     await wait();
+  };
+  // 新建事项处关于起点的那句话；没有这一句时返回空串
+  const startNote = (): string => {
+    if (container === null) return "";
+    for (const item of container.querySelectorAll("p")) {
+      const text = item.textContent ?? "";
+      if (text.includes("新事项从")) return text;
+    }
+    return "";
   };
   const click = async (text: string): Promise<void> => {
     const target = button(text);
@@ -134,6 +145,15 @@ async function driver(input: { scenario: string }): Promise<Record<string, unkno
     await click("作为新事项开始");
     result.afterSubmit = read();
     result.calls = calls;
+  } else if (input.scenario === "start-point") {
+    // 概览给的起点说明以「起点：」开头，新建事项处取它后面的部分
+    props = { ...props, startPoint: "起点：起始文件夹（3 个文件）" };
+    unmount();
+    mount();
+    await wait();
+    result.startNote = startNote();
+  } else if (input.scenario === "no-start-point") {
+    result.startNote = startNote();
   } else if (input.scenario === "draft-persist") {
     await type(recordLabel, "写进记录原文的文字");
     await type(requirementLabel, "写进新要求的文字");
@@ -221,6 +241,13 @@ test("两个按钮各自看自己的框：空的那个按钮保持禁用", async
   const afterBoth = report.afterBoth as Record<string, unknown>;
   assert.equal(afterBoth.recordDisabled, false);
   assert.equal(afterBoth.createDisabled, false);
+});
+
+test("新建事项处写明从项目的起点开始，没有起点信息时不写（工单 #907）", async () => {
+  const withPoint = await run("start-point");
+  assert.equal(withPoint.startNote, "新事项从起始文件夹（3 个文件）开始");
+  const without = await run("no-start-point");
+  assert.equal(without.startNote, "", "没有起点信息时新建事项处不写这句话");
 });
 
 test("提交「记录原文」只清它自己那个框，「新的要求」里的文字留着", async () => {
