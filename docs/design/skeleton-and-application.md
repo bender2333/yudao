@@ -343,7 +343,7 @@ flowchart TB
 - [可信内核设计说明](trusted-kernel.md)第 2 节「裁决读取的运行状态投影」改为最小投影，第 3 节清单的 `projection.py`、`models.py`、`collaboration.py` 条目随 S1d、S2a、S5a 修改。
 - [三部门的循环结构](department-loop.md)是成果驱动路由实现的设计说明；[循环与收敛设计说明](loops-and-convergence.md)第 6 节的五条判据对每个路由实现适用。
 - [规则登记与参数设计说明](rules-and-parameters.md)：路由实现的名称是定义，随定义版本改变，不是参数。
-- [ADR-0041](../adr/0041-two-orchestration-modes-share-control-core.md)（暂缓）恢复时按第 5.1、5.4 节改写：路由是骨架的契约，两种模式都是应用里的路由实现；第二种路由不受成果驱动的 ADR 限制，只受骨架与基础规则约束。
+- ADR-0041（暂缓，只在 [PR #751](https://github.com/bender2333/yudao/pull/751) 里，没有进 main）恢复时按第 5.1、5.4 节改写：路由是骨架的契约，两种模式都是应用里的路由实现；第二种路由不受成果驱动的 ADR 限制，只受骨架与基础规则约束。
 
 ## 15. 验收
 

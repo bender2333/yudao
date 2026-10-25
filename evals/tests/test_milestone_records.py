@@ -1,7 +1,7 @@
 """里程碑工单记录的测试。
 
 字段与汇总用录制的真实数据检查：`fixtures/milestone_early.json` 与
-`fixtures/milestone_late.json` 是 `docs/evaluation/milestones/stage3-m0.json`
+`fixtures/milestone_late.json` 是 `docs/archive/evaluation/milestones/stage3-m0.json`
 （从 GitHub 抓取）里挑出的工单，原样保留。计算只读数据文件，不用 mock，不调用模型。
 
 真实数据里没有的三种情况（一张工单几个 PR、加过两次 needs-architect、合并以后被重新打开）

@@ -4,7 +4,7 @@
 > 范围：第三阶段与第四阶段，以及可以提前完成的接口语义、故障样例和实验准备。
 > 上位依据：总体架构、[第三阶段计划](../stage-3-plan.md)、第四阶段计划。
 > 本文通过网络读取一手文档和论文，未安装或运行这些外部系统，未复现论文结果；来源、实际阅读范围和限制见第 12 节。
-> 配套设计：[可观测性](observability-design.md)、[实验协议](experiment-protocol.md)。
+> 配套设计：[可观测性](../archive/research/observability-design.md)、[实验协议](experiment-protocol.md)。
 
 ## 1. 设计结论与依赖
 

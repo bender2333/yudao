@@ -1,6 +1,6 @@
 # Stage 3 重排方案：将 MCP 和技能提前到 Stage 3
 
-更新：2026-10-13。状态：用户于 2026-10-12 确认采纳；第 7 节的同步修改于 2026-10-13 完成，GitHub 里程碑 M5 与父工单 #494 已建立，MCP-4 是 #495（M3），#100、#173 被 #494 阻塞。按 [ADR-0038](../adr/0038-function-first-commands-without-registration.md)，第 5 节中与批准有关的内容（MCP-2 的「资源链接按批准规则读取」、MCP-4 的「批准」）不再适用，拆分时改写。决定：[ADR-0035](../adr/0035-mcp-and-skills-move-into-stage-3.md)。依据：[Stage 3 计划](../stage-3-plan.md)、[总体路线图](../program-roadmap.md)、[D36 网络取回与 MCP 工具](../requirements/network-and-mcp.md)、[网络取回与 MCP 工具设计说明](../design/network-and-mcp.md)、[阶段需求概览](../requirements/stage-requirements-overview.md)、跟踪工单 #9。
+更新：2026-10-13。状态：用户于 2026-10-12 确认采纳；第 7 节的同步修改于 2026-10-13 完成，GitHub 里程碑 M5 与父工单 #494 已建立，MCP-4 是 #495（M3），#100、#173 被 #494 阻塞。按 [ADR-0038](../adr/0038-function-first-commands-without-registration.md)，第 5 节中与批准有关的内容（MCP-2 的「资源链接按批准规则读取」、MCP-4 的「批准」）不再适用，拆分时改写。决定：[ADR-0035](../adr/0035-mcp-and-skills-move-into-stage-3.md)。依据：[Stage 3 计划](../stage-3-plan.md)、[总体路线图](../program-roadmap.md)、[D36 网络取回与 MCP 工具](../requirements/network-and-mcp.md)、[网络取回与 MCP 工具设计说明](../design/network-and-mcp.md)、[阶段需求概览](../archive/requirements/stage-requirements-overview.md)、跟踪工单 #9。
 
 ## 1. 背景
 
