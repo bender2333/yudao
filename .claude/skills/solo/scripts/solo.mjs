@@ -801,8 +801,19 @@ function commandWorktree(args) {
   if (localBranch) addArgs = ['worktree', 'add', target.dir, target.branch];
   else if (remoteBranch) addArgs = ['worktree', 'add', target.dir, '-b', target.branch, 'origin/' + target.branch];
   else addArgs = ['worktree', 'add', target.dir, '-b', target.branch, target.base];
-  const added = git(root, addArgs);
-  if (added.status !== 0) fail('建 worktree 失败：' + (added.stderr.trim() || added.stdout.trim()));
+  let added = git(root, addArgs);
+  if (added.status !== 0) {
+    // 分支可能还被旧根目录下的 worktree 占着（换过 worktrees.root 就会这样）：搬过来，不要报错。
+    const usedAt = /already used by worktree at '([^']+)'/.exec(added.stderr || '');
+    if (usedAt) {
+      const moved = git(root, ['worktree', 'move', usedAt[1], target.dir]);
+      if (moved.status === 0) {
+        return emit(args, { task: task.id, worktree: target.dir, branch: target.branch, created: false, movedFrom: usedAt[1] }, 'worktree 从 ' + usedAt[1] + ' 搬到 ' + target.dir);
+      }
+      fail('建 worktree 失败：分支 ' + target.branch + ' 被 ' + usedAt[1] + ' 占着，搬过来也失败（' + moved.stderr.trim() + '）');
+    }
+    fail('建 worktree 失败：' + (added.stderr.trim() || added.stdout.trim()));
+  }
   const payload = { task: task.id, worktree: target.dir, branch: target.branch, created: true, fromRemote: remoteBranch && !localBranch };
   return emit(args, payload, 'worktree ' + target.dir + '（分支 ' + target.branch + '）');
 }
