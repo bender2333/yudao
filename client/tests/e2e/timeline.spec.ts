@@ -55,7 +55,7 @@ interface Fact {
   position: number;
   at: string;
   type: string;
-  /** 应用层给出的刻度种类（handoff、ask、answer、rework、release、adopt、decision 等）。 */
+  /** 应用层给出的刻度种类（ask、answer、rework、release、adopt、decision 等；交接已经不再产生）。 */
   kind: string | null;
   label: string;
   project_id: string | null;

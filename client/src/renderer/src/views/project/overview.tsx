@@ -104,7 +104,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
               />
             ) : null}
           </Section>
-          <CurrentItem app={props.app} projectId={projectId} item={current} command={command} />
+          <CurrentItem app={props.app} projectId={projectId} item={current} command={command} startPoint={data.start_point ?? null} />
           <RestartOnboarding app={props.app} projectId={projectId} />
           <Board items={items} />
           <FlowTable app={props.app} flow={flow} />
@@ -160,6 +160,12 @@ function Summary(props: { app: ClientApp; projectId: string; data: ProjectOvervi
   );
 }
 
+// 起点说明去掉前面的「起点：」：概览的摘要行原样写它，新建事项处把它接在「新事项从」后面（工单 #907）
+function startPointText(value: string | null | undefined): string {
+  const text = value ?? "";
+  return text.startsWith("起点：") ? text.slice("起点：".length) : text;
+}
+
 // 快照的 git 来源（与决定卡片同一份文案）：没有仓库时写明采集时的目录内容
 function provenanceText(value: { [key: string]: unknown } | null): string {
   const commit = value !== null && typeof value.commit === "string" ? value.commit : "";
@@ -184,6 +190,7 @@ function CurrentItem(props: {
   projectId: string;
   item: WorkItemCard | null;
   command: CommandState;
+  startPoint: string | null;
 }) {
   const item = props.item;
   const inputs = useSnapshot<WorkItemInputsResult>(props.app, "page.inputs", "work_item.inputs", {
@@ -200,6 +207,7 @@ function CurrentItem(props: {
           command={props.command}
           canRecord={hasCommand(props.app, "material.record")}
           canCreate={hasCommand(props.app, "work_item.create")}
+          startPoint={props.startPoint}
         />
       </Section>
     );
@@ -272,6 +280,8 @@ export function NewItemComposer(props: {
   command: CommandState;
   canRecord: boolean;
   canCreate: boolean;
+  /** 项目的起点说明（project.overview 的 start_point，以「起点：」开头）；没有时新建事项处不写这句话 */
+  startPoint?: string | null;
 }) {
   const [recordText, setRecordText] = useDraft(`input/${props.projectId}/none/record`);
   const [requirementText, setRequirementText] = useDraft(`input/${props.projectId}/none/requirement`);
@@ -310,7 +320,10 @@ export function NewItemComposer(props: {
             }}
           />
         ) : <p className="y10-note note">这台主机没有提供新建事项的操作</p>}
-        <p className="y10-note note">要把已有代码目录作为起点，先在设置页登记源目录。</p>
+        {/* 新事项从项目的起点开始（工单 #907）：起点说明取自概览已有的 start_point，去掉前面的「起点：」 */}
+        {startPointText(props.startPoint) === "" ? null : (
+          <p className="y10-note note">新事项从{startPointText(props.startPoint)}开始</p>
+        )}
         <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
         {(() => {
           const links = rejectionLinks(props.command.problem, props.projectId);
@@ -404,7 +417,7 @@ export function Board(props: { items: WorkItemCard[] }) {
   );
 }
 
-// 流转记录：时间、方向、类型、内容与状态；返工行用醒目颜色，点击打开原始事件
+// 流转记录：时间、方向、类型、内容与状态；缺陷记录行用醒目颜色，点击打开原始事件
 function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | null; loading: boolean; error: string | null } }) {
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const detail = useSnapshot<EventDetailResult>(
@@ -425,7 +438,7 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
   }
 
   return (
-    <Section id="ov-flow" title="流转记录" note="点击时间打开原始事件；返工行用醒目的颜色标出">
+    <Section id="ov-flow" title="流转记录" note="点击时间打开原始事件；缺陷记录行用醒目的颜色标出">
       {records.length === 0 ? <Empty text={emptyOrFailureText(props.flow.error, "项目还没有流转记录")} /> : (
         <Table
           head={["时间", "方向", "类型", "内容", "状态"]}
