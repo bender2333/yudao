@@ -43,10 +43,9 @@ disable-model-invocation: true
 
 对每张父工单读 [`/to-children`](../to-children/SKILL.md) 按它做。它第 5 步里需你批准环的子工单在这里当场办：
 
-1. 把这张子工单的「只改」清单逐个文件念给用户，每个文件一句话说明改什么。
-2. 用户同意：正文「环」一行后面写 `批准：用户 <日期> 在会话中批准「只改」清单`，加标签 `kernel-approved`，标 `ready-for-agent`。
-3. 用户不同意或要再想：标 `ready-for-human`，评论写清要用户批准什么。
-4. 完成：每张需你批准的子工单带 `kernel-approved` 或 `ready-for-human` 之一，可重写与只增环的标 `ready-for-agent`。
+1. 标 `waiting`，把编号与「只改」清单交总架构师（会话消息，或告诉用户转达）；用户不逐张批准。
+2. 总架构师核对清单落在哪一环、与对齐的走向一致，写批准行 `批准：总架构师 <日期>`，加 `kernel-approved`，改 `ready-for-agent`（`CLAUDE.md`「工单规范」）。
+3. 完成：每张需你批准的子工单带 `kernel-approved`，或标 `waiting` 等总架构师；可重写与只增环的标 `ready-for-agent`。
 
 ## 收尾
 
