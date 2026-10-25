@@ -26,7 +26,7 @@ from harness.tests.protocol_helpers import (
     responses_responder,
 )
 
-# 工单 #84：Provider 配置声明一种协议（ADR-0004），服务方案预置表按协议列出请求基址（ADR-0003）。
+# 工单 #84：调用协议属于模型访问定义，连接不声明协议（ADR-0033，取代 ADR-0004）；服务方案预置表按协议列出请求基址（ADR-0003）。
 # 全部用例经运行系统整体进行：真实 HTTP 服务记录请求路径与请求头，模型回答由 FakeAdapter 给出。
 
 
