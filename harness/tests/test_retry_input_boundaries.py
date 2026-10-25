@@ -21,7 +21,9 @@ from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 _WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
 
 
-def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_path):
+def test_retryable_failure_after_new_input_retries_and_carries_it(tmp_path):
+    # 工单 #964：输入到达不再结束部门当前这一轮，它作为通知在这个会话的下一步送达：
+    # 重试照常进行，重试的请求里带着这条输入，模型看见以后提交的要求被接纳
     run_id_holder = []
 
     def fail_after_input(_request):
@@ -37,21 +39,25 @@ def test_retryable_failure_after_new_input_returns_to_product_without_retry(tmp_
 
     events = system.store.list_events(run_id)
     failed = [item for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED]
-    assert has_new_work(result, "product")
     assert result.stop_reason is None
-    assert result.input_version == 2
-    assert len(adapter.invocations) == 1
+    assert result.input_version == 2 and result.processed_input_version == 2
+    assert len(adapter.invocations) == 2, "重试照常进行"
     assert not any(item.type == EventType.RUN_FAILED for item in events)
-    assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
-    assert len(failed) == 1 and failed[0].payload["will_retry"] is False
+    assert any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
+    assert len(failed) == 1 and failed[0].payload["will_retry"] is True
+    # 重试的请求里带着这条输入
+    assert "NEW USER ORIGINAL" in adapter.invocations[1].input_items[0]["content"]
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(result, "engineering")
 
 
-def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path):
-    # 重试等待 30 秒：新输入在等待中提交，等待立即结束，这次激活不再重试
+def test_input_during_retry_backoff_is_carried_by_the_retry(tmp_path):
+    # 工单 #964：输入在工作期间到达时，它在这个会话的下一步作为通知加入历史，
+    # 这一轮不因此结束：重试照常进行，重试的请求里带着这条输入
     scheduled = Event()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter,
-                                    step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
+                                    step_limits=StepLimits(retry_initial_delay_sec=1, retry_max_delay_sec=1))
     run_id = system.create_run("original task")
     after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
@@ -60,39 +66,33 @@ def test_input_during_retry_backoff_is_used_by_next_activation(tmp_path):
         system.add_input(run_id, "NEW USER ORIGINAL\nwith exact spacing")
         first_result = future.result(timeout=_WAIT_LIMIT)
 
-    assert has_new_work(first_result, "product")
-    assert len(adapter.invocations) == 1
-    second_result = system.activate_once(run_id)
-
-    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
-    assert has_new_work(second_result, "engineering")
-    assert len(adapter.invocations) == 2
+    assert len(adapter.invocations) == 2, "重试照常进行"
+    assert first_result.input_version == 2 and first_result.processed_input_version == 2
     content = adapter.invocations[1].input_items[0]["content"]
     assert "[intend]\noriginal taskNEW USER ORIGINAL\nwith exact spacing\n\n" in content
     assert "NEW USER ORIGINAL\nwith exact spacing" in content
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
+    assert has_new_work(first_result, "engineering")
 
 
-def test_input_during_a_long_retry_wait_ends_the_wait_at_once(tmp_path):
-    # 重试等待 30 秒；等待期间到达的新输入使激活立即回到安全节点并停止，不等到间隔结束
+def test_input_during_a_retry_wait_does_not_end_it_and_the_retry_carries_it(tmp_path):
+    # 工单 #964：等待期间到达的新输入不再使激活回到安全节点并停止：
+    # 等待照常走完，重试的请求里带着这条输入
     scheduled = Event()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter,
-                                    step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
+                                    step_limits=StepLimits(retry_initial_delay_sec=1, retry_max_delay_sec=1))
     run_id = system.create_run("original task")
     after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
         assert scheduled.wait(_WAIT_LIMIT)
-        started = time.monotonic()
         system.add_input(run_id, "NEW USER ORIGINAL")
-        result = future.result(timeout=20)
+        result = future.result(timeout=_WAIT_LIMIT)
 
-    # 界限 20 秒明显小于配置的 30 秒等待：要证明的是等待没有被走满，结束以后由阶段与停止原因核对；
-    # 20 秒同时远大于正常用时（唤醒到激活结束含一次版本存储写入，并发负载下数秒），
-    # 按 #107 的裁定（docs/architecture-issues.md，架构师 2026-09-27 16:55）取这一数量级
-    assert time.monotonic() - started < 20
-    assert has_new_work(result, "product") and result.stop_reason is None
-    assert len(adapter.invocations) == 1
+    assert result.stop_reason is None
+    assert len(adapter.invocations) == 2, "重试照常进行"
+    assert "NEW USER ORIGINAL" in adapter.invocations[1].input_items[0]["content"]
 
 
 def test_guidance_during_a_retry_wait_does_not_end_it_and_the_retry_carries_it(tmp_path):
@@ -161,9 +161,10 @@ def test_run_time_limit_ends_a_long_retry_wait(tmp_path):
 
 
 @pytest.mark.parametrize("action", ["input", "cancel"])
-def test_input_or_cancel_after_a_retryable_failure_prevents_the_retry(tmp_path, action):
+def test_input_or_cancel_after_a_retryable_failure_changes_the_retry(tmp_path, action):
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
+    system = LoopSystem.for_testing(tmp_path, adapter,
+                                    step_limits=StepLimits(retry_initial_delay_sec=1, retry_max_delay_sec=1))
     run_id = system.create_run("original task")
 
     def interleave(event):
@@ -178,12 +179,15 @@ def test_input_or_cancel_after_a_retryable_failure_prevents_the_retry(tmp_path, 
     result = system.activate_once(run_id)
 
     events = system.store.list_events(run_id)
-    assert len(adapter.invocations) == 1
-    assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
     if action == "input":
-        assert has_new_work(result, "product")
+        # 工单 #964：输入到达不再结束这一轮，重试照常进行，重试的请求里带着这条输入
+        assert len(adapter.invocations) == 2
+        assert any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
         assert not any(item.type == EventType.RUN_FAILED for item in events)
+        assert result.input_version == 2 and result.processed_input_version == 2
     else:
+        assert len(adapter.invocations) == 1
+        assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
         assert result.status == "failed" and result.stop_reason == "cancelled"
 
 

@@ -83,12 +83,13 @@ def _prepared_source(tmp_path):
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("prepared but not sent")
 
-    def input_after_second_preparation(event):
-        # 第二步装配好以后到达新输入，这一步的请求不再发出
+    def cancel_after_second_preparation(event):
+        # 第二步装配好以后取消运行：这一步的请求不再发出
+        # （工单 #964：新的用户输入不再作废已经装配好的请求，它照常发出）
         if event.payload["step_id"] == 2:
-            system.add_input(run_id, "a new input before the second request")
+            system.cancel(run_id)
 
-    after_event(system, EventType.CONTEXT_ASSEMBLED, input_after_second_preparation)
+    after_event(system, EventType.CONTEXT_ASSEMBLED, cancel_after_second_preparation)
     return system, run_id
 
 

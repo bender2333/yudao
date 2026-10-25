@@ -63,10 +63,11 @@ def test_input_after_validation_rejects_the_commit_and_the_proposal_is_judged_ag
     # 写入口拒绝以校验时的版本作为期望版本的提交，说明流的实际版本
     [conflict] = conflicts
     assert (conflict.stream, conflict.expected, conflict.actual) == (run_stream(run_id), versions[0], versions[0] + 1)
-    # 按写入以后的状态重新校验：激活开始以后输入改变，提案按 execution_basis 拒绝，与没有流版本核对时的结果相同
+    # 按写入以后的状态重新校验：新的用户输入还没有进入产品工作，提案按 input_version 拒绝
+    # （工单 #964：输入不再让这次提交作废，拒绝的理由换成输入还没有分派给产品）
     assert versions == [versions[0], versions[0] + 1]
     [rejected] = _events(system, run_id, EventType.PROPOSAL_REJECTED)
-    assert [error["field"] for error in rejected.payload["errors"]] == ["execution_basis"]
+    assert [error["field"] for error in rejected.payload["errors"]] == ["input_version"]
     assert not _events(system, run_id, EventType.SPEC_ACCEPTED)
     assert has_new_work(result, "product") and result.input_version == 2
     accepted = system.activate_once(run_id)

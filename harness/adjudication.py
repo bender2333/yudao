@@ -40,9 +40,9 @@ def guidance_version(projection: RunProjection, department: str) -> int:
 
 @dataclass(frozen=True)
 class WorkBasis:
-    # 激活开始时采用的工作依据；有效合同与指导变了以后，这个会话在下一步收到通知
-    # （新版本与改动），接着工作，一轮工作不因此结束（工单 #558，循环结构第 5 节与第 6 节）。
-    # 用户输入变了仍然结束这一轮：输入分派给产品部门，由产品在下一轮处理（工单 #556）
+    # 激活开始时采用的工作依据；有效合同、指导与用户输入变了以后，这个会话在下一步收到通知
+    # （新版本与改动、新的输入），接着工作，一轮工作不因此结束（工单 #558、工单 #964，
+    # 循环结构第 5 节与第 6 节）。
     effective_contract_hash: str | None
     input_version: int
     guidance_version: int
@@ -55,17 +55,15 @@ class WorkBasis:
             guidance_version=guidance_version(projection, department),
         )
 
-    def changed(self, projection: RunProjection, department: str) -> bool:
-        # 依据变了没有：只有用户输入算——输入分派给产品部门，已经装配好的请求不再发出；
-        # 有效合同与指导的变化作为通知送达，部门接着工作（工单 #558）
-        return projection.input_version != self.input_version
-
 
 @dataclass(frozen=True)
 class ToolPermission:
     # 工具许可的三种结果：允许；拒绝并说明原因，原因作为工具结果交回模型；停止
+    # deferred：这次拒绝只是推迟（工单 #964）——模型还没有看见新的用户输入，提交推迟到下一步，
+    # 通知在下一步送达，部门接着工作，这一轮不因此结束
     stopped: bool = False
     reason: str | None = None
+    deferred: bool = False
 
     @property
     def allowed(self) -> bool:
@@ -159,11 +157,19 @@ def tool_permission(
     facts: WorkspaceFacts,
 ) -> ToolPermission:
     # facts 是执行环境按 facts_query(call) 查询的结果
-    # 有效合同与指导变了不再停止这次激活：它们作为通知送达，部门接着工作（工单 #558）；
-    # 用户输入变了仍然停止：输入分派给产品部门，已经装配好的请求不再发出
-    if projection.status in TERMINAL_STATUSES or aborted or basis.changed(projection, department):
+    # 有效合同、指导与用户输入变了都不再停止这次激活：它们作为通知送达，部门接着工作，
+    # 这一轮不因此结束（工单 #558、工单 #964，循环结构第 5 节与第 6 节）
+    if projection.status in TERMINAL_STATUSES or aborted:
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
+    # 正式成果要等模型看见新输入以后再提交：这次提交先不做，下一步的通知里写明新输入
+    # （工单 #964）。工具许可的依据是这次请求装配时的输入版本（basis），
+    # 它比当前版本旧就说明模型还没有看到这条输入。
+    if proposal_kind(name) is not None and projection.input_version != basis.input_version:
+        return ToolPermission(reason=(
+            "new user input arrived and has not entered this session's model input yet; "
+            "this proposal is not accepted now. Read the work_notification of the next step, then submit again"
+        ), deferred=True)
     branch_perm = _ask_branch_permission(projection, session_id, department, name)
     if branch_perm is not None:
         return branch_perm
@@ -193,21 +199,17 @@ def commit_decision(
     *,
     department: str,
     proposal: dict[str, Any] | None,
-    basis: WorkBasis,
-    started: RunProjection,
     evaluated: RunProjection,
     facts: TreeFacts,
     current: RunProjection,
     current_facts: TreeFacts,
     events: list[Event],
 ) -> ProposalDecision:
-    # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。激活开始以后输入改变，
-    # 或者校验以后工作区改变，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
-    # 有效合同与指导变了不再拒绝：它们作为通知送达，部门接着工作，提交的成果按当前版本核对
-    # （工单 #558，循环结构第 5 节、第 6 节与第 7 节）
-    now = WorkBasis.current(current, department)
-    if (now.input_version != basis.input_version
-            or submission_basis(current) != submission_basis(evaluated)):
+    # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。校验以后工作区改变，
+    # 或者当前工作已经不是校验时的那一份，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
+    # 有效合同、指导与用户输入变了不再让这次提交作废：它们作为通知送达，部门接着工作，
+    # 提交的成果按当前版本核对（工单 #558、工单 #964，循环结构第 5 节、第 6 节与第 7 节）
+    if submission_basis(current) != submission_basis(evaluated):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
     if current_facts != facts:
         return ProposalDecision(False, [FieldError("execution_basis", _STALE_SNAPSHOT)])
