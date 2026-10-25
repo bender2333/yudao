@@ -61,9 +61,9 @@ def department_work_text(pinned: AssembledContext) -> str:
 
 def work_notifications(projection: RunProjection, events: list[Any] | None, department: str,
                        session_id: str | None) -> list[dict[str, Any]]:
-    # 这个会话还没有看到的新版本（工单 #558）：PRD 的新版本与交付到达。
-    # 判据是「这个会话上一次发出模型请求以后」写下的版本：它在这个会话的下一步作为通知送达，
-    # 部门接着工作。通知只在会话之间比较，同一会话里下一次请求不再重复送达同一份通知。
+    # 这个会话还没有看到的新东西（工单 #558、工单 #964）：PRD 的新版本、交付到达与用户追加的输入。
+    # 判据是「这个会话上一次装配请求以后」写下的东西：它在这个会话的下一步作为通知送达，
+    # 部门接着工作，这一轮不因此结束。通知只在会话之间比较，同一会话里下一次请求不再重复送达同一份通知。
     if session_id is None:
         return []
     items = list(events or [])
@@ -73,9 +73,23 @@ def work_notifications(projection: RunProjection, events: list[Any] | None, depa
     for event in items:
         positions[event.event_id] = event.position
         producers[event.event_id] = event.session_id
-        if event.type == EventType.MODEL_REQUESTED and event.session_id == session_id:
+        if event.type == EventType.CONTEXT_ASSEMBLED and event.session_id == session_id:
+            # 判据是这个会话上一次装配请求的位置：请求里的材料就是那时候算出来的。
+            # 事件在装配以后到达（包括装配与发出之间到达的），在这个会话的下一步送达，
+            # 不会因为请求晚一点发出而丢掉。
             seen = event.position
     notifications: list[dict[str, Any]] = []
+    # 用户追加的输入（工单 #964）：输入到达不再结束部门当前这一轮，它作为通知在这个会话的下一步送达。
+    # 输入仍然分派给产品部门处理（product_input_assigned），产品的 processed_input_version 照常前进。
+    for event in items:
+        if event.type != EventType.USER_INPUT_RECEIVED or event.position <= seen:
+            continue
+        payload = event.payload or {}
+        notifications.append({
+            "kind": "user_input_received",
+            "version": payload.get("version"),
+            "text": payload.get("text") or "",
+        })
     for spec in projection.product_specs:
         if spec.status != "active":
             continue
@@ -113,6 +127,12 @@ def work_notifications(projection: RunProjection, events: list[Any] | None, depa
 
 
 def _notification_text(item: dict[str, Any]) -> str:
+    if item["kind"] == "user_input_received":
+        # 用户追加的输入（工单 #964）：通知写明新到的这一版输入；输入由产品部门处理成新的产品要求，
+        # 部门接着当前工作，不因为输入到达而结束这一轮。
+        return (f"用户追加了输入（第 {item.get('version')} 版）：{item.get('text') or ''}。"
+                "这份输入分派给产品部门处理成新的产品要求；这一轮不因此结束，"
+                "已有的工作还算不算数由你自己判断，接着当前工作。")
     if item["kind"] == "product_spec_revised":
         record = item.get("change_record") or {}
         changed = record.get("changed") if isinstance(record, dict) else None

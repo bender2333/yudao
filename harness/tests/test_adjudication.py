@@ -35,20 +35,25 @@ def _permission(system, projection, name, args, *, basis=None, aborted=False, gu
         aborted=aborted, facts=_environment(system, projection).query(facts_query(call)),
     )
 
-def test_tool_permission_stops_after_cancel_end_or_changed_input(tmp_path):
+def test_tool_permission_stops_after_cancel_end_and_defers_a_proposal_before_the_new_input(tmp_path):
     # 工单 #558：有效合同与指导变了不再停止这次激活（它们作为通知送达，部门接着工作）；
-    # 用户输入变了仍然停止：输入分派给产品部门，由产品在下一轮处理
+    # 工单 #964：用户输入变了也不再停止这一轮，它作为通知在这个会话的下一步送达；
+    # 模型还没有看见新输入时，正式成果这次先不做（推迟到下一步），其它工具照常执行
     system, projection = _engineering(tmp_path)
     write = ("write_file", {"path": "src/echo.py", "content": "print(1)\n"})
     assert _permission(system, projection, *write).allowed
     assert _permission(system, projection, *write, aborted=True).stopped
     assert _permission(system, replace(projection, status="failed"), *write).stopped
     newer_input = replace(WorkBasis.current(projection, "engineering"), input_version=projection.input_version - 1)
-    assert _permission(system, projection, *write, basis=newer_input).stopped
+    assert _permission(system, projection, *write, basis=newer_input).allowed
     other_contract = replace(WorkBasis.current(projection, "engineering"), effective_contract_hash="sha256:other")
     assert _permission(system, projection, *write, basis=other_contract).allowed
     other_guidance = replace(WorkBasis.current(projection, "engineering"), guidance_version=99)
     assert _permission(system, projection, *write, basis=other_guidance).allowed
+    # 正式成果等模型看见新输入以后再提交
+    deferred = _permission(system, projection, "submit_delivery", {}, basis=newer_input)
+    assert deferred.reason and deferred.deferred and not deferred.allowed
+    assert "has not entered this session's model input yet" in deferred.reason
 
 def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
     system, projection = _engineering(tmp_path)
@@ -61,6 +66,7 @@ def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
 
 def test_commit_decision_rejects_results_whose_workspace_changed(tmp_path):
     # 工单 #558：依据变了不再让这次提交作废（PRD 的新版本与指导作为通知送达，部门接着工作）；
+    # 工单 #964：新的用户输入同样不再作废这次提交（它作为通知送达，部门接着工作）；
     # 校验以后工作区改变仍然拒绝：回执不能重新绑定到已经改变的快照上
     system, projection = _engineering(tmp_path)
     environment = _environment(system, projection)
@@ -81,12 +87,12 @@ def test_commit_decision_rejects_results_whose_workspace_changed(tmp_path):
                               events=events)
     assert first.accepted, first.error_dicts
     arguments = dict(department="engineering", proposal=proposal,
-                     basis=WorkBasis.current(projection, "engineering"), started=projection,
                      evaluated=projection, facts=facts, events=events)
     assert commit_decision(first, current=projection, current_facts=facts, **arguments).accepted
     newer_input = replace(projection, input_version=projection.input_version + 1)
-    stale = commit_decision(first, current=newer_input, current_facts=facts, **arguments)
-    assert [error.field for error in stale.errors] == ["execution_basis"]
+    carried = commit_decision(first, current=newer_input, current_facts=facts, **arguments)
+    # 输入变了不再让这次提交作废（工单 #964）：拒绝的理由换成「输入还没有被产品处理」
+    assert [error.field for error in carried.errors] == ["kind"]
     other_contract = replace(projection, effective_contract=replace(projection.effective_contract,
                                                                      content_hash="sha256:other"))
     rebound = commit_decision(first, current=other_contract, current_facts=facts, **arguments)

@@ -52,7 +52,7 @@ def test_demo_fills_four_views(demo_run):
         project_id=projection.project_id, work_item=projection.work_item_id))
     consultations = [record for record in flow.data.records if record.kind == "询问"]
     # demo 等质检对工程的询问回答完再追加那笔输入（同时运行的会话里，那笔输入进产品以后
-    # 还在工作的会话依据就变旧，询问的分支会话会停下来）：三个询问都有回答
+    # 还在工作的会话依据不再变旧，询问的分支会话接着回答）：三个询问都有回答
     assert {record.status for record in consultations} == {"已回答"}
     assert {record.direction_from for record in consultations} == {"product", "engineering", "quality"}
     materials = application.query("work_item.materials", WorkItemMaterials(

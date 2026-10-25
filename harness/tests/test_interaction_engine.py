@@ -20,8 +20,8 @@ from harness.providers.call import ModelResponse
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem, RunTerminalError
 from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_history,
-                                    from_another_thread, quality_turns, recorded_context,
-                                    wait_for_file)
+                                    from_another_thread, list_files_turn, quality_turns,
+                                    recorded_context, wait_for_file)
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 CHANGE_RECORD = {
@@ -163,7 +163,9 @@ def test_only_complete_product_spec_can_process_received_input(tmp_path):
     assert "Accepted user input through version: 2" in prd
     assert CHANGE_RECORD["rationale"] in prd and old.product_spec.content_hash in prd
 
-def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_path):
+def test_new_input_during_product_model_call_is_delivered_as_a_notification(tmp_path):
+    # 工单 #964：输入到达不再结束部门当前这一轮，它作为通知在这个会话的下一步送达，部门接着工作。
+    # 模型还没有看见新输入时，这次提交推迟（工具许可），通知送达以后再提交。
     def old_spec(request):
         assert _manifest(system, request).input_version == 1
         system.add_input(request.run_id, "Also require uppercase output")
@@ -171,16 +173,24 @@ def test_new_input_during_product_model_call_prevents_old_spec_acceptance(tmp_pa
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([old_spec, product_spec(requirements=["Print uppercase output"])]))
     run_id = system.create_run("build echo")
-    stale = system.activate_once(run_id)
-    assert has_new_work(stale, "product") and stale.product_spec is None and stale.processed_input_version == 0
-    assert len(_events(system, run_id, EventType.TOOL_SKIPPED)) == 1
     current = system.activate_once(run_id)
-    assert current.product_spec.revision == 1 and current.processed_input_version == 2
+    # 这一轮没有因为输入结束：模型在下一步看见通知以后提交的要求被接纳
+    assert current.product_spec is not None and current.product_spec.revision == 1
+    assert current.processed_input_version == 2
     assert [_manifest(system, request).input_version for request in system.test_adapter.invocations] == [1, 2]
+    # 第一次的提交被推迟：模型还没有看见新输入，部门没有因此结束这一轮
+    submissions = [event for event in _events(system, run_id, EventType.TOOL_CALLED)
+                   if event.payload["name"] == "submit_product_spec"]
+    assert [event.payload["ok"] for event in submissions] == [False, True]
+    assert "has not entered this session's model input yet" in submissions[0].payload["error"]
+    # 下一步的请求里有这条输入的通知
+    notification = json.loads(_parts(system, system.test_adapter.invocations[1])["work_notification"])
+    assert [item["kind"] for item in notification] == ["user_input_received"]
+    assert notification[0]["version"] == 2 and "uppercase" in notification[0]["text"]
 
-def test_input_before_model_request_start_does_not_send_the_prepared_old_context(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
-    run_id = system.create_run("build echo")
+def test_input_before_model_request_start_does_not_end_the_activation(tmp_path):
+    # 工单 #964：输入在请求发出以前到达，已经装配好的请求照常发出（输入不再作废它），
+    # 这一轮不结束，通知在下一步送达
     received = False
 
     def receive_before_start(_event):
@@ -189,14 +199,22 @@ def test_input_before_model_request_start_does_not_send_the_prepared_old_context
             received = True
             system.add_input(run_id, "Confirm uppercase output")
 
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(),
+                                                           product_spec(requirements=["Print uppercase output"])]))
+    run_id = system.create_run("build echo")
     after_event(system, EventType.CONTEXT_ASSEMBLED, receive_before_start)
-    stopped = system.activate_once(run_id)
-    assert has_new_work(stopped, "product") and not system.test_adapter.invocations
-    assert not _events(system, run_id, EventType.MODEL_REQUESTED)
-    assert system.activate_once(run_id).processed_input_version == 2
+    current = system.activate_once(run_id)
+    # 这一轮没有结束：模型在下一步看见通知以后提交的要求被接纳
+    assert current.product_spec is not None and current.processed_input_version == 2
     assert _manifest(system, system.test_adapter.invocations[-1]).input_version == 2
+    # 下一步的请求里有这条输入的通知
+    notification = json.loads(_parts(system, system.test_adapter.invocations[-1])["work_notification"])
+    assert [item["kind"] for item in notification] == ["user_input_received"]
+    assert notification[0]["version"] == 2
 
-def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_limit(tmp_path):
+def test_input_at_last_toolless_model_step_does_not_end_the_activation_before_its_step_limit(tmp_path):
+    # 工单 #964：输入到达不再结束部门当前这一轮，它作为通知在这个会话的下一步送达。
+    # 这一轮走到自己的步骤上限才停；运行不因此暂停（有新的工作要处理：产品处理这条输入）
     def final_old_response(request):
         system.add_input(run_id, "Confirm uppercase output")
         return ModelResponse(output=[{"type": "message", "id": "old-output", "role": "assistant",
@@ -210,8 +228,9 @@ def test_input_at_last_toolless_model_step_ends_old_activation_before_its_step_l
     assert current.product_work_input_version == 2 and current.processed_input_version == 0
     assert system.activate_once(run_id).processed_input_version == 2
 
-def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_input(tmp_path):
-    # bash 命令运行中收到新输入：这个命令照常完成并记录，其余工具跳过
+def test_started_tool_finishes_and_remaining_model_tools_run_on_new_input(tmp_path):
+    # 工单 #964：输入到达不再结束部门当前这一轮，已经开始的工具照常结束，其余工具照常执行；
+    # 正式成果等模型看见新输入以后再提交（这次提交推迟到下一步）
     signals = tmp_path / "signals"
     signals.mkdir()
     code = ("import pathlib; pathlib.Path('src').mkdir(exist_ok=True); "
@@ -225,7 +244,7 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
     system = LoopSystem.for_testing(tmp_path, FakeAdapter({
         "product": [product_spec(),
                     product_spec_turn(requirements=["print the argument in uppercase"], change_record=CHANGE_RECORD)],
-        "engineering": [ModelResponse(output=calls)],
+        "engineering": [ModelResponse(output=calls), delivery_turn()],
         "quality": quality_turns("release", "checks passed on the current snapshot"),
     }))
     run_id = system.create_run("build echo")
@@ -240,20 +259,52 @@ def test_started_tool_finishes_and_remaining_model_tools_are_skipped_on_new_inpu
             (signals / "release").write_text("go")
         current = future.result(timeout=WAIT_FOR_HOST_WORK_SEC)
     assert has_new_work(current, "product") and current.processed_input_version == 1
-    assert system.workspace(run_id).list_files() == ["src/first.py"]
+    # 部门接着工作：其余工具照常执行
+    assert system.workspace(run_id).list_files() == ["src/echo.py", "src/first.py", "src/second.py"]
     events = system.store.list_events(run_id)
     started = next(event for event in events if event.type == EventType.TOOL_STARTED and event.payload["id"] == "first")
     received = _events(system, run_id, EventType.USER_INPUT_RECEIVED)[0]
     finished = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("id") == "first")
     assert started.stream_version < received.stream_version < finished.stream_version
     assert finished.payload["ok"] and finished.payload["input_version"] == 1
-    skipped = _events(system, run_id, EventType.TOOL_SKIPPED)
-    assert [event.payload["id"] for event in skipped] == ["second", "submission"]
-    assert all(event.payload["input_version"] == 1 for event in skipped)
+    # 这次交付推迟：模型还没有看见新输入
+    submission = next(event for event in events if event.type == EventType.TOOL_CALLED
+                       and event.payload.get("id") == "submission")
+    assert not submission.payload["ok"]
+    assert "has not entered this session's model input yet" in submission.payload["error"]
     visible_history(department_history(system, run_id, "engineering"))
     assert system.activate_once(run_id).processed_input_version == 2
 
-def test_input_received_during_quality_model_response_prevents_its_old_release(tmp_path):
+def test_user_input_during_a_quality_round_is_delivered_as_a_notification(tmp_path):
+    # 工单 #964 验收第 1 条：用户在质检一轮工作进行中追加了输入，质检这一轮不结束，
+    # 它的下一步请求里包含这条输入的通知，它接着工作
+    def in_flight_input(request):
+        system.add_input(request.run_id, "Print uppercase instead")
+        return list_files_turn(request)
+
+    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [in_flight_input, review_turn("release", "checks passed on the current snapshot")],
+    }))
+    run_id = system.create_run("build echo")
+    _steps(system, run_id, 2)
+    current = system.activate_once(run_id)
+    quality = [request for request in system.test_adapter.invocations if request.department == "quality"]
+    # 这一轮没有因为输入结束：质检接着工作，走到了下一步
+    assert len(quality) == 2
+    assert current.input_version == 2 and current.processed_input_version == 1
+    # 下一步的请求里有这条输入的通知（第一条请求在输入到达以前装配，没有这条通知）
+    first = _parts(system, quality[0]).get("work_notification")
+    assert "user_input_received" not in (first or "")
+    notification = json.loads(_parts(system, quality[1])["work_notification"])
+    assert [item["kind"] for item in notification] == ["user_input_received"]
+    assert notification[0]["version"] == 2 and "uppercase" in notification[0]["text"]
+
+def test_input_received_during_quality_model_response_is_delivered_as_a_notification(tmp_path):
+    # 工单 #964：输入到达不再结束质检这一轮，它作为通知在这个会话的下一步送达，质检接着工作。
+    # 模型还没有看见新输入时，这次放行推迟到下一步；输入处理完以前不放行（循环结构第 6 节）
     def stale_release(request):
         system.add_input(request.run_id, "Print uppercase instead")
         return review_turn("release", "This belongs to the old input")(request)
@@ -262,7 +313,7 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
     system = LoopSystem.for_testing(tmp_path, FakeAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn()],
-        "quality": [stale_release],
+        "quality": [stale_release, review_turn("release", "checks passed on the current snapshot")],
     }))
     run_id = system.create_run("build echo")
     _steps(system, run_id, 2)
@@ -270,11 +321,20 @@ def test_input_received_during_quality_model_response_prevents_its_old_release(t
     assert has_new_work(current, "product") and current.last_review is None
     assert current.input_version == 2 and current.processed_input_version == 1
     assert not _events(system, run_id, EventType.RUN_DONE)
-    assert [event.payload["name"] for event in _events(system, run_id, EventType.TOOL_SKIPPED)] == ["run_check", "submit_review"]
+    # 放行没有生效：模型还没有看见新输入，这次提交推迟
+    reviews = [event for event in _events(system, run_id, EventType.TOOL_CALLED)
+               if event.payload["name"] == "submit_review"]
+    assert reviews and not reviews[0].payload["ok"]
+    assert "has not entered this session's model input yet" in reviews[0].payload["error"]
+    # 下一步的请求里有这条输入的通知
+    quality = [request for request in system.test_adapter.invocations if request.department == "quality"]
+    notification = json.loads(_parts(system, quality[-1])["work_notification"])
+    assert [item["kind"] for item in notification] == ["user_input_received"]
+    assert notification[0]["version"] == 2
 
 def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_path, monkeypatch):
     # 质检放行正在准备接纳时另一个线程写入新输入：放行的提交因流版本改变被写入口拒绝，按写入以后的状态重新判断；
-    # 激活开始以后输入改变，放行按 execution_basis 拒绝，新输入保留，运行没有结束
+    # 输入处理完以前不放行（循环结构第 6 节），新输入保留，运行没有结束
     # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
     system = LoopSystem.for_testing(tmp_path, FakeAdapter({
         "product": [product_spec()],
@@ -298,7 +358,7 @@ def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_p
     assert current.status != "done" and current.input_version == 2
     assert not _events(system, run_id, EventType.RUN_DONE) and not _events(system, run_id, EventType.QA_SUBMITTED)
     [rejected] = _events(system, run_id, EventType.PROPOSAL_REJECTED)
-    assert [error["field"] for error in rejected.payload["errors"]] == ["execution_basis"]
+    assert [error["field"] for error in rejected.payload["errors"]] == ["kind"]
     assert current.canonical_state() == system.replay(run_id).canonical_state()
 
 @pytest.mark.parametrize("command", ["/stop", "  /cancel\r\n"])
@@ -387,7 +447,9 @@ def test_identical_requirement_text_for_new_input_still_has_new_contract_binding
     assert current.effective_contract.input_version == 2
     assert not hasattr(current, "engineering_plan")
 
-def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(tmp_path):
+def test_compaction_keeps_activation_versions_and_carries_the_new_input(tmp_path):
+    # 工单 #964：输入到达不再结束这一轮，压缩照常生效（不再因为输入版本变化而作废）；
+    # 压缩以后的请求带着新的输入版本，压缩记录仍记着装配时的版本
     counts = {}
     changed = False
     first_activation = None
@@ -414,27 +476,32 @@ def test_compaction_keeps_activation_versions_and_rebuilds_after_version_change(
     run_id = system.create_run("build echo", context_window=8000)
     system.workspace(run_id).write_file("notes.txt", "PRESERVED_TOOL_BYTES " * 1800)
     first = system.activate_once(run_id)
-    assert has_new_work(changed and first, "product"), first.error
-    assert not first.compactions and first.input_version == 2 and first.product_spec is None
+    # 压缩照常生效：输入到达不再作废这次压缩
+    assert first.compactions and first.input_version == 2
+    assert {item["input_version"] for item in first.compactions} == {1, 2}
+    # 这一轮没有因为输入结束：模型在下一步看见通知以后提交的要求被接纳，这条输入被产品处理掉
+    assert first.product_spec is not None and first.processed_input_version == 2
     first_ids = {item["source_event_id"] for item in first.compactions}
     second = system.activate_once(run_id)
+    # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
     assert has_new_work(second, "engineering"), second.error
     # bare run 的部门 Prompt 是内置默认 Prompt（版本 0），run 内没有副本
     expected_input, expected_prompt = 2, 0
     assert second.processed_input_version == expected_input
     later = [item for item in second.compactions if item["source_event_id"] not in first_ids]
+    # 检查点按输入版本绑定（与合同同理，工单 #840）：新一轮的压缩从原始记录重建
     assert later and later[0]["previous_compaction_event_id"] is None
     assert all(item["input_version"] == expected_input and item["prompt_version"] == expected_prompt for item in later)
     original = next(event for event in _events(system, run_id, EventType.TOOL_CALLED)
                     if event.payload.get("name") == "read_file")
-    assert original.event_id in {ref["event_id"] for item in later for ref in item["source_refs"]}
+    # 这一轮的压缩保留了工具结果：原始记录里的字节仍在
+    assert original.event_id in {ref["event_id"] for item in first.compactions for ref in item["source_refs"]}
     assert system.artifacts.get_text(original.payload["output_ref"]["content_hash"]).count("PRESERVED_TOOL_BYTES") == 1800
-    for request in system.test_adapter.invocations:
-        manifest = _manifest(system, request)
-        if request.activation_id == first_activation:
-            assert manifest.input_version == 1 and manifest.prompt_version == 0
-        else:
-            assert manifest.input_version == expected_input and manifest.prompt_version == expected_prompt
+    versions = [_manifest(system, request).input_version for request in system.test_adapter.invocations]
+    # 第一条请求在输入到达以前装配，以后的请求带着新的输入版本
+    assert versions[0] == 1 and versions[-1] == 2
+    assert all(_manifest(system, request).prompt_version == expected_prompt
+               for request in system.test_adapter.invocations)
     assert second.canonical_state() == system.replay(run_id).canonical_state()
 
 def test_updated_requirements_flow_through_new_delivery_and_independent_quality(tmp_path):

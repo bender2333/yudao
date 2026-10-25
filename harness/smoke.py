@@ -636,8 +636,10 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     notes: list[str] = []
     activations: dict[str, tuple[str, str, str]] = {}
     activation_bases: dict[str, dict[str, Any]] = {}
+    # 每个会话在这一轮工作里已经采用的输入版本：新的用户输入到达以后，会话在下一步采用它
+    # （工单 #964），这一步以后的记录带着新的版本
+    adopted_inputs: dict[str, int] = {}
     activation_prompts = {}
-    activation_intends: dict[str, str] = {}
     activation_guidance_only: dict[str, bool] = {}
     steps: dict[str, int] = {}
     digests: dict[str, str] = {}
@@ -704,7 +706,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 activations[activation] = (event.department, event.session_id, event.event_id)
                 activation_prompts[activation] = _project_prompt(
                     store, artifacts, run_id, event.department, int(payload.get("prompt_version", 0)))
-                activation_intends[activation] = current_work.task
                 basis = {**work_basis, "input_version": current_work.input_version,
                          "prompt_version": payload.get("prompt_version"),
                          "prompt_hash": payload.get("prompt_hash")}
@@ -729,9 +730,15 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             if activations.get(activation) != binding:
                 raise ValueError("input or output does not match its department activation")
             basis = activation_bases[activation]
-            for field in ("input_version", "prompt_version", "prompt_hash"):
+            for field in ("prompt_version", "prompt_hash"):
                 if payload.get(field) != basis[field]:
                     raise ValueError(f"{field} does not match the version adopted at activation")
+            # 输入版本：新的用户输入到达以后，会话在下一步采用它（工单 #964），
+            # 装配那一步的记录带着装配时的当前版本，以后的记录带着已经采用的版本
+            current_input = (current_work.input_version if event.type == EventType.CONTEXT_ASSEMBLED
+                             else adopted_inputs.get(activation, basis["input_version"]))
+            if payload.get("input_version") != current_input:
+                raise ValueError("input_version does not match the version adopted at activation")
             if event.type == EventType.TOOL_STARTED or (
                 event.type == EventType.TOOL_CALLED and payload.get("name") == "provider_usage"
             ):
@@ -828,7 +835,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 department=event.department, session_id=event.session_id, activation_id=activation,
                 prompt=activation_prompts[activation], guidance_only=activation_guidance_only[activation],
                 effective_contract_hash=basis["effective_contract_hash"],
-                input_version=basis["input_version"],
+                input_version=current_input,
             )
             before = events[:index]
             # 回放用的调用目标与本次请求事件记录的一致：CONTEXT_ASSEMBLED 事件本身带目标字段，
@@ -905,8 +912,9 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         or items[pinned_index].get("role") != "developer"):
                     raise ValueError("missing explicit department instructions")
                 instructions = items[pinned_index].get("content")
+                # 原始意图按当前收到的输入算（新的用户输入到达以后任务文本变长，工单 #964）
                 if (not isinstance(instructions, str)
-                        or not instructions.startswith(f"[intend]\n{activation_intends[activation]}\n\n[current_work]\n")):
+                        or not instructions.startswith(f"[intend]\n{current_work.task}\n\n[current_work]\n")):
                     raise ValueError("model input does not carry the verbatim task followed by current work")
                 if items[pinned_index] != pinned.context.input_items[0]:
                     raise ValueError("pinned developer input differs from current allowed materials")
@@ -959,6 +967,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     raise ValueError("injected source metadata differs from current allowed materials")
                 if payload.get("excluded") != [asdict(item) for item in manifest.excluded]:
                     raise ValueError("excluded source metadata differs from current allowed materials")
+                # 这一步采用了这一版输入：以后的记录带着它
+                adopted_inputs[activation] = current_input
             elif event.type == EventType.MODEL_REQUESTED:
                 key = (activation, payload.get("step_id"))
                 if (activation not in steps or key[1] != steps[activation]

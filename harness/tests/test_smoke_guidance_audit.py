@@ -46,7 +46,8 @@ def saved_combined(tmp_path_factory):
     holder = {}
 
     def in_flight_changes(request):
-        # 工程第一次请求在途时：两条工程指导 + 用户连续输入 v2；旧回复的 list_files 不得再执行。
+        # 工程第一次请求在途时：两条工程指导 + 用户连续输入 v2；
+        # 这一轮不因此结束（工单 #964），旧回复的 list_files 照常执行，下一步收到通知。
         system = holder["system"]
         system.add_guidance(request.run_id, "engineering", "请解释当前导出格式的处理边界。")
         system.add_guidance(request.run_id, "engineering", "请在交付文件头部标注导出格式。")
@@ -132,7 +133,9 @@ def test_combined_run_shape(combined_run):
     events = system.store.list_events(run_id)
     ask_answered = [e for e in events if e.type == EventType.ASK_ANSWERED]
     assert len(ask_answered) == 1 and ask_answered[0].payload["status"] == "answered"
-    assert any(event.type == EventType.TOOL_SKIPPED for event in events)
+    # 工单 #964：输入到达不再结束工程这一轮，旧回复里的只读调用照常执行（部门接着工作）
+    assert any(event.type == EventType.TOOL_CALLED and event.payload.get("name") == "list_files"
+               for event in events)
     # 指导进了工程的模型输入（设计说明第 6 节），由工程回答：
     # 同时运行以后这一轮是不是「只回应指导」的一轮取决于别的部门有没有先做完，
     # 这里断言的是指导的处理结果，不断言是哪一轮处理的

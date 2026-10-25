@@ -804,20 +804,18 @@ class Orchestrator:
 
     def _stop_requested(self, activation: _Activation, projection: RunProjection,
                         decisions: Iterable[DecisionRequest]) -> bool:
-        # 停止判断：这个会话自己的停止开关、事项被中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求、
-        # 输入版本改变；只读取，不写入。
+        # 停止判断：这个会话自己的停止开关、事项被中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求；
+        # 只读取，不写入。
         # 会话自己的开关与事项的开关都看（工单 #856）：停下一个会话只停这个会话，
         # 用户取消事项时全部会话都停
-        # 有效合同与指导变了不再停止：它们作为通知送达，部门接着工作，一轮工作因此不结束
-        # （工单 #558，循环结构第 5 节与第 6 节）。用户输入仍然结束这一轮：
-        # 输入分派给产品部门，由产品在下一轮处理（工单 #556）
-        basis = activation.scope.basis
+        # 有效合同、指导与用户输入变了都不再停止：它们作为通知送达，部门接着工作，一轮工作因此不结束
+        # （工单 #558、工单 #964，循环结构第 5 节与第 6 节）。
+        # 输入仍然分派给产品部门处理（工单 #556）：产品在自己的那一轮处理它。
         return (activation.stop_flag.is_set()
                 or self._aborted(activation.run_id)
                 or (activation.deadline is not None and time.monotonic() >= activation.deadline)
                 or time_used_up(projection, self._elapsed_sec(activation.run_id))
-                or projection.status in TERMINAL_STATUSES or blocks_run(decisions)
-                or projection.input_version != basis.input_version)
+                or projection.status in TERMINAL_STATUSES or blocks_run(decisions))
 
     def _elapsed_sec(self, run_id: str) -> float:
         # 这个 run 已经用的运行时间（秒）：已持久化的累计加上当前运行段。等待（重试退避、
@@ -1686,7 +1684,6 @@ class Orchestrator:
                 transcript_ref = ref.__dict__
             self._apply_proposal(
                 run_id, department=department, projection=current, proposal=submission.proposal,
-                basis=activation.scope.basis,
                 transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
                 session_id=scope.session_id,
                 yielded_work=activation.yielded_work,
@@ -1904,12 +1901,10 @@ class Orchestrator:
             elif isinstance(result, Stopped) and result.reason:
                 reason = result.reason
             else:
-                # 分支没有做出回答就结束：最常见的原因是分支工作期间工作依据变了
-                # （另一个会话修订了 PRD、用户有新输入或新的指导），依据变了以后这个分支
-                # 不能继续工作（设计说明第 5 节、第 9 节）。写明是哪一种，提问方才知道
-                # 接下来怎么做（设计说明第 4.5 节）
-                reason = self._stale_branch_reason(scope.run_id, recipient, branch_session_id) \
-                    or "branch failed to answer"
+                # 分支没有做出回答就结束：写明原因，提问方才知道接下来怎么做
+                # （设计说明第 4.5 节）。工作依据变了不再算：PRD 的新版本、新的指导与新的用户输入
+                # 都作为通知送达，分支接着工作（工单 #558、工单 #964，循环结构第 5 节与第 6 节）
+                reason = "branch failed to answer"
             def record_ask_unable(transaction: Transaction) -> None:
                 transaction.append(NewEvent(
                     EventType.ASK_ANSWERED,
@@ -1931,29 +1926,6 @@ class Orchestrator:
                 ))
             self.writes.transact(run_stream(scope.run_id), record_ask_unable)
             return False, None, reason, None, branch_steps
-
-    def _stale_branch_reason(self, run_id: str, department: str, branch_session_id: str) -> str | None:
-        # 分支会话开始时采用的工作依据与此刻的依据：变了就说明这个分支不能继续工作
-        # （设计说明第 9 节）。写明是哪一种变化，提问方拿到的原因才有内容
-        # （设计说明第 4.5 节）。PRD 的新版本不再算：它作为通知送达，分支接着回答
-        # （工单 #558，循环结构第 5 节）。
-        events = self.writes.read(run_stream(run_id)).events()
-        started = next((event for event in events
-                        if event.type == EventType.DEPARTMENT_ACTIVATED
-                        and event.session_id == branch_session_id), None)
-        if started is None:
-            return None
-        payload = started.payload or {}
-        basis = WorkBasis(
-            effective_contract_hash=payload.get("effective_contract_hash"),
-            input_version=int(payload.get("input_version") or 0),
-            guidance_version=int(payload.get("guidance_version") or 0),
-        )
-        current = WorkBasis.current(self.project(run_id), department)
-        if current.input_version != basis.input_version:
-            return ("new user input arrived while this branch was working; "
-                    "the basis of this branch is stale, so it could not answer")
-        return None
 
     def _branch_steps(self, events: list[Any], branch_session_id: str) -> int:
         # 这个分支会话用掉的模型步数：分支里再问一层时，回问的分支是它的下一层，
@@ -2095,7 +2067,6 @@ class Orchestrator:
         *,
         department: str,
         projection: RunProjection,
-        basis: WorkBasis,
         proposal: dict[str, Any] | None,
         transcript_ref: dict[str, Any] | None,
         parent_event_id: str,
@@ -2121,7 +2092,7 @@ class Orchestrator:
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._commit_proposal(
                     transaction, evaluated=evaluated, facts=facts, decision=decision, environment=environment,
-                    department=department, started=projection, basis=basis, proposal=proposal,
+                    department=department, proposal=proposal,
                     transcript_ref=transcript_ref, parent_event_id=parent_event_id, session_id=session_id,
                     provider=provider, model=model, yielded_work=yielded_work,
                 ), expected_version=evaluated.version)
@@ -2138,8 +2109,6 @@ class Orchestrator:
         decision: ProposalDecision,
         environment: LocalEnvironment,
         department: str,
-        started: RunProjection,
-        basis: WorkBasis,
         proposal: dict[str, Any] | None,
         transcript_ref: dict[str, Any] | None,
         parent_event_id: str,
@@ -2156,7 +2125,7 @@ class Orchestrator:
         current = self._assign_new_inputs(transaction)
         snapshot = environment.snapshot()
         judged = commit_decision(
-            decision, department=department, proposal=proposal, basis=basis, started=started,
+            decision, department=department, proposal=proposal,
             evaluated=evaluated.projection, facts=facts, current=current, current_facts=snapshot.facts,
             events=transaction.events(),
         )
@@ -2167,7 +2136,7 @@ class Orchestrator:
                 state_before=current.status, state_after=current.status,
                 session_id=session_id, provider=provider, model=model,
                 payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
-                         "raw_keys": sorted(proposal.keys()), "input_version": basis.input_version,
+                         "raw_keys": sorted(proposal.keys()), "input_version": current.input_version,
                          "definitions_version": DEFINITIONS.version,
                          "parameters_version": current.parameters_version},
             ))
@@ -2181,7 +2150,7 @@ class Orchestrator:
                     "errors": judged.error_dicts,
                     "transcript_ref": transcript_ref,
                     "kind": None if proposal is None else proposal.get("kind"),
-                    "input_version": basis.input_version,
+                    "input_version": current.input_version,
                     "definitions_version": DEFINITIONS.version,
                     "parameters_version": current.parameters_version,
                 },
@@ -2533,14 +2502,18 @@ class Orchestrator:
         transaction.on_commit(lambda: self._wake(projection.run_id))
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
-        # 新的输入或指导：user_input_received 与 department_guidance_received 由用户提出，
-        # 部门指导在事件载荷与 department 列中写明部门
-        if not any(event.type in _USER_EVENTS for event in transaction.events_after(version)):
-            return False
+        # 停止判断过期：这次激活的工作期间有新的用户输入到达（输入版本变了），
+        # 停止判断不再适用：这一轮按安全节点结束，运行继续，由下一次激活处理新的输入
+        # （工单 #964，循环结构第 5 节与第 6 节）。输入到达不再结束部门当前这一轮：
+        # 它作为通知在这个会话的下一步送达，部门接着工作。
         projection = transaction.projection
         basis = activation.scope.basis
-        return (projection.input_version != basis.input_version
-                or guidance_version(projection, activation.department) > basis.guidance_version)
+        if projection.input_version != basis.input_version:
+            return True
+        # 新的指导在停止判断以后到达：同样过期，由下一次激活处理
+        if not any(event.type in _USER_EVENTS for event in transaction.events_after(version)):
+            return False
+        return guidance_version(projection, activation.department) > basis.guidance_version
 
     def _end(self, transaction: Transaction, reason: str, message: str,
              *, facts: list[str] | None = None) -> None:

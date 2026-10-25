@@ -526,6 +526,7 @@ class StepDriver:
                 raw_args = item.get("arguments")
                 after_snapshot = None
                 qa_tests_saved = None
+                deferred = False
                 try:
                     args = json.loads(raw_args)
                     if not isinstance(args, dict):
@@ -546,6 +547,7 @@ class StepDriver:
                         return Stopped(self._version)
                     if not permission.allowed:
                         ok, output, error = False, None, permission.reason
+                        deferred = permission.deferred
                     elif name == "ask":
                         ask_call = {
                             "id": identity,
@@ -627,6 +629,10 @@ class StepDriver:
                     return Stopped(self._version)
                 kind = proposal_kind(name)
                 if kind is not None:
+                    if deferred:
+                        # 这次提交推迟：模型还没有看见新的用户输入，通知在下一步送达，
+                        # 部门没有提交正式成果，这一轮不结束（工单 #964）
+                        continue
                     self._skip(request, response.output[index + 1:],
                                "Not executed because the department already submitted its proposal.")
                     proposal = output if ok else {**args, "kind": kind}
@@ -802,8 +808,6 @@ class StepDriver:
             if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
                 return None
             projection = self._settle(transaction)
-            if scope.basis.changed(projection, scope.department):
-                return None
             target = self._call_public or {}
             try:
                 limits = model_limits(target["context_window"], target["configured_max_output_tokens"])
@@ -828,6 +832,10 @@ class StepDriver:
             except (CompactionError, ValueError, FileNotFoundError) as exc:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             assembled = step.context
+            # 用户追加的输入在这个会话的下一步作为通知送达（工单 #964，循环结构第 5 节与第 6 节）：
+            # 这个会话采用新的输入版本并接着工作，一轮工作不因此结束。
+            # 采用以后模型就看见了这一版输入，正式成果才能按它提交。
+            self._adopt_input_version(assembled.manifest.input_version)
             logical_call_id = f"{scope.activation_id}:root-{root_step_id}:{assembled.manifest.purpose}"
             # 整理请求按最低支持档位解析：向 Provider 传「minimal」，它按模型声明取最低支持档位。
             # 用途只有装配以后才知道，如果这次逻辑调用用的请求档位不是它，重新解析一次
@@ -869,13 +877,9 @@ class StepDriver:
         return self._request
 
     def _start_request(self, request: ModelRequest) -> bool:
-        scope = self._scope
-
         def start(transaction: Transaction) -> bool:
             projection = self._settle(transaction)
             if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
-                return False
-            if scope.basis.changed(projection, scope.department):
                 return False
             self._recorder.request_started(transaction, request)
             return True
@@ -907,12 +911,9 @@ class StepDriver:
         )
 
     def _schedule_retry(self, request: ModelRequest, error: ProviderError, delay: float, next_step_id: int) -> bool:
-        scope = self._scope
-
         def schedule(transaction: Transaction) -> bool:
             projection = self._settle(transaction)
-            if (projection.status in TERMINAL_STATUSES or self._cancelled.is_set()
-                    or scope.basis.changed(projection, scope.department)):
+            if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
                 return False
             self._recorder.retry_scheduled(transaction, request, error, delay, next_step_id)
             return True
@@ -920,16 +921,12 @@ class StepDriver:
         return self._writes.transact(self._stream, schedule)
 
     def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> None:
-        scope = self._scope
-
         def finish(transaction: Transaction) -> _CompactionOutcome | None:
             # 压缩请求的回答生成检查点。这次压缩不生效或者覆盖范围没有往前走时，
             # 结果里写明没有推进的原因；连续没有推进的次数由调用方在事务提交以后判断
             projection = transaction.projection
             self._version = projection.stream_version
             if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
-                return None
-            if scope.basis.changed(projection, scope.department):
                 return None
             try:
                 result = self._assembly.finish_compaction(self._step, response.output)
@@ -981,6 +978,16 @@ class StepDriver:
         if current == self._scope.basis.effective_contract_hash:
             return
         self._adopt_contract(current)
+
+    def _adopt_input_version(self, version: int) -> None:
+        # 用户追加了输入：这次请求的上下文里已经有这条输入的通知（工单 #964，
+        # 循环结构第 5 节与第 6 节）。这个会话采用这一版输入版本并接着工作，一轮工作不因此结束；
+        # 采用以后模型就看见了这一版输入，正式成果才能按它提交。
+        if version == self._scope.basis.input_version:
+            return
+        self._scope = replace(self._scope, basis=replace(self._scope.basis, input_version=version))
+        # 整理检查点按这一版输入绑定（与合同同理，工单 #840）
+        self._frame = replace(self._frame, input_version=version)
 
     def _refresh_workspace_now(self) -> None:
         # 检查工作区按会话保留（工单 #558）：检查工作区只在会话建立时与新交付封存以后重建，

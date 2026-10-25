@@ -234,8 +234,9 @@ async def _run_demo(application: Application, system: LoopSystem) -> tuple[LoopS
     assert task is not None, "work_item.create did not start the run task"
     # 等到修订要求的协作请求已关闭（V2 接纳且 engineering 回复 completed），再追加变更：
     # 主分支上这笔输入在首次计划接纳后才追加；删计划后等价点是请求关闭后，V3 消费它。
-    # 同时运行的会话里还要等质检对工程的询问回答完（工单 #557）：询问的分支会话在工作期间
-    # 遇到依据变化（这里就是 V3 修订了 PRD）会停下来，那次询问就记成「没能回答」。
+    # 同时运行的会话里还要等质检对工程的询问回答完（工单 #557）：否则询问的分支会话还在工作，
+    # 那笔输入进产品以后变成 V3 时它还在工作。依据变了不再让分支停下来
+    # （工单 #558 的 PRD 新版本、工单 #964 的用户输入都作为通知送达），分支接着回答。
     await _wait_for(lambda: len(system.project(run_id).effective_contracts) >= 2
                     and _answers_done(system, run_id))
     await _command(application, "work_item.append_input",
