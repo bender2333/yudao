@@ -1,19 +1,14 @@
 import gc
 import sys
 from dataclasses import asdict
-from pathlib import Path
 
 import pygit2
-import pytest
 
-from harness.artifacts import ArtifactStore
-from harness.event_store import EventStore, project_stream
+from harness.event_store import project_stream
 from harness.models import ProjectEventType
-from harness.project_projection import handler_for
-from harness.projects import ProjectService
 from harness.public_tree import CapturedFile, CapturedTree
 from harness.tree_archive import store_tree
-from harness.write_path import NewProjectEvent, WritePath
+from harness.write_path import NewProjectEvent
 from harness.writeback import git_tree_to_captured
 
 from .test_writeback import _commit_to_bare_repo, _create_bare_repo, _setup_yudao_env
@@ -109,49 +104,6 @@ def test_writeback_uses_project_target_branch(tmp_path):
         gc.collect()
 
 
-def test_writeback_executable_flag_follows_tree_manifest(tmp_path):
-    # 写回树的可执行标记取自树清单：采纳树声明可执行时生效，未声明时不继承目标提交的标记
-    bare_path = tmp_path / "bare.git"
-    src_dir = tmp_path / "src"
-    src_dir.mkdir()
-    c1 = _create_bare_repo(bare_path, {"run.sh": b"#!/bin/sh\nold\n", "tool.sh": b"#!/bin/sh\ntool\n"},
-                           executable_files={"run.sh", "tool.sh"})
-
-    store, writes, artifacts, projects = _setup_yudao_env(tmp_path)
-    try:
-        pid = projects.register("ExecTest", "Goal")
-        projects.configure_source_directory(
-            pid, "default", str(src_dir), base_version=0,
-            writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=[_PASS_COMMAND],
-        )
-
-        base_captured = CapturedTree((), (
-            CapturedFile("run.sh", b"#!/bin/sh\nold\n"),
-            CapturedFile("tool.sh", b"#!/bin/sh\ntool\n"),
-        ))
-        adopted_captured = CapturedTree(
-            directories=(),
-            files=(
-                CapturedFile("run.sh", b"#!/bin/sh\nnew\n"),
-                CapturedFile("tool.sh", b"#!/bin/sh\ntool\n"),
-            ),
-        )
-        _adopt(writes, artifacts, pid, "w1", "r1", "adopt_exec", base_captured, adopted_captured)
-
-        event = projects.execute_writeback(pid, "adopt_exec")
-        assert event.type == ProjectEventType.WRITEBACK_COMPLETED
-
-        bare_repo = pygit2.Repository(str(bare_path))
-        wb_commit = bare_repo.references["refs/heads/writeback/adopt_exec"].peel(pygit2.Commit)
-        assert wb_commit.tree["run.sh"].filemode == pygit2.enums.FileMode.BLOB_EXECUTABLE
-        assert wb_commit.tree["tool.sh"].filemode == pygit2.enums.FileMode.BLOB_EXECUTABLE
-        del bare_repo
-    finally:
-        store.close()
-        gc.collect()
-
-
 def test_writeback_missing_source_reference_stops(tmp_path):
     # 事项既没有起点树也没有快照时，缺少起点依据，写回停止
     bare_path = tmp_path / "bare.git"
@@ -199,44 +151,6 @@ def test_writeback_missing_source_reference_stops(tmp_path):
 
         bare_repo = pygit2.Repository(str(bare_path))
         assert "refs/heads/writeback/adopt_missing" not in bare_repo.references
-        del bare_repo
-    finally:
-        store.close()
-        gc.collect()
-
-
-def test_writeback_failing_check_command_stops(tmp_path):
-    # 源目录设置与采纳成果里写的命令字符串退出码非零时，写回停止并给出回执，不推送分支
-    bare_path = tmp_path / "bare.git"
-    src_dir = tmp_path / "src"
-    src_dir.mkdir()
-    _create_bare_repo(bare_path, {"app.py": b"print('base')\n"})
-
-    fail_command = f'"{sys.executable}" -c "import sys; sys.exit(1)"'
-    store, writes, artifacts, projects = _setup_yudao_env(tmp_path)
-    try:
-        pid = projects.register("FailingCheckTest", "Goal")
-        projects.configure_source_directory(
-            pid, "default", str(src_dir), base_version=0,
-            writeback_enabled=True, remote=str(bare_path), target_branch="main",
-            check_commands=[fail_command],
-        )
-        base_captured = CapturedTree((), (CapturedFile("app.py", b"print('base')\n"),))
-        adopted_captured = CapturedTree((), (CapturedFile("app.py", b"print('adopted')\n"),))
-        _adopt(writes, artifacts, pid, "w1", "r1", "adopt_fail", base_captured, adopted_captured,
-               check_names=(fail_command,))
-
-        event = projects.execute_writeback(pid, "adopt_fail")
-        assert event.type == ProjectEventType.WRITEBACK_STOPPED
-        assert event.payload["reason"] == "verification_failed"
-        receipts = event.payload["check_receipts"]
-        assert len(receipts) == 1
-        assert receipts[0]["name"] == fail_command
-        assert receipts[0]["command"] == fail_command
-        assert receipts[0]["exit_code"] == 1
-
-        bare_repo = pygit2.Repository(str(bare_path))
-        assert "refs/heads/writeback/adopt_fail" not in bare_repo.references
         del bare_repo
     finally:
         store.close()

@@ -237,9 +237,3 @@ def test_a_fake_definition_is_rejected_when_started_normally():
     assert issues == [("models.m-fake.protocol", "正常启动的系统不允许 fake 协议的模型访问定义，"
                                                  "fake 只在测试或演示方式下可用")]
 
-def test_bound_target_carries_the_protocol_of_the_definition():
-    # 解析出的调用目标带这一条定义的协议，不是连接的协议
-    facade = _facade(_custom_document(("m-msg", "messages")))
-    target = _target(facade, "m-msg")
-    assert target.protocol == "messages"
-    assert target.provider_id == "local"

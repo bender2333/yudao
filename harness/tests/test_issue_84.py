@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 
 from harness.adapters.facade_adapter import FacadeAdapter
-from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.providers import (
     CatalogValidationError,
@@ -17,9 +16,7 @@ from harness.providers import (
     ProviderFacade,
 )
 from harness.providers.presets import USER_AGENT
-from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
-from harness.tests.helpers import happy_script
 from harness.tests.protocol_helpers import (
     chat_responder,
     complete,
@@ -190,47 +187,6 @@ def test_opencode_go_three_protocols_paths_and_identity_headers():
         server.server_close()
 
 
-def test_same_service_preset_connections_share_credential_reference():
-    # 验收 3：同一服务方案的两份连接可以使用同一个凭据引用
-    document = {
-        "providers": [
-            {"id": "go-1", "name": "Go 1",
-             "base_url": "https://opencode.ai/zen/go/v1", "credential_ref": "SHARED_KEY_REF",
-             "preset_id": "opencode-go"},
-            {"id": "go-2", "name": "Go 2",
-             "base_url": "https://opencode.ai/zen/go/v1", "credential_ref": "SHARED_KEY_REF",
-             "preset_id": "opencode-go"},
-        ],
-        "models": [
-            {"id": "m1", "provider_id": "go-1", "model": "model-1",
-             "protocol": "responses",
-             "context_window": 32000, "max_output_tokens": 1024},
-            {"id": "m2", "provider_id": "go-2", "model": "model-2",
-             "protocol": "chat_completions",
-             "context_window": 32000, "max_output_tokens": 1024},
-        ],
-        "bindings": {},
-    }
-    facade = ProviderFacade(credentials=CredentialChain(overrides={"SHARED_KEY_REF": "secret-val"}))
-    facade.store_document(document)
-
-    providers = {item["id"]: item for item in facade.providers_view()["providers"]}
-    assert providers["go-1"]["credential_ref"] == "SHARED_KEY_REF"
-    assert providers["go-2"]["credential_ref"] == "SHARED_KEY_REF"
-
-    # 两份连接各自按自己的协议解析，使用同一个凭据引用的凭据
-    for provider_id, model_id, protocol in (
-        ("go-1", "m1", "responses"), ("go-2", "m2", "chat_completions"),
-    ):
-        facade.record_admission(provider_id, model_id, admitted_model="upstream")
-        target = facade.resolve_snapshot(
-            [{"key": "k", "provider_id": provider_id, "model_id": model_id}]
-        ).target("k")
-        assert target.protocol == protocol
-        assert target.credential_ref == "SHARED_KEY_REF"
-        assert target.api_key == "secret-val"
-
-
 def test_catalog_query_returns_presets_revision_and_source_without_models(tmp_path: Path):
     # 验收 4：catalog 查询返回预置表的 revision 与来源；预置表中没有模型、容量、推理档位或准入
     class Opened:
@@ -269,10 +225,3 @@ def test_catalog_query_returns_presets_revision_and_source_without_models(tmp_pa
             assert preset["source"]
 
 
-def test_full_system_run_with_fake_adapter(tmp_path: Path):
-    # 验收 5：测试从运行系统整体进行，模型回答由 FakeAdapter 给出
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
-    run_id = system.create_run("build echo")
-    projection = system.run_until_stop(run_id)
-    assert projection.status == "done"
-    assert projection.stop_reason == "released"

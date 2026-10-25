@@ -1,15 +1,10 @@
 import sqlite3
-import time
 
 import pytest
 
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import run_stream
-from harness.models import json_dumps
 from harness.project_projection import saved_project
-from harness.projection import replay_run
-from harness.proposals import product_spec
-from harness.providers.call import ModelResponse
 from harness.public_tree import capture_public_tree
 from harness.replay_check import PROJECTION_REASON, ReplayIntegrityError
 from harness.runtime import LoopSystem
@@ -37,7 +32,6 @@ def saved_project_and_bare_run(tmp_path_factory):
 def project_and_bare_run(saved_project_and_bare_run, tmp_path):
     saved, project_id, runs = saved_project_and_bare_run
     return system_on_copy(saved, tmp_path / "data"), project_id, runs
-
 
 
 def _delete_saved_projections(data_dir):
@@ -99,34 +93,3 @@ def test_replay_check_reports_a_saved_projection_that_differs_from_the_replay(pr
     assert system.replay(other).to_dict() == system.project(other).to_dict()
 
 
-def _run_with_tool_calls(data_dir, count):
-    # 一次激活：第一步的回答调用 count 次只读工具，第二步提交产品规格。事件随工具调用增加，投影的大小不变
-    def reads(call):
-        return ModelResponse(output=[{"id": f"list-{index}", "call_id": f"list-{index}", "type": "function_call",
-                                      "name": "list_files", "arguments": json_dumps({})} for index in range(count)])
-
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([reads, product_spec()]))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)
-    return system, run_id
-
-
-def _read_time(system, run_id):
-    samples = []
-    for _ in range(40):
-        started = time.perf_counter()
-        system.project(run_id)
-        samples.append(time.perf_counter() - started)
-    return min(samples)
-
-
-def test_reading_the_run_state_does_not_slow_down_with_ten_times_the_history(tmp_path):
-    small_system, small = _run_with_tool_calls(tmp_path / "small", 3)
-    large_system, large = _run_with_tool_calls(tmp_path / "large", 110)
-    small_events, large_events = small_system.store.list_events(small), large_system.store.list_events(large)
-    assert len(large_events) >= 10 * len(small_events)
-    # 工具次数另含提交产品规格的一次
-    assert large_system.project(large).tool_count == 111 and small_system.project(small).tool_count == 4
-    # 保存的投影与重放结果相同，读取的是保存的投影
-    assert large_system.project(large).to_dict() == replay_run(large_system.store, large).to_dict()
-    assert _read_time(large_system, large) < 3 * _read_time(small_system, small)

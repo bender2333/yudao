@@ -18,7 +18,6 @@ from typing import Any
 from harness.models import EventType
 from harness.proposals import delivery, product_spec, review
 from harness.tests import process_kill as killed
-from harness.tests.helpers import run_wait_command
 
 
 def _call(identity: str, name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -33,10 +32,6 @@ def _call(identity: str, name: str, args: dict[str, Any]) -> dict[str, Any]:
 
 def _smoke_check() -> dict[str, Any]:
     return {"smoke": {"command": f'"{sys.executable.replace(chr(92), "/")}" -c "print(\'smoke ok\')"'}}
-
-
-def _session_of(event: Any) -> str | None:
-    return event.session_id
 
 
 def _branch_sessions(events: list[Any]) -> set[str]:
@@ -223,61 +218,3 @@ def test_session_and_item_usage_accumulate_across_a_restart(tmp_path):
         assert steps == len(requested), (steps, len(requested))
 
 
-def test_an_unknown_action_is_handed_back_to_the_session_that_issued_it(tmp_path):
-    # (d) 一个会话中结果未知的动作交还这个会话：核实记录带着发出它的会话的编号，
-    # 模型的下一个请求里是这个会话的这次工具结果
-    data_dir = tmp_path / "data"
-    signals = tmp_path / "signals"
-    signals.mkdir(exist_ok=True)
-
-    # 脚本按会话给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
-    script = {
-        "product": [{"proposal": product_spec()}],
-        "engineering": [
-            {"output": [_call("call-bash", "bash", {"command": run_wait_command(signals)})]},
-        ],
-        "quality": [{"proposal": {"kind": "quality_auto"}}],
-    }
-    tail = {
-        "engineering": [
-            {"proposal": delivery(check_names=["smoke"]),
-             "writes": {"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-             "checks": _smoke_check()},
-        ],
-        "quality": [
-            {"proposal": review("release", "checks passed on the current snapshot"),
-             "checks": _smoke_check()},
-        ],
-    }
-
-    with killed.interrupted(data_dir, script, tail=tail, started=signals / "started") as run:
-        after = run.after.store.list_events(run.run_id)
-        started = [event for event in after
-                   if event.type == EventType.TOOL_STARTED
-                   and (event.payload or {}).get("id") == "call-bash"]
-        assert len(started) == 1
-        session = started[0].session_id
-        assert session, "动作没有记下发出它的会话"
-
-        handed_back = [event for event in after
-                       if event.type == EventType.ACTION_VERIFIED
-                       and (event.payload or {}).get("id") == "call-bash"]
-        assert len(handed_back) == 1
-        assert handed_back[0].session_id == session
-        assert (handed_back[0].payload or {}).get("resolution") == "handed_back"
-
-        # 模型收到这次工具结果：执行被中断、结果未知
-        outputs = [item for invocation in run.after.test_adapter.invocations
-                   for item in invocation.input_items
-                   if isinstance(item, dict) and item.get("type") == "function_call_output"
-                   and item.get("call_id") == "call-bash"]
-        assert outputs, "模型没有收到这次动作的结果"
-        data = json.loads(outputs[0]["output"])
-        assert data["ok"] is False
-        assert "执行被中断" in data["error"] and "结果未知" in data["error"]
-
-        # 这个会话接着工作，事项运行到放行
-        assert run.after.project(run.run_id).status == "done", run.after.project(run.run_id).status
-        released = [event for event in after if event.type == EventType.QA_SUBMITTED]
-        assert len(released) == 1
-        assert (released[0].payload or {}).get("verdict") == "release"

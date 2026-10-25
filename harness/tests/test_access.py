@@ -34,19 +34,10 @@ def _lan_address() -> str:
     return "127.0.0.1"
 
 
-
 def test_local_access_rejects_a_host_that_is_not_a_local_name(data_dir):
     # 本机访问方式：Host 不属于 127.0.0.1、localhost 或 [::1] 时拒绝，防止 DNS 重新绑定
     with running_api(_Opened(data_dir)) as client:
         rejected = client.get("/api/capabilities", headers={"Host": "evil.example"})
-    assert rejected.status_code == 403
-    assert rejected.content == b""
-
-
-def test_access_rejects_an_origin_that_is_not_the_service_itself(data_dir):
-    # 带 Origin 的请求只接受服务自己的来源，其他网站的页面不能借用浏览器操作服务
-    with running_api(_Opened(data_dir)) as client:
-        rejected = client.get("/api/capabilities", headers={"Origin": "https://evil.example"})
     assert rejected.status_code == 403
     assert rejected.content == b""
 

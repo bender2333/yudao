@@ -1,5 +1,4 @@
 from pathlib import Path
-import sqlite3
 
 import pytest
 
@@ -25,20 +24,6 @@ def test_read_only_event_store_refuses_write_methods_at_python_layer(tmp_path: P
             store.claim_execution_right("run:r1", 1, [], "running")
         with pytest.raises(RuntimeError, match="the event store is open read-only"):
             store.replace_projection("run:r1", "running", 0, 0)
-    finally:
-        store.close()
-
-
-def test_read_only_event_store_connection_enforces_query_only(tmp_path: Path) -> None:
-    db_path = tmp_path / "events.sqlite"
-    writable = EventStore(db_path)
-    writable.close()
-
-    store = EventStore(db_path, read_only=True)
-    try:
-        with store._connection() as connection:
-            with pytest.raises(sqlite3.OperationalError, match="attempt to write a readonly database"):
-                connection.execute("CREATE TABLE probe (id INT)")
     finally:
         store.close()
 

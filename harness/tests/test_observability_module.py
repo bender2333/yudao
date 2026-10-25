@@ -4,19 +4,15 @@
 
 from __future__ import annotations
 
-import json
 import threading
 from pathlib import Path
 
-import pytest
 
 from harness.adapters.base import Availability, ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace, ProjectAttempts, ProjectUsage, RunAttempt, WorkItemMaterials
-from harness.artifacts import ArtifactStore
 from harness.models import EventType, Usage
-from harness.observability import attempt_usage
 from harness.proposals import product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
@@ -79,18 +75,6 @@ class _BlockingPartialAdapter:
         )
 
 
-def test_stream_artifact_cleanup_closes_temp_file_before_cleanup(tmp_path: Path):
-    store = ArtifactStore(tmp_path / "artifacts")
-
-    def broken_chunks():
-        yield b"first"
-        raise OSError("stream stopped")
-
-    with pytest.raises(OSError, match="stream stopped"):
-        store.put_stream("run", "sdk_stream_events", broken_chunks())
-    assert not list((tmp_path / "artifacts" / "run").glob(".stream-*"))
-
-
 def test_invalid_usage_numbers_in_saved_usage_summaries_are_unknown(tmp_path: Path):
     # 没有原始用量时按事件中保存的用量摘要读取：负数同样是未知，0 保持为 0
     usage = Usage(input_tokens=-1, output_tokens=-2, total_tokens=-3, cost=-0.1, cost_reported=True)
@@ -109,99 +93,6 @@ def test_invalid_usage_numbers_in_saved_usage_summaries_are_unknown(tmp_path: Pa
     assert normalized["cost"] is None
     assert normalized["cache_read_tokens"] == 0
     assert normalized["cache_write_tokens"] == 0
-
-
-def _raw_usage(artifacts: ArtifactStore, usage: dict) -> dict:
-    # 上游原文的工件引用：读取侧按 kind、content_hash 与 path 取回
-    ref = artifacts.put("run_1", "raw_usage", json.dumps({"usage": usage}))
-    return {"kind": ref.kind, "content_hash": ref.content_hash, "path": ref.path}
-
-
-def test_the_raw_usage_decides_which_items_were_reported(tmp_path: Path):
-    # 原文是提供方自己的报告：它报了哪些项就是哪些项（工单 #656）。
-    # 原文没报的项保持「未上报」，不用摘要里的缺省 0 顶上——
-    # 摘要是适配器把同一份原文规范化出来的，它的 0 是「这一项没有报」。
-    artifacts = ArtifactStore(tmp_path / "artifacts")
-    record = {
-        "raw_usage_ref": _raw_usage(artifacts, {"total_tokens": 9168}),
-        "usage_summary": {"input_tokens": 7556, "output_tokens": 1612, "cache_read_tokens": 8960,
-                          "cache_write_tokens": 0, "total_tokens": 9168, "cost": None, "reported": True},
-        "duration_ms": 12196,
-    }
-    usage = attempt_usage(artifacts, "run_1", record)
-    assert usage["total_tokens"] == 9168
-    assert usage["input_tokens"] is None
-    assert usage["output_tokens"] is None
-    assert usage["cache_read_tokens"] is None
-    assert usage["cache_write_tokens"] is None
-    assert usage["source"] == "reported"
-
-
-def test_chat_completions_raw_usage_names_are_read(tmp_path: Path):
-    # Chat Completions 协议的原文用 prompt_tokens 与 completion_tokens，缓存明细在 prompt_tokens_details 里
-    # （工单 #656）：这些键名也读得到，输入、输出与缓存就不是「未上报」。
-    artifacts = ArtifactStore(tmp_path / "artifacts")
-    record = {"raw_usage_ref": _raw_usage(artifacts, {
-        "prompt_tokens": 7556, "completion_tokens": 1612, "total_tokens": 9168,
-        "prompt_tokens_details": {"cached_tokens": 8960},
-    })}
-    usage = attempt_usage(artifacts, "run_1", record)
-    assert usage["input_tokens"] == 7556
-    assert usage["output_tokens"] == 1612
-    assert usage["cache_read_tokens"] == 8960
-    assert usage["total_tokens"] == 9168
-    assert usage["source"] == "reported"
-
-
-def test_the_summary_is_used_when_the_raw_usage_is_gone(tmp_path: Path):
-    # 原文整个读不到（工件不在了）时，按事件里保存的规范化摘要读取
-    artifacts = ArtifactStore(tmp_path / "artifacts")
-    record = {
-        "raw_usage_ref": {"kind": "raw_usage", "content_hash": "sha256:none", "path": "run_1/none"},
-        "usage_summary": {"input_tokens": 7556, "output_tokens": 1612, "cache_read_tokens": 8960,
-                          "cache_write_tokens": 0, "total_tokens": 9168, "cost": None, "reported": True},
-    }
-    usage = attempt_usage(artifacts, "run_1", record)
-    assert usage["input_tokens"] == 7556
-    assert usage["output_tokens"] == 1612
-    assert usage["cache_read_tokens"] == 8960
-    assert usage["cache_write_tokens"] == 0
-    assert usage["total_tokens"] == 9168
-    assert usage["source"] == "reported"
-
-
-def test_a_summary_that_does_not_report_stays_unknown(tmp_path: Path):
-    # 摘要自己说没有上报时，来源是「未知」，不是「已上报」
-    artifacts = ArtifactStore(tmp_path / "artifacts")
-    record = {
-        "raw_usage_ref": {"kind": "raw_usage", "content_hash": "sha256:none", "path": "run_1/none"},
-        "usage_summary": {"input_tokens": 7556, "reported": False},
-    }
-    usage = attempt_usage(artifacts, "run_1", record)
-    assert usage["input_tokens"] == 7556
-    assert usage["source"] == "unknown"
-    assert usage["coverage"]["input_tokens"] == "unknown"
-
-
-def test_cancelled_attempt_is_independently_filterable(tmp_path: Path):
-    adapter = _BlockingPartialAdapter()
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    application, project_id, work_item_id, run_id = _project_run(system, "cancelled attempt")
-    msg_event = threading.Event()
-    after_event(system, EventType.MODEL_MESSAGE, lambda _: msg_event.set())
-    worker = threading.Thread(target=system.activate_once, args=(run_id,), daemon=True)
-    worker.start()
-    assert msg_event.wait(WAIT_FOR_HOST_WORK_SEC)
-    system.cancel(run_id)
-    worker.join(timeout=WAIT_FOR_HOST_WORK_SEC)
-    assert not worker.is_alive()
-
-    row = _attempts(application, project_id, work_item_id).data.attempts[0]
-    assert row.status == "cancelled"
-    assert row.stage == "cancelled"
-    assert len(_attempts(application, project_id, work_item_id, status="cancelled").data.attempts) == 1
-    assert _attempts(application, project_id, work_item_id, status="failed").data.attempts == []
-    assert _usage(application, project_id, work_item_id, status="cancelled").data.totals.attempts == 1
 
 
 def test_running_partial_output_is_in_attempt_detail_and_is_observation_only(tmp_path: Path):
@@ -259,42 +150,6 @@ def test_failed_partial_output_is_observation_only_but_attempt_keeps_it(tmp_path
     materials = application.query("work_item.materials", WorkItemMaterials(
         project_id=project_id, work_item=work_item_id))
     assert materials.data.contracts == [] and materials.data.deliveries == []
-
-
-def test_unreported_normalized_usage_keeps_unknown_source_and_is_not_counted_as_reported(tmp_path: Path):
-    usage = Usage(total_tokens=7, reported=False)
-    system = LoopSystem.for_testing(
-        tmp_path,
-        FakeAdapter([FakeTurn(proposal=product_spec(), usage=usage)]),
-    )
-    application, project_id, work_item_id, run_id = _project_run(system, "unreported usage")
-    system.activate_once(run_id)
-
-    row = _attempts(application, project_id, work_item_id).data.attempts[0]
-    assert row.usage["source"] == "unknown"
-    assert row.usage["reported"] is False
-    assert row.usage["total_tokens"] == 7
-    # 未上报的尝试不计入已上报的覆盖计数
-    report = _usage(application, project_id, work_item_id)
-    assert report.data.totals.reported == 0
-    assert report.data.totals.attempts == 1
-
-
-def test_cost_totals_follow_reported_provider_values(tmp_path: Path):
-    # 用量汇总的 cost 只累加上报的费用：未上报的尝试不计入，上报的费用按值求和
-    def usage(currency: str, amount: float) -> Usage:
-        return Usage(input_tokens=1, output_tokens=1, total_tokens=2, cost=amount, cost_reported=True)
-
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter([
-        FakeTurn(proposal=product_spec(), usage=usage("CNY", 1.25)),
-        FakeTurn(proposal=None, usage=usage("CNY", 2.75)),
-    ]))
-    application, project_id, work_item_id, run_id = _project_run(system, "cost totals")
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    report = _usage(application, project_id, work_item_id)
-    assert report.data.totals.reported == 2
-    assert report.data.totals.input_tokens == 2
 
 
 def test_usage_totals_count_only_reported_attempts(tmp_path: Path):

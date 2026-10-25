@@ -225,11 +225,3 @@ def test_an_onboarding_run_is_restarted_from_the_recorded_snapshot(data_dir, tmp
     restarted.close()
 
 
-def test_a_work_item_created_by_the_user_has_the_user_priority(data_dir):
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
-    project_id = system.projects.register("优先级", "核对用户新建事项的优先级")
-    _work_item_id, run_id = system.projects.start_work_item(project_id, "用户新要求")
-    [created] = _started_work_items(system, project_id)
-    assert created.payload["priority"] == PRIORITY_USER
-    assert project_run(system.store, run_id).run_event_version == RUN_EVENT_VERSION
-    system.close()

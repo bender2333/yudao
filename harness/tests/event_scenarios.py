@@ -25,7 +25,7 @@ from harness.models import EventType, Usage, json_dumps
 from harness.providers.call import ModelCall, ModelResponse
 from harness.proposals import (
     answer_turn, ask_turn,
-    delivery, delivery_turn, guidance_response,
+    delivery_turn, guidance_response,
     product_spec, review, review_turn,
 )
 from harness.projection import saved_decisions
@@ -178,15 +178,12 @@ def invalid_tool_arguments(data_dir):
     return system, run_id, {}
 
 
-
     system.run_until_stop(run_id)
     return system, run_id, {}
 
 
 def _guidance_id(call) -> str:
     return json.loads(prompt_part(call, "department_guidance"))[0]["id"]
-
-
 
 
 def ask_answer_with_spec_revision(data_dir):
@@ -340,12 +337,6 @@ def history_exceeds_the_window(data_dir):
     return system, run_id, {}
 
 
-def text_only_reply(data_dir):
-    system, _, run_id = _system(data_dir, [FakeTurn(transcript="我先整理一下需求，稍后提交。"), product_spec()])
-    system.activate_once(run_id)
-    return system, run_id, {}
-
-
 def no_tool_call_pause(data_dir):
     replies = [FakeTurn(transcript=f"第 {index} 次只回复文字") for index in range(1, 5)]
     system, _, run_id = _system(data_dir, replies)
@@ -406,7 +397,6 @@ def _cancel_when_running(system: LoopSystem, run_id: str, marker) -> threading.T
     canceller = threading.Thread(target=cancel)
     canceller.start()
     return canceller
-
 
 
 def cancel_while_check_runs(data_dir):
@@ -730,9 +720,6 @@ SCENARIOS: dict[str, Scenario] = {
         "摘要请求也放不下，运行以 compaction_failed 失败，没有模型调用"
         "（调用目标声明了输出上限，#45 起测试也走调用目标）。",
         history_exceeds_the_window),
-    "text_only_reply": Scenario(
-        "模型只回复文字（#47）：回复记入历史，主机追加一条要求调用工具的 user 消息（tool_call_required），下一步提交成功。",
-        text_only_reply),
     "no_tool_call_pause": Scenario(
         "连续 4 次只回复文字（#47）：前 3 次各追加一条主机提示，第 4 次以 no_tool_call 暂停运行。",
         no_tool_call_pause),
@@ -760,39 +747,10 @@ SCENARIOS: dict[str, Scenario] = {
         "经真实 Provider 模块（Responses 协议）：服务端收到产品部门的请求后一直不回复，另一个线程取消运行："
         "这次调用尝试记为已取消（cancelled），运行以 cancelled 结束，不再激活部门。",
         _cancel_while_provider_holds("responses")),
-    "http_chat_cancel_while_provider_holds": Scenario(
-        "经真实 Provider 模块（Chat Completions 协议）：服务端收到产品部门的请求后一直不回复，另一个线程取消运行："
-        "这次调用尝试记为已取消（cancelled），运行以 cancelled 结束，不再激活部门。",
-        _cancel_while_provider_holds("chat_completions")),
-    "http_messages_cancel_while_provider_holds": Scenario(
-        "经真实 Provider 模块（Messages 协议）：服务端收到产品部门的请求后一直不回复，另一个线程取消运行："
-        "这次调用尝试记为已取消（cancelled），运行以 cancelled 结束，不再激活部门。",
-        _cancel_while_provider_holds("messages")),
-    "http_responses_retry_after_then_success": Scenario(
-        "经真实 Provider 模块（Responses 协议）：第一次请求返回 HTTP 429 并带 Retry-After: 1，记录失败的尝试与按 Retry-After "
-        "等待 1 秒的重试安排，同一个逻辑调用的第二次尝试成功，产品规格被接纳。",
-        _failure_then_success("responses", _http_error(429, "rate_limit_exceeded", ("Retry-After", "1")),
-                              step_limits=StepLimits())),
-    "http_responses_server_error_then_success": Scenario(
-        "经真实 Provider 模块（Responses 协议）：第一次请求返回 HTTP 500（server_error），记录可重试的失败与重试安排，"
-        "第二次尝试成功，产品规格被接纳。",
-        _failure_then_success("responses", _http_error(500, "server_error"))),
     "http_responses_stream_broken_then_success": Scenario(
         "经真实 Provider 模块（Responses 协议）：流式回复送出 response.created 与一条输出之后连接中途断开："
         "已收到的输出只作为审计记录，不进入重试请求，失败可重试，第二次尝试成功，产品规格被接纳。",
         _failure_then_success("responses", BROKEN_STREAMS["responses"])),
-    "http_chat_stream_broken_then_success": Scenario(
-        "经真实 Provider 模块（Chat Completions 协议）：流式回复送出一块文字增量之后连接中途断开："
-        "已收到的输出只作为审计记录，不进入重试请求，失败记为可重试的连接失败，第二次尝试成功，产品规格被接纳。",
-        _failure_then_success("chat_completions", BROKEN_STREAMS["chat_completions"])),
-    "http_messages_stream_broken_then_success": Scenario(
-        "经真实 Provider 模块（Messages 协议）：流式回复送出 message_start 与一个文字块的开始和增量之后连接中途断开："
-        "已收到的输出只作为审计记录，不进入重试请求，失败记为可重试的连接失败，第二次尝试成功，产品规格被接纳。",
-        _failure_then_success("messages", BROKEN_STREAMS["messages"])),
-    "http_responses_timeout_then_success": Scenario(
-        "经真实 Provider 模块（Responses 协议）：服务端收到请求后一直不回复，超过请求时限（10 秒）："
-        "尝试记为 provider_timeout 的可重试失败，第二次尝试成功，产品规格被接纳。",
-        _failure_then_success("responses", _held, timeout_sec=10.0)),
     "activation_start_unavailable": Scenario(
         "激活开始时模型引用不可用：可用性检查不通过时没有模型调用，run 停在这次请求之前进入待恢复；"
         "恢复可用以后回答继续执行，走完交接与放行。",

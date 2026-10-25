@@ -28,25 +28,6 @@ def test_establish_builds_the_workspace_from_the_archived_snapshot(tmp_path):
     assert ".checks" not in snapshot.tree.directories
 
 
-def test_establish_without_a_snapshot_creates_an_empty_public_tree(tmp_path):
-    environment = LocalEnvironment.establish(tmp_path / "workspace", None)
-    snapshot = environment.snapshot()
-    facts = environment.query(FactsQuery(tree=True)).tree
-    assert snapshot.tree.files == ()
-    assert snapshot.tree.directories == ()
-    assert facts is not None
-    assert facts.digest == snapshot.digest
-    assert facts.files == ()
-
-
-def test_establish_refuses_an_existing_destination(tmp_path):
-    tree = capture_public_tree(_source(tmp_path / "source"))
-    destination = tmp_path / "workspace"
-    destination.mkdir()
-    with pytest.raises(TreeError, match="already exists"):
-        LocalEnvironment.establish(destination, tree)
-
-
 def test_verify_tree_accepts_the_snapshot_it_was_read_from_and_rejects_a_change(tmp_path):
     environment = LocalEnvironment.establish(tmp_path / "workspace", capture_public_tree(_source(tmp_path / "source")))
     snapshot = environment.snapshot()

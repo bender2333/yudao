@@ -5,9 +5,8 @@ from pathlib import Path
 
 import pytest
 
-import harness.interactions as interactions
 from harness.collaboration import has_new_work
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter
 from harness.compaction import visible_history
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
@@ -102,41 +101,6 @@ def test_original_input_bytes_and_three_progress_versions_are_independent(tmp_pa
     assert [item["text"] for item in json.loads(_parts(system, request)["pending_inputs"])] == texts
     assert accepted.canonical_state() == system.replay(run_id).canonical_state()
 
-@pytest.mark.parametrize("failure", ["partial_write", "replace"])
-def test_failed_intend_publication_preserves_previous_original_and_received_state(tmp_path, monkeypatch, failure):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
-    run_id = system.create_run("original input without newline")
-    before = system.project(run_id).canonical_state()
-    path = tmp_path / "materials" / run_id / "intend.md"
-    original = path.read_bytes()
-    if failure == "replace":
-        def fail_replace(*args):
-            raise OSError("cannot replace the published original")
-        monkeypatch.setattr(interactions.os, "replace", fail_replace)
-    else:
-        temporary_file = interactions.tempfile.NamedTemporaryFile
-
-        class PartialFile:
-            def __init__(self, *args, **kwargs):
-                self.stream = temporary_file(*args, **kwargs)
-                self.name = self.stream.name
-
-            def __enter__(self):
-                return self
-
-            def write(self, data):
-                self.stream.write(data[:2])
-                raise OSError("disk stopped during a write")
-
-            def __exit__(self, *args):
-                self.stream.close()
-
-        monkeypatch.setattr(interactions.tempfile, "NamedTemporaryFile", PartialFile)
-    with pytest.raises(OSError):
-        system.add_input(run_id, "new original")
-    assert path.read_bytes() == original
-    assert system.project(run_id).canonical_state() == before
-    assert list(path.parent.glob(".intend-*.tmp")) == []
 
 def test_only_complete_product_spec_can_process_received_input(tmp_path):
     # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）

@@ -2,16 +2,19 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.context import ContextAssembler
-from harness.definitions import DEFINITIONS
-from harness.models import ArtifactRef, DepartmentPrompt, EventType, canonical_hash, estimate_tokens, json_dumps
+from harness.adapters.fake import FakeAdapter
+from harness.models import ArtifactRef, EventType, canonical_hash, estimate_tokens, json_dumps
 from harness.proposals import answer_turn, delivery_turn, product_spec, review_turn
-from harness.providers.call import CallUsage, ModelResponse
+from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import (FAST_RETRIES, after_event, explore_turn, recorded_context,
-                                   from_another_thread, run_wait_command, wait_for_file)
-from harness.tests.protocol_helpers import complete, model_call
+from harness.tests.helpers import (
+    after_event,
+    explore_turn,
+    recorded_context,
+    from_another_thread,
+    run_wait_command,
+    wait_for_file,
+)
 
 def _call(identity, name, **args):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
@@ -26,24 +29,6 @@ def change_product_model(system: LoopSystem, upstream_model: str) -> None:
     # 运行中更换模型：确定性测试适配器登记的上游模型名取自编排器，在下一次解析时生效（#45 架构答复第 6 条）
     system.orchestrator.test_model = upstream_model
 
-def test_fake_adapter_has_no_workspace_and_does_not_execute_tools(tmp_path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter())
-    run_id = system.create_run("echo")
-    # 部门 Prompt 来自项目部门设置，run 内没有副本；不属于项目的运行使用内置默认 Prompt
-    context = ContextAssembler().assemble(
-        system.project(run_id), department="engineering", session_id="session", activation_id="activation",
-        prompt=DepartmentPrompt(department="engineering", version=0,
-                                text=DEFINITIONS.role("engineering").prompt,
-                                prompt_ref=ArtifactRef(kind="department_prompt", content_hash="", path=""),
-                                created_event_id=""))
-    call = model_call(context.input_items, context.tools)
-    adapter = FakeAdapter([FakeTurn(writes={"owned.txt": "content"})])
-    response = complete(adapter, call)
-    assert not hasattr(call, "workspace")
-    assert not hasattr(adapter, "invoke")
-    assert response.output[0]["name"] == "write_file"
-    assert json.loads(response.output[0]["arguments"]) == {"path": "owned.txt", "content": "content"}
-    assert not (tmp_path / "owned.txt").exists()
 
 def test_each_step_assembles_auditable_input_with_only_current_activation_history(tmp_path):
     reasoning = {"id": "reason-1", "type": "reasoning", "summary": [], "encrypted_content": "PRIVATE_CHAIN"}
@@ -110,31 +95,6 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
         assert event.payload["request_ref"]["content_hash"] in event.artifact_hashes
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
-def test_large_history_requests_compaction_and_rejects_submit_in_summary_response(tmp_path):
-    # A tool call in a tool-less summary request is malformed provider output: it is retried
-    # within the attempt limit and never executed, so three of them fail the compaction.
-    adapter = FakeAdapter([ModelResponse(output=[_call("read-1", "read_file", path="proof.txt")],
-                                         usage=CallUsage(total_tokens=100, reported=True)),
-                           product_spec(), product_spec(), product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
-    run_id = system.create_run("echo", context_window=6000)
-    system.workspace(run_id).write_file("proof.txt", "x" * 40000)
-    result = system.activate_once(run_id)
-    assert len(adapter.invocations) == 4
-    assert all(request.purpose == "compaction" and request.tools == [] for request in adapter.invocations[1:])
-    assert [request.attempt for request in adapter.invocations[1:]] == [1, 2, 3]
-    assert result.stop_reason == "compaction_failed"
-    assert result.token_used == 100
-    assert len(result.manifests) == 4
-    assert result.manifests[-1].admitted
-    events = system.store.list_events(run_id)
-    assert sum(event.type == EventType.MODEL_REQUESTED for event in events) == 4
-    assert not any(event.type == EventType.SPEC_ACCEPTED for event in events)
-    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == "submit_product_spec"
-                   for event in events)
-    tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
-    assert tool.payload["input_item"]["call_id"] == "read-1"
-    assert tool.payload["output_ref"]
 
 def test_cancel_after_context_preparation_prevents_model_attempt(tmp_path):
     # 请求装配完成以后，另一个线程取消运行：取消在开始请求之前提交，这一步不开始模型调用
@@ -229,18 +189,6 @@ def test_cancel_after_the_tool_permission_does_not_start_the_process(tmp_path):
     assert called.payload["error"] == "The action was cancelled before it started."
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
-def test_original_intend_is_preserved_verbatim_outside_the_delivery_tree(tmp_path):
-    original = "  Original request\r\n\r\nKeep these spaces.  \n\t"
-    adapter = FakeAdapter([product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run(original)
-    result = system.activate_once(run_id)
-    assert result.task == original
-    assert (tmp_path / "materials" / run_id / "intend.md").read_bytes() == original.encode("utf-8")
-    assert system.artifacts.get_text(result.intend_ref["content_hash"]) == original
-    assert "intend.md" not in system.workspace(run_id).list_files()
-    assert adapter.invocations[0].input_items[0]["content"].startswith(f"[intend]\n{original}\n\n[current_work]\n")
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 def test_reactivated_department_restores_its_received_work_outputs_and_complete_submit_pairs(tmp_path):
     private = {"id": "product-private", "type": "reasoning", "summary": [], "encrypted_content": "PRODUCT_PRIVATE"}

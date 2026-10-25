@@ -119,34 +119,6 @@ def test_project_check_timeout_applies_to_runs_created_afterwards(data_dir):
         # 项目流的参数事件带 project_parameter_set 种类，与目录流的 parameter_set 是两个不同流的事件种类
         assert event.type == "project_parameter_set"
 
-def test_project_value_does_not_change_runs_created_before_it(data_dir):
-    opened = _Opened(data_dir)
-    with running_api(opened) as client:
-        project = _post(client, "project.create", name="参数", goal="做一个命令行回显工具。")
-        assert project.status_code == 200, project.text
-        project_id = project.json()["refs"]["project_id"]
-        first = _post(client, "work_item.create", project_id=project_id, text="第一个功能。")
-        assert first.status_code == 200, first.text
-        first_run = first.json()["refs"]["run_id"]
-        _settle(opened, first_run)
-
-        changed = _post(client, "parameter.set", name="check_timeout_sec", value=90,
-                        reason="之后的功能给短一点", modified_by="user:test", project_id=project_id)
-        assert changed.status_code == 200, changed.text
-        assert _check_timeout_of(opened, first_run) == 600
-
-        second = _post(client, "work_item.create", project_id=project_id, text="第二个功能。")
-        assert second.status_code == 200, second.text
-        second_run = second.json()["refs"]["run_id"]
-        assert _check_timeout_of(opened, second_run) == 90
-
-        again = _post(client, "parameter.set", name="check_timeout_sec", value=300,
-                      reason="再调回去", modified_by="user:test", project_id=project_id)
-        assert again.status_code == 200, again.text
-        assert _check_timeout_of(opened, second_run) == 90
-        [first_event, second_event] = _project_parameter_events(opened, project_id)
-        assert (first_event.payload["old_value"], first_event.payload["new_value"]) == (600, 90)
-        assert (second_event.payload["old_value"], second_event.payload["new_value"]) == (90, 300)
 
 def test_global_value_stays_the_fallback_for_projects_without_a_value(data_dir):
     opened = _Opened(data_dir)

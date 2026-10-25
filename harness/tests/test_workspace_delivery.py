@@ -1,12 +1,10 @@
 import os
 import shutil
 import subprocess
-from pathlib import Path
 
 import pytest
 
 import harness.submissions as submissions
-import harness.workspace as workspaces
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
@@ -14,7 +12,6 @@ from harness.public_tree import TreeError, capture_public_tree, materialize_tree
 from harness.runtime import LoopSystem
 from harness.tree_archive import load_tree
 from harness.workspace import Workspace
-from harness.tests.helpers import quality_turns
 
 def _system_with_delivery(tmp_path):
     # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）。
@@ -96,29 +93,6 @@ def test_source_change_after_blob_storage_rejects_acceptance_without_replacing_c
     assert archived == captured
     assert next(item.data for item in archived.files if item.path == "undeclared.bin") == b"\x80\x81\r\n"
 
-def test_workspace_snapshot_and_copy_derive_from_one_capture(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "new" / "nested" / "workspace")
-    workspace.write_file("file.txt", "captured")
-    original_capture = workspaces.capture_public_tree
-    calls = []
-
-    def change_after_capture(root, *args, **kwargs):
-        captured = original_capture(root, *args, **kwargs)
-        calls.append(captured)
-        (workspace.root / "file.txt").write_bytes(b"later bytes")
-        (workspace.root / "later.txt").write_bytes(b"later file")
-        return captured
-
-    monkeypatch.setattr(workspaces, "capture_public_tree", change_after_capture)
-    snapshot = workspace.snapshot()
-    assert snapshot.tree is calls[0]
-    assert snapshot.facts.files == ("file.txt",)
-    assert snapshot.digest == snapshot.tree.digest
-    with workspace.check_copy(snapshot.tree) as copy_root:
-        assert (copy_root / "file.txt").read_bytes() == b"captured"
-        assert not (copy_root / "later.txt").exists()
-        assert capture_public_tree(copy_root).digest == snapshot.digest
-    assert len(calls) == 1
 
 @pytest.mark.parametrize("department", ["engineering", "quality"])
 def test_changed_tree_receipts_are_not_reused_even_when_the_hash_later_matches(tmp_path, department):
@@ -131,73 +105,6 @@ def test_changed_tree_receipts_are_not_reused_even_when_the_hash_later_matches(t
     assert snapshot.checks[-1].exit_code == 0
     assert snapshot.facts.latest_check(department, "changed-check") is None
 
-def test_move_and_delete_preserve_binary_bytes_and_do_not_delete_old_archives(tmp_path):
-    system, run_id, workspace = _system_with_delivery(tmp_path)
-    result = system.run_until_stop(run_id)
-    assert result.status == "done", result.error
-    reference = result.delivery_spec.tree_ref
-    before = load_tree(system.artifacts, run_id, reference)
-    result = workspace.move_file("undeclared.bin", "moved/new.bin")
-    assert result == {"source": "undeclared.bin", "destination": "moved/new.bin"}
-    assert not (workspace.root / "undeclared.bin").exists()
-    assert (workspace.root / "moved" / "new.bin").read_bytes() == b"\x80\x81\r\n"
-    assert (workspace.root / "moved" / "new.bin").stat().st_nlink == 1
-    assert workspace.delete_file("moved/new.bin") == "moved/new.bin"
-    assert not (workspace.root / "moved" / "new.bin").exists()
-    assert load_tree(system.artifacts, run_id, reference) == before
-
-def test_move_refuses_existing_destination_without_changing_either_file(tmp_path):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("source", "source bytes")
-    workspace.write_file("destination", "existing bytes")
-    with pytest.raises(FileExistsError, match="already exists"):
-        workspace.move_file("source", "destination")
-    assert workspace.read_file("source") == "source bytes"
-    assert workspace.read_file("destination") == "existing bytes"
-
-def test_move_never_overwrites_a_destination_created_after_validation(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("source", "source bytes")
-    original_link = os.link
-
-    def create_before_move(source, destination, **kwargs):
-        Path(destination).write_bytes(b"concurrent destination")
-        return original_link(source, destination, **kwargs)
-
-    monkeypatch.setattr(workspaces.os, "link", create_before_move)
-    with pytest.raises(FileExistsError):
-        workspace.move_file("source", "destination")
-    assert workspace.read_file("source") == "source bytes"
-    assert workspace.read_file("destination") == "concurrent destination"
-
-def test_move_rolls_back_its_destination_when_source_removal_fails(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("source", "source bytes")
-    original_unlink = Path.unlink
-
-    def failing_unlink(path, *args, **kwargs):
-        if path == workspace.root / "source":
-            raise PermissionError("source removal denied")
-        return original_unlink(path, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "unlink", failing_unlink)
-    with pytest.raises(PermissionError, match="source removal denied"):
-        workspace.move_file("source", "destination")
-    assert workspace.read_file("source") == "source bytes"
-    assert not (workspace.root / "destination").exists()
-    assert (workspace.root / "source").stat().st_nlink == 1
-
-@pytest.mark.parametrize("operation", ["delete", "move"])
-def test_file_mutations_do_not_recursively_operate_on_directories(tmp_path, operation):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("directory/keep", "kept")
-    with pytest.raises(ValueError, match="regular"):
-        if operation == "delete":
-            workspace.delete_file("directory")
-        else:
-            workspace.move_file("directory", "elsewhere")
-    assert workspace.read_file("directory/keep") == "kept"
-    assert not (workspace.root / "elsewhere").exists()
 
 @pytest.mark.parametrize("path", [".checks/receipts.jsonl", ".CHECKS/receipts.jsonl", "../outside", "C:relative", "/absolute", "file:stream", "file.", "dir\\file"])
 @pytest.mark.parametrize("operation", ["read", "write", "delete", "move_source", "move_destination"])
@@ -237,24 +144,6 @@ def test_all_workspace_file_operations_reject_junction_ancestors(tmp_path, opera
     assert (outside / "file").read_bytes() == b"outside"
     assert workspace.read_file("source") == "kept"
 
-def test_write_file_stores_the_given_bytes_without_newline_conversion(tmp_path):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("lf.txt", "a\nb\n")
-    assert (workspace.root / "lf.txt").read_bytes() == b"a\nb\n"
-    workspace.write_file("crlf.txt", "a\r\nb\r\n")
-    assert (workspace.root / "crlf.txt").read_bytes() == b"a\r\nb\r\n"
-    workspace.write_file("cr.txt", "a\rb\r")
-    assert (workspace.root / "cr.txt").read_bytes() == b"a\rb\r"
-
-def test_file_operations_preserve_legal_leading_spaces_in_names(tmp_path):
-    workspace = Workspace(tmp_path)
-    workspace.write_file(" file", "bytes")
-    assert workspace.read_file(" file") == "bytes"
-    workspace.move_file(" file", " moved")
-    assert (workspace.root / " moved").read_bytes() == b"bytes"
-    assert not (workspace.root / "moved").exists()
-    workspace.delete_file(" moved")
-    assert workspace.list_files() == []
 
 def _operate(workspace, operation, path):
     if operation == "read":

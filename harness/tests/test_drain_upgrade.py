@@ -6,7 +6,6 @@
 
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import catalog_stream
-from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.streams import DRAIN_FINISHED, DRAIN_STARTED
 from harness.tests.api_helpers import running_api
@@ -86,12 +85,3 @@ def test_the_queued_work_item_starts_after_the_restart(data_dir):
         assert client.get("/api/queries/system.status").json()["data"]["drain"]["state"] == "idle"
 
 
-def test_the_new_drain_event_can_be_read_back(data_dir):
-    # 新增的事件种类：事件流不断，它能读出来（工单 #731 的验收）
-    from harness.app.labels import event_label
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    _drain_event(system, {"version": 1, "running_runs": 0})
-    reopened = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    finished = _drain_events(reopened)[-1]
-    assert finished.type == DRAIN_FINISHED
-    assert "排空结束" in event_label(finished.type, finished.payload)

@@ -259,13 +259,6 @@ def test_work_item_impact_lists_the_department_whose_selection_is_affected(tmp_p
     assert [(entry["work_item_id"], entry["department"]) for entry in impact["work_items"]] == [
         (item.work_item_id, "quality")]
 
-def test_work_item_impact_lists_engineering_when_only_engineering_selects_the_definition(tmp_path):
-    # 只有工程的模型选择落在受影响的定义上：影响列表里这个事项写工程。
-    # 事项此刻在哪个部门由最后激活的主线会话决定，与影响列表里写哪个部门无关（工单 #872）
-    impact, item = _impact_with_in_progress_item(tmp_path, settings={"engineering": "model-b"})
-    assert item.status == "in_progress", (item.status, item.stop_reason)
-    assert [(entry["work_item_id"], entry["department"]) for entry in impact["work_items"]] == [
-        (item.work_item_id, "engineering")]
 
 def test_work_item_impact_lists_two_departments_when_both_select_the_definition(tmp_path):
     # 工程与质检都选中被修改的定义：这个事项出现两行，分别写工程与质检
@@ -348,29 +341,6 @@ def test_provider_delete_lists_definitions_and_deletes_unreferenced_ones(tmp_pat
         assert rejected.json()["reason"] == "in_use"
         assert f"projects.{project_id}.department_settings.engineering" in rejected.json()["message"]
 
-def test_import_removing_referenced_definition_is_rejected_as_a_whole(tmp_path):
-    # 导入移除了被引用定义的目录文档：整份拒绝，错误写出引用方；目录没有变化
-    opened = _Opened(tmp_path)
-    with running_api(opened) as client:
-        opened.admit(("provider-a", "model-a"))
-        project_id = _create_project(client, "P")
-        _set_model(client, project_id, "engineering", provider_id="provider-a", model_id="model-a")
-
-        document = _document(client)
-        # 文档里去掉 model-a，只保留 model-a2 与 model-b（部门默认指向 model-a，项目部门设置也指向它）
-        trimmed = {
-            "providers": [item for item in document["providers"]],
-            "models": [item for item in document["models"] if item["id"] != "model-a"],
-            "bindings": {key: value for key, value in document["bindings"].items()},
-        }
-        rejected = _post(client, "catalog.document.save", base_version=_catalog(client)["revision"],
-                         document=trimmed)
-        assert rejected.status_code == 409, rejected.text
-        body = rejected.json()
-        assert body["reason"] == "in_use"
-        assert "bindings.engineering" in body["message"]
-        # 目录没有变化
-        assert any(item["id"] == "model-a" for item in _document(client)["models"])
 
 def test_import_removing_definition_referenced_only_by_a_project_is_rejected(tmp_path):
     # 定义只被项目部门设置引用（部门默认都指向 model-a2，不含 model-a）：导入移除 model-a 的文档

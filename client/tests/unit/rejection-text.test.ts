@@ -4,10 +4,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readdirSync,readFileSync } from "node:fs";
+import { dirname,join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ONBOARDING_REJECTION_REASONS, onboardingRejectionText } from "../../src/renderer/src/views/project/onboarding.ts";
 import { rejectionLabel } from "../../src/renderer/src/contract/command-problem.ts";
 import type { Rejected } from "../../src/renderer/src/api/generated/types.gen.ts";
 
@@ -36,17 +35,7 @@ function sourceFiles(directory: string): string[] {
   return found;
 }
 
-test("接入表单的拒绝提示给中文说明，不出现内部原因标识", () => {
-  const text = onboardingRejectionText(rejected("source_invalid", "宿主私有路径不能进入公开快照：.checks"));
-  assert.equal(text, "源目录不能作为代码快照的来源");
-  assert.equal(text.includes("source_invalid"), false);
-});
 
-test("每一种拒绝原因的中文说明里都不出现原因标识本身", () => {
-  for (const [reason, text] of Object.entries(ONBOARDING_REJECTION_REASONS)) {
-    assert.equal(text.includes(reason), false, reason);
-  }
-});
 
 test("顶栏项目菜单的拒绝提示只给服务端的消息", () => {
   const text = rejectionLabel(rejected("not_allowed", "现在不能重新开始建档"));

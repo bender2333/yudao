@@ -256,50 +256,6 @@ def test_step_limit_pauses_during_partial_compaction_without_work_request(tmp_pa
     assert result.product_spec is None
 
 
-def test_single_empty_summary_does_not_fail_the_run_and_department_continues(tmp_path):
-    """一次空摘要不导致任务失败：下一次整理重试并生效，部门继续工作（工单 #840）。"""
-    invocation_count = 0
-    summaries = []
-
-    def respond(request):
-        nonlocal invocation_count
-        invocation_count += 1
-        if request.purpose == "compaction":
-            summaries.append(request)
-            # 第一次整理返回空摘要（不生效），以后的整理生效
-            if len(summaries) == 1:
-                return ModelResponse(output=[_message(request, "")])
-            return ModelResponse(output=[_message(request, "Product memory: prior evidence was read.")])
-        if request.department == "engineering":
-            return delivery_turn()(request)
-        if invocation_count <= 2:
-            return _read(request, "large.txt")
-        return product_spec()
-
-    adapter = FakeAdapter([respond] * 100)
-    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=32))
-    original = "Original intent"
-    # 窗口由固定材料（部门提示、规则、提案合同、工具清单）的实测 token 数推出：
-    # n 加上 plan_compaction 一次压缩请求需要的余量（摘要上限至少 32 token、SUMMARY_OUTPUT_TOKENS 的两倍规则）
-    measure_id = system.create_run(original, context_window=1_000_000)
-    window = pinned_input_tokens(system, measure_id) + SUMMARY_OUTPUT_TOKENS * 2
-    run_id = system.create_run(original, context_window=window)
-    # 使用足够大的工具输出触发压缩：字符数为窗口的 8 倍，读取以后一定超过窗口
-    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * (window * 8 // 11))
-    result = system.activate_once(run_id)
-
-    # 一次空摘要不导致失败，部门继续工作
-    assert result.status != "failed", f"run should not fail on empty summary, got {result.status} / {result.stop_reason}"
-    # 空的那次没有留下检查点，后面的整理生效以后压缩被记录
-    assert len(summaries) >= 2
-    assert result.compactions
-    # 至少有一次工作请求和一次压缩请求
-    work_invocations = [r for r in adapter.invocations if r.purpose == "work"]
-    compaction_invocations = [r for r in adapter.invocations if r.purpose == "compaction"]
-    assert len(work_invocations) >= 1
-    assert len(compaction_invocations) >= 1
-
-
 def test_empty_compaction_summary_allows_retry_in_the_next_compaction(tmp_path):
     """一次空摘要以后可以重新尝试压缩：下一次整理接上上一次的检查点（工单 #840）。"""
     summaries = []

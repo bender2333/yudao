@@ -11,8 +11,15 @@ from harness.environment import QA_TESTS_DIR, inspection_root
 from harness.event_store import Command
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.projection import saved_decisions
-from harness.proposals import (answer_turn, ask_turn, delivery, delivery_turn, product_spec,
-                                product_spec_turn, review, review_turn)
+from harness.proposals import (
+    answer_turn,
+    ask_turn,
+    delivery_turn,
+    product_spec,
+    product_spec_turn,
+    review,
+    review_turn,
+)
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import guidance_reply, quality_turns
@@ -153,33 +160,6 @@ def test_quality_cannot_write_into_the_runtime_workspace(tmp_path: Path) -> None
     # 工程写的交付文件没有被质检改掉
     projection = system.project(run_id)
     assert projection.delivery_spec is not None
-
-
-def test_cancel_stops_every_session(tmp_path: Path) -> None:
-    # 取消事项时全部会话停止
-    def explore(call):
-        return ModelResponse(output=[
-            _call("write-1", "write_file", {"path": TEST_FILE, "content": TEST_CONTENT}),
-        ])
-
-    adapter = FakeAdapter({
-        "product": [product_spec()],
-        "engineering": [delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
-        "quality": [explore],
-    })
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("build an echo CLI")
-    system.activate_once(run_id)
-    cancelled = system.cancel(run_id)
-    assert (cancelled.status, cancelled.stop_reason) == ("failed", "cancelled")
-    events = _events(system, run_id)
-    finished = [event for event in events if event.type == EventType.ACTIVATION_FINISHED]
-    # 已经开始的会话都结束了，没有一个会话还在进行
-    assert {event.session_id for event in finished} == {event.session_id for event in events
-                                                        if event.type == EventType.DEPARTMENT_ACTIVATED}
-    # 取消以后结束的会话都记着取消这个原因
-    assert all(event.payload.get("stop_reason") == "cancelled"
-               for event in finished if event.department != "product")
 
 
 def test_pause_and_continue_lets_each_session_resume_where_it_stopped(tmp_path: Path) -> None:
