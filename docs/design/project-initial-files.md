@@ -1,6 +1,6 @@
 # 项目的起始文件夹设计说明
 
-更新：2026-10-06。状态：设计已确认（2026-10-06 用户同意），未实施。路线位置：Stage 3 的 3.8 的补充，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，属于里程碑 M2。
+更新：2026-10-06。状态：设计已确认（2026-10-06 用户同意），未实施。路线位置：Stage 3 的 3.8 的补充，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，属于里程碑 M2。 总图位置：第一节「一份事实」方框（起始文件夹的快照是事项的起点）。
 
 依据：[D37 新建项目的起始文件夹](../requirements/project-initial-files.md)、[接入已有项目设计说明](existing-project-onboarding.md)（快照采集、`source_invalid` 与公开树的规则）、[本地通用工具设计说明](local-tools.md)（公开树）、[应用层与接口层设计说明](app-and-interface.md)第 3.1、3.2 节、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流只增加字段）、[恢复契约](recovery-contract-and-fault-matrix.md)第 6 节第 10 行。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
 

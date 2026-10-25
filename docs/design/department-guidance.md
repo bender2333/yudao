@@ -1,6 +1,6 @@
 # 部门指导的处理设计
 
-日期：2026-09-06 设计；2026-10-12 按 [ADR-0036](../adr/0036-concurrent-departments-and-nested-asks.md) 修改送达与处理结果，用户采纳；2026-10-13 补充放行等发给产品的输入处理完（第 2 节、第 4 节第 8 条），用户确认；2026-10-14 按 [ADR-0039](../adr/0039-departments-work-from-watched-outputs.md) 修改：指导是接收部门关注的成果，等待工作的部门以它开始一轮工作，不再开以用户为提问方的询问分支，用户确认。对应 [D20](../requirements/department-guidance.md)，循环结构见[三部门的循环结构](department-loop.md)第 6 节。已实现：命令 `guidance.send` 接收指导，`harness/interactions.py` 的 `receive_guidance` 保存原文并写入接收事件；指导记录由 `department.workspace` 查询读取（[应用层与接口层设计说明](app-and-interface.md)第 7.1 节）。本文第 2、3 节的送达与处理结果未实施。
+日期：2026-09-06 设计；2026-10-12 按 [ADR-0036](../adr/0036-concurrent-departments-and-nested-asks.md) 修改送达与处理结果，用户采纳；2026-10-13 补充放行等发给产品的输入处理完（第 2 节、第 4 节第 8 条），用户确认；2026-10-14 按 [ADR-0039](../adr/0039-departments-work-from-watched-outputs.md) 修改：指导是接收部门关注的成果，等待工作的部门以它开始一轮工作，不再开以用户为提问方的询问分支，用户确认。对应 [D20](../requirements/department-guidance.md)，循环结构见[三部门的循环结构](department-loop.md)第 6 节。已实现：命令 `guidance.send` 接收指导，`harness/interactions.py` 的 `receive_guidance` 保存原文并写入接收事件；指导记录由 `department.workspace` 查询读取（[应用层与接口层设计说明](app-and-interface.md)第 7.1 节）。本文第 2、3 节的送达与处理结果未实施。 总图位置：第三节外环「你中途的指导」那条规矩；第一节「你」方框。
 
 ## 1. 三类职责
 

@@ -1,6 +1,6 @@
 # 可信内核设计说明
 
-更新：2026-10-23（按 [ADR-0042](../adr/0042-skeleton-and-application-two-layers.md)：第 2 节裁决读取的投影改为骨架自己算的最小投影，应用的投影移出内核；第 3 节清单的 `projection.py`、`models.py` 条目随[骨架与应用设计说明](skeleton-and-application.md)第 12 节的 S1、S5 修改；B2 已随 #350 完成，`harness/bounds.py` 就是分出来的边界核对）；2026-10-07。状态：设计已确认（2026-10-07 用户确认按意图校准整理项目），未实施。路线位置：Stage 3「迭代底座」工作包的 B1（内核清单、不变式测试、导入方向与行数的检查）与 B7（接口令牌、由已安装的实例提供的发布检查），都在里程碑 M3；边界的核对从流程编排中分出来、已用时间写入事件是 B2，挂在 3.1 下（M2）。
+更新：2026-10-23（按 [ADR-0042](../adr/0042-skeleton-and-application-two-layers.md)：第 2 节裁决读取的投影改为骨架自己算的最小投影，应用的投影移出内核；第 3 节清单的 `projection.py`、`models.py` 条目随[骨架与应用设计说明](skeleton-and-application.md)第 12 节的 S1、S5 修改；B2 已随 #350 完成，`harness/bounds.py` 就是分出来的边界核对）；2026-10-07。状态：设计已确认（2026-10-07 用户确认按意图校准整理项目），未实施。路线位置：Stage 3「迭代底座」工作包的 B1（内核清单、不变式测试、导入方向与行数的检查）与 B7（接口令牌、由已安装的实例提供的发布检查），都在里程碑 M3；边界的核对从流程编排中分出来、已用时间写入事件是 B2，挂在 3.1 下（M2）。 总图位置：第二节内环「只由你批准」；第一节「一份事实」与「裁决与边界」方框。
 
 依据：[D38 系统意图与基础规则](../requirements/system-intent.md)（N-K3、N-K4、N-T5）、[ADR-0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)、[ADR-0014](../adr/0014-versioned-definitions.md)、[ADR-0020](../adr/0020-block-only-when-no-downstream-check.md)、[ADR-0022](../adr/0022-run-directly-without-containers.md)、[D35 自举](../requirements/self-hosting.md)、[基础规则文本](../foundation-rules.md)。
 
