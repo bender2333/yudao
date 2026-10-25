@@ -822,6 +822,22 @@ function commandClaim(args) {
   return emit(args, payload, '#' + issue + ' 领取：' + (result.status === 0 ? '负责人 @me，标签 in-progress' : '失败，见上面的错误') + (drop.length ? '，摘掉 ' + drop.join(',') : ''));
 }
 
+/** 把子会话号记到正在跑的那张任务上：hook 靠它判断谁交卷了。 */
+function commandAttach(args) {
+  const loop = openLedger(args);
+  return withLock(loop, () => {
+    const session = str(args.session, '');
+    if (!session) fail('要给子会话号：--session <id>');
+    const conc = concurrencyOf(loop);
+    const entry = conc.active.find((a) => a.task === args.task);
+    if (!entry) fail(args.task + ' 不在并发位置上（先 start）');
+    entry.session = session;
+    loop.state.concurrency = { max: conc.max, exclusiveLimit: conc.exclusiveLimit, active: conc.active };
+    saveLedger(loop);
+    return emit(args, entry, entry.task + ' 记下子会话 ' + session);
+  });
+}
+
 /* ------------------------------------------------------------------- start */
 
 function commandStart(args) {
@@ -1050,9 +1066,34 @@ function commandCheck(args) {
       ok(!signature || body.includes(signature), '交付说明最后一行有署名 ' + (signature || '(未设置)'));
     }
   }
+  const signature = str(loop.state.signature, '');
+  const headLines = git(dir, ['log', '-1', '--format=%B']).stdout.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim());
+  const headTail = headLines.length ? headLines[headLines.length - 1].trim() : '';
+  ok(!signature || headTail === '— ' + signature, '提交信息最后一行是署名' + (headTail ? '（实际：' + headTail + '）' : ''));
   if (task.issue) {
+    const jour = path.join(dir, 'agents_jour', String(task.issue) + '.md');
+    ok(fs.existsSync(jour), '有日记 agents_jour/' + task.issue + '.md');
+    if (fs.existsSync(jour)) {
+      const text = fs.readFileSync(jour, 'utf8');
+      ok(!signature || text.includes(signature), '日记里有署名');
+    }
     const issue = ghJson(['issue', 'view', String(task.issue), '--json', 'labels'], { labels: [] }, loop.root);
     ok(((issue && issue.labels) || []).some((l) => l.name === 'needs-review'), '工单标签是 needs-review');
+  }
+  if (pr) {
+    const prDetail = ghJson(['pr', 'view', String(pr.number), '--json', 'body,number'], {}, loop.root);
+    const prBody = (prDetail && prDetail.body) || '';
+    ok(/Closes #\d+/.test(prBody), 'PR 正文有 Closes #<编号>');
+    ok(prBody.includes('Solo:'), 'PR 正文有 Solo 那一行');
+    ok(!signature || prBody.includes(signature), 'PR 正文有署名');
+    if (task.text.includes('touches-core')) {
+      const runs = ghJson(['run', 'list', '--workflow', 'CI', '--branch', branch, '--limit', '5', '--json', 'databaseId,conclusion,headSha'], [], loop.root);
+      const green = (Array.isArray(runs) ? runs : []).filter((r) => r.conclusion === 'success');
+      ok(green.length > 0, 'touches-core：分支上跑过集成层');
+      const deliveryBody = (detail && detail.comments || []).filter((c) => (c.body || '').trim().startsWith('DELIVERY:')).pop();
+      const linked = green.some((r) => deliveryBody && String(deliveryBody.body).includes(String(r.databaseId)));
+      if (green.length) ok(linked, '交付说明里有集成层运行的链接');
+    }
   }
 
   if (args.json) return emit(args, { task: task.id, ok: problems.length === 0, lines, problems });
@@ -1538,6 +1579,23 @@ function commandResume(args) {
     '循环 ' + loop.name + ' 恢复（无人值守' + (loop.state.autoContinue ? '开' : '关') + '）。先跑 refresh 与 sync 再看台账。');
 }
 
+/** 署名：六处产出都用它（提交末行、PR 正文末行、每条评论末行、交付说明末行、日记行首、变更记录行首）。 */
+function commandSignature(args) {
+  const loop = openLedger(args);
+  const before = str(loop.state.signature, '');
+  const value = str(args.value, '');
+  if (!value) {
+    if (args.json) return emit(args, { signature: before });
+    process.stdout.write('当前署名：' + (before || '(未设置)') + '\n');
+    return before;
+  }
+  if (!/^solo-[A-Za-z0-9._-]+$/.test(value)) fail('署名要是 solo-<模型 ID> 的形式（例如 solo-deepseek-v4.1-flash）');
+  loop.state.signature = value;
+  saveLedger(loop);
+  appendText(loop, '## 署名（编排者）\n\n- ' + (before || '(空)') + ' → ' + value);
+  return emit(args, { signature: value }, '署名：' + before + ' → ' + value);
+}
+
 /** 预算：无人值守跑多少轮以内。用完就停，这是唯一的花钱闸。 */
 function commandBudget(args) {
   const loop = openLedger(args);
@@ -1652,10 +1710,11 @@ const USAGE = [
   '',
   '  state | tasks | summary | note --text "..."',
   '  refresh | sync [--apply] | next [--max N] [--concurrency N] [--dry-run]',
-  '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004',
+  '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004 | attach --task T-004 --session <id>',
   '  finish --task T-004 --status done|failed|blocked | check --task T-004',
   '  escalate|question|askhuman --task T-004 | handover --task T-004 | reap [--stale 90]',
-  '  pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1',
+  '  pause | resume [--no-auto] | auto on|off | budget --iterations 120 | signature --value solo-<模型 ID>',
+  '  concurrency --max 4 --exclusive 1',
   '',
   '通用选项：--loop <名称>  --workspace <路径>  --json',
 ].join('\n');
@@ -1672,6 +1731,7 @@ switch (command) {
   case 'claim': commandClaim(args); break;
   case 'worktree': commandWorktree(args); break;
   case 'start': commandStart(args); break;
+  case 'attach': commandAttach(args); break;
   case 'finish': commandFinish(args); break;
   case 'check': commandCheck(args); break;
   case 'escalate': handOff(args, 'escalate'); break;
@@ -1686,6 +1746,7 @@ switch (command) {
   case 'concurrency': commandConcurrency(args); break;
   case 'auto': commandAuto(args); break;
   case 'budget': commandBudget(args); break;
+  case 'signature': commandSignature(args); break;
   case undefined:
   case 'help':
     process.stdout.write(USAGE + '\n');

@@ -180,8 +180,8 @@ NEXT: 建议的下一轮任务；没有写 none
 3. 实现（测试先行），在分支提交；日记 `agents_jour/<编号>.md` 随分支提交。
 4. 自测：跑与改动相关的测试文件（含新增的集成层文件）；涉及 `client/` 再跑相关前端测试；逐条核对验收标准。
 5. 推送分支，开 PR：正文写 `Closes #<编号>`、`Solo: 无独立审查，由 solo 执行者自行合并`、一句摘要、署名。
-6. 等 CI：`gh pr checks issue-<编号> --watch`。**不要开自动合并**——自动合并会跳过合并前的核对。
-7. 交付：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾计数行、CI 运行链接、逐条验收核对，最后一行署名；标签从 `in-progress` 改成 `needs-review`。
+6. 等 CI：`gh pr checks issue-<编号> --watch`。**不要开自动合并**——自动合并会跳过合并前的核对。失败项明显与本次改动无关时先 `gh run rerun <运行号> --failed` 重跑一次。带 `touches-core` 的工单，`check` 绿了以后还要在分支上跑集成层：`gh workflow run CI --ref issue-<编号>` → `gh run watch <运行号>`；失败项与 main 最近 7 天比（main 上也红的是不稳定项，写进交付说明），修好再跑。
+7. 交付：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾计数行、CI 运行链接（touches-core 加分支集成层那次）、逐条验收核对、删除用例的「用例名 + 依据」，最后一行 `— <署名>`（署名单独成行）；标签从 `in-progress` 改成 `needs-review`。
 8. 合并前核对：`git fetch origin main && git merge origin/main`；`gh pr checks issue-<编号> --required` 显示 `check` 通过；工作区没有未提交也未推送的东西；每条验收核对都有证据。
 9. 合并：`gh pr merge issue-<编号> --admin --squash`。`--admin` 是仓库所有者的豁免，solo 唯一允许用的场合，它同时绕开 `check`——所以第 8 步只能自己做。
 10. 合并以后：确认 PR 已合并、工单随 `Closes` 关闭（没关就 `gh issue close` 并说明原因）；去掉 `needs-review`；合并提交号写进日记。
@@ -201,7 +201,8 @@ NEXT: 建议的下一轮任务；没有写 none
 9. **派活前先刷新再对账**（`refresh` + `sync`），用旧台账派活会派到已经关掉的单子上，或者与别的执行者撞车。
 10. **不在 `check` 没有通过的提交上合并**；测试不稳定时重新运行失败的作业，通过再合。
 11. **别的执行者在跑同一台机器**：不回退别人的提交、不合并别人的 PR、不改别人的工单、不按进程名批量杀进程。
-12. **循环的记录只写 `.ralph/`**：`progress.md` 与 `notes/`。仓库里的 `agents_jour/<编号>.md` 与 `docs/CHANGELOG.md` 由**工人**按工单写，编排者不写——那两处的记录属于工单，不属于循环。
+12. **署名是 `solo-<模型 ID>`，六处都要署，提交信息的署名单独成行**（正文 → 空行 → `— solo-xxx`）；署名值存在 `state.signature`，换模型用 `solo.mjs signature --value solo-<模型 ID>` 改。
+13. **循环的记录只写 `.ralph/`**：`progress.md` 与 `notes/`。仓库里的 `agents_jour/<编号>.md` 与 `docs/CHANGELOG.md` 由**工人**按工单写，编排者不写——那两处的记录属于工单，不属于循环。
 
 ## 无人值守
 
