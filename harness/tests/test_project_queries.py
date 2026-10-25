@@ -33,6 +33,7 @@ from harness.app.project_queries import (
     RunAsks,
     RunAttempt,
     RunExport,
+    RunRecovery,
     WorkItemInputs,
     WorkItemMaterials,
 )
@@ -51,6 +52,7 @@ from harness.proposals import (
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
+from harness.streams import STOP_REASON_UPGRADE
 from harness.tests.helpers import explore_turn, happy_script, merge_scripts, quality_turns
 from harness.tests.onboarding_project import onboarding_source
 from harness.tests.api_helpers import running_api
@@ -1193,3 +1195,36 @@ def test_background_job_status_query_does_not_affect_read_output(data_dir: Path)
     assert "LINE_ONE" in captured["read_output"]
     assert "LINE_TWO" in captured["read_output"]
     system.close()
+
+
+def test_an_upgrade_stopped_run_puts_the_door_sign_on_the_room(data_dir):
+    # 验收一（工单 #895）：门口牌子比较的是服务端写的停止原因 run_event_version_changed，不是 "upgrade"；
+    # 因升级停止的事项，它所在房间的门口牌子写「因升级停止」
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("升级停止", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.writes.append(run_stream(run_id), NewEvent(
+        EventType.RUN_FAILED, actor="system", department="product", state_before="running",
+        state_after="failed", stop_reason=STOP_REASON_UPGRADE,
+        payload={"stop_reason": STOP_REASON_UPGRADE, "message": "运行事件版本已经不是当前版本"},
+    ))
+    workspace = _application(system).query("department.workspace", DepartmentWorkspace(
+        project_id=project_id, department="product", work_item=work_item_id,
+    ))
+    assert workspace.data.stop_reason == STOP_REASON_UPGRADE
+    assert workspace.data.room.door == "因升级停止"
+
+
+def test_recovery_reports_the_position_of_this_items_last_event(data_dir):
+    # 验收二（工单 #895）：两个事项先后写了事件，前一个事项的最后已确认位置是它自己最后一条事件的位置，
+    # 不是整个事件库的末尾
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("恢复位置", GOAL)
+    first_item, first_run = system.projects.start_work_item(project_id, "先做这件事")
+    second_item, second_run = system.projects.start_work_item(project_id, "再做这件事")
+    own_last = system.store.list_events(first_run)[-1]
+    assert system.store.list_events(second_run)[-1].position > own_last.position
+    recovery = _application(system).query("run.recovery", RunRecovery(run_id=first_run))
+    assert recovery.data.last_confirmed_event_id == own_last.event_id
+    assert recovery.data.last_confirmed_position == own_last.position
+    assert recovery.data.last_confirmed_position < system.store.end_position()

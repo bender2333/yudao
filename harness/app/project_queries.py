@@ -24,6 +24,7 @@ from ..project_projection import replay_project, saved_project
 from ..projection import RunNotFoundError, project_run, replay_decisions, replay_run, load_decisions
 from ..projects import ProjectNotFoundError, project_projection
 from ..redact import redact_tool_args
+from ..streams import STOP_REASON_UPGRADE
 from ..replay_check import ReplayIntegrityError, verify_replay
 from ..recovery import (
     ACTION_UNKNOWN, OBSERVATION_CANCELLED, OBSERVATION_COMPLETED, OBSERVATION_INTERRUPTED,
@@ -807,7 +808,7 @@ def _room_door(run: Any, status: str) -> str | None:
         return "已暂停"
     if status == "interrupted":
         return "中断"
-    if run is not None and run.stop_reason and run.stop_reason == "upgrade":
+    if run is not None and run.stop_reason and run.stop_reason == STOP_REASON_UPGRADE:
         return "因升级停止"
     return None
 
@@ -2416,13 +2417,17 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     unfinished = [] if terminal else _unfinished_actions(events)
     verifications = _verification_records(events, decisions.values())
     resume_requests = [] if terminal else open_resume_decisions(decisions.values())
+    # 最后已确认的位置是这个事项自己最后一条已提交事件的位置（工单 #895）：日志的末尾是全部项目、
+    # 全部事项的最新位置，别的项目或事项在这之后写了事件时不能算作这个事项的进度。没有事件时为 0
+    confirmed = None if run.last_event_id is None else store.get_event(run.last_event_id)
     return Snapshot[RunRecoveryResult](
         position=store.end_position(),
         data=RunRecoveryResult(
             work_item_id=run.work_item_id or "", run_id=run.run_id, state=state,
             reason=_recovery_reason(run, state, resume_requests),
             executable=not terminal,
-            last_confirmed_position=store.end_position(), last_confirmed_event_id=run.last_event_id,
+            last_confirmed_position=0 if confirmed is None else confirmed.position,
+            last_confirmed_event_id=run.last_event_id,
             unfinished_actions=unfinished, verifications=verifications,
             next_legal_action=_NEXT_ACTION[state],
             can_continue=_can_continue(state, terminal),
