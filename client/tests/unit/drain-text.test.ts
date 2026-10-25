@@ -19,6 +19,15 @@ test("确认框写明后果：不再开始新事项、回不去、剩下的是�
   assert.match(all, /运行与执行槽位/);
 });
 
+test("强制升级以后用项目的起点重新开始，不再说用已经采纳的成果（工单 #908）", () => {
+  const all = DRAIN_CONFIRM_LINES.join("；");
+  assert.match(all, /用项目的起点重新开始/);
+  assert.match(all, /采纳成果/);
+  assert.match(all, /起始文件夹/);
+  assert.match(all, /空树/);
+  assert.doesNotMatch(all, /用已经采纳的成果重新开始/);
+});
+
 test("确认与取消两个按钮的措辞是用户看得懂的话", () => {
   assert.equal(DRAIN_CONFIRM_CONFIRM, "不再开始新事项");
   assert.equal(DRAIN_CONFIRM_CANCEL, "先不开始");

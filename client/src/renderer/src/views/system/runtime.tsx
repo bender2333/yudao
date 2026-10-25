@@ -65,8 +65,8 @@ function SlotBlock(props: { status: SystemStatus }) {
   );
 }
 
-// 排空（3.1）：排空期间停止开始新事项，等正在执行的事项结束；
-// 强制升级时正在执行的事项记为因升级停止，对应事项用已采纳成果重新开始并排在队列最前面。
+// 排空（3.1）：排空期间停止开始新事项，等正在执行的事项结束，排空在服务下一次启动时结束（#731）；
+// 强制升级时正在执行的事项记为因升级停止，对应事项用项目的起点重新开始并排在队列最前面（#908）。
 // 两个命令按排空状态出现：未排空时可以开始排空，排空中可以强制升级
 function DrainBlock(props: { app: ClientApp; status: SystemStatus }) {
   const { drain } = props.status;
@@ -83,7 +83,7 @@ function DrainBlock(props: { app: ClientApp; status: SystemStatus }) {
   return (
     <Block
       title="排空"
-      subtitle="排空期间停止开始新事项，等正在执行的事项结束；强制升级时正在执行的事项记为因升级停止"
+      subtitle="排空期间停止开始新事项，等正在执行的事项结束；排空在服务下一次启动时结束；强制升级时正在执行的事项记为因升级停止，用项目的起点重新开始"
     >
       <KeyValue
         items={[
