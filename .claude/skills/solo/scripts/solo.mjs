@@ -595,6 +595,25 @@ function commandState(args) {
   const stalled = conc.active
     .map((a) => ({ task: a.task, issue: a.issue, minutes: Math.round((now - Date.parse(a.startedAt || 0)) / 60000) }))
     .filter((a) => a.minutes >= 90);
+  // 在跑的工人只靠账本看不见进度：现算开派分钟数、最近一次提交、工作区改动数。
+  const flight = conc.active.map((a) => {
+    const target = worktreeTarget(loop, { id: a.task, issue: a.issue });
+    const dir = a.worktree || target.dir;
+    let dirty = 0;
+    let sinceCommitMin = null;
+    if (fs.existsSync(dir)) {
+      dirty = git(dir, ['status', '--porcelain']).stdout.split(/\r?\n/).filter(Boolean).length;
+      const ts = num(git(dir, ['log', '-1', '--format=%ct']).stdout.trim(), 0);
+      if (ts) sinceCommitMin = Math.max(0, Math.round((Date.now() / 1000 - ts) / 60));
+    }
+    return {
+      task: a.task,
+      issue: a.issue,
+      minutes: Math.round((Date.now() - Date.parse(a.startedAt || 0)) / 60000),
+      dirty,
+      sinceCommitMin,
+    };
+  });
   const summary = {
     loop: loop.name,
     status: loop.state.status,
@@ -609,22 +628,30 @@ function commandState(args) {
     concurrency: { max: conc.max, exclusiveLimit: conc.exclusiveLimit, active: conc.active.map((a) => a.task) },
     escalation: { maxFails: esc.maxFails, label: esc.label },
     autoContinue: loop.state.autoContinue === true,
+    waitMode: str(loop.state.waitMode, ''),
     signature: str(loop.state.signature, ''),
     self: str(loop.state.self, ''),
     forUser: Object.keys(state).filter((id) => state[id] && state[id].waitFor === 'user'),
     failing: Object.keys(state).filter((id) => state[id] && state[id].fails > 0).map((id) => id + 'x' + state[id].fails),
     stalled,
+    flight,
   };
   if (args.json) return emit(args, summary);
   const lines = [
     'loop: ' + summary.loop + '   status: ' + summary.status + '   第 ' + summary.iteration + '/' + summary.maxIterations + ' 轮'
-      + '   无人值守 ' + (summary.autoContinue ? '开' : '关'),
+      + '   无人值守 ' + (summary.autoContinue ? '开' : '关')
+      + (summary.waitMode ? '（收账靠 ' + (summary.waitMode === 'hook' ? 'Stop hook' : '宿主通知：派完就结束回合') + '）' : ''),
     '范围: ' + summary.scope.display,
     '任务: ' + summary.doneTasks + ' 完成 / ' + summary.pendingTasks + ' 待办 / ' + summary.waiting + ' 等条件 / ' + summary.escalated + ' 已交回'
       + (summary.outOfScope ? ' / ' + summary.outOfScope + ' 不在范围' : ''),
     '并发: 上限 ' + conc.max + '，互斥 ' + conc.exclusiveLimit + '，在跑 ' + (summary.concurrency.active.join(', ') || '-'),
     '通道: 连续 ' + esc.maxFails + ' 次没过 → ' + esc.label + '；署名 ' + (summary.signature || '(未设置)'),
   ];
+  for (const f of flight) {
+    lines.push('在跑: ' + f.task + (f.issue ? ' #' + f.issue : '') + ' 开派 ' + f.minutes + ' 分钟'
+      + '，最近提交 ' + (f.sinceCommitMin === null ? '看不到' : f.sinceCommitMin + ' 分钟前')
+      + '，工作区 ' + f.dirty + ' 处改动');
+  }
   if (summary.self) lines.push('本机 gh: ' + summary.self);
   if (summary.forUser.length) lines.push('等用户: ' + summary.forUser.join(', '));
   if (summary.failing.length) lines.push('失败中: ' + summary.failing.join(', '));
@@ -655,6 +682,19 @@ function applyConcurrency(loop, args) {
   return { max, exclusiveLimit, active: conc.active, changed };
 }
 
+/** goal.md 里写着并发与互斥，state.json 里也有一份：不一致时以台账为准，但要提醒一句。 */
+function warnGoalConcurrency(loop, conc) {
+  let text = '';
+  try { text = fs.readFileSync(path.join(loop.dir, 'goal.md'), 'utf8'); } catch { return; }
+  const pick = (re) => { const m = re.exec(text); return m ? num(m[1], 0) : 0; };
+  const goalMax = pick(/并发[^0-9]{0,6}(\d+)/);
+  const goalExclusive = pick(/互斥[^0-9]{0,8}(\d+)/);
+  const notes = [];
+  if (goalMax && goalMax !== conc.max) notes.push('并发 goal.md ' + goalMax + ' / 台账 ' + conc.max);
+  if (goalExclusive && goalExclusive !== conc.exclusiveLimit) notes.push('互斥 goal.md ' + goalExclusive + ' / 台账 ' + conc.exclusiveLimit);
+  if (notes.length) process.stderr.write('goal.md 与台账的并发设置不一致（按台账跑）：' + notes.join('，') + '\n');
+}
+
 function commandNext(args) {
   const loop = openLedger(args);
   return withLock(loop, () => {
@@ -663,6 +703,7 @@ function commandNext(args) {
     const scope = scopeConfig(loop, args);
     const conc = applyConcurrency(loop, args);
     if (conc.changed && !args['dry-run']) saveLedger(loop);
+    warnGoalConcurrency(loop, conc);
     const { issues, complete, lastError } = fetchIssues(repo);
     if (!complete) fail('外部工单没有拉全，这一轮先别派活：' + (lastError || '分页中断'));
 
@@ -784,7 +825,10 @@ function commandWorktree(args) {
   }
 
   const listed = git(root, ['worktree', 'list', '--porcelain']).stdout;
-  if (listed.split(/\r?\n/).some((line) => line.trim() === 'worktree ' + target.dir)) {
+  // git 打印的是 C:/w/x，path.join 给的是 C:\w\x：比路径要先归一化，否则已存在的 worktree 会被当成「撞名」。
+  const norm = (s) => (process.platform === 'win32' ? s.replace(/\\/g, '/').toLowerCase() : s);
+  const want = norm(target.dir);
+  if (listed.split(/\r?\n/).some((line) => norm(line.trim()) === 'worktree ' + want)) {
     return emit(args, { task: task.id, worktree: target.dir, branch: target.branch, created: false }, 'worktree 已经在：' + target.dir);
   }
 
@@ -833,7 +877,13 @@ function commandClaim(args) {
   const drop = FLOW_LABELS.filter((l) => present.includes(l) && l !== 'in-progress');
   const ghArgs = ['issue', 'edit', String(issue), '--add-assignee', '@me', '--add-label', 'in-progress'];
   if (drop.length) ghArgs.push('--remove-label', drop.join(','));
-  const result = gh(ghArgs, loop.root);
+  let result = gh(ghArgs, loop.root);
+  // 网络抖一下 gh 会 GraphQL EOF：重试两次；仍然失败就不写台账（写一半的台账会把工单当成别人的）。
+  for (let attempt = 0; result.status !== 0 && attempt < 2; attempt += 1) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000);
+    result = gh(ghArgs, loop.root);
+  }
+  if (result.status !== 0) fail('领取没成功，台账没动过：' + (result.stderr.trim() || result.stdout.trim()) + '\n网络恢复以后重跑 claim。');
 
   const state = taskStateOf(loop);
   state[task.id] = Object.assign({}, state[task.id] || {}, { claimedAt: NOW() });
@@ -841,9 +891,8 @@ function commandClaim(args) {
   loop.state.taskState = state;
   saveLedger(loop);
 
-  const warning = result.status === 0 ? '' : '领取没成功（台账记了，外部没变）：' + (result.stderr.trim() || result.stdout.trim());
-  if (warning) process.stderr.write(warning + '\n');
-  const payload = { task: task.id, issue, assigned: result.status === 0, dropped: drop, warning };
+  const warning = '';
+  const payload = { task: task.id, issue, assigned: true, dropped: drop, warning };
   return emit(args, payload, '#' + issue + ' 领取：' + (result.status === 0 ? '负责人 @me，标签 in-progress' : '失败，见上面的错误') + (drop.length ? '，摘掉 ' + drop.join(',') : ''));
 }
 
@@ -948,6 +997,12 @@ function verifyDone(loop, task) {
     pr = (Array.isArray(found) ? found : []).find((p) => String(p.body || '').includes('Closes #' + task.issue));
   }
   if (!pr) {
+    // 父工单随子单被 GitHub 关闭、或工单被转走：没有分支也没有 PR。工单 CLOSED 就算完成，不必用 --no-verify 跳核对。
+    const remoteHeads = git(loop.root, ['ls-remote', '--heads', 'origin', branch]).stdout.trim();
+    const localBranch = git(loop.root, ['rev-parse', '--verify', 'refs/heads/' + branch]).status === 0;
+    if (!remoteHeads && !localBranch && issue && issue.state === 'CLOSED') {
+      return problems;
+    }
     problems.push('分支 ' + branch + ' 没有 PR');
   } else if (pr.state !== 'MERGED') {
     problems.push('PR #' + pr.number + ' 还没合并（' + pr.state + '）');
@@ -1073,33 +1128,50 @@ function commandCheck(args) {
   };
 
   git(dir, ['fetch', 'origin', 'main']);
-  ok(git(dir, ['status', '--porcelain']).stdout.trim() === '', '工作区没有未提交的改动');
-  const hasRemote = git(dir, ['rev-parse', '--verify', 'origin/' + branch]).status === 0;
-  const ahead = num(git(dir, ['rev-list', '--count', (hasRemote ? 'origin/' + branch : 'origin/main') + '..HEAD']).stdout.trim(), 0);
-  ok(ahead === 0, '没有未推送的提交' + (ahead ? '（还有 ' + ahead + ' 个）' : ''));
-  ok(git(dir, ['merge-base', '--is-ancestor', 'origin/main', 'HEAD']).status === 0, '分支已经包含 origin/main');
-
-  const prs = ghJson(['pr', 'list', '--head', branch, '--state', 'all', '--json', 'number,state,mergeable,statusCheckRollup'], [], loop.root);
-  const pr = (Array.isArray(prs) ? prs : []).find((p) => p.state === 'OPEN');
-  ok(Boolean(pr), pr ? 'PR #' + pr.number + ' 开着' : '没有开着的 PR');
+  const prs = ghJson(['pr', 'list', '--head', branch, '--state', 'all', '--json', 'number,state,headRefName,mergeable,body,statusCheckRollup'], [], loop.root);
+  const openPr = (Array.isArray(prs) ? prs : []).find((p) => p.state === 'OPEN');
+  // 一个分支上可能有两张已合并的 PR（本单那张 + 后来补记日记那张）：认写了 Closes 的那张。
+  const mergedPrs = (Array.isArray(prs) ? prs : []).filter((p) => p.state === 'MERGED');
+  const closes = 'Closes #' + (task.issue || '');
+  const mergedPr = mergedPrs.find((p) => String(p.body || '').includes(closes)) || mergedPrs[0];
+  const issueRow = task.issue ? ghJson(['issue', 'view', String(task.issue), '--json', 'labels,state'], { labels: [] }, loop.root) : {};
+  // 已经合并并关闭的工单，工人可能又开一个补记日记的小 PR：收账看的是本单那张已合并的 PR。
+  const closedMerged = Boolean(issueRow && issueRow.state === 'CLOSED' && mergedPr);
+  const pr = closedMerged ? mergedPr : openPr;
+  const prDetail0 = pr ? ghJson(['pr', 'view', String(pr.number), '--json', 'comments'], { comments: [] }, loop.root) : { comments: [] };
+  ok(Boolean(pr), pr ? (pr.state === 'MERGED' ? 'PR #' + pr.number + ' 已合并' : 'PR #' + pr.number + ' 开着') : '没有开着的 PR');
+  // 一张工单一个 PR：工人另开 issue-<n>-xxx 分支时，只查 branch 会漏掉那个多出来的 PR。
+  const stray = (Array.isArray(prs) ? prs : []).filter((p) => p.state === 'OPEN' && String(p.headRefName || '').startsWith(branch + '-'));
+  ok(stray.length === 0, '没有同一工单的第二个 PR' + (stray.length ? '（还有 ' + stray.map((p) => '#' + p.number).join(' ') + '）' : ''));
+  if (closedMerged) {
+    ok(true, '工单已关闭、PR 已合并（不看工作区与分支）');
+  } else {
+    ok(git(dir, ['status', '--porcelain']).stdout.trim() === '', '工作区没有未提交的改动');
+    const hasRemote = git(dir, ['rev-parse', '--verify', 'origin/' + branch]).status === 0;
+    const ahead = num(git(dir, ['rev-list', '--count', (hasRemote ? 'origin/' + branch : 'origin/main') + '..HEAD']).stdout.trim(), 0);
+    ok(ahead === 0, '没有未推送的提交' + (ahead ? '（还有 ' + ahead + ' 个）' : ''));
+    ok(git(dir, ['merge-base', '--is-ancestor', 'origin/main', 'HEAD']).status === 0, '分支已经包含 origin/main');
+  }
   if (pr) {
-    ok(pr.mergeable !== 'CONFLICTING', 'PR 没有冲突' + (pr.mergeable ? '（' + pr.mergeable + '）' : ''));
+    if (pr.state === 'OPEN') ok(pr.mergeable !== 'CONFLICTING', 'PR 没有冲突' + (pr.mergeable ? '（' + pr.mergeable + '）' : ''));
     const checks = (pr.statusCheckRollup || []).filter((c) => c && c.conclusion);
     const bad = checks.filter((c) => !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.conclusion));
     ok(checks.length > 0 && bad.length === 0, 'PR 的检查全绿' + (bad.length ? '（' + bad.map((c) => (c.name || c.context || '检查') + ':' + c.conclusion).join(' ') + '）' : ''));
-    const detail = ghJson(['pr', 'view', String(pr.number), '--json', 'comments'], { comments: [] }, loop.root);
+    const detail = prDetail0;
     const delivery = ((detail && detail.comments) || []).filter((c) => (c.body || '').trim().startsWith('DELIVERY:'));
     ok(delivery.length > 0, 'PR 上有 DELIVERY 交付说明');
     if (delivery.length) {
-      const signature = str(loop.state.signature, '');
+      const signature0 = str(loop.state.signature, '');
       const body = delivery[delivery.length - 1].body || '';
-      ok(!signature || body.includes(signature), '交付说明最后一行有署名 ' + (signature || '(未设置)'));
+      ok(!signature0 || body.includes(signature0), '交付说明最后一行有署名 ' + (signature0 || '(未设置)'));
     }
   }
   const signature = str(loop.state.signature, '');
-  const headLines = git(dir, ['log', '-1', '--format=%B']).stdout.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim());
-  const headTail = headLines.length ? headLines[headLines.length - 1].trim() : '';
-  ok(!signature || headTail === '— ' + signature, '提交信息最后一行是署名' + (headTail ? '（实际：' + headTail + '）' : ''));
+  if (!closedMerged) {
+    const headLines = git(dir, ['log', '-1', '--format=%B']).stdout.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim());
+    const headTail = headLines.length ? headLines[headLines.length - 1].trim() : '';
+    ok(!signature || headTail === '— ' + signature, '提交信息最后一行是署名' + (headTail ? '（实际：' + headTail + '）' : ''));
+  }
   if (task.issue) {
     const jour = path.join(dir, 'agents_jour', String(task.issue) + '.md');
     ok(fs.existsSync(jour), '有日记 agents_jour/' + task.issue + '.md');
@@ -1107,8 +1179,8 @@ function commandCheck(args) {
       const text = fs.readFileSync(jour, 'utf8');
       ok(!signature || text.includes(signature), '日记里有署名');
     }
-    const issue = ghJson(['issue', 'view', String(task.issue), '--json', 'labels'], { labels: [] }, loop.root);
-    ok(((issue && issue.labels) || []).some((l) => l.name === 'needs-review'), '工单标签是 needs-review');
+    const issueLabels = ((issueRow && issueRow.labels) || []).map((l) => l.name);
+    ok(closedMerged || issueLabels.includes('needs-review'), '工单标签是 needs-review' + (closedMerged ? '（已合并关闭，不再要求）' : ''));
   }
   if (pr) {
     const prDetail = ghJson(['pr', 'view', String(pr.number), '--json', 'body,number'], {}, loop.root);
@@ -1120,7 +1192,7 @@ function commandCheck(args) {
       const runs = ghJson(['run', 'list', '--workflow', 'CI', '--branch', branch, '--limit', '5', '--json', 'databaseId,conclusion,headSha'], [], loop.root);
       const green = (Array.isArray(runs) ? runs : []).filter((r) => r.conclusion === 'success');
       ok(green.length > 0, 'touches-core：分支上跑过集成层');
-      const deliveryBody = (detail && detail.comments || []).filter((c) => (c.body || '').trim().startsWith('DELIVERY:')).pop();
+      const deliveryBody = ((prDetail0 && prDetail0.comments) || []).filter((c) => (c.body || '').trim().startsWith('DELIVERY:')).pop();
       const linked = green.some((r) => deliveryBody && String(deliveryBody.body).includes(String(r.databaseId)));
       if (green.length) ok(linked, '交付说明里有集成层运行的链接');
     }
@@ -1286,6 +1358,10 @@ function commandRefresh(args) {
         changes.push({ task: task.id, issue: task.issue, to: 'done', note: '外部已关闭，台账标完成' });
         continue;
       }
+
+      // 一张工单只该有一个流程标签：两个同时挂着，refresh/claim 会把它当成两个人做的。
+      const flowLabels = FLOW_LABELS.filter((l) => issue.labels.includes(l));
+      if (flowLabels.length > 1) changes.push({ task: task.id, issue: task.issue, to: 'labels', note: '同时带多个流程标签：' + flowLabels.join('、') + '（只该留一个）' });
 
       const active = activeByTask.get(task.id);
       if (active && active.bodyHash) {
@@ -1655,7 +1731,7 @@ function commandGc(args) {
   const loop = openLedger(args);
   const root = repoRoot(loop);
   const keep = Math.max(0, num(args.keep, 0));
-  const done = parseTasks(loop).filter((t) => t.status === 'done' && t.issue);
+  const done = parseTasks(loop).filter((t) => t.status === 'done' && t.issue && (!args.task || t.id === args.task));
   const targets = keep ? done.slice(0, Math.max(0, done.length - keep)) : done;
 
   const removed = [];
@@ -1728,6 +1804,8 @@ function commandResume(args) {
   const loop = openLedger(args);
   loop.state.status = 'running';
   loop.state.autoContinue = !args['no-auto'];
+  // 无人值守靠什么收账：hook（Claude Code 的 Stop hook）还是宿主通知（DSH 等）。记进台账，下一轮不用再猜。
+  if (args.wait) loop.state.waitMode = str(args.wait, 'hook');
   saveLedger(loop);
   appendText(loop, '## 循环恢复（编排者，' + NOW().slice(0, 16).replace('T', ' ') + '）\n\n- 无人值守：' + (loop.state.autoContinue ? '开' : '关'));
   return emit(args, { loop: loop.name, status: 'running', autoContinue: loop.state.autoContinue },
@@ -1905,7 +1983,18 @@ switch (command) {
   case 'worktree': commandWorktree(args); break;
   case 'start': commandStart(args); break;
   case 'attach': commandAttach(args); break;
-  case 'finish': commandFinish(args); break;
+  case 'finish': {
+    const payload = commandFinish(args);
+    // 收账以后顺手清这一张的 worktree（gc 会先归档 .tmp 证据再删）：win 上目录常被进程占着，失败只提示不拦。
+    if (payload && payload.status === 'done' && !args['no-gc'] && payload.task) {
+      try {
+        commandGc(Object.assign({}, args, { task: payload.task }));
+      } catch (e) {
+        process.stderr.write('收账以后清理 worktree 失败（不影响收账）：' + (e && e.message ? e.message : String(e)) + '\n');
+      }
+    }
+    break;
+  }
   case 'check': commandCheck(args); break;
   case 'escalate': handOff(args, 'escalate'); break;
   case 'question': handOff(args, 'question'); break;

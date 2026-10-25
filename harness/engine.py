@@ -239,7 +239,7 @@ class StepDriver:
                  refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> None:
         self._scope = scope
         basis = scope.basis
-        self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt, scope.guidance_only,
+        self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt,
                                 basis.effective_contract_hash, basis.input_version)
         self._stream = run_stream(scope.run_id)
         self._writes = writes
@@ -1007,7 +1007,6 @@ class StepDriver:
             facts = self._environment.query(facts_query(call))
             permission = tool_permission(
                 projection, call, department=scope.department, session_id=scope.session_id,
-                guidance_only=scope.guidance_only,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
             )
             if not permission.allowed and scope.department == "quality" and call["name"] == "write_file":

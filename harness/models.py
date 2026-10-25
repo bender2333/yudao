@@ -384,7 +384,6 @@ class ContextManifest:
     output_reserve_tokens: int = 0
     parts_ref: dict[str, Any] | None = None
     guidance_ids: list[str] = field(default_factory=list)
-    guidance_only: bool = False
 
 
 @dataclass
@@ -553,7 +552,6 @@ class RunProjection:
     processed_input_version: int = 0
     inputs: list[UserInput] = field(default_factory=list)
     department_guidance: list[DepartmentGuidance] = field(default_factory=list)
-    yielded_work: dict[str, Any] | None = None
     # run 的状态（工单 #556）：进行中与三个终态。部门进行到哪一步不记在这里
     status: str = "running"
     active_department: str | None = None
@@ -607,9 +605,6 @@ class RunProjection:
     # 每个部门这一轮开始时面对的交付（工单 #557）：质检的检查工作区由它建立，
     # 没有交付时这一轮没有可以核验的对象，提交结论被拒绝
     department_delivery_bases: dict[str, str] = field(default_factory=dict)
-    # 每个部门让出的工作：被指导提前安排的那一轮让出自己的工作时记在这里，
-    # 部门继续自己的那一轮时取回（工单 #557：同时运行时各部门各记各的）
-    department_yielded_work: dict[str, dict[str, Any]] = field(default_factory=dict)
     product_specs: list[ProductSpec] = field(default_factory=list)
     effective_contracts: list[EffectiveContract] = field(default_factory=list)
     delivery_specs: list[DeliverySpec] = field(default_factory=list)

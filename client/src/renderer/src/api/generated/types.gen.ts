@@ -5586,10 +5586,6 @@ export type ActivationFinishedPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Activation Id
      */
     activation_id: string;
@@ -6833,10 +6829,6 @@ export type CompactionRecordedPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Run Id
      */
     run_id: string;
@@ -7094,10 +7086,6 @@ export type ContextAssembledPayload = {
      * Guidance Ids
      */
     guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
     /**
      * Session Id
      */
@@ -7996,10 +7984,6 @@ export type DepartmentActivatedPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Activation Id
      */
     activation_id: string;
@@ -8007,7 +7991,6 @@ export type DepartmentActivatedPayload = {
      * Cycle
      */
     cycle: number;
-    yielded_work: YieldedWork | null;
     /**
      * Guidance Version
      */
@@ -8405,10 +8388,6 @@ export type DepartmentInputPayload = {
      * Guidance Ids
      */
     guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
     /**
      * Activation Id
      */
@@ -9425,10 +9404,6 @@ export type ModelAttemptFailedPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -9709,10 +9684,6 @@ export type ModelAttemptFinishedPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Attempt Id
      */
     attempt_id: string;
@@ -9971,10 +9942,6 @@ export type ModelMessagePayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
@@ -10189,10 +10156,6 @@ export type ModelReasoningPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
@@ -10390,10 +10353,6 @@ export type ModelRequestSerializedPayload = {
      * Guidance Ids
      */
     guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
     /**
      * Effective Contract Hash
      */
@@ -10612,10 +10571,6 @@ export type ModelRequestedPayload = {
      * Guidance Ids
      */
     guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
     /**
      * Effective Contract Hash
      */
@@ -10858,10 +10813,6 @@ export type ModelRetryScheduledPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
@@ -11014,10 +10965,6 @@ export type ModelStreamProgressPayload = {
      * Guidance Ids
      */
     guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
     /**
      * Attempt Id
      */
@@ -14163,10 +14110,6 @@ export type ToolCallRequiredPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Activation Id
      */
     activation_id: string;
@@ -14297,10 +14240,6 @@ export type ToolCallResult = {
      * Guidance Ids
      */
     guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
     /**
      * Effective Contract Hash
      */
@@ -14594,10 +14533,6 @@ export type ToolSkippedPayload = {
      */
     guidance_ids: Array<string>;
     /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
-    /**
      * Effective Contract Hash
      */
     effective_contract_hash: string | null;
@@ -14735,10 +14670,6 @@ export type ToolStartedPayload = {
      * Guidance Ids
      */
     guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
     /**
      * Attempt Id
      */
@@ -14934,10 +14865,6 @@ export type UsageCharge = {
      * Guidance Ids
      */
     guidance_ids: Array<string>;
-    /**
-     * Guidance Only
-     */
-    guidance_only: boolean;
     /**
      * Name
      */
@@ -15881,20 +15808,6 @@ export type WritebackVerifiedPayload = {
     verified_fact: {
         [key: string]: unknown;
     };
-};
-
-/**
- * YieldedWork
- */
-export type YieldedWork = {
-    /**
-     * Effective Contract Hash
-     */
-    effective_contract_hash: string | null;
-    /**
-     * Delivery Spec Hash
-     */
-    delivery_spec_hash: string | null;
 };
 
 export type EventObject = ({

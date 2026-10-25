@@ -172,15 +172,6 @@ def has_new_work(projection: RunProjection, department: str) -> bool:
     return bool(watched_new_work(projection, department))
 
 
-def watched_normal_work(projection: RunProjection, department: str) -> list[str]:
-    """部门关注的成果里除指导以外有新东西的那些。
-
-    指导由被指导的那一轮单独处理（工单 #556）：它不算是部门自己那一轮的工作，
-    部门让开这一轮以后再继续自己的工作。
-    """
-    return [kind for kind in watched_new_work(projection, department) if kind != "guidance"]
-
-
 def pending_ask_department(projection: RunProjection) -> str | None:
     """还没回答的询问：提问方的那一轮要继续，回答在分支里。
 
@@ -199,35 +190,19 @@ def _free(projection: RunProjection, waiting: set[str] | None, department: str) 
     return department in waiting if waiting is not None else is_waiting(projection, department)
 
 
-def normal_department(projection: RunProjection) -> str | None:
-    """按关注的成果本该开始一轮工作的部门：定义里第一个有新的工作（指导除外）的部门。
-
-    被指导提前安排的部门让开时，这个部门继续它自己的那一轮（工单 #556）。
-    """
-    for department in DEFINITIONS.departments:
-        if watched_normal_work(projection, department):
-            return department
-    return None
-
-
 def next_department(projection: RunProjection, waiting: set[str] | None = None) -> str | None:
-    """下一个开始一轮工作的部门：先看还没回答的询问与被指导提前安排的部门，
-    再按定义里的部门顺序取第一个在等待且有新的工作的。
+    """下一个开始一轮工作的部门：先看还没回答的询问，再按定义里的部门顺序取第一个
+    在等待且有新的工作的。
 
     一个部门同一时刻最多一轮工作（工单 #556）：这里一次只选一个部门。
     waiting 给出在等待的部门（进程中断以后会话是新开的，投影里那条「工作中」的记录不再算数）；
     没有给出时按投影里的会话记录判断。
     """
-    normal = normal_department(projection)
     asking = pending_ask_department(projection)
     if asking is not None and _free(projection, waiting, asking):
         return asking
-    for item in projection.department_guidance:
-        if (item.status in PENDING_GUIDANCE and item.department != normal
-                and _free(projection, waiting, item.department)):
-            return item.department
     for department in DEFINITIONS.departments:
-        if _free(projection, waiting, department) and watched_normal_work(projection, department):
+        if _free(projection, waiting, department) and has_new_work(projection, department):
             return department
     return None
 
@@ -238,12 +213,10 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     关注的成果有了新版本、又在等待工作的部门都列出来：控制核心让它们同时开始，
     一个部门同一时刻最多一轮工作（循环结构第 3.2 节第 6 条）。
 
-    两类工作分开处理：
-    - 还没回答的询问：提问方的会话要继续，支在它自己的会话里跑；
-    - 被指导提前安排的部门：这一轮只回应指导，让出它自己的那一轮（工单 #556）。
-      同一轮里只安排一个这样的部门，让出的工作由各部门自己记着（部门各自的让出记录）。
+    指导与其他关注的成果一样：有待处理指导、又在等待工作的部门以这段指导开始一轮完整的
+    工作（循环结构第 6 节，工单 #560），不为它另设一种只回应指导的轮次。
+    还没回答的询问是另一类：提问方的会话要继续，在它自己的会话里跑。
     """
-    normal = normal_department(projection)
     ready: list[str] = []
 
     def take(department: str) -> None:
@@ -253,22 +226,10 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     asking = pending_ask_department(projection)
     if asking is not None and _free(projection, waiting, asking):
         take(asking)
-    for item in projection.department_guidance:
-        if (item.status in PENDING_GUIDANCE and item.department != normal
-                and _free(projection, waiting, item.department)):
-            take(item.department)
-            break
     for department in DEFINITIONS.departments:
-        if _free(projection, waiting, department) and watched_normal_work(projection, department):
+        if _free(projection, waiting, department) and has_new_work(projection, department):
             take(department)
     return ready
-
-
-def guidance_diverted(projection: RunProjection, department: str) -> bool:
-    """这一轮是被指导提前安排的：部门有待处理指导，而按关注的成果本该工作的不是它。"""
-    if not _has_pending_guidance(projection, department):
-        return False
-    return normal_department(projection) != department
 
 
 def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[str]:
@@ -286,9 +247,6 @@ def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[st
             return allowed - {"product_decision"} if department == "product" else (
                 allowed & {"department_guidance_response"})
         return allowed
-    if has_guidance:
-        # 被指导提前安排的部门只回应指导
-        return _diverted_guidance_kinds(department, projection)
     return set()
 
 
@@ -545,17 +503,6 @@ def _claimable_results_for_activations(projection: RunProjection, department: st
 def _has_pending_guidance(projection: RunProjection, department: str) -> bool:
     return any(item.department == department and item.status in {"received", "in_input"}
                for item in projection.department_guidance)
-
-
-def _diverted_guidance_kinds(department: str, projection: RunProjection) -> set[str]:
-    if department != "product":
-        return {"department_guidance_response"}
-    # 产品被提前安排时仍然可以处理需求：可提交的种类按本事项种类的定义取，再补上回应指导
-    allowed = {"department_guidance_response"} | (
-        proposal_kinds(department, projection.kind) & {"product_spec", "product_decision"})
-    if projection.input_version > projection.processed_input_version:
-        return allowed - {"product_decision"}
-    return allowed
 
 
 def _content_hash(value: Any) -> str | None:

@@ -26,12 +26,12 @@ def _engineering(tmp_path):
 def _environment(system, projection):
     return LocalEnvironment(system.workspace(projection.run_id))
 
-def _permission(system, projection, name, args, *, basis=None, aborted=False, guidance_only=False):
+def _permission(system, projection, name, args, *, basis=None, aborted=False):
     # 工具许可依据的工作区事实由执行环境按 U 给出的查询取得
     call = {"id": "call", "name": name, "args": args}
     return tool_permission(
         projection, call, department="engineering",
-        guidance_only=guidance_only, basis=basis or WorkBasis.current(projection, "engineering"),
+        basis=basis or WorkBasis.current(projection, "engineering"),
         aborted=aborted, facts=_environment(system, projection).query(facts_query(call)),
     )
 
@@ -58,7 +58,6 @@ def test_tool_permission_stops_after_cancel_end_and_defers_a_proposal_before_the
 def test_tool_permission_denies_with_a_reason_the_model_receives(tmp_path):
     system, projection = _engineering(tmp_path)
     assert _permission(system, projection, "submit_review", {}).reason == "engineering cannot use submit_review"
-    guidance = _permission(system, projection, "write_file", {"path": "src/echo.py", "content": ""}, guidance_only=True)
     outside = _permission(system, projection, "write_file", {"path": "docs/notes.md", "content": ""})
     assert outside.allowed
     missing_command = _permission(system, projection, "bash", {})

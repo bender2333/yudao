@@ -41,7 +41,7 @@ def _rebuild_recorded_steps(system, run_id):
                 created_event_id="")
             frames[payload["activation_id"]] = StepFrame(
                 department=event.department, session_id=event.session_id, activation_id=payload["activation_id"],
-                prompt=prompt, guidance_only=payload["guidance_only"],
+                prompt=prompt,
                 effective_contract_hash=payload["effective_contract_hash"],
                 input_version=payload["input_version"],
             )

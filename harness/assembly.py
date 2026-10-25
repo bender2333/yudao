@@ -74,7 +74,6 @@ class StepFrame:
     session_id: str
     activation_id: str
     prompt: DepartmentPrompt
-    guidance_only: bool
     effective_contract_hash: str | None
     input_version: int
 
@@ -276,7 +275,7 @@ class ContextAssembly:
             projection, department=frame.department, session_id=frame.session_id,
             activation_id=frame.activation_id, step_id=step_id, prompt=frame.prompt,
             context_window=limits.context_window, max_output_tokens=limits.output_limit,
-            guidance=guidance, guidance_only=frame.guidance_only, events=events, snapshot_hash=snapshot_hash,
+            guidance=guidance, events=events, snapshot_hash=snapshot_hash,
             input_modalities=input_modalities,
         )
         return PinnedStep(projection, frame, limits, step_id, guidance, events, snapshot_hash,
@@ -302,7 +301,7 @@ class ContextAssembly:
                 activation_id=frame.activation_id, step_id=pinned.step_id, prompt=frame.prompt,
                 history=visible_history(replay_history, checkpoint), compaction_event_id=checkpoint_id,
                 context_window=limits.context_window, max_output_tokens=limits.output_limit,
-                guidance=pinned.guidance, guidance_only=frame.guidance_only,
+                guidance=pinned.guidance,
                 events=pinned.events, snapshot_hash=pinned.snapshot_hash,
                 input_modalities=pinned.input_modalities,
             )

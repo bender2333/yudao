@@ -13342,10 +13342,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "activation_id": {
             "title": "Activation Id",
             "type": "string"
@@ -13398,7 +13394,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "activation_id",
           "latency_ms",
           "elapsed_ms",
@@ -15805,10 +15800,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "run_id": {
             "title": "Run Id",
             "type": "string"
@@ -15897,7 +15888,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "run_id",
           "department",
           "activation_id",
@@ -16328,10 +16318,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "session_id": {
             "title": "Session Id",
             "type": "string"
@@ -16512,7 +16498,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "session_id",
           "department",
           "activation_id",
@@ -18102,10 +18087,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "activation_id": {
             "title": "Activation Id",
             "type": "string"
@@ -18113,16 +18094,6 @@
           "cycle": {
             "title": "Cycle",
             "type": "integer"
-          },
-          "yielded_work": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/YieldedWork"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "guidance_version": {
             "title": "Guidance Version",
@@ -18135,10 +18106,8 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "activation_id",
           "cycle",
-          "yielded_work",
           "guidance_version"
         ],
         "title": "DepartmentActivatedPayload",
@@ -18909,10 +18878,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "activation_id": {
             "title": "Activation Id",
             "type": "string"
@@ -18931,7 +18896,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "activation_id",
           "step_id",
           "input_ref"
@@ -20947,10 +20911,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -21191,7 +21151,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "attempt_id",
           "logical_call_id",
           "context_event_id",
@@ -21571,10 +21530,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -21790,7 +21745,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "attempt_id",
           "logical_call_id",
           "context_event_id",
@@ -22165,10 +22119,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -22267,7 +22217,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "effective_contract_hash",
           "attempt_id",
           "logical_call_id",
@@ -22628,10 +22577,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -22700,7 +22645,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "effective_contract_hash",
           "attempt_id",
           "logical_call_id",
@@ -23057,10 +23001,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -23157,7 +23097,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "effective_contract_hash",
           "attempt_id",
           "logical_call_id",
@@ -23519,10 +23458,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -23650,7 +23585,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "effective_contract_hash",
           "attempt_id",
           "logical_call_id",
@@ -24017,10 +23951,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -24129,7 +24059,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "effective_contract_hash",
           "attempt_id",
           "logical_call_id",
@@ -24317,10 +24246,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -24425,7 +24350,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "attempt_id",
           "logical_call_id",
           "context_event_id",
@@ -30455,10 +30379,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "activation_id": {
             "title": "Activation Id",
             "type": "string"
@@ -30501,7 +30421,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "activation_id",
           "step_id",
           "attempt_id",
@@ -30720,10 +30639,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -30840,7 +30755,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "effective_contract_hash",
           "attempt_id",
           "logical_call_id",
@@ -31348,10 +31262,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "effective_contract_hash": {
             "anyOf": [
               {
@@ -31437,7 +31347,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "effective_contract_hash",
           "attempt_id",
           "logical_call_id",
@@ -31632,10 +31541,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "attempt_id": {
             "title": "Attempt Id",
             "type": "string"
@@ -31713,7 +31618,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "attempt_id",
           "logical_call_id",
           "context_event_id",
@@ -32020,10 +31924,6 @@
             "title": "Guidance Ids",
             "type": "array"
           },
-          "guidance_only": {
-            "title": "Guidance Only",
-            "type": "boolean"
-          },
           "name": {
             "const": "provider_usage",
             "title": "Name",
@@ -32144,7 +32044,6 @@
           "prompt_version",
           "prompt_hash",
           "guidance_ids",
-          "guidance_only",
           "name",
           "ok",
           "activation_id",
@@ -33796,39 +33695,6 @@
           "verified_fact"
         ],
         "title": "WritebackVerifiedPayload",
-        "type": "object"
-      },
-      "YieldedWork": {
-        "additionalProperties": false,
-        "properties": {
-          "effective_contract_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Effective Contract Hash"
-          },
-          "delivery_spec_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Delivery Spec Hash"
-          }
-        },
-        "required": [
-          "effective_contract_hash",
-          "delivery_spec_hash"
-        ],
-        "title": "YieldedWork",
         "type": "object"
       },
       "EventObject": {
