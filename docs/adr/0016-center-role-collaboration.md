@@ -1,6 +1,6 @@
 # 部门采用中心型协作，经理是部门唯一的对外接口
 
-Status: 理由中「部门之间的上下文隔离由控制核心在一处执行」由 [ADR-0029](0029-departments-form-by-information-cohesion.md) 改为按信息的内聚决定可见范围，审查者先提交独立判断再看作者的解释；「权威拓扑保持设计时的常量」与后果中「不能增删角色」由 [ADR-0030](0030-rules-are-provisional-defaults.md) 改为经候选、结构校验与用户批准修改；工具角色可以发起子循环（[ADR-0031](0031-declared-loop-layers-and-sub-loops.md)）。其余决定继续有效。
+Status: 理由中「部门之间的上下文隔离由控制核心在一处执行」由 [ADR-0029](0029-departments-form-by-information-cohesion.md) 改为按信息的内聚决定可见范围，审查者先提交独立判断再看作者的解释；「权威拓扑保持设计时的常量」与后果中「不能增删角色」由 [ADR-0030](0030-rules-are-provisional-defaults.md) 改为经候选、结构校验与用户批准修改；工具角色可以发起子循环（[ADR-0031](0031-declared-loop-layers-and-sub-loops.md)）。「经理是部门唯一的对外接口」与经理的「转交」由 [ADR-0036](0036-concurrent-departments-and-nested-asks.md)、[ADR-0039](0039-departments-work-from-watched-outputs.md) 与总图第一、三节取代（2026-10-25 记）：询问是一次工具调用，部门随时可以询问另一个部门，可以同时有几次、可以嵌套与回问；部门按关注的成果开始工作，没有交接；部门内哪些角色带询问与提交工具，Stage 5 重写[部门内多角色设计说明](../design/department-roles.md)时在角色定义里写。其余决定继续有效。
 
 部门内部需要多个角色分工（[D26](../requirements/department-roles.md)）。决定：三个部门都采用中心型协作。每个部门有一个中心角色（产品架构师、工程架构师、测试工程师），负责规划与判断，保管部门的主要上下文；探索者、主程与审查者是中心角色的工具，只接受中心角色分派的任务，交回结构化的角色结果，工具角色之间不直接往来；经理是部门唯一的对外接口，转交询问、指导与通知，提交部门成果，不分派部门内的工作，不编写产物。
 

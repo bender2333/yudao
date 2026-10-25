@@ -1,6 +1,6 @@
 # Provider 设计说明：统一调用、多厂商接入与配置生效
 
-日期：2026-09-19；2026-10-07 按 [ADR-0033](../adr/0033-protocol-belongs-to-model-access.md) 与 [ADR-0002](../adr/0002-candidates-need-test-to-admit.md) 修改开头的说明、第 2、7.1、8.1、8.2、9 节（协议的预填、自定义服务的模型列表地址、新建连接与勾选加入的流程）。状态：Stage 2.7 已实现（[执行报告](../archive/stage-2-7-provider-report.md)；Anthropic Messages 的真实覆盖由 #96 验收）。所属阶段：[Stage 2.7](../archive/stage-2-provider-plan.md)。需求合同：[D22 启动与热生效](../requirements/startup-provider-reload.md)、[D23 统一 Provider 层](../requirements/provider-layer.md)。 总图位置：第四节「模型」的缝；第六节「只有一份」里凭据只在控制主机。
+日期：2026-09-19；2026-10-07 按 [ADR-0033](../adr/0033-protocol-belongs-to-model-access.md) 与 [ADR-0002](../adr/0002-candidates-need-test-to-admit.md) 修改开头的说明、第 2、7.1、8.1、8.2、9 节（协议的预填、自定义服务的模型列表地址、新建连接与勾选加入的流程）。状态：Stage 2.7 已实现（[执行报告](../archive/stage-2-7-provider-report.md)；Anthropic Messages 的真实覆盖由 #96 验收）。所属阶段：[Stage 2.7](../archive/stage-2-provider-plan.md)。需求合同：[D22 启动与热生效](../requirements/startup-provider-reload.md)、[D23 统一 Provider 层](../requirements/provider-layer.md)。 总图位置：第四节「模型」的缝；第六节「只有一份」里凭据只在控制主机。 2026-10-25：仍然有效的部分（模块边界、统一调用、取消与观测）已并入[模型管理设计说明](model-management.md)第 13 节，本文待用户确认后归档到 `docs/archive/design/`，在那之前以第 13 节为准。
 
 > 2026-09-24：模型目录、部门选择、调用目标解析、推理档位与配置生效时机以[模型管理设计说明](model-management.md)为准。本文中「冻结目标」「新任务取得有效修订，旧任务保留原目标」的内容由它取代；调用协议属于模型访问定义（[ADR-0033](../adr/0033-protocol-belongs-to-model-access.md)），协议的预填、请求基址与认证方式以它的第 4 节为准；模块边界、统一调用、取消与观测部分继续有效。
 
