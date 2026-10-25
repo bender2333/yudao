@@ -143,11 +143,6 @@ def _settings(client, project_id: str, department: str) -> dict[str, Any]:
 def _run_requests(system, run_id: str) -> list[Any]:
     return [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_REQUESTED]
 
-def _run_of(system, project_id: str) -> str:
-    items = system.projects.projection(project_id).work_items
-    assert items and items[-1].run_id
-    return items[-1].run_id
-
 def test_a_project_department_setting_selects_its_own_model_with_its_source(tmp_path):
     # 项目 A 的工程部门另选模型以后，项目 A 工程部门的请求使用该模型，选择来源为项目部门设置；
     # 项目 B 与部门默认不变
