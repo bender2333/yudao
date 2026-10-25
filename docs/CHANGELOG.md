@@ -531,3 +531,5 @@ claude-fable-5-1（总架构师） / 2026-10-25 21:30 / 归档原型（#985，�
 claude-fable-5-1（总架构师） / 2026-10-25 21:50 / `docs/decision.md` 加一条：观察者不承接 harness/analysis，删除（#987 结论，删除工单 #1003） / 用户确认总架构师的判断
 
 solo-deepseek-v4.1-flash / 2026-10-25 20:33 / `docs/design/existing-project-onboarding.md` 第 5 节「采纳写回」补写回目标的解析（远端留空表示源目录本身、相对路径只按源目录解析、目标是本地普通仓库时把写回分支直接写进该仓库），`docs/adr/0034-adopted-change-writeback-three-tree-merge.md` 补同一句 / 工单 #902：`harness/writeback.py` 的写回目标不再是 Yudao 服务进程的当前目录，libgit2 不支持向非裸仓库推送，设计说明与 ADR 缺少这两条，按工单写进文档让文档与代码一致
+
+claude-fable-5-1（总架构师） / 2026-10-25 22:20 / `CLAUDE.md` 加「用户的参与方式」一节、子架构师分诊 solo 交回工单一条、Solo 模式改为跨 harness 一份规矩、工单规范加内核工单事前批准（`kernel-approved`）；`AGENTS.md` Solo 模式「自己解决的问题」改为「交回与自己解决的问题」（工单太大、设计冲突、连续三次没过交回 `needs-triage`），合并前核对认 `kernel-approved`，审查者核对同；`docs/agents/triage-labels.md` 加 `kernel-approved` 一节、solo 段落改交回办法；`/to-children` 需你批准的子工单改为拆单时批准 / Argon 的工作流建议，取舍见 docs/decision.md 10-25「用户只定走向、规则与试用结论」。GitHub 建了 `kernel-approved` 标签。三个技能交子架构师写。
