@@ -2086,7 +2086,7 @@
   "waiting_reason": null,
   "active_department": null,
   "human_action": null,
-  "cycle_count": 5,
+  "cycle_count": 4,
   "rework_count": 0,
   "round": 0,
   "input_version": 1,

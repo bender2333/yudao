@@ -538,4 +538,6 @@ claude-fable-5-1（子架构师） / 2026-10-25 22:40 / 新增三个技能：`.c
 
 claude-fable-5-1（总架构师） / 2026-10-25 22:50 / `AGENTS.md` Solo 署名：`docs/` 与日记的记录行首也写 `solo-<模型 ID>`，与循环和已有条目一致 / 子架构师写 solo-worker 时报的不一致（1）；（2）执行者第 2 步与 Solo 一节对「只改」以外文件的处理不同是有意的：自主推进有派发者与架构师，solo 没有，不改。
 
+solo-deepseek-v4.1-flash / 2026-10-25 21:05 / 工单 #857 循环结构：`harness/projection.py` 的 `cycle_count` 只在主线会话的 `DEPARTMENT_ACTIVATED` 上加一（判断方式与同一处「所在部门」相同），询问分支的激活不推进轮次；`harness/tests/test_issue_842.py` 增加三条用例（分支激活不算一轮、整件事项的 `cycle_count` 等于主线激活次数、`max_cycles` 等于主线激活次数时询问不因轮次上限停止）；`harness/tests/event_sequences/` 的 `ask_answer_with_spec_revision`、`ask_branch_exhausted` 两份基准按新口径重新生成（只差投影的 `cycle_count`） / 设计第 4.2 节写的是「分支是提问方这一轮里的一次旁支工作」，轮次只计主线会话的激活；此前投影对每一次激活都加一，页面上「第 N 轮」因一次询问多一轮，分支的激活还会占用 `harness/bounds.py` 的轮次上限
+
 solo-deepseek-v4.1-flash / 2026-10-25 21:35 / 工单 #894 事件载荷合同补上 definitions_changed：harness/app/payloads.py 新增 DefinitionsChangedRequested（九个字段与 orchestrator._await_definitions 写出的逐一对应）并加进 DecisionRequestedPayload，重新生成接口快照与客户端类型，harness/tests/test_issue_16_recovery.py 加两条经 decisions.list 与事件流读取的用例，新增 agents_jour/894.md / 升级以后继续旧事项时只要有这条请求，decisions.list 就构造不出来（DecisionView 报 48 个校验错误），首页「待你决定」读不出；payload_for_reading 也把两个定义版本字段丢掉
