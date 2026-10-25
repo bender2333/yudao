@@ -475,7 +475,8 @@
       // 时间线上正在演的动作：做它的小人做完主要的部分（进入收尾步骤，例如走回工位）就算演完，下一个动作可以接上
       runs.forEach((run, id) => {
         const a = run.actor;
-        if (!a || a.data.runId !== id || scene.inTail(a)) {
+        // 做它的小人被撤走（角色变了）时也算演完
+        if (!a || !scene.actors.includes(a) || a.data.runId !== id || scene.inTail(a)) {
           runs.delete(id);
           tl.done(id);
           // 演的时候到达的进度，演完以后接上最近的一项

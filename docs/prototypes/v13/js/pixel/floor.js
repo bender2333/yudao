@@ -494,7 +494,7 @@
       },
       begin(e) {
         const run = {
-          id: e.id, action: e.action, ms: e.ms, dead: false, alive: () => !run.dead,
+          id: e.id, action: e.action, ms: e.ms, lanes: e.lanes, dead: false, alive: () => !run.dead,
           finish: () => { if (!run.dead && runs.has(e.id)) { runs.delete(e.id); tl.done(e.id); } }
         };
         runs.set(e.id, run);
@@ -1346,6 +1346,8 @@
       }
       if (m.focus_id !== undefined && focusId === null) focusId = m.focus_id;
       syncWorkers();
+      // 角色被撤走（状态里的角色变了，例如事项完成）：用到它们的动作不会再演完，时间线不再等它们
+      runs.forEach((run) => { if (run.lanes.some((l) => l.indexOf('room:') !== 0 && !world.characters[l])) run.finish(); });
       // 整层静止（中断）时，演到一半的动作停在原处，时间线不再等它们；自动继续以后画面接着动起来
       if (model.interrupted && !scene.frozen) Array.from(runs.values()).forEach((run) => run.finish());
       scene.frozen = Boolean(model.interrupted);

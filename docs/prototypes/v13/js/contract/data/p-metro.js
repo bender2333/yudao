@@ -1250,7 +1250,7 @@
           { delay: 1200, go: '#/p/p-metro/overview', label: '工程与质检同时在工作；下一步一下子到达三十多条事件。打开工具条的「节奏」看画面落后几秒' },
           { delay: 4000, go: '#/p/p-metro/overview', label: '第一批：工程连续调用工具、分派与审查，质检起草测试用例，中间夹着一次询问与回答和一次交付', burst: BURST_FIRST },
           { delay: 9000, go: '#/p/p-metro/overview', label: '第一批还没演完，第二批又到：质检检查交付、记下缺陷记录，工程修复以后再交付，质检放行', burst: BURST_SECOND },
-          { delay: 1200, go: '#/p/p-metro/overview', label: '画面最多落后 5 秒：普通动作丢掉，关键动作缩短，同一个角色连续的同类动作合并；最后显示的是最新的状态' }
+          { delay: 1200, go: '#/p/p-metro/overview', label: '画面最多落后 5 秒：普通动作丢掉，关键动作缩短并加快演完；最后显示的是最新的状态。节奏面板的读数里看丢掉、缩短、加快演完各几次，落后最多几秒' }
         ]
       },
       {

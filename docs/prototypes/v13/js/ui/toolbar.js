@@ -134,7 +134,7 @@
       const t = sc.inspect().timeline;
       const s = t.stats;
       return '落后 ' + (t.lag / 1000).toFixed(1) + ' 秒（最多 ' + (s.maxLag / 1000).toFixed(1) + '）· 排着 ' + t.queued + ' · 在演 ' + t.playing.length +
-        ' · 丢掉 ' + s.dropped + ' · 合并 ' + s.merged + ' · 缩短 ' + s.shortened + ' · 强制 ' + s.forced;
+        ' · 丢掉 ' + s.dropped + ' · 合并 ' + s.merged + ' · 缩短 ' + s.shortened + ' · 加快演完 ' + s.rushed + ' · 强制 ' + s.forced + ' · 现在 ' + t.rate.toFixed(1) + ' 倍';
     }).join('　|　');
   }
 

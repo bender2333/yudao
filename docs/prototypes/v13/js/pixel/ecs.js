@@ -317,7 +317,8 @@
     return to && to !== ch ? to : null;
   };
 
-  // 时间线截断一个动作：它在各个角色队列里的步骤与沿管道走的包裹立刻去掉，不再执行做完以后的效果
+  // 时间线立刻结束一个动作（普通动作到了上限，或跳到最新）：它在各个角色队列里的步骤与沿管道走的包裹立刻去掉，不再执行做完以后的效果。
+  // 关键动作不走这里，它们限时演完（timeline.js 的 rate()）
   ECS.dropAction = function dropAction(world, actionId) {
     Object.values(world.characters).forEach((ch) => {
       if (ch.current && ch.current.actionId === actionId) ch.current = null;

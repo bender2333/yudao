@@ -1,12 +1,17 @@
-// 回放比较：把 record.js 在 v12 上录下的楼层画面调用，按确定的时钟回放给 v12 与 v13 的项目楼层画面，
-// 在「静止检查点」（事件播完、静置一段时间以后）比较整张 canvas 的像素与小人的位置姿势。
-// 时钟、随机数与动画相位都固定，同一串调用下两版应当得到完全相同的画面。
-// v13 的画面只认画面合同：录到的 floorModel 与事件经过真正的翻译层（js/translate/）再交给它，
-// 状态等它之前的动作演完才上画面，所以检查点放在静置 14 秒以后，动作都演完了。
+// 回放比较：把 record.js 在 v12 上录下的楼层画面调用，按确定的时钟回放给 v12 与 v13 的项目楼层画面，截取检查点。
+// 时钟、随机数与小人的动画计时都固定。v13 的画面只认画面合同：录到的 floorModel 与事件经过真正的翻译层（js/translate/）再交给它。
 //
-// 用法：node docs/prototypes/v13/checks/replay.js [--v13 <index.html 的 file:// 地址>] [--only 场景编号,场景编号] [--mode step|burst] [--keep 4]
-// 先运行 record.js 生成 .tmp/v13-checks/recordings.json；有差异的检查点会把 v12、v13 与差异图存进 .tmp/v13-checks/replay/。
-// step：每个事件之后静置 14 秒再比较；burst：事件连续播放，只在最后静置以后比较；--reduced：系统设置为减少动画。
+// 两类检查点：
+// - 每段录制的最后一个（事件播完，静置 14 秒，时间线放空）：整张 canvas 逐像素、逐个小人（位置、姿势、图标……）与 v12 比较，事实层不应该变。
+// - 中间的（每个事件之后：事件刚演的时候、静置以后）：v12 没有播放时间线，演的时间不同，不与 v12 比较，与 v13 自己的基线比较。
+//   基线存在 .tmp/v13-checks/replay-golden/，改动画面或播放规则、看过差异图确认以后用 --rebaseline 重新生成。
+//   中间检查点里静置以后的，与 v12 相同的个数只统计，不判定。
+//
+// 用法：node docs/prototypes/v13/checks/replay.js [--v13 <index.html 的 file:// 地址>] [--only 场景编号,场景编号] [--mode step|burst]
+//   [--recs 录制文件名] [--rebaseline] [--keep 4] [--reduced] [--free-anim]
+// 先运行 record.js 生成 .tmp/v13-checks/recordings.json；有差异的检查点会把两边的画面与差异图存进 .tmp/v13-checks/replay/。
+// step：每个事件之后截取；burst：事件连续播放，只在最后截取；--reduced：系统设置为减少动画；
+// --free-anim：不固定小人的动画计时，用来看差异是否只来自动画相位（小人状态里的 phase 字段）。
 const fs = require('fs');
 const path = require('path');
 const { chromium, EXE, v12Url, v13Url, outDir, spaceOf } = require('./env');
@@ -18,15 +23,21 @@ const ONLY = arg('only', '') ? arg('only').split(',') : null;
 const MODE = arg('mode', 'step');
 const KEEP = Number(arg('keep', 4));
 const REDUCED = process.argv.includes('--reduced');
+const REBASE = process.argv.includes('--rebaseline');
+const FREE = process.argv.includes('--free-anim');
+if (REBASE && FREE) throw new Error('--rebaseline 与 --free-anim 不能一起用');
 const OUT = path.join(outDir, 'replay');
+const GOLDEN = path.join(outDir, 'replay-golden');
 fs.mkdirSync(OUT, { recursive: true });
+fs.mkdirSync(GOLDEN, { recursive: true });
 
-const recordings = JSON.parse(fs.readFileSync(path.join(outDir, 'recordings.json'), 'utf8'))
+const recordings = JSON.parse(fs.readFileSync(path.join(outDir, arg('recs', 'recordings.json')), 'utf8'))
   .filter((r) => !ONLY || ONLY.includes(r.id));
 
 // 在页面里运行的回放驱动
-const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space }) => {
+const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space, freeAnim }) => {
   const P = window[space].pixel;
+  window.__freeAnim = freeAnim;
   // 确定的时钟与随机数
   let t = 0;
   const q = [];
@@ -82,11 +93,14 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space }) =>
       if (firstState) { f.jump(s); firstState = false; } else f.setState(s);
       f.setDecisions(model.decisions || []);
     };
+    // 询问与回答在 v12 里是页面派生的 collaboration_requested、collaboration_responded，v13 的翻译层认原始事件 ask_started、ask_answered，载荷相同
+    const RAW = { collaboration_requested: 'ask_started', collaboration_responded: 'ask_answered' };
     f.playEvent = (ev) => {
-      if (ev.type === 'transition' || /^collaboration_/.test(ev.type)) return;
-      const s = T.stream(ev);
+      if (ev.type === 'transition' || ev.type === 'collaboration_closed') return;
+      const raw = RAW[ev.type] ? Object.assign({}, ev, { type: RAW[ev.type] }) : ev;
+      const s = T.stream(raw);
       if (s) f.stream(s.who, s.text);
-      T.floor.actions(Object.assign({ position: ++pos }, ev), names).forEach((a) => f.play(a));
+      T.floor.actions(Object.assign({ position: ++pos }, raw), names).forEach((a) => f.play(a));
     };
     const setOverlay = f.setOverlay;
     // 覆盖层的取值在录制里是 v12 页面拼好的形状，这里换成合同里的形状
@@ -106,19 +120,21 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space }) =>
   const cps = [];
   let failure = null;
 
-  function shoot(label) {
+  // kind：play（事件刚演的时候）、settled（静置以后，时间线放空）、end（这段录制的最后一个）
+  function shoot(label, kind) {
     const sc = fl.scene;
     const workers = sc.actors.filter(isWorker).sort((a, b) => (a.sprite < b.sprite ? -1 : 1));
     const state = workers.map((a) => ({
       sprite: a.sprite, x: Math.round(a.x * 100) / 100, y: Math.round(a.y * 100) / 100, seat: Boolean(a.seat), anim: a.anim,
       facing: a.facing, icon: a.icon ? { kind: a.icon.kind, text: a.icon.text || null } : null,
-      visible: a.visible, dim: a.dim, hold: a.hold || null, sign: a.sign || null, script: Boolean(a.script)
+      visible: a.visible, dim: a.dim, hold: a.hold || null, sign: a.sign || null, script: Boolean(a.script),
+      phase: window.__freeAnim ? Math.round(a.clock - a.animStart) : null, clock: window.__freeAnim ? Math.round(a.clock) : null
     }));
     // 固定动画相位：小人的动画计时与场景的动画时钟在两版里取同一个值
-    workers.forEach((a, i) => { a.clock = 5000; a.animStart = 0; a.seed = 100 + i; });
+    if (!window.__freeAnim) workers.forEach((a, i) => { a.clock = 5000; a.animStart = 0; a.seed = 100 + i; });
     sc.animT = 20000;
     sc.drawNow();
-    cps.push({ label, state, png: canvas.toDataURL('image/png'), t, frozen: Boolean(sc.frozen) });
+    cps.push({ label, kind, state, png: canvas.toDataURL('image/png'), t, frozen: Boolean(sc.frozen) });
   }
 
   try {
@@ -136,15 +152,17 @@ const DRIVER = async ({ ops, mode, DT, SETTLE, GAP_EVENT, GAP_OTHER, space }) =>
       step(o.op === 'playEvent' ? GAP_EVENT : GAP_OTHER);
       const nextOp = ops[i + 1] && ops[i + 1].op;
       const endOfRefresh = o.op === 'setOverlay' && nextOp !== 'focus';
-      if (endOfRefresh && first) { step(SETTLE); shoot('初始 #' + i); first = false; sinceCheckpoint = 0; }
+      if (endOfRefresh && first) { step(SETTLE); shoot('初始 #' + i, 'settled'); first = false; sinceCheckpoint = 0; }
       else if (endOfRefresh && mode === 'step' && sinceCheckpoint > 0) {
         const lastEv = [...ops.slice(0, i + 1)].reverse().find((x) => x.op === 'playEvent');
+        const type = lastEv ? lastEv.arg.type : '?';
+        shoot('播放中 ' + type + ' #' + i, 'play');
         step(SETTLE);
-        shoot('事件 ' + (lastEv ? lastEv.arg.type : '?') + ' #' + i);
+        shoot('事件 ' + type + ' #' + i, 'settled');
         sinceCheckpoint = 0;
       }
     }
-    if (fl) { step(SETTLE); shoot('结束'); }
+    if (fl) { step(SETTLE); shoot('结束', 'end'); }
   } catch (e) {
     failure = String((e && e.stack) || e).slice(0, 600);
   }
@@ -162,7 +180,7 @@ async function version(browser, root, rec) {
   await page.goto(root + '#/sys/machines');
   await page.waitForTimeout(700);
   const res = await page.evaluate(DRIVER, {
-    ops: rec.ops, mode: MODE, DT: 50, SETTLE: 14000, GAP_EVENT: 900, GAP_OTHER: 50, space: ns
+    ops: rec.ops, mode: MODE, DT: 50, SETTLE: 14000, GAP_EVENT: 900, GAP_OTHER: 50, space: ns, freeAnim: FREE
   });
   await ctx.close();
   return Object.assign(res, { errors });
@@ -210,62 +228,112 @@ const save = (name, dataUrl) => fs.writeFileSync(path.join(OUT, name), Buffer.fr
   const cmp = await browser.newPage();
   await cmp.goto('about:blank');
   const summary = [];
+  // 比较两个检查点：像素（整层中断时小人停在中断前的位置，只比较小人以外的部分）与小人的状态（逐个小人逐个字段）
+  async function compare(A, B) {
+    const frozen = A.frozen || B.frozen;
+    const boxes = frozen ? A.state.concat(B.state).map((s) => [Math.round(s.x) - 40, Math.round(s.y) - 72, Math.round(s.x) + 40, Math.round(s.y) + 8]) : null;
+    const d = await diff(cmp, A.png, B.png, boxes);
+    const fields = [];
+    const keys = new Set();
+    if (!frozen) {
+      A.state.forEach((s, k) => {
+        const u = B.state[k] || {};
+        Object.keys(s).forEach((key) => { if (JSON.stringify(s[key]) !== JSON.stringify(u[key])) { keys.add(key); fields.push(s.sprite + '.' + key + ' ' + JSON.stringify(s[key]) + ' → ' + JSON.stringify(u[key])); } });
+      });
+      if (A.state.length !== B.state.length) { keys.add('小人数量'); fields.push('小人数量 ' + A.state.length + ' → ' + B.state.length); }
+    }
+    return { frozen, d, fields, keys };
+  }
+  // 与 v12 有差异的检查点：哪些小人字段不同的次数，以及只有像素不同、小人字段全部相同的个数
+  const tallyV12 = (row, r) => {
+    if (!r.fields.length && r.d.count === 0) return;
+    row.v12Diff = row.v12Diff || { checkpoints: 0, pixelOnly: 0, keys: {} };
+    row.v12Diff.checkpoints++;
+    if (!r.fields.length) row.v12Diff.pixelOnly++;
+    r.keys.forEach((k) => { row.v12Diff.keys[k] = (row.v12Diff.keys[k] || 0) + 1; });
+  };
+  let kept = 0;
   async function runOne(rec) {
     const a = await version(browser, V12, rec);
     const b = await version(browser, V13, rec);
-    const row = { id: rec.id, checkpoints: a.cps.length, pixelDiff: 0, stateDiff: 0, v12fail: a.failure, v13fail: b.failure,
-      v12errors: a.errors.length, v13errors: b.errors.length, ecs: b.counts, notes: [] };
-    if (a.cps.length !== b.cps.length) row.notes.push('检查点数量不同 ' + a.cps.length + ' / ' + b.cps.length);
-    const n = Math.min(a.cps.length, b.cps.length);
-    let kept = 0;
-    for (let i = 0; i < n; i++) {
-      const A = a.cps[i], B = b.cps[i];
-      // 整层中断（画面静止）时，小人停在中断前正在做的动作的位置：不比较小人的状态，像素只比较小人以外的部分
-      const frozen = A.frozen || B.frozen;
-      const boxes = frozen ? A.state.concat(B.state).map((s) => [Math.round(s.x) - 40, Math.round(s.y) - 72, Math.round(s.x) + 40, Math.round(s.y) + 8]) : null;
-      if (frozen) row.frozenCheckpoints = (row.frozenCheckpoints || 0) + 1;
-      const d = await diff(cmp, A.png, B.png, boxes);
-      const stateSame = frozen || JSON.stringify(A.state) === JSON.stringify(B.state);
-      if (!stateSame) {
-        row.stateDiff++;
-        // 逐个小人逐个字段列出差异
-        const fields = [];
-        A.state.forEach((s, k) => {
-          const u = B.state[k] || {};
-          Object.keys(s).forEach((key) => { if (JSON.stringify(s[key]) !== JSON.stringify(u[key])) fields.push(s.sprite + '.' + key + ' ' + JSON.stringify(s[key]) + ' → ' + JSON.stringify(u[key])); });
-        });
-        if (A.state.length !== B.state.length) fields.push('小人数量 ' + A.state.length + ' → ' + B.state.length);
-        if (row.notes.length < 6) row.notes.push('[小人] ' + A.label + ' ' + fields.join('；'));
+    const row = { id: rec.id, checkpoints: b.cps.length, endPixel: 0, endState: 0, goldPixel: 0, goldState: 0, settledSameAsV12: 0, settled: 0,
+      v12fail: a.failure, v13fail: b.failure, v12errors: a.errors.length, v13errors: b.errors.length, ecs: b.counts, notes: [] };
+    const note = (s) => { if (row.notes.length < 8) row.notes.push(s); };
+    const keep = (tag, X, Y, d, nameX, nameY) => {
+      if (kept >= KEEP || !d.png) return;
+      kept++;
+      save(tag + '-' + nameX + '.png', X.png); save(tag + '-' + nameY + '.png', Y.png); save(tag + '-diff.png', d.png);
+    };
+    if (a.cps.length !== b.cps.length) { row.endState++; note('检查点数量不同 ' + a.cps.length + ' / ' + b.cps.length); return row; }
+    const ends = a.cps.map((c, i) => i).filter((i) => a.cps[i].kind === 'end');
+    if (ends.length !== 1 || ends[0] !== a.cps.length - 1) { row.endState++; note('没有取到这段录制的最后一个检查点'); return row; }
+    // 1. 最后一个检查点：对 v12
+    {
+      const i = ends[0];
+      const r = await compare(a.cps[i], b.cps[i]);
+      if (r.frozen) row.frozenEnd = true;
+      tallyV12(row, r);
+      if (r.fields.length) { row.endState++; note('[结束 小人] ' + r.fields.join('；')); }
+      if (r.d.count !== 0) {
+        row.endPixel++;
+        note('[结束 像素] 差异 ' + r.d.count + ' 个像素 ' + (r.d.bbox ? JSON.stringify(r.d.bbox) : JSON.stringify(r.d.size)));
+        keep(rec.id + '-end', a.cps[i], b.cps[i], r.d, 'v12', 'v13');
       }
-      if (d.count !== 0) {
-        row.pixelDiff++;
-        if (row.notes.length < 6) row.notes.push('[像素] ' + A.label + ' 差异 ' + d.count + ' 个像素 ' + (d.bbox ? JSON.stringify(d.bbox) : JSON.stringify(d.size)));
-        if (kept < KEEP && d.png) {
-          kept++;
-          const tag = rec.id + '-' + String(i).padStart(2, '0');
-          save(tag + '-v12.png', A.png); save(tag + '-v13.png', B.png); save(tag + '-diff.png', d.png);
+    }
+    // 2. 中间的检查点：对 v13 自己的基线；静置以后的另外统计与 v12 是否相同
+    const mids = b.cps.filter((c) => c.kind !== 'end');
+    const goldPath = path.join(GOLDEN, rec.id + '.json');
+    if (FREE) {
+      // 不固定动画计时时只统计与 v12 的差异，不比较基线
+    } else if (REBASE) {
+      if (row.endPixel || row.endState) { note('最后一个检查点与 v12 有差异，不更新基线'); return row; }
+      fs.writeFileSync(goldPath, JSON.stringify(mids.map(({ label, kind, state, png, frozen }) => ({ label, kind, state, png, frozen }))));
+      row.rebaselined = mids.length;
+    } else {
+      if (!fs.existsSync(goldPath)) throw new Error('没有基线 ' + goldPath + '，先运行 --rebaseline');
+      const gold = JSON.parse(fs.readFileSync(goldPath, 'utf8'));
+      if (gold.length !== mids.length || gold.some((g, i) => g.label !== mids[i].label)) { row.goldState++; note('中间检查点与基线的数量或标签不同 ' + mids.length + ' / ' + gold.length); }
+      else {
+        for (let i = 0; i < mids.length; i++) {
+          const r = await compare(gold[i], mids[i]);
+          if (r.fields.length) { row.goldState++; note('[基线 小人] ' + mids[i].label + ' ' + r.fields.join('；')); }
+          if (r.d.count !== 0) {
+            row.goldPixel++;
+            note('[基线 像素] ' + mids[i].label + ' 差异 ' + r.d.count + ' 个像素 ' + (r.d.bbox ? JSON.stringify(r.d.bbox) : JSON.stringify(r.d.size)));
+            keep(rec.id + '-' + String(i).padStart(2, '0'), gold[i], mids[i], r.d, 'baseline', 'now');
+          }
         }
       }
+    }
+    // 静置以后的中间检查点与 v12 相同的个数（a.cps 与 b.cps 的检查点一一对应）
+    for (let i = 0; i < b.cps.length; i++) {
+      if (b.cps[i].kind !== 'settled') continue;
+      row.settled++;
+      const r = await compare(a.cps[i], b.cps[i]);
+      tallyV12(row, r);
+      if (!r.fields.length && r.d.count === 0) row.settledSameAsV12++;
+      else if (r.fields.length) { if (FREE) note('[静置 小人] ' + b.cps[i].label + ' ' + r.fields.slice(0, 3).join('；')); }
+      // 小人的字段都相同，只有像素不同：要看差异图
+      else { note('[静置 只有像素不同] ' + b.cps[i].label + ' 差异 ' + r.d.count + ' 个像素 ' + (r.d.bbox ? JSON.stringify(r.d.bbox) : JSON.stringify(r.d.size))); keep(rec.id + '-settled-' + String(i).padStart(2, '0'), a.cps[i], b.cps[i], r.d, 'v12', 'v13'); }
     }
     return row;
   }
   for (const rec of recordings) {
-    let row = await runOne(rec);
-    // 机器负载高时偶尔出现几个像素的随机差异：重跑一次，重跑相同就不算差异（备注里保留第一次的情况）
-    if (row.pixelDiff || row.stateDiff) {
-      const again = await runOne(rec);
-      if (!again.pixelDiff && !again.stateDiff) {
-        again.notes.push('第一次运行有差异（' + row.pixelDiff + ' 个检查点的像素、' + row.stateDiff + ' 个检查点的小人），重跑相同');
-        again.retried = true;
-        row = again;
-      }
-    }
+    const row = await runOne(rec);
     summary.push(row);
     console.log(JSON.stringify(row));
   }
   await browser.close();
-  const bad = summary.filter((r) => r.pixelDiff || r.stateDiff || r.v12fail || r.v13fail || r.v12errors || r.v13errors);
-  console.log(JSON.stringify({ recordings: summary.length, checkpoints: summary.reduce((s, r) => s + r.checkpoints, 0), badRecordings: bad.length, pixelDiff: summary.reduce((s, r) => s + r.pixelDiff, 0), stateDiff: summary.reduce((s, r) => s + r.stateDiff, 0) }));
+  const sum = (k) => summary.reduce((s, r) => s + (r[k] || 0), 0);
+  const bad = summary.filter((r) => r.endPixel || r.endState || r.goldPixel || r.goldState || r.v12fail || r.v13fail || r.v12errors || r.v13errors);
+  console.log(JSON.stringify({ recordings: summary.length, checkpoints: sum('checkpoints'), badRecordings: bad.length, endPixel: sum('endPixel'), endState: sum('endState'),
+    goldPixel: sum('goldPixel'), goldState: sum('goldState'), settled: sum('settled'), settledSameAsV12: sum('settledSameAsV12'), rebaselined: sum('rebaselined'),
+    v12Diff: summary.reduce((m, r) => {
+      if (!r.v12Diff) return m;
+      m.checkpoints += r.v12Diff.checkpoints; m.pixelOnly += r.v12Diff.pixelOnly;
+      Object.keys(r.v12Diff.keys).forEach((k) => { m.keys[k] = (m.keys[k] || 0) + r.v12Diff.keys[k]; });
+      return m;
+    }, { checkpoints: 0, pixelOnly: 0, keys: {} }) }));
   console.log(bad.length ? 'RESULT: DIFF' : 'RESULT: PASS');
   process.exit(bad.length ? 1 : 0);
 })();

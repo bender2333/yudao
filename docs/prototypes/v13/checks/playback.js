@@ -288,16 +288,17 @@ const DRIVER = async () => {
   await fresh.close();
 
   // ---------------------------------------------------------------- 页面上的两个新场景（真实时钟）
-  const play = async (id, tail) => {
+  const play = async (id, tail, settings) => {
     const p = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     p.on('pageerror', (e) => errors.push(String((e && e.stack) || e).slice(0, 300)));
     await p.addInitScript(() => sessionStorage.setItem('y13.level', JSON.stringify('S5')));
     await p.goto(v13Url + '#/p/p-metro/overview');
     await p.waitForTimeout(1200);
-    const r = await p.evaluate(async ({ sid, tail: wait }) => {
+    const r = await p.evaluate(async ({ sid, tail: wait, settings: set }) => {
       const Y = window.Y13;
       const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+      if (set) Object.assign(Y.pixel.timeline.settings, set);
       Y.scenario.select(sid);
       await sleep(600);
       const total = Y.scenario.current().steps.length;
@@ -315,10 +316,17 @@ const DRIVER = async () => {
       const tl = fl().inspect().timeline;
       const s = Y.pixel.timeline.settings;
       return { total, trace, tl, lagMs: s.lagMs, hidden: Boolean(Y.pixel.hidden) };
-    }, { sid: id, tail });
+    }, { sid: id, tail, settings });
     await p.close();
     return r;
   };
+  {
+    // 极端的设置：落后上限 1 秒、最短时长 1 秒、倍率 3，到了上限时堆积的动作里有做它的角色被撤走的（事项完成以后角色表变了）
+    const r = await play('sc-metro-burst', 40000, { lagMs: 1000, minMs: 1000, speed: 3 });
+    const st = r.tl.stats;
+    check('页面 场景 24 在极端设置下：到了上限强制上画面', st.forced > 0, JSON.stringify(st));
+    check('页面 场景 24 在极端设置下：关键动作不截断，限时的都在限定的时间内演完，播完以后时间线清空', st.cutKey === 0 && st.late === 0 && st.droppedKey === 0 && !r.tl.pending && !r.tl.queued && !r.tl.playing.length, JSON.stringify(r.tl));
+  }
   {
     const r = await play('sc-metro-burst', 14000);
     const st = r.tl.stats;

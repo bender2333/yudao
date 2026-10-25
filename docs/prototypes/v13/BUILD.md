@@ -10,7 +10,7 @@
 
 | 脚本 | 内容 |
 | --- | --- |
-| `js/pixel/timeline.js` | 播放时间线：`P.timeline.create`、`P.timeline.settings`（落后上限、最短时长、倍率） |
+| `js/pixel/timeline.js` | 播放时间线：`P.timeline.create`（含 `rate()`：限时演完的关键动作要求画面时间加快的倍率）、`P.timeline.settings`（落后上限、最短时长、倍率） |
 | `js/pixel/contract.js` | 画面合同的取值表与校验：`P.contract` |
 | `js/pixel/say.js` | 只管怎么画气泡（说什么由翻译层写） |
 | `js/pixel/floor-decl.js`、`room-decl.js`、`building-decl.js` | 三张声明表：级别与最短时长 |
@@ -29,7 +29,9 @@
 
 v12 的 `setModel`、`playEvent` 删除。`opts` 的回调：`onDecide`、`onGo`、`onDoorClick`、`onSeek`、`describe(position)`（来源卡片的事件说明，代替 v12 的 `fetchEvent`）、`onFloorClick`、`onMachineClick`。
 
-`ecs.js`：`ECS.enqueue` 不再有队列上限与 `front`、`must`；`ECS.dispatch(world, action, make)` 吃画面合同的动作；新增 `ECS.doerOf`、`ECS.peerOf`、`ECS.dropAction`（时间线截断一个动作时去掉它的任务与包裹）、`ECS.progressOf`；`world.catalog` 不再有 `keyOf`。
+`ecs.js`：`ECS.enqueue` 不再有队列上限与 `front`、`must`；`ECS.dispatch(world, action, make)` 吃画面合同的动作；新增 `ECS.doerOf`、`ECS.peerOf`、`ECS.dropAction`（时间线立刻结束一个普通动作或跳到最新时去掉它的任务与包裹）、`ECS.progressOf`；`world.catalog` 不再有 `keyOf`。
+
+`engine.js`：场景多了 `scene.wallT`（真实经过的时间，三个场景的播放时间线用它做时钟）与 `scene.rate`（画面时间相对真实时间的倍率，默认 1，楼层与房间每帧取 `tl.rate()`）；每帧把画面时间分成不超过 50 毫秒的小段推进，倍率为 1 时与原来相同。
 
 页面一侧（`js/ui/scenes.js`）：`mountBuilding`、`mountMachineRoom`、`mountFloor`、`mountRoom`；`buildingStates(at)`；`panels()`。`pixelEvents`、`playOn`、`buildingModels` 删除。`js/ui/app.js` 收到事件时先交给页面的画面（事件翻成动作，进时间线），再按事件刷新查询。
 
@@ -56,6 +58,7 @@ v12 的 `setModel`、`playEvent` 删除。`opts` 的回调：`onDecide`、`onGo`
 | `playback.js` | H3（画面层不导入 Yudao 的代码）、翻译覆盖、三个场景的 H8 与 H9、调节面板、状态等动作、实时内容不等、跳到最新、页面上的场景 24 与 25 |
 | `scenarios.js` | 二十五个场景全部按步骤播到最后一步，零错误 |
 | `behaviors.js` | 沿用 v12 的全部检查，调用形状改为经过翻译层的画面合同（检查文件里的适配函数 `adaptFloor`、`adaptRoom`、`adaptBuilding`） |
-| `record.js` + `replay.js` | 在 v12 上录制，回放给 v12 与 v13（v13 经翻译层），每个检查点逐像素相同。**当前未通过**，见 design.md 第 9 节 |
+| `record.js` + `replay.js` | 在 v12 上录制，回放给 v12 与 v13（v13 经翻译层），时钟与小人的动画计时固定。每段录制的最后一个检查点（时间线放空以后）与 v12 逐像素、逐个小人相同；中间的检查点（事件刚演的时候、静置以后）与 v13 自己的基线（`.tmp/v13-checks/replay-golden/`，`--rebaseline` 生成）相同。`--free-anim` 不固定动画计时，用来看与 v12 的差异是否只在动画相位 |
 | `identity-building.js`、`walkers.js` | 楼与机房与 v9 逐像素相同；楼里小人的走位 |
 | `matrix-home.js`、`matrix-floor.js` | 照旧，零错误、没有横向溢出 |
+| `life.js`、`sheets.js` | 事件过程的截图联系表与截图联系表：`life.js` 默认对 v13 回放（录制的查询结果与事件经翻译层再交给画面），`--root` 指向 v12 时用 v12 的调用形状；零页面错误 |
