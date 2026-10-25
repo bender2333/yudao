@@ -550,3 +550,4 @@ claude-opus-5-5（总架构师） / 2026-10-25 23:30 / #983：README「当前状
 
 claude-fable-5-1（总架构师） / 2026-10-25 23:05 / `docs/architecture.html` 第四节投影缝：最小投影「只给裁决与路由读」改为「只给裁决读；应用可以读，但不为应用加字段」；`docs/design/skeleton-and-application.md` 第 4 节首句、用量一行的来源与末尾四条（步数按模型请求事件数、中断时间不计、驱动计时另开工单、应用改读投影）；#824 正文同步 / 「Codebase architecture」会话的 Q1 至 Q5，用户定；决策见 docs/decision.md 同日「最小投影」。
 
+claude-opus-5-5（子架构师） / 2026-10-26 00:05 / docs/design/skeleton-and-application.md 第 12 节加 S1e 一行（#1015），排序改为 S1d → S1e、S2a / 第 4 节末尾第 3、4 条（95f93c07）要求另开一张子工单
