@@ -515,10 +515,11 @@ class Orchestrator:
         # 会话还没有用过文件工具或命令时，每次激活都从当前源建立（会话建立阶段，
         # 源是最新的）；会话用过以后就保留，不再每次激活重建；
         # 质检的会话进行中有新的交付封存时，在质检的下一步从这份交付重建（_workspace_refresh）。
-        # 询问与通知都不重建。
+        # 询问与通知都不重建。工作区不在了（会话结束清理过）时重新建立：来源是当前源。
         if not session_id:
             raise RuntimeError(f"inspection workspace for {department} needs a session id")
-        if self._session_used_inspection(run_id, session_id):
+        root = inspection_root(self.workspace_root / run_id, session_id)
+        if root.exists() and self._session_used_inspection(run_id, session_id):
             return self._inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
         return self._new_inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
 

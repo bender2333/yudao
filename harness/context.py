@@ -106,7 +106,6 @@ def work_notifications(projection: RunProjection, events: list[Any] | None, depa
                 "kind": "delivery_arrived",
                 "revision": delivery.revision,
                 "content_hash": delivery.content_hash,
-                "summary": delivery.summary,
                 "files": delivery.files,
                 "product_spec_hash": delivery.product_spec_hash,
             })
@@ -120,7 +119,8 @@ def _notification_text(item: dict[str, Any]) -> str:
         detail = f"；改动：{'；'.join(changed)}" if changed else ""
         return (f"产品要求有了新版本 r{item['revision']}{detail}。"
                 "这份要求现在有效，已经做的工作还算不算数由你自己判断，接着当前工作。")
-    return (f"新的交付到达了（r{item['revision']}，{item.get('summary') or ''}）。"
+    # 交付到达的通知只给事实部分（工单 #554）：交付说明里的解释部分在质检下结论以前不给
+    return (f"新的交付到达了（r{item['revision']}，{len(item.get('files') or [])} 个文件）。"
             "检查工作区已经从这份交付重建，交付之前写的测试材料仍然在；接着当前工作。")
 
 
