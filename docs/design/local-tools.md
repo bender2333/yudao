@@ -49,7 +49,7 @@
 - 搜索使用 ripgrep，声明为运行前置并验证平台可用性，不静默改用另一套语义。
 - bash 是执行位置上的运行前置：Linux 使用系统的 bash；Windows 使用 Git for Windows 的 bash，查找顺序参照 OMP（oh-my-pi@e3106be，`packages/utils/src/procmgr.ts:135-180`：Git 的安装目录，然后是 PATH 上的 `bash.exe`）。找不到时工具结果写明原因，不改用 cmd 或 PowerShell。git 本来就是执行位置上的必需程序（执行环境服务设计说明第 5.2 节），Windows 上安装 Git for Windows 时同时带有 bash。
 - 后台运行与时限的做法参照 OMP 的 bash 工具（`packages/coding-agent/src/tools/bash.ts:335`、`:900-1000` 的 `async` 参数与任务管理，`packages/coding-agent/src/tools/tool-timeouts.ts:11` 的缺省 300 秒、最长 3600 秒）。
-- 网络取回由 3.2B 使用已有的 HTTPX；MCP 使用官方 Python SDK，不自写协议客户端。模型调用使用官方 OpenAI SDK 与统一 Provider 模块（[Provider 层设计](provider-layer.md)）。
+- 网络取回由 3.2B 使用已有的 HTTPX；MCP 使用官方 Python SDK，不自写协议客户端。模型调用使用官方 OpenAI SDK 与统一 Provider 模块（[模型管理设计说明](model-management.md)第 13 节）。
 - 进程超时不等于整棵进程树已经停止。Windows 和 POSIX 分别验证，使用成熟的进程管理能力；尚未验证的平台不标为支持。
 - OMP 的工具与会话审查用作接口和证据模式的参考，不引入 OMP 运行时接管 Yudao 的部门循环。
 

@@ -31,7 +31,7 @@
   - 状态：2026-10-07 设计，用户已确认，未实施。工单：B5（M4）、#151、#149、3.9（#100）、Stage 5。
   - 需求：[D38](../requirements/system-intent.md)、[D32](../requirements/comparison-experiment.md)。ADR：[0029](../adr/0029-departments-form-by-information-cohesion.md)、[0028](../adr/0028-three-means-of-adjudication.md)。
 - [模型管理](model-management.md)
-  - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。
+  - 内容：模型目录、部门默认与项目部门设置、角色默认与项目角色设置、调用目标按每次请求解析、推理档位、压缩参数。第 13 节是 Provider 模块的统一调用、取消与观测（2026-10-25 由 Provider 设计说明并入，原文归档在 `docs/archive/design/provider-layer.md`）。
   - 状态：2026-09-24 设计已确认，未实施；2026-09-26 第 5 节增加角色层（ADR-0017），第 4.3、4.4、5.2 节写明架构师为建立工单作出的决定（容量预填的来源、连接测试的请求、fake 协议、影响列表的查询、项目部门设置的版本）。2026-09-29 D24 整体移入 Stage 3；增加模型能力表（models.dev 的快照）、模型访问定义的输入方式与部门的建议能力（第 4.1、4.3、5.6 节）。工单：#45（调用目标每次请求解析，3.1 之前，已完成），Stage 3 的工作包父工单 #83（子工单 #84 至 #96、#146），属于里程碑 M1。实施中：#84、#85 已完成。2026-10-07 按意图校准整理；同日 M1 试用以后，调用协议移到模型访问定义上（ADR-0033），自定义服务的模型列表地址默认取「地址/models」，加入模型时直接采用预填的容量并自动进行模型测试，修改内容见该文件更新行；工单为父工单 #371（#83 下）与子工单 #382 至 #386，属于里程碑 M1。
   - 需求：[D24](../requirements/model-management.md)。ADR：0002、0003、0005、0006、[0033](../adr/0033-protocol-belongs-to-model-access.md)、[0017](../adr/0017-role-settings-override-department.md)、[0028](../adr/0028-three-means-of-adjudication.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。
 - [本地通用工具](local-tools.md)
@@ -59,10 +59,6 @@
   - 内容：新建项目时带的起始文件夹：项目的起点（采纳成果、起始文件夹快照、空树）与三处共用的求法、`project.create` 的可选参数与 `project_registered` 的 `initial_snapshot`、事项从快照开始、界面与评测、失败与中断；含流程图与时序图。
   - 状态：2026-10-06 设计，用户同意，未实施。工单：挂在 #124 下，属于里程碑 M2。
   - 需求：[D37](../requirements/project-initial-files.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)。
-- [Provider 层](provider-layer.md)
-  - 内容：独立 Provider 模块的统一调用、服务方案、候选与准入、配置生效，含模块关系图。
-  - 状态：Stage 2.7 已实现。「冻结目标」等部分由模型管理设计取代，模块边界、统一调用、取消与观测部分继续有效；调用协议属于模型访问定义（ADR-0033）。
-  - 需求：[D22](../requirements/startup-provider-reload.md)、[D23](../requirements/provider-layer.md)。ADR：0001 至 0003、[0033](../adr/0033-protocol-belongs-to-model-access.md)。
 - [画面与播放设计说明](visualization.md)
   - 内容：像素画面的分层（服务端、同步层、翻译层、画面层）与依赖方向；画面合同（状态、动作、实时内容、回调）；声明表与动作的三级；播放时间线（状态等动作、落后上限与快进、跳到最新）；翻译层与事件覆盖核对；画面诚实性的不变式 H1 至 H9（由应用层与接口层第 5.8 节移来）；原型 v13 与客户端工单的范围。
   - 状态：2026-10-24 设计，用户已确认（[ADR-0043](../adr/0043-scene-contract-and-playback-belong-to-the-view.md)），未实施；先做原型 v13，客户端工单进里程碑 M0.5（「骨架与应用 · 画面」）。同日架构师补第 5.2 节：两种时间、时间线的流程图、迟到的动作（待 v13 核对）。

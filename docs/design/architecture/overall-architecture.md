@@ -28,7 +28,7 @@
 | 写入口 | 一切写入方 ↔ 内核 | 执行权、流版本、同一事务里的裁决 | 已有 | 已实施 | [可信内核](../trusted-kernel.md) |
 | 裁决 | 写入口 ↔ 裁决；路由 → 裁决（收紧检查） | 工具许可、合同的通用条件、收紧接口 | 已有；收紧新 | S1c（#859）、S1d（#860） | [骨架与应用](../skeleton-and-application.md)第 5.5 节 |
 | 最小投影 | 骨架事件 → 裁决、边界、薄驱动 | 固定的几样事实 | 新 | S1a（#824） | 同上第 4 节 |
-| 模型调用 | 执行实现 ↔ Provider | 调用目标、流式输出、用量 | 已有 | 已实施 | [模型管理](../model-management.md)、[Provider 层](../provider-layer.md) |
+| 模型调用 | 执行实现 ↔ Provider | 调用目标、流式输出、用量 | 已有 | 已实施 | [模型管理](../model-management.md)、模型管理第 13 节 |
 | 动作合同 | 执行实现 ↔ 工具 ↔ 执行环境 | 每类动作的契约与回执；远程经 HTTP | 已有；远程带版本 | 本机已实施；远程 M3（#120） | [执行环境服务](../execution-environment.md)、[本地通用工具](../local-tools.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器](../browser-and-computer-use.md) |
 | 接口合同 | 界面、命令行、评测 ↔ 接口层 | 命令、查询、事件流、能力清单 | 接口版本号 | 已实施（#619） | [应用层与接口层](../app-and-interface.md) |
 | 画面合同 | 翻译层 ↔ 画面层 | 状态、动作、实时内容、回调 | 设计 | M0.5 画面 | [画面与播放](../visualization.md) |
@@ -37,7 +37,7 @@
 | 健康协议 | 看门狗 ↔ 实例 | 心跳、冒烟、金丝雀 | 设计 | Stage 4 | [骨架与应用](../skeleton-and-application.md)第 10 节 |
 | 评价 | 评价材料 → 应用 | 只经接口层 | 不适用 | 运行器实施中；真实用户场景验收 S7（#830） | [评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md) |
 
-**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)第 10 节、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[验证的独立性](../independent-verification.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)、[Provider 层](../provider-layer.md)。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、界面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)、[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39 与 #836。
+**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)第 10 节、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[验证的独立性](../independent-verification.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)、模型管理第 13 节。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、界面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)、[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39 与 #836。
 
 ### 1.4 副图：职责分层
 

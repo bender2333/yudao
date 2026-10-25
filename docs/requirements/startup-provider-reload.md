@@ -126,7 +126,7 @@ flowchart TB
     Target --> Runtime
 ~~~
 
-Web 不持有另一个目录真相。模块关系和调用时序的完整说明见 [Provider 设计说明](../design/provider-layer.md)。
+Web 不持有另一个目录真相。模块关系和调用时序的完整说明见 [Provider 设计说明](../archive/design/provider-layer.md)（已归档；仍然有效的部分在[模型管理设计说明](../design/model-management.md)第 13 节）。
 
 ## 8. 验收标准（保留六条，扩充边界）
 

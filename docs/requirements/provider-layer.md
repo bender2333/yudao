@@ -12,7 +12,7 @@
 
 > 趁着这次的机会，我需要你补充下，provider设计说明，逻辑和交互说明，模块交互图。
 
-完整说明与图见 [Provider 设计说明](../design/provider-layer.md)，一手依据见 [OpenCode Go / OMP 研究](../archive/research/opencode-go-provider-integration.md)。
+完整说明与图见 [Provider 设计说明](../archive/design/provider-layer.md)（已归档；仍然有效的部分在[模型管理设计说明](../design/model-management.md)第 13 节），一手依据见 [OpenCode Go / OMP 研究](../archive/research/opencode-go-provider-integration.md)。
 
 ## 2. 产品结果
 
