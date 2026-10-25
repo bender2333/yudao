@@ -186,9 +186,12 @@ class ContextAssembler:
         # 质检请求里可以放入的工程内容（工单 #554）：事实部分总在，解释部分看质检有没有对当前交付下结论
         engineering = (quality_engineering_content(events or [], delivery=current_delivery)
                        if department == "quality" else None)
+        # 这个会话要回答的那一次询问：询问分支看自己那一次（一个部门可以同时有几个分支，工单 #559），
+        # 主线会话沿用询问链上最内层的那一次
+        pending_ask = projection.ask_by_branch(session_id) or projection.active_ask
         # 钉住材料顺序：intend → current_work → project（项目 run）→ department_guidance（有待处理指导）→ department_rules。
         notifications = work_notifications(projection, events, department, session_id)
-        current_work = _current_work(projection, department, engineering, notifications)
+        current_work = _current_work(projection, department, engineering, notifications, ask=pending_ask)
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
             ContextPart("current_work", _current_work_version(current_work),
@@ -282,8 +285,8 @@ class ContextAssembler:
         if projection.effective_contract is not None:
             parts.append(ContextPart("current_contract", projection.effective_contract.content_hash,
                                      json_dumps(projection.effective_contract)))
-        if projection.active_ask is not None:
-            ask = projection.active_ask
+        if pending_ask is not None:
+            ask = pending_ask
             if ask.get("recipient") == department:
                 payload = dict(ask)
                 if engineering is not None and not engineering["explanation_visible"]:
@@ -523,7 +526,8 @@ def _current_work_version(current_work: dict[str, Any]) -> str:
 
 def _current_work(projection: RunProjection, department: str,
                   engineering: dict[str, Any] | None = None,
-                  notifications: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                  notifications: list[dict[str, Any]] | None = None,
+                  ask: dict[str, Any] | None = None) -> dict[str, Any]:
     if projection.kind == "onboarding":
         # 建档事项中的工作文字（工单 #134）：读取与核验现有代码，没有实现与放行
         work = {
@@ -543,8 +547,7 @@ def _current_work(projection: RunProjection, department: str,
                 else "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。")
     elif department == "engineering" and projection.effective_decisions:
         work = "依据 current_product_decisions 中已正式接纳的有效决定继续当前工程工作。"
-    if projection.active_ask is not None:
-        ask = projection.active_ask
+    if ask is not None:
         if ask.get("recipient") == department:
             question = str(ask.get("question") or "")
             background = str(ask.get("background") or "")

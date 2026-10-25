@@ -4,10 +4,10 @@ from typing import Any
 
 import pytest
 
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, prompt_part
 from harness.models import EventType
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
-from harness.providers.call import ModelResponse
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import quality_turns
 
@@ -746,3 +746,112 @@ def test_ask_branch_exhausted_by_run_time_limit_ends_with_unable(tmp_path: Path)
     assert "time limit" in payload["reason"].lower()
     assert system.project(run_id).stop_reason == "time_limit"
 
+
+
+def test_two_branches_revise_the_prd_and_the_stale_one_sees_the_new_version(tmp_path: Path):
+    # 验收第 5 条（工单 #559）：两个分支同时修订 PRD，后提交的一个因依据的版本过期被拒绝，并看到新版本。
+    # 两条分支都开在产品上：一条由工程的询问开出，一条由质检的询问开出。后提交的那条按它开始时
+    # 看到的版本提交，被拒绝以后按请求里的当前版本重新提交，PRD 的两个新版本因此各来自一条分支。
+    state: dict[str, Any] = {}
+    holder: dict[str, Any] = {}
+    acceptance = ["running the program with a word prints that word in uppercase"]
+
+    def current_spec(call: Any) -> dict[str, Any]:
+        return json.loads(prompt_part(call, "current_product_spec"))
+
+    def revision(call: Any, criteria: list[str], basis: str) -> Any:
+        return answer_turn(
+            answer="按澄清修订 PRD。",
+            requirements=["print the given argument in uppercase to stdout"],
+            acceptance=criteria,
+            change_record={"changed": [criteria[-1]], "retained": [], "retired": [],
+                           "rationale": "询问里澄清了要求。"},
+            basis_product_spec_hash=basis)(call)
+
+    def own_question(call: Any) -> str:
+        # 这条分支回答的那一次询问：一个部门可以同时有几个分支，每条分支看自己的问题（工单 #559）
+        for event in holder["system"].store.list_events(holder["run_id"]):
+            if (event.type == EventType.ASK_STARTED
+                    and (event.payload or {}).get("branch_session_id") == call.session_id):
+                return str((event.payload or {}).get("question") or "")
+        raise AssertionError("the branch has no ask of its own")
+
+    def product_branch(call: Any) -> Any:
+        state.setdefault("asked", {})[call.session_id] = json.loads(
+            prompt_part(call, "pending_ask"))["question"]
+        if "大写" in own_question(call):
+            def engineering_branch(call: Any):
+                # 先等另一条分支读到 PRD 的第 1 版：两个分支的读取同时进行
+                for _ in range(600):
+                    if state.get("quality_saw"):
+                        break
+                    yield ModelStreamEvent(kind="stream_event", id="evt-wait-engineering")
+                return revision(call, acceptance, current_spec(call)["content_hash"])
+            return engineering_branch(call)
+
+        def quality_branch(call: Any):
+            state["quality_attempts"] = state.get("quality_attempts", 0) + 1
+            if state["quality_attempts"] == 1:
+                state["quality_saw"] = current_spec(call)["content_hash"]
+                # 等另一条分支的修订落地：这条分支依据的版本在这期间过期
+                for _ in range(600):
+                    projection = holder["system"].project(holder["run_id"])
+                    if projection.product_spec is not None and projection.product_spec.revision >= 2:
+                        break
+                    yield ModelStreamEvent(kind="stream_event", id="evt-wait-quality")
+                return revision(call, acceptance + ["empty input prints a blank line"], state["quality_saw"])
+            # 被拒绝以后看到新版本：按请求里的当前版本重新提交
+            holder["resubmitted_at"] = current_spec(call)["revision"]
+            return revision(call, acceptance + ["empty input prints a blank line"],
+                            current_spec(call)["content_hash"])
+        return quality_branch(call)
+
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [ask_turn("product", "输出要不要大写？", call_id="ask-eng-1"),
+                        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"},
+                                      checks={"smoke": {"command": "python -c \"print('smoke ok')\""}}),
+                        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"},
+                                      checks={"smoke": {"command": "python -c \"print('smoke ok')\""}}),
+                        delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1].upper())\n"},
+                                      checks={"smoke": {"command": "python -c \"print('smoke ok')\""}})],
+        "quality": [ask_turn("product", "验收标准要补上空输入吗？", call_id="ask-qua-1"),
+                    *quality_turns("release", "checks passed on the current snapshot",
+                                   checks={"smoke": {"command": "python -c \"print('smoke ok')\""}})],
+        "product:ask": [product_branch] * 20,
+    }, stream_gap_sec=0.01)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build an echo CLI")
+    holder["system"] = system
+    holder["run_id"] = run_id
+    system.run_until_stop(run_id)
+
+    events = system.store.list_events(run_id)
+    # 两条分支各自看到自己的问题：一个部门同时有几个分支时，分支不串到别的询问上
+    assert sorted(state["asked"].values()) == ["输出要不要大写？", "验收标准要补上空输入吗？"]
+    # 产品的历史增加两条记录：两条分支各自结束，都得到回答
+    answered = [event for event in events if event.type == EventType.ASK_ANSWERED]
+    assert len(answered) == 2
+    assert [event.payload["status"] for event in answered] == ["answered", "answered"]
+    # 两条分支同时进行：两条分支的激活都在任何一条结束之前开始
+    branch_starts = [event for event in events
+                     if event.type == EventType.DEPARTMENT_ACTIVATED
+                     and event.session_id.startswith("ses_ask_pro_")]
+    branch_finishes = [event for event in events
+                       if event.type == EventType.ACTIVATION_FINISHED
+                       and event.session_id.startswith("ses_ask_pro_")]
+    assert len(branch_starts) == 2
+    assert max(event.position for event in branch_starts) < min(event.position for event in branch_finishes)
+    # 两个分支各带来一个新版本：先提交的是第 2 版
+    revisions = [event.payload["revision"] for event in events if event.type == EventType.SPEC_ACCEPTED]
+    assert revisions == [1, 2, 3]
+    # 后提交的一条按开始时看到的版本提交，被拒绝，原因写明依据的版本不是当前版本
+    rejected = [event for event in events
+                if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("name") == "answer"
+                and not (event.payload or {}).get("ok")]
+    assert len(rejected) == 1
+    error = rejected[0].payload.get("error") or ""
+    # 拒绝的原因写明它依据的版本与当前版本：依据的版本已经不是当前版本，当前版本一并给出
+    assert state["quality_saw"] in error and "current version is" in error, error
+    # 被拒绝以后它看到新版本，并按新版本重新提交（第 3 版）
+    assert holder["resubmitted_at"] == 2
