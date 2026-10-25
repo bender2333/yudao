@@ -340,6 +340,10 @@ export type ArtifactRef = {
  */
 export type AskView = {
     /**
+     * Id
+     */
+    id: string;
+    /**
      * Requester
      */
     requester: string;
@@ -364,6 +368,22 @@ export type AskView = {
      */
     reason?: string | null;
     /**
+     * Parent
+     */
+    parent?: string | null;
+    /**
+     * Chain
+     */
+    chain: Array<string>;
+    /**
+     * Depth
+     */
+    depth: number;
+    /**
+     * Prd Revision
+     */
+    prd_revision?: number | null;
+    /**
      * Start Position
      */
     start_position: number;
@@ -371,6 +391,14 @@ export type AskView = {
      * End Position
      */
     end_position?: number | null;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Ended At
+     */
+    ended_at?: string | null;
 };
 
 /**
@@ -1823,6 +1851,24 @@ export type DepartmentSettingsSaveRefs = {
 };
 
 /**
+ * DepartmentState
+ *
+ * 一个部门在这个事项上的状态与原因（三部门的循环结构第 2.1 节）。
+ *
+ * state 取总图外环的五个词；note 是一句话，没有原因时为空。
+ */
+export type DepartmentState = {
+    /**
+     * State
+     */
+    state: 'waiting_user' | 'working' | 'asking' | 'verifying' | 'waiting';
+    /**
+     * Note
+     */
+    note?: string | null;
+};
+
+/**
  * DepartmentWorkspaceResult
  */
 export type DepartmentWorkspaceResult = {
@@ -1846,6 +1892,12 @@ export type DepartmentWorkspaceResult = {
      * Run Status
      */
     run_status: string | null;
+    /**
+     * Departments
+     */
+    departments?: {
+        [key: string]: DepartmentState;
+    } | null;
     /**
      * Status
      */
@@ -4936,6 +4988,12 @@ export type WorkItemCard = {
     department: string | null;
     progress: WorkItemProgress | null;
     /**
+     * Departments
+     */
+    departments?: {
+        [key: string]: DepartmentState;
+    } | null;
+    /**
      * Round
      */
     round: number;
@@ -5042,6 +5100,12 @@ export type WorkItemLoop = {
      */
     department: string | null;
     progress: WorkItemProgress | null;
+    /**
+     * Departments
+     */
+    departments?: {
+        [key: string]: DepartmentState;
+    } | null;
     /**
      * Round
      */

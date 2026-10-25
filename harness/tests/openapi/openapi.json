@@ -4183,6 +4183,10 @@
       },
       "AskView": {
         "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
           "requester": {
             "type": "string",
             "title": "Requester"
@@ -4226,6 +4230,39 @@
             ],
             "title": "Reason"
           },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "chain": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chain"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "prd_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prd Revision"
+          },
           "start_position": {
             "type": "integer",
             "title": "Start Position"
@@ -4240,16 +4277,35 @@
               }
             ],
             "title": "End Position"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "id",
           "requester",
           "recipient",
           "question",
           "status",
-          "start_position"
+          "chain",
+          "depth",
+          "start_position",
+          "started_at"
         ],
         "title": "AskView"
       },
@@ -6817,6 +6873,39 @@
         "type": "object",
         "title": "DepartmentSettingsSaveRefs"
       },
+      "DepartmentState": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "waiting_user",
+              "working",
+              "asking",
+              "verifying",
+              "waiting"
+            ],
+            "title": "State"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "DepartmentState",
+        "description": "一个部门在这个事项上的状态与原因（三部门的循环结构第 2.1 节）。\n\nstate 取总图外环的五个词；note 是一句话，没有原因时为空。"
+      },
       "DepartmentWorkspaceResult": {
         "properties": {
           "project_id": {
@@ -6859,6 +6948,20 @@
               }
             ],
             "title": "Run Status"
+          },
+          "departments": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/DepartmentState"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Departments"
           },
           "status": {
             "anyOf": [
@@ -12077,6 +12180,20 @@
               }
             ]
           },
+          "departments": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/DepartmentState"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Departments"
+          },
           "round": {
             "type": "integer",
             "title": "Round"
@@ -12280,6 +12397,20 @@
                 "type": "null"
               }
             ]
+          },
+          "departments": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/DepartmentState"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Departments"
           },
           "round": {
             "type": "integer",
