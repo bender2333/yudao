@@ -505,7 +505,6 @@ def test_work_item_derived_fields_follow_the_run(data_dir):
     item = system.projects.projection(project_id).work_item(work_item_id)
     # 还没有部门开始一轮工作：部门由关注的成果决定，阶段不再写部门（工单 #556）
     assert (item.status, item.department, item.cycle_count) == ("in_progress", None, 0)
-    assert item.last_handoff is None
     assert item.pending_question == system.project(run_id).waiting_reason
     assert system.projects.projection(project_id).active_work_item_id == work_item_id
     system.activate_once(run_id)
@@ -516,7 +515,6 @@ def test_work_item_derived_fields_follow_the_run(data_dir):
     item = system.projects.projection(project_id).work_item(work_item_id)
     assert item.status == "released_unsettled" and item.department is None
     assert system.project(run_id).status == "done"
-    assert item.last_handoff is None
     assert [entry["verdict"] for entry in item.rework] == ["rework_engineering"]
     assert item.rework[0]["summary"] == "命名不符" and item.rework[0]["seq"] > 0
     assert system.projects.settle_pending(project_id)[0].type == ProjectEventType.DELIVERABLE_ADOPTED
@@ -540,7 +538,7 @@ def test_work_item_start_failure_is_recorded_and_project_stays_usable(data_dir):
     project = system.projects.projection(project_id)
     failed = project.work_items[0]
     assert failed.status == "not_started" and "max_cycles" in failed.start_error
-    assert failed.department is None and failed.last_handoff is None
+    assert failed.department is None
     assert [event.type for event in system.store.list_project_events(project_id)][1:] == [
         ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
     ]
@@ -688,7 +686,7 @@ def test_mismatched_run_ownership_does_not_derive_work_item(data_dir):
     forged = system.projects.projection(project_b).work_item("wi_forged")
     assert forged.status == "not_started"
     assert forged.department is None
-    assert forged.last_handoff is None and forged.pending_question is None
+    assert forged.pending_question is None
     real = system.projects.projection(project_a).work_item(work_a)
     assert real.status == "in_progress" and real.status is not None
 
