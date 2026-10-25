@@ -6,6 +6,9 @@
 # 第五、六个探针覆盖投影比较（#541）：只改投影字段、事件与投影同时改两种情况。
 # 后面的探针（#892）覆盖事件引用与事项累计数：引用写成被引用事件在它自己会话里的位置，
 # 两个会话交错的先后不同不影响比较；会话内引用换了指向要失败并写明会话、第几条与字段名。
+# 末尾的探针（#1019）覆盖只为真实变化重写：只差编号数字时通过、同一个值变成两个编号或两个值并成
+# 一个编号时失败；投影里的事件版本号不进比对；关键字段等于默认值时与缺失同义，工具调用的 ok 照写。
+# 事件版本号当前值的单独核对在 test_event_sequence.py（那个文件在本工单的「只改」清单里）。
 
 import copy
 import json
@@ -18,6 +21,9 @@ import pytest
 from harness.tests.event_sequence import compare_documents, normalized_run
 
 BASELINE_DIR = Path(__file__).resolve().parent / "event_sequences"
+
+# 编号的写法 <种类#数字>：与 event_sequence.py 的规整规则第 2 条一致
+_PLACEHOLDER = re.compile(r"<([a-z][a-z0-9_]*)#(\d+)>")
 
 
 def _load(name):
@@ -274,5 +280,137 @@ def test_session_reference_change_fails_with_fields_line():
     assert "session <ses_eng#1>" in message, message
     assert "event #" in message, message
     assert "payload.context_event_id" in message, message
+
+
+# 工单 #1019：只为真实变化重写。下面覆盖验收的三条：
+#   编号按一一对应比较；投影里的事件版本号不进比对；关键字段等于默认值时省略（工具调用的 ok 照写）。
+
+
+def _shifted(document, shift=1):
+    # 各处一致地把编号数字加上 shift：只差编号数字的两份基准
+    text = json.dumps(document, ensure_ascii=False)
+    return json.loads(_PLACEHOLDER.sub(lambda match: f"<{match.group(1)}#{int(match.group(2)) + shift}>", text))
+
+
+def _payload_field_with_seen_label(events, field):
+    # 找一个载荷字段：它的编号在本文件更早的地方已经出现过（同一个值在各处是同一个编号）
+    seen: set[str] = set()
+    for event in events:
+        value = (event.get("payload") or {}).get(field)
+        if not isinstance(value, str):
+            continue
+        match = _PLACEHOLDER.fullmatch(value)
+        if match is None:
+            continue
+        if match.group(0) in seen:
+            return event, match
+        seen.add(match.group(0))
+    raise AssertionError(f"基准里没有重复出现的 {field} 编号")
+
+
+def test_documents_differing_only_in_number_digits_pass():
+    # 两份基准只差编号的数字（各处一致地替换）：比较通过（工单 #1019 验收 1）
+    expected = _load("handoff_release")
+    compare_documents("handoff_release", expected, _shifted(expected))
+
+
+def test_one_value_turned_into_two_numbers_fails():
+    # 同一个值在实际里变成两个编号：比较失败并点名该字段（工单 #1019 验收 1）
+    expected = _load("handoff_release")
+    actual = _shifted(expected)
+    event, match = _payload_field_with_seen_label(actual["events"], "activation_id")
+    event["payload"]["activation_id"] = f"<{match.group(1)}#9999>"
+    with pytest.raises(AssertionError) as raised:
+        compare_documents("handoff_release", expected, actual)
+    message = str(raised.value)
+    assert "payload.activation_id" in message, message
+
+
+def test_two_values_merged_into_one_number_fails():
+    # 两个本来不同的值在实际里变成同一个编号：比较失败并点名该字段（工单 #1019 验收 1）
+    expected = _load("handoff_release")
+    actual = _shifted(expected)
+    labels = sorted({
+        match.group(0)
+        for event in actual["events"]
+        for value in (event.get("payload") or {}).values()
+        if isinstance(value, str)
+        for match in [_PLACEHOLDER.fullmatch(value)]
+        if match is not None and match.group(1) == "act"
+    })
+    assert len(labels) >= 2, labels
+    merged = json.loads(json.dumps(actual, ensure_ascii=False).replace(labels[1], labels[0]))
+    with pytest.raises(AssertionError) as raised:
+        compare_documents("handoff_release", expected, merged)
+    message = str(raised.value)
+    assert "payload.activation_id" in message, message
+
+
+def test_baselines_leave_out_the_run_event_version():
+    # 事件版本号不进每个场景的投影比对：基准的投影里不写它（工单 #1019 验收 2）
+    for path in sorted(BASELINE_DIR.glob("*.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        assert "run_event_version" not in (document.get("projection") or {}), \
+            f"{path.name} 的投影还写着 run_event_version"
+
+
+def test_projection_run_event_version_difference_passes():
+    # 两份基准只差投影里的 run_event_version：比较通过（工单 #1019 验收 2）
+    expected = _load("handoff_release")
+    actual = copy.deepcopy(expected)
+    expected["projection"]["run_event_version"] = 10
+    actual["projection"]["run_event_version"] = 11
+    compare_documents("handoff_release", expected, actual)
+
+
+def test_default_valued_key_field_equals_missing():
+    # 一个关键字段在一份里是默认值、另一份里缺失：比较通过（工单 #1019 验收 3）
+    expected = _load("handoff_release")
+    actual = copy.deepcopy(expected)
+    tool = next(event for event in expected["events"]
+                if event["type"] == "tool_called" and "ok" in (event.get("payload") or {}))
+    payload = tool["payload"]
+    assert "error" not in payload and "guidance_ids" not in payload, payload
+    payload["error"] = None
+    payload["guidance_ids"] = []
+    payload["prompt_version"] = 0
+    compare_documents("handoff_release", expected, actual)
+
+
+def test_tool_call_ok_false_is_written_and_other_defaults_are_omitted():
+    # ok 是内核测试按值区分的字段：等于默认值 false 也照写；其余默认值不写进这条事件（验收 3）
+    event = _event("evt_00000000000000a1", None, "tool_called", "engineering",
+                   {"activation_id": "act_00000000000000a1",
+                    "attempt_id": "att_00000000000000a1",
+                    "context_event_id": None,
+                    "effective_contract_hash": None,
+                    "error": None,
+                    "guidance_ids": [],
+                    "id": "call_00000000000000a1",
+                    "input_version": 1,
+                    "logical_call_id": "call_00000000000000a1",
+                    "name": "bash",
+                    "ok": False,
+                    "prompt_version": 0,
+                    "purpose": "work",
+                    "step_id": 1})
+    payload = _normalized([event])["events"][0]["payload"]
+    assert payload["ok"] is False, payload
+    for name in ("context_event_id", "effective_contract_hash", "error", "guidance_ids", "prompt_version"):
+        assert name not in payload, f"默认值的 {name} 不应写进这条事件"
+
+
+def test_baselines_keep_ok_on_every_tool_call_result():
+    # 基准里每次工具调用结果都写着 ok，被拒绝的调用写 ok: false（工单 #1019 验收 3、内核测试按值区分）
+    denied = 0
+    for path in sorted(BASELINE_DIR.glob("*.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for event in document["events"]:
+            if event["type"] not in {"tool_called", "tool_skipped"}:
+                continue
+            payload = event.get("payload") or {}
+            assert "ok" in payload, f"{path.name} 的工具调用结果少了 ok"
+            denied += payload["ok"] is False
+    assert denied > 0, "基准里没有 ok: false 的工具调用结果"
 
 
