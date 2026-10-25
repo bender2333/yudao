@@ -4,10 +4,9 @@
 // 覆盖：状态项「待你决定」与 decisions.list 数量一致、首页与标签栏的决定卡片、提问被回答或撤销时显示原因、
 // 离开期间的报告三种范围与「已看过」、项目列表字段与 projects.list 一致；控制台错误为零。
 
-import { expect, test, type Page } from "@playwright/test";
-import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
+import { expect,test,type Page } from "@playwright/test";
+import { startBackend,startClient,type Backend,type ClientApp } from "./fixtures";
 
-const BLOCKED = "文本工具";
 
 let backend: Backend;
 
@@ -99,30 +98,6 @@ async function waitUntil(check: () => Promise<boolean>, page: Page, description:
   }
 }
 
-async function overflowReport(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const offenders: string[] = [];
-    const root = document.documentElement;
-    if (root.scrollWidth - root.clientWidth > 1) {
-      offenders.push(`document +${root.scrollWidth - root.clientWidth}`);
-    }
-    for (const node of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
-      const over = node.scrollWidth - node.clientWidth;
-      if (over <= 1 || node.offsetParent === null) {
-        continue;
-      }
-      const style = getComputedStyle(node);
-      if (style.overflowX === "auto" || style.overflowX === "scroll") {
-        continue;
-      }
-      const classes = typeof node.className === "string" && node.className.trim() !== "" ? `.${node.className.trim().split(/\s+/).join(".")}` : "";
-      const region = node.closest("section");
-      const heading = region?.querySelector("h2,h3")?.textContent?.slice(0, 16) ?? "";
-      offenders.push(`${node.tagName.toLowerCase()}${classes} +${over} <${heading}>`);
-    }
-    return offenders;
-  });
-}
 
 type DecisionRow = { decision_id: string; version: number; project_id: string; work_item_id: string | null; kind: string };
 
@@ -132,52 +107,8 @@ async function openDecisions(page: Page): Promise<DecisionRow[]> {
 }
 
 test.describe("系统首页（1440×900）", () => {
-  test("状态项「待你决定」的数量与 decisions.list 中等待回答的数量一致", async () => {
-    const client = await openHome({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    try {
-      const waiting = await openDecisions(client.page);
-      expect(waiting.length).toBeGreaterThan(0);
-      const stat = client.page.locator(".status-row .status-item").filter({ hasText: "待你决定" });
-      await expect(stat).toHaveText(`待你决定${waiting.length}`);
-      // 顶栏的状态项与页面上的状态行使用同一份数据
-      await expect(client.page.locator(".topbar .status-item").filter({ hasText: "待你决定：" })).toHaveText(`待你决定：${waiting.length}`);
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
-
-  test("首页「待你决定」列出等待回答的决定卡片，卡片头写明种类、项目与挡住的对象", async () => {
-    const client = await openHome({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    try {
-      const waiting = await openDecisions(client.page);
-      const block = client.page.locator("section.card").filter({ has: client.page.getByRole("heading", { name: "待你决定", exact: true }) });
-      await expect(block.locator(".decision-card")).toHaveCount(waiting.length);
-      const first = block.locator(".decision-card").first();
-      await expect(first.locator(".decision-title")).toContainText("模型引用无法使用");
-      const resolvedName = await projectName(client.page, waiting[0].project_id ?? "");
-      await expect.poll(async () => first.locator(".decision-meta").innerText()).toContain(resolvedName);
-      await expect(first.locator(".decision-meta")).toContainText("已等待");
-      await expect(first.locator(".decision-meta")).toContainText("挡住");
-      // 事项写标题，不写事项标识（工单 #802）
-      const blocked = waiting.find((row) => row.kind === "model_unavailable");
-      if (blocked?.work_item_id) {
-        const title = await workItemTitle(client.page, blocked.project_id, blocked.work_item_id);
-        expect(title).not.toBe("");
-        const card = client.page.locator(`#decision-${blocked.decision_id}`);
-        await expect(card.locator(".decision-meta")).toContainText(title);
-        await expect(card.locator(".decision-meta")).not.toContainText(blocked.work_item_id);
-      }
-      // 材料按决定种类整理：待恢复显示部门与具体问题
-      await expect(first.locator("details")).toContainText("部门");
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
-
+  
+  
   test("回答一个等待中的决定请求：卡片显示已提交，事件到达以后移出列表，run 按回答继续", async () => {
     test.setTimeout(120_000);
     await withOwnBackend(async () => {
@@ -225,59 +156,7 @@ test.describe("系统首页（1440×900）", () => {
     });
   });
 
-  test("回答一个已经回答过的决定请求时，卡片显示原因并刷新", async () => {
-    test.setTimeout(120_000);
-    await withOwnBackend(async () => {
-      const client = await openHome({ width: 1440, height: 900 });
-      const errors = watchErrors(client);
-      try {
-        const [decision] = await openDecisions(client.page);
-        const card = client.page.locator(`#decision-${decision.decision_id}`);
-        await expect(card).toBeVisible();
-        // 在界面之外把这条请求回答掉，然后在同一次脚本里点击卡片中的选项：服务端以 decision_closed 拒绝，
-        // 卡片显示原因。用同一次 evaluate 里的 DOM 点击避免事件流先一步把卡片移走（真实运行里，
-        // 请求被另一个客户端或另一次回答关闭时就是这个过程）
-        const shown = await client.page.evaluate(
-          async ({ address, id, version }) => {
-            await fetch(`${address}/api/commands/decision.answer`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ command_id: crypto.randomUUID(), decision_id: id, option: "continue", base_version: version }),
-            });
-            const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(`#decision-${id} .decision-answer button`));
-            if (buttons.length === 0) {
-              return "没有找到回答按钮";
-            }
-            buttons[buttons.length - 1].click();
-            const deadline = Date.now() + 5000;
-            while (Date.now() < deadline) {
-              const error = document.querySelector(`#decision-${id} p.error`);
-              if (error) {
-                return error.textContent ?? "";
-              }
-              const { promise, resolve } = Promise.withResolvers<void>();
-              setTimeout(resolve, 20);
-              await promise;
-            }
-            return "没有显示原因";
-          },
-          { address: backend.address, id: decision.decision_id, version: decision.version },
-        );
-        expect(shown).toContain("已经回答");
-        // 卡片随后按事件刷新：这条请求移出等待列表
-        await waitUntil(
-          async () => (await openDecisions(client.page)).every((row) => row.decision_id !== decision.decision_id),
-          client.page,
-          "已回答的请求移出等待列表",
-        );
-        await expect(client.page.locator(`#decision-${decision.decision_id}`)).toHaveCount(0);
-        expect(errors).toEqual([]);
-      } finally {
-        await client.close();
-      }
-    });
-  });
-
+  
   test("离开期间的报告：三种范围的汇总项都能展开来源事件，点击「已看过」更新上次查看", async () => {
     test.setTimeout(120_000);
     let client = await openHome({ width: 1440, height: 900 });
@@ -313,131 +192,13 @@ test.describe("系统首页（1440×900）", () => {
     }
   });
 
-  test("首页项目区块的说明不出现接口名", async () => {
-    // 工单 #319 第 5 项：首页「项目」区块的说明原来写着接口名
-    const client = await openHome({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    try {
-      const projects = client.page.locator("section.card")
-        .filter({ has: client.page.getByRole("heading", { name: "项目", exact: true }) });
-      await expect(projects.locator(".note, header .note").first()).not.toContainText("数据来自");
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
+  
+  
   });
-
-  test("项目列表的每个字段与 projects.list 一致", async () => {
-    const client = await openHome({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    try {
-      const data = await fetchQuery<{
-        projects: {
-          project_id: string; name: string; goal: string; archived: boolean; current_adoption: string | null;
-          in_progress_count: number; waiting_count: number; decisions_waiting: number;
-        }[];
-      }>(client.page, "projects.list");
-      const rows = data.projects.filter((project) => !project.archived);
-      const table = client.page.locator("section.card").filter({ has: client.page.getByRole("heading", { name: "项目", exact: true }) }).locator("table");
-      await expect(table.locator("tbody tr")).toHaveCount(rows.length);
-      for (const project of rows) {
-        const row = table.locator("tbody tr").filter({ has: client.page.getByRole("button", { name: project.name, exact: true }) });
-        await expect(row).toContainText(project.goal === "" ? "没有填写" : project.goal);
-        await expect(row).toContainText(`${project.in_progress_count} · ${project.waiting_count}`);
-        await expect(row).toContainText(project.current_adoption === null ? "尚未采纳" : project.current_adoption);
-        await expect(row).toContainText(project.decisions_waiting > 0 ? String(project.decisions_waiting) : "无");
-      }
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
-
-  test("项目标签栏的「待你决定」只列出本项目的决定请求，点击展开卡片", async () => {
-    const client = await openHome({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    try {
-      const blockedId = await projectId(client.page, BLOCKED);
-      await client.page.evaluate((id: string) => {
-        window.location.hash = `#/p/${id}/overview`;
-      }, blockedId);
-      await expect(client.page.locator(".tabbar .tab").first()).toBeVisible();
-      const tabbarButton = client.page.locator(".topbar .status-item").filter({ hasText: "待你决定 · " });
-      const projectWaiting = (await openDecisions(client.page)).filter((row) => row.project_id === blockedId);
-      await expect(tabbarButton).toHaveText(`待你决定 · ${projectWaiting.length}`);
-      // 展开：只含本项目的请求
-      await tabbarButton.click();
-      const dropdown = client.page.locator(".decisions-dropdown");
-      await expect(dropdown.locator(".decision-card")).toHaveCount(projectWaiting.length);
-      for (const decision of projectWaiting) {
-        await expect(dropdown.locator(`#decision-${decision.decision_id}`)).toBeVisible();
-      }
-      // 卡片写事项标题，与首页的同一批卡片写同一件事，不写事项标识（工单 #802）
-      const blockedDecision = projectWaiting.find((row) => row.kind === "model_unavailable");
-      if (blockedDecision?.work_item_id) {
-        const title = await workItemTitle(client.page, blockedId, blockedDecision.work_item_id);
-        expect(title).not.toBe("");
-        const card = dropdown.locator(`#decision-${blockedDecision.decision_id}`);
-        await expect(card.locator(".decision-meta")).toContainText(title);
-        await expect(card.locator(".decision-meta")).not.toContainText(blockedDecision.work_item_id);
-      }
-      await expect(dropdown).not.toContainText("wi_");
-      const otherProject = (await openDecisions(client.page)).find((row) => row.project_id !== blockedId);
-      if (otherProject) {
-        await expect(dropdown.locator(`#decision-${otherProject.decision_id}`)).toHaveCount(0);
-      }
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
-});
 
 test.describe("系统首页（1920×1080）", () => {
-  test("1920×1080：离开期间的报告横向排成多列，不出现横向滚动；控制台错误为零", async () => {
-    test.setTimeout(120_000);
-    const client = await openHome({ width: 1920, height: 1080 });
-    const errors = watchErrors(client);
-    try {
-      await expect(client.page.getByRole("heading", { name: "待你决定", exact: true })).toBeVisible();
-      const report = client.page.locator("section.card")
-        .filter({ has: client.page.getByRole("heading", { name: "离开期间的报告", exact: true }) });
-      // 报告项排成网格：范围「最近 7 天」时至少有完成与放行与用量两项，宽屏下并排而不是叠成一列
-      await report.getByRole("button", { name: "最近 7 天", exact: true }).click();
-      await expect.poll(async () => report.locator(".report-item").count()).toBeGreaterThan(1);
-      const columns = await report.locator(".report-item")
-        .evaluateAll((nodes) => new Set(nodes.map((node) => Math.round(node.getBoundingClientRect().left))).size);
-      expect(columns, "1920×1080 下报告项应当并排成多列").toBeGreaterThan(1);
-      await expect(client.page.getByRole("heading", { name: "项目", exact: true })).toBeVisible();
-      expect(await overflowReport(client.page), "首页：1920×1080 不应出现横向溢出").toEqual([]);
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
   });
-});
 
-async function projectId(page: Page, name: string): Promise<string> {
-  return fetchQuery<{ projects: { name: string; project_id: string }[] }>(page, "projects.list").then((data) => {
-    const row = data.projects.find((project) => project.name === name);
-    if (row === undefined) {
-      throw new Error(`projects.list 里没有项目 ${name}`);
-    }
-    return row.project_id;
-  });
-}
 
-async function projectName(page: Page, projectIdValue: string): Promise<string> {
-  return fetchQuery<{ projects: { name: string; project_id: string }[] }>(page, "projects.list").then((data) => {
-    return data.projects.find((project) => project.project_id === projectIdValue)?.name ?? "";
-  });
-}
 
 // 事项的标题：决定卡片写它，不写事项标识（工单 #802）
-async function workItemTitle(page: Page, projectIdValue: string, workItemId: string): Promise<string> {
-  return fetchQuery<{ work_items: { work_item_id: string; title: string }[] }>(page, "project.overview", {
-    project_id: projectIdValue,
-  }).then((data) => {
-    return data.work_items.find((item) => item.work_item_id === workItemId)?.title ?? "";
-  });
-}

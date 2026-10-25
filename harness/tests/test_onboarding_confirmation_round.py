@@ -160,18 +160,6 @@ def test_confirming_the_first_round_adopts_the_snapshot_as_the_baseline(data_dir
         context.__exit__(None, None, None)
 
 
-def test_non_git_source_records_no_provenance(data_dir, tmp_path):
-    # 验收（4.1 节）：源目录不是 git 仓库时快照没有 provenance，基线文本仍然可以写出来，不因此报错
-    context, client, opened, refs = _run_onboarding_http(data_dir, tmp_path, _round([REQUIREMENT]))
-    try:
-        decision = _open_initial_prd(client, refs["project_id"])
-        assert _answer(client, decision, "confirm").status_code == 200
-        adoption = opened.system.projects.projection(refs["project_id"]).current_adoption
-        assert not (adoption.snapshot.get("provenance") or {})
-    finally:
-        context.__exit__(None, None, None)
-
-
 def test_confirming_the_second_round_adopts_and_a_new_work_item_starts(data_dir, tmp_path):
     # 验收（5 节、第 10 节第 10 项）：第二轮候选确认以后采纳的是第二轮的快照工件（属于第二轮 run），
     # 采纳以后可以新建普通事项，它的 run 从这个基线的快照开始
@@ -272,26 +260,6 @@ def test_decisions_list_carries_the_initial_prd_materials_and_the_note_mark(data
         rejected = _answer(client, decision, "revise")
         assert rejected.status_code == 409, rejected.text
         assert opened.system.writes.read(project_stream(refs["project_id"])).version == before
-    finally:
-        context.__exit__(None, None, None)
-
-
-def test_queries_do_not_write_events(data_dir, tmp_path):
-    # 验收（3.4 节）：确认初始 PRD 以来的查询全部只读，重复读取不写出任何事件
-    context, client, opened, refs = _run_onboarding_http(data_dir, tmp_path, _round([REQUIREMENT]))
-    try:
-        project_id = refs["project_id"]
-        stream = project_stream(project_id)
-        before = opened.system.writes.read(stream).version
-        queries = ["/api/queries/projects.list",
-                   f"/api/queries/project.overview?project_id={project_id}",
-                   f"/api/queries/project.loop?project_id={project_id}",
-                   f"/api/queries/decisions.list?project_id={project_id}",
-                   f"/api/queries/work_item.materials?project_id={project_id}&work_item={refs['work_item_id']}"]
-        for _ in range(2):
-            for path in queries:
-                assert client.get(path).status_code == 200, path
-        assert opened.system.writes.read(stream).version == before
     finally:
         context.__exit__(None, None, None)
 

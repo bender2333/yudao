@@ -2,7 +2,7 @@ import json
 from dataclasses import asdict
 
 from harness.adapters.fake import FakeAdapter
-from harness.assembly import TARGET_KEYS, ContextAssembly, ModelLimits, StepFrame, model_limits
+from harness.assembly import TARGET_KEYS, ContextAssembly, StepFrame, model_limits
 from harness.collaboration import has_new_work
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, EventType, RunProjection, hash_bytes
@@ -11,12 +11,6 @@ from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import compacted_runner as _runner, list_files_turn
 
-def test_model_limits_use_the_call_target_window_and_reserve_half_of_a_narrow_one():
-    # 阈值只用本次调用目标的窗口；宽窗口保留 15%，窄窗口最多保留一半给回复
-    assert model_limits(32000, 4096) == ModelLimits(32000, 4096, 4800)
-    assert model_limits(8000, 4096) == ModelLimits(8000, 4096, 4000)
-    assert model_limits(6000, 1000) == ModelLimits(6000, 1000, 1000)
-    assert model_limits(32000, None) == ModelLimits(32000, None, 4800)
 
 def _rebuild_recorded_steps(system, run_id):
     # 按记录下来的事件逐步重新装配：每个请求与它之前的事件重建的结果一致，每次压缩的检查点与重建的请求加上

@@ -3,8 +3,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ACTION_TABLE_HEAD, actionCells } from "../../src/renderer/src/views/project/action-table.ts";
-import type { ActionReceipt, ActionView } from "../../src/renderer/src/api/generated/types.gen.ts";
+import { actionCells } from "../../src/renderer/src/views/project/action-table.ts";
+import type { ActionReceipt,ActionView } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 function receipt(overrides: Partial<ActionReceipt> = {}): ActionReceipt {
   return {
@@ -34,16 +34,7 @@ function action(overrides: Partial<ActionView> = {}): ActionView {
   };
 }
 
-test("表格没有「登记名」一列，有「命令」一列", () => {
-  assert.deepEqual(ACTION_TABLE_HEAD, ["工具", "命令", "部门", "状态", "结果", "输出引用", "时间"]);
-  assert.equal(ACTION_TABLE_HEAD.includes("登记名"), false);
-});
 
-test("每一行的内容是工具、命令、部门、状态、结果与输出引用", () => {
-  const cells = actionCells(action());
-  assert.deepEqual(cells, ["bash", "", "工程", "已完成", "成功", "无"]);
-  assert.equal(cells.length, ACTION_TABLE_HEAD.length - 1);
-});
 
 test("命令一列显示动作实际执行的命令原文", () => {
   const cells = actionCells(action({

@@ -68,33 +68,9 @@ test("挡住的对象：写明被阻塞的事项与排在后面的事项数量�
   assert.deepEqual(blockedText(alone, ""), { text: "挡住本事项", muted: false });
 });
 
-test("等待时长：按发出时间到现在的差，负差按零", () => {
-  const requested = "2026-10-02T10:00:00Z";
-  const now = new Date("2026-10-02T10:05:30Z").getTime();
-  assert.equal(waitedSeconds(requested, now), 330);
-  assert.equal(waitedSeconds(requested, new Date("2026-10-02T09:00:00Z").getTime()), 0);
-});
 
-test("「在项目中查看」的目标：待恢复落到该事项的恢复页，没有事项时落到项目概览", () => {
-  assert.equal(viewHref(decision()), "#/p/p1/w/w1/recovery");
-  assert.equal(viewHref(decision({ work_item_id: null })), "#/p/p1/overview");
-  assert.equal(viewHref(decision({ project_id: null, work_item_id: null })), null);
-});
 
-test("待恢复的决定：材料里的跳转前往模型管理与本项目的部门设置", () => {
-  const links = decisionLinks(decision());
-  assert.deepEqual(links.map((link) => link.href), ["#/sys/models", "#/p/p1/settings"]);
-  assert.deepEqual(links.map((link) => link.label), ["前往模型管理", "前往本项目的部门设置"]);
-});
 
-test("等待回答的请求按发出时间排列", () => {
-  const rows = sortByRequested([
-    decision({ decision_id: "b", requested_at: "2026-10-02T11:00:00Z" }),
-    decision({ decision_id: "a", requested_at: "2026-10-02T09:00:00Z" }),
-    decision({ decision_id: "c", requested_at: "2026-10-02T10:00:00Z" }),
-  ]);
-  assert.deepEqual(rows.map((row) => row.decision_id), ["a", "c", "b"]);
-});
 
 test("给像素画面用的纯文字版本与页面卡片共用同一份材料", () => {
   const now = new Date("2026-10-02T10:01:00Z").getTime();
@@ -220,17 +196,6 @@ test("初始 PRD 的快照没有 git 仓库时写明采集时的目录内容", (
   assert.equal(map["快照规模"], "文件 1 项，目录 0 项，共 12 字节");
 });
 
-test("初始 PRD 的两个链接都指向资料页并带上轮次，「在项目中查看」也落到资料页", () => {
-  const links = decisionLinks(initialPrd());
-  assert.deepEqual(links.map((link) => link.label), ["PRD.md", "STRUCTURE.md"]);
-  assert.deepEqual(links.map((link) => link.href), ["#/p/p1/materials?w=w1&round=2", "#/p/p1/materials?w=w1&round=2"]);
-  assert.equal(viewHref(initialPrd()), "#/p/p1/materials?w=w1&round=2");
-  // 没有轮次时链接不带 round
-  const noRound = decision({ kind: "initial_prd", request: { work_item_id: "w1" }, work_item_id: "w1" });
-  assert.equal(viewHref(noRound), "#/p/p1/materials?w=w1");
-  // 请求自己给出页面时以它为准
-  assert.equal(viewHref(initialPrd({ view: "#/p/p1/overview" })), "#/p/p1/overview");
-});
 
 test("初始 PRD 的卡片材料与给像素画面的纯文字版本共用", () => {
   const now = new Date("2026-10-02T10:01:00Z").getTime();

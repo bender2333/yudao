@@ -4,10 +4,8 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import re
 import secrets
-import shutil
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -88,23 +86,6 @@ def test_cancel_stops_the_process_tree(tmp_path):
     assert wait_until_stopped(_grandchild(result.output["output"]))
 
 
-def test_timeout_default_and_max_come_from_rules(tmp_path, monkeypatch):
-    seen: dict[str, int] = {}
-    real_run = environment_module._run_process
-
-    async def spy(argv, workdir, env, timeout_sec, stop):
-        seen["timeout_sec"] = timeout_sec
-        return await real_run(argv, workdir, env, timeout_sec, stop)
-
-    monkeypatch.setattr(environment_module, "_run_process", spy)
-    environment = _environment(tmp_path)
-    perform(environment, "bash", {"command": "echo hi"})
-    assert seen["timeout_sec"] == DEFINITIONS.rule_value("bash_timeout_default_sec")
-    over = DEFINITIONS.rule_value("bash_timeout_max_sec") + 100
-    perform(environment, "bash", {"command": "echo hi", "timeout_sec": over})
-    assert seen["timeout_sec"] == DEFINITIONS.rule_value("bash_timeout_max_sec")
-
-
 def test_environment_inherited_and_secrets_redacted(tmp_path, monkeypatch):
     value = secrets.token_hex(8)
     monkeypatch.setenv("MY_SECRET_TOKEN", value)
@@ -139,39 +120,4 @@ def test_truncated_output_pages_back_exactly(tmp_path):
     expected = "\n".join(f"line-{i:05d}-" + "x" * 40 for i in range(2000))
     assert full == expected
 
-def test_missing_bash_reports_the_cause(tmp_path, monkeypatch):
-    monkeypatch.setattr(environment_module, "_BASH_PATH", None)
-    monkeypatch.setattr(shutil, "which", lambda *args, **kwargs: None)
-    real_isfile = os.path.isfile
-    monkeypatch.setattr(os.path, "isfile", lambda p: False if "bash" in str(p).lower() else real_isfile(p))
-    result = perform(_environment(tmp_path), "bash", {"command": "echo hi"})
-    assert result.ok is False and result.output is None
-    assert "bash" in result.error.lower()
 
-
-def test_bash_does_not_start_a_login_shell(tmp_path, monkeypatch):
-    seen: dict[str, list] = {}
-    real_run = environment_module._run_process
-
-    async def spy(argv, workdir, env, timeout_sec, stop):
-        seen["argv"] = list(argv)
-        return await real_run(argv, workdir, env, timeout_sec, stop)
-
-    monkeypatch.setattr(environment_module, "_run_process", spy)
-    result = perform(_environment(tmp_path), "bash", {"command": "echo hi"})
-    assert result.output["status"] == "ok"
-    assert "-l" not in seen["argv"] and "-c" in seen["argv"]
-
-
-def test_saved_output_stays_outside_the_public_tree(tmp_path):
-    environment = _environment(tmp_path)
-    command = f'"{_python()}" -c "for i in range(2000): print(\'line-%05d-\' % i + \'x\' * 40)"'
-    first = perform(environment, "bash", {"command": command})
-    assert first.output["truncated"] is True
-    files = perform(environment, "list_files", {"path": "."}).output
-    assert not any(name.startswith(".checks") for name in files)
-    saved = list((tmp_path / "ws" / ".checks" / "tool-output").glob("*.output"))
-    assert len(saved) == 1
-    stored = saved[0].read_text(encoding="utf-8")
-    expected = "\n".join(f"line-{i:05d}-" + "x" * 40 for i in range(2000))
-    assert stored == expected

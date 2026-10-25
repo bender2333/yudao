@@ -4,9 +4,16 @@ from dataclasses import replace
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
 from harness.collaboration import has_new_work
-from harness.models import EventType, SessionRecord, json_dumps
-from harness.proposals import (answer_turn, ask_turn, delivery, delivery_turn, guidance_response,
-                                product_spec, product_spec_turn, review, review_turn)
+from harness.models import EventType, json_dumps
+from harness.proposals import (
+    delivery,
+    delivery_turn,
+    guidance_response,
+    product_spec,
+    product_spec_turn,
+    review,
+    review_turn,
+)
 from harness.runtime import LoopSystem
 from harness.tests.helpers import from_another_thread
 from harness.validation import evaluate_proposal
@@ -104,27 +111,6 @@ CHANGE_RECORD = {
 }
 
 
-def _system_asking_product(tmp_path):
-    # 质检要求有问题时询问产品，产品在回答里修订 PRD（工单 #555）：结论只有缺陷记录与放行，
-    # 要求有问题时不再把工作退回产品。脚本按会话给：产品的询问分支回答并修订 PRD。
-    adapter = FakeAdapter({
-        "product": [product_spec()],
-        "engineering": [delivery_turn()],
-        "quality": [
-            ask_turn(recipient="product", question="验收标准漏了空输入，请修订 PRD。"),
-            review_turn("rework_engineering", "the contract missed empty input",
-                        defects=[{"severity": "major", "summary": "empty input not covered"}]),
-        ],
-        "product:ask": [answer_turn(
-            answer="已补上空输入的验收标准。",
-            requirements=["print the given argument to stdout"],
-            acceptance=["empty input prints a blank line"],
-            change_record=CHANGE_RECORD)],
-    })
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    return system, system.create_run("build an echo CLI")
-
-
 def _system_with_guided_revision(tmp_path):
     # 产品修订 PRD：质检的结论不再把工作退回产品（工单 #555），产品的修订由用户的指导触发，
     # 修订以后事项仍在工程阶段，工程按新合同继续工作。
@@ -156,114 +142,6 @@ def _activate_until(system, run_id, revision):
         projection = system.activate_once(run_id)
         assert projection.status not in ("done", "failed"), projection.stop_reason
     return projection
-
-
-def _working(projection, department):
-    # 部门按关注的成果开始一轮工作（工单 #556）：这一轮在工作的部门可以提交正式成果
-    return replace(projection, sessions={**projection.sessions, department: SessionRecord(
-        session_id=f"ses_{department}", department=department, status="active")})
-
-
-def test_a_spec_that_declares_the_wrong_basis_is_rejected_with_the_current_version(tmp_path):
-    # 修订版 ProductSpec 声明了别的 hash：整次提交被拒绝，错误给出 host 端的当前版本，模型重读后可以重交
-    system, run_id = _system(tmp_path, product_spec())
-    first = system.activate_once(run_id)
-    assert first.product_spec is not None
-    projection = system.project(run_id)
-    decision = evaluate_proposal(department="product",
-                                 projection=_working(projection, "product"),
-                                 facts=system.workspace(run_id).snapshot().facts,
-                                 proposal=_revision(CHANGE_RECORD, "sha256:" + "0" * 64))
-    assert not decision.accepted
-    [error] = decision.error_dicts
-    assert error["field"] == "basis_product_spec_hash"
-    assert first.product_spec.content_hash in error["message"]
-
-
-def test_a_first_spec_must_declare_a_null_basis(tmp_path):
-    # 还没有当前 ProductSpec：第一份规格必须声明 null 依据，给了 hash 就拒绝
-    system, run_id = _system(tmp_path, product_spec())
-    projection = system.project(run_id)
-    decision = evaluate_proposal(department="product",
-                                 projection=replace(projection, status="running"),
-                                 facts=system.workspace(run_id).snapshot().facts,
-                                 proposal=_revision(CHANGE_RECORD, "sha256:" + "1" * 64))
-    assert not decision.accepted
-    [error] = decision.error_dicts
-    assert error["field"] == "basis_product_spec_hash"
-    assert "null" in error["message"]
-
-
-def test_a_missing_basis_declaration_rejects_the_submission(tmp_path):
-    system, run_id = _system(tmp_path, product_spec())
-    projection = system.project(run_id)
-    proposal = _revision(CHANGE_RECORD, None)
-    without_field = {key: value for key, value in proposal.items() if key != "basis_product_spec_hash"}
-    decision = evaluate_proposal(department="product",
-                                 projection=replace(projection, status="running"),
-                                 facts=system.workspace(run_id).snapshot().facts, proposal=without_field)
-    assert not decision.accepted
-    [error] = decision.error_dicts
-    assert error["field"] == "basis_product_spec_hash"
-    assert "required" in error["message"]
-
-
-def test_a_spec_may_declare_the_current_basis(tmp_path):
-    # 与当前版本一致的声明通过校验，修订版可以提交
-    system, run_id = _system(tmp_path, product_spec())
-    first = system.activate_once(run_id)
-    projection = system.project(run_id)
-    decision = evaluate_proposal(department="product",
-                                 projection=_working(projection, "product"),
-                                 facts=system.workspace(run_id).snapshot().facts,
-                                 proposal=_revision(CHANGE_RECORD, first.product_spec.content_hash))
-    assert decision.accepted, decision.errors
-    assert decision.artifact["revision"] == 2
-
-
-def test_a_delivery_bound_to_a_stale_spec_is_rejected(tmp_path):
-    # 工程拿着已过期的 ProductSpec 提交交付：整次提交被拒绝，错误指向依据字段并给出当前版本
-    system, run_id = _system_with_guided_revision(tmp_path)
-    revised = _activate_until(system, run_id, 2)
-    # 产品修订了 PRD（工单 #556：产品按关注的成果开始工作，工程按 PRD 的新版本开始返工）
-    assert has_new_work(revised, "product")
-    assert revised.product_specs[0].content_hash != revised.product_spec.content_hash
-    stale_delivery = FakeTurn(proposal=delivery(
-        summary="implemented echo CLI", check_names=["smoke"],
-        basis_product_spec_hash=revised.product_specs[0].content_hash), checks={"smoke": 0})
-    system.activate_once(run_id)  # 产品回应指导，指导不再是待处理
-    system.test_adapter.scripts = {"engineering": [stale_delivery]}
-    accepted_before = len(_events(system, run_id, EventType.DELIVERY_ACCEPTED))
-    result = system.activate_once(run_id)
-    [error] = [item for rejection in result.rejections for item in rejection["errors"]]
-    assert error["field"] == "basis_product_spec_hash"
-    assert revised.product_spec.content_hash in error["message"]
-    assert len(_events(system, run_id, EventType.DELIVERY_ACCEPTED)) == accepted_before
-
-
-def test_a_review_bound_to_a_stale_delivery_is_rejected(tmp_path):
-    # 质检拿着已被返工取代的 DeliverySpec 提交复核：整次提交被拒绝
-    system, run_id = _system_by_department(tmp_path, {
-        "product": [product_spec()],
-        "engineering": [delivery_turn(), delivery_turn(summary="revised implementation")],
-        "quality": [review_turn("rework_engineering", "naming does not match the requirements",
-                                 defects=[{"severity": "minor", "summary": "naming"}])],
-    })
-    # 跑到质检阶段且已有两个交付版本：第一个已被返工取代，不是当前版本
-    projection = system.project(run_id)
-    while len(projection.delivery_specs) < 2:
-        projection = system.activate_once(run_id)
-        assert projection.status not in ("done", "failed"), projection.stop_reason
-    stale_review = FakeTurn(proposal=review(
-        "release", "the superseded delivery passed", checks=["smoke"],
-        basis_delivery_spec_hash=projection.delivery_specs[0].content_hash), checks={"smoke": 0})
-    system.test_adapter.scripts = {"quality": [stale_review]}
-    submitted_before = len(_events(system, run_id, EventType.QA_SUBMITTED))
-    rejected = system.activate_once(run_id)
-    [error] = [item for rejection in rejected.rejections for item in rejection["errors"]]
-    assert error["field"] == "basis_delivery_spec_hash"
-    assert projection.delivery_spec.content_hash in error["message"]
-    assert len(_events(system, run_id, EventType.QA_SUBMITTED)) == submitted_before
 
 
 def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path):

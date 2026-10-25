@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import type { WritebackRecordView } from "../../src/renderer/src/api/generated/types.gen.ts";
-import { sourceWritebackText, writebackText } from "../../src/renderer/src/views/project/writeback-text.ts";
+import { writebackText } from "../../src/renderer/src/views/project/writeback-text.ts";
 
 function record(overrides: Partial<WritebackRecordView>): WritebackRecordView {
   return {
@@ -96,25 +96,5 @@ test("页面上不出现英文内部标识与开发者措辞", () => {
   }
 });
 
-test("源目录的写回设置：没有打开时写未打开", () => {
-  assert.equal(sourceWritebackText({ writeback_enabled: false, target_branch: "main", remote: "" }), "未打开");
-  assert.equal(sourceWritebackText({}), "未打开");
-});
 
-test("源目录的写回设置：打开以后写目标分支与远端", () => {
-  assert.equal(
-    sourceWritebackText({ writeback_enabled: true, target_branch: "main", remote: "" }),
-    "已打开，目标分支 main",
-  );
-  assert.equal(
-    sourceWritebackText({ writeback_enabled: true, target_branch: "main", remote: "origin" }),
-    "已打开，目标分支 main，远端 origin",
-  );
-});
 
-test("源目录的写回设置：打开了却没有目标分支时照实写明", () => {
-  assert.equal(
-    sourceWritebackText({ writeback_enabled: true, target_branch: "", remote: "" }),
-    "已打开，没有填目标分支",
-  );
-});

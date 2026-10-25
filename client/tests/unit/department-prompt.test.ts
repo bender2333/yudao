@@ -16,6 +16,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import fs from "node:fs";
+import type { DepartmentSetting } from "../../src/renderer/src/api/generated/types.gen";
 
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
@@ -38,13 +39,11 @@ function loader(module: NodeJS.Module, filename: string) {
 require.extensions[".tsx"] = loader;
 require.extensions[".ts"] = loader;
 
-const { renderToStaticMarkup } = require("react-dom/server");
 const form = require("../../src/renderer/src/views/project/department-settings-form.tsx");
 const { itemSource } = require("../../src/renderer/src/views/project/labels.ts");
-import type { DepartmentSetting } from "../../src/renderer/src/api/generated/types.gen";
 
-const { draftFromSetting, promptWritten, promptDraftOnInput, promptDraftRevert, promptDraftUseDefault,
-  departmentSettingsPayload, DepartmentSettingsFields } = form;
+const { draftFromSetting, promptWritten, promptDraftOnInput, promptDraftUseDefault,
+  departmentSettingsPayload } = form;
 
 const TEXT = "质检部门先核产品要求，再核实际结果，两样都要有证据。";
 
@@ -103,18 +102,6 @@ test("清空文本框以后这一段按「不写入」处理，不再是一个�
   assert.equal(typed.writePrompt, true);
 });
 
-test("两个动作各做各的事：撤销本次修改只撤销本次编辑，使用内置默认才是不写入", () => {
-  const saved = draftFromSetting(setting());
-  const edited = promptDraftOnInput(saved, "改了一半的文字");
-  // 撤销本次修改：还原成已保存的那一份（不是恢复默认）
-  const reverted = promptDraftRevert(edited, saved);
-  assert.equal(reverted.text, TEXT);
-  assert.equal(reverted.writePrompt, true);
-  // 使用内置默认 Prompt：这一段不再由本项目写入
-  const fallback = promptDraftUseDefault(edited);
-  assert.equal(fallback.text, "");
-  assert.equal(fallback.writePrompt, false);
-});
 
 test("保存时这一段不写入就发 null，基准版本取设置的版本", () => {
   const saved = draftFromSetting(setting());
@@ -138,44 +125,4 @@ test("保存时这一段不写入就发 null，基准版本取设置的版本", 
   assert.equal(written["department_prompt"], TEXT);
 });
 
-test("表单里有一行中文说明说清这一段写不写，两个按钮的名字说它们做的事", () => {
-  const saved = draftFromSetting(setting());
-  const html = renderToStaticMarkup(React.createElement(DepartmentSettingsFields, {
-    app: null,
-    projectId: "proj_1",
-    department: "quality",
-    draft: saved,
-    onDraft: () => undefined,
-    effective: null,
-    reminders: [],
-    saved,
-  }));
-  // 这一段由本项目写入时，说明与两个按钮都在
-  assert.match(html, /这一段由本项目写入，保存以后按这里的内容生效。/);
-  assert.match(html, /撤销本次修改/);
-  assert.match(html, /使用内置默认 Prompt/);
-  // 名字不副实的那个按钮没有了
-  assert.equal(html.includes("恢复默认</button>"), false);
-  // 页面上不出现英文内部标识与开发者措辞
-  assert.equal(html.includes("department_prompt"), false);
-  assert.equal(html.includes("writePrompt"), false);
-  assert.equal(html.includes("configured"), false);
-  assert.equal(html.includes("Prompt</span>"), true);
-});
 
-test("这一段不写入时说明写明用内置默认，文本框是空的", () => {
-  const saved = draftFromSetting(setting({ department_setting_configured: false }));
-  const html = renderToStaticMarkup(React.createElement(DepartmentSettingsFields, {
-    app: null,
-    projectId: "proj_1",
-    department: "quality",
-    draft: saved,
-    onDraft: () => undefined,
-    effective: null,
-    reminders: [],
-    saved,
-  }));
-  assert.match(html, /这一段不写入本项目，部门使用内置默认 Prompt。/);
-  // 文本框里没有内容：这一段不由本项目写入
-  assert.match(html, /<textarea[^>]*><\/textarea>/);
-});

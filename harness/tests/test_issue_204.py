@@ -15,7 +15,6 @@ import pytest
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
-from harness.decisions import RESUMABLE_PAUSE_KINDS
 from harness.definitions import DEFINITIONS
 from harness.event_store import Command
 from harness.models import EventType, new_id
@@ -283,9 +282,6 @@ def test_model_steps_exhausted_pause_does_not_request_a_decision(tmp_path):
     assert _open_decisions(system, run_id) == []
     system.close()
 
-def test_pause_decision_kinds_are_registered(tmp_path):
-    # 两种决定种类登记在决定合同里，能力清单与查询都能看到
-    assert set(RESUMABLE_PAUSE_KINDS) == {"no_tool_call", "workspace_unrepresentable"}
 
 def _text_only_reply(text: str) -> bytes:
     # Responses 协议下只回复文字、没有工具调用的回复

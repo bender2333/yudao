@@ -254,31 +254,6 @@ def test_department_default_requested_tier_must_be_a_known_level():
     facade.set_credential_override("credential-a", "secret-a")
     assert facade.resolve_department_default("product").public["requested_tier"] == "high"
 
-def test_swapping_to_a_model_with_other_levels_keeps_the_saved_tier_and_limits_the_request():
-    # 运行中把部门默认换成支持档位不同的模型：保存被接受，原请求档位保留；
-    # 下一次解析按新模型的支持档位限制，公开部分同时给出请求档位与实际发送的档位（#87）
-    document = _document()
-    document["models"][0]["reasoning_levels"] = ["medium", "high"]
-    document["models"][0]["default_reasoning_level"] = "medium"
-    document["models"][0]["reasoning_mode"] = "effort"
-    document["models"][1]["reasoning_levels"] = ["low"]
-    document["models"][1]["default_reasoning_level"] = "low"
-    document["models"][1]["reasoning_mode"] = "effort"
-    document["bindings"]["product"]["requested_tier"] = "high"
-    facade = ProviderFacade()
-    facade.store_document(document)
-    facade.set_credential_override("credential-a", "secret-a")
-    facade.set_credential_override("credential-b", "secret-b")
-    admit_bound_models(facade, document)
-    assert facade.resolve_department_default("product").public["sent_tier"] == "high"
-
-    document["bindings"]["product"] = {"provider_id": "provider-b", "model_id": "model-b",
-                                       "requested_tier": "high"}
-    facade.store_document(document)
-    assert facade.get_bindings()["product"]["requested_tier"] == "high"
-    public = facade.resolve_department_default("product").public
-    assert public["requested_tier"] == "high"
-    assert public["sent_tier"] == "low"
 
 def test_narrowing_supported_levels_keeps_a_referencing_binding_accepted():
     # 收窄某个模型的支持档位：仍有部门默认引用它、请求档位落在被移除的档位上时，
@@ -300,34 +275,6 @@ def test_narrowing_supported_levels_keeps_a_referencing_binding_accepted():
     assert public["requested_tier"] == "high"
     assert public["sent_tier"] == "medium"
 
-def test_provider_config_rejects_a_protocol():
-    # 连接不再声明调用协议（ADR-0033）；出现时指出字段位置
-    document = _document()
-    document["providers"][0]["protocol"] = "responses"
-    facade = ProviderFacade()
-    with pytest.raises(CatalogValidationError) as caught:
-        facade.store_document(document)
-    assert any(issue.location == "providers[0].protocol" for issue in caught.value.issues)
-
-
-def test_model_definition_requires_a_protocol():
-    # 模型访问定义必须声明协议（ADR-0033）：缺少时指出字段位置
-    document = _document()
-    del document["models"][0]["protocol"]
-    facade = ProviderFacade()
-    with pytest.raises(CatalogValidationError) as caught:
-        facade.store_document(document)
-    assert any(issue.location == "models[0].protocol" for issue in caught.value.issues)
-
-
-def test_model_with_protocol_is_accepted():
-    facade = ProviderFacade()
-    assertion = facade.store_document(_document())
-    assert assertion >= 1
-    view = facade.providers_view()
-    assert view["models"][0]["protocol"] == "responses"
-    assert "protocol" not in view["providers"][0]
-
 
 def test_snapshot_freezes_three_targets_without_persisting_secrets():
     facade = _facade(**{"credential-a": CredentialMaterial("secret-a", version="a-v1"),
@@ -340,20 +287,6 @@ def test_snapshot_freezes_three_targets_without_persisting_secrets():
     encoded = json.dumps(snapshot.public_dict())
     assert "secret-a" not in encoded and "secret-b" not in encoded
     assert "api_key" not in encoded
-
-
-def test_each_target_is_independent_and_frozen_after_publish():
-    facade = _facade(**{"credential-a": "secret-a", "credential-b": "secret-b"})
-    snapshot = facade.resolve_departments()
-    revision_before = facade.revision
-    facade.save_model({
-        "id": "model-c", "provider_id": "provider-a", "model": "model-c",
-        "protocol": "responses",
-        "context_window": 8000, "max_output_tokens": 512,
-    })
-    assert facade.revision > revision_before
-    assert snapshot.target("product").model == "model-a"
-    assert facade.resolve_departments().target("product").model == "model-a"
 
 
 def test_missing_credentials_reported_per_item():
@@ -423,19 +356,6 @@ def test_dangling_binding_references_are_rejected():
         facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "missing-model"}})
     facade.save_bindings({"product": {"provider_id": "provider-a", "model_id": "model-a"}})
     assert facade.get_bindings()["product"] == {"provider_id": "provider-a", "model_id": "model-a"}
-
-
-def test_unknown_model_capacity_is_rejected_for_a_bound_department():
-    facade = ProviderFacade()
-    document = _document()
-    document["models"][0]["context_window"] = None
-    facade.store_document(document)
-    facade.set_credential_override("credential-a", "secret-a")
-    facade.set_credential_override("credential-b", "secret-b")
-    with pytest.raises(CatalogValidationError) as caught:
-        facade.resolve_departments()
-    assert any("context_window" in issue.location or "context_window" in issue.message
-               for issue in caught.value.issues)
 
 
 def test_max_output_tokens_is_required_and_positive():

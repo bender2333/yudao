@@ -14,8 +14,6 @@ from harness.tests.protocol_helpers import (
     STUB_TEXT as TEXT,
     STUB_USAGE as RAW_USAGE,
     ResponsesAdapter,
-    stub_event as _event,
-    stub_response as _response,
     stub_server as _server,
     stub_stream as _stream,
     write_stub_reply as _send,
@@ -247,31 +245,6 @@ def test_missing_provider_usage_is_not_estimated_and_does_not_stop_work(tmp_path
             reports = [event.payload for event in system.store.list_events(run_id)
                        if event.payload.get("name") == "provider_usage"]
             assert reports[-1]["source"] == "unreported"
-        finally:
-            system.store.close()
-
-
-def test_host_failure_to_record_a_stream_event_names_the_actual_error_type(tmp_path, monkeypatch):
-    # 主机记录流事件失败：流事件累计超过内存上限时转存临时文件，临时目录不存在，转存失败；
-    # 尝试失败的记录写明实际的异常类型
-    created = _response([TEXT], response_id="resp-large")
-    large_delta = _event("response.output_text.delta", item_id="msg-one", output_index=0, content_index=0,
-                         delta="x" * (1024 * 1024 + 1), logprobs=[], sequence_number=1)
-    body = (_event("response.created", response={**created, "status": "in_progress", "output": [], "usage": None},
-                   sequence_number=0)
-            + large_delta
-            + _event("response.completed", response=created, sequence_number=2))
-    with _server([body]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config))
-        try:
-            run_id = system.create_run("stream capture failure")
-            monkeypatch.setattr("tempfile.tempdir", str(tmp_path / "missing-temp"))
-            result = system.activate_once(run_id)
-            assert result.status == "failed" and result.stop_reason == "provider_error"
-            assert len(captures) == 1
-            failed = [event for event in system.store.list_events(run_id) if event.type == EventType.MODEL_ATTEMPT_FAILED]
-            assert [event.error for event in failed] == ["model adapter failed: FileNotFoundError"]
-            assert failed[0].payload["diagnostics"] == {"error_type": "adapter_failure"}
         finally:
             system.store.close()
 

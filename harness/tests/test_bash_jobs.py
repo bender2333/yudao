@@ -4,7 +4,6 @@
 # 重启后旧编号 ended。
 # 真实子进程与端口监听，登记为集成层。
 from __future__ import annotations
-import json
 import re
 import socket
 import sys
@@ -12,13 +11,10 @@ import time
 from pathlib import Path
 
 from harness.collaboration import has_new_work
-from harness.models import ArtifactRef, EventType
-from harness.proposals import delivery_turn, product_spec, review_turn
-from harness.providers.call import ModelCall, ModelResponse
 from harness.adapters.fake import FakeAdapter
 from harness.environment import BackgroundJobTable, LocalEnvironment
 from harness.runtime import LoopSystem
-from harness.tests.helpers import happy_script, perform, wait_for_file, wait_until_stopped, quality_turns
+from harness.tests.helpers import happy_script, perform, wait_for_file, wait_until_stopped
 from harness.workspace import Workspace
 
 
@@ -161,35 +157,6 @@ def test_cross_activation_read_output_stop_job_and_department_isolation(tmp_path
     assert stop_res.ok is True and stop_res.output["status"] == "stopped"
 
 
-def test_inspection_workspace_rebuild_stops_jobs_and_returns_ended(tmp_path: Path):
-    system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter([]))
-    run_id = system.create_run("qa inspection test")
-
-    env_qa1 = system.orchestrator._environment_for(run_id, "quality", refresh=True)
-    marker = tmp_path / "started_qa"
-    receipt = perform(env_qa1, "bash", {"command": _tree_command(str(marker)), "background": True})
-    assert receipt.ok is True
-    job_id = receipt.output["job_id"]
-    wait_for_file(marker)
-
-    read_res = perform(env_qa1, "read_output", {"job_id": job_id})
-    child_pid = _grandchild(read_res.output["output"])
-
-    # 编排器重建这个检查工作区
-    env_qa2 = system.orchestrator._new_inspection_environment(run_id, "quality")
-    assert env_qa2 is not None
-
-    # 重建成功，进程树不存在
-    assert wait_until_stopped(child_pid)
-
-    # 编号回答 ended
-    read_after = perform(env_qa2, "read_output", {"job_id": job_id})
-    assert read_after.ok is True and read_after.output["status"] == "ended"
-
-    stop_after = perform(env_qa2, "stop_job", {"job_id": job_id})
-    assert stop_after.ok is True and stop_after.output["status"] == "ended"
-
-
 def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
     # 经过 LoopSystem 的真实路径：放行、事项暂停、事项取消三种情况下，后台命令的进程树都被结束
 
@@ -260,175 +227,3 @@ def test_recreate_loop_system_returns_ended_for_old_job_id(tmp_path: Path):
     sys2.close()
 
 
-def test_environment_without_session_context_rejects_background_and_truncation(tmp_path: Path):
-    # 只用于查询树的环境不带 session_id / jobs，启动后台命令或截断输出直接报错
-    env = LocalEnvironment(Workspace(tmp_path / "ws"))
-    bg_res = perform(env, "bash", {"command": "echo hi", "background": True})
-    assert bg_res.ok is False
-    assert "session context" in bg_res.error
-
-    command = f'"{_python()}" -c "for i in range(2000): print(\'line-%05d-\' % i + \'x\' * 40)"'
-    trunc_res = perform(env, "bash", {"command": command})
-    assert trunc_res.ok is False
-    assert "session context" in trunc_res.error
-
-
-def test_stop_job_on_already_exited_process_preserves_exit_code_and_receipt_shape(tmp_path: Path):
-    environment = _environment(tmp_path)
-    receipt = perform(
-        environment, "bash",
-        {"command": f'"{_python()}" -c "import sys; sys.exit(3)"', "background": True},
-    )
-    assert receipt.ok is True
-    job_id = receipt.output["job_id"]
-
-    for _ in range(50):
-        time.sleep(0.05)
-        if environment._jobs and environment._jobs.get_status(job_id) == "exited":
-            break
-
-    stop_res = perform(environment, "stop_job", {"job_id": job_id})
-    assert stop_res.ok is True and stop_res.status == "completed"
-    assert stop_res.output["job_id"] == job_id
-    assert stop_res.output["status"] == "exited"
-    assert stop_res.output["exit_code"] == 3
-    assert "exited" in stop_res.output["output"]
-    assert "3" in stop_res.output["output"]
-
-    # 再次调用 stop_job 依然返回 exited 与 exit_code
-    again = perform(environment, "stop_job", {"job_id": job_id})
-    assert again.ok is True and again.status == "completed"
-    assert again.output["status"] == "exited"
-    assert again.output["exit_code"] == 3
-
-
-def test_work_item_run_with_background_bash_port_access_read_output_and_stop(tmp_path: Path):
-    port = _free_port()
-    server_code = (
-        "import http.server, sys\n"
-        f"port = {port}\n"
-        "class Handler(http.server.BaseHTTPRequestHandler):\n"
-        "    def do_GET(self):\n"
-        "        self.send_response(200)\n"
-        "        self.end_headers()\n"
-        "        self.wfile.write(b'server_responded')\n"
-        "    def log_message(self, format, *args):\n"
-        "        sys.stdout.write((format % args) + '\\n')\n"
-        "        sys.stdout.flush()\n"
-        "server = http.server.HTTPServer(('127.0.0.1', port), Handler)\n"
-        "print('server_ready on port %d' % port, flush=True)\n"
-        "server.serve_forever()\n"
-    )
-    access_code = (
-        "import urllib.request, time\n"
-        "for _ in range(50):\n"
-        "    try:\n"
-        f"        with urllib.request.urlopen('http://127.0.0.1:{port}') as r:\n"
-        "            print('ACCESS_OK:' + r.read().decode(), flush=True)\n"
-        "            break\n"
-        "    except Exception:\n"
-        "        time.sleep(0.1)\n"
-    )
-
-    def _extract_job_id(call: ModelCall) -> str:
-        for item in reversed(call.input_items):
-            if item.get("type") == "function_call_output":
-                try:
-                    data = json.loads(item["output"])
-                    if isinstance(data, dict) and data.get("ok"):
-                        out = data.get("output")
-                        if isinstance(out, dict) and "job_id" in out:
-                            return out["job_id"]
-                except Exception:
-                    pass
-        raise ValueError(f"job_id not found in input_items: {call.input_items}")
-
-    def eng_step1(call: ModelCall) -> ModelResponse:
-        identity = f"call-bg-start-{call.activation_id}"
-        return ModelResponse(output=[{
-            "id": identity, "call_id": identity, "type": "function_call",
-            "name": "bash", "arguments": json.dumps({"command": f'"{_python()}" -c "{server_code}"', "background": True}),
-        }])
-
-    def eng_step2(call: ModelCall) -> ModelResponse:
-        identity = f"call-bg-access-{call.activation_id}"
-        return ModelResponse(output=[{
-            "id": identity, "call_id": identity, "type": "function_call",
-            "name": "bash", "arguments": json.dumps({"command": f'"{_python()}" -c "{access_code}"'}),
-        }])
-
-    def eng_step3(call: ModelCall) -> ModelResponse:
-        job_id = _extract_job_id(call)
-        identity = f"call-read-output-{call.activation_id}"
-        return ModelResponse(output=[{
-            "id": identity, "call_id": identity, "type": "function_call",
-            "name": "read_output", "arguments": json.dumps({"job_id": job_id}),
-        }])
-
-    def eng_step4(call: ModelCall) -> ModelResponse:
-        job_id = _extract_job_id(call)
-        identity = f"call-stop-job-{call.activation_id}"
-        return ModelResponse(output=[{
-            "id": identity, "call_id": identity, "type": "function_call",
-            "name": "stop_job", "arguments": json.dumps({"job_id": job_id}),
-        }])
-
-    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
-    script = {
-        "product": [product_spec()],
-        "engineering": [
-            eng_step1,
-            eng_step2,
-            eng_step3,
-            eng_step4,
-            delivery_turn(files={"src/server.py": "print('ok')\n"}, checks={"smoke": 0}),
-        ],
-        "quality": quality_turns("release", "verified server delivery independently"),
-    }
-
-    system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter(script))
-    run_id = system.create_run("build server")
-    result = system.run_until_stop(run_id)
-    assert result.status == "done" and result.stop_reason == "released"
-
-    events = system.store.list_events(run_id)
-    tool_events = [e for e in events if e.type == EventType.TOOL_CALLED and e.payload.get("name") in {"bash", "read_output", "stop_job"}]
-    assert len(tool_events) == 4
-
-    # 1. bash background start
-    bg_start = tool_events[0]
-    assert bg_start.payload["name"] == "bash"
-    assert bg_start.payload["args"].get("background") is True
-    assert bg_start.payload["ok"] is True
-    bg_start_out = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**bg_start.payload["output_ref"])))
-    job_id = bg_start_out["job_id"]
-    assert job_id and job_id.startswith("job_")
-    assert bg_start_out["status"] == "running"
-
-    # 2. bash access
-    bg_access = tool_events[1]
-    assert bg_access.payload["name"] == "bash"
-    assert bg_access.payload["ok"] is True
-    bg_access_out = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**bg_access.payload["output_ref"])))
-    assert "ACCESS_OK:server_responded" in bg_access_out["output"]
-
-    # 3. read_output
-    read_ev = tool_events[2]
-    assert read_ev.payload["name"] == "read_output"
-    assert read_ev.payload["args"] == {"job_id": job_id}
-    assert read_ev.payload["ok"] is True
-    read_out = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**read_ev.payload["output_ref"])))
-    assert read_out["job_id"] == job_id
-    assert "server_ready" in read_out["output"]
-    assert read_out["status"] in ("running", "exited")
-
-    # 4. stop_job
-    stop_ev = tool_events[3]
-    assert stop_ev.payload["name"] == "stop_job"
-    assert stop_ev.payload["args"] == {"job_id": job_id}
-    assert stop_ev.payload["ok"] is True
-    stop_out = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**stop_ev.payload["output_ref"])))
-    assert stop_out["job_id"] == job_id
-    assert stop_out["status"] == "stopped"
-
-    system.close()

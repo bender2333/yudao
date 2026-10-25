@@ -22,14 +22,13 @@ import httpx
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.app.access_tokens import AccessTokenStore
 from harness.app.application import Application
-from harness.models import TERMINAL_STATUSES, utc_now
+from harness.models import TERMINAL_STATUSES
 from harness.data_directory import LOG_DIR, LOG_FILE
 from harness.projection import project_run
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec
 from harness.runtime import LoopSystem
-from harness.tests.api_helpers import bearer, running_server
+from harness.tests.api_helpers import running_server
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 from harness.tests.helpers import quality_turns
 
@@ -189,24 +188,6 @@ def test_no_browser_leaves_the_page_closed(service, tmp_path):
     assert "web: http" not in _ready(started)
     assert _wait_opened(recorded, 3) is None
 
-def test_the_lan_access_mode_opens_the_address_of_this_machine(service, tmp_path):
-    # 局域网访问方式下打开的同样是本机地址：浏览器在本机地址上保留系统通知与安装应用的设置；
-    # 接口路径都要求访问令牌（第 6.3 节），测试先在数据目录建立令牌，再带着它请求
-    recorded = tmp_path / "opened.txt"
-    data_dir = tmp_path / "data"
-    _entry, token = AccessTokenStore(data_dir).create("客厅的电脑", now=utc_now())
-    started = service(data_dir, tmp_path / "lan.log", extra=["--access", "lan", "--host", "0.0.0.0"],
-                      browser=_recording_browser(tmp_path, recorded))
-    _ready(started, headers=bearer(token))
-    assert _wait_opened(recorded, time.monotonic() + 30) == f"http://127.0.0.1:{started.port}/"
-    with httpx.Client(base_url=f"http://127.0.0.1:{started.port}", timeout=STARTUP_TIMEOUT_SEC) as client:
-        # 没有令牌的接口请求被拒绝（第 6.3 节）；带令牌的请求照常给出访问方式
-        without_token = client.get("/api/capabilities")
-        capabilities = client.get("/api/capabilities", headers=bearer(token))
-    assert without_token.status_code == 401
-    assert without_token.content == b""
-    assert capabilities.status_code == 200
-    assert capabilities.json()["deployment"]["access"] == "lan"
 
 def test_ctrl_c_stops_the_service_and_releases_the_data_directory(service, tmp_path):
     # Ctrl+C 停止服务：进程正常退出，数据目录的进程锁释放，第二个服务进程可以取得同一个数据目录

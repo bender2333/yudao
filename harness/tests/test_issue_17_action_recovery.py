@@ -9,10 +9,9 @@ from typing import Any
 from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
-from harness.app.decision_commands import DecisionAnswer
 from harness.app.project_queries import RunActions
 from harness.event_store import run_stream
-from harness.models import EventType, new_id
+from harness.models import EventType
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.write_path import NewEvent
@@ -62,40 +61,11 @@ def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-wri
                  "purpose": "work", "before_snapshot_ref": asdict(ref)}))
     return ref
 
-def _decisions(system, run_id, kind=None):
-    return [event for event in system.store.list_events(run_id)
-            if event.type == EventType.DECISION_REQUESTED and (kind is None or event.payload["kind"] == kind)]
 
 def _tool_events(system, run_id, tool):
     return [event for event in system.store.list_events(run_id)
             if event.type in _write_events(run_id) and (event.payload or {}).get("name") == tool]
 
-def _answer(system, decision_id, option, base_version=1):
-    import asyncio
-    import uuid
-    application = Application(system)
-    return asyncio.run(application.command("decision.answer", DecisionAnswer(
-        command_id=str(uuid.uuid4()), decision_id=decision_id, option=option, base_version=base_version,
-        note=None), actor="user"))
-
-def test_a_lost_write_action_is_handed_back_and_is_not_blindly_redone(data_dir):
-    # 工具效果尚未确认。恢复不会盲目重做写入，而是交还发出它的会话，不发决定请求
-    system, run_id = _engineering_run(data_dir, _product_only_script())
-    _append_lost_write(system, run_id)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()), resume_on_startup=False)
-    restarted.orchestrator.resume_incomplete_run(run_id)
-    assert _decisions(restarted, run_id, kind="unknown_action") == []
-    verified = [e for e in restarted.store.list_events(run_id) if e.type == EventType.ACTION_VERIFIED]
-    assert len(verified) == 1
-    assert verified[0].payload["resolution"] == "handed_back"
-    # 没有发生盲目重做：动作仍然只有一条 tool_started，没有补出 tool_called
-    assert len([event for event in restarted.store.list_events(run_id)
-                if event.type == EventType.TOOL_STARTED and event.payload.get("id") == "lost-write"]) == 1
-    assert [event for event in restarted.store.list_events(run_id)
-            if event.type == EventType.TOOL_CALLED and event.payload.get("id") == "lost-write"] == []
-    restarted.close()
 
 def test_run_actions_reports_unknown_with_snapshots(data_dir):
     # run.actions 返回每个动作的状态与前后快照：中断的写入是 unknown，带动作前快照

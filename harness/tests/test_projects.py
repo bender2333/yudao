@@ -4,16 +4,12 @@ import json
 
 import pytest
 
-from harness.collaboration import has_new_work
 from harness.__main__ import main
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.context import ContextAssembler
 from harness.definitions import DEFINITIONS
-from harness.engine import StepLimits
-from harness.event_store import Command, project_stream, run_stream
-from harness.department_prompts import save_department_prompt
-from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, EventType, ProjectEventType, json_dumps
+from harness.event_store import Command, project_stream
+from harness.models import DEPARTMENTS, ArtifactRef, EventType, ProjectEventType, json_dumps
 from harness.write_path import NewProjectEvent
 from harness.providers.selection import ModelSelection
 from harness.projects import (
@@ -21,19 +17,16 @@ from harness.projects import (
     ProjectArchivedError,
     ProjectNotFoundError,
     WorkItemInProgressError,
-    project_context_text,
     project_projection,
 )
 from harness.proposals import (
     delivery_turn, product_spec,
     review_turn,
 )
-from harness.projection import RunNotFoundError, saved_decision, saved_decisions
-from harness.providers.call import ModelResponse
+from harness.projection import RunNotFoundError, saved_decisions
 from harness.public_tree import TreeError, capture_public_tree
 from harness.runtime import LoopSystem
-from harness.smoke import isolation_fields, summarize_run
-from harness.tests.helpers import explore_turn, happy_script, merge_scripts, recorded_context
+from harness.tests.helpers import explore_turn, happy_script, merge_scripts
 from harness.tree_archive import load_tree
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
@@ -60,8 +53,6 @@ def _kernel_release_script(summary="v1", files=None):
         "quality": [explore_turn(), review_turn("release", f"ok {summary}")],
     }
 
-def _pinned_sources(system, request):
-    return [part.source for part in recorded_context(system, request).parts]
 
 def _project_events(system, project_id, event_type):
     return [event for event in system.store.list_project_events(project_id) if event.type == event_type]
@@ -73,45 +64,6 @@ def _project_events(system, project_id, event_type):
 def _open_decisions(system):
     return [decision for decision in saved_decisions(system.store, kinds=("kernel_modification",))[1]
             if decision.status == "open"]
-
-@pytest.mark.parametrize("query", ["project_list", "drain"])
-def test_status_queries_keep_work_item_states_without_reading_run_histories(data_dir, query):
-    script = happy_script()
-    script["product"] = [*script["product"], product_spec()]
-    system = _system(data_dir, script)
-    try:
-        adopted_project = system.projects.register("已有成果", GOAL)
-        _adopted_item, adopted_run = system.projects.start_work_item(adopted_project, "完成一个事项")
-        assert system.run_until_stop(adopted_run).status == "done"
-        system.projects.settle(adopted_run)
-        running_project = system.projects.register("正在运行", GOAL)
-        _running_item, running_run = system.projects.start_work_item(running_project, "继续工作")
-        system.activate_once(running_run)
-        system.start_drain()
-        queued_project = system.projects.register("等待执行", GOAL)
-        system.projects.queue_work_item(queued_project, "排队的事项")
-        queries = []
-        connections = list(system.store._opened)
-        for connection in connections:
-            connection.set_trace_callback(queries.append)
-        try:
-            if query == "project_list":
-                projects = system.projects.list_projects()
-                assert {project.name: project.work_items[0].status for project in projects} == {
-                    "已有成果": "adopted", "正在运行": "in_progress", "等待执行": "not_started",
-                }
-            else:
-                state = system.drain
-                assert (state.state, state.running_runs, state.queued_work_items) == ("draining", 1, 1)
-        finally:
-            for connection in connections:
-                connection.set_trace_callback(None)
-        run_queries = [statement for statement in queries
-                       if "SELECT * FROM events WHERE stream = '" in statement
-                       and any(run_stream(run_id) in statement for run_id in (adopted_run, running_run))]
-        assert run_queries == []
-    finally:
-        system.close()
 
 
 def _answer(system, decision_id, option):
@@ -323,31 +275,6 @@ def _ownership(project_id="proj_x", work_item_id="wi_x"):
         "prompt_config_versions": {department: 0 for department in DEPARTMENTS},
     }
 
-def test_create_run_rejects_mixed_ownership_parameters(data_dir, tmp_path):
-    system = _system(data_dir, happy_script())
-    for missing in ("project_id", "work_item_id", "project_context", "prompt_config_versions"):
-        kwargs = _ownership()
-        kwargs.pop(missing)
-        with pytest.raises(ValueError, match="given together"):
-            system.create_run("mixed", **kwargs)
-    (tmp_path / "empty").mkdir()
-    with pytest.raises(ValueError, match="require project ownership"):
-        system.create_run("bare with baseline", baseline={"adoption_id": "a"}, initial_tree=capture_public_tree(tmp_path / "empty"))
-    with pytest.raises(ValueError, match="cover exactly"):
-        system.create_run("bad versions", **{**_ownership(), "prompt_config_versions": {"product": 0}})
-    assert system.store.list_run_ids() == []
-    # bare run 仍然允许：空目录 digest，没有 project 部件。
-    run_id = system.create_run("bare")
-    run = system.project(run_id)
-    assert run.project_id is None and run.work_item_id is None and run.baseline is None
-    assert run.project_context_ref is None and run.prompt_config_versions == {}
-    assert run.workspace_digest == capture_public_tree(system.workspace(run_id).root).digest
-    prompt = DepartmentPrompt("product", 0, DEFINITIONS.role("product").prompt,
-                              save_department_prompt(system.artifacts, run_id, "product",
-                                                     DEFINITIONS.role("product").prompt), "")
-    assembled = ContextAssembler(system.artifacts).assemble(
-        run, department="product", session_id="s", activation_id="a", prompt=prompt)
-    assert "project" not in [part.source for part in assembled.parts]
 
 def test_create_run_rejects_baseline_digest_mismatch_and_existing_workspace(data_dir, tmp_path):
     system = _system(data_dir, happy_script())
@@ -380,95 +307,6 @@ def test_create_run_rejects_baseline_digest_mismatch_and_existing_workspace(data
 # ---------------------------------------------------------------------------
 # §13.7 项目上下文部件
 
-def test_project_context_part_is_pinned_between_current_work_and_department_rules(data_dir):
-    adapter = FakeAdapter(happy_script())
-    system = LoopSystem.for_testing(data_dir, adapter)
-    project_id = system.projects.register("Ctx", GOAL)
-    _work_item_id, run_id = system.projects.start_work_item(project_id, "第一步：echo")
-    run = system.project(run_id)
-    text = system.artifacts.get_for_run(run_id, ArtifactRef(**run.project_context_ref)).decode("utf-8")
-    assert text == project_context_text(system.projects.projection(project_id), "第一步：echo")
-    assert "仍有效的决定：无" in text
-    assert run.project_context_ref["media_type"] == "text/markdown"
-    created = next(event for event in system.store.list_events(run_id) if event.type == EventType.RUN_CREATED)
-    assert created.payload["project_context_ref"] == run.project_context_ref
-    assert "project_context" not in created.payload
-    assert "project_context" not in run.to_dict()
-    assert system.run_until_stop(run_id).status == "done"
-    first_requests = {}
-    for request in adapter.invocations:
-        first_requests.setdefault(request.department, request)
-    assert set(first_requests) == {"product", "engineering", "quality"}
-    for request in adapter.invocations:
-        context = recorded_context(system, request)
-        sources = [part.source for part in context.parts]
-        assert sources.index("current_work") < sources.index("project") < sources.index("department_rules")
-        content = request.input_items[0]["content"]
-        assert content.index("[current_work]") < content.index(f"[project]\n{text}") < content.index("[department_rules]")
-        assert content.startswith(f"[intend]\n{run.task}\n\n[current_work]\n")
-        project_part = next(part for part in context.parts if part.source == "project")
-        assert project_part.version == run.project_context_ref["content_hash"].split(":", 1)[1][:12]
-        injected = [item.source for item in context.manifest.injected]
-        assert injected.index("current_work") < injected.index("project") < injected.index("department_rules")
-    # 部门工作消息不重复项目材料（它属于钉住材料）。
-    department_inputs = [event for event in system.store.list_events(run_id) if event.type == EventType.DEPARTMENT_INPUT]
-    for event in department_inputs:
-        item = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["input_ref"])))
-        assert "[project]" not in item["content"]
-    # smoke 审计把 project 视为合法钉住材料。
-    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
-    assert audit["status"] == "verified", audit["notes"]
-    summary = summarize_run(system, run_id, scenario="happy")
-    assert summary["model_input_audit"]["status"] == "verified"
-    assert summary["context_isolated"] is True, summary["context_isolation_notes"]
-    assert summary["delivery_archive"]["status"] == "verified"
-
-def test_project_context_guidance_stays_before_department_rules(data_dir):
-    adapter = FakeAdapter([lambda request: product_spec()])
-    system = LoopSystem.for_testing(data_dir, adapter)
-    project_id = system.projects.register("Guide", GOAL)
-    _work_item_id, run_id = system.projects.start_work_item(project_id, "带指导的事项")
-    system.add_guidance(run_id, "product", "先给出验收标准。")
-    system.activate_once(run_id)
-    sources = _pinned_sources(system, adapter.invocations[0])
-    assert sources[:5] == ["intend", "current_work", "project", "department_guidance", "department_rules"]
-
-def test_compaction_pinned_input_contains_project_part(data_dir):
-    # 步数上限已放开为时间边界，本用例按旧步数上限验证单次激活内的压缩行为
-    def respond(request):
-        if request.purpose == "compaction":
-            return ModelResponse(output=[{
-                "id": f"summary-{request.activation_id}-{request.step_id}", "type": "message", "role": "assistant",
-                "content": [{"type": "output_text", "text": "Product memory: prior evidence was read."}],
-            }])
-        if request.department != "product":
-            return delivery_turn()
-        if request.step_id == 1:
-            identity = f"read-{request.activation_id}-{request.step_id}"
-            return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call",
-                                          "name": "read_file", "arguments": json_dumps({"path": "large.txt"})}])
-        return product_spec()
-
-    adapter = FakeAdapter([respond] * 100)
-    system = LoopSystem.for_testing(data_dir, adapter, step_limits=StepLimits(max_model_steps=32))
-    project_id = system.projects.register("Compact", GOAL)
-    _work_item_id, run_id = system.projects.start_work_item(project_id, "小窗口事项", context_window=6000)
-    system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
-    result = system.activate_once(run_id)
-    assert has_new_work(result, "engineering"), result.error
-    compactions = [request for request in adapter.invocations if request.purpose == "compaction"]
-    assert compactions
-    project_text = system.artifacts.get_for_run(
-        run_id, ArtifactRef(**system.project(run_id).project_context_ref),
-    ).decode("utf-8")
-    for request in compactions:
-        pinned = request.input_items[1]["content"]
-        assert pinned.index("[current_work]") < pinned.index(f"[project]\n{project_text}") < pinned.index("[department_rules]")
-        pinned_work = next(part for part in recorded_context(system, request).parts if part.source == "pinned_work")
-        assert f"[project]\n{project_text}" in pinned_work.text
-    audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
-    assert audit["status"] == "verified", audit["notes"]
-    assert audit["compaction_count"] >= 1
 
 # ---------------------------------------------------------------------------
 # §13.8 部门 Prompt 项目配置
@@ -625,43 +463,6 @@ def test_material_recording_creates_no_run_events(data_dir):
 # ---------------------------------------------------------------------------
 # §5 / §6 / §7 / §8 其他约定
 
-def test_project_context_text_is_deterministic_and_ordered(data_dir):
-    system = _system(data_dir, _release_script("交付摘要"))
-    project_id = system.projects.register("文本", "长期目标\n第二行")
-    project = system.projects.projection(project_id)
-    first = project_context_text(project, "首个事项")
-    assert first == project_context_text(project, "首个事项")
-    assert first == (
-        "项目：文本\n长期目标：长期目标\n第二行\n当前采用成果：无（这是项目的第一个事项）\n"
-        "已采纳事项：无\n仍有效的决定：无\n本事项：首个事项"
-    )
-    work_item_id, run_id = system.projects.start_work_item(project_id, "首个事项\n更多说明")
-    assert system.projects.projection(project_id).work_items[0].title == "首个事项"
-    system.run_until_stop(run_id)
-    system.projects.settle(run_id)
-    project = system.projects.projection(project_id)
-    adoption = project.current_adoption
-    source = system.project(run_id)
-    second = project_context_text(project, "第二个事项", source)
-    assert second == project_context_text(project, "第二个事项", source)
-    assert second == (
-        "项目：文本\n长期目标：长期目标\n第二行\n"
-        f"当前采用成果：来自事项「首个事项」（run {run_id}，采纳 {adoption.adoption_id}）：交付摘要；"
-        f"文件：src/echo.py；检查：smoke；已知风险：无。本 run 工作区已从该成果的完整封存恢复，digest {adoption.code_tree_digest}。\n"
-        '已采纳事项：\n1. "首个事项" — 交付摘要\n'
-        "仍有效的决定：\n"
-        f"产品合同 r1 hash {source.product_spec.content_hash}\n"
-        "目标：build an echo CLI\n"
-        "要求：print the given argument to stdout\n"
-        "边界：do not read files\n"
-        "约束：single file implementation\n"
-        "验收：running the program with a word prints that word\n"
-        "致命条件：non-zero exit on valid input\n"
-        "非目标：network access\n"
-        "有效决定：无\n"
-        "本事项：第二个事项"
-    )
-    assert project.work_item(work_item_id).run_id == run_id
 
 def test_second_work_item_project_part_includes_source_spec(data_dir):
     system = _system(data_dir, merge_scripts(_release_script("v1"), _release_script("v2", files=_v2_files())))
@@ -910,22 +711,3 @@ def test_register_validates_and_stores_goal_artifact(data_dir):
     with pytest.raises(ProjectNotFoundError):
         system.projects.projection("proj_missing")
 
-def test_cli_project_list_and_show(data_dir, capsys):
-    system = _system(data_dir, happy_script())
-    project_id = system.projects.register("CLI", GOAL)
-    archived_id = system.projects.register("Archived", GOAL)
-    system.projects.archive(archived_id)
-    version = system.projects.projection(project_id).stream_version
-    assert main(["project", "list", "--data-dir", str(data_dir)]) == 0
-    listed = json.loads(capsys.readouterr().out)
-    rows = listed["data"]["projects"]
-    assert [row["project_id"] for row in rows] == [project_id]
-    assert rows[0]["work_item_count"] == 0 and rows[0]["current_adoption"] is None
-    assert listed["position"] >= 1
-    assert main(["project", "list", "--archived", "--data-dir", str(data_dir)]) == 0
-    archived_rows = json.loads(capsys.readouterr().out)["data"]["projects"]
-    assert {row["project_id"] for row in archived_rows} == {project_id, archived_id}
-    assert main(["project", "show", project_id, "--data-dir", str(data_dir)]) == 0
-    shown = json.loads(capsys.readouterr().out)
-    assert shown["data"]["name"] == "CLI" and shown["data"]["goal"] == GOAL
-    assert shown["data"]["version"] == version

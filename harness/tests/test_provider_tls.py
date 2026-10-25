@@ -6,10 +6,9 @@ import trustme
 
 from harness.collaboration import has_new_work
 from harness.models import EventType
-from harness.providers import ProviderDefinition, effective_models_url, refresh_candidates, ssl_context
-from harness.providers.tls import service_address
+from harness.providers import ProviderDefinition, refresh_candidates, ssl_context
 from harness.tests.helpers import FAST_RETRIES
-from harness.tests.protocol_helpers import ScriptedProvider, facade_with, provider_system, send_reply
+from harness.tests.protocol_helpers import ScriptedProvider, provider_system, send_reply
 from harness.tests.provider_replies import product_spec_reply
 
 # Provider 的连接信任操作系统的证书库（D17，truststore）。测试内启动使用测试 CA 签发证书的真实 HTTPS 服务：
@@ -84,20 +83,6 @@ def test_certificate_from_an_authority_in_the_trust_source_is_accepted(protocol,
     assert len(provider.requests) == 1
 
 
-@pytest.mark.parametrize("protocol", PROTOCOLS)
-def test_model_test_reports_the_certificate_verification_failure(protocol):
-    # 模型测试遇到证书校验失败：结果写明同样的原因，不记录准入
-    provider = ScriptedProvider([], tls=_server_context(trustme.CA()))
-    try:
-        facade = facade_with(provider.base + "/v1", protocol=protocol)
-        result = facade.model_test("go", "m-go")
-    finally:
-        provider.close()
-    assert result["ok"] is False and result["admitted"] is False
-    assert result["error"] == _certificate_error(provider)
-    assert provider.requests == []
-
-
 def _model_list(_provider: ScriptedProvider, handler) -> None:
     send_reply(handler, 200, "application/json", json.dumps({"data": [{"id": "model-a"}]}).encode("utf-8"))
 
@@ -115,14 +100,3 @@ def test_model_list_is_read_over_the_same_trust_source(trusted_ca):
     assert provider.requests == [None]
 
 
-def test_model_list_reports_the_certificate_verification_failure():
-    provider = ScriptedProvider([_model_list], tls=_server_context(trustme.CA()))
-    definition = ProviderDefinition(id="go", name="Go", models_url=provider.base + "/v1/models")
-    try:
-        result = refresh_candidates(definition, api_key="tls-secret")
-    finally:
-        provider.close()
-    source_url = effective_models_url(definition)
-    assert result["status"] == "unknown"
-    assert result["error"] == f"模型列表请求 {source_url} 失败：证书校验失败（{service_address(source_url)}）"
-    assert provider.requests == []

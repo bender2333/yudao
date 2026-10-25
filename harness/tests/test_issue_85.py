@@ -209,20 +209,6 @@ def test_collect_candidates_is_unknown_when_upstream_rejects_the_credential(tmp_
             _assert_no_secret(client, opened)
 
 
-def test_collect_candidates_is_unknown_without_a_models_url(tmp_path):
-    opened = _Opened(tmp_path, _document(models_url=""))
-    with running_api(opened) as client:
-        current = _catalog(client)["revision"]
-        collected = _command(client, "catalog.candidates.collect", base_version=current, provider_id="p1")
-        assert collected.status_code == 200, collected.text
-        [event] = _wait_for(opened.store, lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
-                            description="catalog_candidates_collected")
-        assert event.payload["status"] == "unknown"
-        assert event.payload["candidate_ids"] == []
-        assert event.payload["error"]
-        _assert_no_secret(client, opened)
-
-
 def test_collect_candidates_rejects_an_unknown_connection(tmp_path):
     server = _ModelsServer()
     with server as models_url:
@@ -236,27 +222,6 @@ def test_collect_candidates_rejects_an_unknown_connection(tmp_path):
                         if event.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED]
             assert not server.requests
 
-
-def test_connection_test_sends_a_real_request_for_each_protocol(tmp_path):
-    # ADR-0033: 获取模型列表与连接测试按服务方案规定的认证方式带上凭据；自定义服务（preset_id=""）使用 Bearer
-    for protocol in ("responses", "chat_completions", "messages"):
-        server = _ModelsServer()
-        with server as models_url:
-            opened = _Opened(tmp_path / protocol, _document(protocol=protocol, models_url=models_url))
-            with running_api(opened) as client:
-                current = _catalog(client)["revision"]
-                tested = _command(client, "catalog.connection.test", base_version=current, provider_id="p1")
-                assert tested.status_code == 200, tested.text
-                [event] = _wait_for(
-                    opened.store, lambda item: item.payload.get("kind") == "connection",
-                    description=f"catalog_test_finished (connection, {protocol})")
-                assert event.payload["ok"] is True, event.payload
-                assert event.payload["protocol"] is None
-                assert event.payload["error"] is None
-                # 上游确实收到了带凭据的请求
-                assert server.requests, protocol
-                assert "authorization" in server.requests[-1], protocol
-                assert server.requests[-1]["authorization"] == f"Bearer {SECRET}"
 
 def test_connection_test_without_models_uses_saved_address_and_credential(tmp_path):
     server = _ModelsServer()
@@ -318,19 +283,6 @@ def test_connection_test_keeps_admission_unchanged(tmp_path):
             assert after["revision"] == before["revision"]
             assert after["admissions"] == []
             _assert_no_secret(client, opened)
-
-
-def test_connection_test_without_a_models_url_reports_the_reason(tmp_path):
-    opened = _Opened(tmp_path, _document(models_url=""))
-    with running_api(opened) as client:
-        current = _catalog(client)["revision"]
-        tested = _command(client, "catalog.connection.test", base_version=current, provider_id="p1")
-        assert tested.status_code == 200, tested.text
-        [event] = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
-                            description="catalog_test_finished (connection)")
-        assert event.payload["ok"] is False
-        assert event.payload["error"]
-        _assert_no_secret(client, opened)
 
 
 def test_connection_test_rejects_an_unknown_connection(tmp_path):

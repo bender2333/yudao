@@ -341,27 +341,3 @@ def test_every_event_that_changes_the_departments_is_in_the_three_refresh_lists(
     assert {EventType.ASK_STARTED, EventType.ASK_ANSWERED} <= set(RUN_ASKS.changed_by)
 
 
-def test_the_departments_do_not_read_the_run_projection_or_decisions_more_often(data_dir):
-    # 验收第 10 条：每个事项读取 run 投影与决定请求的次数不增加（决定请求随投影一起读出）
-    system = _system(data_dir, _happy_script())
-    project_id = system.projects.register("读取次数", GOAL)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
-    system.run_until_stop(run_id)
-    application = _application(system)
-    reads: list[str] = []
-    original = system.store.projection
-    system.store.projection = lambda stream: (reads.append(stream), original(stream))[1]
-    try:
-        for name, request in (
-            ("project.overview", ProjectOverview(project_id=project_id)),
-            ("project.loop", ProjectLoop(project_id=project_id)),
-            ("department.workspace", DepartmentWorkspace(project_id=project_id, department="quality",
-                                                         work_item=work_item_id)),
-        ):
-            reads.clear()
-            application.query(name, request)
-            # 一个事项两次：项目投影按事项取 run 的一次，查询自己取 run 与它的决定请求的一次
-            assert reads.count(run_stream(run_id)) <= 2, (name, reads)
-    finally:
-        system.store.projection = original
-

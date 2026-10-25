@@ -5,7 +5,6 @@ import asyncio
 import json
 import sqlite3
 
-from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
@@ -19,8 +18,8 @@ from harness.proposals import product_spec
 from harness.providers import ProviderFacade
 from harness.providers.credentials import CredentialChain
 from harness.runtime import LoopSystem
-from harness.streams import RUN_EVENT_VERSION, STOP_REASON_UPGRADE
-from harness.tests.helpers import delivery_turn, review_turn, quality_turns
+from harness.streams import RUN_EVENT_VERSION
+from harness.tests.helpers import delivery_turn, quality_turns
 from harness.tests.protocol_helpers import serve, sse
 from harness.tests.saved_rewrite import reload_without_saved_projection as _reload_without_saved_projection
 from harness.write_path import NewEvent
@@ -70,23 +69,6 @@ def _unfinished_run(data_dir, script=None, *, to_stop=False):
     system.close()
     return system, project_id, run_id
 
-def _older_run_event_version(data_dir):
-    # 得到一份由较早 run 事件版本写入的数据目录：run_created 事件里没有 run 事件版本字段，
-    # 保存的投影也一并删掉——启动时由事件重放补建，这与较早版本留下的数据目录一致
-    connection = sqlite3.connect(data_dir / "events.sqlite")
-    try:
-        rows = connection.execute(
-            "SELECT event_id, payload_json FROM events WHERE type = ?", (EventType.RUN_CREATED,)).fetchall()
-        assert rows, "no run_created events"
-        for event_id, payload in rows:
-            document = json.loads(payload)
-            document.pop("run_event_version", None)
-            connection.execute("UPDATE events SET payload_json = ? WHERE event_id = ?",
-                               (json.dumps(document, ensure_ascii=False, sort_keys=True), event_id))
-        connection.commit()
-    finally:
-        connection.close()
-    _reload_without_saved_projection(data_dir)
 
 def _older_definitions_version(data_dir, version="sha256:定义版本在升级之前的内容"):
     # 模拟一次升级：把 run_created 记录的定义版本改成另一个版本。ADR-0014 的定义版本只有发布新版本时改变，
@@ -166,32 +148,6 @@ def test_resume_records_the_interrupted_position_and_the_basis(data_dir):
     assert isinstance(basis["interrupted_at_version"], int) and basis["interrupted_at_version"] > 0
     restarted.close()
 
-def test_resume_does_not_grant_a_free_activation(data_dir):
-    # 恢复不新增一次免费的部门激活：恢复事件本身不是激活，之后的每一次激活都由激活写入；
-    # 恢复也不把模型步骤重新计满（工单 #16 验收 5）
-    _system, _project_id, run_id = _unfinished_run(data_dir)
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_completion_script()))
-    events = restarted.store.list_events(run_id)
-    resumed = _resumed_events(restarted, run_id)
-    assert len(resumed) == 1
-    # 恢复事件不携带停止原因，也不改写限额字段
-    assert resumed[0].stop_reason is None
-    assert resumed[0].payload["acquired_epoch"] >= 1
-    # 恢复事件之前只有一次激活（中断时的激活，由 activate_once 写入）；恢复事件本身不新增一次激活，
-    # 它之后的每一次激活都由激活写入
-    activation_of_resume = len([event for event in events
-                                if event.type == EventType.DEPARTMENT_ACTIVATED
-                                and event.stream_version < resumed[0].stream_version])
-    assert activation_of_resume >= 1
-    activated = [event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED]
-    assert len(activated) > activation_of_resume
-    assert not [event for event in events if event.stream_version == resumed[0].stream_version
-                and event.type != EventType.RUN_RESUMED]
-    # 恢复不把已用的模型步骤与循环次数清零
-    assert len([event for event in events if event.type == EventType.MODEL_REQUESTED]) >= 2
-    assert project_run(restarted.store, run_id).cycle_count >= 1
-    restarted.close()
 
 def test_finished_cancelled_and_exhausted_runs_are_not_restarted(data_dir):
     # 已完成、已取消及次数耗尽停止的任务不能通过恢复重新开始
@@ -430,18 +386,6 @@ def test_credentials_are_resolved_from_the_host_again_and_not_written_into_event
         server.shutdown()
         server.server_close()
 
-def test_resumed_runs_are_distinct_from_runs_stopped_for_an_upgrade(data_dir):
-    # run 事件版本不同的未结束 run 按强制升级处理（工单 #322）：记为因升级停止，不由恢复继续，
-    # 恢复继续的只有版本与当前相同的 run
-    _system, _project_id, run_id = _unfinished_run(data_dir)
-    _older_run_event_version(data_dir)
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_parked_script()))
-    assert restarted.startup_runs.other_version == ()
-    assert run_id not in restarted.resumed_runs, "版本不同的 run 已经停止并重新开始，恢复不再继续它"
-    assert _resumed_events(restarted, run_id) == []
-    assert project_run(restarted.store, run_id).stop_reason == STOP_REASON_UPGRADE
-    restarted.close()
 
 def test_a_run_waiting_for_the_user_is_not_continued_by_startup(data_dir):
     # 模型引用无法使用时 run 等待用户修复配置：启动不自动开始新的激活

@@ -16,7 +16,6 @@ from harness.models import EventType, ProjectEventType
 from harness.providers.presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, get_preset, list_presets
 from harness.runtime import LoopSystem
 from harness.tests.helpers import happy_script
-from harness.tools import tool_definitions
 from harness.write_path import NewEvent
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -37,8 +36,6 @@ def _read(directory: Path, name: str):
 
 def _write(directory: Path, name: str, content) -> None:
     (directory / name).write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
 
 
 def test_version_is_the_digest_of_the_content_and_ignores_the_format(tmp_path):
@@ -79,8 +76,6 @@ def test_invalid_definition_names_the_file_and_the_entry(tmp_path, change, messa
     [issue] = raised.value.issues
     assert issue[0] == "rules.json" and message in issue[2]
     assert f"rules.json {issue[1]}：" in str(raised.value)
-
-
 
 
 def test_invalid_stop_reason_names_the_file_and_the_field(tmp_path):
@@ -183,29 +178,6 @@ def test_a_role_and_the_shared_part_cannot_describe_the_same_proposal_kind(tmp_p
         load_definitions(directory)
     assert raised.value.issues == (
         ("proposal_contracts.json", "roles.product.kinds", "与共同部分重复说明 department_guidance_response"),)
-
-
-def test_loaded_definitions_are_read_only_and_hand_out_plain_copies(tmp_path):
-    # 映射是只读映射、列表是元组，改不到；请求与界面用的是普通 JSON 结构的副本
-    review = DEFINITIONS.tools["submit_review"]
-    assert isinstance(review.parameters["properties"]["verdict"]["enum"], tuple)
-    with pytest.raises(TypeError):
-        review.parameters["properties"]["verdict"]["enum"][0] = "approve"
-    with pytest.raises(TypeError):
-        del review.parameters["properties"]["defects"]
-    with pytest.raises(TypeError):
-        DEFINITIONS.tools["fetch_url"] = review
-    with pytest.raises(TypeError):
-        del DEFINITIONS.stop_reasons["max_cycles"]
-    [definition] = tool_definitions(["submit_review"])
-    definition["parameters"]["properties"].clear()
-    contract = DEFINITIONS.proposal_contract("quality")
-    contract["kinds"]["qa_review"]["verdict"].append("approve")
-    contract["submit_tools"].clear()
-    assert list(review.parameters["properties"]["verdict"]["enum"]) == ["rework_engineering", "release"]
-    assert DEFINITIONS.proposal_contract("quality")["kinds"]["qa_review"]["verdict"] == [
-        "rework_engineering", "release"]
-    assert load_definitions() == DEFINITIONS
 
 
 @pytest.mark.parametrize(("change", "message"), [

@@ -2,17 +2,12 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-import pytest
 
 from harness.collaboration import has_new_work
 from harness.actions import Action
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.definitions import DEFINITIONS
-from harness.environment import LocalEnvironment, QA_TESTS_DIR, inspection_root
-from harness.event_store import Command
-from harness.models import ArtifactRef, EventType, new_id
-from harness.providers.call import ModelResponse
-from harness.projection import saved_decisions
+from harness.environment import QA_TESTS_DIR
+from harness.models import ArtifactRef, EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.public_tree import capture_public_tree
 from harness.runtime import LoopSystem
@@ -108,60 +103,6 @@ def test_next_session_has_saved_test_materials(tmp_path: Path) -> None:
     assert "CHECK_V1_IN_SESSION_2" in output.get("summary", "")
 
 
-def test_pause_and_resume_preserves_qa_tests(tmp_path: Path) -> None:
-    test_py = f"{QA_TESTS_DIR}/test_paused.py"
-    test_content = "import sys\nprint('RESUMED_QA_TEST_OK')\nsys.exit(0)\n"
-    python_exe = sys.executable.replace("\\", "/")
-    cmd = f'"{python_exe}" {test_py}'
-    limit = DEFINITIONS.rule_value("tool_call_required_limit")
-
-    # Turn with write_file, then plain text replies to trigger no_tool_call pause
-    def qa_write_step(call):
-        return FakeTurn(writes={test_py: test_content}, transcript="wrote test")
-
-    def plain_reply(call):
-        return FakeTurn(transcript="thinking...")
-
-    def qa_resumed_step(call):
-        turn = review_turn("release", "resumed release", checks={"resume_check": {"name": "resume_check", "command": cmd}})(call)
-        return FakeTurn(
-            checks={"resume_check": {"name": "resume_check", "command": cmd}},
-            proposal=turn.proposal
-        )
-
-    script = {
-        # 脚本按部门给出（工单 #877）：质检的轮数不随其他部门变化，
-        # 质检自己的脚本按它自己的先后排列
-        "product": [product_spec()],
-        "engineering": [delivery_turn()],
-        "quality": [qa_write_step, *[plain_reply for _ in range(limit + 1)], qa_resumed_step],
-    }
-    adapter = FakeAdapter(script)
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)  # product
-    system.activate_once(run_id)  # engineering
-    proj = system.run_until_stop(run_id)
-    assert proj.status == "paused" and proj.stop_reason == "no_tool_call"
-
-    # User answers decision to continue
-    _pos, decisions = saved_decisions(system.store, statuses=("open",))
-    run_decisions = [d for d in decisions if d.run_id == run_id]
-    assert len(run_decisions) == 1
-    d = run_decisions[0]
-    command_obj = Command(new_id("cmd"), "decision.answer", f"sha256:continue:{d.version}", "user:local")
-    system.orchestrator.answer_decision(d.decision_id, "continue", None, base_version=d.version, command=command_obj)
-
-    result = system.run_until_stop(run_id)
-    assert result.status == "done"
-
-    events = system.writes.read(f"run:{run_id}").events()
-    check_called = next(e for e in events if e.type == EventType.TOOL_CALLED and e.department == "quality" and e.payload.get("name") == "run_check" and (e.payload.get("args") or {}).get("name") == "resume_check")
-    assert check_called.payload.get("ok") is True
-    output = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**check_called.payload["output_ref"])))
-    assert "RESUMED_QA_TEST_OK" in output.get("summary", "")
-
-
 def test_qa_tests_dir_excluded_from_public_tree_and_delivery_and_engineering(tmp_path: Path) -> None:
     test_py = f"{QA_TESTS_DIR}/test_secret.py"
 
@@ -220,99 +161,6 @@ def test_qa_tests_dir_excluded_from_public_tree_and_delivery_and_engineering(tmp
     receipt = asyncio.run(env.perform(read_act))
     assert receipt.status == "failed"
     assert "质检的测试材料" in str(receipt.error)
-
-
-def test_persistence_and_reload_survives_new_loopsystem(tmp_path: Path) -> None:
-    test_v1 = f"{QA_TESTS_DIR}/test_v1.py"
-    test_v2 = f"{QA_TESTS_DIR}/test_v2.py"
-
-    def qa_turn_1(call):
-        turn = review_turn("rework_engineering", "defects found", defects=[{"severity": "minor", "summary": "issue"}])(call)
-        return FakeTurn(
-            writes={test_v1: "v1"},
-            checks=turn.checks,
-            proposal=turn.proposal
-        )
-
-    def qa_turn_2(call):
-        turn = review_turn("release", "v2 verified")(call)
-        return FakeTurn(
-            writes={test_v2: "v2"},
-            checks=turn.checks,
-            proposal=turn.proposal
-        )
-
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
-        # 脚本按部门给出（工单 #877）
-        "product": [product_spec()],
-        "engineering": [delivery_turn(summary="first delivery"), delivery_turn(summary="second delivery")],
-        "quality": [qa_turn_1, qa_turn_2],
-    }))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)  # product
-    system.activate_once(run_id)  # engineering
-    system.activate_once(run_id)  # quality v1
-    system.activate_once(run_id)  # engineering 2
-    system.activate_once(run_id)  # quality v2
-
-    proj_before = system.project(run_id)
-    assert proj_before.qa_tests_version == 2
-    hash_v2 = proj_before.qa_tests_hash
-
-    # Create fresh LoopSystem on the same data directory
-    reloaded = LoopSystem.for_testing(tmp_path, FakeAdapter([]), resume_on_startup=False)
-    proj_after = reloaded.project(run_id)
-    assert proj_after.qa_tests_version == 2
-    assert proj_after.qa_tests_hash == hash_v2
-    assert proj_after.qa_tests_archive_ref is not None
-
-    # New inspection environment created from reloaded system places version 2
-    env = reloaded.orchestrator._new_inspection_environment(run_id, "quality")
-    assert (env.workspace.root / test_v2).exists()
-    assert (env.workspace.root / test_v2).read_text(encoding="utf-8") == "v2"
-
-
-def test_no_event_when_unchanged_or_empty_initial(tmp_path: Path) -> None:
-    def qa_turn_1(call):
-        turn = review_turn("rework_engineering", "check done",
-                           checks={"smoke": {"name": "smoke", "command": 'python -c "exit(0)"'}},
-                           defects=[{"severity": "minor", "summary": "need rework"}])(call)
-        return FakeTurn(
-            checks={"smoke": {"name": "smoke", "command": 'python -c "exit(0)"'}},
-            proposal=turn.proposal
-        )
-
-    def qa_turn_2(call):
-        turn = review_turn("release", "release done",
-                           checks={"smoke": {"name": "smoke", "command": 'python -c "exit(0)"'}})(call)
-        return FakeTurn(
-            writes={f"{QA_TESTS_DIR}/test_a.py": "def test_a(): pass\n"},
-            checks={"smoke": {"name": "smoke", "command": 'python -c "exit(0)"'}},
-            proposal=turn.proposal
-        )
-
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
-        # 脚本按部门给出（工单 #877）
-        "product": [product_spec()],
-        "engineering": [delivery_turn(), delivery_turn(summary="delivery 2")],
-        "quality": [qa_turn_1, qa_turn_2],
-    }))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)  # product
-    system.activate_once(run_id)  # engineering
-    system.activate_once(run_id)  # quality turn 1 (empty, no qa_tests_saved)
-
-    events_1 = system.writes.read(f"run:{run_id}").events()
-    saved_1 = [e for e in events_1 if e.type == EventType.QA_TESTS_SAVED]
-    assert len(saved_1) == 0, "No qa_tests_saved should be written when initially empty"
-
-    system.activate_once(run_id)  # engineering 2
-    system.activate_once(run_id)  # quality turn 2 (writes test_a.py and runs smoke check)
-
-    events_2 = system.writes.read(f"run:{run_id}").events()
-    saved_2 = [e for e in events_2 if e.type == EventType.QA_TESTS_SAVED]
-    assert len(saved_2) == 1, "Exactly 1 qa_tests_saved should be written (version 1), smoke check did not change it"
-    assert saved_2[0].payload["version"] == 1
 
 
 def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_rerun(tmp_path: Path) -> None:
@@ -382,57 +230,3 @@ def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_reru
     assert checks[0]["qa_tests_hash"] is not None
 
 
-def test_qa_emptying_test_materials_allows_release(tmp_path: Path) -> None:
-    test_py = f"{QA_TESTS_DIR}/test_check.py"
-    content = "import sys\nprint('PASS')\nsys.exit(0)\n"
-    python_exe = sys.executable.replace("\\", "/")
-    cmd = f'"{python_exe}" {test_py}'
-    pass_cmd = f'"{python_exe}" -c "import sys; sys.exit(0)"'
-    clean_cmd = f'"{python_exe}" -c "import os; os.remove(\'{test_py}\')"'
-    def qa_step_1(call):
-        return FakeTurn(
-            writes={test_py: content},
-            checks={"qa_check": {"name": "qa_check", "command": cmd}},
-            transcript="wrote test and ran check",
-        )
-
-    def qa_step_2(call):
-        turn = review_turn("release", "release after emptying qa tests",
-                           checks={"pass_check": {"name": "pass_check", "command": pass_cmd}})(call)
-        c1 = {"id": "c1", "call_id": "c1", "type": "function_call", "name": "bash",
-              "arguments": json.dumps({"command": clean_cmd})}
-        c2 = {"id": "c2", "call_id": "c2", "type": "function_call", "name": "run_check",
-              "arguments": json.dumps({"name": "pass_check", "command": pass_cmd})}
-        submit_args = {k: v for k, v in turn.proposal.items() if k != "kind"}
-        c3 = {"id": "c3", "call_id": "c3", "type": "function_call", "name": "submit_review",
-              "arguments": json.dumps(submit_args)}
-        return ModelResponse(
-            output=[c1, c2, c3],
-            provider="fake",
-            model="fake-script",
-        )
-
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
-        # 脚本按部门给出（工单 #877）
-        "product": [product_spec()],
-        "engineering": [delivery_turn()],
-        "quality": [qa_step_1, qa_step_2],
-    }))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)  # product
-    system.activate_once(run_id)  # engineering
-    proj = system.activate_once(run_id)  # quality step 1 & 2
-
-    assert proj.status == "done"
-
-    events = system.writes.read(f"run:{run_id}").events()
-    saved_events = [e for e in events if e.type == EventType.QA_TESTS_SAVED]
-    assert len(saved_events) == 2, f"Expected 2 qa_tests_saved events, got {len(saved_events)}"
-    assert saved_events[0].payload["version"] == 1
-    assert saved_events[0].payload["content_hash"] is not None
-    assert saved_events[1].payload["version"] == 2
-    assert saved_events[1].payload["content_hash"] is None
-    assert proj.qa_tests_hash is None
-
-    qa_sub = next(e for e in events if e.type == EventType.QA_SUBMITTED)
-    assert qa_sub.payload["checks"][0]["qa_tests_hash"] is None

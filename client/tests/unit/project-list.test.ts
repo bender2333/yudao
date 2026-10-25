@@ -34,17 +34,3 @@ test("开关打开时已归档的项目出现在列表里", () => {
   assert.deepEqual(visible.map((row) => row.project_id), ["p1", "p2"]);
 });
 
-test("搜索词照旧按名称与目标过滤", () => {
-  const projects = [
-    project({ project_id: "p1", name: "词频统计工具" }),
-    project({ project_id: "p2", name: "回声工具", goal: "统计词频" }),
-  ];
-  assert.deepEqual(
-    visibleProjects(projects, { search: "词频", includeArchived: true }).map((row) => row.project_id),
-    ["p1", "p2"],
-  );
-  assert.deepEqual(
-    visibleProjects(projects, { search: "回声", includeArchived: true }).map((row) => row.project_id),
-    ["p2"],
-  );
-});

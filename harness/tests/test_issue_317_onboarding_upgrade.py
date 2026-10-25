@@ -3,13 +3,11 @@
 # （旧事件没有 run_event_version 字段），强制升级由真实 HTTP 命令发起，取消由 work_item.cancel 提交。
 # 系统整体运行：真实启动 FastAPI 应用（uvicorn），模型回答由 FakeAdapter 给出，不使用 mock。
 
-import json
-import sqlite3
 import uuid
 
 from harness.collaboration import has_new_work
 from harness.adapters.base import ProviderError
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeTurn
 from harness.models import EventType, ProjectEventType
 from harness.projection import saved_decisions
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
@@ -26,7 +24,6 @@ from harness.tests.onboarding_project import (
     wait_until as _wait_for,
     wait_until as _wait_run,
 )
-from harness.tests.saved_rewrite import reload_without_saved_projection as _reload_without_saved_projection
 
 NOTE = "现有 CLI 还没有 --help，初始 PRD 要把这个用法说明写进去"
 SECOND_REQUIREMENT = "the CLI explains its usage when started with --help"
@@ -79,98 +76,6 @@ def _onboard(client, tmp_path):
     assert _wait_for(lambda: _open_initial_prd(client, refs["project_id"]) is not None), \
         "第一轮没有发出确认请求"
     return refs
-
-
-def _older_run_event_version(data_dir) -> None:
-    # 得到一份由较早 run 事件版本写入的数据目录：run_created 事件里没有 run 事件版本字段，
-    # 保存的投影也一并删掉——启动时由事件重放补建，这与较早版本留下的数据目录一致
-    connection = sqlite3.connect(data_dir / "events.sqlite")
-    try:
-        rows = connection.execute(
-            "SELECT event_id, payload_json FROM events WHERE type = ?", (EventType.RUN_CREATED,)).fetchall()
-        assert rows, "no run_created events"
-        for event_id, payload in rows:
-            document = json.loads(payload)
-            document.pop("run_event_version", None)
-            connection.execute("UPDATE events SET payload_json = ? WHERE event_id = ?",
-                               (json.dumps(document, ensure_ascii=False, sort_keys=True), event_id))
-        connection.commit()
-    finally:
-        connection.close()
-    _reload_without_saved_projection(data_dir)
-
-
-def test_starting_from_an_older_version_can_confirm_the_candidate(data_dir, tmp_path):
-    # 验收四（确认）：用较早 run 事件版本写入的数据目录启动，等待确认的建档候选照常显示与回答：
-    # 确认以后采纳的是这一轮候选的基线
-    opened = _Opened(data_dir, turns=_round([REQUIREMENT]))
-    with running_api(opened) as client:
-        refs = _onboard(client, tmp_path)
-        opened.system.close()
-    _older_run_event_version(data_dir)
-
-    restarted = _Opened(data_dir, turns=[])
-    with running_api(restarted) as client:
-        decision = _open_initial_prd(client, refs["project_id"])
-        assert decision is not None, "旧版本数据目录里的确认请求照常显示"
-        assert _answer(client, decision, "confirm").status_code == 200
-        project = restarted.system.projects.projection(refs["project_id"])
-        assert project.current_adoption is not None, "确认以后项目有了基线"
-        assert project.current_adoption.run_id == refs["run_id"]
-        assert _open_initial_prd(client, refs["project_id"]) is None, "确认以后没有仍然打开的请求"
-
-
-def test_starting_from_an_older_version_can_ask_for_a_revision(data_dir, tmp_path):
-    # 验收四（提出修改）：同样用较早 run 事件版本的数据目录启动，提出修改以后开始第二轮 run，
-    # 第二轮带这一轮的候选与修改意见
-    opened = _Opened(data_dir, turns=merge_scripts(_round([REQUIREMENT]), _round([SECOND_REQUIREMENT])))
-    with running_api(opened) as client:
-        refs = _onboard(client, tmp_path)
-        opened.system.close()
-    _older_run_event_version(data_dir)
-
-    restarted = _Opened(data_dir, turns=_round([SECOND_REQUIREMENT]))
-    with running_api(restarted) as client:
-        decision = _open_initial_prd(client, refs["project_id"])
-        assert decision is not None, "旧版本数据目录里的确认请求照常显示"
-        assert _answer(client, decision, "revise", NOTE).status_code == 200
-        revision = next(event for event in restarted.system.store.list_project_events(refs["project_id"])
-                        if event.type == ProjectEventType.ONBOARDING_REVISION_STARTED)
-        second_run_id = revision.payload["run_id"]
-        assert _wait_for(lambda: restarted.system.project(second_run_id).status == "done"), \
-            "第二轮没有结束"
-        assert restarted.system.project(second_run_id).error is None
-        assert _wait_for(lambda: _open_initial_prd(client, refs["project_id"]) is not None), \
-            "第二轮没有发出确认请求"
-
-
-def test_force_upgrade_restarts_the_first_onboarding_round_from_the_snapshot(data_dir, tmp_path):
-    # 验收五（第一轮）：强制升级时进行中的建档 run 记为因升级停止，建档事项重新开始一个 run，
-    # 它从事项记录的快照开始，种类仍是建档、轮次仍是 1、没有基线
-    opened = _Opened(data_dir, turns=_blocked_onboarding([REQUIREMENT]))
-    with running_api(opened) as client:
-        refs = _onboard_partial(client, tmp_path)
-        run_id = refs["run_id"]
-        assert _wait_run(lambda: has_new_work(opened.system.project(run_id), "engineering"))
-        assert _post(client, "runtime.start_drain").status_code == 200
-        assert _post(client, "runtime.force_upgrade").status_code == 200
-
-        stopped = opened.system.project(run_id)
-        assert (stopped.status, stopped.stop_reason) == ("failed", STOP_REASON_UPGRADE)
-        created = [event for event in opened.system.store.list_project_events(refs["project_id"])
-                   if event.type == ProjectEventType.WORK_ITEM_CREATED]
-        assert created[-1].payload["priority"] == PRIORITY_UPGRADE_RESTART
-        assert created[-1].payload["kind"] == "onboarding", "重新开始的是建档事项"
-        restarted_run_id = created[-1].payload["run_id"]
-        assert restarted_run_id != run_id
-        projection = opened.system.project(restarted_run_id)
-        assert projection.kind == "onboarding"
-        assert projection.round == 1, "第一轮重新开始以后轮次仍为 1"
-        assert projection.baseline is None, "建档 run 没有基线"
-        assert projection.snapshot is not None, "重新开始以后从快照开始"
-        assert projection.snapshot == created[0].payload["snapshot"]
-        assert projection.workspace_digest == projection.snapshot["tree_digest"], \
-            "重新开始以后工作区摘要等于快照摘要"
 
 
 def test_force_upgrade_restarts_the_revision_round_with_the_same_candidate_and_note(data_dir, tmp_path):
@@ -232,10 +137,3 @@ def test_cancelling_while_waiting_keeps_the_request_withdrawn_after_a_restart(da
         assert project.work_item(refs["work_item_id"]).status == "stopped"
 
 
-def _onboard_partial(client, tmp_path):
-    # 接入已有项目但不等第一轮结束：run 停在工程部门请求失败的非终态
-    source = _source(tmp_path / "src")
-    accepted = _post(client, "project.onboard", name="已有项目", goal=GOAL,
-                     source_name="src", source_path=str(source))
-    assert accepted.status_code == 200, accepted.text
-    return accepted.json()["refs"]

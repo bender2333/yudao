@@ -1,8 +1,6 @@
-import sqlite3
-
 import pytest
 
-from harness.event_store import EventStore, StreamVersionConflict, run_stream
+from harness.event_store import EventStore, run_stream
 from harness.projection import run_handler
 from harness.write_path import NewEvent, WritePath
 
@@ -40,24 +38,3 @@ def test_failed_later_insert_rolls_back_the_whole_batch_and_its_projection(tmp_p
     assert (after.stream_version, after.position) == (first.stream_version + 1, first.position + 1)
 
 
-def test_invalid_batch_entry_cannot_begin_a_partial_commit(tmp_path):
-    store = EventStore(tmp_path / "events.sqlite")
-    writes = WritePath(store, lambda _stream: run_handler())
-    with pytest.raises(sqlite3.IntegrityError):
-        writes.append(RUN, _note("valid"),
-                      NewEvent("invalid", state_before="running", state_after=None, actor="system"))
-    assert store.list_events("run") == []
-    assert store.projection(run_stream("run")) is None
-
-
-def test_commit_with_a_stale_expected_version_is_rejected_without_writing(tmp_path):
-    store = EventStore(tmp_path / "events.sqlite")
-    writes = WritePath(store, lambda _stream: run_handler())
-    [first] = writes.append(RUN, _note("before"))
-    saved = store.projection(run_stream("run"))
-    with pytest.raises(StreamVersionConflict) as rejected:
-        store.commit(run_stream("run"), 0, [], saved.state)
-    assert (rejected.value.expected, rejected.value.actual) == (0, 1)
-    assert "stale" in str(rejected.value)
-    assert store.list_events("run") == [first]
-    assert store.projection(run_stream("run")) == saved

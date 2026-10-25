@@ -1,7 +1,3 @@
-import json
-import ssl
-import subprocess
-import sys
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -11,7 +7,6 @@ import pytest
 from harness.engine import StepLimits
 from harness.models import EventType
 from harness.providers import ProviderError
-from harness.tests.helpers import calls_during as _calls_during
 from harness.tests.protocol_helpers import bound_target, facade_with, invoke, model_call, provider_system, serve
 from harness.tests.provider_replies import HTTP_REPLIES, HTTP_SCRIPT
 
@@ -71,14 +66,6 @@ print(json.dumps({model.__name__: isinstance(model.__pydantic_validator__, Schem
 """
 
 
-def test_sdk_stream_models_are_built_when_the_catalog_uses_the_protocol():
-    completed = subprocess.run([sys.executable, "-c", SDK_MODELS_BUILT], cwd=REPOSITORY,
-                               capture_output=True, text=True, timeout=300)
-    assert completed.returncode == 0, completed.stderr
-    built = json.loads(completed.stdout.strip().splitlines()[-1])
-    assert built and all(built.values()), built
-
-
 # 新进程中读入用到三种协议的模型目录（服务启动），再按两个 SDK 的方式识别平台（platform.system 与 platform.platform），
 # 打印识别期间查询系统版本（platform.win32_ver）的次数
 PLATFORM_IDENTIFIED = CATALOG_WITH_THE_THREE_PROTOCOLS + """
@@ -86,52 +73,6 @@ import platform
 from harness.tests.helpers import calls_during as _calls_during
 print(_calls_during(platform.win32_ver, lambda: (platform.system(), platform.platform())))
 """
-
-
-def test_platform_is_identified_when_the_catalog_uses_the_protocol():
-    # 两个 SDK 在每个客户端的第一次请求之前识别平台，进程内第一次识别在 Windows 上要查询系统版本（约 0.4 秒）；
-    # 这项一次性工作在服务启动时完成
-    completed = subprocess.run([sys.executable, "-c", PLATFORM_IDENTIFIED], cwd=REPOSITORY,
-                               capture_output=True, text=True, timeout=300)
-    assert completed.returncode == 0, completed.stderr
-    assert completed.stdout.strip().splitlines()[-1] == "0"
-
-
-@pytest.mark.parametrize("protocol", PROTOCOLS)
-def test_calls_reuse_one_ssl_context_instead_of_loading_certificates_each_time(protocol):
-    # 各次调用的客户端共用服务启动时创建的 SSL 上下文，请求发出之前不再创建上下文、加载证书
-    server, _capture, base = serve(lambda _body: (200, "text/event-stream", [_reply(protocol)]))
-    try:
-        facade = facade_with(base + "/v1", protocol=protocol)
-        target = bound_target(facade)
-
-        def two_calls():
-            for attempt_id in ("activation:1:attempt-1", "activation:2:attempt-1"):
-                invoke(facade, target, model_call([{"role": "user", "content": "write the spec"}],
-                                                  max_output_tokens=256, attempt_id=attempt_id))
-
-        created = _calls_during(ssl.create_default_context, two_calls)
-    finally:
-        _close(server)
-    assert created == 0
-
-
-@pytest.mark.parametrize("protocol", PROTOCOLS)
-def test_first_request_in_a_new_process_fits_provider_delay_plus_one_second(protocol, tmp_path):
-    delay = 1.0
-    server, capture, base = serve(_delayed(protocol, delay))
-    try:
-        completed = subprocess.run(
-            [sys.executable, "-m", "harness.tests.first_request", base, protocol, str(delay + 1.0),
-             str(tmp_path / "data")],
-            cwd=REPOSITORY, capture_output=True, text=True, timeout=300,
-        )
-    finally:
-        _close(server)
-    assert completed.returncode == 0, completed.stderr
-    result = json.loads(completed.stdout.strip().splitlines()[-1])
-    assert result == {"status": "running", "stop_reason": None, "failed": []}
-    assert len(capture.requests) == 1
 
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)

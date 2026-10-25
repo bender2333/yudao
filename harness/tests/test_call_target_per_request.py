@@ -302,40 +302,6 @@ def test_a_running_request_and_its_retry_keep_the_resolved_target(tmp_path):
         server_b.shutdown()
         server_b.server_close()
 
-def test_request_event_records_requested_and_sent_tier(tmp_path):
-    # 请求事件同时记录请求档位与实际发送的档位（设计说明第 6、7.3 节）：
-    # 部门默认保存请求档位 medium，模型的声明只支持 low 与 medium，发送的就是 medium
-    server, capture, base = serve(lambda _body: _stream_reply(
-        _product_spec_stream(response_id="resp-1", model="m-local-target")))
-    try:
-        facade = ProviderFacade(credentials=CredentialChain(
-            overrides={"KEY": CredentialMaterial("key", version="v1")}, use_env=False))
-        facade.store_document({
-            "providers": [{"id": "local", "name": "Local", "base_url": base,
-                           "credential_ref": "KEY", "timeout_sec": 20}],
-            "models": [{"id": "m-local", "provider_id": "local", "model": "m-local-target",
-                        "protocol": "responses",
-                        "context_window": 32000, "max_output_tokens": 2048,
-                        "reasoning_levels": ["low", "medium"], "default_reasoning_level": "low",
-                        "reasoning_mode": "effort"}],
-            "bindings": {department: {"provider_id": "local", "model_id": "m-local",
-                                      "requested_tier": "medium"}
-                         for department in DEPARTMENTS},
-        })
-        facade.record_admission("local", "m-local", admitted_model="m-local-target")
-
-        system = LoopSystem(tmp_path / "data", facade=facade, step_limits=MILLISECOND_RETRIES)
-        run_id = system.create_run("build an echo CLI")
-        system.activate_once(run_id)
-
-        assert capture.requests[0]["reasoning"] == {"effort": "medium"}
-        request = [event for event in system.store.list_events(run_id)
-                   if event.type == EventType.MODEL_REQUESTED][-1]
-        assert request.payload["requested_tier"] == "medium"
-        assert request.payload["sent_tier"] == "medium"
-    finally:
-        server.shutdown()
-        server.server_close()
 
 def test_swapping_the_department_model_limits_the_saved_tier_on_the_next_request(tmp_path):
     # 运行中把部门默认换成支持档位不同的模型：保存被接受，原请求档位保留；

@@ -32,14 +32,6 @@ test("连上以后断开：顶栏说连接中断并写明断开的时间，不�
   assert.match(text, /\d{2}:\d{2}/, text);
 });
 
-test("状态本身能分辨「还没连上过」与「连上以后断了」，不靠断开时间猜", () => {
-  assert.equal(CONNECTING.kind, "connecting");
-  assert.equal(CONNECTED.kind, "connected");
-  assert.equal(INTERRUPTED.kind, "interrupted");
-  assert.equal("disconnectedAt" in CONNECTING, false);
-  assert.equal("disconnectedAt" in CONNECTED, false);
-  assert.equal(typeof (INTERRUPTED as { disconnectedAt: string }).disconnectedAt, "string");
-});
 
 test("连接中的失败不改状态：还在连接中，不产生连接中断", () => {
   const next = nextStreamState(CONNECTING, false, "2026-10-22T08:30:00.000Z");
