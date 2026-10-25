@@ -383,6 +383,8 @@ claude-opus-5-5 / 2026-10-24 23:25 / `docs/design/app-and-interface.md` 第 4.3 
 
 solo-minimax-M3.1-Flash / 2026-10-24 23:30 / 工单 #876：进程被结束以后重新打开事件库时，可写打开（含设置 WAL）也在等待上限内重试——`harness/tests/process_kill.py` 增加 `_open_writable_after_kill` 与 `_open_system_after_kill`，`interrupted` 与 `restarted` 结束进程以后打开系统的四处改用它；只读打开原有的重试不变；产品代码不动（`harness/event_store.py` 没有改）/ GitHub 的 Windows 运行机上进程刚被结束时事件库文件还会被短暂占用，可写打开失败在 `PRAGMA journal_mode=WAL`（2026-10-23 run 39998093540：集成层两条用例报 disk I/O error）；用这个辅助的 8 个文件一起生效，不在各个用例里加重试
 
+minimax-M3.1-Flash / 2026-10-25 17:40 / `docs/agents/triage-labels.md` 不动；本次改的是仓库外的 Ralph 循环技能（`~/.minimax/plugins/ralph-loop`）与这个循环自己的账本（`.ralph/m0-solo/`）：新增台账对账 `sync`、重派交接 `handover`、暂停/恢复 `pause`/`resume`、总结 `summary`、补充说明 `note` 五组命令；建 worktree 前先 fetch；原生依赖（`Blocked by`）进候选过滤；「一轮」改为「一段连续的工作」的语义；里程碑改名后同步了 `goal.md` 与 `state.json` 的范围定义 / 用户要求一起改；`sync` 第一次跑就找出 13 张没进台账的 M0 工单（#894、#895、#900、#902、#903、#904、#905、#906、#907、#908、#909、#736、#604），说明「外部有、台账里没有」这个缺口必须机械地查
+
 minimax-M3.1-Flash / 2026-10-24 23:35 / `docs/agents/triage-labels.md` 补一段：循环交回外部的三条通道（连着三次没过 → `needs-triage` 升级；架构、需求、设计问题 → `needs-triage` 提问题，写结构化评论；执行环境挡住任务 → `ready-for-human` 转给用户，写清哪一步被挡住、试过什么、需要什么），外部处理完标签改回 `ready-for-agent` 后循环刷新时重新排上 / 用户要求工人遇到执行环境问题要有一条通道与用户沟通，由编排者转给用户
 
 solo-minimax-code / 2026-10-24 23:40 / 工单 #856：`docs/design/department-loop.md` 第 5 节补「停下一个会话与结束整个事项是两件事」三条——停下一个会话只停这个会话、不改变事项的状态（事项被未回答的决定请求挡住时运行循环停下其余会话，停下不是取消）；回答以后运行循环照常按各部门关注的成果重新开始一轮，各会话从停下的位置接着工作；用户取消事项仍然让事项进入取消并停下全部会话 / 工单正文写明了这套口径，实现里停下其余会话时打开了整个事项的取消开关，暂停或待恢复以后回答「继续」，事项被记成已取消（`run_failed`，停止原因 `cancelled`）；这次把设计说明补成与口径一致
