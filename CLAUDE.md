@@ -111,7 +111,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 
 ### docs/
 - `docs/architecture.html`：总图，给用户看的一页，六节：全局总图与方程、什么能动、一轮工作的经过、要守的缝、自举与验收、拆开部署。只由总架构师改。
-- `docs/program-roadmap.md`：总体路线图，阶段定义与依赖的入口。
+- `docs/program-roadmap.md`：总体路线图，五个阶段、十条道、三个空间与五条判据的对照；之前按 Stage 写的路线图在 `docs/archive/program-roadmap-2026-10-25.md`。
 - `docs/current-baseline.md`：当前验收基线与证据状态。
 - `docs/foundation-rules.md`：六条基础规则与属于它们的具体规则，属于可信内核，只由用户修改。
 - `docs/stage-3-plan.md`、`docs/stage-3/`：Stage 3 计划，以及验收合同与重排方案。
@@ -136,7 +136,7 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 3. 规格：`/to-spec` 把讨论结果整理成父工单。
 4. 拆分：`/to-tickets` 把父工单拆成可以独立验证的子工单，写明阻塞关系，添加 `ready-for-agent` 标签。
 5. 执行：执行者按 `AGENTS.md` 领取子工单，实现、自测、推送并开 PR，CI 通过以后交付；审查者在 PR 上批准或要求修改，GitHub 在 main 的规则满足时合并。
-6. 验收：子工单全部关闭后，架构师核对父工单的验收标准，关闭父工单，并更新路线图、验收基线，以及需求索引（`docs/requirements/README.md`）与设计索引（`docs/design/README.md`）中对应条目的状态。里程碑的工单全部关闭时，按路线图里那个里程碑写的「结束时总图的变化」（第 2 节各步或第 8.2 节）核对 main，把结果告诉总架构师；总图的建设状态与缝的已定、未定由总架构师改。
+6. 验收：子工单全部关闭后，架构师核对父工单的验收标准，关闭父工单，并更新路线图、验收基线，以及需求索引（`docs/requirements/README.md`）与设计索引（`docs/design/README.md`）中对应条目的状态。里程碑的工单全部关闭时，按路线图第 2 节该阶段的「结束时总图」与第 5 节的对照表核对 main，把结果告诉总架构师；总图的建设状态与缝的已定、未定由总架构师改。
 7. 试用：阶段内的工单按试用里程碑（GitHub Milestone）分组，每个里程碑有一张试用工单，在里程碑达到之前标 `waiting`。里程碑达到以后，架构师先用 `/retro <里程碑标题>` 复盘（[复盘 skill](.claude/skills/retro/SKILL.md)），报告发在 GitHub Discussions 的 Announcements 分类；提出的改动中，参数与规则句子的修改先经用户确认。然后架构师发布版本并按试用指南走查，再把试用工单改为 `ready-for-human` 交给用户；步骤见 `docs/design/web-interface-and-release.md` 第 6.4 至 6.6 节。试用期间继续推进下一个里程碑。
 
 第 1 至 4 步在同一个上下文窗口中完成，`/to-tickets` 完成之前不清空、不压缩上下文。
