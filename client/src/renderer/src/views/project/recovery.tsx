@@ -102,7 +102,7 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
           <Section
             id="rc-decide"
             title="决定请求"
-            note="主机无法确定结果或需要修复入口时，由这里的卡片交给你"
+            note="需要你修复入口、选择版本或决定是否继续等待时，由这里的卡片交给你；结果未知的动作不在这里"
             className="y10-rc-decide-block"
           >
             <Loading state={decisions} />
@@ -323,7 +323,7 @@ function LimitsBlock(props: { data: RunRecoveryResult; elapsed: number | null; l
           )}
         </div>
         <div className="y10-rc-limit">
-          <span>已用激活次数</span>
+          <span>已用的工作轮数</span>
           <strong>{limits.activations}</strong>
         </div>
         <div className="y10-rc-limit">
