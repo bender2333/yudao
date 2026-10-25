@@ -112,3 +112,72 @@ def test_run_failed_carries_the_department_that_was_working(tmp_path: Path):
     events = system.store.list_events(run_id)
     failed = next(event for event in events if event.type == EventType.RUN_FAILED)
     assert failed.department == "engineering"
+
+def test_ask_branch_activation_does_not_count_as_a_cycle(tmp_path: Path):
+    # 工单 #857：轮次只计主线会话的激活。工程询问产品，产品在分支里回答，
+    # 分支的那一次激活不算一轮，事项的 cycle_count 仍等于主线激活的次数。
+    system = _system(tmp_path)
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)  # 产品提交初始 PRD
+    projection = system.activate_once(run_id)  # 工程询问产品，产品在分支里回答
+
+    events = system.store.list_events(run_id)
+    activated = [event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED]
+    main = [event for event in activated if not event.session_id.startswith("ses_ask")]
+    branch = [event for event in activated if event.session_id.startswith("ses_ask")]
+    assert main and branch
+    # 主线两次激活（产品、工程），分支的一次激活不加一
+    assert projection.cycle_count == len(main) == 2
+    # 分支激活事件里的 cycle 与回答以后投影的 cycle_count 相同（设计第 4.2 节）
+    assert branch[0].payload["cycle"] == projection.cycle_count
+
+
+def _finishing_script() -> dict[str, Any]:
+    # 一次询问走完整个事项：产品提交 PRD，工程询问产品以后交付，质检起草用例后放行
+    return {
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn(recipient="product", question="输出要不要改成大写？"),
+            delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
+        ],
+        "product:ask": [answer_turn(answer="不改，保持原样。")],
+        "quality": [review_turn("release", "按 PRD 起草了测试用例；还没有交付可以核验"),
+                    review_turn("release", "ok")],
+    }
+
+
+def test_cycle_count_of_a_full_ask_run_counts_only_the_main_activations(tmp_path: Path):
+    # 整件事项跑完：投影的 cycle_count 等于主线的激活次数，不含询问分支的那一次
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(_finishing_script()))
+    run_id = system.create_run("build echo")
+    projection = system.run_until_stop(run_id)
+    assert projection.status == "done"
+
+    events = system.store.list_events(run_id)
+    activated = [event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED]
+    main = [event for event in activated if not event.session_id.startswith("ses_ask")]
+    branch = [event for event in activated if event.session_id.startswith("ses_ask")]
+    assert len(branch) == 1
+    assert projection.cycle_count == len(main)
+    # 分支激活的 cycle 与回答那一刻的投影相同：回答以后主线接着工作才加一
+    answered_at = next(index for index, event in enumerate(events) if event.type == EventType.ASK_ANSWERED)
+    through_answer = replay_events(events[:answered_at + 1])
+    assert branch[0].payload["cycle"] == through_answer.cycle_count
+
+
+def test_max_cycles_equal_to_the_main_activations_does_not_stop_an_ask(tmp_path: Path):
+    # 轮次上限恰好等于主线激活次数时，一次询问分支不让事项因轮次上限停止
+    counting = LoopSystem.for_testing(tmp_path / "counting", FakeAdapter(_finishing_script()))
+    counting_run = counting.create_run("build echo")
+    counting.run_until_stop(counting_run)
+    main_activations = len([
+        event for event in counting.store.list_events(counting_run)
+        if event.type == EventType.DEPARTMENT_ACTIVATED and not event.session_id.startswith("ses_ask")
+    ])
+    assert main_activations > 0
+
+    system = LoopSystem.for_testing(tmp_path / "bounded", FakeAdapter(_finishing_script()))
+    run_id = system.create_run("build echo", max_cycles=main_activations)
+    projection = system.run_until_stop(run_id)
+    assert projection.cycle_count == main_activations
+    assert (projection.status, projection.stop_reason) == ("done", "released")
