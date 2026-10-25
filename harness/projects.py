@@ -190,8 +190,6 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
         item.status = "in_progress"
     if include_history:
         events = store.list_events(item.run_id, through_position=through)
-        handoffs = work_item_handoffs(events)
-        item.last_handoff = handoffs[-1] if handoffs else None
         item.rework = [
             {"verdict": event.payload["verdict"], "seq": event.stream_version, "at": event.created_at,
              "summary": event.payload.get("rationale", "")}
@@ -207,12 +205,6 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
         item.pending_question = run.human_action
     else:
         item.pending_question = run.waiting_reason
-
-
-def work_item_handoffs(events: list[Event]) -> list[dict[str, Any]]:
-    # 交接没有了（工单 #556：部门按关注的成果开始工作，控制核心不再决定下一个谁工作）：
-    # 这里给出空的清单，调用方按没有交接处理
-    return []
 
 
 def project_event_card(event: ProjectEvent) -> dict[str, Any]:

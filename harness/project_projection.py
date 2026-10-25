@@ -194,7 +194,6 @@ class WorkItem:
     stop_reason: str | None = None
     human_action: str | None = None
     cycle_count: int = 0
-    last_handoff: dict[str, Any] | None = None
     rework: list[dict[str, Any]] = field(default_factory=list)
     pending_question: str | None = None
     adoption_id: str | None = None
