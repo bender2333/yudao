@@ -167,12 +167,12 @@ jobs:
         working-directory: client
         run: npx playwright install chromium
 
-      # 逐场景回放测试（*-replay）按 AGENTS.md 单独运行，不在 CI 中
+      # 像素画面的逐场景回放测试（pixel-*-replay）按 AGENTS.md 单独运行，不在 CI 中；路由的 routing-replay 是纯逻辑，照常运行
       - name: 客户端单元测试
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client
         timeout-minutes: 10
-        run: node --test --test-force-exit --test-timeout=60000 --test-reporter=spec $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- '-replay\.test\.')
+        run: node --test --test-force-exit --test-timeout=60000 --test-reporter=spec $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- 'pixel-.*-replay\.test\.')
 
       - name: 编译页面与 wheel
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
