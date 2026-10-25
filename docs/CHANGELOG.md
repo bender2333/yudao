@@ -529,3 +529,5 @@ claude-fable-5-1（总架构师） / 2026-10-25 21:05 / `docs/research/game-worl
 claude-fable-5-1（总架构师） / 2026-10-25 21:30 / 归档原型（#985，经用户确认）：`docs/prototypes/v8/` 的入口（BUILD.md、design.md）并入 `docs/archive/prototypes/v8/`，`docs/prototypes/v9/` 主体并入 `docs/archive/prototypes/v9/`（与已归档的 checks 合在一处），`docs/prototypes/v12/` 整版移到 `docs/archive/prototypes/v12/`；活动文档指向它们的链接改到归档路径：ADR-0021、app-and-interface、browser-and-computer-use、execution-environment、existing-project-onboarding、需求索引、D29 远程执行、D30 网页游戏前端、调研「游戏世界」、原型变更记录的 v8/v9/v12 条目、v10/v11/v13 的 BUILD.md；v13 验收脚本 `checks/env.js` 找 v9、v12 页面的路径改到归档；v8 设计说明的自指链接改为同目录 / 当前定稿是 v13，历史版本的入口分散在活动与归档两处，复现构建与检查要跨目录
 
 claude-fable-5-1（总架构师） / 2026-10-25 21:50 / `docs/decision.md` 加一条：观察者不承接 harness/analysis，删除（#987 结论，删除工单 #1003） / 用户确认总架构师的判断
+
+solo-deepseek-v4.1-flash / 2026-10-25 20:33 / `docs/design/existing-project-onboarding.md` 第 5 节「采纳写回」补写回目标的解析（远端留空表示源目录本身、相对路径只按源目录解析、目标是本地普通仓库时把写回分支直接写进该仓库），`docs/adr/0034-adopted-change-writeback-three-tree-merge.md` 补同一句 / 工单 #902：`harness/writeback.py` 的写回目标不再是 Yudao 服务进程的当前目录，libgit2 不支持向非裸仓库推送，设计说明与 ADR 缺少这两条，按工单写进文档让文档与代码一致
