@@ -1,6 +1,6 @@
 # 原型 v13 构建约定
 
-本文件只写跟 [v12 BUILD.md](../v12/BUILD.md) 不一样的地方，其余照旧：v13 沿用 v12，依次往前。画面与交互见 [design.md](design.md)。
+本文件只写跟 [v12 BUILD.md](../../archive/prototypes/v12/BUILD.md) 不一样的地方，其余照旧：v13 沿用 v12，依次往前。画面与交互见 [design.md](design.md)。
 
 命名随版本改名：v13 的全局对象是 `window.Y13`，CSS 类名以 `y13-` 开头，存储键以 `y13.` 开头，脚本是 `js/y13.js`，页面标题与顶栏的标签写「v13 原型」。前几版 BUILD.md 里的 `Y12`、`y12-`、`js/y12.js` 在 v13 读作 `Y13`、`y13-`、`js/y13.js`。
 

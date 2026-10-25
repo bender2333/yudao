@@ -1,6 +1,6 @@
 # 游戏世界与代码世界的映射：可行性、图灵完备与路径
 
-日期：2026-10-02。状态：2026-10-25 用户采纳为路线图第 4 节「三个空间」的依据，确认的内容与六项待定的处理见 [D41 三个空间](../requirements/game-world-three-spaces.md)；文中的 Stage 与工单号是写作时的位置，与五个阶段的对应见路线图第 6 节。服务的需求：[D30 游戏化的桌面客户端界面](../requirements/web-game-frontend.md)的后续方向。相关决定：[ADR-0008](../adr/0008-trajectory-and-graph-as-event-projections.md)（轨迹与图谱是事件的投影）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与唯一写入口）、[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)（像素画面按 v9 的实体—组件—系统结构实现）。原型：[v8 设计说明](../prototypes/v8/design.md)、[v9 设计说明](../prototypes/v9/design.md)。相关设计：[语义系统设计说明](../design/semantic-system.md)（实体类型与图谱）、[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)（试用记录）、[应用层与接口层设计说明](../design/app-and-interface.md)（查询、命令、事件流）。参照来源的核对记录在第 11 节。
+日期：2026-10-02。状态：2026-10-25 用户采纳为路线图第 4 节「三个空间」的依据，确认的内容与六项待定的处理见 [D41 三个空间](../requirements/game-world-three-spaces.md)；文中的 Stage 与工单号是写作时的位置，与五个阶段的对应见路线图第 6 节。服务的需求：[D30 游戏化的桌面客户端界面](../requirements/web-game-frontend.md)的后续方向。相关决定：[ADR-0008](../adr/0008-trajectory-and-graph-as-event-projections.md)（轨迹与图谱是事件的投影）、[ADR-0013](../adr/0013-event-log-and-single-write-path.md)（一份事件日志与唯一写入口）、[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)（像素画面按 v9 的实体—组件—系统结构实现）。原型：[v8 设计说明](../archive/prototypes/v8/design.md)、[v9 设计说明](../archive/prototypes/v9/design.md)。相关设计：[语义系统设计说明](../design/semantic-system.md)（实体类型与图谱）、[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)（试用记录）、[应用层与接口层设计说明](../design/app-and-interface.md)（查询、命令、事件流）。参照来源的核对记录在第 11 节。
 
 ## 1. 用户的问题
 
@@ -395,7 +395,7 @@ flowchart LR
 3. 城作为新的需求记录：实体是建筑，证据让蓝图变成实体，访客与烟来自记录；路线位置 Stage 5 的界面一节。
 4. 指向式输入：事项输入与指导的命令增加实体引用，进入产品部门的焦点；随 Stage 5 实施。
 5. 传送带的边界：部门之间与部门之内画传送带，城里的路画实体之间的依赖，函数内部用文字。
-6. 本专题加入[各阶段需求概览](../requirements/stage-requirements-overview.md)第 6 节的待讨论清单。
+6. 本专题加入[各阶段需求概览](../archive/requirements/stage-requirements-overview.md)第 6 节的待讨论清单。
 
 确认这六项用 `/grill-with-docs`，决定写成 ADR 与需求记录，再写设计文档。
 

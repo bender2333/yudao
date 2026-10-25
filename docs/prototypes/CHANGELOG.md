@@ -2,7 +2,7 @@
 
 本文档记录 Yudao 原型设计各版本的演化历程、核心设计决策与交互改进。
 
-**当前定稿：[v13](v13/index.html)**（2026-10-25 用户确认）。界面的结构、行为与外观以它为准，截图对照与录制也用它（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）；像素画面从 v13 起按画面合同与播放时间线工作（[ADR-0043](../adr/0043-scene-contract-and-playback-belong-to-the-view.md)）。每一版的设计说明与构建约定只写与前一版不同的地方：v13 沿用 [v12](v12/design.md)，v12 沿用 [v11](v11/design.md)，v11 沿用 [v10](v10/design.md)，v10 沿用 [v9](v9/design.md)，v9 沿用 [v8](v8/design.md)。设计文档里写明版本号的引用，指的是那一版首次给出的内容。原型定稿时改这一行，并把开放的工单中引用旧版本代码的路径改为新版本。
+**当前定稿：[v13](v13/index.html)**（2026-10-25 用户确认）。界面的结构、行为与外观以它为准，截图对照与录制也用它（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）；像素画面从 v13 起按画面合同与播放时间线工作（[ADR-0043](../adr/0043-scene-contract-and-playback-belong-to-the-view.md)）。每一版的设计说明与构建约定只写与前一版不同的地方：v13 沿用 [v12](../archive/prototypes/v12/design.md)，v12 沿用 [v11](v11/design.md)，v11 沿用 [v10](v10/design.md)，v10 沿用 [v9](../archive/prototypes/v9/design.md)，v9 沿用 [v8](../archive/prototypes/v8/design.md)。设计文档里写明版本号的引用，指的是那一版首次给出的内容。原型定稿时改这一行，并把开放的工单中引用旧版本代码的路径改为新版本。
 
 **下一版原型（v14）的待办**（2026-10-25，由 v13 的待办转来）：v13 只做了画面与数据解耦，下面几处都照 v12 画。第 1 至 9 条是 v12 设计说明第 5 节没有定的，括号里是架构师的推荐，等用户确认；第 10 至 12 条是 2026-10-25 对照路线图第 4 节步 0 与阶段一补的，用户已定记在这里、不开工单。确认了的在 v14 里画：
 
@@ -43,12 +43,12 @@
 ## [v12] - 2026-10-24（定稿）
 
 ### 原型交付
-- 原型文件：[v12/index.html](v12/index.html)（浏览器直接打开，档位切到「自举试点」）
-- 设计文档：[v12/design.md](v12/design.md)；构建约定：[v12/BUILD.md](v12/BUILD.md)；验收脚本：[v12/checks/](v12/checks/)
+- 原型文件：[v12/index.html](../archive/prototypes/v12/index.html)（浏览器直接打开，档位切到「自举试点」）
+- 设计文档：[v12/design.md](../archive/prototypes/v12/design.md)；构建约定：[v12/BUILD.md](../archive/prototypes/v12/BUILD.md)；验收脚本：[v12/checks/](../archive/prototypes/v12/checks/)
 - 状态：2026-10-24 用户确认定稿，「当前定稿」改为 v12，「下一版原型的待办」四条已删除（v12 已处理）
 
 ### 变更明细
-1. **范围**：由 v11 整份复制而来，做两件事：补上之前整理出的遗漏点，体现 2026-10-12 以来设计变化里用户看得到的部分；每一项的来源、做与不做见 [v12/design.md](v12/design.md) 第 1 节。
+1. **范围**：由 v11 整份复制而来，做两件事：补上之前整理出的遗漏点，体现 2026-10-12 以来设计变化里用户看得到的部分；每一项的来源、做与不做见 [v12/design.md](../archive/prototypes/v12/design.md) 第 1 节。
 2. **待办四条**：删除一次性批准的决定卡片、登记命令与工具授权两节、「核实结果未知的动作」的决定卡片与首页状态项；恢复页的动作核实按恢复契约第 4 节改为只读的「结果未知的动作」（核实确认或交还会话）。
 3. **三个部门同时工作与询问**：概览与部门工作间写三个部门各自的状态（工作中、等待工作、回答询问、等待用户）与原因；楼层与楼里几个部门可以同时亮灯；询问写成询问链（含回问），产品的回答可以附带 PRD 新版本；事项的进度按成果写，不写阶段。
 4. **恢复页**：七种恢复观察状态；等待机器；各会话的用量；因升级停止写项目的起点。
@@ -97,8 +97,8 @@
 ## [v9] - 2026-09-30
 
 ### 原型交付
-- 原型文件：[v9/index.html](v9/index.html)（浏览器直接打开）
-- 设计文档：[v9/design.md](v9/design.md)；构建约定：[v9/BUILD.md](v9/BUILD.md)；验收脚本：[v9/checks/](../archive/prototypes/v9/checks/)
+- 原型文件：[v9/index.html](../archive/prototypes/v9/index.html)（浏览器直接打开）
+- 设计文档：[v9/design.md](../archive/prototypes/v9/design.md)；构建约定：[v9/BUILD.md](../archive/prototypes/v9/BUILD.md)；验收脚本：[v9/checks/](../archive/prototypes/v9/checks/)
 
 ### 变更明细
 1. **像素引擎改为实体—组件—系统结构（第一步）**：v8 反馈画面像快照加一次性动画，缺少沉浸感。项目楼层、楼里的小人、通往机房的管线、地下室的机房都由实体组成。房间与管道由图结构声明排布（声明在 `js/pixel/floor-decl.js`，引擎 `ecs.js` 与画面 `floor.js` 里没有具体的部门名）；域事件变成任务放进角色的队列，或者变成信号；快照决定角色的持续状态；交接由经理放进管道口的任务、沿管道移动的包裹实体、接收方的经理从管道口取出的任务组成，两个房间之间没有直接的管道时包裹沿声明的管道一段一段走；整层中断时小人停在原地，队列等着。
@@ -118,7 +118,7 @@
 
 ### 原型交付
 - 原型文件：[v8/index.html](../archive/prototypes/v8/index.html)（浏览器直接打开）
-- 设计文档：[v8/design.md](v8/design.md)；构建约定：[v8/BUILD.md](v8/BUILD.md)
+- 设计文档：[v8/design.md](../archive/prototypes/v8/design.md)；构建约定：[v8/BUILD.md](../archive/prototypes/v8/BUILD.md)
 
 ### 变更明细
 1. **界面层与接口层分开**
