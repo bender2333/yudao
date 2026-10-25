@@ -96,7 +96,7 @@ finish --task T-004 --status done|failed|blocked [--summary "..."] [--raw-file <
 check --task T-004
 escalate --task T-004 [--reason "..."] | question --task T-004 --comment-file <文件>
 askhuman --task T-004 --comment-file <文件> | handover --task T-004 | reap [--task T-004] [--stale 90]
-pause | resume | concurrency --max 4 --exclusive 1
+pause | resume [--no-auto] | auto on|off | concurrency --max 4 --exclusive 1
 ```
 
 ## 起一个循环，或者接一个循环
@@ -203,6 +203,18 @@ NEXT: 建议的下一轮任务；没有写 none
 11. **别的执行者在跑同一台机器**：不回退别人的提交、不合并别人的 PR、不改别人的工单、不按进程名批量杀进程。
 12. **循环的记录只写 `.ralph/`**：`progress.md` 与 `notes/`。仓库里的 `agents_jour/<编号>.md` 与 `docs/CHANGELOG.md` 由**工人**按工单写，编排者不写——那两处的记录属于工单，不属于循环。
 
+## 无人值守
+
+`solo.mjs auto on`（或者 `resume` 不加 `--no-auto`）以后，循环不再需要人每轮说「继续」：
+
+- 一轮结束时 **Stop hook** 会看账本：还有工人在跑 → 把会话叫回来收账；没有工人但还有待办 → 叫回来派下一批。实现是 `.claude/skills/solo/scripts/hook.mjs`，在 `.claude/settings.json` 的 `hooks` 里注册（`SessionStart`、`SubagentStart`、`PreToolUse`、`SubagentStop`、`Stop`）。
+- 同一个会话最多续 **200** 次，计数器在 `.ralph/<循环>/.stop-guard.json`；续到上限就停下，不会无声死循环。
+- 同时被 hook 挡住的两件事：**写 `.ralph/**`**（账本只由命令改）、**`task_append`**（会复用子会话上下文）。派活超过并发上限、任务书过长时会给提醒。
+- 停下：`solo.mjs pause`（同时关掉无人值守），或者用户直接打断。跑到没有可派的、预算用尽、全部完成时自己停。
+- 没有生效时的查法：新的会话开头应当看到 `[solo] 本工作区有一个…循环` 那段注入；看不到就是宿主没执行项目 hooks，这时退回手动模式——每轮结束时由用户说「继续」。需要 `node` 在 `PATH` 上。
+
+无人值守只省掉「说继续」这一步，不改变任何核对：`check`、`finish` 的证据要求照样成立，`maxIterations` 是唯一的预算闸，跑之前把它设成你能接受的轮数。
+
 ## 停止条件
 
 | 情况 | 动作 |
@@ -214,6 +226,7 @@ NEXT: 建议的下一轮任务；没有写 none
 | 需要用户裁决（范围、接口、规则文件、验收标准） | `blocked`，把问题写进 `progress.md` 并问用户 |
 | 工人报 blocked | 先看任务书里是不是漏了信息，能补就补一轮，不能就问人 |
 | main 的 `check` 红了 | 停下先修，不再领新活 |
+| 无人值守续到上限（200 次） | 停下，把进度与卡点告诉用户 |
 
 ## 收尾
 
@@ -221,4 +234,4 @@ NEXT: 建议的下一轮任务；没有写 none
 
 ## 与旧的 ralph-loop 插件的关系
 
-这个技能是 `ralph-loop` 插件的重写，装在仓库里（有版本、能 review、能回滚），不再依赖 `~/.minimax/plugins/ralph-loop`。主要差别：领取工单进流程；`check` 与 `finish` 带合并前核对；被中断的单子能接着做（区分「我们的」与「别人在做」）；`reap` 回收停住的并发位置；范围每轮重算并且认里程碑编号；并发是参数；账本有锁、写前比条数；删 worktree 前检查未提交与未推送。
+这个技能是 `ralph-loop` 插件的重写，装在仓库里（有版本、能 review、能回滚），不再依赖 `~/.minimax/plugins/ralph-loop`：账本命令、工人契约、无人值守的 hooks 都在 `.claude/` 下。主要差别：领取工单进流程；`check` 与 `finish` 带合并前核对；被中断的单子能接着做（区分「我们的」与「别人在做」）；`reap` 回收停住的并发位置；范围每轮重算并且认里程碑编号；并发是参数；账本有锁、写前比条数；删 worktree 前检查未提交与未推送。

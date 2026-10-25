@@ -102,6 +102,7 @@ function ensureSchema(loop) {
   s.worktrees = { root: wt.root, branchPrefix: wt.branchPrefix, base: wt.base };
   if (typeof s.signature !== 'string') s.signature = '';
   if (typeof s.self !== 'string') s.self = '';
+  if (typeof s.autoContinue !== 'boolean') s.autoContinue = false;
   return s;
 }
 
@@ -584,6 +585,7 @@ function commandState(args) {
     scope: Object.assign({ display: scopeLabel(scope) }, scope),
     concurrency: { max: conc.max, exclusiveLimit: conc.exclusiveLimit, active: conc.active.map((a) => a.task) },
     escalation: { maxFails: esc.maxFails, label: esc.label },
+    autoContinue: loop.state.autoContinue === true,
     signature: str(loop.state.signature, ''),
     self: str(loop.state.self, ''),
     forUser: Object.keys(state).filter((id) => state[id] && state[id].waitFor === 'user'),
@@ -592,7 +594,8 @@ function commandState(args) {
   };
   if (args.json) return emit(args, summary);
   const lines = [
-    'loop: ' + summary.loop + '   status: ' + summary.status + '   第 ' + summary.iteration + '/' + summary.maxIterations + ' 轮',
+    'loop: ' + summary.loop + '   status: ' + summary.status + '   第 ' + summary.iteration + '/' + summary.maxIterations + ' 轮'
+      + '   无人值守 ' + (summary.autoContinue ? '开' : '关'),
     '范围: ' + summary.scope.display,
     '任务: ' + summary.doneTasks + ' 完成 / ' + summary.pendingTasks + ' 待办 / ' + summary.waiting + ' 等条件 / ' + summary.escalated + ' 已交回'
       + (summary.outOfScope ? ' / ' + summary.outOfScope + ' 不在范围' : ''),
@@ -1510,17 +1513,32 @@ function commandReap(args) {
 function commandPause(args) {
   const loop = openLedger(args);
   loop.state.status = 'paused';
+  loop.state.autoContinue = false;
   saveLedger(loop);
   appendText(loop, '## 循环暂停（编排者，' + NOW().slice(0, 16).replace('T', ' ') + '）');
-  return emit(args, { loop: loop.name, status: 'paused' }, '循环 ' + loop.name + ' 已暂停。');
+  return emit(args, { loop: loop.name, status: 'paused', autoContinue: false }, '循环 ' + loop.name + ' 已暂停（无人值守也停了）。');
 }
 
 function commandResume(args) {
   const loop = openLedger(args);
   loop.state.status = 'running';
+  loop.state.autoContinue = !args['no-auto'];
   saveLedger(loop);
-  appendText(loop, '## 循环恢复（编排者，' + NOW().slice(0, 16).replace('T', ' ') + '）');
-  return emit(args, { loop: loop.name, status: 'running' }, '循环 ' + loop.name + ' 恢复。先跑 refresh 与 sync 再看台账。');
+  appendText(loop, '## 循环恢复（编排者，' + NOW().slice(0, 16).replace('T', ' ') + '）\n\n- 无人值守：' + (loop.state.autoContinue ? '开' : '关'));
+  return emit(args, { loop: loop.name, status: 'running', autoContinue: loop.state.autoContinue },
+    '循环 ' + loop.name + ' 恢复（无人值守' + (loop.state.autoContinue ? '开' : '关') + '）。先跑 refresh 与 sync 再看台账。');
+}
+
+/** 无人值守开关：开的时候 Stop hook 会在轮次结束时把会话叫回来接着跑。 */
+function commandAuto(args) {
+  const loop = openLedger(args);
+  const value = str(args._[1], 'on');
+  loop.state.autoContinue = value !== 'off' && value !== 'false';
+  if (loop.state.autoContinue) loop.state.status = 'running';
+  saveLedger(loop);
+  appendText(loop, '## 无人值守（编排者）\n\n- 改为 ' + (loop.state.autoContinue ? '开' : '关') + '，循环状态 ' + loop.state.status);
+  return emit(args, { autoContinue: loop.state.autoContinue, status: loop.state.status },
+    '无人值守 ' + (loop.state.autoContinue ? '开：一轮跑完 hook 会接着叫下一轮' : '关：跑完当前这轮就停'));
 }
 
 function commandConcurrency(args) {
@@ -1617,7 +1635,7 @@ const USAGE = [
   '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004',
   '  finish --task T-004 --status done|failed|blocked | check --task T-004',
   '  escalate|question|askhuman --task T-004 | handover --task T-004 | reap [--stale 90]',
-  '  pause | resume | concurrency --max 4 --exclusive 1',
+  '  pause | resume [--no-auto] | auto on|off | concurrency --max 4 --exclusive 1',
   '',
   '通用选项：--loop <名称>  --workspace <路径>  --json',
 ].join('\n');
@@ -1646,6 +1664,7 @@ switch (command) {
   case 'summary': commandSummary(args); break;
   case 'note': commandNote(args); break;
   case 'concurrency': commandConcurrency(args); break;
+  case 'auto': commandAuto(args); break;
   case undefined:
   case 'help':
     process.stdout.write(USAGE + '\n');

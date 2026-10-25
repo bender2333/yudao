@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .claude/skills/solo/scripts/hook.mjs", "timeout": 10 }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .claude/skills/solo/scripts/hook.mjs", "timeout": 10 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .claude/skills/solo/scripts/hook.mjs", "timeout": 10 }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .claude/skills/solo/scripts/hook.mjs", "timeout": 10 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .claude/skills/solo/scripts/hook.mjs", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}
