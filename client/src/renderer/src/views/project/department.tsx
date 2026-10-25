@@ -1,9 +1,10 @@
-// 部门工作间（原型 v8 设计说明第 7.1 节，工单 #80）：标题区（部门名、职责、当前生效的模型及来源、
-// 最近一次请求实际使用的模型、协议与发送的档位、部门状态、「部门设置」）；部门房间的位置由 #177 填入；
-// 检查区页签：动作与回执（run.actions）、Context（清单与压缩记录）、部门 Prompt；
-// 部门消息与指导（guidance.send）；部门设置弹窗只改部门 Prompt，模型与档位由 #95 加入。
+// 部门工作间（原型 v8 设计说明第 7.1 节，工单 #80）：标题区（部门名、职责、本部门的状态与原因、三个部门各自的状态、
+// 当前生效的模型及来源、最近一次请求实际使用的模型、协议与发送的档位、「部门设置」）；部门房间的位置由 #177 填入，
+// 房间信息写传信管上等待本部门回答的询问数；检查区页签：动作与回执（run.actions）、Context（清单与压缩记录）、部门 Prompt；
+// 询问、部门消息与指导（run.asks 的询问、department.workspace 的消息与 guidance.send 的指导）；
+// 部门设置弹窗只改部门 Prompt，模型与档位由 #95 加入。标题区与询问的写法按原型 v12 第 3.1、3.3 节（工单 #905）。
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
   BackgroundCommandView,
@@ -11,12 +12,15 @@ import type {
   EventDetailResult,
   ProjectOverviewResult,
   RunActionsResult,
+  RunAsksResult,
 } from "../../api/generated/types.gen";
 import { paths, type Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDepartmentDraft } from "./department-settings-form";
-import { DEPARTMENTS, GUIDANCE_STATUS, RUN_STATUS_LABELS, departmentName, formatTime, itemSource, label } from "./labels";
+import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, departmentsLineParts, formatTime,
+  itemSource, label, lettersWaitingText, type DepartmentStateView } from "./labels";
+import { askIndent, askLine } from "./asks-text";
 import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
@@ -112,6 +116,8 @@ export function RoomSection(props: { app: ClientApp; department: string; data: D
 function RoomInfoArea(props: { data: DepartmentWorkspaceResult }) {
   const { data } = props;
   const room = data.room;
+  // 传信管：等待本部门回答的询问数（原型 v12 第 3.3 节，工单 #905）；为 0 时不写这一行
+  const letters = lettersWaitingText(room.pipes?.letters_waiting);
   return (
     <>
       <KeyValue
@@ -126,6 +132,7 @@ function RoomInfoArea(props: { data: DepartmentWorkspaceResult }) {
           ["信箱", `${room.mailbox} 封未读指导`],
         ]}
       />
+      {letters === null ? null : <p className="y10-note note ws-tube" data-ws-tube>{letters}</p>}
       {room.roles && room.roles.length > 0 ? (
         <div className="y10-ws-roles roles">
           <span className="y10-ws-k">房间里的角色</span>
@@ -160,18 +167,27 @@ function selectionSourceLabel(value: string | null): string {
   return show(value, "未上报");
 }
 
-function departmentStatus(data: DepartmentWorkspaceResult): string {
-  if (data.run_id === null) {
-    return "空闲（这个范围里没有运行）";
+// 三个部门各自的状态（原型 v12 第 3.1 节、三部门的循环结构第 2.1 节，工单 #905）：
+// 标题区另起一行列出三个部门，本部门加粗；没有部门状态（事项没有进行中）时这一行不出现。
+export function DepartmentsLine(props: {
+  departments?: Record<string, DepartmentStateView> | null;
+  department: string;
+}) {
+  const parts = departmentsLineParts(props.departments, props.department);
+  if (parts === null) {
+    return null;
   }
-  // 用户停止的事项写「已停止」，与概览看板一致（工单 #319）
-  if (data.status === "stopped") {
-    return "已停止";
-  }
-  if (data.active) {
-    return `正在工作 · ${label(RUN_STATUS_LABELS, data.run_status)}`;
-  }
-  return `这次运行不在本部门 · ${label(RUN_STATUS_LABELS, data.run_status)}`;
+  return (
+    <p className="y10-ws-item y10-ws-states department-line">
+      <span className="y10-muted">三个部门</span>
+      {parts.map((part, index) => (
+        <Fragment key={part.text}>
+          {index === 0 ? "　" : " · "}
+          {part.current ? <strong>{part.text}</strong> : <span>{part.text}</span>}
+        </Fragment>
+      ))}
+    </p>
+  );
 }
 
 function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: string; scopeWorkItem: string | null; scopeNote: string; onOpenSettings: () => void }) {
@@ -182,8 +198,8 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: stri
   // 去观测页时带着当前的范围（工单 #746）与本部门的筛选条件（工单 #801）：
   // 范围是项目级的一份，换页面不丢掉；部门是筛选条件，观测页按它只显示这个部门的请求
   const observeLink = paths.observe(data.project_id, { workItem: props.scopeWorkItem, department: data.department });
-  const statusText = departmentStatus(data);
-  const statusKind = data.status === "stopped" ? "cancelled stopped" : data.active ? "running" : "idle";
+  // 部门状态：事项进行中时用查询给的这个部门的状态与原因；没有部门状态时按事项的结束方式写（工单 #905）
+  const status = departmentStatusView(data);
 
   return (
     <section className="y10-block card y10-ws-head-block" id="ws-head-block">
@@ -194,7 +210,8 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: stri
             <h1 className="y10-h1 title" style={{ margin: 0, fontSize: "20px", fontWeight: 700 }}>
               {departmentName(data.department)}部门
             </h1>
-            <span className={`y10-status is-${statusKind}`}>{statusText}</span>
+            <span className={`y10-status is-${status.kind}`}>{status.text}</span>
+            {status.note === "" ? null : <small className="y10-muted">{status.note}</small>}
           </div>
           <p className="y10-ws-duty note">{info ? info.role : "部门职责未登记"}</p>
           <p className="y10-ws-item item">
@@ -204,6 +221,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: stri
               : `所选事项${props.workItemTitle === "" ? "" : ` ${props.workItemTitle}`}`}</strong>
             {props.scopeNote ? <span className="y10-muted">{props.scopeNote}</span> : null}
           </p>
+          <DepartmentsLine departments={data.departments} department={data.department} />
           <div className="y10-ws-inline">
             <span className="y10-ws-k">当前生效模型</span>
             <strong>
@@ -228,7 +246,8 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: stri
       <KeyValue
         className="is-inline y10-ws-model kv"
         items={[
-          ["部门状态", statusText],
+          // 部门状态与原因：与标题区同一个状态（工单 #905）
+          ["部门状态", status.note === "" ? status.text : `${status.text}（${status.note}）`],
           ["当前生效的模型及来源", effective.state === "unset"
             ? "未设置"
             : effective.state === "unusable"
@@ -428,7 +447,7 @@ function DepartmentSettingState(props: { data: DepartmentWorkspaceResult }) {
   );
 }
 
-// 部门消息与指导：消息日志每条可打开原始事件；指导记录列出状态与回应
+// 部门消息与指导：询问一节列出本部门发出与收到的询问；消息日志每条可打开原始事件；指导记录列出状态与回应
 function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceResult; command: CommandState }) {
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const data = props.data;
@@ -440,74 +459,97 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
     { event_id: openEvent ?? "" },
     openEvent === null,
   );
+  // 本部门发出与收到的询问（原型 v12 第 3.3 节、三部门的循环结构第 4.7 节，工单 #905）：
+  // 用 run.asks，写法与概览的询问一行相同（共用的 asks-text）
+  const asks = useSnapshot<RunAsksResult>(
+    props.app, "page.dept.asks", "run.asks", { run_id: data.run_id ?? "" }, data.run_id === null);
+  const ownAsks = (asks.data?.asks ?? []).filter(
+    (ask) => ask.requester === data.department || ask.recipient === data.department);
   const messages = list(data.messages);
 
   return (
     <>
       <div className="y10-ws-comms-grid">
-        <Section title="部门消息" note="按日志位置取最近的一批；点击时间打开原始事件">
-          {messages.length === 0 ? <Empty text="这个部门还没有消息" /> : (
-            <ul className="y10-ws-log message-list">
-              {messages.map((message) => {
-                const msgType = text(message.type);
-                const isUser = msgType.includes("user") || msgType.includes("guidance");
-                const isOther = msgType.includes("other") || msgType.includes("peer");
-                const cls = isUser ? "is-user" : isOther ? "is-other" : "is-self";
-                return (
-                  <li key={text(message.event_id)} className={cls}>
+        <div className="y10-ws-col">
+          <Section title="询问" note="本部门发出与收到的询问：状态、询问链、时间与问题；有回答时写回答，没能回答写原因">
+            {asks.error !== null ? (
+              <p className="y10-note note" role="status">{readFailureText(asks.error)}</p>
+            ) : ownAsks.length === 0 ? (
+              <Empty text="这个事项里本部门还没有发出或收到询问" />
+            ) : (
+              <ul className="y10-ws-guidance ask-list ws-asks">
+                {ownAsks.map((ask) => (
+                  <li key={ask.id} data-depth={ask.depth} style={{ marginLeft: askIndent(ask) }}>{askLine(ask)}</li>
+                ))}
+              </ul>
+            )}
+          </Section>
+          <Section title="部门消息" note="按日志位置取最近的一批；点击时间打开原始事件">
+            {messages.length === 0 ? <Empty text="这个部门还没有消息" /> : (
+              <ul className="y10-ws-log message-list">
+                {messages.map((message) => {
+                  const msgType = text(message.type);
+                  const isUser = msgType.includes("user") || msgType.includes("guidance");
+                  const isOther = msgType.includes("other") || msgType.includes("peer");
+                  const cls = isUser ? "is-user" : isOther ? "is-other" : "is-self";
+                  return (
+                    <li key={text(message.event_id)} className={cls}>
+                      <div className="y10-ws-log-meta input-head">
+                        <button type="button" className="y10-link link" onClick={() => setOpenEvent(text(message.event_id))}>
+                          {formatTime(optionalText(message.created_at))}
+                        </button>
+                        <span className="y10-ws-src msg-type">{msgType}</span>
+                      </div>
+                      <p className="y10-ws-log p msg-text">{show(text(message.text), "（这条消息没有正文，点上面的时间看原始事件）")}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Section>
+        </div>
+        <div className="y10-ws-col">
+          <Section title="部门指导" note="已接收的指导在下一次安全激活进入模型输入">
+            {data.work_item_id && hasCommand(props.app, "guidance.send") ? (
+              <div className="y10-ws-composer composer">
+                <TextArea label={`向${departmentName(data.department)}下达指导`} value={draft} onInput={setDraft} />
+                <SubmitButton
+                  label="发送指导"
+                  busy={props.command.busy}
+                  disabled={draft.trim() === ""}
+                  onClick={() => {
+                    void props.command.submit("guidance.send", {
+                      work_item_id: data.work_item_id,
+                      department: data.department,
+                      text: draft.trim(),
+                    }).then((ok) => { if (ok) setDraft(""); });
+                  }}
+                />
+                <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
+              </div>
+            ) : (
+              <p className="y10-note note">
+                {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "这台主机没有提供发送指导的操作"}
+              </p>
+            )}
+            {data.guidance.length === 0 ? <Empty text="这个部门还没有指导记录" /> : (
+              <ul className="y10-ws-guidance guidance-list">
+                {data.guidance.map((record) => (
+                  <li key={record.guidance_id}>
                     <div className="y10-ws-log-meta input-head">
-                      <button type="button" className="y10-link link" onClick={() => setOpenEvent(text(message.event_id))}>
-                        {formatTime(optionalText(message.created_at))}
-                      </button>
-                      <span className="y10-ws-src msg-type">{msgType}</span>
+                      <strong>{label(GUIDANCE_STATUS, record.status)}</strong>
+                      <span className="y10-code byte-range">第 {record.version} 版</span>
+                      {record.applied_activation_id ? <span className="y10-code byte-range">已用于激活 {record.applied_activation_id}</span> : null}
+                      <button type="button" className="y10-link link" onClick={() => setOpenEvent(record.created_event_id)}>查看原始事件</button>
                     </div>
-                    <p className="y10-ws-log p msg-text">{show(text(message.text), "（这条消息没有正文，点上面的时间看原始事件）")}</p>
+                    <p className="y10-ws-guidance p msg-text">{record.text}</p>
+                    {record.response_status ? <p className="y10-muted card-note">部门的回应：{show(record.response_text, record.response_status)}</p> : null}
                   </li>
-                );
-              })}
-            </ul>
-          )}
-        </Section>
-        <Section title="部门指导" note="已接收的指导在下一次安全激活进入模型输入">
-          {data.work_item_id && hasCommand(props.app, "guidance.send") ? (
-            <div className="y10-ws-composer composer">
-              <TextArea label={`向${departmentName(data.department)}下达指导`} value={draft} onInput={setDraft} />
-              <SubmitButton
-                label="发送指导"
-                busy={props.command.busy}
-                disabled={draft.trim() === ""}
-                onClick={() => {
-                  void props.command.submit("guidance.send", {
-                    work_item_id: data.work_item_id,
-                    department: data.department,
-                    text: draft.trim(),
-                  }).then((ok) => { if (ok) setDraft(""); });
-                }}
-              />
-              <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
-            </div>
-          ) : (
-            <p className="y10-note note">
-              {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "这台主机没有提供发送指导的操作"}
-            </p>
-          )}
-          {data.guidance.length === 0 ? <Empty text="这个部门还没有指导记录" /> : (
-            <ul className="y10-ws-guidance guidance-list">
-              {data.guidance.map((record) => (
-                <li key={record.guidance_id}>
-                  <div className="y10-ws-log-meta input-head">
-                    <strong>{label(GUIDANCE_STATUS, record.status)}</strong>
-                    <span className="y10-code byte-range">第 {record.version} 版</span>
-                    {record.applied_activation_id ? <span className="y10-code byte-range">已用于激活 {record.applied_activation_id}</span> : null}
-                    <button type="button" className="y10-link link" onClick={() => setOpenEvent(record.created_event_id)}>查看原始事件</button>
-                  </div>
-                  <p className="y10-ws-guidance p msg-text">{record.text}</p>
-                  {record.response_status ? <p className="y10-muted card-note">部门的回应：{show(record.response_text, record.response_status)}</p> : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </div>
       </div>
       {openEvent ? <EventDetail eventId={openEvent} onClose={() => setOpenEvent(null)} snapshot={detail} /> : null}
     </>
