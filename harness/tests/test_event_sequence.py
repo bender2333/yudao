@@ -26,11 +26,12 @@ def test_event_sequence_matches_its_baseline(name, data_dir, request):
                           write=request.config.getoption("--write-event-baselines"))
 
 
-# 部门提示与工具说明快照（#532 步骤 3）：这五个场景各自跑一遍，合并 prompt_entries 的结果与
+# 部门提示与工具说明快照（#532 步骤 3）：这四个场景各自跑一遍，合并 prompt_entries 的结果与
 # harness/tests/prompt_snapshot.json 比较。快照集中记录发出去的部门材料与工具说明，
 # 事件序列基准里不再出现它们的全文。故意改变时用 --write-event-baselines 重写。
+# 只回应指导的那种轮次随工单 #560 删除，tool_denied_guidance_only 场景随之删除。
 SNAPSHOT_SCENARIOS = ("handoff_release", "compaction_success",
-                      "guidance_response_explained", "tool_denied_guidance_only",
+                      "guidance_response_explained",
                       "ask_answer_with_spec_revision")
 
 

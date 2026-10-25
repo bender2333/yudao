@@ -184,7 +184,7 @@ def test_snapshot_gated_guidance_results_after_a_no_op_write_are_verified(tmp_pa
     result = system.activate_once(run_id)
     assert result.department_guidance[0].status == "explained"
     last = adapter.invocations[-1]
-    assert recorded_context(system, last).manifest.guidance_only is False and last.step_id == 3
+    assert last.step_id == 3
     results = json.loads(prompt_part(last, "guidance_results"))
     assert {item["name"] for item in results} == {"write_file", "run_check"}
     assembled = [event for event in system.store.list_events(run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
@@ -229,32 +229,21 @@ def _rehash_request(system, events, assembled, request):
     attempted.context_digest = assembled.context_digest
     rewrite_saved_events(system.store, [assembled, attempted])
 
-@pytest.mark.parametrize("mutation,expected", [
-    ("private_text_in_guidance", "pinned developer input differs"),
-    ("guidance_only_flag", "guidance_only does not match"),
-])
-def test_model_input_audit_rejects_tampered_guidance_request(combined_run, mutation, expected):
+def test_model_input_audit_rejects_tampered_guidance_request(combined_run):
     system, run_id, _projection, _invocations = combined_run
     assert isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]["status"] == "verified"
     events = _saved_events(system, run_id)
-    if mutation == "private_text_in_guidance":
-        # 处理指导的那一次激活：它的固定输入里有指导的内容
-        activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
-                         and event.payload.get("guidance_ids"))
-        assembled = next(event for event in events if event.type == EventType.CONTEXT_ASSEMBLED
-                         and event.payload["activation_id"] == activated.payload["activation_id"]
-                         and event.payload["step_id"] == 1)
-        request = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**assembled.payload["request_ref"])))
-        request["input"][0]["content"] = request["input"][0]["content"].replace(
-            "[department_guidance]\n", "[department_guidance]\n[product_private_transcript] PRIVATE_PRODUCT_CANARY\n", 1,
-        )
-        _rehash_request(system, events, assembled, request)
-    else:
-        # 把一次普通激活记成「只回应指导」的一轮：审计按事件重新判定，对不上
-        activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
-                         and event.payload.get("guidance_only") is False)
-        activated.payload["guidance_only"] = True
-        rewrite_saved_event(system.store, activated)
+    # 处理指导的那一次激活：它的固定输入里有指导的内容，往里塞一段别的部门的内容以后审计对不上
+    activated = next(event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED
+                     and event.payload.get("guidance_ids"))
+    assembled = next(event for event in events if event.type == EventType.CONTEXT_ASSEMBLED
+                     and event.payload["activation_id"] == activated.payload["activation_id"]
+                     and event.payload["step_id"] == 1)
+    request = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**assembled.payload["request_ref"])))
+    request["input"][0]["content"] = request["input"][0]["content"].replace(
+        "[department_guidance]\n", "[department_guidance]\n[product_private_transcript] PRIVATE_PRODUCT_CANARY\n", 1,
+    )
+    _rehash_request(system, events, assembled, request)
     audit = isolation_fields(system.store, system.artifacts, run_id)["model_input_audit"]
     assert audit["status"] == "unverified"
-    assert any(expected in note for note in audit["notes"]), audit["notes"]
+    assert any("pinned developer input differs" in note for note in audit["notes"]), audit["notes"]

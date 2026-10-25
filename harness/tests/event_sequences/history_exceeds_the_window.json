@@ -35,7 +35,6 @@
     "activation_id": "<act#1>",
     "effective_contract_hash": null,
     "guidance_ids": [],
-    "guidance_only": false,
     "guidance_version": 0,
     "input_version": 1,
     "prompt_version": 0
@@ -56,7 +55,6 @@
     "activation_id": "<act#1>",
     "effective_contract_hash": null,
     "guidance_ids": [],
-    "guidance_only": false,
     "input_version": 1,
     "prompt_version": 0,
     "step_id": 1
@@ -112,7 +110,6 @@
    "payload": {
     "activation_id": "<act#1>",
     "guidance_ids": [],
-    "guidance_only": false,
     "input_version": 1,
     "prompt_version": 0,
     "session_activations": 1,
