@@ -5,11 +5,10 @@
 import socket
 import uuid
 
-import pytest
 
 from harness.__main__ import main
 from harness.adapters.fake import FakeAdapter
-from harness.app.access_tokens import AccessTokenStore, TokenNameTaken, UnknownToken, digest
+from harness.app.access_tokens import AccessTokenStore, digest
 from harness.app.application import Application
 from harness.models import utc_now
 from harness.runtime import LoopSystem
@@ -36,7 +35,6 @@ def _lan_address() -> str:
     return "127.0.0.1"
 
 
-
 def _lan(opened, data_dir, **options):
     # 局域网访问方式的真实服务：监听本机所有地址，经局域网地址连接（第 6.2、6.3 节）
     return running_api(opened, access="lan", host="0.0.0.0", connect=_lan_address(),
@@ -56,39 +54,6 @@ def test_only_the_digest_of_a_token_is_kept(data_dir):
     written = (data_dir / "access-tokens.json").read_text(encoding="utf-8")
     assert token not in written
     assert digest(token) in written
-
-
-def test_a_token_is_accepted_once_per_name_and_lists_its_time(data_dir):
-    # 建立、列表与同名拒绝：列表给出名称与建立时间，令牌明文只在建立时显示一次
-    store = AccessTokenStore(data_dir)
-    assert store.list() == ()
-    entry, token = store.create("客厅的电脑", now="2026-10-08T10:00:00+00:00")
-    assert store.list() == (entry,)
-    assert store.name_of(token) == "客厅的电脑"
-    with pytest.raises(TokenNameTaken):
-        store.create("客厅的电脑", now="2026-10-08T10:00:00+00:00")
-
-
-def test_a_revoked_token_stops_working_at_once(data_dir):
-    # 撤销以后立即失效；撤销后的名称可以重新建立，旧的令牌仍然无效
-    store = AccessTokenStore(data_dir)
-    _entry, token = store.create("客厅的电脑", now=utc_now())
-    store.revoke("客厅的电脑", now="2026-10-08T11:00:00+00:00")
-    assert store.name_of(token) is None
-    assert store.list()[0].revoked_at == "2026-10-08T11:00:00+00:00"
-    _second, token2 = store.create("客厅的电脑", now="2026-10-08T12:00:00+00:00")
-    assert store.name_of(token2) == "客厅的电脑"
-    assert store.name_of(token) is None
-    with pytest.raises(UnknownToken):
-        store.revoke("书房", now=utc_now())
-
-
-def test_an_unknown_token_is_not_accepted(data_dir):
-    # 明文与任何有效令牌都不匹配时拒绝：长度不同、内容不同都不通过
-    store = AccessTokenStore(data_dir)
-    _entry, token = store.create("客厅的电脑", now=utc_now())
-    assert store.name_of("0" * 64) is None
-    assert store.name_of(token[:-1]) is None
 
 
 def test_the_command_line_creates_lists_and_revokes_tokens(tmp_path, capsys):

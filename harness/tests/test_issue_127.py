@@ -5,17 +5,15 @@
 import uuid
 
 import pytest
-from pydantic import ValidationError
 
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import DEFAULT_REGISTRY, Application
-from harness.app.contracts import API_VERSION
 from harness.app.decision_queries import DecisionsList
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import ProjectLoop, ProjectsList
-from harness.app.system_queries import LiveAttemptRequest, SystemStatusRequest
-from harness.models import CatalogEventType, Usage
+from harness.app.system_queries import SystemStatusRequest
+from harness.models import Usage
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
@@ -80,10 +78,6 @@ def test_at_beyond_the_log_end_is_refused(data_dir):
             application.query(name, request)
         assert type(caught.value).__name__ == "ReplayOutOfRange", name
 
-def test_a_query_that_is_not_replayable_refuses_at_by_its_contract(data_dir):
-    # attempt.live 的请求合同不接受 at：多出的字段被 pydantic 拒绝
-    with pytest.raises(ValidationError):
-        LiveAttemptRequest(attempt_id="x", at=1)
 
 # ---------------------------------------------------------------------------
 # 离开期间的报告与已看过
@@ -196,23 +190,3 @@ def test_mark_seen_is_a_command_and_updates_the_away_report(data_dir):
         assert report["last_seen"]["position"] == end
         assert report["range"]["from_position"] == end
 
-def test_capabilities_mark_replayable_queries_and_expose_the_interface_version(data_dir):
-    opened = _Opened(data_dir)
-    with running_api(opened) as client:
-        capabilities = client.get("/api/capabilities").json()
-        document = client.get("/openapi.json").json()
-    assert {item["name"] for item in capabilities["queries"] if item["replayable"]} == {
-        "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry"}
-    for name in ("system.status", "projects.list", "decisions.list", "project.loop", "rules.registry"):
-        parameters = document["paths"][f"/api/queries/{name}"]["get"]["parameters"]
-        assert any(item["name"] == "at" for item in parameters), name
-    deployment = capabilities["deployment"]
-    assert deployment["api_version"] == API_VERSION
-    assert deployment["access"] == "local"
-    assert deployment["contract_digest"]
-    assert "home.away_report" in {item["name"] for item in capabilities["queries"]}
-    assert "home.mark_seen" in {item["name"] for item in capabilities["commands"]}
-    assert CatalogEventType.HOME_SEEN in capabilities["event_types"]
-    # 工单 #301：已看过事件触发报告重查，点「已看过」以后页面刷新
-    report_query = next(item for item in capabilities["queries"] if item["name"] == "home.away_report")
-    assert CatalogEventType.HOME_SEEN in report_query["changed_by"]

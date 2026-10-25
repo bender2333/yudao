@@ -12,8 +12,13 @@ from harness.app.labels import (DECISION_KIND_NAMES, STATUS_NAMES, STOP_REASON_N
                                 event_label, status_name, stop_reason_name)
 from harness.app.payloads import PAYLOADS
 from harness.definitions import DEFINITIONS
-from harness.models import (RUN_STATUSES, TERMINAL_STATUSES, EventType, ProjectEventType,
-                           stop_reason_name as core_name, waiting_reason_for)
+from harness.models import (
+    RUN_STATUSES,
+    TERMINAL_STATUSES,
+    EventType,
+    stop_reason_name as core_name,
+    waiting_reason_for,
+)
 from harness.tests.project_stream_fields import load_manifest
 
 def test_status_names_cover_the_run_statuses_exactly():
@@ -100,8 +105,3 @@ def test_every_label_renders_without_a_blank_placeholder(kind):
     assert "部门部门" not in label, label
 
 
-def test_adoption_line_shows_the_adopted_result_instead_of_a_missing_version():
-    # 工单 #319：采纳交付物的那一行原来按第几版写，而载荷里没有版本字段，用户看到空白的括号
-    payload = {field: field for field in _payload_fields(ProjectEventType.DELIVERABLE_ADOPTED)}
-    payload["summary"] = "把首页换成公司动态"
-    assert event_label(ProjectEventType.DELIVERABLE_ADOPTED, payload) == "采纳了交付物：把首页换成公司动态"

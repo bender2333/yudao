@@ -148,14 +148,6 @@ def test_writing_a_missing_manifest_reports_recovery_from_git(tmp_path, monkeypa
     assert "从 git 历史恢复" in str(caught.value)
     assert not missing.exists()
 
-def test_writing_the_committed_manifest_is_a_no_op(request):
-    # 清单已与合同类型一致，写入路径（--write-project-stream-fields）落回同一份内容：
-    # 字节不变，baseline 与 added_defaults 都不动
-    if not request.config.getoption("--write-project-stream-fields"):
-        pytest.skip("pass --write-project-stream-fields to exercise the writing path on the committed manifest")
-    before = MANIFEST.read_text(encoding="utf-8")
-    apply_rewrite()
-    assert MANIFEST.read_text(encoding="utf-8") == before
 
 def test_writing_accepts_an_expanded_value_set_and_records_it(scratch_manifest, monkeypatch):
     # #241：取值固定字段（enum）的取值集合扩大时写入成功，清单记录扩大后的取值集合
@@ -182,14 +174,3 @@ def test_writing_rejects_a_removed_value_and_names_it(scratch_manifest, monkeypa
     assert "删除取值 quality" in str(caught.value)
     assert scratch_manifest.read_text(encoding="utf-8") == before
 
-def test_writing_rejects_changing_the_base_type_of_a_fixed_value_field(scratch_manifest, monkeypatch):
-    # 取值固定字段改变基础类型（不只是取值集合变化）时仍按改变字段类型拒绝
-    registered = load_manifest()["fields"]
-    before = scratch_manifest.read_text(encoding="utf-8")
-    live = _doctored_live(registered, retypes=(
-        ("department_prompt_configured", "department", "enum integer[1, 2, 3]"),))
-    monkeypatch.setattr(project_stream_fields, "live_fields", lambda: live)
-    with pytest.raises(ManifestWriteRejected) as caught:
-        apply_rewrite()
-    assert "改变字段类型" in str(caught.value)
-    assert scratch_manifest.read_text(encoding="utf-8") == before

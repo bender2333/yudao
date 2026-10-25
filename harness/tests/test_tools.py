@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +9,6 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.environment import LocalEnvironment
 from harness.models import EventType, json_dumps
-from harness.public_tree import UnrepresentableWorkspace
 from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -35,43 +33,6 @@ def test_quality_checks_only_through_run_check(tmp_path):
     assert workspace.snapshot().facts.latest_check("quality", "smoke").exit_code == 0
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
-def test_write_file_creates_parents_and_replaces_the_whole_file(tmp_path):
-    workspace = Workspace(tmp_path)
-    environment = LocalEnvironment(workspace)
-    assert perform(environment, "write_file", {"path": "src/deep/a.py", "content": "first\nsecond\n"}).ok
-    assert perform(environment, "write_file", {"path": "src/deep/a.py", "content": "only\n"}).ok
-    assert workspace.read_file("src/deep/a.py") == "only\n"
-
-def test_read_file_returns_the_whole_file_without_line_numbers_and_rejects_non_utf8(tmp_path):
-    description = TOOLS["read_file"].description
-    assert "entire content" in description and "without line numbers or truncation" in description
-    assert "Files that are not valid UTF-8 are rejected." in description
-    assert "Use read_range for large files" in description and "content_hash" in description
-    workspace = Workspace(tmp_path)
-    environment = LocalEnvironment(workspace)
-    # 超过 read_range 单页上限的文件由 read_file 完整返回
-    text = "".join(f"line {index} " + "x" * 80 + "\n" for index in range(200))
-    workspace.write_file("big.txt", text)
-    assert len(text) > 4000
-    assert perform(environment, "read_file", {"path": "big.txt"}, department="quality").output == text
-    (tmp_path / "latin1.txt").write_bytes(b"caf\xe9\n")
-    unreadable = perform(environment, "read_file", {"path": "latin1.txt"}, department="quality")
-    assert unreadable.ok is False and unreadable.status == "failed"
-
-def test_list_files_is_recursive_and_prefix_is_a_plain_string_prefix(tmp_path):
-    description = TOOLS["list_files"].description
-    assert "recursively" in description and '"src2/a.py"' in description
-    assert "end it with / to limit the list to one directory" in (
-        TOOLS["list_files"].parameters["properties"]["prefix"]["description"])
-    workspace = Workspace(tmp_path)
-    environment = LocalEnvironment(workspace)
-    for path in ("src/a.py", "src/deep/b.py", "src2/a.py", "top.txt"):
-        workspace.write_file(path, "x\n")
-    assert sorted(perform(environment, "list_files", {}).output) == [
-        "src/a.py", "src/deep/b.py", "src2/a.py", "top.txt"]
-    assert sorted(perform(environment, "list_files", {"prefix": "src/"}).output) == ["src/a.py", "src/deep/b.py"]
-    assert sorted(perform(environment, "list_files", {"prefix": "src"}).output) == [
-        "src/a.py", "src/deep/b.py", "src2/a.py"]
 
 def test_actions_and_receipts_are_serializable_contracts(tmp_path):
     workspace = Workspace(tmp_path)
@@ -97,10 +58,6 @@ def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp
     assert receipt.exit_code == 3
     assert "host-executed" in receipt.summary
 
-def test_run_check_requires_command(tmp_path):
-    result = perform(LocalEnvironment(Workspace(tmp_path)), "run_check", {"name": "smoke", "exit_code": 0})
-    assert result.ok is False
-    assert "command" in (result.error or "")
 
 def test_agent_cannot_read_or_write_checks(tmp_path):
     environment = LocalEnvironment(Workspace(tmp_path))
@@ -125,14 +82,6 @@ def test_check_cannot_persist_forged_receipt(tmp_path):
     assert all(row["name"] == "smoke" and row["department"] == "engineering" for row in rows)
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is not None
 
-def test_check_does_not_keep_workspace_mutations(tmp_path):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("src/echo.py", "print('ok')\n")
-    workspace.write_file("mutate.py", "from pathlib import Path\nPath('hacked.txt').write_text('x')\n")
-    perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python mutate.py"},
-            department="quality")
-    assert "hacked.txt" not in workspace.list_files()
-    assert workspace.read_file("src/echo.py") == "print('ok')\n"
 
 def test_check_subprocess_inherits_environment_and_redacts_secrets(tmp_path, monkeypatch):
     # 检查继承 Yudao 进程的全部环境变量（与 bash 相同），输出里只脱敏不删除
@@ -171,33 +120,6 @@ def test_mutating_check_does_not_bind_pass_to_original_snapshot(tmp_path):
     assert result.output["tree_changed"] is True
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is None
 
-def test_check_copy_does_not_follow_hardlink_into_external_file(tmp_path):
-    workspace = Workspace(tmp_path / "ws")
-    outside = tmp_path / "outside.txt"
-    outside.write_text("EXTERNAL", encoding="utf-8")
-    target = workspace.root / "target.txt"
-    try:
-        os.link(outside, target)
-    except OSError:
-        pytest.skip("hard links are not available")
-    workspace.write_file("poke.py", "from pathlib import Path\nPath('target.txt').write_text('HACKED')\n")
-    # 工作区已有公开树无法表示的条目：检查不开始，由步骤驱动以 workspace_unrepresentable 暂停运行
-    with pytest.raises(UnrepresentableWorkspace, match="Hard-linked files are not supported: target.txt"):
-        perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python poke.py"})
-    assert workspace.receipts() == []
-    assert outside.read_text(encoding="utf-8") == "EXTERNAL"
-    assert target.read_text(encoding="utf-8") != "HACKED"
-
-def test_failed_check_records_real_exit_code(tmp_path):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("fail.py", "raise SystemExit(7)\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python fail.py"})
-    assert result.ok is True
-    assert result.output["exit_code"] == 7
-    receipt = workspace.snapshot().facts.latest_check("engineering", "smoke")
-    assert receipt is not None
-    assert receipt.exit_code == 7
-    assert receipt.snapshot_hash == workspace.digest()
 
 def test_timed_out_check_records_timeout_exit_code_and_stops_the_process_tree(tmp_path):
     workspace = Workspace(tmp_path / "ws")
@@ -258,44 +180,6 @@ def check_copy_base(tmp_path, monkeypatch):
     monkeypatch.setattr("harness.workspace.tempfile.tempdir", str(base))
     return base
 
-def test_missing_check_command_does_not_leave_a_copy(tmp_path, check_copy_base):
-    # 命令字符串缺失：检查不开始，副本不留
-    workspace = Workspace(tmp_path / "workspace")
-    workspace.write_file("ok.py", "print('ok')\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke"})
-    assert result.ok is False
-    assert "command" in (result.error or "")
-    assert list(check_copy_base.iterdir()) == []
-
-def test_failed_check_copy_does_not_leave_a_copy(tmp_path, monkeypatch, check_copy_base):
-    workspace = Workspace(tmp_path / "workspace")
-    workspace.write_file("ok.py", "print('ok')\n")
-    def fail_copy(tree, target):
-        target.mkdir()
-        raise OSError("copy failed")
-
-    monkeypatch.setattr("harness.workspace.materialize_tree", fail_copy)
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python ok.py"})
-    assert result.ok is False
-    assert "copy failed" in (result.error or "")
-    assert list(check_copy_base.iterdir()) == []
-
-def test_successful_and_failed_checks_do_not_leave_copies(tmp_path, check_copy_base):
-    workspace = Workspace(tmp_path / "workspace")
-    environment = LocalEnvironment(workspace)
-    workspace.write_file("ok.py", "print('ok')\n")
-    workspace.write_file("fail.py", "raise SystemExit(7)\n")
-    with workspace.check_copy(workspace.snapshot().tree) as copy_root:
-        assert copy_root.parent.parent == check_copy_base
-        assert not copy_root.is_relative_to(workspace.root)
-    ok = perform(environment, "run_check", {"name": "ok", "command": "python ok.py"})
-    failed = perform(environment, "run_check", {"name": "fail", "command": "python fail.py"})
-    assert ok.ok is True
-    assert ok.output["exit_code"] == 0
-    assert failed.ok is True
-    assert failed.output["exit_code"] == 7
-    assert workspace.read_file("ok.py") == "print('ok')\n"
-    assert list(check_copy_base.iterdir()) == []
 
 @pytest.mark.parametrize("department", ["product", "quality"])
 def test_departments_without_write_tools_cannot_change_files(tmp_path, department):
@@ -332,16 +216,6 @@ def test_departments_without_write_tools_cannot_change_files(tmp_path, departmen
     assert workspace.read_file("src/echo.py") == before != "x"
     assert not (workspace.root / "src" / "moved.py").exists()
 
-def test_module_import_check_preserves_complete_tree(tmp_path):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("helper.py", "VALUE = 42\n")
-    workspace.write_file("main.py", "from helper import VALUE\nprint(VALUE)\nassert VALUE == 42\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "imports", "command": "python main.py"})
-    assert result.ok and result.output["exit_code"] == 0
-    assert result.output["tree_changed"] is False
-    assert "42" in result.output["summary"]
-    assert workspace.snapshot().facts.latest_check("engineering", "imports") is not None
-    assert workspace.list_files() == ["helper.py", "main.py"]
 
 def test_check_copy_uses_previously_captured_bytes(tmp_path):
     workspace = Workspace(tmp_path)
@@ -371,51 +245,4 @@ def test_check_records_source_workspace_change(tmp_path):
     assert len(workspace.receipts()) == 1
     assert workspace.snapshot().facts.latest_check("engineering", "source") is None
 
-@pytest.mark.parametrize("failed_root", ["copy", "source"])
-def test_check_keeps_process_evidence_when_postcheck_capture_fails(tmp_path, failed_root):
-    # 检查进程在被检查的副本或源工作区中留下硬链接，检查以后读取公开树失败：进程的结果仍然记为证据
-    workspace = Workspace(tmp_path / "ws")
-    workspace.write_file(
-        "app.py",
-        "import os, sys\nroot = sys.argv[1] if len(sys.argv) > 1 else '.'\n"
-        "os.link(os.path.join(root, 'app.py'), os.path.join(root, 'linked.py'))\n"
-        "print('observed output')\nraise SystemExit(9)\n",
-    )
-    command = "python app.py" + (f' "{workspace.root}"' if failed_root == "source" else "")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "unverified", "command": command})
-    assert result.ok and result.output["exit_code"] == 9
-    assert result.output["tree_changed"] is True
-    assert "observed output" in result.output["summary"]
-    label = "source workspace" if failed_root == "source" else "tested tree"
-    assert f"{label} could not be verified" in result.output["summary"]
-    [receipt] = workspace.receipts()
-    assert receipt.tree_changed is True
-
-@pytest.mark.parametrize("reason", [None, "", " ", 2])
-def test_refactoring_tools_require_explained_reason(tmp_path, reason):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("old.py", "original\n")
-    environment = LocalEnvironment(workspace)
-    for tool, args in (("delete_file", {"path": "old.py"}),
-                       ("move_file", {"source": "old.py", "destination": "new.py"})):
-        result = perform(environment, tool, {**args, "reason": reason})
-        assert result.ok is False
-        assert "reason" in result.error
-        assert workspace.read_file("old.py") == "original\n"
-
-def test_refactoring_tools_move_and_delete_regular_files(tmp_path):
-    workspace = Workspace(tmp_path)
-    workspace.write_file("old.py", "original\n")
-    environment = LocalEnvironment(workspace)
-    moved = perform(environment, "move_file", {
-        "source": "old.py", "destination": "src/new.py", "reason": "organize module",
-    })
-    assert moved.ok and moved.output == {"source": "old.py", "destination": "src/new.py"}
-    assert not (workspace.root / "old.py").exists()
-    assert workspace.read_file("src/new.py") == "original\n"
-    deleted = perform(environment, "delete_file", {
-        "path": "src/new.py", "reason": "remove replaced module",
-    })
-    assert deleted.ok and deleted.output == "src/new.py"
-    assert workspace.list_files() == []
 

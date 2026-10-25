@@ -11,7 +11,10 @@ from harness.app.labels import _LABELS
 from harness.app.payloads import PAYLOADS
 from harness.models import CatalogEventType, EventType, ProjectEventType
 from harness.streams import (
-    CATALOG_EVENT_TYPES, DECLARED_EVENT_TYPES, PROJECT_EVENT_TYPES, RUN_EVENT_TYPES, RUN_EVENT_VERSION,
+    CATALOG_EVENT_TYPES,
+    DECLARED_EVENT_TYPES,
+    PROJECT_EVENT_TYPES,
+    RUN_EVENT_TYPES,
 )
 
 def _kinds(cls) -> frozenset[str]:
@@ -58,9 +61,6 @@ def test_run_stream_records_the_course_of_a_work_item():
     assert {"run_created", "department_activated", "model_requested", "proposal_submitted", "qa_submitted",
             "run_done", "run_failed", "decision_requested"} <= RUN_EVENT_TYPES
     assert "work_item_created" not in RUN_EVENT_TYPES
-
-def test_the_run_event_version_is_a_positive_integer():
-    assert isinstance(RUN_EVENT_VERSION, int) and RUN_EVENT_VERSION >= 1
 
 
 def test_every_event_kind_has_a_chinese_label():

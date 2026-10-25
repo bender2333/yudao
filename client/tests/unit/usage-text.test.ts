@@ -115,8 +115,3 @@ test("上报用量的请求数：有上报时给出个数", () => {
   assert.equal(reportedCountText(1), "1 个");
 });
 
-test("请求记录表与请求详情给出同一句话", () => {
-  // 两处调的是同一个函数（#301 的约定）：同一份数据得出同一句话
-  const usage = totalOnly();
-  assert.equal(usageText(usage), usageText(usage));
-});

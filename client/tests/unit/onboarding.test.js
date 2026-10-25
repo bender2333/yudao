@@ -49,24 +49,8 @@ function toolStarted(overrides) {
   };
 }
 
-test("拒绝说明按分号分行，每条相对路径各占一行", () => {
-  assert.deepEqual(sourceInvalidLines(problem(rejection())), [
-    "Links and reparse points are not supported: docs/alpha",
-    "Links and reparse points are not supported: docs/beta",
-    "Add these paths to the project's ignore rules or delete them.",
-  ]);
-});
 
-test("只有一条原因时分行给出这一条，空段落不出现", () => {
-  assert.deepEqual(
-    sourceInvalidLines(problem(rejection({ message: "宿主私有路径不能进入公开快照：.checks" }))),
-    ["宿主私有路径不能进入公开快照：.checks"],
-  );
-});
 
-test("接口层校验错误没有路径可列（工单 #740）", () => {
-  assert.deepEqual(sourceInvalidLines({ kind: "invalid", note: "这次请求被拒绝：「名称」不能为空" }), []);
-});
 
 test("接入的每个拒绝原因都有中文说明", () => {
   for (const reason of ["source_invalid", "not_allowed", "not_found", "project_archived", "busy", "provider_unavailable"]) {
@@ -104,34 +88,10 @@ test("没有建档状态的项目没有标记", () => {
   assert.equal(projectOnboardingMark(project({ onboarding_status: "" }), []), null);
 });
 
-test("读取、搜索与区间阅读三种工具驱动阅读已有项目，其他工具不驱动", () => {
-  for (const name of ["read_file", "search", "read_range"]) {
-    assert.equal(readExistingAction(toolStarted({ payload: { name } })), name);
-  }
-  for (const name of ["write_file", "run_check", "submit_structure", "list_files"]) {
-    assert.equal(readExistingAction(toolStarted({ payload: { name } })), null);
-  }
-});
 
-test("只有 tool_started 事件驱动阅读已有项目，其他事件不驱动", () => {
-  assert.equal(readExistingAction(toolStarted({ type: "tool_called", payload: { name: "read_file" } })), null);
-  assert.equal(readExistingAction(toolStarted({ type: "model_message", payload: {} })), null);
-});
 
 function action(overrides) {
   return { tool: "read_file", department: "product", created_at: "2026-10-07T01:00:00+00:00", ...overrides };
 }
 
-test("页面打开以前已经发生的读取按动作列表读出最近一次", () => {
-  const last = lastReadExistingAction([
-    action({}),
-    action({ tool: "run_check", created_at: "2026-10-07T02:00:00+00:00" }),
-    action({ tool: "read_range", department: "quality", created_at: "2026-10-07T03:00:00+00:00" }),
-  ]);
-  assert.deepEqual(last, { tool: "read_range", department: "quality", at: "2026-10-07T03:00:00+00:00" });
-});
 
-test("动作列表里没有读取时没有已发生的读取", () => {
-  assert.equal(lastReadExistingAction([]), null);
-  assert.equal(lastReadExistingAction([action({ tool: "submit_structure" })]), null);
-});

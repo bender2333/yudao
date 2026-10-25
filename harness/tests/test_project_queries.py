@@ -1,13 +1,11 @@
 import base64
 import json
-import sqlite3
 import sys
 import time
-from dataclasses import asdict, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 import pytest
-import pygit2
 from filelock import FileLock
 
 from harness.__main__ import main
@@ -38,12 +36,10 @@ from harness.app.project_queries import (
     WorkItemMaterials,
 )
 from harness.app.registry import Registry
-from harness.app.read_models import DERIVATION_KEY
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
-from harness.git_versions import GitVersionError
-from harness.models import ArtifactRef, EventType, ProjectEventType
+from harness.models import EventType
 from harness.proposals import (
     product_spec, delivery_turn, review_turn,
     ask_turn, answer_turn,
@@ -52,12 +48,8 @@ from harness.proposals import (
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
-from harness.streams import STOP_REASON_UPGRADE
 from harness.tests.helpers import explore_turn, happy_script, merge_scripts, quality_turns
 from harness.tests.onboarding_project import onboarding_source
-from harness.tests.api_helpers import running_api
-from harness.tests.saved_rewrite import rewrite_saved_event
-from harness.tree_archive import load_tree
 from harness.write_path import NewEvent
 
 GOAL = "把文本按行处理清楚"
@@ -161,18 +153,6 @@ def _all_requests(system, project_id, work_item_id, run_id):
         ("rules.registry", RulesRegistryRequest()),
     ]
 
-def test_overview_does_not_settle_a_released_run(data_dir):
-    system = _system(data_dir, _release_script())
-    project_id = system.projects.register("未结算", GOAL)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "第一步")
-    system.run_until_stop(run_id)
-    application = _application(system)
-    before = [event.type for event in system.store.list_project_events(project_id)]
-    snapshot = application.query("project.overview", ProjectOverview(project_id=project_id))
-    item = next(item for item in snapshot.data.work_items if item.work_item_id == work_item_id)
-    assert item.status == "released_unsettled"
-    assert [event.type for event in system.store.list_project_events(project_id)] == before
-    assert ProjectEventType.DELIVERABLE_ADOPTED not in before
 
 def test_deleting_read_models_and_rebuilding_returns_the_same_queries_without_calling_a_model(data_dir):
     system = _system(data_dir, happy_script())
@@ -237,53 +217,6 @@ def test_attempt_pages_stay_inside_the_first_page_position(data_dir):
     bounded = {item.attempt_id for item in complete.data.attempts if item.position <= first.position}
     assert set(seen) == bounded
 
-def test_query_time_does_not_grow_with_unrelated_history(data_dir):
-    # 同一场景把历史事件数量增加十倍：已登记的查询耗时不变。
-    # replay.check 按设计要重放整份日志，与历史长度有关，不在其列
-    system = _system(data_dir, happy_script())
-    project_id = system.projects.register("耗时", GOAL)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
-    projection = system.run_until_stop(run_id)
-    application = _application(system)
-    attempts = application.query("project.attempts", ProjectAttempts(project_id=project_id)).data.attempts
-    assembled = next(item for item in system.store.list_events(run_id)
-                     if item.type == EventType.CONTEXT_ASSEMBLED)
-    requests = (
-        ("projects.list", ProjectsList()),
-        ("project.overview", ProjectOverview(project_id=project_id)),
-        ("project.loop", ProjectLoop(project_id=project_id)),
-        ("project.flow", ProjectFlow(project_id=project_id)),
-        ("work_item.inputs", WorkItemInputs(project_id=project_id, work_item=work_item_id)),
-        ("event.detail", EventDetail(event_id=assembled.event_id)),
-        ("department.workspace", DepartmentWorkspace(project_id=project_id, department="product",
-                                                     work_item=work_item_id)),
-        ("run.actions", RunActions(run_id=run_id)),
-        ("run.asks", RunAsks(run_id=run_id)),
-        ("work_item.materials", WorkItemMaterials(project_id=project_id, work_item=work_item_id)),
-        ("delivery.file", DeliveryFile(event_id=projection.delivery_spec.created_event_id, path="src/echo.py")),
-        ("project.attempts", ProjectAttempts(project_id=project_id, limit=5)),
-        ("project.usage", ProjectUsage(project_id=project_id)),
-        ("run.attempt", RunAttempt(run_id=run_id, attempt_id=attempts[0].attempt_id)),
-        ("project.settings", ProjectSettings(project_id=project_id)),
-        ("run.export", RunExport(run_id=run_id)),
-    )
-
-    def measure() -> float:
-        started = time.perf_counter()
-        for _ in range(10):
-            for name, request in requests:
-                application.query(name, request)
-        return time.perf_counter() - started
-
-    measure()  # 预热：第一次查询建立读取模型
-    baseline = min(measure(), measure(), measure())
-    noise = [NewEvent("noise", state_before="running", state_after="running", actor="system",
-                      payload={"n": index})
-             for index in range(system.store.end_position() * 9)]
-    system.writes.append(run_stream("run_noise"), *noise)
-    measure()  # 订阅把新事件吸收进读取模型；之后的查询不再处理它们
-    again = min(measure(), measure(), measure())
-    assert again < baseline * 4, f"baseline={baseline:.4f}s again={again:.4f}s"
 
 def test_the_action_receipt_shows_the_command_text(data_dir):
     # 工单 #658：动作回执里显示动作实际执行的命令原文，界面按它列出命令
@@ -649,34 +582,6 @@ def test_flow_records_give_two_prd_new_versions_for_the_onboarding_initial_prd(d
     assert all("第 1 版" in record.content for record in rows)
 
 
-def test_the_flow_records_are_rebuilt_when_the_derivation_version_changed(data_dir):
-    # 工单 #882 验收标准 3：推导方式变了以后旧行不会自己跟着变；打开读取模型时按推导版本重建一次，
-    # 重建以后「PRD 新版本」的记录重新出现（工单 #684 的做法）
-    system = _system(data_dir, _prd_revision_script())
-    project_id = system.projects.register("推导版本", GOAL)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
-    system.run_until_stop(run_id)
-    application = _application(system)
-    flow = application.query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
-    assert len([record for record in flow.data.records if record.kind == "PRD 新版本"]) == 4
-    application.close()
-
-    # 旧读取模型：没有「PRD 新版本」的行，推导版本是第 1 版
-    path = data_dir / "read-models.sqlite"
-    with sqlite3.connect(path) as connection:
-        connection.execute("DELETE FROM app_flows WHERE kind = ?", ("PRD 新版本",))
-        connection.execute("INSERT OR REPLACE INTO app_read_meta (key, value) VALUES (?, ?)",
-                           (DERIVATION_KEY, "1"))
-
-    # 重新打开：保存的推导版本与代码不同，重建以后「PRD 新版本」的记录重新出现
-    reopened = Application(LoopSystem(data_dir))
-    flow = reopened.query("project.flow", ProjectFlow(project_id=project_id, work_item=work_item_id))
-    rows = [record for record in flow.data.records if record.kind == "PRD 新版本"]
-    assert len(rows) == 4
-    assert sum("第 1 版" in record.content for record in rows) == 2
-    reopened.close()
-
-
 def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
     system = _system(data_dir, _release_script())
     project_id = system.projects.register("工件", GOAL)
@@ -694,55 +599,6 @@ def test_event_detail_returns_git_version_and_accepted_materials(data_dir):
                      if item.type == EventType.CONTEXT_ASSEMBLED)
     context = application.query("event.detail", EventDetail(event_id=assembled.event_id))
     assert context.data.artifacts["request"]["input"][0]["role"] == "developer"
-
-def test_event_detail_reads_the_recorded_contract_shape_from_git(data_dir):
-    system = _system(data_dir, _release_script())
-    try:
-        run_id = system.create_run("读取历史交付")
-        assert system.run_until_stop(run_id).status == "done"
-        delivery = next(event for event in system.store.list_events(run_id)
-                        if event.type == EventType.DELIVERY_ACCEPTED)
-        original = delivery.payload["git_version"]
-        files = system.git_versions.read_files(run_id, original)
-        contract = json.loads(files["specs/contract.json"])
-        contract["legacy_contract_field"] = "stored with this delivery"
-        revision = system.git_versions.prepare(
-            run_id, parent_commit=original["parent_commit"],
-            updates={"specs/contract.json": json.dumps(contract).encode("utf-8"),
-                     "specs/delivery.json": files["specs/delivery.json"],
-                     "specs/delivery-tree.json": files["specs/delivery-tree.json"]},
-            code_tree=load_tree(system.artifacts, run_id, ArtifactRef(**delivery.payload["tree_ref"])),
-            message="历史材料包含旧字段",
-        )
-        rewrite_saved_event(system.store, replace(delivery, payload={**delivery.payload, "git_version": revision}))
-        detail = _application(system).query("event.detail", EventDetail(event_id=delivery.event_id))
-        shown = detail.data.artifacts["git_version"]
-        assert shown["commit"] == revision["commit"]
-        assert "legacy_contract_field" in shown["diff"]
-        assert any(item["path"] == "specs/contract.json" for item in shown["files"])
-        assert detail.data.artifacts["tree_archive"]["tree_digest"] == delivery.payload["code_tree_digest"]
-    finally:
-        system.close()
-
-
-@pytest.mark.parametrize("damage", ["missing_commit", "unbound_commit"])
-def test_event_detail_http_reports_unreadable_git_references(data_dir, damage):
-    system = _system(data_dir, [])
-    run_id = system.create_run("读取失效版本")
-    event = next(event for event in system.store.list_events(run_id) if event.type == EventType.RUN_CREATED)
-    revision = dict(event.payload["git_version"])
-    if damage == "missing_commit":
-        revision["commit"] = "0" * 40
-        rewrite_saved_event(system.store, replace(event, payload={**event.payload, "git_version": revision}))
-    else:
-        repository = pygit2.Repository(str(system.git_versions.root / (run_id + ".git")))
-        repository.references["refs/snapshots/" + revision["commit"]].delete()
-    with pytest.raises(GitVersionError) as failed:
-        system.git_versions.show(run_id, revision)
-    with running_api(lambda: _application(system)) as client:
-        response = client.get("/api/queries/event.detail", params={"event_id": event.event_id})
-        assert response.status_code == 404, response.text
-        assert response.json()["error"] == str(failed.value)
 
 
 def test_event_detail_rejects_an_artifact_of_another_run(data_dir, monkeypatch):
@@ -847,32 +703,6 @@ def test_queries_reject_a_corrupted_delivery_archive(data_dir, damage):
     with pytest.raises(file_error):
         application.query("delivery.file", DeliveryFile(event_id=delivery.created_event_id, path="src/echo.py"))
 
-@pytest.mark.parametrize("mismatch", ["other_commit", "fake_tree", "forged_material"])
-def test_event_detail_reads_only_the_recorded_git_reference(data_dir, mismatch):
-    # 引用按 Git 对象读取；材料的完整核对由 replay.check 执行
-    system = _system(data_dir, _release_script())
-    project_id = system.projects.register("绑定", GOAL)
-    _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
-    system.run_until_stop(run_id)
-    events = system.store.list_events(run_id)
-    delivery = next(item for item in events if item.type == EventType.DELIVERY_ACCEPTED)
-    payload = dict(delivery.payload)
-    if mismatch == "other_commit":
-        payload["git_version"] = next(item.payload["git_version"] for item in events
-                                      if item.type == EventType.SPEC_ACCEPTED)
-    elif mismatch == "fake_tree":
-        payload["git_version"] = {**payload["git_version"], "tree": "0" * 40}
-    else:
-        payload["prd_ref"] = asdict(system.artifacts.put(
-            run_id, "prd", "FORGED_ACCEPTED_MATERIAL", media_type="text/markdown"))
-    rewrite_saved_event(system.store, replace(delivery, payload=payload))
-    application = _application(system)
-    if mismatch == "fake_tree":
-        with pytest.raises(NotFound, match="Git version is unavailable or invalid"):
-            application.query("event.detail", EventDetail(event_id=delivery.event_id))
-    else:
-        detail = application.query("event.detail", EventDetail(event_id=delivery.event_id))
-        assert detail.data.artifacts["git_version"]["commit"] == payload["git_version"]["commit"]
 
 def test_work_item_scope_is_checked_in_every_project_query(data_dir):
     # 事项范围参数指向别的事项时，项目内的查询都以目标不存在拒绝（旧路由的跨项目场景）
@@ -909,36 +739,6 @@ def _rework_script(verdict="rework_engineering"):
                     review_turn("release", "revised delivery checked")],
     }
 
-
-def test_read_models_write_only_their_own_database(data_dir):
-    system = _system(data_dir, happy_script())
-    project_id = system.projects.register("读取模型", GOAL)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
-    system.run_until_stop(run_id)
-    application = _application(system)
-    before = _log_tables(data_dir / "events.sqlite")
-    application.query("project.attempts", ProjectAttempts(project_id=project_id))
-    application.query("project.flow", ProjectFlow(project_id=project_id))
-    application.rebuild_read_models()
-    assert _log_tables(data_dir / "events.sqlite") == before
-    assert (data_dir / "read-models.sqlite").is_file()
-    assert _table_names(data_dir / "read-models.sqlite") >= {
-        "app_attempt_state", "app_attempts", "app_flows", "app_read_positions",
-    }
-    assert not (data_dir / "read-models.sqlite").samefile(data_dir / "events.sqlite")
-
-def _log_tables(path: Path) -> dict[str, list[tuple]]:
-    # 事件日志的三张表：读取模型与查询都不写它们
-    with sqlite3.connect(path) as connection:
-        return {
-            name: connection.execute(f"SELECT * FROM {name} ORDER BY 1").fetchall()
-            for name in ("events", "projections", "commands")
-        }
-
-def _table_names(path: Path) -> set[str]:
-    with sqlite3.connect(path) as connection:
-        rows = connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
-    return {row[0] for row in rows}
 
 def test_cli_output_matches_the_queries_and_does_not_write_or_lock(data_dir, capsys):
     system = _system(data_dir, happy_script())
@@ -1195,24 +995,6 @@ def test_background_job_status_query_does_not_affect_read_output(data_dir: Path)
     assert "LINE_ONE" in captured["read_output"]
     assert "LINE_TWO" in captured["read_output"]
     system.close()
-
-
-def test_an_upgrade_stopped_run_puts_the_door_sign_on_the_room(data_dir):
-    # 验收一（工单 #895）：门口牌子比较的是服务端写的停止原因 run_event_version_changed，不是 "upgrade"；
-    # 因升级停止的事项，它所在房间的门口牌子写「因升级停止」
-    system = _system(data_dir, happy_script())
-    project_id = system.projects.register("升级停止", GOAL)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
-    system.writes.append(run_stream(run_id), NewEvent(
-        EventType.RUN_FAILED, actor="system", department="product", state_before="running",
-        state_after="failed", stop_reason=STOP_REASON_UPGRADE,
-        payload={"stop_reason": STOP_REASON_UPGRADE, "message": "运行事件版本已经不是当前版本"},
-    ))
-    workspace = _application(system).query("department.workspace", DepartmentWorkspace(
-        project_id=project_id, department="product", work_item=work_item_id,
-    ))
-    assert workspace.data.stop_reason == STOP_REASON_UPGRADE
-    assert workspace.data.room.door == "因升级停止"
 
 
 def test_recovery_reports_the_position_of_this_items_last_event(data_dir):

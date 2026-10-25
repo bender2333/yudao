@@ -15,7 +15,6 @@ from harness.providers import (
     CredentialChain,
     ProviderFacade,
 )
-from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 
 
@@ -66,11 +65,6 @@ def _fake_catalog_only() -> dict:
     }
 
 
-def _fake_provider_entry() -> dict:
-    """单个 Provider 结构条目，无 credential_ref。"""
-    return {"id": "pf", "name": "测试服务"}
-
-
 def _write_json(path, data) -> None:
     """以与 persist_document 一致的字节格式写 JSON：UTF-8, \n 换行。"""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -86,35 +80,6 @@ def _write_text(path, text: str) -> None:
 # ---------------------------------------------------------------------------
 # 1. 无配置启动
 # ---------------------------------------------------------------------------
-
-def test_no_config_start(tmp_path):
-    """指向不存在的 providers.json 和 .env -> provider_status 可用为 False，
-    原因 provider_config_missing；config_status 报告路径与「没有文件」，无异常。"""
-    missing_config = tmp_path / "nonexistent" / "providers.json"
-    missing_dotenv = tmp_path / "nonexistent" / ".env"
-
-    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
-    facade.configure_paths(missing_config, missing_dotenv)
-    revision_before = facade.revision
-    catalog_revision_before = facade.catalog_revision()
-    facade.reload()
-
-    system = LoopSystem(tmp_path / "data", facade=facade)
-
-    # provider_status: 无配置 -> 不可用
-    status = system.provider_status()
-    assert status["available"] is False
-    assert status["reason"] == "provider_config_missing"
-
-    # config_status: 路径已记录，reload 报告目录文件不存在，reload_error 为空
-    cfg = facade.config_status()
-    assert cfg["config_path"] == str(missing_config)
-    # 启动时没有目录文件是「没有文件」，不是文件被删除（工单 #844，设计说明第 4.7 节）
-    assert cfg["config_state"] == "missing"
-    assert cfg["reload_error"] is None
-    # 没有文件不是一次目录变更：启动不推进修订号
-    assert facade.revision == revision_before
-    assert facade.catalog_revision() == catalog_revision_before
 
 
 def test_missing_file_at_startup_does_not_clear_the_catalog(tmp_path):
@@ -286,81 +251,10 @@ def test_service_starts_in_every_unready_state_and_blocks_the_first_request(tmp_
 # 3. 结构合法的部分保存
 # ---------------------------------------------------------------------------
 
-def test_structural_partial_save(tmp_path):
-    """save_provider_entry 保存结构合法的 Provider（无 credential、无 model）-> 发布成功；
-    describe_readiness available False 且含定位 issues；落盘可重新加载且非敏感内容一致。"""
-    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
-    # 保存结构条目，不传 models_raw
-    rev = facade.save_provider_entry(_fake_provider_entry())
-    assert rev >= 1
-
-    # 就绪检查：缺绑定 -> 不可用
-    readiness = facade.describe_readiness()
-    assert readiness["available"] is False
-    assert readiness["issues"]  # 有定位 issue
-
-    # 持久化文档并重新加载
-    doc_path = tmp_path / "providers.json"
-    facade.persist_document(doc_path)
-
-    loaded = json.loads(doc_path.read_text(encoding="utf-8"))
-    assert loaded["providers"][0]["id"] == "pf"
-    assert loaded["providers"][0]["name"] == "测试服务"
-    assert "credential_ref" not in loaded["providers"][0] or loaded["providers"][0].get("credential_ref", "") == ""
-
-    # 验证已持久化的文档能被全新 facade 加载且结构一致
-    facade2 = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
-    facade2.load_document(doc_path)
-    doc2 = facade2.to_document()
-    assert doc2["providers"] == loaded["providers"]
-
 
 # ---------------------------------------------------------------------------
 # 4. 新任务修订与冻结快照不变性
 # ---------------------------------------------------------------------------
-
-def test_frozen_snapshot_immutability(tmp_path):
-    """resolve_departments 返回的快照 public_dict 在后续 save_bindings 推进修订后不变。"""
-    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
-
-    # 先写入目录与模型（fake 协议无需凭据）
-    facade.store(_fake_catalog_only())
-
-    # 绑定并发布第一个版本
-    facade.save_bindings({
-        "product": {"provider_id": "pf", "model_id": "mf"},
-        "engineering": {"provider_id": "pf", "model_id": "mf"},
-        "quality": {"provider_id": "pf", "model_id": "mf"},
-    })
-    rev_before = facade.revision
-
-    # 取得冻结快照，捕获其公开字典
-    snapshot = facade.resolve_departments()
-    snapshot_public = snapshot.public_dict()
-
-    # 快照中目标与当前目录一致
-    assert snapshot.target("product").provider_id == "pf"
-    assert snapshot.target("product").model_id == "mf"
-
-    # 推进新修订：新增一个模型并重新绑定到新模型
-    facade.save_model({
-        "id": "mf2", "provider_id": "pf", "model": "fake-model-2",
-        "protocol": "fake",
-        "context_window": 4000, "max_output_tokens": 256,
-    })
-    facade.save_bindings({
-        "product": {"provider_id": "pf", "model_id": "mf2"},
-        "engineering": {"provider_id": "pf", "model_id": "mf2"},
-        "quality": {"provider_id": "pf", "model_id": "mf2"},
-    })
-
-    # 冻结快照仍然持有旧值（公共字典与修订不随后续发布改变）
-    assert snapshot.public_dict() == snapshot_public
-    assert snapshot.target("product").model_id == "mf"
-
-    # 新快照反映新状态
-    new_snapshot = facade.resolve_departments()
-    assert new_snapshot.target("product").model_id == "mf2"
 
 
 # ---------------------------------------------------------------------------

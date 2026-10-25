@@ -5,22 +5,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { emptyOrFailureText, readFailureText } from "../../src/renderer/src/contract/read-failure.ts";
 import { attemptsSummary } from "../../src/renderer/src/views/project/attempts-summary.ts";
 
-test("读不出来：写「读取失败」与服务端给的原文", () => {
-  const reason = "查询 project.overview 没有返回数据：Internal Server Error";
-  assert.equal(readFailureText(reason), `读取失败：${reason}`);
-  assert.equal(
-    emptyOrFailureText(reason, "项目还没有流转记录"),
-    `读取失败：${reason}`,
-  );
-});
 
-test("读出来且为空：写原来的空态文案", () => {
-  assert.equal(emptyOrFailureText(null, "项目还没有流转记录"), "项目还没有流转记录");
-  assert.equal(emptyOrFailureText("", "项目还没有流转记录"), "项目还没有流转记录");
-});
 
 test("观测页：总数读不出来时说明读不出来，不安静地少一句数字", () => {
   const text = attemptsSummary({

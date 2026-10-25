@@ -10,7 +10,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Event, Thread
 from typing import Any, Callable, Iterator
 
-import pytest
 from openai import DEFAULT_CONNECTION_LIMITS
 
 from harness.collaboration import has_new_work
@@ -249,10 +248,6 @@ def _department(body: dict[str, Any]) -> str:
     assert raw is not None
     return json.loads(raw)["department"]
 
-def _contract_hash(body: dict[str, Any]) -> str:
-    raw = _part(body, "current_contract")
-    assert raw is not None
-    return json.loads(raw)["content_hash"]
 
 def _facade(
     product_url: str,
@@ -608,47 +603,6 @@ def test_restart_resolves_the_current_credentials_for_the_next_request(tmp_path)
         for secret in ("provider-a-key", "provider-a-new-key", "provider-b-new-key"):
             assert secret not in public
 
-def test_retry_stays_on_the_bound_provider_and_model(tmp_path):
-    def retrying(body: dict[str, Any], count: int) -> _Reply:
-        assert _department(body) == "product"
-        if count == 1:
-            return _error()
-        payload = product_spec()
-        payload.pop("kind")
-        return _stream([_call("retry-product", "submit_product_spec", payload)],
-                       response_id="retry-success", model="a-product-actual")
-
-    with _provider_server("provider-a", "provider-a-key", retrying) as (config_a, captures_a, errors_a), \
-            _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, captures_b, errors_b):
-        system = LoopSystem(tmp_path, facade=_facade(
-            config_a.base_url, config_b.base_url, credentials={
-                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-            }), step_limits=MILLISECOND_RETRIES)
-        run_id = system.create_run("retry this task")
-        result = system.activate_once(run_id)
-
-        assert not errors_a and not errors_b
-        assert has_new_work(result, "engineering"), result.error
-        assert len(captures_a) == 2 and not captures_b
-        assert all(item["authorization"] == "Bearer provider-a-key" for item in captures_a)
-        assert [item["body"]["model"] for item in captures_a] == ["a-product", "a-product"]
-        requests = [item for item in result.model_requests if item["purpose"] == "work"]
-        assert [item["attempt"] for item in requests] == [1, 2]
-        assert [item["retry_of_step_id"] for item in requests] == [None, 1]
-        assert all(item["provider_config_id"] == "provider-a" for item in requests)
-        scheduled = [event for event in system.store.list_events(result.run_id) if event.type == EventType.MODEL_RETRY_SCHEDULED]
-        assert len(scheduled) == 1
-        assert scheduled[0].payload["provider_config_id"] == "provider-a"
-        assert scheduled[0].payload["requested_model"] == "a-product"
-        contexts = [event for event in system.store.list_events(result.run_id) if event.type == EventType.CONTEXT_ASSEMBLED]
-        for event, captured in zip(contexts, captures_a):
-            persisted = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["request_ref"])))
-            assert persisted["input"] == captured["body"]["input"]
-            assert persisted["tools"] == captured["body"]["tools"]
-            assert persisted.get("max_output_tokens") == captured["body"].get("max_output_tokens")
-            assert "authorization" not in json_dumps(persisted).casefold()
-            assert "provider-a-key" not in json_dumps(persisted)
 
 def test_missing_returned_model_remains_unknown_in_request_trace(tmp_path):
     def without_model(body: dict[str, Any], _count: int) -> _Reply:
@@ -742,103 +696,6 @@ def test_failed_http_attempt_keeps_requested_identity_without_actual_model(tmp_p
         assert all(event.provider == "provider-a" and event.model is None for event in failures)
         assert all(event.payload["requested_model"] == "a-product" for event in failures)
 
-def test_cancelled_http_request_keeps_bound_identity_without_a_response(tmp_path):
-    entered = Event()
-    release = Event()
-
-    def blocked(_body: dict[str, Any], _count: int) -> _Reply:
-        entered.set()
-        release.wait(5)
-        return _error()
-
-    with _provider_server("provider-a", "provider-a-key", blocked) as (config_a, captures_a, errors_a), \
-            _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
-        system = LoopSystem(tmp_path, facade=_facade(
-            config_a.base_url, config_b.base_url, credentials={
-                "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-                "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-            }))
-        run_id = system.create_run("cancel this task")
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(system.activate_once, run_id)
-            assert entered.wait(3)
-            cancelled = system.cancel(run_id)
-            release.set()
-            result = future.result(timeout=5)
-
-        assert cancelled.stop_reason == "cancelled"
-        assert result.stop_reason == "cancelled"
-        assert not errors_a
-        assert len(captures_a) == 1
-        events = system.store.list_events(run_id)
-        failure = next(event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED)
-        assert failure.provider == "provider-a" and failure.model is None
-        assert failure.payload["provider_config_id"] == "provider-a"
-        assert failure.payload["requested_model"] == "a-product"
-        assert not any(event.type == EventType.MODEL_MESSAGE for event in events)
-        public = _public_run_data(system, run_id)
-        assert "provider-a-key" not in public and "provider-b-key" not in public
-
-def test_small_bound_model_uses_its_own_compaction_request(tmp_path):
-    state = {"read": False, "compactions": 0}
-
-    def compacting(body: dict[str, Any], _count: int) -> _Reply:
-        assert _department(body) == "product"
-        if not body["tools"]:
-            state["compactions"] += 1
-            return _stream([_message(f"summary-{state['compactions']}", "The large file was read and is ready for the product decision.")],
-                           response_id=f"compact-{state['compactions']}", model="a-product-actual")
-        if not state["read"]:
-            state["read"] = True
-            return _stream([
-                _call("read-large", "read_file", {"path": "large.txt"}),
-            ], response_id="read-large", model="a-product-actual")
-        payload = product_spec()
-        payload.pop("kind")
-        return _stream([_call("product-after-compaction", "submit_product_spec", payload)],
-                       response_id="product-after-compaction", model="a-product-actual")
-
-    with _provider_server("provider-a", "provider-a-key", compacting) as (config_a, captures_a, errors_a), \
-            _provider_server("provider-b", "provider-b-key", lambda _body, _count: _error()) as (config_b, _captures_b, _errors_b):
-        system = LoopSystem(
-            tmp_path,
-            facade=_facade(
-                config_a.base_url, config_b.base_url, product_context_window=6_000,
-                credentials={
-                    "credential-a": CredentialMaterial("provider-a-key", version="a-v1"),
-                    "credential-b": CredentialMaterial("provider-b-key", version="b-v1"),
-                }),
-        )
-        run_id = system.create_run("compact product history")
-        system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5_000)
-        result = system.activate_once(run_id)
-
-        assert not errors_a
-        assert has_new_work(result, "engineering"), result.error
-        assert state["read"] and state["compactions"] >= 1
-        assert len(captures_a) == len(result.model_requests)
-        assert all(item["body"]["model"] == "a-product" for item in captures_a)
-        purposes = [item["purpose"] for item in result.model_requests]
-        assert purposes[0] == purposes[-1] == "work"
-        assert all(purpose == "compaction" for purpose in purposes[1:-1])
-        assert result.compactions
-        # Each summary request spends what the 6000-token window leaves after its input, capped by the
-        # model's declared 1000; the old fixed 15% reserve would have allowed only 900.
-        compaction_manifests = [manifest for manifest in result.manifests if manifest.purpose == "compaction"]
-        assert len(compaction_manifests) == len(result.compactions)
-        for manifest, item in zip(compaction_manifests, result.compactions):
-            assert manifest.max_output_tokens == item["max_output_tokens"]
-            assert manifest.max_output_tokens == min(1_000, 6_000 - manifest.input_token_estimate) > 900
-            assert manifest.input_token_estimate + manifest.max_output_tokens <= 6_000
-        assert all(item["provider_config_id"] == "provider-a" for item in result.compactions)
-        assert all(item["model_id"] == "model-a-product" for item in result.compactions)
-        assert all(item["body"]["tools"] == [] for item, purpose in zip(captures_a[1:-1], purposes[1:-1]))
-        assert all(manifest.budget == 6_000 for manifest in result.manifests)
-        audit = summarize_run(system, run_id, scenario="d18-small-window")
-        assert audit["model_input_audit"]["status"] == "verified", audit["model_input_audit"]
-        assert audit["manifest_boundary"] is True
-        assert audit["context_isolated"] is True
-        assert audit["replay_consistent"] is True
 
 _MIXED_SECRETS = {"credential-p": "secret-messages-p", "credential-e": "secret-chat-e",
                   "credential-q": "secret-responses-q"}

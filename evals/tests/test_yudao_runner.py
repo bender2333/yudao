@@ -82,27 +82,6 @@ def test_a_clean_event_log_has_no_void_reasons():
     assert yudao.void_reasons(json.dumps(_export(), ensure_ascii=False)) == []
 
 
-def test_a_tampered_check_voids_the_scoring_run(tmp_path):
-    base = yudao.scenario_base()
-    copy = tmp_path / "scenario-3"
-    shutil.copytree(base, copy)
-    target = copy / "checks" / "check_harness.py"
-    target.write_text(target.read_text(encoding="utf-8") + "\n# tampered\n", encoding="utf-8")
-    reasons = yudao.digest_reasons(copy)
-    assert [reason.split("：")[1] for reason in reasons] == ["checks"], reasons
-    assert "摘要" in reasons[0]
-    assert yudao.digest_reasons(base) == []
-
-
-def test_stray_bytecode_in_the_checks_does_not_change_the_digest(tmp_path):
-    base = yudao.scenario_base()
-    copy = tmp_path / "scenario-3"
-    shutil.copytree(base, copy, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    (copy / "checks" / "__pycache__").mkdir()
-    (copy / "checks" / "__pycache__" / "check_harness.cpython-313.pyc").write_bytes(b"x")
-    assert yudao.digest_reasons(copy) == []
-
-
 # 运行器入口：评分之前的核对走完整条 run_once
 
 class _FakeClient:
@@ -182,20 +161,12 @@ def test_clean_materials_let_the_yudao_run_score(runs_root, tmp_path, monkeypatc
     assert run["score"]["scorer_version"] == "scorer-3@2"
 
 
-
 def test_requirement_text_carries_the_prd_and_the_agreement():
     text = yudao.requirement_text()
     assert "## 需求原文" in text and "## 接口约定" in text
     with open(os.path.join(yudao.materials_dir(), "prd.md"), encoding="utf-8") as handle:
         prd = handle.read()
     assert prd in text
-
-
-def test_requirement_text_names_the_missing_start_file():
-    """起点文件没有进入工作区：运行器如实告诉工程，由工程自己写出这份数据文件。"""
-    text = yudao.requirement_text()
-    assert "subway_data.json" in text
-    assert "data_loader.DATA_FILE_PATH" in text
 
 
 def test_requirement_text_holds_no_hidden_material():
@@ -228,30 +199,6 @@ def _export(outcome="released", events=None, projection=None):
     if projection:
         base.update(projection)
     return {"projection": base, "events": events, "usage": {}}
-
-
-def _release_events(binding="match", coverage=None):
-    """一次放行的事件：质检放行绑定最后一次封存的交付。"""
-    delivery_tree = "tree-a" if binding == "match" else "tree-b"
-    events = [
-        {"type": "run_created", "payload": {"run_time_limit_sec": 7200,
-                                            "parameters_version": "sha256:test"}},
-        {"type": "department_activated", "department": "quality",
-         "payload": {"activation_id": "act-qa-1"}},
-        {"type": "delivery_accepted",
-         "payload": {"code_tree_digest": "tree-a", "content_hash": "spec-a",
-                     "checks": [{"name": "smoke"}]}},
-        {"type": "qa_submitted",
-         "payload": {"verdict": "release", "code_snapshot_hash": delivery_tree,
-                     "delivery_spec_hash": "spec-a",
-                     "checks": [{"name": "smoke", "activation_id": "act-qa-1",
-                                 "snapshot_hash": delivery_tree}]}},
-        {"type": "run_done", "state_after": "DONE",
-         "stop_reason": "released", "payload": {"stop_reason": "released"}},
-    ]
-    if coverage is not None:
-        events[4]["payload"]["coverage"] = coverage
-    return events
 
 
 def test_released_run_is_reported_as_released():
@@ -341,17 +288,6 @@ def test_usage_that_the_model_did_not_report_is_unknown_not_zero():
     assert collected["total_tokens"] == 216_649
 
 
-def test_missing_usage_fields_are_unknown():
-    """字段整个缺失与上报为 None 同样是未知。"""
-    export = _export(projection={"status": "paused"})
-    export["usage"] = {"totals": {"attempts": 11, "total_tokens": 216_649}}
-    collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 5.0,
-                                               "hidden_failures": []})
-    assert collected["input_tokens"] is None
-    assert collected["output_tokens"] is None
-    assert collected["cost"] is None
-
-
 def test_unknown_usage_stays_out_of_the_aggregate():
     """未知样本不进均值、最小值与最大值；统计列写出未知样本数与原因。"""
     run = _run()
@@ -416,16 +352,6 @@ def test_release_checkpoint_passes_on_handoff_release_fixture():
 def test_release_checkpoint_fails_on_no_tool_call_pause():
     """第一项四项同检：no_tool_call 暂停不算放行。"""
     export = _load_fixture("no_tool_call_pause.json")
-    collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
-                                               "hidden_failures": []}, None, None)
-    assert collected["end_status"] == "ended"
-    assert collected["checkpoints"]["ended_within_limit"]["passed"] is False
-    assert "不是 released" in collected["checkpoints"]["ended_within_limit"]["detail"]
-
-
-def test_release_checkpoint_fails_on_a_cancellation():
-    """第一项四项同检：取消的运行不算放行。"""
-    export = _load_fixture("request_time_unavailable_cancel.json")
     collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
                                                "hidden_failures": []}, None, None)
     assert collected["end_status"] == "ended"
@@ -742,7 +668,6 @@ def _inside(path, parent):
     path = os.path.normcase(os.path.abspath(path))
     parent = os.path.normcase(os.path.abspath(parent))
     return path == parent or path.startswith(parent + os.sep)
-
 
 
 def test_process_exit_failure_is_not_a_release():

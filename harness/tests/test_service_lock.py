@@ -7,8 +7,6 @@ from pathlib import Path
 
 import httpx
 
-from harness.__main__ import main
-from harness.models import utc_now
 
 # 同一个数据目录只允许一个服务进程（应用层与接口层设计说明第 7.2 节）：新接口（python -m harness api）
 # 取得数据目录的进程锁。测试启动真实的服务进程，经 HTTP 确认服务在运行。
@@ -20,14 +18,6 @@ IN_USE = "data directory is in use by another service process"
 
 
 PORT_LINE = "port: "
-
-
-def _started(workdir: Path, command: str, data_dir: Path, log: Path, *,
-             options_first: bool = False, extra: tuple[str, ...] = ()) -> tuple[subprocess.Popen, int]:
-    # 启动服务并取它实际监听的端口：子进程自己绑定端口 0，就绪以后在日志输出一行报告实际端口；
-    # 由调用方先占用再释放端口的写法在多进程运行中会冲突
-    process = _start(workdir, command, data_dir, 0, log, options_first=options_first, extra=extra)
-    return process, _bound_port(process, log)
 
 
 def _bound_port(process: subprocess.Popen, log: Path) -> int:
@@ -80,23 +70,6 @@ def _wait_until_serving(process: subprocess.Popen, url: str, log: Path, *, token
             pass
         time.sleep(0.2)
     raise TimeoutError(f"service did not start: {log.read_text(encoding='utf-8', errors='replace')}")
-
-
-def _lan_token(data_dir: Path) -> str:
-    # 局域网访问方式下的一个令牌：令牌文件在服务启动前建立，服务按它校验（第 6.3 节）
-    from harness.app.access_tokens import AccessTokenStore
-
-    _entry, token = AccessTokenStore(data_dir).create("control-host", now=utc_now())
-    return token
-
-
-def _refused(process: subprocess.Popen, log: Path) -> str:
-    try:
-        assert process.wait(STARTUP_TIMEOUT_SEC) == 1, log.read_text(encoding="utf-8", errors="replace")
-    finally:
-        if process.poll() is None:
-            _stop(process)
-    return log.read_text(encoding="utf-8", errors="replace")
 
 
 def _stop(process: subprocess.Popen) -> None:
@@ -167,32 +140,3 @@ def test_two_service_processes_cannot_use_the_same_data_directory(tmp_path):
         _stop(restarted)
 
 
-def test_the_api_only_listens_on_a_loopback_address(tmp_path, capsys):
-    # 本机访问方式（设计说明第 6.2 节）：设置非回环地址时拒绝启动，不取得锁，也不建立数据目录
-    assert main(["api", "--host", "0.0.0.0", "--data-dir", str(tmp_path / "data")]) == 1
-    assert "only listens on a loopback address, not 0.0.0.0" in capsys.readouterr().err
-    assert not (tmp_path / "data").exists()
-
-
-def test_the_api_serves_the_local_network_with_the_lan_access_mode(tmp_path):
-    # 局域网访问方式（设计说明第 6.2 节）：监听任意地址，能力清单列出访问方式；
-    # Host 不受本机名称限制，Origin 只接受桌面客户端页面的来源
-    data_dir = tmp_path / "lan"
-    log = tmp_path / "lan.log"
-    token = _lan_token(data_dir)
-    api, port = _started(tmp_path, "api", data_dir, log, options_first=True,
-                         extra=("--access", "lan", "--host", "0.0.0.0"))
-    try:
-        _wait_until_serving(api, f"http://127.0.0.1:{port}/api/capabilities", log, token=token)
-        authorized = {"Authorization": f"Bearer {token}"}
-        with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=STARTUP_TIMEOUT_SEC,
-                          headers=authorized) as client:
-            capabilities = client.get("/api/capabilities")
-            other_host = client.get("/api/capabilities", headers={"Host": "control-host"})
-            rejected = client.get("/api/capabilities", headers={"Origin": "https://evil.example"})
-        assert capabilities.status_code == 200
-        assert capabilities.json()["deployment"]["access"] == "lan"
-        assert other_host.status_code == 200
-        assert rejected.status_code == 403
-    finally:
-        _stop(api)

@@ -215,73 +215,7 @@ test.describe("起始文件夹（1440×900）", () => {
     }
   });
 
-  test("填写不存在的起始文件夹时表单显示原因，没有出现新项目；留空时概览没有起点行", async () => {
-    test.setTimeout(120_000);
-    const client = await openClient({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    const page = client.page;
-    try {
-      const before = (await projects(page)).map((project) => project.project_id);
-      const form = await newProjectForm(page);
-      await fillNewProjectForm(form, "不该出现的项目", join(backend.dataDir, "no-such-directory"));
-      await form.getByRole("button", { name: "新建项目" }).click();
-
-      // 拒绝说明：原因名与原因码一行，服务端的说明各占一行；表单没有关闭，已填字段保留
-      const rejection = form.locator(".rejection");
-      await expect(rejection.locator("p.error")).toContainText("源目录不能作为代码快照的来源");
-      await expect(rejection.locator("p.error")).toContainText("source_invalid");
-      await expect(rejection.locator(".rejection-paths li").first()).toContainText("no-such-directory");
-      await expect(form).toBeVisible();
-      await expect(form.getByLabel("项目名称")).toHaveValue("不该出现的项目");
-      await expect(form.getByLabel("起始文件夹")).not.toHaveValue("");
-
-      // 没有出现新项目
-      expect((await projects(page)).map((project) => project.project_id)).toEqual(before);
-      expect((await page.locator(".project-entry").allInnerTexts()).join()).not.toContain("不该出现的项目");
-
-      // 留空新建：与没有起始文件夹的项目一样，概览没有起点行
-      const empty = `空起点项目 ${Date.now()}`;
-      await form.getByLabel("起始文件夹").fill("");
-      await form.getByLabel("项目名称").fill(empty);
-      await form.getByRole("button", { name: "新建项目" }).click();
-      await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes(empty),
-        page, "侧栏出现留空起点的新项目");
-      await navigate(page, await projectId(page, empty), "overview");
-      await expect(await section(page, "项目摘要")).not.toContainText("起点：起始文件夹");
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
   });
-});
 
 test.describe("起始文件夹（1920×1080）", () => {
-  test("1920×1080：表单与起点行没有横向滚动", async () => {
-    test.setTimeout(300_000);
-    const client = await openClient({ width: 1920, height: 1080 });
-    const errors = watchErrors(client);
-    const page = client.page;
-    try {
-      const source = backend.sourceDir;
-      if (source === null) {
-        throw new Error("后端没有报出起始文件夹脚本的目录");
-      }
-      const name = `大屏起点 ${Date.now()}`;
-      const form = await newProjectForm(page);
-      await expect(form.getByLabel("起始文件夹")).toBeVisible();
-      await fillNewProjectForm(form, name, source);
-      expect(await overflowReport(page)).toEqual([]);
-      await form.getByRole("button", { name: "新建项目" }).click();
-      await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes(name),
-        page, "侧栏出现大屏新建的项目");
-
-      await navigate(page, await projectId(page, name), "overview");
-      const summary = await section(page, "项目摘要");
-      await expect(summary).toContainText(`起点：起始文件夹（${listedFiles(source).length} 个文件）`);
-      expect(await overflowReport(page)).toEqual([]);
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
   });
-});

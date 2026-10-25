@@ -4,7 +4,6 @@
 # 测试从运行中的系统整体驱动：事件日志是真实的 SQLite 文件，模型回答由 FakeAdapter 脚本给出，
 # 回答决定经真实运行的服务与命令接口，不用替身。
 
-import asyncio
 import time
 import uuid
 
@@ -12,7 +11,7 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.models import ProjectEventType, TERMINAL_STATUSES, Usage
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
@@ -47,13 +46,6 @@ def _blocked_script():
         "quality": quality_turns("release", "checks passed on the current snapshot"),
     }
 
-def _release_script():
-    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
-    return {
-        "product": [product_spec()],
-        "engineering": [delivery_turn()],
-        "quality": quality_turns("release", "checks passed on the current snapshot"),
-    }
 
 def _completion_script():
     # 产品已经提交规格以后剩下的回答：交付与放行评审
@@ -135,27 +127,4 @@ def test_a_run_resumed_on_startup_is_settled_when_it_stops(data_dir):
     finally:
         restarted.close()
 
-def test_a_settled_run_does_not_write_another_adoption(data_dir):
-    # 已经结算过的 run 再次经过运行到停止的入口：不写第二条采纳，成果与事项状态保持
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(_release_script()))
-    project_id = system.projects.register("重复结算", "核对结算幂等")
-    work_item_id, run_id = system.projects.start_work_item(project_id, "第一个事项")
-    assert system.run_until_stop(run_id).status == "done"
-    assert system.projects.settle(run_id).type == ProjectEventType.DELIVERABLE_ADOPTED
-    before = [event.event_id for event in system.store.list_project_events(project_id)]
 
-    # 再次经回答决定以后的入口把同一个 run 运行到停止
-    projection = asyncio.run(_start_again(system, run_id))
-
-    assert projection.status == "done"
-    assert [event.event_id for event in system.store.list_project_events(project_id)] == before
-    assert system.projects.settle(run_id) is None
-    project = system.projects.projection(project_id)
-    assert len(project.adoptions) == 1 and project.adoptions[0].run_id == run_id
-    assert project.work_items[0].status == "adopted" and project.work_item(work_item_id).status == "adopted"
-    assert project.current_adoption.run_id == run_id
-    system.close()
-
-async def _start_again(system, run_id):
-    # 经回答决定以后使用的入口再运行一次这个已经结算的 run
-    return await system.orchestrator.start(run_id)

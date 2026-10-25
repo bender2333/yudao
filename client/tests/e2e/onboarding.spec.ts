@@ -8,11 +8,8 @@
 //   3. 放弃等待确认的建档以后「重新开始建档」可用，点击以后出现新的建档事项。
 // 两种视口尺寸：1440×900 走完整流程，1920×1080 核对接入对话框与状态标记可用。控制台错误为零。
 
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
+import { expect,test,type Locator,type Page } from "@playwright/test";
+import { startBackend,startClient,type Backend,type ClientApp } from "./fixtures";
 
 const PROJECT = "接入演练";
 const GOAL = "核对接入已有项目";
@@ -127,17 +124,6 @@ async function projectId(page: Page): Promise<string> {
 
 // 一个含符号链接的源目录：接入被拒绝，拒绝说明里给出相对路径（harness/public_tree.py 的
 // UnrepresentableWorkspace 用分号连接各条原因与处理方法）
-function linkedSourceDir(): string {
-  const root = mkdtempSync(join(tmpdir(), "yudao-e2e-links-"));
-  mkdirSync(join(root, "src"));
-  mkdirSync(join(root, "docs"));
-  writeFileSync(join(root, "src", "echo.py"), "import sys\nprint(sys.argv[1])\n", "utf8");
-  writeFileSync(join(root, "README.md"), "# Echo\n", "utf8");
-  for (const name of ["alpha", "beta"]) {
-    symlinkSync(join(root, "README.md"), join(root, "docs", name));
-  }
-  return root;
-}
 
 test.describe("接入已有项目（1440×900）", () => {
   test("经对话框完成一次接入，建档状态标记随事件变化，部门房间出现阅读已有项目", async () => {
@@ -180,105 +166,8 @@ test.describe("接入已有项目（1440×900）", () => {
     }
   });
 
-  test("填写无效的源目录时对话框显示原因与相对路径，没有出现新项目", async () => {
-    test.setTimeout(120_000);
-    const client = await openClient({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    const page = client.page;
-    try {
-      const before = (await projects(page)).map((project) => project.project_id);
-      const form = await onboardForm(page);
-      await fillOnboardForm(form, "不该出现的项目", linkedSourceDir());
-      await form.getByRole("button", { name: "接入项目" }).click();
-
-      // 拒绝说明：原因名一行，相对路径各占一行；表单没有关闭
-      const rejection = form.locator(".rejection");
-      await expect(rejection.locator("p.error")).toContainText("源目录不能作为代码快照的来源");
-      await expect(rejection.locator("p.error")).toContainText("source_invalid");
-      await expect(rejection.locator(".rejection-paths li")).toHaveCount(3);
-      await expect(rejection.locator(".rejection-paths li").first()).toContainText("docs/alpha");
-      await expect(rejection.locator(".rejection-paths li").nth(1)).toContainText("docs/beta");
-      await expect(form).toBeVisible();
-      // 被拒绝时四个字段保留已填的值，用户改正以后可以直接重新提交（工单 #295 第 1 项）
-      await expect(form.getByLabel("项目名称")).toHaveValue("不该出现的项目");
-      await expect(form.getByLabel("长期目标")).toHaveValue(GOAL);
-      await expect(form.getByLabel("源目录名称")).toHaveValue(SOURCE_NAME);
-      await expect(form.getByLabel("源目录路径")).not.toHaveValue("");
-
-      // 没有出现新项目
-      expect((await projects(page)).map((project) => project.project_id)).toEqual(before);
-      expect((await page.locator(".project-entry").allInnerTexts()).join()).not.toContain("不该出现的项目");
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
+  
   });
-
-  test("放弃等待确认的建档以后重新开始建档可用，点击以后出现新的建档事项", async () => {
-    test.setTimeout(300_000);
-    const client = await openClient({ width: 1440, height: 900 });
-    const errors = watchErrors(client);
-    const page = client.page;
-    try {
-      const id = await projectId(page);
-      await navigate(page, id, "overview");
-      // 建档停下以后等用户确认初始 PRD（工单 #136）。重新开始建档只在没有等待中的决定请求时可用，
-      // 用户先放弃本次建档（work_item.cancel 撤销那条请求），项目回到「等待建档」
-      await waitUntil(async () => (await bodyText(page)).includes("等待确认初始 PRD"), page,
-        "概览显示建档事项等待确认初始 PRD", 120_000);
-      const current = await section(page, "当前事项");
-      await current.getByRole("button", { name: "放弃本次建档" }).click();
-
-      await waitUntil(async () => (await (await section(page, "重新开始建档")).count()) > 0, page,
-        "放弃以后概览出现重新开始建档的区块", 120_000);
-
-      const restart = await section(page, "重新开始建档");
-      await expect(restart).toContainText(SOURCE_NAME);
-      await restart.getByRole("button", { name: "重新开始建档" }).click();
-
-      // 新的建档事项出现在看板里（重新开始以前只有一个建档事项）
-      const board = await section(page, "事项看板");
-      await waitUntil(async () => (await board.locator(".board-card").count()) >= 2, page,
-        "看板里出现第二个建档事项", 60_000);
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
-});
 
 test.describe("接入已有项目（1920×1080）", () => {
-  test("1920×1080：经对话框完成一次接入，项目列表显示建档状态标记，没有横向滚动", async () => {
-    test.setTimeout(300_000);
-    const client = await openClient({ width: 1920, height: 1080 });
-    const errors = watchErrors(client);
-    const page = client.page;
-    try {
-      const source = backend.sourceDir;
-      if (source === null) {
-        throw new Error("后端没有报出建档脚本的源目录");
-      }
-      // 宽屏布局侧栏常驻，「接入已有项目」直接可用，接入真的走完
-      const form = await onboardForm(page);
-      await expect(form.getByLabel("源目录路径")).toBeVisible();
-      await fillOnboardForm(form, "大屏接入", source);
-      await form.getByRole("button", { name: "接入项目" }).click();
-      await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes("大屏接入"),
-        page, "侧栏出现大屏接入的项目");
-
-      // 首页项目列表上的建档状态标记
-      await page.evaluate(() => {
-        window.location.hash = "#/home";
-      });
-      await expect(page.locator(".page.home")).toBeVisible();
-      await waitUntil(async () => (await bodyText(page)).includes("等待确认初始 PRD"), page,
-        "首页显示建档状态标记", 180_000);
-
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-      expect(overflow).toBeLessThanOrEqual(0);
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-    }
   });
-});

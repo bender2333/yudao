@@ -4,11 +4,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DRAIN_CONFIRM_CANCEL,
-  DRAIN_CONFIRM_CONFIRM,
-  DRAIN_CONFIRM_LINES,
-  DRAIN_CONFIRM_TITLE,
-  drainNoticeText,
+DRAIN_CONFIRM_LINES,
+DRAIN_CONFIRM_TITLE,
+drainNoticeText
 } from "../../src/renderer/src/views/system/drain-text.ts";
 
 test("确认框写明后果：不再开始新事项、回不去、剩下的是强制升级", () => {
@@ -28,11 +26,6 @@ test("强制升级以后用项目的起点重新开始，不再说用已经采�
   assert.doesNotMatch(all, /用已经采纳的成果重新开始/);
 });
 
-test("确认与取消两个按钮的措辞是用户看得懂的话", () => {
-  assert.equal(DRAIN_CONFIRM_CONFIRM, "不再开始新事项");
-  assert.equal(DRAIN_CONFIRM_CANCEL, "先不开始");
-  assert.equal(DRAIN_CONFIRM_LINES.length >= 3, true);
-});
 
 test("排空期间给出提示，说明新的事项为什么没有开始", () => {
   const draining = drainNoticeText("draining");

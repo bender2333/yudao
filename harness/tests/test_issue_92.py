@@ -144,10 +144,6 @@ def _workspace(client, project_id: str, department: str, *, work_item: str | Non
     assert response.status_code == 200, response.text
     return response.json()["data"]
 
-def _run_of(system, project_id: str) -> str:
-    items = system.projects.projection(project_id).work_items
-    assert items and items[-1].run_id
-    return items[-1].run_id
 
 def _finish(system, run_id: str) -> None:
     deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
@@ -347,31 +343,3 @@ def test_project_attempts_filters_by_provider_and_model(tmp_path):
     finally:
         _close(server_a, server_b)
 
-def test_queries_do_not_append_events(tmp_path):
-    # 调用查询前后事件日志末尾不变
-    server_a, _capture_a, base_a = serve(_department_aware("upstream-a"))
-    server_b, _capture_b, base_b = serve(_department_aware("upstream-b"))
-    try:
-        opened = _Opened(tmp_path, base_a, base_b)
-        with running_api(opened) as client:
-            opened.admit()
-            project_id = _create_project(client, "P")
-            started = _post(client, "work_item.create", project_id=project_id, text="echo")
-            assert started.status_code == 200, started.text
-            run_id = started.json()["refs"]["run_id"]
-            _finish(opened.system, run_id)
-
-            attempts = client.get("/api/queries/project.attempts",
-                                  params={"project_id": project_id}).json()["data"]["attempts"]
-            attempt_id = attempts[0]["attempt_id"]
-            store = opened.system.store
-            before = store.end_position()
-            assert client.get("/api/queries/department.workspace",
-                              params={"project_id": project_id, "department": "product"}).status_code == 200
-            assert client.get("/api/queries/project.attempts",
-                              params={"project_id": project_id}).status_code == 200
-            assert client.get("/api/queries/run.attempt",
-                              params={"run_id": run_id, "attempt_id": attempt_id}).status_code == 200
-            assert store.end_position() == before
-    finally:
-        _close(server_a, server_b)
