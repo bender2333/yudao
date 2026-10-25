@@ -13,7 +13,7 @@ from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn
-from harness.providers.call import ModelResponse
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 
 QUESTION_FACTS = "接口：echo <文本>，输出大写；文件：src/echo.py"
@@ -147,3 +147,65 @@ def test_the_quality_sees_only_facts_before_its_own_conclusion(tmp_path: Path):
     assert system.project(run_id).status == "done"
     reviews = [event for event in system.store.list_events(run_id) if event.type == EventType.QA_SUBMITTED]
     assert len(reviews) == 2
+
+
+def test_predictive_exploration_asks_carry_only_the_facts(tmp_path: Path):
+    # 验收第 2 条（工单 #559）：预测性探索中质检询问工程、工程询问质检，
+    # 质检的请求里只有工程内容的事实部分；核验同一份交付时仍然如此，直到质检提交结论
+    # （核验阶段的三个通道见上一项）。
+    # 工程等到质检的第二步请求做完才交付，所以质检这一步确实还在预测性探索里。
+    holder: dict[str, Any] = {}
+
+    def deliver_after_the_exploration(call):
+        for _ in range(600):
+            if holder.get("quality_second") is not None:
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
+        return delivery_turn(summary=FIRST_SUMMARY)(call)
+
+    def quality_exploration(call):
+        # 预测性探索：按 PRD 起草测试用例之前先问工程
+        return ModelResponse(output=[
+            _call("ask-e", "ask", recipient="engineering", question="检查项覆盖了换行吗？",
+                  background="按 PRD 起草测试用例", expected="结论"),
+        ])
+
+    def quality_after_the_answer(call):
+        # 拿到的回答只留事实部分；这时还没有交付，解释部分同样不给
+        holder["quality_second"] = _text(call)
+        return review_turn("release", "按 PRD 起草了测试用例；还没有交付可以核验", checks={"smoke": 0})(call)
+
+    scripts = {
+        "product": [product_spec()],
+        "engineering": [
+            _engineering_asks_quality("ask-q1", QUESTION_FACTS, QUESTION_EXPLANATION),
+            deliver_after_the_exploration,
+            delivery_turn(summary=FIRST_SUMMARY),
+        ],
+        # 工程在分支里回答质检：回答分两部分
+        "engineering:ask": [
+            ModelResponse(output=[
+                _call("ans-1", "answer", answer="", facts=ANSWER_FACTS, explanation=ANSWER_EXPLANATION),
+            ]),
+        ],
+        # 质检在分支里回答工程的问题
+        "quality:ask": [ModelResponse(output=[_call("ans-2", "answer", answer="按现有合同。")])],
+        "quality": [quality_exploration, quality_after_the_answer,
+                    review_turn("release", "checks passed on the current snapshot", checks={"smoke": 0})],
+    }
+    adapter = FakeAdapter(scripts)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo")
+    projection = system.run_until_stop(run_id)
+    assert projection.status == "done", projection.stop_reason
+
+    # 质检的分支看到的工程的问题只有事实部分
+    branch_text = _text(_quality_branch_calls(adapter)[0])
+    assert QUESTION_FACTS in branch_text
+    assert QUESTION_EXPLANATION not in branch_text
+
+    # 预测性探索的第二步：工程回答的事实部分在，解释部分不在；这时还没有交付
+    second = holder["quality_second"]
+    assert ANSWER_FACTS in second
+    assert ANSWER_EXPLANATION not in second
+    assert FIRST_SUMMARY not in second

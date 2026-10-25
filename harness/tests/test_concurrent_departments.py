@@ -9,7 +9,7 @@ from pathlib import Path
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.environment import QA_TESTS_DIR, inspection_root
 from harness.event_store import Command
-from harness.models import EventType, json_dumps
+from harness.models import ArtifactRef, EventType, json_dumps
 from harness.projection import saved_decisions
 from harness.proposals import (answer_turn, ask_turn, delivery, delivery_turn, product_spec,
                                 product_spec_turn, review, review_turn)
@@ -557,3 +557,119 @@ def test_the_inspection_workspace_survives_the_ask_and_is_rebuilt_by_a_new_deliv
     assert "notes/finding.md" not in files
     assert "vendor/lib/dep.txt" not in files
     assert files["src/echo.py"] == ECHO
+
+
+def test_engineering_and_quality_ask_each_other_at_the_same_time(tmp_path: Path) -> None:
+    # 验收第 4 条（工单 #559）：工程与质检同时互相询问，两边都得到回答。
+    # 两边的询问都在各自的第一步发出，两条询问分支同时进行：谁也没有停在对方身上。
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn("quality", "检查项覆盖了换行吗？", background="交付之前核对", expected="结论",
+                     call_id="ask-eng-1"),
+            delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
+        ],
+        "quality": [
+            ask_turn("engineering", "接口怎么用？", background="按 PRD 起草测试用例", expected="事实",
+                     call_id="ask-qua-1"),
+            _explore(),
+            _release(),
+        ],
+        # 两个部门各自在分支里回答对方的询问：分支按部门给出脚本，谁先被问到不影响结果
+        "engineering:ask": [answer_turn("接口：echo <文本>；检查项不用改。", call_id="ans-eng-1")],
+        "quality:ask": [answer_turn("换行已经覆盖。", call_id="ans-qua-1")],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build an echo CLI")
+    projection = system.run_until_stop(run_id)
+    assert projection.status == "done", projection.stop_reason
+
+    events = _events(system, run_id)
+    started = [event for event in events if event.type == EventType.ASK_STARTED]
+    answered = [event for event in events if event.type == EventType.ASK_ANSWERED]
+    # 两个部门各问一次，问题分别到对方的历史上开分支
+    assert {(event.payload["requester"], event.payload["recipient"]) for event in started} == {
+        ("engineering", "quality"), ("quality", "engineering")}
+    # 两边都得到回答，没有一边因为另一边在等而拿不到答案
+    assert len(answered) == 2
+    assert [event.payload["status"] for event in answered] == ["answered", "answered"]
+    assert {event.payload["requester"] for event in answered} == {"engineering", "quality"}
+    # 两条分支同时进行：两个询问都在任何一个回答之前发出
+    assert max(event.position for event in started) < min(event.position for event in answered)
+    # 提问方拿到回答以后接着工作：工程交付、质检核验并放行
+    assert [event.type for event in events if event.type == EventType.DELIVERY_ACCEPTED]
+    assert projection.stop_reason == "released"
+
+
+def test_two_checks_at_the_same_time_run_in_their_own_workspaces(tmp_path: Path) -> None:
+    # 验收第 6 条（工单 #559）：两个同时进行的检查各自使用自己的检查工作区与检查副本。
+    # 质检的主线会话在预测性探索里跑检查，它在回答工程询问的分支里同时跑另一个检查：
+    # 两条会话写同一个相对路径的标记文件，各自的检查副本里读到的都是自己写的那份。
+    holder: dict[str, object] = {}
+
+    def main_check(call):
+        # 主线会话：在自己的检查工作区写下标记，检查在副本里运行并占住一段时间，
+        # 分支的检查在这段时间里开始
+        return ModelResponse(output=[
+            _call("main-mark", "bash", {"command": "mkdir -p notes && printf 'main\\n' > notes/marker.txt"}),
+            _call("main-check", "run_check", {"name": "smoke", "command": "sleep 0.5; cat notes/marker.txt"}),
+        ])
+
+    def branch_check(call):
+        # 分支会话：等主线会话的检查已经开始，再在自己的工作区写下同名标记并跑检查
+        for _ in range(600):
+            events = holder["system"].store.list_events(holder["run_id"])
+            if any(event.type == EventType.TOOL_STARTED
+                   and (event.payload or {}).get("name") == "run_check"
+                   and not event.session_id.startswith("ses_ask_") for event in events):
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
+        return ModelResponse(output=[
+            _call("branch-mark", "bash", {"command": "mkdir -p notes && printf 'branch\\n' > notes/marker.txt"}),
+            _call("branch-check", "run_check", {"name": "smoke", "command": "cat notes/marker.txt"}),
+            _call("branch-answer", "answer", {"answer": "检查项不用改。"}),
+        ])
+
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn("quality", "检查项覆盖了换行吗？", background="交付之前核对", expected="结论",
+                     call_id="ask-eng-1"),
+            delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
+        ],
+        # 质检的主线：先跑自己的检查，再按 PRD 起草测试用例；交付到达以后核验并放行
+        "quality": [main_check, _explore(), _release()],
+        "quality:ask": [branch_check],
+    }, stream_gap_sec=0.01)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build an echo CLI")
+    holder["system"] = system
+    holder["run_id"] = run_id
+    projection = system.run_until_stop(run_id)
+    assert projection.status == "done", projection.stop_reason
+
+    events = _events(system, run_id)
+    checks = [event for event in events
+              if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("name") == "run_check"
+              and "notes/marker.txt" in json_dumps((event.payload or {}).get("args") or {})]
+    assert len(checks) == 2, checks
+    by_session = {event.session_id: event for event in checks}
+    main_session = next(item for item in by_session if not item.startswith("ses_ask_"))
+    branch_session = next(item for item in by_session if item.startswith("ses_ask_"))
+
+    def receipt(event):
+        # 检查回执保存在工件里：从 output_ref 指到的内容里读
+        return json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**event.payload["output_ref"])))
+
+    # 各自的检查副本里是各自工作区写下的那份标记：两条会话没有共用一个检查工作区，也没有共用一份副本
+    assert "main" in receipt(by_session[main_session])["summary"]
+    assert "branch" in receipt(by_session[branch_session])["summary"]
+    # 两次检查的副本与被检查的树各不相同
+    assert receipt(by_session[main_session])["snapshot_hash"] != receipt(by_session[branch_session])["snapshot_hash"]
+    assert (receipt(by_session[main_session])["activation_id"]
+            != receipt(by_session[branch_session])["activation_id"])
+    # 两个检查同时在运行：分支的检查在主线的检查开始之后、结束之前完成
+    main_started = next(event for event in events
+                        if event.type == EventType.TOOL_STARTED and event.session_id == main_session
+                        and (event.payload or {}).get("name") == "run_check")
+    assert main_started.position < by_session[branch_session].position < by_session[main_session].position
