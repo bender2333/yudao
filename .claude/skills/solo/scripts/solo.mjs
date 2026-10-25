@@ -1577,6 +1577,112 @@ function commandReap(args) {
   });
 }
 
+/* ----------------------------------------------------------------------- gc */
+
+/** 把 worktree 里的证据（.tmp 下的评论、截图）先搬进账本，再让目录消失。 */
+function archiveEvidence(loop, dir, issue) {
+  const src = path.join(dir, '.tmp');
+  if (!fs.existsSync(src)) return 0;
+  const dest = path.join(loop.dir, 'evidence', String(issue));
+  let copied = 0;
+  const walk = (from, to) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(from, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fromPath = path.join(from, entry.name);
+      const toPath = path.join(to, entry.name);
+      if (entry.isDirectory()) {
+        walk(fromPath, toPath);
+        continue;
+      }
+      try {
+        const stat = fs.statSync(fromPath);
+        if (stat.size > 5 * 1024 * 1024) continue;
+        fs.mkdirSync(path.dirname(toPath), { recursive: true });
+        fs.copyFileSync(fromPath, toPath);
+        copied += 1;
+      } catch {
+        /* 拷不动就算了，删目录不因为它停下 */
+      }
+    }
+  };
+  walk(src, dest);
+  return copied;
+}
+
+/**
+ * 清理已经关闭的工单的 worktree。
+ *
+ * 为什么不在工人手里删：Windows 上目录里有 .venv / node_modules 或还有进程拿着文件时，
+ * 删除会失败一半，留下半截目录，下一次 worktree add 撞上它。清理交给编排者一次做完，
+ * 失败就重试、还不行就留着并报到残留清单里 —— 不影响工单本身。
+ */
+function commandGc(args) {
+  const loop = openLedger(args);
+  const root = repoRoot(loop);
+  const keep = Math.max(0, num(args.keep, 0));
+  const done = parseTasks(loop).filter((t) => t.status === 'done' && t.issue);
+  const targets = keep ? done.slice(0, Math.max(0, done.length - keep)) : done;
+
+  const removed = [];
+  const residual = [];
+  const skipped = [];
+  for (const task of targets) {
+    const target = worktreeTarget(loop, task);
+    const dirs = [target.dir];
+    if (args.from) dirs.push(path.join(String(args.from), target.branch));
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) {
+        skipped.push({ issue: task.issue, reason: '目录不在' });
+        continue;
+      }
+      const residue = worktreeResidue(dir, target.branch, target.base);
+      if ((residue.dirty || residue.unpushed) && !args.force) {
+        residual.push({ issue: task.issue, dir, reason: '有未提交 ' + residue.dirty + ' 处、未推送 ' + residue.unpushed + ' 个提交（要强删加 --force）' });
+        continue;
+      }
+      const archived = archiveEvidence(loop, dir, task.issue);
+      git(root, ['worktree', 'remove', '--force', dir]);
+      let gone = !fs.existsSync(dir);
+      for (let attempt = 0; !gone && attempt < 3; attempt += 1) {
+        try {
+          fs.rmSync(dir, { recursive: true, force: true });
+        } catch {
+          /* 下一轮重试 */
+        }
+        gone = !fs.existsSync(dir);
+        if (!gone) sleepSync(500 * (attempt + 1));
+      }
+      if (!gone && process.platform === 'win32') {
+        spawnSync('cmd', ['/c', 'rd', '/s', '/q', dir], { encoding: 'utf8' });
+        gone = !fs.existsSync(dir);
+      }
+      if (gone) removed.push({ issue: task.issue, dir, archived });
+      else residual.push({ issue: task.issue, dir, reason: '目录删不掉（多半有进程占用），下一次 gc 再试' });
+    }
+    continue;
+  }
+  git(root, ['worktree', 'prune']);
+  {
+    const removedUnused = removed;
+  }
+
+  const payload = { removed, residual, skipped: skipped.length };
+  if (args.json) return emit(args, payload);
+  const lines = ['清理完成 ' + removed.length + ' 个 worktree' + (skipped.length ? '，跳过 ' + skipped.length + ' 个目录不在的' : ''),];
+  for (const r of removed) lines.push('  ✓ #' + r.issue + '（归档 ' + r.archived + ' 个证据文件）');
+  if (residual.length) {
+    lines.push('  还剩 ' + residual.length + ' 个：');
+    for (const r of residual) lines.push('  ⚠ #' + r.issue + ' ' + r.dir + '：' + r.reason);
+  }
+  process.stdout.write(lines.join('\n') + '\n');
+  return payload;
+}
+
 /* --------------------------------------------------------- pause and resume */
 
 function commandPause(args) {
@@ -1613,6 +1719,20 @@ function commandSignature(args) {
   saveLedger(loop);
   appendText(loop, '## 署名（编排者）\n\n- ' + (before || '(空)') + ' → ' + value);
   return emit(args, { signature: value }, '署名：' + before + ' → ' + value);
+}
+
+/** worktree 的根目录与分支前缀、起点提交。短根目录能省 Windows 的 260 字符。 */
+function commandWorktrees(args) {
+  const loop = openLedger(args);
+  const cfg = worktreeOf(loop);
+  const root = str(args.root, cfg.root);
+  const base = str(args.base, cfg.base);
+  const branchPrefix = str(args.prefix, cfg.branchPrefix);
+  loop.state.worktrees = { root, optional: undefined, branchPrefix, base };
+  delete loop.state.worktrees.optional;
+  saveLedger(loop);
+  appendText(loop, '## worktree 配置（编排者）\n\n- 根目录 ' + cfg.root + ' → ' + root + '，分支前缀 ' + branchPrefix + '，起点 ' + base);
+  return emit(args, { root, branchPrefix, base }, 'worktree 根目录：' + root + '（分支 ' + branchPrefix + '<编号>，起点 ' + base + '）');
 }
 
 /** 预算：无人值守跑多少轮以内。用完就停，这是唯一的花钱闸。 */
@@ -1734,6 +1854,8 @@ const USAGE = [
   '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004 | attach --task T-004 --session <id>',
   '  finish --task T-004 --status done|failed|blocked | check --task T-004',
   '  escalate|question|askhuman --task T-004 | handover --task T-004 | reap [--stale 90]',
+  '  gc [--keep N] [--force] [--from <旧根目录>]   清掉已关闭工单的 worktree（先归档 .tmp 证据）',
+  '  worktrees --root C:/w --base origin/main        worktree 根目录、分支前缀、起点',
   '  pause | resume [--no-auto] | auto on|off | budget --iterations 120 | signature --value solo-<模型 ID>',
   '  concurrency --max 4 --exclusive 1',
   '',
@@ -1759,6 +1881,8 @@ switch (command) {
   case 'question': handOff(args, 'question'); break;
   case 'askhuman': handOff(args, 'askhuman'); break;
   case 'handover': commandHandover(args); break;
+  case 'gc': commandGc(args); break;
+  case 'worktrees': commandWorktrees(args); break;
   case 'reap': commandReap(args); break;
   case 'pause': commandPause(args); break;
   case 'resume': commandResume(args); break;

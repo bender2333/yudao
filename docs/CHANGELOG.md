@@ -522,7 +522,10 @@ claude-fable-5-1（总架构师） / 2026-10-25 20:05 / `.claude/skills/to-child
 claude-opus-5-5（子架构师） / 2026-10-25 20:10 / 新增 `docs/design/architecture/name-map.md`「总图的词与代码名的对照」：按总图第四节十三道缝分组，加第一节方框与第三节外环九个状态，列总图的词、总图位置、代码里现在的名字、归哪道缝或哪条道、状态（一致、不一致、代码里还没有），按 main `a8a2182c` 用目录与 grep 清点；`docs/design/architecture/overall-architecture.md` 第 1.3 节末尾加一行指向它；`docs/design/README.md` 加索引条目；不改代码与测试 / 用户 2026-10-25 定代码名随立缝工单向总图靠拢，第一步建对照表（决策记录同日一条）
 
 claude-fable-5-1（总架构师） / 2026-10-25 20:40 / 归档（#984，经用户确认）：`docs/stage-3-plan.md` → `docs/archive/stage-3-plan.md`，`docs/stage-3/` 剩下的三份（replan-mcp-skills、skill-dossier-sample、trial-acceptance-contract）→ `docs/archive/stage-3/`，目录删除；活动文档里指向它们的链接全部改到归档路径：README.md（去掉入口）、CLAUDE.md 文档地址、设计索引三处、十份设计与需求文档的状态行、ADR-0019、0021、0022、0035、原型 v8 设计说明、决策记录里的旧链接；AGENTS.md 代码位置去掉已删除的 `compare.py`（#988） / 用户问 Stage 3 计划怎么还在；它已被路线图取代，归档被写成 #984 等用户确认
+solo-deepseek-v4.1-flash / 2026-10-25 20:30 / 工单 #895 [M0] 读取模型的两处错位：`harness/app/project_queries.py` 的 `_room_door` 改为与 `harness/streams.py` 的 `STOP_REASON_UPGRADE`（run_event_version_changed）比较，不再与不存在的 "upgrade" 比较；`_run_recovery` 的 `last_confirmed_position` 取这个事项自己最后一条已提交事件（`run.last_event_id`）的 `position`，不再取 `store.end_position()`；`harness/tests/test_project_queries.py` 新增两条用例 / 楼层门口的「因升级停止」从来不出现；恢复页的「最后已确认的位置」取了整个事件库的末尾，不是这个事项的
 
 claude-fable-5-1（总架构师） / 2026-10-25 21:05 / `docs/research/game-world-as-projection.md` 状态行指向已归档的阶段需求概览的链接改到归档路径 / 全仓扫活动文档的断链只剩这一处（#983 列到的那条）
 
 claude-fable-5-1（总架构师） / 2026-10-25 21:30 / 归档原型（#985，经用户确认）：`docs/prototypes/v8/` 的入口（BUILD.md、design.md）并入 `docs/archive/prototypes/v8/`，`docs/prototypes/v9/` 主体并入 `docs/archive/prototypes/v9/`（与已归档的 checks 合在一处），`docs/prototypes/v12/` 整版移到 `docs/archive/prototypes/v12/`；活动文档指向它们的链接改到归档路径：ADR-0021、app-and-interface、browser-and-computer-use、execution-environment、existing-project-onboarding、需求索引、D29 远程执行、D30 网页游戏前端、调研「游戏世界」、原型变更记录的 v8/v9/v12 条目、v10/v11/v13 的 BUILD.md；v13 验收脚本 `checks/env.js` 找 v9、v12 页面的路径改到归档；v8 设计说明的自指链接改为同目录 / 当前定稿是 v13，历史版本的入口分散在活动与归档两处，复现构建与检查要跨目录
+
+claude-fable-5-1（总架构师） / 2026-10-25 21:50 / `docs/decision.md` 加一条：观察者不承接 harness/analysis，删除（#987 结论，删除工单 #1003） / 用户确认总架构师的判断
