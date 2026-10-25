@@ -139,6 +139,7 @@
 "test_providers_module.py" = "integration"
 "test_public_tree.py" = "module"
 "test_qa_test_materials.py" = "integration"
+"test_query_refresh_lists.py" = "integration"
 "test_quality_facts.py" = "integration"
 "test_range_edit.py" = "integration"
 "test_read_model_derivation.py" = "module"
@@ -193,4 +194,5 @@
 "test_issue_709.py" = "module"
 "test_issue_740.py" = "integration"
 "test_issue_842.py" = "integration"
+"test_issue_856.py" = "integration"
 "test_issue_865.py" = "integration"

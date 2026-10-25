@@ -95,7 +95,8 @@ async function waitUntil(check: () => Promise<boolean>, description: string, tim
     await promise;
   }
 }
-// 用户主动停止的事项要在楼层写「已停止」。停止会改变服务端状态（run 以 cancelled 结束），
+// 用户主动停止的事项：部门页写「已停止」，首页楼层写「空闲」（工单 #734：楼层只由未结束的事项决定，
+// 被停止、已采纳与放行未定的事项不参与）。停止会改变服务端状态（run 以 cancelled 结束），
 // 因此这条用例用自己的一份后端，结束以后停掉，共用的那份不受影响
 async function withOwnBackend<T>(run: () => Promise<T>): Promise<T> {
   const previous = backend;
@@ -109,7 +110,7 @@ async function withOwnBackend<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-test("用户停止的事项：楼层与部门页都写「已停止」，不含「执行失败」「中断」", async () => {
+test("用户停止的事项：部门页写「已停止」，首页楼层写「空闲」，都不写「执行失败」「中断」", async () => {
   test.setTimeout(300_000);
   await withOwnBackend(async () => {
     const client = await startClient(backend, { width: 1440, height: 900 });
@@ -130,13 +131,21 @@ test("用户停止的事项：楼层与部门页都写「已停止」，不含�
       await expect(status).toContainText("已停止");
       await expect(status).not.toContainText("执行失败");
       await expect(status).not.toContainText("中断");
-      // 首页楼层：这一层的状态灯写「已停止」
+      // 首页楼层：这一层的状态灯写「空闲」（工单 #734：楼层说的是这个项目此刻怎么样，
+      // 停止是过去发生的事；被停止的事项不参与楼层的状态）
       await page.evaluate(() => { window.location.hash = "#/home"; });
       await expect(page.getByRole("heading", { name: "全部项目与机器", exact: true })).toBeVisible();
       await waitUntil(
-        async () => (await floors(page)).find((f) => f.name === RUNNING)?.status === "已停止",
-        "这一层的状态灯显示「已停止」",
+        async () => (await floors(page)).find((f) => f.name === RUNNING)?.status === "空闲",
+        "这一层的状态灯显示「空闲」",
       );
+      const floor = (await floors(page)).find((f) => f.name === RUNNING);
+      expect(floor?.status).toBe("空闲");
+      expect(floor?.status).not.toContain("已停止");
+      expect(floor?.status).not.toContain("执行失败");
+      expect(floor?.status).not.toContain("中断");
+      // 空闲的一层：此刻没有部门在工作
+      expect(floor?.lit).toBe("没有部门在工作");
       expect(errors).toEqual([]);
     } finally {
       await client.close();

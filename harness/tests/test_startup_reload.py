@@ -89,12 +89,14 @@ def _write_text(path, text: str) -> None:
 
 def test_no_config_start(tmp_path):
     """指向不存在的 providers.json 和 .env -> provider_status 可用为 False，
-    原因 provider_config_missing；config_status 报告路径与空态，无异常。"""
+    原因 provider_config_missing；config_status 报告路径与「没有文件」，无异常。"""
     missing_config = tmp_path / "nonexistent" / "providers.json"
     missing_dotenv = tmp_path / "nonexistent" / ".env"
 
     facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
     facade.configure_paths(missing_config, missing_dotenv)
+    revision_before = facade.revision
+    catalog_revision_before = facade.catalog_revision()
     facade.reload()
 
     system = LoopSystem(tmp_path / "data", facade=facade)
@@ -107,8 +109,79 @@ def test_no_config_start(tmp_path):
     # config_status: 路径已记录，reload 报告目录文件不存在，reload_error 为空
     cfg = facade.config_status()
     assert cfg["config_path"] == str(missing_config)
-    assert cfg["config_state"] in ("empty", "missing", "deleted")
+    # 启动时没有目录文件是「没有文件」，不是文件被删除（工单 #844，设计说明第 4.7 节）
+    assert cfg["config_state"] == "missing"
     assert cfg["reload_error"] is None
+    # 没有文件不是一次目录变更：启动不推进修订号
+    assert facade.revision == revision_before
+    assert facade.catalog_revision() == catalog_revision_before
+
+
+def test_missing_file_at_startup_does_not_clear_the_catalog(tmp_path):
+    """服务启动时没有 providers.json -> 记为「没有文件」：不按删除处理，
+    不推进修订号、不清空准入记录（工单 #844）。"""
+    config_path = tmp_path / "providers.json"
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
+    facade.configure_paths(config_path)
+    facade.reload()
+
+    assert facade.config_status()["config_state"] == "missing"
+    # 删除处理会推进修订号并清空准入记录；「没有文件」两样都不做
+    assert facade.revision == 0
+    assert facade.catalog_revision() == 0
+    assert facade.providers_view()["admissions"] == []
+    assert facade.get_bindings() == {}
+    # 反复轮询不改变状态，也不推进修订号
+    for _ in range(3):
+        facade.reload()
+    assert facade.config_status()["config_state"] == "missing"
+    assert facade.revision == 0
+    assert facade.catalog_revision() == 0
+
+
+def test_file_created_after_starting_without_one_is_loaded(tmp_path):
+    """没有文件启动以后创建 providers.json -> 重新读取，配置状态变为已加载或空目录。"""
+    config_path = tmp_path / "providers.json"
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
+    facade.configure_paths(config_path)
+    facade.reload()
+    assert facade.config_status()["config_state"] == "missing"
+
+    # 创建空目录文件：状态是「空目录」
+    _write_json(config_path, {"providers": [], "models": [], "bindings": {}})
+    result = facade.reload()
+    assert result["ok"] is True
+    assert facade.config_status()["config_state"] == "empty"
+
+    # 创建有内容的目录文件：状态是「已加载」，内容生效
+    _write_json(config_path, _fake_doc())
+    result = facade.reload()
+    assert result["ok"] is True
+    assert facade.config_status()["config_state"] == "loaded"
+    assert facade.to_document()["models"]
+    assert facade.revision > 0
+
+
+def test_file_deleted_after_being_read_is_still_a_deletion(tmp_path):
+    """先读到文件、后被删除 -> 仍然按删除处理：状态为 deleted，目录与部门默认一起清空。"""
+    config_path = tmp_path / "providers.json"
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
+    facade.configure_paths(config_path)
+
+    # 启动读取：文件存在
+    _write_json(config_path, _fake_doc())
+    facade.reload()
+    assert facade.config_status()["config_state"] == "loaded"
+
+    # 运行期间文件被删除
+    config_path.unlink()
+    result = facade.reload()
+    assert result["ok"] is True
+    assert facade.config_status()["config_state"] == "deleted"
+    assert facade.get_bindings() == {}
+    assert facade.to_document()["models"] == []
+    # 删除处理推进修订号（与「没有文件」不同）
+    assert facade.catalog_revision() > 0
 
 
 # ---------------------------------------------------------------------------

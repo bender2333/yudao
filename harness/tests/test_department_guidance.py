@@ -18,6 +18,10 @@ from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import recorded_context
 
+# 这个文件里的脚本按部门给出，三个部门都写上（工单 #943）：质检在这些用例里不工作，给它的是空脚本。
+# 脚本里没有它的名字时，假模型在它真的发请求时报「脚本用尽」，整个 run 以 provider_error 提前结束，
+# 用例在到达要核对的那一步以前就失败（工单 #935 查出的成因，工单 #943 收尾）
+
 def _guidance_id(request):
     return json.loads(prompt_part(request, "department_guidance"))[0]["id"]
 
@@ -38,7 +42,7 @@ def _guidance_results(request):
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
     # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     project_id = system.projects.register("指导", "把文本按行处理清楚")
     work_item_id, run_id = system.projects.start_work_item(project_id, "echo")
@@ -71,7 +75,7 @@ def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_pa
 
 def test_guidance_for_previous_department_gets_a_read_only_activation_before_release(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -162,7 +166,7 @@ def test_guidance_completed_requires_nonempty_response_text(tmp_path, text, stat
 
 def test_guidance_response_binds_that_guidance_id(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -187,7 +191,7 @@ def test_guidance_response_binds_that_guidance_id(tmp_path):
 
 def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -220,7 +224,7 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
 
 def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
     system.activate_once(run_id)
@@ -273,7 +277,7 @@ def test_quality_guidance_does_not_resume_superseded_delivery(tmp_path):
 
 def test_guidance_only_engineering_cannot_write_during_quality(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -399,7 +403,7 @@ def test_qa_reject_then_guidance_completed_does_not_skip_quality(tmp_path):
 
 def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -416,7 +420,7 @@ def test_explain_only_completed_without_result_ids_still_completes(tmp_path):
 
 def test_engineering_write_then_completed_without_tool_id_is_host_bound(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -457,7 +461,7 @@ def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
         ))
 
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     holder["system"] = system
     run_id = system.create_run("echo")
@@ -475,7 +479,7 @@ def test_engineering_write_then_completed_with_tool_id_is_accepted(tmp_path):
 
 def test_write_then_later_empty_completed_still_binds_tool_id(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -545,7 +549,7 @@ def test_guidance_completed_rejects_proposal_rejected_as_result(tmp_path):
 @pytest.mark.parametrize("kind", ["delivery", "check"])
 def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_path, kind):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo", max_cycles=12)
     system.activate_once(run_id)
@@ -598,7 +602,7 @@ def test_old_delivery_or_check_cannot_complete_guidance_after_spec_change(tmp_pa
 
 def test_completed_without_host_action_after_guidance_is_rejected(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -630,6 +634,7 @@ def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
             writes={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
             proposal=guidance_response("guidance-not-yet", text=""),
         )],
+        "quality": [],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
@@ -660,7 +665,7 @@ def test_pre_guidance_write_cannot_complete_new_guidance(tmp_path):
 
 def test_explained_without_tools_is_recorded_as_explained(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
@@ -680,7 +685,7 @@ def test_explained_without_tools_is_recorded_as_explained(tmp_path):
 
 def test_one_write_cannot_complete_two_guidance_items(tmp_path):
     # 脚本按部门给出（工单 #877）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)

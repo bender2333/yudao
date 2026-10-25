@@ -125,13 +125,27 @@ def _document(base_url: str) -> dict[str, Any]:
         "bindings": {department: {"provider_id": "local", "model_id": "m-local"} for department in DEPARTMENTS},
     }
 
+class _RecordingFacade(ProviderFacade):
+    # 记录每个部门解析调用目标的结果：解析不出来（模型引用无法使用）就是被挡住的那一步。
+    # 夹具据此把「两个会话各自走到被挡住的那一步」变成可核对的事实，用例不再假定它（工单 #893）。
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.blocked_departments: list[str] = []
+
+    def resolve_department_default(self, department: str, requested_tier: str | None = None, *,
+                                   project: Any = None) -> Any:
+        resolution = super().resolve_department_default(department, requested_tier, project=project)
+        if not resolution.available:
+            self.blocked_departments.append(department)
+        return resolution
+
 def _file_system(tmp_path, base_url: str, *, dotenv_text: str) -> tuple[LoopSystem, ProviderFacade, Any]:
     # 目录与 .env 都从文件读取：修复凭据就是把这些文件写成可解析的内容，再让运行中的门面读到
     config = tmp_path / "providers.json"
     dotenv = tmp_path / ".env"
     config.write_text(json.dumps(_document(base_url), ensure_ascii=False), encoding="utf-8")
     dotenv.write_text(dotenv_text, encoding="utf-8")
-    facade = ProviderFacade(credentials=CredentialChain(use_env=False))
+    facade = _RecordingFacade(credentials=CredentialChain(use_env=False))
     facade.configure_paths(config, dotenv)
     facade.reload()
     facade.record_admission("local", "m-local", admitted_model="m-local-target")
@@ -356,6 +370,10 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
     # 部门默认所选模型的准入作废（改了连接的地址）以后，该部门的下一次模型请求进入待恢复，
     # 重新测试通过并回答以后继续执行；引用保留，已完成的工作与已用限额保留（工单 #86）
     # 同一次运行跨越产品与工程两个部门：产品请求返回产品要求，工程请求返回交付文件
+    # 同时运行的会话（工单 #557）：工程与质检各自走到被挡住的那一步，各发一条待恢复的决定请求。
+    # 这一步能不能两个都走到，取决于两个会话的先后：一条未回答的决定请求就挡住整个 run，
+    # 后到的会话在自己的安全节点上看见它就不再发请求（工单 #893 登记了这个缺口）。
+    # 用例因此核对两个会话都走到了这一步（夹具记录），不假定它。
     server, capture, base = serve(_department_aware_reply)
     try:
         system, facade, _dotenv = _file_system(tmp_path, base, dotenv_text="SCENARIO_KEY=secret-1\n")
@@ -378,6 +396,11 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
         # 下一次请求不发送，运行停在这次请求之前，发出待恢复的决定请求
         blocked = system.run_until_stop(run_id)
         assert blocked.status == "running"
+        # 两个会话各自走到被挡住的那一步（工单 #557）：解析调用目标失败就是这一步，
+        # 它紧跟在这个会话的第一个安全节点以后发生。
+        # 一条未回答的决定请求就挡住整个 run：第二个会话若在自己的安全节点上已经看见第一条请求，
+        # 它就停在安全节点、不再发自己的请求。因此这里核对两个会话都走到了这一步，不假定它。
+        assert set(facade.blocked_departments) == {"engineering", "quality"}, facade.blocked_departments
         # 同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，每条写明自己的部门
         # （模型管理设计说明第 5.5 节：这次模型请求不发送，事项停在这次请求之前）
         _position, decisions = saved_decisions(system.store, statuses=("open",))

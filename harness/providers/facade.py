@@ -1225,6 +1225,15 @@ class ProviderFacade:
         except OSError:
             if self._disk_config_seen and self._disk_config_hash is None:
                 return False
+            if not self._disk_config_seen:
+                # 从来没有读到过文件：这是「没有文件」，不是文件被删除。
+                # 与 load_document 的缺文件处理一致（记为 missing），不按删除处理：
+                # 不推进修订号、不清空准入记录、不发布（设计说明第 4.7 节，工单 #844）
+                self._config_state = "missing"
+                self._reload_error = None
+                self._disk_config_hash = None
+                self._disk_config_seen = True
+                return False
             # 明确删除目录文件表示撤销默认配置：目录、部门默认与角色默认一起清空，部门默认变为「未设置」；
             # 新任务停止创建，进行中事项的下一次模型请求进入待恢复；修订号继续前进（设计说明第 4.7 节）
             previous_revision = self._store.revision

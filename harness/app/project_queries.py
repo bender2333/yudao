@@ -35,7 +35,7 @@ from .contracts import Contract, Snapshot, Text
 from .labels import status_name
 from .payloads import BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure, Department
 from .read_models import AttemptStatus, ReadModels
-from .registry import QueryDefinition
+from .registry import QueryDefinition, UnchangedEvent
 from .replay import ReplayRequest, check_position
 
 if TYPE_CHECKING:
@@ -2114,38 +2114,65 @@ def recovery_status(application: Application) -> RecoveryStatus:
 # ---------------------------------------------------------------------------
 # 查询登记
 
+# 项目流的全部事件种类：项目流上任何一条事件都改变项目流的版本，而版本是命令的基准
+# （保存部门设置、取消事项都以它为准），所以读项目流版本的查询都要列出全部种类
+PROJECT_EVENT_KINDS: tuple[str, ...] = (
+    ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
+    ProjectEventType.PROJECT_GOAL_CHANGED, ProjectEventType.PROJECT_PINNED,
+    ProjectEventType.PROJECT_ARCHIVED, ProjectEventType.PROJECT_RESTORED,
+    ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
+    ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
+    ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, ProjectEventType.MATERIAL_RECORDED,
+    ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, ProjectEventType.INITIAL_PRD_PROPOSED,
+    ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
+    ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
+    ProjectEventType.BASELINE_ADOPTED, ProjectEventType.PARAMETER_SET,
+    ProjectEventType.WRITEBACK_COMPLETED, ProjectEventType.WRITEBACK_STOPPED,
+    ProjectEventType.WRITEBACK_NOT_NEEDED, ProjectEventType.WRITEBACK_HELD,
+    ProjectEventType.WRITEBACK_VERIFIED,
+)
+
+# run 流的全部事件种类：导出（run.export）给出这个 run 的全部事件与投影，任何一条 run 事件都改变它
+RUN_EVENT_KINDS: tuple[str, ...] = (
+    EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.PRODUCT_INPUT_ASSIGNED,
+    EventType.DEPARTMENT_GUIDANCE_RECEIVED, EventType.DEPARTMENT_GUIDANCE_APPLIED,
+    EventType.DEPARTMENT_GUIDANCE_RESPONDED, EventType.DEPARTMENT_ACTIVATED, EventType.DEPARTMENT_INPUT,
+    EventType.TOOL_CALL_REQUIRED, EventType.ACTIVATION_FINISHED, EventType.CONTEXT_ASSEMBLED,
+    EventType.MODEL_REQUEST_SERIALIZED, EventType.MODEL_REASONING, EventType.MODEL_MESSAGE,
+    EventType.MODEL_REQUESTED, EventType.MODEL_STREAM_PROGRESS, EventType.MODEL_ATTEMPT_FINISHED,
+    EventType.MODEL_ATTEMPT_FAILED, EventType.MODEL_RETRY_SCHEDULED, EventType.COMPACTION_RECORDED,
+    EventType.TOOL_CALLED, EventType.TOOL_STARTED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED,
+    EventType.PROPOSAL_SUBMITTED, EventType.PROPOSAL_REJECTED, EventType.SPEC_ACCEPTED,
+    EventType.SPEC_SUPERSEDED, EventType.CONTRACT_ACCEPTED, EventType.ASK_STARTED, EventType.ASK_ANSWERED,
+    EventType.PRODUCT_DECISION_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+    EventType.QA_TESTS_SAVED, EventType.STRUCTURE_ACCEPTED, EventType.BASELINE_REVIEW_ACCEPTED,
+    EventType.LESSON_CANDIDATE_RECORDED, EventType.RUN_DONE, EventType.RUN_PAUSED, EventType.RUN_FAILED,
+    EventType.RUN_RESUMED, EventType.RUN_CONTINUED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
+    EventType.DECISION_WITHDRAWN,
+)
+
 
 PROJECTS_LIST = QueryDefinition(
     name="projects.list", request=ProjectsList, result=ProjectList, handle=_projects_list,
     replayable=True,
-    changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
-                ProjectEventType.PROJECT_GOAL_CHANGED,
-                ProjectEventType.PROJECT_PINNED, ProjectEventType.PROJECT_ARCHIVED,
-                ProjectEventType.PROJECT_RESTORED, ProjectEventType.WORK_ITEM_CREATED,
-                ProjectEventType.WORK_ITEM_START_FAILED, ProjectEventType.DELIVERABLE_ADOPTED,
-                ProjectEventType.ADOPTION_HELD, ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED,
-                ProjectEventType.MATERIAL_RECORDED,
-                ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
-                ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
-                ProjectEventType.BASELINE_ADOPTED,
-                EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+    # 项目流上的任何一条事件都改变项目流版本（列表里显示的版本），因此全部项目流种类都在清单里
+    changed_by=(*PROJECT_EVENT_KINDS,
+                EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.TOOL_STARTED, EventType.ACTION_VERIFIED,
-                EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
+                EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN,
+                # 恢复观察的汇总：部门激活与激活结束改变事项的恢复状态
+                EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED),
 )
 
 PROJECT_OVERVIEW = QueryDefinition(
     name="project.overview", request=ProjectOverview, result=ProjectOverviewResult, handle=_project_overview,
-    changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
-                ProjectEventType.PROJECT_GOAL_CHANGED,
-                ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
-                ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
-                EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
-                EventType.RUN_CONTINUED,
-                EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
+    # 项目流上的任何一条事件都改变项目流版本（这一页显示的版本），因此全部项目流种类都在清单里
+    changed_by=(*PROJECT_EVENT_KINDS,
+                EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_CONTINUED, EventType.RUN_RESUMED,
+                EventType.DEPARTMENT_ACTIVATED,
+                EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED, EventType.SPEC_ACCEPTED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED,
-                ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
-                ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
-                ProjectEventType.BASELINE_ADOPTED,
                 EventType.DECISION_REQUESTED),
 )
 
@@ -2160,18 +2187,26 @@ PROJECT_LOOP = QueryDefinition(
                 EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
-                ProjectEventType.BASELINE_ADOPTED),
+                ProjectEventType.BASELINE_ADOPTED,
+                # 事项的进度由成果推算：规格被接纳、交付到达、质检放行与退回都改变它
+                EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                # 激活结束以后事项的恢复状态改变
+                EventType.ACTIVATION_FINISHED),
 )
 
 PROJECT_FLOW = QueryDefinition(
     name="project.flow", request=ProjectFlow, result=ProjectFlowResult, handle=_project_flow,
+    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、交付到达与质检结论都进流转记录
     changed_by=(EventType.ASK_STARTED, EventType.ASK_ANSWERED,
+                EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED,
                 EventType.QA_SUBMITTED),
 )
 
 WORK_ITEM_INPUTS = QueryDefinition(
     name="work_item.inputs", request=WorkItemInputs, result=WorkItemInputsResult, handle=_work_item_inputs,
-    changed_by=(EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.PRODUCT_INPUT_ASSIGNED),
+    changed_by=(EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.PRODUCT_INPUT_ASSIGNED,
+                # 规格被接纳以后这一页显示的已处理输入版本随之更新
+                EventType.SPEC_ACCEPTED),
 )
 
 EVENT_DETAIL = QueryDefinition(
@@ -2192,7 +2227,9 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 # 本项目的部门设置修改以后生效模型与来源随之更新（工单 #95 的验收）；
                 # 目录修订（准入作废、连接修改）以后引用可用性随之更新
-                ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, CatalogEventType.CATALOG_REVISED),
+                ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, CatalogEventType.CATALOG_REVISED,
+                # 规格被接纳以后这个部门的房间里挂着新的规格
+                EventType.SPEC_ACCEPTED),
 )
 
 RUN_ACTIONS = QueryDefinition(
@@ -2224,11 +2261,16 @@ PROJECT_ATTEMPTS = QueryDefinition(
     name="project.attempts", request=ProjectAttempts, result=ProjectAttemptsResult, handle=_project_attempts,
     changed_by=(EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED, EventType.MODEL_ATTEMPT_FINISHED,
                 EventType.MODEL_ATTEMPT_FAILED, EventType.MODEL_RETRY_SCHEDULED),
+    unchanged_by=(
+        UnchangedEvent(EventType.MODEL_MESSAGE,
+                       "模型消息只改变调用尝试表的阶段与输出条数；进行中的阶段由输出片段实时显示（工单 #891）"),
+    ),
 )
 
 PROJECT_USAGE = QueryDefinition(
     name="project.usage", request=ProjectUsage, result=UsageReport, handle=_project_usage,
-    changed_by=(EventType.MODEL_ATTEMPT_FINISHED, EventType.MODEL_ATTEMPT_FAILED,
+    # 用量报告按调用尝试统计：上下文装配多一次就多一条尝试，所以它在清单里
+    changed_by=(EventType.CONTEXT_ASSEMBLED, EventType.MODEL_ATTEMPT_FINISHED, EventType.MODEL_ATTEMPT_FAILED,
                 EventType.MODEL_RETRY_SCHEDULED),
 )
 
@@ -2236,24 +2278,25 @@ RUN_ATTEMPT = QueryDefinition(
     name="run.attempt", request=RunAttempt, result=RunAttemptResult, handle=_run_attempt,
     changed_by=(EventType.CONTEXT_ASSEMBLED, EventType.MODEL_REQUESTED, EventType.MODEL_ATTEMPT_FINISHED,
                 EventType.MODEL_ATTEMPT_FAILED),
+    unchanged_by=(
+        UnchangedEvent(EventType.MODEL_MESSAGE,
+                       "模型消息只改变这次调用的阶段与已收到的输出条数；进行中的阶段由输出片段实时显示（工单 #891）"),
+    ),
 )
 
 PROJECT_SETTINGS = QueryDefinition(
     name="project.settings", request=ProjectSettings, result=ProjectSettingsResult, handle=_project_settings,
-    changed_by=(ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
-                ProjectEventType.PROJECT_GOAL_CHANGED,
-                ProjectEventType.SOURCE_DIRECTORY_CONFIGURED,
-                # 这一页显示部门设置、置顶与归档：改变它们的事件种类要在清单里，
-                # 否则保存以后页面停在旧值，要手动刷新（工单 #674）
-                ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED,
-                ProjectEventType.PROJECT_PINNED, ProjectEventType.PROJECT_ARCHIVED,
-                ProjectEventType.PROJECT_RESTORED,
+    # 这一页显示的项目版本是项目流的版本：项目流上的任何一条事件都改变它，
+    # 因此保存部门设置、取消事项的基准不会过期（工单 #891 的验收）
+    changed_by=(*PROJECT_EVENT_KINDS,
                 # 目录修订（准入作废、模型变更）以后生效模型的建议能力提醒随之更新（工单 #95）
                 CatalogEventType.CATALOG_REVISED),
 )
 
 RUN_EXPORT = QueryDefinition(
-    name="run.export", request=RunExport, result=RunExportResult, handle=_run_export, changed_by=(),
+    name="run.export", request=RunExport, result=RunExportResult, handle=_run_export,
+    # 导出给出这个 run 的全部事件与投影：任何一条 run 事件都改变它
+    changed_by=RUN_EVENT_KINDS,
 )
 
 PROJECT_WRITEBACK = QueryDefinition(
@@ -2535,6 +2578,10 @@ RUN_RECOVERY = QueryDefinition(
                 EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
                 EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
                 EventType.DECISION_WITHDRAWN, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED),
+    unchanged_by=(
+        UnchangedEvent(EventType.MODEL_REQUESTED,
+                       "模型请求只改变恢复页上的已用模型步数；那是进度读数，与已用秒数同类（工单 #891）"),
+    ),
 )
 
 PROJECT_QUERIES = (

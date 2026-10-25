@@ -11,7 +11,7 @@ from ..models import CatalogEventType, EventType
 from ..projection import saved_decisions
 from .contracts import Contract, Snapshot
 from .project_queries import RecoveryStatus, recovery_status
-from .registry import QueryDefinition
+from .registry import QueryDefinition, UnchangedEvent
 from .replay import ReplayRequest, catalog_through, check_position, decisions_through
 
 if TYPE_CHECKING:
@@ -67,6 +67,16 @@ class SystemStatusRequest(ReplayRequest):
     # 可回放（设计说明第 4.1 节）：at 是全局位置，省略时读取现在的快照
     pass
 
+# 模型调用的过程事件：这些高频事件不改变系统状态，进行中的状态由输出片段实时给出（工单 #891）
+_MODEL_PROCESS_EVENTS = (
+    UnchangedEvent(EventType.CONTEXT_ASSEMBLED, "上下文装配只影响这一次调用的输入，系统状态不变"),
+    UnchangedEvent(EventType.MODEL_REQUEST_SERIALIZED, "请求序列化是发给模型前的一步，系统状态不变"),
+    UnchangedEvent(EventType.MODEL_REQUESTED, "发出模型请求不改变系统状态"),
+    UnchangedEvent(EventType.MODEL_MESSAGE, "模型消息不改变系统状态"),
+    UnchangedEvent(EventType.MODEL_REASONING, "模型的推理内容不改变系统状态"),
+    UnchangedEvent(EventType.MODEL_STREAM_PROGRESS, "流式进度只改变进度读数，系统状态不变"),
+)
+
 def _system_status(application: Application, request: SystemStatusRequest) -> Snapshot[SystemStatus]:
     system = application.system
     store = system.store
@@ -117,6 +127,7 @@ SYSTEM_STATUS = QueryDefinition(
                 EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
                 EventType.DECISION_WITHDRAWN, CatalogEventType.CATALOG_REVISED,
                 CatalogEventType.RUNTIME_DRAIN_STARTED, CatalogEventType.RUNTIME_DRAIN_FINISHED),
+    unchanged_by=_MODEL_PROCESS_EVENTS,
     replayable=True,
 )
 
@@ -138,5 +149,16 @@ def _attempt_live(application: Application, request: LiveAttemptRequest) -> Snap
     )
 
 ATTEMPT_LIVE = QueryDefinition(
-    name="attempt.live", request=LiveAttemptRequest, result=LiveAttempt, handle=_attempt_live, changed_by=(),
+    name="attempt.live", request=LiveAttemptRequest, result=LiveAttempt, handle=_attempt_live,
+    changed_by=(),
+    unchanged_by=(
+        UnchangedEvent(EventType.CONTEXT_ASSEMBLED, "上下文装配不改变这个查询：进行中的调用由输出片段给出"),
+        UnchangedEvent(EventType.MODEL_REQUESTED, "发出模型请求不改变这个查询：进行中的调用由输出片段给出"),
+        UnchangedEvent(EventType.MODEL_MESSAGE, "模型消息不改变这个查询：它由输出片段实时给出"),
+        UnchangedEvent(EventType.MODEL_REASONING, "模型的推理内容不改变这个查询：它由输出片段实时给出"),
+        UnchangedEvent(EventType.MODEL_STREAM_PROGRESS, "流式进度不改变这个查询：它由输出片段实时给出"),
+        UnchangedEvent(EventType.MODEL_REQUEST_SERIALIZED, "请求序列化不改变这个查询：它由输出片段实时给出"),
+        UnchangedEvent(EventType.MODEL_ATTEMPT_FINISHED, "调用结束以后这个查询给出空结果：结束由输出片段与调用记录说明"),
+        UnchangedEvent(EventType.MODEL_ATTEMPT_FAILED, "调用失败以后这个查询给出空结果：失败由输出片段与调用记录说明"),
+    ),
 )

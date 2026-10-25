@@ -6,12 +6,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Literal, Mapping
 
-from ..models import DEPARTMENTS, CatalogEventType
+from ..models import DEPARTMENTS, CatalogEventType, EventType, ProjectEventType
 from ..providers import DEFAULT_TIMEOUT_SEC, capabilities
 from ..providers.errors import CatalogValidationError
 from .contracts import Contract, Snapshot
 from .project_queries import NotFound
-from .registry import QueryDefinition
+from .registry import QueryDefinition, UnchangedEvent
 
 if TYPE_CHECKING:
     from .application import Application
@@ -157,7 +157,9 @@ class ImpactProjectSetting(Contract):
     provider_id: str
 
 class ImpactWorkItem(Contract):
-    # 正在使用受影响定义的进行中事项（设计说明第 5.3 节的生效模型：项目部门设置优先，否则部门默认）
+    # 正在使用受影响定义的进行中事项（设计说明第 5.3 节的生效模型：项目部门设置优先，否则部门默认）。
+    # 按（事项，部门）逐条列出：事项里哪个部门的模型选择落在受影响的定义上就写哪个部门，
+    # 与它此刻在不在工作无关（设计说明第 4.4 节，工单 #872）
     project_id: str
     project_name: str
     work_item_id: str
@@ -233,6 +235,18 @@ def _catalog_document(application: Application, _request: None) -> Snapshot[Cata
 # 目录事件改变这里的结果：客户端收到这些事件时重新查询
 _CATALOG_EVENTS = (CatalogEventType.CATALOG_REVISED, CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
                    CatalogEventType.CATALOG_TEST_FINISHED, CatalogEventType.CREDENTIAL_CHANGED)
+
+# 模型调用的过程事件：这些高频事件不改变目录的内容（工单 #891）
+_CATALOG_UNCHANGED_EVENTS = (
+    UnchangedEvent(EventType.CONTEXT_ASSEMBLED, "上下文装配不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_REQUEST_SERIALIZED, "请求序列化不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_REQUESTED, "发出模型请求不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_MESSAGE, "模型消息不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_REASONING, "模型的推理内容不改变目录的内容"),
+    UnchangedEvent(EventType.MODEL_STREAM_PROGRESS, "流式进度不改变目录的内容"),
+    UnchangedEvent(EventType.TOOL_STARTED, "工具开始不改变目录的内容"),
+    UnchangedEvent(EventType.TOOL_CALLED, "工具调用不改变目录的内容"),
+)
 
 
 def _definition_identity(item: Mapping[str, Any]) -> ImpactDefinition:
@@ -349,13 +363,17 @@ def _change_impact(application: Application, request: ChangeImpactRequest) -> Sn
                     model_id=str(setting.model_id or ""), provider_id=str(setting.provider_id or "")))
         item = (None if project.active_work_item_id is None
                 else project.work_item(project.active_work_item_id))
-        if item is None or item.status != "in_progress" or not item.department:
+        if item is None or item.status != "in_progress":
             continue
-        department = item.department
-        setting = settings.get(department) if isinstance(settings, Mapping) else None
-        selected = str((setting.model_id if setting is not None else None) or "") or \
-            str((bindings.get(department) or {}).get("model_id") or "")
-        if selected in affected:
+        # 进行中事项按（事项，部门）逐条列出（设计说明第 4.4 节，工单 #872）：
+        # 事项里哪个部门的模型选择（项目部门设置，没有时取部门默认）落在受影响的定义上，就列出这个部门，
+        # 不论它此刻在不在工作——它下一次开始工作时同样会被挡住。一个事项可以出现几次。
+        for department in DEPARTMENTS:
+            setting = settings.get(department) if isinstance(settings, Mapping) else None
+            selected = str((setting.model_id if setting is not None else None) or "") or \
+                str((bindings.get(department) or {}).get("model_id") or "")
+            if selected not in affected:
+                continue
             work_items.append(ImpactWorkItem(
                 project_id=project.project_id, project_name=project.name,
                 work_item_id=item.work_item_id, title=item.title, department=department))
@@ -366,9 +384,15 @@ def _change_impact(application: Application, request: ChangeImpactRequest) -> Sn
 
 
 CATALOG_QUERY = QueryDefinition(name="catalog", request=None, result=Catalog, handle=_catalog,
-                                changed_by=_CATALOG_EVENTS)
+                                changed_by=_CATALOG_EVENTS, unchanged_by=_CATALOG_UNCHANGED_EVENTS)
 CATALOG_DOCUMENT_QUERY = QueryDefinition(name="catalog.document", request=None, result=CatalogDocument,
-                                         handle=_catalog_document, changed_by=_CATALOG_EVENTS)
+                                         handle=_catalog_document, changed_by=_CATALOG_EVENTS,
+                                         unchanged_by=_CATALOG_UNCHANGED_EVENTS)
 CATALOG_CHANGE_IMPACT_QUERY = QueryDefinition(name="catalog.change_impact", request=ChangeImpactRequest,
                                               result=ChangeImpact, handle=_change_impact,
-                                              changed_by=_CATALOG_EVENTS)
+                                              # 结果里列出进行中的事项：事项开始与结束改变这份清单
+                                              changed_by=(*_CATALOG_EVENTS,
+                                                          EventType.RUN_CREATED, EventType.RUN_DONE,
+                                                          EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                                                          ProjectEventType.WORK_ITEM_CREATED,
+                                                          ProjectEventType.WORK_ITEM_START_FAILED))
