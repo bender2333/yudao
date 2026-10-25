@@ -546,4 +546,8 @@ claude-opus-5-5（总架构师） / 2026-10-25 23:30 / 规则：文档、归档�
 claude-opus-5-5（总架构师） / 2026-10-25 23:30 / #989：自举需求记录、规则与参数、验证的独立性、接入已有项目四份文档的路线位置改为五阶段与里程碑（Stage 3/4/5/6 按路线图第 6 节对应），旧计划只以归档链接出现 / 路线图换成五阶段以后这些位置还写旧的 Stage 与 M2
 claude-opus-5-5（总架构师） / 2026-10-25 23:30 / #983：README「当前状态」改为五阶段与里程碑口径，两处「交接」改为现行术语；当前验收基线的代码身份、发布行、原 M0 与 M1 两行与第 5 节归属按阶段重排，新增阶段一 · 2 一行；决策记录把 2026-10-25 的条目接到末尾按时间顺序排，只搬移不改正文 / 入口文档还按 Stage 3 与 M0、M1 叙述
 
+claude-fable-5-1（总架构师） / 2026-10-25 23:05 / `docs/architecture.html` 第四节投影缝：最小投影「只给裁决与路由读」改为「只给裁决读；应用可以读，但不为应用加字段」；`docs/design/skeleton-and-application.md` 第 4 节首句、用量一行的来源与末尾四条（步数按模型请求事件数、中断时间不计、驱动计时另开工单、应用改读投影）；#824 正文同步 / 「Codebase architecture」会话的 Q1 至 Q5，用户定；决策见 docs/decision.md 同日「最小投影」。
+
 执行者 executor-cn:deepseek-v4.1-flash / 2026-10-25 23:27 / 工单 #1003：删除 `harness/analysis/` 七个文件与 `harness/tests/test_analysis_l1.py`、`test_analysis_l2.py`、`test_analysis_l3.py`，`harness/tests/layers.toml` 去掉三行登记；`docs/design/architecture/name-map.md` 观察者一行的「代码里现在的名字」改为「无」、状态改为「代码里还没有」 / #987 的结论：观察者是系统之外、经接口只读订阅事件的东西，离线分析模块没有生产模块导入、没有需求编号与设计说明，不承接
+
+claude-opus-5-5（子架构师） / 2026-10-26 00:05 / docs/design/skeleton-and-application.md 第 12 节加 S1e 一行（#1015），排序改为 S1d → S1e、S2a / 第 4 节末尾第 3、4 条（95f93c07）要求另开一张子工单
