@@ -1,10 +1,12 @@
 // 事项看板分列与页面名称的单元测试（工单 #303）：取消的事项不再落进部门列；
 // run 状态与停止原因的中文名与控制核心一致，停止事项没有部门时页面省略这一格（工单 #556）。
+// 工单 #904 在这里核对概览与看板的文字：所在部门一行写三个部门各自的状态与原因、按成果写的进度行、
+// 看板卡片上正在工作的部门。期望值写成字面值，不复用实现的公式。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { boardColumns } from "../../src/renderer/src/views/project/board.ts";
-import { DECISION_BLOCKS,RUN_STATUS_LABELS,STOP_REASON,departmentName,label } from "../../src/renderer/src/views/project/labels.ts";
+import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_REASON,departmentLine,departmentName,departmentsText,label,progressLabel,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
 import type { WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 
@@ -85,4 +87,112 @@ test("停止的事项没有部门时不写「未知部门」，页面自己决�
   assert.equal(departmentName(null), "");
   assert.equal(departmentName(""), "");
   assert.equal(departmentName("engineering"), "工程");
+});
+
+// ---------------------------------------------------------------------------
+// 概览「当前事项」的两行与看板卡片（工单 #904）：所在部门一行写三个部门各自的状态与原因，
+// 进度行按成果写，看板卡片写正在工作的部门。期望值是字面值。
+
+test("所在部门一行写三个部门各自的状态与原因，按产品、工程、质检的顺序", () => {
+  assert.equal(
+    departmentLine({
+      product: { state: "waiting" },
+      engineering: { state: "working" },
+      quality: { state: "working", note: "预测性探索：按 PRD r1 起草测试用例" },
+    }, "quality"),
+    "产品 等待工作 · 工程 一轮工作中 · 质检 一轮工作中（预测性探索：按 PRD r1 起草测试用例）",
+  );
+  // 只有一个部门有状态时只写它（查询给几个部门就写几个）
+  assert.equal(
+    departmentsText({ engineering: { state: "verifying", note: "等质检核验交付 r1" } }),
+    "工程 核验中（等质检核验交付 r1）",
+  );
+});
+
+test("没有 departments 时照旧写所在部门，没有部门时写大厅", () => {
+  assert.equal(departmentLine(null, "engineering"), "所在部门：工程");
+  assert.equal(departmentLine(undefined, null), "所在部门：大厅");
+  assert.equal(departmentsText(null), null);
+  assert.equal(departmentLine({}, "product"), "所在部门：产品");
+});
+
+test("部门状态的中文名用总图外环的五个词，只写这一处", () => {
+  assert.deepEqual(Object.keys(DEPARTMENT_STATE).sort(), ["asking", "verifying", "waiting", "waiting_user", "working"]);
+  assert.equal(DEPARTMENT_STATE.waiting_user, "等用户");
+  assert.equal(DEPARTMENT_STATE.working, "一轮工作中");
+  assert.equal(DEPARTMENT_STATE.asking, "询问中");
+  assert.equal(DEPARTMENT_STATE.verifying, "核验中");
+  assert.equal(DEPARTMENT_STATE.waiting, "等待工作");
+});
+
+test("进度行的三种写法：有交付、没有交付、没有结论", () => {
+  // 有交付：当前 PRD 版本、交付版本与它依据的 PRD、对最新交付的结论
+  assert.equal(
+    progressLabel({
+      product_spec_revision: 2,
+      delivery_revision: 1,
+      delivery_product_spec_revision: 2,
+      conclusion: "release",
+    }),
+    "PRD r2 · 交付 r1（依据 PRD r2）· 结论：放行",
+  );
+  // 没有交付
+  assert.equal(
+    progressLabel({ product_spec_revision: 2, delivery_revision: null, delivery_product_spec_revision: null, conclusion: null }),
+    "PRD r2 · 还没有交付",
+  );
+  // 没有结论：这一项不写
+  assert.equal(
+    progressLabel({ product_spec_revision: 1, delivery_revision: 1, delivery_product_spec_revision: 1, conclusion: null }),
+    "PRD r1 · 交付 r1（依据 PRD r1）",
+  );
+  // 还没有成果时不写这一行
+  assert.equal(
+    progressLabel({ product_spec_revision: null, delivery_revision: null, delivery_product_spec_revision: null, conclusion: null }),
+    null,
+  );
+});
+
+test("看板卡片写正在工作的部门，按产品、工程、质检的顺序", () => {
+  assert.equal(
+    workingDepartmentsText({
+      department: "product",
+      departments: {
+        product: { state: "waiting", note: null },
+        engineering: { state: "asking", note: "在等待产品的回答" },
+        quality: { state: "working", note: "预测性探索：按 PRD r1 起草测试用例" },
+      },
+    }),
+    "工程、质检在工作",
+  );
+  assert.equal(
+    workingDepartmentsText({
+      department: null,
+      departments: {
+        product: { state: "waiting" },
+        engineering: { state: "working" },
+        quality: { state: "waiting" },
+      },
+    }),
+    "工程在工作",
+  );
+});
+
+test("没有部门在工作时看板卡片不写这一格", () => {
+  assert.equal(
+    workingDepartmentsText({
+      department: "engineering",
+      departments: {
+        product: { state: "waiting" },
+        engineering: { state: "waiting_user", note: null },
+        quality: { state: "verifying", note: "等质检核验交付 r1" },
+      },
+    }),
+    "",
+  );
+});
+
+test("查询结果里没有 departments 时看板卡片照旧写事项所在的部门", () => {
+  assert.equal(workingDepartmentsText({ department: "engineering" }), "工程");
+  assert.equal(workingDepartmentsText({ department: null }), "");
 });

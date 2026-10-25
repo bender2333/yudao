@@ -20,7 +20,7 @@
 | 客户端端到端 | 157 / 26 | 71 / 16 | −86 |
 | evals/tests | 158 / 11 | 125 / 9 | −33 |
 
-集成层按 CI 的逐项用时估算：串行合计约 3750 秒降到约 2740 秒（约 62 分钟到约 46 分钟），CI 四路并行约 16 分钟到约 12 分钟。降得比用例数少，因为最慢的两块没有动：`test_release_script.py` 一个文件 432 秒（时间花在夹具里装 wheel，删用例不省时间），事件序列基准 157 秒（基准这套机制是骨架重写的验收依据，只删了 8 个重复场景）。再往下降靠 #598（往下层移）和发布脚本夹具的改写，不靠删。
+集成层按 CI 的逐项用时估算：串行合计约 3750 秒降到约 2740 秒（约 62 分钟到约 46 分钟），CI 四路并行的实测：合并前约 16 分钟，合并后 main（c5f86025）上的集成层 10 分 15 秒，全部通过。降得比用例数少，因为最慢的两块没有动：`test_release_script.py` 一个文件 432 秒（时间花在夹具里装 wheel，删用例不省时间），事件序列基准 157 秒（基准这套机制是骨架重写的验收依据，只删了 8 个重复场景）。再往下降靠 #598（往下层移）和发布脚本夹具的改写，不靠删。
 
 事件序列基准删了 8 个场景：`http_chat_cancel_while_provider_holds`、`http_messages_cancel_while_provider_holds`（与 responses 版逐字相同）、`http_chat_stream_broken_then_success`、`http_messages_stream_broken_then_success`、`http_responses_retry_after_then_success`、`http_responses_server_error_then_success`、`http_responses_timeout_then_success`、`text_only_reply`（协议级的失败与重试由 `test_provider_protocols.py`、`test_responses.py` 守着）。终态基准剩 31 个，满足内核测试的 `> 30`。
 
