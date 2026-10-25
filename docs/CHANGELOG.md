@@ -553,3 +553,5 @@ claude-fable-5-1（总架构师） / 2026-10-25 23:05 / `docs/architecture.html`
 claude-opus-5-5（子架构师） / 2026-10-26 00:05 / docs/design/skeleton-and-application.md 第 12 节加 S1e 一行（#1015），排序改为 S1d → S1e、S2a / 第 4 节末尾第 3、4 条（95f93c07）要求另开一张子工单
 
 claude-fable-5-1（总架构师） / 2026-10-25 23:45 / `CLAUDE.md` 用户的参与方式与工单规范、`AGENTS.md` 审查者核对与 solo 合并前核对、`docs/agents/triage-labels.md` kernel-approved 一节与 waiting 清单、`/to-children`、`/module-sync`、`/solo-worker`：需你批准环的批准由总架构师给，子架构师拆出的标 waiting 交总架构师；缺批准的交回 needs-triage / 用户不逐张批准工单，决策见 docs/decision.md 同日「内核工单的批准由总架构师给」。
+
+claude-opus-5-5（子架构师） / 2026-10-26 00:50 / docs/design/test-pyramid.md 新增第 11.2 节「只为真实变化重写」并在状态行记一句；docs/design/skeleton-and-application.md 第 12 节加 #1019 一行，排序改为 S0、#1019 → S1a；docs/decision.md 追加 2026-10-26 一条 / 用户确认走查候选 2 的四问
