@@ -279,3 +279,7 @@ flowchart LR
 - 由 `test_event_sequence.py` 里单独的一项测试生成与比较：它运行覆盖这些键的最少场景（`handoff_release`、`compaction_success`、`ask_answer_with_spec_revision`、`guidance_response_explained`、`tool_denied_guidance_only`），从请求材料取出上面的内容。同一个键在两个场景里取到的内容不同时测试失败，写明场景与键。
 
 - 依赖说明总长度的测试与场景（第 10 节第 3 条）：窗口与阈值由「固定材料的实测 token 数」加上场景需要的余量算出，不写固定的数字。实验中依赖长度的有三处：`test_context.py` 的窄窗口测试（固定上限 3600）、`test_compaction_engine.py` 中注释写明为说明长度调过窗口的两项（窗口 5000），以及事件序列场景 `history_exceeds_the_window`（窗口由固定材料的实测 token 数加余量推出：固定材料的 token 数实测恒定，摘要请求也放不下，运行以 compaction_failed 失败、没有模型调用；余量低于实测下界时失败原因会变成「固定材料放不下摘要」，高于上界时摘要请求放得下、运行会真的调用模型）。
+
+## 12. 缝的合同检查
+
+总图第五节的验收表有三层：内核、缝、真实场景。本文的单元、模块、集成按用到的资源分，缝的检查按查什么分，两种划分交叉，所以没有第四层。缝的合同检查（导入方向，骨架事件、停止原因与契约公开名称只增，契约与接口版本；内容见[骨架与应用设计说明](skeleton-and-application.md)第 12 节 S6a 一行）登记在 `harness/tests/layers.toml`，属于单元层或模块层，由 CI 的 `unit`、`module` 作业在每次推送时运行，是 `check` 的一部分，失败就不能合并。登记为 `integration` 的只在合并以后运行，阻止不了合并，所以新的缝检查登记为 `unit` 或 `module`。骨架契约的快照放在 `harness/tests/kernel/`，它在内核清单里；OpenAPI 快照留在 `harness/tests/openapi/`，随接口版本改动。真实场景验收不在 `harness/tests/` 里（第 4 节最后一行）。审查者核对快照的每处改动都带版本提高。

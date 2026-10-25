@@ -47,7 +47,7 @@ PowerShell 的测试终端先设置 `$env:PYTHONUTF8='1'`，让 Python 及其测
 | --- | --- | --- |
 | 开发 App（`yudao-dev`） | 执行者 | Contents、Pull requests、Issues：读写；Actions：读写（重新运行失败的 CI）；Checks、Commit statuses：只读；没有 Workflows 权限，推送不了 `.github/workflows` |
 | 审查 App（`yudao-review`） | 审查者 | Pull requests：读写（提交审查）；Contents、Issues、Actions、Checks、Commit statuses：只读 |
-| `bender2333` | 用户、架构师（包括被唤醒的架构师）、派发者 | 仓库所有者，main 规则唯一可以豁免的身份 |
+| `bender2333` | 用户、架构师（包括被唤醒的架构师）、派发者、solo 执行者 | 仓库所有者，main 规则唯一可以豁免的身份；派发者不使用豁免，solo 执行者只在合并自己范围内的 PR 时使用（`AGENTS.md`「Solo 模式」） |
 
 - 两个 App 只安装在 `bender2333/yudao`。私钥文件放在派发的机器上仓库以外的目录。
 - 执行者与审查者的进程启动前设置 `YUDAO_GH_APP_ID`（App 编号）与 `YUDAO_GH_APP_KEY_FILE`（私钥文件路径），并把仓库的 `scripts/github-app/` 放在 `PATH` 的最前面。之后进程里的 `gh` 与 `git push` 以这个 App 的身份运行，令牌快到期时自动换新（#513）。
@@ -96,7 +96,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
   uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
   ```
 
-- 导出里程碑的工单记录（架构师在里程碑达到时，`CLAUDE.md` 工作流程第 7 步）。`<短名>` 例如 `stage3-m1`；有上一个里程碑的记录时加 `--previous`：
+- 导出里程碑的工单记录（架构师在里程碑达到时，`CLAUDE.md` 工作流程第 7 步）。`<短名>` 例如 `phase1-1`；有上一个里程碑的记录时加 `--previous`：
 
   ```bash
   uv run python evals/baseline/milestone.py collect --milestone "<里程碑标题>" --data docs/evaluation/milestones/<短名>.json
@@ -163,7 +163,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
   gh api repos/bender2333/yudao/commits/<after_sha>/pulls --jq '.[].number'
   ```
 
-  第二条命令有输出的，是经豁免合并的 PR；没有输出的，是架构师直接推送的文档与日记（被唤醒的架构师的提交作者是 `claude-架构师`）。
+  第二条命令有输出的，是经豁免合并的 PR：用 `gh pr view <PR 编号> --json body --jq .body` 看正文里有没有 `Solo:` 行（`AGENTS.md`「Solo 模式」第 2 步要求写），有的是 solo 模式的合并，记入 `claude_jour.md`，其余的告诉用户。没有输出的，是架构师直接推送的文档与日记（被唤醒的架构师的提交作者是 `claude-架构师`）。
 
 ## 7. 参数
 
@@ -176,7 +176,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 同一个 PR 要求修改的上限 | 3 次，第 3 次时搁置 | 派发者规则第 3 节第 4、5 步 |
 | 工单大小的上限 | 「只改」清单中手写文件 15 个；生成的客户端类型、接口快照、事件序列基准与日记不计 | `CLAUDE.md`「工单规范」；`AGENTS.md` 执行者第 2 步 |
 | 同时进行的 `touches-core` 工单 | 1 张（`in-progress` 与 `needs-review` 合计） | 派发者规则第 3 节第 1 步 |
-| 核心文件 | 工具定义：`harness/tools.py`、`harness/definitions/`；控制核心：`harness/` 下的 `orchestrator.py`、`engine.py`、`recording.py`、`assembly.py`、`context.py`、`compaction.py`、`adjudication.py`、`validation.py`、`write_path.py`、`event_store.py`、`projection.py`、`decisions.py`、`runtime.py`；执行环境：`harness/` 下的 `environment.py`、`actions.py`、`workspace.py`；事件序列基准：`harness/tests/event_sequences/`、`harness/tests/prompt_snapshot.json`；接口合同：`harness/tests/openapi/openapi.json`、`client/src/renderer/src/api/generated/` | `CLAUDE.md`「工单规范」 |
+| 核心文件 | 工具定义：`harness/tools.py`、`harness/definitions/`；控制核心：`harness/` 下的 `orchestrator.py`、`engine.py`、`recording.py`、`assembly.py`、`context.py`、`compaction.py`、`adjudication.py`、`validation.py`、`write_path.py`、`event_store.py`、`projection.py`、`decisions.py`、`runtime.py`；执行环境：`harness/` 下的 `environment.py`、`actions.py`、`workspace.py`；事件序列基准：`harness/tests/event_sequences/`、`harness/tests/prompt_snapshot.json`；接口合同：`harness/tests/openapi/openapi.json`、`client/src/renderer/src/api/generated/`；可信内核：`harness/definitions/kernel-manifest.json` 里 `kind` 为 `module` 的路径 | `CLAUDE.md`「工单规范」 |
 | 唤醒架构师 | 关 | 派发者规则第 3 节第 7 步；用户在场的会话做大的设计修改时改为关，做完改回 |
 | 被唤醒的架构师一次运行的时长 | 4 小时 | 派发者规则第 3 节第 7 步 |
 | 同一张工单唤醒架构师的上限 | 2 次，第 3 次直接交给用户 | `CLAUDE.md`「被唤醒的架构师」 |
