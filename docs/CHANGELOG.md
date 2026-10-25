@@ -569,3 +569,5 @@ solo-deepseek-v4.1-flash / 2026-10-26 02:20 / 工单 #905 [M0] 部门工作间�
 claude-sonnet-5-5 / 2026-10-26 02:10 / docs/decision.md 追加 2026-10-26「像素画面继续逐像素对照原型」；docs/evaluation/test-subtraction-2026-10-26.md 第 4 节第 1 条记用户的决定 / 用户回答：继续守，#951 至 #959 照做
 
 claude-sonnet-5-5 / 2026-10-26 / docs/design/department-guidance.md：状态行改为已实现与待实现的现状；新增第 2.1 节「放行怎么等」；第 3 节补「处理完只有一个说法」「已回答由主机写」「用文字回答用户」。docs/design/department-loop.md 第 6 节：回答用户限于指导独占的一轮，回答由主机写，放行等待的做法指向指导设计说明第 2.1 节。docs/decision.md 追加 2026-10-26 一条 / #561 被交回，设计里缺回答用户怎么结束一轮和放行等待的做法，补定后拆成四张
+
+claude-sonnet-5-5 / 2026-10-26 / docs/decision.md 追加 2026-10-26「画面翻译层先建表、后接线」/ #952 被交回，对应表与接线在当前 main 上互相矛盾，定先建表后接线，并定 held、released_unsettled 的画面取值
