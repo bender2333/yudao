@@ -119,6 +119,15 @@ function saveLedger(loop) {
 function acquireLock(loop) {
   try {
     fs.writeFileSync(loop.lockFile, JSON.stringify({ pid: process.pid, at: NOW() }), { flag: 'wx' });
+    // fail() 走 process.exit，finally 不会执行：退出时一定把锁放掉，
+    // 否则下一次调用会被自己的上一个进程挡住 10 分钟。
+    process.on('exit', () => {
+      try {
+        fs.unlinkSync(loop.lockFile);
+      } catch {
+        /* 已经不在了 */
+      }
+    });
     return true;
   } catch (error) {
     if (error.code !== 'EEXIST') return false;
@@ -1529,6 +1538,17 @@ function commandResume(args) {
     '循环 ' + loop.name + ' 恢复（无人值守' + (loop.state.autoContinue ? '开' : '关') + '）。先跑 refresh 与 sync 再看台账。');
 }
 
+/** 预算：无人值守跑多少轮以内。用完就停，这是唯一的花钱闸。 */
+function commandBudget(args) {
+  const loop = openLedger(args);
+  const current = num(loop.state.maxIterations, 0);
+  const target = args.iterations !== undefined ? Math.max(1, num(args.iterations, current)) : current;
+  loop.state.maxIterations = target;
+  saveLedger(loop);
+  appendText(loop, '## 预算（编排者）\n\n- maxIterations ' + current + ' → ' + target);
+  return emit(args, { maxIterations: target }, '预算：最多 ' + target + ' 轮（已跑 ' + num(loop.state.iteration, 0) + ' 轮）');
+}
+
 /** 无人值守开关：开的时候 Stop hook 会在轮次结束时把会话叫回来接着跑。 */
 function commandAuto(args) {
   const loop = openLedger(args);
@@ -1635,7 +1655,7 @@ const USAGE = [
   '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004',
   '  finish --task T-004 --status done|failed|blocked | check --task T-004',
   '  escalate|question|askhuman --task T-004 | handover --task T-004 | reap [--stale 90]',
-  '  pause | resume [--no-auto] | auto on|off | concurrency --max 4 --exclusive 1',
+  '  pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1',
   '',
   '通用选项：--loop <名称>  --workspace <路径>  --json',
 ].join('\n');
@@ -1665,6 +1685,7 @@ switch (command) {
   case 'note': commandNote(args); break;
   case 'concurrency': commandConcurrency(args); break;
   case 'auto': commandAuto(args); break;
+  case 'budget': commandBudget(args); break;
   case undefined:
   case 'help':
     process.stdout.write(USAGE + '\n');

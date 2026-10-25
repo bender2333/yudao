@@ -29,7 +29,7 @@ const MAX_CONTINUES = 200;
 const MAX_BRIEF_CHARS = 6000;
 
 function resolveWorkspace(input) {
-  const fromEnv = process.env.CLAUDE_PROJECT_DIR || process.env.MINIMAX_PROJECT_DIR;
+  const fromEnv = process.env.CODEBUDDY_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.env.MINIMAX_PROJECT_DIR;
   if (typeof fromEnv === 'string' && fromEnv.trim()) return path.resolve(fromEnv.trim());
   if (input && typeof input.cwd === 'string' && input.cwd.trim()) return path.resolve(input.cwd.trim());
   return process.cwd();
@@ -224,7 +224,8 @@ function onStop(input) {
     : 'solo 循环「' + loop.name + '」还没做完：第 ' + iteration + '/' + max + ' 轮，待办 ' + pending + ' 张。'
       + '接着做：先 refresh、再 sync，然后 next --max ' + conc.max + ' 挑活，建 worktree、claim、start、派活；'
       + '挑不到可派的就 solo.mjs pause 并把原因告诉用户。' + userNote;
-  emit({ decision: 'block', reason });
+  // CodeBuddy 读 continue:false，Claude Code 读 decision:block——两个都发。
+  emit({ continue: false, decision: 'block', reason, stopReason: reason });
 }
 
 const HANDLERS = {

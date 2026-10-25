@@ -96,7 +96,7 @@ finish --task T-004 --status done|failed|blocked [--summary "..."] [--raw-file <
 check --task T-004
 escalate --task T-004 [--reason "..."] | question --task T-004 --comment-file <文件>
 askhuman --task T-004 --comment-file <文件> | handover --task T-004 | reap [--task T-004] [--stale 90]
-pause | resume [--no-auto] | auto on|off | concurrency --max 4 --exclusive 1
+pause | resume [--no-auto] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1
 ```
 
 ## 起一个循环，或者接一个循环
