@@ -2,7 +2,7 @@
 
 更新：2026-10-08（采纳写回的三份代码树、冲突与最终树核验写入 ADR-0034 与第 5、6、10、11、12、13 节）；2026-10-07（结构说明的可见范围改为角色定义中的参数，建档材料分为现有行为的材料与要求材料，新增采纳写回，见第 4.2、4.3、4.4、5、10、12 节）；2026-10-06（取消等待确认的建档事项只写 `project_decision_withdrawn`，当前 PRD 由 `baseline_adopted` 的字段引用，新建项目可以带起始文件夹，见第 3.1、3.3、5、12 节）。状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定；2026-10-02 建档的读取顺序写在事项种类的工作说明中，用户写入部门 Prompt 以后仍然放入，见第 4.2 节，工单 #248）；实施中：#134 至 #137 与 #346（建档材料的分类）已实施，#138、#139 与 #347（采纳写回）未实施。采纳写回的合同由 ADR-0034 确定。路线位置：Stage 3 的 3.8，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，前置 3.1 的后端（#119）。 总图位置：第一节「你」与「一份事实」方框（接入已有项目是事项的一种起点）。
 
-依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0014](../adr/0014-versioned-definitions.md)（带版本的定义）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../prototypes/v8/BUILD.md)第 5.2、8.3 节）。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
+依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0014](../adr/0014-versioned-definitions.md)（带版本的定义）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../archive/stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../prototypes/v9/design.md)（沿用 [v8 设计说明](../prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../prototypes/v8/BUILD.md)第 5.2、8.3 节）。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
 
 ## 1. 要解决的问题
 
@@ -354,7 +354,7 @@ flowchart LR
 - [评测场景设计](evaluation-scenarios.md)：场景 2 的 Yudao 一侧先建档，建档的用量与耗时单独列出。
 - [原型 v9 构建约定](../prototypes/v9/BUILD.md)（第 5、8 节沿用 [v8 构建约定](../prototypes/v8/BUILD.md)）：`project.onboard` 去掉「合同待补」并增加源目录名称参数；3.8 的临时事件改为第 3.3 节的事件；`p-agents` 的示例数据按第 3.2 节的决定材料编写。
 - [D33](../requirements/existing-project-onboarding.md)：「设计中待确定的内容」四项的结论指向本文第 4.2 至 4.7 节，实现状态写明设计完成。
-- [设计文档索引](README.md)、[Stage 3 计划](../stage-3-plan.md) 3.8 行、`docs/CHANGELOG.md`。
+- [设计文档索引](README.md)、[Stage 3 计划](../archive/stage-3-plan.md) 3.8 行、`docs/CHANGELOG.md`。
 
 ## 12. 用户确认的决定
 

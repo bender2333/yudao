@@ -437,7 +437,7 @@ stateDiagram-v2
 | [D05](../requirements/engineering-plan.md) | 工程计划由工程架构师起草，经工程审查者审查通过后由经理提交 |
 | [D07](../requirements/expert-ask-react.md)、[D20](../requirements/department-guidance.md) | 开头补充说明：部门由经理对外，询问与指导经经理转给中心角色；D20 另写明用户可以用部门指导回应反复退回的提醒 |
 | [D11](../requirements/three-department-loop.md) | 「同一时刻只有一个部门激活」改为「只有一个部门持有交接」，其他部门可以做预测性探索 |
-| [Stage 3 计划](../stage-3-plan.md) 3.4A | 执行槽位按正在执行步骤的角色计数，等待期间不占用；预测性任务优先级最低，在安全节点让出（本说明第 11.3 节） |
+| [Stage 3 计划](../archive/stage-3-plan.md) 3.4A | 执行槽位按正在执行步骤的角色计数，等待期间不占用；预测性任务优先级最低，在安全节点让出（本说明第 11.3 节） |
 | [语义系统设计说明](semantic-system.md) | 第 10.8 节写明中心角色、经理、探索者与主程、审查者各自的上下文，以及 PRD 更新后依据旧版本的预测性任务记录的内容变为失效；第 10.3 节写明部门账本在中心角色与经理的当前状态栏目中的显示；第 4、8 节写明复盘由流程编排安排，中心角色通过一次单独的请求完成 |
 | [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md) | 第 5 节写明角色任务（含审查任务与预测性任务）的恢复规则；进行中的角色任务由步骤驱动从已提交的状态重新装配后继续 |
 | [D31](../requirements/outsourced-agent-roles.md) | 自有角色的步骤由控制核心驱动；外包角色由控制核心派发给外部 agent |

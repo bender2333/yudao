@@ -30,7 +30,7 @@
 - 下一个发布是 M0 与 M1 一起的 0.1.2，附试用指南。发布之前要完成 M0 剩下的工单，并修好发布构建测试的崩溃（#614）。
 - 想先看 main 上的网页界面：在与 origin/main 一致、没有未提交改动的检出上运行 `uv run python scripts/release.py`（需要 Node 22.12 以上；只构建 wheel，不发布），再按下面「安装与启动」安装它输出的 wheel。直接从源码运行服务时没有页面文件，页面只返回「没有页面文件」。
 
-当前入口：[总体路线图](docs/program-roadmap.md)、[Stage 3 计划](docs/stage-3-plan.md)、[当前验收基线](docs/current-baseline.md)；进度看 GitHub 的里程碑。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
+当前入口：[总体路线图](docs/program-roadmap.md)、[当前验收基线](docs/current-baseline.md)；进度看 GitHub 的里程碑。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
 
 ## 分层
 

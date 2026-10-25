@@ -21,7 +21,7 @@ Status: 「Yudao 继续保证」中的「命令只能是登记的命令」「进
 后果：
 
 - 3.2C 的关闭条件：同一事项的工程构建在控制主机上完成，质检检查在开发板上完成（[执行环境服务设计说明](../design/execution-environment.md)第 10 节）。
-- 3.2B 与 3.2D 的工单只依赖执行环境的合同（#128），不等待 3.2C 的远程部分；Stage 3 的关键路径随之缩短（[Stage 3 计划](../stage-3-plan.md)第 8 节）。
+- 3.2B 与 3.2D 的工单只依赖执行环境的合同（#128），不等待 3.2C 的远程部分；Stage 3 的关键路径随之缩短（[Stage 3 计划](../archive/stage-3-plan.md)第 8 节）。
 - 执行位置上需要的程序（git、uv、项目自己的构建工具、试用用的 Node.js 与 Playwright 的 Chromium）由用户在这台机器上安装，执行环境的环境信息列出它们（执行环境服务设计说明第 5.2 节）。
 - 不同项目的 run 共用执行位置的端口与依赖缓存：试用的端口由 Yudao 分配，依赖缓存使用各工具在这台机器上的缓存。
 - 本决定取代 ADR-0018 中的本机容器一项、理由中「执行环境服务同时满足本机的隔离（容器）」、后果中「外部内容进入模型输入之前，任意代码已经可以在容器中隔离运行」；取代 [ADR-0012](0012-single-control-core-scalable-execution.md) 中「执行环境的容器实现」。[ADR-0010](0010-control-core-drives-role-steps.md)、ADR-0012、[ADR-0015](0015-desktop-client-and-http-contracts.md) 中「外包 agent 的运行容器」改为外包 agent 的运行进程：外部 agent 在执行位置上以自己的进程运行（[D31](../requirements/outsourced-agent-roles.md)）。

@@ -520,3 +520,5 @@ claude-sonnet-5-5 / 2026-10-25 19:33 / 规则文件跟上总图与五阶段路�
 claude-fable-5-1（总架构师） / 2026-10-25 20:05 / `.claude/skills/to-children/SKILL.md` 立缝定义加状态与名字两条核对、验收核对命令只限「只改」目录；`AGENTS.md` 审查流程第 2 步按「环」核对只增环与需你批准环；`CLAUDE.md` 工单规范加两端共读夹具一条；`CONTEXT.md`「环」的 Avoid 加第一环、第二环、中环；`docs/decision.md` 加一条写明对 Argon 建议的取舍 / 用户拿来 Argon 的规则更新建议，大半已有，采纳五处，不采纳架构师会话各用 worktree
 
 claude-opus-5-5（子架构师） / 2026-10-25 20:10 / 新增 `docs/design/architecture/name-map.md`「总图的词与代码名的对照」：按总图第四节十三道缝分组，加第一节方框与第三节外环九个状态，列总图的词、总图位置、代码里现在的名字、归哪道缝或哪条道、状态（一致、不一致、代码里还没有），按 main `a8a2182c` 用目录与 grep 清点；`docs/design/architecture/overall-architecture.md` 第 1.3 节末尾加一行指向它；`docs/design/README.md` 加索引条目；不改代码与测试 / 用户 2026-10-25 定代码名随立缝工单向总图靠拢，第一步建对照表（决策记录同日一条）
+
+claude-fable-5-1（总架构师） / 2026-10-25 20:40 / 归档（#984，经用户确认）：`docs/stage-3-plan.md` → `docs/archive/stage-3-plan.md`，`docs/stage-3/` 剩下的三份（replan-mcp-skills、skill-dossier-sample、trial-acceptance-contract）→ `docs/archive/stage-3/`，目录删除；活动文档里指向它们的链接全部改到归档路径：README.md（去掉入口）、CLAUDE.md 文档地址、设计索引三处、十份设计与需求文档的状态行、ADR-0019、0021、0022、0035、原型 v8 设计说明、决策记录里的旧链接；AGENTS.md 代码位置去掉已删除的 `compare.py`（#988） / 用户问 Stage 3 计划怎么还在；它已被路线图取代，归档被写成 #984 等用户确认

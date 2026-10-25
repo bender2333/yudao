@@ -19,6 +19,6 @@
 后果：
 
 - `CLAUDE.md` 与 `AGENTS.md` 的规则 1 增加这个例外（项目流与机器流）。
-- [Stage 3 计划](../stage-3-plan.md)与[恢复合同](../design/recovery-contract-and-fault-matrix.md)的版本规则改为本决定：不兼容只针对 run 流。
+- [Stage 3 计划](../archive/stage-3-plan.md)与[恢复合同](../design/recovery-contract-and-fault-matrix.md)的版本规则改为本决定：不兼容只针对 run 流。
 - 项目流事件的新增字段需要写明缺省含义，事件种类的设计要比 run 流更谨慎。
 - 语义系统的项目流事件种类同样登记在字段清单中；本体对这些内容只增加种类、关系与字段（[语义系统设计说明](../design/semantic-system.md)第 4、5 节）。

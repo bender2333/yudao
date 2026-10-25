@@ -40,7 +40,7 @@
 - [本地通用工具](local-tools.md)
   - 内容：代码快照接入的使用过程；运行工作区、每个会话一个的检查工作区与检查副本；公开树、搜索、区间阅读与编辑、命令（`bash`，任意命令字符串、后台运行、环境变量）、检查、动作回执、结果未知、独立质检、网络取回与 MCP 工具的边界与验收反例；使用的依赖与成熟实现，含模块交互图。
   - 状态：2026-09-26 随 3.2A 验收（#12 至 #15）；2026-09-29 由 Stage 3 计划第 4 节移出成为设计说明，3.2B、3.2C、3.2D 新增的工具同样遵守；2026-10-13 按 ADR-0038 改写（命令不经登记，检查接受任意命令字符串，结果未知交还模型），未实施，父工单 #478（#479 至 #485），属于里程碑 M0；评测运行器的核对见 #486。
-  - 计划：[Stage 3 计划](../stage-3-plan.md) 第 4 节、第 9 节 M0。
+  - 计划：[Stage 3 计划](../archive/stage-3-plan.md) 第 4 节、第 9 节 M0。
   - ADR：[0024](../adr/0024-git-in-process-with-pygit2.md)、[0038](../adr/0038-function-first-commands-without-registration.md)。
 - [执行环境服务](execution-environment.md)
   - 内容：执行环境服务的合同（操作、类型、工作区的建立封存与传输、动作与回执、执行权编号、HTTP 路径、版本核对）；本机进程与远程执行代理两种实现；执行位置上的程序与依赖缓存；心跳、结果未知、迟到回执与等待机器；执行位置；认证与加密（TODO）；故障与验收场景；含模块交互图与时序图。
@@ -88,7 +88,7 @@
 - [评测场景：版本回归与 OpenCode 对照](evaluation-scenarios.md)
   - 内容：三个评测场景（WebGen-Bench 待办清单、FeatBench openai-agents-python-842、PRDBench 北京地铁票价）的侧重、难度、材料与改造；两边的运行条件；完成度、正确性与失败分类、原有功能、丰富程度的评分；Yudao 的过程检查点与指标；结束状态与放行状态的独立核对；未知用量、费用和有效样本数；报告与版本比较；评测工具的模块划分（`evals/`，只通过公开接口观察 Yudao），回归场景与留出场景、噪声范围与三种结论，含模块交互图。
   - 状态：2026-09-28 设计，场景与评分方法经用户确认；2026-09-30 用户逐项审阅完毕（各部分所属的里程碑、版本回归在每个里程碑试用之前运行、超时按最后一次封存的交付评分），未实施，工单为 #118 的子工单 #188 至 #198（评测工具、OpenCode 基础分与场景 2、3 的 Yudao 一侧属于里程碑 M2，场景 1 的 Yudao 一侧属于 M4）；评测模型（包括界面智能体与裁判）由用户提供；质检的浏览器由 3.2D 提供（[D34](../requirements/browser-and-computer-use.md)）。2026-10-07 版本比较增加噪声范围与三种结论，报告增加费用与检验覆盖比例，三个场景作为回归场景、另设留出场景。
-  - 需求：[D32](../requirements/comparison-experiment.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。调研：[评测场景选题调研](../archive/research/evaluation-benchmarks.md)。共同报告合同见 [Stage 3 试用与自举准备验收合同](../stage-3/trial-acceptance-contract.md)。
+  - 需求：[D32](../requirements/comparison-experiment.md)。ADR：[0022](../adr/0022-run-directly-without-containers.md)、[0027](../adr/0027-trusted-kernel-outside-self-modification.md)、[0030](../adr/0030-rules-are-provisional-defaults.md)。调研：[评测场景选题调研](../archive/research/evaluation-benchmarks.md)。共同报告合同见 [Stage 3 试用与自举准备验收合同](../archive/stage-3/trial-acceptance-contract.md)。
 - [测试分层](test-pyramid.md)
   - 证据与角色流程：[验收证据规则](../agents/acceptance-evidence.md)。
   - 内容：单元、功能与模块、集成三层的定义与登记表 `layers.toml`（测试文件原地不动），审计钩子检查边界、单项时间上限、多进程只用于集成层；共用的辅助函数放在已有的辅助文件中，测试文件之间不互相导入；执行者、CI、审查者、派发者与架构师各自运行的层；集成层在每个 PR 合并之前运行；测试的写法；事件序列基准的范围并用 `git bisect` 找出问题 PR；测试往下层移的规则；输出每项失败一行；含流程图与模块交互图。
@@ -97,4 +97,4 @@
   - 内容：3.1 单机可靠恢复的恢复契约、角色任务的恢复、故障矩阵与产品边界。
   - 状态：2026-09-19 设计合同，2026-09-26 增加角色任务的恢复（第 5 节），2026-09-28 写明启动时自动继续与执行权没有期限（第 3 节）；项目流与 run 流（#126）已完成，其余未实现；对应工单 #16、#17、#18，界面 #181，属于里程碑 M2。2026-10-07 按意图校准整理；2026-10-13 按 ADR-0038 修改第 4 节：结果未知的动作在自动核实以后交还发出它的会话，由模型决定是否重新执行，修改内容见该文件更新行。
   - ADR：[0031](../adr/0031-declared-loop-layers-and-sub-loops.md)、[0038](../adr/0038-function-first-commands-without-registration.md)。
-  - 计划：[Stage 3 计划](../stage-3-plan.md) 3.1。
+  - 计划：[Stage 3 计划](../archive/stage-3-plan.md) 3.1。

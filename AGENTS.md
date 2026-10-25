@@ -30,7 +30,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 - 定义：`definitions/`（限额、停止原因、组织、角色、工具、提案合同、服务方案预置表）。
 - 执行层：`providers/`（模型接入：配置、调用目标解析、三种协议的调用）、`adapters/`（模型适配器，包括测试用的 FakeAdapter）、`environment.py` 与 `actions.py`（执行环境与动作合同）、`workspace.py`、`public_tree.py`、`tools.py`（工作区、公开树、工具定义）、`artifacts.py`、`tree_archive.py`、`git_versions.py`、`git_audit.py`（工件、封存与 Git 版本）。
 - 观察与分析：`observability.py`、`replay_check.py`、`views.py`、`analysis/`。
-- 演示与真实模型 smoke：`demo.py`、`smoke.py`、`compare.py`。
+- 演示与真实模型 smoke：`demo.py`、`smoke.py`。
 - 测试：`harness/tests/`。
 
 ## 常用命令
