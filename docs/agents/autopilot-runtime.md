@@ -79,7 +79,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
   git fetch origin main
   git checkout --detach origin/main
   claude -p --model <架构师模型> --effort <架构师 effort> --dangerously-skip-permissions --output-format json \
-    "你是被唤醒的架构师，按 CLAUDE.md「被唤醒的架构师」一节处理全部带 needs-architect 标签的工单" \
+    "你是被唤醒的架构师，也是子架构师：按 CLAUDE.md「被唤醒的架构师」与「子架构师」两节，在总图 docs/architecture.html 的范围内处理全部带 needs-architect 标签的工单" \
     > .tmp/architect-<日期时刻>.json
   ```
 
