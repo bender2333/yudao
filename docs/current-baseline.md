@@ -73,7 +73,7 @@ Stage 2.7 补充：用户新增 [Stage 2.7](archive/stage-2-provider-plan.md)，
 | 无 run 部门模型对话 | 首批明确排除 | 不阻塞；不得把材料登记称为对话 |
 | 接入已有项目：真实项目验收与采纳写回 | 3.8（#139、#347、B8，[D33](requirements/existing-project-onboarding.md)） | 3.9 与自举试点依赖它；写回合同按 ADR-0034 先处理三份代码树、冲突与最终核验 |
 | 迭代底座：规则登记与参数、omp 基线、内核清单与发布检查、可见范围与先判断后看解释 | Stage 3「迭代底座」工作包（B1、B3、B5、B6、B7，[D38](requirements/system-intent.md)） | 不阻塞其他工作包；B3、B6 是自举试点的前置条件 |
-| 自举试点 | Stage 3 自举工作线（[总体路线图](program-roadmap.md)第 6.1 节） | #416 保存准备证据并阻塞 #396–#401；M2 关闭、B3/B6/B8、独立数据目录与端口、3.8 接入 Yudao 仓库五项前置条件完成以后才派发；验收并入 3.9 |
+| 自举试点 | Stage 3 自举工作线（[总体路线图](archive/program-roadmap-2026-10-25.md)第 6.1 节） | #416 保存准备证据并阻塞 #396–#401；M2 关闭、B3/B6/B8、独立数据目录与端口、3.8 接入 Yudao 仓库五项前置条件完成以后才派发；验收并入 3.9 |
 | 共享上下文的一组对照 | 3.9（#100），[验证的独立性设计说明](design/independent-verification.md)第 6 节 | 依赖 B5 |
 | 留出场景 | 评测工作线，第一次运行在 Stage 4 结束时 | 不阻塞 Stage 3 |
 | 项目流跨版本保存与升级排空 | 3.1 的版本规则（[ADR-0019](adr/0019-project-stream-across-versions.md)） | 3.1 按 run 事件版本核对 |

@@ -4,6 +4,7 @@
 
 | 调研 | 支持的文档 | 用途 |
 | --- | --- | --- |
+| [游戏世界与代码世界的映射：可行性、图灵完备与路径](game-world-as-projection.md) | [D41 三个空间](../requirements/game-world-three-spaces.md)、[总体路线图](../program-roadmap.md)第 4 节 | 七种元件、三个空间与五层、投影的三条性质与三种检验、六步路径、可能错的七处 |
 | [JEV 决策模型：能力边界与在 Yudao 中的用法](jev-decision-model.md) | [D28 元观察与规则检查部门](../requirements/meta-observer.md)、[ADR-0028](../adr/0028-three-means-of-adjudication.md) | 元观察的设计还没有写，这份调研是能力边界的依据 |
 | [圈复杂度与变异测试调研](complexity-and-mutation-testing.md) | [D35 自举](../requirements/self-hosting.md) | Stage 3 结束之前手动进行的步骤与工具选择 |
 | [组织、运行与演化研究](organization-runtime-evolution.md) | [恢复合同与故障矩阵](../design/recovery-contract-and-fault-matrix.md)、[D29 远程执行](../requirements/remote-execution.md) | 子循环、持久恢复与运维分工的依据 |
