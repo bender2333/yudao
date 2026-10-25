@@ -5,32 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Yudao 总图</title>
 <style>
-  /* 布局：一页两图。主图是围着一份事实的循环，四样固定结构实线、填进去的内容虚线；小图是三环。 */
+  /* 一页六节。第一节是总图与方程，带建设状态；二至六节写应当如此。固定结构实线，填进去的内容虚线。 */
   :root {
     --bg: #fbfaf7; --fg: #1f1f1d; --muted: #6b6a64; --line: #1f1f1d; --soft: #c9c7bf;
-    --s3: #2f5d50; --s2: #9fbfb3; --s1: #e6ede9; --accent: #2f5d50;
+    --s3: #2f5d50; --s2: #9fbfb3; --s1: #e6ede9; --accent: #2f5d50; --warn: #a8622a; --stop: #8a3a3a;
     --font: system-ui, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    --mono: ui-monospace, Consolas, "SF Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
     --bg: #17181a; --fg: #ecebe6; --muted: #a09f98; --line: #ecebe6; --soft: #4a4a46;
-    --s3: #8fc7b3; --s2: #3f6f60; --s1: #243a33; --accent: #8fc7b3; color-scheme: dark } }
+    --s3: #8fc7b3; --s2: #3f6f60; --s1: #243a33; --accent: #8fc7b3; --warn: #d79a5c; --stop: #d47f7f; color-scheme: dark } }
   :root[data-theme="dark"] {
     --bg: #17181a; --fg: #ecebe6; --muted: #a09f98; --line: #ecebe6; --soft: #4a4a46;
-    --s3: #8fc7b3; --s2: #3f6f60; --s1: #243a33; --accent: #8fc7b3; color-scheme: dark }
+    --s3: #8fc7b3; --s2: #3f6f60; --s1: #243a33; --accent: #8fc7b3; --warn: #d79a5c; --stop: #d47f7f; color-scheme: dark }
   * { box-sizing: border-box }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font);
     padding-block: 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
-  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px }
+  main { max-width: 1060px; margin: 0 auto; display: grid; gap: 32px }
   h1 { font-size: 24px; font-weight: 600; margin: 0 }
   h2 { font-size: 17px; font-weight: 600; margin: 0 0 6px }
-  p { margin: 0; max-width: 68ch }
+  h2 small { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px }
+  h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; color: var(--muted) }
+  p { margin: 0; max-width: 70ch }
   .muted { color: var(--muted) }
+  nav { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; margin-top: 10px }
+  nav a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--soft) }
   .legend { display: flex; flex-wrap: wrap; gap: 14px 22px; font-size: 13px; color: var(--muted); align-items: center }
   .legend i { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; border: 1px solid var(--soft) }
   .legend .solid { border: 2px solid var(--line); background: transparent }
   .legend .dash { border: 1.5px dashed var(--soft); background: transparent }
 
-  /* 方框。data-status: 3 已建 / 2 建了一半 / 1 未建 */
+  /* 方框。data-status: 3 已建 / 2 建了一半 / 1 未建；没有 data-status 的是应然 */
   .box { position: relative; padding: 10px 12px; border: 1.5px dashed var(--soft); background: var(--s1); min-width: 0 }
   .box[data-status="3"] { background: var(--s3); color: var(--bg) }
   .box[data-status="2"] { background: var(--s2) }
@@ -40,58 +45,96 @@
   .box small { display: block; font-size: 12.5px; line-height: 1.4 }
   .box:hover::after, .box:focus-within::after {
     content: attr(data-tech); position: absolute; left: 0; top: 100%; z-index: 5; margin-top: 4px;
-    background: var(--fg); color: var(--bg); font-size: 12.5px; line-height: 1.4; padding: 8px 10px; max-width: 320px; white-space: pre-line }
+    background: var(--fg); color: var(--bg); font-size: 12.5px; line-height: 1.4; padding: 8px 10px; max-width: 340px; white-space: pre-line }
   .box[tabindex] { cursor: default }
 
-  /* 主图 */
+  /* 第一节：主图 */
   .ring { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 12px; align-items: stretch }
   .ring .fact { display: grid; place-items: center; text-align: center; padding: 18px 14px }
   .ring .fact b { font-size: 17px }
   .outer { display: grid; grid-template-columns: 170px 1fr 170px; gap: 12px; align-items: stretch }
   .col { display: grid; gap: 12px; align-content: start }
+  .outer > *, .ring > *, .slots > *, .rings > *, .two > *, .seams > *, .col, .frame { min-width: 0 }
   .frame { border: 2px solid var(--line); padding: 12px; display: grid; gap: 12px }
   .frame > .label { font-size: 13px; color: var(--muted) }
+  .slots { display: grid; grid-template-columns: 150px 1fr 1fr 1fr; gap: 8px; align-items: stretch }
   .switch { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--line); font-size: 13px }
   .switch span { padding: 6px 8px; text-align: center }
   .switch span.on { background: var(--fg); color: var(--bg) }
   .arrows { font-size: 12.5px; color: var(--muted); text-align: center }
-  @media (max-width: 760px) {
-    .outer { grid-template-columns: 1fr }
-    .ring { grid-template-columns: 1fr }
-  }
+  @media (max-width: 760px) { .outer, .ring, .slots { grid-template-columns: 1fr } }
 
-  /* 小图：三环 */
-  .rings { display: grid; grid-template-columns: 1fr 240px; gap: 16px; align-items: start }
+  /* 方程 */
+  .formula { display: grid; grid-template-columns: 1.1fr 1.4fr; gap: 16px; align-items: start; border: 2px solid var(--line); padding: 14px; margin-top: 14px }
+  .formula .eq { font: 600 16px/1.9 var(--mono); padding: 10px 12px; background: var(--s1); text-align: center; letter-spacing: .2px }
+  .formula .eq sub { font-size: 10px }
+  .formula .eq .u { color: var(--accent) } .formula .eq .f { color: var(--warn) }
+  .formula .eq small { display: block; font: 12.5px/1.5 var(--font); color: var(--muted); margin-top: 6px }
+  .formula dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; font-size: 13.5px }
+  .formula dt { font-family: var(--mono); font-weight: 600 }
+  .formula dd { margin: 0; color: var(--muted) }
+  @media (max-width: 760px) { .formula { grid-template-columns: 1fr } }
+
+  /* 第二节：三环 */
+  .rings { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start }
   .r { padding: 14px; border: 2px solid var(--line) }
   .r .r { border-style: dashed; border-width: 1.5px; margin-top: 10px }
   .r .r .r { border-style: dotted }
   .r > b { display: block; font-weight: 600 }
   .r > small { display: block; color: var(--muted); font-size: 12.5px }
   @media (max-width: 760px) { .rings { grid-template-columns: 1fr } }
-  /* 第三、四节：系统的形状与要守的缝 */
-  h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; color: var(--muted) }
-  .deploy { display: grid; grid-template-columns: 1fr 220px; gap: 12px; align-items: start }
-  .host { border: 2px solid var(--line); padding: 12px; display: grid; gap: 12px }
-  .host > .label { font-size: 13px; color: var(--muted) }
-  .flow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px }
-  .flow .box + .box::before { content: "→"; position: absolute; left: -10px; top: 8px; color: var(--muted); font-size: 12px }
-  .seams { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px }
-  .seam { border: 1.5px solid var(--line); padding: 10px 12px; font-size: 13px; min-width: 0 }
-  .seam[data-state="open"] { border-style: dashed; border-color: var(--soft) }
-  .seam b { display: block; font-weight: 600; font-size: 14px }
-  .seam i { display: block; font-style: normal; color: var(--muted); font-size: 12px }
-  .seam em { display: block; font-style: normal; margin: 6px 0 }
-  .seam ul { margin: 0; padding-left: 16px; color: var(--muted) }
-  @media (max-width: 760px) { .deploy, .flow { grid-template-columns: 1fr } .flow .box + .box::before { content: none } }
-  /* 第五节：拆开部署，圆与曲线 */
+
+  /* 第三节：状态图与单步 */
   .map { overflow-x: auto }
   .map svg { width: 100%; max-width: 1000px; height: auto; display: block; font: 13px var(--font) }
-  .zone { fill: var(--s1); stroke: var(--soft); stroke-width: 1.5; stroke-dasharray: 6 5; opacity: .9 }
-  .zone-l { fill: var(--muted); font-size: 12px }
+  .st rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.5 }
+  .st.main rect { fill: var(--s1); stroke-width: 2 }
+  .st.end rect { fill: var(--s3) }
+  .st.end text { fill: var(--bg) }
+  .st.side rect { stroke-dasharray: 5 4; stroke: var(--muted) }
+  .st text { text-anchor: middle; fill: var(--fg); font-weight: 600 }
+  .st text.s { font-weight: 400; font-size: 11px; fill: var(--muted) }
+  .st.end text.s { fill: var(--bg); opacity: .85 }
   .edge { fill: none; stroke: var(--muted); stroke-width: 1.5 }
   .edge.dashed { stroke-dasharray: 5 4 }
   .edge.thin { stroke-width: 1; opacity: .7 }
+  .edge.back { stroke: var(--stop) }
   .e-l { fill: var(--muted); font-size: 11.5px }
+  .e-l.back { fill: var(--stop) }
+  .flow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px }
+  .flow .box + .box::before { content: "→"; position: absolute; left: -10px; top: 8px; color: var(--muted); font-size: 12px }
+  @media (max-width: 760px) { .flow { grid-template-columns: 1fr } .flow .box + .box::before { content: none } }
+  .rules { margin: 10px 0 0; padding-left: 18px; font-size: 13.5px; max-width: 76ch }
+  .rules li { margin: 4px 0 }
+
+  /* 第四节：缝 */
+  .seams { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px }
+  .seam { border: 1.5px solid var(--line); padding: 10px 12px; font-size: 13px; min-width: 0; display: grid; gap: 4px; align-content: start }
+  .seam[data-state="open"] { border-style: dashed; border-color: var(--soft) }
+  .seam b { font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; gap: 8px }
+  .seam b span { font-size: 11.5px; font-weight: 600; padding: 1px 7px; border: 1px solid var(--line); border-radius: 3px; white-space: nowrap }
+  .seam[data-state="open"] b span { border-style: dashed; color: var(--muted) }
+  .seam i { font-style: normal; color: var(--muted); font-size: 12px }
+  .seam em { font-style: normal; margin: 2px 0 }
+  .seam ul { margin: 0; padding-left: 16px; color: var(--muted) }
+  .seam .x { font-size: 12.5px; color: var(--muted); border-top: 1px dotted var(--soft); padding-top: 5px; margin-top: 3px }
+  .seam .x b { display: inline; font-size: 12.5px; color: var(--fg) }
+
+  /* 第五节：自举 */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+  .layer { border: 2px solid var(--line); padding: 12px; display: grid; gap: 6px; align-content: start }
+  .layer.dashed { border-style: dashed; border-width: 1.5px }
+  .layer > b { font-weight: 600 }
+  .layer ul { margin: 0; padding-left: 16px; font-size: 13.5px }
+  .layer li { margin: 3px 0 }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin-top: 8px }
+  th, td { text-align: left; vertical-align: top; padding: 7px 10px; border-bottom: 1px solid var(--soft) }
+  th { font-weight: 600; color: var(--muted); font-size: 12.5px; white-space: nowrap }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr } }
+
+  /* 第六节：拆开部署，圆与曲线 */
+  .zone { fill: var(--s1); stroke: var(--soft); stroke-width: 1.5; stroke-dasharray: 6 5; opacity: .9 }
+  .zone-l { fill: var(--muted); font-size: 12px }
   .n text { text-anchor: middle; fill: var(--fg); font-weight: 600 }
   .n text.s { font-weight: 400; font-size: 11px; fill: var(--muted) }
   .n.only circle { fill: var(--s3); stroke: var(--line); stroke-width: 2 }
@@ -100,8 +143,6 @@
   .n.ro circle { fill: var(--bg); stroke: var(--line); stroke-width: 1.5 }
   .n.cloud ellipse { fill: var(--bg); stroke: var(--soft); stroke-width: 1.5; stroke-dasharray: 3 3 }
   .n.out circle { fill: var(--bg); stroke: var(--line); stroke-width: 2 }
-  .rules { margin: 10px 0 0; padding-left: 18px; font-size: 13.5px; max-width: 72ch }
-  .rules li { margin: 4px 0 }
   footer { font-size: 12.5px; color: var(--muted) }
 </style>
 </head>
@@ -109,11 +150,14 @@
 <main>
   <header>
     <h1>Yudao 总图</h1>
-    <p class="muted">五节，从上往下越来越具体：怎么运转、什么能动、系统的形状、要守的缝、拆开部署。三个部门围着同一份事实循环，写入先过门，结论靠独立的证据。固定不变的只有四样：循环、边界、裁决、独立的证据；部门与轮转方式都是填进去的内容。鼠标放到方框上看对应的技术名词与状态。</p>
+    <p class="muted">六节，从上往下越来越具体。三个部门围着同一份事实循环，写入先过门，结论靠独立的证据。固定不变的只有四样：循环、边界、裁决、独立的证据；部门、轮转方式、工作单元的大小都是填进去的内容。第一节带建设状态，鼠标放到方框上看技术名词；二至六节写的是应当如此，与代码不符的地方由子架构师把代码改到图这样。</p>
+    <nav>
+      <a href="#s1">01 全局总图与方程</a><a href="#s2">02 什么能动</a><a href="#s3">03 一轮工作的经过</a><a href="#s4">04 要守的缝</a><a href="#s5">05 自举与验收</a><a href="#s6">06 拆开部署</a>
+    </nav>
   </header>
 
-  <section>
-    <h2>怎么运转</h2>
+  <section id="s1">
+    <h2>全局总图与方程<small>部门围着一份事实转，薄驱动连着三个共用的槽位</small></h2>
     <div class="legend">
       <span><i class="solid"></i>固定的结构</span><span><i class="dash"></i>填进去的内容</span>
       <span><i style="background:var(--s3)"></i>已建</span><span><i style="background:var(--s2)"></i>建了一半</span><span><i style="background:var(--s1)"></i>未建</span>
@@ -124,9 +168,13 @@
 状态：检查回执与用户决定已建；另一个模型的判断（判定点）未建。">
           <b>独立的证据</b><small>主机跑的检查回执、另一个模型的判断、你的回答。不信部门自己说的。</small>
         </div>
-        <div class="box" data-status="1" tabindex="0" data-tech="技术名词：观察者（教训发现、元观察、演化）。
-状态：未建。只按读取范围看事实，只出证据与提案，不动手。">
-          <b>观察者</b><small>只看，只出证据与提案，不动手。</small>
+        <div class="box" data-status="1" tabindex="0" data-tech="技术名词：观察者（教训发现、元观察、演化）、振荡信号。
+状态：离线的教训候选已有；在线订阅、提案与振荡信号未建。">
+          <b>观察者</b><small>在系统外面看。只出证据、提案与振荡信号，都经写入口；不动手。</small>
+        </div>
+        <div class="box" data-status="3" tabindex="0" data-tech="技术名词：命令接口、决定请求与回答、指导。
+状态：已建。">
+          <b>你</b><small>给意图与中途的指导，回答停在写入口的决定请求，批准内核与定义的修改。</small>
         </div>
       </div>
 
@@ -134,7 +182,7 @@
         <div class="label">循环（固定）</div>
         <div class="box" data-status="2" tabindex="0" data-tech="技术名词：界面（同步层、翻译层、画面层、页面）、应用层、接口层。
 状态：页面已建；像素画面按新合同重做中。">
-          <b>界面</b><small>你看到的页面与画面，只读事实；命令从这里发。</small>
+          <b>界面</b><small>你看到的页面与画面，只读事实；命令从这里发。关掉页面，循环照跑。</small>
         </div>
         <div class="ring">
           <div class="col">
@@ -142,138 +190,237 @@
 状态：三部门同时运行的循环正在实施。">
               <b>产品</b><small>意图 → 要求（PRD）。裁决目标与取舍。</small>
             </div>
-            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：成果驱动路由里的工程一轮、运行工作区。
-状态：实施中。">
-              <b>工程</b><small>要求 → 交付。写代码、自测、交快照。</small>
+            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：成果驱动路由里的工程一轮、运行工作区、外包角色。
+状态：实施中；外包角色未建。">
+              <b>工程</b><small>要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色。</small>
             </div>
             <div class="box" data-status="1" tabindex="0" data-tech="技术名词：运维部门（Stage 4）。外部动作走「模型与工具」。
 状态：未建。">
-              <b>运维（以后）</b><small>监控与发布。</small>
+              <b>运维（以后）</b><small>监控、部署、故障记录。</small>
             </div>
           </div>
           <div class="col">
-            <div class="box fact" data-status="3" tabindex="0" data-tech="技术名词：事件日志、写入口、工件。
+            <div class="box fact" data-status="3" tabindex="0" data-tech="技术名词：事件日志、写入口、工件、封存快照、带版本的定义。
 状态：已建。项目流长期保存，run 流只在一次运行里用。">
               <b>一份事实</b><small>发生过的事只记一份，只追加，谁都不能改。部门之间的询问也在这里。</small>
             </div>
-            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：路由契约与路由实现（成果驱动；任务池、黑板是第二种实现）。
-状态：按成果在实施；任务池未建。换档位只换「谁开工、一轮怎么结束」。">
+            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：路由契约与路由实现（成果驱动；任务池是第二种实现）。
+状态：按成果在实施；任务池未建。换档位只换「谁开工、一轮怎么结束」与它自己的定义。">
               <b>轮转方式</b>
               <div class="switch" style="margin-top:6px"><span class="on">按成果</span><span>任务池（以后）</span></div>
-              <small class="muted" style="margin-top:6px">按成果：谁关注的成果有了新版本谁开工，质检放行才结束。任务池：发布、领取、完成、打回。</small>
+              <small class="muted" style="margin-top:6px">按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。两种只差工作单元的大小与由谁来拆。</small>
             </div>
           </div>
           <div class="col">
             <div class="box" data-status="2" tabindex="0" data-tech="技术名词：成果驱动路由里的质检一轮、检查工作区。
 状态：实施中。">
-              <b>质检</b><small>交付 → 缺陷或放行。只有它能放行。</small>
+              <b>质检</b><small>交付 → 缺陷或放行。只有它能放行；在信任链末端，不能外包。</small>
             </div>
             <div class="box" data-status="1" tabindex="0" data-tech="加一个部门只写声明（组织定义），不改其他方框。">
-              <b>下一个部门</b><small>加部门只写声明。</small>
+              <b>下一个部门</b><small>加部门只写声明。部门拥有的是定义、角色材料与知识，不是代码。</small>
             </div>
           </div>
         </div>
         <div class="arrows">产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门</div>
+        <div class="slots">
+          <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：薄驱动、插件加载。
+状态：流程编排正在拆成薄驱动与路由实现。">
+            <b>薄驱动</b><small>只做连接：读事实、问路由、问装配、交执行、经写入口写回。不认识部门的名字。</small>
+          </div>
+          <div class="box" data-status="2" tabindex="0" data-tech="技术名词：路由实现（成果驱动）。
+状态：正从流程编排里抽出来。">
+            <b>槽位：路由</b><small>谁开工、一轮怎么结束、事项怎么结束。</small>
+          </div>
+          <div class="box" data-status="2" tabindex="0" data-tech="技术名词：上下文装配、压缩、上下文清单。
+状态：装配与压缩已建；按契约抽成槽位半建。">
+            <b>槽位：装配</b><small>从事实减出这一轮要看的，交给模型的那份记进事实。</small>
+          </div>
+          <div class="box" data-status="2" tabindex="0" data-tech="技术名词：步骤驱动、外包角色派发。
+状态：本机步骤驱动已建；外包未建。">
+            <b>槽位：执行</b><small>一轮里的每一步：问边界、调模型、发工具请求。</small>
+          </div>
+        </div>
         <div class="box" data-status="2" tabindex="0" data-tech="技术名词：Provider、工具实现、执行环境（本机进程、远程执行代理）、动作合同。
 状态：本机已建；远程执行、网络与 MCP、浏览器未建。">
-          <b>模型与工具</b><small>调模型、改文件、跑命令、查网络；本机或远程。</small>
+          <b>模型与工具</b><small>调模型、改文件、跑命令、查网络；本机或远程。每个动作带前后快照的差异与回执。</small>
         </div>
       </div>
 
       <div class="col">
-        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同。
+        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同、停止原因清单。
 状态：裁决与边界已建；裁决改读最小投影未建。">
           <b>裁决与边界</b><small>每次写入先过这里：有没有资格、引用的是不是最新、到没到上限。保证一定会停。</small>
         </div>
-        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：评价材料（评测场景与隐藏检查、评分器、发布检查、内核清单）、看门狗。
-状态：评测工具实施中；发布检查与看门狗未建。">
+        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：评价材料（评测场景与隐藏检查、评分器、发布检查、内核清单）。
+状态：评测工具实施中；发布检查未建。">
           <b>评价</b><small>评测题与判分器、发布检查。在系统之外，被开发的版本读不到。</small>
+        </div>
+        <div class="box fixed" data-status="1" tabindex="0" data-tech="技术名词：看门狗、A/B 槽位、健康协议、金丝雀任务。
+状态：未建（Stage 4）。">
+          <b>看门狗</b><small>在进程外面。两个槽位，候选版本失败就切回稳定版。</small>
         </div>
       </div>
     </div>
+
+    <div class="formula">
+      <div class="eq">
+        事实<sub>t+1</sub> = 事实<sub>t</sub> ⊕ <span class="u">U</span>( <span class="f">f</span>( P(事实<sub>t</sub>) ), 回执, 执行权, 派发编号 )<br>
+        画面<sub>t+1</sub> = P<sub>view</sub>( 事实<sub>t+1</sub> )
+        <small>U ≠ f：模型与部门只提交提案，经裁决写入才成为事实。</small>
+      </div>
+      <dl>
+        <dt>事实</dt><dd>只追加的事件库、封存快照、冻结的定义版本。只有一份。</dd>
+        <dt>P</dt><dd>两类纯函数：装配从事实减出这一轮要看的；投影把事实折成页面与观察者看的。</dd>
+        <dt>f</dt><dd>模型调用或外包会话。会出错的那部分，只产出工具请求与完成提案。</dd>
+        <dt>U</dt><dd>裁决与边界。同一事务里核对事项的执行权、这一轮的派发编号、引用的版本、上限，以及主机的回执。</dd>
+      </dl>
+    </div>
   </section>
 
-  <section>
-    <h2>什么能动</h2>
+  <section id="s2">
+    <h2>什么能动<small>按「能不能被系统自己改」分三环</small></h2>
     <div class="rings">
       <div class="r">
-        <b>可以整体重写</b><small>部门的循环、装配、执行、模型与工具、界面、观察者。重写以后外面看不出区别。</small>
+        <b>可以整体重写</b><small>路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。</small>
         <div class="r">
-          <b>只能向后兼容</b><small>薄驱动与三道合同（轮转、装配、执行），对外的合同。字段只增，带版本。</small>
+          <b>只能向后兼容</b><small>三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。</small>
           <div class="r">
-            <b>只由你改</b><small>一份事实的写入口、裁决、边界、评价材料、看门狗。改之前你批准。</small>
+            <b>只由你批准</b><small>一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。系统可以提案，生效要你批准。</small>
           </div>
         </div>
       </div>
-      <div class="box" data-status="3" tabindex="0" data-tech="技术名词：定义与参数（组织、角色、工具、提案合同、上限与规则）。
-状态：已建；参数事件与路由自己的定义未建。">
-        <b>定义</b><small>带版本的数据。部门、角色、工具、上限住在这里。改定义不改代码，能撤回。</small>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2>系统的形状</h2>
-    <p class="muted">这一节与下一节写的是应当如此：与代码不符的地方，由子架构师把代码改到图这样。</p>
-    <h3>落地</h3>
-    <div class="deploy">
-      <div class="host">
-        <div class="label">一台电脑</div>
-        <div class="box"><b>服务进程</b><small>循环、裁决与边界、投影都在它里面；一个进程管一个数据目录。</small></div>
-        <div class="box"><b>页面</b><small>浏览器里的一页，只读投影，命令从这里发；关掉页面，循环照跑。</small></div>
-        <div class="box"><b>数据目录</b><small>一份事实（事件库与工件）、材料、带版本的定义、凭据。凭据只在这台机器，不进事实与导出。</small></div>
-      </div>
       <div class="col">
-        <div class="box"><b>模型服务</b><small>外面的 API。每次请求按定义解析调用目标，用量记进事实。</small></div>
-        <div class="box" style="border-style:dashed"><b>执行机器（以后）</b><small>登记的另一台电脑，照同一份动作合同干活，回执进事实。</small></div>
-        <div class="box fixed"><b>评价材料</b><small>在系统之外：被开发的版本读不到评它的题。</small></div>
+        <div class="box" data-status="3" tabindex="0" data-tech="技术名词：定义与参数（组织、角色、工具、提案合同、上限与规则）。
+状态：已建；参数事件、路由自己的定义、判定点、登记的机器、限定采用未建。">
+          <b>定义</b><small>带版本的数据。部门与角色、谁能拒绝谁、判定点、登记的机器、路由实现与它自己的定义、工作单元的大小、限定采用的范围、上限、停止原因清单，都住在这里。改定义不改代码，能撤回。</small>
+        </div>
+        <p class="muted" style="font-size:12.5px"><b>交叉演进</b>：谁的定义与角色材料不由谁自己改。工程改质检的材料，质检核验工程的交付。</p>
       </div>
     </div>
-    <h3>一轮工作的经过</h3>
-    <div class="flow">
-      <div class="box"><b>写入口</b><small>命令或结果要进事实，先到这里。</small></div>
-      <div class="box"><b>路由</b><small>决定谁开工、一轮怎么结束。</small></div>
-      <div class="box"><b>装配</b><small>从事实里减出这一轮要看的。</small></div>
-      <div class="box"><b>模型</b><small>给出下一步。</small></div>
-      <div class="box"><b>工具</b><small>改文件、跑命令，交回回执。</small></div>
-      <div class="box"><b>裁决</b><small>每次写入与每个动作：有没有资格、到没到上限。</small></div>
-      <div class="box"><b>投影</b><small>事实折成页面与内核要看的。</small></div>
-    </div>
-    <p class="muted" style="margin-top:8px">分支不画：询问是嵌在一轮里的另一轮；决定请求停在写入口等你；边界在任何一步都能停下。</p>
   </section>
 
-  <section>
-    <h2>要守的缝</h2>
-    <p class="muted">一道缝连接两边，各自可以重写，合同不能偷偷改。<b>已定</b>：规矩不再改，子架构师现在就守；<b>未定</b>：我还在定，先别依赖。代码里叫什么由子架构师定，写在设计说明里。</p>
-    <div class="seams">
-      <div class="seam" data-state="set"><b>写入口</b><i>一切写入方 ↔ 一份事实</i><em>事实只从这里进，进了就不改。</em><ul><li>先过裁决与边界再写</li><li>同一事务里核对执行权与版本</li><li>只追加</li></ul></div>
-      <div class="seam" data-state="set"><b>路由</b><i>薄驱动 ↔ 路由实现</i><em>换轮转方式，循环本身不动。</em><ul><li>只回答谁开工、一轮怎么结束、事项怎么结束</li><li>部门的名字不进代码，来自定义</li><li>合同带版本，只增</li></ul></div>
-      <div class="seam" data-state="set"><b>装配</b><i>执行 ↔ 装配实现</i><em>一轮看到的是事实的一个视图，不改事实。</em><ul><li>只读事实与定义，输出请求与清单</li><li>同样的输入得同样的输出</li><li>交给模型的那份记进事实</li></ul></div>
-      <div class="seam" data-state="set"><b>执行</b><i>薄驱动 ↔ 执行实现</i><em>一轮里的每一步都停得下来。</em><ul><li>每一步先问边界</li><li>工具调用经裁决</li><li>结果写回事实，不自己存</li></ul></div>
-      <div class="seam" data-state="set"><b>模型</b><i>执行 ↔ 模型服务</i><em>换模型不改循环。</em><ul><li>每次请求解析一次调用目标</li><li>用量记进事实</li><li>凭据不进事实与导出</li></ul></div>
-      <div class="seam" data-state="set"><b>动作</b><i>工具 ↔ 执行环境</i><em>每个动作有回执；结果未知时有核实办法。</em><ul><li>按类别带合同：成功证据、核实方法、能否取消</li><li>本机与远程同一份合同</li><li>效果记进事实</li></ul></div>
-      <div class="seam" data-state="set"><b>投影</b><i>一份事实 → 读的人</i><em>任何投影都能从事实重算。</em><ul><li>内核只读最小投影：固定的几样</li><li>其余投影推倒重算，不写回事实</li><li>骨架事件只增，应用事件可以排空</li></ul></div>
-      <div class="seam" data-state="set"><b>接口</b><i>页面、命令行、评测 ↔ 应用层</i><em>外面只经这里读与发。</em><ul><li>只有命令、查询、事件流三种</li><li>带版本号；改了合同版本必升</li></ul></div>
-      <div class="seam" data-state="set"><b>画面</b><i>翻译层 ↔ 画面层</i><em>画面整个换掉，事实与页面不动。</em><ul><li>画面只收状态与动作，不读事实</li><li>回放走同一份合同</li></ul></div>
-      <div class="seam" data-state="set"><b>定义</b><i>定义文件 ↔ 加载与校验</i><em>改定义不改代码，能撤回。</em><ul><li>带版本；创建事项时冻结</li><li>字段只增，旧文件新版本能读</li></ul></div>
+  <section id="s3">
+    <h2>一轮工作的经过<small>两种轮转方式共用一套状态词</small></h2>
+    <p class="muted">下面的状态对一个部门成立。按成果时，状态由关注的成果推动；任务池时，由认领的工作单元推动。工作单元有多大是定义里的参数，池子允许一个单元就是整个事项，那时它就是按成果。</p>
+    <div class="map" style="margin-top:12px">
+    <svg viewBox="0 -12 1000 412" role="img" aria-label="一个部门的状态：等待工作、一轮工作中、询问中、等用户、核验中、接纳、返工、排空中、停止">
+      <defs>
+        <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker>
+        <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--stop)"/></marker>
+      </defs>
+      <!-- 上排：分支 -->
+      <g class="st side"><rect x="250" y="20" width="170" height="56" rx="4"/><text x="335" y="44">询问中</text><text x="335" y="62" class="s">嵌在一轮里的另一轮，等回应</text></g>
+      <g class="st side"><rect x="470" y="20" width="170" height="56" rx="4"/><text x="555" y="44">等用户</text><text x="555" y="62" class="s">决定请求停在写入口</text></g>
+      <!-- 中排：主线 -->
+      <g class="st main"><rect x="30" y="150" width="150" height="60" rx="4"/><text x="105" y="176">等待工作</text><text x="105" y="194" class="s">关注的成果更新 / 待认领</text></g>
+      <g class="st main"><rect x="250" y="150" width="170" height="60" rx="4"/><text x="335" y="176">一轮工作中</text><text x="335" y="194" class="s">派发编号 + 从快照建工作区</text></g>
+      <g class="st main"><rect x="560" y="150" width="150" height="60" rx="4"/><text x="635" y="176">核验中</text><text x="635" y="194" class="s">独立副本检查 + 回执</text></g>
+      <g class="st end"><rect x="800" y="150" width="150" height="60" rx="4"/><text x="875" y="176">接纳</text><text x="875" y="194" class="s">绑定合同、交付树、回执</text></g>
+      <!-- 下排 -->
+      <g class="st side"><rect x="250" y="300" width="170" height="56" rx="4"/><text x="335" y="324">排空中</text><text x="335" y="342" class="s">不接新事项，等在途的结束</text></g>
+      <g class="st"><rect x="560" y="300" width="150" height="56" rx="4"/><text x="635" y="324">返工</text><text x="635" y="342" class="s">打回工程或产品</text></g>
+      <g class="st end"><rect x="800" y="300" width="150" height="56" rx="4"/><text x="875" y="324">停止</text><text x="875" y="342" class="s">原因来自封闭清单</text></g>
+      <!-- 主线箭头 -->
+      <path class="edge" d="M180 180 L248 180" marker-end="url(#ah)"/><text class="e-l" x="214" y="172" text-anchor="middle">路由触发 / 认领</text>
+      <path class="edge" d="M420 180 L558 180" marker-end="url(#ah)"/><text class="e-l" x="489" y="172" text-anchor="middle">提交成果或单元</text>
+      <path class="edge" d="M710 180 L798 180" marker-end="url(#ah)"/><text class="e-l" x="754" y="172" text-anchor="middle">通过</text>
+      <path class="edge" d="M875 210 L875 298" marker-end="url(#ah)"/><text class="e-l" x="885" y="258">质检放行，事项完成</text>
+      <path class="edge dashed" d="M875 150 C 875 -40, 105 -40, 105 148" marker-end="url(#ah)"/><text class="e-l" x="490" y="12" text-anchor="middle">下游部门关注的成果有了新版本，它开始一轮</text>
+      <!-- 分支箭头 -->
+      <path class="edge" d="M300 150 L300 78" marker-end="url(#ah)"/><text class="e-l" x="262" y="118">询问</text>
+      <path class="edge" d="M370 78 L370 148" marker-end="url(#ah)"/><text class="e-l" x="378" y="118">回应到达</text>
+      <path class="edge" d="M420 165 L470 76" marker-end="url(#ah)"/><text class="e-l" x="455" y="130">决定请求</text>
+      <path class="edge" d="M555 78 L430 158" marker-end="url(#ah)"/><text class="e-l" x="520" y="140">你的回答</text>
+      <path class="edge back" d="M635 210 L635 298" marker-end="url(#ahb)"/><text class="e-l back" x="645" y="258">打回</text>
+      <path class="edge back" d="M560 330 C 400 330, 200 300, 105 212" marker-end="url(#ahb)"/><text class="e-l back" x="330" y="268" text-anchor="middle">缺陷记录是上游关注的成果；连续无进展达到阈值就提醒你</text>
+      <path class="edge dashed" d="M105 210 C 105 330, 150 328, 248 328" marker-end="url(#ah)"/><text class="e-l" x="150" y="372">升级前排空</text>
+      <path class="edge dashed" d="M420 328 L798 328" marker-end="url(#ah)"/><text class="e-l" x="500" y="320">排空完毕</text>
+      <path class="edge thin dashed" d="M335 210 C 335 250, 700 260, 800 310" marker-end="url(#ah)"/><text class="e-l" x="700" y="282">边界到上限、你取消、振荡信号：任何状态都能到停止</text>
+    </svg>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin-top:6px">你中途的指导是部门关注的成果：部门在等待时，指导让它开始一轮；在一轮工作中时，指导在下一步作为通知加入。</p>
+
+    <h3>一轮里的每一步</h3>
+    <div class="flow">
+      <div class="box"><b>写入口</b><small>命令、指导或结果要进事实，先到这里。</small></div>
+      <div class="box"><b>路由</b><small>读事实与定义，决定谁开工、一轮怎么结束。</small></div>
+      <div class="box"><b>装配</b><small>从事实减出这一轮要看的，并入指导；交给模型的那份记进事实。</small></div>
+      <div class="box"><b>模型</b><small>一次请求，记尝试与用量，只出提案。</small></div>
+      <div class="box"><b>工具</b><small>核对许可与范围；改文件、跑命令，交回前后差异与回执。</small></div>
+      <div class="box"><b>裁决</b><small>同一事务里核对执行权、派发编号、版本、上限；只追加写入。</small></div>
+      <div class="box"><b>投影</b><small>事实折成最小投影、页面与观察者看的。</small></div>
+    </div>
+    <ul class="rules">
+      <li><b>每一步先问边界</b>：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。</li>
+      <li><b>判定点</b>：需要判断的小问题（挑上下文、含糊的读法）可以问一个小模型，答案先写成事件再被使用；重放时读事件，不再问模型。下游有独立核验兜底时默认继续，没有就升级成决定请求。</li>
+      <li><b>压缩</b>：上下文逼近窗口上限时清理旧工具结果、压缩历史；保留意图原文、有效合同与近期回合；摘要是可核对的工件；连续压缩没有推进就停。</li>
+      <li><b>重派与迟到</b>：重派先经写入口写一条事件、派发编号加一；旧编号交回的结果只记录，不接纳。</li>
+      <li><b>失败的尝试</b>：超时重试、未获许可的工具调用都记成事件供回查，不执行、不进有效历史。</li>
+      <li><b>增量与整份</b>：任务池模式下每个单元各自核验，但放行门仍是整份交付对要求的一次核验。</li>
+    </ul>
+  </section>
+
+  <section id="s4">
+    <h2>要守的缝<small>十道在系统里，三道在系统外</small></h2>
+    <p class="muted">一道缝连接两边，各自可以重写，合同不能偷偷改。<b>已定</b>：规矩不再改，子架构师现在就守；<b>未定</b>：我还在定，先别依赖。每张卡写两侧、保证什么、规矩，以及交换什么；交换的是意思，不是类型，代码里叫什么由子架构师定，写在设计说明里。所有合同带版本，字段只增。</p>
+    <div class="seams" style="margin-top:12px">
+      <div class="seam" data-state="set"><b>写入口<span>已定</span></b><i>一切写入方 ↔ 一份事实</i><em>事实只从这里进，进了就不改。</em><ul><li>先过裁决与边界再写</li><li>同一事务里核对执行权、派发编号与版本</li><li>只追加；按消息身份去重</li></ul><div class="x"><b>交换：</b>消息身份、事项的执行权编号、这一轮的派发编号、期望版本、来源（部门、角色、工作单元）、内容（提案、回执、模型判断、你的回答、观察者信号）、证据引用。</div></div>
+      <div class="seam" data-state="set"><b>路由<span>已定</span></b><i>薄驱动 ↔ 路由实现</i><em>换轮转方式，循环本身不动。</em><ul><li>只回答谁开工、一轮怎么结束、事项怎么结束</li><li>只读事实与冻结的定义，自己从事件折叠要用的状态，不存别的</li><li>部门的名字不进代码；每种路由带自己的定义</li></ul><div class="x"><b>交换：</b>入：只读事实、冻结的定义、最新事件。出：下一步谁开工（部门或工作单元的认领）、这一轮怎么结束（继续、询问、等你、核验、结束）、事项是否结束及原因。</div></div>
+      <div class="seam" data-state="set"><b>装配<span>已定</span></b><i>执行 ↔ 装配实现</i><em>一轮看到的是事实的一个视图，不改事实。</em><ul><li>只读事实、定义与待并入的指导</li><li>同样的事件重放出同样的请求；判定点的选择先写事件</li><li>交给模型的那份与清单记进事实</li></ul><div class="x"><b>交换：</b>入：只读事实、角色定义、待并入的指导。出：交给模型的每一个字节、上下文清单（指令、意图、有效合同、摘要、放进去的事件位置）。</div></div>
+      <div class="seam" data-state="set"><b>执行<span>已定</span></b><i>薄驱动 ↔ 执行实现</i><em>一轮里的每一步都停得下来。</em><ul><li>每一步先问边界</li><li>工具调用经裁决；结果写回事实，不自己存</li><li>外包角色是执行的一种实现：全新的状态目录、无历史的快照，模型与工具走受控入口；只限有下游独立核验的角色</li></ul><div class="x"><b>交换：</b>入：装配结果、角色的工具。出：完成提案、工具请求、询问。每步前：用量与上限 → 继续或停止。</div></div>
+      <div class="seam" data-state="set"><b>模型<span>已定</span></b><i>执行 ↔ 模型服务</i><em>换模型不改循环。</em><ul><li>每次请求解析一次调用目标</li><li>尝试与用量记进事实；重放读事件不再调模型</li><li>凭据只在控制主机，不进事实与导出</li></ul><div class="x"><b>交换：</b>入：请求字节、调用目标。出：尝试记录、模型输出事件、用量。</div></div>
+      <div class="seam" data-state="set"><b>动作<span>已定</span></b><i>工具 ↔ 执行环境</i><em>每个动作有回执；结果未知时有核实办法。</em><ul><li>按类别带合同：成功证据、核实方法、能否取消</li><li>本机与远程同一份合同</li><li>工作区每次从封存快照建；环境可以温热</li></ul><div class="x"><b>交换：</b>请求：动作身份、起点快照、命令或改动、核实方法、能否取消。回执：退出状态、输出、终点快照、前后差异。</div></div>
+      <div class="seam" data-state="set"><b>投影<span>已定</span></b><i>一份事实 → 读的人</i><em>任何投影都能从事实重算。</em><ul><li>内核的最小投影是骨架的一部分，只给裁决与路由读，不在这道缝里</li><li>应用的投影（轨迹、图谱、状态视图）推倒重算，不写回事实</li><li>骨架事件只增，应用事件可以排空</li></ul><div class="x"><b>交换：</b>折叠函数：当前状态 + 一条事件 → 下一状态；从头重算：事件序列 → 同一状态。</div></div>
+      <div class="seam" data-state="set"><b>接口<span>已定</span></b><i>页面、命令行、评测、观察者 ↔ 应用层</i><em>外面只经这里读与发。</em><ul><li>只有命令、查询、事件流三种</li><li>命令带身份，重发不重做；事件流按位置续</li><li>带版本号；改了合同版本必升</li></ul><div class="x"><b>交换：</b>命令（带身份）、查询（只读快照）、事件流（从某个位置起）。</div></div>
+      <div class="seam" data-state="set"><b>画面<span>已定</span></b><i>翻译层 ↔ 画面层</i><em>画面整个换掉，事实与页面不动。</em><ul><li>画面只收元件断言与动作，不读事实</li><li>每条断言带回链到事件</li><li>播放节奏归画面，回放走同一份合同</li></ul><div class="x"><b>交换：</b>元件断言（元件、状态、回链）、播放参数。</div></div>
+      <div class="seam" data-state="set"><b>定义<span>已定</span></b><i>定义文件 ↔ 加载与校验</i><em>改定义不改代码，能撤回。</em><ul><li>带版本；创建事项时冻结</li><li>字段只增，旧文件新版本能读</li><li>采纳前校验谁能拒绝谁无环、末端有独立证据</li></ul><div class="x"><b>交换：</b>版本、部门与角色（关注的成果、目标、证据来源、可见范围、工具许可）、谁能拒绝谁、判定点、登记的机器、路由实现与它的定义、工作单元的大小、限定采用的范围、上限、停止原因清单。</div></div>
     </div>
     <h3>系统之外的三道</h3>
     <div class="seams">
-      <div class="seam" data-state="set"><b>评价</b><i>评价材料 → 系统</i><em>被开发的版本读不到评它的题。</em><ul><li>只经接口层运行</li><li>材料由运行中的上一版提供</li><li>只由你改</li></ul></div>
-      <div class="seam" data-state="open"><b>看门狗</b><i>看门狗 ↔ 实例</i><em>候选失败能退回。</em><ul><li>两个槽位</li><li>心跳与冒烟</li><li>只由你改</li></ul></div>
-      <div class="seam" data-state="open"><b>观察者</b><i>观察者 ↔ 应用层</i><em>只看，不动手。</em><ul><li>按读取范围看事实</li><li>只出证据与提案，提案经裁决</li></ul></div>
+      <div class="seam" data-state="set"><b>评价<span>已定</span></b><i>评价材料 → 系统</i><em>被开发的版本读不到评它的题。</em><ul><li>只经接口层操作，像用户一样</li><li>材料由运行中的上一版提供</li><li>只由你改</li></ul><div class="x"><b>交换：</b>题、说明书、判分器在外面；经接口的命令与查询；判分看数据库与文件产物。</div></div>
+      <div class="seam" data-state="set"><b>观察者<span>已定</span></b><i>观察者 ↔ 接口（读）与写入口（写）</i><em>只看，不动手。</em><ul><li>按读取范围经接口读事实</li><li>证据、提案与振荡信号都经写入口写入，经裁决</li><li>振荡信号是边界的输入：内核按定义停下受影响的分支，交给你</li></ul><div class="x"><b>交换：</b>读取范围；写入：统计证据、改进提案、振荡信号（哪个事项、哪条分支、依据的事件）。</div></div>
+      <div class="seam" data-state="open"><b>看门狗<span>未定</span></b><i>看门狗 ↔ 实例</i><em>候选失败能退回。</em><ul><li>在进程外，不依赖 Yudao 的代码</li><li>两个槽位；心跳、金丝雀、观察期指标</li><li>只由你改</li></ul><div class="x"><b>交换：</b>健康探针、切换命令、排空命令。</div></div>
     </div>
   </section>
 
-  <section>
-    <h2>拆开部署</h2>
-    <p class="muted">现在全部跑在一台电脑的一个进程里。将来要拆，拆的线就是上一节的缝：缝过了网络，合同不变，只多了超时与结果未知两件事。图上只有一个东西不能复制。</p>
+  <section id="s5">
+    <h2>自举与验收<small>两层自举，三层验收</small></h2>
+    <div class="two">
+      <div class="layer">
+        <b>第一层：把 Yudao 当普通项目开发下一个版本</b>
+        <ul>
+          <li>改的对象是整个仓库，包括内核；内核的改动生效前要你批准。</li>
+          <li>作为普通事项走三部门循环：工程改，质检在独立副本上核验并签回执。</li>
+          <li>发布：新版本在候选槽旁路启动，稳定槽先排空、保留为退回点。</li>
+          <li>看门狗在进程外检查：心跳、金丝雀任务、观察期指标；超时或不过就切回稳定版。</li>
+        </ul>
+      </div>
+      <div class="layer dashed">
+        <b>第二层：按运行证据改自己的组织与规则</b>
+        <ul>
+          <li>改的对象是定义与角色材料：部门与角色声明、关注的成果、可见范围、上限、判定点、经验教训。</li>
+          <li>观察者给证据与提案；谁的定义与材料不由谁自己改。</li>
+          <li>经独立评价通过后<b>限定采用</b>：只在指定范围（某类事项、某个比例）生效，不覆盖默认定义。</li>
+          <li>事项创建时冻结定义版本，所以限定采用版与基线版能直接比较；指标变差就撤回，不重启、不回滚代码。</li>
+          <li>降解走同一条路：某类工作连续成功、零返工，就把它的处理者从模型换成确定性程序，外面的合同不变。</li>
+        </ul>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>验收层</th><th>查什么</th><th>怎么判</th></tr></thead>
+      <tbody>
+        <tr><td><b>内核</b></td><td>给定事件序列，状态与决定。用真实存储，不用替身。</td><td>同样的事件重放出同样的状态；重放不调模型。</td></tr>
+        <tr><td><b>缝</b></td><td>十三道合同的字段兼容、部门交接产物的结构、超出上限时的停止原因。</td><td>合同快照核对，确定性断言。</td></tr>
+        <tr><td><b>真实场景</b></td><td>操作代理按用户说明书与一句话目标操作真实界面。</td><td>外面的确定性代码查数据库与文件产物判分；题对被测版本不可读。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="s6">
+    <h2>拆开部署<small>只有一份的只有一份事实</small></h2>
+    <p class="muted">现在全部跑在一台电脑的一个进程里。将来要拆，拆的线就是第四节的缝：缝过了网络，合同不变，只多了超时与结果未知两件事。谁放在哪台机器写在定义里。</p>
     <div class="map">
     <svg viewBox="0 0 1000 700" role="img" aria-label="拆开部署：内核只有一份，部门成员、工具与模型可以放到任何机器或容器">
-      <defs>
-        <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker>
-      </defs>
-      <!-- 机器与容器：软边色块 -->
       <ellipse class="zone" cx="420" cy="340" rx="200" ry="150" transform="rotate(-8 420 340)"/>
       <text class="zone-l" x="250" y="222">控制主机</text>
       <ellipse class="zone" cx="770" cy="235" rx="175" ry="115" transform="rotate(12 770 235)"/>
@@ -282,7 +429,6 @@
       <text class="zone-l" x="585" y="490">容器 C</text>
       <ellipse class="zone" cx="235" cy="150" rx="95" ry="62" transform="rotate(-15 235 150)"/>
       <text class="zone-l" x="160" y="90">任意一台</text>
-      <!-- 连线 -->
       <path class="edge" d="M265 175 C 320 230, 350 260, 375 290" marker-end="url(#ah)"/>
       <path class="edge" d="M705 250 C 620 280, 560 300, 500 320" marker-end="url(#ah)"/>
       <path class="edge" d="M780 300 C 680 330, 580 340, 505 345" marker-end="url(#ah)"/>
@@ -300,7 +446,6 @@
       <text class="e-l" x="770" y="208">动作</text>
       <path class="edge thin" d="M720 548 L 790 585"/>
       <path class="edge dashed" d="M160 330 C 170 390, 180 450, 185 500" marker-end="url(#ah)"/>
-      <!-- 节点 -->
       <g class="n only"><circle cx="430" cy="340" r="74"/><text x="430" y="328">一份事实</text><text x="430" y="348" class="s">写入口 · 裁决 · 边界</text><text x="430" y="366" class="s">只有一份</text></g>
       <g class="n copy"><circle cx="560" cy="250" r="34"/><text x="560" y="246">薄驱动</text><text x="560" y="262" class="s">与路由</text></g>
       <g class="n ro"><circle cx="325" cy="465" r="34"/><text x="325" y="470">投影</text></g>
@@ -320,15 +465,24 @@
       <span><i style="background:var(--s3)"></i>只有一份</span><span><i style="background:var(--s2)"></i>可以多份，放哪都行</span><span><i class="solid" style="border-width:1.5px"></i>只读，随便几份</span><span><i class="dash"></i>一台机器或一个容器</span>
     </div>
     <ul class="rules">
-      <li><b>只有一份</b>：一份事实与它的写入口、裁决、边界。拆开时它是一个服务，别的都经网络来写；它不复制，所以不用分布式锁。</li>
-      <li><b>可以多份</b>：部门成员。一个成员就是一个会话，自己带装配与执行，放在哪台机器、哪个容器都行，同一部门可以有几个成员同时在不同的地方。工具、执行机器、模型服务同样。</li>
+      <li><b>只有一份</b>：一份事实与它的写入口、裁决、边界、薄驱动，模型凭据也只在这里。拆开时它是一个服务，别的都经网络来写；它不复制，所以不用分布式锁，认领也不用锁：向那条流写一个事件，写入口核对版本，两个认领只有一个成功。</li>
+      <li><b>可以多份</b>：部门成员。一个成员就是一个会话，放在哪台机器、哪个容器都行，同一部门可以有几个成员同时在不同的地方；质检可以在另一个平台上重建副本，拿到错误独立的回执。工具、执行机器、模型服务同样。</li>
       <li><b>只读</b>：投影、页面、观察者。从事实重算，想要几份有几份，坏了丢掉重算。</li>
-      <li><b>要过网络的缝</b>：写入口、动作、模型、接口四道。合同照旧，多出的只有超时与结果未知；动作合同已经写了核实方法，写入口已经按版本拒绝过期的写入。</li>
+      <li><b>要过网络的缝</b>：写入口、动作、模型、接口四道。合同照旧，多出的只有超时与结果未知。</li>
       <li><b>部署是定义，不是代码</b>：谁放在哪台机器写在带版本的定义里，换部署不改代码，能撤回。</li>
     </ul>
+    <h3>拆开以后的三个硬问题</h3>
+    <table>
+      <thead><tr><th>问题</th><th>怎么解</th></tr></thead>
+      <tbody>
+        <tr><td><b>工作区在别的机器上</b></td><td>执行节点不保存跨激活的状态。每次激活从封存快照建工作区，只含这次要的文件，不带历史；上次被拒绝的尝试留下的东西不会污染这次。环境（依赖、编译缓存）可以温热。</td></tr>
+        <tr><td><b>消息丢了、重发了、迟到了</b></td><td>过网的消息都带身份，写入口按身份去重；执行权与派发编号只由控制主机发；重派先经写入口写事件，旧编号交回的结果只记录不接纳。</td></tr>
+        <tr><td><b>进程停了又起</b></td><td>控制核心是按事件重放的状态机，没有事件库之外的第二份事实。重启丢掉内存里的会话，从已提交的事件恢复；结果未知的在途动作按动作合同的核实方法查，查不到就从最近的快照重新装配执行。</td></tr>
+      </tbody>
+    </table>
   </section>
 
-  <footer>状态按 main 2026-10-25。已建：在 main 上运行并有测试；建了一半：有代码，设计里标了未实施的部分；未建：只有设计。里程碑结束时由总架构师更新。第三至五节写的是应当如此，没有状态；缝的已定、未定由总架构师改。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
+  <footer>第一节的状态按 main 2026-10-25。已建：在 main 上运行并有测试；建了一半：有代码，设计里标了未实施的部分；未建：只有设计。里程碑结束时由总架构师更新。二至六节写的是应当如此，没有状态；缝的已定、未定由总架构师改。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
 </main>
 </body>
 </html>
