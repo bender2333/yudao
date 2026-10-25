@@ -51,6 +51,7 @@
 "test_department_language_rule.py" = "module"
 "test_department_prompts.py" = "module"
 "test_department_providers.py" = "integration"
+"test_department_states.py" = "integration"
 "test_engine.py" = "integration"
 "test_environment_establish.py" = "module"
 "test_engineering_facts.py" = "unit"

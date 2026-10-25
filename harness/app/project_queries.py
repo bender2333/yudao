@@ -21,7 +21,9 @@ from ..models import (
 from ..observability import ObservabilityQuery
 from ..providers.selection import ModelSelection
 from ..project_projection import replay_project, saved_project
-from ..projection import RunNotFoundError, project_run, replay_decisions, replay_run, load_decisions
+from ..projection import (
+    RunNotFoundError, load_decisions, project_run, replay_decisions, replay_events, replay_run, run_handler,
+)
 from ..projects import ProjectNotFoundError, project_projection
 from ..redact import redact_tool_args
 from ..streams import STOP_REASON_UPGRADE
@@ -187,6 +189,23 @@ class ProjectOverview(Contract):
     work_item: str | None = None
 
 
+# 部门状态的取值：总图第三节外环的五个词（三部门的循环结构第 2.1 节，工单 #903）
+DEPARTMENT_STATES = ("waiting_user", "working", "asking", "verifying", "waiting")
+# 阻塞事项的决定请求：回答以前事项（它的 run）不推进（decisions.py 的 blocks）
+BLOCKING_SCOPES = ("run", "work_item")
+# 谁核验谁的成果取自定义里的「谁能拒绝谁」：成果驱动下只有工程的交付由质检核验（循环结构第 2.1 节）
+VERIFIER_OF = {"engineering": "quality"}
+
+
+class DepartmentState(Contract):
+    """一个部门在这个事项上的状态与原因（三部门的循环结构第 2.1 节）。
+
+    state 取总图外环的五个词；note 是一句话，没有原因时为空。
+    """
+    state: Literal["waiting_user", "working", "asking", "verifying", "waiting"]
+    note: str | None = None
+
+
 class WorkItemProgress(Contract):
     """事项的进度：从成果推算（循环结构第 2 节）。
 
@@ -212,6 +231,8 @@ class WorkItemCard(Contract):
     department: str | None
     # 事项的进度：从成果推算（循环结构第 2 节、工单 #556）
     progress: WorkItemProgress | None
+    # 三个部门各自的状态与原因（循环结构第 2.1 节，工单 #903）：事项没有 run、已经结束或中断时为空
+    departments: dict[str, DepartmentState] | None = None
     round: int
     stop_reason: str | None
     human_action: str | None
@@ -247,6 +268,22 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
     store = application.system.store
     state = _project(application, request.project_id, include_history=False)
     items = ([_work_item(state, request.work_item)] if request.work_item is not None else state.work_items)
+    cards: list[WorkItemCard] = []
+    for item in items:
+        # run 投影、决定请求与事件一起读取一次：进度与部门状态都用这一份（工单 #903）
+        run, decisions, events = _item_sources(application, item.run_id)
+        progress = _work_item_progress(run)
+        cards.append(WorkItemCard(
+            work_item_id=item.work_item_id, kind=item.kind, title=item.title, text=item.text, run_id=item.run_id,
+            version=item.stream_version, created_at=item.created_at, status=item.status,
+            department=item.department,
+            progress=progress,
+            departments=_departments(run, progress, _observation(run, decisions, events), decisions),
+            round=item.cycle_count,
+            stop_reason=item.stop_reason, human_action=item.human_action,
+            pending_question=item.pending_question, adoption_id=item.adoption_id,
+            start_error=item.start_error,
+        ))
     return Snapshot[ProjectOverviewResult](
         position=store.end_position(),
         data=ProjectOverviewResult(
@@ -255,19 +292,7 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
             stats=_work_item_stats(items),
             start_point=(None if state.current_adoption is not None or not state.initial_snapshot
                          else f"起点：起始文件夹（{len(state.initial_snapshot.get('files') or [])} 个文件）"),
-            work_items=[
-                WorkItemCard(
-                    work_item_id=item.work_item_id, kind=item.kind, title=item.title, text=item.text, run_id=item.run_id,
-                    version=item.stream_version, created_at=item.created_at, status=item.status,
-                    department=item.department,
-                    progress=_work_item_progress(_optional_run(application, item.run_id)),
-                    round=item.cycle_count,
-                    stop_reason=item.stop_reason, human_action=item.human_action,
-                    pending_question=item.pending_question, adoption_id=item.adoption_id,
-                    start_error=item.start_error,
-                )
-                for item in items
-            ],
+            work_items=cards,
         ),
     )
 
@@ -319,6 +344,8 @@ class WorkItemLoop(Contract):
     status: str
     department: str | None
     progress: WorkItemProgress | None
+    # 三个部门各自的状态与原因（循环结构第 2.1 节，工单 #903）：事项没有 run、已经结束或中断时为空
+    departments: dict[str, DepartmentState] | None = None
     round: int
     started_at: str | None
     elapsed_sec: int | None
@@ -350,16 +377,19 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
     for index, item in enumerate(state.work_items):
         if request.work_item is not None and item.work_item_id != request.work_item:
             continue
-        run = _optional_run(application, item.run_id, through=through)
+        run, decisions, events = _item_sources(application, item.run_id, through=through)
+        progress = _work_item_progress(run)
+        observation = _observation(run, decisions, events)
         bounds = store.run_time_bounds(item.run_id, through=through)
         rows.append(WorkItemLoop(
             work_item_id=item.work_item_id, kind=item.kind, sign=item.title, color_index=index + 1, status=item.status,
-            department=item.department, progress=_work_item_progress(run), round=item.cycle_count,
+            department=item.department, progress=progress, round=item.cycle_count,
+            departments=_departments(run, progress, observation, decisions),
             started_at=None if bounds is None else bounds[0],
             elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run, now=at_time),
             time_limit_sec=item.run_time_limit_sec, pending_question=item.pending_question,
             run_id=item.run_id, adoption_id=item.adoption_id,
-            recovery_state=_recovery_observation(application, item.run_id), version=item.stream_version,
+            recovery_state=observation, version=item.stream_version,
         ))
     return Snapshot[ProjectLoopResult](
         position=_snapshot_position(store, through),
@@ -399,6 +429,88 @@ def _work_item_progress(run: Any) -> WorkItemProgress | None:
         delivery_product_spec_revision=basis_revision,
         conclusion=conclusion,
     )
+
+
+def _item_sources(application: Application, run_id: str, *, through: int | None = None
+                  ) -> tuple[Any, dict[str, Any], list[Any]]:
+    """一个事项的 run 投影、决定请求与事件（工单 #903）。
+
+    部门状态要会话、进行中的询问、没有回答的决定请求与恢复观察状态一起算，三者一次读出：
+    run 投影与它的决定请求来自同一次投影读取，不因为多算一个字段而多读一遍。
+    已经结束的 run 不需要事件（恢复观察状态只看状态与停止原因）。
+    """
+    store = application.system.store
+    if through is not None:
+        events = store.list_events(run_id, through_position=through)
+        if not events:
+            return None, {}, []
+        return replay_events(events), replay_decisions(events), events
+    saved = store.projection(run_stream(run_id))
+    if saved is None:
+        return None, {}, []
+    run = run_handler().load(saved)
+    decisions = load_decisions(saved)
+    if run.status in TERMINAL_STATUSES:
+        return run, decisions, []
+    return run, decisions, store.list_events(run_id)
+
+
+def _observation(run: Any, decisions: Any, events: list[Any]) -> str | None:
+    # 一个事项的恢复观察状态（工单 #18）：由已经读出的 run、决定请求与事件算出
+    if run is None:
+        return None
+    return observation_state(events, decisions.values(), status=run.status, stop_reason=run.stop_reason)
+
+
+def _departments(run: Any, progress: WorkItemProgress | None, observation: str | None,
+                 decisions: dict[str, Any]) -> dict[str, DepartmentState] | None:
+    """三个部门各自的状态与原因（三部门的循环结构第 2.1 节，工单 #903）。
+
+    状态不单独记录，由已经记录的事实现算：会话的状态、进行中的询问、没有回答的决定请求与成果。
+    同时满足几条时按设计说明的顺序取第一条：等用户、在分支里回答、询问中、主线的一轮工作中、核验中、等待工作。
+    """
+    if run is None or run.status in TERMINAL_STATUSES or observation == OBSERVATION_INTERRUPTED:
+        return None
+    waiting_user = {decision.request.get("department") for decision in decisions.values()
+                    if decision.status == "open" and decision.blocks in BLOCKING_SCOPES}
+    # 还没回答的询问：链上每一层一个，最内层在最后（投影的 ask_stack）
+    asks = list(run.ask_stack)
+    departments: dict[str, DepartmentState] = {}
+    for department in DEPARTMENTS:
+        session = run.sessions.get(department)
+        main_session = None if session is None else session.session_id
+        active = session is not None and session.status == "active"
+        # 这条部门主线停在自己发出、还没有回答的询问上
+        own_ask = next((ask for ask in reversed(asks) if ask.get("origin_session_id") == main_session), None)
+        # 还在等这个部门回答的询问：部门在它的分支里回答（分支嵌在提问方那一轮里）
+        incoming = next((ask for ask in reversed(asks) if ask.get("recipient") == department), None)
+        if department in waiting_user:
+            state, note = "waiting_user", None
+        elif incoming is not None:
+            state, note = "working", f"回答{_department_label(incoming.get('requester') or '')}的询问"
+        elif own_ask is not None:
+            state, note = "asking", f"在等待{_department_label(own_ask.get('recipient') or '')}的回答"
+        elif active:
+            # 质检在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构第 3.1 节）
+            predictive = (department == "quality" and not run.delivery_specs and progress is not None
+                          and progress.product_spec_revision is not None)
+            state = "working"
+            note = (f"预测性探索：按 PRD r{progress.product_spec_revision} 起草测试用例"
+                    if predictive else None)
+        elif _awaiting_verification(department, progress):
+            state, note = "verifying", f"等{_department_label(VERIFIER_OF[department])}核验交付 r{progress.delivery_revision}"
+        else:
+            state, note = "waiting", None
+        departments[department] = DepartmentState(state=state, note=note)
+    return departments
+
+
+def _awaiting_verification(department: str, progress: WorkItemProgress | None) -> bool:
+    # 核验中：最新的正式成果在等下游的结论。成果驱动下只有工程有这种情况：
+    # 最新的交付还没有质检的缺陷记录或放行（循环结构第 2.1 节）
+    if department not in VERIFIER_OF or progress is None or progress.delivery_revision is None:
+        return False
+    return progress.conclusion is None
 
 
 def _elapsed_seconds(bounds: tuple[str, str], *, terminal: Any, now: str | None = None) -> int:
@@ -719,6 +831,8 @@ class DepartmentWorkspaceResult(Contract):
     run_id: str | None
     # run 的状态（进行中与三个终态）：部门进行到哪一步不记在这里（工单 #556）
     run_status: str | None
+    # 三个部门各自的状态与原因（循环结构第 2.1 节，工单 #903）：事项没有 run、已经结束或中断时为空
+    departments: dict[str, DepartmentState] | None = None
     # 事项状态与停止原因：用户停止的事项在部门页写「已停止」，不写「执行失败」（工单 #319）
     status: str | None
     stop_reason: str | None
@@ -813,10 +927,10 @@ def _room_door(run: Any, status: str) -> str | None:
     return None
 
 def _room_view(application: Application, state: Any, item: Any, run: Any, department: str,
-               guidance: list[GuidanceRecord], effective: EffectiveModel) -> RoomView:
+               guidance: list[GuidanceRecord], effective: EffectiveModel, observation: str | None) -> RoomView:
     # 部门房间的画面数据（v8 设计说明第 8 节）：状态、CRT、角色、门口状态、信箱与档案盒、管道状态。
     # Stage 4（运维）、3.2C（远程执行）与 3.2D（试用）的数据尚未进入 run 投影，这些字段保持为空或零。
-    observation = None if run is None else _recovery_observation(application, run.run_id)
+    # 恢复观察状态由调用处读出（工单 #903）：房间与部门状态用它判断，不各读一次
     status = _room_status(run, department, observation)
     target = "—" if item is None else item.title
     protocol = "—"
@@ -830,7 +944,8 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
     role_status = "working" if status == "working" else "idle"
     role_name = f"{_department_label(department)}部门 Agent"
     pose = {"role_id": role_id, "action": "typing"} if status == "working" else None
-    letters_waiting = 0
+    # 传信数：问本部门、还没有回答的询问数（循环结构第 4.7 节，工单 #903）
+    letters_waiting = 0 if run is None else sum(1 for ask in run.ask_stack if ask.get("recipient") == department)
     waiting_provider = False
     scrolls = 0
     if run is not None and department == "product":
@@ -878,7 +993,10 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
     store = application.system.store
     state = _project(application, request.project_id, include_history=False)
     item = None if request.work_item is None else _work_item(state, request.work_item)
-    run = None if item is None else _optional_run(application, item.run_id)
+    # 事项没有给出时没有 run，也没有部门状态；给出时一次读出 run、决定请求与事件（工单 #903）
+    run, decisions, events = (None, {}, []) if item is None else _item_sources(application, item.run_id)
+    observation = _observation(run, decisions, events)
+    progress = _work_item_progress(run)
     configured = state.department_settings[request.department]
     used_version = _last_used_prompt_version(run, request.department)
     effective = _effective_model(application, configured, request.department)
@@ -902,6 +1020,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             project_id=state.project_id, department=request.department,
             work_item_id=None if item is None else item.work_item_id,
             run_id=None if run is None else run.run_id, run_status=None if run is None else run.status,
+            departments=_departments(run, progress, observation, decisions),
             status=None if item is None else item.status,
             stop_reason=None if run is None else run.stop_reason,
             active=False if run is None else run.active_department == request.department,
@@ -922,7 +1041,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             last_call=_last_call(run, request.department),
             # 当前生效模型不具备本部门建议能力时的提醒（设计说明第 5.6 节「部门工作间」）
             reminders=application.system.facade.model_reminders(effective.model_id, request.department),
-            room=_room_view(application, state, item, run, request.department, guidance, effective),
+            room=_room_view(application, state, item, run, request.department, guidance, effective, observation),
         ),
     )
 
@@ -1243,14 +1362,27 @@ class RunAsks(Contract):
 
 
 class AskView(Contract):
+    # 一次询问（三部门的循环结构第 4.7 节）：提问方、被询问的部门、问题、状态与回答。
+    # 工单 #903 补上询问的编号（分支会话）、上一层询问、询问链与层数、产品的回答附带的 PRD 修订号与起止时间
+    id: str
     requester: str
     recipient: str
     question: str
     status: Literal["进行中", "已回答", "没能回答"]
     answer: str | None = None
     reason: str | None = None
+    # 上一层询问的编号：这次询问是在另一次询问的分支里发出的时候（回问）有值
+    parent: str | None = None
+    # 询问链：从最外层的提问方起经过的部门，例如 engineering → product → engineering
+    chain: list[str]
+    # 询问链上的询问数：最外层为 1
+    depth: int
+    # 产品的回答附带 PRD 新版本时的修订号
+    prd_revision: int | None = None
     start_position: int
     end_position: int | None = None
+    started_at: str
+    ended_at: str | None = None
 
 
 class RunAsksResult(Contract):
@@ -1261,42 +1393,62 @@ def _run_asks(application: Application, request: RunAsks) -> Snapshot[RunAsksRes
     store = application.system.store
     _run(application, request.run_id)
     events = store.list_events(request.run_id)
+    # 已经结束的询问按分支会话找它的回答事件；还没回答的没有这一条
+    answers: dict[str, Any] = {}
+    for event in events:
+        if event.type == EventType.ASK_ANSWERED:
+            answers.setdefault(event.session_id, event)
+    # 开过询问的会话：一次询问的编号就是它的分支会话。询问链上的上一层由此找到（工单 #903）
+    opened: dict[str, AskView] = {}
     asks: list[AskView] = []
     for event in events:
         if event.type != EventType.ASK_STARTED:
             continue
         payload = event.payload or {}
-        branch_session_id = payload.get("branch_session_id")
-        answer_event = next(
-            (e for e in events if e.type == EventType.ASK_ANSWERED and e.session_id == branch_session_id),
-            None,
-        )
+        branch_session_id = payload.get("branch_session_id") or ""
+        # ask_started 所在的会话是另一次询问的分支会话时，那次询问就是这一层的上一层（回问）
+        above = opened.get(event.session_id)
+        chain = [*(above.chain if above is not None else []), payload.get("requester") or ""]
+        answer_event = answers.get(branch_session_id)
+        prd_revision = None
         if answer_event is not None:
             ans_payload = answer_event.payload or {}
             if ans_payload.get("status") == "answered":
                 status: Literal["进行中", "已回答", "没能回答"] = "已回答"
                 answer = ans_payload.get("answer")
                 reason = None
+                prd_revision = ans_payload.get("revision")
             else:
                 status = "没能回答"
                 answer = None
                 reason = ans_payload.get("reason")
             end_position = answer_event.position
+            ended_at = answer_event.created_at
         else:
             status = "进行中"
             answer = None
             reason = None
             end_position = None
-        asks.append(AskView(
+            ended_at = None
+        ask = AskView(
+            id=branch_session_id,
             requester=payload.get("requester") or "",
             recipient=payload.get("recipient") or "",
             question=payload.get("question") or "",
             status=status,
             answer=answer,
             reason=reason,
+            parent=None if above is None else above.id,
+            chain=chain,
+            depth=len(chain),
+            prd_revision=prd_revision,
             start_position=event.position,
             end_position=end_position,
-        ))
+            started_at=event.created_at,
+            ended_at=ended_at,
+        )
+        opened[branch_session_id] = ask
+        asks.append(ask)
     return Snapshot[RunAsksResult](
         position=store.end_position(),
         data=RunAsksResult(asks=asks),
@@ -2174,7 +2326,10 @@ PROJECT_OVERVIEW = QueryDefinition(
                 EventType.DEPARTMENT_ACTIVATED,
                 EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED, EventType.SPEC_ACCEPTED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED,
-                EventType.DECISION_REQUESTED),
+                EventType.DECISION_REQUESTED,
+                # 部门状态（工单 #903）：一轮工作结束以后部门回到等待工作或核验中，
+                # 决定请求的回答与撤销让「等用户」结束
+                EventType.ACTIVATION_FINISHED, EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN),
 )
 
 PROJECT_LOOP = QueryDefinition(
@@ -2230,7 +2385,11 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 # 目录修订（准入作废、连接修改）以后引用可用性随之更新
                 ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED, CatalogEventType.CATALOG_REVISED,
                 # 规格被接纳以后这个部门的房间里挂着新的规格
-                EventType.SPEC_ACCEPTED),
+                EventType.SPEC_ACCEPTED,
+                # 部门状态与房间的传信数（工单 #903）：一轮工作结束、决定请求的发出与回答、
+                # 交付到达与质检结论都改变它们
+                EventType.ACTIVATION_FINISHED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
+                EventType.DECISION_WITHDRAWN, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED),
 )
 
 RUN_ACTIONS = QueryDefinition(
