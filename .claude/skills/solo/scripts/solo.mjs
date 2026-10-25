@@ -1577,6 +1577,25 @@ function commandReap(args) {
   });
 }
 
+/* ----------------------------------------------------------------- evidence */
+
+/**
+ * 把 worktree 里的证据（.tmp 下的截图、页面文字、评论稿）收进账本。
+ * gc 删目录之前会自动做一次，但 UI 工单应当在收账时就做——那时截图才刚拍好。
+ */
+function commandEvidence(args) {
+  const loop = openLedger(args);
+  const task = taskById(parseTasks(loop), args.task);
+  if (!task) fail('任务清单里没有 ' + args.task);
+  const active = concurrencyOf(loop).active.find((a) => a.task === task.id);
+  const dir = active && active.worktree ? active.worktree : worktreeTarget(loop, task).dir;
+  if (!fs.existsSync(dir)) fail('worktree 不在：' + dir);
+  const copied = archiveEvidence(loop, dir, task.issue || task.id);
+  const dest = path.join(loop.dir, 'evidence', String(task.issue || task.id));
+  const payload = { task: task.id, issue: task.issue, from: dir, to: dest, files: copied };
+  return emit(args, payload, '证据 ' + copied + ' 个文件 → ' + dest);
+}
+
 /* ----------------------------------------------------------------------- gc */
 
 /** 把 worktree 里的证据（.tmp 下的评论、截图）先搬进账本，再让目录消失。 */
@@ -1882,6 +1901,7 @@ switch (command) {
   case 'askhuman': handOff(args, 'askhuman'); break;
   case 'handover': commandHandover(args); break;
   case 'gc': commandGc(args); break;
+  case 'evidence': commandEvidence(args); break;
   case 'worktrees': commandWorktrees(args); break;
   case 'reap': commandReap(args); break;
   case 'pause': commandPause(args); break;
