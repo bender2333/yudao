@@ -54,3 +54,5 @@ ref/
 .agents/
 .opencode/*
 !.opencode/agent/
+# solo 模式的循环账本与工作记录（运行配置第 3 节）
+.ralph/
