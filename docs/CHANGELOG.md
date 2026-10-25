@@ -496,3 +496,5 @@ claude-fable-5-1 / 2026-10-25 15:50 / `docs/program-roadmap.md` 加第 1.4 节�
 claude-opus-5-5（子架构师） / 2026-10-25 14:58 / 归档 docs/design/provider-layer.md → docs/archive/design/provider-layer.md（git mv），文内相对链接按新位置改写，状态行写明已归档；指向它的链接改为模型管理第 13 节或归档位置：docs/design/README.md（删去 Provider 层一项，模型管理一项注明第 13 节）、docs/design/architecture/overall-architecture.md 第 1.3 节两处、docs/design/local-tools.md、docs/design/model-management.md 第 11、13 节、docs/requirements/provider-layer.md、docs/requirements/startup-provider-reload.md / 仍然有效的部分已于同日并入 model-management.md 第 13 节，用户 2026-10-25 确认归档
 
 claude-fable-5-1 / 2026-10-25 16:40 / `docs/program-roadmap.md` 阶段一第 2 项的写入口核对改为执行权与期望版本（派发编号随阶段二的重派）；`docs/decision.md` 加「/to-parents 阶段一」；GitHub：#466、#823、#950、#968、#467、#629 与十一张单张工单挂到阶段工单 #976，#559/#560/#561/#857 挂到 #466，#619/#620 推进到阶段一 · 2 挂到 #823，新建 #979，关闭 #183、#71，#976 正文补父工单 / 用户 2026-10-25 运行 /to-parents 阶段一 并同意三张表
+
+claude-fable-5-1 / 2026-10-25 17:00 / `docs/decision.md`「/to-parents 阶段一」一条补 #979 的去向；GitHub：#979 改标 `ready-for-agent` 并留言 / 用户 2026-10-25 决定 #979 进 M0.5 的 solo 范围
