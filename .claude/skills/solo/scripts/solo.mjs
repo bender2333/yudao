@@ -1189,12 +1189,18 @@ function commandCheck(args) {
     ok(prBody.includes('Solo:'), 'PR 正文有 Solo 那一行');
     ok(!signature || prBody.includes(signature), 'PR 正文有署名');
     if (task.text.includes('touches-core')) {
-      const runs = ghJson(['run', 'list', '--workflow', 'CI', '--branch', branch, '--limit', '5', '--json', 'databaseId,conclusion,headSha'], [], loop.root);
+      const runs = ghJson(['run', 'list', '--workflow', 'CI', '--branch', branch, '--limit', '20', '--json', 'databaseId,conclusion,headSha'], [], loop.root);
       const green = (Array.isArray(runs) ? runs : []).filter((r) => r.conclusion === 'success');
       ok(green.length > 0, 'touches-core：分支上跑过集成层');
       const deliveryBody = ((prDetail0 && prDetail0.comments) || []).filter((c) => (c.body || '').trim().startsWith('DELIVERY:')).pop();
-      const linked = green.some((r) => deliveryBody && String(deliveryBody.body).includes(String(r.databaseId)));
-      if (green.length) ok(linked, '交付说明里有集成层运行的链接');
+      // 交付说明里的运行链接不必是最近那几次（工人常常更早就跑过集成层）：把链接里的运行号逐个问一遍，
+      // 只要有一条是这个分支上成功的就认。
+      const ids = [...String((deliveryBody && deliveryBody.body) || '').matchAll(/actions\/runs\/(\d+)/g)].map((m) => m[1]);
+      const linked = ids.some((id) => {
+        const run = ghJson(['api', 'repos/{owner}/{repo}/actions/runs/' + id, '--jq', '{branch: .head_branch, conclusion: .conclusion}'], {}, loop.root);
+        return run && run.branch === branch && run.conclusion === 'success';
+      });
+      if (green.length) ok(linked, '交付说明里有集成层运行的链接' + (ids.length ? '（链接的运行号：' + ids.join(' ') + '）' : '（交付说明里没有 actions/runs 链接）'));
     }
   }
 
