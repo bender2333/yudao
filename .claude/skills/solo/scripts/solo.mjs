@@ -77,6 +77,15 @@ function parseArgs(argv) {
   return args;
 }
 
+/** 同步睡一会儿：GitHub 偶尔 TLS 握手超时，重试前等一等。 */
+function sleepSync(ms) {
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  } catch {
+    /* 不能睡就立刻重试 */
+  }
+}
+
 function fail(message) {
   process.stderr.write(message + '\n');
   process.exit(1);
@@ -251,7 +260,12 @@ function fetchIssues(repo, maxPages = 8) {
   for (let page = 0; page < maxPages; page += 1) {
     const after = cursor ? `, after: "${cursor}"` : '';
     const query = `query { repository(owner: "${owner}", name: "${name}") { issues(first: 100${after}, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) { pageInfo { hasNextPage endCursor } nodes {${ISSUE_FIELDS} } } } }`;
-    const result = gh(['api', 'graphql', '-f', 'query=' + query], undefined);
+    let result;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      result = gh(['api', 'graphql', '-f', 'query=' + query], undefined);
+      if (result.status === 0) break;
+      if (attempt < 2) sleepSync(2000 * (attempt + 1));
+    }
     if (result.status !== 0) {
       lastError = (result.stderr || result.stdout || '退出码 ' + result.status).trim().slice(0, 400);
       complete = false;
@@ -916,7 +930,12 @@ function verifyDone(loop, task) {
 
   const prs = ghJson(['pr', 'list', '--head', branch, '--state', 'all', '--json', 'number,state,mergedAt'], [], loop.root);
   const list = Array.isArray(prs) ? prs : [];
-  const pr = list.find((p) => p.state === 'MERGED') || list[0];
+  let pr = list.find((p) => p.state === 'MERGED') || list[0];
+  if (!pr) {
+    // 合并以后远端分支会被删掉，按 head 查就查不到了：改按正文里的 Closes 找。
+    const found = ghJson(['pr', 'list', '--state', 'merged', '--search', '#' + task.issue + ' in:title,body', '--limit', '10', '--json', 'number,state,mergedAt,body'], [], loop.root);
+    pr = (Array.isArray(found) ? found : []).find((p) => String(p.body || '').includes('Closes #' + task.issue));
+  }
   if (!pr) {
     problems.push('分支 ' + branch + ' 没有 PR');
   } else if (pr.state !== 'MERGED') {
