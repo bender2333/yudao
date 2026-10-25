@@ -147,6 +147,7 @@
 "test_release_archive_integrity.py" = "module"
 "test_release_script.py" = "integration"
 "test_release_check.py" = "module"
+"test_release_sha256.py" = "unit"
 "test_release_wheel_contents.py" = "module"
 "test_replay.py" = "module"
 "test_import_without_sdk.py" = "integration"
