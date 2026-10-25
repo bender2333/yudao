@@ -11,7 +11,7 @@ from .collaboration import tool_error
 from .contracts import current_contract_hash
 from .definitions import DEFINITIONS
 from .models import TERMINAL_STATUSES, Event, RunProjection, hash_bytes
-from .tools import has_tool, offers_with_input, proposal_kind, tool_action, tools_for, usable_when_guidance_only
+from .tools import has_tool, offers_with_input, proposal_kind, tool_action, tools_for
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 
 _STALE_BASIS = ("The input, contract, or current work changed after this activation began; "
@@ -115,9 +115,8 @@ def _ask_branch_permission(projection: RunProjection, session_id: str | None, de
 
 
 def offered_tools(projection: RunProjection, department: str, *, session_id: str | None = None,
-                  guidance_only: bool = False,
                   input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
-    # 请求中提供给模型的工具：部门的工具，只能回应指导时限于回应指导的范围，再去掉当前工作不允许的提交，
+    # 请求中提供给模型的工具：部门的工具去掉当前工作不允许的提交，
     # 最后按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具（设计说明第 5.6 节）
     available = tools_for(department, projection.kind)
     if projection.ask_by_branch(session_id) is not None:
@@ -129,8 +128,6 @@ def offered_tools(projection: RunProjection, department: str, *, session_id: str
         allowed = [name for name in available
                    if name != "ask" and not _is_write(name) and proposal_kind(name) is None]
         return allowed + ["answer"] + nested
-    if guidance_only:
-        available = [name for name in available if usable_when_guidance_only(name)]
     return [name for name in offers_with_input(available, input_modalities)
             if tool_error(projection, department, name, {}) is None]
 
@@ -151,7 +148,6 @@ def tool_permission(
     *,
     department: str,
     session_id: str | None = None,
-    guidance_only: bool,
     basis: WorkBasis,
     aborted: bool,
     facts: WorkspaceFacts,
@@ -175,8 +171,6 @@ def tool_permission(
         return branch_perm
     if not has_tool(department, name, projection.kind):
         return ToolPermission(reason=f"{department} cannot use {name}")
-    if guidance_only and not usable_when_guidance_only(name):
-        return ToolPermission(reason="This guidance activation cannot change files or submit normal department work.")
     reason = tool_error(projection, department, name, args)
     if reason:
         return ToolPermission(reason=reason)

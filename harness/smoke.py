@@ -20,7 +20,6 @@ from .app.project_commands import ProjectCreate
 from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, TARGET_KEYS, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
-from .collaboration import guidance_diverted
 from .contracts import current_contract_hash
 from .data_directory import default_provider_config
 from .definitions import DEFINITIONS
@@ -577,14 +576,6 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
     return expected
 
 
-def _expected_guidance_only(projection: RunProjection, department: str) -> bool:
-    """部门因待处理指导被提前安排（不是按关注的成果本该工作的部门）时只拿只读与回应工具；产品照常处理。"""
-
-    if department == "product":
-        return False
-    return guidance_diverted(projection, department)
-
-
 def _assembly_snapshot_hash(events: list[Any], index: int) -> str:
     """装配所用的工作区快照记录在 context_assembled；同一模型步骤的其他事件与它共用同一份快照。"""
 
@@ -640,7 +631,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     # （工单 #964），这一步以后的记录带着新的版本
     adopted_inputs: dict[str, int] = {}
     activation_prompts = {}
-    activation_guidance_only: dict[str, bool] = {}
     steps: dict[str, int] = {}
     digests: dict[str, str] = {}
     purposes: dict[str, str] = {}
@@ -710,10 +700,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                          "prompt_version": payload.get("prompt_version"),
                          "prompt_hash": payload.get("prompt_hash")}
                 activation_bases[activation] = basis
-                guidance_only = _expected_guidance_only(current_work, event.department)
-                activation_guidance_only[activation] = guidance_only
-                expected_guidance = {"guidance_ids": [item.id for item in pending_guidance(current_work, event.department)],
-                                     "guidance_only": guidance_only}
+                expected_guidance = {"guidance_ids": [item.id for item in pending_guidance(current_work, event.department)]}
                 for field, value in {**basis, **expected_guidance}.items():
                     if field not in payload or payload[field] != value:
                         notes.append(f"event {event.stream_version}: activation {field} does not match current work")
@@ -833,7 +820,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
             limits = model_limits(target_window, configured_output_limit)
             frame = StepFrame(
                 department=event.department, session_id=event.session_id, activation_id=activation,
-                prompt=activation_prompts[activation], guidance_only=activation_guidance_only[activation],
+                prompt=activation_prompts[activation],
                 effective_contract_hash=basis["effective_contract_hash"],
                 input_version=current_input,
             )
@@ -944,7 +931,6 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
                     offered = set(offered_tools(current_work, event.department, session_id=event.session_id,
-                                               guidance_only=frame.guidance_only,
                                                input_modalities=tuple(target_modalities or ())))
                     if len(names) != len(set(names)) or set(names) != offered:
                         raise ValueError("actual tool schemas do not match the department's tools")
@@ -960,8 +946,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                         or payload.get("budget") != limits.context_window
                         or payload.get("admitted") != expected.admitted):
                     raise ValueError("context token accounting or admission differs from the effective model limits")
-                if (payload.get("guidance_ids") != manifest.guidance_ids
-                        or payload.get("guidance_only") != manifest.guidance_only):
+                if payload.get("guidance_ids") != manifest.guidance_ids:
                     raise ValueError("guidance metadata differs from the department's pending guidance")
                 if payload.get("injected") != [asdict(item) for item in manifest.injected]:
                     raise ValueError("injected source metadata differs from current allowed materials")

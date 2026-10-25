@@ -51,14 +51,12 @@ class ActivationScope:
     prompt_version: int
     prompt_hash: str | None
     guidance_ids: tuple[str, ...]
-    guidance_only: bool
     basis: WorkBasis
     provider: str
 
     def versions(self) -> dict[str, Any]:
         return {"input_version": self.basis.input_version, "prompt_version": self.prompt_version,
-                "prompt_hash": self.prompt_hash, "guidance_ids": list(self.guidance_ids),
-                "guidance_only": self.guidance_only}
+                "prompt_hash": self.prompt_hash, "guidance_ids": list(self.guidance_ids)}
 
     def work_basis(self) -> dict[str, Any]:
         return {"effective_contract_hash": self.basis.effective_contract_hash}

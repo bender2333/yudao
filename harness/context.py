@@ -156,7 +156,6 @@ class ContextAssembler:
                  compaction_event_id: str | None = None, prompt: DepartmentPrompt | None = None,
                  context_window: int | None = None, max_output_tokens: int | None = None,
                  guidance: list[DepartmentGuidance] | None = None,
-                 guidance_only: bool = False,
                  events: list[Any] | None = None,
                  snapshot_hash: str | None = None,
                  input_modalities: tuple[str, ...] = ("text",)) -> AssembledContext:
@@ -176,7 +175,7 @@ class ContextAssembler:
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
         tool_names = offered_tools(projection, department, session_id=session_id,
-                                   guidance_only=guidance_only, input_modalities=input_modalities)
+                                   input_modalities=input_modalities)
         # 全体角色共同的规则文字与本角色的可见范围取自定义
         rules = DEFINITIONS.organization.rules
         visible = DEFINITIONS.role(department).visibility
@@ -436,7 +435,6 @@ class ContextAssembler:
             input_token_estimate=input_token_estimate,
             output_reserve_tokens=max_output_tokens or 0,
             guidance_ids=[item.id for item in guidance_items],
-            guidance_only=guidance_only,
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
@@ -514,7 +512,6 @@ class ContextAssembler:
             input_token_estimate=input_token_estimate,
             output_reserve_tokens=max_output_tokens,
             guidance_ids=list(pinned.manifest.guidance_ids),
-            guidance_only=pinned.manifest.guidance_only,
         )
         return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
 

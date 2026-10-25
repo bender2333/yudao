@@ -60,11 +60,6 @@ class CheckReceipt(Payload):
     qa_tests_hash: str | None = None
 
 
-class YieldedWork(Payload):
-    # 部门为回应指导让出的工作与让出时的依据
-    effective_contract_hash: str | None
-    delivery_spec_hash: str | None
-
 
 class Baseline(Payload):
     # 事项的代码基线：继承的采纳版本
@@ -141,7 +136,6 @@ class Versions(Payload):
     prompt_version: int
     prompt_hash: str | None
     guidance_ids: list[str]
-    guidance_only: bool
 
 class WorkBasis(Payload):
     # 激活开始时的有效合同
@@ -310,7 +304,6 @@ class DepartmentGuidanceRespondedPayload(Payload):
 class DepartmentActivatedPayload(Versions, WorkBasis):
     activation_id: str
     cycle: int
-    yielded_work: YieldedWork | None
     guidance_version: int
 
 
