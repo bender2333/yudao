@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import threading
@@ -12,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from harness.collaboration import has_new_work
-from harness.engine import StepLimits
+from harness.engine import StepDriver, StepLimits
 from harness.models import DEPARTMENTS, EventType
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade
@@ -161,6 +162,28 @@ def _answer_open_decision(system: LoopSystem, option: str) -> None:
         command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:{option}:1", "user:local")
         system.orchestrator.answer_decision(decision.decision_id, option, None,
                                              base_version=decision.version, command=command)
+
+
+def _answer_one(system: LoopSystem, decision, option: str) -> str | None:
+    # 只回答一条待恢复的决定请求：交回需要继续执行的 run（没有时为空）
+    command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:{option}:1", "user:local")
+    return system.orchestrator.answer_decision(decision.decision_id, option, None,
+                                                base_version=decision.version, command=command)
+
+
+def _yield_before_the_safe_node(monkeypatch, department: str) -> None:
+    # 让一个部门的驱动器在安全节点以前让出一次（恢复上一次激活没有处置完的工具调用）：
+    # 两个会话的驱动器任务在事件循环里前后相邻，余量只有一轮；后一个会话让出一次，
+    # 先一个会话的决定请求就已经写下，后一个会话在自己的安全节点上看见它。
+    # 用例因此确定地走到「两个会话同时被挡住」的场景，不靠时序碰运气（工单 #933）
+    original = StepDriver._continue_unexecuted_calls
+
+    async def patched(self):
+        if self._scope.department == department:
+            await asyncio.sleep(0)
+        return await original(self)
+
+    monkeypatch.setattr(StepDriver, "_continue_unexecuted_calls", patched)
 
 def test_missing_credential_blocks_until_the_dotenv_file_is_fixed(tmp_path):
     server, capture, base = serve(lambda _body: _stream_reply(
@@ -366,14 +389,15 @@ def test_swapping_the_department_model_limits_the_saved_tier_on_the_next_request
         server.shutdown()
         server.server_close()
 
-def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
+def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path, monkeypatch):
     # 部门默认所选模型的准入作废（改了连接的地址）以后，该部门的下一次模型请求进入待恢复，
     # 重新测试通过并回答以后继续执行；引用保留，已完成的工作与已用限额保留（工单 #86）
     # 同一次运行跨越产品与工程两个部门：产品请求返回产品要求，工程请求返回交付文件
-    # 同时运行的会话（工单 #557）：工程与质检各自走到被挡住的那一步，各发一条待恢复的决定请求。
-    # 这一步能不能两个都走到，取决于两个会话的先后：一条未回答的决定请求就挡住整个 run，
-    # 后到的会话在自己的安全节点上看见它就不再发请求（工单 #893 登记了这个缺口）。
-    # 用例因此核对两个会话都走到了这一步（夹具记录），不假定它。
+    # 同时运行的会话（工单 #557）：工程与质检各自走到被挡住的那一步，各发一条待恢复的决定请求
+    # （模型管理设计说明第 5.5 节：同一事项里同时有几个会话被挡住时，各发一条，各写明自己的部门、模型与问题，
+    # 事项等这几条都回答以后再继续）
+    # 质检的驱动器在安全节点以前让出一次：确定地走到「两个会话同时被挡住」的场景，不靠时序碰运气
+    _yield_before_the_safe_node(monkeypatch, "quality")
     server, capture, base = serve(_department_aware_reply)
     try:
         system, facade, _dotenv = _file_system(tmp_path, base, dotenv_text="SCENARIO_KEY=secret-1\n")
@@ -398,8 +422,8 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
         assert blocked.status == "running"
         # 两个会话各自走到被挡住的那一步（工单 #557）：解析调用目标失败就是这一步，
         # 它紧跟在这个会话的第一个安全节点以后发生。
-        # 一条未回答的决定请求就挡住整个 run：第二个会话若在自己的安全节点上已经看见第一条请求，
-        # 它就停在安全节点、不再发自己的请求。因此这里核对两个会话都走到了这一步，不假定它。
+        # 别的会话写下请求以后，这个会话照常停下，但停下的不是取消（工单 #856）：
+        # 它自己也被挡住时（这次的模型请求发不出去），它写下自己的那一条（设计第 5.5 节）。
         assert set(facade.blocked_departments) == {"engineering", "quality"}, facade.blocked_departments
         # 同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，每条写明自己的部门
         # （模型管理设计说明第 5.5 节：这次模型请求不发送，事项停在这次请求之前）
@@ -413,13 +437,20 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path):
         # 已完成的工作与已用限额保留：停止发生在这次请求之前，事件只增不改
         assert len(system.store.list_events(run_id)) > positions_before
 
-        # 把地址改回去并重新测试：准入重新有效，回答以后从这次请求接着进行
+        # 回答其中一条以后，另一条仍然待回答，事项仍然不继续（设计第 5.5 节：等这几条都回答以后再继续）
+        assert _answer_one(system, decisions[0], "continue") is None
+        _position, pending = saved_decisions(system.store, statuses=("open",))
+        assert [decision.decision_id for decision in pending] == [decisions[1].decision_id]
+        # 事项没有继续：没有新的模型请求发出去
+        assert [item["model"] for item in capture.requests] == ["m-local-target"]
+
+        # 把地址改回去并重新测试：准入重新有效，两条都回答以后从这次请求接着进行
         document["providers"][0]["base_url"] = base
         facade.store_document(document)
         facade.record_admission("local", "m-local", admitted_model="m-local-target")
         assert facade.model_admissions()[0]["stale"] is False
 
-        _answer_open_decision(system, "continue")
+        assert _answer_one(system, decisions[1], "continue") is not None
         finished = system.activate_once(run_id)
         # 从被挡住的那次请求接着进行：工程部门的交付请求重新发出并被接受
         assert has_new_work(finished, "quality"), finished.error

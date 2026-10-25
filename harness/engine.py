@@ -50,9 +50,12 @@ COMPACTION_REQUEST_TIER = "minimal"
 
 @dataclass(frozen=True)
 class Judgment:
-    # 安全节点的回答：是否继续，以及作出判断时 run 流的版本
+    # 安全节点的回答：是否继续，以及作出判断时 run 流的版本；
+    # blocked_by_other_session 说明别的会话已经写下待恢复的决定请求（模型管理设计说明第 5.5 节）：
+    # 这个会话照常停下（事项的状态不变，工单 #856），它自己也被挡住时它要写下自己的那一条
     proceed: bool
     version: int
+    blocked_by_other_session: bool = False
 
 
 class SafeNode(Protocol):
@@ -353,10 +356,21 @@ class StepDriver:
         if key is not None and self._facade is not None:
             self._facade.release_call_handle(key)
 
-    def _proceed(self) -> bool:
+    def _proceed(self) -> Judgment:
         judgment = self._nodes.proceed()
         self._version = judgment.version
-        return judgment.proceed
+        return judgment
+
+    def _stop_now(self, judgment: Judgment) -> Stopped:
+        # 这个会话停下。别的会话已经写下待恢复的决定请求时，它照常停下（事项的状态不变，工单 #856）；
+        # 它自己也被挡住时（这次的模型请求发不出去），它写下自己的那一条决定请求，
+        # 各写明自己的部门、模型与问题（模型管理设计说明第 5.5 节）。
+        # 写下以后由流程编排走待恢复那一条路，与它自己走到被挡住那一步时写下的完全一样
+        if judgment.blocked_by_other_session and self._facade is not None:
+            unavailable = self._begin_call()
+            if unavailable is not None:
+                return unavailable
+        return Stopped(judgment.version)
 
     async def _wait(self, seconds: float) -> bool:
         judgment = await self._nodes.wait(seconds)
@@ -383,8 +397,9 @@ class StepDriver:
         while self._consumed_steps < limits.max_model_steps:
             step_id += 1
             self._consumed_steps += 1
-            if not self._proceed():
-                return Stopped(self._version)
+            judgment = self._proceed()
+            if not judgment.proceed:
+                return self._stop_now(judgment)
             prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id,
                                      replies_without_tool_call)
             if isinstance(prepared, Stopped):
@@ -424,9 +439,9 @@ class StepDriver:
                     and attempt < limits.max_provider_attempts
                     and self._consumed_steps < limits.max_model_steps
                 )
-                will_retry = can_retry and self._proceed()
+                will_retry = can_retry and self._proceed().proceed
                 self._recorder.attempt_failed(request, retry_error, will_retry)
-                if not self._proceed():
+                if not self._proceed().proceed:
                     return Stopped(self._version)
                 if not will_retry:
                     if retry_error.retryable and self._consumed_steps >= limits.max_model_steps:
@@ -467,7 +482,7 @@ class StepDriver:
             retry_of_step_id = None
             # 这次逻辑调用成功，凭据材料不再保留；下一次逻辑调用重新解析
             self._release_call()
-            if not self._proceed():
+            if not self._proceed().proceed:
                 self._skip(request, response.output,
                            "Not executed because this activation ended or its input changed during the model request.")
                 return Stopped(self._version)
@@ -493,7 +508,7 @@ class StepDriver:
             for index, item in enumerate(response.output):
                 if item.get("type") != "function_call":
                     continue
-                if not self._proceed():
+                if not self._proceed().proceed:
                     self._skip(request, response.output[index:],
                                "Not executed because this activation ended or its input changed before these tools started.")
                     return Stopped(self._version)
@@ -597,7 +612,7 @@ class StepDriver:
                     failure = output["workspace_unrepresentable"]
                     raise ProviderError(failure["message"], reason="workspace_unrepresentable",
                                         facts=list(failure.get("paths", [])))
-                if not self._proceed():
+                if not self._proceed().proceed:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because this activation ended or its input changed after the current tool.")
                     return Stopped(self._version)
@@ -620,7 +635,7 @@ class StepDriver:
         # 每个都照常经过工具许可与执行环境，写好 tool_called；不重新调用模型，也不整批重发已经执行过的动作
         calls, request = self._unexecuted_calls()
         for call in calls:
-            if not self._proceed():
+            if not self._proceed().proceed:
                 return
             await self._execute_call(request, call)
 
