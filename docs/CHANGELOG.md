@@ -559,3 +559,5 @@ claude-fable-5-1（总架构师） / 2026-10-25 23:45 / `CLAUDE.md` 用户的参
 claude-opus-5-5（子架构师） / 2026-10-26 00:50 / docs/design/test-pyramid.md 新增第 11.2 节「只为真实变化重写」并在状态行记一句；docs/design/skeleton-and-application.md 第 12 节加 #1019 一行，排序改为 S0、#1019 → S1a；docs/decision.md 追加 2026-10-26 一条 / 用户确认走查候选 2 的四问
 
 claude-fable-5-1（总架构师） / 2026-10-26 00:30 / `docs/decision.md` 把插在顶部的两条 10-25 条目（最小投影、内核工单批准）挪到末尾按正序，只动位置；`docs/agents/shared-rules.md`「文档与记录」补一条：decision.md 按时间正序追加末尾 / 10-25 23:30 已改为正序，我后来两条又插了顶部；子架构师问顺序，定下来写进规则。
+
+claude-sonnet-5-5 / 2026-10-26 01:10 / docs/design/test-pyramid.md 新增第 13 节「测试按三环留」，状态行记一句，第 4.4 节第 1 条与第 10 节第 5 条改为「用例只由架构师删」；CLAUDE.md「角色」加删除用例的例外、「工单规范」删减功能的工单一条改为用例由架构师先删；AGENTS.md 执行者（测试写法、交付说明）与审查者（内容核对）改为不删用例、新增用例写明守第 13 节的哪一条；.claude/skills/to-children/SKILL.md 同步；新增 docs/evaluation/test-subtraction-2026-10-26.md（删前删后数字、裁定、逐文件清单） / 用户要对测试做减法，只留符合新总图与路线图的，并指出由执行者删测试有逻辑冲突
