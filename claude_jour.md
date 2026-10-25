@@ -2755,3 +2755,27 @@ minimax-M3.1-Flash / 2026-10-25 07:50 / #840 完成并记账；接上 #933（互
   「停下其余会话」与「取消整个事项」分开了，这张要保留那个口径：别的会话写下请求以后，仍然进行中的会话照旧停下，
   但停下的不是取消。
 - 队列：可做 7 张，2 张在跑（#943、#933），互斥排队的是 #558、#559、#560、#561、#857。
+
+minimax-M3.1-Flash / 2026-10-25 08:20 / #943 完成并记账；剩下五张互斥项查过文件重叠，确实只能一张一张来。
+
+- #943 完成（PR #944 合并，日记补记另开 PR）：两个文件（`test_issue_308_file_action_verification.py` 四条、
+  `test_issue_350_usage_resumes.py` 一条）的脚本与 `tail` 按部门补上质检会话，五条用例各补「结果确实交还了」的断言
+  （`action_verified` 里那个调用编号恰好一条 + `resolution`，自动核实那一条另加「模型的下一次请求里带着确定的结果」）
+  与「那条命令整个 run 里只有最初那一次 `tool_started`」。
+- **它做得比工单要求的更多**：验收第 5 条它用 AST 扫 + 临时探针逐个核了 `harness/tests/` 里另外 19 处
+  「脚本字面上只写产品与工程」的地方（`test_department_guidance.py` 15、`test_onboarding.py` 3、`test_context.py` 1）：
+  那些用例里质检那一步从未被激活，今天不触发脚本用尽，但它仍按部门写全（补 `"quality": []`，行为不变），
+  改完再扫 0 处。范围按 `AGENTS.md` 在工单评论里补记。
+- 验证：30 次重复运行 0 失败、单元层退出码 0、集成层 1287 项 0 失败 0 错误（本地与 GitHub 运行机
+  `40144678883` 的 ③ 集成层都过）。它**如实说明**本机复现不出那个偶发失败（工单正文已写明窗口窄），
+  差别是结构性的而不是本地可见的反转。
+- 它过程中误在编排者的 `.ralph/m0-solo/` 账本目录里建过一个文件，自己立即移出；已核对该目录完好。
+- **剩下五张互斥项的文件重叠查过了**（决定互斥名额不用放宽）：
+  - #558：`harness/orchestrator.py`、`harness/adjudication.py`、`harness/tests/test_concurrent_departments.py`；
+  - #559：同时互相询问与多个分支（从 #520 拆出，改 `WritePath` 的版本核对与各部门的检查副本）；
+  - #560：`harness/collaboration.py`（`guidance_*`）、`harness/interactions.py`；
+  - #561：`harness/collaboration.py`（与 #560 同一个文件）、`harness/definitions/tools.json`、`harness/validation.py`，
+    **相关事件序列基准由 #561 重建**；
+  - #857：`harness/projection.py`（`cycle_count`）、`harness/bounds.py`，**也要重新生成事件序列基准**。
+  #560 与 #561 碰同一个文件，#561 重建基准、#857 又重建基准 → 顺序必须是 #558 → #559 → #560 → #561 → #857。
+  所以互斥名额保持 1 不只是守规则，是这批活本身的要求。
