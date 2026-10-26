@@ -1,6 +1,6 @@
 ---
 name: solo
-description: 以 solo 模式把一组工单做完：自己领取、实现、自测、开 PR、发交付说明、自我核对、合并；每一轮都在一个全新的子代理上下文里执行，轮与轮之间只靠 .ralph/<循环>/ 的账本传递。范围与并发都是参数，范围按外部工单每轮重算（工单会进出里程碑，里程碑会改名）；一轮最多并发 N 张，每张一个 worktree，带 touches-core 的互斥。设计问题与连续三次失败交回后台架构师（needs-triage），执行环境挡住转用户（ready-for-human）。
+description: 以 solo 模式把一组工单做完：自己领取、实现、自测、开 PR、发交付说明、自我核对、合并；每一轮都在一个全新的子代理上下文里执行，轮与轮之间只靠 .ralph/<循环>/ 的账本传递。范围与并发都是参数，范围按外部工单每轮重算（工单会进出里程碑，里程碑会改名）；一轮最多并发 N 张，每张一个 worktree，带 `@exclusive` 标记的互斥（`touches-core` 不互斥）。设计问题与连续三次失败交回后台架构师（needs-triage），执行环境挡住转用户（ready-for-human）。
 argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--并发 N] [--互斥 N] [--续 <循环名>]"
 ---
 
@@ -67,7 +67,8 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | 行尾 `（waiting）` | 前提条件没满足 |
 | 行尾 `（等用户）` | 转给用户了 |
 | 行里 `#<编号>` | 对应的工单号 |
-| 行里 `touches-core` 或 `@exclusive` | 互斥任务，同一时刻最多 `concurrency.exclusiveLimit` 张 |
+| 行里 `@exclusive` | 互斥任务，同一时刻最多 `concurrency.exclusiveLimit` 张 |
+| 行里 `touches-core` | 改核心文件：合并前在分支上多跑一次集成层；不互斥 |
 | 行里 `(after T-030)` 或 `依赖 T-030` | 前面那张完成才派 |
 
 `state.json` 里要紧的字段：
@@ -126,7 +127,6 @@ pause | resume [--no-auto] [--wait hook|notify] | auto on|off | budget --iterati
 | 「[M0] 开头的」 | `next --prefix "[M0]"` |
 | 「都做」/ 没说范围 | `next --all` |
 | 「一次做两张」 | `next --concurrency 2`，或者 `concurrency --max 2` |
-| 「核心的单子一张一张来」 | `--exclusive 1`（默认就是 1） |
 
 三个范围条件是**并集**：里程碑里的、带那个标签的、标题带那个前缀的，都算。开循环时把用户的原话抄进 `goal.md` 的「范围」一节，之后每轮不再问。
 
