@@ -714,31 +714,7 @@
       "label": "停止事项"
      }
     ],
-    "reason": "provider_unavailable",
-    "target": {
-     "accepts_required_tool_call": true,
-     "base_url": "",
-     "configured_max_output_tokens": 4800,
-     "context_window": 32000,
-     "credential_ref": null,
-     "credential_version": null,
-     "default_reasoning_level": null,
-     "input_modalities": [
-      "text"
-     ],
-     "model_id": "fake-model",
-     "protocol": "fake",
-     "provider_config_id": "fake",
-     "provider_name": "fake",
-     "reasoning_levels": [],
-     "reasoning_mode": null,
-     "requested_model": "fake-script",
-     "requested_protocol": "fake",
-     "requested_provider": "fake",
-     "requested_tier": null,
-     "selection_source": null,
-     "sent_tier": null
-    }
+    "reason": "provider_unavailable"
    }
   },
   {

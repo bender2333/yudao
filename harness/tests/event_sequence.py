@@ -189,8 +189,11 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "run_failed": ("human_action", "stop_reason"),
     "run_resumed": ("acquired_epoch", "previous_epoch"),
     "run_continued": ("decision_id", "stop_reason"),
-    "decision_requested": ("blocks", "department", "kind", "options", "reason", "stop_reason",
-                           "target"),
+    # decision_requested 不带 target（工单 #618，test-pyramid.md 第 11.1 节「不进入基准」）：target 里是模型与
+    # 连接配置（provider_name、requested_model、base_url、context_window、configured_max_output_tokens 等），
+    # 换一条连接或改默认输出上限不改变行为，不该让基准跟着重写；一次运行里的决定请求由 kind、department、
+    # reason、options 与 blocks 识别，同一会话里同类决定的先后由事件序列本身比较。
+    "decision_requested": ("blocks", "department", "kind", "options", "reason", "stop_reason"),
     "decision_answered": ("base_version", "decision_id", "option"),
     "decision_withdrawn": ("decision_id", "reason"),
 }

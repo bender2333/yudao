@@ -45,29 +45,7 @@
       "label": "停止事项"
      }
     ],
-    "reason": "provider_unavailable",
-    "target": {
-     "accepts_required_tool_call": null,
-     "base_url": null,
-     "configured_max_output_tokens": null,
-     "context_window": null,
-     "credential_ref": null,
-     "credential_version": null,
-     "default_reasoning_level": null,
-     "input_modalities": [],
-     "model_id": null,
-     "protocol": "test",
-     "provider_config_id": null,
-     "provider_name": "fake",
-     "reasoning_levels": [],
-     "reasoning_mode": null,
-     "requested_model": "fake-script",
-     "requested_protocol": "test",
-     "requested_provider": "fake",
-     "requested_tier": null,
-     "selection_source": null,
-     "sent_tier": null
-    }
+    "reason": "provider_unavailable"
    }
   },
   {
