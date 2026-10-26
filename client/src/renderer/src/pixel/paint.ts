@@ -4,7 +4,7 @@
 
 import { hash } from "./anims.ts";
 import { linePts, mix, rgba } from "./grid.ts";
-import { PAL } from "./registry.ts";
+import { PAL, PIXEL_FONT_STACK } from "./registry.ts";
 import { drawBitmap, drawPixelText, drawText, fillPixel, fillPixelOutlined } from "./shapes.ts";
 
 /** 陈设画法的参数表；各方法按原型保留自己的可选参数。 */
@@ -190,7 +190,7 @@ function deskItems(c: CanvasRenderingContext2D, x0: number, y0: number, o?: Pain
     fillPixel(c, lx, ly + 2, 2, 1, PAL.grey3);
   }
   if (o?.nameplate) {
-    c.font = `600 6px sans-serif`;
+    c.font = `600 6px ${PIXEL_FONT_STACK}`;
     const tw = Math.min(w - 10, c.measureText(String(o.nameplate)).width + 6);
     const nx = Math.round(x + w / 2 - tw / 2);
     fillPixel(c, nx - 1, y + 2, tw + 2, 9, PAL.ink);
@@ -369,7 +369,7 @@ function whiteboard(c: CanvasRenderingContext2D, x0: number, y0: number, o?: Pai
       fillPixel(c, x + 8, ly, Math.round((0.4 + hash(i + 3) * 0.5) * (w - 16 - sheetW)), 1, col);
     }
     if (ln.tag) {
-      c.font = "700 5px sans-serif";
+      c.font = `700 5px ${PIXEL_FONT_STACK}`;
       const tw = Math.min(34, c.measureText(ln.tag).width + 4);
       const tx = x + w - 3 - sheetW - tw;
       fillPixel(c, tx, ly - 3, tw, 7, ln.tagColor || PAL.yellow2);
@@ -694,7 +694,7 @@ function table(c: CanvasRenderingContext2D, x0: number, y0: number, w: number, o
   fillPixel(c, x, y, w, 12, face);
   fillPixel(c, x, y, w, 1, edge);
   if (o?.label) {
-    c.font = "700 6px sans-serif";
+    c.font = `700 6px ${PIXEL_FONT_STACK}`;
     const tw = c.measureText(String(o.label)).width + 8;
     fillPixel(c, x + w / 2 - tw / 2 - 1, y + 2, tw + 2, 9, PAL.ink);
     fillPixel(c, x + w / 2 - tw / 2, y + 3, tw, 7, optStr(o, "labelBg", PAL.paper));
@@ -804,7 +804,7 @@ function cardCabinet(c: CanvasRenderingContext2D, x0: number, y0: number, o?: Pa
     fillPixel(c, cx, y - h - 4 + (i % 2), 1, 4, i === n - 1 && optBool(o, "flash", false) && Math.floor(t / 150) % 2 === 0 ? PAL.yellow2 : [PAL.white, PAL.blue1, PAL.yellow1][i % 3]);
   }
   if (o?.label) {
-    c.font = "700 5.5px sans-serif";
+    c.font = `700 5.5px ${PIXEL_FONT_STACK}`;
     const lw = c.measureText(String(o.label)).width + 6;
     fillPixel(c, x + w / 2 - lw / 2, y - h - 14, lw, 8, PAL.paper);
     drawText(c, String(o.label), x + w / 2, y - h - 10, { size: 5.5, weight: 700, align: "center", color: PAL.ink2 });
