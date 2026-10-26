@@ -1,7 +1,8 @@
 // 概览页的循环画面：把查询结果交给翻译层，把翻译层给出的状态与动作交给楼层画面（工单 #82、#953）。
 //
 // 这个组件只做连接（画面与播放设计说明第 3 节）：
-//   - 同步层的数据（project.loop、decisions.list）经 translate/floor.ts 翻成画面合同的状态与卡片；
+//   - 同步层的数据（project.loop、decisions.list）与当前事项那次运行的询问链（run.asks）经 translate/floor.ts
+//     翻成画面合同的状态与卡片；
 //   - 事件流里本项目的事件经翻译层翻成动作，回放期间不播动作；
 //   - 打开画面、重新同步、标签页从后台切回与回放拖动都用 jump：直接显示最新状态，不补播；
 //   - 画面的回调（回答决定、点击跳转）变成命令。
@@ -9,7 +10,9 @@
 // 页面文字（下方的文字列表、覆盖层按钮条）不属于画面，照旧按查询结果显示。
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult } from "../../api/generated/types.gen";
+import type {
+  Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, RunAsksResult,
+} from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { newCommandId } from "../../contract/command-id.ts";
 import { commandProblemText } from "../../contract/command-problem.ts";
@@ -53,6 +56,17 @@ const OVERLAY_LABELS: [string, string][] = [
   ["context_usage", "上下文用量"],
   ["semantic_records", "语义记录"],
 ];
+
+/**
+ * 楼层画面要读询问链的那次运行：聚焦的事项优先，否则进行中的一项（与概览页「当前事项」同一口径）。
+ * 没有这样的运行时为空串，页面据此不发查询。
+ */
+export function asksRunId(loop: ProjectLoopResult | null, focus: string | null): string {
+  const rows = loop?.work_items ?? [];
+  const picked = (focus === null ? undefined : rows.find((row) => row.work_item_id === focus))
+    ?? rows.find((row) => row.status === "in_progress" || row.status === "awaiting_initial_prd");
+  return picked?.run_id ?? "";
+}
 
 /** 文字列表里的行：事项本身的状态，不是画面的状态名（工单 #900）。 */
 export function floorTextRows(loop: ProjectLoopResult | null): FloorTextRow[] {
@@ -137,6 +151,11 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const decisions = useSnapshot<DecisionList>(props.app, "page.decisions", "decisions.list", {
     project_id: props.projectId, status: ["open"],
   }, replaying);
+  // 当前事项那次运行的询问链（run.asks，工单 #903）：未回答的询问画在传信管的出口。
+  // 回放不查：这个查询不带位置，把最新的询问画到过去的画面上会讲反（画面诚实性 H7）
+  const runId = useMemo(() => asksRunId(loop.data, props.workItemId), [loop.data, props.workItemId]);
+  const asks = useSnapshot<RunAsksResult>(props.app, "page.loop.asks", "run.asks", { run_id: runId },
+    replaying || runId === "");
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<FloorView | null>(null);
   const modelRef = useRef<FloorModel | null>(null);
@@ -209,11 +228,13 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     };
   }, []);
 
-  // 查询结果经翻译层翻成楼层状态（回到过去的时间点时不显示决定请求，部门按一个部门一个角色画）
+  // 查询结果经翻译层翻成楼层状态（回到过去的时间点时不显示决定请求，部门按一个部门一个角色画）。
+  // 询问链是另一处查询：状态的位置取两处快照里新的一个（与楼的翻译层同一做法）
   const model = useMemo(
     () => floorState({
-      position: loop.position,
+      position: Math.max(loop.position, asks.position),
       loop: loop.data,
+      asks: asks.data === null ? null : { [runId]: asks.data.asks },
       roles: null,
       slots: null,
       ops: null,
@@ -221,7 +242,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
       interrupted: false,
       focus: props.workItemId,
     }),
-    [loop.position, loop.data, props.workItemId],
+    [loop.position, asks.position, loop.data, asks.data, runId, props.workItemId],
   );
 
   // 决定卡片是实时内容：到了就贴上大厅的板（回放期间不显示）
