@@ -80,26 +80,60 @@ function proposalName(ev: SayEvent, pl: Payload): string {
 }
 
 const FILE_RE = /([\w\-./]+\.[A-Za-z0-9]{1,5})(?![A-Za-z0-9])/;
+// 真实系统把工具名与参数放在载荷里：工具名是 name，参数在 args 之下（harness/app/payloads.py 的 ToolStartedPayload）。
+// args 以下的键按工具各自的要求取：读取与修改类用 path，翻找用 pattern，bash 用 command。
+const argsOf = (pl: Payload): Payload => (pl.args as Payload | undefined) ?? {};
+const argOf = (pl: Payload, key: string): string | null => {
+  const value = argsOf(pl)[key] ?? pl[key];
+  return typeof value === "string" && value !== "" ? value : null;
+};
 const fileOf = (ev: SayEvent, pl: Payload): string | null =>
-  (typeof pl.path === "string" && pl.path) || (typeof pl.file === "string" && pl.file) || (FILE_RE.exec(text(ev.label)) ?? [])[1] || null;
-// 命令：载荷里有就用载荷，没有就取事件说明末尾的英文名称
+  argOf(pl, "path") ?? argOf(pl, "source") ?? (typeof pl.file === "string" ? pl.file : null)
+  ?? (FILE_RE.exec(text(ev.label)) ?? [])[1] ?? null;
+// 翻找的查询词：真实载荷在 args.pattern，原型事件的载荷直接给 query
+const searchQuery = (pl: Payload): string | null => argOf(pl, "pattern") ?? argOf(pl, "query");
+// 命令：真实载荷给 args.command（顶层 command 也认），原型事件把命令名写在说明的末尾。
+// 不回退 name：真实载荷的顶层 name 是工具名，回退会把工具名当命令说出来。
 const commandOf = (ev: SayEvent, pl: Payload): string | null =>
-  (typeof pl.command === "string" && pl.command)
-  || (typeof pl.name === "string" && pl.name)
-  || (/([A-Za-z][\w.\-]*)\s*$/.exec(text(ev.label)) ?? [])[1]
-  || null;
+  argOf(pl, "command") || (/([A-Za-z][\w.\-]*)\s*$/.exec(text(ev.label)) ?? [])[1] || null;
+
+// 交出类工具的说话：真实系统的 submit_* 与提案事件的 kind 共用一套名字（harness 的提案合同）
+const SUBMIT_NAME: Readonly<Record<string, string>> = {
+  submit_product_spec: "产品规格",
+  submit_product_decision: "产品决定",
+  submit_delivery: "交付说明",
+  submit_review: "质检结论",
+  ask: "询问",
+  answer: "回答",
+  submit_guidance_response: "指导回复",
+};
 
 function toolText(ev: SayEvent, pl: Payload): string | null {
-  const tool = text(ev.tool ?? pl.tool);
+  const tool = text(ev.tool ?? pl.tool ?? pl.name);
   const file = fileOf(ev, pl);
-  if (tool === "search") return "现在翻找资料" + (typeof pl.query === "string" && pl.query ? "：" + cut(pl.query, 12) : "");
-  if (/^read/.test(tool)) return "现在阅读" + (file ? " " + cut(baseName(file), 16) : "资料");
-  if (/^(edit|write)/.test(tool)) return "现在编辑" + (file ? " " + cut(baseName(file), 16) : "文件");
+  const named = (prefix: string, fallback: string): string =>
+    "现在" + prefix + (file ? " " + cut(baseName(file), 16) : fallback);
+  if (tool === "search") {
+    const q = searchQuery(pl);
+    return "现在翻找资料" + (q ? "：" + cut(q, 12) : "");
+  }
+  if (/^read/.test(tool)) return named("阅读", "资料");
+  if (/^(edit|write)/.test(tool)) return named("编辑", "文件");
+  if (tool === "delete_file") return named("删除", "文件");
+  if (tool === "move_file") return named("移动", "文件");
+  if (tool === "list_files") return "现在看看有什么文件" + (argOf(pl, "prefix") ? "：" + cut(argOf(pl, "prefix") ?? "", 12) : "");
+  // 交出类工具（真实系统的 submit_*）：提案事件随后还会说一次提交了什么，这里先说正在交出哪一份
+  const submit = SUBMIT_NAME[tool];
+  if (submit !== undefined) return "现在提交" + submit;
+  if (/^submit_/.test(tool)) return "现在提交";
   if (tool === "run_command" || tool === "bash") {
     const name = commandOf(ev, pl);
     return "现在执行" + (name ? " " + cut(name, 14) : "命令");
   }
-  if (tool === "run_check") return "现在检查交付";
+  if (tool === "run_check") {
+    const name = argOf(pl, "name");
+    return "现在检查交付" + (name ? "：" + cut(name, 12) : "");
+  }
   if (/^browser/.test(tool)) return ev.department === "quality" ? "现在试用网页" : "现在自测网页";
   if (/^(fetch|http|net|url)/.test(tool)) return "现在取回网络资料";
   if (/^mcp/.test(tool)) return "现在调用工具";
@@ -132,9 +166,13 @@ const TEXT: Readonly<Record<string, SayText>> = {
   model_attempt_failed: () => "请求失败了",
   tool_started: toolText,
   tool_called: (ev, pl) => {
-    if (!["run_command", "bash"].includes(text(ev.tool ?? pl.tool))) return null;
+    const tool = text(ev.tool ?? pl.tool ?? pl.name);
+    if (!["run_command", "bash"].includes(tool)) return null;
     if (flag(pl.timed_out)) return "命令超时了";
-    return pl.exit_code === 0 ? "命令通过了" : "命令没有通过";
+    // 真实载荷只有 ok 与 error（退出码在工件里，事件上读不到）；原型事件带 exit_code
+    const ok = typeof pl.exit_code === "number" ? pl.exit_code === 0 : pl.ok !== false;
+    if (ok) return "命令通过了";
+    return "命令没有通过" + (text(pl.error) ? "：" + cut(pl.error, 12) : "");
   },
   tool_skipped: () => "这个工具没有获准，换个办法",
   proposal_submitted: (ev, pl) => "现在提交" + proposalName(ev, pl),
@@ -159,7 +197,11 @@ const TEXT: Readonly<Record<string, SayText>> = {
   run_done: () => "完成了！",
   run_resumed: () => "继续工作",
   run_continued: () => "收到你的回答，继续工作",
-  decision_requested: () => "现在送出决定单",
+  decision_requested: (_ev, pl) => (
+    pl.kind === "model_unavailable" ? "模型引用用不了，等你决定"
+      : pl.kind === "unknown_action" ? "这个动作的结果不确定"
+        : "现在送出决定单"
+  ),
   decision_answered: () => "收到你的回答",
   project_decision_requested: () => "现在送出决定单",
   project_decision_answered: () => "收到你的回答",

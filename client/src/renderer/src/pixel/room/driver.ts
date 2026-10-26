@@ -1,19 +1,26 @@
-// 部门房间的驱动：按快照配置角色与持续状态，把事件变成动作放进角色的队列（原型 v10 room.js 的
-// setModel、playEvent、restFor、applyLights 与 handlers，工单 #177）。
+// 部门房间的驱动（原型 v13 room.js 的 createRoomScene，工单 #954）：按状态摆姿势，按画面合同的动作演。
 //
 // 驱动持有一个场景（world/scene.ts 的 createScene），小人的走位与动作由场景的脚本按帧推进；
 // 渲染层只读驱动的房间数据与场景里 actor 的状态。这里不依赖渲染与 PixiJS，可以直接在 node --test 下驱动。
+//
+// 排队的规则不在这里：动作按位置交给播放时间线（pixel/timeline.ts），
+// 状态只等位置不大于它的动作演完再上画面，正在演的动作不被状态的变化打断（设计说明第 5.2、5.3 节）。
+// 说话的内容由翻译层写在动作的 say 与 sayTo 上，这里只管演。
 
 import { createScene } from "../world/scene.ts";
-import { say as sayCatalog, sayMs } from "../world/say.ts";
+import { sayMs } from "../world/say.ts";
 import { PAL } from "../registry.ts";
 import { hash } from "../anims.ts";
 import { headTop } from "../shapes.ts";
-import type { Actor, PixelFloorEvent, SceneLike, SceneOptions, Step } from "../world/types.ts";
-import { handoffOf, layoutDesks, levelAtLeast, poseAnim, resolveAction, rolesOf, spriteForRole, toolSpot } from "./decl.ts";
-import { L, ROW_A, ROW_B, S, SPOT } from "./layout.ts";
-import type { RoomRole, RoomSeat } from "./layout.ts";
-import { createRoomState, emptyRoomModel, letterSides, quoted, type DeskState, type RoomModel, type RoomState } from "./room.ts";
+import { action as contractAction, roomState as contractRoomState } from "../contract.ts";
+import type { PixelAction, PixelState } from "../contract.ts";
+import { create as createTimeline, type Timeline, type TimelineEntry, type TimelineInspect } from "../timeline.ts";
+import type { Actor, SceneLike, SceneOptions, Step } from "../world/types.ts";
+import { layoutDesks, rolesOf, spriteForRole } from "./decl.ts";
+import { L, ROW_A, ROW_B, S, SPOT, levelAtLeast } from "./layout.ts";
+import type { RoomSeat } from "./layout.ts";
+import { createRoomState, emptyRoomData, type DeskState, type RoomData, type RoomRoleData, type RoomState as RoomTemp } from "./room.ts";
+import { ROOM_KINDS } from "./room-decl.ts";
 
 const PROP_KEEP = 7000;
 const BENCH_KEEP = 12000;
@@ -21,20 +28,27 @@ const BENCH_KEEP = 12000;
 /** 桌上保留时间的字段：值是从保留到期的时刻（其余字段不是时间）。 */
 type DeskNumberKey = "folder" | "doc" | "box" | "card" | "cardResult" | "scroll" | "letter";
 
+/** 房间里一个动作占的参与方（时间线用）。 */
+interface StreamWho {
+  room?: string | null;
+  role?: string | null;
+}
+
 /** 房间里的一个角色：角色的持续与动作状态（渲染只读）。 */
 export interface RoomActor {
   id: string;
-  role: RoomRole;
+  role: RoomRoleData;
   desk: RoomSeat;
+  /** 正在演的动作种类。 */
   doing: string | null;
+  /** 正在演的动作在时间线上的编号；没有时为 null。 */
+  runId: number | null;
+  /** 演着时间线上的动作时到达的进度，演完以后接上最近的一项。 */
+  pendingProgress: PixelAction | null;
   persist: { anim: string; icon?: { kind: string; text?: string } | null; hold?: string | null; write?: boolean; until?: number } | null;
   say: { text: string; until: number } | null;
-  /** 排队的动作：`from` 是产生它的真实事件类型，事项进入停止态时据此决定保留或清除。 */
-  queue: { fn: () => void; at: number; from: string; action: string }[];
-  /** 正在做的是交接：交接与盖章先做完，状态类动作排在它们后面（原型 v11 第 2 条）。 */
-  handoff: boolean;
   formSign: string | null;
-  /** 流式输出的累计文字：第一段取代默认的标签，后续片段接在后面。 */
+  /** 流式输出的累计文字（实时内容，不进时间线）。 */
   streamText: string | null;
   nextStretch: number;
   nextPause: number;
@@ -55,16 +69,26 @@ interface RestSpec {
 
 /** 房间驱动：世界（角色与场景）与画面状态都在这里维护。 */
 export interface RoomDriver {
-  model: RoomModel;
-  state: RoomState;
+  model: RoomData;
+  state: RoomTemp;
   scene: SceneLike;
   actors(): RoomActor[];
   primary(): RoomActor | null;
   actorById(id: string): RoomActor | null;
-  setModel(model: RoomModel): void;
-  playEvent(ev: PixelFloorEvent): void;
-  setStreamText(text: string): void;
-  step(): void;
+  /** 一份状态：等位置不大于它的动作演完再上画面。 */
+  setState(state: PixelState): void;
+  /** 跳到最新：清空时间线，直接显示给出的状态（打开、重新同步、切换部门、标签页切回）。 */
+  jump(state: PixelState): void;
+  /** 一个动作：检验画面合同以后交给播放时间线。 */
+  play(action: PixelAction): void;
+  /** 实时内容：流式文字，到了就显示，不进时间线。 */
+  stream(who: StreamWho, text: string): void;
+  /** 推进一帧：deltaMs 是这一帧的墙钟时间（画面时间按加快倍率推进）。 */
+  step(deltaMs?: number): void;
+  /** 画面里的时间要推进得比真实时间快几倍（关键动作被要求限时演完时大于 1）。 */
+  rate(): number;
+  /** 时间线此刻的读数（测试与调节面板）。 */
+  timeline(): TimelineInspect;
 }
 
 /** 走位与动作的脚本构造器（原型 room.js 的 plan）。 */
@@ -74,6 +98,17 @@ interface Plan {
   y: number;
   seated: boolean;
   tailAt?: number;
+}
+
+interface PlanApi extends Plan {
+  stand(): PlanApi;
+  to(x: number, y: number, gait?: string, speed?: number): PlanApi;
+  spot(name: string, gait?: string): PlanApi;
+  sit(gait?: string): PlanApi;
+  add(...list: Step[]): PlanApi;
+  mark(): PlanApi;
+  back(gait?: string): PlanApi;
+  run(finalize?: () => void, tail?: number): PlanApi;
 }
 
 function makePlan(scene: SceneLike, a: RoomActor, actor: Actor, blocks: Block[]): PlanApi {
@@ -142,17 +177,6 @@ function makePlan(scene: SceneLike, a: RoomActor, actor: Actor, blocks: Block[])
   return p;
 }
 
-interface PlanApi extends Plan {
-  stand(): PlanApi;
-  to(x: number, y: number, gait?: string, speed?: number): PlanApi;
-  spot(name: string, gait?: string): PlanApi;
-  sit(gait?: string): PlanApi;
-  add(...list: Step[]): PlanApi;
-  mark(): PlanApi;
-  back(gait?: string): PlanApi;
-  run(finalize?: () => void, tail?: number): PlanApi;
-}
-
 interface Block {
   x0: number;
   x1: number;
@@ -171,19 +195,15 @@ function blocked(blocks: Block[], p0: [number, number], p1: [number, number]): b
 }
 
 /** 交接的物件到画法位图（原型 room.js 的 ART_BMP）。 */
-const ART_BMP: Record<string, string | false> = { prd: "scroll", box: "box_sealed", defect: "box_rework", release: "box_release", letter: "letter" };
-/** 提案被接纳或退回后托盘清空（原型 PROPOSAL_DONE）。 */
-const PROPOSAL_DONE = new Set(["spec_accepted", "contract_accepted", "delivery_accepted", "qa_submitted", "proposal_rejected"]);
-/** 只改变房间物件的事件：不影响小人正在做和排队的动作（原型 SIDE_ONLY）。 */
-const SIDE_ONLY = new Set(["guidance_in", "semantic", "freeze"]);
-/** 由动作自己让两端说话的（原型 OWN_SPEECH）。 */
-const OWN_SPEECH = new Set(["hand_back"]);
-/** 打字思考类动作：头顶已有思考气泡，不再重复说话（原型 THINK_ACTIONS）。 */
+const ART_BMP: Record<string, string | false> = { prd: "scroll", box: "box_sealed", defect: "box_rework", release: "box_release" };
+/** 提案有了结果（盖章或退回），托盘清空。 */
+const TRAY_CLEAR = new Set(["stamp_valid", "seal", "stamp_release", "stamp_rework", "returned"]);
+/** 只改变房间物件、没有小人要走动的动作（演完立刻报告时间线）。 */
+const PROPS_ONLY = new Set(["guidance_in", "semantic", "hold_card"]);
+/** 动作自己让两端的小人各说一句（交接的两端、交回结果的两端）。 */
+const OWN_SPEECH = new Set(["hand_back", "handoff"]);
+/** 打字思考时头顶已经有思考气泡，不再说话。 */
 const THINK_ACTIONS = new Set(["type_think", "stream_text"]);
-/** 状态类动作立即执行（原型 IMMEDIATE）。 */
-const IMMEDIATE = new Set(["paused", "failed", "done", "cancelled", "puzzled", "hold_card", "resume"]);
-/** 交接与盖章这两类先做完（原型 v11 第 2 条）：还在做或排在队里时，状态类动作排在它们后面。 */
-const KEEP_ACTIONS = new Set(["seal", "stamp_valid", "stamp_release", "stamp_rework"]);
 
 /** 建立部门房间的驱动。 */
 export function createRoomDriver(opts: { department: string; sceneOptions: SceneOptions }): RoomDriver {
@@ -192,7 +212,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   const state = createRoomState();
   const actors = new Map<string, RoomActor>();
   const blocks: Block[] = dept === "operations" ? [] : [{ x0: L.bench.x - 4, x1: L.bench.x + L.bench.w + 4, y0: ROW_A + 1, y1: ROW_A + 16 }];
-  let model = emptyRoomModel(dept);
+  let model = emptyRoomData(dept);
+  let level = model.level;
+  /** 墙钟时间（毫秒）：时间线的时钟，不受画面加快倍率影响。 */
+  let wallT = 0;
 
   function actorOf(id: string): Actor | null {
     return scene.actors.find((x) => x.id === `ch-${id}`) ?? null;
@@ -211,10 +234,12 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   function byKind(kind: string): RoomActor | null {
     return roleActors().find((a) => a.role.kind === kind) ?? null;
   }
-  function actorFor(ev: PixelFloorEvent): RoomActor | null {
+  /** 做这个动作的小人：动作指定的角色（id、种类或名称），否则是中心角色。 */
+  function actorFor(act: PixelAction): RoomActor | null {
     const list = roleActors();
-    if (ev.role) {
-      const hit = list.find((a) => a.id === ev.role || a.role.kind === ev.role || a.role.name === ev.role);
+    const want = typeof act.role === "string" ? act.role : null;
+    if (want) {
+      const hit = list.find((a) => a.id === want || a.role.kind === want || a.role.name === want);
       if (hit) return hit;
     }
     return primary();
@@ -231,14 +256,11 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   function drop(a: RoomActor, key: DeskNumberKey): void {
     ds(a)[key] = 0;
   }
-  function nameOfRole(k: string | null | undefined): string | null {
-    const hit = roleActors().find((r) => r.id === k || r.role.kind === k || r.role.name === k);
-    return hit ? hit.role.name : null;
-  }
-  function say(ev: PixelFloorEvent, a: RoomActor | null, side?: "to" | "from"): void {
+  /** 表演层的一句话：内容由翻译层写在动作上（say 是做事的一方，sayTo 是收东西的一方）。 */
+  function speak(act: PixelAction, a: RoomActor | null, side: "to" | "from" = "from"): void {
     if (!a) return;
-    const text = sayCatalog(ev, { dept, side, roleName: nameOfRole });
-    if (!text) return;
+    const text = side === "to" ? act.sayTo : act.say;
+    if (typeof text !== "string" || text === "") return;
     // 原型 room.js 的口径：新话直接覆盖头顶正在显示的那句
     a.say = { text, until: scene.realT + sayMs(text) };
   }
@@ -276,7 +298,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         actors.delete(id);
       }
     }
-    const lay = layoutDesks(dept, list, model.level ?? "ui");
+    const lay = layoutDesks(dept, list, level);
     state.desks = list.map((r, i) => ({
       x: lay[i].x, w: lay[i].w, seatX: lay[i].x + 18, seatY: ROW_B, roleId: r.id, role: r,
     }));
@@ -297,7 +319,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         existing.role = r;
         existing.desk = d;
       } else {
-        actors.set(r.id, { id: r.id, role: r, desk: d, doing: null, persist: null, say: null, queue: [], handoff: false, formSign: null, streamText: null, nextStretch: 0, nextPause: 0 });
+        actors.set(r.id, {
+          id: r.id, role: r, desk: d, doing: null, runId: null, pendingProgress: null, persist: null, say: null,
+          formSign: null, streamText: null, nextStretch: 0, nextPause: 0,
+        });
       }
       if (!state.deskState[r.id]) {
         state.deskState[r.id] = {
@@ -310,34 +335,34 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     state.bin = { x: state.desks[0].x + state.desks[0].w + 2, y: ROW_B + 9 };
     if (prim) state.bin.x = prim.desk.x + prim.desk.w + 2;
     // 质检的试用台座位（3.2D）：档位达到且房间有试用数据时，测试工程师坐在试用台前
-    state.trialSeat = dept === "quality" && levelAtLeast(model.level, "3.2D")
+    state.trialSeat = dept === "quality" && levelAtLeast(level, "3.2D")
       ? { x: SPOT.trial[0], w: 30, seatX: SPOT.trial[0], seatY: SPOT.trial[1], roleId: "", role: prim?.role ?? list[0], trial: true }
       : null;
   }
-  function setModel(m: RoomModel): void {
-    if (!m) throw new Error("setModel 需要 roomModel");
-    if (m.department && m.department !== dept) throw new Error(`roomModel 的部门与画面不一致：${m.department}`);
+  /** 一份状态上画面（时间线决定什么时候）：动作在状态之前演完，状态的变化不打断正在演的动作。 */
+  function apply(m: PixelState): void {
+    const next = m as unknown as RoomData;
+    if (next.department && next.department !== dept) throw new Error(`房间的状态与画面的部门不一致：${next.department}`);
     const prev = effStatus();
-    model = { ...m };
+    model = { ...emptyRoomData(dept), ...next };
+    if (model.level && model.level !== level) {
+      levelAtLeast(model.level, "ui");
+      level = model.level;
+    }
     state.eventStatus = null;
     state.eventCard = null;
-    state.eventTool = null;
     state.eventRemote = false;
     state.eventMachine = null;
     state.eventWaiting = false;
     state.eventStep = 0;
     state.eventLines = null;
-    if (m.pending_tool) state.lastPendingTool = m.pending_tool;
     state.wbTags = {};
     state.wbDone = {};
     syncRoles();
     const s = effStatus();
     if (s !== prev) {
       for (const a of roleActors()) {
-        if (s === "interrupted") continue;
-        const actor = actorOf(a.id);
-        if (actor?.script && (s === "waiting_resume" || s === "asking" || prev === "asking")) scene.cancel(actor);
-        if (s !== "working") { a.persist = null; a.queue = a.queue.filter((item) => KEEP_ACTIONS.has(item.action) || IMMEDIATE.has(item.action)); }
+        if (s !== "interrupted" && s !== "working") a.persist = null;
       }
       if (s !== "failed") for (const a of roleActors()) { if (!a.persist) ds(a).redLamp = false; }
     }
@@ -378,7 +403,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     if (r.status === "returned") return seatRest("sit_happy");
     if (r.status === "failed") return seatRest("slump");
     if (model.pose && (model.pose.role_id === a.id || (!model.pose.role_id && isPrim))) {
-      const anim = poseAnim(model.pose.action);
+      const anim = model.pose.anim;
       return seatRest(anim, { hold: anim === "read_sit" ? "doc" : null });
     }
     return seatRest("type");
@@ -456,46 +481,9 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       Object.assign(b, { item: null, mark: null, slip: null, slipMark: null, ticks: 0, tape: 0 });
     }
   }
-  function step(): void {
-    if (effStatus() !== "interrupted") state.clock += scene.reduced ? 0 : 16.7;
-    for (const a of roleActors()) {
-      const q = a.queue;
-      if (q.length && !scene.frozen) {
-        const waited = scene.realT - q[0].at;
-        const actor = actorOf(a.id);
-        const inTail = actor ? scene.inTail(actor) : true;
-        const justStarted = actor?.step?.st.key === true && scene.realT - actor.step.t0 < 600;
-        // 原型 room.js：排队的动作在当前动作的关键步骤做完（或进入收尾步骤）后立即开始；
-        // 等了 0.9 秒仍未轮到时打断当前动作，只让刚开始的关键步骤再显示到 0.6 秒。
-        // 交接与盖章先做完：它们在做的时候不打断（原型 v11 第 2 条）
-        const currentIsKeep = (a.handoff || (a.doing !== null && KEEP_ACTIONS.has(a.doing))) && !inTail;
-        if (!currentIsKeep && (inTail || (waited >= 900 && !justStarted))) {
-          const next = q.shift()!;
-          if (actor?.script) scene.cancel(actor);
-          next.fn();
-          continue;
-        }
-      }
-      const actor = actorOf(a.id);
-      if (actor && !actor.script) applyRest(a);
-    }
-    tickBench();
-    // 与原型 room.js 的 update 一致：终端冒烟与茶水台蒸汽（同时保持随机数的消耗顺序一致）
-    if (state.smokeUntil > scene.realT && !scene.reduced && scene.random() < 0.3) {
-      scene.emit("smoke", L.terminal.x + 14, L.terminal.base - 38, 1);
-    }
-    if (!scene.frozen && scene.random() < 0.035) scene.emit("steam", 413, ROW_B - 15, 1);
-    for (const a of roleActors()) {
-      const actor = actorOf(a.id);
-      if (actor && actor.anim === "tea" && actor.seat && !scene.frozen && scene.random() < 0.03) {
-        const [hx, hy] = headTop(scene, actor);
-        scene.emit("steam", hx + 2, hy + 12, 1);
-      }
-    }
-  }
 
   // -------------------------------------------------------------------------
-  // 事件的处理
+  // 动作的处理
 
   function giveSpot(d: RoomSeat): [number, number, number] {
     return d.x - 8 >= 10 ? [d.x - 8, ROW_B, 1] : [d.x + d.w + 8, ROW_B, -1];
@@ -541,19 +529,13 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     }
   }
 
-  function transition(ev: PixelFloorEvent): void {
-    const raw = (ev.payload ?? {}) as Record<string, unknown>;
-    const handoff = handoffOf(raw);
-    if (!handoff) return;
-    const pl = { ...raw, from: handoff.from, to: handoff.to, artifact: handoff.artifact };
-    const sayEv: PixelFloorEvent = { ...ev, payload: pl };
-    const art = handoff.artifact;
+  /** 交接：本部门把包裹放进管道口，或从管道口取出（act.from、act.to、act.artifact）。 */
+  function handoff(act: PixelAction, a: RoomActor): void {
+    const art = typeof act.artifact === "string" ? act.artifact : "";
     const bmp = ART_BMP[art];
     if (!bmp) return;
-    const a = primary();
-    if (!a) return;
-    if (pl.from === dept) {
-      say(sayEv, a, "from");
+    if (act.from === dept) {
+      speak(act, a);
       const p = plan(a);
       p.stand();
       if (state.bench.item === bmp) p.add(S.call(() => { state.bench.item = null; state.bench.mark = null; }));
@@ -561,18 +543,16 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.hold(bmp));
       p.spot("pipe", "carry");
       p.add(S.call(() => scene.after(scene.reduced ? 0 : 260, () => {
-        a.doing = a.doing;
         const actor = actorOf(a.id);
         if (actor) actor.hold = null;
-        scene.fly({ bmp, from: [p.x + 6, p.y - 20], to: [L.pipe.x + 10, L.pipe.base - 8], ms: 620, arc: 8, onDone: undefined });
+        scene.fly({ bmp, from: [p.x + 6, p.y - 20], to: [L.pipe.x + 10, L.pipe.base - 8], ms: 620, arc: 8 });
       })), S.anim("side_reach", 900, true));
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
-    } else if (pl.to === dept) {
+    } else if (act.to === dept) {
       // 收到的一方在动作开始时说话（原型 v11 第 1 条）：随后从管道口取出，带到工作台或桌上放下
-      say(sayEv, a, "to");
+      speak(act, a, "to");
       const p = plan(a);
-      a.handoff = true;
       p.spot("pipe");
       p.add(S.call(() => {
         scene.fly({ bmp, from: [L.pipe.x + 10, L.pipe.base - 8], to: [p.x + 6, p.y - 18], ms: 620, arc: 8, onDone: () => { const actor = actorOf(a.id); if (actor) actor.hold = bmp; } });
@@ -585,14 +565,29 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         p.add(S.anim("place", 700), S.hold(null), S.call(() => arrivalArt(a, art)));
       }
       p.back();
-      p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; a.handoff = false; });
+      p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
     }
   }
 
-  /** 事件到动作的处理函数（原型 room.js 的 handlers）。 */
-  const handlers: Record<string, (ev: PixelFloorEvent, a: RoomActor) => void> = {
-    activate(_ev: PixelFloorEvent, a: RoomActor) {
-      if ((model.status || "idle") === "idle") state.eventStatus = "working";
+  /** 命令结束：act.ok 为命令通过，act.timed_out 为超时。 */
+  function commandDone(act: PixelAction, a: RoomActor): void {
+    const timedOut = Boolean(act.timed_out);
+    const ok = act.ok !== false;
+    state.termRun = false;
+    state.exit = timedOut || !ok ? "red" : "green";
+    if (timedOut) state.smokeUntil = scene.realT + 4200;
+    state.lever = 0;
+    const p = plan(a);
+    p.spot("terminal");
+    p.add(S.icon({ kind: timedOut ? "exclaim" : ok ? "check" : "cross" }), S.anim(ok ? "idle_happy" : "stand_sad", 1200, true), S.icon(null));
+    p.back();
+    p.run();
+  }
+
+  /** 动作的种类 → 怎么演（原型 v13 room.js 的 handlers）。参数是画面合同的动作与做它的小人。 */
+  const handlers: Record<string, (act: PixelAction, a: RoomActor) => void> = {
+    activate(_act, a) {
+      if (effStatus() === "idle") state.eventStatus = "working";
       applyLights();
       setPersist(a, null);
       state.crtBoot = 0;
@@ -605,7 +600,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("type", 500));
       p.run(() => { state.crtBoot = 1; });
     },
-    fetch_folder(_ev: PixelFloorEvent, a: RoomActor) {
+    fetch_folder(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.spot("cabinet");
@@ -617,8 +612,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.call(place), S.hold(null), S.anim("sit_happy", 600));
       p.run(() => { state.drawer = 0; const actor = actorOf(a.id); if (actor) actor.hold = null; place(); });
     },
-    type_think(_ev: PixelFloorEvent, a: RoomActor) {
-      a.streamText = null;
+    type_think(_act, a) {
       setPersist(a, { anim: "type", icon: { kind: "think" } });
       ds(a).redLamp = false;
       const p = plan(a);
@@ -626,18 +620,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.icon({ kind: "think" }), S.anim("type", 1200, true));
       p.run();
     },
-    stream_text(ev, a) {
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
-      const chunk = String(pl.text ?? pl.delta ?? pl.chunk ?? quoted(ev.label) ?? "……");
-      // 流式输出：文字接在正在做的模型请求上（第一段取代默认标签），保留最后一段
-      a.streamText = ((a.streamText ?? "") + chunk).slice(-120);
-      setPersist(a, { anim: "type", icon: { kind: "stream", text: a.streamText } });
-      const p = plan(a);
-      p.sit();
-      p.add(S.icon({ kind: "stream", text: a.streamText }), S.anim("type", 1500, true));
-      p.run();
-    },
-    idea(_ev: PixelFloorEvent, a: RoomActor) {
+    idea(_act, a) {
       setPersist(a, { anim: "sit_happy", icon: { kind: "bulb" }, until: scene.realT + 2600 });
       const p = plan(a);
       p.sit();
@@ -650,18 +633,15 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       }), S.anim("sit_happy", 1600, true));
       p.run();
     },
-    retry_wait(ev, a) {
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
-      const n = pl.n || pl.attempt || pl.attempt_no || 2;
-      const of = pl.of || pl.max || pl.max_attempts || 3;
-      const text = `第 ${n}/${of} 次`;
+    retry_wait(act, a) {
+      const text = `第 ${typeof act.count === "string" ? act.count : "2/3"} 次`;
       setPersist(a, { anim: "sit_wait", icon: { kind: "hourglass", text } });
       const p = plan(a);
       p.sit();
       p.add(S.icon({ kind: "hourglass", text }), S.anim("sit_wait", 1600, true));
       p.run();
     },
-    slump(_ev: PixelFloorEvent, a: RoomActor) {
+    slump(_act, a) {
       setPersist(a, { anim: "slump" });
       ds(a).redLamp = true;
       const p = plan(a);
@@ -669,7 +649,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("shock", 300), S.anim("slump", 1600, true));
       p.run();
     },
-    search(_ev: PixelFloorEvent, a: RoomActor) {
+    search(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.spot("cabinet");
@@ -678,22 +658,21 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { state.drawer = 0; });
     },
-    read(_ev: PixelFloorEvent, a: RoomActor) {
+    read(_act, a) {
       setPersist(a, { anim: "read_sit", hold: "doc" });
       const p = plan(a);
       p.sit();
       p.add(S.hold("doc"), S.anim("read_sit", 1800, true));
       p.run();
     },
-    write(_ev: PixelFloorEvent, a: RoomActor) {
+    write(_act, a) {
       setPersist(a, { anim: "write", write: true });
       const p = plan(a);
       p.sit();
       p.add(S.call(() => keep(a, "doc")), S.anim("write", 1800, true));
       p.run();
     },
-    run_command(ev, a) {
-      if (ev.type === "tool_called") { commandDone(ev, a); return; }
+    run_command(_act, a) {
       setPersist(a, null);
       state.exit = null;
       const p = plan(a);
@@ -706,7 +685,22 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("watch_r", 14000));
       p.run();
     },
-    submit(_ev: PixelFloorEvent, a: RoomActor) {
+    command_done(act, a) {
+      commandDone(act, a);
+    },
+    toss(_act, a) {
+      setPersist(a, null);
+      const p = plan(a);
+      p.stand();
+      p.add(S.anim("shake", undefined), S.anim("fold", 600), S.hold("paperball"), S.call(() => scene.after(scene.reduced ? 0 : 450, () => {
+        const actor = actorOf(a.id);
+        if (actor) actor.hold = null;
+        scene.fly({ bmp: "paperball", from: [p.x + 6, p.y - 20], to: [state.bin.x + 5, state.bin.y - 10], ms: 650, arc: 22, onDone: () => { state.binUntil = scene.realT + 3500; } });
+      })), S.anim("throw", 1000, true));
+      p.back();
+      p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
+    },
+    submit(_act, a) {
       setPersist(a, null);
       let placed = false;
       const place = (): void => { if (!placed) { placed = true; state.trayPaper = true; const actor = actorOf(a.id); if (actor) actor.hold = null; } };
@@ -718,7 +712,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(place);
     },
-    returned(_ev: PixelFloorEvent, a: RoomActor) {
+    returned(_act, a) {
       setPersist(a, null);
       const d = a.desk;
       state.trayPaper = false;
@@ -728,10 +722,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("sit_up", 700), S.icon({ kind: "question" }), S.anim("sit_scratch", 1800, true), S.icon(null));
       p.run(() => keep(a, "doc"));
     },
-    stamp_valid(_ev: PixelFloorEvent, a: RoomActor) {
+    stamp_valid(_act, a) {
       setPersist(a, null);
       let shelved = false;
-      const shelve = (): void => { if (!shelved) { shelved = true; state.scrollHide = 0; state.scrollFlash = scene.realT + 1500; state.bench.item = null; state.bench.mark = null; } };
+      const shelve = (): void => { if (!shelved) { shelved = true; state.scrollFlash = scene.realT + 1500; state.bench.item = null; state.bench.mark = null; } };
       const p = plan(a);
       p.add(S.call(() => { state.bench.item = "scroll_open"; state.bench.mark = null; }));
       p.spot("bench");
@@ -746,24 +740,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; shelve(); });
     },
-    pin_plan(_ev: PixelFloorEvent, a: RoomActor) {
-      // 计划接纳：把计划拿到白板贴上（原型 room.js 的 pin_plan）
-      setPersist(a, null);
-      const p = plan(a);
-      p.stand();
-      p.add(S.hold("doc"));
-      p.spot("wb", "carry");
-      p.add(S.anim("board_pin", undefined, true),
-        S.call(() => { state.wbSheetUntil = scene.realT + PROP_KEEP; }),
-        S.hold(null), S.anim("back", 500), S.anim("idle_happy", 400));
-      p.back();
-      p.run(() => {
-        if (state.wbSheetUntil < scene.realT) state.wbSheetUntil = scene.realT + PROP_KEEP;
-        const actor = actorOf(a.id);
-        if (actor) actor.hold = null;
-      });
-    },
-    seal(_ev: PixelFloorEvent, a: RoomActor) {
+    seal(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.add(S.call(() => { state.bench.item = "box_open"; state.bench.mark = null; state.bench.tape = 0; }));
@@ -801,7 +778,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         p2.run(() => { const actor = actorOf(pa.id); if (actor) actor.hold = null; });
       });
     },
-    inspect(_ev: PixelFloorEvent, a: RoomActor) {
+    inspect(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.add(S.call(() => { if (!state.bench.item) state.bench.item = "box_sealed"; state.bench.ticks = 0; }));
@@ -812,7 +789,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { state.bench.ticks = 3; });
     },
-    stamp_release(_ev: PixelFloorEvent, a: RoomActor) {
+    stamp_release(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.add(S.call(() => { state.bench.slip = "release"; state.bench.slipMark = null; }));
@@ -832,7 +809,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; state.bench.item = null; state.bench.slip = null; state.bench.slipMark = null; });
     },
-    stamp_rework(_ev: PixelFloorEvent, a: RoomActor) {
+    stamp_rework(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.add(S.call(() => { state.bench.slip = "defect"; state.bench.slipMark = null; if (!state.bench.item) state.bench.item = "box_sealed"; }));
@@ -859,7 +836,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         p2.run(() => { const actor = actorOf(pa.id); if (actor) actor.hold = null; });
       });
     },
-    send_letter(_ev: PixelFloorEvent, a: RoomActor) {
+    send_letter(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.sit();
@@ -869,10 +846,9 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
     },
-    answer_letter(ev, a) {
+    answer_letter(act, a) {
       setPersist(a, null);
-      const sides = letterSides(ev);
-      const reads = ev.type === "collaboration_requested" || sides.asker === dept;
+      const reads = Boolean(act.reads);
       const p = plan(a);
       const take = (ms: number): Step => S.call(() => {
         scene.fly({ bmp: "letter", from: [L.tube.x + 4, L.tube.base - 8], to: [p.x + 4, p.y - 20], ms, arc: 8, onDone: () => { const actor = actorOf(a.id); if (actor) actor.hold = "letter"; } });
@@ -888,7 +864,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
     },
-    compact(_ev: PixelFloorEvent, a: RoomActor) {
+    compact(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.stand();
@@ -902,7 +878,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; ds(a).hidePapers = false; });
     },
-    compact_fail(_ev: PixelFloorEvent, a: RoomActor) {
+    compact_fail(_act, a) {
       setPersist(a, null);
       const d = a.desk;
       ds(a).hidePapers = true;
@@ -917,7 +893,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { ds(a).hidePapers = false; const actor = actorOf(a.id); if (actor) actor.hold = null; });
     },
-    paused(_ev: PixelFloorEvent, a: RoomActor) {
+    paused(_act, a) {
       state.doorEvent = "已暂停";
       state.eventStatus = "paused";
       applyLights();
@@ -926,9 +902,8 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("sit_relax", 1200, true));
       p.run();
     },
-    failed(ev, a) {
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
-      state.doorEvent = `失败${pl.reason || pl.stopReason ? `：${pl.reason || pl.stopReason}` : ""}`;
+    failed(act, a) {
+      state.doorEvent = `失败${typeof act.text === "string" && act.text ? `：${act.text}` : ""}`;
       state.eventStatus = "failed";
       applyLights();
       ds(a).redLamp = true;
@@ -937,7 +912,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("slump", 1400, true));
       p.run();
     },
-    done(_ev: PixelFloorEvent, a: RoomActor) {
+    done(_act, a) {
       state.doorEvent = "已完成";
       state.eventStatus = "done";
       applyLights();
@@ -946,7 +921,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.call(() => scene.emit("confetti", 240, 8, 60, { spread: 460 })), S.anim("cheer", 2200, true));
       p.run();
     },
-    cancelled(_ev: PixelFloorEvent, a: RoomActor) {
+    cancelled(_act, a) {
       state.doorEvent = "已取消";
       state.eventStatus = "cancelled";
       applyLights();
@@ -955,29 +930,25 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("tidy", 1800, true), S.anim("idle", 400));
       p.run();
     },
-    freeze() {
-      state.eventStatus = "interrupted";
-      state.doorEvent = "中断";
-      applyLights();
+    // 结果未知的动作：小人站在原处，头顶黄色问号（与 v12 的差异：只演一次，不再有「待核实」的分支）
+    puzzled(_act, a) {
+      setPersist(a, null);
+      const p = plan(a);
+      p.stand();
+      p.add(S.icon({ kind: "question" }), S.anim("puzzled", 1800, true), S.icon(null));
+      p.back();
+      p.run();
     },
-    puzzled(ev) {
-      state.eventTool = ((ev.payload as Record<string, unknown>)?.tool as string) || ev.tool || "bash";
-      state.lastPendingTool = state.eventTool;
-      scene.frozen = false;
-      applyLights();
-    },
-    hold_card(ev) {
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
+    hold_card(act) {
       state.eventStatus = "waiting_resume";
-      state.eventCard = (pl.missing as string) || (pl.text as string) || quoted(ev.label) || "待恢复";
+      state.eventCard = typeof act.text === "string" ? act.text : "待恢复";
       state.doorEvent = "待恢复";
       scene.frozen = false;
       applyLights();
     },
-    resume(_ev: PixelFloorEvent, a: RoomActor) {
+    resume(_act, a) {
       state.eventStatus = "working";
       state.eventCard = null;
-      state.eventTool = null;
       state.doorEvent = null;
       scene.frozen = false;
       applyLights();
@@ -991,12 +962,12 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         p.run();
       }
     },
-    assign(ev) {
+    assign(act, _a) {
       const mgr = byKind("manager") || primary();
       if (!mgr) return;
       const list = roleActors();
-      const target = list.find((x) => x.id === (((ev.payload as Record<string, unknown>)?.to as string) || ev.role) && x !== mgr)
-        || list.find((x) => x !== mgr);
+      const want = typeof act.role === "string" ? act.role : null;
+      const target = list.find((x) => want !== null && x.id === want && x !== mgr) || list.find((x) => x !== mgr);
       if (!target) return;
       const gs = giveSpot(target.desk);
       const p = plan(mgr);
@@ -1006,7 +977,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.turn(gs[2]), S.anim("give", undefined, true), S.call(() => {
         keep(target, "card");
         state.wbTags[target.id] = true;
-        say(ev, target, "to");
+        speak(act, target, "to");
       }), S.hold(null), S.anim("idle_happy", 400));
       p.back();
       p.run(() => {
@@ -1018,13 +989,13 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       const targetActor = actorOf(target.id);
       if (targetActor && scene.inTail(targetActor)) scene.run(targetActor, [S.anim("sit_up", 1600)], { tail: 0 });
     },
-    hand_back(ev, a) {
+    hand_back(act, a) {
       const mgr = byKind("manager") || primary();
       if (!mgr) return;
       const worker = a === mgr ? roleActors().find((x) => x !== mgr) : a;
       if (!worker) return;
       const gs = giveSpot(mgr.desk);
-      say(ev, worker);
+      speak(act, worker);
       const p = plan(worker);
       p.stand();
       p.add(S.call(() => drop(worker, "card")), S.hold("card_result"));
@@ -1032,7 +1003,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.turn(gs[2]), S.anim("give", undefined, true), S.call(() => {
         keep(mgr, "cardResult");
         state.wbDone[worker.id] = true;
-        say(ev, mgr, "to");
+        speak(act, mgr, "to");
       }), S.hold(null), S.anim("idle_happy", 400));
       p.back();
       p.run(() => {
@@ -1044,7 +1015,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       const mgrActor = actorOf(mgr.id);
       if (mgrActor && scene.inTail(mgrActor)) scene.run(mgrActor, [S.anim(mgrActor.seat ? "sit_happy" : "idle_happy", 1800)], { tail: 0 });
     },
-    explore(_ev: PixelFloorEvent, a: RoomActor) {
+    explore(_act, a) {
       const ex = byKind("explorer") || a;
       setPersist(ex, null);
       let filed = false;
@@ -1066,7 +1037,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         file();
       });
     },
-    replan() {
+    replan(_act, _a) {
       const mgr = byKind("manager") || primary();
       if (!mgr) return;
       let rewritten = false;
@@ -1087,10 +1058,9 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(rewrite);
     },
-    review(ev, a) {
+    review(act, a) {
       setPersist(a, null);
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
-      const verdict = pl.verdict === "return" || pl.verdict === "reject" ? "退回" : "通过";
+      const verdict = act.verdict === "return" ? "退回" : "通过";
       const color = verdict === "通过" ? PAL.green2 : PAL.red2;
       const rv = byKind("reviewer") || a;
       const p = plan(rv);
@@ -1104,7 +1074,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     guidance_in() {
       scene.fly({ bmp: "note", from: [L.door.x + 18, L.door.base - 9], to: [L.mailbox.x + 7, L.mailbox.base - 9], ms: 700, arc: 2 });
     },
-    guidance_read(_ev: PixelFloorEvent, a: RoomActor) {
+    guidance_read(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.spot("mailbox");
@@ -1119,7 +1089,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; state.noteHide = 0; });
     },
-    guidance_reply(_ev: PixelFloorEvent, a: RoomActor) {
+    guidance_reply(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.spot("cork");
@@ -1128,13 +1098,12 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.run();
     },
     // 试用网页或桌面程序：测试工程师坐在试用台前点击与输入（3.2D）
-    trial(ev, _a: RoomActor) {
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
+    trial(act, _a) {
       const t = byKind("tester") || primary();
       if (!t) return;
       setPersist(t, null);
-      state.eventStep = (pl.step as number) || (model.trial && (model.trial.step as number)) || 1;
-      if (pl.text_lines) state.eventLines = pl.text_lines as string[];
+      state.eventStep = typeof act.step === "number" ? act.step : (model.trial && (model.trial.step as number)) || 1;
+      if (Array.isArray(act.lines)) state.eventLines = act.lines as string[];
       if (!state.trialSeat) return;
       const p = plan(t);
       p.to(state.trialSeat.seatX, state.trialSeat.seatY);
@@ -1144,7 +1113,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { state.eventStep = 0; state.eventLines = null; });
     },
-    self_test(_ev: PixelFloorEvent, a: RoomActor) {
+    self_test(_act, a) {
       setPersist(a, { anim: "type" });
       state.selfShot = true;
       const p = plan(a);
@@ -1152,7 +1121,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("type", 2200, true), S.anim("sit_up", 900, true));
       p.run(() => { state.selfShot = true; });
     },
-    read_existing(_ev: PixelFloorEvent, a: RoomActor) {
+    read_existing(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.to(SPOT.door[0], SPOT.door[1]);
@@ -1164,24 +1133,24 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.call(() => { state.wbExisting = true; }), S.hold("doc"), S.anim("read_sit", 3200, true));
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; state.wbExisting = true; });
     },
-    remote_run(_ev: PixelFloorEvent, a: RoomActor) {
+    remote_run(act, a) {
       setPersist(a, null);
-      state.eventMachine = (model.machine as string) || "登记的机器";
+      state.eventMachine = (typeof act.text === "string" && act.text) || model.machine || "登记的机器";
       const p = plan(a);
       p.spot("terminal");
       p.add(S.call(() => { state.lever = 1; state.termRun = true; state.exit = null; }), S.anim("lever", 1000), S.anim("watch_r", 2600, true));
       p.run(() => { state.eventMachine = null; state.termRun = false; });
     },
-    remote_unknown(_ev: PixelFloorEvent, a: RoomActor) {
+    remote_unknown(act, a) {
       state.eventRemote = true;
-      state.eventMachine = (model.machine as string) || null;
+      state.eventMachine = (typeof act.text === "string" && act.text) || model.machine || null;
       state.termRun = false;
       const p = plan(a);
       p.spot("terminal");
       p.add(S.icon({ kind: "question" }), S.anim("watch_r", 1500), S.anim("puzzled", 3000, true), S.icon(null));
       p.run(() => { state.eventRemote = false; });
     },
-    net_fetch(_ev: PixelFloorEvent, a: RoomActor) {
+    net_fetch(_act, a) {
       setPersist(a, null);
       const p = plan(a);
       p.spot("post", "carry");
@@ -1193,10 +1162,9 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back("carry");
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; state.postFlag = 0; });
     },
-    mcp_press(ev, a: RoomActor) {
+    mcp_press(act, a) {
       setPersist(a, null);
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
-      const idx = (pl.index as number) ?? (pl.button as number) ?? 0;
+      const idx = typeof act.index === "number" ? act.index : 0;
       const panel = model.tool_panel;
       const n = (panel?.buttons?.length) || 3;
       const k = Math.max(0, Math.min(n - 1, idx));
@@ -1206,7 +1174,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { state.toolLit = -1; });
     },
-    deploy(_ev: PixelFloorEvent, a: RoomActor) {
+    deploy(_act, a) {
       const p = plan(a);
       state.cart.box = "box_sealed";
       state.cart.pushed = true;
@@ -1225,7 +1193,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { state.mdoorGlow = 0; state.cart.pushed = false; state.cart.box = null; state.cart.x = 296; });
     },
-    rollback(_ev: PixelFloorEvent, a: RoomActor) {
+    rollback(_act, a) {
       const p = plan(a);
       p.spot("mdoor");
       p.add(S.call(() => { state.mdoorGlow = 1; }), S.anim("reach", 700, true), S.call(() => {
@@ -1234,7 +1202,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back("carry");
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; state.mdoorGlow = 0; });
     },
-    fault(_ev: PixelFloorEvent, a: RoomActor) {
+    fault(_act, a) {
       const p = plan(a);
       p.stand();
       p.add(S.icon({ kind: "exclaim" }), S.anim("shock", 400));
@@ -1249,7 +1217,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; state.monitorAlarmUntil = scene.realT + 9000; });
     },
-    wait_provider(_ev: PixelFloorEvent, a: RoomActor) {
+    wait_provider(_act, a) {
       setPersist(a, null);
       state.eventWaiting = true;
       applyLights();
@@ -1258,10 +1226,9 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.anim("sit_up", 2600, true));
       p.run(() => { state.eventWaiting = false; applyLights(); });
     },
-    hold_form(ev, a: RoomActor) {
+    hold_form(act, a) {
       setPersist(a, null);
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
-      const what = (pl.action as string) || (pl.kind === "external_action" ? "外部动作" : (pl.kind as string)) || quoted(ev.label) || "外部动作";
+      const what = (typeof act.text === "string" && act.text) || "外部动作";
       const text = `待授权：${what}`;
       const p = plan(a);
       p.to(SPOT.door[0] - 16, SPOT.door[1] + 4);
@@ -1271,187 +1238,201 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.back();
       p.run(() => { a.formSign = null; });
     },
-    decided(ev, a: RoomActor) {
-      const pl = (ev.payload ?? {}) as Record<string, unknown>;
-      const choice = (pl.choice as string) || "accept_current";
-      const tool = ev.tool || (pl.tool as string) || state.lastPendingTool || model.pending_tool || "bash";
-      const words: Record<string, string> = { rerun: "重新执行", accept_current: "按当前实际状态继续", stop: "停止事项" };
-      state.eventStatus = choice === "stop" ? "cancelled" : "working";
-      state.eventTool = null;
-      if (choice === "stop") state.doorEvent = "已停止";
-      applyLights();
-      setPersist(a, null);
-      const p = plan(a);
-      p.to(SPOT.door[0] - 14, SPOT.door[1] + 2);
-      p.add(S.turn(1), S.call(() => {
-        scene.fly({ bmp: "decision", from: [L.door.x + 18, L.door.base - 9], to: [p.x + 6, p.y - 2], ms: 500, arc: 2 });
-      }), S.anim("crouch", 700), S.hold("decision"), S.icon({ kind: "text", text: words[choice] || choice }), S.anim("read_stand", 1500, true), S.icon(null), S.hold(null));
-      if (choice === "rerun") {
-        const spot = toolSpot(tool);
-        if (spot === "terminal") {
-          p.spot("terminal");
-          p.add(S.call(() => scene.after(scene.reduced ? 0 : 450, () => { state.lever = 1; state.termRun = true; state.exit = null; })), S.anim("lever", 1000), S.anim("watch_r", 1600));
-        } else if (spot === "cabinet") {
-          p.spot("cabinet");
-          p.add(S.call(() => { state.drawer = 1; }), S.anim("rummage", 1200), S.call(() => { state.drawer = 0; }));
-        } else if (spot === "bench") {
-          p.spot("bench");
-          p.add(S.anim("inspect", 1400));
-        } else {
-          p.sit();
-          p.add(S.anim("write", 1400));
-        }
-        p.back();
-      } else if (choice === "stop") {
-        p.to(a.desk.seatX, a.desk.seatY);
-        p.add(S.anim("tidy", 1600));
-      } else {
-        p.back();
-        p.add(S.anim("type", 800));
-      }
-      p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
-    },
-    manager_out(_ev: PixelFloorEvent, a: RoomActor) {
-      setPersist(a, null);
-      const mgr = byKind("manager") || a;
-      const p = plan(mgr);
-      p.stand();
-      p.spot("pipe", "carry");
-      p.add(S.hold("box_sealed"), S.anim("side_reach", 800, true), S.call(() => { const actor = actorOf(mgr.id); if (actor) actor.hold = null; }), S.anim("idle", 400));
-      p.spot("tube", "carry");
-      p.add(S.hold("letter"), S.anim("side_place", 800, true), S.call(() => { const actor = actorOf(mgr.id); if (actor) actor.hold = null; }), S.anim("idle", 500));
-      p.back();
-      p.run(() => { const actor = actorOf(mgr.id); if (actor) actor.hold = null; });
-    },
-    semantic(_ev: PixelFloorEvent, a: RoomActor) {
+    semantic(_act, a) {
       const d = a.desk;
       if ((model.semantic_cards || 0) > 0) state.cardHide = scene.realT + 5000;
       scene.fly({ bmp: "card", from: [d.seatX, ROW_B - 22], to: [L.cards.x + 12, L.cards.base - 32], ms: 900, arc: 30, onDone: () => { state.cardHide = 0; state.cardFlash = scene.realT + 1600; } });
       const actor = actorOf(a.id);
       if (actor && scene.inTail(actor)) scene.run(actor, [S.anim("sit_up", 1200)], { tail: 0 });
     },
-    toss(_ev: PixelFloorEvent, a: RoomActor) {
-      setPersist(a, null);
-      const p = plan(a);
-      p.stand();
-      p.add(S.anim("shake", undefined), S.anim("fold", 600), S.hold("paperball"), S.call(() => scene.after(scene.reduced ? 0 : 450, () => {
-        const actor = actorOf(a.id);
-        if (actor) actor.hold = null;
-        scene.fly({ bmp: "paperball", from: [p.x + 6, p.y - 20], to: [state.bin.x + 5, state.bin.y - 10], ms: 650, arc: 22, onDone: () => { state.binUntil = scene.realT + 3500; } });
-      })), S.anim("throw", 1000, true));
-      p.back();
-      p.run(() => { const actor = actorOf(a.id); if (actor) actor.hold = null; });
-    },
+    handoff,
   };
 
-  function commandDone(ev: PixelFloorEvent, a: RoomActor): void {
-    const pl = (ev.payload ?? {}) as Record<string, unknown>;
-    // 真实事件的工具结果只有 ok 与 error，退出码在工件里事件上读不到（harness/app/payloads.py 的 ToolCallResult）；
-    // 原型事件带 exit_code 与 timed_out，按它们判定
-    const timedOut = Boolean(pl.timed_out);
-    const ok = typeof pl.exit_code === "number" ? pl.exit_code === 0 && !timedOut : pl.ok !== false;
-    state.termRun = false;
-    state.exit = ok ? "green" : "red";
-    if (timedOut) state.smokeUntil = scene.realT + 4200;
-    state.lever = 0;
-    const p = plan(a);
-    p.spot("terminal");
-    p.add(S.icon({ kind: timedOut ? "exclaim" : ok ? "check" : "cross" }), S.anim(ok ? "idle_happy" : "stand_sad", 1200, true), S.icon(null));
-    p.back();
-    p.run();
+  /** 声明表里的每种动作都要有演法（进度一级里只有思考与工具没有单独的动作）。 */
+  Object.keys(ROOM_KINDS).forEach((kind) => {
+    if (kind !== "tool_progress" && kind !== "stream_text" && !handlers[kind]) {
+      throw new Error("房间的声明表里有动作，driver.ts 没有它的演法：" + kind);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // 播放时间线：排队的规则只在 pixel/timeline.ts；这里给出做动作的小人、开始演、立刻结束与状态上画面
+
+  /** 做这个动作的小人：分派与重新规划由经理做，探索、审查、试用由对应的角色做，交接与传信由中心角色做。 */
+  function doerOf(act: PixelAction): RoomActor | null {
+    const k = act.kind;
+    if (k === "assign" || k === "replan") return byKind("manager") || primary();
+    if (k === "explore") return byKind("explorer") || actorFor(act);
+    if (k === "review") return byKind("reviewer") || actorFor(act);
+    if (k === "trial") return byKind("tester") || actorFor(act);
+    if (k === "handoff" || k === "send_letter" || k === "answer_letter") return primary();
+    if (k === "hand_back") {
+      const mgr = byKind("manager") || primary();
+      const a = actorFor(act);
+      return a === mgr ? roleActors().find((x) => x !== mgr) || a : a;
+    }
+    return actorFor(act);
   }
 
-  /** 流式输出：把 attempt.live 已收到的文字交给正在做模型请求的角色（设计说明第 6 节）。
-   *  没有正在做模型请求的角色时不改动画面的任何状态。 */
-  function setStreamText(text: string): void {
-    const target = roleActors().find((a) => a.persist?.icon?.kind === "stream")
-      ?? roleActors().find((a) => a.doing === "type_think" || a.doing === "stream_text")
-      ?? primary();
-    if (!target) return;
-    target.streamText = text.slice(-120);
-    target.persist = { anim: "type", icon: { kind: "stream", text: target.streamText } };
+  /** 参与方：做它的小人；分派还占着接任务的角色，交回还占着收结果的经理，自动继续占着所有人。 */
+  function lanesOf(act: PixelAction): string[] {
+    if (PROPS_ONLY.has(act.kind)) return [];
+    if (act.kind === "resume") return roleActors().map((x) => x.id);
+    const a = doerOf(act);
+    if (!a) return [];
+    const lanes = [a.id];
+    if (act.kind === "assign") {
+      const t = roleActors().find((x) => x.id === act.role && x !== a);
+      if (t) lanes.push(t.id);
+    }
+    if (act.kind === "hand_back") {
+      const mgr = byKind("manager") || primary();
+      if (mgr && mgr !== a) lanes.push(mgr.id);
+    }
+    return lanes;
   }
 
-  function playEvent(ev: PixelFloorEvent): void {
-    if (!ev || !ev.type) throw new Error("playEvent 需要事件对象");
-    const pl = (ev.payload ?? {}) as Record<string, unknown>;
-    const related = !ev.department || ev.department === dept || pl.from === dept || pl.to === dept;
-    if (!related) return;
-    if (PROPOSAL_DONE.has(ev.type)) state.trayPaper = false;
-    if ((ev.type === "spec_accepted" || ev.type === "contract_accepted") && dept === "product" && (model.scrolls || 0) > 0) {
-      state.scrollHide = scene.realT + 15000;
-    }
-    if (ev.type === "department_guidance_applied" && (model.pinned_notes || 0) > 0) state.noteHide = scene.realT + 15000;
-    if (ev.type === "transition") {
-      transition(ev);
+  /** 时间线上正在演的动作：编号 → 做它的小人；小人进入收尾步骤（step 里检查）就告诉时间线演完了。 */
+  const runs = new Map<number, { actor: RoomActor }>();
+
+  function begin(e: TimelineEntry): void {
+    const act = e.action;
+    // 建档事项里的阅读与搜索演成「阅读已有项目」
+    const kind = model.existing_read && (act.kind === "read" || act.kind === "search") ? "read_existing" : act.kind;
+    const a = doerOf(act);
+    if (TRAY_CLEAR.has(kind)) state.trayPaper = false;
+    // 整层静止（中断）或角色外出时不演；自动继续与待恢复的牌子照样演
+    const skip = !a || (scene.frozen && kind !== "resume" && kind !== "hold_card") || (a.role.status === "away" && kind !== "explore");
+    if (skip) {
+      tl.done(e.id);
       return;
     }
-    let action = resolveAction(ev);
-    // 建档事项（3.8）中读取与搜索工具的 tool_started 播放「阅读已有项目」
-    if (model.existing_read && (action === "read" || action === "search")) action = "read_existing";
-    if (action === "send_letter") {
-      const sides = letterSides(ev);
-      if (sides.answerer === dept && sides.asker !== dept) action = "answer_letter";
-    }
-    const a = (action === "assign" || action === "replan") ? (byKind("manager") || primary())
-      : action === "explore" ? (byKind("explorer") || actorFor(ev)) : actorFor(ev);
-    if (!a) return;
-    if (scene.frozen && action !== "resume" && action !== "puzzled" && action !== "hold_card") return;
-    if (a.role.status === "away" && action !== "explore") return;
-    if (!action) {
-      if (ev.type === "tool_started") {
-        setPersist(a, { anim: "type" });
-        if (!scene.frozen) say(ev, a);
-      }
+    if (PROPS_ONLY.has(kind)) {
+      speak(act, a);
+      handlers[kind](act, a);
+      tl.done(e.id);
       return;
     }
-    const fn = handlers[action];
-    if (!fn) return;
-    if (SIDE_ONLY.has(action)) {
-      say(ev, a);
-      fn(ev, a);
-      return;
-    }
+    if (kind !== "slump" && kind !== "failed") ds(a).redLamp = false;
     const actor = actorOf(a.id);
-    if (!IMMEDIATE.has(action) && actor && !scene.inTail(actor) && a.doing === action) return;
-    if (action !== "slump" && action !== "failed") ds(a).redLamp = false;
-    const start = (): void => {
-      const actor2 = actorOf(a.id);
-      if (actor2) actor2.icon = null;
-      a.doing = action;
-      a.handoff = false;
-      if (!OWN_SPEECH.has(action) && !THINK_ACTIONS.has(action)) say(ev, a);
-      fn(ev, a);
-    };
-    // 原型 v11 第 2 条：交接与盖章先做完——还在做或排在队里时，状态类动作排在它们后面，
-    // 说出的话停留到读得完；队满时也不挤掉它们
-    const keepPending = (): boolean => {
-      if (a.handoff) return true;
-      if (a.doing && KEEP_ACTIONS.has(a.doing)) return true;
-      // 队里的任何一条交接与盖章都算数，不只是队首那条（原型 v11 第 2 条）
-      return a.queue.some((item) => KEEP_ACTIONS.has(item.action));
-    };
-    // 原型 room.js 的口径：立即执行的动作清掉排队的条目；排队的条目超出上限时丢掉最早的
-    if (IMMEDIATE.has(action) || (actor && scene.inTail(actor))) {
-      if (keepPending()) {
-        // 交接与盖章先做完：普通的排队动作仍然清掉，状态类动作排在它们后面（原型 v11 第 2 条）
-        a.queue = a.queue.filter((item) => KEEP_ACTIONS.has(item.action));
-        a.queue.push({ fn: start, at: scene.realT, from: ev.type, action });
-        return;
-      }
-      a.queue = [];
-      start();
-      return;
-    }
-    a.queue.push({ fn: start, at: scene.realT, from: ev.type, action });
-    if (a.queue.length > 3) {
-      // 队满时挤掉最早的一条；交接与盖章不挤掉（原型 v11 第 2 条）
-      const index = a.queue.findIndex((item) => !KEEP_ACTIONS.has(item.action));
-      a.queue.splice(index >= 0 ? index : 0, 1);
+    if (actor) actor.icon = null;
+    a.doing = kind;
+    a.runId = e.id;
+    if (!OWN_SPEECH.has(kind) && !THINK_ACTIONS.has(kind)) speak(act, a);
+    handlers[kind](act, a);
+    runs.set(e.id, { actor: a });
+  }
+
+  function cut(e: TimelineEntry): void {
+    runs.delete(e.id);
+    for (const a of roleActors()) {
+      const actor = actorOf(a.id);
+      if (a.runId === e.id && actor?.script) scene.cancel(actor);
     }
   }
 
-  // 与原型 room.js 一致：建立画面时先按缺省角色设置同步一次（一个部门一个 Agent），快照到达时再同步
+  /** 进度：不排队。小人空着时演一小段；正在演时间线上的动作时记下最近的一项，演完以后接上。 */
+  function showProgress(act: PixelAction, a: RoomActor): void {
+    if (act.kind === "tool_progress") {
+      setPersist(a, { anim: "type" });
+      speak(act, a);
+      return;
+    }
+    if (!THINK_ACTIONS.has(act.kind)) speak(act, a);
+    handlers[act.kind](act, a);
+  }
+  function progress(act: PixelAction): void {
+    const a = doerOf(act);
+    if (!a || scene.frozen || a.role.status === "away") return;
+    if (a.runId !== null && runs.has(a.runId)) {
+      a.pendingProgress = act;
+      return;
+    }
+    showProgress(act, a);
+  }
+
+  const tl: Timeline = createTimeline({
+    clock: () => wallT,
+    classify(act) {
+      const d = ROOM_KINDS[act.kind];
+      if (!d) throw new Error("房间的声明表里没有这种动作：" + act.kind);
+      return { tier: d.tier, ms: d.ms, lanes: lanesOf(act) };
+    },
+    begin,
+    cut,
+    apply,
+    progress,
+  });
+
+  // -------------------------------------------------------------------------
+  // 接口
+
+  function setState(s: PixelState): void {
+    tl.state(contractRoomState(s));
+  }
+  function jump(s: PixelState): void {
+    tl.jump(contractRoomState(s));
+  }
+  function play(a: PixelAction): void {
+    tl.push(contractAction("房间", a, ROOM_KINDS));
+  }
+  /** 实时内容：流式文字到了就显示，不进时间线（接在正在做模型请求的角色头上）。 */
+  function stream(who: StreamWho, text: string): void {
+    const want = who.role ?? null;
+    const target = (want !== null ? actorFor({ kind: "tool_progress", position: 0, role: want }) : null) ?? primary();
+    if (!target) return;
+    target.streamText = String(text).slice(-120);
+    setPersist(target, { anim: "type", icon: { kind: "stream", text: target.streamText } });
+  }
+  function rate(): number {
+    return tl.rate();
+  }
+  function timeline(): TimelineInspect {
+    return tl.inspect();
+  }
+
+  /** 推进一帧：画面时间按加快倍率推进，时间线按墙钟推进。 */
+  function step(deltaMs = 0): void {
+    const delta = Math.max(0, deltaMs);
+    scene.stepScene(delta * tl.rate());
+    wallT += delta;
+    tl.tick();
+    if (effStatus() !== "interrupted") state.clock += scene.reduced ? 0 : 16.7;
+    // 时间线上正在演的动作：做它的小人进入收尾步骤（或换了动作、被撤走）就算演完
+    runs.forEach((run, id) => {
+      const a = run.actor;
+      const actor = actorOf(a.id);
+      if (!actor || !scene.actors.includes(actor) || a.runId !== id || scene.inTail(actor)) {
+        runs.delete(id);
+        tl.done(id);
+        // 演的时候到达的进度，演完以后接上最近的一项
+        if (a.pendingProgress) {
+          const next = a.pendingProgress;
+          a.pendingProgress = null;
+          showProgress(next, a);
+        }
+      }
+    });
+    for (const a of roleActors()) {
+      const actor = actorOf(a.id);
+      if (actor && !actor.script) applyRest(a);
+    }
+    tickBench();
+    // 与原型 room.js 的 update 一致：终端冒烟与茶水台蒸汽（同时保持随机数的消耗顺序一致）
+    if (state.smokeUntil > scene.realT && !scene.reduced && scene.random() < 0.3) {
+      scene.emit("smoke", L.terminal.x + 14, L.terminal.base - 38, 1);
+    }
+    if (!scene.frozen && scene.random() < 0.035) scene.emit("steam", 413, ROW_B - 15, 1);
+    for (const a of roleActors()) {
+      const actor = actorOf(a.id);
+      if (actor && actor.anim === "tea" && actor.seat && !scene.frozen && scene.random() < 0.03) {
+        const [hx, hy] = headTop(scene, actor);
+        scene.emit("steam", hx + 2, hy + 12, 1);
+      }
+    }
+  }
+
+  // 与原型 room.js 一致：建立画面时先按缺省角色设置同步一次（一个部门一个 Agent），状态到达时再同步
   syncRoles();
   applyLights();
 
@@ -1462,11 +1443,12 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     actors: roleActors,
     primary,
     actorById,
-    setModel,
-    playEvent,
-    setStreamText,
+    setState,
+    jump,
+    play,
+    stream,
     step,
+    rate,
+    timeline,
   };
 }
-
-
