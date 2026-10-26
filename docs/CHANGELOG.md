@@ -571,3 +571,5 @@ claude-sonnet-5-5 / 2026-10-26 02:10 / docs/decision.md 追加 2026-10-26「像�
 claude-sonnet-5-5 / 2026-10-26 / docs/design/department-guidance.md：状态行改为已实现与待实现的现状；新增第 2.1 节「放行怎么等」；第 3 节补「处理完只有一个说法」「已回答由主机写」「用文字回答用户」。docs/design/department-loop.md 第 6 节：回答用户限于指导独占的一轮，回答由主机写，放行等待的做法指向指导设计说明第 2.1 节。docs/decision.md 追加 2026-10-26 一条 / #561 被交回，设计里缺回答用户怎么结束一轮和放行等待的做法，补定后拆成四张
 
 claude-sonnet-5-5 / 2026-10-26 / docs/decision.md 追加 2026-10-26「画面翻译层先建表、后接线」/ #952 被交回，对应表与接线在当前 main 上互相矛盾，定先建表后接线，并定 held、released_unsettled 的画面取值
+
+claude-opus-5-5 / 2026-10-26 10:10 / docs/design/skeleton-and-application.md 第 12 节「开工之前」一条改为取消说明、删 S0 一行、S1a、S1c、S3 的前置改为 #561（S1a 加 #1019）、顺序一段去掉 S0，第 15 节第 6 条改为按验收证据规则第 5 节对照上一个发布；docs/program-roadmap.md 第 1.4 节阶段一 · 2 的收口改为对照上一个发布的读数；docs/agents/acceptance-evidence.md 第 5 节版本回归去掉「#871 的改动前基准」特例；docs/current-baseline.md 阶段一 · 2 一行去掉 #871；docs/decision.md 追加一条 / 用户取消 #871，阶段一做完以后整体测试
