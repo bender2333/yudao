@@ -122,6 +122,9 @@ export const ATTEMPT_STATUS: Record<string, string> = {
   cancelled: "已取消",
 };
 
+// 指导的状态只有三种（原型 v12 设计说明第 3.4 节、部门指导的处理设计第 3 节，工单 #906）：
+// 已接收、已进入模型输入、已回答，没有别的状态。第三种状态的「已回答」由主机在收到指导的那一轮
+// 正常结束时写，部门不提交（工单 #1039）。状态值取查询 department.workspace 的 guidance 一项。
 export const GUIDANCE_STATUS: Record<string, string> = {
   received: "已接收",
   in_input: "已进入模型输入",
