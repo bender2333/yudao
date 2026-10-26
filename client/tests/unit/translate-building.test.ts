@@ -181,6 +181,30 @@ test("状态灯：几个部门同时工作时几个房间同时亮灯（部门�
   assert.equal(state.floors[0].lit.quality, false);
 });
 
+test("状态灯：事项停在工程、质检同时在预测性探索时这一层两个房间都亮灯，小旗只在工程", () => {
+  // 工单 #958 验收标准 1 的楼那一半：几个部门同时工作时几个房间同时亮灯；小旗只在事项所在的房间
+  const state = buildingState({
+    position: 1,
+    projects: [projectRow()],
+    loops: {
+      p1: loop([item({
+        work_item_id: "w1",
+        department: "engineering",
+        departments: {
+          engineering: { state: "working", note: null },
+          quality: { state: "working", note: "预测性探索：按 PRD r1 起草测试用例" },
+          product: { state: "waiting", note: null },
+        },
+      })]),
+    },
+  });
+  const floor = state.floors[0];
+  assert.equal(floor.lit.engineering, true);
+  assert.equal(floor.lit.quality, true);
+  assert.equal(floor.lit.product, false);
+  assert.deepEqual(floor.flags.map((flag) => [flag.work_item_id, flag.department]), [["w1", "engineering"]]);
+});
+
 test("状态灯：进行中的事项所在的层亮灯，原来 sceneStatus 的行为不变", () => {
   // 服务端的 in_progress 翻成画面的 working：这一层亮灯、事项在房间里
   const working = buildingState({ position: 1, projects: [projectRow()], loops: { p1: loop([item()]) } });

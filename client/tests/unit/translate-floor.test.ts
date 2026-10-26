@@ -1,7 +1,8 @@
-// 楼层翻译层的测试（工单 #953 验收标准 2）。
+// 楼层翻译层的测试（工单 #953 验收标准 2；工单 #958 验收标准 1、2）。
 //
 // 覆盖：覆盖核对里楼层「翻成动作」的每种事件，用一条样例事件翻出至少一个动作，动作的 kind 都在楼层的声明表里；
 // 事件翻成动作时带上来源事件的位置（回链）；project.loop 的样例结果翻出的状态通过画面合同的校验；
+// 几个部门同时工作的部门状态（#903）与未回答的询问（run.asks）：询问中、信停在被询问部门的管口、回答以后不再等待；
 // 决定请求翻成大厅板上的卡片（文字在这里写好）；输出片段翻成流式文字。
 
 import { test } from "node:test";
@@ -11,7 +12,7 @@ import { COVERAGE, classOf } from "../../src/renderer/src/translate/coverage.ts"
 import { FLOOR_EVENT_TYPES, floorActions, floorCards, floorState, streamText, type FloorEvent } from "../../src/renderer/src/translate/floor.ts";
 import { KINDS } from "../../src/renderer/src/pixel/world/floor-decl.ts";
 import { floorState as checkFloorState } from "../../src/renderer/src/pixel/contract.ts";
-import type { DecisionView, ProjectLoopResult } from "../../src/renderer/src/api/generated/types.gen.ts";
+import type { AskView, DecisionView, ProjectLoopResult } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 // ---------------------------------------------------------------------------
 // 每一条翻成动作的事件都有样例，每种动作都在声明表里
@@ -168,6 +169,114 @@ test("状态：部门的忙碌状态经对应表翻成画面的取值，空闲�
   });
   assert.deepEqual(state.items[0].departments, { engineering: "working", quality: "waiting_user" });
 });
+
+// 工单 #958 验收标准 1、2：几个部门同时工作的状态与询问链（#903 的 departments 与 run.asks）
+
+/** 一次询问（run.asks 的一条，工单 #903）。 */
+const askRow = (over: Record<string, unknown> = {}): AskView => ({
+  id: "a1", requester: "engineering", recipient: "product", question: "线路偏好是否改变最短距离",
+  status: "进行中", answer: null, reason: null, parent: null, chain: ["engineering"], depth: 1,
+  prd_revision: null, start_position: 10, end_position: null,
+  started_at: "2026-10-26T09:00:10+08:00", ended_at: null, ...over,
+} as AskView);
+
+test("状态：事项停在工程、质检同时在预测性探索时两个部门都在工作中", () => {
+  const state = floorState({
+    position: 9,
+    loop: loopResult([loopRow({
+      department: "engineering",
+      departments: {
+        engineering: { state: "working", note: null },
+        quality: { state: "working", note: "预测性探索：按 PRD r1 起草测试用例" },
+        product: { state: "waiting", note: null },
+      },
+    })]),
+  });
+  // 事项只有一条、停在工程：包裹与门口的小旗按事项所在的部门画
+  assert.equal(state.items[0].department, "engineering");
+  assert.equal(state.items[0].status, "working");
+  // 质检的预测性探索也写进部门状态：那个房间同样亮灯、小人坐在桌前工作（画面层按 busyItems 算）
+  assert.deepEqual(state.items[0].departments, { engineering: "working", quality: "working" });
+});
+
+test("状态：工程询问产品时事项是询问中，信停在产品的传信管出口", () => {
+  const state = floorState({
+    position: 12,
+    loop: loopResult([loopRow({
+      department: "engineering",
+      departments: {
+        engineering: { state: "asking", note: "在等待产品的回答" },
+        product: { state: "working", note: "回答工程的询问" },
+        quality: { state: "waiting", note: null },
+      },
+    })]),
+    asks: { r1: [askRow()] },
+  });
+  // 所在部门停在自己发出的询问上：事项在画面上是询问中，工程的小人在传信管口等待
+  assert.equal(state.items[0].status, "asking");
+  // 未回答的询问停在产品的管口（信从工程送到产品）；传信管里信的封数就是这条询问链里未回答的条数
+  assert.deepEqual(state.open_requests, [{ from: "engineering", to: "product", work_item_id: "w1" }]);
+});
+
+test("状态：产品回答以后提问方不再在管口等待，传信管里没有信", () => {
+  const state = floorState({
+    position: 14,
+    loop: loopResult([loopRow({
+      department: "engineering",
+      departments: {
+        engineering: { state: "working", note: null },
+        product: { state: "waiting", note: null },
+        quality: { state: "waiting", note: null },
+      },
+    })]),
+    asks: { r1: [askRow({ status: "已回答", answer: "不改变", end_position: 13 })] },
+  });
+  // 询问结束了：事项回到工作中，管口没有信
+  assert.equal(state.items[0].status, "working");
+  assert.deepEqual(state.open_requests, []);
+  assert.equal(state.items[0].departments && state.items[0].departments.engineering, "working");
+});
+
+test("状态：未回答的询问按运行对到事项，已回答与没能回答的不算", () => {
+  const state = floorState({
+    position: 20,
+    loop: loopResult([
+      loopRow({ work_item_id: "w1", run_id: "r1", department: "engineering" }),
+      loopRow({ work_item_id: "w2", run_id: "r2", department: "quality" }),
+    ]),
+    asks: {
+      r1: [askRow({ id: "a1" }), askRow({ id: "a2", status: "没能回答", reason: "对方没有回答" })],
+      r2: [
+        askRow({ id: "a3", requester: "quality", recipient: "engineering" }),
+        askRow({ id: "a4", requester: "quality", recipient: "product", status: "已回答", answer: "按现状" }),
+      ],
+    },
+  });
+  // 两条未回答的询问各自停在被询问部门的管口，事项标识按运行对到事项
+  assert.deepEqual(state.open_requests, [
+    { from: "engineering", to: "product", work_item_id: "w1" },
+    { from: "quality", to: "engineering", work_item_id: "w2" },
+  ]);
+});
+
+test("状态：没有查到询问链时不画信，事项状态按部门状态之外的规则翻", () => {
+  const state = floorState({
+    position: 21,
+    loop: loopResult([loopRow({ department: "engineering" })]),
+  });
+  assert.deepEqual(state.open_requests, []);
+  // 中断的恢复状态优先于询问中：画面上不是询问中
+  const interrupted = floorState({
+    position: 22,
+    loop: loopResult([loopRow({
+      department: "engineering",
+      recovery_state: "interrupted",
+      departments: { engineering: { state: "asking", note: null } },
+    })]),
+  });
+  assert.equal(interrupted.items[0].status, "interrupted");
+});
+
 
 test("状态：没有查角色时 roles 为空，没有查询结果时事项为空", () => {
   const empty = floorState({ position: 1, loop: null });
