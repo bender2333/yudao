@@ -1,6 +1,6 @@
 {
  "scenario": "ask_answer_with_spec_revision",
- "covers": "工程询问产品，产品在分支里修订 PRD 并回答，工程收到回答与 PRD 新版本，接着交付，质检放行。",
+ "covers": "工程询问产品，产品在分支里修订 PRD 并回答，工程收到回答与 PRD 新版本，接着交付，质检核验后放行（单步驱动，工单 #1061；质检的预测性探索在 concurrent_departments 覆盖）。",
  "events": [
   {
    "event": "<evt#1>",
@@ -32,7 +32,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
+    "activation_id": "<act#1>",
     "input_version": 1
    }
   },
@@ -48,7 +48,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
+    "activation_id": "<act#1>",
     "input_version": 1,
     "step_id": 1
    }
@@ -65,13 +65,13 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
+    "activation_id": "<act#1>",
     "admitted": true,
     "attempt": 1,
-    "attempt_id": "<act#2>:root-1:work:attempt-1",
+    "attempt_id": "<act#1>:root-1:work:attempt-1",
     "department": "product",
     "input_version": 1,
-    "logical_call_id": "<act#2>:root-1:work",
+    "logical_call_id": "<act#1>:root-1:work",
     "purpose": "work",
     "step_id": 1
    }
@@ -88,14 +88,14 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
+    "activation_id": "<act#1>",
     "attempt": 1,
-    "attempt_id": "<act#2>:root-1:work:attempt-1",
+    "attempt_id": "<act#1>:root-1:work:attempt-1",
     "attempted": true,
     "context_event_id": "<ses_pro#1>#3",
     "definitions_version": "<definitions>",
     "input_version": 1,
-    "logical_call_id": "<act#2>:root-1:work",
+    "logical_call_id": "<act#1>:root-1:work",
     "max_attempts": 3,
     "parameters_version": "<parameters>",
     "purpose": "work",
@@ -114,11 +114,11 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
-    "attempt_id": "<act#2>:root-1:work:attempt-1",
+    "activation_id": "<act#1>",
+    "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
     "input_version": 1,
-    "logical_call_id": "<act#2>:root-1:work",
+    "logical_call_id": "<act#1>:root-1:work",
     "purpose": "work",
     "step_id": 1
    }
@@ -135,7 +135,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
+    "activation_id": "<act#1>",
     "input_version": 1,
     "name": "provider_usage",
     "ok": true,
@@ -155,12 +155,12 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
+    "activation_id": "<act#1>",
     "attempt": 1,
-    "attempt_id": "<act#2>:root-1:work:attempt-1",
+    "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
     "input_version": 1,
-    "logical_call_id": "<act#2>:root-1:work",
+    "logical_call_id": "<act#1>:root-1:work",
     "purpose": "work",
     "status": "completed",
     "step_id": 1
@@ -178,13 +178,13 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
+    "activation_id": "<act#1>",
     "attempt": 1,
-    "attempt_id": "<act#2>:root-1:work:attempt-1",
+    "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
-    "id": "call-<act#2>-1-1",
+    "id": "call-<act#1>-1-1",
     "input_version": 1,
-    "logical_call_id": "<act#2>:root-1:work",
+    "logical_call_id": "<act#1>:root-1:work",
     "name": "submit_product_spec",
     "step_id": 1
    }
@@ -201,12 +201,12 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
-    "attempt_id": "<act#2>:root-1:work:attempt-1",
+    "activation_id": "<act#1>",
+    "attempt_id": "<act#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_pro#1>#3",
-    "id": "call-<act#2>-1-1",
+    "id": "call-<act#1>-1-1",
     "input_version": 1,
-    "logical_call_id": "<act#2>:root-1:work",
+    "logical_call_id": "<act#1>:root-1:work",
     "name": "submit_product_spec",
     "ok": true,
     "purpose": "work",
@@ -243,7 +243,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#30>",
+    "content_hash": "<sha256#25>",
     "id": "<spec#1>",
     "input_version": 1,
     "issuer": "product",
@@ -264,9 +264,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#31>",
+    "content_hash": "<sha256#26>",
     "input_version": 1,
-    "product_spec_hash": "<sha256#30>",
+    "product_spec_hash": "<sha256#25>",
     "revision": 1
    }
   },
@@ -282,7 +282,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#2>",
+    "activation_id": "<act#1>",
     "input_version": 1,
     "session_activations": 1,
     "session_elapsed_ms": "<duration>",
@@ -301,30 +301,13 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "effective_contract_hash": "<sha256#31>",
+    "activation_id": "<act#2>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1
    }
   },
   {
    "event": "<evt#16>",
-   "type": "department_activated",
-   "actor": "system",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": null,
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "effective_contract_hash": "<sha256#31>",
-    "input_version": 1
-   }
-  },
-  {
-   "event": "<evt#17>",
    "type": "department_input",
    "actor": "department:engineering",
    "department": "engineering",
@@ -335,14 +318,14 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "effective_contract_hash": "<sha256#31>",
+    "activation_id": "<act#2>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1,
     "step_id": 1
    }
   },
   {
-   "event": "<evt#18>",
+   "event": "<evt#17>",
    "type": "context_assembled",
    "actor": "department:engineering",
    "department": "engineering",
@@ -353,20 +336,20 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "admitted": true,
     "attempt": 1,
-    "attempt_id": "<act#1>:root-1:work:attempt-1",
+    "attempt_id": "<act#2>:root-1:work:attempt-1",
     "department": "engineering",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-1:work",
+    "logical_call_id": "<act#2>:root-1:work",
     "purpose": "work",
     "step_id": 1
    }
   },
   {
-   "event": "<evt#19>",
+   "event": "<evt#18>",
    "type": "model_requested",
    "actor": "department:engineering",
    "department": "engineering",
@@ -377,15 +360,15 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "attempt": 1,
-    "attempt_id": "<act#1>:root-1:work:attempt-1",
+    "attempt_id": "<act#2>:root-1:work:attempt-1",
     "attempted": true,
     "context_event_id": "<ses_eng#1>#3",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-1:work",
+    "logical_call_id": "<act#2>:root-1:work",
     "max_attempts": 3,
     "parameters_version": "<parameters>",
     "purpose": "work",
@@ -393,7 +376,7 @@
    }
   },
   {
-   "event": "<evt#20>",
+   "event": "<evt#19>",
    "type": "model_message",
    "actor": "department:engineering",
    "department": "engineering",
@@ -404,18 +387,18 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "attempt_id": "<act#1>:root-1:work:attempt-1",
+    "activation_id": "<act#2>",
+    "attempt_id": "<act#2>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-1:work",
+    "logical_call_id": "<act#2>:root-1:work",
     "purpose": "work",
     "step_id": 1
    }
   },
   {
-   "event": "<evt#21>",
+   "event": "<evt#20>",
    "type": "tool_called",
    "actor": "department:engineering",
    "department": "engineering",
@@ -426,7 +409,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "input_version": 1,
     "name": "provider_usage",
     "ok": true,
@@ -435,7 +418,7 @@
    }
   },
   {
-   "event": "<evt#22>",
+   "event": "<evt#21>",
    "type": "model_attempt_finished",
    "actor": "department:engineering",
    "department": "engineering",
@@ -446,19 +429,19 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "attempt": 1,
-    "attempt_id": "<act#1>:root-1:work:attempt-1",
+    "attempt_id": "<act#2>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-1:work",
+    "logical_call_id": "<act#2>:root-1:work",
     "purpose": "work",
     "status": "completed",
     "step_id": 1
    }
   },
   {
-   "event": "<evt#23>",
+   "event": "<evt#22>",
    "type": "tool_started",
    "actor": "department:engineering",
    "department": "engineering",
@@ -469,20 +452,20 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "attempt": 1,
-    "attempt_id": "<act#1>:root-1:work:attempt-1",
+    "attempt_id": "<act#2>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "id": "ask-1",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-1:work",
+    "logical_call_id": "<act#2>:root-1:work",
     "name": "ask",
     "step_id": 1
    }
   },
   {
-   "event": "<evt#24>",
+   "event": "<evt#23>",
    "type": "ask_started",
    "actor": "department:engineering",
    "department": "engineering",
@@ -500,7 +483,7 @@
    }
   },
   {
-   "event": "<evt#25>",
+   "event": "<evt#24>",
    "type": "department_activated",
    "actor": "system",
    "department": "product",
@@ -512,283 +495,12 @@
    "error": null,
    "payload": {
     "activation_id": "<act_ask#1>",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1
    }
   },
   {
-   "event": "<evt#26>",
-   "type": "department_input",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "effective_contract_hash": "<sha256#31>",
-    "input_version": 1,
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#27>",
-   "type": "context_assembled",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "admitted": true,
-    "attempt": 1,
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "department": "quality",
-    "effective_contract_hash": "<sha256#31>",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#28>",
-   "type": "model_requested",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "attempt": 1,
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "attempted": true,
-    "context_event_id": "<ses_qua#1>#3",
-    "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#31>",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "max_attempts": 3,
-    "parameters_version": "<parameters>",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#29>",
-   "type": "model_message",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#31>",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#30>",
-   "type": "model_message",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#31>",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#31>",
-   "type": "tool_called",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "input_version": 1,
-    "name": "provider_usage",
-    "ok": true,
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#32>",
-   "type": "model_attempt_finished",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "attempt": 1,
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#3",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "purpose": "work",
-    "status": "completed",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#33>",
-   "type": "tool_started",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "attempt": 1,
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#31>",
-    "id": "call-<act#3>-1-1",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "name": "write_file",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#34>",
-   "type": "qa_tests_saved",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "content_hash": "<sha256#100>",
-    "version": 1
-   }
-  },
-  {
-   "event": "<evt#35>",
-   "type": "tool_called",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#31>",
-    "id": "call-<act#3>-1-1",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "name": "write_file",
-    "ok": true,
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#36>",
-   "type": "tool_started",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "attempt": 1,
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#31>",
-    "id": "call-<act#3>-1-2",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "name": "submit_review",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#37>",
-   "type": "tool_called",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "attempt_id": "<act#3>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#31>",
-    "id": "call-<act#3>-1-2",
-    "input_version": 1,
-    "logical_call_id": "<act#3>:root-1:work",
-    "name": "submit_review",
-    "ok": true,
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#38>",
+   "event": "<evt#25>",
    "type": "department_input",
    "actor": "department:product",
    "department": "product",
@@ -800,13 +512,13 @@
    "error": null,
    "payload": {
     "activation_id": "<act_ask#1>",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1,
     "step_id": 1
    }
   },
   {
-   "event": "<evt#39>",
+   "event": "<evt#26>",
    "type": "context_assembled",
    "actor": "department:product",
    "department": "product",
@@ -822,7 +534,7 @@
     "attempt": 1,
     "attempt_id": "<act_ask#1>:root-1:work:attempt-1",
     "department": "product",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1,
     "logical_call_id": "<act_ask#1>:root-1:work",
     "purpose": "work",
@@ -830,7 +542,7 @@
    }
   },
   {
-   "event": "<evt#40>",
+   "event": "<evt#27>",
    "type": "model_requested",
    "actor": "department:product",
    "department": "product",
@@ -847,7 +559,7 @@
     "attempted": true,
     "context_event_id": "<ses_ask_pro#1>#3",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1,
     "logical_call_id": "<act_ask#1>:root-1:work",
     "max_attempts": 3,
@@ -857,7 +569,7 @@
    }
   },
   {
-   "event": "<evt#41>",
+   "event": "<evt#28>",
    "type": "model_message",
    "actor": "department:product",
    "department": "product",
@@ -871,7 +583,7 @@
     "activation_id": "<act_ask#1>",
     "attempt_id": "<act_ask#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_ask_pro#1>#3",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "input_version": 1,
     "logical_call_id": "<act_ask#1>:root-1:work",
     "purpose": "work",
@@ -879,7 +591,7 @@
    }
   },
   {
-   "event": "<evt#42>",
+   "event": "<evt#29>",
    "type": "tool_called",
    "actor": "department:product",
    "department": "product",
@@ -899,7 +611,7 @@
    }
   },
   {
-   "event": "<evt#43>",
+   "event": "<evt#30>",
    "type": "model_attempt_finished",
    "actor": "department:product",
    "department": "product",
@@ -922,7 +634,7 @@
    }
   },
   {
-   "event": "<evt#44>",
+   "event": "<evt#31>",
    "type": "tool_started",
    "actor": "department:product",
    "department": "product",
@@ -937,7 +649,7 @@
     "attempt": 1,
     "attempt_id": "<act_ask#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_ask_pro#1>#3",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "id": "ans-1",
     "input_version": 1,
     "logical_call_id": "<act_ask#1>:root-1:work",
@@ -946,7 +658,7 @@
    }
   },
   {
-   "event": "<evt#45>",
+   "event": "<evt#32>",
    "type": "tool_called",
    "actor": "department:product",
    "department": "product",
@@ -960,7 +672,7 @@
     "activation_id": "<act_ask#1>",
     "attempt_id": "<act_ask#1>:root-1:work:attempt-1",
     "context_event_id": "<ses_ask_pro#1>#3",
-    "effective_contract_hash": "<sha256#31>",
+    "effective_contract_hash": "<sha256#26>",
     "id": "ans-1",
     "input_version": 1,
     "logical_call_id": "<act_ask#1>:root-1:work",
@@ -971,49 +683,7 @@
    }
   },
   {
-   "event": "<evt#46>",
-   "type": "proposal_submitted",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "definitions_version": "<definitions>",
-    "input_version": 1,
-    "kind": "qa_review",
-    "parameters_version": "<parameters>"
-   }
-  },
-  {
-   "event": "<evt#47>",
-   "type": "proposal_rejected",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "definitions_version": "<definitions>",
-    "errors": [
-     {
-      "field": "delivery_spec",
-      "message": "this work has no delivery to review"
-     }
-    ],
-    "input_version": 1,
-    "kind": "qa_review",
-    "parameters_version": "<parameters>"
-   }
-  },
-  {
-   "event": "<evt#48>",
+   "event": "<evt#33>",
    "type": "activation_finished",
    "actor": "system",
    "department": "product",
@@ -1032,7 +702,7 @@
    }
   },
   {
-   "event": "<evt#49>",
+   "event": "<evt#34>",
    "type": "spec_superseded",
    "actor": "department:product",
    "department": "product",
@@ -1043,12 +713,12 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#30>",
+    "content_hash": "<sha256#25>",
     "revision": 1
    }
   },
   {
-   "event": "<evt#50>",
+   "event": "<evt#35>",
    "type": "spec_accepted",
    "actor": "department:product",
    "department": "product",
@@ -1059,18 +729,18 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#4>",
+    "content_hash": "<sha256#45>",
     "id": "<spec#2>",
     "input_version": 1,
     "issuer": "product",
     "kind": "product_spec",
-    "parent_hash": "<sha256#30>",
+    "parent_hash": "<sha256#25>",
     "revision": 2,
     "status": "active"
    }
   },
   {
-   "event": "<evt#51>",
+   "event": "<evt#36>",
    "type": "contract_accepted",
    "actor": "department:product",
    "department": "product",
@@ -1081,14 +751,14 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#3>",
+    "content_hash": "<sha256#46>",
     "input_version": 1,
-    "product_spec_hash": "<sha256#4>",
+    "product_spec_hash": "<sha256#45>",
     "revision": 2
    }
   },
   {
-   "event": "<evt#52>",
+   "event": "<evt#37>",
    "type": "ask_answered",
    "actor": "department:product",
    "department": "product",
@@ -1108,7 +778,7 @@
    }
   },
   {
-   "event": "<evt#53>",
+   "event": "<evt#38>",
    "type": "tool_called",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1119,13 +789,13 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "attempt_id": "<act#1>:root-1:work:attempt-1",
+    "activation_id": "<act#2>",
+    "attempt_id": "<act#2>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#3>",
+    "effective_contract_hash": "<sha256#46>",
     "id": "ask-1",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-1:work",
+    "logical_call_id": "<act#2>:root-1:work",
     "name": "ask",
     "ok": true,
     "purpose": "work",
@@ -1133,7 +803,7 @@
    }
   },
   {
-   "event": "<evt#54>",
+   "event": "<evt#39>",
    "type": "context_assembled",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1144,20 +814,20 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "admitted": true,
     "attempt": 1,
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "department": "engineering",
-    "effective_contract_hash": "<sha256#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "purpose": "work",
     "step_id": 2
    }
   },
   {
-   "event": "<evt#55>",
+   "event": "<evt#40>",
    "type": "model_requested",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1168,15 +838,15 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "attempt": 1,
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "attempted": true,
     "context_event_id": "<ses_eng#1>#11",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "max_attempts": 3,
     "parameters_version": "<parameters>",
     "purpose": "work",
@@ -1184,7 +854,7 @@
    }
   },
   {
-   "event": "<evt#56>",
+   "event": "<evt#41>",
    "type": "model_message",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1195,18 +865,18 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "activation_id": "<act#2>",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "purpose": "work",
     "step_id": 2
    }
   },
   {
-   "event": "<evt#57>",
+   "event": "<evt#42>",
    "type": "model_message",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1217,18 +887,18 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "activation_id": "<act#2>",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "purpose": "work",
     "step_id": 2
    }
   },
   {
-   "event": "<evt#58>",
+   "event": "<evt#43>",
    "type": "model_message",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1239,18 +909,18 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "activation_id": "<act#2>",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "purpose": "work",
     "step_id": 2
    }
   },
   {
-   "event": "<evt#59>",
+   "event": "<evt#44>",
    "type": "model_attempt_finished",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1261,19 +931,19 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "attempt": 1,
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "purpose": "work",
     "status": "completed",
     "step_id": 2
    }
   },
   {
-   "event": "<evt#60>",
+   "event": "<evt#45>",
    "type": "tool_started",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1284,20 +954,20 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "attempt": 1,
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#1>-2-1",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#2>-2-1",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "name": "write_file",
     "step_id": 2
    }
   },
   {
-   "event": "<evt#61>",
+   "event": "<evt#46>",
    "type": "tool_called",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1308,13 +978,13 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "activation_id": "<act#2>",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#1>-2-1",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#2>-2-1",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "name": "write_file",
     "ok": true,
     "purpose": "work",
@@ -1322,7 +992,7 @@
    }
   },
   {
-   "event": "<evt#62>",
+   "event": "<evt#47>",
    "type": "tool_started",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1333,236 +1003,20 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "attempt": 1,
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#1>-2-2",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#2>-2-2",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "name": "run_check",
     "step_id": 2
    }
   },
   {
-   "event": "<evt#63>",
-   "type": "activation_finished",
-   "actor": "system",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#1",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#3>",
-    "input_version": 1,
-    "session_activations": 1,
-    "session_elapsed_ms": "<duration>",
-    "session_model_steps": 1
-   }
-  },
-  {
-   "event": "<evt#64>",
-   "type": "department_activated",
-   "actor": "system",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": null,
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "effective_contract_hash": "<sha256#3>",
-    "input_version": 1
-   }
-  },
-  {
-   "event": "<evt#65>",
-   "type": "department_input",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "effective_contract_hash": "<sha256#3>",
-    "input_version": 1,
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#66>",
-   "type": "context_assembled",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "admitted": true,
-    "attempt": 1,
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "department": "quality",
-    "effective_contract_hash": "<sha256#3>",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#67>",
-   "type": "model_requested",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "attempt": 1,
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "attempted": true,
-    "context_event_id": "<ses_qua#1>#19",
-    "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#3>",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "max_attempts": 3,
-    "parameters_version": "<parameters>",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#68>",
-   "type": "model_message",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#3>",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#69>",
-   "type": "model_message",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#3>",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#70>",
-   "type": "tool_called",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "input_version": 1,
-    "name": "provider_usage",
-    "ok": true,
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#71>",
-   "type": "model_attempt_finished",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "attempt": 1,
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#19",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "purpose": "work",
-    "status": "completed",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#72>",
-   "type": "tool_started",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "attempt": 1,
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#4>-1-1",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "name": "run_check",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#73>",
+   "event": "<evt#48>",
    "type": "tool_called",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1573,13 +1027,13 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "activation_id": "<act#2>",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#1>-2-2",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#2>-2-2",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "name": "run_check",
     "ok": true,
     "purpose": "work",
@@ -1592,7 +1046,7 @@
    }
   },
   {
-   "event": "<evt#74>",
+   "event": "<evt#49>",
    "type": "tool_started",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1603,20 +1057,20 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "attempt": 1,
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#1>-2-3",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#2>-2-3",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "name": "submit_delivery",
     "step_id": 2
    }
   },
   {
-   "event": "<evt#75>",
+   "event": "<evt#50>",
    "type": "tool_called",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1627,13 +1081,13 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
-    "attempt_id": "<act#1>:root-2:work:attempt-1",
+    "activation_id": "<act#2>",
+    "attempt_id": "<act#2>:root-2:work:attempt-1",
     "context_event_id": "<ses_eng#1>#11",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#1>-2-3",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#2>-2-3",
     "input_version": 1,
-    "logical_call_id": "<act#1>:root-2:work",
+    "logical_call_id": "<act#2>:root-2:work",
     "name": "submit_delivery",
     "ok": true,
     "purpose": "work",
@@ -1641,7 +1095,7 @@
    }
   },
   {
-   "event": "<evt#76>",
+   "event": "<evt#51>",
    "type": "proposal_submitted",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1659,7 +1113,7 @@
    }
   },
   {
-   "event": "<evt#77>",
+   "event": "<evt#52>",
    "type": "delivery_accepted",
    "actor": "department:engineering",
    "department": "engineering",
@@ -1673,19 +1127,19 @@
     "check_names": [
      "smoke"
     ],
-    "code_tree_digest": "<sha256#5>",
-    "content_hash": "<sha256#6>",
-    "effective_contract_hash": "<sha256#3>",
+    "code_tree_digest": "<sha256#78>",
+    "content_hash": "<sha256#82>",
+    "effective_contract_hash": "<sha256#46>",
     "id": "<del#1>",
     "issuer": "engineering",
     "kind": "delivery_spec",
-    "product_spec_hash": "<sha256#4>",
+    "product_spec_hash": "<sha256#45>",
     "revision": 1,
     "status": "active"
    }
   },
   {
-   "event": "<evt#78>",
+   "event": "<evt#53>",
    "type": "activation_finished",
    "actor": "system",
    "department": "engineering",
@@ -1696,7 +1150,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#1>",
+    "activation_id": "<act#2>",
     "input_version": 1,
     "session_activations": 1,
     "session_elapsed_ms": "<duration>",
@@ -1704,147 +1158,7 @@
    }
   },
   {
-   "event": "<evt#79>",
-   "type": "tool_called",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#4>-1-1",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "name": "run_check",
-    "ok": true,
-    "purpose": "work",
-    "step_id": 1
-   },
-   "receipt": {
-    "exit_code": 0,
-    "qa_tests_hash": "<sha256#100>",
-    "tree_changed": false
-   }
-  },
-  {
-   "event": "<evt#80>",
-   "type": "tool_started",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "attempt": 1,
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#4>-1-2",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "name": "submit_review",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#81>",
-   "type": "tool_called",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "attempt_id": "<act#4>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#3>",
-    "id": "call-<act#4>-1-2",
-    "input_version": 1,
-    "logical_call_id": "<act#4>:root-1:work",
-    "name": "submit_review",
-    "ok": true,
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#82>",
-   "type": "proposal_submitted",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "definitions_version": "<definitions>",
-    "input_version": 1,
-    "kind": "qa_review",
-    "parameters_version": "<parameters>"
-   }
-  },
-  {
-   "event": "<evt#83>",
-   "type": "proposal_rejected",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "definitions_version": "<definitions>",
-    "errors": [
-     {
-      "field": "delivery_spec",
-      "message": "this work has no delivery to review"
-     }
-    ],
-    "input_version": 1,
-    "kind": "qa_review",
-    "parameters_version": "<parameters>"
-   }
-  },
-  {
-   "event": "<evt#84>",
-   "type": "activation_finished",
-   "actor": "system",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#4>",
-    "input_version": 1,
-    "session_activations": 2,
-    "session_elapsed_ms": "<duration>",
-    "session_model_steps": 2
-   }
-  },
-  {
-   "event": "<evt#85>",
+   "event": "<evt#54>",
    "type": "department_activated",
    "actor": "system",
    "department": "quality",
@@ -1855,74 +1169,74 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#5>",
-    "effective_contract_hash": "<sha256#3>",
+    "activation_id": "<act#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1
    }
   },
   {
-   "event": "<evt#86>",
+   "event": "<evt#55>",
    "type": "department_input",
    "actor": "department:quality",
    "department": "quality",
    "state_before": "running",
    "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#32",
+   "parent_event_id": "<ses_qua#1>#1",
    "session_id": "<ses_qua#1>",
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#5>",
-    "effective_contract_hash": "<sha256#3>",
+    "activation_id": "<act#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
     "step_id": 1
    }
   },
   {
-   "event": "<evt#87>",
+   "event": "<evt#56>",
    "type": "context_assembled",
    "actor": "department:quality",
    "department": "quality",
    "state_before": "running",
    "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#32",
+   "parent_event_id": "<ses_qua#1>#1",
    "session_id": "<ses_qua#1>",
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#5>",
+    "activation_id": "<act#3>",
     "admitted": true,
     "attempt": 1,
-    "attempt_id": "<act#5>:root-1:work:attempt-1",
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
     "department": "quality",
-    "effective_contract_hash": "<sha256#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "logical_call_id": "<act#5>:root-1:work",
+    "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
     "step_id": 1
    }
   },
   {
-   "event": "<evt#88>",
+   "event": "<evt#57>",
    "type": "model_requested",
    "actor": "department:quality",
    "department": "quality",
    "state_before": "running",
    "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#32",
+   "parent_event_id": "<ses_qua#1>#1",
    "session_id": "<ses_qua#1>",
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#5>",
+    "activation_id": "<act#3>",
     "attempt": 1,
-    "attempt_id": "<act#5>:root-1:work:attempt-1",
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
     "attempted": true,
-    "context_event_id": "<ses_qua#1>#34",
+    "context_event_id": "<ses_qua#1>#3",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#3>",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "logical_call_id": "<act#5>:root-1:work",
+    "logical_call_id": "<act#3>:root-1:work",
     "max_attempts": 3,
     "parameters_version": "<parameters>",
     "purpose": "work",
@@ -1930,102 +1244,288 @@
    }
   },
   {
-   "event": "<evt#89>",
-   "type": "model_attempt_failed",
+   "event": "<evt#58>",
+   "type": "model_message",
    "actor": "department:quality",
    "department": "quality",
    "state_before": "running",
    "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#32",
+   "parent_event_id": "<ses_qua#1>#1",
    "session_id": "<ses_qua#1>",
    "stop_reason": null,
-   "error": "fake adapter script exhausted",
+   "error": null,
    "payload": {
-    "activation_id": "<act#5>",
-    "attempt": 1,
-    "attempt_id": "<act#5>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#34",
-    "effective_contract_hash": "<sha256#3>",
+    "activation_id": "<act#3>",
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#3",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "logical_call_id": "<act#5>:root-1:work",
-    "max_attempts": 3,
+    "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
-    "reason": "provider_error",
-    "status": "failed",
     "step_id": 1
    }
   },
   {
-   "event": "<evt#90>",
-   "type": "run_failed",
-   "actor": "system",
+   "event": "<evt#59>",
+   "type": "model_message",
+   "actor": "department:quality",
    "department": "quality",
    "state_before": "running",
-   "state_after": "failed",
-   "parent_event_id": null,
-   "session_id": null,
-   "stop_reason": "provider_error",
-   "error": "fake adapter script exhausted",
-   "payload": {
-    "human_action": "模型服务失败。查看错误事件后，作为新事项重新开始或更换模型服务。",
-    "stop_reason": "provider_error"
-   }
-  },
-  {
-   "event": "<evt#91>",
-   "type": "lesson_candidate_recorded",
-   "actor": "system",
-   "department": "quality",
-   "state_before": "failed",
-   "state_after": "failed",
-   "parent_event_id": "__run__#2",
-   "session_id": null,
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "delivery_spec_hash": "<sha256#6>",
-    "id": "<lesson#1>",
-    "kind": "lesson_candidate",
-    "product_spec_hash": "<sha256#4>",
-    "source_event_id": "__run__#2",
-    "status": "unverified"
-   }
-  },
-  {
-   "event": "<evt#92>",
-   "type": "activation_finished",
-   "actor": "system",
-   "department": "quality",
-   "state_before": "failed",
-   "state_after": "failed",
-   "parent_event_id": "<ses_qua#1>#32",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
    "session_id": "<ses_qua#1>",
    "stop_reason": null,
    "error": null,
    "payload": {
-    "activation_id": "<act#5>",
+    "activation_id": "<act#3>",
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#3",
+    "effective_contract_hash": "<sha256#46>",
     "input_version": 1,
-    "session_activations": 3,
+    "logical_call_id": "<act#3>:root-1:work",
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#60>",
+   "type": "tool_called",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "input_version": 1,
+    "name": "provider_usage",
+    "ok": true,
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#61>",
+   "type": "model_attempt_finished",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "attempt": 1,
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#3",
+    "input_version": 1,
+    "logical_call_id": "<act#3>:root-1:work",
+    "purpose": "work",
+    "status": "completed",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#62>",
+   "type": "tool_started",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "attempt": 1,
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#3",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#3>-1-1",
+    "input_version": 1,
+    "logical_call_id": "<act#3>:root-1:work",
+    "name": "run_check",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#63>",
+   "type": "tool_called",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#3",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#3>-1-1",
+    "input_version": 1,
+    "logical_call_id": "<act#3>:root-1:work",
+    "name": "run_check",
+    "ok": true,
+    "purpose": "work",
+    "step_id": 1
+   },
+   "receipt": {
+    "exit_code": 0,
+    "qa_tests_hash": null,
+    "tree_changed": false
+   }
+  },
+  {
+   "event": "<evt#64>",
+   "type": "tool_started",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "attempt": 1,
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#3",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#3>-1-2",
+    "input_version": 1,
+    "logical_call_id": "<act#3>:root-1:work",
+    "name": "submit_review",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#65>",
+   "type": "tool_called",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "attempt_id": "<act#3>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#3",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "call-<act#3>-1-2",
+    "input_version": 1,
+    "logical_call_id": "<act#3>:root-1:work",
+    "name": "submit_review",
+    "ok": true,
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#66>",
+   "type": "proposal_submitted",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "definitions_version": "<definitions>",
+    "input_version": 1,
+    "kind": "qa_review",
+    "parameters_version": "<parameters>"
+   }
+  },
+  {
+   "event": "<evt#67>",
+   "type": "qa_submitted",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "code_snapshot_hash": "<sha256#78>",
+    "content_hash": "<sha256#105>",
+    "delivery_spec_hash": "<sha256#82>",
+    "effective_contract_hash": "<sha256#46>",
+    "id": "<qa#1>",
+    "issuer": "quality",
+    "kind": "qa_review",
+    "product_spec_hash": "<sha256#45>",
+    "revision": 1,
+    "status": "active",
+    "verdict": "release"
+   }
+  },
+  {
+   "event": "<evt#68>",
+   "type": "run_done",
+   "actor": "system",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "done",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": "released",
+   "error": null,
+   "payload": {
+    "stop_reason": "released"
+   }
+  },
+  {
+   "event": "<evt#69>",
+   "type": "activation_finished",
+   "actor": "system",
+   "department": "quality",
+   "state_before": "done",
+   "state_after": "done",
+   "parent_event_id": "<ses_qua#1>#1",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "input_version": 1,
+    "session_activations": 1,
     "session_elapsed_ms": "<duration>",
-    "session_model_steps": 3,
-    "stop_reason": "provider_error"
+    "session_model_steps": 1,
+    "stop_reason": "released"
    }
   }
  ],
  "projection": {
-  "status": "failed",
-  "stop_reason": "provider_error",
-  "error": "fake adapter script exhausted",
-  "waiting_reason": "未能完成：模型服务失败",
+  "status": "done",
+  "stop_reason": "released",
+  "error": null,
+  "waiting_reason": null,
   "active_department": null,
-  "human_action": "模型服务失败。查看错误事件后，作为新事项重新开始或更换模型服务。",
-  "cycle_count": 5,
+  "human_action": null,
+  "cycle_count": 3,
   "rework_count": 0,
   "round": 0,
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
-  "stream_version": 92,
+  "stream_version": 69,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
  },
