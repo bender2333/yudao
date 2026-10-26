@@ -150,3 +150,18 @@ test("重查失败保留旧快照与旧位置，不抛出", async () => {
   assert.deepEqual(seen.map((item) => item.value), ["ok"]);
   assert.equal(await views.refreshAll(), 5);
 });
+
+test("监听者的位置等于快照的位置，重新查询以后跟着更新", async () => {
+  // 工单 #952 验收标准 1：页面经 useSnapshot 交出这个位置，翻译层把它写进画面状态（设计说明第 4.1 节）
+  // 守第 13 节的 R2（各缝的交换字段：同步层交给监听者的快照位置）
+  let position = 7;
+  const views = new ViewSync(async () => ({ position, data: { value: position } }), CAPABILITIES);
+  const seen = [];
+  await views.open("v", { query: "projects.list" }, (data, at) => seen.push({ value: data.value, position: at }));
+  assert.deepEqual(seen, [{ value: 7, position: 7 }]);
+  // 相关事件到达以后重新查询，新快照的位置更大，监听者拿到新的位置
+  position = 9;
+  views.applyEvent("project_registered", 8);
+  await delay(400);
+  assert.deepEqual(seen[1], { value: 9, position: 9 });
+});

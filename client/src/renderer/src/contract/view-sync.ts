@@ -7,6 +7,10 @@ import { failureReason } from "./read-failure.ts";
 // 一次查询：名称与参数；转交应用层发出请求并返回快照（position 与 data）
 export type QueryRunner = <T>(name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
 
+// 一份数据的监听者：拿到查询结果与它来自的快照的位置（工单 #952）。
+// 画面合同的状态要带位置（画面与播放设计说明第 4.1 节），页面从 useSnapshot 拿到它再交给翻译层。
+export type ViewListener<T> = (value: T, position: number) => void;
+
 // 打开一个视图时登记的内容：查询名称与参数
 export type ViewRequest = {
   query: string;
@@ -17,7 +21,7 @@ type Entry = {
   query: string;
   params: Record<string, unknown> | undefined;
   changedBy: Set<string>;
-  listeners: Set<(value: unknown) => void>;
+  listeners: Set<ViewListener<unknown>>;
   // 快照已经包含的最大全局位置；位置不大于它的事件不作用（设计说明第 5.7 节）
   position: number;
   active: boolean;
@@ -44,14 +48,14 @@ export class ViewSync {
   // 查询失败时（例如服务不可达）不通知、不抛出：调用处继续显示旧的或空的状态，由连接状态提示过时；
   // useSnapshot 另传 onError 把读取状态结束并带上失败的原因（工单 #728），避免「正在读取数据」一直不消失，
   // 也避免失败与「本来就没有内容」在界面上变成同一句话
-  async open<Data>(viewId: string, request: ViewRequest, listener: (value: Data) => void,
+  async open<Data>(viewId: string, request: ViewRequest, listener: ViewListener<Data>,
                    onError?: (reason: string) => void): Promise<void> {
     this.close(viewId);
     const entry: Entry = {
       query: request.query,
       params: request.params,
       changedBy: this.changedByQuery[request.query] ?? new Set(),
-      listeners: new Set([listener as (value: unknown) => void]),
+      listeners: new Set([listener as ViewListener<unknown>]),
       position: 0,
       active: true,
     };
@@ -75,7 +79,7 @@ export class ViewSync {
     }
     entry.position = snapshot.position;
     for (const target of entry.listeners) {
-      target(snapshot.data);
+      target(snapshot.data, snapshot.position);
     }
   }
 
@@ -132,7 +136,7 @@ export class ViewSync {
     }
     entry.position = snapshot.position;
     for (const target of entry.listeners) {
-      target(snapshot.data);
+      target(snapshot.data, snapshot.position);
     }
   }
 

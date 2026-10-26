@@ -13,6 +13,9 @@ export type SnapshotState<T> = {
   // 这次读取失败时的原因；null 表示没有失败（工单 #728）。
   // 有这个字段，界面才能把「读不出来」与「本来就没有内容」分开说。
   error: string | null;
+  // 这份数据来自的快照的位置（全局位置）；没有数据时为 0（工单 #952）。
+  // 画面合同的状态要带位置（画面与播放设计说明第 4.1 节），页面把它交给翻译层，翻译层交给画面。
+  position: number;
 };
 
 // 一处视图在当前参数下页面能看到什么（纯函数，单元测试直接调用）：
@@ -22,17 +25,17 @@ export type SnapshotState<T> = {
 // 参数变了以后、新快照到达之前仍算读取中，且上一处（别的项目、别的事项）的数据不能接着用，
 // 否则调用处会拿它去发下一次查询（换项目以后用旧事项标识发查询会被服务端按找不到拒绝）
 export function snapshotView<T>(
-  state: { data: T | null; loading: boolean; error: string | null; key: string | null },
+  state: { data: T | null; loading: boolean; error: string | null; key: string | null; position: number },
   key: string,
   skip: boolean,
 ): SnapshotState<T> {
   if (skip) {
-    return { data: null, loading: false, error: null };
+    return { data: null, loading: false, error: null, position: 0 };
   }
   if (state.key !== key) {
-    return { data: null, loading: true, error: null };
+    return { data: null, loading: true, error: null, position: 0 };
   }
-  return { data: state.data, loading: state.loading, error: state.error };
+  return { data: state.data, loading: state.loading, error: state.error, position: state.position };
 }
 
 // 打开一个视图：viewId 唯一标识这一处数据；skip 为真时不打开
@@ -44,8 +47,8 @@ export function useSnapshot<T>(
   skip = false,
 ): SnapshotState<T> {
   const key = JSON.stringify(params, (_name, value) => (value === null || value === undefined ? undefined : value));
-  const [state, setState] = useState<{ data: T | null; loading: boolean; error: string | null; key: string | null }>(
-    { data: null, loading: true, error: null, key: null },
+  const [state, setState] = useState<{ data: T | null; loading: boolean; error: string | null; key: string | null; position: number }>(
+    { data: null, loading: true, error: null, key: null, position: 0 },
   );
 
   useEffect(() => {
@@ -53,13 +56,14 @@ export function useSnapshot<T>(
     if (!views || skip) {
       return;
     }
-    setState({ data: null, loading: true, error: null, key });
-    void views.open<T>(viewId, { query, params: JSON.parse(key) as Record<string, unknown> }, (data) => {
-      setState({ data, loading: false, error: null, key });
+    setState({ data: null, loading: true, error: null, key, position: 0 });
+    // 查询结果与它来自的快照位置一起记下：重新查询以后位置跟着更新（工单 #952）
+    void views.open<T>(viewId, { query, params: JSON.parse(key) as Record<string, unknown> }, (data, position) => {
+      setState({ data, loading: false, error: null, key, position });
     }, (reason) => {
       // 查询失败（例如服务不可达）：读取结束，不一直显示「正在读取数据」；
       // 失败的原因带出来（工单 #728），调用处据此说「读不出来」而不是「本来就没有内容」
-      setState({ data: null, loading: false, error: reason, key });
+      setState({ data: null, loading: false, error: reason, key, position: 0 });
     });
     return () => {
       views.close(viewId);
