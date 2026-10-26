@@ -573,3 +573,5 @@ claude-sonnet-5-5 / 2026-10-26 / docs/design/department-guidance.md：状态行�
 claude-sonnet-5-5 / 2026-10-26 / docs/decision.md 追加 2026-10-26「画面翻译层先建表、后接线」/ #952 被交回，对应表与接线在当前 main 上互相矛盾，定先建表后接线，并定 held、released_unsettled 的画面取值
 
 claude-opus-5-5 / 2026-10-26 10:10 / docs/design/skeleton-and-application.md 第 12 节「开工之前」一条改为取消说明、删 S0 一行、S1a、S1c、S3 的前置改为 #561（S1a 加 #1019）、顺序一段去掉 S0，第 15 节第 6 条改为按验收证据规则第 5 节对照上一个发布；docs/program-roadmap.md 第 1.4 节阶段一 · 2 的收口改为对照上一个发布的读数；docs/agents/acceptance-evidence.md 第 5 节版本回归去掉「#871 的改动前基准」特例；docs/current-baseline.md 阶段一 · 2 一行去掉 #871；docs/decision.md 追加一条 / 用户取消 #871，阶段一做完以后整体测试
+
+claude-opus-5-5 / 2026-10-26 10:40 / docs/program-roadmap.md 第 1.4 节阶段一两行合成「阶段一 · 1 核心打通与换骨架」一行；docs/current-baseline.md 发布行与阶段一两行改为合并后的里程碑与试用 #994；README.md 路线一节阶段一合成一条；docs/design/skeleton-and-application.md 第 12 节与第 15 节第 6 条改为阶段一发布时按首个发布跑一次场景 3；docs/agents/dispatcher.md 第 3 节、docs/agents/acceptance-evidence.md 第 6 节的举例去掉阶段一 · 2；docs/design/independent-verification.md 状态行「阶段一 · 1」改「阶段一」；docs/decision.md 追加一条 / 用户决定阶段一合成一个里程碑、只试用一次
