@@ -1,6 +1,7 @@
 // 房间的翻译层测试（工单 #954 验收标准 2）：把画面与播放设计说明第 6 节的核对落成客户端单元测试。
 //
 // 覆盖：department.workspace 的样例结果翻出的状态通过画面合同的校验（取值不合法时报错）；
+// 房间信息里的询问数等于查询给出的封数（#958 验收标准 3）；
 // 覆盖核对里房间「翻成动作」的每种事件，用一条样例事件翻出至少一个动作，动作的 kind 在房间声明表里；
 // 交接、询问、回答的几句；流式文字（实时内容）与声明表的检查。
 
@@ -70,6 +71,19 @@ test("翻译：department.workspace 的样例结果翻出的状态通过画面�
     ["eng-manager", "idle"], ["eng-architect", "working"], ["eng-lead", "idle"],
   ]);
   assert.equal((s.pipes as { letters_waiting?: number } | undefined)?.letters_waiting, 1);
+});
+
+test("翻译：房间信息里的询问数等于查询给出的那个值（#903 由询问链算出的封数），翻译层不另算", () => {
+  // 工单 #958 验收标准 3：department.workspace 的 pipes.letters_waiting 是问这个部门、还没有回答的询问数
+  const waiting = (letters: number): number | undefined => {
+    const s = state({ position: 3, workspace: roomSample({ pipes: { out: "idle", letters_waiting: letters } }) });
+    return (s.pipes as { letters_waiting?: number } | null | undefined)?.letters_waiting;
+  };
+  assert.equal(waiting(0), 0);
+  assert.equal(waiting(2), 2);
+  // 查询没有给管道状态时不给，也不猜一个数
+  const none = state({ position: 4, workspace: roomSample({ pipes: null }) });
+  assert.equal(none.pipes, null);
 });
 
 test("翻译：状态取值不在对应表里时报错，写明是哪一张表、哪个值", () => {

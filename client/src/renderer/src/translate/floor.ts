@@ -1,8 +1,9 @@
 // 楼层的翻译层（画面与播放设计说明第 6 节、原型 v13 js/translate/translate.js 的楼层部分，工单 #953）。
 //
 // 这一层是唯一同时认识 Yudao 的说法与画面的说法的地方：
-//   - floorState：project.loop（带位置）加上各部门的角色 → 画面合同的楼层状态（事项、部门在事项上的状态、
-//     角色、成果库），状态值经 translate/tables.ts 的对应表翻好（服务端 in_progress → 画面的 working）；
+//   - floorState：project.loop（带位置）加上各部门的角色与运行的询问链 → 画面合同的楼层状态
+//     （事项、部门在事项上的状态、未回答的询问、角色、成果库），状态值经 translate/tables.ts 的对应表翻好
+//     （服务端 in_progress → 画面的 working）；
 //   - floorActions：一条事件（带位置）→ 零个、一个或几个楼层的动作（kind 取画面合同的楼层声明表，
 //     client/src/renderer/src/pixel/generated/floor-decl.json 的 kinds）；
 //   - floorCards：决定请求 → 大厅板上贴着的卡片，卡片上的文字在这里写好；
@@ -11,10 +12,12 @@
 // 事实只来自查询：状态由查询结果翻译，翻译层不把事件累加成事实（设计说明第 6 节）。
 // 说话的话术用 translate/say.ts（画面 2 的成果）。
 
-import type { DecisionView, EventObject, ProjectLoopResult, WorkItemLoop } from "../api/generated/types.gen.ts";
+import type { AskView, DecisionView, EventObject, ProjectLoopResult, WorkItemLoop } from "../api/generated/types.gen.ts";
 import type { Artifact, BusyState, ItemState, PixelAction } from "../pixel/contract.ts";
 import { floorState as checkFloorState } from "../pixel/contract.ts";
-import type { DecisionFace, FloorModel, LoopItem, MachineView, OpsView, RoleInfo, WaitingProvider } from "../pixel/world/types.ts";
+import type {
+  DecisionFace, FloorModel, LoopItem, MachineView, OpenRequest, OpsView, RoleInfo, WaitingProvider,
+} from "../pixel/world/types.ts";
 import { face } from "../views/decisions/card-logic.ts";
 import { cut, say, sayAnswer, sayAsk, sayHandoff } from "./say.ts";
 import { itemStateOf, roleStatus } from "./tables.ts";
@@ -25,8 +28,10 @@ import { itemStateOf, roleStatus } from "./tables.ts";
 /** 一个部门在事项上的状态（服务端的 DepartmentState.state）→ 画面合同的部门状态。 */
 const DEPT_BUSY: Readonly<Record<string, BusyState>> = {
   working: "working",
-  // 回答别的部门的询问：部门在做这件事（服务端同样记作 working，只是原因不同）
+  // 这个部门停在自己发出、还没有回答的询问上：部门本身没有停手，事项在画面上是询问中
+  // （原型 v13 core.js 的 deptStatesOf 把提问方写成 working，等待写在原因里；画面合同的部门状态没有「询问中」）
   asking: "working",
+  // 在等下游核验交付：手上还有这一轮的事
   verifying: "working",
   waiting_user: "waiting_user",
   // waiting：这个部门此刻没有在做这件事，不写进事项的部门状态
@@ -42,6 +47,12 @@ export interface FloorStateInput {
   /** 来自的查询快照的位置。 */
   position: number;
   loop: ProjectLoopResult | null;
+  /**
+   * 运行标识 → 这个运行的询问链（查询 run.asks；没有查时不传）。
+   * 只有未回答的询问进楼层状态：信件停在被询问部门的传信管出口，传信管按它有没有信判断流动。
+   * run.asks 不带位置，回放（画在过去的位置上）不传它。
+   */
+  asks?: Readonly<Record<string, readonly AskView[] | null>> | null;
   /** 部门 → 角色（department.workspace 的 room.roles；没有查时不传）。 */
   roles?: Record<string, { id: string; name: string; kind: string; status: string }[]> | null;
   /** 聚焦的事项。 */
@@ -53,6 +64,16 @@ export interface FloorStateInput {
   interrupted?: boolean;
 }
 
+/**
+ * 事项在画面上的状态：所在部门停在自己发出的询问上时是询问中（原型 v13 core.js 的 sceneStatus）。
+ * 服务端把这件事记在部门状态上（DepartmentState 的 asking），画面合同记在事项的状态上。
+ */
+function itemState(row: WorkItemLoop): ItemState {
+  const base = itemStateOf(row);
+  const own = row.department ? row.departments?.[row.department]?.state : null;
+  return base === "working" && own === "asking" ? "asking" : base;
+}
+
 function itemOf(row: WorkItemLoop, index: number): LoopItem {
   const departments: Record<string, BusyState> = {};
   for (const [dept, state] of Object.entries(row.departments ?? {})) {
@@ -62,7 +83,7 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
   return {
     id: row.work_item_id,
     work_item_id: row.work_item_id,
-    status: itemStateOf(row) as ItemState,
+    status: itemState(row),
     kind: row.kind,
     sign: row.sign,
     color_index: row.color_index ?? index + 1,
@@ -75,6 +96,23 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     waiting_provider_sec: undefined,
     ...(Object.keys(departments).length ? { departments } : {}),
   };
+}
+
+/** 未回答的询问：信件停在被询问部门的传信管出口（原型 v13 core.js 的 openRequests）。 */
+export function openRequestsOf(
+  loop: ProjectLoopResult | null,
+  asks: FloorStateInput["asks"],
+): OpenRequest[] {
+  const out: OpenRequest[] = [];
+  for (const row of loop?.work_items ?? []) {
+    const chain = asks?.[row.run_id] ?? [];
+    for (const ask of chain) {
+      // 已回答与没能回答都算这次询问结束了，提问方不再在管口等待
+      if (ask.status !== "进行中") continue;
+      out.push({ from: ask.requester, to: ask.recipient, work_item_id: row.work_item_id });
+    }
+  }
+  return out;
 }
 
 function rolesOf(input: FloorStateInput): Record<string, RoleInfo[]> | null {
@@ -96,7 +134,7 @@ export function floorState(input: FloorStateInput): FloorModel {
   const model: FloorModel = {
     position: input.position,
     items: (loop?.work_items ?? []).map(itemOf),
-    open_requests: [],
+    open_requests: openRequestsOf(loop, input.asks),
     shelves: { adopted: (loop?.adoptions ?? []).map((a) => a.work_item_id) },
     slots: input.slots ?? null,
     waiting_provider: input.waiting_provider ?? [],

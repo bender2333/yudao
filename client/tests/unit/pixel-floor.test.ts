@@ -1,9 +1,10 @@
-// 楼层画面的行为测试（工单 #82、#953）：把原型 v13 checks/behaviors.js 与 checks/playback.js 里
+// 楼层画面的行为测试（工单 #82、#953、#958）：把原型 v13 checks/behaviors.js 与 checks/playback.js 里
 // 关于项目楼层的检查改写为对客户端的测试，直接对世界、系统与播放时间线运行，用确定的时钟与手写的数据。
 //
 // 覆盖：多角色（角色实体、工位、同时做不同的任务、动作按角色找人、交接由经理做、没有角色设置时一个部门一个小人）、
-// 自主行为、管道流动、包裹沿管道走、运维数据出现时世界重新声明、状态机、决定单与大厅的板、
-// 画面合同接线后的四条行为（交付箱还在管道里走时质检不提前显示收到、PRD 被接纳盖有效章加交接、
+// 几个部门同时工作时几个房间都算忙（#958：事项的 departments）、询问在房间之间传（#958：信沿传信管走、
+// 提问方在管口等待、回答以后回桌前）、自主行为、管道流动、包裹沿管道走、运维数据出现时世界重新声明、状态机、
+// 决定单与大厅的板、画面合同接线后的四条行为（交付箱还在管道里走时质检不提前显示收到、PRD 被接纳盖有效章加交接、
 // 进行中的事项进房间、决定单一到就贴在大厅的板上）、跳到最新不补播、以及画面层的导入方向。
 //
 // 事件 → 动作的翻译由 translate/floor.ts 负责，它的测试在 translate-floor.test.ts；这里只用它翻好的动作。
@@ -16,7 +17,7 @@ import { buildCatalog, sayCatalogTypes } from "../../src/renderer/src/pixel/worl
 import { declareLinks, declareRooms, createWorld, polyLength, pointAt, route } from "../../src/renderer/src/pixel/world/declare.ts";
 import { bubbleFor, dispatch, dropAction, enqueue, stepCharacters, stepPackages, stepPipes } from "../../src/renderer/src/pixel/world/characters.ts";
 import { mountMachines, syncCharacters } from "../../src/renderer/src/pixel/world/scene.ts";
-import { ACTIVE, IN_ROOM, createFloorDriver, createFloorState, itemColor, visibleDecisions } from "../../src/renderer/src/pixel/world/floor.ts";
+import { ACTIVE, IN_ROOM, busyItems, createFloorDriver, createFloorState, itemColor, visibleDecisions } from "../../src/renderer/src/pixel/world/floor.ts";
 import { createScene } from "../../src/renderer/src/pixel/world/scene.ts";
 import type { DecisionFace, FloorModel, LoopItem, RoleInfo, Task } from "../../src/renderer/src/pixel/world/types.ts";
 import type { PixelAction } from "../../src/renderer/src/pixel/contract.ts";
@@ -167,6 +168,61 @@ test("多角色：包裹沿管道到质检，接收方的经理取出来", () =>
   assert.ok(received, "质检的经理没有取包裹");
   h.step(9000);
   assert.equal(Object.keys(h.driver.world.packages).length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 几个部门同时工作与询问在房间之间传（工单 #958 验收标准 1、2）
+
+test("几个部门同时工作：事项停在工程、质检同时在预测性探索时两个房间都算忙，小人坐在桌前工作", () => {
+  const busy: LoopItem = { ...item("working", "engineering"), departments: { engineering: "working", quality: "working" } };
+  const h = mountFloor(model({ items: [busy] }));
+  h.step(1500);
+  // 房间的忙碌按「事项停在这里」或者「这个部门同时在为它做事」算（原型 v13 floor.js 的 alsoIn）
+  assert.deepEqual(busyItems(h.driver.model, "engineering").map((x) => x.work_item_id), ["w1"]);
+  assert.deepEqual(busyItems(h.driver.model, "quality").map((x) => x.work_item_id), ["w1"]);
+  assert.deepEqual(busyItems(h.driver.model, "product"), []);
+  // 两个房间的中心角色都坐在桌前打字（房间的灯与屏幕滚动在渲染层按同一份忙碌算）
+  assert.equal(h.driver.world.characters["e-arch"].rest?.spot, "desk");
+  assert.equal(h.driver.world.characters["e-arch"].rest?.pose, "type");
+  assert.equal(h.driver.world.characters["q-test"].rest?.spot, "desk");
+  assert.equal(h.driver.world.characters["q-test"].rest?.pose, "type");
+  // 没有在做事的产品房间还在喝茶
+  assert.equal(h.driver.world.characters["p-arch"].rest?.pose, "tea");
+  // 包裹与门口的小旗只在事项所在的房间：事项的部门仍是工程，质检只是同时在做
+  assert.equal(h.driver.model.items[0].department, "engineering");
+});
+
+test("传信：工程询问产品时信沿传信管从工程送到产品，回答以后提问方不再在管口等待", () => {
+  const asking: LoopItem = {
+    ...item("asking", "engineering"), departments: { engineering: "working", product: "working" },
+  };
+  const h = mountFloor(model({
+    items: [asking],
+    open_requests: [{ from: "engineering", to: "product", work_item_id: "w1" }],
+  }));
+  h.step(1500);
+  // 提问方在管口等：工程的中心角色站到朝向产品的那个管口
+  const waiting = h.driver.world.characters["e-arch"].rest;
+  assert.equal(waiting?.pose, "wait");
+  assert.ok(waiting?.spot === "port_in" || waiting?.spot === "port_out", `不在管口：${waiting?.spot}`);
+  // 信沿传信管走：传信管上的小包裹，从工程送往产品（两个部门之间只有一条传信管）
+  h.driver.play(act("letter", {
+    item: "w1", from: "engineering", to: "product", say: "现在向产品发出询问", sayTo: "收到工程的询问",
+  }));
+  const carried = h.until(() => Object.values(h.driver.world.packages).some((pk) => pk.bmp === "letter"));
+  assert.ok(carried, "信没有沿传信管走");
+  const letter = Object.values(h.driver.world.packages).find((pk) => pk.bmp === "letter");
+  assert.equal(letter?.small, true);
+  assert.equal(letter?.transit?.linkKey, "product~engineering");
+  // 信到了产品：产品的经理在管口取信
+  const arrived = h.until(() => ["letter_arrive_in", "letter_arrive_out"]
+    .includes(h.driver.world.characters["p-mgr"].current?.taskKey ?? ""));
+  assert.ok(arrived, "产品的小人没有在管口取信");
+  // 产品回答以后这次询问结束：提问方不再在管口等待，回到桌前工作
+  h.driver.setState({ ...model(), position: 9, items: [item("working", "engineering")], open_requests: [] });
+  const back = h.until(() => h.driver.world.characters["e-arch"].rest?.spot === "desk", 30000);
+  assert.ok(back, "回答以后工程的中心角色还在管口等");
+  assert.equal(h.driver.world.characters["e-arch"].rest?.pose, "type");
 });
 
 test("没有角色设置（低档位）：一个部门一个小人，分派动作不产生任务", () => {

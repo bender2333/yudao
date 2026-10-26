@@ -10,7 +10,9 @@
 // 世界与系统都在这里维护；画面渲染只读这里给出的世界与状态。驱动不依赖 PixiJS：
 // 飞行物、粒子与说话停留都记在驱动自己的状态里，渲染层照读。
 
-import { action as checkAction, floorState as checkFloorState, type ItemState, type PixelAction, type PixelState } from "../contract.ts";
+import {
+  action as checkAction, floorState as checkFloorState, type BusyState, type ItemState, type PixelAction, type PixelState,
+} from "../contract.ts";
 import { create as createTimeline, type Timeline, type TimelineEntry, type TimelineInspect } from "../timeline.ts";
 import { asText, dispatch, dropAction, enqueue, nextPackageId, progressOf, sendPackage, spawnPackage, stepCharacters, stepPackages, stepPipes } from "./characters.ts";
 import { declareLinks, declareRooms, linkBetween, route, roomOf } from "./declare.ts";
@@ -29,6 +31,21 @@ export const IN_ROOM: readonly ItemState[] = [
 ];
 /** 房间亮灯与管道流动对应的活跃事项状态。 */
 export const ACTIVE: readonly ItemState[] = ["working", "asking"];
+
+/** 部门在事项上正做着（工作中、回答询问）：停在别的房间的事项也让这个部门忙碌。 */
+const BUSY_STATES: readonly BusyState[] = ["working", "answering"];
+
+/**
+ * 在这个房间忙碌的事项（原型 v13 floor.js 的 alsoIn 与 busyIn）：
+ * 事项停在这个房间，或者停在别的房间、这个部门同时在为它做事（一轮工作中、回答询问，例如质检的预测性探索）。
+ * 包裹与门口的小旗不按这个算，它们只在事项所在的房间。
+ */
+export function busyItems(model: FloorModel, department: string): LoopItem[] {
+  const here = model.items.filter((it) => it.department === department && IN_ROOM.includes(it.status));
+  const also = model.items.filter((it) => it.department !== department && ACTIVE.includes(it.status)
+    && BUSY_STATES.includes(it.departments?.[department] as BusyState));
+  return here.concat(also);
+}
 
 const PIPE_Y = 138;
 const TOP = 50;
@@ -171,11 +188,11 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     return { hall, lib, depts: list.filter((r) => r.roomKind === "dept"), out, door: world.machineDoor };
   }
 
-  const itemsIn = (department: string): LoopItem[] => model.items.filter((it) => it.department === department && IN_ROOM.includes(it.status));
   const waitingDept = (department: string): { department: string; retry_text: string | null } | null =>
     model.waiting_provider.find((w) => w.department === department) ?? null;
   const primaryItem = (department: string): LoopItem | null => {
-    const here = itemsIn(department);
+    // 停在别的房间、这个部门同时在为它做事的事项也算：这个房间的小人坐在桌前工作（原型 v13 floor.js 的 primaryItem）
+    const here = busyItems(model, department);
     return here.find((it) => ACTIVE.includes(it.status)) ?? here.find((it) => it.status === "waiting_model") ?? here[0] ?? null;
   };
 
@@ -671,7 +688,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     if (model.interrupted) return "stopped";
     const [a, b] = pipe.id.split(/[>~]/);
     if (waitingDept(a) || waitingDept(b)) return "stopped";
-    const active = (department: string): boolean => itemsIn(department).some((it) => ACTIVE.includes(it.status));
+    const active = (department: string): boolean => busyItems(model, department).some((it) => ACTIVE.includes(it.status));
     if (Object.values(world.packages).some((pk) => pk.transit && pk.transit.linkKey === pipe.id)) return "flowing";
     if (pipe.linkKind === "tube") return model.open_requests.length ? "flowing" : "idle";
     return active(a) || active(b) ? "flowing" : "idle";

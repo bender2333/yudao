@@ -252,6 +252,45 @@ test("画面的状态来自查询：事项的每个状态都对应事件日志�
   }
 });
 
+// 楼层画面读未回答的询问（工单 #958 验收标准 2）：概览页按当前事项那次运行查 run.asks，把询问链交给翻译层
+// （信停在被询问部门的管口、提问方在管口等待都由它决定）。这里核对这条查询真的发出、带上那次运行的标识，
+// 并且画面照常画出内容、控制台没有错误；询问的等待与传信在单元测试里按画面合同核对。
+test("楼层画面按当前事项那次运行读询问链（run.asks）", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith("/api/queries/run.asks")) asked.push(url.searchParams.get("run_id") ?? "");
+  });
+  try {
+    // 找一个有进行中的事项的项目：楼层画面按那个事项的那次运行读询问链
+    const rows = await query<{ projects: { project_id: string }[] }>("projects.list");
+    let projectId: string | null = null;
+    let runId: string | null = null;
+    for (const row of rows.projects) {
+      const loop = await query<{ work_items: { status: string; run_id: string }[] }>("project.loop", {
+        project_id: row.project_id,
+      });
+      const found = loop.work_items.find((item) => item.status === "in_progress" || item.status === "awaiting_initial_prd");
+      if (found) {
+        projectId = row.project_id;
+        runId = found.run_id;
+        break;
+      }
+    }
+    expect(projectId, "预置的项目里没有进行中的事项").not.toBeNull();
+    await openFloor(page, projectId!);
+    await waitUntil(async () => asked.includes(runId ?? ""), "楼层画面没有查当前事项那次运行的询问链");
+    const signature = await canvasSignature(page);
+    expect(signature).not.toBe("no-2d");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
 test("断线重连（重新订阅）以后画面回到查询给出的状态，不补播", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = watchErrors(client);

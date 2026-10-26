@@ -11,7 +11,7 @@ import {
   drawActor, drawArrow, drawBitmap, drawBubble, drawIcon, drawPixelText, drawSign, drawText, headTop, measure,
 } from "../shapes.ts";
 import { polyLength, pointAt, roomOf } from "../world/declare.ts";
-import { ACTIVE, IN_ROOM, itemColor, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
+import { ACTIVE, IN_ROOM, busyItems, itemColor, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
 import { actorOf, charsOf, primaryOf } from "../world/scene.ts";
 import type { Character, LoopItem, MachineView, Room, SceneLike, World } from "../world/types.ts";
 
@@ -374,8 +374,8 @@ export class FloorRenderer {
 
   private department(c: CanvasRenderingContext2D, r: Room, t: number): void {
     const world = this.driver.world;
-    const here = this.itemsIn(r.id);
-    const working = here.some((it) => ACTIVE.includes(it.status));
+    // 这个房间在小人与屏幕上的忙碌：事项停在这里，或者停在别的房间、这个部门同时在为它做事（原型 v13 的 busyIn）
+    const working = busyItems(this.driver.model, r.id).some((it) => ACTIVE.includes(it.status));
     const sx = r.x + Math.round(r.w / 2) - 22;
     const sy = 68;
     RB(c, sx - 2, sy - 2, 32, 22, PAL.beige2);
@@ -545,7 +545,8 @@ export class FloorRenderer {
   private lights(c: CanvasRenderingContext2D, t: number): void {
     const ctx = this.driver.declCtx();
     for (const r of this.rooms().depts) {
-      const here = this.itemsIn(r.id);
+      // 亮灯按这个房间忙碌的事项算（停在这里的与停在别的房间、这个部门同时在做的）；门口的小旗仍只看停在这里的
+      const here = busyItems(this.driver.model, r.id);
       const lit = here.some((it) => ACTIVE.includes(it.status) || it.status === "done") || Boolean(r.def.lit?.(ctx));
       if (!lit) {
         c.fillStyle = "rgba(14,12,34,0.32)";
