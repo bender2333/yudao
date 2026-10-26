@@ -58,7 +58,7 @@ argument-hint: "[扫描 | 观察 | 复现 | 想法] <范围>"
 
 ```powershell
 pwsh -NoProfile -File .claude/skills/discussion-note/scripts/overlap-scan.ps1 `
-  -Milestone "阶段一 · 1 核心打通与换骨架" `
+  -Milestone "阶段一：单机诚实闭环，三道槽位立缝" `
   -Signature "<署名>"
 ```
 
