@@ -110,15 +110,8 @@
     }
   },
   "shared": {
-    "submit_tools": ["submit_guidance_response"],
-    "kinds": {
-      "department_guidance_response": {
-        "required": ["guidance_id", "status", "text", "result_event_ids"],
-        "status": ["explained", "completed", "declined", "needs_work"],
-        "result_event_ids": "optional; completed binds host results from guidance_results after this guidance was adopted; explained does not claim an action",
-        "bind": ["the target department guidance id and current host results"]
-      }
-    },
+    "submit_tools": [],
+    "kinds": {},
     "notes": []
   }
 }
