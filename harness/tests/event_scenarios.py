@@ -217,9 +217,9 @@ def ask_branch_exhausted(data_dir):
     return system, run_id, {}
 
 
-def guidance_response_explained(data_dir):
-    # 场景名保留到 #1039 改名；指导独占的一轮用文字回答结束（工单 #1037、#1038）：
-    # 工程先交付，指导到达时它已在等待工作，关注的成果里只有这段指导
+def guidance_answered(data_dir):
+    # 指导独占的一轮用文字回答结束（工单 #1037、#1038）：工程先交付，指导到达时它已在等待工作，
+    # 关注的成果里只有这段指导；这一轮正常结束时主机写已回答（工单 #1039）
     system, adapter, run_id = _system(data_dir, {"product": [product_spec()],
                                                  "engineering": [_deliver()],
                                                  "quality": [_explore(), _release()]})
@@ -686,10 +686,10 @@ SCENARIOS: dict[str, Scenario] = {
     "ask_branch_exhausted": Scenario(
         "分支达到上限时以没能回答结束（unable），提问方收到原因后接着工作，事项运行到放行。",
         ask_branch_exhausted),
-    "guidance_response_explained": Scenario(
+    "guidance_answered": Scenario(
         "产品规格接纳后工程交付；用户随后给工程部门写指导，指导进入它的一轮工作（标记已进入输入），"
-        "这一轮只有指导、以文字回答结束，之后放行。",
-        guidance_response_explained),
+        "这一轮只有指导、以文字回答结束，主机在这一轮结束时写已回答，之后放行。",
+        guidance_answered),
     "proposal_rejected": Scenario(
         "产品规格缺少目标被控制层拒绝，拒绝原因作为 validation_feedback 进入下一次激活，修正后接纳，走完交付与放行。",
         proposal_rejected),
