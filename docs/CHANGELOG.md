@@ -597,3 +597,5 @@ claude-sonnet-5-5（总架构师） / 2026-10-26 16:28 / docs/design/department-
 claude-sonnet-5-5（总架构师） / 2026-10-26 17:02 / docs/design/skeleton-and-application.md 开头的更新段收成一行状态，第 12 节「用户批准」改为「批准」，写明要改内核清单或 harness/tests/kernel/ 的四张（S1d、S2a、S5a、S6a）在 AGENTS.md 开例外以前按现有规则交回 / 用户 2026-10-26 决定改内核路径的七张由总架构师事前批准、solo 合并（docs/decision.md 同日一条）；AGENTS.md 与 .claude/skills/solo-worker/SKILL.md 的例外没有推送，等用户定
 
 claude-sonnet-5-5（总架构师） / 2026-10-26 17:22 / AGENTS.md：Solo 模式删去 solo 执行者不修改可信内核清单与 harness/tests/kernel/ 的规定（隐藏检查、参考解法、评分器、发布检查改为列明），共同要求加「内核路径的测试覆盖」，solo 合并前的核对与审查流程第 2 步各加一句；.claude/skills/solo-worker/SKILL.md 同步；docs/design/skeleton-and-application.md 第 12 节「批准」、docs/design/test-pyramid.md 第 13 节特别规则第 1 条随之改 / 用户 2026-10-26 决定（docs/decision.md 同日一条）
+
+claude-sonnet-5-5（总架构师） / 2026-10-26 17:42 / docs/foundation-rules.md 基础规则 4：「内核清单只由用户修改」改为经批准修改，加内核路径的测试覆盖一行；docs/design/trusted-kernel.md 开头收成一行状态、第 3 节末条分开运行中的实例与开发仓库；docs/design/architecture/overall-architecture.md 两处、CONTEXT.md「可信内核」同步；docs/adr/0027 后果加一条 2026-10-26 的修订 / 用户 2026-10-26 决定（docs/decision.md 同日一条）
