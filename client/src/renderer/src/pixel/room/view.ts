@@ -10,7 +10,7 @@ import { createPixelSurface } from "../surface.ts";
 import { createRoomDriver, type RoomDriver } from "./driver.ts";
 import { RoomRenderer } from "./render.ts";
 import { emptyRoomData } from "./room.ts";
-import { H, W } from "./layout.ts";
+import { H, W, STATUS_TEXT } from "./layout.ts";
 import type { PixelAction, PixelState } from "../contract.ts";
 import type { SceneLike } from "../world/types.ts";
 
@@ -20,6 +20,61 @@ export type { RoomData } from "./room.ts";
 export interface RoomStreamWho {
   room?: string | null;
   role?: string | null;
+}
+
+/**
+ * 房间承载事实的视觉通道（画面与播放设计说明第 8.1 节的房间那一行）：房间状态与状态文字、状态给出的姿势、
+ * 角色与角色的状态、信箱与卷轴等物件的数量、头顶的流式文字。
+ *
+ * 只读状态给出的东西：工作台上的零件、抽屉、灯、动作的姿势与说话气泡属于表演层，不在这里。
+ */
+export interface RoomChannels {
+  /** 上画面的状态来自的查询快照的位置。 */
+  position: number;
+  /** 房间状态与 CRT 上的状态文字。 */
+  status: { value: string; text: string };
+  /** 状态给出的姿势（哪个角色摆的、什么姿势）。 */
+  pose: { role_id: string | null; anim: string } | null;
+  /** 角色与角色的状态（状态给出的那一个，不是正在演的动作）。 */
+  roles: { id: string; kind: string; status: string | null }[];
+  /** 信箱、卷轴等物件的数量。 */
+  objects: {
+    mailbox: number;
+    scrolls: number;
+    summaries: number;
+    pinned_notes: number;
+    semantic_cards: number;
+    letters_waiting: number;
+  };
+  /** 头顶的流式文字。 */
+  stream: { role: string; text: string }[];
+}
+
+/** 读一份状态承载事实的视觉通道：状态给出的部分（动作期间的临时状态不算）。 */
+function roomChannels(driver: RoomDriver): RoomChannels {
+  const model = driver.model;
+  const status = model.status || "idle";
+  const actors = driver.actors();
+  return {
+    position: model.position,
+    status: { value: status, text: STATUS_TEXT[status] ?? status },
+    pose: model.pose ? { role_id: model.pose.role_id ?? null, anim: model.pose.anim } : null,
+    roles: model.roles
+      .map((r) => ({ id: r.id, kind: r.kind, status: r.status }))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    objects: {
+      mailbox: model.mailbox || 0,
+      scrolls: model.scrolls || 0,
+      summaries: model.summaries || 0,
+      pinned_notes: model.pinned_notes || 0,
+      semantic_cards: model.semantic_cards || 0,
+      letters_waiting: model.pipes?.letters_waiting || 0,
+    },
+    stream: actors
+      .filter((a) => typeof a.streamText === "string" && a.streamText !== "")
+      .map((a) => ({ role: a.id, text: String(a.streamText) }))
+      .sort((a, b) => (a.role < b.role ? -1 : a.role > b.role ? 1 : 0)),
+  };
 }
 
 /** 部门房间画面对象：只认画面合同（状态、动作）与实时内容（流式文字）。 */
@@ -34,10 +89,19 @@ export interface RoomView {
   stream(who: RoomStreamWho, text: string): void;
   resize(): void;
   destroy(): void;
+  /**
+   * 关掉或打开表演层（待机活动与动作）的测试入口（设计说明第 8.1 节的 H2）。
+   * 关掉以后动作与特效不演，画面只画状态给出的样子；承载事实的通道不受影响。
+   */
+  performance(on: boolean): void;
   /** 画面逻辑尺寸，供宿主与测试读取。 */
   readonly size: { W: number; H: number };
-  /** 世界（角色、场景与临时状态）与驱动（测试与回放读取）。 */
-  inspect(): { driver: RoomDriver; scene: SceneLike; renderer: RoomRenderer };
+  /** 世界（角色、场景与临时状态）与驱动（测试与回放读取），以及承载事实的视觉通道。 */
+  inspect(): {
+    driver: RoomDriver; scene: SceneLike; renderer: RoomRenderer;
+    /** 承载事实的视觉通道（设计说明第 8.1 节的房间那一行）。 */
+    channels: () => RoomChannels;
+  };
 }
 
 export interface RoomViewOptions {
@@ -119,13 +183,20 @@ export async function createRoomView(opts: RoomViewOptions): Promise<RoomView> {
       surface.resize();
       draw();
     },
+    performance(on) {
+      // 待机活动与动作一起关掉：动作停在原处，不再开始新的步子（承载事实的通道只由状态决定）
+      driver.scene.performance = on;
+      driver.scene.autonomy = on;
+      if (!on) for (const actor of driver.scene.actors.slice()) driver.scene.cancel(actor);
+      draw();
+    },
     destroy() {
       offTick();
       window.removeEventListener("resize", onResize);
       observer?.disconnect();
       if (surface.canvas.parentNode === opts.host) opts.host.removeChild(surface.canvas);
     },
-    inspect: () => ({ driver, scene: driver.scene, renderer }),
+    inspect: () => ({ driver, scene: driver.scene, renderer, channels: () => roomChannels(driver) }),
   };
 }
 

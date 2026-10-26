@@ -16,52 +16,27 @@
 // 世界与系统不依赖渲染与 PixiJS，可以直接在 node --test 下驱动：#82 的角色、包裹与管道机制
 // 在这里被复用，本模块只补「每层一个小人、每层一根竖井管道」的驱动与「楼层数据」的形状。
 
-import type { BuildingFloor as ContractFloor, BuildingState, FloorSign, PixelAction } from "../contract.ts";
+import {
+  FLASH_COLORS, type BuildingFloor, type BuildingModel, type FlashColor, type PixelAction,
+} from "../contract.ts";
 import { create as createTimeline, type Timeline, type TimelineEntry, type TimelineInspect } from "../timeline.ts";
 import { BUILDING_KINDS } from "../building/building-decl.ts";
 import { stepCharacters, stepPipes } from "./characters.ts";
 import { createWorld, declareLinks } from "./declare.ts";
 import type { Catalog, Character, Pipe, SceneLike, World } from "./types.ts";
 
-/** 楼的一层：一个项目的缩小楼层（原型 building.js 的 floor 数据与 scenes.js 的 buildingModels）。 */
-export interface BuildingFloor extends ContractFloor {
-  project_id: string;
-  name: string;
-  /** 楼层的状态灯：画面合同 FLOOR_SIGNS 的取值（翻译层翻好）。 */
-  status: FloorSign;
-  /** 四个部门房间的灯：亮灯表示该部门正在工作。 */
-  lit: { product: boolean; engineering: boolean; quality: boolean; operations: boolean };
-  /** 有没有运维（机房与运行环境）：客户端没有，属于 3.2C。 */
-  has_ops: boolean;
-  /** 事项的小旗：在本层房间里的事项，按部门挂在房门口。 */
-  flags: { work_item_id: string; color_index: number; department: string }[];
-  /** 入口阀门：等待执行槽位时关闭。 */
-  valve_closed: boolean;
-  /** 用着机器的设备编号：通往机房的管线按它画。 */
-  machine_ids: string[];
-  /** 通往机房的管线是否在流动。 */
-  link_active: boolean;
-  /** 本层等待回答的决定请求数（名牌右上角的计数）。 */
-  decisions: number;
-}
-
-/** 楼的画面数据：画面合同的楼的状态（带位置）加上画面要用的几个字段。 */
-export interface BuildingModel extends Omit<BuildingState, "floors"> {
-  /** 来自的查询快照的位置（时间线按它决定状态什么时候上画面）。 */
-  position: number;
-  floors: BuildingFloor[];
-  /** 底部是否留出地下室的位置（机房属于 3.2C，现在不画）。 */
-  show_basement: boolean;
-}
+// 楼的一层（BuildingFloor）与楼的状态（BuildingModel）的形状在画面合同里（pixel/contract.ts）：
+// 翻译层只从合同取状态形状，不导入画面层的实现。这里转发出去，画面与测试的入口不变。
+export type { BuildingFloor, BuildingModel, FlashColor };
 
 /** 没有数据时的空状态：带位置 0，一层也没有。 */
 export function emptyBuildingModel(): BuildingModel {
   return { position: 0, floors: [], show_basement: false };
 }
 
-/** 楼里闪光的颜色名（翻译层写在动作的 color 上，画面层按名字取配色）。 */
-export const FLASH_COLOR_NAMES = ["white", "green", "yellow", "red"] as const;
-export type FlashColor = (typeof FLASH_COLOR_NAMES)[number];
+/** 楼里闪光的颜色名（画面合同 FLASH_COLORS 的别名，原型 v13 building.js 的用法）。 */
+export const FLASH_COLOR_NAMES = FLASH_COLORS;
+
 
 /** 动作里的颜色名；不在表里的按白光画（翻译层只给这几种）。 */
 export function flashColorOf(value: unknown): FlashColor {

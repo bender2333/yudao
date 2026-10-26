@@ -14,7 +14,7 @@ import { ROOM_KINDS } from "../../src/renderer/src/pixel/room/room-decl.ts";
 import { actions as roomActions, quoted, state as roomState } from "../../src/renderer/src/translate/room.ts";
 import { say, sayCatalog, sayHandoff } from "../../src/renderer/src/translate/say.ts";
 import { COVERAGE } from "../../src/renderer/src/translate/coverage.ts";
-import { sayMs } from "../../src/renderer/src/pixel/world/say.ts";
+import { sayMs } from "../../src/renderer/src/pixel/world/characters.ts";
 import type { RoomActor } from "../../src/renderer/src/pixel/room/driver.ts";
 import type { RoomRole } from "../../src/renderer/src/pixel/room/layout.ts";
 import type { RoomEvent } from "../../src/renderer/src/translate/room.ts";
