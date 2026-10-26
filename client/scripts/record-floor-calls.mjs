@@ -1,11 +1,16 @@
-// 楼层画面的调用录制（工单 #82 验收标准 2）：在原型 v10 的页面上播放 19 个场景，
-// 录下项目楼层画面收到的 setModel、playEvent、focus、setOverlay 调用（原型 checks/record.js 的做法），
-// 并记录每个事件之后固定时刻的状态：每个角色的任务、姿势与头顶的话，每个包裹的去向，每根管道的状态与各个信号。
+// 楼层画面的调用录制（工单 #957；原型 v13 的页面与翻译层，做法照 docs/prototypes/v13/checks/record.js）：
+// 在 v13 的页面上逐个播放场景，录下项目楼层画面收到的状态、实时内容与页面收到的事件。
 //
-// 录下的调用序列与状态记录存入客户端的测试目录（tests/fixtures/floor/recordings.json），
+// 录的是 Yudao 的说法：状态是 v13 的翻译层从查询结果（project.loop）翻好、交给画面的画面合同状态，
+// 事件是页面收到的原始事件（带位置、工具名已经是 bash），回放时由客户端的翻译层翻成动作。
+//
+// 每段录制要在回放时比的是最后一个检查点：事件播完、时间线放空以后，与 v13 的画面逐像素、逐个小人相同，
+// 所以录制里只存调用，不存状态与截图；比较在 tests/helpers/floor-replay.ts 里做。
+//
+// 录下的调用序列存入客户端的测试目录（tests/fixtures/floor/recordings.json），
 // 只经重写开关更新（--write 时才写；否则只比较，不一致时报错）。
 //
-// 用法：node client/scripts/record-floor-calls.mjs [--write] [--root <原型 index.html 的地址>]
+// 用法：node client/scripts/record-floor-calls.mjs [--write]
 // 需要 Playwright 的 Chromium（PLAYWRIGHT_PATH 可以指定位置，CHROMIUM_EXE 指定可执行文件）。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -19,11 +24,10 @@ const clientRoot = resolve(here, "..");
 const repoRoot = resolve(clientRoot, "..");
 const outDir = join(clientRoot, "tests", "fixtures", "floor");
 const outFile = join(outDir, "recordings.json");
+const ROOT = pathToFileURL(join(repoRoot, "docs", "prototypes", "v13", "index.html")).href;
 
 const args = process.argv.slice(2);
 const WRITE = args.includes("--write");
-const rootArg = args.indexOf("--root");
-const ROOT = rootArg >= 0 ? args[rootArg + 1] : pathToFileURL(join(repoRoot, "docs", "prototypes", "v10", "index.html")).href;
 
 const playwrightPath = process.env.PLAYWRIGHT_PATH
   || join(repoRoot, ".tmp", "v8", "pw", "node_modules", "playwright");
@@ -35,174 +39,79 @@ if (existsSync(playwrightPath)) {
 }
 const EXE = process.env.CHROMIUM_EXE || "C:/Users/BA_H3C_Pad/AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe";
 
-/**
- * 每个事件之后固定的时刻：录下的状态在这些毫秒数上取。
- * 事件进行中的画面（走动、包裹移动、说话气泡）在各版本是同一套结构，取固定的时刻用于逐项对照；
- * 这里取 0 与 800 毫秒两个时刻，短的抓动作的进行中，长的抓动作的收尾。
- * 800 毫秒是上限：任务目录里最长的做饭类任务 1600 毫秒、其余在 520 至 1400 毫秒之间，
- * 取更晚的时刻（曾经取 5000 毫秒）会让全部任务与头顶的话都已经结束，回放就再也不比较这两项。
- */
-const SAMPLE_MS = [0, 800];
-
-/** 录下的场景编号上限：编号 20、21 是自举试点的场景，由实现覆盖层的工单加入录制（工单 #434）。 */
+/** 场景编号上限：编号 20 以上的场景是自举试点与新画面的，只录现有测试用到的（工单 #434）。 */
 const MAX_SCENARIO_NO = 19;
 
-// 在页面里运行的录制驱动：包装 createFloorScene，记录调用；在每次调用之后把时钟推进到固定时刻并取状态。
-const DRIVER = async ({ sampleMs, maxScenarioNo }) => {
-  const P = window.Y10.pixel;
-  const E = P.ecs;
-  // 确定的时钟与随机数
-  let t = 0;
-  const q = [];
-  window.requestAnimationFrame = (cb) => { q.push(cb); return q.length; };
-  window.cancelAnimationFrame = () => {};
-  performance.now = () => t;
-  let seed = 987654321;
-  Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-  const step = (ms) => {
-    const n = Math.max(1, Math.round(ms / 50));
-    for (let i = 0; i < n; i++) {
-      t += 50;
-      const cbs = q.splice(0);
-      for (const cb of cbs) cb(t);
-    }
+/** 回放时每一步之间推进的毫秒数：事件之间留出动作演完的间隔，其余调用之间只推进一帧。 */
+const GAP_MS = { event: 900, other: 50 };
+
+/** 全部事件播完以后静置多久再取最后一个检查点：时间线放空（原型 checks/replay.js 的 SETTLE）。 */
+const SETTLE_MS = 14000;
+
+// 在页面里运行的录制驱动：包装 createFloorScene 与翻译层，记录画面收到的状态、实时内容与页面收到的事件。
+const DRIVER = () => {
+  const Y = window.Y13;
+  const P = Y.pixel;
+  const T = Y.translate;
+  /** 当前这一段录制的调用；null 时什么都不记（两次播放之间）。 */
+  let ops = [];
+  const push = (op, arg, extra) => {
+    if (!ops) return;
+    ops.push(Object.assign({ op }, extra ?? {}, { arg: arg === undefined ? null : JSON.parse(JSON.stringify(arg)) }));
   };
-  // 录制时关掉自主行为：静止的画面只由快照决定，待机活动不影响录下的状态
-  E.config.autonomy = false;
 
-  const isWorker = (a) => /\.(agent|ops|manager|architect|lead|explorer|reviewer|tester)$/.test(a.sprite);
-
-  /** 取一份状态：角色、包裹、管道与信号。 */
-  function snapshot(fl) {
-    const world = fl.inspect().world;
-    const scene = fl.scene;
-    // 角色：任务、姿势、头顶的话、位置与是否坐在工位（元组形式，减少重复）
-    const chars = Object.values(world.characters).sort((a, b) => (a.id < b.id ? -1 : 1)).map((c) => {
-      const a = scene.actors.find((x) => x.id === "ch-" + c.id);
-      return [
-        c.id,
-        c.current ? c.current.taskKey : null,
-        c.queue.map((x) => x.taskKey),
-        a ? a.anim : null,
-        a && a.icon ? a.icon.kind : null,
-        c.bubble ? c.bubble.text : null,
-        a ? Math.round(a.x) : null,
-        a ? Math.round(a.y) : null,
-        a ? Boolean(a.seat) : null,
-        a ? a.visible : null,
-      ];
-    });
-    // 包裹：去向（正在走的管道）与位置（去向是关键，位置取整到像素）
-    const packages = Object.values(world.packages).map((pk) => [
-      pk.id,
-      pk.transit ? pk.transit.linkKey : "rest",
-      pk.transit && pk.transit.pos ? [Math.round(pk.transit.pos[0]), Math.round(pk.transit.pos[1])] : null,
-    ]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
-    // 管道：状态与光点的多少（口径）
-    const pipes = Object.keys(world.links).sort().map((key) => [
-      key,
-      world.links[key].flow ? world.links[key].flow.state : null,
-      world.links[key].flow ? Math.round(world.links[key].flow.load * 10) / 10 : null,
-    ]);
-    const signals = Object.keys(world.signals).sort().filter((name) => world.signals[name].until > scene.realT);
-    return { chars, packages, pipes, signals };
-  }
-
-  const orig = P.createFloorScene;
-  const recordings = [];
-  let current = null;
-
+  const create = P.createFloorScene;
   P.createFloorScene = function wrapped(canvas, opts) {
-    const obj = orig.call(this, canvas, opts);
-    const rec = { ops: [], samples: [] };
-    current = rec;
-    const push = (op, arg) => {
-      rec.ops.push({ op, arg: arg === undefined ? null : JSON.parse(JSON.stringify(arg)) });
-    };
+    const obj = create.call(this, canvas, opts);
     push("mount");
-    ["setModel", "playEvent", "focus"].forEach((name) => {
-      const f = obj[name];
-      obj[name] = function () {
-        push(name, arguments[0]);
-        const out = f.apply(this, arguments);
-        // 每个事件之后固定时刻的状态：调用之后静置，取几个时刻的状态
-        for (const ms of sampleMs) {
-          step(ms);
-          rec.samples.push({ after: rec.ops.length - 1, ms, state: snapshot(obj) });
-        }
-        return out;
-      };
-    });
+    // 状态：jump 清空时间线直接显示，setState 等它之前的动作演完（画面合同的两个入口）
+    const jump = obj.jump;
+    obj.jump = function () { push("state", arguments[0], { jump: true }); return jump.apply(this, arguments); };
+    const setState = obj.setState;
+    obj.setState = function () { push("state", arguments[0], { jump: false }); return setState.apply(this, arguments); };
+    // 实时内容：决定卡片的列表、覆盖层、聚焦的事项
+    const setDecisions = obj.setDecisions;
+    obj.setDecisions = function () { push("decisions", arguments[0]); return setDecisions.apply(this, arguments); };
     const setOverlay = obj.setOverlay;
-    obj.setOverlay = function (id, data) {
-      push("setOverlay", { id, data });
-      return setOverlay.apply(this, arguments);
-    };
-    const destroy = obj.destroy;
-    obj.destroy = function () {
-      push("destroy");
-      return destroy.apply(this, arguments);
-    };
+    obj.setOverlay = function (id) { push("overlay", { id: id ?? null, data: arguments[1] ?? null }); return setOverlay.apply(this, arguments); };
+    const focus = obj.focus;
+    obj.focus = function (id) { push("focus", id ?? null); return focus.apply(this, arguments); };
     return obj;
   };
 
-  window.__record = {
-    take: () => current,
-    stop: () => { P.createFloorScene = orig; },
-  };
+  // 一条事件：页面的 play(ev) 先交给 T.stream（流式文字），再交给 T.floor.actions（动作）。
+  // 在 actions 上记下原始事件，回放时两边的翻译层各翻一次
+  const actions = T.floor.actions;
+  T.floor.actions = function () { push("event", arguments[0]); return actions.apply(this, arguments); };
 
-  /** 播放一个场景，返回录下的调用与状态。 */
-  window.__playScenario = async (id, pid) => {
-    const app = window.Y10;
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const overview = "#/p/" + pid + "/overview";
-    app.scenario.select(id);
-    await sleep(350);
-    if (location.hash !== overview) app.go(overview);
-    await sleep(600);
-    const total = app.scenario.current().steps.length;
-    let guard = 0;
-    while (app.scenario.state().step < total && guard++ < 90) {
-      app.scenario.step();
-      await sleep(420);
-      if (location.hash !== overview) {
-        app.go(overview);
-        await sleep(400);
-      }
-    }
-    await sleep(600);
-    return window.__record.take();
-  };
-
-  // 只录现有测试用到的场景（编号 1 至 19）：编号 20、21 是自举试点的场景，由实现覆盖层的工单加入录制
-  const scenarios = window.Y10.backend.scenarios().filter((s) => s.no <= maxScenarioNo).map((s) => {
-    const m = /^#\/p\/([^/]+)\//.exec(s.go || "");
-    let pid = m ? m[1] : null;
-    if (!pid) pid = s.steps.map((st) => st.event && st.event.project_id).find(Boolean) || null;
-    return { id: s.id, name: s.name, level: s.level, pid, steps: s.steps.length };
-  });
-  return scenarios;
-};
-
-/** 原型 floorModel 里客户端画面用到的字段：事项、角色（去掉模型细节）、决定请求、槽位、运维与机器。 */
-function trimModel(model) {
-  const roles = {};
-  for (const [department, list] of Object.entries(model.roles ?? {})) {
-    roles[department] = list.map((r) => ({ id: r.id, name: r.name, kind: r.kind, status: r.status, task: r.task ?? null }));
-  }
   return {
-    items: model.items ?? [],
-    open_requests: model.open_requests ?? [],
-    shelves: model.shelves ?? { adopted: [] },
-    slots: model.slots ?? null,
-    waiting_provider: model.waiting_provider ?? [],
-    machines: model.machines ?? null,
-    ops: model.ops ?? null,
-    interrupted: Boolean(model.interrupted),
-    roles,
-    decisions: (model.decisions ?? []).map((d) => ({ id: d.id, kind: d.kind, version: d.version, title: d.title, work_item_id: d.work_item_id ?? null })),
+    /** 播放一个场景，返回录下的调用。 */
+    play: async (id, pid) => {
+      const app = window.Y13;
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const overview = "#/p/" + pid + "/overview";
+      ops = [];
+      app.scenario.select(id);
+      await sleep(350);
+      if (location.hash !== overview) app.go(overview);
+      await sleep(600);
+      const total = app.scenario.current().steps.length;
+      let guard = 0;
+      while (app.scenario.state().step < total && guard++ < 90) {
+        app.scenario.step();
+        await sleep(420);
+        if (location.hash !== overview) {
+          app.go(overview);
+          await sleep(400);
+        }
+      }
+      await sleep(600);
+      const out = ops;
+      ops = null;
+      return out;
+    },
   };
-}
+};
 
 async function main() {
   const browser = await chromium.launch({ executablePath: EXE });
@@ -211,44 +120,39 @@ async function main() {
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.addInitScript(() => sessionStorage.setItem("y10.level", JSON.stringify("S5")));
+  await page.addInitScript(() => sessionStorage.setItem("y13.level", JSON.stringify("S5")));
   await page.goto(ROOT + "#/sys/machines");
   await page.waitForTimeout(700);
-  const scenarios = await page.evaluate(DRIVER, { sampleMs: SAMPLE_MS, maxScenarioNo: MAX_SCENARIO_NO });
+  await page.evaluate((src) => { window.__floorRecord = (0, eval)(`(${src})`); }, DRIVER.toString());
+  await page.evaluate(() => { window.__floor = window.__floorRecord(); });
+
+  const scenarios = await page.evaluate((maxScenarioNo) => window.Y13.backend.scenarios()
+    .filter((s) => s.no <= maxScenarioNo)
+    .map((s) => {
+      const m = /^#\/p\/([^/]+)\//.exec(s.go || "");
+      let pid = m ? m[1] : null;
+      if (!pid) pid = s.steps.map((st) => st.event && st.event.project_id).find(Boolean) || null;
+      return { id: s.id, name: s.name, level: s.level, pid, steps: s.steps.length };
+    }), MAX_SCENARIO_NO);
+
   const recordings = [];
   for (const sc of scenarios) {
     if (!sc.pid) {
       console.log("跳过（没有项目）", sc.id);
       continue;
     }
-    const rec = await page.evaluate(({ id, pid }) => window.__playScenario(id, pid), { id: sc.id, pid: sc.pid });
-    recordings.push({ id: sc.id, name: sc.name, level: sc.level, project: sc.pid, ops: rec.ops, samples: rec.samples });
-    console.log(sc.id, sc.pid, "调用", rec.ops.length, "样本", rec.samples.length);
+    const ops = await page.evaluate(({ id, pid }) => window.__floor.play(id, pid), { id: sc.id, pid: sc.pid });
+    recordings.push({ id: sc.id, name: sc.name, level: sc.level, project: sc.pid, ops });
+    const counts = ops.reduce((m, o) => { m[o.op] = (m[o.op] || 0) + 1; return m; }, {});
+    console.log(sc.id, sc.pid, JSON.stringify(counts));
   }
   await browser.close();
-  if (errors.length) {
-    console.log("原型页面控制台错误", errors.length, errors.slice(0, 3));
-  }
-  // setModel 的模型放进共享的表，调用里只留索引：同一个模型只存一份。
-  // 只留客户端画面用到的字段（原型 models 里的 resolved、rows 等属于卡片内容，不在本项目楼层的范围内）。
-  const models = [];
-  const modelIndex = new Map();
-  for (const rec of recordings) {
-    rec.ops = rec.ops.map((op) => {
-      if (op.op !== "setModel") return op;
-      const trimmed = trimModel(op.arg);
-      const text = JSON.stringify(trimmed);
-      if (!modelIndex.has(text)) {
-        modelIndex.set(text, models.length);
-        models.push(trimmed);
-      }
-      return { op: op.op, model: modelIndex.get(text) };
-    });
-  }
+  if (errors.length) console.log("原型页面控制台错误", errors.length, errors.slice(0, 3));
+
   const payload = {
-    generatedFrom: "docs/prototypes/v10（原型 checks/record.js 的做法）",
-    sampleMs: SAMPLE_MS,
-    models,
+    generatedFrom: "docs/prototypes/v13（原型 v13 的页面与翻译层，checks/record.js 的做法；工单 #957）",
+    gapMs: GAP_MS,
+    settleMs: SETTLE_MS,
     scenarios: recordings,
   };
   mkdirSync(outDir, { recursive: true });
@@ -256,7 +160,8 @@ async function main() {
     if (!existsSync(outFile)) {
       throw new Error(`没有录下的调用记录：${outFile}；用 --write 生成`);
     }
-    const before = readFileSync(outFile, "utf8");
+    // 换行符由 git 按平台转换：比较之前先归一成 \n
+    const before = readFileSync(outFile, "utf8").replace(/\r\n/g, "\n");
     const after = JSON.stringify(payload) + "\n";
     if (before !== after) {
       throw new Error("录下的调用与原记录不同；确认以后用 --write 重写");

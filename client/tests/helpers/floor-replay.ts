@@ -1,49 +1,46 @@
-// 楼层画面的回放核对（工单 #82 验收标准 2）：把原型录下的调用序列送进客户端的画面，
-// 按录下的固定时刻取状态，与原型录下的状态逐项比较：每个角色的任务、姿势与头顶的话，
-// 每个包裹的去向，每根管道的状态与各个信号。
+// 楼层画面的回放核对（工单 #957 验收标准 2）：把原型 v13 的页面上录下的调用送进客户端的画面，
+// 静置到时间线放空（最后一个检查点），与 v13 的画面逐像素、逐个小人比较。
 //
-// 录下的调用与状态记录在 tests/fixtures/floor/recordings.json，只经 record-floor-calls.mjs --write 更新。
-// 这个模块输出比较结果，测试与命令行都调用它。
+// 录下的调用是在 docs/prototypes/v13 的页面上录的（client/scripts/record-floor-calls.mjs）：
+// 状态是 v13 的翻译层从查询结果（project.loop）翻好、交给画面的画面合同状态，事件是页面收到的原始事件。
+// 回放时状态直接交给画面，事件经客户端的翻译层（src/translate/floor.ts）翻成动作——就是页面上走的那条路。
+//
+// 录下的调用序列在 tests/fixtures/floor/recordings.json，只经 record-floor-calls.mjs --write 更新。
+// 回放测试不进 CI（AGENTS.md「执行者」），按本文件底的命令单独运行。
 
 import { createServer } from "vite";
 import react from "@vitejs/plugin-react";
-import { chromium } from "@playwright/test";
+import type { Browser } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { adaptRecordedArg } from "./recorded-tool-names.ts";
+import { compareActors, diffPixels, launch, v13Checkpoint, type ActorShot, type CheckpointShot, type PixelDiff, type RecordedOp } from "./prototype-v13.ts";
+import type { FloorModel } from "../../src/renderer/src/pixel/world/types.ts";
+import type { FloorEvent } from "../../src/renderer/src/translate/floor.ts";
+import type { DecisionFace } from "../../src/renderer/src/pixel/world/types.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const clientRoot = resolve(here, "..", "..");
 
-export interface RecordedSample {
-  after: number;
-  ms: number;
-  state: {
-    chars: [string, string | null, string[], string | null, string | null, string | null, number | null, number | null, boolean | null, boolean | null][];
-    packages: [string, string, [number, number] | null][];
-    pipes: [string, string | null, number | null][];
-    signals: string[];
-  };
-}
-
 export interface RecordedScenario {
   id: string;
   name: string;
+  level: string;
   project: string;
-  ops: { op: string; arg?: unknown; model?: number }[];
-  samples: RecordedSample[];
+  ops: RecordedOp[];
 }
 
 export interface RecordingFile {
   generatedFrom: string;
-  sampleMs: number[];
-  models: Record<string, unknown>[];
+  gapMs: { event: number; other: number };
+  settleMs: number;
   scenarios: RecordedScenario[];
 }
 
 export interface CompareResult {
   scenario: string;
+  pixelDiff: PixelDiff;
+  actorMismatches: string[];
   mismatches: string[];
   clientErrors: string[];
 }
@@ -53,24 +50,62 @@ export function loadRecordings(): RecordingFile {
 }
 
 /**
- * 在页面里运行的驱动：把调用序列送进客户端的画面，按固定时刻取状态。
- * 注册进页面以后由 replayScenario 调用（函数体在浏览器里执行，只能引用浏览器里可用的模块）。
+ * v13 的画面合同状态 → 客户端画面合同的状态。
  *
- * 工单 #953 起画面只收画面合同的状态与动作：录下的 setModel 换成 jump（带一个递增的位置，
- * 直接显示那份状态），录下的 playEvent 先经翻译层翻成动作再交给画面。录制还是 v10 的形状，
- * 翻不出动作的事件不会演出，所以与旧录制的比较会有差异（画面 7 换录制以后恢复）。
+ * 两边的合同说的是同一件事，字段名不同：v13 原型的事项用 id、cycle、limit_sec，客户端的画面合同用
+ * work_item_id、round、time_limit_sec（服务端的说法，工单 #952 定下）。这里只换名，不改取值：状态的取值
+ * （working、waiting_model 这些画面的词）两边本来一样，客户端画面收到状态以后自己校验。
  */
-async function driver(input: { ops: RecordedScenario["ops"]; models: Record<string, unknown>[]; sampleMs: number[] }): Promise<{ samples: RecordedSample[]; errors: string[] }> {
-  // 驱动在浏览器里执行：这几个模块经开发服务器的绝对路径加载（不在 Node 的类型系统里）
+export function toViewState(raw: unknown): FloorModel {
+  const s = (raw ?? {}) as Record<string, unknown>;
+  const items = ((s.items ?? []) as Record<string, unknown>[]).map((it) => ({
+    ...it,
+    work_item_id: String(it.id ?? ""),
+    round: Number(it.cycle ?? 0),
+    time_limit_sec: Number(it.limit_sec ?? 0),
+    kind: String(it.kind ?? "request"),
+    sign: (it.sign as string | null) ?? null,
+    department: (it.department as string | null) ?? null,
+    color_index: Number(it.color_index ?? 0),
+    elapsed_sec: it.elapsed_sec === undefined || it.elapsed_sec === null ? null : Number(it.elapsed_sec),
+  }));
+  const shelves = (s.shelves ?? {}) as { adopted?: string[] };
+  return {
+    position: Number(s.position ?? 0),
+    items,
+    open_requests: (s.open_requests ?? []) as FloorModel["open_requests"],
+    shelves: { adopted: shelves.adopted ?? [] },
+    slots: (s.slots ?? null) as FloorModel["slots"],
+    waiting_provider: (s.waiting_provider ?? []) as FloorModel["waiting_provider"],
+    machines: (s.machines ?? null) as FloorModel["machines"],
+    ops: (s.ops ?? null) as FloorModel["ops"],
+    interrupted: Boolean(s.interrupted),
+    roles: (s.roles ?? null) as FloorModel["roles"],
+    decisions: [],
+    ...(s.focus_id ? { focus_id: String(s.focus_id) } : {}),
+  } as unknown as FloorModel;
+}
+
+/**
+ * 在页面里运行的驱动：把录下的调用送进客户端的楼层画面，静置到时间线放空，固定小人的动画计时，
+ * 取画布与逐个小人。函数体在浏览器里执行，只能引用浏览器里可用的模块（经开发服务器的绝对路径加载）。
+ */
+async function driver(input: {
+  ops: RecordedOp[];
+  gapMs: { event: number; other: number };
+  settleMs: number;
+}): Promise<{ png: string; actors: ActorShot[]; size: [number, number]; errors: string[] }> {
   const P = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/renderer/src/pixel/floor/view.ts");
   const clockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/renderer/src/pixel/clock.ts");
   const tr = await import(/* @vite-ignore */ "/src/translate/floor.ts" as string) as typeof import("../../src/renderer/src/translate/floor.ts");
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px;z-index:9999;background:#000";
   document.body.appendChild(host);
+  // 确定的随机数：待机活动关掉以后画面只由状态与动作决定，随机数只是让两次运行的结果一致
+  let seed = 987654321;
+  Math.random = (): number => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   const clock = clockMod.createManualClock();
-  const view = await P.createFloorView({ host, clock });
-  // 与录制时一致：关掉自主行为（待机活动与管道的惯性），静止的画面只由快照决定
+  let view = await P.createFloorView({ host, clock });
   view.inspect().scene.autonomy = false;
   const errors: string[] = [];
   const origError = console.error;
@@ -78,78 +113,95 @@ async function driver(input: { ops: RecordedScenario["ops"]; models: Record<stri
     errors.push(a.map(String).join(" "));
     origError.apply(console, a);
   };
-  // 录下的调用没有位置：状态与动作按调用顺序给一个递增的位置（画面合同要求带位置）
-  let position = 0;
-  function snapshot(): RecordedSample["state"] & { realT: number } {
-    const world = view.inspect().driver.world;
-    const scene = view.inspect().scene;
-    const chars = Object.values(world.characters).sort((a, b) => (a.id < b.id ? -1 : 1)).map((c) => {
-      const a = scene.actors.find((x) => x.id === "ch-" + c.id);
-      return [c.id, c.current ? c.current.taskKey : null, c.queue.map((x) => x.taskKey), a ? a.anim : null,
-        a && a.icon ? a.icon.kind : null, c.bubble ? c.bubble.text : null, a ? Math.round(a.x) : null,
-        a ? Math.round(a.y) : null, a ? Boolean(a.seat) : null, a ? a.visible : null];
-    });
-    const packages = Object.values(world.packages).map((pk) => [pk.id, pk.transit ? pk.transit.linkKey : "rest",
-      pk.transit && pk.transit.pos ? [Math.round(pk.transit.pos[0]), Math.round(pk.transit.pos[1])] : null] as [string, string, [number, number] | null])
-      .sort((a, b) => (a[0] < b[0] ? -1 : 1));
-    const pipes = Object.keys(world.links).sort().map((key) => [key,
-      world.links[key].flow ? world.links[key].flow.state : null,
-      world.links[key].flow ? Math.round(world.links[key].flow.load * 10) / 10 : null] as [string, string | null, number | null]);
-    const signals = Object.keys(world.signals).sort().filter((name) => world.signals[name].until > scene.realT);
-    return { chars: chars as never, packages, pipes, signals, realT: Math.round(scene.realT * 100) / 100 };
-  }
-  const samples: RecordedSample[] = [];
-  // 与原型一致：按 50 毫秒一帧推进（原型的 step 把 0 毫秒也算作一帧）
+  let roles: { id: string; name: string; kind: string }[] = [];
+  const collect = (input2: unknown): { id: string; name: string; kind: string }[] => {
+    if (!input2) return [];
+    return Object.values(input2 as Record<string, unknown>).reduce<{ id: string; name: string; kind: string }[]>(
+      (list, x) => list.concat((x ?? []) as { id: string; name: string; kind: string }[]), []);
+  };
+  const roleName = (id: string | null): string | null => {
+    const hit = roles.find((r) => r.id === id || r.kind === id);
+    return hit ? hit.name : null;
+  };
+  // 与原型一致：按 50 毫秒一帧推进
   const advance = (ms: number): void => {
     const frames = Math.max(1, Math.round(ms / 50));
     for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
   };
-  for (let i = 0; i < input.ops.length; i++) {
-    const op = input.ops[i];
-    if (op.op === "mount") continue;
-    position += 1;
-    if (op.op === "setModel") {
-      view.jump({ position, ...(input.models[op.model as number] as Record<string, unknown>) } as never);
-    } else if (op.op === "playEvent") {
-      // 录下的是 v10 的事件形状：经翻译层翻成动作，翻不出来的（原型才有的 transition、x_ 事件）不演出
-      const raw = (op.arg ?? {}) as Record<string, unknown>;
-      const ev = {
-        type: String(raw.type ?? ""),
-        position,
-        event_id: raw.event_id as string | undefined,
-        department: raw.department as string | undefined,
-        role: raw.role as string | undefined,
-        tool: raw.tool as string | undefined,
-        label: raw.label as string | undefined,
-        work_item_id: raw.work_item_id as string | undefined,
-        payload: raw.payload as Record<string, unknown> | undefined,
-      };
-      for (const action of tr.floorActions(ev)) view.play(action);
-    } else if (op.op === "focus") view.focus(op.arg as string | null);
-    else if (op.op === "setOverlay") view.setOverlay((op.arg as { id: string }).id, (op.arg as { data: unknown }).data);
-    // 与原型一致：只在 setModel、playEvent、focus 之后取状态
-    if (op.op === "setModel" || op.op === "playEvent" || op.op === "focus") {
-      for (const ms of input.sampleMs) {
-        advance(ms);
-        samples.push({ after: i, ms, state: snapshot() });
+  for (const op of input.ops) {
+    try {
+      if (op.op === "mount") {
+        view.destroy();
+        view = await P.createFloorView({ host, clock });
+        view.inspect().scene.autonomy = false;
+        advance(input.gapMs.other);
+        continue;
       }
+      if (op.op === "state") {
+        const state = op.arg as unknown as FloorModel;
+        roles = collect((op.arg as { roles?: unknown }).roles);
+        if (op.jump) view.jump(state);
+        else view.setState(state);
+      } else if (op.op === "event") {
+        const raw = (op.arg ?? {}) as Record<string, unknown>;
+        const ev: FloorEvent = {
+          type: String(raw.type ?? ""),
+          position: Number(raw.position ?? 0),
+          event_id: (raw.event_id as string) ?? null,
+          project_id: (raw.project_id as string) ?? null,
+          department: (raw.department as string) ?? null,
+          role: (raw.role as string) ?? null,
+          tool: (raw.tool as string) ?? null,
+          label: (raw.label as string) ?? null,
+          work_item_id: (raw.work_item_id as string) ?? null,
+          payload: (raw.payload as Record<string, unknown>) ?? null,
+        };
+        const stream = tr.streamText(ev);
+        if (stream) view.stream({ room: stream.room, role: stream.role }, stream.text);
+        for (const action of tr.floorActions(ev, { roleName })) view.play(action);
+      } else if (op.op === "decisions") view.setDecisions((op.arg ?? []) as unknown as DecisionFace[]);
+      else if (op.op === "overlay") view.setOverlay((op.arg as { id: string | null }).id, (op.arg as { data: unknown }).data);
+      else if (op.op === "focus") view.focus((op.arg as string | null) ?? null);
+      // destroy：最后一个检查点要在画面上取，销毁画面的调用不执行
+    } catch (e) {
+      errors.push(String((e as Error)?.message ?? e));
     }
+    advance(op.op === "event" ? input.gapMs.event : input.gapMs.other);
   }
+  advance(input.settleMs);
+  // 静置到时间线与动作放空（小人走回原位）
+  const isBusy = (): boolean => {
+    const tl = view.inspect().driver.inspectTimeline();
+    return tl.pending > 0 || tl.playing.length > 0 || view.inspect().scene.actors.some((a) => a.script);
+  };
+  for (let i = 0; i < 60 && isBusy(); i++) {
+    advance(100);
+  }
+  // 固定小人的动画计时与场景的动画时钟：与 v13 一侧取同一个值
+  const scene = view.inspect().scene;
+  const list = scene.actors.slice().sort((a, b) => (a.sprite < b.sprite ? -1 : 1));
+  list.forEach((a, i) => { a.clock = 5000; a.animStart = 0; a.seed = 100 + i; });
+  scene.animT = 20000;
+  // 重画一帧（重排尺寸会清屏并按当前的世界重画，不推进时间）
+  view.resize();
+  const canvas = host.querySelector("canvas");
+  if (!canvas) return { png: "", actors: [], size: [0, 0], errors: [...errors, "画面上没有画布"] };
+  const actors: ActorShot[] = list.map((a) => ({
+    sprite: a.sprite, x: Math.round(a.x * 100) / 100, y: Math.round(a.y * 100) / 100, seat: Boolean(a.seat),
+    anim: a.anim, facing: a.facing, icon: a.icon ? { kind: a.icon.kind, text: a.icon.text ?? null } : null,
+    visible: a.visible, dim: a.dim, hold: a.hold ?? null, sign: a.sign ?? null, script: Boolean(a.script),
+  }));
   console.error = origError;
   view.destroy();
   host.remove();
-  return { samples, errors };
+  return { png: canvas.toDataURL("image/png"), actors, size: [canvas.width, canvas.height], errors };
 }
 
-/** 起一个渲染进程的开发服务器，把一个场景的调用序列送进画面，返回取到的状态。 */
-export async function replayScenario(serverUrl: string, scenario: RecordedScenario, models: Record<string, unknown>[], sampleMs: number[]): Promise<{ samples: RecordedSample[]; errors: string[] }> {
-  const browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
+/** 起一个渲染进程的开发服务器，把一段录制送进客户端的楼层画面，取最后一个检查点。 */
+export async function replayScenario(serverUrl: string, browser: Browser, rec: RecordedScenario, recording: RecordingFile): Promise<CheckpointShot> {
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
-    const pageErrors: string[] = [];
-    page.on("pageerror", (e) => pageErrors.push(e.message));
     await page.goto(serverUrl + "index.html");
-    // 驱动注册进页面：evaluate 只送参数，函数体在浏览器里执行
     await page.evaluate((fnSource) => {
       (window as unknown as { __floorDriver: unknown }).__floorDriver = (0, eval)(`(${fnSource})`);
     }, driver.toString());
@@ -160,64 +212,18 @@ export async function replayScenario(serverUrl: string, scenario: RecordedScenar
       } catch (e) {
         return { failed: String((e as Error)?.stack ?? e) };
       }
-    }, { ops: scenario.ops.map((op) => ({ ...op, arg: adaptRecordedArg(op.arg) })), models, sampleMs });
+    }, { ops: rec.ops.map((op) => (op.op === "state" ? { ...op, arg: toViewState(op.arg) } : op)), gapMs: recording.gapMs, settleMs: recording.settleMs });
     if ("failed" in result) {
-      return { samples: [], errors: [...pageErrors, `驱动失败：${String(result.failed)}`] };
+      return { png: "", actors: [], size: [0, 0], errors: [`驱动失败：${String(result.failed)}`] };
     }
-    const ok = result.ok as { samples: RecordedSample[]; errors: string[] };
-    return { samples: ok.samples, errors: [...pageErrors, ...ok.errors] };
+    return result.ok as CheckpointShot;
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 
-/** 比较两份状态：逐项列出不同（角色的任务/姿势/话、包裹的去向、管道的状态、信号）。 */
-export function compareStates(recorded: RecordedSample[], replayed: RecordedSample[]): string[] {
-  const out: string[] = [];
-  if (recorded.length !== replayed.length) {
-    return [`样本数量不同：原型 ${recorded.length}，客户端 ${replayed.length}`];
-  }
-  for (let i = 0; i < recorded.length; i++) {
-    const a = recorded[i];
-    const b = replayed[i];
-    if (a.after !== b.after || a.ms !== b.ms) {
-      out.push(`样本 ${i} 的位置不同：原型 ${a.after}/${a.ms}，客户端 ${b.after}/${b.ms}`);
-      continue;
-    }
-    // 角色：任务、姿势、头顶的话、位置与是否坐在工位
-    const ca = new Map(a.state.chars.map((c) => [c[0], c]));
-    const cb = new Map(b.state.chars.map((c) => [c[0], c]));
-    for (const [id, left] of ca) {
-      const right = cb.get(id);
-      if (!right) {
-        out.push(`样本 ${i}（${a.ms} 毫秒）缺少角色 ${id}`);
-        continue;
-      }
-      const fields = ["任务", "队列", "姿势", "图标", "头顶的话", "x", "y", "坐着", "可见"];
-      for (let k = 1; k <= 9; k++) {
-        if (JSON.stringify(left[k]) !== JSON.stringify(right[k])) {
-          out.push(`样本 ${i}（${a.ms} 毫秒）角色 ${id} 的${fields[k - 1]}不同：原型 ${JSON.stringify(left[k])}，客户端 ${JSON.stringify(right[k])}`);
-        }
-      }
-    }
-    // 包裹：去向与位置
-    const pkA = JSON.stringify(a.state.packages);
-    const pkB = JSON.stringify(b.state.packages);
-    if (pkA !== pkB) out.push(`样本 ${i}（${a.ms} 毫秒）包裹不同：原型 ${pkA}，客户端 ${pkB}`);
-    // 管道：状态与光点
-    const pipeA = JSON.stringify(a.state.pipes);
-    const pipeB = JSON.stringify(b.state.pipes);
-    if (pipeA !== pipeB) out.push(`样本 ${i}（${a.ms} 毫秒）管道不同：原型 ${pipeA}，客户端 ${pipeB}`);
-    // 信号
-    if (JSON.stringify(a.state.signals) !== JSON.stringify(b.state.signals)) {
-      out.push(`样本 ${i}（${a.ms} 毫秒）信号不同：原型 ${JSON.stringify(a.state.signals)}，客户端 ${JSON.stringify(b.state.signals)}`);
-    }
-  }
-  return out;
-}
-
-/** 起一个开发服务器，回放全部录下的场景，返回每个场景的比较结果。 */
-export async function replayAll(options: { only?: string[]; exclude?: string[] } = {}): Promise<CompareResult[]> {
+/** 起开发服务器与浏览器，回放录下的场景，返回每个场景的比较结果。 */
+export async function replayAll(options: { only?: string[] } = {}): Promise<CompareResult[]> {
   const recording = loadRecordings();
   const server = await createServer({
     root: join(clientRoot, "src", "renderer"),
@@ -229,19 +235,30 @@ export async function replayAll(options: { only?: string[]; exclude?: string[] }
   await server.listen();
   const address = server.resolvedUrls?.local[0];
   if (!address) throw new Error("渲染进程的开发服务器没有给出地址");
+  const { browser, proto, diff } = await launch();
   const results: CompareResult[] = [];
   try {
     for (const scenario of recording.scenarios) {
       if (options.only && !options.only.includes(scenario.id)) continue;
-      if (options.exclude && options.exclude.includes(scenario.id)) continue;
-      const replayed = await replayScenario(address, scenario, recording.models, recording.sampleMs);
+      const expected = await v13Checkpoint(proto, { screen: "floor", ops: scenario.ops, gapMs: recording.gapMs, settleMs: recording.settleMs });
+      const actual = await replayScenario(address, browser, scenario, recording);
+      const actorMismatches = compareActors(expected.actors, actual.actors);
+      const mismatches: string[] = [...actorMismatches];
+      let pixelDiff: PixelDiff = { count: 0 };
+      if (expected.png && actual.png) {
+        pixelDiff = await diffPixels(diff, expected.png, actual.png);
+        if (pixelDiff.count < 0) mismatches.push(`画布尺寸不同：v13 ${JSON.stringify(pixelDiff.size)}`);
+      }
       results.push({
         scenario: scenario.id,
-        mismatches: compareStates(scenario.samples, replayed.samples),
-        clientErrors: replayed.errors,
+        pixelDiff,
+        actorMismatches,
+        mismatches,
+        clientErrors: [...expected.errors, ...actual.errors],
       });
     }
   } finally {
+    await browser.close();
     await server.close();
   }
   return results;
