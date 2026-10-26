@@ -109,12 +109,15 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
     assert len(dec.product_decisions) == 1
     original_decision = dec.product_decisions[0]
     original_spec = dec.product_spec.content_hash
-    system.activate_once(run_id)  # product replies to the guidance
 
     facts = system.workspace(run_id).snapshot().facts
+    # 产品这一轮在提交修订：投影里它的主线会话在工作中。指导不再让收过它的部门自己重开一轮（工单 #1038），
+    # 所以不靠待处理指导表示「这个部门在工作」
+    working = replace(dec, status="running",
+                      sessions={**dec.sessions, "product": replace(dec.sessions["product"], status="active")})
     for changes in ([], [{"decision_hash": "unknown", "disposition": "retain", "rationale": "Unknown"}],
                     [{"decision_hash": original_decision.content_hash, "disposition": "retain", "rationale": "Keep"}] * 2):
-        decision = evaluate_proposal(department="product", projection=replace(dec, status="running"),
+        decision = evaluate_proposal(department="product", projection=working,
                                      facts=facts, proposal=product_spec(decision_changes=changes, change_record={
                                          "changed": [], "retained": ["Echo behavior"], "retired": [],
                                          "rationale": "Review earlier decisions",

@@ -6,9 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .contracts import current_contract_hash, normalize_scope
-from .collaboration import (
-    allowed_proposal_kinds, guidance_bound_result_ids, guidance_response_errors,
-)
+from .collaboration import allowed_proposal_kinds
 from .models import (
     BASELINE_STATUSES,
     DEPARTMENTS,
@@ -128,8 +126,6 @@ def _evaluate_proposal(
 
     if kind == "product_spec":
         return _accept_product_spec(proposal, projection)
-    if kind == "department_guidance_response":
-        return _accept_guidance_response(proposal, projection, department, events, facts)
     if kind == "product_decision":
         return _accept_product_decision(proposal, projection)
     if kind == "delivery_spec":
@@ -144,11 +140,6 @@ def _evaluate_proposal(
 
 
 def _validate_schema(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
-    if kind == "department_guidance_response":
-        errors = _require_text(proposal, "guidance_id") + _require_text(proposal, "text")
-        if proposal.get("status") not in {"explained", "completed", "declined", "needs_work"}:
-            errors.append(FieldError("status", "status must be explained, completed, declined, or needs_work"))
-        return errors
     if kind == "product_decision":
         return _require_text(proposal, "statement") + _require_text(proposal, "rationale")
     if kind == "product_spec":
@@ -368,41 +359,6 @@ def _baseline_omission_records(proposal: dict[str, Any], facts: TreeFacts) -> tu
     return records, errors
 
 
-
-def _accept_guidance_response(proposal: dict[str, Any], projection: RunProjection,
-                              department: str, events: list[Event],
-                              facts: TreeFacts) -> ProposalDecision:
-    guidance = next((item for item in projection.department_guidance
-                     if item.id == proposal.get("guidance_id")), None)
-    if guidance is None or guidance.department != department:
-        return ProposalDecision(False, [FieldError("guidance_id", "guidance must belong to the current department and run")])
-    if guidance.status not in {"received", "in_input"}:
-        return ProposalDecision(False, [FieldError("guidance_id", "guidance has already been responded to")])
-    text = proposal.get("text")
-    if not isinstance(text, str) or not text.strip():
-        return ProposalDecision(False, [FieldError("text", "text must be a non-empty string")])
-    errors = guidance_response_errors(proposal, projection, department, events, snapshot_hash=facts.digest)
-    if errors:
-        return ProposalDecision(False, [FieldError(**item) for item in errors])
-    payload = {
-        "guidance_id": guidance.id,
-        "guidance_version": guidance.version,
-        "guidance_created_event_id": guidance.created_event_id,
-        "department": department,
-        "status": proposal["status"],
-        "text": text.strip(),
-        "result_event_ids": guidance_bound_result_ids(
-            proposal, projection, department, events, snapshot_hash=facts.digest, guidance=guidance,
-        ),
-    }
-    return ProposalDecision(True, artifact={
-        **payload,
-        "kind": "department_guidance_response",
-        "issuer": department,
-        "content_hash": canonical_hash(payload),
-    })
-
-
 def _accept_product_spec(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
     if projection.input_version != projection.product_work_input_version:
         return ProposalDecision(False, [FieldError("input_version", "new user input must enter product work before requirements can be accepted")])
@@ -547,10 +503,6 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
         bound_checks.append(_receipt_evidence(receipt))
     verdict = proposal["verdict"]
     if verdict == "release":
-        pending_guidance = [item.id for item in projection.department_guidance
-                            if item.status in {"received", "in_input"}]
-        if pending_guidance:
-            errors.append(FieldError("guidance", "release requires all received department guidance to have a recorded response"))
         if any(item["exit_code"] != 0 for item in bound_checks):
             errors.append(FieldError("checks", "release requires all quality checks to exit 0"))
         if not bound_checks:

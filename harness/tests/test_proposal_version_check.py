@@ -8,7 +8,6 @@ from harness.models import EventType, json_dumps
 from harness.proposals import (
     delivery,
     delivery_turn,
-    guidance_response,
     product_spec,
     product_spec_turn,
     review,
@@ -113,7 +112,8 @@ CHANGE_RECORD = {
 
 def _system_with_guided_revision(tmp_path):
     # 产品修订 PRD：质检的结论不再把工作退回产品（工单 #555），产品的修订由用户的指导触发，
-    # 修订以后事项仍在工程阶段，工程按新合同继续工作。
+    # 修订以后事项仍在工程阶段，工程按新合同继续工作。收到指导的那一轮以提交接纳收尾，
+    # 指导停在已进入模型输入，没有单独的回应（工单 #1038、#1039）。
     adapter = FakeAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn()],
@@ -125,14 +125,8 @@ def _system_with_guided_revision(tmp_path):
     system.add_guidance(run_id, "product", "请把验收标准写清空输入的行为。")
     adapter.scripts["product"] = [
         product_spec_turn(acceptance=["empty input prints a blank line"], change_record=CHANGE_RECORD),
-        lambda request: FakeTurn(proposal=guidance_response(
-            _guidance_id(request), status="explained", text="已按新的验收标准修订产品要求。")),
     ]
     return system, run_id
-
-
-def _guidance_id(request):
-    return json.loads(prompt_part(request, "department_guidance"))[0]["id"]
 
 
 def _activate_until(system, run_id, revision):
@@ -192,8 +186,8 @@ def test_a_revision_with_a_stale_basis_is_rejected_by_the_host_and_can_be_resubm
     # 拒绝的原因与当前版本作为 validation_feedback 交回，产品读过反馈以后按当前版本重交，修订被接纳
     system, run_id = _system_with_guided_revision(tmp_path)
     projection = _activate_until(system, run_id, 2)
-    # 产品修订了 PRD（工单 #556：产品按关注的成果开始工作，工程按 PRD 的新版本开始返工）
-    assert has_new_work(projection, "product")
+    # 产品修订了 PRD：工程按 PRD 的新版本开始返工；产品自己不再被重新激活（工单 #556、#1038）
+    assert has_new_work(projection, "engineering")
     current_hash = projection.product_spec.content_hash
     # 修订提交必须来自产品会话：用指导把产品请回工作，脚本按会话给
     system.add_guidance(run_id, "product", "请再确认一次验收边界。")
@@ -210,6 +204,8 @@ def test_a_revision_with_a_stale_basis_is_rejected_by_the_host_and_can_be_resubm
         assert current_hash in prompt_part(call, "current_product_spec")
         return _revision(CHANGE_RECORD, current_hash)
     system.test_adapter.scripts = {"product": [resubmit]}
+    # 收到指导的那一轮以拒绝收尾，指导停在已进入模型输入；再给一段指导请产品按当前版本重交（工单 #1038）
+    system.add_guidance(run_id, "product", "请按当前版本重新提交这次修订。")
     accepted = system.activate_once(run_id)
     assert accepted.product_spec.revision == 3
     assert accepted.product_spec.parent_hash == current_hash
@@ -224,8 +220,8 @@ def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_cur
     # 读过反馈以后按当前版本重交，交付被接纳并进入质检
     system, run_id = _system_with_guided_revision(tmp_path)
     projection = _activate_until(system, run_id, 2)
-    # 产品修订了 PRD（工单 #556：产品按关注的成果开始工作，工程按 PRD 的新版本开始返工）
-    assert has_new_work(projection, "product")
+    # 产品修订了 PRD：工程按 PRD 的新版本开始返工；产品自己不再被重新激活（工单 #556、#1038）
+    assert has_new_work(projection, "engineering")
     current_hash = projection.product_spec.content_hash
     files = {"src/echo.py": "import sys\nprint(sys.argv[1])\n"}
     stale = FakeTurn(proposal=delivery(
@@ -233,7 +229,6 @@ def test_a_delivery_with_a_stale_basis_is_rejected_then_resubmitted_with_the_cur
         basis_product_spec_hash=projection.product_specs[0].content_hash),
         writes=files, checks={"smoke": 0})
     accepted_before = len(_events(system, run_id, EventType.DELIVERY_ACCEPTED))
-    system.activate_once(run_id)  # 产品回应指导，指导不再是待处理
     system.test_adapter.scripts = {"engineering": [stale]}
     rejected = system.activate_once(run_id)
     [error] = _basis_errors(rejected)

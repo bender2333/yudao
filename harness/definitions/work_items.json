@@ -17,8 +17,7 @@
             "run_check",
             "submit_product_spec",
             "submit_product_decision",
-            "ask",
-            "submit_guidance_response"
+            "ask"
           ],
           "notes": [
             "不带 PRD 修订的回答不更新PRD；产品决定和需求正文经正常接纳后才生效。",
@@ -41,7 +40,6 @@
             "read_output",
             "stop_job",
             "ask",
-            "submit_guidance_response",
             "submit_delivery"
           ],
           "notes": [
@@ -61,7 +59,6 @@
             "stop_job",
             "run_check",
             "ask",
-            "submit_guidance_response",
             "submit_review"
           ],
           "notes": [
@@ -92,8 +89,7 @@
             "stop_job",
             "run_check",
             "submit_product_spec",
-            "ask",
-            "submit_guidance_response"
+            "ask"
           ]
         },
         "engineering": {
@@ -105,8 +101,7 @@
             "read_range",
             "run_check",
             "submit_structure",
-            "ask",
-            "submit_guidance_response"
+            "ask"
           ]
         },
         "quality": {
@@ -121,8 +116,7 @@
             "stop_job",
             "run_check",
             "submit_baseline_review",
-            "ask",
-            "submit_guidance_response"
+            "ask"
           ]
         }
       }

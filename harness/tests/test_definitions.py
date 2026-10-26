@@ -149,7 +149,7 @@ def test_tool_categories_and_references_are_checked(tmp_path):
         ("work_items.json", "kinds.onboarding.departments.quality.tools[4]", "工具 bash 没有定义"),
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
         ("proposal_contracts.json", "roles.quality.kinds",
-         "与共同部分合起来必须恰好说明这些提案种类：delivery_spec、department_guidance_response、qa_review"),
+         "与共同部分合起来必须恰好说明这些提案种类：delivery_spec、qa_review"),
     )
 
 
@@ -170,14 +170,21 @@ def test_proposal_contracts_must_match_the_submit_tools_of_each_role(tmp_path):
 
 
 def test_a_role_and_the_shared_part_cannot_describe_the_same_proposal_kind(tmp_path):
+    # 共同部分在指导的回应删除以后是空的（工单 #1038）：这里把一个种类同时写进每个角色与共同部分，
+    # 核对装载时的重复说明检查照样报出（共同部分对每个角色都算，所以三个角色各报一条）
     directory = _copy(tmp_path)
     contracts = _read(directory, "proposal_contracts.json")
-    contracts["roles"]["product"]["kinds"]["department_guidance_response"] = {"required": ["guidance_id"]}
+    contracts["shared"]["kinds"]["product_decision"] = {"required": ["statement"]}
+    for role in ("product", "engineering", "quality"):
+        contracts["roles"][role]["kinds"]["product_decision"] = {"required": ["statement"]}
     _write(directory, "proposal_contracts.json", contracts)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     assert raised.value.issues == (
-        ("proposal_contracts.json", "roles.product.kinds", "与共同部分重复说明 department_guidance_response"),)
+        ("proposal_contracts.json", "roles.product.kinds", "与共同部分重复说明 product_decision"),
+        ("proposal_contracts.json", "roles.engineering.kinds", "与共同部分重复说明 product_decision"),
+        ("proposal_contracts.json", "roles.quality.kinds", "与共同部分重复说明 product_decision"),
+    )
 
 
 @pytest.mark.parametrize(("change", "message"), [

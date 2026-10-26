@@ -406,9 +406,10 @@ def test_the_scenario_covers_the_asked_for_behaviours(data_dir):
         project_types = {event.type for event in system.store.list_project_events(project_id)}
     finally:
         system.close()
+    # 指导的回答事件由主机在 #1039 写：这一轮结束时不再有部门提交的回应（工单 #1038），#1039 加回
     assert {EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED,
             EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
-            EventType.DEPARTMENT_GUIDANCE_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RESPONDED} <= types
+            EventType.DEPARTMENT_GUIDANCE_RECEIVED} <= types
     assert {"project_renamed", "project_pinned", "department_prompt_configured",
             "source_directory_configured", "deliverable_adopted"} <= project_types
 

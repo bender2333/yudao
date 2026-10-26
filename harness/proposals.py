@@ -53,18 +53,6 @@ def product_spec_turn(
     return submit
 
 
-def guidance_response(guidance_id: str, status: str = "completed",
-                      text: str = "The department reviewed and handled this guidance.",
-                      result_event_ids: list[str] | None = None) -> dict[str, Any]:
-    return {
-        "kind": "department_guidance_response",
-        "guidance_id": guidance_id,
-        "status": status,
-        "text": text,
-        "result_event_ids": [] if result_event_ids is None else result_event_ids,
-    }
-
-
 def product_decision(statement: str, rationale: str) -> dict[str, Any]:
     return {"kind": "product_decision", "statement": statement, "rationale": rationale}
 

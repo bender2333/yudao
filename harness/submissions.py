@@ -85,8 +85,6 @@ class SubmissionWriter:
         elif kind == "product_decision":
             artifact["id"] = new_id("decision")
             event = append(EventType.PRODUCT_DECISION_ACCEPTED, artifact, [artifact["content_hash"]])
-        elif kind == "department_guidance_response":
-            event = append(EventType.DEPARTMENT_GUIDANCE_RESPONDED, artifact, [artifact["content_hash"]])
         elif kind == "delivery_spec":
             if artifact["code_tree_digest"] != snapshot.digest:
                 raise ValueError("Delivery does not match the validated workspace snapshot")
