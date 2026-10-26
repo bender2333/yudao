@@ -1,24 +1,22 @@
-// 首页的楼（原型 v8 设计说明第 4.2 节、v10 设计说明第 7 节，工单 #178）：
-// 每个项目一层，画成缩小的项目楼层；楼层数据来自 projects.list 与每个项目的 project.loop，
-// 事件流不按项目筛选，铺到画面上的动作由楼的世界与系统推进；点击楼层进入项目概览。
+// 首页的楼（原型 v13 设计说明第 3 至 5 节、原型 js/ui/scenes.js 的 mountBuilding，工单 #178、#955）：
+// 每个项目一层，画成缩小的项目楼层。
 //
-// 状态以查询为准：projects.list 或任一 project.loop 的快照到达都重新 setModel；
-// 断线重连或收到 resync 以后画面回到查询给出的状态，不补播已经播放过的动作。
+// 页面只做连接（画面与播放设计说明第 3 节）：
+//   - projects.list 与每个项目的 project.loop 交给翻译层（translate/building.ts），翻成画面合同的楼的状态；
+//   - 事件流不按项目筛选，每条事件先经翻译层翻成楼的动作，再交给画面播放；
+//   - 打开画面、重新同步、标签页从后台切回都用 jump：直接显示最新状态，不补播；
+//   - 画面的回调（点击楼层）变成跳转。
+// 文字列表不属于画面，照旧按查询结果写。
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Capabilities, EventObject, ProjectList, ProjectLoopResult } from "../../api/generated/types.gen";
+import type { ProjectList, ProjectLoopResult } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { createRafClock } from "../../pixel/clock";
-import { createBuildingView, buildingTestHooks, type BuildingModel, type BuildingTestHooks, type BuildingView } from "../../pixel/building/view";
-import { buildingModelOf, type BuildingItemRow, type BuildingProjectRow } from "../../pixel/building/model";
-import { BUILDING_STATUS } from "../../pixel/building/render";
-import type { PixelFloorEvent } from "../../pixel/world/types";
-import { floorEventOf } from "../project/floor-screen";
+import { buildingTestHooks, createBuildingView, type BuildingModel, type BuildingTestHooks, type BuildingView } from "../../pixel/building/view";
+import { BUILDING_STATUS } from "../../pixel/building/status-text";
+import { buildingActions, buildingState, toBuildingEvent } from "../../translate/building";
 import { Section } from "../project/common";
 import { emptyOrFailureText } from "../../contract/read-failure";
-
-/** 楼的位置用到的项目行：projects.list 里与建楼有关的字段。 */
-type ProjectRow = ProjectList["projects"][number];
 
 export interface BuildingSectionProps {
   app: ClientApp;
@@ -33,12 +31,13 @@ export interface BuildingSectionProps {
 /** 首页的楼：画布、按项目打开的事项查询与事件流接线。 */
 export function BuildingSection(props: BuildingSectionProps): React.JSX.Element {
   const at = props.at ?? null;
-  const items = useProjectItems(props.app, props.projects, at);
-  const model = useMemo(() => buildingModelOf(
-    (props.projects?.projects ?? []).map(toProjectRow),
-    (projectId) => items[projectId] ?? [],
-    false,
-  ), [props.projects, items]);
+  const loops = useProjectLoops(props.app, props.projects, at);
+  // 状态只由查询结果翻出来：projects.list 的行与各项目的 project.loop
+  const model = useMemo(() => buildingState({
+    position: loops.position,
+    projects: props.projects?.projects ?? [],
+    loops: loops.byProject,
+  }), [props.projects, loops]);
 
   return (
     <Section className="y10-home-building" title="全部项目与机器" note={at !== null ? "回放中：每个项目一层，按所选位置的快照显示" : "每个项目一层；点击楼层进入项目概览"}>
@@ -75,33 +74,28 @@ function litText(lit: Record<string, boolean>): string {
   return names.length ? `${names.join("、")}在工作` : "没有部门在工作";
 }
 
-/** projects.list 的一行转成建楼用的项目行。 */
-function toProjectRow(row: ProjectRow): BuildingProjectRow {
-  return {
-    project_id: row.project_id,
-    name: row.name,
-    pinned: row.pinned,
-    archived: row.archived,
-    last_activity_at: row.last_activity_at,
-    decisions_waiting: row.decisions_waiting,
-  };
+// ---------------------------------------------------------------------------
+// 每个项目的事项：为每行项目打开一次 project.loop，连同查询快照的位置一起记下。
+// 项目集合变化时重新打开；查询随事件刷新。位置只增不减：跳到最新以后晚回来的旧结果不再上画面。
+
+interface ProjectLoops {
+  byProject: Record<string, ProjectLoopResult>;
+  /** 这些查询里最新的位置（画面合同的状态要带位置）。 */
+  position: number;
 }
 
-// ---------------------------------------------------------------------------
-// 每个项目的事项：为每行项目打开一次 project.loop，汇总成项目标识到事项的表。
-// 项目集合变化时重新打开；查询随事件刷新。事项表用一个合并后的状态存放，避免每个项目各存一份
-
-function useProjectItems(app: ClientApp, projects: ProjectList | null, at: number | null): Record<string, BuildingItemRow[]> {
+function useProjectLoops(app: ClientApp, projects: ProjectList | null, at: number | null): ProjectLoops {
   const ids = useMemo(
     () => [...new Set((projects?.projects ?? []).map((p) => p.project_id))].sort(),
     [projects],
   );
   const key = ids.join(",");
-  const [items, setItems] = useState<Record<string, BuildingItemRow[]>>({});
+  const [loops, setLoops] = useState<ProjectLoops>({ byProject: {}, position: 0 });
   useEffect(() => {
     const views = app.viewSync;
     if (!views || key === "") {
-      setItems({});
+      // 没有项目：楼层清空，位置保留（时间线按位置决定状态上不上画面，位置回到 0 会让空状态上不去）
+      setLoops((current) => ({ byProject: {}, position: current.position }));
       return;
     }
     const open = key.split(",");
@@ -111,8 +105,11 @@ function useProjectItems(app: ClientApp, projects: ProjectList | null, at: numbe
       void views.open<ProjectLoopResult>(`home.building.${projectId}`, {
         query: "project.loop",
         params,
-      }, (data) => {
-        setItems((current) => ({ ...current, [projectId]: data.work_items.map(toItemRow) }));
+      }, (data, position) => {
+        setLoops((current) => ({
+          byProject: { ...current.byProject, [projectId]: data },
+          position: Math.max(current.position, position),
+        }));
       });
     }
     return () => {
@@ -121,19 +118,7 @@ function useProjectItems(app: ClientApp, projects: ProjectList | null, at: numbe
       }
     };
   }, [app, key, at]);
-  return items;
-}
-
-/** project.loop 的一行转成建楼用的事项行。 */
-function toItemRow(row: ProjectLoopResult["work_items"][number]): BuildingItemRow {
-  return {
-    work_item_id: row.work_item_id,
-    status: row.status,
-    department: row.department,
-    color_index: row.color_index,
-    recovery_state: row.recovery_state,
-    pending_question: row.pending_question,
-  };
+  return loops;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,9 +130,11 @@ function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigat
   const clockRef = useRef<ReturnType<typeof createRafClock> | null>(null);
   const navigateRef = useRef(props.onNavigate);
   const liveRef = useRef(props.live);
+  const modelRef = useRef(props.model);
   const [error, setError] = useState<string | null>(null);
   navigateRef.current = props.onNavigate;
   liveRef.current = props.live;
+  modelRef.current = props.model;
 
   // 建立画面：PixiJS 的 Application 挂在宿主元素上，时钟与事件流分别订阅
   useEffect(() => {
@@ -172,10 +159,10 @@ function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigat
           return;
         }
         viewRef.current = view;
-        // 端到端测试经这个入口读取楼的当前状态；只在开发构建里暴露
-        if (import.meta.env.DEV) {
-          (window as unknown as { __buildingViewForTest?: BuildingTestHooks }).__buildingViewForTest = buildingTestHooks(view);
-        }
+        // 打开画面：直接显示最新的状态，不补播（查询可能早于画面就绪）
+        view.jump(modelRef.current);
+        // 端到端测试经这个入口读取楼的当前状态（只读的检查入口，与楼层画面的入口同一个做法）
+        (window as unknown as { __buildingViewForTest?: BuildingTestHooks }).__buildingViewForTest = buildingTestHooks(view);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -189,29 +176,37 @@ function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigat
     };
   }, []);
 
-  // 每次查询结果到达：状态以查询为准
+  // 每次查询结果到达：直播交给播放时间线（状态等它之前的动作演完再上画面），回放直接显示那个位置的状态
   useEffect(() => {
-    viewRef.current?.setModel(props.model);
-  }, [props.model]);
+    if (!props.live) viewRef.current?.jump(props.model);
+    else viewRef.current?.setState(props.model);
+  }, [props.model, props.live]);
 
-  // 事件只决定动作的起点（事件流不按项目筛选，事件本身带项目标识）。
+  // 事件只决定动作的起点：事件经翻译层翻成楼的动作（楼的远层动作不按项目筛选，事件本身带项目标识）。
   // 回放期间不按事件流更新画面（设计说明第 4.1 节：客户端不按事件流更新回放的视图）
   useEffect(() => {
     const off = props.app.subscribeEvents((event) => {
       if (!liveRef.current) return;
-      const buildingEvent = buildingEventOf(event);
-      if (buildingEvent) viewRef.current?.playEvent(buildingEvent);
+      for (const action of buildingActions(toBuildingEvent(event))) viewRef.current?.play(action);
     });
     return off;
   }, [props.app]);
 
-  // 重新同步：画面回到查询给出的状态，不补播
+  // 重新同步与标签页从后台切回：清空时间线，直接显示最新状态，不补播（设计说明第 5.2 节）
   useEffect(() => {
-    const off = props.app.subscribeResync(() => {
-      viewRef.current?.setModel(props.model);
-    });
-    return off;
-  }, [props.app, props.model]);
+    const jumpLatest = (): void => {
+      if (modelRef.current) viewRef.current?.jump(modelRef.current);
+    };
+    const off = props.app.subscribeResync(jumpLatest);
+    const onVisible = (): void => {
+      if (document.visibilityState === "visible") jumpLatest();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      off();
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [props.app]);
 
   return (
     <>
@@ -221,10 +216,3 @@ function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigat
   );
 }
 
-/** 事件流里的事件转成楼的画面事件：楼的远层动作不按项目筛选，事件本身带项目标识。 */
-export function buildingEventOf(event: EventObject): PixelFloorEvent | null {
-  if (event.project_id === null) return null;
-  return floorEventOf(event, event.project_id);
-}
-
-export type { Capabilities };

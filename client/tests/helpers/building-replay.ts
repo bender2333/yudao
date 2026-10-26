@@ -3,6 +3,10 @@
 //
 // 录下的调用与状态记录在 tests/fixtures/building/recordings.json，只经 record-building-calls.mjs --write 更新。
 // 这个模块输出比较结果，测试与命令行都调用它。
+//
+// 工单 #955 起画面只收画面合同的状态与动作：录下的 setModel 换成 jump（带一个递增的位置，直接显示那份状态），
+// 状态灯的词按录下的 v10 说法换到画面合同的取值。录制还是 v10 的形状，所以与旧录制的比较会有差异
+// （画面 7 换录制以后恢复）；CI 的客户端单元测试按文件名跳过 pixel-building-replay。
 
 import { createServer } from "vite";
 import react from "@vitejs/plugin-react";
@@ -12,7 +16,6 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BuildingView } from "../../src/renderer/src/pixel/building/view.ts";
 import type { BuildingModel } from "../../src/renderer/src/pixel/world/building.ts";
-import type { PixelFloorEvent } from "../../src/renderer/src/pixel/world/types.ts";
 import type { Clock } from "../../src/renderer/src/pixel/clock.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +65,7 @@ export function loadBuildingRecordings(): BuildingRecordingFile {
 async function driver(input: { ops: RecordedScenario["ops"]; models: BuildingModel[]; sampleMs: number[] }): Promise<{ samples: RecordedSample[]; errors: string[] }> {
   // 驱动在浏览器里执行：这两个模块经开发服务器的绝对路径加载（Vite 在浏览器里提供它们，不能在 Node 里静态 import）
   const P = await import(/* @vite-ignore */ "/src/pixel/building/view.ts" as string) as { createBuildingView: (opts: { host: HTMLElement; clock: Clock }) => Promise<BuildingView> };
+  const tr = await import(/* @vite-ignore */ "/src/translate/building.ts" as string) as typeof import("../../src/renderer/src/translate/building.ts");
   const clockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as { createManualClock: () => Clock & { advance(toMs: number): void } };
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px;z-index:9999;background:#000";
@@ -78,6 +82,18 @@ async function driver(input: { ops: RecordedScenario["ops"]; models: BuildingMod
   console.error = (...a: unknown[]): void => {
     errors.push(a.map(String).join(" "));
     origError.apply(console, a);
+  };
+  // 录下的状态灯是 v10 的说法：换成画面合同的取值（翻译层在真实数据上做同一件事）
+  const SIGN: Record<string, string> = {
+    running: "working",
+    waiting_provider: "waiting_model",
+    waiting_decision: "waiting_user",
+    queued: "queued",
+    waiting_slot: "waiting_slot",
+    waiting_resume: "waiting_resume",
+    interrupted: "interrupted",
+    working: "working",
+    idle: "idle",
   };
   function snapshot(): RecordedSample["state"] {
     const { driver: d, scene } = view.inspect();
@@ -101,11 +117,29 @@ async function driver(input: { ops: RecordedScenario["ops"]; models: BuildingMod
     const frames = Math.max(1, Math.round(ms / 50));
     for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
   };
+  // 录下的调用没有位置：状态与动作按调用顺序给一个递增的位置（画面合同要求带位置）
+  let position = 0;
   for (let i = 0; i < input.ops.length; i++) {
     const op = input.ops[i];
     if (op.op === "mount") continue;
-    if (op.op === "setModel") view.setModel(input.models[op.model as number]);
-    else if (op.op === "playEvent") view.playEvent(op.arg as PixelFloorEvent);
+    position += 1;
+    if (op.op === "setModel") {
+      const recorded = input.models[op.model as number] as unknown as { floors?: Record<string, unknown>[]; show_basement?: boolean };
+      const floors = (recorded.floors ?? []).map((f) => ({ ...f, status: SIGN[String(f.status)] ?? "idle" }));
+      // 状态直接显示（打开画面与跳到最新都是 jump），不补播
+      view.jump({ position, floors, show_basement: Boolean(recorded.show_basement) } as never);
+    } else if (op.op === "playEvent") {
+      const raw = (op.arg ?? {}) as Record<string, unknown>;
+      const ev = {
+        type: String(raw.type ?? ""),
+        position,
+        project_id: (raw.project_id as string) ?? null,
+        department: (raw.department as string) ?? null,
+        work_item_id: (raw.work_item_id as string) ?? null,
+        payload: (raw.payload as Record<string, unknown>) ?? null,
+      };
+      for (const action of tr.buildingActions(ev)) view.play(action);
+    }
     if (op.op === "setModel" || op.op === "playEvent") {
       for (const ms of input.sampleMs) {
         advance(ms);

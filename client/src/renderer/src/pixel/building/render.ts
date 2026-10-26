@@ -1,16 +1,17 @@
-// 首页的楼的画法：把每层的缩小楼层画到 2D 画布上（原型 v10 building.js 的 draw 与 drawFloor、设计说明第 7 节，工单 #178）。
+// 首页的楼的画法：把每层的缩小楼层画到 2D 画布上（原型 v10 building.js 的 draw 与 drawFloor、v13 building.js 的楼、
+// 设计说明第 7 节，工单 #178、#955）。
 //
 // 每层为四个部门房间留了固定的位置：部门房间的灯、房门口的事项小旗、楼层入口的阀门与一盏状态灯；
 // 名牌与状态灯在左侧，通往机房的管线沿右侧竖井下到地下室的位置；楼里每层一个小人。
-// 画法复用已有的画布原语（shapes、char、grid 与 registry），与原型逐行对应。
+// 动作演出来的只有这一层的闪光（关键事实）与撒彩带（采纳），承载事实的通道（状态灯、灯、小旗）只由状态决定。
+// 画法复用已有的画布原语（grid、char 与 registry），与原型逐行对应。
 
-import { bitmapGrid } from "../char.ts";
 import { mix, rgba } from "../grid.ts";
 import { DEPTS, ITEM_COLORS, ITEM_SHADES, PAL } from "../registry.ts";
 import { drawActor, drawBitmap, drawPixelText, drawSign, drawText, fillPixel, fillPixelOutlined } from "../shapes.ts";
 import { BUILDING_STATUS } from "./status-text.ts";
 import type { SceneLike } from "../world/types.ts";
-import { BUILDING_GEO, type BuildingDriver, type BuildingFloor } from "../world/building.ts";
+import { BUILDING_GEO, type BuildingDriver, type BuildingFloor, type FlashColor } from "../world/building.ts";
 
 const { W, ROOF, FH, BASE } = BUILDING_GEO;
 const ROOMS = ["product", "engineering", "quality", "operations"] as const;
@@ -18,10 +19,19 @@ const ROOMS = ["product", "engineering", "quality", "operations"] as const;
 /** 状态灯与状态文字的配色：单独成模块，单元测试才能直接核对这几句话。 */
 export { BUILDING_STATUS } from "./status-text.ts";
 
-/** 每分钟闪烁的状态灯（原型 drawFloor 的判据）。 */
-const BLINK = ["running", "waiting_slot", "waiting_resume"];
+/** 每分钟闪烁的状态灯（原型 drawFloor 的判据）：画面合同的状态灯里正在等的三种。 */
+const BLINK: readonly string[] = ["working", "waiting_slot", "waiting_resume"];
 
-/** 楼的绘制：屋顶、每层的楼层、通往机房的管线、包裹与小人。 */
+/** 闪光的颜色名 → 配色（翻译层写在动作的 color 上，原型 v13 building.js 的 FLASH）。 */
+export const FLASH_COLORS: Record<FlashColor, string> = {
+  white: PAL.white,
+  green: PAL.green2,
+  yellow: PAL.yellow2,
+  red: PAL.red2,
+};
+
+
+/** 楼的绘制：屋顶、每层的楼层、通往机房的管线、小人、这一层的闪光与撒下的彩带。 */
 export class BuildingRenderer {
   private bg: HTMLCanvasElement | null = null;
   private bgKey = "";
@@ -40,7 +50,6 @@ export class BuildingRenderer {
     c.drawImage(this.background(), 0, 0);
     this.driver.model.floors.forEach((f, i) => this.floor(c, f, i, t));
     this.shafts(c);
-    this.packages(c);
     const walkers = this.scene.actors.filter((a) => a.data.walker).sort((p, q) => p.y - q.y);
     for (const a of walkers) drawActor(c, this.scene, a);
     this.particles(c);
@@ -78,10 +87,10 @@ export class BuildingRenderer {
     return cv;
   }
 
-  /** 一层：地板、名牌与状态灯、入口阀门、部门房间的灯与小旗（原型 drawFloor）。 */
+  /** 一层：地板、名牌与状态灯、入口阀门、部门房间的灯与小旗、这一层的闪光（原型 drawFloor）。 */
   private floor(c: CanvasRenderingContext2D, f: BuildingFloor, i: number, t: number): void {
     const y = ROOF + i * FH;
-    const st = BUILDING_STATUS[f.status] ?? BUILDING_STATUS.idle;
+    const st = BUILDING_STATUS[f.status];
     fillPixel(c, 12, y, W - 24, FH, "#e8e0cc");
     fillPixel(c, 12, y + FH - 14, W - 24, 14, "#c9a77a");
     for (let x = 12; x < W - 12; x += 10) fillPixel(c, x, y + FH - 14, 1, 14, "#b8966a");
@@ -127,6 +136,13 @@ export class BuildingRenderer {
       });
       if (k < 3 && (!f.has_ops ? k < 2 : true)) fillPixel(c, x + 80, y + 26, 16, 3, PAL.glass2);
     });
+    // 这一层的闪光：关键事实时闪一下（颜色写在动作里），采纳时闪绿光并撒彩带（原型 v13 drawFloor 的 flashes）
+    const flash = this.driver.flashOf(f.project_id);
+    if (flash) {
+      const left = Math.max(0, flash.until - this.scene.realT);
+      c.fillStyle = rgba(FLASH_COLORS[flash.color], Math.min(0.3, (left / 1200) * 0.3));
+      c.fillRect(12, y + 2, W - 24, FH - 2);
+    }
   }
 
   /** 通往机房的管线：从这一层的出口横着走到右侧竖井，再沿竖井下到地下室的位置（原型 drawFloor 的管线出口）。 */
@@ -151,17 +167,6 @@ export class BuildingRenderer {
     }
   }
 
-  /** 包裹沿管线走（原型 drawPackages）。 */
-  private packages(c: CanvasRenderingContext2D): void {
-    for (const pk of Object.values(this.driver.world.packages)) {
-      const pos = pk.transit?.pos;
-      if (!pos) continue;
-      const name = pk.bmp ?? "box_sealed";
-      const b = bitmapGrid(name);
-      drawBitmap(c, name, Math.round(pos[0] - b.w / 2), Math.round(pos[1] - b.h / 2));
-    }
-  }
-
   private particles(c: CanvasRenderingContext2D): void {
     for (const p of this.scene.particles) {
       const k = 1 - p.age / p.life;
@@ -181,3 +186,4 @@ export class BuildingRenderer {
 
 /** 每个项目的管线颜色：取项目在楼中的序号（原型 building.js 的 LINK_COLORS）。 */
 export const LINK_COLORS = ["#e8505b", "#3fc1e8", "#8fd14f", "#f7c948", "#f27ec2", "#b98558"];
+
