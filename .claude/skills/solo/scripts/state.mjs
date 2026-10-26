@@ -155,7 +155,7 @@ export function parseTasksText(text) {
         issue: issueMatch ? Number(issueMatch[1]) : null,
         status,
         blocked: waiting,
-        exclusive: /touches-core|@exclusive/i.test(body),
+        exclusive: /@exclusive/i.test(body),
         after: parseAfter(body),
         text: body,
         lineNo: index + 1,

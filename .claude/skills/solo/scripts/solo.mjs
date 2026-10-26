@@ -569,7 +569,7 @@ function reconcile(loop, scope, issues, args) {
     recount(loop);
     saveLedger(loop);
     const lines = ['## 范围重算（编排者）', ''];
-    for (const a of added) lines.push('- 收进台账 ' + a.id + '（#' + a.issue + '）' + (a.exclusive ? ' [互斥]' : '') + '：' + a.title);
+    for (const a of added) lines.push('- 收进台账 ' + a.id + '（#' + a.issue + '）' + (a.exclusive ? ' [touches-core]' : '') + '：' + a.title);
     for (const l of left) lines.push('- 离开范围 ' + l.task + '（#' + l.issue + '）：不再派，台账保留');
     for (const b of back) lines.push('- 回到范围 ' + b.task + '（#' + b.issue + '）：重新可以派');
     appendText(loop, lines.join('\n'));
