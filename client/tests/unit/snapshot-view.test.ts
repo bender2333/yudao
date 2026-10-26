@@ -52,6 +52,7 @@ test("读取失败时把原因带出来：界面据此说「读不出来」而�
 test("交出的位置等于这份数据来自的快照的位置，重新查询以后跟着更新", () => {
   // 工单 #952 验收标准 1：同一处视图的重新查询由视图同步发出，新快照到达时带上新的位置；
   // 这里核对页面拿到的位置随快照走，而不是停在第一次读取的位置
+  // 守第 13 节的 R2（各缝的交换字段：同步层交给页面的快照位置）
   const first = { data: { count: 1 }, loading: false, error: null, key: KEY, position: 12 };
   assert.equal(snapshotView(first, KEY, false).position, 12);
   const refreshed = { data: { count: 2 }, loading: false, error: null, key: KEY, position: 15 };
