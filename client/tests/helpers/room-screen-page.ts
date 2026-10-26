@@ -40,13 +40,14 @@ export interface RoomSwitchReport {
 export function roomWorkspaceFixture(department: string): RoomWorkspaceFixture {
   const recording = loadRoomRecordings();
   const scenario = recording.scenarios.find((s) => s.department === department);
-  const room = scenario?.ops.find((op) => op.op === "setModel")?.arg;
-  if (!scenario || !room) {
-    throw new Error(`录下的场景里没有部门 ${department} 的房间模型`);
-  }
-  // 录下的是驱动收到的房间模型，与查询结果里的房间数据同一个类型；查询结果的其余字段
-  // 房间组件不读，这里不填
-  return { department, room } as unknown as DepartmentWorkspaceResult;
+  if (!scenario) throw new Error(`录下的场景里没有部门 ${department} 的房间查询结果`);
+  // 录制里存 DEPARTMENT.workspace 的查询结果（带快照位置）：房间组件读它的 department 与 room 两个字段
+  const workspace = scenario.ops.find((op) => op.op === "workspace" && op.arg !== null && op.arg !== undefined);
+  if (workspace) return workspace.arg as RoomWorkspaceFixture;
+  // 换录制之前的格式只存房间模型（v11 的 setModel）：部门与模型拼成查询结果的形状，房间组件同样只读这两个字段
+  const model = scenario.ops.find((op) => op.op === "setModel")?.arg;
+  if (!model) throw new Error(`录下的场景里没有部门 ${department} 的房间数据`);
+  return { department, room: model } as unknown as DepartmentWorkspaceResult;
 }
 
 /** 数据从空到有的存活观测：挂载计数与画面容器节点在前后两步是否同一个 DOM 节点。 */

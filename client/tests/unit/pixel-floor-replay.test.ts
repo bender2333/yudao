@@ -1,29 +1,23 @@
-// 楼层画面的回放核对（工单 #82 验收标准 2）：把原型录下的 19 个场景的调用序列送进客户端的画面，
-// 在每个事件之后的固定时刻比较状态：每个角色的任务、姿势与头顶的话，每个包裹的去向，
-// 每根管道的状态与各个信号。录下的调用与状态在 tests/fixtures/floor/recordings.json。
+// 楼层画面的回放核对（工单 #957 验收标准 2）：把原型 v13 的页面上录下的调用送进客户端的画面，
+// 静置到时间线放空（最后一个检查点），与 v13 的画面逐像素、逐个小人比较。
 //
-// 这个测试需要浏览器（客户端的画面用 PixiJS 画），用 Playwright 的 Chromium 与 Vite 的开发服务器；
-// 只经 record-floor-calls.mjs --write 更新录制。
+// 录下的调用序列与事件在 tests/fixtures/floor/recordings.json（由 client/scripts/record-floor-calls.mjs
+// 从 docs/prototypes/v13 录制）。这个测试需要浏览器（客户端与原型两边的画面都画在画布上），
+// 回放测试不进 CI：按 AGENTS.md「执行者」，用 `node --test tests/unit/pixel-floor-replay.test.ts` 单独运行。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadRecordings, replayAll } from "../helpers/floor-replay.ts";
 
-// ADR-0038 与 docs/prototypes/CHANGELOG.md 待办：v10 原型中录下的「待核实」状态在真实系统中不再实现，
-// 回放测试里这些状态不再出现（sc-metro-ask、sc-metro-compact、sc-metro-unknown、sc-metro-offline、sc-metro-queue）
-const PENDING_VERIFICATION_SCENARIOS = [
-  "sc-metro-ask",
-  "sc-metro-compact",
-  "sc-metro-unknown",
-  "sc-metro-offline",
-  "sc-metro-queue",
-];
-
-test("回放：录下的调用序列送进客户端的画面零错误，状态与原型的记录相同", async () => {
+test("录制来自原型 v13：不加 --write 时与提交的录制相同", () => {
   const recording = loadRecordings();
+  assert.match(recording.generatedFrom, /docs\/prototypes\/v13/, `录制的来源：${recording.generatedFrom}`);
   assert.ok(recording.scenarios.length >= 18, `录下的场景 ${recording.scenarios.length} 个`);
-  const results = await replayAll({ exclude: PENDING_VERIFICATION_SCENARIOS });
+});
+
+test("回放：每段录制的最后一个检查点与原型 v13 逐像素、逐个小人相同", async () => {
+  const results = await replayAll();
   const failed = results.filter((r) => r.mismatches.length > 0 || r.clientErrors.length > 0);
   const detail = failed.map((r) => `${r.scenario}：\n  ${[...r.mismatches.slice(0, 6), ...r.clientErrors.slice(0, 3)].join("\n  ")}`).join("\n");
-  assert.deepEqual(failed.map((r) => r.scenario), [], `回放不一致：\n${detail}`);
+  assert.deepEqual(failed.map((r) => r.scenario), [], `回放与原型 v13 不一致：\n${detail}`);
 });

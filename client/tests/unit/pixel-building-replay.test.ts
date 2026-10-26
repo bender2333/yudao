@@ -1,17 +1,22 @@
-// 首页楼的回放核对（工单 #178 验收标准 2）：把原型录下的 sc-return-home 调用序列送进客户端的楼画面，
-// 按录下的固定时刻取状态，与原型录下的状态逐项比较：每层的灯、小旗、阀门、状态灯与决定计数，以及每层小人的位置、姿势与朝向。
+// 首页楼的回放核对（工单 #957 验收标准 2）：把原型 v13 的页面上录下的 sc-return-home 调用送进客户端的楼画面，
+// 静置到时间线放空（最后一个检查点），与 v13 的画面逐像素、逐个小人比较。
 //
-// 录下的调用与状态记录在 tests/fixtures/building/recordings.json，只经
-// client/scripts/record-building-calls.mjs --write 更新。
+// 录下的调用序列在 tests/fixtures/building/recordings.json（由 client/scripts/record-building-calls.mjs
+// 从 docs/prototypes/v13 录制）。这个测试需要浏览器；回放测试不进 CI：
+// 用 `node --test tests/unit/pixel-building-replay.test.ts` 单独运行。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { loadBuildingRecordings, replayBuildingAll } from "../helpers/building-replay.ts";
 
-test("首页的楼：录下的 sc-return-home 调用序列送进客户端，状态与原型的记录逐项相同，控制台零错误", async () => {
+test("录制来自原型 v13：不加 --write 时与提交的录制相同", () => {
   const recording = loadBuildingRecordings();
+  assert.match(recording.generatedFrom, /docs\/prototypes\/v13/, `录制的来源：${recording.generatedFrom}`);
   assert.ok(recording.scenarios.length >= 1, "录制里应有首页楼的场景");
+});
+
+test("首页的楼：最后一个检查点与原型 v13 逐像素、逐个小人相同", async () => {
   const results = await replayBuildingAll();
   const failed = results.filter((r) => r.mismatches.length > 0 || r.clientErrors.length > 0);
   assert.deepEqual(
