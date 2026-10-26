@@ -1,14 +1,38 @@
-// 首页楼的端到端测试（工单 #178 验收标准 3、4）：Playwright 打开 Chromium 页面，页面由 FakeAdapter 驱动的真实服务提供。
-// 覆盖：两个项目（一个运行中、一个空闲）各画一层，楼层的灯与状态灯随事件变化；置顶以后楼层顺序改变；
-// 点击楼层进入对应项目的概览；1440×900 与 1920×1080 两种窗口尺寸下控制台错误为零。
+// 首页楼的端到端测试（工单 #178 验收标准 3、4，工单 #955 验收标准 3、5）：
+// Playwright 打开 Chromium 页面，页面由 FakeAdapter 驱动的真实服务提供（页面是构建产物）。
+// 覆盖：两个项目（一个运行中、一个空闲）各画一层，楼层的灯与状态灯随查询变化；状态词只出现画面合同的八个取值；
+// 置顶以后楼层顺序改变；点击楼层进入对应项目的概览；打开画面与标签页从后台切回时画面直接显示最新状态、
+// 不补播（与重新同步同一条 jump）；1440×900 与 1920×1080 两种窗口尺寸下控制台错误为零。
 //
-// 观测方式：楼层的文字列表（与画面同一份数据）读每层的名称、状态与亮灯部门；导航读页面的 hash 与概览页的标题。
+// 观测方式：楼层的文字列表（与画面同一份数据）读每层的名称、状态与亮灯部门；画面自己的读数经
+// __buildingViewForTest（每层、每层小人与播放时间线）读；导航读页面的 hash 与概览页的标题。
+// 截图只在本机留证据时写（环境变量 YUDAO_SHOTS 给出目录），CI 里不写文件。
 
 import { expect, test, type Page } from "@playwright/test";
+import { join } from "node:path";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
 const IDLE = "示例项目";
 const RUNNING = "文本工具";
+
+/** 画面合同的八个状态灯（像素 5 只出现这几个词；服务端的说法不上海画面）。 */
+const FLOOR_SIGN_TEXT = ["运行中", "排队中", "等待执行槽位", "等待模型服务", "待恢复", "等待你的决定", "中断", "空闲"];
+
+/** 本机留证据时的截图目录（交付说明里列路径）；CI 里不设，不写文件。 */
+const SHOTS = process.env.YUDAO_SHOTS ?? "";
+
+async function shot(page: Page, name: string): Promise<void> {
+  if (!SHOTS) return;
+  await page.screenshot({ path: join(SHOTS, name) });
+}
+
+interface BuildingTimeline {
+  shown: number | null;
+  pending: number;
+  lag: number;
+  queued: number;
+  playing: string[];
+}
 
 let backend: Backend;
 
@@ -83,8 +107,16 @@ async function floors(page: Page): Promise<{ name: string; status: string; lit: 
   }));
 }
 
-/** 等某个条件成立（页面按事件流自动重查询，不刷新页面）。 */
+/** 画面自己的读数：播放时间线此刻的位置、排着的状态与在演的动作。 */
+async function timeline(page: Page): Promise<BuildingTimeline> {
+  return page.evaluate(() => {
+    const hooks = (window as unknown as { __buildingViewForTest?: { timeline: () => BuildingTimeline } }).__buildingViewForTest;
+    if (!hooks) throw new Error("页面没有楼画面的读取入口");
+    return hooks.timeline();
+  });
+}
 
+/** 等某个条件成立（页面按事件流自动重查询，不刷新页面）。 */
 async function waitUntil(check: () => Promise<boolean>, description: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -95,6 +127,7 @@ async function waitUntil(check: () => Promise<boolean>, description: string, tim
     await promise;
   }
 }
+
 // 用户主动停止的事项：部门页写「已停止」，首页楼层写「空闲」（工单 #734：楼层只由未结束的事项决定，
 // 被停止、已采纳与放行未定的事项不参与）。停止会改变服务端状态（run 以 cancelled 结束），
 // 因此这条用例用自己的一份后端，结束以后停掉，共用的那份不受影响
@@ -146,6 +179,7 @@ test("用户停止的事项：部门页写「已停止」，首页楼层写「�
       expect(floor?.status).not.toContain("中断");
       // 空闲的一层：此刻没有部门在工作
       expect(floor?.lit).toBe("没有部门在工作");
+      await shot(page, "955-home-stopped.png");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
@@ -173,6 +207,11 @@ test("楼里每个项目一层，运行中的一层亮起工作部门，空闲�
     expect(names).toContain(IDLE);
     expect(names).toContain(RUNNING);
 
+    // 状态词只出现画面合同的八个（翻译层翻好的取值，服务端的 in_progress、waiting_provider 这类说法不上画面）
+    for (const floor of list) {
+      expect(FLOOR_SIGN_TEXT).toContain(floor.status);
+    }
+
     // 空闲的一层：状态为空闲，没有部门在工作
     const idle = list.find((f) => f.name === IDLE);
     expect(idle?.status).toBe("空闲");
@@ -183,6 +222,68 @@ test("楼里每个项目一层，运行中的一层亮起工作部门，空闲�
     expect(running?.status).not.toBe("空闲");
     expect(running?.lit).toMatch(/在工作$/);
 
+    // 画布确实画出了楼：取画布上的像素，颜色不止一种（空白画布只有一种颜色）。
+    // 不用 toHaveScreenshot 基线：跨机器字体会让它变成不稳定测试。
+    const colors = await page.locator(".building-canvas canvas").evaluate((el) => {
+      const canvas = el as HTMLCanvasElement;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return 0;
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const seen = new Set<string>();
+      for (let i = 0; i < data.length; i += 4 * 97) seen.add(`${data[i]},${data[i + 1]},${data[i + 2]}`);
+      return seen.size;
+    });
+    expect(colors).toBeGreaterThan(8);
+    await shot(page, "955-home-building.png");
+
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
+test("打开画面与标签页从后台切回：直接显示最新状态，不补播", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    await page.evaluate(() => { window.location.hash = "#/home"; });
+    await waitUntil(async () => (await floors(page)).length >= 2, "楼里出现至少两层");
+    // 打开画面时状态直接显示（jump）：时间线上的位置就是查询给出的位置，没有排着的状态。
+    // 建立画面以后到达的事件照演（设计说明第 5.2 节「迟到的动作」），所以这里不要求此刻没有在演的动作。
+    await waitUntil(async () => {
+      const info = await timeline(page);
+      return (info.shown ?? 0) > 0 && info.pending === 0;
+    }, "画面显示了一份状态，没有排着的状态");
+    const opened = await timeline(page);
+    expect(opened.pending).toBe(0);
+    // 积下的动作演完以后时间线放空，一层状态的画面不再被动作挡住
+    await waitUntil(async () => (await timeline(page)).playing.length === 0, "积下的动作演完");
+
+    // 标签页从后台切回：清空时间线，直接显示最新状态，不补播（与打开画面、重新同步走同一个 jump）。
+    // 在页面里同一步里派发事件再读，读到的是 jump 之后、下一帧之前的时间线。
+    const afterVisible = await page.evaluate(() => {
+      const hooks = (window as unknown as { __buildingViewForTest?: { timeline: () => BuildingTimeline } }).__buildingViewForTest;
+      if (!hooks) throw new Error("页面没有楼画面的读取入口");
+      Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+      return hooks.timeline();
+    });
+    expect(afterVisible.pending).toBe(0);
+    expect(afterVisible.playing).toEqual([]);
+    expect(afterVisible.shown).not.toBeNull();
+
+    // 重新打开页面（重新同步与打开画面是同一条 jump）：楼的层次与状态再次按查询给出
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "全部项目与机器", exact: true })).toBeVisible();
+    await waitUntil(async () => (await floors(page)).length >= 2, "重新打开以后楼里仍有至少两层");
+    await waitUntil(async () => {
+      const info = await timeline(page);
+      return (info.shown ?? 0) > 0 && info.pending === 0;
+    }, "重新打开以后画面显示了一份状态");
+    const reopened = await timeline(page);
+    expect(reopened.pending).toBe(0);
+    await shot(page, "955-home-reopened.png");
     expect(errors).toEqual([]);
   } finally {
     await client.close();
@@ -252,6 +353,7 @@ test.describe("宽屏", () => {
         return root.scrollWidth - root.clientWidth;
       });
       expect(overflow).toBeLessThanOrEqual(1);
+      await shot(page, "955-home-wide-1920x1080.png");
       expect(errors).toEqual([]);
     } finally {
       await client.close();

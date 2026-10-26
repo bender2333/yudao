@@ -1,25 +1,37 @@
-// 首页的楼的世界与系统（原型 v10 building.js 的 createBuildingScene、设计说明第 7 节「楼」，工单 #178）。
+// 首页的楼的世界与系统（原型 v10 building.js 的 createBuildingScene、原型 v13 building.js 的楼、
+// 设计说明第 7 节「楼」，工单 #178、#955）。
 //
 // 每个项目一层，画成缩小的项目楼层：部门房间的灯、事项的小旗、楼层入口的阀门与一盏状态灯；
 // 楼里每层一个小人（角色实体，没有房间），走位与待机由 world/characters.ts 的 stepCharacters 推进；
 // 每个用着机器的项目一根通往机房的管线（管道实体，沿右侧竖井下到地下室）。
 //
+// 楼的状态来自画面合同（pixel/contract.ts 的 BuildingState）加上画面上还要用的几个字段（名牌、灯、小旗、
+// 阀门、决定计数）：世界与系统不导入 api/generated 里的服务端类型，服务端的说法只出现在翻译层
+// （translate/building.ts，工单 #955）。
+//
+// 什么时候演由播放时间线决定（pixel/timeline.ts）：动作按级别与声明时长进来（pixel/building/building-decl.ts），
+// 楼里的动作都是闪光与彩带、不占参与方，开始演的同时就算演完；状态等它之前的动作演完再上画面，
+// jump 清空时间线直接显示（打开、重新同步、标签页切回）。
+//
 // 世界与系统不依赖渲染与 PixiJS，可以直接在 node --test 下驱动：#82 的角色、包裹与管道机制
 // 在这里被复用，本模块只补「每层一个小人、每层一根竖井管道」的驱动与「楼层数据」的形状。
 
-import { sendPackage, spawnPackage, stepCharacters, stepPackages, stepPipes } from "./characters.ts";
-import { createWorld, declareLinks, polyLength } from "./declare.ts";
+import type { BuildingFloor as ContractFloor, BuildingState, FloorSign, PixelAction } from "../contract.ts";
+import { create as createTimeline, type Timeline, type TimelineEntry, type TimelineInspect } from "../timeline.ts";
+import { BUILDING_KINDS } from "../building/building-decl.ts";
+import { stepCharacters, stepPipes } from "./characters.ts";
+import { createWorld, declareLinks } from "./declare.ts";
 import type { Catalog, Character, Pipe, SceneLike, World } from "./types.ts";
 
 /** 楼的一层：一个项目的缩小楼层（原型 building.js 的 floor 数据与 scenes.js 的 buildingModels）。 */
-export interface BuildingFloor {
+export interface BuildingFloor extends ContractFloor {
   project_id: string;
   name: string;
-  /** 楼层的状态灯：运行中、排队中、等待执行槽位、等待模型服务、待恢复、等待你的决定、中断、空闲。 */
-  status: string;
+  /** 楼层的状态灯：画面合同 FLOOR_SIGNS 的取值（翻译层翻好）。 */
+  status: FloorSign;
   /** 四个部门房间的灯：亮灯表示该部门正在工作。 */
   lit: { product: boolean; engineering: boolean; quality: boolean; operations: boolean };
-  /** 有没有运维（机房与运行环境）。 */
+  /** 有没有运维（机房与运行环境）：客户端没有，属于 3.2C。 */
   has_ops: boolean;
   /** 事项的小旗：在本层房间里的事项，按部门挂在房门口。 */
   flags: { work_item_id: string; color_index: number; department: string }[];
@@ -33,23 +45,51 @@ export interface BuildingFloor {
   decisions: number;
 }
 
-/** 楼的画面数据（原型 building.js 的 model）。 */
-export interface BuildingModel {
+/** 楼的画面数据：画面合同的楼的状态（带位置）加上画面要用的几个字段。 */
+export interface BuildingModel extends Omit<BuildingState, "floors"> {
+  /** 来自的查询快照的位置（时间线按它决定状态什么时候上画面）。 */
+  position: number;
   floors: BuildingFloor[];
-  /** 底部是否留出地下室的位置（机房由 #117 实现）。 */
+  /** 底部是否留出地下室的位置（机房属于 3.2C，现在不画）。 */
   show_basement: boolean;
 }
 
-/** 楼的世界与系统：世界、场景、每层的走位驱动与竖井管道的发送。 */
+/** 没有数据时的空状态：带位置 0，一层也没有。 */
+export function emptyBuildingModel(): BuildingModel {
+  return { position: 0, floors: [], show_basement: false };
+}
+
+/** 楼里闪光的颜色名（翻译层写在动作的 color 上，画面层按名字取配色）。 */
+export const FLASH_COLOR_NAMES = ["white", "green", "yellow", "red"] as const;
+export type FlashColor = (typeof FLASH_COLOR_NAMES)[number];
+
+/** 动作里的颜色名；不在表里的按白光画（翻译层只给这几种）。 */
+export function flashColorOf(value: unknown): FlashColor {
+  return typeof value === "string" && (FLASH_COLOR_NAMES as readonly string[]).includes(value) ? (value as FlashColor) : "white";
+}
+
+/** 一层的闪光：颜色与持续到哪个时刻（楼里的动作只在这些地方看得见）。 */
+export interface FloorFlash {
+  color: FlashColor;
+  until: number;
+}
+
+/** 楼的世界与系统：世界、场景、每层的走位驱动与播放时间线。 */
 export interface BuildingDriver {
   world: World;
   model: BuildingModel;
-  /** 重新按快照配置世界：新增或去掉楼层、同步每层的小人、重声明竖井管道。 */
-  setModel(model: BuildingModel): void;
-  /** 远程动作与部署、回滚的包裹沿这一层通往机房的管线走（出去往下，回滚与回执往上）。 */
-  sendOnShaft(projectId: string, bmp: string, up: boolean): void;
-  /** 推进一帧：每层小人的走位、竖井管道与包裹。 */
+  /** 一份状态：等它之前的动作演完再上画面（由播放时间线决定）。 */
+  setState(state: BuildingModel): void;
+  /** 跳到最新：清空时间线，正在演的立刻结束，直接显示给出的状态，不补播。 */
+  jump(state: BuildingModel): void;
+  /** 一个动作：进播放时间线，按声明演出。 */
+  play(action: PixelAction): void;
+  /** 推进一帧：时间线、每层小人的走位、竖井管道与包裹。 */
   step(): void;
+  /** 时间线此刻的读数（状态的位置、排着的状态、在演的动作）。 */
+  inspectTimeline(): TimelineInspect;
+  /** 一层此刻的闪光；没有闪光时为 null。 */
+  flashOf(projectId: string): FloorFlash | null;
 }
 
 /** 楼里小人的速度：走到门口 40 像素/秒、随机走动 22 像素/秒（原型 building.js 的 SPEED_WORK/SPEED_ROAM）。 */
@@ -77,10 +117,12 @@ interface BuildingDriverOptions {
   random: () => number;
 }
 
-/** 建立一个楼驱动：世界与走位都在这里维护，画面渲染只读这里给出的世界与模型。 */
+/** 建立一个楼驱动：世界、走位与播放时间线都在这里维护，画面渲染只读这里给出的世界与模型。 */
 export function createBuildingDriver(opts: BuildingDriverOptions): BuildingDriver {
   const world = createWorld(opts.catalog);
   const modelRef: { model: BuildingModel } = { model: opts.model };
+  // 每层此刻的闪光（原型 building.js 的 flashes）：颜色名与持续到的时刻
+  const flashes: Record<string, FloorFlash> = {};
 
   const floorY = (i: number): number => BUILDING_GEO.ROOF + i * BUILDING_GEO.FH;
   const roomX = (k: number): number => 150 + k * 96;
@@ -140,6 +182,10 @@ export function createBuildingDriver(opts: BuildingDriverOptions): BuildingDrive
       actor.y = y;
       world.characters[f.project_id].spot.y = y;
     });
+    // 不再显示的楼层，闪光也一并清掉
+    for (const pid of Object.keys(flashes)) {
+      if (!modelRef.model.floors.some((f) => f.project_id === pid)) delete flashes[pid];
+    }
   }
 
   /** 通往机房的竖井管道：从这一层的出口横着走到右侧竖井，再沿竖井下到地下室的位置。 */
@@ -189,34 +235,81 @@ export function createBuildingDriver(opts: BuildingDriverOptions): BuildingDrive
     });
   }
 
+  /** 状态上画面：重新按快照配置世界（新增或去掉楼层、同步每层的小人、重声明竖井管道）。 */
+  function applyModel(model: BuildingModel): void {
+    modelRef.model = model;
+    declareShafts();
+    syncWalkers();
+  }
+
+  /** 楼的动作：这一层闪一下（颜色写在动作里），采纳时撒彩带（画面层按绿光画）。 */
+  function perform(action: PixelAction, ms: number): void {
+    const project = typeof action.project === "string" ? action.project : null;
+    if (!project) return;
+    if (action.kind === "floor_flash" || action.kind === "celebrate") {
+      const color: FlashColor = action.kind === "celebrate" ? "green" : flashColorOf(action.color);
+      flashes[project] = { color, until: opts.scene.realT + ms };
+    }
+    if (action.kind === "celebrate") {
+      const i = modelRef.model.floors.findIndex((f) => f.project_id === project);
+      if (i >= 0) opts.scene.emit("confetti", BUILDING_GEO.W / 2, floorY(i), 24, { spread: 400 });
+    }
+  }
+
+  // 播放时间线：排队的规则只在 pixel/timeline.ts；楼里的动作不占参与方，开始演的同时就算演完
+  const tl: Timeline = createTimeline({
+    clock: () => opts.scene.realT,
+    classify(action) {
+      const decl = BUILDING_KINDS[action.kind];
+      if (!decl) throw new Error("楼的声明表里没有这种动作：" + action.kind);
+      return { tier: decl.tier, ms: decl.ms, lanes: [] };
+    },
+    begin(entry: TimelineEntry) {
+      perform(entry.action, entry.ms);
+      tl.done(entry.id);
+    },
+    cut() {
+      // 楼里的动作一进来就演完，没有可以立刻结束的部分
+    },
+    apply(state) {
+      applyModel(state as unknown as BuildingModel);
+    },
+    progress() {
+      throw new Error("楼里没有进度一级的动作");
+    },
+  });
+
+  function setState(state: BuildingModel): void {
+    tl.state(state);
+  }
+
+  function jump(state: BuildingModel): void {
+    tl.jump(state);
+  }
+
+  function play(action: PixelAction): void {
+    tl.push(action);
+  }
+
   const driver: BuildingDriver = {
     world,
     get model() {
       return modelRef.model;
     },
-    setModel(model) {
-      modelRef.model = model;
-      declareShafts();
-      syncWalkers();
-    },
-    sendOnShaft(projectId, bmp, up) {
-      const link = world.links[`floor:${projectId}>basement`];
-      if (!link || opts.scene.reduced) return;
-      const id = `pk-${projectId}-${Math.round(opts.scene.realT)}-${up ? "up" : "down"}`;
-      spawnPackage(world, id, null, null, null, null);
-      const pk = world.packages[id];
-      pk.bmp = bmp;
-      const pts = up ? link.pts.slice().reverse() : link.pts;
-      sendPackage(world, opts.scene, id, link.id, pts, Math.max(700, polyLength(pts) * 9), () => {
-        delete world.packages[id];
-      });
-    },
+    setState,
+    jump,
+    play,
     step() {
+      tl.tick();
       updateWalkers();
       // 楼里的小人没有房间，queue 恒为空，走位与待机由 stepCharacters 推进
       stepCharacters(world, opts.scene);
       stepPipes(world, opts.scene, shaftState);
-      stepPackages(world, opts.scene);
+    },
+    inspectTimeline: () => tl.inspect(),
+    flashOf: (projectId) => {
+      const flash = flashes[projectId];
+      return flash && flash.until > opts.scene.realT ? flash : null;
     },
   };
 
@@ -247,3 +340,5 @@ export function buildingWalkerState(world: World, scene: SceneLike): { id: strin
     };
   });
 }
+
+
