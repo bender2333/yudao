@@ -7,6 +7,7 @@
  *   - PreToolUse：拒绝写 `.ralph/**`（账本只由命令改）、拒绝 task_append（会复用上下文），
  *     并发超了给出提醒。
  *   - Stop：循环还在跑、还有活、无人值守开着时，把会话叫回来接着做。
+ *   - 账本 `waitMode` 是 `notify`（靠宿主通知收账，如 DSH）时不参与接管：SessionStart 与 Stop 直接返回。
  *
  * 任何异常都 fail open：Hook 不能把宿主会话弄坏。
  * 每条事件的输出都只写 stdout，一行 JSON。
@@ -103,6 +104,8 @@ function readStdin() {
 function onSessionStart(input) {
   const loop = loadState(input);
   if (!loop) return;
+  // 收账靠宿主通知的循环（DSH 等 `resume --wait notify`）不参与接管：不认领租约，也不提示。
+  if (loop.state.waitMode === 'notify') return;
   if (loop.status !== 'running' && loop.status !== 'paused') return;
   const sessionId = typeof input.session_id === 'string' ? input.session_id : '';
   const other = claimOwnership(loop, sessionId);
@@ -226,6 +229,8 @@ function onSubagentStop(input) {
 function onStop(input) {
   const loop = loadState(input);
   if (!loop || !isLive(loop)) return;
+  // 收账靠宿主通知的循环（DSH 等 `resume --wait notify`）不参与接管：不认领租约，也不拦停。
+  if (loop.state.waitMode === 'notify') return;
   if (loop.state.autoContinue !== true) return;
 
   const mySession = typeof input.session_id === 'string' ? input.session_id : '';
