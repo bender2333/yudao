@@ -14,10 +14,9 @@ import {
   action as checkAction, floorState as checkFloorState, type BusyState, type ItemState, type PixelAction, type PixelState,
 } from "../contract.ts";
 import { create as createTimeline, type Timeline, type TimelineEntry, type TimelineInspect } from "../timeline.ts";
-import { asText, dispatch, dropAction, enqueue, nextPackageId, progressOf, sendPackage, spawnPackage, stepCharacters, stepPackages, stepPipes } from "./characters.ts";
+import { asText, dispatch, dropAction, enqueue, nextPackageId, progressOf, sayMs, sendPackage, spawnPackage, stepCharacters, stepPackages, stepPipes } from "./characters.ts";
 import { declareLinks, declareRooms, linkBetween, route, roomOf } from "./declare.ts";
 import { actorOf, charFor, primaryOf, syncCharacters, mountMachines } from "./scene.ts";
-import { sayMs } from "./say.ts";
 import { signal, signalOn } from "./signals.ts";
 import type {
   Catalog, Character, DecisionFace, DeclContext, FloorModel, LoopItem, PackageVisual, SceneLike, Task, TaskDef, TaskFx, World,

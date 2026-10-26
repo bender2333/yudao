@@ -8,7 +8,7 @@
 // 说话的内容由翻译层写在动作的 say 与 sayTo 上，这里只管演。
 
 import { createScene } from "../world/scene.ts";
-import { sayMs } from "../world/say.ts";
+import { sayMs } from "../world/characters.ts";
 import { PAL } from "../registry.ts";
 import { hash } from "../anims.ts";
 import { headTop } from "../shapes.ts";

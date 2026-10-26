@@ -5,7 +5,7 @@
 // 楼层的数据形状就是画面合同的楼层状态（pixel/contract.ts 的 FloorState）加上画面上还要用的几个字段
 // （执行槽位、运维、机器、决定卡片）：世界与系统不导入 api/generated 里的服务端类型（工单 #953）。
 
-import type { FloorItem, FloorState, RoleState } from "../contract.ts";
+import type { FloorModel, LoopItem, RoleInfo, WaitingProvider } from "../contract.ts";
 
 /** 任务里的命名位置（原型 floor-decl.js 的 spot 字段）。 */
 export type SpotKind =
@@ -342,105 +342,12 @@ export interface Bubble {
 }
 
 // ---------------------------------------------------------------------------
-// 画面数据：楼层驱动拿到的画面合同的楼层状态（pixel/contract.ts 的 FloorState）加上画面要用的几个字段。
-// 服务端的说法（状态词、查询名与事件种类）只出现在翻译层（translate/floor.ts），这里只有画面的说法。
-
-export interface RoleInfo {
-  id: string;
-  name: string;
-  kind: string;
-  /** 角色的状态（画面合同的取值，翻译层翻好）。 */
-  status: RoleState;
-  task?: string | null;
-}
-
-/**
- * 楼层上的一个事项：画面合同的事项（id、状态、各部门在这个事项上的状态、来源）加上画面上还要画的几个字段
- * （标题、颜色、轮次与用时）。状态是画面合同的取值（working、waiting_model 等），不是服务端的说法。
- */
-export interface LoopItem extends FloorItem {
-  /** 事项的标识；画面上按它找包裹与队列位置（与 id 相同）。 */
-  work_item_id: string;
-  kind: string;
-  sign: string;
-  color_index: number;
-  department: string | null;
-  round: number;
-  started_at?: string | null;
-  elapsed_sec: number | null;
-  time_limit_sec: number;
-  /** 排队位置与等待模型服务的时间（原型示例数据里有）。 */
-  queue_pos?: number;
-  waiting_provider_sec?: number;
-  url?: string;
-}
-
-export interface WaitingProvider {
-  department: string;
-  /** 已经写好的重试文字（例如「12:30 重试」）。 */
-  retry_text: string | null;
-  work_item_id?: string | null;
-}
-
-export interface OpenRequest {
-  from: string;
-  to: string;
-  work_item_id: string;
-}
-
-/** 决定请求在画面上的内容（原型 Y13.cards.face 的纯文字版本，与页面卡片同一份材料，工单 #179；#953 由翻译层写好）。 */
-export interface DecisionFace {
-  id: string;
-  kind: string;
-  version: number;
-  title: string;
-  work_item_id: string | null;
-  where: string;
-  waited: string;
-  blocks: string;
-  rows: { term: string; value: string }[];
-  links: { label: string; href: string }[];
-  options: {
-    id: string;
-    label: string;
-    kind?: string | null;
-    note_required?: boolean;
-    /** 需要说明而没有写时卡片上显示的提示（文字由翻译层写好）。 */
-    note_missing_text?: string | null;
-  }[];
-}
-
-export interface MachineView {
-  id: string;
-  name: string;
-  actions: number;
-  unknown?: boolean;
-  online?: boolean;
-}
-
-/**
- * 项目楼层的画面数据：画面合同的楼层状态（带位置）加上画面上还要用的几个字段
- * （未回答的询问、成果库、执行槽位、等待模型服务、运维、机器、部门里的角色、决定请求）。
- * 由翻译层从查询结果写出来（translate/floor.ts），世界与系统只读它。
- */
-export interface FloorModel extends Omit<FloorState, "roles"> {
-  items: LoopItem[];
-  open_requests: OpenRequest[];
-  shelves: { adopted: string[] };
-  slots: { total: number; used: number } | null;
-  waiting_provider: WaitingProvider[];
-  machines: MachineView[] | null;
-  ops: OpsView | null;
-  interrupted: boolean;
-  roles: Record<string, RoleInfo[]> | null;
-  decisions: DecisionFace[];
-}
-
-export interface OpsView {
-  version?: string;
-  fault?: boolean;
-  auto_repair_stopped?: boolean;
-}
+// 画面数据：楼层驱动拿到的画面合同的楼层状态（pixel/contract.ts 的 FloorModel）与画面要用的几个字段。
+// 形状在画面合同里：翻译层只从合同取状态，不导入画面层的实现（设计说明第 3 节、第 8 节 H3）。
+// 这里转发出去，画面与测试的入口不变。
+export type {
+  DecisionFace, FloorModel, LoopItem, MachineView, OpenRequest, OpsView, RoleInfo, WaitingProvider,
+} from "../contract.ts";
 
 /** 原型 v10 的传信事件名：像素层用它表示部门之间的一次询问与它的回答（接口合同的事件种类里没有这两个）。 */
 export const LETTER_ASKED_TYPE = "collaboration_requested";
@@ -603,6 +510,11 @@ export interface SceneLike {
   emit: (kind: string, x: number, y: number, n: number, o?: { spread?: number; color?: string; floor?: number }) => void;
   /** 当前聚焦的事项（其它事项的小人与包裹调暗）。 */
   focusId: string | null;
+  /**
+   * 表演层开关（默认为开）：关掉以后待机活动与动作都不演，只画状态给出的样子
+   * （画面与播放设计说明第 8.1 节的 H2：关掉表演层前后，承载事实的视觉通道的取值相同）。
+   */
+  performance?: boolean;
   /** 决定卡片上的盖章（画面提供；驱动在收到回答事件时调用）。 */
   cardStamped?: (id: string, text: string) => void;
   makeCharacterMachine: (input: CharacterMachineInput) => unknown;

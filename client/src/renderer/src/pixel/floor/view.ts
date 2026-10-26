@@ -11,7 +11,7 @@
 import type { Clock } from "../clock.ts";
 import { createPixelSurface } from "../surface.ts";
 import { buildCatalog } from "./../world/floor-decl.ts";
-import { createFloorDriver, createFloorState, type FloorDriver, type FloorState } from "./../world/floor.ts";
+import { ACTIVE, IN_ROOM, busyItems, createFloorDriver, createFloorState, itemColor, type FloorDriver, type FloorState } from "./../world/floor.ts";
 import { createScene } from "./../world/scene.ts";
 import { FloorRenderer, H, W } from "./render.ts";
 import { createDecisionCard, type DecisionCard } from "./card.ts";
@@ -60,14 +60,117 @@ export interface FloorView {
   setOverlay(id: string | null, data: unknown): void;
   resize(): void;
   destroy(): void;
+  /**
+   * 关掉或打开表演层（待机活动与动作）的测试入口（设计说明第 8.1 节的 H2）。
+   * 关掉以后动作与特效不演，画面只画状态给出的样子；承载事实的通道不受影响。
+   */
+  performance(on: boolean): void;
   /** 画面逻辑尺寸，供宿主与测试读取。 */
   readonly size: { W: number; H: number };
-  /** 世界的当前状态、驱动与场景（测试与回放读取）。 */
-  inspect(): { driver: FloorDriver; scene: SceneLike; state: FloorState; renderer: FloorRenderer; card: DecisionCard };
+  /** 世界的当前状态、驱动与场景（测试与回放读取），以及承载事实的视觉通道。 */
+  inspect(): {
+    driver: FloorDriver; scene: SceneLike; state: FloorState; renderer: FloorRenderer; card: DecisionCard;
+    /** 承载事实的视觉通道（设计说明第 8.1 节的楼层那一行）。 */
+    channels: () => FloorChannels;
+  };
   /** 大厅决定板在画面逻辑坐标里的矩形（点击与测试共用）。 */
   boardRect(): { x: number; y: number; w: number; h: number };
   /** 打开着的决定卡片（测试与宿主读取）。 */
   card(): DecisionCard;
+}
+
+/**
+ * 楼层承载事实的视觉通道（画面与播放设计说明第 8.1 节的楼层那一行）：事项在哪个房间或在大厅、事项的颜色，
+ * 房间亮灯与屏幕滚动，门口的小旗与牌子文字，大厅板上的决定单，成果库里的成果，传信管里等待回答的询问数，
+ * 等待模型服务的文字，各部门的角色与角色的状态。
+ *
+ * 只读状态给出的东西：还在路上的决定单、包裹与飞行物、说话气泡、走位与待机活动属于表演层，不在这里。
+ */
+export interface FloorChannels {
+  /** 上画面的状态来自的查询快照的位置。 */
+  position: number;
+  /** 事项在哪个房间或在大厅、事项的颜色。 */
+  items: { id: string; department: string | null; status: string; where: "room" | "hall" | "other"; color: string }[];
+  /** 部门 → 房间的亮灯、屏幕与门口的小旗；label 是门口的牌子文字。 */
+  rooms: Record<string, {
+    label: string;
+    lit: boolean;
+    screen: "off" | "code" | "idle";
+    flags: { id: string; color: string; status: string }[];
+  }>;
+  /** 大厅板上的决定单。 */
+  board: { id: string; kind: string; title: string; color: string | null }[];
+  /** 成果库里的成果：已采纳的全部与货架上摆得下的那几个。 */
+  shelf: { adopted: string[]; shown: string[] };
+  /** 传信管里等待回答的询问数（接收的部门、封数）。 */
+  tubes: { department: string; count: number }[];
+  /** 等待模型服务的文字（部门与牌子上的字）。 */
+  waiting: { department: string; text: string }[];
+  /** 部门 → 角色与角色的状态。 */
+  roles: Record<string, { id: string; kind: string; status: string | null }[]>;
+}
+
+/** 读一份状态承载事实的视觉通道：与渲染层取同一份状态数据（渲染层在动作期间另加的临时效果不算）。 */
+function floorChannels(driver: FloorDriver): FloorChannels {
+  const model = driver.model;
+  const world = driver.world;
+  const ctx = driver.declCtx();
+  const itemsOf = (department: string): FloorChannels["items"] => model.items
+    .filter((it) => it.department === department && IN_ROOM.includes(it.status))
+    .map((it) => ({ id: it.work_item_id, department: it.department, status: it.status, where: "room", color: itemColor(it) }));
+  const rooms: FloorChannels["rooms"] = {};
+  let shelfRoom: (typeof world.rooms)[string] | null = null;
+  for (const id of world.roomOrder) {
+    const room = world.rooms[id];
+    if (room.roomKind === "shelf") {
+      shelfRoom = room;
+      continue;
+    }
+    if (room.roomKind !== "dept") continue;
+    // 与渲染层同一口径：亮灯按这个房间忙碌的事项算；门口的小旗只看停在这里的事项
+    const here = busyItems(model, id);
+    rooms[id] = {
+      label: room.label,
+      lit: here.some((it) => ACTIVE.includes(it.status) || it.status === "done") || Boolean(room.def.lit?.(ctx)),
+      screen: model.interrupted ? "off" : here.some((it) => ACTIVE.includes(it.status)) ? "code" : "idle",
+      flags: itemsOf(id).map((it) => ({ id: it.id, color: it.color, status: it.status })),
+    };
+  }
+  const adopted = model.shelves.adopted.slice();
+  const per = shelfRoom ? Math.max(1, Math.floor((shelfRoom.w - 26) / 18)) : adopted.length;
+  const itemById = (id: string | null): (typeof model.items)[number] | null =>
+    (id ? model.items.find((it) => it.id === id || it.work_item_id === id) ?? null : null);
+  const roles: FloorChannels["roles"] = {};
+  for (const id of world.roomOrder) {
+    if (world.rooms[id].roomKind !== "dept") continue;
+    roles[id] = Object.values(world.characters)
+      .filter((ch) => ch.department === id)
+      .map((ch) => ({ id: ch.id, kind: ch.roleKind, status: ch.roleInfo ? ch.roleInfo.status : null }))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+  return {
+    position: model.position,
+    items: model.items.map((it) => ({
+      id: it.work_item_id,
+      department: it.department,
+      status: it.status,
+      where: IN_ROOM.includes(it.status) ? "room" : it.status === "queued" || it.status === "waiting_slot" ? "hall" : "other",
+      color: itemColor(it),
+    })),
+    rooms,
+    board: (model.decisions ?? []).map((d) => {
+      const item = itemById(d.work_item_id ?? null);
+      return { id: d.id, kind: d.kind, title: d.title, color: item ? itemColor(item) : null };
+    }),
+    shelf: { adopted, shown: adopted.slice(-per) },
+    tubes: world.roomOrder.filter((id) => world.rooms[id].roomKind === "dept")
+      .map((id) => ({ department: id, count: model.open_requests.filter((q) => q.to === id).length })),
+    waiting: model.waiting_provider.map((w) => ({
+      department: w.department,
+      text: "等待模型服务" + (w.retry_text ? " · " + w.retry_text : ""),
+    })),
+    roles,
+  };
 }
 
 /** 端到端测试的入口：按需要给出世界、角色、包裹、管道与信号的当前状态（含类型，测试不猜形状）。 */
@@ -265,6 +368,13 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
       renderer.overlay = { id: id ?? null, data: (data as Record<string, unknown>) ?? null };
       draw();
     },
+    performance(on) {
+      // 待机活动与动作一起关掉：动作停在原处，不再开始新的步子（承载事实的通道只由状态决定）
+      scene.performance = on;
+      scene.autonomy = on;
+      if (!on) for (const actor of scene.actors.slice()) scene.cancel(actor);
+      draw();
+    },
     resize() {
       surface.resize();
       draw();
@@ -277,7 +387,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
       card.destroy();
       if (canvas.parentNode === opts.host) opts.host.removeChild(canvas);
     },
-    inspect: () => ({ driver, scene, state: driver.state, renderer, card }),
+    inspect: () => ({ driver, scene, state: driver.state, renderer, card, channels: () => floorChannels(driver) }),
     boardRect: () => driver.boardRect(),
     card: () => card,
   };
